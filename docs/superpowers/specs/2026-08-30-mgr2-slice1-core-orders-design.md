@@ -13,10 +13,12 @@ MGR2 is a multi-brewery SaaS for brewery operations. Full capability map (each i
 | 2 | Raw materials | Vendors, POs, receiving, lot management, materials inventory (own movement ledger mirroring slice 1's), packaging materials as first-class per-SKU materials, PO-draft-from-requirements engine |
 | 3 | Recipes | Recipe dev against materials, versions, scaling, costing |
 | 4 | Batches + cellar | Brew scheduling, vessels, fermentation logs (temp/pH/gravity), transfers, batch→FG conversion (replaces slice 1's manual FG entry) |
-| 5 | Packaging | Packaging runs (keg/bottle/can), lot codes, yields/losses; runs declare material requirements via per-SKU packaging BOM; run close records actual consumption + returns (leftover labels → `return_to_stock`, damage → `loss`) |
+| 5 | Packaging | Packaging runs (keg/bottle/can), lot codes, yields/losses; runs declare material requirements via per-SKU packaging BOM (cans, ends, labels, trays, 4-pack holders …); pre-run checklist from requirements engine (required / on hand / incoming / short); run close records actual consumption + returns (leftover labels → `return_to_stock`, damage → `loss`). Keg SKUs declare container source: `owned_fleet` (asset move, slice 9 ledger) \| `per_fill_rental` (per-fill cost + vendor billing) \| `one_way_material` (consumed like cans) |
 | 6 | Compliance reporting | TTB Brewer's Report of Operations + pluggable per-state excise (PA first, OH next) as pure functions over the movement ledger |
 | 7 | POS reconciliation | Square ingest, taproom depletion vs. transfer reconciliation (other POS later) |
 | 8 | Planning | Order demand vs. planned brew/packaging schedule; feeds requirements engine ("Sept 12 packaging day short 4,000 labels, 10-day lead time — draft PO?") |
+| 9 | Keg fleet | Owned-keg asset ledger: states (empty/filled/shipped/at-customer/lost), which customer holds how many, deposit balances, loss rates. Integrates with packaging (fill = asset state change) and orders (ship/return). Per-fill rental and one-way kegs are handled in slices 2/5, not here |
+| 10 | Deliveries | Self-distribution logistics: routes, truck loading, delivery confirmation, invoice-on-delivery |
 
 ### Compliance research findings (constrain the ledger design)
 
@@ -36,6 +38,7 @@ Next.js (App Router) + Supabase (Postgres, RLS, Auth) + Vercel. Chosen over app-
   - **Staff**: `brewery_users` (user_id, brewery_id, role). Slice-1 roles: `admin`, `sales`, `warehouse`. (Brewer/cellar roles arrive with slice 4.)
   - **Wholesale customers**: `customer_users` (user_id, customer_id). A customer belongs to one brewery. RLS grants them their own orders/invoices and the brewery's orderable catalog with their assigned price list only.
 - JWT claims carry no tenant info; RLS derives access from membership tables, so one email can be staff at one brewery and a customer of another.
+- Invitation flow for both audiences: admin invites staff by email/role; sales invites customer users tied to a customer account. Basic transactional email (invites + order confirmations) is in slice-1 scope; nothing more.
 
 ## 2. Product catalog
 
@@ -50,7 +53,8 @@ Inventory is never a mutable quantity column; it is the sum of an append-only le
 
 `inventory_movements` (immutable — no UPDATE/DELETE grants):
 - `brewery_id`, `sku_id`, `location_id`, `qty` (signed units), `bbl` (qty × sku.bbl_per_unit, stored at write time for audit stability)
-- `type`: `production_in` (manual FG entry until slice 4) | `adjustment` | `sale_removal` | `taproom_transfer` | `depletion` | `return_in` | `destruction` | `loss`
+- `type`: `production_in` (manual FG entry until slice 4) | `adjustment` | `sale_removal` | `taproom_transfer` | `depletion` | `return_in` | `destruction` | `loss` | `sample` | `festival_removal` — samples/donations/festival removals carry distinct TTB tax treatment and must be classifiable from day one
+- `lot_id` (nullable): forward-compat reference for slice 5 lot codes — recall traceability without a ledger migration
 - `channel`: `wholesale` | `taproom` | `dtc` | `export` — required on removals, null otherwise (CHECK constraint)
 - `dest_state`: required on removals leaving the brewery
 - `ref` (order_id etc.), `note`, `created_by`, `created_at`
@@ -63,7 +67,8 @@ DTC readiness: channel enum + dest_state already captured; per-customer annual v
 
 ## 4. Orders & invoicing
 
-- `customers` — wholesale accounts: license info, state, price_list_id, `qbo_customer_id`, payment terms.
+- `customers` — accounts with `type` (`distributor` | `retailer` | `brewery` | `other`; PA self-distribution means retailers/bars are direct customers), license number/class, price_list_id, `qbo_customer_id`, payment terms.
+- `ship_tos` — multiple ship-to addresses per customer; each order references one, and `dest_state` on removals derives from it (load-bearing for per-state excise).
 - `orders` → `order_lines` (sku, qty, unit_price snapshot at order time).
 - Status: `draft → submitted → confirmed → picked → shipped → invoiced → paid`, plus `cancelled`. Portal customers create up to `submitted`; staff advance from there.
 - Availability check at confirm is a soft warning, not a hard block (breweries deliberately oversell against planned production; slice 8 makes this smart).
