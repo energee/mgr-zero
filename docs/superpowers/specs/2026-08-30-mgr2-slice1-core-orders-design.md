@@ -50,14 +50,14 @@ Inventory is never a mutable quantity column; it is the sum of an append-only le
 
 `inventory_movements` (immutable — no UPDATE/DELETE grants):
 - `brewery_id`, `sku_id`, `location_id`, `qty` (signed units), `bbl` (qty × sku.bbl_per_unit, stored at write time for audit stability)
-- `type`: `production_in` (manual FG entry until slice 4) | `adjustment` | `sale_removal` | `taproom_transfer` | `return_in` | `destruction` | `loss`
+- `type`: `production_in` (manual FG entry until slice 4) | `adjustment` | `sale_removal` | `taproom_transfer` | `depletion` | `return_in` | `destruction` | `loss`
 - `channel`: `wholesale` | `taproom` | `dtc` | `export` — required on removals, null otherwise (CHECK constraint)
 - `dest_state`: required on removals leaving the brewery
 - `ref` (order_id etc.), `note`, `created_by`, `created_at`
 
 Corrections are reversal entries, never edits. On-hand = view summing movements per sku/location; materialize only if it measurably slows.
 
-`locations` — warehouse(s) + taprooms per brewery. Taproom transfer = movement to taproom location with `channel=taproom` (a TTB taxpaid removal).
+`locations` — warehouse(s) + taprooms per brewery. Taproom transfer = a location move (not the taxpaid removal); the removal is recorded when beer is sold at the taproom via a `depletion` movement with `channel=taproom` — manual entry in slice 1 (weekly count / keg-blown), automated by Square ingest in slice 7. This is the TTB-correct treatment: taxpaid removal happens at sale, not at transfer.
 
 DTC readiness: channel enum + dest_state already captured; per-customer annual volume is a query, not new schema.
 
@@ -70,6 +70,16 @@ DTC readiness: channel enum + dest_state already captured; per-customer annual v
 - Shipping atomically writes `sale_removal` movements (channel=wholesale, dest_state from ship-to) in the same transaction as the status change — ledger and order state cannot drift.
 - Invoices are generated at ship, one per order; MGR records until pushed to QBO. Credit memos = negative-line invoice + `return_in` movements.
 - Taproom transfers use the same order machinery with an internal order type, producing `taproom_transfer` movements.
+
+## 4b. Allocation & taproom demand
+
+A reservation layer between the ledger (physical truth) and orders (demand):
+
+- `allocations`: brewery_id, sku_id, qty, source (`order_line` | `taproom_standing`), ref (order_line_id or location_id), status (`open → fulfilled | released`), created_at.
+- **Available-to-promise (ATP)** = on-hand − open allocations; shown wherever quantities are entered. Confirming an order creates its allocations; shipping fulfills them (writing ledger movements in the same transaction); cancelling releases them.
+- Overallocation is allowed but loud: ATP can go negative; a shortfall view shows which orders/taprooms compete for the same beer. Priority resolution is a staff decision the system surfaces, never one it makes.
+- **Taproom pars**: `taproom_pars` (location_id, sku_id, par_qty). Taproom on-hand is computed from the ledger (transfers in − depletions). A replenishment view compares on-hand vs. par → suggested transfer quantities → one click creates the internal transfer order, which allocates like any other order.
+- **Standing taproom allocations** (`taproom_standing`) protect taproom supply from wholesale overselling in advance.
 
 ## 5. QBO boundary
 
