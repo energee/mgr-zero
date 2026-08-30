@@ -47,6 +47,17 @@ Every operation is implemented exactly once as a typed **command** (Zod input sc
 - DRY at the business-logic layer (one command per operation, ever); UI may repeat until the rule of three triggers abstraction.
 - Atomic design for UI: shadcn/ui primitives → small composed components (SkuPicker, QtyInput+UoM, MovementBadge) → feature views. Reuse emerges from the design system, not premature abstraction.
 - Cohesion and intuitiveness outrank reusability when they conflict.
+- **Consistency beats local perfection**: solve a problem the same way everywhere, even when a locally "better" design exists — as long as user-facing behavior is right. One table pattern, one form pattern, one command pattern; a new pattern must justify replacing the old one *everywhere*, or it doesn't come in.
+
+### Performance budget
+
+Everything loads instantly; the app should feel like a local tool, not a website.
+
+- Server Components by default; client JS only where interactivity demands it. No heavy client state library — server is the source of truth.
+- Every list view paginated + indexed from day one; indexes are part of each migration, not an afterthought. On-hand/ATP views must be measured at realistic row counts before shipping.
+- Optimistic UI on every mutation (command result reconciles); navigation prefetch on hover; no full-page spinners — skeletons only where data genuinely can't be instant, and that list should be near-empty.
+- Budget: p75 page navigation < 300ms perceived, mutations reflected < 100ms (optimistic). Regressions are bugs, not backlog items.
+- Fewest clicks: common tasks (record depletion, confirm order, check ATP) reachable in ≤2 interactions from anywhere — the chat surface and command palette both help here.
 
 ### Deployment modes
 
