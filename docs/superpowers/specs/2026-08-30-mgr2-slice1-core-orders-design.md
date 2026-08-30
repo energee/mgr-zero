@@ -10,11 +10,11 @@ MGR2 is a multi-brewery SaaS for brewery operations. Full capability map (each i
 | # | Slice | Contents |
 |---|-------|----------|
 | 1 | **Core + Orders (this spec)** | Tenancy/auth/roles, product catalog, FG inventory movement ledger, wholesale portal + internal order entry + taproom transfers, invoicing, QBO invoices-out/payments-back |
-| 2 | Raw materials | Vendors, POs, receiving, lot management, materials inventory (own movement ledger mirroring slice 1's), packaging materials as first-class per-SKU materials, PO-draft-from-requirements engine (shortfall = required − on-hand − open POs, so returned leftovers automatically suppress reorders), cycle counts with adjustment movements to keep material on-hand honest |
+| 2 | Raw materials | Vendors, POs, receiving, lot management, materials inventory (own movement ledger mirroring slice 1's), packaging materials as first-class per-SKU materials, PO-draft-from-requirements engine (shortfall = required − on-hand − open POs, so returned leftovers automatically suppress reorders), cycle counts with adjustment movements to keep material on-hand honest, unit-of-measure conversions (lbs/kg/oz/each) for BOMs and POs, hop/malt contracts as committed quantities drawn down over time, **receiving approval**: expected vs. actual counted qty per PO line, over/short recorded, partial receipts (`partially_received`), only counted quantities post to the materials ledger, discrepancies flagged for vendor follow-up |
 | 3 | Recipes | Recipe dev against materials, versions, scaling, costing |
-| 4 | Batches + cellar | Brew scheduling, vessels, fermentation logs (temp/pH/gravity), transfers, batch→FG conversion (replaces slice 1's manual FG entry) |
+| 4 | Batches + cellar | Brew scheduling, vessels (barrels count as vessels for aging programs), fermentation logs (temp/pH/gravity), transfers, batch→FG conversion (replaces slice 1's manual FG entry). Mobile-first forms tolerant of flaky brewery-floor wifi |
 | 5 | Packaging | Packaging runs (keg/bottle/can), lot codes, yields/losses; runs declare material requirements via per-SKU packaging BOM (cans, ends, labels, trays, 4-pack holders …); pre-run checklist from requirements engine (required / on hand / incoming / short); run close records actual consumption + returns (leftover labels → `return_to_stock`, damage → `loss`). Keg SKUs declare container source: `owned_fleet` (asset move, slice 9 ledger) \| `per_fill_rental` (per-fill cost + vendor billing) \| `one_way_material` (consumed like cans) |
-| 6 | Compliance reporting | TTB Brewer's Report of Operations + pluggable per-state excise (PA first, OH next) as pure functions over the movement ledger |
+| 6 | Compliance reporting | TTB Brewer's Report of Operations + pluggable per-state excise (PA first, OH next) as pure functions over the movement ledger; CBMA reduced-rate table; COLA/formula approval tracking per product + state brand registrations per destination state |
 | 7 | POS reconciliation | Square ingest, taproom depletion vs. transfer reconciliation (other POS later) |
 | 8 | Planning | Order demand vs. planned brew/packaging schedule; feeds requirements engine ("Sept 12 packaging day short 4,000 labels, 10-day lead time — draft PO?") |
 | 9 | Keg fleet | Owned-keg asset ledger: states (empty/filled/shipped/at-customer/lost), which customer holds how many, deposit balances, loss rates. Integrates with packaging (fill = asset state change) and orders (ship/return). Per-fill rental and one-way kegs are handled in slices 2/5, not here |
@@ -61,7 +61,7 @@ Inventory is never a mutable quantity column; it is the sum of an append-only le
 
 `inventory_movements` (immutable — no UPDATE/DELETE grants):
 - `brewery_id`, `sku_id`, `location_id`, `qty` (signed units), `bbl` (qty × sku.bbl_per_unit, stored at write time for audit stability)
-- `type`: `production_in` (manual FG entry until slice 4) | `adjustment` | `sale_removal` | `taproom_transfer` | `depletion` | `return_in` | `destruction` | `loss` | `sample` | `festival_removal` — samples/donations/festival removals carry distinct TTB tax treatment and must be classifiable from day one
+- `type`: `opening_balance` (migration starting truth) | `production_in` (manual FG entry until slice 4) | `adjustment` | `sale_removal` | `taproom_transfer` | `depletion` | `return_in` | `destruction` | `loss` | `sample` | `festival_removal` — samples/donations/festival removals carry distinct TTB tax treatment and must be classifiable from day one
 - `lot_id` (nullable): forward-compat reference for slice 5 lot codes — recall traceability without a ledger migration
 - `channel`: `wholesale` | `taproom` | `dtc` | `export` — required on removals, null otherwise (CHECK constraint)
 - `dest_state`: required on removals leaving the brewery
@@ -79,9 +79,11 @@ DTC readiness: channel enum + dest_state already captured; per-customer annual v
 - `ship_tos` — multiple ship-to addresses per customer; each order references one, and `dest_state` on removals derives from it (load-bearing for per-state excise).
 - `orders` → `order_lines` (sku, qty, unit_price snapshot at order time).
 - Status: `draft → submitted → confirmed → picked → shipped → invoiced → paid`, plus `cancelled`. Portal customers create up to `submitted`; staff advance from there.
+- **Partial shipments & short-ship reconciliation**: order lines track ordered vs. shipped qty. At pick/ship, staff record actual shipped quantities; a shortage either adjusts the line down (with reason) or leaves a backordered remainder. Invoices are **per shipment** (billing shipped quantities only), not per order; an order is `shipped` when all lines are fulfilled or adjusted. Unshipped allocations release; the portal shows the adjusted order.
 - Availability check at confirm is a soft warning, not a hard block (breweries deliberately oversell against planned production; slice 8 makes this smart).
 - Shipping atomically writes `sale_removal` movements (channel=wholesale, dest_state from ship-to) in the same transaction as the status change — ledger and order state cannot drift.
-- Invoices are generated at ship, one per order; MGR records until pushed to QBO. Credit memos = negative-line invoice + `return_in` movements.
+- Invoices are generated per shipment; MGR records until pushed to QBO. Credit memos = negative-line invoice + `return_in` movements.
+- **Migration/import**: CSV import for customers, ship-tos, SKUs, price lists; opening FG inventory via `opening_balance` movements. Day-one blocking for a real launch (existing Ekos-class system + live QBO).
 - Taproom transfers use the same order machinery with an internal order type, producing `taproom_transfer` movements.
 
 ## 4b. Allocation & taproom demand
