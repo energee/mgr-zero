@@ -42,7 +42,8 @@ export async function runCommand(name: string, rawInput: unknown, ctx: Ctx) {
     return await def.handler(ctx, parsed.data);
   } catch (e: unknown) {
     if (e instanceof CommandError) throw e;
-    throw new CommandError(e instanceof Error ? e.message : "unknown error");
+    console.error(`handler error in ${name}:`, e);
+    throw e;
   }
 }
 

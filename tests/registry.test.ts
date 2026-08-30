@@ -19,7 +19,7 @@ describe("command registry", () => {
     await expect(runCommand("echo", { msg: "hi" }, ctx)).rejects.toThrow(/permission/i);
   });
 
-  it("wraps handler errors as CommandError", async () => {
+  it("handler plain Error falls through without wrapping", async () => {
     _clearRegistry();
     defineCommand({
       name: "failing", input: z.object({}), roles: ["admin"],
@@ -30,8 +30,24 @@ describe("command registry", () => {
       await runCommand("failing", {}, ctx);
       throw new Error("should have thrown");
     } catch (e: unknown) {
-      expect(e instanceof CommandError).toBe(true);
+      expect(e instanceof CommandError).toBe(false);
       expect(e instanceof Error && e.message).toBe("db connection failed");
+    }
+  });
+
+  it("handler CommandError passes through", async () => {
+    _clearRegistry();
+    defineCommand({
+      name: "controlled", input: z.object({}), roles: ["admin"],
+      handler: async () => { throw new CommandError("validation failed: item not found"); },
+    });
+    const ctx = { db: null as any, userId: "u", breweryId: "b", role: "admin" as const };
+    try {
+      await runCommand("controlled", {}, ctx);
+      throw new Error("should have thrown");
+    } catch (e: unknown) {
+      expect(e instanceof CommandError).toBe(true);
+      expect(e instanceof Error && e.message).toBe("validation failed: item not found");
     }
   });
 });
