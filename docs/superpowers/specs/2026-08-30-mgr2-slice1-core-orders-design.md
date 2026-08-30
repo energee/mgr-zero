@@ -30,6 +30,24 @@ MGR2 is a multi-brewery SaaS for brewery operations. Full capability map (each i
 
 Next.js (App Router) + Supabase (Postgres, RLS, Auth) + Vercel. Chosen over app-layer tenancy (Neon/Drizzle) and a separate API backend: RLS gives database-enforced tenant isolation, which a compliance-grade multi-tenant ledger demands; no non-web consumers exist yet to justify a separate API.
 
+### AI-first architecture
+
+Every operation is implemented exactly once as a typed **command** (Zod input schema, permission check, business logic, typed result) in a command/query registry. The web UI calls commands; the AI chat calls the same commands as tools, with tool definitions generated from the command schemas — the AI capability surface is automatically complete and never drifts. Reads are typed named queries exposed the same way.
+
+- The AI executes as the logged-in user: RLS + role checks apply identically; no separate AI permission model.
+- High-stakes commands (ship order, QBO push) carry `requiresConfirmation`; chat presents intent, user confirms.
+- The immutable ledger makes AI mistakes reversals, never corruption.
+- Chat: Vercel AI SDK v6 via AI Gateway, tool loop over the registry, chat surface on every page with page-scoped context, per-user history.
+- Voice is a future transport (STT → same loop → TTS); nothing built now, nothing changes later.
+- Mandatory pattern from the first line of code: no route handlers with inline business logic.
+
+### Engineering principles
+
+- YAGNI by default; extension points only with named future consumers (ledger enums, command registry).
+- DRY at the business-logic layer (one command per operation, ever); UI may repeat until the rule of three triggers abstraction.
+- Atomic design for UI: shadcn/ui primitives → small composed components (SkuPicker, QtyInput+UoM, MovementBadge) → feature views. Reuse emerges from the design system, not premature abstraction.
+- Cohesion and intuitiveness outrank reusability when they conflict.
+
 ### Deployment modes
 
 The same codebase and schema support two modes; the schema never differs between them:
