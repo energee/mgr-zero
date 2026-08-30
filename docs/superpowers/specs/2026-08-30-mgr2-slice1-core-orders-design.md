@@ -30,6 +30,14 @@ MGR2 is a multi-brewery SaaS for brewery operations. Full capability map (each i
 
 Next.js (App Router) + Supabase (Postgres, RLS, Auth) + Vercel. Chosen over app-layer tenancy (Neon/Drizzle) and a separate API backend: RLS gives database-enforced tenant isolation, which a compliance-grade multi-tenant ledger demands; no non-web consumers exist yet to justify a separate API.
 
+### Deployment modes
+
+The same codebase and schema support two modes; the schema never differs between them:
+- **SaaS**: one Supabase project, many breweries, RLS isolation, self-serve tenant provisioning.
+- **Dedicated**: a customer's own Supabase project + deployment with a single `breweries` row. An instance setting (`deployment_mode`) disables tenant signup and pins the app to the one brewery; nothing else changes.
+
+Rules: `brewery_id` + RLS everywhere in both modes; no "only one tenant" shortcuts; migrations identical; SaaS-only provisioning/billing code isolated in one module. Identical data shape makes migrating a brewery between SaaS and dedicated a row move, not a transformation.
+
 ## 1. Tenancy, auth, roles
 
 - `breweries` is the tenant root: name, TTB registry number, PA license info, timezone, settings JSONB.
