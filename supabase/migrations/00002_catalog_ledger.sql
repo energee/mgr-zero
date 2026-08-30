@@ -19,12 +19,13 @@ create table skus (
   name text not null,                    -- "1/2 bbl keg", "16oz 4-pack"
   package_type package_type not null,
   units_per_case int,
-  bbl_per_unit numeric(12,8) not null,   -- exact fraction; basis of all TTB math
+  bbl_per_unit numeric(12,8) not null check (bbl_per_unit > 0),   -- exact fraction; basis of all TTB math
   qbo_item_id text,
   active boolean not null default true,
   created_at timestamptz not null default now()
 );
 create index skus_brewery_idx on skus (brewery_id, product_id);
+create unique index skus_product_name_idx on skus (product_id, name);
 
 create table price_lists (
   id uuid primary key default gen_random_uuid(),
@@ -48,6 +49,7 @@ create table locations (
   kind location_kind not null
 );
 create index locations_brewery_idx on locations (brewery_id);
+create unique index locations_brewery_name_idx on locations (brewery_id, name);
 
 create type movement_type as enum
   ('opening_balance','production_in','adjustment','sale_removal','taproom_transfer',
@@ -86,6 +88,17 @@ create table inventory_movements (
 );
 create index movements_onhand_idx on inventory_movements (brewery_id, sku_id, location_id);
 create index movements_created_idx on inventory_movements (brewery_id, created_at);
+
+-- Enforce bbl = qty * bbl_per_unit at insert time.
+create function enforce_bbl_integrity() returns trigger as $$
+begin
+  select (new.qty * s.bbl_per_unit) into new.bbl from skus s where s.id = new.sku_id;
+  return new;
+end;
+$$ language plpgsql;
+
+create trigger inventory_movements_bbl_trigger before insert on inventory_movements
+  for each row execute function enforce_bbl_integrity();
 
 -- Immutability at the grant level.
 revoke update, delete on inventory_movements from authenticated, anon;

@@ -47,4 +47,19 @@ describe("ledger integrity + RLS", () => {
     const { data: atp } = await db.from("atp").select().eq("sku_id", sku.id);
     expect(Number(atp![0].qty)).toBe(6);
   });
+
+  it("trigger overwrites bbl: client-supplied value is ignored, computed from qty * bbl_per_unit", async () => {
+    const db = await asUser(staff.email);
+    const { data: { user } } = await db.auth.getUser();
+    // Insert with deliberately wrong bbl (should be 2 * 0.5 = 1, not 999)
+    const { data: m, error } = await db.from("inventory_movements").insert({
+      brewery_id: b.id, sku_id: sku.id, location_id: loc.id,
+      qty: 2, bbl: 999, type: "production_in", created_by: user!.id,
+    }).select().single();
+    expect(error).toBeNull();
+    // Verify via admin that stored bbl was corrected to qty * bbl_per_unit = 2 * 0.5 = 1
+    const { data: stored } = await admin.from("inventory_movements").select("qty, bbl").eq("id", m!.id).single();
+    expect(Number(stored!.qty)).toBe(2);
+    expect(Number(stored!.bbl)).toBe(1);
+  });
 });
