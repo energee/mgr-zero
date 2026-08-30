@@ -10,7 +10,7 @@ MGR2 is a multi-brewery SaaS for brewery operations. Full capability map (each i
 | # | Slice | Contents |
 |---|-------|----------|
 | 1 | **Core + Orders (this spec)** | Tenancy/auth/roles, product catalog, FG inventory movement ledger, wholesale portal + internal order entry + taproom transfers, invoicing, QBO invoices-out/payments-back |
-| 2 | Raw materials | Vendors, POs, receiving, lot management, materials inventory (own movement ledger mirroring slice 1's), packaging materials as first-class per-SKU materials, PO-draft-from-requirements engine |
+| 2 | Raw materials | Vendors, POs, receiving, lot management, materials inventory (own movement ledger mirroring slice 1's), packaging materials as first-class per-SKU materials, PO-draft-from-requirements engine (shortfall = required − on-hand − open POs, so returned leftovers automatically suppress reorders), cycle counts with adjustment movements to keep material on-hand honest |
 | 3 | Recipes | Recipe dev against materials, versions, scaling, costing |
 | 4 | Batches + cellar | Brew scheduling, vessels, fermentation logs (temp/pH/gravity), transfers, batch→FG conversion (replaces slice 1's manual FG entry) |
 | 5 | Packaging | Packaging runs (keg/bottle/can), lot codes, yields/losses; runs declare material requirements via per-SKU packaging BOM (cans, ends, labels, trays, 4-pack holders …); pre-run checklist from requirements engine (required / on hand / incoming / short); run close records actual consumption + returns (leftover labels → `return_to_stock`, damage → `loss`). Keg SKUs declare container source: `owned_fleet` (asset move, slice 9 ledger) \| `per_fill_rental` (per-fill cost + vendor billing) \| `one_way_material` (consumed like cans) |
