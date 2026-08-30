@@ -6,6 +6,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export type StaffRole = "admin" | "sales" | "warehouse";
 export type Ctx = { db: SupabaseClient; userId: string; breweryId: string; role: StaffRole | "customer" };
 
+export class CommandError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CommandError";
+  }
+}
+
 type Def<In, Out> = {
   name: string;
   description?: string;
@@ -18,7 +25,7 @@ type Def<In, Out> = {
 const registry = new Map<string, Def<any, any>>();
 
 export function defineCommand<In, Out>(def: Def<In, Out>) {
-  if (registry.has(def.name)) throw new Error(`duplicate command: ${def.name}`);
+  if (registry.has(def.name)) throw new CommandError(`duplicate command: ${def.name}`);
   registry.set(def.name, def);
   return def;
 }
@@ -26,15 +33,21 @@ export const defineQuery = defineCommand;
 
 export async function runCommand(name: string, rawInput: unknown, ctx: Ctx) {
   const def = registry.get(name);
-  if (!def) throw new Error(`unknown command: ${name}`);
+  if (!def) throw new CommandError(`unknown command: ${name}`);
   const allowed = def.roles === "any" || (def.roles === "customer" ? ctx.role === "customer" : def.roles.includes(ctx.role as StaffRole));
-  if (!allowed) throw new Error(`permission denied: ${name} requires ${JSON.stringify(def.roles)}`);
+  if (!allowed) throw new CommandError(`permission denied: ${name} requires ${JSON.stringify(def.roles)}`);
   const parsed = def.input.safeParse(rawInput);
-  if (!parsed.success) throw new Error(`validation failed: ${parsed.error.message}`);
-  return def.handler(ctx, parsed.data);
+  if (!parsed.success) throw new CommandError(`validation failed: ${parsed.error.message}`);
+  try {
+    return await def.handler(ctx, parsed.data);
+  } catch (e: unknown) {
+    if (e instanceof CommandError) throw e;
+    throw new CommandError(e instanceof Error ? e.message : "unknown error");
+  }
 }
 
 export function listTools() {
+  // inputSchema is a Zod object for same-process use (API clients see the schema structure)
   return [...registry.values()].map(d => ({ name: d.name, description: d.description ?? "", inputSchema: d.input, requiresConfirmation: !!d.requiresConfirmation }));
 }
 export function _clearRegistry() { registry.clear(); } // tests only
