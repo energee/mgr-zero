@@ -6,6 +6,7 @@ Running log of what's done, in flight, and next. Newest at top. Keep entries to 
 - [ ] Slice 1B: orders → allocations → ship → invoices on the baseline schema.
 
 ## Done
+- 2026-08-31 — UI layout plan (mobile-first, composer + forms, all ten slices): `2026-08-31-mgr-ui-layout-plan.md`, draft awaiting Ted.
 - 2026-08-31 — Docs reconciled to the baseline (README test list, rule count, stale skip notes, v1-review status, proxy migration).
 - 2026-08-31 — `tests/schema-rules.test.ts` (pg_catalog gates), all rules active; definer fns revoked from anon/public in the baseline.
 - 2026-08-31 — Single baseline migration `00001_baseline.sql` (58 tables, all ten slices) replaces the two slice-1A migrations; design in `2026-08-31-mgr-schema-design.md`; `tests/schema-conventions.test.ts` proves composite FKs, lot trigger, append-only ledgers.
