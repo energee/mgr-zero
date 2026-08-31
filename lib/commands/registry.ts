@@ -32,6 +32,7 @@ type Def<In, Out> = {
   handler: (ctx: Ctx, input: In) => Promise<Out>;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous registry; each entry is typed at define time
 const registry = new Map<string, Def<any, any>>();
 
 export function defineCommand<In, Out>(def: Def<In, Out>) {

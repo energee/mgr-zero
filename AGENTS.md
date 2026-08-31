@@ -8,16 +8,48 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
-# Agent working files
+# MGR — agent guide
 
-- `.agents/MEMORY.md` — durable facts and decisions. Read it first; update it when a decision changes.
-- `.agents/PROGRESS.md` — what's done / in flight / next. Update at the end of each work session.
-- `.agents/worktrees/<branch>/` — the only place for git worktrees: `git worktree add .agents/worktrees/<branch> -b <branch>`. Gitignored.
+Multi-tenant brewery operations SaaS: Next.js App Router + Supabase (Postgres,
+Auth, RLS). Nothing is deployed yet. Read this file, then follow the routes
+below just in time — don't preload everything.
 
-# Planning
+## Where to look
 
-- Plans live in `docs/superpowers/plans/`, specs in `docs/superpowers/specs/`. No other location.
-- One plan ↔ one branch ↔ one worktree, same name: `plans/<date>-<name>.md` → branch `<name>` → `.agents/worktrees/<name>`.
-- Claim before planning: add a line under `## Now` in `.agents/PROGRESS.md` with the plan path and branch. If the area is already listed, join that plan — don't write a second one. `git worktree list` is the backup check.
-- Every plan starts with `status: draft | approved | in-progress | done`. Move its PROGRESS line to `## Done` when done.
-- Plans cite `.agents/MEMORY.md` and the schema decisions doc; they don't re-decide them. If two plans touch the same table, the second edits the first plan's schema section.
+| Task | Read first |
+| --- | --- |
+| Any code change | `ARCHITECTURE.md` — ownership map and the four iron rules |
+| Setup, ports, dev login, env vars | `README.md` |
+| Schema / migration work | `ARCHITECTURE.md` conventions, then `docs/superpowers/specs/2026-08-31-mgr-schema-decisions.md` |
+| Product intent, what a slice is | `docs/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md` |
+| What's done / next | `.agents/PROGRESS.md` |
+| Past decisions and lessons | `.agents/MEMORY.md` |
+| Next.js APIs | `node_modules/next/dist/docs/` (this version differs from training data) |
+
+## Operating loop
+
+1. `npx supabase start` must be running; tests hit the real database.
+2. Find the owner of the concept in `ARCHITECTURE.md` and change it there.
+3. Prove it: `npx vitest run && npx tsc --noEmit && npm run lint`. For UI, look
+   at the rendered page — tests don't cover rendering.
+4. `git diff` before committing (a stray NUL byte once made a file binary).
+5. Update `.agents/PROGRESS.md`; update `.agents/MEMORY.md` only if a durable
+   decision changed.
+
+CI (`.github/workflows/ci.yml`) runs the same checks plus `next build` on every
+push; it is the merge gate.
+
+## Authority
+
+Do freely: edit code, edit the baseline migration in place, `supabase db reset`,
+reseed, create worktrees under `.agents/worktrees/<branch>`.
+
+Ask first: provisioning hosted Supabase or Vercel, any deploy, adding a
+dependency, adding a second migration file, anything that would `DELETE`
+production data (there is none yet — keep it that way by asking).
+
+## Working files
+
+- `.agents/MEMORY.md` — durable facts and decisions. Update when a decision changes.
+- `.agents/PROGRESS.md` — done / in flight / next. Update at the end of each session.
+- `.agents/worktrees/<branch>/` — the only place for worktrees: `git worktree add .agents/worktrees/<branch> -b <branch>`. Gitignored.

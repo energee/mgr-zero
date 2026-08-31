@@ -13,37 +13,9 @@ Slice 1B; QBO integration and AI chat are Slice 1C.
 
 ## Iron rules
 
-These are non-negotiable and enforced by tests and/or the database, not
-just convention:
-
-1. **Every operation is a command.** All mutations and queries the UI (and,
-   later, AI chat) perform go through the registry in
-   `lib/commands/registry.ts` via `defineCommand`/`defineQuery` and the
-   single endpoint `app/api/command/route.ts`. No route handler contains
-   inline business logic. Handlers that need to signal a user-facing error
-   throw `CommandError`; anything else that escapes a handler is treated as
-   unexpected and surfaces to the client as a generic 500 (the real error is
-   logged server-side, never leaked). `lib/commands/all.ts` is the single
-   side-effecting import that registers every command module.
-2. **`inventory_movements` is never mutated.** The table is append-only —
-   `UPDATE`/`DELETE` grants are revoked at the database level for
-   `authenticated`/`anon`. Corrections are new reversal rows, never edits.
-   `bbl` (barrels) is computed and frozen at write time by a database
-   trigger from `qty * sku.bbl_per_unit`; callers never supply `bbl`
-   directly.
-3. **Every tenant table carries `brewery_id` with RLS.** Row-level security
-   is enabled on every table and derives access from `brewery_users` /
-   `customer_users` membership (see `supabase/migrations/00001_tenancy.sql`
-   helpers `my_brewery_ids()`, `is_staff_of()`, `staff_role()`). Tenant
-   isolation is never trusted to application code alone — it's proven by
-   the RLS test suite (`tests/rls-tenancy.test.ts`, `tests/rls-ledger.test.ts`).
-4. **`createAdminClient()` (service-role, RLS-bypassing) is restricted to
-   `lib/commands/invites.ts`.** Inviting a user requires
-   `auth.admin.inviteUserByEmail`, which needs the service role, and the
-   resulting membership row must be inserted for a user who isn't the
-   caller yet. Both handlers there permission-check via the normal RLS-bound
-   `Ctx` *first*, then use the admin client only for the parts that require
-   it. No other request path uses the admin client.
+See `ARCHITECTURE.md` for the ownership map and the four iron rules
+(commands-only, append-only ledger, RLS everywhere, admin client confined)
+and what enforces each one. Agents start at `AGENTS.md`.
 
 ## Local development
 
@@ -104,6 +76,7 @@ npm run dev   # http://localhost:3000
 
 ```bash
 npm test          # vitest run — 29 tests across 6 files
+npm run lint       # eslint, incl. the admin-client import guard
 npx tsc --noEmit   # typecheck
 npm run build      # production build
 ```
@@ -131,5 +104,5 @@ preview URL.
 `.github/workflows/ci.yml` runs on every push and pull request: installs
 deps, starts a local Supabase stack, applies migrations
 (`supabase db reset`), runs the full vitest suite against it, then
-`tsc --noEmit` and `npm run build`. This is the merge gate — RLS and
+`npm run lint`, `tsc --noEmit` and `npm run build`. This is the merge gate — RLS and
 command-registry correctness are enforced here, not just locally.

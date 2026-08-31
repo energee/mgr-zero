@@ -14,7 +14,7 @@ async function seed() {
     console.log("Seeding development environment...");
 
     // Ensure brewery exists
-    let { data: breweries, error: breweryErr } = await admin
+    const { data: breweries, error: breweryErr } = await admin
       .from("breweries")
       .select("id")
       .eq("name", "Demo Brewing")
@@ -39,7 +39,7 @@ async function seed() {
 
     // Ensure user exists
     const email = "dev@mgr.local";
-    let { data: users, error: userListErr } = await admin.auth.admin.listUsers();
+    const { data: users, error: userListErr } = await admin.auth.admin.listUsers();
     if (userListErr) throw userListErr;
 
     let userId: string;
