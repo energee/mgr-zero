@@ -3,9 +3,11 @@
 Running log of what's done, in flight, and next. Newest at top. Keep entries to one line each; details belong in commits and docs.
 
 ## Now
-- [ ] Replace the two existing migrations with the single baseline schema (all ten slices).
+- [ ] Slice 1B: orders → allocations → ship → invoices on the baseline schema.
 
 ## Done
+- 2026-08-31 — `tests/schema-rules.test.ts` (pg_catalog gates); anon-execute rule skipped until baseline revokes PUBLIC on definer fns.
+- 2026-08-31 — Single baseline migration `00001_baseline.sql` (58 tables, all ten slices) replaces the two slice-1A migrations; design in `2026-08-31-mgr-schema-design.md`; `tests/schema-conventions.test.ts` proves composite FKs, lot trigger, append-only ledgers.
 - 2026-08-31 — Reviewed MGR v1; adopted iron rule 5 (multi-write = one plpgsql fn, `tests/write-atomicity.test.ts`) and `brewing-domain.md`. Remaining pulls listed in the review doc §3.
 - 2026-08-31 — Schema design decisions doc for the single-baseline migration.
 - 2026-08-31 — Slice 1A (foundation) complete on `slice1a-foundation`: auth, app shell, catalog, inventory ledger/ATP, CSV import, invitations, CI. PR #1 open, CI green.

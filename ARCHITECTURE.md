@@ -46,7 +46,10 @@ a gap to close, not a convention to trust.
    `brewery_users` / `customer_users` via `my_brewery_ids()`, `is_staff_of()`,
    `staff_role()`. Cross-tenant FKs are composite so a row can't reference
    another brewery's data. *Enforced by:* RLS policies in migrations, proven by
-   `tests/rls-tenancy.test.ts`.
+   `tests/rls-tenancy.test.ts`; `tests/schema-rules.test.ts` reads `pg_catalog`
+   to assert RLS on every table, `security_invoker` on every view,
+   `search_path` on every function, and an `RLS-EXCEPTION:` comment on any
+   permissive policy.
 4. **`createAdminClient()` is restricted to `lib/commands/invites.ts`.**
    Inviting requires `auth.admin.inviteUserByEmail` and a membership insert for
    a user who isn't the caller. Both handlers permission-check via the
