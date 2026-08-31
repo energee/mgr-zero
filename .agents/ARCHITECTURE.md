@@ -25,7 +25,7 @@ never copy it into a second place.
 | `docs/user-guide.md` | Complete customer-facing manual for every available screen and action: prerequisites, permissions, steps, fields/options, results, corrections, and errors. Uses customer language only and never exposes implementation phases or internals. |
 | `.agents/superpowers/specs/` | Product and schema design decisions (why). |
 | `.agents/orchestration/` | Cross-provider model roles, routing, budgets, prompts, approval gates, and run artifacts. |
-| `.agents/agents/documentation-maintainer.md`, `.github/workflows/documentation-agent.yml` | Post-merge documentation review criteria and its GitHub trigger. The reviewer is read-only; actionable drift becomes one follow-up issue per merged PR. |
+| `.agents/agents/documentation-maintainer.md`, `.github/workflows/documentation-agent.yml`, `.github/scripts/upsert-documentation-issue.mjs` | Post-merge documentation review criteria, GitHub trigger, structured-output handling, and deterministic issue upsert. The Claude reviewer is read-only; actionable drift becomes one follow-up issue per merged PR. |
 | `.agents/skills/` | Project-local, harness-compatible agent workflows loaded on demand. |
 | `.pi/prompts/` | Thin Pi slash-command aliases; workflow instructions remain owned by the corresponding skill. |
 | `.agents/` | This file, agent memory and progress; worktrees live under `.agents/worktrees/`. |

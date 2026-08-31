@@ -11,16 +11,17 @@ Ask a brewery administrator for help.
 
 1. [Sign in](#sign-in)
 2. [Navigate MGR](#navigate-mgr)
-3. [Understand products and SKUs](#understand-products-and-skus)
-4. [Create a product](#create-a-product)
-5. [Create a SKU](#create-a-sku)
-6. [Understand inventory](#understand-inventory)
-7. [Record an inventory movement](#record-an-inventory-movement)
-8. [Import data from CSV](#import-data-from-csv)
-9. [View the team](#view-the-team)
-10. [Invite a staff member](#invite-a-staff-member)
-11. [Roles and access](#roles-and-access)
-12. [Errors and corrections](#errors-and-corrections)
+3. [Dashboard](#dashboard)
+4. [Understand products and SKUs](#understand-products-and-skus)
+5. [Create a product](#create-a-product)
+6. [Create a SKU](#create-a-sku)
+7. [Understand inventory](#understand-inventory)
+8. [Record an inventory movement](#record-an-inventory-movement)
+9. [Import data from CSV](#import-data-from-csv)
+10. [View the team](#view-the-team)
+11. [Invite a staff member](#invite-a-staff-member)
+12. [Roles and access](#roles-and-access)
+13. [Errors and corrections](#errors-and-corrections)
 
 ## Sign in
 
@@ -62,6 +63,16 @@ open a form over the current page. A successful action closes the form and refre
 page. A validation or permission error appears inside the open form and preserves the
 values so you can correct them. Closing a form without submitting clears its entered
 values.
+
+## Dashboard
+
+Available to any signed-in staff member whose role allows access to the brewery.
+
+1. Select **Dashboard** in the navigation rail, or sign in successfully.
+2. The page displays the **Dashboard** heading.
+
+The current Dashboard is only a landing page. It does not show metrics, shortcuts,
+or controls yet. Nothing is recorded or changed when you view it.
 
 ## Understand products and SKUs
 
@@ -108,9 +119,11 @@ Available to administrators and sales staff.
 3. Select **New SKU** on that product.
 4. Complete the fields:
    - **Name** — required; identify the sellable package clearly.
-   - **Package type** — required; choose **keg**, **can**, or **bottle**.
+   - **Package type** — required; choose **keg**, **can**, or **bottle**. The form
+     opens with **keg** selected.
    - **Units per case** — optional; enter a whole number when the SKU is a case.
-   - **BBL per unit** — required; the barrel volume of one SKU unit.
+   - **BBL per unit** — required; the barrel volume of one SKU unit. The placeholder
+     example is `0.5`.
 5. Select **Create**.
 
 The SKU appears beneath its product and becomes available in inventory forms and
@@ -147,17 +160,20 @@ Inventory entries form a permanent audit trail. They cannot be edited or deleted
 Available to administrators and warehouse staff.
 
 Before recording a movement, the product, SKU, and location must already exist.
+If there are no SKUs or locations to choose from, the **Record** button stays
+unavailable until both are selected.
 
 1. Open **Inventory**.
 2. Select **Record Movement**.
 3. Choose the **SKU** and **Location**.
-4. Choose a movement **Type**.
+4. Choose a movement **Type**. The form opens with **opening_balance** selected.
 5. Enter **Qty** in SKU units:
    - use a positive number to add stock;
    - use a negative number to remove stock.
-6. For a depletion, set **Channel** to **taproom**. Although the current selector also
-   lists wholesale, DTC, and export, those choices are not valid for a depletion and will
-   be rejected.
+6. For a depletion, **Channel** appears and opens with **taproom** selected. Although
+   the selector also lists wholesale, DTC, and export, those choices are not valid for
+   a depletion and will be rejected. For all other movement types, the Channel field is
+   hidden and no channel is recorded.
 7. Add a **Note** when it will help another user understand the event or correction.
 8. Select **Record**.
 
@@ -305,7 +321,7 @@ Available to administrators.
 1. Open **Team**.
 2. Select **Invite Staff**.
 3. Enter the person's **Email**.
-4. Choose a **Role**:
+4. Choose a **Role**. The form opens with **sales** selected.
    - **admin**;
    - **sales**;
    - **warehouse**;
