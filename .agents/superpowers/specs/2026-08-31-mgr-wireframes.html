@@ -1,8 +1,10 @@
+<meta charset="utf-8">
 <title>MGR Wireframes</title>
 <!--
   MGR screen inventory as low-fi wireframes. Companion to 2026-08-31-mgr-ui-layout-plan.md:
   one wireframe per §4 row (plus sub-screens), tagged with tab, slice, build step, and the
-  queries/commands it uses. Edit the SCREENS array at the bottom; the page renders itself.
+  queries/commands it uses. Edit the SCREENS array at the bottom (plus TABS/RAIL for nav and
+  STEPS for build order — both mirror the plan); the page renders itself.
   Published as an artifact from this path; keep the file self-contained (no external assets).
 -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -94,12 +96,16 @@ h2.grp.hide{display:none}
 
 <script>
 // ---- tiny renderer -------------------------------------------------------
+const TABS=['Today','Beer','Work','More'];
+// Desk rail: the four tabs as group headers, each with its areas (plan §3).
+const RAIL={Today:[],Beer:['Inventory','Cellar','Materials','Kegs'],Work:['Orders','Batches','Packaging','POs','Deliveries'],More:['Catalog','Customers','Recipes','Compliance','Planning','Settings']};
+const RAIL_HTML=TABS.flatMap(t=>[RAIL[t].length?`<b>${t}</b>`:t,...RAIL[t]]).map(x=>`<div>${x}</div>`).join('');
 const E={
   hd:(t,r='')=>`<div class="hd"><span>${t}</span><i>${r}</i></div>`,
   ttl:(t)=>`<div class="ttl">${t}</div>`,
   row:(t,s='',n='',cls='')=>`<div class="r ${cls}"><span>${t}${s?`<small>${s}</small>`:''}</span><span class="n">${n}</span></div>`,
   btn:(t,k='p')=>`<div class="btn ${k}">${t}</div>`,
-  btns:(arr,k='p',c='c3')=>`<div class="btns ${c}">${arr.map(t=>`<div class="btn ${k}">${t}</div>`).join('')}</div>`,
+  btns:(arr,k='p',c='c3')=>`<div class="btns ${c}">${arr.map(t=>E.btn(...[].concat(t,k))).join('')}</div>`,
   num:(v,s)=>`<div class="num"><b>${v}</b><span>${s}</span></div>`,
   chips:(arr,on=0)=>`<div class="chips">${arr.map((c,i)=>`<span class="${i===on?'on':''}">${c}</span>`).join('')}</div>`,
   pad:()=>`<div class="pad">${'1 2 3 4 5 6 7 8 9 . 0 ⌫'.split(' ').map(k=>`<div>${k}</div>`).join('')}</div>`,
@@ -113,33 +119,38 @@ const E={
   inp:(t)=>`<div class="inp">${t}</div>`,
   sp:()=>`<div style="flex:1"></div>`,
   comp:()=>`<div class="comp"><span>Say what happened…</span><span>mic</span></div>`,
-  tabs:(on)=>`<div class="tabs">${['Today','Beer','Work','More'].map(t=>`<div class="${t===on?'on':''}">${t}</div>`).join('')}</div>`,
+  tabs:(on)=>`<div class="tabs">${TABS.map(t=>`<div class="${t===on?'on':''}">${t}</div>`).join('')}</div>`,
 };
 const W=(t)=>`<span style="color:var(--warn)">${t}</span>`;
 function phone(s){return `<div class="ph">${s.hd||''}<div class="bd">${s.body.join('')}</div>${s.comp?E.comp():''}${s.tabbar?E.tabs(s.tabbar):''}</div>`;}
-function desk(s){return `<div class="ph desk"><div class="rail">${['Today','<b>Beer</b>','Inventory','Cellar','Materials','Kegs','<b>Work</b>','Orders','Batches','Packaging','POs','Deliveries','<b>More</b>','Catalog','Customers','Recipes','Compliance','Planning','Settings'].map(x=>`<div>${x}</div>`).join('')}</div><div class="body ${s.one?'one':''}">${s.body.join('')}</div></div>`;}
+function desk(s){return `<div class="ph desk"><div class="rail">${RAIL_HTML}</div><div class="body ${s.one?'one':''}">${s.body.join('')}</div></div>`;}
+// Mirrors plan §7 build order — change both together.
 const STEPS={1:'Entry (sign-in, onboarding, import)',2:'Shell + Today',3:'Pads, pickers, tape (movement form)',4:'Composer',5:'Orders 1B',6:'Portal',7:'Later slices'};
-function render(ft,fs){
+function render(){
   let out='',last=null;
   for(const s of SCREENS){
     const grp=s.portal?'Portal':s.desk?'Desk':s.tab;
-    const show=(ft==='all'||grp===ft)&&(fs==='all'||s.step===fs);
     if(s.step!==last){out+=`<h2 class="grp">Build step ${s.step} — ${STEPS[s.step]}</h2>`;last=s.step;}
-    out+=`<div class="sc ${show?'':'hide'} ${s.desk?'wide':''}">
+    out+=`<div class="sc ${s.desk?'wide':''}" data-g="${grp}" data-s="${s.step}">
       <div class="meta"><b>${grp}</b><span class="b">slice ${s.slice}</span><span class="b">step ${s.step}</span></div>
       <div class="name">${s.name}</div><div class="job">${s.job}</div>
       ${s.desk?desk(s):phone(s)}
       <div class="io">reads <span>${s.reads}</span><br>writes <span>${s.writes}</span></div></div>`;
   }
-  const g=document.getElementById('grid');g.innerHTML=out;
+  document.getElementById('grid').innerHTML=out;
+}
+function filter(ft,fs){
+  const g=document.getElementById('grid');
+  g.querySelectorAll('.sc').forEach(c=>c.classList.toggle('hide',!((ft==='all'||c.dataset.g===ft)&&(fs==='all'||c.dataset.s===fs))));
   g.querySelectorAll('h2.grp').forEach(h=>{let n=h.nextElementSibling,any=false;while(n&&!n.classList.contains('grp')){if(!n.classList.contains('hide'))any=true;n=n.nextElementSibling;}h.classList.toggle('hide',!any);});
 }
 function bar(){
-  const tabs=['all','Today','Beer','Work','More','Portal','Desk'],steps=['all',1,2,3,4,5,6,7];
+  const tabs=['all',...TABS,'Portal','Desk'],steps=['all',...Object.keys(STEPS)];
   let t='all',st='all';const b=document.getElementById('bar');
-  const draw=()=>{b.innerHTML=tabs.map(x=>`<button data-t="${x}" class="${x===t?'on':''}">${x==='all'?'all tabs':x}</button>`).join('')+'<span class="sep"></span>'+steps.map(x=>`<button data-s="${x}" class="${x==st?'on':''}">${x==='all'?'all steps':'step '+x}</button>`).join('');render(t,st);};
-  b.addEventListener('click',e=>{const k=e.target.closest('button');if(!k)return;if(k.dataset.t)t=k.dataset.t;if(k.dataset.s)st=k.dataset.s==='all'?'all':+k.dataset.s;draw();});
-  draw();
+  b.innerHTML=tabs.map(x=>`<button data-t="${x}">${x==='all'?'all tabs':x}</button>`).join('')+'<span class="sep"></span>'+steps.map(x=>`<button data-s="${x}">${x==='all'?'all steps':'step '+x}</button>`).join('');
+  const apply=()=>{b.querySelectorAll('button').forEach(k=>k.classList.toggle('on',k.dataset.t===t||k.dataset.s===st));filter(t,st);};
+  b.addEventListener('click',e=>{const k=e.target.closest('button');if(!k)return;if(k.dataset.t)t=k.dataset.t;if(k.dataset.s)st=k.dataset.s;apply();});
+  apply();
 }
 
 // ---- screens: {step, slice, tab|portal|desk, name, job, reads, writes, hd, body[], comp, tabbar}
@@ -157,7 +168,7 @@ const SCREENS=[
 {step:1,slice:1,tab:'Today',name:'First run checklist',job:'Turn an empty brewery into a usable one',reads:'counts of locations, skus, brewery_users, opening_balance rows',writes:'— (links to actions)',
  hd:H('◐ Demo Brewing','TS'),body:[E.ttl('Set up Demo Brewing'),E.row('1 · Add your locations','warehouse, taproom…','›','ok'),E.row('2 · Import or add catalog','CSV or one product at a time','›'),E.row('3 · Invite your team','admin, sales, warehouse, brewer','›'),E.row('4 · Opening inventory','counts → opening_balance rows','›'),E.note('Replaces the empty Today inbox until all four are done.')],comp:true,tabbar:'Today'},
 {step:1,slice:1,desk:true,name:'Import wizard',job:'Upload → map → preview → commit; idempotent re-runs',reads:'skus, customers, locations for matching',writes:'import.customers / skus / priceLists / openingBalances (atomic-exempt, per row)',
- one:true,body:[E.stp(['upload','map columns','preview','commit'],2),E.tbl(['row','customer','ship-to','state','status'],[['1','Sly Fox','Main','PA','ok'],['2','Al’s Bar','—','OH',W('missing ship-to')],['3','Teresa’s','Dock','PA','exists · skip']]),`<div class="btns c2">${E.btn('Back','g')}${E.btn('Import 2 rows','irr')}</div>`]},
+ one:true,body:[E.stp(['upload','map columns','preview','commit'],2),E.tbl(['row','customer','ship-to','state','status'],[['1','Sly Fox','Main','PA','ok'],['2','Al’s Bar','—','OH',W('missing ship-to')],['3','Teresa’s','Dock','PA','exists · skip']]),E.btns([['Back','g'],['Import 2 rows','irr']],'p','c2')]},
 // step 2 — shell
 {step:2,slice:1,tab:'Today',name:'Today',job:'What needs doing, across slices',reads:'q.today (picks due, negative ATP, below par, overdue readings, failed pushes)',writes:'—',
  hd:H('◐ Demo Brewing','⌕ TS'),body:[E.ttl('Today'),E.row('3 orders to pick','ship today','›','w'),E.row('FV3 reading overdue','31 h','›','w'),E.row('Taproom: Pils below par','4 / 8','›','w'),E.row('PO 0142 arrives Thu','Country Malt','›','ok'),E.btns(['Record','Pick','Reading'])],comp:true,tabbar:'Today'},
@@ -180,7 +191,7 @@ const SCREENS=[
  hd:H('Choose SKU','✕'),body:[E.inp('search'),E.row('Recent'),E.row('Hazy IPA ½bbl','','ATP 11'),E.row('Pils 16oz case','','ATP −6'),E.row('Stout ⅙bbl','','ATP 7'),E.row('All SKUs'),E.blank('alphabetical list…')]},
 // step 4 — composer
 {step:4,slice:1,tab:'Today',name:'Composer → proposal',job:'Sentence → command fields → commit',reads:'registry schemas (tool defs)',writes:'the proposed command, on Commit',
- hd:H('◐ Demo Brewing','⌕ TS'),body:[E.row('“blew a half of Hazy at the taproom”'),E.fld('Type','depletion'),E.fld('SKU','Hazy IPA ½bbl'),E.fld('Qty','−1 keg (0.5 bbl)'),E.fld('Location','Taproom'),`<div class="btns c2">${E.btn('Open as form','g')}${E.btn('Commit','irr')}</div>`,E.tape([['−1 depletion · taproom','queued']])],comp:true,tabbar:'Today'},
+ hd:H('◐ Demo Brewing','⌕ TS'),body:[E.row('“blew a half of Hazy at the taproom”'),E.fld('Type','depletion'),E.fld('SKU','Hazy IPA ½bbl'),E.fld('Qty','−1 keg (0.5 bbl)'),E.fld('Location','Taproom'),E.btns([['Open as form','g'],['Commit','irr']],'p','c2'),E.tape([['−1 depletion · taproom','queued']])],comp:true,tabbar:'Today'},
 {step:4,slice:1,tab:'Today',name:'Composer → answer',job:'Questions run queries',reads:'q.atp, q.shortfall',writes:'—',
  hd:H('◐ Demo Brewing','⌕ TS'),body:[E.row('“how much Hazy can I promise Friday?”'),E.num('11 ½bbl','+40 cases · 2 orders compete for 6'),E.row('Open shortfall view','','›'),E.blank('history: swipe up on the composer')],comp:true,tabbar:'Today'},
 {step:4,slice:1,tab:'Today',name:'Offline outbox',job:'See and retry queued writes',reads:'IndexedDB outbox',writes:'replays queued commands (same idempotency id)',
@@ -249,5 +260,5 @@ const SCREENS=[
 {step:7,slice:8,desk:true,name:'Planning (desk)',job:'Demand vs supply; shortfalls as views',reads:'open orders + pars vs batches.planned_on + packaging_runs.planned_on',writes:'purchaseOrder.draftFromRequirements',
  body:[E.tbl(['week','demand','supply','gap'],[['9/7','48 bbl','40 bbl',W('−8')],['9/14','52 bbl','60 bbl','+8']]),`<div>${E.row('Sept 12 packaging: short 480 ends · lead 10d','','draft PO','w')}${E.row('Hazy ATP goes negative 9/9','','→ shortfall')}</div>`]},
 ];
-bar();
+render();bar();
 </script>
