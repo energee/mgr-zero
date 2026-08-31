@@ -170,7 +170,37 @@ Bottom composer and tab bar sit above the safe area.
 says the same word as the resulting tape line. Errors say what to change ("Depletions
 need a channel — taproom or wholesale?"), never "invalid input".
 
+## 5b. Build rules: shadcn for every element, Hugeicons for every icon (Ted, 2026-08-31)
+
+- **Every interactive element is a shadcn/ui component** added via the CLI into `components/ui/`
+  (never hand-edited — `.agents/ARCHITECTURE.md` ownership table). No bespoke buttons, inputs,
+  sheets or menus. Where shadcn lacks a primitive (the `QtyPad` keys, `VesselTile`), compose
+  it from `Button`, `Card`, `Badge` and Tailwind; do not reach for another library.
+  Theme via shadcn CSS variables: `--primary` = hop, `--destructive` repurposed as *copper /
+  irreversible*, a custom `--warning` = wort. Radius token `--radius: 4px`.
+- **Icons are Hugeicons** (`@hugeicons/react` + `@hugeicons/core-free-icons`, stroke-rounded
+  set, 1.5px), replacing `lucide-react`, which is removed. Icons appear **only where a word
+  cannot do the job**: the four tab glyphs, mic, close, back chevron, the queued/committed
+  dot, and status marks in dense tables. Buttons are words. No icon-only buttons without a
+  visible label except close/back/mic. Adding Hugeicons is a dependency change — approved
+  by Ted in this decision; still lands as its own commit.
+- **Polish checklist** (every screen, every PR):
+  - Spacing on the 4/8 grid only; one type scale; tabular numerals on every number.
+  - Every control has hover, focus-visible, pressed and disabled states from the shadcn
+    variants; nothing custom.
+  - Every list has a designed empty state that says what to do next; every async read has a
+    skeleton in the exact shape of the loaded content; no spinners.
+  - Every write gives feedback in ≤100 ms (optimistic tape row) and the button's verb matches
+    the tape line's verb.
+  - Sheets and the tab bar respect the safe area; touch targets ≥ 48px; phone forms use
+    `inputmode`/`enterkeyhint` correctly.
+  - Dark mode is designed, not inverted: hop and copper lighten on dark ground.
+  - One motion (card → tape), `prefers-reduced-motion` honoured; everything else instant.
+  - Copy in sentence case, verbs first, errors say what to change.
+
 ## 6. Component inventory (small, composed from shadcn)
+
+Each maps to shadcn primitives: `Composer` = `Command` (cmdk) + `Textarea` + `Card`; `QtyPad` = `Button` grid + `ToggleGroup` (units); `EntityPicker` = `Command` in a `Drawer`; `LedgerTape` = list + `Badge`; `StatusStepper` = `Badge` + `Separator`; `ActionCard` = `Card` + `Button`; `Sheet` = shadcn `Drawer` (phone) / `Sheet` (desk); `VesselTile` = `Card` + `Progress`; tabs = `Tabs`; tables = `Table`; toasts = `Sonner`.
 
 `Composer` (text + mic + proposal card) · `QtyPad` (numeric pad + unit chips + conversion
 line) · `EntityPicker` (recents + search; used for SKU, vessel, location, customer, material)
