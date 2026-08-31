@@ -27,7 +27,7 @@ Almost none — `invoices`, `qbo_connections`, and the mapping columns already e
 
 ## Parallelism
 
-- Track A (QBO): Tasks 1 → 2 → 3 → 4 → 5 → 6 → 7 (sequential within track; 4 can run parallel to 3).
+- Track A (QBO): Tasks 1 → 2 → 3 → 4 → 5 → 6 → 7 (sequential within track).
 - Track B (Composer): Tasks 8 → 9 → 10 (sequential within track).
 - Tracks A and B are fully independent of each other. Task 11 (docs/validation) last.
 
