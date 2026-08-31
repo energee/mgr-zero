@@ -48,5 +48,6 @@ next-env.d.ts
 /.agents/worktrees/*
 !/.agents/worktrees/.gitkeep
 
-# remember plugin session scratch (Claude-only, per machine)
-/.remember/
+# remember plugin: logs/tmp stay local; *.md digests are committed as dream input (see .agents/agents/dreaming.md)
+/.remember/*
+!/.remember/*.md
