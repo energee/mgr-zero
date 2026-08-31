@@ -8,9 +8,13 @@ on:
   schedule:
     - cron: '0 9 * * *' # daily dream at 09:00 UTC (~4-5am ET); no-ops when there's nothing to curate
 
+# cancel-in-progress stays false: the publish sequence (force-push then PR
+# create/edit) is not atomic, and cancelling between those steps strands
+# pushed dream commits with a stale or missing PR. GitHub still collapses
+# queued runs in this group to the newest, so the latest push always dreams.
 concurrency:
   group: dreaming
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   dream:
@@ -18,6 +22,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      issues: read # gh pr list reads PR data through the issues API
       id-token: write
     steps:
       - name: Checkout repository

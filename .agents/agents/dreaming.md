@@ -36,8 +36,11 @@ Never delete a spec. Never copy secret-shaped strings out of digests.
 ## Publish
 - No changes needed → print "Nothing to dream about" and stop. Do not open a PR.
 - Otherwise:
-  1. `git config user.name "dreaming-bot" && git config user.email "dreaming@users.noreply.github.com"`
-     (fresh CI runners have no git identity).
+  1. Set the git identity (fresh CI runners have none) as two separate
+     commands — the workflow allowlist matches single commands, so never
+     chain them with `&&`:
+     - `git config user.name "dreaming-bot"`
+     - `git config user.email "dreaming@users.noreply.github.com"`
   2. `git checkout -B dreaming/main`
   3. Commit with message starting `dream:` and a body listing each change
      with its evidence (commit SHA or PR number).
