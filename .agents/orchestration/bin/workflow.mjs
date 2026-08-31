@@ -2,6 +2,10 @@
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
+import { bin as claudeBin } from "../adapters/claude.mjs";
+import { bin as codexBin } from "../adapters/codex.mjs";
+import { bin as grokBin } from "../adapters/grok.mjs";
 import {
   fixRun,
   implementRun,
@@ -26,25 +30,10 @@ Usage:
   workflow status [run-id]
   workflow doctor
 
-Tiers: mechanical, standard, complex, high-risk
+Tiers: standard, complex, high-risk
 
 Complex and high-risk runs stop after planning. Inspect the run artifacts, then
 continue with "workflow implement --approve <run-id>". No command commits changes.`);
-}
-
-function parse(argv) {
-  const values = { positionals: [] };
-  for (let index = 0; index < argv.length; index += 1) {
-    const value = argv[index];
-    if (value === "--approve") values.approved = true;
-    else if (value === "--tier") {
-      values.tier = argv[index + 1];
-      index += 1;
-    } else if (value === "--help" || value === "-h") values.help = true;
-    else if (value.startsWith("--")) throw new Error(`Unknown option: ${value}`);
-    else values.positionals.push(value);
-  }
-  return values;
 }
 
 function printRun(result, next) {
@@ -59,12 +48,7 @@ function printRun(result, next) {
 }
 
 function doctor() {
-  const commands = {
-    grok: process.env.AGENT_WORKFLOW_GROK_BIN || "grok",
-    codex: process.env.AGENT_WORKFLOW_CODEX_BIN || "codex",
-    claude: process.env.AGENT_WORKFLOW_CLAUDE_BIN || "claude",
-    pi: process.env.AGENT_WORKFLOW_PI_BIN || "pi",
-  };
+  const commands = { grok: grokBin(), codex: codexBin(), claude: claudeBin() };
   let missing = false;
   for (const [name, command] of Object.entries(commands)) {
     const result = spawnSync("sh", ["-c", "command -v -- \"$1\"", "sh", command], { encoding: "utf8" });
@@ -80,47 +64,52 @@ async function main() {
     throw new Error("Recursive multi-agent invocation refused");
   }
   const [command, ...rest] = process.argv.slice(2);
-  const args = parse(rest);
+  const { values: args, positionals } = parseArgs({
+    args: rest,
+    options: {
+      tier: { type: "string" },
+      approve: { type: "boolean" },
+      help: { type: "boolean", short: "h" },
+    },
+    allowPositionals: true,
+  });
   if (!command || command === "--help" || command === "-h" || args.help) return usage();
-
-  const policy = await loadPolicy(root);
   if (command === "doctor") return doctor();
 
+  const policy = await loadPolicy(root);
   if (command === "status") {
-    const runId = args.positionals[0];
+    const runId = positionals[0];
     const result = runId ? [(await loadState(root, runId)).state] : await listRuns(root);
     console.log(JSON.stringify(result, null, 2));
     return;
   }
 
   if (command === "plan" || command === "run") {
-    const task = args.positionals.join(" ").trim();
+    const task = positionals.join(" ").trim();
     if (!task) throw new Error(`${command} requires a task`);
     const tier = args.tier || policy.defaultTier;
-    const planned = await planRun(root, { task, tier });
-    if (command === "plan" || policy.tiers[tier].requiresPlanApproval) {
-      const next = policy.tiers[tier].requiresPlanApproval
-        ? `.agents/orchestration/bin/workflow implement --approve ${planned.state.id}`
-        : `.agents/orchestration/bin/workflow implement ${planned.state.id}`;
-      return printRun(planned, next);
+    const planned = await planRun(root, { task, tier, policy });
+    const gate = policy.tiers[tier]?.requiresPlanApproval;
+    if (command === "plan" || gate) {
+      return printRun(planned, `.agents/orchestration/bin/workflow implement ${gate ? "--approve " : ""}${planned.state.id}`);
     }
-    const implemented = await implementRun(root, planned.state.id);
+    const implemented = await implementRun(root, planned.state.id, { policy });
     return printRun(implemented, null);
   }
 
-  const runId = args.positionals[0];
+  const runId = positionals[0];
   if (!runId) throw new Error(`${command} requires a run ID`);
   if (command === "implement") {
-    const result = await implementRun(root, runId, { approved: args.approved });
+    const result = await implementRun(root, runId, { approved: args.approve, policy });
     const reviewer = policy.tiers[result.state.tier].reviewer;
     return printRun(result, reviewer ? `.agents/orchestration/bin/workflow review ${runId}` : null);
   }
   if (command === "review") {
-    const result = await reviewRun(root, runId);
+    const result = await reviewRun(root, runId, { policy });
     return printRun(result, `.agents/orchestration/bin/workflow fix --approve ${runId}`);
   }
   if (command === "fix") {
-    const result = await fixRun(root, runId, { approved: args.approved });
+    const result = await fixRun(root, runId, { approved: args.approve, policy });
     return printRun(result, null);
   }
   throw new Error(`Unknown command: ${command}`);

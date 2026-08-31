@@ -1,10 +1,10 @@
 import { spawn } from "node:child_process";
 
-export function runProcess(command, args, { cwd, timeoutMs, env = {}, allowedExitCodes = [0] } = {}) {
+export function runProcess(command, args, { cwd, timeoutMs, allowedExitCodes = [0] } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd,
-      env: { ...process.env, ...env, MULTI_AGENT_ACTIVE: "1" },
+      env: { ...process.env, MULTI_AGENT_ACTIVE: "1" },
       stdio: ["ignore", "pipe", "pipe"],
     });
 

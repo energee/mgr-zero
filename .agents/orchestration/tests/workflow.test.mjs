@@ -1,18 +1,18 @@
 import assert from "node:assert/strict";
-import { cp, mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
-import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { onTestFinished, test } from "vitest";
 import { implementRun, planRun, reviewRun } from "../lib/workflow.mjs";
 
 const orchestrationRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const mockAgent = path.join(orchestrationRoot, "tests/mock-agent.mjs");
 
-async function fixture(t) {
+async function fixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "mgr-workflow-"));
-  t.after(async () => { await import("node:fs/promises").then(({ rm }) => rm(root, { recursive: true, force: true })); });
+  onTestFinished(() => rm(root, { recursive: true, force: true }));
   await mkdir(path.join(root, ".agents"), { recursive: true });
   await cp(orchestrationRoot, path.join(root, ".agents/orchestration"), { recursive: true });
   execFileSync("git", ["init", "-q"], { cwd: root });
@@ -26,8 +26,8 @@ async function fixture(t) {
   return root;
 }
 
-test("standard run plans locally and uses one Codex run", async (t) => {
-  const root = await fixture(t);
+test("standard run plans locally and uses one Codex run", async () => {
+  const root = await fixture();
   const planned = await planRun(root, { task: "Small fix", tier: "standard" });
   assert.equal(planned.state.agentRuns, 0);
   assert.equal(planned.state.status, "planned");
@@ -40,14 +40,14 @@ test("standard run plans locally and uses one Codex run", async (t) => {
   assert.match(await readFile(path.join(implemented.directory, "diff.patch"), "utf8"), /new-file\.txt/);
 });
 
-test("new runs refuse a dirty working tree", async (t) => {
-  const root = await fixture(t);
+test("new runs refuse a dirty working tree", async () => {
+  const root = await fixture();
   await writeFile(path.join(root, "dirty.txt"), "unrelated\n", "utf8");
   await assert.rejects(() => planRun(root, { task: "Small fix", tier: "standard" }), /clean working tree/);
 });
 
-test("complex run requires approval and stays within its route budget", async (t) => {
-  const root = await fixture(t);
+test("complex run requires approval and stays within its route budget", async () => {
+  const root = await fixture();
   const planned = await planRun(root, { task: "Cross-layer feature", tier: "complex" });
   assert.equal(planned.state.agentRuns, 1);
   await assert.rejects(() => implementRun(root, planned.state.id), /requires explicit plan approval/);
@@ -59,8 +59,8 @@ test("complex run requires approval and stays within its route budget", async (t
   assert.equal(reviewed.state.status, "reviewed");
 });
 
-test("high-risk planning uses Grok and Claude before the approval gate", async (t) => {
-  const root = await fixture(t);
+test("high-risk planning uses Grok and Claude before the approval gate", async () => {
+  const root = await fixture();
   const planned = await planRun(root, { task: "Change RLS", tier: "high-risk" });
   assert.equal(planned.state.agentRuns, 2);
   assert.equal(planned.state.status, "planned");

@@ -1,9 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export function createRunId() {
   const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
-  return `${stamp}-${Math.random().toString(36).slice(2, 8)}`;
+  return `${stamp}-${randomUUID().slice(0, 8)}`;
 }
 
 export function runDirectory(root, runId) {
@@ -16,14 +17,11 @@ export async function createState(root, { task, tier }) {
   const directory = runDirectory(root, id);
   await mkdir(directory, { recursive: true });
   const state = {
-    version: 1,
     id,
     task,
     tier,
     status: "created",
     agentRuns: 0,
-    reviewRounds: 0,
-    fixRounds: 0,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };

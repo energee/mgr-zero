@@ -1,16 +1,15 @@
 # MGR multi-agent workflow
 
-A project-local, harness-neutral orchestrator for budgeting Grok, Codex, Claude,
-and Pi according to their strengths. Any coding harness can invoke the same CLI
+A project-local, harness-neutral orchestrator for budgeting Grok, Codex, and
+Claude according to their strengths. Any coding harness can invoke the same CLI
 through its shell tool; the initiating harness does not own the workflow state.
 
 ## Safety model
 
 - Codex is the only write-enabled model.
 - Grok and Claude run in read-only/plan permission modes.
-- Pi is an optional read-only fallback adapter and is not in the default routes.
 - Complex and high-risk tasks require a separate human-approved implementation command.
-- There is at most one external review and one fix round.
+- Review and fix rounds are bounded by each tier's `maxAgentRuns` budget.
 - Recursive orchestration is blocked with `MULTI_AGENT_ACTIVE`.
 - A new run requires a clean working tree so reviews cannot mix unrelated edits.
 - The workflow never commits.
@@ -38,7 +37,7 @@ A complex plan stops and prints a run ID. Inspect its artifacts before continuin
 .agents/orchestration/bin/workflow fix --approve <run-id>
 ```
 
-`run` completes mechanical and standard tasks directly. For complex and
+`run` completes standard tasks directly. For complex and
 high-risk tasks it intentionally behaves like `plan` and stops at the approval
 gate.
 
@@ -46,7 +45,6 @@ gate.
 
 | Tier | Route | Maximum agent runs |
 | --- | --- | ---: |
-| `mechanical` | Codex implement | 1 |
 | `standard` | Codex implement | 1 |
 | `complex` | Grok plan → Codex implement → Grok review → Codex fix | 4 |
 | `high-risk` | Grok plan → Claude plan review → Codex implement → Claude review → Codex fix | 5 |
@@ -57,7 +55,7 @@ beside it. Generated state, raw model output, status, and diffs are written to
 
 ## Harness usage
 
-Pi, Claude Code, Codex, and Grok can all execute the same command. A caller
+Claude Code, Codex, and Grok can all execute the same command. A caller
 should invoke the command once, display its JSON result, and stop at approval
 gates. It must not recreate routing logic or invoke provider CLIs directly.
 
@@ -70,7 +68,6 @@ nonstandard installation with:
 AGENT_WORKFLOW_GROK_BIN=/path/to/grok
 AGENT_WORKFLOW_CODEX_BIN=/path/to/codex
 AGENT_WORKFLOW_CLAUDE_BIN=/path/to/claude
-AGENT_WORKFLOW_PI_BIN=/path/to/pi
 ```
 
 Timeouts, tier routes, and run caps are configured in `policy.json`.
@@ -78,5 +75,7 @@ Timeouts, tier routes, and run caps are configured in `policy.json`.
 ## Verification
 
 ```bash
-node --test .agents/orchestration/tests/*.test.mjs
+npx vitest run .agents/orchestration/tests
 ```
+
+The workflow tests run with the rest of the suite via `npx vitest run`.

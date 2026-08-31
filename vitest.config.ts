@@ -9,7 +9,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["tests/**/*.test.ts"],
+    include: ["tests/**/*.test.ts", ".agents/orchestration/tests/**/*.test.mjs"],
     testTimeout: 20000,
     fileParallelism: false,
     env: loadEnv("", process.cwd(), ""),

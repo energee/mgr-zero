@@ -3,7 +3,6 @@ import path from "node:path";
 import { runClaude } from "../adapters/claude.mjs";
 import { runCodex } from "../adapters/codex.mjs";
 import { runGrok } from "../adapters/grok.mjs";
-import { runPi } from "../adapters/pi.mjs";
 import { assertCleanWorkingTree, captureDiff } from "./git.mjs";
 import { createState, loadState, saveState } from "./state.mjs";
 
@@ -19,8 +18,9 @@ function schema(root, name) {
   return path.join(root, `.agents/orchestration/schemas/${name}.schema.json`);
 }
 
-function assertTier(policy, tier) {
-  if (!policy.tiers[tier]) throw new Error(`Unknown tier: ${tier}`);
+// Missing artifacts (e.g. no plan for plannerless tiers) read as empty sections.
+function optionalFile(directory, name) {
+  return readFile(path.join(directory, name), "utf8").catch(() => "");
 }
 
 async function invoke(root, directory, state, policy, { agent, role, prompt, schemaName }) {
@@ -33,7 +33,7 @@ async function invoke(root, directory, state, policy, { agent, role, prompt, sch
   await saveState(directory, state);
   const timeoutMs = policy.limits.timeoutMinutes * 60_000;
   const options = { cwd: root, prompt, schemaPath: schema(root, schemaName), timeoutMs };
-  const adapters = { grok: runGrok, codex: runCodex, claude: runClaude, pi: runPi };
+  const adapters = { grok: runGrok, codex: runCodex, claude: runClaude };
   const adapter = adapters[agent];
   if (!adapter) throw new Error(`No adapter for ${agent}`);
 
@@ -55,22 +55,14 @@ async function invoke(root, directory, state, policy, { agent, role, prompt, sch
   }
 }
 
-export async function planRun(root, { task, tier }) {
-  const policy = await loadPolicy(root);
-  assertTier(policy, tier);
+export async function planRun(root, { task, tier, policy }) {
+  policy ??= await loadPolicy(root);
+  const tierPolicy = policy.tiers[tier];
+  if (!tierPolicy) throw new Error(`Unknown tier: ${tier}`);
   await assertCleanWorkingTree(root);
   const { directory, state } = await createState(root, { task, tier });
-  const tierPolicy = policy.tiers[tier];
 
-  if (!tierPolicy.planner) {
-    const plan = JSON.stringify({
-      summary: "Direct implementation for a bounded task",
-      steps: ["Read applicable project instructions", "Implement the task", "Run required verification and inspect the diff"],
-      risks: ["Escalate the tier if the task is broader or riskier than described"],
-      acceptanceCriteria: ["Requested behavior is implemented", "Required checks pass", "No unrelated changes"],
-    }, null, 2);
-    await writeFile(path.join(directory, "plan.json"), `${plan}\n`, "utf8");
-  } else {
+  if (tierPolicy.planner) {
     const base = await promptFile(root, "planner");
     const output = await invoke(root, directory, state, policy, {
       agent: tierPolicy.planner,
@@ -98,8 +90,8 @@ export async function planRun(root, { task, tier }) {
   return { directory, state };
 }
 
-export async function implementRun(root, runId, { approved = false } = {}) {
-  const policy = await loadPolicy(root);
+export async function implementRun(root, runId, { approved = false, policy } = {}) {
+  policy ??= await loadPolicy(root);
   const { directory, state } = await loadState(root, runId);
   const tierPolicy = policy.tiers[state.tier];
   if (tierPolicy.requiresPlanApproval && !approved) {
@@ -107,15 +99,19 @@ export async function implementRun(root, runId, { approved = false } = {}) {
   }
   if (state.status !== "planned") throw new Error(`Cannot implement a run in status ${state.status}`);
 
-  const plan = await readFile(path.join(directory, "plan.json"), "utf8");
-  let planReview = "";
-  try { planReview = await readFile(path.join(directory, "plan-review.json"), "utf8"); } catch {}
-  const base = await promptFile(root, "implementer");
+  const [base, plan, planReview] = await Promise.all([
+    promptFile(root, "implementer"),
+    optionalFile(directory, "plan.json"),
+    optionalFile(directory, "plan-review.json"),
+  ]);
+  const sections = [base, `Task:\n${state.task}`];
+  if (plan) sections.push(`Approved plan:\n${plan}`);
+  if (planReview) sections.push(`Plan review:\n${planReview}`);
   const output = await invoke(root, directory, state, policy, {
-    agent: "codex",
+    agent: tierPolicy.implementer,
     role: "implement",
     schemaName: "implementation",
-    prompt: `${base}\n\nTask:\n${state.task}\n\nApproved plan:\n${plan}\n\nPlan review (if any):\n${planReview}`,
+    prompt: sections.join("\n\n"),
   });
   await writeFile(path.join(directory, "implementation.json"), output, "utf8");
   await captureDiff(root, directory);
@@ -125,53 +121,49 @@ export async function implementRun(root, runId, { approved = false } = {}) {
   return { directory, state };
 }
 
-export async function reviewRun(root, runId) {
-  const policy = await loadPolicy(root);
+export async function reviewRun(root, runId, { policy } = {}) {
+  policy ??= await loadPolicy(root);
   const { directory, state } = await loadState(root, runId);
   const tierPolicy = policy.tiers[state.tier];
   if (!tierPolicy.reviewer) throw new Error(`Tier ${state.tier} has no automatic external reviewer`);
   if (!["implemented", "fixed"].includes(state.status)) throw new Error(`Cannot review a run in status ${state.status}`);
-  if (state.reviewRounds >= policy.limits.maxReviewRounds) throw new Error("Review-round budget exhausted");
 
-  const [plan, implementation] = await Promise.all([
-    readFile(path.join(directory, "plan.json"), "utf8"),
+  const [base, plan, implementation] = await Promise.all([
+    promptFile(root, "reviewer"),
+    optionalFile(directory, "plan.json"),
     readFile(path.join(directory, "implementation.json"), "utf8"),
   ]);
   const { diff, status } = await captureDiff(root, directory);
-  const base = await promptFile(root, "reviewer");
   const output = await invoke(root, directory, state, policy, {
     agent: tierPolicy.reviewer,
     role: "review",
     schemaName: "review",
     prompt: `${base}\n\nTask:\n${state.task}\n\nPlan:\n${plan}\n\nImplementation report:\n${implementation}\n\nGit status:\n${status}\n\nDiff:\n${diff}`,
   });
-  state.reviewRounds += 1;
   await writeFile(path.join(directory, "review.json"), output, "utf8");
   state.status = "reviewed";
   await saveState(directory, state);
   return { directory, state };
 }
 
-export async function fixRun(root, runId, { approved = false } = {}) {
+export async function fixRun(root, runId, { approved = false, policy } = {}) {
   if (!approved) throw new Error("Applying review findings requires explicit approval (--approve)");
-  const policy = await loadPolicy(root);
+  policy ??= await loadPolicy(root);
   const { directory, state } = await loadState(root, runId);
+  const tierPolicy = policy.tiers[state.tier];
   if (state.status !== "reviewed") throw new Error(`Cannot fix a run in status ${state.status}`);
-  if (state.fixRounds >= policy.limits.maxFixRounds) throw new Error("Fix-round budget exhausted");
 
-  const [plan, review] = await Promise.all([
-    readFile(path.join(directory, "plan.json"), "utf8"),
+  const [base, plan, review] = await Promise.all([
+    promptFile(root, "implementer"),
+    optionalFile(directory, "plan.json"),
     readFile(path.join(directory, "review.json"), "utf8"),
   ]);
-  const base = await promptFile(root, "implementer");
   const output = await invoke(root, directory, state, policy, {
-    agent: "codex",
+    agent: tierPolicy.implementer,
     role: "fix",
     schemaName: "implementation",
     prompt: `${base}\n\nTask:\n${state.task}\n\nApproved plan:\n${plan}\n\nApproved review findings to address:\n${review}\n\nApply only actionable findings and rerun verification.`,
   });
-  state.fixRounds += 1;
-  await writeFile(path.join(directory, "fix.json"), output, "utf8");
   await writeFile(path.join(directory, "implementation.json"), output, "utf8");
   await captureDiff(root, directory);
   state.status = "fixed";
@@ -182,9 +174,11 @@ export async function fixRun(root, runId, { approved = false } = {}) {
 export async function listRuns(root) {
   const runsRoot = path.join(root, ".agents/orchestration/runs");
   const entries = await readdir(runsRoot, { withFileTypes: true });
-  const states = [];
-  for (const entry of entries.filter((item) => item.isDirectory()).sort((a, b) => b.name.localeCompare(a.name))) {
-    try { states.push((await loadState(root, entry.name)).state); } catch {}
-  }
-  return states;
+  const states = await Promise.all(
+    entries
+      .filter((item) => item.isDirectory())
+      .sort((a, b) => b.name.localeCompare(a.name))
+      .map((entry) => loadState(root, entry.name).then((run) => run.state, () => null)),
+  );
+  return states.filter(Boolean);
 }

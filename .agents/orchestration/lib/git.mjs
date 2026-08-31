@@ -29,18 +29,16 @@ export async function captureDiff(root, directory) {
     "ls-files", "--others", "--exclude-standard", "-z", "--", ".", RUNS_EXCLUDE,
   ], { cwd: root, timeoutMs: 30_000 });
 
-  const patches = [tracked.stdout];
   const untracked = untrackedResult.stdout.split("\0").filter(Boolean);
-  for (const file of untracked) {
-    const addition = await runProcess("git", ["diff", "--no-index", "--binary", "--", "/dev/null", file], {
+  const additions = await Promise.all(untracked.map((file) =>
+    runProcess("git", ["diff", "--no-index", "--binary", "--", "/dev/null", file], {
       cwd: root,
       timeoutMs: 30_000,
       allowedExitCodes: [0, 1],
-    });
-    patches.push(addition.stdout);
-  }
+    }),
+  ));
 
-  const diff = patches.filter(Boolean).join("\n");
+  const diff = [tracked.stdout, ...additions.map((result) => result.stdout)].filter(Boolean).join("\n");
   await writeFile(path.join(directory, "git-status.txt"), status, "utf8");
   await writeFile(path.join(directory, "diff.patch"), diff, "utf8");
   return { status, diff };
