@@ -1,12 +1,20 @@
-import { login } from "../actions";
+/**
+ * Sign-in page. Renders the shadcn-based LoginForm; the `login` server action
+ * redirects here with `?error=1` when credentials are rejected.
+ */
+import { LoginForm } from "@/components/login-form"
 
-export default function Login() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>
+}) {
+  const { error } = await searchParams
   return (
-    <form action={login} className="mx-auto mt-32 flex max-w-sm flex-col gap-3">
-      <h1 className="text-xl font-semibold">MGR</h1>
-      <input name="email" type="email" required placeholder="Email" className="rounded border p-2" />
-      <input name="password" type="password" required placeholder="Password" className="rounded border p-2" />
-      <button className="rounded bg-black p-2 text-white">Sign in</button>
-    </form>
-  );
+    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
+      <div className="w-full max-w-sm">
+        <LoginForm error={error === "1"} />
+      </div>
+    </div>
+  )
 }
