@@ -8,7 +8,7 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
 - Setup, ports, dev login: `README.md`. Ownership + iron rules: `.agents/ARCHITECTURE.md`.
 
 ## Decisions
-- One baseline migration covering all ten slices (~55 tables) instead of accumulating migrations. Pre-deploy, the baseline is edited in place. Details: `.agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md`.
+- One baseline migration covering all ten slices (58 tables) instead of accumulating migrations. Pre-deploy, the baseline is edited in place. Details: `.agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md`.
 - Product spec: `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md`.
 - Schema conventions live in `.agents/ARCHITECTURE.md`; the quote behind "no status columns" is Ted's: "if it won't be accurate I don't want it".
 
