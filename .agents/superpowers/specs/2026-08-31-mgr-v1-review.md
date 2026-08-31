@@ -59,7 +59,7 @@ auto-price — mgr2's "price lists are the tiers" simplifies this correctly).
 1. Add iron rule 5 (multi-write = one plpgsql function) to `ARCHITECTURE.md` and the
    schema-decisions doc; enforce with a test that flags command handlers with >1
    `.insert/.update/.delete/.upsert` and no `.rpc(`.
-2. Copy `brewing-domain.md` → `docs/superpowers/specs/brewing-domain.md`, trimmed.
+2. Copy `brewing-domain.md` → `.agents/superpowers/specs/brewing-domain.md`, trimmed.
 3. `tests/schema-rules.test.ts`: every table in `public` has RLS enabled; every permissive
    policy has an `RLS-EXCEPTION` comment; every view is `security_invoker`; every function
    sets `search_path`.

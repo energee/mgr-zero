@@ -20,10 +20,10 @@ below just in time — don't preload everything.
 | --- | --- |
 | Any code change | `ARCHITECTURE.md` — ownership map and the five iron rules |
 | Setup, ports, dev login, env vars | `README.md` |
-| Schema / migration work | `ARCHITECTURE.md` conventions, then `docs/superpowers/specs/2026-08-31-mgr-schema-decisions.md` |
-| Brewing/TTB domain rules (units, loss, removals) | `docs/superpowers/specs/brewing-domain.md` |
-| Why v1 (`~/Repos/mgr`) was left behind | `docs/superpowers/specs/2026-08-31-mgr-v1-review.md` |
-| Product intent, what a slice is | `docs/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md` |
+| Schema / migration work | `ARCHITECTURE.md` conventions, then `.agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md` |
+| Brewing/TTB domain rules (units, loss, removals) | `.agents/superpowers/specs/brewing-domain.md` |
+| Why v1 (`~/Repos/mgr`) was left behind | `.agents/superpowers/specs/2026-08-31-mgr-v1-review.md` |
+| Product intent, what a slice is | `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md` |
 | What's done / next | `.agents/PROGRESS.md` |
 | Past decisions and lessons | `.agents/MEMORY.md` |
 | Next.js APIs | `node_modules/next/dist/docs/` (this version differs from training data) |
@@ -54,5 +54,6 @@ production data (there is none yet — keep it that way by asking).
 
 - `.agents/MEMORY.md` — durable facts and decisions. Update when a decision changes.
 - `.agents/PROGRESS.md` — done / in flight / next. Update at the end of each session.
+- `.agents/superpowers/{specs,plans}` — design specs and plans; `docs/superpowers` is a symlink to it (the superpowers skills write there).
 - `.agents/agents/` — subagent definitions; `.claude/agents` is a symlink to it (Claude Code only reads `.claude/agents`).
 - `.agents/worktrees/<branch>/` — the only place for worktrees: `git worktree add .agents/worktrees/<branch> -b <branch>`. Gitignored.

@@ -10,7 +10,7 @@ status: done
 
 **Tech Stack:** Next.js (App Router, TS), Supabase (Postgres/RLS/Auth, local CLI for dev + tests), Zod, vitest, shadcn/ui + Tailwind, Vercel.
 
-**Spec:** `docs/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md`
+**Spec:** `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md`
 
 ## Global Constraints
 

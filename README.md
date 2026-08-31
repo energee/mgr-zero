@@ -7,8 +7,8 @@ invitations, built on Next.js (App Router, TypeScript) and Supabase
 (tenancy, ledger, catalog, import, invites). Orders/shipments/portal are
 Slice 1B; QBO integration and AI chat are Slice 1C.
 
-- Spec: `docs/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md`
-- Plan: `docs/superpowers/plans/2026-08-30-slice1a-foundation.md`
+- Spec: `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md`
+- Plan: `.agents/superpowers/plans/2026-08-30-slice1a-foundation.md`
 - SDD task briefs/reports (planning artifacts, not app source, gitignored): `.superpowers/sdd/2026-08-30-slice1a-foundation/`
 
 ## Iron rules
