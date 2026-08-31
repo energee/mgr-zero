@@ -1388,6 +1388,97 @@ begin
   return jsonb_build_object('order_id', p_order);
 end $$;
 
+create function record_pick(p_order uuid, p_picks jsonb) returns jsonb
+language plpgsql set search_path = '' as $$
+declare o public.orders; pk record;
+begin
+  o := public.lock_order(p_order, array['confirmed','picked']::public.order_status[]);
+  for pk in select (e->>'line_id')::uuid as line_id, (e->>'qty_picked')::numeric as qty from jsonb_array_elements(p_picks) e loop
+    update public.order_lines set qty_picked = pk.qty where id = pk.line_id and order_id = p_order;
+  end loop;
+  update public.orders set status = 'picked', needs_restock = false where id = p_order;
+  insert into public.order_events (brewery_id, order_id, actor, event, payload)
+  values (o.brewery_id, p_order, auth.uid(), 'picked', jsonb_build_object('picks', p_picks));
+  return jsonb_build_object('order_id', p_order);
+end $$;
+
+create function ship_order(p_order uuid, p_ship jsonb, p_carrier text, p_tracking text) returns jsonb
+language plpgsql set search_path = '' as $$
+declare o public.orders; sp record; v_state text; v_invoice uuid; v_shipment uuid;
+begin
+  o := public.lock_order(p_order, array['picked']::public.order_status[]);
+  insert into public.shipments (brewery_id, order_id, carrier, tracking, created_by)
+  values (o.brewery_id, p_order, p_carrier, p_tracking, auth.uid()) returning id into v_shipment;
+  if o.kind = 'wholesale' then
+    select state into v_state from public.ship_tos where id = o.ship_to_id;
+    insert into public.invoices (brewery_id, kind, customer_id, shipment_id, issued_on)
+    values (o.brewery_id, 'invoice', o.customer_id, v_shipment, current_date)
+    returning id into v_invoice;
+  end if;
+  for sp in select (e->>'line_id')::uuid as line_id, (e->>'qty_shipped')::numeric as qty from jsonb_array_elements(p_ship) e loop
+    update public.order_lines set qty_shipped = sp.qty where id = sp.line_id and order_id = p_order;
+    if sp.qty > 0 then
+      if o.kind = 'wholesale' then
+        insert into public.inventory_movements (brewery_id, sku_id, location_id, qty, type, channel, dest_state, ref, created_by)
+        select o.brewery_id, ol.sku_id, o.from_location_id, -sp.qty, 'sale_removal', 'wholesale', v_state, p_order, auth.uid()
+        from public.order_lines ol where ol.id = sp.line_id;
+        insert into public.invoice_lines (brewery_id, invoice_id, kind, sku_id, qty, unit_price_cents, description)
+        select o.brewery_id, v_invoice, 'sku', ol.sku_id, sp.qty, ol.unit_price_cents, s.name
+        from public.order_lines ol join public.skus s on s.id = ol.sku_id where ol.id = sp.line_id;
+      else
+        insert into public.inventory_movements (brewery_id, sku_id, location_id, qty, type, ref, created_by)
+        select o.brewery_id, ol.sku_id, o.from_location_id, -sp.qty, 'taproom_transfer', p_order, auth.uid()
+        from public.order_lines ol where ol.id = sp.line_id;
+        insert into public.inventory_movements (brewery_id, sku_id, location_id, qty, type, ref, created_by)
+        select o.brewery_id, ol.sku_id, o.to_location_id, sp.qty, 'taproom_transfer', p_order, auth.uid()
+        from public.order_lines ol where ol.id = sp.line_id;
+      end if;
+      update public.allocations set status = 'fulfilled'
+        where source = 'order_line' and ref = sp.line_id and status = 'open';
+    else
+      update public.allocations set status = 'released'
+        where source = 'order_line' and ref = sp.line_id and status = 'open';
+    end if;
+  end loop;
+  update public.orders set status = 'shipped', shipped_at = now(), needs_restock = false where id = p_order;
+  insert into public.order_events (brewery_id, order_id, actor, event, payload)
+  values (o.brewery_id, p_order, auth.uid(), 'shipped',
+          jsonb_build_object('ship', p_ship, 'carrier', p_carrier, 'invoice_id', v_invoice));
+  return jsonb_build_object('order_id', p_order, 'invoice_id', v_invoice);
+end $$;
+
+create function create_credit_memo(p_invoice uuid, p_lines jsonb, p_location uuid, p_reason text) returns jsonb
+language plpgsql set search_path = '' as $$
+declare v_inv public.invoices; v_cm uuid; cl record;
+begin
+  select * into v_inv from public.invoices where id = p_invoice;
+  if not found then raise exception 'invoice not found'; end if;
+  if v_inv.kind <> 'invoice' then raise exception 'can only credit an invoice'; end if;
+  insert into public.invoices (brewery_id, kind, customer_id, issued_on)
+  values (v_inv.brewery_id, 'credit_memo', v_inv.customer_id, current_date)
+  returning id into v_cm;
+  for cl in select (e->>'invoice_line_id')::uuid as line_id, (e->>'qty')::numeric as qty from jsonb_array_elements(p_lines) e loop
+    insert into public.invoice_lines (brewery_id, invoice_id, kind, sku_id, qty, unit_price_cents, description)
+    select v_inv.brewery_id, v_cm, 'sku', il.sku_id, -cl.qty, il.unit_price_cents, il.description
+    from public.invoice_lines il where il.id = cl.line_id and il.invoice_id = p_invoice;
+    insert into public.inventory_movements (brewery_id, sku_id, location_id, qty, type, note, created_by)
+    select v_inv.brewery_id, il.sku_id, p_location, cl.qty, 'return_in', p_reason, auth.uid()
+    from public.invoice_lines il where il.id = cl.line_id and il.invoice_id = p_invoice;
+  end loop;
+  return jsonb_build_object('invoice_id', v_cm);
+end $$;
+
+create function create_replenishment_order(p_from uuid, p_to uuid, p_lines jsonb) returns jsonb
+language plpgsql set search_path = '' as $$
+declare v_brewery uuid; v jsonb;
+begin
+  select brewery_id into v_brewery from public.locations where id = p_to;
+  if v_brewery is null then raise exception 'location not found'; end if;
+  v := public.create_order(v_brewery, 'taproom_transfer', null, null, p_from, p_to, null, null, null, p_lines);
+  perform public.submit_order((v->>'order_id')::uuid);
+  perform public.confirm_order((v->>'order_id')::uuid);
+  return v;
+end $$;
 -- ---------------------------------------------------------------- RLS
 do $$
 declare t text;
