@@ -4,6 +4,8 @@
 // within ctx.breweryId, creating catalog/price-list parents on the fly.
 // Per-row failures are collected into `errors` rather than thrown, so a bad
 // row never aborts the good ones in the same batch.
+// atomic-exempt: rows are independent by design and re-import is idempotent
+// by name; a customer row's customer+ship_to pair is the one non-atomic pair.
 import { z } from "zod";
 import { defineCommand, runCommand, unwrap, CommandError, Ctx } from "./registry";
 import { insertMovement } from "./inventory";

@@ -52,6 +52,14 @@ a gap to close, not a convention to trust.
    a user who isn't the caller. Both handlers permission-check via the
    RLS-bound `Ctx` first. *Enforced by:* `no-restricted-imports` in
    `eslint.config.mjs`, run in CI.
+5. **A command that writes more than one row is one Postgres function.**
+   supabase-js cannot span a transaction across statements, so a handler that
+   does `insert` then `update` can half-commit. Such commands call a single
+   `security invoker` plpgsql function (`ctx.db.rpc(...)`); the handler is a
+   thin caller. Per-row-independent bulk work (CSV import) is the one exemption
+   and says so with an `// atomic-exempt:` comment. MGR v1 learned this after
+   real data loss (`docs/superpowers/specs/2026-08-31-mgr-v1-review.md`).
+   *Enforced by:* `tests/write-atomicity.test.ts`.
 
 ## Schema conventions
 

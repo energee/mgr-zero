@@ -1,0 +1,51 @@
+# Brewing domain rules
+
+Lifted from MGR v1 `docs/knowledge/brewing-domain.md` (2026-08-31) and trimmed of v1
+implementation detail (entity_revisions, get_ttb_report, view names). These are product
+rules; when one changes, change it here first. mgr2 stores volumes in bbl and money in
+integer cents (see `2026-08-31-mgr-schema-decisions.md`).
+
+## Units & conversions
+
+The system stores every measurement in one fixed set of "back-of-house" units, then converts to whatever unit a person prefers to see or type. Volumes are stored in barrels (1 barrel = 31 US gallons ≈ 117.35 liters ≈ 1.17 hectoliters). Weights are stored in pounds (1 pound ≈ 0.4536 kilograms). Temperatures are stored in Fahrenheit. Gravity — the density measurement that tracks how much sugar is dissolved in wort or beer — is stored in degrees Plato, and converted to Specific Gravity (the "1.0xx" number most brewers think in) using a standard brewing-industry formula.Small containers (bottles, cans) are tracked in ounces or milliliters. Ingredient and packaging-material quantities also accept everyday units like pounds, ounces, kilograms, grams, "each," and "case," with common alternate spellings (e.g., "lbs," "pounds," "ea") automatically recognized as the same thing.
+
+## BOM & packaging
+
+A container's retail volume is always recorded for a single container unit — one can, one bottle — never as a case or pack total; the total volume of a selling format is its container's per-unit volume multiplied by the format's unit count (kegs instead carry a barrel volume directly). Every sellable package format (a case of 12oz cans, a keg, a growler) has a bill of materials: the packaging components — cans, lids, labels, boxes, kegs — required to produce one unit of that format, expressed as "quantity of material per package unit." When a packaging run is completed, the system multiplies the actual quantity packaged by each bill-of-materials line to determine total material consumed, and draws that consumption from inventory oldest-first (first-in, first-out) by expiration date. Discrete materials (cans, lids, cases) are always rounded up to whole numbers — there is no such thing as consuming three-quarters of a can. Materials are consumed through the packaging run as a whole, not tracked against an individual batch directly — sessions consume materials this way by design, not through any direct batch-to-material link; when a session pulls from multiple batches, the material draw is attributed to the run as a whole, and any leftover volume in a source vessel after a partial transfer is recorded as process loss rather than material consumption.
+
+## Loss accounting
+
+Loss on a batch is ultimately anchored to packaging: the source of truth is how much beer actually made it into packages versus how much wort was produced. Each batch's production baseline is the knockout (wort) volume allocated from its brew logs, adjusted for volume blended into or out of the batch — a deliberate product choice that makes this a total brewhouse-to-package accountability number, so normal fermentation shrinkage (trub, yeast, CO2 blow-off, dry-hop absorption) lands inside "loss" rather than being tracked as a separate yield figure. Along the way, staff can attribute portions of that loss as it happens: transferring less than a vessel held prompts a loss entry, packaging fewer units than planned prompts one, and samples, taproom pours, and destroyed beer are recorded as their own removal types. When a batch is completed, the system reconciles the whole identity — production baseline minus packaged volume minus everything already attributed — and automatically records any meaningful remainder (at least 0.05 bbl or 0.5% of the baseline, whichever is larger) as a loss allocation tagged with the "Completion Reconciliation" reason. Because auto-reconciled entries default to the generic losses line, they should be reviewed (and re-attributed to samples/taproom/destroyed where applicable) before the monthly TTB filing. Reconciliation is skipped while any of the batch's packaging runs is still open, and per-unit package volume falls back from a container's barrel volume to its fluid-ounce volume (kegs are the only container type required to carry a barrel volume). Known limitation: keg fills recorded directly against a batch outside a packaging session are not yet counted as packaged volume.
+
+## TTB & compliance
+
+The Brewer's Report of Operations (TTB F 5130.9) is a monthly balance per tax class
+(cellar / kegs / bottles-cans): beginning + produced/received = available; available −
+removals = ending. Rules that v1 got wrong at least once:
+
+- **Taproom sales are taxpaid removals** — same bucket as domestic sales, never samples.
+- Samples, donations, festival pours, destructions and losses are distinct removal types
+  with distinct tax treatment; classify at the ledger, not at report time.
+- All report volumes are barrels at exactly 31 US gallons, regardless of display units.
+- A removal belongs to the month the beer *left* (shipment/fulfilment date), not the
+  month it was ordered or allocated. Beginning/ending inventory key on the same date, so
+  a filed month is never rewritten by a later fulfilment. Store the filed snapshot
+  (`report_filings`).
+- Zero cells print as `0.00`, never blank.
+- The cellar column is the one identity exemption: beer leaves the cellar by being
+  packaged, which is not a removal; its balance is carried on the beer-in-process line.
+  Every packaged class — including ones added later — is checked, so an unhandled class
+  fails loudly rather than being quietly excused.
+- Packaged volume is never a cellar removal, and cellar removals (losses, samples, pours
+  taken straight from a tank) are never a packaged removal; the two partition the beer.
+  Inter-vessel transfers and blends are removals in neither.
+- Sanity check: once a batch's whole baseline is accounted for, its removals summed across
+  all tax classes equal that baseline exactly once.
+- A "Total" column mixing cellar and packaged classes does not foot by exactly the cellar
+  removals; if one is shown, label the scope per line rather than dropping real removals.
+- Cross-state wholesale: destination-state registration; OH and WI require the shipping
+  brewery to remit excise. Every removal therefore records channel + destination state.
+
+## Yeast & water chemistry assumptions
+
+Yeast health is modeled as a daily decay: liquid yeast loses roughly 2% of its viability per day, while dry yeast — which is packaged to survive longer — loses only about 0.5% per day. A fresh liquid yeast pack is assumed to contain about 100 billion cells; a dry yeast packet, about 200 billion. Pitching-rate guidance (how much yeast to add per batch) follows standard brewing targets: ales need less yeast per gallon than lagers, and very high-gravity beers need a rate in between. Yeast can be reused ("repitched") across multiple batches, but strains degrade with each generation — most strains are recommended for replacement after about 8 generations, hardier lager strains after about 10, delicate Belgian strains after about 6, and highly stable Brettanomyces cultures after as many as 12. Water chemistry calculations model how brewing salts (gypsum, calcium chloride, Epsom salt, baking soda, chalk, table salt, magnesium chloride) shift a water profile's mineral content, and estimate the resulting mash pH from that mineral balance plus the color/roast level of the grain bill — darker grains naturally push pH lower. These are simplified estimation models meant to guide recipe formulation, not to replace a lab water report or a calibrated pH meter reading during an actual brew day.

@@ -40,6 +40,8 @@ Enums stay conservative: adding a value later is one line; a wrong one is foreve
 - Currency in integer cents; volumes and quantities `numeric`; never float.
 - Unique-by-name where lookups happen by name: `customers (brewery_id, name)`, `products (brewery_id, name)`, `locations (brewery_id, name)`, `skus (product_id, name)`.
 - Views use `security_invoker = true`.
+- Multi-row writes (confirm order, ship, close packaging run) are one `security invoker` plpgsql function each; the command handler only calls it. Functions `set search_path = ''`. Rationale and v1 evidence: `2026-08-31-mgr-v1-review.md` §1.1.
+- Post-deploy, destructive DDL is guarded: `if exists (select 1 from <table>) then raise` — a migration must refuse to drop data it didn't expect.
 
 ## Existing tables to carry forward unchanged in intent
 
