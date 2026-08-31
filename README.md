@@ -47,12 +47,11 @@ just convention:
 
 ## Local development
 
-Local Supabase in this repo runs on **offset ports** (configured in
-`supabase/config.toml`) because a different Supabase project already
-occupies the CLI's default ports on this machine. The values below are
-what this repo currently uses locally — always confirm with
-`npx supabase status` rather than assuming, since the real values are
-whatever your local `config.toml` and running stack report:
+Local Supabase runs on non-default ports (54341/54342/54343) configured
+in the committed `supabase/config.toml`. These ports are used by every
+developer and in CI — they were chosen to avoid colliding with a
+default-port Supabase project running alongside locally. Verify the live
+values with `npx supabase status`:
 
 ```
 API URL:  http://127.0.0.1:54341
@@ -60,10 +59,9 @@ DB URL:   postgresql://postgres:postgres@127.0.0.1:54342/postgres
 Studio:   http://127.0.0.1:54343
 ```
 
-CI (`.github/workflows/ci.yml`) runs in a clean container with no port
-conflicts, so it uses the Supabase CLI's normal defaults and derives every
-env var it needs from `supabase status -o env` — it never hardcodes ports
-or keys.
+CI (`.github/workflows/ci.yml`) derives env vars from
+`supabase status -o env` rather than hardcoding them, so the setup
+automatically adapts to the values in `config.toml`.
 
 ### Setup
 
