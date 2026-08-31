@@ -1,4 +1,6 @@
-// app/(app)/customers/customer-form.tsx — dialog form for the upsert_customer command.
+// app/(app)/customers/customer-form.tsx — dialog form for the upsert_customer
+// command. Doubles as create (no `customer` prop) and edit (`customer` prop
+// pre-fills fields and the command input carries `id`, per plan decision 8).
 "use client";
 
 import { useState } from "react";
@@ -14,15 +16,33 @@ type CustomerType = (typeof CUSTOMER_TYPES)[number];
 
 const NONE_PRICE_LIST = "__none__";
 
-export function CustomerForm({ priceLists }: { priceLists: { id: string; name: string }[] }) {
-  const [name, setName] = useState("");
-  const [type, setType] = useState<CustomerType>("retailer");
-  const [state, setState] = useState("");
-  const [priceListId, setPriceListId] = useState(NONE_PRICE_LIST);
-  const [licenseNumber, setLicenseNumber] = useState("");
-  const [paymentTerms, setPaymentTerms] = useState("");
+export type CustomerEditData = {
+  id: string;
+  name: string;
+  type: CustomerType;
+  state: string;
+  priceListId: string | null;
+  licenseNumber: string | null;
+  paymentTerms: string;
+};
+
+export function CustomerForm({
+  priceLists,
+  customer,
+}: {
+  priceLists: { id: string; name: string }[];
+  customer?: CustomerEditData;
+}) {
+  const isEdit = !!customer;
+  const [name, setName] = useState(customer?.name ?? "");
+  const [type, setType] = useState<CustomerType>(customer?.type ?? "retailer");
+  const [state, setState] = useState(customer?.state ?? "");
+  const [priceListId, setPriceListId] = useState(customer?.priceListId ?? NONE_PRICE_LIST);
+  const [licenseNumber, setLicenseNumber] = useState(customer?.licenseNumber ?? "");
+  const [paymentTerms, setPaymentTerms] = useState(customer?.paymentTerms ?? "");
   const form = useCommandForm("upsert_customer", {
     build: () => ({
+      ...(isEdit ? { id: customer.id } : {}),
       name,
       type,
       state: state.toUpperCase(),
@@ -31,19 +51,25 @@ export function CustomerForm({ priceLists }: { priceLists: { id: string; name: s
       paymentTerms: paymentTerms || undefined,
     }),
     reset: () => {
-      setName(""); setType("retailer"); setState(""); setPriceListId(NONE_PRICE_LIST);
-      setLicenseNumber(""); setPaymentTerms("");
+      setName(customer?.name ?? "");
+      setType(customer?.type ?? "retailer");
+      setState(customer?.state ?? "");
+      setPriceListId(customer?.priceListId ?? NONE_PRICE_LIST);
+      setLicenseNumber(customer?.licenseNumber ?? "");
+      setPaymentTerms(customer?.paymentTerms ?? "");
     },
   });
 
   return (
     <Dialog open={form.open} onOpenChange={form.setOpen}>
       <DialogTrigger asChild>
-        <Button>New Customer</Button>
+        <Button variant={isEdit ? "outline" : "default"} size={isEdit ? "sm" : "default"}>
+          {isEdit ? "Edit" : "New Customer"}
+        </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New Customer</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit Customer" : "New Customer"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={form.submit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
@@ -103,7 +129,7 @@ export function CustomerForm({ priceLists }: { priceLists: { id: string; name: s
           {form.error && <p className="text-sm text-red-600">{form.error}</p>}
           <DialogFooter>
             <Button type="submit" disabled={form.submitting}>
-              {form.submitting ? "Creating…" : "Create"}
+              {form.submitting ? (isEdit ? "Saving…" : "Creating…") : isEdit ? "Save" : "Create"}
             </Button>
           </DialogFooter>
         </form>

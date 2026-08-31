@@ -1,4 +1,6 @@
-// app/(app)/customers/ship-to-form.tsx — dialog form for the upsert_ship_to command.
+// app/(app)/customers/ship-to-form.tsx — dialog form for the upsert_ship_to
+// command. Doubles as create (no `shipTo` prop) and edit (`shipTo` prop
+// pre-fills fields and the command input carries `id`, per plan decision 8).
 "use client";
 
 import { useState } from "react";
@@ -8,20 +10,37 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
-export function ShipToForm({ customerId }: { customerId: string }) {
-  const [label, setLabel] = useState("");
-  const [address1, setAddress1] = useState("");
-  const [address2, setAddress2] = useState("");
-  const [city, setCity] = useState("");
-  const [state, setState] = useState("");
-  const [zip, setZip] = useState("");
+export type ShipToEditData = {
+  id: string;
+  label: string;
+  address1: string;
+  address2: string | null;
+  city: string;
+  state: string;
+  zip: string;
+};
+
+export function ShipToForm({ customerId, shipTo }: { customerId: string; shipTo?: ShipToEditData }) {
+  const isEdit = !!shipTo;
+  const [label, setLabel] = useState(shipTo?.label ?? "");
+  const [address1, setAddress1] = useState(shipTo?.address1 ?? "");
+  const [address2, setAddress2] = useState(shipTo?.address2 ?? "");
+  const [city, setCity] = useState(shipTo?.city ?? "");
+  const [state, setState] = useState(shipTo?.state ?? "");
+  const [zip, setZip] = useState(shipTo?.zip ?? "");
   const form = useCommandForm("upsert_ship_to", {
     build: () => ({
+      ...(isEdit ? { id: shipTo.id } : {}),
       customerId, label, address1, address2: address2 || undefined,
       city, state: state.toUpperCase(), zip,
     }),
     reset: () => {
-      setLabel(""); setAddress1(""); setAddress2(""); setCity(""); setState(""); setZip("");
+      setLabel(shipTo?.label ?? "");
+      setAddress1(shipTo?.address1 ?? "");
+      setAddress2(shipTo?.address2 ?? "");
+      setCity(shipTo?.city ?? "");
+      setState(shipTo?.state ?? "");
+      setZip(shipTo?.zip ?? "");
     },
   });
 
@@ -29,12 +48,12 @@ export function ShipToForm({ customerId }: { customerId: string }) {
     <Dialog open={form.open} onOpenChange={form.setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
-          New Ship-To
+          {isEdit ? "Edit" : "New Ship-To"}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New Ship-To</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit Ship-To" : "New Ship-To"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={form.submit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
@@ -71,7 +90,7 @@ export function ShipToForm({ customerId }: { customerId: string }) {
           {form.error && <p className="text-sm text-red-600">{form.error}</p>}
           <DialogFooter>
             <Button type="submit" disabled={form.submitting}>
-              {form.submitting ? "Creating…" : "Create"}
+              {form.submitting ? (isEdit ? "Saving…" : "Creating…") : isEdit ? "Save" : "Create"}
             </Button>
           </DialogFooter>
         </form>

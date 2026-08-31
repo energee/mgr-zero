@@ -45,7 +45,10 @@ export default async function PricingPage() {
             <div key={list.id} className="rounded border p-4">
               <div className="flex items-center justify-between">
                 <div className="font-medium">{list.name}</div>
-                <PriceForm priceListId={list.id} skus={skuOptions} />
+                <div className="flex items-center gap-2">
+                  <PriceListForm priceList={{ id: list.id, name: list.name }} />
+                  <PriceForm priceListId={list.id} skus={skuOptions} />
+                </div>
               </div>
 
               {list.price_list_items?.length ? (

@@ -9,11 +9,13 @@ import "@/lib/commands/all";
 import { CustomerForm } from "./customer-form";
 
 type PriceList = { id: string; name: string };
+type CustomerType = "distributor" | "retailer" | "brewery" | "other";
 type Customer = {
   id: string;
   name: string;
-  type: string;
+  type: CustomerType;
   state: string;
+  price_list_id: string | null;
   license_no: string | null;
   payment_terms: string;
   price_lists: { name: string } | null;
@@ -43,6 +45,7 @@ export default async function CustomersPage() {
               <th className="py-1 font-normal">State</th>
               <th className="py-1 font-normal">Price list</th>
               <th className="py-1 font-normal">Terms</th>
+              <th className="py-1 font-normal" />
             </tr>
           </thead>
           <tbody>
@@ -57,6 +60,15 @@ export default async function CustomersPage() {
                 <td className="py-1">{c.state}</td>
                 <td className="py-1">{c.price_lists?.name ?? "—"}</td>
                 <td className="py-1">{c.payment_terms}</td>
+                <td className="py-1 text-right">
+                  <CustomerForm
+                    priceLists={priceLists.map((p) => ({ id: p.id, name: p.name }))}
+                    customer={{
+                      id: c.id, name: c.name, type: c.type, state: c.state,
+                      priceListId: c.price_list_id, licenseNumber: c.license_no, paymentTerms: c.payment_terms,
+                    }}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>
