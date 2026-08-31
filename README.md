@@ -116,7 +116,9 @@ After a pull request merges, `.github/workflows/documentation-agent.yml` runs a
 read-only Claude Code review and opens or refreshes a follow-up issue when the
 merged behavior is missing from its owning documentation or contradicts it. The
 Claude job uses the same `CLAUDE_CODE_OAUTH_TOKEN` secret as the existing Claude
-workflows, has only repository read permissions, and may use only Read, Grep, and
-Glob. A separate deterministic job with issue-write permission turns Claude's
-schema-validated `DOCS_GAP` output into one idempotent issue per merged PR; the
-bot never commits documentation directly to `main`.
+workflows, has only repository read permissions, may use only Read, Grep, and
+Glob, and carries Claude Code permission denies for common runner secret locations
+and credential dotfiles outside the checked-out repository. A separate
+deterministic job with issue-write permission turns Claude's schema-validated
+`DOCS_GAP` output into one idempotent issue per merged PR; the bot never commits
+documentation directly to `main`.
