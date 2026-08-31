@@ -75,7 +75,7 @@ Timeouts, tier routes, and run caps are configured in `policy.json`.
 ## Verification
 
 ```bash
-npx vitest run .agents/orchestration/tests
+npx vitest run .agents/orchestration/tests/workflow.test.mjs
 ```
 
-The workflow tests run with the rest of the suite via `npx vitest run`.
+Vitest ignores dot-directories during its default scan, so keep this explicit check alongside the project suite.
