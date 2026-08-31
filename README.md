@@ -1,36 +1,137 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MGR2
 
-## Getting Started
+MGR2 is a multi-tenant brewery operations system: catalog, immutable
+inventory ledger, allocations/ATP, CSV import, and staff/customer
+invitations, built on Next.js (App Router, TypeScript) and Supabase
+(Postgres, Auth, RLS). This repo currently covers **Slice 1A — Foundation**
+(tenancy, ledger, catalog, import, invites). Orders/shipments/portal are
+Slice 1B; QBO integration and AI chat are Slice 1C.
 
-First, run the development server:
+- Spec: `docs/superpowers/specs/2026-08-30-mgr2-slice1-core-orders-design.md`
+- Plan: `docs/superpowers/plans/2026-08-30-slice1a-foundation.md`
+- SDD task briefs/reports (planning artifacts, not app source, gitignored): `.superpowers/sdd/2026-08-30-slice1a-foundation/`
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Iron rules
+
+These are non-negotiable and enforced by tests and/or the database, not
+just convention:
+
+1. **Every operation is a command.** All mutations and queries the UI (and,
+   later, AI chat) perform go through the registry in
+   `lib/commands/registry.ts` via `defineCommand`/`defineQuery` and the
+   single endpoint `app/api/command/route.ts`. No route handler contains
+   inline business logic. Handlers that need to signal a user-facing error
+   throw `CommandError`; anything else that escapes a handler is treated as
+   unexpected and surfaces to the client as a generic 500 (the real error is
+   logged server-side, never leaked). `lib/commands/all.ts` is the single
+   side-effecting import that registers every command module.
+2. **`inventory_movements` is never mutated.** The table is append-only —
+   `UPDATE`/`DELETE` grants are revoked at the database level for
+   `authenticated`/`anon`. Corrections are new reversal rows, never edits.
+   `bbl` (barrels) is computed and frozen at write time by a database
+   trigger from `qty * sku.bbl_per_unit`; callers never supply `bbl`
+   directly.
+3. **Every tenant table carries `brewery_id` with RLS.** Row-level security
+   is enabled on every table and derives access from `brewery_users` /
+   `customer_users` membership (see `supabase/migrations/00001_tenancy.sql`
+   helpers `my_brewery_ids()`, `is_staff_of()`, `staff_role()`). Tenant
+   isolation is never trusted to application code alone — it's proven by
+   the RLS test suite (`tests/rls-tenancy.test.ts`, `tests/rls-ledger.test.ts`).
+4. **`createAdminClient()` (service-role, RLS-bypassing) is restricted to
+   `lib/commands/invites.ts`.** Inviting a user requires
+   `auth.admin.inviteUserByEmail`, which needs the service role, and the
+   resulting membership row must be inserted for a user who isn't the
+   caller yet. Both handlers there permission-check via the normal RLS-bound
+   `Ctx` *first*, then use the admin client only for the parts that require
+   it. No other request path uses the admin client.
+
+## Local development
+
+Local Supabase in this repo runs on **offset ports** (configured in
+`supabase/config.toml`) because a different Supabase project already
+occupies the CLI's default ports on this machine. The values below are
+what this repo currently uses locally — always confirm with
+`npx supabase status` rather than assuming, since the real values are
+whatever your local `config.toml` and running stack report:
+
+```
+API URL:  http://127.0.0.1:54341
+DB URL:   postgresql://postgres:postgres@127.0.0.1:54342/postgres
+Studio:   http://127.0.0.1:54343
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+CI (`.github/workflows/ci.yml`) runs in a clean container with no port
+conflicts, so it uses the Supabase CLI's normal defaults and derives every
+env var it needs from `supabase status -o env` — it never hardcodes ports
+or keys.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Setup
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm install
+npx supabase start        # starts the local Postgres/Auth/Studio stack
+npx supabase status       # prints the real local URL + anon/service keys
+```
 
-## Learn More
+Create `.env.local` with the values `supabase status` printed:
 
-To learn more about Next.js, take a look at the following resources:
+```
+NEXT_PUBLIC_SUPABASE_URL=<API URL from supabase status>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key from supabase status>
+SUPABASE_SERVICE_ROLE_KEY=<service_role key from supabase status>
+DEPLOYMENT_MODE=saas
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`DEPLOYMENT_MODE` is `saas` (multi-brewery, with a brewery switcher) or
+`dedicated` (single-tenant deployment, switcher hidden). The schema is
+identical in both modes — deployment mode is config, not schema.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Apply migrations and seed a dev user/brewery:
 
-## Deploy on Vercel
+```bash
+npx supabase db reset             # applies supabase/migrations/*.sql
+npx tsx scripts/seed-dev.ts       # idempotent; creates "Demo Brewing" + dev@mgr.local
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Seeded dev login: `dev@mgr.local` / `dev-password-1` (dev-only credential —
+never used outside local development).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Run the app:
+
+```bash
+npm run dev   # http://localhost:3000
+```
+
+### Tests
+
+```bash
+npm test          # vitest run — 19 tests across 6 files
+npx tsc --noEmit   # typecheck
+npm run build      # production build
+```
+
+Test files: `tests/rls-tenancy.test.ts`, `tests/rls-ledger.test.ts` (RLS
+isolation, ledger immutability, CHECK constraints, ATP math),
+`tests/registry.test.ts` (command registry validation/permissions),
+`tests/commands-inventory.test.ts` (catalog/inventory commands),
+`tests/commands-import.test.ts` (CSV import), `tests/commands-invites.test.ts`
+(invitations). Tests run against the real local Supabase stack (not a
+mock) — `npx supabase start` must be running first.
+
+## Deployment
+
+**Not yet provisioned.** No hosted Supabase project or Vercel project
+exists for this repo yet. When that's set up: create the hosted Supabase
+project and Vercel project, set `NEXT_PUBLIC_SUPABASE_URL`,
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and
+`DEPLOYMENT_MODE=saas` as Vercel env vars, run `supabase db push` against
+the hosted project, deploy, and verify login → catalog → inventory on the
+preview URL.
+
+## CI
+
+`.github/workflows/ci.yml` runs on every push and pull request: installs
+deps, starts a local Supabase stack, applies migrations
+(`supabase db reset`), runs the full vitest suite against it, then
+`tsc --noEmit` and `npm run build`. This is the merge gate — RLS and
+command-registry correctness are enforced here, not just locally.
