@@ -6,6 +6,7 @@ Running log of what's done, in flight, and next. Newest at top. Keep entries to 
 - [ ] Slice 1B starts with UI-plan rev-3 Step 1 contracts/schema gates, then orders → allocations → ship → invoices.
 
 ## Done
+- 2026-08-31 — Wireframes: phone/desk toggle renders all 50 frames as desktop views from the same bodies (rail/top-nav shells, dialog sheets, 32 px cursor-density controls); plan §1 reference updated.
 - 2026-08-31 — Fresh-eyes UI plan rev 3 + rendered artifact: honest persona tap audits, proposal safety, exact registry/atomicity contracts, complete portal/nav/state coverage, wet-phone tokens, entry-first build order, and explicit implementation/schema gates; v1 CONFLICT/REPEAT cross-check folded in; PR #3's 11 gap screens reconciled: consolidated into rev-3 frames or dropped per plan decisions (Notifications history, portal writes).
 - 2026-08-31 — Wireframes: 11 gap screens added (settings sub-pages, new order/PO, customer/product/price-list editors, recipe editor, portal account, keg return); later subsumed by rev 3.
 - 2026-08-31 — Pi `/simplify` alias and harness-compatible `.agents/skills/simplify` workflow for behavior-preserving cleanup of recently modified code.

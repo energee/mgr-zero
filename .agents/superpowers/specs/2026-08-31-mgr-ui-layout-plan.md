@@ -6,7 +6,9 @@ navigation, state, build-order, and wet-phone review. Nothing in this plan is bu
 the current shell (`app/(app)/layout.tsx`, a 208px left rail with five links and Geist) is
 the placeholder it replaces.
 Wireframes: `2026-08-31-mgr-wireframes.html` — 50 frames tagged with tab, slice, build
-step, registered reads, and registered writes. Update it in the same commit as any change
+step, registered reads, and registered writes; the phone/desk toggle re-renders every
+frame from the same body (desk = rail/top-nav shell, dialog sheets, 32 px
+cursor-density controls). Update it in the same commit as any change
 to §3 or §4. The repository HTML is the canonical rev-3 artifact; republish that exact
 source before sharing an external artifact URL.
 Inputs: `2026-08-30-mgr-slice1-core-orders-design.md` (roles, slices, interaction budget,

@@ -3,7 +3,9 @@
 <title>MGR rev-3 wireframes</title>
 <!--
   MGR rev-3 screen inventory. SCREENS is the source of truth for the 50 frames; TABS,
-  RAIL and STEPS mirror the UI plan. Registry labels are snake_case operation IDs;
+  RAIL and STEPS mirror the UI plan. The phone/desk toggle re-renders every frame from
+  the same body: desk adds the rail (or portal top nav), turns sheets/entry into
+  centered dialogs, and drops control heights to cursor density. Registry labels are snake_case operation IDs;
   bracketed text describes transaction boundaries and atomic row effects.
 -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
@@ -89,13 +91,22 @@ h2.grp{grid-column:1/-1;font-size:13px;font-weight:600;color:var(--ink2);margin:
 h2.grp.hide{display:none}
 .state-spec{border:1px solid var(--line);background:var(--sf);border-radius:4px;min-width:0;max-width:100%;margin:0 0 22px;padding:10px}.state-spec summary{cursor:pointer;min-height:48px;display:flex;align-items:center;font:600 15px "Familjen Grotesk",sans-serif;overflow-wrap:anywhere}.state-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}.state-card,.variant{border:1px dashed var(--line);border-radius:4px;min-width:0;padding:6px;color:var(--ink2);font-size:9.5px;overflow-wrap:anywhere}.state-card{min-height:78px;font-size:10.5px}.state-card b,.variant b{display:block;color:var(--ink);font:500 9.5px "JetBrains Mono",monospace;text-transform:uppercase;margin-bottom:3px}.variants{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}.variant.w{border-color:var(--warn);background:var(--warn-bg);color:var(--warn-text)}.path{border-left:4px solid var(--acc);padding:7px 8px;background:color-mix(in srgb,var(--acc) 7%,var(--sf));font:10px "JetBrains Mono",monospace;overflow-wrap:anywhere}.path b{color:var(--acc);margin-right:5px}.info{border-left:3px solid var(--acc);padding:7px 8px;color:var(--ink2);background:color-mix(in srgb,var(--acc) 7%,var(--sf));overflow-wrap:anywhere}.portalnav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px dashed var(--line);padding:5px 0 max(8px,env(safe-area-inset-bottom));font-size:10px;color:var(--ink2);text-align:center}.portalnav div{min-height:48px;display:flex;align-items:center;justify-content:center}.portalnav .on{color:var(--acc);font-weight:600}
 @media(pointer:coarse){.btn.p,.btn.irr,.pad div,.comp,.tabs div,.portalnav div{min-height:56px}.icon-stroke{stroke-width:2px}}
+/* desk density: cursor targets, not thumbs (plan §4 desk column) */
+.ph.desk .body{overflow:auto;flex:1}
+.ph.desk .r,.ph.desk .fld,.ph.desk .btn,.ph.desk .inp,.ph.desk .chips span,.ph.desk .pad div{min-height:32px}
+.ph.desk .btn{padding:5px}
+.ph.desk.dlg{align-items:center;justify-content:center;background:color-mix(in srgb,var(--ink) 10%,var(--bg))}
+.dlgcard{background:var(--sf);border:1.5px solid var(--line);border-radius:8px;width:min(440px,92%);max-height:94%;display:flex;flex-direction:column;overflow:hidden}
+.dlgcard .bd{overflow:auto}
+.portaltop{display:flex;gap:18px;padding:8px 12px;border-bottom:1px dashed var(--line2);font-size:11px;color:var(--ink2)}
+.portaltop .on{color:var(--acc);font-weight:600}
 @media(max-width:900px){.state-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:700px){.grid{grid-template-columns:minmax(0,1fr)}.state-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
 
 <div class="wrap">
   <h1>MGR wireframes · rev 3</h1>
-  <p class="sub"><span id="count">50</span> implementation-ready or explicitly gated, state-aware frames. Dashed = wire, green = mutable, copper = append-only / finalizing / external / destructive, amber = attention. Every authenticated page receives its shell automatically; entry screens and open sheets stay focused. Controls model shadcn composition at 48 px minimum (56 px primary/keypad on coarse pointers); Hugeicons are reserved for tabs, back and close at a 2 px coarse-pointer stroke.</p>
+  <p class="sub"><span id="count">50</span> implementation-ready or explicitly gated, state-aware frames. Dashed = wire, green = mutable, copper = append-only / finalizing / external / destructive, amber = attention. Every authenticated page receives its shell automatically; entry screens and open sheets stay focused. Controls model shadcn composition at 48 px minimum (56 px primary/keypad on coarse pointers; 32 px cursor density in the desk view — toggle above); Hugeicons are reserved for tabs, back and close at a 2 px coarse-pointer stroke.</p>
   <div class="bar" id="bar"></div>
   <details class="state-spec" open><summary>Shared six-state contract · drawn once, specialized below</summary><div class="state-grid" id="state-grid"></div></details>
   <div class="grid" id="grid"></div>
@@ -140,20 +151,28 @@ function phone(s){
   return `<div class="ph">${E.hd('Demo Brewing','Search · TS')}<div class="bd">${s.body.join('')}</div>${E.comp()}${E.tabs(s.tab)}</div>`;
 }
 function desk(s){return `<div class="ph desk"><div class="rail">${RAIL_HTML}</div><div style="flex:1;min-width:0"><div class="hd"><span>Demo Brewing</span><i>Command palette · action or query</i></div><div class="body ${s.one?'one':''}">${s.body.join('')}</div></div></div>`;}
+// Desk view of any frame: same body, wider shell, cursor density (plan §4 desk column).
+// Sheets/entry become centered dialogs; portal gets a top nav; tab screens get the rail.
+function deskView(s){
+  if(s.desk)return desk(s);
+  if(s.surface==='entry'||s.surface==='sheet')return `<div class="ph desk dlg"><div class="dlgcard">${s.hd||''}<div class="bd">${s.body.join('')}</div></div></div>`;
+  if(s.portal)return `<div class="ph desk"><div style="flex:1;min-width:0;display:flex;flex-direction:column"><div class="hd"><span>Demo Brewing wholesale</span><i>Sly Fox</i></div><div class="portaltop">${['Order','Orders','Invoices','Account'].map(t=>`<span class="${t===s.portal?'on':''}">${t}</span>`).join('')}</div><div class="body">${s.body.join('')}</div>${E.comp(true)}</div></div>`;
+  return `<div class="ph desk"><div class="rail">${RAIL_HTML}</div><div style="flex:1;min-width:0;display:flex;flex-direction:column"><div class="hd"><span>Demo Brewing</span><i>Command palette · action or query</i></div><div class="body">${s.body.join('')}</div>${E.comp()}</div></div>`;
+}
 // Mirrors plan §7 build order — change both together.
 const STEPS={1:'Foundations + authenticated shells',2:'Entry + first run',3:'Primitives + movement + import',4:'Composer + outbox',5:'Orders + QBO',6:'Portal content',7:'Later slices'};
 function groupOf(s){return s.group||(s.portal?'Portal':s.desk?'Desk':s.tab);}
-function render(){
+function render(view='phone'){
   if(SCREENS.length!==50)throw new Error(`Expected 50 screens, found ${SCREENS.length}`);
   document.getElementById('count').textContent=SCREENS.length;
   let out='',last=null;
   for(const s of SCREENS){
     const grp=groupOf(s);
     if(s.step!==last){out+=`<h2 class="grp">Build step ${s.step} — ${STEPS[s.step]}</h2>`;last=s.step;}
-    out+=`<div class="sc ${s.desk?'wide':''}" data-g="${grp}" data-s="${s.step}">
+    out+=`<div class="sc ${(s.desk||view==='desk')?'wide':''}" data-g="${grp}" data-s="${s.step}">
       <div class="meta"><b>${grp}</b><span class="b">slice ${s.slice}</span><span class="b">step ${s.step}</span></div>
       <div class="name">${s.name}</div><div class="job">${s.job}</div>
-      ${s.desk?desk(s):phone(s)}
+      ${view==='desk'?deskView(s):s.desk?desk(s):phone(s)}
       <div class="io">reads <span>${s.reads}</span><br>writes <span>${s.writes}</span></div></div>`;
   }
   document.getElementById('grid').innerHTML=out;
@@ -165,10 +184,10 @@ function filter(ft,fs){
 }
 function bar(){
   const tabs=['all',...GROUPS],steps=['all',...Object.keys(STEPS)];
-  let t='all',st='all';const b=document.getElementById('bar');
-  b.innerHTML=tabs.map(x=>`<button data-t="${x}">${x==='all'?'all groups':x}</button>`).join('')+'<span class="sep"></span>'+steps.map(x=>`<button data-s="${x}">${x==='all'?'all steps':'step '+x}</button>`).join('');
-  const apply=()=>{b.querySelectorAll('button').forEach(k=>k.classList.toggle('on',k.dataset.t===t||k.dataset.s===st));filter(t,st);};
-  b.addEventListener('click',e=>{const k=e.target.closest('button');if(!k)return;if(k.dataset.t)t=k.dataset.t;if(k.dataset.s)st=k.dataset.s;apply();});
+  let t='all',st='all',v='phone';const b=document.getElementById('bar');
+  b.innerHTML=['phone','desk'].map(x=>`<button data-v="${x}">${x}</button>`).join('')+'<span class="sep"></span>'+tabs.map(x=>`<button data-t="${x}">${x==='all'?'all groups':x}</button>`).join('')+'<span class="sep"></span>'+steps.map(x=>`<button data-s="${x}">${x==='all'?'all steps':'step '+x}</button>`).join('');
+  const apply=()=>{b.querySelectorAll('button').forEach(k=>k.classList.toggle('on',k.dataset.t===t||k.dataset.s===st||k.dataset.v===v));filter(t,st);};
+  b.addEventListener('click',e=>{const k=e.target.closest('button');if(!k)return;if(k.dataset.t)t=k.dataset.t;if(k.dataset.s)st=k.dataset.s;if(k.dataset.v&&k.dataset.v!==v){v=k.dataset.v;render(v);}apply();});
   apply();
 }
 
