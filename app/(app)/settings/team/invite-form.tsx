@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
-const ROLES = ["admin", "sales", "warehouse"] as const;
+const ROLES = ["admin", "sales", "warehouse", "brewer"] as const;
 
 export function InviteForm() {
   const [email, setEmail] = useState("");

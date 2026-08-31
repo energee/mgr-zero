@@ -47,6 +47,6 @@ Enums stay conservative: adding a value later is one line; a wrong one is foreve
 
 `breweries`, `brewery_users`, `customers`, `customer_users`, `ship_tos`, `products`, `skus`,
 `price_lists`, `price_list_items`, `locations`, `inventory_movements`, `allocations`,
-`taproom_pars` — see `supabase/migrations/00001_tenancy.sql` and `00002_catalog_ledger.sql`
+`taproom_pars` — see the slice-1A history (`git show 2802ae5:supabase/migrations/`)
 for the current shape, CHECK constraints and trigger; the baseline must preserve their
 semantics so the 29 existing tests keep passing.

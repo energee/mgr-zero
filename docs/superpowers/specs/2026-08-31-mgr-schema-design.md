@@ -1,10 +1,11 @@
 # MGR — Baseline Schema Design (all ten slices)
 
 Date: 2026-08-31
-Status: Draft for Ted's review. Becomes `supabase/migrations/00001_baseline.sql` on approval.
+Status: Approved 2026-08-31 (with `brewer` added); implemented as `supabase/migrations/00001_baseline.sql`.
+Phase-2 deltas from the reviewed draft are marked **(impl)**.
 Inputs: `2026-08-31-mgr-schema-decisions.md` (decisions + conventions),
-`2026-08-30-mgr-slice1-core-orders-design.md` (product), `00001_tenancy.sql` /
-`00002_catalog_ledger.sql` (semantics that the 29 existing tests pin).
+`2026-08-30-mgr-slice1-core-orders-design.md` (product), `brewing-domain.md` (units), and the
+slice-1A migrations this baseline replaced (semantics that the 29 existing tests pin).
 
 ## 0. Conventions (stated once, applied to every table below)
 
@@ -58,13 +59,17 @@ a listed unique. Every list view has a covering index listed under `idx`.
 **Extensions.** `btree_gist` (vessel occupancy exclusion).
 
 **Helper functions carried forward unchanged:** `my_brewery_ids()`, `my_customer_ids()`,
-`is_staff_of(b)`, `staff_role(b)`.
+`is_staff_of(b)`, `staff_role(b)`. **(impl)** Every function sets `search_path = ''` and
+schema-qualifies its references (decisions doc, iron rule 5 follow-on).
+
+**Units (impl, per `brewing-domain.md`):** volume bbl, temperature °F, gravity °Plato,
+money cents.
 
 ## 1. Enums
 
 | Enum | Values | Notes |
 |---|---|---|
-| `staff_role` | `admin, sales, warehouse` | unchanged; `brewer` is an open choice (§14) |
+| `staff_role` | `admin, sales, warehouse, brewer` | `brewer` added at review |
 | `customer_type` | `distributor, retailer, brewery, other` | unchanged |
 | `package_type` | `keg, can, bottle` | unchanged |
 | `keg_size` | `half_bbl, quarter_bbl, sixth_bbl, fifty_l, thirty_l, twenty_l` | physical set; safe as enum |
@@ -123,7 +128,8 @@ Existing: `product_id → products, name, package_type, units_per_case, bbl_per_
 numeric(12,8) > 0, qbo_item_id, active`. New:
 - `upc text` — barcode; unique `(brewery_id, upc)` where not null.
 - `keg_size keg_size`, `container_source keg_container_source`, `keg_pool_id → keg_pools`.
-- check: `package_type = 'keg'` ⇔ `keg_size is not null and container_source is not null`;
+- check **(impl)**: `package_type <> 'keg'` ⇒ `keg_size` and `container_source` are null; kegs
+  may leave them unset until slice 5 (the slice-1A tests create bare keg SKUs).
   `container_source in ('owned_fleet','per_fill_rental')` ⇔ `keg_pool_id is not null`.
   One-way kegs need no pool: they are a `sku_bom` line.
 - unique `(product_id, name)`; idx `(brewery_id, product_id)`.
@@ -335,7 +341,7 @@ variance). idx `(count_id)`, `(material_id)`.
 unique `(brewery_id, name)`.
 
 ### `recipe_versions` — immutable
-`recipe_id → recipes, version int, target_og numeric(5,3), target_fg numeric(5,3),
+`recipe_id → recipes, version int, target_og_plato numeric(5,2), target_fg_plato numeric(5,2),
 target_abv numeric(4,2), target_ibu numeric(5,1), boil_minutes int, note text,
 created_by`. unique `(recipe_id, version)`. Revoke update/delete.
 
@@ -377,8 +383,8 @@ numeric > 0, loss_bbl numeric >= 0 default 0, at timestamptz, note, created_by`.
 at, note, created_by`. Cellar losses/dumps feed TTB.
 
 ### `fermentation_readings`
-`occupancy_id, at timestamptz, temp_c numeric(5,2), ph numeric(4,2), gravity
-numeric(6,4), note, created_by`. Manual entry only (decision). idx `(occupancy_id, at)`.
+`occupancy_id, at timestamptz, temp_f numeric(5,1), ph numeric(4,2), gravity_plato
+numeric(5,2), note, created_by`. Manual entry only (decision). idx `(occupancy_id, at)`.
 Mutable (typo fixes), staff only.
 
 ### `batch_additions`
@@ -477,8 +483,7 @@ via the shipment's order.
 
 ## 14. Open choices (decisions doc silent; conservative option taken)
 
-1. **`staff_role`** stays `admin, sales, warehouse`. Production tables use `is_staff_of`,
-   so brewers work as any staff role for now; add `brewer` when a policy needs it.
+1. ~~`staff_role` stays `admin, sales, warehouse`~~ — resolved: `brewer` added.
 2. **`order_status`** stops at `shipped`; "invoiced"/"paid" are read from `invoices`
    (`shipment_id`, `paid_at`). The product spec listed them as order statuses; the
    decisions doc's "order closes on ship" makes them derived. Say if you want the two

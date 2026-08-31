@@ -20,7 +20,7 @@ async function makeAuthUser() {
   return { id: data.user.id, email };
 }
 
-export async function makeStaff(breweryId: string, role: "admin" | "sales" | "warehouse" = "admin") {
+export async function makeStaff(breweryId: string, role: "admin" | "sales" | "warehouse" | "brewer" = "admin") {
   const u = await makeAuthUser();
   const { error } = await admin.from("brewery_users").insert({ brewery_id: breweryId, user_id: u.id, role });
   if (error) throw error;
@@ -42,7 +42,7 @@ export async function asUser(email: string): Promise<SupabaseClient> {
 }
 
 // A ready-to-use command Ctx for a fresh staff member of `breweryId`.
-export async function makeStaffCtx(breweryId: string, role: "admin" | "sales" | "warehouse" = "admin") {
+export async function makeStaffCtx(breweryId: string, role: "admin" | "sales" | "warehouse" | "brewer" = "admin") {
   const staff = await makeStaff(breweryId, role);
   const db = await asUser(staff.email);
   return { db, userId: staff.id, breweryId, role };

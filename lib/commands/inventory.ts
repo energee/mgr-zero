@@ -13,7 +13,7 @@ const movementInput = z.object({
 
 /**
  * Inserts an inventory movement. `bbl` is not supplied: the DB trigger
- * (enforce_bbl_integrity, 00002_catalog_ledger.sql) computes it from
+ * (enforce_bbl_integrity, 00001_baseline.sql) computes it from
  * `qty * skus.bbl_per_unit` and overwrites anything a client sends.
  * CHECK/FK failures surface as CommandError.
  */

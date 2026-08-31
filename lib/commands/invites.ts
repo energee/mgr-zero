@@ -62,7 +62,7 @@ async function insertMembership(table: "brewery_users" | "customer_users", row: 
 defineCommand({
   name: "invite_staff",
   description: "Invite a user to join the brewery's staff",
-  input: z.object({ email: z.string().email(), role: z.enum(["admin", "sales", "warehouse"]) }),
+  input: z.object({ email: z.string().email(), role: z.enum(["admin", "sales", "warehouse", "brewer"]) }),
   roles: ["admin"],
   handler: async (ctx, i) => {
     const userId = await inviteOrResolveUser(i.email);
