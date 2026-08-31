@@ -1,0 +1,35 @@
+# .github/workflows/ci.yml — RLS + command tests gate every merge.
+#
+# Runs against a local Supabase stack. Ports are set in the committed
+# supabase/config.toml (54341/54342/54343), same as every local dev machine.
+# Env vars for the test suite are derived from `supabase status -o env`
+# rather than hardcoded, so this keeps working if the config ever changes.
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - uses: supabase/setup-cli@v1
+        with: { version: 2.116.0 }
+      - run: supabase start
+      - run: supabase db reset
+      - name: Env from local stack
+        # `supabase status -o env` prints KEY="value" lines. Grep the three
+        # keys the app/tests need, then strip the surrounding quotes before
+        # appending to $GITHUB_ENV (GITHUB_ENV does no shell-quote parsing —
+        # a literal quote in the value would end up baked into the secret).
+        run: |
+          supabase status -o env | grep -E '^(ANON_KEY|SERVICE_ROLE_KEY|API_URL)=' | sed 's/"//g' >> "$GITHUB_ENV"
+      - run: npx vitest run
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ env.API_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ env.SERVICE_ROLE_KEY }}
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm run build

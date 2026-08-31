@@ -1,11 +1,11 @@
-# MGR2 — Slice 1 Design: Core + Orders
+# MGR — Slice 1 Design: Core + Orders
 
 Date: 2026-08-30
 Status: Approved by Ted (in-chat design review)
 
 ## Product context
 
-MGR2 is a multi-brewery SaaS for brewery operations. Full capability map (each its own spec → plan → build cycle):
+MGR is a multi-brewery SaaS for brewery operations. Full capability map (each its own spec → plan → build cycle):
 
 | # | Slice | Contents |
 |---|-------|----------|
@@ -107,7 +107,7 @@ DTC readiness: channel enum + dest_state already captured; per-customer annual v
 - `customers` — accounts with `type` (`distributor` | `retailer` | `brewery` | `other`; PA self-distribution means retailers/bars are direct customers), license number/class, price_list_id, `qbo_customer_id`, payment terms.
 - `ship_tos` — multiple ship-to addresses per customer; each order references one, and `dest_state` on removals derives from it (load-bearing for per-state excise).
 - `orders` → `order_lines` (sku, qty, unit_price snapshot at order time).
-- Status: `draft → submitted → confirmed → picked → shipped → invoiced → paid`, plus `cancelled`. Portal customers create up to `submitted`; staff advance from there.
+- Status: `draft → submitted → confirmed → picked → shipped`, plus `cancelled`. Portal customers create up to `submitted`; staff advance from there. "Invoiced" and "paid" are not order statuses — they are derived from `invoices` (`shipment_id`, `paid_at`); the order closes on ship (schema decisions: short-ship remainder cancelled, no backorder state).
 - **Pick lists**: per-order pick list (printable/phone-friendly) and a daily pick sheet grouping confirmed orders by ship date. Warehouse records actual picked qty per line — the input feeding short-ship reconciliation, so shortages are captured at pick time. Picking is allowed any time after confirm (early staging is fine — the allocation already holds the product out of ATP); if a picked order is later adjusted or cancelled, the release is reflected in a "staged, needs restocking" indicator. No barcodes, bin locations, or wave picking in v1 (route grouping arrives with slice 10).
 - **Partial shipments & short-ship reconciliation**: order lines track ordered vs. shipped qty. At pick/ship, staff record actual shipped quantities; a shortage either adjusts the line down (with reason) or leaves a backordered remainder. Invoices are **per shipment** (billing shipped quantities only), not per order; an order is `shipped` when all lines are fulfilled or adjusted. Unshipped allocations release; the portal shows the adjusted order.
 - Availability check at confirm is a soft warning, not a hard block (breweries deliberately oversell against planned production; slice 8 makes this smart).
@@ -133,7 +133,7 @@ QBO is the book of record for money; MGR for inventory/orders. Direction: invoic
 - OAuth2 per brewery (`qbo_connections` table; server-side token refresh). Each brewery links its own QBO company.
 - Mapping via `customers.qbo_customer_id` and `skus.qbo_item_id`. Unmapped entities block the push with a clear error and a pick-from-QBO mapping UI. Never auto-create QBO customers/items in v1.
 - Push on invoice creation via server job; stores `qbo_invoice_id` + sync status. Failures → `push_failed` with retry; idempotency key prevents duplicates.
-- Payments back via QBO webhooks + daily reconciliation poll as backstop. Payment marks invoice/order `paid`.
+- Payments back via QBO webhooks + daily reconciliation poll as backstop. Payment sets `invoices.paid_at`; the order is not re-stated.
 
 ## 6. Error handling & testing
 
