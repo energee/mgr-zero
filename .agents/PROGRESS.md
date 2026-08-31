@@ -6,6 +6,7 @@ Running log of what's done, in flight, and next. Newest at top. Keep entries to 
 - [ ] Slice 1B starts with UI-plan rev-3 Step 1 contracts/schema gates, then orders → allocations → ship → invoices.
 
 ## Done
+- 2026-08-31 — Customer user guide established as the complete plain-language manual for every available screen/action; post-merge Claude audit enforces action steps, fields/options, permissions, results, corrections, and errors.
 - 2026-08-31 — Read-only Claude Code post-merge documentation agent audits each merged PR against the owning docs and opens one idempotent follow-up issue for high-confidence drift.
 - 2026-08-31 — Rev-3 simplification pass on latest main: actionable Today/Work ordering, Beer as a landing page, complete movement intents, simpler order state, separated taproom tasks, explicit cellar reading/remainder semantics, richer irreversible previews, and filing copy that does not imply transmission.
 - 2026-08-31 — Recipe development loop designed: version snapshots assumptions + per-ingredient extract; OG/FG/ABV computed by one registry-layer formula (live preview + server reads; never stored, no view); per-batch actuals derived from readings via get_recipe_outcomes shown as deltas. Derived-values principle recorded in schema-decisions.

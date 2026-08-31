@@ -22,6 +22,7 @@ never copy it into a second place.
 | `components/ui/` | shadcn primitives. Don't hand-edit; re-add with the shadcn CLI. |
 | `tests/` | Proof. Runs against the real local Supabase stack, never mocks. |
 | `scripts/seed-dev.ts` | Idempotent dev seed. |
+| `docs/user-guide.md` | Complete customer-facing manual for every available screen and action: prerequisites, permissions, steps, fields/options, results, corrections, and errors. Uses customer language only and never exposes implementation phases or internals. |
 | `.agents/superpowers/specs/` | Product and schema design decisions (why). |
 | `.agents/orchestration/` | Cross-provider model roles, routing, budgets, prompts, approval gates, and run artifacts. |
 | `.agents/agents/documentation-maintainer.md`, `.github/workflows/documentation-agent.yml` | Post-merge documentation review criteria and its GitHub trigger. The reviewer is read-only; actionable drift becomes one follow-up issue per merged PR. |
