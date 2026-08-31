@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // scripts/seed-dev.ts — idempotent dev environment seed.
 // Creates "Demo Brewing" brewery and dev@mgr.local / password "dev-password-1" admin user.
+// NOTE: password "dev-password-1" is intentionally dev-only; use only in local development.
 import { createClient } from "@supabase/supabase-js";
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54341";
