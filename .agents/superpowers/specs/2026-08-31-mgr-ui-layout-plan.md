@@ -3,6 +3,7 @@
 Date: 2026-08-31
 Status: Draft for Ted; rev 2 (2026-08-31) added 13 flows, cross-cutting list, entry-first build order. Nothing built; the current shell (`app/(app)/layout.tsx`, a 208px
 left rail with five links and Geist) is the placeholder this replaces.
+Wireframes: `2026-08-31-mgr-wireframes.html` — one frame per §4 row, tagged with reads/writes; **update it in the same commit as any change to §3/§4** (artifact: https://claude.ai/code/artifact/060ce361-a424-4ea9-a02f-7b55c3ce582b).
 Inputs: `2026-08-30-mgr-slice1-core-orders-design.md` (roles, slices, ≤2-interaction rule,
 AI-first command registry), `2026-08-31-mgr-schema-design.md` (what exists to show),
 `brewing-domain.md` (units people actually say).
