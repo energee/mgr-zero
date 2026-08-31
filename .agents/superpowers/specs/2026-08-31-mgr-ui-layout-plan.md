@@ -1,7 +1,7 @@
 # MGR — UI layout plan (all slices, mobile-first, chat-first input)
 
 Date: 2026-08-31
-Status: Draft for Ted. Nothing built; the current shell (`app/(app)/layout.tsx`, a 208px
+Status: Draft for Ted; rev 2 (2026-08-31) added 13 flows, cross-cutting list, entry-first build order. Nothing built; the current shell (`app/(app)/layout.tsx`, a 208px
 left rail with five links and Geist) is the placeholder this replaces.
 Inputs: `2026-08-30-mgr-slice1-core-orders-design.md` (roles, slices, ≤2-interaction rule,
 AI-first command registry), `2026-08-31-mgr-schema-design.md` (what exists to show),
@@ -103,6 +103,17 @@ proposal card. Content gets two columns where it earns it (order list + detail; 
 The portal (`/portal`) is a separate shell: Order · Orders · Invoices · Account, same
 composer restricted to portal commands ("same as last week" → repeat order proposal).
 
+### Cross-cutting (every screen, not a row)
+
+- **Chat history** — the composer keeps per-user history; a swipe-up on the composer shows past proposals and answers, tappable to re-run.
+- **Global search** — the header search is `EntityPicker` across kinds (SKU, customer, order no., lot code, vessel, material); one result list, grouped by kind.
+- **Roles** — `admin` sees everything; `sales` sees Orders/Customers/Invoices and reads Beer; `warehouse` sees Pick/Ship/Receive/Record and reads Work; `brewer` sees Cellar/Brew day/Packaging/Record. Quick actions and Today rows are filtered by role; hidden ≠ forbidden — the command registry still enforces.
+- **Locations and brewery profile** live under Settings: locations (warehouse/taproom, par sets), brewery (name, TTB no., timezone, deployment mode read-only).
+- **Notifications** — invites and order confirmations are sent by the system; Settings › Notifications lists what was sent and to whom; no preferences in v1.
+- **Printing** — pick lists, daily pick sheet, lot trace, and **keg-collar / lot labels** from packaging (thermal; measure the rendered output before styling — `measure-first`).
+- **Offline outbox** — a badge on the composer shows N queued writes; tap → list with retry/discard.
+- **Document numbers** — `ORD-`, `INV-`, `PO-`, `B-` numbers appear on every card title and tape line, monospaced.
+
 ## 4. Area by area
 
 Each row: the screen's one job, phone-first pattern, and the desk extras. "Card" means the
@@ -129,6 +140,19 @@ one list-item component; "sheet" means the one bottom-sheet/dialog form componen
 | **Planning** (8) | See the gap | Read-only shortfall cards | Demand vs supply calendar; "draft PO" actions |
 | **Keg fleet** (9) | Who has our kegs | Per-customer counts; return entry sheet | Pools, deposits, loss rates |
 | **Deliveries** (10) | Get it there | Driver mode: today's route, load list, per-stop **Delivered** with qty adjust → invoice | Route builder |
+| **Sign in / invites / portal signup** (1) | Get the right person into the right brewery | Email + password or magic link; invite-accept sets password and lands on Today (staff) or Order (portal); reset flow | Same; admin sees pending invites under Team |
+| **Onboarding / first run** (1) | Turn an empty brewery into a usable one | SaaS: create brewery → Today shows a 3-step checklist (add locations, import or add catalog, invite team) instead of an empty inbox | Import wizard: upload → column map → preview with row errors → commit; re-runnable (idempotent) |
+| **Returns & credit memos** (1) | Take beer back and fix the money | Sheet from an order or shipment: lines + qty returned + reason → `return_in` rows and a negative-line invoice preview | Same; credit memo pushes to QBO like an invoice |
+| **Taproom transfer order** (1) | Move beer to the taproom through the same order path | From the par view: suggested qtys → one tap creates internal order → appears in Work → pick/complete like any order → `taproom_transfer` rows | Same |
+| **Allocation shortfall & pars** (1) | Decide who gets scarce beer | Shortfall card per SKU: competing orders + standing taproom allocation, tap to release/reprioritise; par editor per location | Full shortfall table; standing allocation editor |
+| **Brew day** (4) | Start a batch and record the baseline | Schedule batch (recipe version, planned bbl, date); brew-day sheet: additions from recipe (actual lots where tracked), **knockout volume → vessel** (this is the loss baseline) | Brew calendar; recipe scaling side-by-side |
+| **Packaging outputs → lots** (5) | Land finished goods in inventory | Run close shows the FG lot being created (`lots`, `production_in` rows per SKU) before Commit; lot code editable, default from pattern | Same; yield vs planned |
+| **Lot trace / recall** (5) | Where did lot X go | Search a lot code → tape of every movement, shipment and customer it reached; material lots → batches → FG lots | Same, printable |
+| **Materials housekeeping** (2) | Keep material truth honest | **Cycle count** sheet: material → counted qty → adjustment movement; vendor picker in PO/receive | Vendors list; contracts with drawdown bar (committed / received / remaining) |
+| **Compliance registry** (6) | Know what we may ship where | Read-only: per product, COLA/formula status; per state, registration + license status; ship-to in an unregistered state shows a warning at confirm | Editors for `product_approvals`, `state_registrations`, `brewery_state_licenses`; expiry dates surface on Today |
+| **POS setup & mapping** (7) | Make Square sales mean something | Read-only status | Connect Square; map POS locations → `locations`; **unmapped items queue** → pick SKU; reconciliation diff (POS depletions vs transfers) |
+| **Keg deposits** (1, 9) | Charge and refund deposits | Order/return sheets offer a deposit line per keg pool; balance shown on the customer card | Deposit lines on invoices; per-customer balance and history |
+| **Truck loading** (10) | Load the right kegs on the right truck | Driver/warehouse phone: route's load list grouped by stop, tap to confirm loaded, short flags | Route builder assigns orders to routes |
 | **Settings** | Rarely | Team, import, integrations, brewery | Same |
 
 Portal: **Order** (catalog with assigned prices, cart, repeat-last), **Orders** (status),
@@ -211,15 +235,21 @@ form components until the rule of three.
 
 ## 7. Build order (each a small PR, on the existing slice plan)
 
-1. Shell: 4-tab phone nav + desk rail, brewery header, Today page (reads only what slice 1
-   has: picks due, negative ATP, taproom below par). Replace the placeholder layout.
-2. `QtyPad`, `EntityPicker`, `Sheet`, `LedgerTape`; rebuild the existing movement form on
+1. **Entry**: sign-in, invite accept, password reset, portal signup; SaaS brewery creation;
+   first-run checklist on Today; import wizard (upload → map → preview → commit) replacing
+   the current import page. Gates everything else — nobody can reach a screen without it.
+2. Shell: 4-tab phone nav + desk rail, brewery header, Today page (picks due, negative ATP,
+   taproom below par, first-run checklist). Replaces the placeholder layout. shadcn +
+   Hugeicons land here (lucide removed).
+3. `QtyPad`, `EntityPicker`, `Sheet`, `LedgerTape`; rebuild the existing movement form on
    them (proves the pattern on real code).
-3. Composer v1: text → proposal card → commit, over the existing registry; ⌘K on desk.
-   Voice = browser SpeechRecognition where available; no server STT yet.
-4. Orders / pick / ship screens as slice 1B lands.
-5. Portal shell.
-6. Each later slice adds its sheet + its Today rows; no new nav groups.
+4. Composer v1: text → proposal card → commit, over the existing registry; ⌘K on desk;
+   chat history; offline outbox. Voice = browser SpeechRecognition where available.
+5. Orders / pick / ship / returns / taproom transfer / shortfall screens as slice 1B lands;
+   invoices + QBO mapping; keg deposit lines.
+6. Portal shell (Order · Orders · Invoices · Account).
+7. Each later slice adds its sheets + its Today rows + its Settings/registry editors; no new
+   nav groups. Printing (labels) arrives with packaging (slice 5).
 
 ## 8. Open questions for Ted
 
