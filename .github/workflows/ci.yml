@@ -5,7 +5,10 @@
 # Env vars for the test suite are derived from `supabase status -o env`
 # rather than hardcoded, so this keeps working if the config ever changes.
 name: ci
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
 jobs:
   test:
     runs-on: ubuntu-latest

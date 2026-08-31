@@ -1,7 +1,9 @@
 # MGR — Baseline Schema Design (all ten slices)
 
 Date: 2026-08-31
-Status: Approved 2026-08-31 (with `brewer` added); implemented as `supabase/migrations/00001_baseline.sql`.
+Status: Approved 2026-08-31 (with `brewer` added); implemented as
+`supabase/migrations/00001_baseline.sql`. Newly discovered blockers are marked
+**SCHEMA-GATE** and are not implemented.
 Phase-2 deltas from the reviewed draft are marked **(impl)**.
 Inputs: `2026-08-31-mgr-schema-decisions.md` (decisions + conventions),
 `2026-08-30-mgr-slice1-core-orders-design.md` (product), `brewing-domain.md` (units), and the
@@ -23,9 +25,11 @@ Written as `→ table` below. Rows referencing a different brewery are structura
 **Ledgers (append-only).** `inventory_movements`, `material_movements`, `keg_events`,
 `transfers`, `volume_adjustments`: `revoke update, delete from authenticated, anon`;
 RLS `staff_read` (select) + `staff_insert` (insert, `is_staff_of(brewery_id) and
-created_by = auth.uid()`). Corrections are reversal rows. Domain rows point *at* their
-ledger row (`movement_id unique`), never the reverse, so a ledger row is never edited to
-attach context.
+created_by = auth.uid()`). A declared compensating command corrects a ledger entry with a
+reversal row; there is no generic Undo. Domain rows point *at* their ledger row
+(`movement_id unique`), never the reverse, so a ledger row is never edited to attach
+context. Compound writes use their domain compensation instead (shipment → return and
+credit memo).
 
 **Immutable definitions.** `recipe_versions`, `recipe_ingredients`: same revoke; a change
 is a new version.
@@ -36,8 +40,9 @@ volume, keg balances, deposit balances, contract balances, invoice totals, requi
 views (`security_invoker = true`). No column exists that a human must remember to update.
 
 **Status columns** exist only where a command owns every transition and tests cover them:
-`orders.status`, `purchase_orders.status` (trigger-assisted), `invoices.qbo_sync_status`.
-Everything else is timestamps (`closed_at`, `delivered_at`) or derived.
+`orders.status`, `allocations.status`, `purchase_orders.status` (trigger-assisted), and
+`invoices.qbo_sync_status`. No new priority, loading, or generic workflow status is stored;
+urgency and every other state are timestamps (`closed_at`, `delivered_at`) or derived.
 
 **RLS policy templates.**
 - `P-staff`: `staff_all for all using (is_staff_of(brewery_id))`.
@@ -103,6 +108,11 @@ default '{}'`. Premises = brewery (one per). RLS: `staff_read` select `is_staff_
 
 ### `brewery_users` — unchanged
 pk `(brewery_id, user_id)`, `role staff_role`. RLS unchanged (`member_read`, `admin_write`).
+The current brewery-bound command context cannot bootstrap these two rows, and the listed
+policies intentionally expose no client insert path. SaaS provisioning remains blocked
+until a registered pre-tenant `provision_brewery` command and narrow RLS bootstrap path can
+invoke one `security invoker` function for brewery + first-admin creation. No provisioning
+schema is added by this document pass.
 
 ### `customers` — unchanged + composite parent key
 Adds `unique (id, brewery_id)`; `price_list_id` composite FK → `price_lists` (added after
@@ -152,6 +162,15 @@ policies carried forward verbatim. `lot_id → lots` composite FK added after `l
 (nullable). `ref uuid` stays (order id / pos sale id / run id; typed context lives on the
 domain row's `movement_id`).
 
+**SCHEMA-GATE — FG correction identity:** this shape cannot implement a generic
+`reverse_inventory_movement`. `removal_shape` rejects the opposite sign for most
+types, and there is no structured relationship to the original row. Posting a
+generic `adjustment` would restore on-hand while leaving the original TTB removal
+classified. Before a named FG correction ships, define an auditable original ↔
+compensation relationship, legal sign/type rules, and report-generator semantics;
+prove that all correction writes append and that the corrected report cross-foots.
+No generic correction command exists in the implemented baseline.
+
 ### `lots` — new (slice 5)
 `packaging_run_id → packaging_runs unique not null` (1:1), `product_id → products`,
 `code text`, `packaged_on date not null`, `best_by date`. unique `(brewery_id, code)`.
@@ -164,6 +183,16 @@ the referenced `order_lines`/`locations` row exists in the same `brewery_id`. id
 `(brewery_id, sku_id) where status='open'` unchanged; add `(ref)`.
 
 ### `taproom_pars` — unchanged
+
+**SCHEMA-GATE — taproom count observations:** the implemented baseline has no FG
+count header/lines. Nonzero movement deltas alone cannot preserve a count's time,
+expected values, observed values, or zero-variance completion, so weekly-due and
+prior-snapshot queries are not currently implementable. Before the count UI ships,
+add a durable count occurrence and per-SKU expected/observed lines with optional
+links to their resulting movements. `record_taproom_count` must write the complete
+observation plus every required depletion/adjustment movement in one
+security-invoker function. The exact table shape remains a baseline-migration
+decision; no status column or mutable inventory quantity is required.
 
 ### Views
 - `on_hand`, `atp` — unchanged definitions.
@@ -186,6 +215,13 @@ order's customer), `from_location_id → locations not null` (where removals pos
 - RLS: `staff_all`; `P-customer` select; `customer_insert`/`customer_update` restricted to
   `kind='wholesale' and status in ('draft','submitted')` (portal creates up to submitted).
 
+**SCHEMA/RLS-GATE — portal fulfillment source:** `from_location_id` is required,
+but the baseline defines neither a customer-visible allowed/default order source
+nor a portal-safe read for locations. Staff order entry must choose a source.
+Before `submit_order` is exposed to customers, define a brewery-configured source
+contract and narrow RLS/read path, then require the submitted source to belong to
+that allowlist. Do not infer the first warehouse or bypass RLS with a service role.
+
 ### `order_lines`
 `order_id → orders, sku_id → skus, qty_ordered numeric > 0, qty_picked numeric >= 0,
 qty_shipped numeric >= 0 check (<= qty_ordered), unit_price_cents int >= 0` (snapshot),
@@ -198,8 +234,19 @@ no backorder columns.
 `order_id → orders unique` (one shipment per order; short-ship cancels the remainder),
 `shipped_at timestamptz not null default now()`, `carrier text`, `tracking text`,
 `created_by`. Ship command writes `sale_removal`/`taproom_transfer` movements with
-`ref = order_id` in the same transaction. Route stops reference shipments (§13).
-RLS: `staff_all`; `P-customer` select via the order.
+`ref = order_id`, fulfils/releases allocations, and advances the order in the same
+transaction. Ordinary shipping also creates the invoice. Self-delivery defers that
+invoice until `confirm_delivery`; it does not defer or repeat shipment/removal effects. Route
+stops reference shipments (§13). RLS: `staff_all`; `P-customer` select via the order.
+
+**SCHEMA-GATE — invoice timing:** the implemented shipment shape has no durable
+fact that distinguishes ordinary invoice-at-ship from self-delivery
+invoice-at-delivery, and route assignment happens later. Before either branch
+ships, add explicit immutable-at-ship intent (for example
+`invoice_on_delivery boolean not null`) and require `ship_order` to persist it.
+`confirm_delivery` may create an invoice only for a shipment carrying that intent;
+never infer it from `carrier`, `tracking`, or later route membership. This is a
+fulfillment mode, not a workflow status.
 
 ### `invoices`
 `invoice_no bigint` (trigger), `kind invoice_kind`, `customer_id → customers`,
@@ -210,6 +257,9 @@ RLS: `staff_all`; `P-customer` select via the order.
 (all five QBO fields written only by the sync job; tax is QBO's — decision). unique
 `(brewery_id, invoice_no)`. idx `(customer_id, issued_on desc)`, `(brewery_id,
 qbo_sync_status) where qbo_sync_status <> 'pushed'`. RLS: `staff_all`; `P-customer` select.
+`qbo_idempotency_key` is the stable external request identity, not durable intent storage.
+QBO create remains blocked until its slice defines how the exact outbound payload is saved
+before POST and replayed with this same key; this pass deliberately adds no storage shape.
 
 ### `invoice_lines`
 `invoice_id → invoices, kind invoice_line_kind, sku_id → skus, order_line_id →
@@ -231,6 +281,9 @@ not null <> 0, unit_price_cents int not null, amount_cents int generated always 
 pk `brewery_id`, `realm_id text not null`, `access_token text`, `refresh_token text`,
 `access_expires_at`, `refresh_expires_at`, `connected_by`, `updated_at`. RLS: `P-admin`
 (admins of the brewery). Token handling is open choice §14.
+`connect_qbo` owns OAuth completion/upsert through the narrow integration-client
+exception; `get_qbo_connection` returns health/realm/timestamps only and never tokens.
+Invoice mapping/push is unavailable until that health read is connected.
 
 ### `pos_connections`
 `provider text not null default 'square'`, `merchant_id text`, `access_token`,
@@ -254,6 +307,9 @@ gross_cents int, ingested_at default now(), movement_id → inventory_movements 
 `(connection_id, external_line_id)` (idempotent ingest). idx `(brewery_id, sold_at)`,
 `(brewery_id) where movement_id is null`. Rows are raw facts from Square: revoke `update`
 except `movement_id` (column-level grant), revoke `delete`.
+`sync_square_sales` inserts each fetched page through one security-invoker batch
+function and relies on the unique external line ID for row dedupe. The current schema
+stores no sync cursor, so neither the command nor UI may claim cursor durability.
 
 ### View `pos_unmapped_items` — distinct `(connection_id, external_item_id, external_item_name)` in `pos_sales` without a mapping.
 
@@ -376,11 +432,38 @@ is null`.
 ### `transfers` — ledger
 `from_occupancy_id → vessel_occupancies, to_occupancy_id → vessel_occupancies, bbl
 numeric > 0, loss_bbl numeric >= 0 default 0, at timestamptz, note, created_by`. check
-`from <> to`. idx on both occupancy columns.
+`from <> to`. The transfer's contemporaneous loss is represented once in `loss_bbl`; the
+command must not also insert a `volume_adjustments` loss row. A transfer to an empty
+vessel first creates its target occupancy with `initial_bbl = 0` in the same function;
+after appending the transfer, that function sets the source occupancy's `ended_at` only
+when its derived remainder is zero. A transfer into an existing compatible occupancy
+reuses it. These dependent rows are one RPC; no vessel status column or ledger mutation
+is involved. idx on both occupancy columns.
 
 ### `volume_adjustments` — ledger
 `occupancy_id → vessel_occupancies, bbl numeric <> 0, reason volume_adjustment_reason,
 at, note, created_by`. Cellar losses/dumps feed TTB.
+
+**SCHEMA-GATE — batch completion, reconciliation, and re-attribution:** this current
+shape is not sufficient for the planned `complete_batch` or loss-review flow.
+`reason='loss'` plus free-text `note` cannot
+reliably distinguish a system-created Completion Reconciliation from an ordinary manual
+loss, and `volume_adjustment_reason` cannot express cellar sample, taproom-pour, and
+destruction removals as distinct TTB classifications. Before slice 4 writes automatic
+reconciliation rows or slice 6 offers review/re-attribution, the schema must provide:
+
+- immutable, queryable system origin for a reconciliation row (not `note`);
+- the required distinct cellar-removal classifications; and
+- an auditable link to the exact original row plus one registered atomic compensating
+  command that reverses/reclassifies the selected amount with new rows.
+
+Once resolved, `complete_batch` owns `batches.closed_at`, closes the appropriate
+remaining occupancy state, and appends any threshold-qualified completion
+reconciliation in one function after verifying no packaging run remains open.
+
+No update/delete of `volume_adjustments` is permitted. This pass intentionally does not
+choose a new column or table; the database design, migration, TTB projection, and
+real-Postgres proofs are a blocking follow-up.
 
 ### `fermentation_readings`
 `occupancy_id, at timestamptz, temp_f numeric(5,1), ph numeric(4,2), gravity_plato
@@ -408,6 +491,8 @@ decision), `planned_on date not null, started_at, closed_at, bbl_drawn numeric >
 in one transaction: sets `closed_at, bbl_drawn`; inserts the `lots` row; inserts
 `production_in` movements per output (with `lot_id`); inserts consumption/return/loss
 material movements. Owned-keg fills are FG inventory, not keg events (§12).
+`schedule_packaging_run` creates the run plus all planned output rows in one
+function; the client never inserts the parent and planned outputs separately.
 
 ### `packaging_run_outputs`
 `run_id → packaging_runs, sku_id → skus, qty_planned numeric >= 0, qty_actual numeric
@@ -462,6 +547,11 @@ customer_id → customers, shipment_id → shipments, at timestamptz, note, crea
   `(shipment_id)`.
 Fill = FG `production_in` of a keg SKU; empty-at-brewery is derived, never stored:
 `fleet_total − at_customers − filled_on_hand`.
+When an order ships or returned beer includes an `owned_fleet` keg SKU, the owning
+`ship_order`/`return_shipment` RPC also appends the matching keg event linked to the
+shipment. A separate client command may not post the container effect later; the FG and
+asset ledgers must not drift. Empty-asset-only return/lost/found remains
+`record_keg_event`.
 
 ### Views
 - `keg_fleet_totals` — per `(pool, size)`: `acquired − retired − lost + found`.
@@ -476,10 +566,14 @@ vehicle text, departed_at, returned_at, note`. idx `(brewery_id, delivery_date)`
 
 ### `deliveries`
 `route_id → routes, shipment_id → shipments unique, stop_no int, delivered_at
-timestamptz, signed_by text, note`. unique `(route_id, stop_no)`. Truck load = the
-route's shipments' order lines (view `route_loads`). Invoice-on-delivery is the deliver
-command creating the invoice; no extra columns. RLS: `staff_all`; `P-customer` select
-via the shipment's order.
+timestamptz, signed_by text, note`. unique `(route_id, stop_no)`. Truck load is derived
+from the route's shipments' order lines (`route_loads`); load checkmarks are transient UI,
+with no persisted loaded, priority, or delivery status. `confirm_delivery` sets `delivered_at`
+and `signed_by` and creates the invoice in one function. It references the shipment that
+the earlier ship command already created and never ships, changes the order, or writes
+removal rows again. It must also reject a shipment that lacks the persisted
+invoice-on-delivery intent from §5. RLS: `staff_all`; `P-customer` select via the
+shipment's order.
 
 ## 14. Open choices (decisions doc silent; conservative option taken)
 

@@ -27,6 +27,8 @@ below just in time — don't preload everything.
 | UI layout, navigation, input model (chat + forms) | `.agents/superpowers/specs/2026-08-31-mgr-ui-layout-plan.md`; screens: `2026-08-31-mgr-wireframes.html` (edit the `SCREENS` array; keep in step with the plan) |
 | What's done / next | `.agents/PROGRESS.md` |
 | Past decisions and lessons | `.agents/MEMORY.md` |
+| Multi-model planning, implementation, or review | `.agents/orchestration/README.md`; invoke `.agents/orchestration/bin/workflow` rather than provider CLIs directly |
+| Simplifying recently modified code without behavior changes | `.agents/skills/simplify/SKILL.md`; in Pi use `/simplify` or `/skill:simplify` |
 | Next.js APIs | `node_modules/next/dist/docs/` (this version differs from training data) |
 
 ## Operating loop
@@ -57,4 +59,6 @@ production data (there is none yet — keep it that way by asking).
 - `.agents/PROGRESS.md` — done / in flight / next. Update at the end of each session.
 - `.agents/superpowers/{specs,plans}` — design specs and plans; `docs/superpowers` is a symlink to it (the superpowers skills write there).
 - `.agents/agents/` — subagent definitions; `.claude/agents` is a symlink to it (Claude Code only reads `.claude/agents`).
+- `.agents/orchestration/` — harness-neutral multi-model routing, budgets, prompts, and generated run artifacts. Its CLI is the only owner of cross-provider workflow policy.
+- `.agents/skills/` — project-local reusable workflows; `.pi/prompts/` may provide thin Pi command aliases without duplicating skill instructions.
 - `.agents/worktrees/<branch>/` — the only place for worktrees: `git worktree add .agents/worktrees/<branch> -b <branch>`. Gitignored.
