@@ -1,5 +1,7 @@
 # MGR Slice 1A — Foundation Implementation Plan
 
+status: done
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Multi-tenant foundation for MGR: Next.js + Supabase scaffold, tenancy/auth/RLS, command/query registry, product catalog, immutable FG movement ledger, allocations/ATP, and CSV import with opening balances.
