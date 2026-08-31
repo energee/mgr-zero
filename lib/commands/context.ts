@@ -18,6 +18,6 @@ export const buildContext = cache(async (breweryId: string): Promise<Ctx> => {
     .eq("user_id", user.id)
     .eq("customers.brewery_id", breweryId)
     .limit(1);
-  if (cust?.length) return { db, userId: user.id, breweryId, role: "customer" };
+  if (cust?.length) return { db, userId: user.id, breweryId, role: "customer", customerId: cust[0].customer_id };
   throw new CommandError("not a member of this brewery");
 });

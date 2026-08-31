@@ -1556,14 +1556,16 @@ create policy customer_own_prices on price_list_items for select
 create policy customer_read on orders for select using (customer_id in (select my_customer_ids()));
 create policy customer_insert on orders for insert
   with check (customer_id in (select my_customer_ids()) and kind = 'wholesale' and status in ('draft','submitted'));
+-- A submitted order is locked from customer edits (spec decision 2): only the
+-- draft->submitted transition remains writable for the portal.
 create policy customer_update on orders for update
-  using (customer_id in (select my_customer_ids()) and status in ('draft','submitted'))
+  using (customer_id in (select my_customer_ids()) and status = 'draft')
   with check (customer_id in (select my_customer_ids()) and kind = 'wholesale' and status in ('draft','submitted'));
 create policy customer_read on order_lines for select
   using (order_id in (select id from orders where customer_id in (select my_customer_ids())));
 create policy customer_write on order_lines for all
-  using (order_id in (select id from orders where customer_id in (select my_customer_ids()) and status in ('draft','submitted')))
-  with check (order_id in (select id from orders where customer_id in (select my_customer_ids()) and status in ('draft','submitted')));
+  using (order_id in (select id from orders where customer_id in (select my_customer_ids()) and status = 'draft'))
+  with check (order_id in (select id from orders where customer_id in (select my_customer_ids()) and status = 'draft'));
 create policy customer_read on shipments for select
   using (order_id in (select id from orders where customer_id in (select my_customer_ids())));
 create policy customer_read on invoices for select using (customer_id in (select my_customer_ids()));
@@ -1580,16 +1582,34 @@ create policy customer_read on order_events for select
 -- (create/update/submit on their own draft/submitted orders).
 create policy customer_insert on order_events for insert
   with check (actor = auth.uid() and order_id in
-    (select id from orders where customer_id in (select my_customer_ids())));
+    (select id from orders where customer_id in (select my_customer_ids()) and status in ('draft','submitted')));
+
+-- Customer portal needs the brewery's warehouse location(s) to place orders
+-- (portal_create_order looks up the default warehouse); nothing else on
+-- locations is exposed to customers.
+create policy customer_read on locations for select
+  using (kind = 'warehouse' and brewery_id in (select c.brewery_id from customers c where c.id in (select my_customer_ids())));
 
 -- ---------------------------------------------------------------- immutability grants
 revoke update, delete on recipe_versions, recipe_ingredients from authenticated, anon;
 revoke update, delete on pos_sales from authenticated, anon;
 grant update (movement_id) on pos_sales to authenticated;
 
+-- Availability badge tiers for portal customers: coarse tiers only, never raw
+-- quantities (spec 1B decision 7). security definer on purpose — customers
+-- cannot read the ledger; the where-clause pins the caller to their own account.
+create function portal_availability(p_customer uuid) returns table (sku_id uuid, badge text)
+language sql stable security definer set search_path = '' as $$
+  select a.sku_id, case when a.qty <= 0 then 'out' when a.qty < 20 then 'low' else 'in' end
+  from public.atp a
+  join public.customers c on c.brewery_id = a.brewery_id
+  where c.id = p_customer and c.id in (select public.my_customer_ids());
+$$;
+-- ponytail: fixed low-stock threshold, per-brewery setting when someone asks
+
 -- ---------------------------------------------------------------- definer functions: never callable by anon
 -- These bypass RLS; only logged-in users (and policies evaluated as them) may run them.
-revoke execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), next_no(uuid, text)
+revoke execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), next_no(uuid, text), portal_availability(uuid)
   from public, anon;
-grant execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), next_no(uuid, text)
+grant execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), next_no(uuid, text), portal_availability(uuid)
   to authenticated;
