@@ -23,6 +23,7 @@ never copy it into a second place.
 | `tests/` | Proof. Runs against the real local Supabase stack, never mocks. |
 | `scripts/seed-dev.ts` | Idempotent dev seed. |
 | `.agents/superpowers/specs/` | Product and schema design decisions (why). |
+| `.agents/orchestration/` | Cross-provider model roles, routing, budgets, prompts, approval gates, and run artifacts. |
 | `.agents/` | This file, agent memory and progress; worktrees live under `.agents/worktrees/`. |
 
 ## Iron rules

@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "defaultTier": "standard",
+  "tiers": {
+    "mechanical": {
+      "maxAgentRuns": 1,
+      "planner": null,
+      "reviewer": null,
+      "requiresPlanApproval": false
+    },
+    "standard": {
+      "maxAgentRuns": 1,
+      "planner": null,
+      "reviewer": null,
+      "requiresPlanApproval": false
+    },
+    "complex": {
+      "maxAgentRuns": 4,
+      "planner": "grok",
+      "reviewer": "grok",
+      "requiresPlanApproval": true
+    },
+    "high-risk": {
+      "maxAgentRuns": 5,
+      "planner": "grok",
+      "planReviewer": "claude",
+      "reviewer": "claude",
+      "requiresPlanApproval": true
+    }
+  },
+  "roles": {
+    "grok": "Read-only planner and product/domain critic",
+    "codex": "Sole implementation and test-repair agent",
+    "claude": "Read-only architecture, security, and high-risk reviewer",
+    "pi": "Optional read-only fallback reviewer"
+  },
+  "limits": {
+    "timeoutMinutes": 30,
+    "maxReviewRounds": 1,
+    "maxFixRounds": 1
+  }
+}
