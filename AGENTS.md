@@ -54,4 +54,5 @@ production data (there is none yet — keep it that way by asking).
 
 - `.agents/MEMORY.md` — durable facts and decisions. Update when a decision changes.
 - `.agents/PROGRESS.md` — done / in flight / next. Update at the end of each session.
+- `.agents/agents/` — subagent definitions; `.claude/agents` is a symlink to it (Claude Code only reads `.claude/agents`).
 - `.agents/worktrees/<branch>/` — the only place for worktrees: `git worktree add .agents/worktrees/<branch> -b <branch>`. Gitignored.
