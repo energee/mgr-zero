@@ -40,9 +40,9 @@ Almost none — `invoices`, `qbo_connections`, and the mapping columns already e
 - Test: `tests/qbo-push-log.test.ts`
 
 **Interfaces:**
-- Produces: table `qbo_pushes`; plpgsql `start_qbo_push(p_invoice_id uuid, p_payload jsonb) returns uuid` and `finish_qbo_push(p_push_id uuid, p_status qbo_sync_status, p_qbo_invoice_id text, p_error text, p_response jsonb)` — both security definer; only `finish_qbo_push` stamps the parent invoice's `qbo_sync_status`.
+- Produces: table `qbo_pushes`; plpgsql `start_qbo_push(p_invoice_id uuid, p_payload jsonb) returns uuid` and `finish_qbo_push(p_push_id uuid, p_status qbo_sync_status, p_qbo_invoice_id text, p_error text, p_response jsonb)` — both security definer and role-gated inside the function body to `staff_role(brewery_id) in ('admin','sales')` (matching `push_invoice_to_qbo`'s command gate — definer fns are callable directly via PostgREST RPC, so the check must live in SQL, not only in the command layer); only `finish_qbo_push` stamps the parent invoice's `qbo_sync_status`.
 
-- [ ] **Step 1: Write the failing test** (`tests/qbo-push-log.test.ts`, copy setup style from `tests/write-atomicity.test.ts` / `tests/helpers.ts`): seed brewery + customer + invoice; `rpc('start_qbo_push', {p_invoice_id, p_payload})` returns a push id, invoice `qbo_sync_status` unchanged (`pending`), `qbo_pushes` row has the payload and the invoice's `qbo_idempotency_key`; `rpc('finish_qbo_push', {…status:'pushed', p_qbo_invoice_id:'123'})` sets push row + invoice `qbo_sync_status='pushed'`, `qbo_invoice_id='123'`; direct `update`/`delete` on `qbo_pushes` as authenticated user fails (append-only, like `inventory_movements`); cross-tenant `start_qbo_push` fails.
+- [ ] **Step 1: Write the failing test** (`tests/qbo-push-log.test.ts`, copy setup style from `tests/write-atomicity.test.ts` / `tests/helpers.ts`): seed brewery + customer + invoice; `rpc('start_qbo_push', {p_invoice_id, p_payload})` returns a push id, invoice `qbo_sync_status` unchanged (`pending`), `qbo_pushes` row has the payload and the invoice's `qbo_idempotency_key`; `rpc('finish_qbo_push', {…status:'pushed', p_qbo_invoice_id:'123'})` sets push row + invoice `qbo_sync_status='pushed'`, `qbo_invoice_id='123'`; direct `update`/`delete` on `qbo_pushes` as authenticated user fails (append-only, like `inventory_movements`); cross-tenant `start_qbo_push` fails; `start_qbo_push`/`finish_qbo_push` as a `warehouse`-role member of the same brewery fails (role gate holds under direct RPC).
 - [ ] **Step 2: Run** `npx vitest run tests/qbo-push-log.test.ts` — expect FAIL (function does not exist).
 - [ ] **Step 3: Implement** in the baseline (mirroring the existing append-only ledger conventions — composite FK, no UPDATE/DELETE grants, definer fns with `revoke`/`grant execute to authenticated`):
 
@@ -73,7 +73,8 @@ declare v_push_id uuid;
 begin
   insert into qbo_pushes (brewery_id, invoice_id, idempotency_key, request_payload)
   select i.brewery_id, i.id, i.qbo_idempotency_key, p_payload
-  from invoices i where i.id = p_invoice_id and is_member(i.brewery_id)
+  from invoices i where i.id = p_invoice_id
+    and staff_role(i.brewery_id) in ('admin','sales')  -- role gate: RPC is callable directly, not just via the command
   returning id into v_push_id;
   if v_push_id is null then raise exception 'invoice not found'; end if;
   return v_push_id;
@@ -87,7 +88,7 @@ declare v_invoice_id uuid;
 begin
   update qbo_pushes set status = p_status, qbo_invoice_id = p_qbo_invoice_id,
          error = p_error, response = p_response, finished_at = now()
-  where id = p_push_id and is_member(brewery_id)
+  where id = p_push_id and staff_role(brewery_id) in ('admin','sales')
   returning invoice_id into v_invoice_id;
   if v_invoice_id is null then raise exception 'push not found'; end if;
   update invoices set qbo_sync_status = p_status, qbo_sync_error = p_error,
@@ -100,7 +101,7 @@ revoke all on function finish_qbo_push(uuid, qbo_sync_status, text, text, jsonb)
 grant execute on function finish_qbo_push(uuid, qbo_sync_status, text, text, jsonb) to authenticated;
 ```
 
-Before writing, grep the baseline for the membership-check helper's exact name (`is_member` assumed here) and copy the file's grant/revoke idiom; if the helper differs, use the file's name.
+Before writing, grep the baseline for the role helper's exact name (`staff_role(uuid)` in the current baseline) and copy the file's grant/revoke idiom; if the helper differs, use the file's name.
 - [ ] **Step 4:** `npx supabase db reset`, then `npx vitest run tests/qbo-push-log.test.ts` — PASS; also `npx vitest run tests/schema-conventions.test.ts` (append-only + composite-FK conventions must still hold; extend that test's table list if it enumerates ledgers).
 - [ ] **Step 5: Commit** `feat(1c): qbo_pushes append-only push log + start/finish definer fns`
 
@@ -178,7 +179,7 @@ Handler order (the ordering is the spec's durability requirement — payload per
 - Test: `tests/commands-qbo.test.ts` (extend)
 
 **Interfaces:**
-- Produces: command `sync_qbo_payments` (roles `["admin","sales"]`, input `{}`) → `{ updated: number }`; baseline definer fn `apply_qbo_invoice_state(p_invoice_id uuid, p_tax_cents int, p_total_cents int, p_balance_cents int, p_paid_at timestamptz) returns void` — the single writer of the "written by the sync job only" columns (`qbo_tax_cents/qbo_total_cents/qbo_balance_cents/paid_at`), same definer/grant idiom as Task 1.
+- Produces: command `sync_qbo_payments` (roles `["admin","sales"]`, input `{}`) → `{ updated: number }`; baseline definer fn `apply_qbo_invoice_state(p_invoice_id uuid, p_tax_cents int, p_total_cents int, p_balance_cents int, p_paid_at timestamptz) returns void` — the single writer of the "written by the sync job only" columns (`qbo_tax_cents/qbo_total_cents/qbo_balance_cents/paid_at`), same definer/grant idiom as Task 1 including the in-function `staff_role(brewery_id) in ('admin','sales')` role gate (definer fns are directly RPC-callable; the command-layer role check alone is bypassable).
 
 - [ ] **Step 1: Failing tests**: seed two `pushed` invoices with `qbo_invoice_id`; fake QBO query response marks one `Balance: 0` → that invoice gets `paid_at` set and `qbo_balance_cents = 0`, the other untouched; nonzero balance → `qbo_balance_cents` updated, `paid_at` stays null.
 - [ ] **Step 2:** run — FAIL. **Step 3:** implement: select `pushed` invoices with a `qbo_invoice_id`, batch-fetch `/query?query=select Id, Balance, TotalAmt, TxnTaxDetail from Invoice where Id in (…)`, call `apply_qbo_invoice_state` per changed invoice. `npx supabase db reset` after the baseline edit. **Step 4:** full `npx vitest run` — PASS. **Step 5: Commit** `feat(1c): sync_qbo_payments payments-back`
