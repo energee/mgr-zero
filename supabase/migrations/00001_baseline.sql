@@ -1406,14 +1406,28 @@ create function ship_order(p_order uuid, p_ship jsonb, p_carrier text, p_trackin
 language plpgsql set search_path = '' as $$
 declare o public.orders; sp record; v_state text; v_invoice uuid; v_shipment uuid;
 begin
+  -- Full-coverage guard: ensure p_ship covers every order line
+  if exists (
+    select 1 from public.order_lines ol
+    where ol.order_id = p_order
+    and not exists (
+      select 1 from jsonb_array_elements(p_ship) e
+      where (e->>'line_id')::uuid = ol.id
+    )
+  ) then
+    raise exception 'ship list must cover every order line';
+  end if;
   o := public.lock_order(p_order, array['picked']::public.order_status[]);
   insert into public.shipments (brewery_id, order_id, carrier, tracking, created_by)
   values (o.brewery_id, p_order, p_carrier, p_tracking, auth.uid()) returning id into v_shipment;
   if o.kind = 'wholesale' then
     select state into v_state from public.ship_tos where id = o.ship_to_id;
+    -- Empty-invoice guard: only create invoice if at least one line ships qty > 0
+    if exists (select 1 from jsonb_array_elements(p_ship) e where (e->>'qty_shipped')::numeric > 0) then
     insert into public.invoices (brewery_id, kind, customer_id, shipment_id, issued_on)
     values (o.brewery_id, 'invoice', o.customer_id, v_shipment, current_date)
     returning id into v_invoice;
+    end if;
   end if;
   for sp in select (e->>'line_id')::uuid as line_id, (e->>'qty_shipped')::numeric as qty from jsonb_array_elements(p_ship) e loop
     update public.order_lines set qty_shipped = sp.qty where id = sp.line_id and order_id = p_order;
