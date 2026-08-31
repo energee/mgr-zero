@@ -188,13 +188,28 @@ end if;
 - Ship with p_ship covering all lines → proceeds (even if some qty_shipped=0)
 
 ### Test Coverage
-**File:** `tests/orders-fulfillment.test.ts`
+**File:** `tests/orders-fulfillment.test.ts` (commit `19f8312`)
 
-Added 2 new tests to "pick and ship" describe block (lines 78-99):
-- ✅ `empty-invoice guard: ship with qty_shipped 0 creates no invoice` (tests Guard 2)
-- ✅ `full-coverage guard: ship with missing order line raises exception` (tests Guard 1)
+Added 2 new tests to "pick and ship" describe block:
+- ✅ `ship with all lines qty_shipped 0 creates no invoice and releases allocations` (tests Guard 2 — empty-invoice)
+- ✅ `ship rejects when p_ship omits an order line` (tests Guard 1 — full-coverage)
 
-**Total Tests:** 68 passed (4 original order fulfillment + 2 guard + 62 others)
+**Vitest Output:**
+```
+npx vitest run tests/orders-fulfillment.test.ts
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  17:30:07
+   Duration  589ms
+
+npx vitest run (full suite)
+ Test Files  13 passed (13)
+      Tests  68 passed (68)
+   Start at  17:30:10
+   Duration  6.71s
+```
+
+**Total Tests:** 68 passed (all fulfillment tests now properly covered by guards)
 
 ### Verification Output
 ```
