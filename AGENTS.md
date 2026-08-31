@@ -38,7 +38,7 @@ below just in time — don't preload everything.
 3. TDD: new behavior starts with a failing vitest — write it, watch it fail,
    then implement; the commit contains the test. Applies to every harness
    (Claude Code, pi, Codex, or other). Exception: UI rendering — TDD the
-   logic below the component boundary, eyeball the page.
+   logic below the component boundary; step 4 covers the eyeball check.
 4. Prove it: `npx vitest run && npx tsc --noEmit && npm run lint`. For UI, look
    at the rendered page — tests don't cover rendering.
 5. `git diff` before committing (a stray NUL byte once made a file binary).

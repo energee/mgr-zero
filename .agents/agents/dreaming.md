@@ -14,12 +14,15 @@ consolidation: make the living agent docs match reality, citing evidence.
 - .agents/agents/*.md
 
 ## Gather signal
-1. Find the last dream: `git log --grep='^dream: agent doc maintenance' --format=%H -1`
-   (the squash-merge commit keeps the dream PR's title). Empty on the first
-   run — then use the last 25 commits as the window.
+1. Find the last dream: `git log --grep='^dream:' --format=%H -1`
+   (the squash-merged dream commit keeps its `dream:` subject). Empty on the
+   first run — then use the last 25 commits as the window.
 2. Review the window: `git log --stat <last-dream>..HEAD` and
    `gh pr list --state merged --limit 20 --json number,title,mergedAt`
-   (use `gh pr view <n>` only for PRs you need evidence from).
+   (use `gh pr view <n>` only for PRs you need evidence from). The list is
+   sorted by creation date, so also check `mergedAt` against the last-dream
+   date — a long-open PR merged recently may need
+   `--search 'merged:>=<last-dream date>'` to appear.
 3. Read the .remember/today-*.md session digests.
 4. Read every editable file end to end.
 
@@ -38,7 +41,9 @@ Never delete a spec. Never copy secret-shaped strings out of digests.
 - No changes needed → print "Nothing to dream about" and stop. Do not open a PR.
 - Otherwise:
   1. `git checkout -B dreaming/main`
-  2. Commit with message starting `dream:` and a body listing each change
+  2. Commit with subject exactly `dream: agent doc maintenance` (a
+     single-commit squash merge reuses the commit subject, and the next
+     dream finds it by the `dream:` prefix) and a body listing each change
      with its evidence (commit SHA or PR number). (The workflow sets the
      git identity before you run.)
   3. `git push -f origin dreaming/main`

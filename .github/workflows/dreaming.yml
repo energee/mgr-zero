@@ -3,7 +3,16 @@ name: Dreaming
 on:
   push:
     branches: [main]
-    paths-ignore: ['.agents/**.md', 'AGENTS.md', '.remember/**']
+    # Loop guard: ignore only the dream-editable files (the list in
+    # .agents/agents/dreaming.md), so a merged dream PR never retriggers a
+    # dream. Specs, plans, and .remember digests are dream *signal* and must
+    # still trigger.
+    paths-ignore:
+      - '.agents/MEMORY.md'
+      - '.agents/PROGRESS.md'
+      - '.agents/ARCHITECTURE.md'
+      - '.agents/agents/**'
+      - 'AGENTS.md'
   workflow_dispatch:
   schedule:
     - cron: '0 9 * * *' # daily dream at 09:00 UTC (~4-5am ET); no-ops when there's nothing to curate
@@ -18,6 +27,10 @@ concurrency:
 
 jobs:
   dream:
+    # Guard workflow_dispatch on a non-main ref: a dream over a feature
+    # branch would force-push dreaming/main and open a PR to main with
+    # unmerged branch content.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -35,7 +48,22 @@ jobs:
           git config user.name "dreaming-bot"
           git config user.email "dreaming@users.noreply.github.com"
 
+      - name: Check for new commits since the last dream
+        id: window
+        # Skip the paid agent run (daily cron, redundant queued runs) when
+        # nothing landed since the last dream merge. Matches the `dream:`
+        # subject convention in .agents/agents/dreaming.md.
+        run: |
+          last=$(git log --grep='^dream:' --format=%H -1)
+          if [ -n "$last" ] && [ "$(git rev-list --count "$last"..HEAD)" = "0" ]; then
+            echo "Nothing new since last dream $last — skipping."
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run dream
+        if: steps.window.outputs.new == 'true'
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -43,7 +71,12 @@ jobs:
           # The push entries below are exact-match on purpose (not `git push:*`),
           # so an injected dream cannot push to any branch but dreaming/main —
           # in particular, never to main — and gh is limited to PR list/create/
-          # edit/view, so a dream can never merge a PR.
-          claude_args: '--allowedTools "Read,Glob,Grep,Edit,Write,Bash(git status:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(git checkout:*),Bash(git push -f origin dreaming/main),Bash(git push origin dreaming/main),Bash(gh pr list:*),Bash(gh pr create:*),Bash(gh pr edit:*),Bash(gh pr view:*)"'
+          # edit/view, so a dream can never merge a PR. The run is unattended,
+          # so the common spellings of the same dreaming/main push are all
+          # listed; any other target is still denied.
+          claude_args: '--allowedTools "Read,Glob,Grep,Edit,Write,Bash(git status:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(git checkout:*),Bash(git push -f origin dreaming/main),Bash(git push --force origin dreaming/main),Bash(git push --force-with-lease origin dreaming/main),Bash(git push -u origin dreaming/main),Bash(git push origin dreaming/main),Bash(gh pr list:*),Bash(gh pr create:*),Bash(gh pr edit:*),Bash(gh pr view:*)"'
         env:
+          # github.token pushes suppress workflow triggers: the dream PR gets
+          # no CI run — close/reopen it to trigger CI, or switch to a PAT
+          # (known limitation; see the dreaming design spec).
           GH_TOKEN: ${{ github.token }}
