@@ -40,7 +40,7 @@ Almost none — `invoices`, `qbo_connections`, and the mapping columns already e
 - Test: `tests/qbo-push-log.test.ts`
 
 **Interfaces:**
-- Produces: table `qbo_pushes`; plpgsql `start_qbo_push(p_invoice_id uuid, p_payload jsonb) returns uuid` and `finish_qbo_push(p_push_id uuid, p_status qbo_sync_status, p_qbo_invoice_id text, p_error text, p_response jsonb)` — both security definer, both stamp the parent invoice's `qbo_sync_status`.
+- Produces: table `qbo_pushes`; plpgsql `start_qbo_push(p_invoice_id uuid, p_payload jsonb) returns uuid` and `finish_qbo_push(p_push_id uuid, p_status qbo_sync_status, p_qbo_invoice_id text, p_error text, p_response jsonb)` — both security definer; only `finish_qbo_push` stamps the parent invoice's `qbo_sync_status`.
 
 - [ ] **Step 1: Write the failing test** (`tests/qbo-push-log.test.ts`, copy setup style from `tests/write-atomicity.test.ts` / `tests/helpers.ts`): seed brewery + customer + invoice; `rpc('start_qbo_push', {p_invoice_id, p_payload})` returns a push id, invoice `qbo_sync_status` unchanged (`pending`), `qbo_pushes` row has the payload and the invoice's `qbo_idempotency_key`; `rpc('finish_qbo_push', {…status:'pushed', p_qbo_invoice_id:'123'})` sets push row + invoice `qbo_sync_status='pushed'`, `qbo_invoice_id='123'`; direct `update`/`delete` on `qbo_pushes` as authenticated user fails (append-only, like `inventory_movements`); cross-tenant `start_qbo_push` fails.
 - [ ] **Step 2: Run** `npx vitest run tests/qbo-push-log.test.ts` — expect FAIL (function does not exist).
