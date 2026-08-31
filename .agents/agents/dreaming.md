@@ -1,5 +1,8 @@
 # Dreaming — curate the living agent docs
 
+**CI only.** If you are not running inside GitHub Actions (no `GITHUB_ACTIONS`
+env var), stop — this contract force-pushes and opens PRs.
+
 You are running unattended in CI after a merge to main. Your job is memory
 consolidation: make the living agent docs match reality, citing evidence.
 
@@ -11,8 +14,9 @@ consolidation: make the living agent docs match reality, citing evidence.
 - .agents/agents/*.md
 
 ## Gather signal
-1. Find the last dream: `git log --author="claude" --grep="dream" --format=%H -1 -- .agents/MEMORY.md`
-   (empty on the first run — then use the last 25 commits as the window).
+1. Find the last dream: `git log --grep='^dream: agent doc maintenance' --format=%H -1`
+   (the squash-merge commit keeps the dream PR's title). Empty on the first
+   run — then use the last 25 commits as the window.
 2. Review the window: `git log --stat <last-dream>..HEAD` and
    `gh pr list --state merged --limit 20 --json number,title,body,mergedAt`.
 3. Read the .remember/*.md session digests.
@@ -32,11 +36,13 @@ Never delete a spec. Never copy secret-shaped strings out of digests.
 ## Publish
 - No changes needed → print "Nothing to dream about" and stop. Do not open a PR.
 - Otherwise:
-  1. `git checkout -B dreaming/main`
-  2. Commit with message starting `dream:` and a body listing each change
+  1. `git config user.name "dreaming-bot" && git config user.email "dreaming@users.noreply.github.com"`
+     (fresh CI runners have no git identity).
+  2. `git checkout -B dreaming/main`
+  3. Commit with message starting `dream:` and a body listing each change
      with its evidence (commit SHA or PR number).
-  3. `git push -f origin dreaming/main`
-  4. `gh pr create --base main --head dreaming/main --title "dream: agent doc maintenance" --body <changes+flags>`
+  4. `git push -f origin dreaming/main`
+  5. `gh pr create --base main --head dreaming/main --title "dream: agent doc maintenance" --body <changes+flags>`
      — if a PR for dreaming/main already exists, `gh pr edit` its body instead.
 - Keep the diff small. If everything seems wrong, flag it in an issue-sized
   PR-body note and change only what you can cite.

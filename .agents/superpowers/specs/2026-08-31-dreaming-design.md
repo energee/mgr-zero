@@ -43,10 +43,14 @@ substitutes repo-visible signals (see Signal).
 
 Inputs each run:
 - Commits and merged PR diffs/review comments since the previous dream
-  (previous dream = last commit touching only editable files by the dream PR,
-  or full history on first run).
+  (previous dream = the squash-merge commit whose title starts
+  `dream: agent doc maintenance`, or full history on first run).
 - `.remember/` digests.
 - The editable artifacts themselves, checked for internal consistency.
+
+The editable set includes `dreaming.md` itself, so a dream may propose
+changes to its own contract; this is deliberate and contained by human
+review of the dream PR.
 
 Allowed actions on editable files:
 - Prune facts contradicted by merged work; convert relative dates to absolute.
@@ -69,6 +73,12 @@ Trigger once via `workflow_dispatch`; verify the dream PR (a) edits only
 editable files, (b) cites evidence for each change, (c) correctly catches the
 known current drift (PROGRESS.md predates PRs #7/#8). Normal CI runs on the
 dream PR as the merge gate.
+
+Known limitation: the dream pushes with `github.token`, and GitHub suppresses
+workflow triggers for such pushes — the dream PR gets no CI run and there is
+no branch protection; the human review of the dream PR is the entire merge
+gate. Workaround: close/reopen the dream PR to trigger CI, or switch the push
+to a PAT later.
 
 ## Out of scope (add if needed)
 
