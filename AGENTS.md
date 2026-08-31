@@ -18,12 +18,13 @@ below just in time — don't preload everything.
 
 | Task | Read first |
 | --- | --- |
-| Any code change | `ARCHITECTURE.md` — ownership map and the five iron rules |
+| Any code change | `.agents/ARCHITECTURE.md` — ownership map and the five iron rules |
 | Setup, ports, dev login, env vars | `README.md` |
-| Schema / migration work | `ARCHITECTURE.md` conventions, then `docs/superpowers/specs/2026-08-31-mgr-schema-decisions.md` |
-| Brewing/TTB domain rules (units, loss, removals) | `docs/superpowers/specs/brewing-domain.md` |
-| Why v1 (`~/Repos/mgr`) was left behind | `docs/superpowers/specs/2026-08-31-mgr-v1-review.md` |
-| Product intent, what a slice is | `docs/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md` |
+| Schema / migration work | `.agents/ARCHITECTURE.md` conventions, then `.agents/superpowers/specs/2026-08-31-mgr-schema-design.md` (tables) and `2026-08-31-mgr-schema-decisions.md` (why) |
+| Brewing/TTB domain rules (units, loss, removals) | `.agents/superpowers/specs/brewing-domain.md` |
+| Why v1 (`~/Repos/mgr`) was left behind | `.agents/superpowers/specs/2026-08-31-mgr-v1-review.md` |
+| Product intent, what a slice is | `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md` |
+| UI layout, navigation, input model (chat + forms) | `.agents/superpowers/specs/2026-08-31-mgr-ui-layout-plan.md`; screens: `2026-08-31-mgr-wireframes.html` (edit the `SCREENS` array; keep in step with the plan) |
 | What's done / next | `.agents/PROGRESS.md` |
 | Past decisions and lessons | `.agents/MEMORY.md` |
 | Next.js APIs | `node_modules/next/dist/docs/` (this version differs from training data) |
@@ -31,7 +32,7 @@ below just in time — don't preload everything.
 ## Operating loop
 
 1. `npx supabase start` must be running; tests hit the real database.
-2. Find the owner of the concept in `ARCHITECTURE.md` and change it there.
+2. Find the owner of the concept in `.agents/ARCHITECTURE.md` and change it there.
 3. Prove it: `npx vitest run && npx tsc --noEmit && npm run lint`. For UI, look
    at the rendered page — tests don't cover rendering.
 4. `git diff` before committing (a stray NUL byte once made a file binary).
@@ -54,4 +55,6 @@ production data (there is none yet — keep it that way by asking).
 
 - `.agents/MEMORY.md` — durable facts and decisions. Update when a decision changes.
 - `.agents/PROGRESS.md` — done / in flight / next. Update at the end of each session.
+- `.agents/superpowers/{specs,plans}` — design specs and plans; `docs/superpowers` is a symlink to it (the superpowers skills write there).
+- `.agents/agents/` — subagent definitions; `.claude/agents` is a symlink to it (Claude Code only reads `.claude/agents`).
 - `.agents/worktrees/<branch>/` — the only place for worktrees: `git worktree add .agents/worktrees/<branch> -b <branch>`. Gitignored.

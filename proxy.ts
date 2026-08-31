@@ -1,11 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-// Refreshes the Supabase session on every request. Refreshed cookies are
+// Next.js proxy (formerly `middleware`): refreshes the Supabase session on every request. Refreshed cookies are
 // written to BOTH the request (so server components and route handlers in
 // this same request read the new token) and the response (so the browser
 // stores it) — the standard @supabase/ssr pattern.
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   let res = NextResponse.next({ request: req });
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

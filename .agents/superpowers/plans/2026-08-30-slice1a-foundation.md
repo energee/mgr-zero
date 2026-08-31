@@ -2,6 +2,8 @@
 
 status: done
 
+> **Superseded schema:** this plan built two slice-1A migrations that were replaced by `supabase/migrations/00001_baseline.sql` on 2026-08-31 (see `../specs/2026-08-31-mgr-schema-design.md`). Task text below is history, not instructions.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Multi-tenant foundation for MGR: Next.js + Supabase scaffold, tenancy/auth/RLS, command/query registry, product catalog, immutable FG movement ledger, allocations/ATP, and CSV import with opening balances.
@@ -10,7 +12,7 @@ status: done
 
 **Tech Stack:** Next.js (App Router, TS), Supabase (Postgres/RLS/Auth, local CLI for dev + tests), Zod, vitest, shadcn/ui + Tailwind, Vercel.
 
-**Spec:** `docs/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md`
+**Spec:** `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md`
 
 ## Global Constraints
 

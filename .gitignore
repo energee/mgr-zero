@@ -43,9 +43,10 @@ next-env.d.ts
 # superpowers (sdd planning artifacts, not app source)
 .superpowers/
 
-# local env
-.env.local
 
 # agent worktrees (see AGENTS.md)
 /.agents/worktrees/*
 !/.agents/worktrees/.gitkeep
+
+# remember plugin session scratch (Claude-only, per machine)
+/.remember/

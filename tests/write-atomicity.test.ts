@@ -1,4 +1,4 @@
-// tests/write-atomicity.test.ts — enforces ARCHITECTURE.md iron rule 5: a
+// tests/write-atomicity.test.ts — enforces .agents/ARCHITECTURE.md iron rule 5: a
 // command block with two or more supabase-js write calls must go through one
 // plpgsql function (`.rpc(`) or carry an `// atomic-exempt:` comment.
 // Source-level check; blocks are split on defineCommand/defineQuery, and code

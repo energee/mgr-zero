@@ -1,12 +1,12 @@
 # MGR — Schema Design Decisions (input to the baseline migration)
 
 Date: 2026-08-31
-Status: Decided with Ted; the schema design doc and baseline migration follow from this.
+Status: Decided with Ted; implemented as `2026-08-31-mgr-schema-design.md` (58 tables) and `supabase/migrations/00001_baseline.sql`.
 
 ## Goal
 
-Replace the two existing migrations with **one complete baseline** covering every
-entity the ten-slice spec implies (~55 tables), so that migrations after first
+One complete baseline migration covering every
+entity the ten-slice spec implies (58 tables; it replaced the two slice-1A migrations), so that migrations after first
 deploy are rare and additive. Until first deploy the baseline is edited in place.
 Enums stay conservative: adding a value later is one line; a wrong one is forever.
 
@@ -32,7 +32,7 @@ Enums stay conservative: adding a value later is one line; a wrong one is foreve
 
 ## Conventions applied uniformly (learned the hard way in slice 1A)
 
-- Every tenant table: `brewery_id uuid not null`, RLS enabled, policies via `is_staff_of()` / `my_customer_ids()`.
+- Every tenant table: `brewery_id uuid not null`, RLS enabled, policies via the helpers named in `.agents/ARCHITECTURE.md` rule 3.
 - **Composite tenant FKs** on every cross-table reference: `unique (id, brewery_id)` on the parent, `foreign key (x_id, brewery_id) references parent (id, brewery_id)` on the child. Cross-brewery rows must be structurally impossible, not merely reviewable.
 - Ledgers (`inventory_movements`, `material_movements`, `keg_events`) are append-only: `revoke update, delete`; corrections are reversal rows.
 - Derived quantities are triggers, never client-supplied (`bbl` from `skus.bbl_per_unit`; lot requirement from `materials.lot_tracked`).
@@ -43,10 +43,9 @@ Enums stay conservative: adding a value later is one line; a wrong one is foreve
 - Multi-row writes (confirm order, ship, close packaging run) are one `security invoker` plpgsql function each; the command handler only calls it. Functions `set search_path = ''`. Rationale and v1 evidence: `2026-08-31-mgr-v1-review.md` §1.1.
 - Post-deploy, destructive DDL is guarded: `if exists (select 1 from <table>) then raise` — a migration must refuse to drop data it didn't expect.
 
-## Existing tables to carry forward unchanged in intent
+## Slice-1A tables carried forward unchanged in intent
 
 `breweries`, `brewery_users`, `customers`, `customer_users`, `ship_tos`, `products`, `skus`,
 `price_lists`, `price_list_items`, `locations`, `inventory_movements`, `allocations`,
 `taproom_pars` — see the slice-1A history (`git show 2802ae5:supabase/migrations/`)
-for the current shape, CHECK constraints and trigger; the baseline must preserve their
-semantics so the 29 existing tests keep passing.
+for the pre-baseline shape; the baseline preserved their semantics so the slice-1A tests kept passing.

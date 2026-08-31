@@ -1,0 +1,264 @@
+<meta charset="utf-8">
+<title>MGR Wireframes</title>
+<!--
+  MGR screen inventory as low-fi wireframes. Companion to 2026-08-31-mgr-ui-layout-plan.md:
+  one wireframe per §4 row (plus sub-screens), tagged with tab, slice, build step, and the
+  queries/commands it uses. Edit the SCREENS array at the bottom (plus TABS/RAIL for nav and
+  STEPS for build order — both mirror the plan); the page renders itself.
+  Published as an artifact from this path; keep the file self-contained (no external assets).
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#F2F3F1;--sf:#FFFFFF;--ink:#1B221E;--ink2:#66736C;--line:#B9C1BB;--line2:#DDE2DE;--acc:#1F4D3A;--warn:#C99A2E;--irr:#B5652E;--wire:#9AA49E}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#151A17;--sf:#1E2622;--ink:#EDF0EE;--ink2:#A3ADA7;--line:#3D4842;--line2:#2C352F;--acc:#7FB89F;--warn:#E0B24A;--irr:#D98A4F;--wire:#5F6B64}}
+:root[data-theme="dark"]{--bg:#151A17;--sf:#1E2622;--ink:#EDF0EE;--ink2:#A3ADA7;--line:#3D4842;--line2:#2C352F;--acc:#7FB89F;--warn:#E0B24A;--irr:#D98A4F;--wire:#5F6B64}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 "Instrument Sans",system-ui,sans-serif}
+.wrap{max-width:1240px;margin:0 auto;padding:28px 20px 80px}
+h1{font-size:26px;margin:0 0 4px;font-weight:600}
+.sub{color:var(--ink2);max-width:70ch;margin:0 0 16px}
+.bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:22px;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:2}
+.bar button{border:1px solid var(--line);background:var(--sf);color:var(--ink);border-radius:3px;padding:4px 10px;font:12px "JetBrains Mono",monospace;cursor:pointer}
+.bar button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.bar button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.bar .sep{width:1px;background:var(--line);margin:0 4px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:22px 18px}
+.sc{display:flex;flex-direction:column;gap:8px}
+.sc.hide{display:none}
+.sc.wide{grid-column:1/-1}
+.meta{font:11px "JetBrains Mono",monospace;color:var(--ink2);display:flex;gap:6px;flex-wrap:wrap}
+.meta b{color:var(--acc);font-weight:500}
+.meta .b{border:1px solid var(--line);border-radius:3px;padding:0 5px}
+.name{font-weight:600;font-size:14px}
+.job{color:var(--ink2);font-size:12px;margin-top:-4px}
+.io{font:11px/1.5 "JetBrains Mono",monospace;color:var(--ink2);border-top:1px solid var(--line2);padding-top:6px;overflow-wrap:anywhere}
+.io span{color:var(--ink)}
+/* frame */
+.ph{background:var(--sf);border:1.5px solid var(--line);border-radius:18px;height:520px;display:flex;flex-direction:column;overflow:hidden;font-size:11.5px}
+.ph.desk{height:auto;min-height:300px;border-radius:6px;flex-direction:row}
+.ph.desk .rail{width:150px;border-right:1px dashed var(--line);padding:10px;color:var(--ink2);font-size:11px;display:flex;flex-direction:column;gap:3px}
+.ph.desk .body{flex:1;padding:12px;display:grid;grid-template-columns:1fr 1.4fr;gap:10px;align-content:start;min-width:0}
+.ph.desk .body.one{grid-template-columns:1fr}
+@media (max-width:700px){.ph.desk .rail{display:none}.ph.desk .body{grid-template-columns:1fr}}
+.hd{display:flex;justify-content:space-between;align-items:center;padding:10px 12px 6px;font-weight:600;font-size:12.5px;border-bottom:1px dashed var(--line2)}
+.hd i{font:10px "JetBrains Mono",monospace;color:var(--ink2);font-style:normal}
+.bd{flex:1;padding:8px 10px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.ttl{font-weight:600;font-size:15px;margin:2px 0}
+.r{border:1px dashed var(--wire);border-radius:3px;padding:6px 8px;display:flex;justify-content:space-between;gap:6px;align-items:center;background:var(--sf)}
+.r small{display:block;color:var(--ink2);font-size:10px}
+.r.w{border-left:3px solid var(--warn)}
+.r.ok{border-left:3px solid var(--acc)}
+.r .n{font:12px "JetBrains Mono",monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+.btn{border:1.5px solid var(--acc);color:var(--acc);border-radius:3px;padding:9px;text-align:center;font-weight:600;min-height:40px;display:flex;align-items:center;justify-content:center}
+.btn.p{background:var(--acc);color:#fff}
+.btn.irr{background:var(--irr);border-color:var(--irr);color:#fff}
+.btn.g{border-color:var(--line);color:var(--ink);font-weight:500}
+.btns{display:grid;gap:6px}
+.btns.c2{grid-template-columns:1fr 1fr}.btns.c3{grid-template-columns:1fr 1fr 1fr}
+.num{border:1px dashed var(--wire);border-radius:3px;padding:8px;text-align:right}
+.num b{display:block;font:500 24px "JetBrains Mono",monospace;font-variant-numeric:tabular-nums}
+.num span{font:10px "JetBrains Mono",monospace;color:var(--ink2)}
+.chips{display:flex;gap:4px;flex-wrap:wrap}
+.chips span{border:1px solid var(--line);border-radius:3px;padding:2px 6px;font:10px "JetBrains Mono",monospace}
+.chips span.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:auto}
+.pad div{border:1px solid var(--line2);border-radius:3px;height:34px;display:flex;align-items:center;justify-content:center;font:14px "JetBrains Mono",monospace}
+.tape{border-left:2px solid var(--line);margin-left:3px;padding-left:8px;display:flex;flex-direction:column;gap:4px;font:10.5px "JetBrains Mono",monospace}
+.tape div{display:flex;justify-content:space-between;gap:6px;position:relative}
+.tape div::before{content:"";position:absolute;left:-12px;top:5px;width:5px;height:5px;border-radius:50%;background:var(--acc)}
+.fld{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px dashed var(--line2)}
+.fld span{font:11px "JetBrains Mono",monospace;color:var(--acc);text-align:right}
+.note{border:1px dashed var(--warn);border-radius:3px;padding:6px 8px;font-size:11px;color:var(--ink2)}
+.stp{display:flex;align-items:center;gap:3px;font:9.5px "JetBrains Mono",monospace;color:var(--ink2)}
+.stp i{flex:1;height:2px;background:var(--line2)}.stp i.d{background:var(--acc)}.stp b{font-weight:400}.stp b.c{color:var(--acc);font-weight:500}
+.tl{display:grid;gap:4px}
+.tl div{border:1px dashed var(--wire);border-radius:3px;padding:6px;min-height:52px;display:flex;flex-direction:column;justify-content:space-between;font-size:10.5px}
+.tl div b{font-size:12px}.tl div.w{border-left:3px solid var(--warn)}
+table.t{width:100%;border-collapse:collapse;font:10.5px "JetBrains Mono",monospace;font-variant-numeric:tabular-nums}
+table.t td,table.t th{padding:3px 4px;border-bottom:1px dashed var(--line2);text-align:right}
+table.t th{color:var(--ink2);font-weight:500}
+table.t td:first-child,table.t th:first-child{text-align:left;font-family:"Instrument Sans",sans-serif}
+.blank{flex:1;border:1px dashed var(--wire);border-radius:3px;display:flex;align-items:center;justify-content:center;color:var(--ink2);font-size:11px;text-align:center;padding:10px;min-height:60px}
+.comp{margin:0 10px 6px;border:1px dashed var(--wire);border-radius:3px;padding:8px 10px;color:var(--ink2);display:flex;justify-content:space-between}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px dashed var(--line);padding:6px 0 10px;font-size:10px;text-align:center;color:var(--ink2)}
+.tabs .on{color:var(--acc);font-weight:600}
+.inp{border:1px solid var(--line);border-radius:3px;padding:8px;color:var(--ink2)}
+h2.grp{grid-column:1/-1;font-size:13px;font-weight:600;color:var(--ink2);margin:12px 0 -8px;font-family:"JetBrains Mono",monospace;text-transform:uppercase;letter-spacing:.06em}
+h2.grp.hide{display:none}
+</style>
+
+<div class="wrap">
+  <h1>MGR wireframes</h1>
+  <p class="sub">One low-fi frame per screen in the UI layout plan §4, grouped by build step. Dashed = wire, green = interactive, copper = irreversible write, amber = attention. Under each frame: the queries it reads and the commands it writes. Filter by tab or build step.</p>
+  <div class="bar" id="bar"></div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<script>
+// ---- tiny renderer -------------------------------------------------------
+const TABS=['Today','Beer','Work','More'];
+// Desk rail: the four tabs as group headers, each with its areas (plan §3).
+const RAIL={Today:[],Beer:['Inventory','Cellar','Materials','Kegs'],Work:['Orders','Batches','Packaging','POs','Deliveries'],More:['Catalog','Customers','Recipes','Compliance','Planning','Settings']};
+const RAIL_HTML=TABS.flatMap(t=>[RAIL[t].length?`<b>${t}</b>`:t,...RAIL[t]]).map(x=>`<div>${x}</div>`).join('');
+const E={
+  hd:(t,r='')=>`<div class="hd"><span>${t}</span><i>${r}</i></div>`,
+  ttl:(t)=>`<div class="ttl">${t}</div>`,
+  row:(t,s='',n='',cls='')=>`<div class="r ${cls}"><span>${t}${s?`<small>${s}</small>`:''}</span><span class="n">${n}</span></div>`,
+  btn:(t,k='p')=>`<div class="btn ${k}">${t}</div>`,
+  btns:(arr,k='p',c='c3')=>`<div class="btns ${c}">${arr.map(t=>E.btn(...[].concat(t,k))).join('')}</div>`,
+  num:(v,s)=>`<div class="num"><b>${v}</b><span>${s}</span></div>`,
+  chips:(arr,on=0)=>`<div class="chips">${arr.map((c,i)=>`<span class="${i===on?'on':''}">${c}</span>`).join('')}</div>`,
+  pad:()=>`<div class="pad">${'1 2 3 4 5 6 7 8 9 . 0 ⌫'.split(' ').map(k=>`<div>${k}</div>`).join('')}</div>`,
+  tape:(arr)=>`<div class="tape">${arr.map(([a,b])=>`<div><span>${a}</span><span>${b||''}</span></div>`).join('')}</div>`,
+  fld:(k,v)=>`<div class="fld"><b>${k}</b><span>${v}</span></div>`,
+  note:(t)=>`<div class="note">${t}</div>`,
+  stp:(arr,cur)=>`<div class="stp">${arr.map((s,i)=>`<b class="${i===cur?'c':''}">${s}</b>${i<arr.length-1?`<i class="${i<cur?'d':''}"></i>`:''}`).join('')}</div>`,
+  tiles:(arr,cols=3)=>`<div class="tl" style="grid-template-columns:repeat(${cols},1fr)">${arr.map(([n,s,g,w])=>`<div class="${w?'w':''}"><b>${n}</b><span>${s}</span><span>${g||''}</span></div>`).join('')}</div>`,
+  tbl:(hd,rows)=>`<table class="t"><tr>${hd.map(h=>`<th>${h}</th>`).join('')}</tr>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</table>`,
+  blank:(t)=>`<div class="blank">${t}</div>`,
+  inp:(t)=>`<div class="inp">${t}</div>`,
+  sp:()=>`<div style="flex:1"></div>`,
+  comp:()=>`<div class="comp"><span>Say what happened…</span><span>mic</span></div>`,
+  tabs:(on)=>`<div class="tabs">${TABS.map(t=>`<div class="${t===on?'on':''}">${t}</div>`).join('')}</div>`,
+};
+const W=(t)=>`<span style="color:var(--warn)">${t}</span>`;
+function phone(s){return `<div class="ph">${s.hd||''}<div class="bd">${s.body.join('')}</div>${s.comp?E.comp():''}${s.tabbar?E.tabs(s.tabbar):''}</div>`;}
+function desk(s){return `<div class="ph desk"><div class="rail">${RAIL_HTML}</div><div class="body ${s.one?'one':''}">${s.body.join('')}</div></div>`;}
+// Mirrors plan §7 build order — change both together.
+const STEPS={1:'Entry (sign-in, onboarding, import)',2:'Shell + Today',3:'Pads, pickers, tape (movement form)',4:'Composer',5:'Orders 1B',6:'Portal',7:'Later slices'};
+function render(){
+  let out='',last=null;
+  for(const s of SCREENS){
+    const grp=s.portal?'Portal':s.desk?'Desk':s.tab;
+    if(s.step!==last){out+=`<h2 class="grp">Build step ${s.step} — ${STEPS[s.step]}</h2>`;last=s.step;}
+    out+=`<div class="sc ${s.desk?'wide':''}" data-g="${grp}" data-s="${s.step}">
+      <div class="meta"><b>${grp}</b><span class="b">slice ${s.slice}</span><span class="b">step ${s.step}</span></div>
+      <div class="name">${s.name}</div><div class="job">${s.job}</div>
+      ${s.desk?desk(s):phone(s)}
+      <div class="io">reads <span>${s.reads}</span><br>writes <span>${s.writes}</span></div></div>`;
+  }
+  document.getElementById('grid').innerHTML=out;
+}
+function filter(ft,fs){
+  const g=document.getElementById('grid');
+  g.querySelectorAll('.sc').forEach(c=>c.classList.toggle('hide',!((ft==='all'||c.dataset.g===ft)&&(fs==='all'||c.dataset.s===fs))));
+  g.querySelectorAll('h2.grp').forEach(h=>{let n=h.nextElementSibling,any=false;while(n&&!n.classList.contains('grp')){if(!n.classList.contains('hide'))any=true;n=n.nextElementSibling;}h.classList.toggle('hide',!any);});
+}
+function bar(){
+  const tabs=['all',...TABS,'Portal','Desk'],steps=['all',...Object.keys(STEPS)];
+  let t='all',st='all';const b=document.getElementById('bar');
+  b.innerHTML=tabs.map(x=>`<button data-t="${x}">${x==='all'?'all tabs':x}</button>`).join('')+'<span class="sep"></span>'+steps.map(x=>`<button data-s="${x}">${x==='all'?'all steps':'step '+x}</button>`).join('');
+  const apply=()=>{b.querySelectorAll('button').forEach(k=>k.classList.toggle('on',k.dataset.t===t||k.dataset.s===st));filter(t,st);};
+  b.addEventListener('click',e=>{const k=e.target.closest('button');if(!k)return;if(k.dataset.t)t=k.dataset.t;if(k.dataset.s)st=k.dataset.s;apply();});
+  apply();
+}
+
+// ---- screens: {step, slice, tab|portal|desk, name, job, reads, writes, hd, body[], comp, tabbar}
+const H=E.hd;
+const SCREENS=[
+// step 1 — entry
+{step:1,slice:1,tab:'More',name:'Sign in',job:'Get into the right brewery',reads:'—',writes:'auth.signInWithPassword / magic link',
+ hd:H('MGR'),body:[E.sp(),E.ttl('Sign in'),E.inp('email'),E.inp('password'),E.btn('Sign in'),E.btn('Email me a link','g'),E.row('Forgot password?'),E.sp()]},
+{step:1,slice:1,tab:'More',name:'Accept invite',job:'Set a password and land in the right place',reads:'invite token → brewery/customer, role',writes:'auth.updateUser (membership row already exists)',
+ hd:H('MGR'),body:[E.sp(),E.ttl('You’re invited to Demo Brewing'),E.row('Role','','warehouse'),E.inp('choose a password'),E.btn('Join Demo Brewing'),E.note('Staff → Today. Portal customer → Order.'),E.sp()]},
+{step:1,slice:1,tab:'More',name:'Reset password',job:'Recover an account',reads:'—',writes:'auth.resetPasswordForEmail',
+ hd:H('MGR'),body:[E.sp(),E.ttl('Reset password'),E.inp('email'),E.btn('Send reset link'),E.note('Sent state: “Check your email.” No account enumeration.'),E.sp()]},
+{step:1,slice:1,tab:'More',name:'Create brewery (SaaS)',job:'Provision a tenant',reads:'DEPLOYMENT_MODE=saas',writes:'brewery.create (breweries + admin brewery_users row)',
+ hd:H('MGR'),body:[E.ttl('New brewery'),E.inp('Brewery name'),E.inp('Timezone'),E.inp('TTB registry no. (optional)'),E.btn('Create brewery'),E.note('Hidden in dedicated mode.')]},
+{step:1,slice:1,tab:'Today',name:'First run checklist',job:'Turn an empty brewery into a usable one',reads:'counts of locations, skus, brewery_users, opening_balance rows',writes:'— (links to actions)',
+ hd:H('◐ Demo Brewing','TS'),body:[E.ttl('Set up Demo Brewing'),E.row('1 · Add your locations','warehouse, taproom…','›','ok'),E.row('2 · Import or add catalog','CSV or one product at a time','›'),E.row('3 · Invite your team','admin, sales, warehouse, brewer','›'),E.row('4 · Opening inventory','counts → opening_balance rows','›'),E.note('Replaces the empty Today inbox until all four are done.')],comp:true,tabbar:'Today'},
+{step:1,slice:1,desk:true,name:'Import wizard',job:'Upload → map → preview → commit; idempotent re-runs',reads:'skus, customers, locations for matching',writes:'import.customers / skus / priceLists / openingBalances (atomic-exempt, per row)',
+ one:true,body:[E.stp(['upload','map columns','preview','commit'],2),E.tbl(['row','customer','ship-to','state','status'],[['1','Sly Fox','Main','PA','ok'],['2','Al’s Bar','—','OH',W('missing ship-to')],['3','Teresa’s','Dock','PA','exists · skip']]),E.btns([['Back','g'],['Import 2 rows','irr']],'p','c2')]},
+// step 2 — shell
+{step:2,slice:1,tab:'Today',name:'Today',job:'What needs doing, across slices',reads:'q.today (picks due, negative ATP, below par, overdue readings, failed pushes)',writes:'—',
+ hd:H('◐ Demo Brewing','⌕ TS'),body:[E.ttl('Today'),E.row('3 orders to pick','ship today','›','w'),E.row('FV3 reading overdue','31 h','›','w'),E.row('Taproom: Pils below par','4 / 8','›','w'),E.row('PO 0142 arrives Thu','Country Malt','›','ok'),E.btns(['Record','Pick','Reading'])],comp:true,tabbar:'Today'},
+{step:2,slice:1,tab:'Beer',name:'Beer',job:'What we have: FG, cellar, materials, kegs',reads:'v_on_hand, v_atp, v_occupancy, v_material_on_hand, v_keg_balances',writes:'—',
+ hd:H('◐ Demo Brewing','⌕ TS'),body:[E.ttl('Beer'),E.row('Finished goods','ATP by SKU','11 · −6'),E.row('Cellar','6 vessels · 1 overdue','›'),E.row('Materials','3 short','›'),E.row('Kegs','142 out · 38 at Sly Fox','›'),E.blank('sections collapse to totals; tap to expand')],comp:true,tabbar:'Beer'},
+{step:2,slice:1,tab:'Work',name:'Work',job:'What’s in motion',reads:'open orders, batches, packaging_runs, purchase_orders, deliveries',writes:'—',
+ hd:H('◐ Demo Brewing','⌕ TS'),body:[E.ttl('Work'),E.chips(['all','orders','batches','runs','POs','routes']),E.row('ORD-0231 Sly Fox','confirmed · ship Thu','›'),E.row('B-0413 Stout','FV3 · d7','›'),E.row('PO-0142 Country Malt','arrives Thu','›'),E.row('RUN-0031 Hazy cans','planned Fri','›')],comp:true,tabbar:'Work'},
+{step:2,slice:1,tab:'More',name:'More',job:'Desk things, two taps deep',reads:'role',writes:'—',
+ hd:H('◐ Demo Brewing','⌕ TS'),body:[E.ttl('More'),E.row('Catalog'),E.row('Customers'),E.row('Price lists'),E.row('Recipes'),E.row('Compliance'),E.row('Planning'),E.row('Settings','team · locations · import · integrations · notifications')],comp:true,tabbar:'More'},
+{step:2,slice:1,tab:'More',name:'Search',job:'One picker across kinds',reads:'q.search (skus, customers, orders, lots, vessels, materials)',writes:'—',
+ hd:H('Search','✕'),body:[E.inp('hazy'),E.row('Hazy IPA ½bbl','SKU','ATP 11'),E.row('Hazy IPA 16oz case','SKU','ATP 40'),E.row('ORD-0231 Sly Fox','order · 4 × Hazy','›'),E.row('L-240831-HZ','lot · 2026-08-31','›')]},
+{step:2,slice:1,tab:'More',name:'Settings',job:'Brewery, locations, team, integrations, notifications',reads:'breweries, locations, brewery_users, *_connections',writes:'brewery.update, location.upsert, invite.staff',
+ hd:H('‹ More','Settings'),body:[E.row('Brewery','Demo Brewing · America/New_York · TTB BR-PA-…','›'),E.row('Locations','Warehouse, Taproom','›'),E.row('Team','5 people · 1 invite pending','›'),E.row('Integrations','QuickBooks ✓ · Square —','›'),E.row('Notifications','sent log','›'),E.row('Import','CSV wizard','›')]},
+// step 3 — pads/pickers/tape
+{step:3,slice:1,tab:'Beer',name:'Inventory · SKU detail',job:'On-hand, ATP, movement tape per SKU',reads:'v_on_hand, v_atp by location; inventory_movements',writes:'—',
+ hd:H('‹ Beer','Hazy IPA ½bbl'),body:[E.num('11','ATP · 15 on hand · 4 allocated'),E.row('Warehouse','','12'),E.row('Taproom','','3'),E.tape([['+8 production_in · Wh','Mon'],['−4 taproom_transfer','Tue'],['−1 depletion · taproom','Wed']]),E.btn('Record movement')],comp:true,tabbar:'Beer'},
+{step:3,slice:1,tab:'Beer',name:'Record movement (sheet)',job:'Write one ledger row fast',reads:'skus, locations (recents first)',writes:'inventory.recordMovement',
+ hd:H('Record','✕'),body:[E.chips(['depletion','loss','sample','festival','adjust']),E.fld('SKU','Hazy IPA ½bbl'),E.fld('Location','Taproom'),E.fld('Channel','taproom'),E.num('2','= 1.00 bbl · ATP after 9'),E.chips(['kegs','cases','bbl']),E.pad(),E.btn('Record','irr')]},
+{step:3,slice:1,tab:'Beer',name:'Entity picker (drawer)',job:'Recents first, then search',reads:'recents (local) + q.search kind=sku',writes:'—',
+ hd:H('Choose SKU','✕'),body:[E.inp('search'),E.row('Recent'),E.row('Hazy IPA ½bbl','','ATP 11'),E.row('Pils 16oz case','','ATP −6'),E.row('Stout ⅙bbl','','ATP 7'),E.row('All SKUs'),E.blank('alphabetical list…')]},
+// step 4 — composer
+{step:4,slice:1,tab:'Today',name:'Composer → proposal',job:'Sentence → command fields → commit',reads:'registry schemas (tool defs)',writes:'the proposed command, on Commit',
+ hd:H('◐ Demo Brewing','⌕ TS'),body:[E.row('“blew a half of Hazy at the taproom”'),E.fld('Type','depletion'),E.fld('SKU','Hazy IPA ½bbl'),E.fld('Qty','−1 keg (0.5 bbl)'),E.fld('Location','Taproom'),E.btns([['Open as form','g'],['Commit','irr']],'p','c2'),E.tape([['−1 depletion · taproom','queued']])],comp:true,tabbar:'Today'},
+{step:4,slice:1,tab:'Today',name:'Composer → answer',job:'Questions run queries',reads:'q.atp, q.shortfall',writes:'—',
+ hd:H('◐ Demo Brewing','⌕ TS'),body:[E.row('“how much Hazy can I promise Friday?”'),E.num('11 ½bbl','+40 cases · 2 orders compete for 6'),E.row('Open shortfall view','','›'),E.blank('history: swipe up on the composer')],comp:true,tabbar:'Today'},
+{step:4,slice:1,tab:'Today',name:'Offline outbox',job:'See and retry queued writes',reads:'IndexedDB outbox',writes:'replays queued commands (same idempotency id)',
+ hd:H('Queued · 3','✕'),body:[E.row('−1 depletion · Hazy ½bbl','09:41 · waiting for wifi','retry'),E.row('reading FV3 1.019','09:44','retry'),E.row('−0.2 bbl loss FV2','09:50','retry'),E.btns(['Retry all','Discard…'],'g','c2')]},
+// step 5 — orders 1B
+{step:5,slice:1,tab:'Work',name:'Order',job:'Next state is the only button',reads:'orders, order_lines, v_atp, ship_tos',writes:'order.confirm / pick / ship / cancel',
+ hd:H('‹ Work','ORD-0231'),body:[E.ttl('Sly Fox Tap Room'),E.row('Ship Thu 9/3 · Phoenixville, PA · wholesale'),E.stp(['draft','submitted','confirmed','picked','shipped'],2),E.row('Hazy IPA ½bbl','','4 · ATP 11'),E.row('Pils 16oz case','','10 · ATP −6','w'),E.note('Pils short: ATP −6. Confirm anyway? (soft warning)'),E.sp(),E.btn('Start picking')]},
+{step:5,slice:1,tab:'Work',name:'Pick',job:'Count what’s on the pallet',reads:'order_lines',writes:'order.recordPicked (qty per line)',
+ hd:H('‹ ORD-0231','Pick'),body:[E.row('Hazy IPA ½bbl','picked / ordered','4 / 4','ok'),E.row('Pils 16oz case','','6 / 10','w'),E.row('Stout ⅙bbl','','— / 2'),E.note('Pils short by 4: adjust line down, or leave and remainder cancels on ship.'),E.sp(),E.btn('Print pick list','g'),E.btn('Done picking')]},
+{step:5,slice:1,tab:'Work',name:'Ship (confirm-gated)',job:'Commit the removal + invoice',reads:'picked qtys, ship_to.state, sku.bbl_per_unit',writes:'order.ship → shipments, sale_removal rows, allocations fulfilled, invoice (one plpgsql fn)',
+ hd:H('‹ ORD-0231','Ship'),body:[E.row('About to write'),E.tape([['−4 Hazy ½bbl · sale · PA','2.00 bbl'],['−6 Pils case · sale · PA','0.28 bbl'],['INV-0198 · $1,240.00','']]),E.note('Remainder (4 Pils) cancels. Removal month = today.'),E.sp(),E.btn('Ship','irr')]},
+{step:5,slice:1,tab:'Work',name:'Daily pick sheet',job:'All confirmed orders by ship date',reads:'orders confirmed, grouped by ship_date',writes:'—',
+ hd:H('‹ Work','Pick sheet · Thu'),body:[E.row('Sly Fox','ORD-0231','3 lines'),E.row('Al’s Bar','ORD-0232','1 line'),E.row('Teresa’s','ORD-0234','5 lines'),E.row('Totals','Hazy ½bbl 9 · Pils case 22 · Stout ⅙ 4'),E.sp(),E.btn('Print','g')]},
+{step:5,slice:1,tab:'Beer',name:'Taproom',job:'Par vs on-hand → transfer order',reads:'taproom_pars, v_on_hand(taproom)',writes:'order.createInternalTransfer',
+ hd:H('‹ Beer','Taproom'),body:[E.row('Pils 16oz case','par 8','4 / 8','w'),E.row('Hazy ½bbl','par 4','3 / 4','w'),E.row('Stout ⅙bbl','par 2','2 / 2','ok'),E.note('Suggested transfer: 4 Pils, 1 Hazy'),E.sp(),E.btn('Record depletion','g'),E.btn('Create transfer order')],comp:true,tabbar:'Beer'},
+{step:5,slice:1,tab:'Beer',name:'Shortfall & pars',job:'Decide who gets scarce beer',reads:'v_shortfall (open allocations vs on-hand)',writes:'allocation.release, order.adjustLine, taproomPar.upsert',
+ hd:H('‹ Beer','Pils 16oz case'),body:[E.num('−6','ATP · 22 on hand · 28 allocated'),E.row('ORD-0231 Sly Fox','Thu','10','w'),E.row('ORD-0234 Teresa’s','Fri','12'),E.row('Taproom standing','','6'),E.note('Release or adjust a line — the system never chooses.'),E.btn('Edit pars','g')]},
+{step:5,slice:1,tab:'Work',name:'Return / credit memo',job:'Take beer back and fix the money',reads:'shipment lines',writes:'order.return → return_in rows + negative-line invoice (one fn)',
+ hd:H('‹ ORD-0231','Return'),body:[E.row('Hazy IPA ½bbl','shipped 4','1'),E.chips(['damaged','wrong item','unsold','keg return']),E.row('Deposit refund','1 × ½bbl pool','−$30.00'),E.tape([['+1 Hazy ½bbl · return_in','Wh'],['CM-0012 · −$150.00','']]),E.sp(),E.btn('Record return','irr')]},
+{step:5,slice:1,tab:'More',name:'Customers',job:'Who buys, where it goes',reads:'customers, ship_tos, price_lists, v_keg_balances',writes:'customer.upsert, shipTo.upsert, invite.customerUser',
+ hd:H('‹ More','Customers'),body:[E.inp('search'),E.row('Sly Fox Tap Room','Wholesale · PA · 38 kegs out','›'),E.row('Al’s Bar','Retail · OH · excise: brewery remits','›','w'),E.row('Teresa’s','Wholesale · PA','›'),E.btn('Add customer','g')]},
+{step:5,slice:1,tab:'More',name:'Customer',job:'Account, ship-tos, deposits, portal users',reads:'customer, ship_tos, invoices, keg deposit balance',writes:'shipTo.upsert, invite.customerUser',
+ hd:H('‹ Customers','Sly Fox'),body:[E.row('Price list','','Wholesale'),E.row('QBO','','mapped ✓'),E.row('Ship-tos','Main (PA), Dock (PA)','+'),E.row('Keg deposits','38 out','$1,140.00'),E.row('Portal users','2','invite'),E.row('Open invoices','2','$2,480.00')]},
+{step:5,slice:1,tab:'More',name:'Invoices & QBO',job:'Get paid; fix mappings',reads:'invoices, qbo_sync_status, unmapped customers/skus',writes:'invoice.pushToQbo (idempotent), mapping.set',
+ hd:H('‹ More','Invoices'),body:[E.chips(['all','unsent','failed','unpaid','paid']),E.row('INV-0198 Sly Fox','$1,240.00','pushed ✓'),E.row('INV-0197 Al’s Bar','$380.00','push failed','w'),E.note('Al’s Bar has no QBO customer — pick from QBO to map, then retry.'),E.btn('Map & retry')]},
+{step:5,slice:1,tab:'More',name:'Catalog',job:'Define what we sell',reads:'products, skus, price_list_items, sku_bom',writes:'product.upsert, sku.upsert, priceList.setItem',
+ hd:H('‹ More','Catalog'),body:[E.row('Hazy IPA','IPA · 6.8% · ½bbl, ⅙bbl, 16oz case','›'),E.row('Pils','Lager · 4.9% · ½bbl, 16oz case','›'),E.row('Stout','Stout · 7.2% · ⅙bbl','›'),E.note('SKU: bbl_per_unit shown as fraction and decimal; BOM tab (slice 5).'),E.btn('Add product','g')]},
+// step 6 — portal
+{step:6,slice:1,portal:true,name:'Portal · Order',job:'Place or repeat this week’s order',reads:'orderable skus + assigned price list, v_atp (soft)',writes:'order.create / submit (portal)',
+ hd:H('Sly Fox','Demo Brewing'),body:[E.btn('Same as last week','g'),E.row('Hazy IPA ½bbl','$150.00','− 4 +'),E.row('Pils 16oz case','$38.00','− 6 +'),E.row('Stout ⅙bbl','$62.00','− 0 +'),E.row('Ship to','Main · Wed 9/9'),E.sp(),E.btn('Submit order · $828.00')]},
+{step:6,slice:1,portal:true,name:'Portal · Orders / Invoices',job:'Status and money',reads:'own orders, invoices',writes:'—',
+ hd:H('Sly Fox','Orders'),body:[E.row('ORD-0231','confirmed · ships Thu','$1,240'),E.row('ORD-0225','shipped 8/27','paid ✓'),E.row('INV-0190','due 9/10','$980.00','w'),E.blank('Account: ship-tos, users, deposits held')]},
+// step 7 — later slices
+{step:7,slice:4,tab:'Beer',name:'Cellar map',job:'Every tank, time since last reading',reads:'vessels, v_occupancy, last fermentation_reading',writes:'—',
+ hd:H('‹ Beer','Cellar'),body:[E.tiles([['FV1','Pils · d9','1.008'],['FV2','Hazy · d4','1.030'],['FV3','Stout · d7','1.021 · 31h',1],['BT1','Pils','carb'],['BT2','empty','—'],['FB1','Saison','aging']]),E.sp(),E.btns(['Reading','Transfer','Brew day'])],comp:true,tabbar:'Beer'},
+{step:7,slice:4,tab:'Beer',name:'Reading (sheet)',job:'Type only what changed',reads:'last reading (ghosted)',writes:'cellar.recordReading',
+ hd:H('FV3 · Stout','✕'),body:[E.chips(['gravity','temp','pH']),E.num('1.019','last 1.021 · 31h ago'),E.chips(['SG','°P'],0),E.inp('note (optional)'),E.pad(),E.btn('Record')]},
+{step:7,slice:4,tab:'Beer',name:'Brew day',job:'Start a batch; knockout is the loss baseline',reads:'recipe_versions, materials/lots, free vessels',writes:'batch.create, batch.recordAdditions, batch.knockout → vessel_occupancies (one fn)',
+ hd:H('‹ Cellar','Brew B-0416'),body:[E.fld('Recipe','Hazy IPA v4 · 15 bbl'),E.row('2-row','lot L-0821','660 lb ✓'),E.row('Citra','lot L-0790','18 lb ✓'),E.row('Yeast','WLP066 gen 3','1 brink'),E.fld('Knockout','14.6 bbl → FV2'),E.sp(),E.btn('Record knockout','irr')]},
+{step:7,slice:4,tab:'Beer',name:'Transfer / loss',job:'Move beer, account for the rest',reads:'v_occupancy volumes',writes:'cellar.transfer (+ loss adjustment) one fn',
+ hd:H('Transfer','✕'),body:[E.fld('From','FV3 · Stout · 14.2 bbl'),E.fld('To','BT2 (empty)'),E.num('13.8','bbl moving'),E.note('FV3 held 14.2, moving 13.8 — record 0.4 bbl loss? reason: trub / yeast / other'),E.pad(),E.btn('Transfer','irr')]},
+{step:7,slice:5,tab:'Work',name:'Packaging run',job:'Checklist → counts → lot lands in inventory',reads:'sku_bom, v_material_on_hand, occupancy',writes:'packaging.closeRun → lots, production_in, consumptions, returns/loss (one fn)',
+ hd:H('‹ Work','RUN-0031 Hazy cans'),body:[E.tbl(['need','have','short'],[['cans 2,880','3,100','—'],['ends 2,880','2,400',W('480')],['labels 2,880','5,000','—']]),E.fld('Packaged','118 cases'),E.fld('Lot','L-240905-HZ'),E.tape([['+118 Hazy 16oz case · production_in',''],['−2,832 cans · consumed','']]),E.btn('Close run','irr')]},
+{step:7,slice:5,tab:'More',name:'Lot trace',job:'Where did lot X go',reads:'lots → inventory_movements → shipments → customers; material_lots → batches',writes:'—',
+ hd:H('‹ Search','L-240831-HZ'),body:[E.row('Hazy IPA 16oz case','packaged 8/31 · RUN-0028','118'),E.tape([['−40 · ORD-0225 Sly Fox · PA','8/27'],['−24 · ORD-0229 Teresa’s · PA','8/29'],['−6 · taproom_transfer','8/30'],['−2 · sample','8/30']]),E.row('Materials in','2-row L-0821 · Citra L-0790'),E.btn('Print trace','g')]},
+{step:7,slice:2,tab:'Work',name:'Receive PO',job:'Expected vs counted; only counted posts',reads:'purchase_order_lines, materials.lot_tracked',writes:'materials.receive → receipts, material_lots, material_movements (one fn)',
+ hd:H('‹ Work','PO-0142 Country Malt'),body:[E.row('2-row 55lb','expected 40','40','ok'),E.row('Citra 44lb','expected 4','3','w'),E.fld('Lot (Citra)','2026-CIT-77'),E.note('Citra short 1 — flagged for vendor follow-up; PO partially_received.'),E.sp(),E.btn('Receive','irr')]},
+{step:7,slice:2,tab:'Beer',name:'Cycle count',job:'Keep material truth honest',reads:'v_material_on_hand',writes:'materials.count → adjustment movements',
+ hd:H('Count','✕'),body:[E.fld('Material','Cans 16oz'),E.num('3,050','system 3,100 · adj −50'),E.chips(['each','case']),E.pad(),E.btn('Record count')]},
+{step:7,slice:2,tab:'More',name:'Vendors & contracts',job:'Who supplies; drawdown of committed qty',reads:'vendors, material_contracts, receipts',writes:'vendor.upsert, contract.upsert',
+ hd:H('‹ Materials','Contracts'),body:[E.row('Citra 2026 · YCH','committed 400 lb','received 262'),E.row('2-row 2026 · Country Malt','committed 20,000 lb','received 8,800'),E.blank('vendor list · lead times · PO history')]},
+{step:7,slice:3,tab:'More',name:'Recipes',job:'Author, version, scale, cost',reads:'recipes, recipe_versions, recipe_ingredients, material prices',writes:'recipe.createVersion (immutable)',
+ hd:H('‹ More','Hazy IPA v4'),body:[E.chips(['per bbl','15 bbl','30 bbl'],1),E.row('2-row','44 lb/bbl','660 lb'),E.row('Citra','1.2 lb/bbl','18 lb'),E.row('Cost','','$41.20 / bbl'),E.btn('New version','g')]},
+{step:7,slice:6,tab:'More',name:'Compliance · month',job:'File the month; review losses first',reads:'v_bro (per tax class), report_filings, unattributed losses',writes:'compliance.file → report_filings snapshot',
+ hd:H('‹ More','August 2026'),body:[E.row('Auto-reconciled losses to review','','3','w'),E.tbl(['class','begin','+','−','end'],[['cellar','120.4','62.0','58.1','124.3'],['kegs','41.0','30.5','33.2','38.3'],['cans','12.6','18.0','14.9','15.7']]),E.row('PA excise','','$1,412'),E.row('OH excise (Al’s)','','$96'),E.btn('File & snapshot','irr')]},
+{step:7,slice:6,tab:'More',name:'Compliance registry',job:'What we may ship where',reads:'product_approvals, state_registrations, brewery_state_licenses',writes:'registry.upsert',
+ hd:H('‹ Compliance','Registry'),body:[E.chips(['products','states','licenses']),E.row('Hazy IPA','COLA ✓ · formula n/a','PA OH'),E.row('Stout','COLA pending','PA','w'),E.row('Ohio','registered · exp 12/31','we remit'),E.note('Confirm order warns when ship-to state isn’t registered for the product.')]},
+{step:7,slice:7,tab:'More',name:'POS setup & mapping',job:'Make Square sales mean something',reads:'pos_connections, pos_locations, pos_item_mappings, unmapped pos_sales',writes:'pos.connect, pos.mapLocation, pos.mapItem',
+ hd:H('‹ Settings','Square'),body:[E.row('Connection','','connected ✓'),E.row('Taproom (Square) → Taproom','','✓'),E.row('Unmapped items','','7','w'),E.row('“Hazy 16oz draft”','→ pick SKU','›'),E.row('“Flight”','→ pick SKU or ignore','›'),E.btn('Reconcile week','g')]},
+{step:7,slice:9,tab:'Beer',name:'Keg fleet',job:'Who has our kegs',reads:'keg_pools, v_keg_balances, deposits',writes:'kegs.recordEvent (return, loss)',
+ hd:H('‹ Beer','Kegs'),body:[E.row('Owned ½bbl','142 out · 61 in','203'),E.row('Sly Fox','38 out','$1,140'),E.row('Teresa’s','22 out','$660'),E.row('Lost / unreturned > 90d','','9','w'),E.btn('Record return')]},
+{step:7,slice:10,tab:'Work',name:'Truck loading',job:'Right kegs on the right truck',reads:'routes, deliveries, picked orders',writes:'delivery.markLoaded',
+ hd:H('‹ Work','Route A · Thu'),body:[E.row('Stop 1 · Sly Fox','4 Hazy ½ · 6 Pils cs','loaded ✓','ok'),E.row('Stop 2 · Al’s Bar','2 Stout ⅙','load'),E.row('Stop 3 · Teresa’s','8 Hazy ½ · 12 Pils cs','load','w'),E.note('Teresa’s Pils short 2 — flagged at pick.'),E.sp(),E.btn('Start route')]},
+{step:7,slice:10,tab:'Work',name:'Driver · deliver',job:'Confirm drop, invoice on delivery',reads:'delivery stop, order lines',writes:'delivery.confirm → ship + invoice (one fn)',
+ hd:H('Route A','Stop 1 / 3'),body:[E.ttl('Sly Fox Tap Room'),E.row('Hazy IPA ½bbl','','4'),E.row('Pils 16oz case','','6'),E.row('Kegs returned','empties','+5'),E.inp('signature / name'),E.sp(),E.btn('Delivered','irr')]},
+{step:7,slice:8,desk:true,name:'Planning (desk)',job:'Demand vs supply; shortfalls as views',reads:'open orders + pars vs batches.planned_on + packaging_runs.planned_on',writes:'purchaseOrder.draftFromRequirements',
+ body:[E.tbl(['week','demand','supply','gap'],[['9/7','48 bbl','40 bbl',W('−8')],['9/14','52 bbl','60 bbl','+8']]),`<div>${E.row('Sept 12 packaging: short 480 ends · lead 10d','','draft PO','w')}${E.row('Hazy ATP goes negative 9/9','','→ shortfall')}</div>`]},
+];
+render();bar();
+</script>

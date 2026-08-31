@@ -1,5 +1,5 @@
 // tests/schema-rules.test.ts — schema-wide rules read straight from pg_catalog,
-// so ARCHITECTURE.md conventions are gates, not prose. Uses `psql` (present on
+// so .agents/ARCHITECTURE.md conventions are gates, not prose. Uses `psql` (present on
 // dev machines via libpq and on ubuntu-latest CI); DATABASE_URL overrides the
 // local Supabase default. Lifted from MGR v1's check-* scripts, each of which
 // was written after a Supabase advisor finding or a real bug.

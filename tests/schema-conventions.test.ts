@@ -1,6 +1,6 @@
 // tests/schema-conventions.test.ts — proves the baseline-migration conventions hold by
 // writing to the live local database: composite tenant FKs, lot-tracking trigger, and
-// append-only ledgers (UPDATE/DELETE revoked). See docs/superpowers/specs/2026-08-31-mgr-schema-design.md §0.
+// append-only ledgers (UPDATE/DELETE revoked). See .agents/superpowers/specs/2026-08-31-mgr-schema-design.md §0.
 import { describe, it, expect, beforeAll } from "vitest";
 import { admin, makeBrewery, makeStaff, asUser } from "./helpers";
 

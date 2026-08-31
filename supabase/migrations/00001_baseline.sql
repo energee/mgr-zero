@@ -1,7 +1,7 @@
 -- 00001_baseline.sql — the complete MGR schema for all ten slices.
--- Design: docs/superpowers/specs/2026-08-31-mgr-schema-design.md
--- Decisions: docs/superpowers/specs/2026-08-31-mgr-schema-decisions.md
--- Domain units: docs/superpowers/specs/brewing-domain.md (bbl, °F, °Plato, cents)
+-- Design: .agents/superpowers/specs/2026-08-31-mgr-schema-design.md
+-- Decisions: .agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md
+-- Domain units: .agents/superpowers/specs/brewing-domain.md (bbl, °F, °Plato, cents)
 --
 -- Conventions (see §0 of the design doc):
 --   * every tenant table has brewery_id, unique (id, brewery_id), RLS

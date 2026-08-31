@@ -7,14 +7,15 @@ invitations, built on Next.js (App Router, TypeScript) and Supabase
 (tenancy, ledger, catalog, import, invites). Orders/shipments/portal are
 Slice 1B; QBO integration and AI chat are Slice 1C.
 
-- Spec: `docs/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md`
-- Plan: `docs/superpowers/plans/2026-08-30-slice1a-foundation.md`
-- SDD task briefs/reports (planning artifacts, not app source, gitignored): `.superpowers/sdd/2026-08-30-slice1a-foundation/`
+- Spec: `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md`
+- Plan: `.agents/superpowers/plans/2026-08-30-slice1a-foundation.md`
+- Schema: `.agents/superpowers/specs/2026-08-31-mgr-schema-design.md` (tables) and `2026-08-31-mgr-schema-decisions.md` (why)
 
 ## Iron rules
 
-See `ARCHITECTURE.md` for the ownership map and the four iron rules
-(commands-only, append-only ledger, RLS everywhere, admin client confined)
+See `.agents/ARCHITECTURE.md` for the ownership map and the five iron rules
+(commands-only, append-only ledger, RLS everywhere, admin client confined,
+multi-row writes are one Postgres function)
 and what enforces each one. Agents start at `AGENTS.md`.
 
 ## Local development
@@ -75,7 +76,7 @@ npm run dev   # http://localhost:3000
 ### Tests
 
 ```bash
-npm test          # vitest run — 29 tests across 6 files
+npm test          # vitest run — 47 tests across 9 files
 npm run lint       # eslint, incl. the admin-client import guard
 npx tsc --noEmit   # typecheck
 npm run build      # production build
@@ -86,7 +87,10 @@ isolation, ledger immutability, CHECK constraints, ATP math),
 `tests/registry.test.ts` (command registry validation/permissions),
 `tests/commands-inventory.test.ts` (catalog/inventory commands),
 `tests/commands-import.test.ts` (CSV import), `tests/commands-invites.test.ts`
-(invitations). Tests run against the real local Supabase stack (not a
+(invitations), `tests/schema-rules.test.ts` (pg_catalog gates: RLS on every
+table, `security_invoker` views, `search_path` on functions, no anon-executable
+definer functions), `tests/schema-conventions.test.ts` (composite FKs, lot
+trigger, append-only ledgers), `tests/write-atomicity.test.ts` (iron rule 5). Tests run against the real local Supabase stack (not a
 mock) — `npx supabase start` must be running first.
 
 ## Deployment
