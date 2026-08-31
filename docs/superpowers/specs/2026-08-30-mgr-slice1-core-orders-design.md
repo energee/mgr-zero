@@ -1,11 +1,11 @@
-# MGR2 — Slice 1 Design: Core + Orders
+# MGR — Slice 1 Design: Core + Orders
 
 Date: 2026-08-30
 Status: Approved by Ted (in-chat design review)
 
 ## Product context
 
-MGR2 is a multi-brewery SaaS for brewery operations. Full capability map (each its own spec → plan → build cycle):
+MGR is a multi-brewery SaaS for brewery operations. Full capability map (each its own spec → plan → build cycle):
 
 | # | Slice | Contents |
 |---|-------|----------|

@@ -1,14 +1,14 @@
-# MGR2 Slice 1A — Foundation Implementation Plan
+# MGR Slice 1A — Foundation Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Multi-tenant foundation for MGR2: Next.js + Supabase scaffold, tenancy/auth/RLS, command/query registry, product catalog, immutable FG movement ledger, allocations/ATP, and CSV import with opening balances.
+**Goal:** Multi-tenant foundation for MGR: Next.js + Supabase scaffold, tenancy/auth/RLS, command/query registry, product catalog, immutable FG movement ledger, allocations/ATP, and CSV import with opening balances.
 
 **Architecture:** Every mutation is a typed command (Zod schema + permission check + logic) in a registry; the UI calls commands via a single server endpoint, and the future AI chat (plan 1C) calls the same registry as tools. Inventory is an append-only `inventory_movements` ledger; on-hand and ATP are derived views. RLS enforces tenant isolation in Postgres for both staff and portal-customer audiences.
 
 **Tech Stack:** Next.js (App Router, TS), Supabase (Postgres/RLS/Auth, local CLI for dev + tests), Zod, vitest, shadcn/ui + Tailwind, Vercel.
 
-**Spec:** `docs/superpowers/specs/2026-08-30-mgr2-slice1-core-orders-design.md`
+**Spec:** `docs/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md`
 
 ## Global Constraints
 
@@ -1180,7 +1180,7 @@ jobs:
 
 (Adjust the env-extraction step to the actual `supabase status -o env` output names on first run.)
 
-- [ ] **Step 2: README** — orientation for humans and agents: what MGR2 is; pointer to spec + plans; local dev (`supabase start`, `.env.local` keys, `npm run dev`, `npx vitest run`); the two iron rules ("every operation is a command — `lib/commands/registry.ts`"; "never mutate `inventory_movements` — corrections are reversals").
+- [ ] **Step 2: README** — orientation for humans and agents: what MGR is; pointer to spec + plans; local dev (`supabase start`, `.env.local` keys, `npm run dev`, `npx vitest run`); the two iron rules ("every operation is a command — `lib/commands/registry.ts`"; "never mutate `inventory_movements` — corrections are reversals").
 
 - [ ] **Step 3: Deploy** — create hosted Supabase project + Vercel project; set the three env vars + `DEPLOYMENT_MODE=saas`; `supabase db push` to hosted; deploy; verify login → catalog → inventory on the preview URL.
 

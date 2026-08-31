@@ -7,3 +7,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+# Agent working files
+
+- `.agents/MEMORY.md` — durable facts and decisions. Read it first; update it when a decision changes.
+- `.agents/PROGRESS.md` — what's done / in flight / next. Update at the end of each work session.
+- `.agents/worktrees/<branch>/` — the only place for git worktrees: `git worktree add .agents/worktrees/<branch> -b <branch>`. Gitignored.

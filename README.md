@@ -1,13 +1,13 @@
-# MGR2
+# MGR
 
-MGR2 is a multi-tenant brewery operations system: catalog, immutable
+MGR is a multi-tenant brewery operations system: catalog, immutable
 inventory ledger, allocations/ATP, CSV import, and staff/customer
 invitations, built on Next.js (App Router, TypeScript) and Supabase
 (Postgres, Auth, RLS). This repo currently covers **Slice 1A — Foundation**
 (tenancy, ledger, catalog, import, invites). Orders/shipments/portal are
 Slice 1B; QBO integration and AI chat are Slice 1C.
 
-- Spec: `docs/superpowers/specs/2026-08-30-mgr2-slice1-core-orders-design.md`
+- Spec: `docs/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md`
 - Plan: `docs/superpowers/plans/2026-08-30-slice1a-foundation.md`
 - SDD task briefs/reports (planning artifacts, not app source, gitignored): `.superpowers/sdd/2026-08-30-slice1a-foundation/`
 
@@ -103,7 +103,7 @@ npm run dev   # http://localhost:3000
 ### Tests
 
 ```bash
-npm test          # vitest run — 19 tests across 6 files
+npm test          # vitest run — 29 tests across 6 files
 npx tsc --noEmit   # typecheck
 npm run build      # production build
 ```

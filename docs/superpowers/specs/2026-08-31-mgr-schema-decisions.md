@@ -1,4 +1,4 @@
-# MGR2 — Schema Design Decisions (input to the baseline migration)
+# MGR — Schema Design Decisions (input to the baseline migration)
 
 Date: 2026-08-31
 Status: Decided with Ted; the schema design doc and baseline migration follow from this.
