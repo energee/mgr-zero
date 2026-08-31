@@ -13,6 +13,26 @@ import { z } from "zod";
 import { defineCommand, CommandError } from "./registry";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+// Resolves an already-registered email to its user id by paging through
+// auth.admin.listUsers(). The installed supabase-js (2.112.4) has no
+// server-side email filter on this endpoint (PageParams is just
+// { page, perPage }), so this pages client-side with a generous perPage and
+// a sane page-count cap rather than assuming everything fits on page 1.
+const LIST_USERS_PER_PAGE = 200;
+const LIST_USERS_MAX_PAGES = 50;
+
+async function findUserByEmail(adminClient: ReturnType<typeof createAdminClient>, email: string): Promise<string> {
+  const target = email.toLowerCase();
+  for (let page = 1; page <= LIST_USERS_MAX_PAGES; page++) {
+    const { data: list, error: listError } = await adminClient.auth.admin.listUsers({ page, perPage: LIST_USERS_PER_PAGE });
+    if (listError) throw new CommandError(listError.message);
+    const existing = list.users.find((u) => u.email?.toLowerCase() === target);
+    if (existing) return existing.id;
+    if (list.users.length < LIST_USERS_PER_PAGE) break; // last page
+  }
+  throw new CommandError(`could not resolve existing user for ${email}`);
+}
+
 // Invites `email` via Supabase auth admin, tolerating the case where the
 // email is already registered (resolves the existing user id instead of
 // failing). Returns the user id either way.
@@ -22,17 +42,17 @@ async function inviteOrResolveUser(email: string): Promise<string> {
   if (!error) return data.user.id;
 
   // Already-registered emails come back as an error from inviteUserByEmail;
-  // resolve the existing user id by listing and filtering client-side
-  // (admin.auth.admin has no getUserByEmail).
+  // resolve the existing user id instead of failing.
   const alreadyRegistered = /already.*registered|already.*exists/i.test(error.message);
   if (!alreadyRegistered) throw new CommandError(error.message);
 
-  const { data: list, error: listError } = await adminClient.auth.admin.listUsers();
-  if (listError) throw new CommandError(listError.message);
-  const existing = list.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
-  if (!existing) throw new CommandError(`could not resolve existing user for ${email}`);
-  return existing.id;
+  return findUserByEmail(adminClient, email);
 }
+
+// Postgres unique-violation code — used to turn a raw constraint error from
+// a racing concurrent invite into the same friendly "already a member"
+// CommandError the pre-check produces.
+const UNIQUE_VIOLATION = "23505";
 
 defineCommand({
   name: "invite_staff",
@@ -54,7 +74,10 @@ defineCommand({
     const { error } = await adminClient
       .from("brewery_users")
       .insert({ brewery_id: ctx.breweryId, user_id: userId, role: i.role });
-    if (error) throw new CommandError(error.message);
+    if (error) {
+      if (error.code === UNIQUE_VIOLATION) throw new CommandError(`${i.email} is already a member of this brewery`);
+      throw new CommandError(error.message);
+    }
 
     return { userId };
   },
@@ -92,7 +115,10 @@ defineCommand({
     const { error } = await adminClient
       .from("customer_users")
       .insert({ customer_id: i.customerId, user_id: userId });
-    if (error) throw new CommandError(error.message);
+    if (error) {
+      if (error.code === UNIQUE_VIOLATION) throw new CommandError(`${i.email} already has access to this customer`);
+      throw new CommandError(error.message);
+    }
 
     return { userId };
   },
