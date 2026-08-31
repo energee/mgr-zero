@@ -8,6 +8,9 @@ Running log of what's done, in flight, and next. Newest at top. Keep entries to 
 ## Done
 - 2026-08-31 — Customer user guide established as the complete plain-language manual for every available screen/action; post-merge Claude audit enforces action steps, fields/options, permissions, results, corrections, and errors.
 - 2026-08-31 — Read-only Claude Code post-merge documentation agent audits each merged PR against the owning docs and opens one idempotent follow-up issue for high-confidence drift; review tools are denied common runner secret paths and credential dotfiles.
+- 2026-08-31 — `http-api` agent keeps README § HTTP API in lockstep with registered commands (`/http-api`).
+- 2026-08-31 — Public API is the existing command endpoint; Bearer Supabase access tokens accepted alongside cookie sessions (`tests/api-command.test.ts`).
+- 2026-08-31 — Slice 1B orders design spec (`2026-08-31-mgr-slice1b-orders-design.md`) and slice 1C implementation plan (`2026-08-31-slice1c-qbo-ai-chat.md`: QBO invoices-out/payments-back + AI chat composer, 11 TDD tasks in two independent tracks) written; PR #11.
 - 2026-08-31 — Dreaming: post-merge CI curation of agent docs via dreaming/main PR (spec: superpowers/specs/2026-08-31-dreaming-design.md). Live run pending.
 - 2026-08-31 — Rev-3 simplification pass on latest main: actionable Today/Work ordering, Beer as a landing page, complete movement intents, simpler order state, separated taproom tasks, explicit cellar reading/remainder semantics, richer irreversible previews, and filing copy that does not imply transmission.
 - 2026-08-31 — Recipe development loop designed: version snapshots assumptions + per-ingredient extract; OG/FG/ABV computed by one registry-layer formula (live preview + server reads; never stored, no view); per-batch actuals derived from readings via get_recipe_outcomes shown as deltas. Derived-values principle recorded in schema-decisions.
