@@ -12,6 +12,21 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
 - Product spec: `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md`.
 - Schema conventions live in `.agents/ARCHITECTURE.md`; the quote behind "no status columns" is Ted's: "if it won't be accurate I don't want it".
 - Cross-provider agent work is harness-neutral and owned by `.agents/orchestration/`: Codex is the sole writer, Grok plans/critiques, Claude reviews high-risk work, and complex/high-risk implementation requires a separate approval command.
+- UI source of truth is UI plan rev 3 plus the exactly 50-frame
+  `2026-08-31-mgr-wireframes.html`; change navigation/flows and the `SCREENS`
+  array together. Staff uses Today/Beer/Work/More; the wholesale portal has its
+  own Order/Orders/Invoices/Account shell.
+- Every AI mutation is proposal-only: registry-owned server preview,
+  canonical effects, explicit user confirmation, same `requestId` +
+  `previewToken`, and stale revalidation. There is no generic Undo. Replay and
+  offline outbox stay disabled until durable server dedupe/result replay exists;
+  voice and server chat history are deferred.
+- Before affected UI work, close the explicit rev-3 gates: pre-tenant
+  provisioning, invite compensation, import per-row RPC/dedupe, FG correction
+  identity/report semantics, durable taproom count snapshots, shipment invoice
+  timing, portal-safe fulfillment source, exact QBO payload persistence, and
+  typed batch-completion/loss reconciliation. A registry name or client-held ID
+  does not prove a gate is met.
 
 ## Gotchas (carried from MGR v1)
 - PostgREST caches the schema: after DDL, errors naming a column/enum that plainly exists are a stale cache — `NOTIFY pgrst, 'reload schema'` or restart the stack before debugging.
