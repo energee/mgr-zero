@@ -23,7 +23,7 @@
 
 ## Dependencies on slice 1B
 
-Almost none — `invoices`, `qbo_connections`, and the mapping columns already exist in `00001_baseline.sql`; tests seed invoice rows directly. Only Task 10's "push" button placement on the 1B invoice screens and the portal composer entry wait for 1B UI; both are marked below.
+Almost none — `invoices`, `qbo_connections`, and the mapping columns already exist in `00001_baseline.sql`; tests seed invoice rows directly. Only Task 7's "push" button placement on the 1B invoice screens and Task 10's portal composer entry wait for 1B UI; both are marked below.
 
 ## Parallelism
 
