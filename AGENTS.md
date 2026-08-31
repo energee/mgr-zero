@@ -36,10 +36,14 @@ below just in time — don't preload everything.
 
 1. `npx supabase start` must be running; tests hit the real database.
 2. Find the owner of the concept in `.agents/ARCHITECTURE.md` and change it there.
-3. Prove it: `npx vitest run && npx tsc --noEmit && npm run lint`. For UI, look
+3. TDD: new behavior starts with a failing vitest — write it, watch it fail,
+   then implement; the commit contains the test. Applies to every harness
+   (Claude Code, pi, Codex, or other). Exception: UI rendering — TDD the
+   logic below the component boundary; step 4 covers the eyeball check.
+4. Prove it: `npx vitest run && npx tsc --noEmit && npm run lint`. For UI, look
    at the rendered page — tests don't cover rendering.
-4. `git diff` before committing (a stray NUL byte once made a file binary).
-5. Update `.agents/PROGRESS.md`; update `.agents/MEMORY.md` only if a durable
+5. `git diff` before committing (a stray NUL byte once made a file binary).
+6. Update `.agents/PROGRESS.md`; update `.agents/MEMORY.md` only if a durable
    decision changed.
 
 CI (`.github/workflows/ci.yml`) runs the same checks plus `next build` on every
@@ -63,3 +67,6 @@ production data (there is none yet — keep it that way by asking).
 - `.agents/orchestration/` — harness-neutral multi-model routing, budgets, prompts, and generated run artifacts. Its CLI is the only owner of cross-provider workflow policy.
 - `.agents/skills/` — project-local reusable workflows; `.pi/prompts/` may provide thin Pi command aliases without duplicating skill instructions.
 - `.agents/worktrees/<branch>/` — the only place for worktrees: `git worktree add .agents/worktrees/<branch> -b <branch>`. Gitignored.
+- `.agents/agents/dreaming.md` — prompt for the dreaming workflow
+  (`.github/workflows/dreaming.yml`) that curates the agent docs via a
+  `dreaming/main` PR; committed `.remember/today-*.md` digests are its input.
