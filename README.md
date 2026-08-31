@@ -66,7 +66,15 @@ npx tsx --env-file=.env.local scripts/seed-dev.ts   # idempotent; creates "Demo 
 ```
 
 Seeded dev login: `dev@mgr.local` / `dev-password-1` (dev-only credential —
-never used outside local development).
+never used outside local development). A customer-only account (a
+`customer_users` row with no `brewery_users` row) lands on `/portal` instead
+of `/` after login — that's the wholesale customer portal, not a bug.
+
+Working in a worktree (`.agents/worktrees/<branch>`): `.env.local` is
+gitignored and **not** inherited from the main checkout — copy it in
+(`cp ../../../.env.local .env.local` or similar) before running `npm test`
+or `npm run dev` there, or Supabase calls fail with `supabaseKey is
+required`.
 
 Run the app:
 
@@ -81,7 +89,14 @@ npm test          # vitest run — 47 tests across 9 files
 npm run lint       # eslint, incl. the admin-client import guard
 npx tsc --noEmit   # typecheck
 npm run build      # production build
+npm run test:e2e   # Playwright smoke — local only, not run in CI
 ```
+
+`npm run test:e2e` runs Playwright's own `next dev` on port 3100 (not 3000,
+so it never collides with another worktree's dev server on the same repo)
+and reuses one already running there. It needs `npx supabase start` and a
+`.env.local` in place, same as the vitest suite. See `playwright.config.ts`
+and `tests-e2e/`.
 
 Test files: `tests/rls-tenancy.test.ts`, `tests/rls-ledger.test.ts` (RLS
 isolation, ledger immutability, CHECK constraints, ATP math),

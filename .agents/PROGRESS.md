@@ -3,9 +3,10 @@
 Running log of what's done, in flight, and next. Newest at top. Keep entries to one line each; details belong in commits and docs.
 
 ## Now
-- [ ] Slice 1B starts with UI-plan rev-3 Step 1 contracts/schema gates, then orders → allocations → ship → invoices.
+- [ ] Slice 1C: QBO invoices-out/payments-back + AI chat composer (`.agents/superpowers/specs/2026-08-31-slice1c-qbo-ai-chat.md`).
 
 ## Done
+- 2026-08-31 — Slice 1B (orders) complete on `slice1b-orders`: order lifecycle (create/submit/confirm/adjust/cancel), allocations, pick/ship, per-shipment invoices, credit memos, taproom replenishment, customer/ship-to/price-list CRUD, wholesale customer portal (shop, orders, invoices), Playwright e2e smoke (`npm run test:e2e`). Branch awaiting PR.
 - 2026-08-31 — Recipe development loop designed: version snapshots assumptions + per-ingredient extract; OG/FG/ABV computed by one registry-layer formula (live preview + server reads; never stored, no view); per-batch actuals derived from readings via get_recipe_outcomes shown as deltas. Derived-values principle recorded in schema-decisions.
 - 2026-08-31 — Wireframes + plan corrected per frontend review: frames draw only user-visible UI (state chips, gate names, tap audits moved to under-frame annotations), human copy for gated actions, named row verbs replace universal "Open", Today redrawn role-filtered as full-size 16px exemplar with ship-scale callout, hairline surfaces, cellar tiles lead with fill/occupancy, portal Order is a buyer catalog ("Ships from Warehouse", 48×48 steppers), composer proposal leads with signed effect, desk rail hierarchy + one-column default, safe-area on both shells, header Search/Me controls; plan §preamble/§3/§4/§5/§5b updated in step.
 - 2026-08-31 — Wireframes: phone/desk toggle renders all 50 frames as desktop views from the same bodies (rail/top-nav shells, dialog sheets, 32 px cursor-density controls); plan §1 reference updated.
