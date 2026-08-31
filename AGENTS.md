@@ -62,7 +62,6 @@ production data (there is none yet — keep it that way by asking).
 - `.agents/orchestration/` — harness-neutral multi-model routing, budgets, prompts, and generated run artifacts. Its CLI is the only owner of cross-provider workflow policy.
 - `.agents/skills/` — project-local reusable workflows; `.pi/prompts/` may provide thin Pi command aliases without duplicating skill instructions.
 - `.agents/worktrees/<branch>/` — the only place for worktrees: `git worktree add .agents/worktrees/<branch> -b <branch>`. Gitignored.
-- `.agents/agents/dreaming.md` — prompt for the post-merge + daily dreaming workflow
-  (`.github/workflows/dreaming.yml`) that curates MEMORY/PROGRESS/ARCHITECTURE/
-  AGENTS.md via a `dreaming/main` PR. `.remember/*.md` digests are committed as
-  its input.
+- `.agents/agents/dreaming.md` — prompt for the dreaming workflow
+  (`.github/workflows/dreaming.yml`) that curates the agent docs via a
+  `dreaming/main` PR; committed `.remember/today-*.md` digests are its input.

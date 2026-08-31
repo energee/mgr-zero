@@ -30,6 +30,11 @@ jobs:
         with:
           fetch-depth: 0 # the dream reads history since the last dream
 
+      - name: Set git identity for the dream
+        run: |
+          git config user.name "dreaming-bot"
+          git config user.email "dreaming@users.noreply.github.com"
+
       - name: Run dream
         uses: anthropics/claude-code-action@v1
         with:
@@ -39,6 +44,6 @@ jobs:
           # so an injected dream cannot push to any branch but dreaming/main —
           # in particular, never to main — and gh is limited to PR list/create/
           # edit/view, so a dream can never merge a PR.
-          claude_args: '--allowedTools "Read,Glob,Grep,Edit,Write,Bash(git status:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(git checkout:*),Bash(git config user.name:*),Bash(git config user.email:*),Bash(git push -f origin dreaming/main),Bash(git push origin dreaming/main),Bash(gh pr list:*),Bash(gh pr create:*),Bash(gh pr edit:*),Bash(gh pr view:*)"'
+          claude_args: '--allowedTools "Read,Glob,Grep,Edit,Write,Bash(git status:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(git checkout:*),Bash(git push -f origin dreaming/main),Bash(git push origin dreaming/main),Bash(gh pr list:*),Bash(gh pr create:*),Bash(gh pr edit:*),Bash(gh pr view:*)"'
         env:
           GH_TOKEN: ${{ github.token }}

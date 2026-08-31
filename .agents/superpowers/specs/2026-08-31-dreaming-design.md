@@ -1,7 +1,7 @@
 # Dreaming — CI-maintained agent artifacts
 
 Date: 2026-08-31
-Status: approved design, pre-implementation
+Status: shipped 2026-08-31; live run pending
 Branch: agent-prompting
 
 ## What and why
@@ -21,8 +21,8 @@ substitutes repo-visible signals (see Signal).
 
 | Decision | Choice |
 | --- | --- |
-| Trigger | Every push to `main`, a daily schedule (`cron: 0 9 * * *` UTC), plus `workflow_dispatch` |
-| Loop guard | `paths-ignore: ['.agents/**.md', 'AGENTS.md', '.remember/**']` + `concurrency: dreaming, cancel-in-progress: true` |
+| Trigger | Every push to `main`, a daily schedule, plus `workflow_dispatch` |
+| Loop guard | `paths-ignore` on the doc paths + a `dreaming` concurrency group — exact values live in `.github/workflows/dreaming.yml`, which is authoritative and self-documents the cancel-in-progress rationale |
 | Write path | One long-lived PR from branch `dreaming/main` (force-pushed each dream); never direct commits to main |
 | Editable | `.agents/MEMORY.md`, `.agents/PROGRESS.md`, `.agents/ARCHITECTURE.md`, `AGENTS.md`, `.agents/agents/*.md` |
 | Read-only (flag drift only) | specs, wireframes, code, workflows |
@@ -36,36 +36,23 @@ substitutes repo-visible signals (see Signal).
 2. `.agents/agents/dreaming.md` — the committed dream prompt (the contract
    below). The workflow passes it as the prompt; changing dream behavior is a
    normal reviewed edit to this file.
-3. `.gitignore` change — un-ignore `.remember/*.md` digests so session
-   summaries ride along with normal commits and become dream input.
+3. `.gitignore` change — un-ignore `.remember/today-*.md` digests so dated
+   session summaries ride along with normal commits and become dream input
+   (rolling scratch like `now.md` stays local).
 
 ## Dream prompt contract
 
-Inputs each run:
-- Commits and merged PR diffs/review comments since the previous dream
-  (previous dream = the squash-merge commit whose title starts
-  `dream: agent doc maintenance`, or full history on first run).
-- `.remember/` digests.
-- The editable artifacts themselves, checked for internal consistency.
+The contract lives in `.agents/agents/dreaming.md` — the executable copy the
+workflow runs — and is not restated here; edit dream behavior there via
+normal review. Two rationale points that belong to the design, not the
+contract:
 
-The editable set includes `dreaming.md` itself, so a dream may propose
-changes to its own contract; this is deliberate and contained by human
-review of the dream PR.
-
-Allowed actions on editable files:
-- Prune facts contradicted by merged work; convert relative dates to absolute.
-- Merge duplicate or overlapping entries.
-- Resolve contradictions, citing the winning evidence.
-- Record durable decisions evidenced by merged PRs.
-
-Required behavior:
-- Every change cited to a commit/PR in the PR body.
-- Drift in read-only artifacts (e.g. wireframes out of step with the UI plan,
-  ARCHITECTURE.md referencing moved files) is flagged in the PR body, not fixed.
-- Never delete a spec. Never propagate secret-shaped strings from digests.
-- Nothing to change → no PR, exit clean.
-- Keep diffs small; a dream that wants to rewrite everything should instead
-  flag the need and stop.
+- Transcript signal doesn't exist in CI, so the inputs are repo-visible
+  substitutes: the git/PR window since the last dream plus committed
+  `.remember/today-*.md` digests.
+- The editable set includes `dreaming.md` itself, so a dream may propose
+  changes to its own contract; this is deliberate and contained by human
+  review of the dream PR.
 
 ## Testing
 

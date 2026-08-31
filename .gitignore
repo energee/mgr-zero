@@ -48,6 +48,7 @@ next-env.d.ts
 /.agents/worktrees/*
 !/.agents/worktrees/.gitkeep
 
-# remember plugin: logs/tmp stay local; *.md digests are committed as dream input (see .agents/agents/dreaming.md)
+# remember plugin: only dated, append-only digests are committed as dream input
+# (see .agents/agents/dreaming.md); rolling scratch like now.md stays local
 /.remember/*
-!/.remember/*.md
+!/.remember/today-*.md
