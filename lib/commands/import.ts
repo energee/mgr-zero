@@ -3,13 +3,23 @@
 // `kind` to a per-kind row inserter; every referenced entity (SKU, location,
 // customer, product, price list) is resolved by name scoped to
 // ctx.breweryId, creating catalog/price-list parents on the fly when missing.
+// SKUs are only unique per (product_id, name) — not per brewery — so any
+// import that resolves a SKU (price_list_items, opening_balances) requires a
+// `product` column and looks the SKU up by (brewery, product name, sku name)
+// rather than name alone, or an ambiguous name ("1/2 bbl keg" under several
+// products) silently resolves the wrong row or fails PGRST116.
+// Rows are capped (rowsSchema.max) so a single request can't attempt an
+// unbounded number of inserts; the import client chunks larger files.
 // Per-row failures are collected into `errors` rather than thrown, so a bad
 // row never aborts the good ones in the same batch.
 import { z } from "zod";
 import { defineCommand, CommandError, Ctx } from "./registry";
 import { insertMovement } from "./inventory";
 
-const rowsSchema = z.array(z.record(z.string(), z.string()));
+// Capped so a single request can't attempt an unbounded number of row
+// inserts; larger files are chunked into sequential batches by the import
+// client (see app/(app)/settings/import/import-client.tsx).
+const rowsSchema = z.array(z.record(z.string(), z.string())).max(5000, "at most 5000 rows per import batch");
 
 type ImportResult = { inserted: number; errors: { row: number; message: string }[] };
 
@@ -42,6 +52,15 @@ function parseNumericString(row: Record<string, string>, field: string): string 
   const raw = requireField(row, field);
   if (!/^-?\d+(\.\d+)?$/.test(raw)) throw new Error(`invalid number for ${field}: "${raw}"`);
   return raw;
+}
+
+// Like parseNumericField, but rejects non-integer values (e.g. "12.5") rather
+// than truncating them — unit_price_cents is an integer column and a
+// fractional cents value almost always means the CSV author entered dollars.
+function parseIntegerField(row: Record<string, string>, field: string): number {
+  const n = parseNumericField(row, field);
+  if (!Number.isInteger(n)) throw new Error(`invalid integer for ${field}: "${row[field]}"`);
+  return n;
 }
 
 async function importCustomers(ctx: Ctx, rows: Record<string, string>[]): Promise<ImportResult> {
@@ -146,6 +165,23 @@ async function findOrCreatePriceList(ctx: Ctx, name: string) {
   return created.id as string;
 }
 
+// skus is only unique on (product_id, name), not (brewery_id, name) — every
+// brewery tends to have a generically-named SKU ("1/2 bbl keg") under many
+// products, so resolving by name alone is ambiguous and returns PGRST116
+// (multiple/no rows) via maybeSingle(). Resolve through the product name too.
+async function findSkuByProductAndName(ctx: Ctx, productName: string, skuName: string) {
+  const { data: sku, error } = await ctx.db
+    .from("skus")
+    .select("id, products!inner(name)")
+    .eq("brewery_id", ctx.breweryId)
+    .eq("name", skuName)
+    .eq("products.name", productName)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!sku) throw new Error(`sku not found: ${productName} — ${skuName}`);
+  return sku.id as string;
+}
+
 async function importPriceListItems(ctx: Ctx, rows: Record<string, string>[]): Promise<ImportResult> {
   const errors: ImportResult["errors"] = [];
   let inserted = 0;
@@ -153,15 +189,13 @@ async function importPriceListItems(ctx: Ctx, rows: Record<string, string>[]): P
     try {
       const r = rows[row];
       const priceListName = requireField(r, "price_list");
+      const productName = requireField(r, "product");
       const skuName = requireField(r, "sku_name");
-      const unitPriceCents = parseNumericField(r, "unit_price_cents");
-      const { data: sku, error: se } = await ctx.db
-        .from("skus").select("id").eq("brewery_id", ctx.breweryId).eq("name", skuName).maybeSingle();
-      if (se) throw new Error(se.message);
-      if (!sku) throw new Error(`sku not found: ${skuName}`);
+      const unitPriceCents = parseIntegerField(r, "unit_price_cents");
+      const skuId = await findSkuByProductAndName(ctx, productName, skuName);
       const priceListId = await findOrCreatePriceList(ctx, priceListName);
       const { error } = await ctx.db.from("price_list_items").insert({
-        brewery_id: ctx.breweryId, price_list_id: priceListId, sku_id: sku.id, unit_price_cents: unitPriceCents,
+        brewery_id: ctx.breweryId, price_list_id: priceListId, sku_id: skuId, unit_price_cents: unitPriceCents,
       });
       if (error) throw new Error(error.message);
       inserted++;
@@ -178,19 +212,17 @@ async function importOpeningBalances(ctx: Ctx, rows: Record<string, string>[]): 
   for (let row = 0; row < rows.length; row++) {
     try {
       const r = rows[row];
+      const productName = requireField(r, "product");
       const skuName = requireField(r, "sku_name");
       const locationName = requireField(r, "location");
       const qty = parseNumericField(r, "qty");
       if (qty === 0) throw new Error(`invalid value for qty: "0" (qty cannot be 0)`);
-      const { data: sku, error: se } = await ctx.db
-        .from("skus").select("id").eq("brewery_id", ctx.breweryId).eq("name", skuName).maybeSingle();
-      if (se) throw new Error(se.message);
-      if (!sku) throw new Error(`sku not found: ${skuName}`);
+      const skuId = await findSkuByProductAndName(ctx, productName, skuName);
       const { data: location, error: le } = await ctx.db
         .from("locations").select("id").eq("brewery_id", ctx.breweryId).eq("name", locationName).maybeSingle();
       if (le) throw new Error(le.message);
       if (!location) throw new Error(`location not found: ${locationName}`);
-      await insertMovement(ctx, { skuId: sku.id, locationId: location.id, qty, type: "opening_balance" });
+      await insertMovement(ctx, { skuId, locationId: location.id, qty, type: "opening_balance" });
       inserted++;
     } catch (e) {
       errors.push({ row, message: e instanceof Error ? e.message : String(e) });

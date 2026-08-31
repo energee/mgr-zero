@@ -1,10 +1,14 @@
 // app/(app)/settings/team/page.tsx — staff roster + invite entry point.
+// Scoped to the active brewery (getActiveBrewery + .eq("brewery_id", ...)):
+// RLS alone isn't enough here because a user who is staff at two breweries
+// would otherwise see a merged roster of both under one brewery's header.
 // auth.users is not readable under RLS, so we can only show role + user_id
 // for existing members here (no email column exists to join against).
 // InviteForm's optimistic append shows the invited email until the page is
 // refreshed. Full member management (remove, change role, search by email)
 // is out of scope for this pass.
 import { createServerClient } from "@/lib/supabase/server";
+import { getActiveBrewery } from "@/lib/brewery";
 import { InviteForm } from "./invite-form";
 
 type Membership = {
@@ -13,10 +17,12 @@ type Membership = {
 };
 
 export default async function TeamPage() {
+  const brewery = await getActiveBrewery();
   const db = await createServerClient();
   const { data: members, error } = await db
     .from("brewery_users")
     .select("user_id, role")
+    .eq("brewery_id", brewery.id)
     .order("role");
 
   if (error) {

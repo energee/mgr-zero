@@ -12,19 +12,20 @@ const movementInput = z.object({
 });
 
 /**
- * Reusable helper to insert an inventory movement, computing bbl from SKU.
- * Thrown errors are CommandError instances (not re-wrapped).
+ * Reusable helper to insert an inventory movement. `bbl` is not supplied here
+ * — the `inventory_movements_bbl_trigger` (enforce_bbl_integrity, see
+ * 00002_catalog_ledger.sql) is the sole authority for bbl, computing it
+ * server-side from `qty * skus.bbl_per_unit` at insert time and overwriting
+ * anything the client sends. Thrown errors are CommandError instances (not
+ * re-wrapped).
  */
 export async function insertMovement(ctx: Ctx, input: z.infer<typeof movementInput>) {
-  const { data: sku, error: se } = await ctx.db.from("skus").select("bbl_per_unit").eq("id", input.skuId).single();
-  if (se) throw new CommandError(`sku not found: ${se.message}`);
-  const bbl = input.qty * Number(sku.bbl_per_unit);
   const { data, error } = await ctx.db.from("inventory_movements").insert({
     brewery_id: ctx.breweryId, sku_id: input.skuId, location_id: input.locationId,
-    qty: input.qty, bbl, type: input.type, channel: input.channel ?? null,
+    qty: input.qty, type: input.type, channel: input.channel ?? null,
     dest_state: input.destState ?? null, note: input.note ?? null, created_by: ctx.userId,
   }).select().single();
-  if (error) throw new CommandError(error.message); // CHECK constraints surface here
+  if (error) throw new CommandError(error.message); // CHECK/FK constraints surface here, including "sku not found"
   return data;
 }
 

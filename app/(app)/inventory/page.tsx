@@ -1,9 +1,16 @@
 // app/(app)/inventory/page.tsx — on-hand/ATP inventory + movement log.
-// Server-rendered from Supabase (RLS scopes rows to the active brewery); reads
-// hit the on_hand/atp views and inventory_movements directly (no command
-// endpoint needed for reads). Mutations go through the MovementForm dialog,
-// which calls the shared command client (record_movement).
-import { createServerClient } from "@/lib/supabase/server";
+// Server-rendered from Supabase, explicitly scoped to the active brewery
+// (getActiveBrewery + .eq("brewery_id", ...)): RLS alone isn't enough here
+// because a user who is staff at two breweries would otherwise see a merged
+// view of both under one brewery's header. On-hand/ATP/movements are read
+// through the command registry's get_on_hand/get_atp/list_movements queries
+// (via buildContext) rather than re-implementing the same SQL inline, so
+// there is exactly one implementation of each read. Mutations go through the
+// MovementForm dialog, which calls the shared command client (record_movement).
+import { getActiveBrewery } from "@/lib/brewery";
+import { buildContext } from "@/lib/commands/context";
+import { runCommand } from "@/lib/commands/registry";
+import "@/lib/commands/all"; // side-effect: registers every command/query
 import { MovementForm } from "./movement-form";
 
 type Sku = { id: string; name: string; products: { name: string } | null };
@@ -26,27 +33,25 @@ function skuLabel(sku: Sku | undefined) {
 }
 
 export default async function InventoryPage() {
-  const db = await createServerClient();
+  const brewery = await getActiveBrewery();
+  const ctx = await buildContext(brewery.id);
+  const db = ctx.db;
 
   const [
     { data: skus, error: skusError },
     { data: locations, error: locationsError },
-    { data: onHand, error: onHandError },
-    { data: atp, error: atpError },
-    { data: movements, error: movementsError },
+    onHand,
+    atp,
+    movements,
   ] = await Promise.all([
-    db.from("skus").select("id, name, products(name)").order("name"),
-    db.from("locations").select("id, name, kind").order("name"),
-    db.from("on_hand").select("sku_id, location_id, qty"),
-    db.from("atp").select("sku_id, qty"),
-    db
-      .from("inventory_movements")
-      .select("id, created_at, type, qty, sku_id, location_id, note")
-      .order("created_at", { ascending: false })
-      .limit(50),
+    db.from("skus").select("id, name, products(name)").eq("brewery_id", brewery.id).order("name"),
+    db.from("locations").select("id, name, kind").eq("brewery_id", brewery.id).order("name"),
+    runCommand("get_on_hand", {}, ctx) as Promise<OnHandRow[]>,
+    runCommand("get_atp", {}, ctx) as Promise<AtpRow[]>,
+    runCommand("list_movements", { limit: 50 }, ctx) as Promise<Movement[]>,
   ]);
 
-  const error = skusError ?? locationsError ?? onHandError ?? atpError ?? movementsError;
+  const error = skusError ?? locationsError;
   if (error) {
     return <p className="text-sm text-red-600">Failed to load inventory: {error.message}</p>;
   }
@@ -55,9 +60,9 @@ export default async function InventoryPage() {
   const locationList = (locations as Location[]) ?? [];
   const skuById = new Map(skuList.map((s) => [s.id, s]));
   const locationById = new Map(locationList.map((l) => [l.id, l]));
-  const atpBySku = new Map((atp as AtpRow[] | null)?.map((a) => [a.sku_id, a.qty]) ?? []);
-  const onHandRows = (onHand as OnHandRow[] | null) ?? [];
-  const movementRows = (movements as Movement[] | null) ?? [];
+  const atpBySku = new Map(atp.map((a) => [a.sku_id, a.qty]));
+  const onHandRows = onHand ?? [];
+  const movementRows = movements ?? [];
 
   return (
     <div className="flex flex-col gap-6">

@@ -1,7 +1,8 @@
 // app/(app)/settings/import/import-client.tsx — CSV import UI: pick a kind,
 // parse a CSV file client-side with papaparse, preview the first 5 rows, then
-// submit all parsed rows to the import_csv command. Results show the
-// inserted count plus any per-row errors returned by the command.
+// submit the parsed rows to the import_csv command in sequential CHUNK_SIZE
+// batches (the server rejects a single request over that many rows).
+// Results (inserted count + per-row errors) accumulate across chunks.
 "use client";
 
 import { useState } from "react";
@@ -17,12 +18,19 @@ const KINDS = [
   { value: "customers", label: "Customers", columns: "name,type,license_no,state,payment_terms" },
   { value: "ship_tos", label: "Ship-tos", columns: "customer_name,label,address1,city,state,zip" },
   { value: "products_skus", label: "Products & SKUs", columns: "product,style,abv,sku_name,package_type,units_per_case,bbl_per_unit" },
-  { value: "price_list_items", label: "Price list items", columns: "price_list,sku_name,unit_price_cents" },
-  { value: "opening_balances", label: "Opening balances", columns: "sku_name,location,qty" },
+  // sku_name alone is ambiguous — skus are only unique per (product, name),
+  // e.g. "1/2 bbl keg" exists under many products — so these two kinds also
+  // require a `product` column to resolve the right SKU.
+  { value: "price_list_items", label: "Price list items", columns: "price_list,product,sku_name,unit_price_cents" },
+  { value: "opening_balances", label: "Opening balances", columns: "product,sku_name,location,qty" },
 ] as const;
 type Kind = (typeof KINDS)[number]["value"];
 
 type ImportResult = { inserted: number; errors: { row: number; message: string }[] };
+
+// Mirrors the server-side cap (lib/commands/import.ts rowsSchema.max) so a
+// large CSV is chunked into sequential batches instead of rejected outright.
+const CHUNK_SIZE = 5000;
 
 export function ImportClient() {
   const breweryId = useBrewery();
@@ -59,9 +67,19 @@ export function ImportClient() {
   async function onImport() {
     setSubmitting(true);
     setResult(null);
+    // Larger files are chunked into sequential batches (each within the
+    // server-side row cap) rather than sent as one request; results
+    // accumulate across chunks, with each chunk's row numbers offset so
+    // reported errors still point at the right line in the original CSV.
+    const accumulated: ImportResult = { inserted: 0, errors: [] };
     try {
-      const data = (await command(breweryId, "import_csv", { kind, rows })) as ImportResult;
-      setResult(data);
+      for (let offset = 0; offset < rows.length; offset += CHUNK_SIZE) {
+        const chunk = rows.slice(offset, offset + CHUNK_SIZE);
+        const data = (await command(breweryId, "import_csv", { kind, rows: chunk })) as ImportResult;
+        accumulated.inserted += data.inserted;
+        accumulated.errors.push(...data.errors.map((e) => ({ ...e, row: e.row + offset })));
+        setResult({ ...accumulated });
+      }
     } catch (err) {
       setParseError(err instanceof Error ? err.message : "import failed");
     } finally {

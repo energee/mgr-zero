@@ -22,8 +22,8 @@ describe("import_csv", () => {
     ] }, ctx);
     expect(r1.inserted).toBe(2);
     const r2 = await runCommand("import_csv", { kind: "opening_balances", rows: [
-      { sku_name: "1/2 bbl keg", location: "WH", qty: "24" },
-      { sku_name: "does-not-exist", location: "WH", qty: "5" },
+      { product: "Hazy IPA", sku_name: "1/2 bbl keg", location: "WH", qty: "24" },
+      { product: "Hazy IPA", sku_name: "does-not-exist", location: "WH", qty: "5" },
     ] }, ctx);
     expect(r2.inserted).toBe(1);
     expect(r2.errors).toHaveLength(1);
@@ -44,10 +44,45 @@ describe("import_csv", () => {
 
   it("rejects a qty of 0 for opening balances with a clean error", async () => {
     const r = await runCommand("import_csv", { kind: "opening_balances", rows: [
-      { sku_name: "1/2 bbl keg", location: "WH", qty: "0" },
+      { product: "Hazy IPA", sku_name: "1/2 bbl keg", location: "WH", qty: "0" },
     ] }, ctx);
     expect(r.inserted).toBe(0);
     expect(r.errors).toHaveLength(1);
     expect(r.errors[0].message).toMatch(/qty/i);
+  });
+
+  it("resolves an ambiguous sku_name via the product column instead of failing PGRST116", async () => {
+    // Two different products both carry a sku literally named "1/2 bbl keg" —
+    // sku_name alone is not unique per brewery, only per (product, name).
+    await runCommand("import_csv", { kind: "products_skus", rows: [
+      { product: "Pale Ale", style: "APA", abv: "5.2", sku_name: "1/2 bbl keg", package_type: "keg", units_per_case: "", bbl_per_unit: "0.5" },
+    ] }, ctx);
+    const r = await runCommand("import_csv", { kind: "opening_balances", rows: [
+      { product: "Pale Ale", sku_name: "1/2 bbl keg", location: "WH", qty: "10" },
+    ] }, ctx);
+    expect(r.errors).toHaveLength(0);
+    expect(r.inserted).toBe(1);
+  });
+
+  it("rejects a fractional unit_price_cents instead of silently truncating it", async () => {
+    const r = await runCommand("import_csv", { kind: "price_list_items", rows: [
+      { price_list: "Standard", product: "Hazy IPA", sku_name: "1/2 bbl keg", unit_price_cents: "12.5" },
+    ] }, ctx);
+    expect(r.inserted).toBe(0);
+    expect(r.errors).toHaveLength(1);
+    expect(r.errors[0].message).toMatch(/unit_price_cents/i);
+  });
+
+  it("imports a price_list_items row when product + sku_name resolve unambiguously", async () => {
+    const r = await runCommand("import_csv", { kind: "price_list_items", rows: [
+      { price_list: "Standard", product: "Hazy IPA", sku_name: "1/2 bbl keg", unit_price_cents: "12500" },
+    ] }, ctx);
+    expect(r.errors).toHaveLength(0);
+    expect(r.inserted).toBe(1);
+  });
+
+  it("rejects a batch over the 5000-row cap before touching the database", async () => {
+    const rows = Array.from({ length: 5001 }, () => ({ name: "x", state: "PA" }));
+    await expect(runCommand("import_csv", { kind: "customers", rows }, ctx)).rejects.toThrow(/validation/i);
   });
 });

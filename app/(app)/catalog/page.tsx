@@ -1,7 +1,11 @@
 // app/(app)/catalog/page.tsx — products + SKUs catalog. Server-rendered from
-// Supabase (RLS scopes rows to the active brewery); mutations go through the
-// ProductForm/SkuForm client dialogs, which call the shared command client.
+// Supabase, explicitly scoped to the active brewery (getActiveBrewery +
+// .eq("brewery_id", ...)): RLS alone isn't enough here because a user who is
+// staff at two breweries would otherwise see a merged view of both under one
+// brewery's header. Mutations go through the ProductForm/SkuForm client
+// dialogs, which call the shared command client.
 import { createServerClient } from "@/lib/supabase/server";
+import { getActiveBrewery } from "@/lib/brewery";
 import { ProductForm } from "./product-form";
 import { SkuForm } from "./sku-form";
 
@@ -21,10 +25,12 @@ type Product = {
 };
 
 export default async function CatalogPage() {
+  const brewery = await getActiveBrewery();
   const db = await createServerClient();
   const { data: products, error } = await db
     .from("products")
     .select("*, skus(*)")
+    .eq("brewery_id", brewery.id)
     .order("name");
 
   if (error) {
