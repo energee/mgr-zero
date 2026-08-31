@@ -778,6 +778,7 @@ create table orders (
   requested_ship_date date,
   po_number text,
   note text,
+  needs_restock boolean not null default false,
   created_by uuid not null references auth.users(id),
   shipped_at timestamptz,
   created_at timestamptz not null default now(),
@@ -813,6 +814,22 @@ create table order_lines (
   foreign key (sku_id, brewery_id) references skus (id, brewery_id)
 );
 create index order_lines_sku_idx on order_lines (sku_id);
+
+-- Append-only per-order change log (spec 1B decision 3). Written inside the
+-- same plpgsql command functions that make each change; payload is the
+-- minimal diff, e.g. {"sku": "...", "qty": [24, 18], "reason": "..."}.
+create table order_events (
+  id uuid primary key default gen_random_uuid(),
+  brewery_id uuid not null references breweries(id),
+  order_id uuid not null,
+  actor uuid not null references auth.users(id),
+  event text not null,
+  payload jsonb not null default '{}',
+  created_at timestamptz not null default now(),
+  unique (id, brewery_id),
+  foreign key (order_id, brewery_id) references orders (id, brewery_id)
+);
+create index order_events_order_idx on order_events (order_id, created_at);
 
 -- allocations.ref is polymorphic; enforce that it points at a same-brewery row.
 create function validate_allocation_ref() returns trigger language plpgsql set search_path = '' as $$
@@ -1250,6 +1267,9 @@ begin
     execute format('create policy staff_insert on %I for insert with check (is_staff_of(brewery_id) and created_by = auth.uid())', t);
     execute format('revoke update, delete on %I from authenticated, anon', t);
   end loop;
+  -- order_events: append-only but with custom staff + customer policies
+  execute format('alter table %I enable row level security', 'order_events');
+  execute format('revoke update, delete on %I from authenticated, anon', 'order_events');
   -- admin-only (hold OAuth tokens)
   foreach t in array array['qbo_connections','pos_connections']
   loop
@@ -1298,6 +1318,16 @@ create policy customer_read on invoice_lines for select
   using (invoice_id in (select id from invoices where customer_id in (select my_customer_ids())));
 create policy customer_read on deliveries for select
   using (shipment_id in (select s.id from shipments s join orders o on o.id = s.order_id where o.customer_id in (select my_customer_ids())));
+create policy staff_read on order_events for select using (is_staff_of(brewery_id));
+create policy staff_insert on order_events for insert
+  with check (is_staff_of(brewery_id) and actor = auth.uid());
+create policy customer_read on order_events for select
+  using (order_id in (select id from orders where customer_id in (select my_customer_ids())));
+-- Portal users write events only through their own lifecycle transitions
+-- (create/update/submit on their own draft/submitted orders).
+create policy customer_insert on order_events for insert
+  with check (actor = auth.uid() and order_id in
+    (select id from orders where customer_id in (select my_customer_ids())));
 
 -- ---------------------------------------------------------------- immutability grants
 revoke update, delete on recipe_versions, recipe_ingredients from authenticated, anon;
