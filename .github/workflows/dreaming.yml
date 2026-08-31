@@ -1,0 +1,32 @@
+name: Dreaming
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['.agents/**.md', 'AGENTS.md', '.remember/**']
+  workflow_dispatch:
+
+concurrency:
+  group: dreaming
+  cancel-in-progress: true
+
+jobs:
+  dream:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # the dream reads history since the last dream
+
+      - name: Run dream
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: 'Read .agents/agents/dreaming.md and follow it exactly.'
+          claude_args: '--allowedTools "Read,Glob,Grep,Edit,Write,Bash(git:*),Bash(gh:*)"'
