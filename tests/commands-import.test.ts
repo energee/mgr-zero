@@ -30,4 +30,24 @@ describe("import_csv", () => {
     const oh = await runCommand("get_on_hand", {}, ctx);
     expect(oh.some((r: any) => Number(r.qty) === 24)).toBe(true);
   });
+
+  it("rejects a non-numeric abv instead of silently nulling it", async () => {
+    const r = await runCommand("import_csv", { kind: "products_skus", rows: [
+      { product: "Bad ABV Ale", style: "Pale", abv: "n/a", sku_name: "6-pack", package_type: "can", units_per_case: "4", bbl_per_unit: "0.05" },
+    ] }, ctx);
+    expect(r.inserted).toBe(0);
+    expect(r.errors).toHaveLength(1);
+    expect(r.errors[0].message).toMatch(/abv/i);
+    const { data: product } = await ctx.db.from("products").select("id").eq("brewery_id", b.id).eq("name", "Bad ABV Ale").maybeSingle();
+    expect(product).toBeNull();
+  });
+
+  it("rejects a qty of 0 for opening balances with a clean error", async () => {
+    const r = await runCommand("import_csv", { kind: "opening_balances", rows: [
+      { sku_name: "1/2 bbl keg", location: "WH", qty: "0" },
+    ] }, ctx);
+    expect(r.inserted).toBe(0);
+    expect(r.errors).toHaveLength(1);
+    expect(r.errors[0].message).toMatch(/qty/i);
+  });
 });

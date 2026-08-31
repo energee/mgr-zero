@@ -19,6 +19,31 @@ function requireField(row: Record<string, string>, field: string): string {
   return value;
 }
 
+// Parses a numeric field, rejecting non-numeric values loudly rather than
+// letting Number() produce NaN, which serializes to null over the wire and
+// silently drops data into a nullable column. Blank/absent stays `undefined`
+// (legitimate null) only when the field is optional.
+function parseNumericField(row: Record<string, string>, field: string, opts: { optional: true }): number | undefined;
+function parseNumericField(row: Record<string, string>, field: string, opts?: { optional?: false }): number;
+function parseNumericField(row: Record<string, string>, field: string, opts?: { optional?: boolean }): number | undefined {
+  const raw = row[field]?.trim();
+  if (!raw) {
+    if (opts?.optional) return undefined;
+    throw new Error(`missing required field: ${field}`);
+  }
+  const n = Number(raw);
+  if (!Number.isFinite(n)) throw new Error(`invalid number for ${field}: "${raw}"`);
+  return n;
+}
+
+// Same validation as parseNumericField, but returns the original string so
+// exact-decimal columns (bbl_per_unit) aren't coerced through a float.
+function parseNumericString(row: Record<string, string>, field: string): string {
+  const raw = requireField(row, field);
+  if (!/^-?\d+(\.\d+)?$/.test(raw)) throw new Error(`invalid number for ${field}: "${raw}"`);
+  return raw;
+}
+
 async function importCustomers(ctx: Ctx, rows: Record<string, string>[]): Promise<ImportResult> {
   const errors: ImportResult["errors"] = [];
   let inserted = 0;
@@ -93,9 +118,9 @@ async function importProductsSkus(ctx: Ctx, rows: Record<string, string>[]): Pro
       const productName = requireField(r, "product");
       const skuName = requireField(r, "sku_name");
       const packageType = requireField(r, "package_type");
-      const bblPerUnit = requireField(r, "bbl_per_unit");
-      const abv = r.abv?.trim() ? Number(r.abv) : undefined;
-      const unitsPerCase = r.units_per_case?.trim() ? Number(r.units_per_case) : null;
+      const bblPerUnit = parseNumericString(r, "bbl_per_unit");
+      const abv = parseNumericField(r, "abv", { optional: true });
+      const unitsPerCase = parseNumericField(r, "units_per_case", { optional: true }) ?? null;
       const productId = await findOrCreateProduct(ctx, productName, r.style?.trim(), abv);
       const { error } = await ctx.db.from("skus").insert({
         brewery_id: ctx.breweryId, product_id: productId, name: skuName,
@@ -129,7 +154,7 @@ async function importPriceListItems(ctx: Ctx, rows: Record<string, string>[]): P
       const r = rows[row];
       const priceListName = requireField(r, "price_list");
       const skuName = requireField(r, "sku_name");
-      const unitPriceCents = Number(requireField(r, "unit_price_cents"));
+      const unitPriceCents = parseNumericField(r, "unit_price_cents");
       const { data: sku, error: se } = await ctx.db
         .from("skus").select("id").eq("brewery_id", ctx.breweryId).eq("name", skuName).maybeSingle();
       if (se) throw new Error(se.message);
@@ -155,7 +180,8 @@ async function importOpeningBalances(ctx: Ctx, rows: Record<string, string>[]): 
       const r = rows[row];
       const skuName = requireField(r, "sku_name");
       const locationName = requireField(r, "location");
-      const qty = Number(requireField(r, "qty"));
+      const qty = parseNumericField(r, "qty");
+      if (qty === 0) throw new Error(`invalid value for qty: "0" (qty cannot be 0)`);
       const { data: sku, error: se } = await ctx.db
         .from("skus").select("id").eq("brewery_id", ctx.breweryId).eq("name", skuName).maybeSingle();
       if (se) throw new Error(se.message);
