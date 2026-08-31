@@ -13,6 +13,16 @@ export class CommandError extends Error {
   }
 }
 
+// Awaits a Supabase query and turns its { data, error } into data-or-throw,
+// so handlers don't each repeat `if (error) throw new CommandError(...)`.
+// Postgres errors (CHECK, FK, RLS) are user-facing by design here: they are
+// the ledger's validation messages.
+export async function unwrap<T>(query: PromiseLike<{ data: T; error: { message: string } | null }>): Promise<T> {
+  const { data, error } = await query;
+  if (error) throw new CommandError(error.message);
+  return data;
+}
+
 type Def<In, Out> = {
   name: string;
   description?: string;

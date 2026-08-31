@@ -1,6 +1,6 @@
 // tests/commands-invites.test.ts — invite_staff and invite_customer_user command tests.
 import { describe, it, expect, beforeAll } from "vitest";
-import { makeBrewery, makeStaff, asUser, admin } from "./helpers";
+import { makeBrewery, makeStaffCtx, admin } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -8,13 +8,8 @@ describe("invitations", () => {
   let adminCtx: any, warehouseCtx: any, b: any;
   beforeAll(async () => {
     b = await makeBrewery();
-    for (const [role, slot] of [["admin", "adminCtx"], ["warehouse", "warehouseCtx"]] as const) {
-      const u = await makeStaff(b.id, role);
-      const db = await asUser(u.email);
-      const { data: { user } } = await db.auth.getUser();
-      const ctx = { db, userId: user!.id, breweryId: b.id, role };
-      if (slot === "adminCtx") adminCtx = ctx; else warehouseCtx = ctx;
-    }
+    adminCtx = await makeStaffCtx(b.id, "admin");
+    warehouseCtx = await makeStaffCtx(b.id, "warehouse");
   });
 
   it("admin invites staff; membership row created with role", async () => {

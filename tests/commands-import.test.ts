@@ -1,6 +1,6 @@
 // tests/commands-import.test.ts — TDD spec for the import_csv command (Task 9).
 import { describe, it, expect, beforeAll } from "vitest";
-import { makeBrewery, makeStaff, asUser, admin } from "./helpers";
+import { makeBrewery, makeStaffCtx, admin } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -8,10 +8,7 @@ describe("import_csv", () => {
   let ctx: any, b: any;
   beforeAll(async () => {
     b = await makeBrewery();
-    const staff = await makeStaff(b.id, "admin");
-    const db = await asUser(staff.email);
-    const { data: { user } } = await db.auth.getUser();
-    ctx = { db, userId: user!.id, breweryId: b.id, role: "admin" };
+    ctx = await makeStaffCtx(b.id);
     await admin.from("locations").insert({ brewery_id: b.id, name: "WH", kind: "warehouse" });
   });
 

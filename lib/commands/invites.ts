@@ -10,7 +10,7 @@
 // RLS-bound client) before ever using the admin client, so a caller cannot
 // attach a user to a customer in a brewery they don't belong to.
 import { z } from "zod";
-import { defineCommand, CommandError } from "./registry";
+import { defineCommand, defineQuery, unwrap, CommandError } from "./registry";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 // Resolves an already-registered email to its user id by paging through
@@ -49,10 +49,15 @@ async function inviteOrResolveUser(email: string): Promise<string> {
   return findUserByEmail(adminClient, email);
 }
 
-// Postgres unique-violation code — used to turn a raw constraint error from
-// a racing concurrent invite into the same friendly "already a member"
-// CommandError the pre-check produces.
-const UNIQUE_VIOLATION = "23505";
+// Inserts a membership row via the admin client. The table's primary key is
+// the only duplicate guard needed: a unique violation (Postgres 23505) —
+// whether from a repeat invite or a racing concurrent one — becomes the
+// friendly message, so there is one code path instead of a pre-check plus
+// a catch that must stay in sync.
+async function insertMembership(table: "brewery_users" | "customer_users", row: Record<string, string>, duplicateMessage: string) {
+  const { error } = await createAdminClient().from(table).insert(row);
+  if (error) throw new CommandError(error.code === "23505" ? duplicateMessage : error.message);
+}
 
 defineCommand({
   name: "invite_staff",
@@ -61,24 +66,8 @@ defineCommand({
   roles: ["admin"],
   handler: async (ctx, i) => {
     const userId = await inviteOrResolveUser(i.email);
-
-    const adminClient = createAdminClient();
-    const { data: existingMembership } = await adminClient
-      .from("brewery_users")
-      .select("user_id")
-      .eq("brewery_id", ctx.breweryId)
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (existingMembership) throw new CommandError(`${i.email} is already a member of this brewery`);
-
-    const { error } = await adminClient
-      .from("brewery_users")
-      .insert({ brewery_id: ctx.breweryId, user_id: userId, role: i.role });
-    if (error) {
-      if (error.code === UNIQUE_VIOLATION) throw new CommandError(`${i.email} is already a member of this brewery`);
-      throw new CommandError(error.message);
-    }
-
+    await insertMembership("brewery_users", { brewery_id: ctx.breweryId, user_id: userId, role: i.role },
+      `${i.email} is already a member of this brewery`);
     return { userId };
   },
 });
@@ -92,34 +81,18 @@ defineCommand({
     // RLS-bound check first, using the caller's own client — never the admin
     // client — so a customer belonging to another brewery is invisible here
     // and the insert below never happens for it.
-    const { data: customer, error: customerError } = await ctx.db
-      .from("customers")
-      .select("id")
-      .eq("id", i.customerId)
-      .eq("brewery_id", ctx.breweryId)
-      .maybeSingle();
-    if (customerError) throw new CommandError(customerError.message);
+    const customer = await unwrap(ctx.db.from("customers").select("id").eq("id", i.customerId).eq("brewery_id", ctx.breweryId).maybeSingle());
     if (!customer) throw new CommandError(`customer not found: ${i.customerId}`);
 
     const userId = await inviteOrResolveUser(i.email);
-
-    const adminClient = createAdminClient();
-    const { data: existingMembership } = await adminClient
-      .from("customer_users")
-      .select("user_id")
-      .eq("customer_id", i.customerId)
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (existingMembership) throw new CommandError(`${i.email} already has access to this customer`);
-
-    const { error } = await adminClient
-      .from("customer_users")
-      .insert({ customer_id: i.customerId, user_id: userId });
-    if (error) {
-      if (error.code === UNIQUE_VIOLATION) throw new CommandError(`${i.email} already has access to this customer`);
-      throw new CommandError(error.message);
-    }
-
+    await insertMembership("customer_users", { customer_id: i.customerId, user_id: userId },
+      `${i.email} already has access to this customer`);
     return { userId };
   },
+});
+
+defineQuery({
+  name: "list_team_members", description: "Staff memberships for the brewery (user id + role; emails live in auth and are not readable under RLS)",
+  input: z.object({}), roles: ["admin", "sales", "warehouse"],
+  handler: (ctx) => unwrap(ctx.db.from("brewery_users").select("user_id, role").eq("brewery_id", ctx.breweryId).order("role")),
 });

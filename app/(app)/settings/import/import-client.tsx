@@ -1,6 +1,6 @@
 // app/(app)/settings/import/import-client.tsx — CSV import UI: pick a kind,
 // parse a CSV file client-side with papaparse, preview the first 5 rows, then
-// submit the parsed rows to the import_csv command in sequential CHUNK_SIZE
+// submit the parsed rows to the import_csv command in sequential IMPORT_ROW_CAP
 // batches (the server rejects a single request over that many rows).
 // Results (inserted count + per-row errors) accumulate across chunks.
 "use client";
@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useBrewery } from "../../brewery-provider";
 import { command } from "@/lib/commands/client";
+import { IMPORT_ROW_CAP } from "@/lib/commands/import-limits";
 
 const KINDS = [
   { value: "customers", label: "Customers", columns: "name,type,license_no,state,payment_terms" },
@@ -27,10 +28,6 @@ const KINDS = [
 type Kind = (typeof KINDS)[number]["value"];
 
 type ImportResult = { inserted: number; errors: { row: number; message: string }[] };
-
-// Mirrors the server-side cap (lib/commands/import.ts rowsSchema.max) so a
-// large CSV is chunked into sequential batches instead of rejected outright.
-const CHUNK_SIZE = 5000;
 
 export function ImportClient() {
   const breweryId = useBrewery();
@@ -73,8 +70,8 @@ export function ImportClient() {
     // reported errors still point at the right line in the original CSV.
     const accumulated: ImportResult = { inserted: 0, errors: [] };
     try {
-      for (let offset = 0; offset < rows.length; offset += CHUNK_SIZE) {
-        const chunk = rows.slice(offset, offset + CHUNK_SIZE);
+      for (let offset = 0; offset < rows.length; offset += IMPORT_ROW_CAP) {
+        const chunk = rows.slice(offset, offset + IMPORT_ROW_CAP);
         const data = (await command(breweryId, "import_csv", { kind, rows: chunk })) as ImportResult;
         accumulated.inserted += data.inserted;
         accumulated.errors.push(...data.errors.map((e) => ({ ...e, row: e.row + offset })));

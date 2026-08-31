@@ -2,27 +2,18 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useBrewery } from "../brewery-provider";
-import { command } from "@/lib/commands/client";
+import { useCommandForm } from "@/lib/commands/use-command-form";
 
 // Staff-facing movement types; sale_removal/taproom_transfer are produced by
 // order flows (plan 1B), not entered manually here.
 const MOVEMENT_TYPES = [
-  "opening_balance",
-  "production_in",
-  "adjustment",
-  "depletion",
-  "destruction",
-  "loss",
-  "sample",
-  "festival_removal",
-  "return_in",
+  "opening_balance", "production_in", "adjustment", "depletion",
+  "destruction", "loss", "sample", "festival_removal", "return_in",
 ] as const;
 type MovementType = (typeof MOVEMENT_TYPES)[number];
 
@@ -30,9 +21,7 @@ const CHANNELS = ["wholesale", "taproom", "dtc", "export"] as const;
 
 // Mirrors the DB CHECK (removal_shape): only depletion requires a channel
 // (fixed to taproom) among the staff-facing types above.
-function requiresChannel(type: MovementType) {
-  return type === "depletion";
-}
+const requiresChannel = (type: MovementType) => type === "depletion";
 
 export function MovementForm({
   skus,
@@ -41,64 +30,24 @@ export function MovementForm({
   skus: { id: string; label: string }[];
   locations: { id: string; name: string; kind: string }[];
 }) {
-  const breweryId = useBrewery();
-  const router = useRouter();
-  const [open, setOpen] = useState(false);
   const [skuId, setSkuId] = useState("");
   const [locationId, setLocationId] = useState("");
   const [qty, setQty] = useState("");
   const [type, setType] = useState<MovementType>("opening_balance");
   const [channel, setChannel] = useState<(typeof CHANNELS)[number]>("taproom");
   const [note, setNote] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  function reset() {
-    setSkuId("");
-    setLocationId("");
-    setQty("");
-    setType("opening_balance");
-    setChannel("taproom");
-    setNote("");
-    setError(null);
-  }
+  const form = useCommandForm("record_movement", {
+    build: () => ({ skuId, locationId, qty: Number(qty), type, channel: requiresChannel(type) ? channel : undefined, note: note || undefined }),
+    reset: () => { setSkuId(""); setLocationId(""); setQty(""); setType("opening_balance"); setChannel("taproom"); setNote(""); },
+  });
 
   function onTypeChange(next: MovementType) {
     setType(next);
     if (next === "depletion") setChannel("taproom");
   }
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    setError(null);
-    try {
-      await command(breweryId, "record_movement", {
-        skuId,
-        locationId,
-        qty: Number(qty),
-        type,
-        channel: requiresChannel(type) ? channel : undefined,
-        note: note || undefined,
-      });
-      setOpen(false);
-      reset();
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "failed to record movement");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) reset();
-      }}
-    >
+    <Dialog open={form.open} onOpenChange={form.setOpen}>
       <DialogTrigger asChild>
         <Button>Record Movement</Button>
       </DialogTrigger>
@@ -106,7 +55,7 @@ export function MovementForm({
         <DialogHeader>
           <DialogTitle>Record Movement</DialogTitle>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <form onSubmit={form.submit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="movement-sku">SKU</Label>
             <Select value={skuId} onValueChange={setSkuId}>
@@ -179,10 +128,10 @@ export function MovementForm({
             <Label htmlFor="movement-note">Note</Label>
             <Input id="movement-note" value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {form.error && <p className="text-sm text-red-600">{form.error}</p>}
           <DialogFooter>
-            <Button type="submit" disabled={submitting || !skuId || !locationId}>
-              {submitting ? "Recording…" : "Record"}
+            <Button type="submit" disabled={form.submitting || !skuId || !locationId}>
+              {form.submitting ? "Recording…" : "Record"}
             </Button>
           </DialogFooter>
         </form>

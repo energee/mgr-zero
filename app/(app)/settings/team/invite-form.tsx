@@ -2,55 +2,25 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useBrewery } from "../../brewery-provider";
-import { command } from "@/lib/commands/client";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useCommandForm } from "@/lib/commands/use-command-form";
 
-type StaffRole = "admin" | "sales" | "warehouse";
+const ROLES = ["admin", "sales", "warehouse"] as const;
 
 export function InviteForm() {
-  const breweryId = useBrewery();
-  const router = useRouter();
-  const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<StaffRole>("sales");
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  function reset() {
-    setEmail("");
-    setRole("sales");
-    setError(null);
-  }
-
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    setError(null);
-    try {
-      await command(breweryId, "invite_staff", { email, role });
-      setOpen(false);
-      reset();
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "failed to invite");
-    } finally {
-      setSubmitting(false);
-    }
-  }
+  const [role, setRole] = useState<(typeof ROLES)[number]>("sales");
+  const form = useCommandForm("invite_staff", {
+    build: () => ({ email, role }),
+    reset: () => { setEmail(""); setRole("sales"); },
+  });
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) reset();
-      }}
-    >
+    <Dialog open={form.open} onOpenChange={form.setOpen}>
       <DialogTrigger asChild>
         <Button>Invite Staff</Button>
       </DialogTrigger>
@@ -58,34 +28,30 @@ export function InviteForm() {
         <DialogHeader>
           <DialogTitle>Invite Staff</DialogTitle>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <form onSubmit={form.submit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="invite-email">Email</Label>
-            <Input
-              id="invite-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+            <Input id="invite-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="invite-role">Role</Label>
-            <select
-              id="invite-role"
-              className="rounded border px-3 py-2 text-sm"
-              value={role}
-              onChange={(e) => setRole(e.target.value as StaffRole)}
-            >
-              <option value="admin">Admin</option>
-              <option value="sales">Sales</option>
-              <option value="warehouse">Warehouse</option>
-            </select>
+            <Select value={role} onValueChange={(v) => setRole(v as typeof role)}>
+              <SelectTrigger id="invite-role">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ROLES.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {r}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {form.error && <p className="text-sm text-red-600">{form.error}</p>}
           <DialogFooter>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? "Inviting…" : "Invite"}
+            <Button type="submit" disabled={form.submitting}>
+              {form.submitting ? "Inviting…" : "Invite"}
             </Button>
           </DialogFooter>
         </form>

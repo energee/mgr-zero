@@ -2,66 +2,27 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useBrewery } from "../brewery-provider";
-import { command } from "@/lib/commands/client";
+import { useCommandForm } from "@/lib/commands/use-command-form";
 
 const PACKAGE_TYPES = ["keg", "can", "bottle"] as const;
 
 export function SkuForm({ productId }: { productId: string }) {
-  const breweryId = useBrewery();
-  const router = useRouter();
-  const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [packageType, setPackageType] = useState<(typeof PACKAGE_TYPES)[number]>("keg");
   const [unitsPerCase, setUnitsPerCase] = useState("");
   const [bblPerUnit, setBblPerUnit] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  function reset() {
-    setName("");
-    setPackageType("keg");
-    setUnitsPerCase("");
-    setBblPerUnit("");
-    setError(null);
-  }
-
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    setError(null);
-    try {
-      await command(breweryId, "create_sku", {
-        productId,
-        name,
-        packageType,
-        unitsPerCase: unitsPerCase ? Number(unitsPerCase) : undefined,
-        bblPerUnit,
-      });
-      setOpen(false);
-      reset();
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "failed to create SKU");
-    } finally {
-      setSubmitting(false);
-    }
-  }
+  const form = useCommandForm("create_sku", {
+    build: () => ({ productId, name, packageType, unitsPerCase: unitsPerCase ? Number(unitsPerCase) : undefined, bblPerUnit }),
+    reset: () => { setName(""); setPackageType("keg"); setUnitsPerCase(""); setBblPerUnit(""); },
+  });
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) reset();
-      }}
-    >
+    <Dialog open={form.open} onOpenChange={form.setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
           New SKU
@@ -71,7 +32,7 @@ export function SkuForm({ productId }: { productId: string }) {
         <DialogHeader>
           <DialogTitle>New SKU</DialogTitle>
         </DialogHeader>
-        <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <form onSubmit={form.submit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="sku-name">Name</Label>
             <Input id="sku-name" value={name} onChange={(e) => setName(e.target.value)} required />
@@ -93,29 +54,16 @@ export function SkuForm({ productId }: { productId: string }) {
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="sku-units-per-case">Units per case</Label>
-            <Input
-              id="sku-units-per-case"
-              type="number"
-              step="1"
-              value={unitsPerCase}
-              onChange={(e) => setUnitsPerCase(e.target.value)}
-            />
+            <Input id="sku-units-per-case" type="number" step="1" value={unitsPerCase} onChange={(e) => setUnitsPerCase(e.target.value)} />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="sku-bbl-per-unit">BBL per unit</Label>
-            <Input
-              id="sku-bbl-per-unit"
-              inputMode="decimal"
-              placeholder="0.5"
-              value={bblPerUnit}
-              onChange={(e) => setBblPerUnit(e.target.value)}
-              required
-            />
+            <Input id="sku-bbl-per-unit" inputMode="decimal" placeholder="0.5" value={bblPerUnit} onChange={(e) => setBblPerUnit(e.target.value)} required />
           </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {form.error && <p className="text-sm text-red-600">{form.error}</p>}
           <DialogFooter>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? "Creating…" : "Create"}
+            <Button type="submit" disabled={form.submitting}>
+              {form.submitting ? "Creating…" : "Create"}
             </Button>
           </DialogFooter>
         </form>

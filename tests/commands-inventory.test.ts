@@ -1,17 +1,13 @@
 // tests/commands-inventory.test.ts — exercises the command handlers with a real RLS-bound Ctx.
 import { describe, it, expect, beforeAll } from "vitest";
-import { makeBrewery, makeStaff, asUser } from "./helpers";
+import { makeBrewery, makeStaffCtx } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
 describe("inventory commands", () => {
   let ctx: any;
   beforeAll(async () => {
-    const b = await makeBrewery();
-    const staff = await makeStaff(b.id, "admin");
-    const db = await asUser(staff.email);
-    const { data: { user } } = await db.auth.getUser();
-    ctx = { db, userId: user!.id, breweryId: b.id, role: "admin" };
+    ctx = await makeStaffCtx((await makeBrewery()).id);
   });
 
   it("full flow: product -> sku -> location -> movement -> on_hand", async () => {

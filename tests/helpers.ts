@@ -40,3 +40,10 @@ export async function asUser(email: string): Promise<SupabaseClient> {
   if (error) throw error;
   return c;
 }
+
+// A ready-to-use command Ctx for a fresh staff member of `breweryId`.
+export async function makeStaffCtx(breweryId: string, role: "admin" | "sales" | "warehouse" = "admin") {
+  const staff = await makeStaff(breweryId, role);
+  const db = await asUser(staff.email);
+  return { db, userId: staff.id, breweryId, role };
+}
