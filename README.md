@@ -13,7 +13,7 @@ Slice 1B; QBO integration and AI chat are Slice 1C.
 
 ## Iron rules
 
-See `ARCHITECTURE.md` for the ownership map and the five iron rules
+See `.agents/ARCHITECTURE.md` for the ownership map and the five iron rules
 (commands-only, append-only ledger, RLS everywhere, admin client confined,
 multi-row writes are one Postgres function)
 and what enforces each one. Agents start at `AGENTS.md`.

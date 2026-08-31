@@ -18,9 +18,9 @@ below just in time — don't preload everything.
 
 | Task | Read first |
 | --- | --- |
-| Any code change | `ARCHITECTURE.md` — ownership map and the five iron rules |
+| Any code change | `.agents/ARCHITECTURE.md` — ownership map and the five iron rules |
 | Setup, ports, dev login, env vars | `README.md` |
-| Schema / migration work | `ARCHITECTURE.md` conventions, then `.agents/superpowers/specs/2026-08-31-mgr-schema-design.md` (tables) and `2026-08-31-mgr-schema-decisions.md` (why) |
+| Schema / migration work | `.agents/ARCHITECTURE.md` conventions, then `.agents/superpowers/specs/2026-08-31-mgr-schema-design.md` (tables) and `2026-08-31-mgr-schema-decisions.md` (why) |
 | Brewing/TTB domain rules (units, loss, removals) | `.agents/superpowers/specs/brewing-domain.md` |
 | Why v1 (`~/Repos/mgr`) was left behind | `.agents/superpowers/specs/2026-08-31-mgr-v1-review.md` |
 | Product intent, what a slice is | `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md` |
@@ -31,7 +31,7 @@ below just in time — don't preload everything.
 ## Operating loop
 
 1. `npx supabase start` must be running; tests hit the real database.
-2. Find the owner of the concept in `ARCHITECTURE.md` and change it there.
+2. Find the owner of the concept in `.agents/ARCHITECTURE.md` and change it there.
 3. Prove it: `npx vitest run && npx tsc --noEmit && npm run lint`. For UI, look
    at the rendered page — tests don't cover rendering.
 4. `git diff` before committing (a stray NUL byte once made a file binary).

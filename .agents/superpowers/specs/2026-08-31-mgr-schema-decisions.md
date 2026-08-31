@@ -32,7 +32,7 @@ Enums stay conservative: adding a value later is one line; a wrong one is foreve
 
 ## Conventions applied uniformly (learned the hard way in slice 1A)
 
-- Every tenant table: `brewery_id uuid not null`, RLS enabled, policies via the helpers named in `ARCHITECTURE.md` rule 3.
+- Every tenant table: `brewery_id uuid not null`, RLS enabled, policies via the helpers named in `.agents/ARCHITECTURE.md` rule 3.
 - **Composite tenant FKs** on every cross-table reference: `unique (id, brewery_id)` on the parent, `foreign key (x_id, brewery_id) references parent (id, brewery_id)` on the child. Cross-brewery rows must be structurally impossible, not merely reviewable.
 - Ledgers (`inventory_movements`, `material_movements`, `keg_events`) are append-only: `revoke update, delete`; corrections are reversal rows.
 - Derived quantities are triggers, never client-supplied (`bbl` from `skus.bbl_per_unit`; lot requirement from `materials.lot_tracked`).

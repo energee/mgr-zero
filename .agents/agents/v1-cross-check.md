@@ -30,7 +30,7 @@ entity/concept names in the v2 input; follow references from there.
    - **REPEAT** — v2 is doing something v1 tried and then reversed or flagged (audit findings, "lesson" notes, migration that undid an earlier one).
    - **LEARNING** — v1 hit an edge case, TTB/brewing-domain rule, or Supabase/RLS gotcha that v2's plan doesn't mention.
    - **DIVERGENCE-OK** — v2 differs, but the v1 review doc already explains why. Say so in one line; do not relitigate.
-4. Check v2's own `ARCHITECTURE.md` iron rules and `.agents/superpowers/specs/brewing-domain.md` before flagging — if v2 already covers it, it is not a finding.
+4. Check v2's own `.agents/ARCHITECTURE.md` iron rules and `.agents/superpowers/specs/brewing-domain.md` before flagging — if v2 already covers it, it is not a finding.
 
 ## Report
 
