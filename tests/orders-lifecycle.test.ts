@@ -84,6 +84,42 @@ describe("order lifecycle", () => {
     const { data: o } = await admin.from("orders").select("status").eq("id", id).single();
     expect(o!.status).toBe("cancelled");
   });
+  it("update_draft_order replaces lines, re-snapshots price, and updates order fields", async () => {
+    const id = await createOrder(10);
+    // Update: reduce qty 10 → 7, change po_number
+    const { error: updErr } = await staffDb.rpc("update_draft_order", {
+      p_order: id,
+      p_ship_to: null,
+      p_requested: null,
+      p_po: "PO-123",
+      p_note: null,
+      p_lines: [{ sku_id: skuId, qty: 7 }],
+    });
+    expect(updErr).toBeNull();
+    // Assert line qty_ordered is 7 with price re-snapshotted (12000)
+    const { data: line } = await admin.from("order_lines").select().eq("order_id", id).single();
+    expect(Number(line!.qty_ordered)).toBe(7);
+    expect(line!.unit_price_cents).toBe(12000);
+    // Assert orders.po_number updated
+    const { data: order } = await admin.from("orders").select("po_number").eq("id", id).single();
+    expect(order!.po_number).toBe("PO-123");
+    // Assert events are ["created", "updated"]
+    const { data: events } = await admin.from("order_events").select().eq("order_id", id).order("created_at", { ascending: true });
+    expect(events!.map(e => e.event)).toEqual(["created", "updated"]);
+  });
+  it("update_draft_order rejects when order is submitted", async () => {
+    const id = await createOrder(10);
+    await staffDb.rpc("submit_order", { p_order: id });
+    const { error } = await staffDb.rpc("update_draft_order", {
+      p_order: id,
+      p_ship_to: null,
+      p_requested: null,
+      p_po: "PO-456",
+      p_note: null,
+      p_lines: [{ sku_id: skuId, qty: 5 }],
+    });
+    expect(error!.message).toMatch(/order is/);
+  });
   it("rejects wrong-status transitions", async () => {
     const id = await createOrder();
     const { error } = await staffDb.rpc("confirm_order", { p_order: id }); // still draft
