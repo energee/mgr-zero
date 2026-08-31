@@ -15,7 +15,10 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
 - UI source of truth is UI plan rev 3 plus the exactly 50-frame
   `2026-08-31-mgr-wireframes.html`; change navigation/flows and the `SCREENS`
   array together. Staff uses Today/Beer/Work/More; the wholesale portal has its
-  own Order/Orders/Invoices/Account shell.
+  own Order/Orders/Invoices/Account shell. Frames draw only what a user sees:
+  gate names, state variants, and tap audits are annotations under the frame;
+  gated actions use human copy ("isn't available yet"); the Today frame is the
+  full-size 16px exemplar — build from plan §5 tokens, not catalog pixels.
 - Every AI mutation is proposal-only: registry-owned server preview,
   canonical effects, explicit user confirmation, same `requestId` +
   `previewToken`, and stale revalidation. There is no generic Undo. Replay and

@@ -11,6 +11,10 @@ frame from the same body (desk = rail/top-nav shell, dialog sheets, 32 px
 cursor-density controls). Update it in the same commit as any change
 to §3 or §4. The repository HTML is the canonical rev-3 artifact; republish that exact
 source before sharing an external artifact URL.
+The wireframe catalog is drawn compressed to fit 50-up; implementers build from the §5
+tokens (16px phone body), not the artifact's pixels — the Today frame is the full-size
+exemplar. Frames draw only what a user sees; state variants, tap audits, gate names, and
+transaction notes are annotations under each frame, never in-device chrome.
 Inputs: `2026-08-30-mgr-slice1-core-orders-design.md` (roles, slices, interaction budget,
 AI-first command registry), `2026-08-31-mgr-schema-design.md` (what exists to show), and
 `brewing-domain.md` (units and compliance semantics).
@@ -215,7 +219,9 @@ query owns it.
 - **Today** is the role-filtered inbox: picks due, submitted orders, overdue readings,
   weekly taproom count (after its schema gate), PO arrivals, negative ATP, QBO failures, delivery next stop, and
   compliance deadlines. Standing work stays here, not in More. Each row either performs
-  a fully explicit safe action or opens its owning form prefilled.
+  a fully explicit safe action or opens its owning form prefilled. The first viewport is
+  the brewery header, two or three role actions, the next real rows, and the composer —
+  never every persona's inventory at once; role-hidden rows leave no blank gaps.
 - **Beer** is physical truth: FG on-hand/ATP, taproom replenishment/count, cellar
   occupancies, materials, and keg fleet. There is no vessel status column; occupancy and
   timestamps derive presentation.
@@ -231,8 +237,9 @@ Brewery switching (SaaS only) and account actions live in the header.
 
 ### Staff desktop (> 768px)
 
-The same four groups become a left rail with listed subareas expanded. Content gets two
-columns only where comparison matters. Composer is available from the visible top entry
+The same four groups become a left rail with the four tabs as group headers and their
+subareas beneath — hierarchy, not a flat sitemap of equal-weight links. Content gets two
+columns only where comparison matters; the default is one column. Composer is available from the visible top entry
 and `⌘K`. Viewport chooses layout; `(pointer: coarse)` independently chooses larger
 controls, so a wall tablet is desktop layout with glove-safe targets.
 
@@ -244,7 +251,10 @@ empty, and error states. Composer is restricted to the current customer's ordera
 catalog, own orders/invoices, repeat-order proposal, and draft/submit
 commands. The portal does not expose ATP/on-hand: those views are staff-only under the
 baseline RLS, while staff still receive the soft availability warning at confirm. It
-cannot discover staff tools or other customers. Account is read-only under
+cannot discover staff tools or other customers. Portal copy is buyer-facing: price,
+package, quantity, **Place order**, and a plain fulfillment line ("Ships from
+Warehouse"); staff vocabulary — ATP, gate names, fulfillment-source engineering — never
+appears in the portal. Account is read-only under
 current RLS: permitted ship-tos and only the signed-in portal user's own membership can
 be viewed, not edited; peer portal users are not listed. Invite acceptance lands
 inside this shell, never in the staff app.
@@ -289,7 +299,7 @@ Dialog/Sheet on desk.
 | **Materials / receiving** (2) | Receive counted material | Expected vs counted, over/short, conditional lot, one copper receipt commit | PO list, requirements → draft PO |
 | **Material count / materials / vendors / contracts** (2) | Keep material/supply truth | Create/edit material facts; positive counts → adjustment preview; vendor picker | Material/vendor/contracts and committed/received/remaining |
 | **Recipes** (3) | Create recipes and immutable versions; keep predictions honest | Create mutable recipe parent; read/scale; draft editor takes grain bill + mash temp + efficiency + attenuation and shows OG/FG/ABV computed live by the shared registry formula (never stored, no view); version view lists per-batch actuals (OG/FG/ABV from fermentation readings, realized efficiency/attenuation) with deltas vs predicted — one row per batch, amber when out of band | Version editor and costing; outcome table across batches |
-| **Cellar / reading** (4) | Set up vessels, know occupancy, and log reading | Create/edit vessel facts without status; map derives contents; reading defaults current occupancy and unit; disabled `complete_batch` names its reconciliation schema gate | Timeline and lineage graph |
+| **Cellar / reading** (4) | Set up vessels, know occupancy, and log reading | Create/edit vessel facts without status; map derives contents; each tile leads with occupancy — fill level, contents/gravity, overdue — not a generic dashboard grid; reading defaults current occupancy and unit; disabled `complete_batch` names its reconciliation schema gate | Timeline and lineage graph |
 | **Brew day** (4) | Establish batch baseline | Schedule/record brew day, lots/additions, knockout volume → free vessel | Calendar and scaled recipe |
 | **Transfer / loss** (4) | Move beer and account for remainder | From occupancy + target vessel/occupancy, positive bbl, `loss_bbl` in the same RPC; an empty target gets a zero-baseline occupancy and a fully emptied source closes | Lineage and named correction |
 | **Packaging run / outputs** (5) | Plan and close real stock | Green schedule/edit selects one exact open source occupancy and writes run + planned outputs in one RPC; close revalidates source and reviews requirements, actual output, lot, explicit FG destination, consumption/return/loss, then commits copper | Run list, yield/loss, labels |
@@ -353,7 +363,11 @@ for the five command classes named above.
 
 Copy uses sentence case and names the write: **Record reading**, **Done picking**, **Ship
 order**, **Receive materials**, **Complete transfer**, **Delivered**. Success repeats the
-verb; errors say what to change and preserve entered data.
+verb; errors say what to change and preserve entered data. Row actions name the write or
+destination — Confirm, Pick, Resume, Record, Review — or are plain navigation (chevron);
+**Open** is never a universal row verb. Gated actions render visibly disabled with human
+copy ("Weekly count isn't available yet"); gate names such as SCHEMA-GATE live in specs
+and wireframe annotations only and never appear in-app.
 
 ## 5b. shadcn, icons, and required states
 
@@ -397,7 +411,9 @@ Every one of the 50 screens implements this shared baseline:
 | Stale | Name changed data, refresh canonical values, require fresh confirmation; never silent rebase. |
 | Deduplicated | Show prior result for same request ID as “Already recorded”; never add a second optimistic row. |
 
-Draw variants, not prose alone, for:
+Draw variants, not prose alone, for the flows below. In the wireframe artifact they
+render as annotation chips under the frame — the device itself shows only the happy
+path (or one dedicated alternate frame), never a grid of state chips inside the screen:
 
 - **Composer/Outbox:** ambiguous, preview pending, queued, response lost, dedup success,
   stale, permanent rejection, role changed, and copper discard `AlertDialog`.
