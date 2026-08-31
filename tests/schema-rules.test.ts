@@ -43,11 +43,7 @@ describe("schema rules", () => {
       order by 1`)).toEqual([]);
   });
 
-  // TODO(baseline): currently fails — is_staff_of, my_brewery_ids, my_customer_ids,
-  // next_no, staff_role keep the default PUBLIC execute grant. Fix in the baseline:
-  //   revoke execute on function <fn> from public, anon;  (v1 did this in 00247)
-  // then drop the .skip.
-  it.skip("security definer functions are not callable by anon", () => {
+  it("security definer functions are not callable by anon", () => {
     // Definer functions bypass RLS; anon must never reach one.
     expect(sql(`
       select p.proname from pg_proc p

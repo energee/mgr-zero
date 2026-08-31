@@ -1303,3 +1303,10 @@ create policy customer_read on deliveries for select
 revoke update, delete on recipe_versions, recipe_ingredients from authenticated, anon;
 revoke update, delete on pos_sales from authenticated, anon;
 grant update (movement_id) on pos_sales to authenticated;
+
+-- ---------------------------------------------------------------- definer functions: never callable by anon
+-- These bypass RLS; only logged-in users (and policies evaluated as them) may run them.
+revoke execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), next_no(uuid, text)
+  from public, anon;
+grant execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), next_no(uuid, text)
+  to authenticated;
