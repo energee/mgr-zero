@@ -101,7 +101,7 @@ describe("pick and ship", () => {
 });
 
 describe("credit memo", () => {
-  it("writes negative invoice lines and return_in movements", async () => {
+  it("writes negative invoice lines and return_in movements, and logs an order_events row", async () => {
     const id = await confirmedOrder(5);
     const line = await lineOf(id);
     await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 5 }] });
@@ -118,6 +118,24 @@ describe("credit memo", () => {
     expect(cmLines![0].unit_price_cents).toBe(12000);
     const { data: ret } = await admin.from("inventory_movements").select().eq("type", "return_in").eq("brewery_id", b.id);
     expect(ret!.some(m => Number(m.qty) === 2)).toBe(true);
+    const { data: events } = await admin.from("order_events").select().eq("order_id", id).eq("event", "credit_memo");
+    expect(events!.length).toBe(1);
+    const payload = events![0].payload as { invoice_id: string; credit_memo_id: string; reason: string };
+    expect(payload.invoice_id).toBe(invId);
+    expect(payload.credit_memo_id).toBe(cmId);
+    expect(payload.reason).toBe("damaged");
+
+    // Over-credit guard: 2 of 5 already credited above; 4 more would exceed
+    // the remaining 3, 3 more exactly exhausts it.
+    const { error: overErr } = await staffDb.rpc("create_credit_memo", {
+      p_invoice: invId, p_lines: [{ invoice_line_id: il!.id, qty: 4 }], p_location: whId, p_reason: "damaged again",
+    });
+    expect(overErr).not.toBeNull();
+    expect(overErr?.message).toMatch(/credit exceeds remaining creditable qty/);
+    const { error: exactErr } = await staffDb.rpc("create_credit_memo", {
+      p_invoice: invId, p_lines: [{ invoice_line_id: il!.id, qty: 3 }], p_location: whId, p_reason: "rest",
+    });
+    expect(exactErr).toBeNull();
   });
 });
 

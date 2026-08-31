@@ -896,10 +896,13 @@ create table invoice_lines (
   qty numeric(12,2) not null check (qty <> 0),
   unit_price_cents int not null,
   amount_cents int generated always as (round(qty * unit_price_cents)::int) stored,
+  credited_invoice_line_id uuid,   -- set on a credit-memo line: the original invoice line it credits
+  unique (id, brewery_id),
   foreign key (invoice_id, brewery_id) references invoices (id, brewery_id),
   foreign key (sku_id, brewery_id) references skus (id, brewery_id),
   foreign key (order_line_id, brewery_id) references order_lines (id, brewery_id),
   foreign key (keg_pool_id, brewery_id) references keg_pools (id, brewery_id),
+  foreign key (credited_invoice_line_id, brewery_id) references invoice_lines (id, brewery_id),
   check (case kind
     when 'sku'                then sku_id is not null
     when 'keg_deposit'        then keg_pool_id is not null and keg_size is not null and qty > 0
@@ -1406,7 +1409,9 @@ create function ship_order(p_order uuid, p_ship jsonb, p_carrier text, p_trackin
 language plpgsql set search_path = '' as $$
 declare o public.orders; sp record; v_state text; v_invoice uuid; v_shipment uuid;
 begin
-  -- Full-coverage guard: ensure p_ship covers every order line
+  o := public.lock_order(p_order, array['picked']::public.order_status[]);
+  -- Full-coverage guard: ensure p_ship covers every order line. Runs after the
+  -- lock so the line set can't change between the check and the lock (TOCTOU).
   if exists (
     select 1 from public.order_lines ol
     where ol.order_id = p_order
@@ -1417,7 +1422,6 @@ begin
   ) then
     raise exception 'ship list must cover every order line';
   end if;
-  o := public.lock_order(p_order, array['picked']::public.order_status[]);
   insert into public.shipments (brewery_id, order_id, carrier, tracking, created_by)
   values (o.brewery_id, p_order, p_carrier, p_tracking, auth.uid()) returning id into v_shipment;
   if o.kind = 'wholesale' then
@@ -1463,7 +1467,7 @@ end $$;
 
 create function create_credit_memo(p_invoice uuid, p_lines jsonb, p_location uuid, p_reason text) returns jsonb
 language plpgsql set search_path = '' as $$
-declare v_inv public.invoices; v_cm uuid; cl record;
+declare v_inv public.invoices; v_cm uuid; v_order uuid; cl record; v_orig_qty numeric; v_already_credited numeric;
 begin
   select * into v_inv from public.invoices where id = p_invoice;
   if not found then raise exception 'invoice not found'; end if;
@@ -1472,14 +1476,58 @@ begin
   values (v_inv.brewery_id, 'credit_memo', v_inv.customer_id, current_date)
   returning id into v_cm;
   for cl in select (e->>'invoice_line_id')::uuid as line_id, (e->>'qty')::numeric as qty from jsonb_array_elements(p_lines) e loop
-    insert into public.invoice_lines (brewery_id, invoice_id, kind, sku_id, qty, unit_price_cents, description)
-    select v_inv.brewery_id, v_cm, 'sku', il.sku_id, -cl.qty, il.unit_price_cents, il.description
+    select qty into v_orig_qty from public.invoice_lines where id = cl.line_id and invoice_id = p_invoice;
+    if v_orig_qty is null then raise exception 'invoice line % not found on invoice', cl.line_id; end if;
+    -- Over-credit guard: qty already credited against this invoice line across
+    -- all prior credit memos, plus this request, must not exceed the original.
+    select coalesce(sum(-il.qty), 0) into v_already_credited
+      from public.invoice_lines il where il.credited_invoice_line_id = cl.line_id;
+    if cl.qty > (v_orig_qty - v_already_credited) then
+      raise exception 'credit exceeds remaining creditable qty for line %', cl.line_id;
+    end if;
+    insert into public.invoice_lines (brewery_id, invoice_id, kind, sku_id, qty, unit_price_cents, description, credited_invoice_line_id)
+    select v_inv.brewery_id, v_cm, 'sku', il.sku_id, -cl.qty, il.unit_price_cents, il.description, il.id
     from public.invoice_lines il where il.id = cl.line_id and il.invoice_id = p_invoice;
     insert into public.inventory_movements (brewery_id, sku_id, location_id, qty, type, note, created_by)
     select v_inv.brewery_id, il.sku_id, p_location, cl.qty, 'return_in', p_reason, auth.uid()
     from public.invoice_lines il where il.id = cl.line_id and il.invoice_id = p_invoice;
   end loop;
+  -- Append to the originating order's event log, if this invoice came from a
+  -- shipment (credit memos on a manually-issued invoice have none).
+  select s.order_id into v_order from public.shipments s where s.id = v_inv.shipment_id;
+  if v_order is not null then
+    insert into public.order_events (brewery_id, order_id, actor, event, payload)
+    values (v_inv.brewery_id, v_order, auth.uid(), 'credit_memo',
+            jsonb_build_object('invoice_id', p_invoice, 'credit_memo_id', v_cm, 'lines', p_lines, 'reason', p_reason));
+  end if;
   return jsonb_build_object('invoice_id', v_cm);
+end $$;
+
+-- One open standing taproom allocation per (sku, location): upsert by qty>0,
+-- release by qty<=0. One plpgsql function per iron rule 5 (find-then-write).
+create function set_standing_allocation(p_location uuid, p_sku uuid, p_qty numeric) returns jsonb
+language plpgsql set search_path = '' as $$
+declare v_brewery uuid; v_alloc uuid; v_status public.allocation_status;
+begin
+  select brewery_id into v_brewery from public.locations where id = p_location;
+  if v_brewery is null then raise exception 'location not found'; end if;
+  select id into v_alloc from public.allocations
+    where source = 'taproom_standing' and ref = p_location and sku_id = p_sku and status = 'open';
+  if p_qty <= 0 then
+    if v_alloc is not null then
+      update public.allocations set status = 'released' where id = v_alloc;
+      v_status := 'released';
+    end if;
+  elsif v_alloc is not null then
+    update public.allocations set qty = p_qty where id = v_alloc;
+    v_status := 'open';
+  else
+    insert into public.allocations (brewery_id, sku_id, qty, source, ref, status)
+    values (v_brewery, p_sku, p_qty, 'taproom_standing', p_location, 'open')
+    returning id into v_alloc;
+    v_status := 'open';
+  end if;
+  return jsonb_build_object('allocation_id', v_alloc, 'status', v_status);
 end $$;
 
 create function create_replenishment_order(p_from uuid, p_to uuid, p_lines jsonb) returns jsonb
