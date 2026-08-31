@@ -60,14 +60,16 @@ export function Cart({ items, shipTos }: { items: CatalogItem[]; shipTos: ShipTo
   // retry never calls portal_create_order twice for the same cart.
   async function ensureDraft(): Promise<string> {
     if (draftId) return draftId;
+    // create_order (the underlying plpgsql fn) returns jsonb keyed
+    // order_id, not id — see lib/commands/portal.ts's portal_create_order.
     const order = (await command(breweryId, "portal_create_order", {
       shipToId,
       poNumber: poNumber || undefined,
       note: note || undefined,
       lines,
-    })) as { id: string };
-    setDraftId(order.id);
-    return order.id;
+    })) as { order_id: string };
+    setDraftId(order.order_id);
+    return order.order_id;
   }
 
   async function saveDraft() {
