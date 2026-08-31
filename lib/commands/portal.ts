@@ -17,8 +17,13 @@ defineCommand({
   input: z.object({ shipToId: z.string().uuid(), poNumber: z.string().optional(), note: z.string().optional(), lines }),
   handler: async (ctx, i) => {
     const customerId = requireCustomer(ctx);
-    // The brewery's default shipping origin: its first warehouse.
-    const wh = await unwrap(ctx.db.from("locations").select("id").eq("brewery_id", ctx.breweryId).eq("kind", "warehouse").single());
+    // The brewery's default shipping origin: one of its warehouses, picked
+    // deterministically. .single() errors if more than one row matches
+    // (PGRST116), and nothing constrains a brewery to one warehouse — so
+    // .limit(1) is load-bearing, not a no-op; locations has no created_at
+    // column, so order by id (stable, arbitrary but deterministic) rather
+    // than insertion order.
+    const wh = await unwrap(ctx.db.from("locations").select("id").eq("brewery_id", ctx.breweryId).eq("kind", "warehouse").order("id").limit(1).single());
     return unwrap(ctx.db.rpc("create_order", {
       p_brewery: ctx.breweryId, p_kind: "wholesale", p_customer: customerId, p_ship_to: i.shipToId,
       p_from_location: wh!.id, p_to_location: null, p_requested: null,

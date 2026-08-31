@@ -84,4 +84,15 @@ describe("portal commands", () => {
   it("staff-only commands reject a customer ctx", async () => {
     await expect(runCommand("list_orders", {}, custCtx)).rejects.toThrow(/permission denied/);
   });
+
+  it("portal_create_order still succeeds when the brewery has more than one warehouse", async () => {
+    // Nothing constrains a brewery to a single warehouse; the lookup must
+    // tolerate multiple rows (.single() would throw PGRST116 without a limit).
+    await admin.from("locations").insert({ brewery_id: b.id, name: "WH2", kind: "warehouse" });
+    const created = await runCommand("portal_create_order", {
+      shipToId, lines: [{ skuId, qty: 1 }],
+    }, custCtx) as { order_id: string };
+    const { data: order } = await admin.from("orders").select("status").eq("id", created.order_id).single();
+    expect(order!.status).toBe("draft");
+  });
 });
