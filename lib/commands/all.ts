@@ -3,4 +3,5 @@
 import "./catalog";
 import "./inventory";
 import "./import";
+import "./invites";
 export {};
