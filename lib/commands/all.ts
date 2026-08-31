@@ -5,4 +5,5 @@ import "./inventory";
 import "./import";
 import "./invites";
 import "./orders";
+import "./customers";
 export {};
