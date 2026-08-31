@@ -1240,6 +1240,154 @@ create view route_loads with (security_invoker = true) as
   join orders o on o.id = s.order_id
   join order_lines l on l.order_id = o.id;
 
+-- ------------------------------------------------- order lifecycle commands
+-- One function per transition (iron rule 5). Invoker-rights: RLS does
+-- tenancy; each starts by locking the order row. p_lines is a full
+-- replacement: [{"sku_id": uuid, "qty": n}].
+
+-- Resolves the unit price for a sku from a price list; raises if missing.
+create function order_line_price(p_brewery uuid, p_price_list uuid, p_sku uuid) returns int
+language plpgsql stable set search_path = '' as $$
+declare v int;
+begin
+  select unit_price_cents into v from public.price_list_items
+    where brewery_id = p_brewery and price_list_id = p_price_list and sku_id = p_sku;
+  if v is null then raise exception 'no price for sku % on price list', p_sku; end if;
+  return v;
+end $$;
+
+create function create_order(
+  p_brewery uuid, p_kind public.order_kind, p_customer uuid, p_ship_to uuid,
+  p_from_location uuid, p_to_location uuid, p_requested date, p_po text, p_note text, p_lines jsonb
+) returns jsonb language plpgsql set search_path = '' as $$
+declare v_order uuid; v_pl uuid; l record;
+begin
+  if p_kind = 'wholesale' then
+    select price_list_id into v_pl from public.customers where id = p_customer and brewery_id = p_brewery;
+    if v_pl is null then raise exception 'customer has no price list'; end if;
+  end if;
+  insert into public.orders (brewery_id, kind, customer_id, ship_to_id, from_location_id, to_location_id,
+                             price_list_id, requested_ship_date, po_number, note, created_by)
+  values (p_brewery, p_kind, p_customer, p_ship_to, p_from_location, p_to_location,
+          v_pl, p_requested, p_po, p_note, auth.uid())
+  returning id into v_order;
+  for l in select (e->>'sku_id')::uuid as sku_id, (e->>'qty')::numeric as qty from jsonb_array_elements(p_lines) e loop
+    insert into public.order_lines (brewery_id, order_id, sku_id, qty_ordered, unit_price_cents)
+    values (p_brewery, v_order, l.sku_id, l.qty,
+            case when p_kind = 'wholesale' then public.order_line_price(p_brewery, v_pl, l.sku_id) else 0 end);
+  end loop;
+  insert into public.order_events (brewery_id, order_id, actor, event, payload)
+  values (p_brewery, v_order, auth.uid(), 'created', jsonb_build_object('lines', p_lines));
+  return jsonb_build_object('order_id', v_order);
+end $$;
+
+-- Shared guard: lock the order, check status, return the row.
+create function lock_order(p_order uuid, p_allowed public.order_status[]) returns public.orders
+language plpgsql set search_path = '' as $$
+declare o public.orders;
+begin
+  select * into o from public.orders where id = p_order for update;
+  if not found then raise exception 'order not found'; end if;
+  if not (o.status = any(p_allowed)) then raise exception 'order is %', o.status; end if;
+  return o;
+end $$;
+
+create function update_draft_order(
+  p_order uuid, p_ship_to uuid, p_requested date, p_po text, p_note text, p_lines jsonb
+) returns jsonb language plpgsql set search_path = '' as $$
+declare o public.orders; l record;
+begin
+  o := public.lock_order(p_order, array['draft']::public.order_status[]);
+  update public.orders set ship_to_id = coalesce(p_ship_to, ship_to_id),
+    requested_ship_date = coalesce(p_requested, requested_ship_date),
+    po_number = coalesce(p_po, po_number), note = coalesce(p_note, note)
+    where id = p_order;
+  delete from public.order_lines where order_id = p_order;
+  for l in select (e->>'sku_id')::uuid as sku_id, (e->>'qty')::numeric as qty from jsonb_array_elements(p_lines) e loop
+    insert into public.order_lines (brewery_id, order_id, sku_id, qty_ordered, unit_price_cents)
+    values (o.brewery_id, p_order, l.sku_id, l.qty,
+            case when o.kind = 'wholesale' then public.order_line_price(o.brewery_id, o.price_list_id, l.sku_id) else 0 end);
+  end loop;
+  insert into public.order_events (brewery_id, order_id, actor, event, payload)
+  values (o.brewery_id, p_order, auth.uid(), 'updated', jsonb_build_object('lines', p_lines));
+  return jsonb_build_object('order_id', p_order);
+end $$;
+
+create function submit_order(p_order uuid) returns jsonb
+language plpgsql set search_path = '' as $$
+declare o public.orders;
+begin
+  o := public.lock_order(p_order, array['draft']::public.order_status[]);
+  update public.orders set status = 'submitted' where id = p_order;
+  insert into public.order_events (brewery_id, order_id, actor, event)
+  values (o.brewery_id, p_order, auth.uid(), 'submitted');
+  return jsonb_build_object('order_id', p_order);
+end $$;
+
+create function confirm_order(p_order uuid) returns jsonb
+language plpgsql set search_path = '' as $$
+declare o public.orders; w jsonb;
+begin
+  o := public.lock_order(p_order, array['submitted']::public.order_status[]);
+  insert into public.allocations (brewery_id, sku_id, qty, source, ref, status)
+  select o.brewery_id, sku_id, qty_ordered, 'order_line', id, 'open'
+  from public.order_lines where order_id = p_order;
+  update public.orders set status = 'confirmed' where id = p_order;
+  insert into public.order_events (brewery_id, order_id, actor, event)
+  values (o.brewery_id, p_order, auth.uid(), 'confirmed');
+  select coalesce(jsonb_agg(jsonb_build_object('sku_id', a.sku_id, 'atp', a.qty)), '[]') into w
+  from public.atp a join public.order_lines ol on ol.sku_id = a.sku_id and ol.order_id = p_order
+  where a.brewery_id = o.brewery_id and a.qty < 0;
+  return jsonb_build_object('order_id', p_order, 'warnings', w);
+end $$;
+
+create function adjust_order_lines(p_order uuid, p_lines jsonb, p_reason text) returns jsonb
+language plpgsql set search_path = '' as $$
+declare o public.orders; l record; v_line uuid; v_before jsonb;
+begin
+  o := public.lock_order(p_order, array['confirmed','picked']::public.order_status[]);
+  select jsonb_object_agg(ol.sku_id, ol.qty_ordered) into v_before
+  from public.order_lines ol where ol.order_id = p_order;
+  -- Drop lines (and their open allocations) not present in the new set.
+  update public.allocations set status = 'released'
+  where source = 'order_line' and status = 'open'
+    and ref in (select id from public.order_lines where order_id = p_order
+                and sku_id not in (select (e->>'sku_id')::uuid from jsonb_array_elements(p_lines) e));
+  delete from public.order_lines where order_id = p_order
+    and sku_id not in (select (e->>'sku_id')::uuid from jsonb_array_elements(p_lines) e);
+  for l in select (e->>'sku_id')::uuid as sku_id, (e->>'qty')::numeric as qty from jsonb_array_elements(p_lines) e loop
+    insert into public.order_lines (brewery_id, order_id, sku_id, qty_ordered, unit_price_cents)
+    values (o.brewery_id, p_order, l.sku_id, l.qty,
+            case when o.kind = 'wholesale' then public.order_line_price(o.brewery_id, o.price_list_id, l.sku_id) else 0 end)
+    on conflict (order_id, sku_id) do update set qty_ordered = excluded.qty_ordered
+    returning id into v_line;
+    update public.allocations set qty = l.qty
+      where source = 'order_line' and ref = v_line and status = 'open';
+    insert into public.allocations (brewery_id, sku_id, qty, source, ref, status)
+    select o.brewery_id, l.sku_id, l.qty, 'order_line', v_line, 'open'
+    where not exists (select 1 from public.allocations where source = 'order_line' and ref = v_line and status = 'open');
+  end loop;
+  update public.orders set needs_restock = needs_restock or (o.status = 'picked') where id = p_order;
+  insert into public.order_events (brewery_id, order_id, actor, event, payload)
+  values (o.brewery_id, p_order, auth.uid(), 'lines_adjusted',
+          jsonb_build_object('before', v_before, 'lines', p_lines, 'reason', p_reason));
+  return jsonb_build_object('order_id', p_order);
+end $$;
+
+create function cancel_order(p_order uuid, p_reason text) returns jsonb
+language plpgsql set search_path = '' as $$
+declare o public.orders;
+begin
+  o := public.lock_order(p_order, array['draft','submitted','confirmed','picked']::public.order_status[]);
+  update public.allocations set status = 'released'
+  where source = 'order_line' and status = 'open'
+    and ref in (select id from public.order_lines where order_id = p_order);
+  update public.orders set status = 'cancelled', needs_restock = (o.status = 'picked') where id = p_order;
+  insert into public.order_events (brewery_id, order_id, actor, event, payload)
+  values (o.brewery_id, p_order, auth.uid(), 'cancelled', jsonb_build_object('reason', p_reason));
+  return jsonb_build_object('order_id', p_order);
+end $$;
+
 -- ---------------------------------------------------------------- RLS
 do $$
 declare t text;
