@@ -12,6 +12,7 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
 - Product spec: `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md`.
 - Schema conventions live in `.agents/ARCHITECTURE.md`; the quote behind "no status columns" is Ted's: "if it won't be accurate I don't want it".
 - Cross-provider agent work is harness-neutral and owned by `.agents/orchestration/`: Codex is the sole writer, Grok plans/critiques, Claude reviews high-risk work, and complex/high-risk implementation requires a separate approval command.
+- Every merged PR gets one read-only Codex documentation audit; high-confidence omissions or contradictions are tracked in one follow-up issue rather than committed directly to `main` by a bot.
 - UI source of truth is UI plan rev 3 plus the exactly 50-frame
   `2026-08-31-mgr-wireframes.html`; change navigation/flows and the `SCREENS`
   array together. Staff uses Today/Beer/Work/More; the wholesale portal has its

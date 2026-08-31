@@ -110,3 +110,8 @@ deps, starts a local Supabase stack, applies migrations
 (`supabase db reset`), runs the full vitest suite against it, then
 `npm run lint`, `tsc --noEmit` and `npm run build`. This is the merge gate — RLS and
 command-registry correctness are enforced here, not just locally.
+
+After a pull request merges, `.github/workflows/documentation-agent.yml` runs a
+read-only Codex review and opens or refreshes a follow-up issue when the merged
+behavior is missing from its owning documentation or contradicts it. Add an
+`OPENAI_API_KEY` repository secret to enable the workflow.

@@ -24,6 +24,7 @@ never copy it into a second place.
 | `scripts/seed-dev.ts` | Idempotent dev seed. |
 | `.agents/superpowers/specs/` | Product and schema design decisions (why). |
 | `.agents/orchestration/` | Cross-provider model roles, routing, budgets, prompts, approval gates, and run artifacts. |
+| `.agents/agents/documentation-maintainer.md`, `.github/workflows/documentation-agent.yml` | Post-merge documentation review criteria and its GitHub trigger. The reviewer is read-only; actionable drift becomes one follow-up issue per merged PR. |
 | `.agents/skills/` | Project-local, harness-compatible agent workflows loaded on demand. |
 | `.pi/prompts/` | Thin Pi slash-command aliases; workflow instructions remain owned by the corresponding skill. |
 | `.agents/` | This file, agent memory and progress; worktrees live under `.agents/worktrees/`. |
