@@ -53,3 +53,42 @@ describe("order commands", () => {
     expect(rows.every(r => r.status === "confirmed")).toBe(true);
   });
 });
+
+describe("standing taproom allocations", () => {
+  it("set creates an open allocation, shows in list, and reduces ATP; qty 0 releases it", async () => {
+    const { data: tap } = await admin.from("locations").insert({ brewery_id: b.id, name: "Tap", kind: "taproom" }).select().single();
+    const tapId = tap!.id;
+    await admin.from("inventory_movements").insert({
+      brewery_id: b.id, sku_id: skuId, location_id: tapId, qty: 20, type: "opening_balance", created_by: adminCtx.userId,
+    });
+    const atpBefore = await runCommand("get_atp", { skuId }, adminCtx) as { sku_id: string; qty: number }[];
+    const before = atpBefore.find(r => r.sku_id === skuId)!.qty;
+
+    const set = await runCommand("set_standing_allocation", { locationId: tapId, skuId, qty: 6 }, adminCtx) as { allocation_id: string; status: string };
+    expect(set.status).toBe("open");
+
+    const list = await runCommand("list_standing_allocations", { locationId: tapId }, adminCtx) as { id: string; sku_id: string; qty: number }[];
+    expect(list.some(a => a.id === set.allocation_id && a.sku_id === skuId && Number(a.qty) === 6)).toBe(true);
+
+    const atpAfter = await runCommand("get_atp", { skuId }, adminCtx) as { sku_id: string; qty: number }[];
+    const after = atpAfter.find(r => r.sku_id === skuId)!.qty;
+    expect(Number(after)).toBe(Number(before) - 6);
+
+    // Setting again updates the same row rather than creating a second one.
+    const setAgain = await runCommand("set_standing_allocation", { locationId: tapId, skuId, qty: 9 }, adminCtx) as { allocation_id: string; status: string };
+    expect(setAgain.allocation_id).toBe(set.allocation_id);
+    const listAgain = await runCommand("list_standing_allocations", { locationId: tapId }, adminCtx) as { id: string; qty: number }[];
+    expect(listAgain.length).toBe(1);
+    expect(Number(listAgain[0].qty)).toBe(9);
+
+    const released = await runCommand("set_standing_allocation", { locationId: tapId, skuId, qty: 0 }, adminCtx) as { status: string };
+    expect(released.status).toBe("released");
+    const listAfterRelease = await runCommand("list_standing_allocations", { locationId: tapId }, adminCtx) as unknown[];
+    expect(listAfterRelease.length).toBe(0);
+  });
+
+  it("brewer role cannot set standing allocations", async () => {
+    const { data: tap } = await admin.from("locations").insert({ brewery_id: b.id, name: "Tap2", kind: "taproom" }).select().single();
+    await expect(runCommand("set_standing_allocation", { locationId: tap!.id, skuId, qty: 1 }, brewerCtx)).rejects.toThrow(/permission denied/);
+  });
+});
