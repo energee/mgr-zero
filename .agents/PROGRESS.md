@@ -6,6 +6,7 @@ Running log of what's done, in flight, and next. Newest at top. Keep entries to 
 - [ ] Slice 1B: orders → allocations → ship → invoices on the baseline schema.
 
 ## Done
+- 2026-08-31 — Wireframes: 11 gap screens added (settings sub-pages, new order/PO, customer/product/price-list editors, recipe editor, portal account, keg return) → 59 total.
 - 2026-08-31 — Pi `/simplify` alias and harness-compatible `.agents/skills/simplify` workflow for behavior-preserving cleanup of recently modified code.
 - 2026-08-31 — Harness-neutral multi-model workflow in `.agents/orchestration/`: tiered Grok/Codex/Claude routing, hard run budgets, approval gates, read-only reviewers, run artifacts, and dependency-free tests.
 - 2026-08-31 — Wireframes for all 50 planned screens (`2026-08-31-mgr-wireframes.html`, published as artifact); UI plan rev 2 with 13 added flows and entry-first build order.
