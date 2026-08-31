@@ -123,6 +123,12 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           status={order.status}
           lines={lines.map((l) => ({ skuId: l.sku_id, skuName: l.skus?.name ?? l.sku_id, qty: Number(l.qty_ordered) }))}
           skus={skus}
+          pickLines={lines.map((l) => ({
+            id: l.id,
+            skuName: l.skus?.name ?? l.sku_id,
+            qtyOrdered: Number(l.qty_ordered),
+            qtyPicked: l.qty_picked === null ? null : Number(l.qty_picked),
+          }))}
         />
       </div>
 

@@ -1,8 +1,10 @@
 // app/(app)/orders/[id]/lifecycle-buttons.tsx — status-gated order actions:
 // Submit (draft), Confirm (submitted — surfaces confirm_order's ATP soft
 // warnings inline), Adjust lines (confirmed/picked, via adjust-lines-form.tsx),
-// Cancel with reason (any pre-ship status). Calls commands directly rather
-// than through useCommandForm since these aren't single-field dialog forms.
+// Record pick (confirmed/picked, via pick-form.tsx), Ship (picked, via
+// ship-form.tsx), Cancel with reason (any pre-ship status). Calls commands
+// directly rather than through useCommandForm since these aren't
+// single-field dialog forms.
 "use client";
 
 import { useState } from "react";
@@ -14,6 +16,8 @@ import { Label } from "@/components/ui/label";
 import { useBrewery } from "../../brewery-provider";
 import { command } from "@/lib/commands/client";
 import { AdjustLinesForm } from "./adjust-lines-form";
+import { PickForm, type PickLine } from "./pick-form";
+import { ShipForm, type ShipLine } from "./ship-form";
 
 type OrderStatus = "draft" | "submitted" | "confirmed" | "picked" | "shipped" | "cancelled";
 type Warning = { sku_id: string; atp: number };
@@ -23,11 +27,13 @@ export function LifecycleButtons({
   status,
   lines,
   skus,
+  pickLines,
 }: {
   orderId: string;
   status: OrderStatus;
   lines: { skuId: string; skuName: string; qty: number }[];
   skus: { id: string; label: string }[];
+  pickLines: (PickLine & ShipLine)[];
 }) {
   const breweryId = useBrewery();
   const router = useRouter();
@@ -87,6 +93,8 @@ export function LifecycleButtons({
         {(status === "confirmed" || status === "picked") && (
           <AdjustLinesForm orderId={orderId} currentLines={lines.map((l) => ({ skuId: l.skuId, qty: l.qty }))} skus={skus} />
         )}
+        {(status === "confirmed" || status === "picked") && <PickForm orderId={orderId} lines={pickLines} />}
+        {status === "picked" && <ShipForm orderId={orderId} lines={pickLines} />}
         {canCancel && (
           <Dialog
             open={cancelOpen}

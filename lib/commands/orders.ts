@@ -161,14 +161,20 @@ defineQuery({
 });
 
 defineQuery({
-  name: "list_invoices", description: "Invoices and credit memos, newest first",
+  name: "list_invoices", description: "Invoices and credit memos with subtotal (from invoice_totals), newest first",
   roles: [...readRoles],
   input: z.object({ customerId: z.string().uuid().optional(), limit: z.number().int().max(200).default(50) }),
-  handler: (ctx, i) => {
+  handler: async (ctx, i) => {
     let q = ctx.db.from("invoices").select("*, customers(name)").eq("brewery_id", ctx.breweryId)
       .order("created_at", { ascending: false }).limit(i.limit);
     if (i.customerId) q = q.eq("customer_id", i.customerId);
-    return unwrap(q);
+    const invoices = (await unwrap(q)) as { id: string }[];
+    const ids = invoices.map(inv => inv.id);
+    const totals = ids.length
+      ? (await unwrap(ctx.db.from("invoice_totals").select("invoice_id, subtotal_cents").in("invoice_id", ids))) as { invoice_id: string; subtotal_cents: number }[]
+      : [];
+    const subtotalById = new Map(totals.map(t => [t.invoice_id, t.subtotal_cents]));
+    return invoices.map(inv => ({ ...inv, subtotal_cents: subtotalById.get(inv.id) ?? 0 }));
   },
 });
 
