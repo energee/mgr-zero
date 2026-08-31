@@ -29,6 +29,11 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
   timing, portal-safe fulfillment source, exact QBO payload persistence, and
   typed batch-completion/loss reconciliation. A registry name or client-held ID
   does not prove a gate is met.
+- The public HTTP API is `POST /api/command` (the command registry). Auth is
+  the existing Supabase user session: browser cookies, or
+  `Authorization: Bearer <access_token>` from password grant against the
+  Supabase Auth URL. No resource REST routes, no API keys, until a non-user
+  machine client exists.
 
 ## Gotchas (carried from MGR v1)
 - PostgREST caches the schema: after DDL, errors naming a column/enum that plainly exists are a stale cache — `NOTIFY pgrst, 'reload schema'` or restart the stack before debugging.

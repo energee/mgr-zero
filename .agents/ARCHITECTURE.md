@@ -12,7 +12,7 @@ never copy it into a second place.
 | `lib/commands/registry.ts` | `defineCommand` / `defineQuery`, `Ctx`, role checks, `CommandError`. Every domain operation the app performs is registered here. |
 | `lib/commands/<area>.ts` | Business logic per area (catalog, inventory, import, invites). Handlers get an RLS-bound `ctx.db`. |
 | `lib/commands/all.ts` | The one side-effecting import that registers every command module. |
-| `app/api/command/route.ts` | The single HTTP entry point. Dispatches to the registry; contains no business logic. |
+| `app/api/command/route.ts` | The single HTTP entry point. Dispatches to the registry; contains no business logic. Cookie session or `Authorization: Bearer <supabase access_token>`. |
 | `lib/commands/client.ts`, `use-command-form.ts` | How the UI calls commands. |
 | `lib/supabase/server.ts` | RLS-bound client for request paths. |
 | `lib/supabase/admin.ts` | Service-role client. Import restricted by eslint (see rule 4). |
@@ -36,8 +36,10 @@ a gap to close, not a convention to trust.
 1. **Every domain operation is a command.** All public-schema mutations and
    queries go through `lib/commands/registry.ts` via
    `defineCommand`/`defineQuery` and the single
-   endpoint `app/api/command/route.ts`. No route handler or page contains
-   inline business logic. Handlers signal user-facing failures by throwing
+   endpoint `app/api/command/route.ts` (cookie session or Bearer access token).
+   No route handler or page contains
+   inline business logic. There is no resource REST API and no API-key table —
+   new operations are registered commands, not new routes. Handlers signal user-facing failures by throwing
    `CommandError`; anything else surfaces as a generic 500 with the real error
    logged server-side. Supabase Auth session primitives (sign-up, sign-in/out, magic-link
    exchange, password reset/update, session refresh) are the sole non-domain
