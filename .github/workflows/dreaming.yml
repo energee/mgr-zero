@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths-ignore: ['.agents/**.md', 'AGENTS.md', '.remember/**']
   workflow_dispatch:
+  schedule:
+    - cron: '0 9 * * *' # daily dream at 09:00 UTC (~4-5am ET); no-ops when there's nothing to curate
 
 concurrency:
   group: dreaming

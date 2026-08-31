@@ -21,7 +21,7 @@ substitutes repo-visible signals (see Signal).
 
 | Decision | Choice |
 | --- | --- |
-| Trigger | Every push to `main`, plus `workflow_dispatch` |
+| Trigger | Every push to `main`, a daily schedule (`cron: 0 9 * * *` UTC), plus `workflow_dispatch` |
 | Loop guard | `paths-ignore: ['.agents/**.md', 'AGENTS.md', '.remember/**']` + `concurrency: dreaming, cancel-in-progress: true` |
 | Write path | One long-lived PR from branch `dreaming/main` (force-pushed each dream); never direct commits to main |
 | Editable | `.agents/MEMORY.md`, `.agents/PROGRESS.md`, `.agents/ARCHITECTURE.md`, `AGENTS.md`, `.agents/agents/*.md` |
