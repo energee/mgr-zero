@@ -9,7 +9,7 @@ never copy it into a second place.
 | Path | Owns |
 | --- | --- |
 | `supabase/migrations/*.sql` | Schema, RLS policies, triggers, grants. The only source of truth for data rules. Pre-deploy, the baseline is edited in place (see `.agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md`). |
-| `lib/commands/registry.ts` | `defineCommand` / `defineQuery`, `Ctx`, role checks, `CommandError`. Every operation the app performs is registered here. |
+| `lib/commands/registry.ts` | `defineCommand` / `defineQuery`, `Ctx`, role checks, `CommandError`. Every domain operation the app performs is registered here. |
 | `lib/commands/<area>.ts` | Business logic per area (catalog, inventory, import, invites). Handlers get an RLS-bound `ctx.db`. |
 | `lib/commands/all.ts` | The one side-effecting import that registers every command module. |
 | `app/api/command/route.ts` | The single HTTP entry point. Dispatches to the registry; contains no business logic. |
@@ -33,15 +33,28 @@ never copy it into a second place.
 Each rule names what enforces it. If a rule is only enforced by prose, that is
 a gap to close, not a convention to trust.
 
-1. **Every operation is a command.** All mutations and queries go through
-   `lib/commands/registry.ts` via `defineCommand`/`defineQuery` and the single
+1. **Every domain operation is a command.** All public-schema mutations and
+   queries go through `lib/commands/registry.ts` via
+   `defineCommand`/`defineQuery` and the single
    endpoint `app/api/command/route.ts`. No route handler or page contains
    inline business logic. Handlers signal user-facing failures by throwing
    `CommandError`; anything else surfaces as a generic 500 with the real error
-   logged server-side. *Enforced by:* `tests/registry.test.ts` (validation and
-   role checks); structure by review.
+   logged server-side. Supabase Auth session primitives (sign-up, sign-in/out, magic-link
+   exchange, password reset/update, session refresh) are the sole non-domain
+   exception; they never authorize direct public-schema access. SaaS tenant
+   provisioning is domain work: `provision_brewery` remains blocked until the
+   registry has an explicit pre-tenant context, then invokes one
+   `security invoker` RPC for the brewery + first admin membership — never a fake
+   `breweryId` or an RLS bypass. AI write tools only propose registered commands;
+   an explicit user confirmation is required before execution. *Enforced by:*
+   `tests/registry.test.ts` (validation and role checks); structure by review.
 2. **`inventory_movements` is append-only.** `UPDATE`/`DELETE` are revoked at
-   the database for `authenticated`/`anon`. Corrections are new reversal rows.
+   the database for `authenticated`/`anon`. A correction appends new rows through
+   a declared compensating command; there is no generic Undo. A compensation is
+   available only when the schema can link it structurally to the original and
+   downstream reports preserve the original classification. Compound writes own
+   their compensation — a shipped order is corrected through the
+   return/credit-memo command, never by reversing one movement.
    `bbl` is computed by trigger from `qty * sku.bbl_per_unit`; callers never
    supply it. *Enforced by:* grants and trigger in `supabase/migrations/`,
    proven by `tests/rls-ledger.test.ts`.
@@ -56,7 +69,9 @@ a gap to close, not a convention to trust.
 4. **`createAdminClient()` is restricted to `lib/commands/invites.ts`.**
    Inviting requires `auth.admin.inviteUserByEmail` and a membership insert for
    a user who isn't the caller. Both handlers permission-check via the
-   RLS-bound `Ctx` first. *Enforced by:* `no-restricted-imports` in
+   RLS-bound `Ctx` first. Because Auth and Postgres cannot share a transaction,
+   the current invite-then-membership handlers are not UI-ready until the
+   external-write gate below is implemented. *Enforced by:* `no-restricted-imports` in
    `eslint.config.mjs`, run in CI. Integration sync modules (`qbo.ts`, `pos.ts`,
    slices 1C/7) will need the same client for token storage; each is added to the
    eslint allowlist explicitly with its own permission check — never a blanket exemption.
@@ -64,10 +79,52 @@ a gap to close, not a convention to trust.
    supabase-js cannot span a transaction across statements, so a handler that
    does `insert` then `update` can half-commit. Such commands call a single
    `security invoker` plpgsql function (`ctx.db.rpc(...)`); the handler is a
-   thin caller. Per-row-independent bulk work (CSV import) is the one exemption
-   and says so with an `// atomic-exempt:` comment. MGR v1 learned this after
-   real data loss (`.agents/superpowers/specs/2026-08-31-mgr-v1-review.md`).
-   *Enforced by:* `tests/write-atomicity.test.ts`.
+   thin caller. One committed user action cannot be split across dependent
+   commands to evade this boundary. Per-row-independent bulk work (CSV import)
+   is the one exemption and says so with an `// atomic-exempt:` comment. MGR v1
+   learned this after real data loss
+   (`.agents/superpowers/specs/2026-08-31-mgr-v1-review.md`). *Enforced by:*
+   `tests/write-atomicity.test.ts`.
+
+## Pre-implementation gates
+
+- **Replayable commands are idempotent at the server.** Before the composer or
+  any offline outbox may replay a write, `/api/command` must carry a stable
+  `requestId` end to end and the server must durably return the first result for
+  repeats of that ID. The server binds the ID to the authenticated actor, tenant
+  context, and full submitted write envelope; mismatched reuse is rejected.
+  Keeping an ID only in IndexedDB is not deduplication. The persistence shape is
+  deliberately deferred; replay stays disabled until the contract and its
+  real-Postgres proof exist.
+- **AI proposals are registry-owned contracts.** Before composer writes ship,
+  registry metadata must declare each write command's risk, preview/canonicalize
+  hook, compensation, and offline/replay eligibility. The language layer emits
+  only a candidate command name + input. An internal registered
+  `preview_command` operation (not AI-exposed) calls that hook and returns
+  canonical effects, warnings, and a version token. Commit sends the same
+  `requestId` + preview token, re-resolves and revalidates server-side, and
+  rejects stale state; it never trusts model output or a cached proposal. This
+  is a design prerequisite, not a claim about the current registry.
+- **Inventory correction and taproom counts need durable identity.** The current
+  FG ledger has neither a structured reversal link nor sign rules/report semantics
+  for an exact opposite entry, so `reverse_inventory_movement` remains disabled.
+  The current schema also has no FG count header/lines; a zero-variance weekly
+  count would disappear entirely. Before either UI ships, the baseline must add
+  auditable correction identity and a durable taproom count occurrence/snapshot,
+  and their registered one-RPC commands must have real-Postgres/report proofs.
+- **Auth invitations need a durable external-write workflow.** The implemented
+  invite handlers call Supabase Auth before inserting membership. A failed DB
+  write can therefore leave an invited Auth user without the intended access.
+  Before either invite UI ships, retries must reuse one durable request identity
+  and an incomplete second step must be recoverable or compensate the created
+  Auth account. Tests must force failure after Auth success for staff and customer
+  invites; an implemented registry name alone is not evidence that this gate is met.
+- **CSV exemption stops between logical rows.** `import_csv` may continue after
+  one independent CSV row fails, but dependent writes inside a logical row still
+  require one Postgres function. The implemented importer currently sequences
+  some parent/child writes and has no durable per-row request/result identity;
+  opening-balance reruns can append twice. The import UI remains blocked until
+  each logical row is atomic and reruns return its first durable result.
 
 ## Schema conventions
 

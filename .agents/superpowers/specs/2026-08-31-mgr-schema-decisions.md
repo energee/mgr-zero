@@ -43,6 +43,28 @@ Enums stay conservative: adding a value later is one line; a wrong one is foreve
 - Multi-row writes (confirm order, ship, close packaging run) are one `security invoker` plpgsql function each; the command handler only calls it. Functions `set search_path = ''`. Rationale and v1 evidence: `2026-08-31-mgr-v1-review.md` §1.1.
 - Post-deploy, destructive DDL is guarded: `if exists (select 1 from <table>) then raise` — a migration must refuse to drop data it didn't expect.
 
+## Derived values: views for state, snapshots for inputs, storage for facts of record
+
+Decided 2026-08-31 during the recipe-development design (UI plan rev 3):
+
+- **Current state derives in views** (`v_on_hand`, `v_atp`, `v_occupancy`, `v_keg_balances`):
+  never store a value the database can recompute — stored copies drift.
+- **Facts of record are stored**, because there drift prevention runs the other way: a
+  movement's `bbl`, an invoice total, a `report_filings` snapshot, a price on an order line
+  must say what was true at commit time, not track later edits to their inputs.
+- **Mutable inputs to immutable records get snapshotted at commit** (extract potential onto
+  `recipe_ingredients`, like price onto order lines); the derived output (OG/FG/ABV) is then
+  computed from immutable inputs and never stored.
+- **Row-local arithmetic lives in one registry-layer pure function, not SQL**, when the value
+  is consumed only through registered queries and the UI needs it live pre-commit (the recipe
+  editor previews OG/FG/ABV as the grain bill is typed). A view earns its place only when SQL
+  itself consumes the value — joins, filters, RLS, or ledger-scale aggregation. Two
+  implementations of one formula are drift between codebases.
+
+Consequence for the baseline: `recipe_versions.target_og_plato / target_fg_plato /
+target_abv` are drop candidates once assumption columns and the ingredient extract snapshot
+land (the rev-3 SCHEMA-GATE).
+
 ## Slice-1A tables carried forward unchanged in intent
 
 `breweries`, `brewery_users`, `customers`, `customer_users`, `ship_tos`, `products`, `skus`,
