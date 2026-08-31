@@ -1,13 +1,18 @@
 // app/(portal)/portal/cart.tsx — client cart for the catalog page. Qty state
 // keyed by skuId; "out" badge rows are disabled (qty forced to 0). Submit
 // chains portal_create_order then portal_submit_order — the draft it creates
-// along the way is an implementation detail, never shown to the customer.
-// Save draft stops after portal_create_order so the customer can resume
-// later from the orders list.
+// along the way is an implementation detail, never shown to the customer, as
+// long as both calls succeed. If portal_create_order succeeds but
+// portal_submit_order fails, the created order id is kept in `draftId` so a
+// retry (Save draft or Submit) reuses it and calls portal_submit_order again
+// rather than calling portal_create_order a second time — that would leave
+// an orphan duplicate draft behind. The error shown in that case links to
+// the saved draft so the customer isn't left wondering if anything happened.
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,6 +44,7 @@ export function Cart({ items, shipTos }: { items: CatalogItem[]; shipTos: ShipTo
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState<"submit" | "draft" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [draftId, setDraftId] = useState<string | null>(null);
 
   const lines = items
     .filter((i) => i.badge !== "out")
@@ -50,21 +56,26 @@ export function Cart({ items, shipTos }: { items: CatalogItem[]; shipTos: ShipTo
     return sum + (item ? item.unitPriceCents * l.qty : 0);
   }, 0);
 
-  async function createDraft() {
-    return (await command(breweryId, "portal_create_order", {
+  // Reuses `draftId` if a previous attempt already created the order, so a
+  // retry never calls portal_create_order twice for the same cart.
+  async function ensureDraft(): Promise<string> {
+    if (draftId) return draftId;
+    const order = (await command(breweryId, "portal_create_order", {
       shipToId,
       poNumber: poNumber || undefined,
       note: note || undefined,
       lines,
     })) as { id: string };
+    setDraftId(order.id);
+    return order.id;
   }
 
   async function saveDraft() {
     setBusy("draft");
     setError(null);
     try {
-      const order = await createDraft();
-      router.push(`/portal/orders/${order.id}`);
+      const id = await ensureDraft();
+      router.push(`/portal/orders/${id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "portal_create_order failed");
     } finally {
@@ -76,17 +87,21 @@ export function Cart({ items, shipTos }: { items: CatalogItem[]; shipTos: ShipTo
     setBusy("submit");
     setError(null);
     try {
-      const order = await createDraft();
-      await command(breweryId, "portal_submit_order", { orderId: order.id });
-      router.push(`/portal/orders/${order.id}`);
+      const id = await ensureDraft();
+      await command(breweryId, "portal_submit_order", { orderId: id });
+      router.push(`/portal/orders/${id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "order submission failed");
+      // If ensureDraft succeeded but portal_submit_order failed, the draft
+      // exists and is kept in state (not discarded) — surface it as saved,
+      // with a link, rather than a bare failure the customer can't act on.
+      const message = err instanceof Error ? err.message : "order submission failed";
+      setError(draftId ? `Order saved as a draft (${message}). You can submit it from the order page.` : message);
     } finally {
       setBusy(null);
     }
   }
 
-  const disabled = !shipToId || lines.length === 0 || busy !== null;
+  const disabled = !shipToId || (lines.length === 0 && !draftId) || busy !== null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -157,7 +172,19 @@ export function Cart({ items, shipTos }: { items: CatalogItem[]; shipTos: ShipTo
         <div className="text-sm text-muted-foreground">
           Subtotal: ${(subtotalCents / 100).toFixed(2)}
         </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && (
+          <p className="text-sm text-red-600">
+            {error}
+            {draftId && (
+              <>
+                {" "}
+                <Link href={`/portal/orders/${draftId}`} className="underline">
+                  View draft order
+                </Link>
+              </>
+            )}
+          </p>
+        )}
         <div className="flex gap-2">
           <Button type="button" variant="outline" disabled={disabled} onClick={saveDraft}>
             {busy === "draft" ? "Saving…" : "Save draft"}
