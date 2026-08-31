@@ -24,7 +24,7 @@ export function LoginForm({
   className,
   error,
   ...props
-}: React.ComponentProps<"div"> & { error?: boolean }) {
+}: React.ComponentProps<"div"> & { error?: string }) {
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
@@ -40,7 +40,7 @@ export function LoginForm({
                   role="alert"
                   className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
                 >
-                  Incorrect email or password.
+                  {error}
                 </p>
               )}
               <Field>

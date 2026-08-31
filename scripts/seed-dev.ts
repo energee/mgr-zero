@@ -18,10 +18,11 @@ async function seed() {
       .from("breweries")
       .select("id")
       .eq("name", "Demo Brewing")
-      .single();
+      .maybeSingle();
+    if (breweryErr) throw breweryErr; // a real failure, not "doesn't exist yet"
 
     let breweryId: string;
-    if (breweryErr) {
+    if (!breweries) {
       console.log("Creating brewery 'Demo Brewing'...");
       const { data: newBrewery, error: createErr } = await admin
         .from("breweries")

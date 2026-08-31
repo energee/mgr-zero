@@ -88,7 +88,7 @@ Apply migrations and seed a dev user/brewery:
 
 ```bash
 npx supabase db reset             # applies supabase/migrations/*.sql
-npx tsx scripts/seed-dev.ts       # idempotent; creates "Demo Brewing" + dev@mgr.local
+npx tsx --env-file=.env.local scripts/seed-dev.ts   # idempotent; creates "Demo Brewing" + dev@mgr.local
 ```
 
 Seeded dev login: `dev@mgr.local` / `dev-password-1` (dev-only credential —
