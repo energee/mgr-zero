@@ -1,7 +1,7 @@
 # MGR v1 (`~/Repos/mgr`) — what to keep, what to leave
 
 Date: 2026-08-31
-Status: Review for Ted; nothing adopted yet.
+Status: Reviewed with Ted 2026-08-31. §3 items 1–4 adopted (iron rule 5, `brewing-domain.md`, `tests/schema-rules.test.ts`, gotchas in `.agents/MEMORY.md`); items 5–6 pending their slices.
 
 v1 shape: Jan–Aug 2026, 832 commits, ~123k LOC in `src/`, **276 migrations / 281 SQL
 functions**, 270 test files, 16 CI workflows, 40 generic-entity configs. It ended

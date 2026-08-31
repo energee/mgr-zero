@@ -485,16 +485,14 @@ via the shipment's order.
 
 1. ~~`staff_role` stays `admin, sales, warehouse`~~ — resolved: `brewer` added.
 2. **`order_status`** stops at `shipped`; "invoiced"/"paid" are read from `invoices`
-   (`shipment_id`, `paid_at`). The product spec listed them as order statuses; the
-   decisions doc's "order closes on ship" makes them derived. Say if you want the two
-   enum values kept.
+   (`shipment_id`, `paid_at`) — resolved 2026-08-31: product spec updated to match.
 3. **Keg deposits** are `invoice_lines` (`keg_deposit` / `keg_deposit_refund`) with
    `keg_pool_id + keg_size`, not order lines; balance is a view. Alternative was a
    `keg_deposits` ledger.
 4. **QBO/Square tokens** live in `qbo_connections` / `pos_connections` behind an
    admin-only policy. A sync job needs the service-role client, which ARCHITECTURE rule 4
-   currently pins to `invites.ts`; that rule will need a second allowed module (`qbo.ts`,
-   `pos.ts`) or Supabase Vault. Not a schema change — flagging it.
+   pins to `invites.ts`; resolved 2026-08-31: rule 4 now states each sync module is
+   added to the eslint allowlist explicitly when its slice lands.
 5. **Payments** have no table; `invoices.paid_at / qbo_balance_cents` from QBO is enough
    while QBO is the book of record.
 6. **Materials have no locations**; one store per brewery. `material_movements` gains a

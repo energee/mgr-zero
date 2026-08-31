@@ -20,7 +20,7 @@ below just in time — don't preload everything.
 | --- | --- |
 | Any code change | `ARCHITECTURE.md` — ownership map and the five iron rules |
 | Setup, ports, dev login, env vars | `README.md` |
-| Schema / migration work | `ARCHITECTURE.md` conventions, then `.agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md` |
+| Schema / migration work | `ARCHITECTURE.md` conventions, then `.agents/superpowers/specs/2026-08-31-mgr-schema-design.md` (tables) and `2026-08-31-mgr-schema-decisions.md` (why) |
 | Brewing/TTB domain rules (units, loss, removals) | `.agents/superpowers/specs/brewing-domain.md` |
 | Why v1 (`~/Repos/mgr`) was left behind | `.agents/superpowers/specs/2026-08-31-mgr-v1-review.md` |
 | Product intent, what a slice is | `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md` |

@@ -43,8 +43,6 @@ next-env.d.ts
 # superpowers (sdd planning artifacts, not app source)
 .superpowers/
 
-# local env
-.env.local
 
 # agent worktrees (see AGENTS.md)
 /.agents/worktrees/*

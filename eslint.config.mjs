@@ -17,7 +17,7 @@ const eslintConfig = defineConfig([
     // Iron rule 4 (ARCHITECTURE.md): the service-role client bypasses RLS and
     // is only allowed in lib/commands/invites.ts. Tests and scripts run
     // outside request paths and are exempt below.
-    files: ["app/**", "lib/**", "components/**", "middleware.ts"],
+    files: ["app/**", "lib/**", "components/**", "proxy.ts"],
     ignores: ["lib/commands/invites.ts", "lib/supabase/admin.ts"],
     rules: {
       "no-restricted-imports": ["error", {

@@ -17,7 +17,7 @@ never copy it into a second place.
 | `lib/supabase/server.ts` | RLS-bound client for request paths. |
 | `lib/supabase/admin.ts` | Service-role client. Import restricted by eslint (see rule 4). |
 | `lib/brewery.ts`, `app/(app)/brewery-provider.tsx` | Current-brewery resolution and switching (`DEPLOYMENT_MODE` saas vs dedicated). |
-| `middleware.ts`, `app/(auth)/` | Session refresh and login. |
+| `proxy.ts`, `app/(auth)/` | Session refresh and login. |
 | `app/(app)/<area>/` | Pages and forms. Thin: read via queries, mutate via commands. |
 | `components/ui/` | shadcn primitives. Don't hand-edit; re-add with the shadcn CLI. |
 | `tests/` | Proof. Runs against the real local Supabase stack, never mocks. |
@@ -44,7 +44,7 @@ a gap to close, not a convention to trust.
    proven by `tests/rls-ledger.test.ts`.
 3. **Every tenant table carries `brewery_id` with RLS.** Access derives from
    `brewery_users` / `customer_users` via `my_brewery_ids()`, `is_staff_of()`,
-   `staff_role()`. Cross-tenant FKs are composite so a row can't reference
+   `staff_role()`, `my_customer_ids()` (the only RLS helpers; defined once in the baseline). Cross-tenant FKs are composite so a row can't reference
    another brewery's data. *Enforced by:* RLS policies in migrations, proven by
    `tests/rls-tenancy.test.ts`; `tests/schema-rules.test.ts` reads `pg_catalog`
    to assert RLS on every table, `security_invoker` on every view,
@@ -54,7 +54,9 @@ a gap to close, not a convention to trust.
    Inviting requires `auth.admin.inviteUserByEmail` and a membership insert for
    a user who isn't the caller. Both handlers permission-check via the
    RLS-bound `Ctx` first. *Enforced by:* `no-restricted-imports` in
-   `eslint.config.mjs`, run in CI.
+   `eslint.config.mjs`, run in CI. Integration sync modules (`qbo.ts`, `pos.ts`,
+   slices 1C/7) will need the same client for token storage; each is added to the
+   eslint allowlist explicitly with its own permission check — never a blanket exemption.
 5. **A command that writes more than one row is one Postgres function.**
    supabase-js cannot span a transaction across statements, so a handler that
    does `insert` then `update` can half-commit. Such commands call a single
