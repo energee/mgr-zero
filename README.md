@@ -67,22 +67,116 @@ npx tsx --env-file=.env.local scripts/seed-dev.ts   # idempotent; creates "Demo 
 Seeded dev login: `dev@mgr.local` / `dev-password-1` (dev-only credential —
 never used outside local development).
 
-Run the app:
-
 ```bash
 npm run dev   # http://localhost:3000
 ```
 
-### Tests
+## HTTP API
+
+One endpoint: `POST /api/command`. You authenticate as a brewery user, name the
+command, and pass its input. Data is always scoped to `breweryId` — you only
+see that brewery, and only if you are a member.
+
+### Auth
+
+Send a user access token:
+
+```
+Authorization: Bearer <access_token>
+```
+
+Exchange email/password for a token at the project's Auth URL (`/auth/v1/token?grant_type=password`, header `apikey` = the project's anon key). Tokens expire; use the `refresh_token` from the same response when you need a new one. A logged-in browser session (cookies) also works.
 
 ```bash
-npm test          # vitest run — 47 tests across 9 files
+TOKEN=$(curl -sS "$NEXT_PUBLIC_SUPABASE_URL/auth/v1/token?grant_type=password" \
+  -H "apikey: $NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+  -H "content-type: application/json" \
+  -d '{"email":"you@brewery.example","password":"..."}' \
+  | jq -r .access_token)
+
+curl -sS http://localhost:3000/api/command \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "content-type: application/json" \
+  -d '{"breweryId":"<brewery uuid>","name":"list_products","input":{}}'
+```
+
+Staff roles: `admin`, `sales`, `warehouse`, `brewer`. Each command lists who may call it. Customer-portal users are `customer` and currently have no commands.
+
+### Request / response
+
+```json
+{ "breweryId": "<uuid>", "name": "list_products", "input": {} }
+```
+
+Success: `{ "ok": true, "data": ... }` (HTTP 200). Failure: `{ "ok": false, "error": "..." }`.
+
+| HTTP | Meaning |
+| --- | --- |
+| 401 | Missing, malformed, expired, or revoked token |
+| 403 | Authenticated, but not a member of `breweryId`, or your role cannot run this command |
+| 400 | Unknown command, invalid `input`, or a data rule rejected the write |
+| 500 | Server error (message is generic) |
+
+### Catalog
+
+| Command | Roles | `input` |
+| --- | --- | --- |
+| `list_products` | admin, sales, warehouse | `{}` — products with nested SKUs, A–Z |
+| `list_skus` | admin, sales, warehouse | `{}` — `{ id, name, products: { name } }` |
+| `list_locations` | admin, sales, warehouse | `{}` — `{ id, name, kind }` |
+| `create_product` | admin, sales | `{ name, style?, abv? }` |
+| `create_sku` | admin, sales | `{ productId, name, packageType, bblPerUnit, unitsPerCase? }` — `packageType` is `keg`, `can`, or `bottle`; `bblPerUnit` is a numeric string (`"0.5"`) |
+| `create_location` | admin | `{ name, kind }` — `kind` is `warehouse` or `taproom` |
+
+### Inventory
+
+On-hand is the sum of an append-only movement ledger. You never send `bbl`; it is computed from `qty × sku.bbl_per_unit`. Corrections are new movements, not edits.
+
+| Command | Roles | `input` |
+| --- | --- | --- |
+| `get_on_hand` | admin, sales, warehouse | `{ skuId? }` — qty per SKU/location |
+| `get_atp` | admin, sales, warehouse | `{ skuId? }` — on-hand minus open allocations |
+| `list_movements` | admin, sales, warehouse | `{ skuId?, limit? }` — newest first; `limit` default 50, max 200 |
+| `record_movement` | admin, warehouse | `{ skuId, locationId, qty, type, channel?, destState?, note? }` — `qty` ≠ 0; `destState` is a 2-letter code |
+| `set_taproom_par` | admin, sales | `{ locationId, skuId, parQty }` |
+
+`record_movement` `type`: `opening_balance`, `production_in`, `adjustment`, `sale_removal`, `taproom_transfer`, `depletion`, `return_in`, `destruction`, `loss`, `sample`, `festival_removal`.
+
+`channel` (when the movement is a removal): `wholesale`, `taproom`, `dtc`, `export`.
+
+### Import
+
+`import_csv` (admin). `{ kind, rows }` — at most 5000 rows per call. Each row is a string map. Per-row failures are returned, not thrown: `{ inserted, errors: [{ row, message }] }` (`row` is 0-based).
+
+| `kind` | Required columns | Optional |
+| --- | --- | --- |
+| `customers` | `name`, `state` | `type`, `license_no`, `payment_terms` |
+| `ship_tos` | `customer_name`, `label`, `address1`, `city`, `state`, `zip` | |
+| `products_skus` | `product`, `sku_name`, `package_type`, `bbl_per_unit` | `style`, `abv`, `units_per_case` |
+| `price_list_items` | `product`, `sku_name`, `price_list`, `unit_price_cents` | |
+| `opening_balances` | `product`, `sku_name`, `location`, `qty` | |
+
+Names resolve within the brewery. Missing products/price lists are created; missing SKUs, locations, and customers are errors.
+
+### Team
+
+| Command | Roles | `input` |
+| --- | --- | --- |
+| `list_team_members` | admin, sales, warehouse | `{}` — `{ user_id, role }` (no emails) |
+| `invite_staff` | admin | `{ email, role }` — `role` is `admin`, `sales`, `warehouse`, or `brewer` |
+| `invite_customer_user` | admin, sales | `{ email, customerId }` |
+
+## Tests
+
+```bash
+npm test          # vitest run — real local Supabase, not mocks
 npm run lint       # eslint, incl. the admin-client import guard
 npx tsc --noEmit   # typecheck
 npm run build      # production build
 ```
 
-Test files: `tests/rls-tenancy.test.ts`, `tests/rls-ledger.test.ts` (RLS
+Test files: `tests/api-command.test.ts` (Bearer auth on `/api/command`),
+`tests/rls-tenancy.test.ts`, `tests/rls-ledger.test.ts` (RLS
 isolation, ledger immutability, CHECK constraints, ATP math),
 `tests/registry.test.ts` (command registry validation/permissions),
 `tests/commands-inventory.test.ts` (catalog/inventory commands),
