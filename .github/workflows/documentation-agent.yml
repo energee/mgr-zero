@@ -15,10 +15,11 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+      id-token: write
     outputs:
-      report: ${{ steps.review.outputs.final-message }}
+      result: ${{ steps.review.outputs.structured_output }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.base.ref }}
           fetch-depth: 0
@@ -32,21 +33,25 @@ jobs:
 
       - name: Review documentation
         id: review
-        uses: openai/codex-action@v1
+        uses: anthropics/claude-code-action@v1
         with:
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          prompt-file: .agents/agents/documentation-maintainer.md
-          sandbox: read-only
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: Read .agents/agents/documentation-maintainer.md and perform that review.
+          display_report: false
+          show_full_output: false
+          claude_args: >-
+            --allowedTools "Read,Grep,Glob"
+            --json-schema '{"type":"object","properties":{"status":{"type":"string","enum":["DOCS_OK","DOCS_GAP"]},"report":{"type":"string"}},"required":["status","report"],"additionalProperties":false}'
 
   track-gap:
     needs: review
-    if: needs.review.outputs.report != '' && needs.review.outputs.report != 'DOCS_OK'
+    if: fromJSON(needs.review.outputs.result).status == 'DOCS_GAP'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       issues: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.base.ref }}
           persist-credentials: false
@@ -54,16 +59,17 @@ jobs:
       - name: Open or refresh documentation follow-up
         uses: actions/github-script@v7
         env:
-          REPORT: ${{ needs.review.outputs.report }}
+          RESULT: ${{ needs.review.outputs.result }}
         with:
           script: |
             const { pathToFileURL } = await import('node:url');
             const { default: upsert } = await import(
               pathToFileURL(`${process.env.GITHUB_WORKSPACE}/.github/scripts/upsert-documentation-issue.mjs`),
             );
+            const result = JSON.parse(process.env.RESULT);
             await upsert({
               github,
               ...context.repo,
               pr: context.payload.pull_request.number,
-              report: process.env.REPORT,
+              report: result.report,
             });

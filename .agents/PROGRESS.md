@@ -3,11 +3,10 @@
 Running log of what's done, in flight, and next. Newest at top. Keep entries to one line each; details belong in commits and docs.
 
 ## Now
-- [ ] Add the `OPENAI_API_KEY` repository secret before merging `documentation-agent-pr` to activate its post-merge audit.
 - [ ] Slice 1B starts with UI-plan rev-3 Step 1 contracts/schema gates, then orders → allocations → ship → invoices.
 
 ## Done
-- 2026-08-31 — Read-only post-merge documentation agent audits each merged PR against the owning docs and opens one idempotent follow-up issue for high-confidence drift.
+- 2026-08-31 — Read-only Claude Code post-merge documentation agent audits each merged PR against the owning docs and opens one idempotent follow-up issue for high-confidence drift.
 - 2026-08-31 — Rev-3 simplification pass on latest main: actionable Today/Work ordering, Beer as a landing page, complete movement intents, simpler order state, separated taproom tasks, explicit cellar reading/remainder semantics, richer irreversible previews, and filing copy that does not imply transmission.
 - 2026-08-31 — Recipe development loop designed: version snapshots assumptions + per-ingredient extract; OG/FG/ABV computed by one registry-layer formula (live preview + server reads; never stored, no view); per-batch actuals derived from readings via get_recipe_outcomes shown as deltas. Derived-values principle recorded in schema-decisions.
 - 2026-08-31 — Wireframes + plan corrected per frontend review: frames draw only user-visible UI (state chips, gate names, tap audits moved to under-frame annotations), human copy for gated actions, named row verbs replace universal "Open", Today redrawn role-filtered as full-size 16px exemplar with ship-scale callout, hairline surfaces, cellar tiles lead with fill/occupancy, portal Order is a buyer catalog ("Ships from Warehouse", 48×48 steppers), composer proposal leads with signed effect, desk rail hierarchy + one-column default, safe-area on both shells, header Search/Me controls; plan §preamble/§3/§4/§5/§5b updated in step.

@@ -112,6 +112,6 @@ deps, starts a local Supabase stack, applies migrations
 command-registry correctness are enforced here, not just locally.
 
 After a pull request merges, `.github/workflows/documentation-agent.yml` runs a
-read-only Codex review and opens or refreshes a follow-up issue when the merged
-behavior is missing from its owning documentation or contradicts it. Add an
-`OPENAI_API_KEY` repository secret to enable the workflow.
+read-only Claude Code review and opens or refreshes a follow-up issue when the
+merged behavior is missing from its owning documentation or contradicts it. It
+uses the same `CLAUDE_CODE_OAUTH_TOKEN` secret as the existing Claude workflows.
