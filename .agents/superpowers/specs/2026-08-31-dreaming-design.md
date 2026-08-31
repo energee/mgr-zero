@@ -22,7 +22,7 @@ substitutes repo-visible signals (see Signal).
 | Decision | Choice |
 | --- | --- |
 | Trigger | Every push to `main`, plus `workflow_dispatch` |
-| Loop guard | `paths-ignore: ['.agents/**.md', '.remember/**']` + `concurrency: dreaming, cancel-in-progress: true` |
+| Loop guard | `paths-ignore: ['.agents/**.md', 'AGENTS.md', '.remember/**']` + `concurrency: dreaming, cancel-in-progress: true` |
 | Write path | One long-lived PR from branch `dreaming/main` (force-pushed each dream); never direct commits to main |
 | Editable | `.agents/MEMORY.md`, `.agents/PROGRESS.md`, `.agents/ARCHITECTURE.md`, `AGENTS.md`, `.agents/agents/*.md` |
 | Read-only (flag drift only) | specs, wireframes, code, workflows |
