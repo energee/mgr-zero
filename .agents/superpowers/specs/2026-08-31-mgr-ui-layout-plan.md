@@ -5,7 +5,8 @@ Status: Draft for Ted; rev 3 incorporates the fresh-eyes product, architecture, 
 navigation, state, build-order, and wet-phone review. Nothing in this plan is built yet;
 the current shell (`app/(app)/layout.tsx`, a 208px left rail with five links and Geist) is
 the placeholder it replaces.
-Wireframes: `2026-08-31-mgr-wireframes.html` — 50 frames tagged with tab, slice, build
+Wireframes: `2026-08-31-mgr-wireframes.html` — 50 frames (product destinations plus
+separately identified sheets, overlays, and flow states) tagged with tab, slice, build
 step, registered reads, and registered writes; the phone/desk toggle re-renders every
 frame from the same body (desk = rail/top-nav shell, dialog sheets, 32 px
 cursor-density controls). Update it in the same commit as any change
@@ -216,17 +217,25 @@ query owns it.
 └───────┴───────┴──────┴──────┘
 ```
 
-- **Today** is the role-filtered inbox: picks due, submitted orders, overdue readings,
-  weekly taproom count (after its schema gate), PO arrivals, negative ATP, QBO failures, delivery next stop, and
-  compliance deadlines. Standing work stays here, not in More. Each row either performs
-  a fully explicit safe action or opens its owning form prefilled. The first viewport is
+- **Today** is the actionable role-filtered inbox, not an activity feed: picks due,
+  submitted orders, overdue readings, weekly taproom count (after its schema gate), PO
+  receipts due, negative ATP, QBO failures, delivery next stop, and compliance deadlines.
+  A row appears only when it explains why action is needed now, opens a specific next
+  action, and has a defined condition for disappearing. Sort by urgency then due time;
+  add Overdue / Today / Coming soon sections only when volume earns them. Standing work
+  stays here, not in More. Each row either performs a fully explicit safe action or opens
+  its owning form prefilled. The first viewport is
   the brewery header, two or three role actions, the next real rows, and the composer —
   never every persona's inventory at once; role-hidden rows leave no blank gaps.
-- **Beer** is physical truth: FG on-hand/ATP, taproom replenishment/count, cellar
-  occupancies, materials, and keg fleet. There is no vessel status column; occupancy and
-  timestamps derive presentation.
+- **Beer** is the landing page for physical truth: FG on-hand/ATP, taproom
+  replenishment/count, cellar occupancies, materials, and keg fleet. Each summary opens
+  its dedicated area; Beer does not become an indefinitely expanding accordion. There is
+  no vessel status column; occupancy and timestamps derive presentation.
 - **Work** is in-motion work: new/existing orders, picks, shipments, transfer-order
-  completion, batches, packaging runs, POs, routes, and deliveries.
+  completion, batches, packaging runs, POs, routes, and deliveries. Sort by next due
+  action, not recent activity. Role defaults reduce noise (warehouse: orders/POs/routes;
+  brewer: batches/runs; sales: orders), and an explicit user filter is remembered. Every
+  row names its next action.
 - **More** is desk-biased reference/admin work: Catalog, Customers, **Invoices & QBO**,
   Price lists, Recipes, Compliance/Reports, Planning, Import, Team, Integrations, and
   Brewery/Locations settings. Invoices appears here and in the desktop rail.
@@ -287,11 +296,11 @@ Dialog/Sheet on desk.
 |---|---|---|---|
 | **Today** | Tell me what needs doing | Role-filtered actions/quick commits; first-run checklist replaces normal empty inbox | Week strip for ship, receipt, brew, packaging, compliance dates |
 | **Beer / Inventory** (1) | Show physical and promiseable stock | SKU cards with on-hand, allocated, ATP; detail has per-location values + movement tape | Location table, filters, shortfall link |
-| **Record movement** (1) | Append one correct FG event | Type `ToggleGroup`, SKU/location pickers, positive QtyPad, conditional channel/state/direction, canonical signed preview | Same form; keyboard entry secondary |
-| **Orders** (1) | Create and advance an order | Work includes **New order** with an explicit fulfillment source; detail exposes only valid draft → submitted → confirmed → picked → shipped/cancelled actions | List/detail split, lines + ATP + ship-to; no priority/backorder state |
+| **Record movement** (1) | Append one correct FG event | Intent/type choices cover add finished goods, depletion, loss, sample, festival removal, destruction, and adjustment; then SKU/location pickers, positive QtyPad, conditional channel/state/direction, canonical signed preview. Opening balances stay in onboarding/import and returns stay in shipment context. | Same form; keyboard entry secondary |
+| **Orders** (1) | Create and advance an order | Work includes **New order** with an explicit fulfillment source; detail leads with current state and exposes one valid next transition, while the full lifecycle is secondary | List/detail split, lines + ATP + ship-to; no priority/backorder state |
 | **Pick / short pick** (1) | Record pallet quantities | Pick-as-ordered fast path; complete line set editor; shortage requires adjust-down reason or cancel/release remainder; concurrent/staged-restock states | Daily pick sheet, print, explicit restock queue |
 | **Ship / transfer completion** (1) | Commit physical removal/move | Exact source/signed rows and explicit invoice timing, then copper **Ship order** or **Complete transfer**; `ship_order` waits for its persisted-timing SCHEMA-GATE | Wholesale invoice/QBO result; transfer has no invoice |
-| **Taproom** (1, 7) | Keep taproom stock honest | Par/on-hand, request transfer with explicit source/destination, keg-blown/depletion. **SCHEMA-GATE:** weekly count waits for a durable observation/snapshot; its later one-RPC commit writes that snapshot plus only required movements | Replenishment and Square reconciliation |
+| **Taproom** (1, 7) | Keep taproom stock honest | Separate **Weekly count / sales depletion** from **Needs replenishment**; request transfer has explicit source/destination and is primary only when below par. **SCHEMA-GATE:** weekly count waits for a durable observation/snapshot; its later one-RPC commit writes that snapshot plus only required movements | Replenishment and Square reconciliation |
 | **Shortfalls / pars / standing allocation** (1) | Choose who gets scarce beer | Competing allocations, release/adjust actions, par and standing-allocation editors | Full table; no priority/reprioritize field |
 | **Customers / ship-tos** (1) | Maintain buyer and destination | Search cards, customer/ship-to forms, portal invite | Table, price list, deposits, QBO customer map |
 | **Catalog / price lists** (1) | Define what is sold | Read-first cards; create/edit remains usable | Product → SKU tree, package facts, prices, full `replace_sku_bom` editor |
@@ -299,12 +308,12 @@ Dialog/Sheet on desk.
 | **Materials / receiving** (2) | Receive counted material | Expected vs counted, over/short, conditional lot, one copper receipt commit | PO list, requirements → draft PO |
 | **Material count / materials / vendors / contracts** (2) | Keep material/supply truth | Create/edit material facts; positive counts → adjustment preview; vendor picker | Material/vendor/contracts and committed/received/remaining |
 | **Recipes** (3) | Create recipes and immutable versions; keep predictions honest | Create mutable recipe parent; read/scale; draft editor takes grain bill + mash temp + efficiency + attenuation and shows OG/FG/ABV computed live by the shared registry formula (never stored, no view); version view lists per-batch actuals (OG/FG/ABV from fermentation readings, realized efficiency/attenuation) with deltas vs predicted — one row per batch, amber when out of band | Version editor and costing; outcome table across batches |
-| **Cellar / reading** (4) | Set up vessels, know occupancy, and log reading | Create/edit vessel facts without status; map derives contents; each tile leads with occupancy — fill level, contents/gravity, overdue — not a generic dashboard grid; reading defaults current occupancy and unit; disabled `complete_batch` names its reconciliation schema gate | Timeline and lineage graph |
+| **Cellar / reading** (4) | Set up vessels, know occupancy, and log reading | Create/edit vessel facts without status; map derives contents; each tile leads with occupancy — volume/capacity, contents/gravity, and explicit reading age/overdue text, with color only supplemental. One reading accepts any combination of gravity, temperature, and pH while showing prior values; disabled `complete_batch` names its reconciliation schema gate | Timeline and lineage graph |
 | **Brew day** (4) | Establish batch baseline | Schedule/record brew day, lots/additions, knockout volume → free vessel | Calendar and scaled recipe |
-| **Transfer / loss** (4) | Move beer and account for remainder | From occupancy + target vessel/occupancy, positive bbl, `loss_bbl` in the same RPC; an empty target gets a zero-baseline occupancy and a fully emptied source closes | Lineage and named correction |
-| **Packaging run / outputs** (5) | Plan and close real stock | Green schedule/edit selects one exact open source occupancy and writes run + planned outputs in one RPC; close revalidates source and reviews requirements, actual output, lot, explicit FG destination, consumption/return/loss, then commits copper | Run list, yield/loss, labels |
+| **Transfer / loss** (4) | Move beer and account for remainder | From occupancy + target vessel/occupancy, positive bbl, then explicitly classify remainder as intentional hold or `loss_bbl`; never assume every partial transfer is loss. An empty target gets a zero-baseline occupancy and a fully emptied source closes. | Lineage and named correction |
+| **Packaging run / outputs** (5) | Plan and close real stock | Green schedule/edit selects one exact open source occupancy and writes run + planned outputs in one RPC; shortages surface before start. Close revalidates source and previews actual FG output, lot, explicit destination, material consumption/returns/damage, beer loss, and yield before copper commit. | Run list, yield/loss, labels |
 | **Lot trace / recall** (5) | Find where a lot went | Global lot search → material/batch/FG/shipment/customer tape | Printable trace; not hidden in More |
-| **Compliance month / loss review** (6) | Generate, review, file | Registered generator and copper filing. **SCHEMA-GATE:** loss queue/reattribution stays disabled until structured reconciliation identity/classification exists | Tax/state tables, filed snapshot; never `v_bro` |
+| **Compliance month / loss review** (6) | Generate, review, and record filing | Review losses → review generated figures → confirm filing occurred outside MGR → **Save filed snapshot**. MGR does not imply it transmitted the report. **SCHEMA-GATE:** loss queue/reattribution stays disabled until structured reconciliation identity/classification exists. | Tax/state tables, filed snapshot; never `v_bro` |
 | **Compliance registry** (6) | Know where product may ship | Read approvals/registrations/licenses; order warning links here | Editors and expiry Today rows |
 | **POS setup / mapping** (7) | Ingest and classify Square facts | Connection health; idempotent sales sync; exact package SKU + `qty_per_sale` conversion; reconciliation disabled until valid | Connect/sync/map/diff; one `reconcile_pos_sales` RPC |
 | **Planning** (8) | Show demand/supply gap | Read shortfall cards | Calendar + draft PO; no planning status table |
