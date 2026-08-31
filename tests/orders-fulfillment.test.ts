@@ -75,6 +75,29 @@ describe("pick and ship", () => {
     ({ data: o } = await admin.from("orders").select().eq("id", id).single());
     expect(o!.needs_restock).toBe(false);
   });
+  it("ship with all lines qty_shipped 0 creates no invoice and releases allocations", async () => {
+    const id = await confirmedOrder(4);
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 0 }] });
+    const { data, error } = await staffDb.rpc("ship_order", { p_order: id, p_ship: [{ line_id: line.id, qty_shipped: 0 }], p_carrier: null, p_tracking: null });
+    expect(error).toBeNull();
+    expect((data as { invoice_id: string | null }).invoice_id).toBeNull();
+    const { data: shipment } = await admin.from("shipments").select().eq("order_id", id).single();
+    const { data: invs } = await admin.from("invoices").select().eq("shipment_id", shipment!.id);
+    expect(invs!.length).toBe(0);
+    const { data: o } = await admin.from("orders").select().eq("id", id).single();
+    expect(o!.status).toBe("shipped");
+    const { data: alloc } = await admin.from("allocations").select().eq("ref", line.id).single();
+    expect(alloc!.status).toBe("released");
+  });
+  it("ship rejects when p_ship omits an order line", async () => {
+    const id = await confirmedOrder(3);
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 3 }] });
+    const { error } = await staffDb.rpc("ship_order", { p_order: id, p_ship: [], p_carrier: null, p_tracking: null });
+    expect(error).not.toBeNull();
+    expect(error?.message).toMatch(/ship list must cover/);
+  });
 });
 
 describe("credit memo", () => {
