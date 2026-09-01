@@ -2034,3 +2034,72 @@ revoke execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid
   from public, anon;
 grant execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), next_no(uuid, text), portal_availability(uuid)
   to authenticated;
+
+-- ---------------------------------------------------------------- explicit Data API ACLs
+-- RLS decides which rows a signed-in caller may see. These ACLs separately
+-- define which public objects the Data API can reach: no anonymous MGR surface,
+-- read-only authenticated query access plus the DML each invoker RPC needs, and
+-- server-only service-role administration.
+revoke all on schema public from public, anon, authenticated, service_role;
+revoke all privileges on all tables in schema public from public, anon, authenticated, service_role;
+revoke all privileges on all sequences in schema public from public, anon, authenticated, service_role;
+revoke all privileges on all functions in schema public from public, anon, authenticated, service_role;
+
+alter default privileges for role postgres in schema public revoke all on tables from public, anon, authenticated, service_role;
+alter default privileges for role postgres in schema public revoke all on sequences from public, anon, authenticated, service_role;
+alter default privileges for role postgres in schema public revoke all on functions from public, anon, authenticated, service_role;
+
+grant usage on schema public to authenticated, service_role;
+grant select on all tables in schema public to authenticated;
+grant insert on allocations, customers, inventory_movements, invoice_lines, invoices, locations, order_events,
+  order_lines, orders, price_list_items, price_lists, products, ship_tos, shipments, skus, taproom_pars
+  to authenticated;
+grant update on allocations, customers, order_lines, orders, price_list_items, price_lists, ship_tos, taproom_pars
+  to authenticated;
+grant delete on order_lines to authenticated;
+
+grant select on all tables in schema public to service_role;
+do $$
+declare t text;
+begin
+  for t in select relname from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r' loop
+    execute format('grant insert, update, delete on table public.%I to service_role', t);
+  end loop;
+end $$;
+grant usage, select, update on all sequences in schema public to service_role;
+grant execute on all functions in schema public to service_role;
+
+-- Every authenticated EXECUTE grant is either a Data API RPC, an RLS
+-- predicate helper, or a direct invoker-call dependency of an RPC.
+grant execute on function
+  my_brewery_ids(),
+  is_staff_of(uuid),
+  staff_role(uuid),
+  next_no(uuid, text),
+  my_customer_ids(),
+  is_authorized_staff_rpc(uuid, text, public.staff_role[]),
+  require_authorized_staff_rpc(uuid, text, public.staff_role[]),
+  create_product(uuid, text, text, numeric),
+  create_sku(uuid, uuid, text, public.package_type, integer, numeric),
+  create_location(uuid, text, public.location_kind),
+  upsert_customer(uuid, uuid, text, public.customer_type, text, uuid, text, text),
+  upsert_ship_to(uuid, uuid, uuid, text, text, text, text, text, text),
+  upsert_price_list(uuid, uuid, text),
+  set_price(uuid, uuid, uuid, integer),
+  record_movement(uuid, uuid, uuid, numeric, public.movement_type, public.sale_channel, text, text),
+  set_taproom_par(uuid, uuid, uuid, numeric),
+  order_line_price(uuid, uuid, uuid),
+  create_order(uuid, public.order_kind, uuid, uuid, uuid, uuid, date, text, text, jsonb),
+  lock_order(uuid, public.order_status[]),
+  update_draft_order(uuid, uuid, date, text, text, jsonb),
+  submit_order(uuid),
+  confirm_order(uuid),
+  adjust_order_lines(uuid, jsonb, text),
+  cancel_order(uuid, text),
+  record_pick(uuid, jsonb),
+  ship_order(uuid, jsonb, text, text),
+  create_credit_memo(uuid, jsonb, uuid, text),
+  set_standing_allocation(uuid, uuid, numeric),
+  create_replenishment_order(uuid, uuid, jsonb),
+  portal_availability(uuid)
+  to authenticated;

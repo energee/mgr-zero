@@ -51,4 +51,149 @@ describe("schema rules", () => {
         and has_function_privilege('anon', p.oid, 'execute')
       order by 1`)).toEqual([]);
   });
+
+  it("pins the public schema and relation ACL matrix", () => {
+    expect(sql(`
+      with domain_relations as (
+        select c.oid, c.relname, c.relkind
+        from pg_class c
+        where c.relnamespace = 'public'::regnamespace
+          and c.relkind in ('r', 'v', 'S')
+          and not exists (select 1 from pg_depend d where d.objid = c.oid and d.deptype = 'e')
+      ),
+      role_privileges as (
+        select role, relname, privilege
+        from domain_relations
+        cross join (values ('anon'::name), ('authenticated'::name), ('service_role'::name)) roles(role)
+        cross join lateral (
+          values
+            ('SELECT', case when relkind in ('r', 'v') then has_table_privilege(role, oid, 'select') else has_sequence_privilege(role, oid, 'select') end),
+            ('INSERT', case when relkind in ('r', 'v') then has_table_privilege(role, oid, 'insert') else false end),
+            ('UPDATE', case when relkind in ('r', 'v') then has_table_privilege(role, oid, 'update') else has_sequence_privilege(role, oid, 'update') end),
+            ('DELETE', case when relkind in ('r', 'v') then has_table_privilege(role, oid, 'delete') else false end),
+            ('USAGE', case when relkind = 'S' then has_sequence_privilege(role, oid, 'usage') else false end)
+        ) privileges(privilege, granted)
+        where granted
+      ),
+      expected as (
+        select 'authenticated'::name as role, relname, 'SELECT'::text as privilege
+        from domain_relations where relkind in ('r', 'v')
+        union all
+        select 'authenticated'::name, relname, privilege
+        from (values
+          ('allocations', 'INSERT'), ('allocations', 'UPDATE'),
+          ('customers', 'INSERT'), ('customers', 'UPDATE'),
+          ('inventory_movements', 'INSERT'),
+          ('invoice_lines', 'INSERT'), ('invoices', 'INSERT'),
+          ('locations', 'INSERT'),
+          ('order_events', 'INSERT'),
+          ('order_lines', 'DELETE'), ('order_lines', 'INSERT'), ('order_lines', 'UPDATE'),
+          ('orders', 'INSERT'), ('orders', 'UPDATE'),
+          ('price_list_items', 'INSERT'), ('price_list_items', 'UPDATE'),
+          ('price_lists', 'INSERT'), ('price_lists', 'UPDATE'),
+          ('products', 'INSERT'),
+          ('ship_tos', 'INSERT'), ('ship_tos', 'UPDATE'),
+          ('shipments', 'INSERT'),
+          ('skus', 'INSERT'),
+          ('taproom_pars', 'INSERT'), ('taproom_pars', 'UPDATE')
+        ) as dml(relname, privilege)
+        union all
+        select 'service_role'::name, relname, privilege
+        from domain_relations
+        cross join lateral (
+          values
+            ('SELECT', relkind in ('r', 'v', 'S')),
+            ('INSERT', relkind = 'r'),
+            ('UPDATE', relkind in ('r', 'S')),
+            ('DELETE', relkind = 'r'),
+            ('USAGE', relkind = 'S')
+        ) privileges(privilege, granted)
+        where granted
+      )
+      select 'schema:' || role
+      from (values ('anon'::name, false), ('authenticated'::name, true), ('service_role'::name, true)) expected_schema(role, granted)
+      where has_schema_privilege(role, 'public', 'usage') <> granted
+      union all
+      select 'extra:' || role || ':' || relname || ':' || privilege
+      from (select * from role_privileges except select * from expected) extra
+      union all
+      select 'missing:' || role || ':' || relname || ':' || privilege
+      from (select * from expected except select * from role_privileges) missing
+      order by 1
+    `)).toEqual([]);
+  });
+
+  it("pins exact public function execute privileges by signature", () => {
+    expect(sql(`
+      with domain_functions as (
+        select p.oid, p.oid::regprocedure::text as signature
+        from pg_proc p
+        where p.pronamespace = 'public'::regnamespace and p.prokind = 'f'
+          and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')
+      ),
+      actual as (
+        select role, signature
+        from domain_functions
+        cross join (values ('anon'::name), ('authenticated'::name), ('service_role'::name)) roles(role)
+        where has_function_privilege(role, oid, 'execute')
+      ),
+      expected as (
+        select 'authenticated'::name as role, signature
+        from (values
+          ('my_brewery_ids()'),
+          ('is_staff_of(uuid)'),
+          ('staff_role(uuid)'),
+          ('next_no(uuid,text)'),
+          ('my_customer_ids()'),
+          ('is_authorized_staff_rpc(uuid,text,staff_role[])'),
+          ('require_authorized_staff_rpc(uuid,text,staff_role[])'),
+          ('create_product(uuid,text,text,numeric)'),
+          ('create_sku(uuid,uuid,text,package_type,integer,numeric)'),
+          ('create_location(uuid,text,location_kind)'),
+          ('upsert_customer(uuid,uuid,text,customer_type,text,uuid,text,text)'),
+          ('upsert_ship_to(uuid,uuid,uuid,text,text,text,text,text,text)'),
+          ('upsert_price_list(uuid,uuid,text)'),
+          ('set_price(uuid,uuid,uuid,integer)'),
+          ('record_movement(uuid,uuid,uuid,numeric,movement_type,sale_channel,text,text)'),
+          ('set_taproom_par(uuid,uuid,uuid,numeric)'),
+          ('order_line_price(uuid,uuid,uuid)'),
+          ('create_order(uuid,order_kind,uuid,uuid,uuid,uuid,date,text,text,jsonb)'),
+          ('lock_order(uuid,order_status[])'),
+          ('update_draft_order(uuid,uuid,date,text,text,jsonb)'),
+          ('submit_order(uuid)'),
+          ('confirm_order(uuid)'),
+          ('adjust_order_lines(uuid,jsonb,text)'),
+          ('cancel_order(uuid,text)'),
+          ('record_pick(uuid,jsonb)'),
+          ('ship_order(uuid,jsonb,text,text)'),
+          ('create_credit_memo(uuid,jsonb,uuid,text)'),
+          ('set_standing_allocation(uuid,uuid,numeric)'),
+          ('create_replenishment_order(uuid,uuid,jsonb)'),
+          ('portal_availability(uuid)')
+        ) callable(signature)
+        union all
+        select 'service_role'::name, signature from domain_functions
+      )
+      select 'extra:' || role || ':' || signature
+      from (select * from actual except select * from expected) extra
+      union all
+      select 'missing:' || role || ':' || signature
+      from (select * from expected except select * from actual) missing
+      order by 1
+    `)).toEqual([]);
+  });
+
+  it("revokes future public object ACL defaults", () => {
+    expect(sql(`
+      select defaclobjtype::text || ':' || defaclacl::text
+      from pg_default_acl
+      where defaclrole = 'postgres'::regrole
+        and defaclnamespace = 'public'::regnamespace
+      order by 1
+    `)).toEqual([
+      'f:{postgres=X/postgres}',
+      'r:{postgres=arwdDxtm/postgres}',
+      'S:{postgres=rwU/postgres}',
+    ]);
+  });
 });
