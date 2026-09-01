@@ -3,7 +3,7 @@
 Running log of what's done, in flight, and next. Newest at top. Keep entries to one line each; details belong in commits and docs.
 
 ## Now
-- [ ] Vercel production-readiness is paused at the Task 3 boundary for draft-PR review: Tasks 1, 2, 6, and 8 are committed; Task 3's explicit idempotent RPC/ACL implementation passes an isolated reset, 64 targeted tests, typecheck, and lint. Re-review of the fix round, the Task 2 envelope follow-ups, and Tasks 4–19 remain.
+- [ ] Vercel production-readiness (PR #29) at the Task 3 boundary: Tasks 1, 2 (incl. envelope follow-ups: non-JSON 400, browser envelope validation, `runCommand` returns `unknown`), 6, and 8 committed; Task 3 RPC/ACL boundary green on the full suite (25 files / 138 tests), typecheck, lint. Remaining: specialist re-review of the Task 3 fix round, then Tasks 4–19.
 - [ ] Slice 1C: QBO invoices-out/payments-back + AI chat composer (`.agents/superpowers/specs/2026-08-31-slice1c-qbo-ai-chat.md`).
 
 ## Done

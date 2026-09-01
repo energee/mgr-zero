@@ -15,7 +15,7 @@ type Product = { id: string; name: string; style: string | null; abv: number | n
 export default async function CatalogPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const products: Product[] = await runCommand("list_products", {}, ctx);
+  const products = (await runCommand("list_products", {}, ctx)) as Product[];
 
   return (
     <div className="flex flex-col gap-6">

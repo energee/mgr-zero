@@ -14,6 +14,9 @@ describe("command registry", () => {
     });
     const ctx = { db: testDb, userId: "u", breweryId: "b", role: "admin" as const };
     await expect(runCommand("echo", { msg: "hi" }, ctx)).resolves.toEqual({ echoed: "hi" });
+    // Output is unknown until the caller narrows it; there is no type parameter to assert through.
+    // @ts-expect-error runCommand has no output type parameter
+    await expect(runCommand<{ echoed: string }>("echo", { msg: "hi" }, ctx)).resolves.toEqual({ echoed: "hi" });
     await expect(runCommand("echo", { msg: 5 }, ctx)).rejects.toThrow(/validation/i);
   });
 

@@ -16,25 +16,25 @@ describe("import_csv", () => {
   });
 
   it("imports products+skus then opening balances; bad rows reported not fatal", async () => {
-    const r1 = await runCommand<ImportResult>("import_csv", { kind: "products_skus", rows: [
+    const r1 = (await runCommand("import_csv", { kind: "products_skus", rows: [
       { product: "Hazy IPA", style: "IPA", abv: "6.5", sku_name: "1/2 bbl keg", package_type: "keg", units_per_case: "", bbl_per_unit: "0.5" },
       { product: "Hazy IPA", style: "IPA", abv: "6.5", sku_name: "16oz 4-pack", package_type: "can", units_per_case: "6", bbl_per_unit: "0.01612903" },
-    ] }, ctx);
+    ] }, ctx)) as ImportResult;
     expect(r1.inserted).toBe(2);
-    const r2 = await runCommand<ImportResult>("import_csv", { kind: "opening_balances", rows: [
+    const r2 = (await runCommand("import_csv", { kind: "opening_balances", rows: [
       { product: "Hazy IPA", sku_name: "1/2 bbl keg", location: "WH", qty: "24" },
       { product: "Hazy IPA", sku_name: "does-not-exist", location: "WH", qty: "5" },
-    ] }, ctx);
+    ] }, ctx)) as ImportResult;
     expect(r2.inserted).toBe(1);
     expect(r2.errors).toHaveLength(1);
-    const oh = await runCommand<OnHandRow[]>("get_on_hand", {}, ctx);
+    const oh = (await runCommand("get_on_hand", {}, ctx)) as OnHandRow[];
     expect(oh.some((r: any) => Number(r.qty) === 24)).toBe(true);
   });
 
   it("rejects a non-numeric abv instead of silently nulling it", async () => {
-    const r = await runCommand<ImportResult>("import_csv", { kind: "products_skus", rows: [
+    const r = (await runCommand("import_csv", { kind: "products_skus", rows: [
       { product: "Bad ABV Ale", style: "Pale", abv: "n/a", sku_name: "6-pack", package_type: "can", units_per_case: "4", bbl_per_unit: "0.05" },
-    ] }, ctx);
+    ] }, ctx)) as ImportResult;
     expect(r.inserted).toBe(0);
     expect(r.errors).toHaveLength(1);
     expect(r.errors[0].message).toMatch(/abv/i);
@@ -43,9 +43,9 @@ describe("import_csv", () => {
   });
 
   it("rejects a qty of 0 for opening balances with a clean error", async () => {
-    const r = await runCommand<ImportResult>("import_csv", { kind: "opening_balances", rows: [
+    const r = (await runCommand("import_csv", { kind: "opening_balances", rows: [
       { product: "Hazy IPA", sku_name: "1/2 bbl keg", location: "WH", qty: "0" },
-    ] }, ctx);
+    ] }, ctx)) as ImportResult;
     expect(r.inserted).toBe(0);
     expect(r.errors).toHaveLength(1);
     expect(r.errors[0].message).toMatch(/qty/i);
@@ -54,29 +54,29 @@ describe("import_csv", () => {
   it("resolves an ambiguous sku_name via the product column instead of failing PGRST116", async () => {
     // Two different products both carry a sku literally named "1/2 bbl keg" —
     // sku_name alone is not unique per brewery, only per (product, name).
-    await runCommand<ImportResult>("import_csv", { kind: "products_skus", rows: [
+    (await runCommand("import_csv", { kind: "products_skus", rows: [
       { product: "Pale Ale", style: "APA", abv: "5.2", sku_name: "1/2 bbl keg", package_type: "keg", units_per_case: "", bbl_per_unit: "0.5" },
-    ] }, ctx);
-    const r = await runCommand<ImportResult>("import_csv", { kind: "opening_balances", rows: [
+    ] }, ctx)) as ImportResult;
+    const r = (await runCommand("import_csv", { kind: "opening_balances", rows: [
       { product: "Pale Ale", sku_name: "1/2 bbl keg", location: "WH", qty: "10" },
-    ] }, ctx);
+    ] }, ctx)) as ImportResult;
     expect(r.errors).toHaveLength(0);
     expect(r.inserted).toBe(1);
   });
 
   it("rejects a fractional unit_price_cents instead of silently truncating it", async () => {
-    const r = await runCommand<ImportResult>("import_csv", { kind: "price_list_items", rows: [
+    const r = (await runCommand("import_csv", { kind: "price_list_items", rows: [
       { price_list: "Standard", product: "Hazy IPA", sku_name: "1/2 bbl keg", unit_price_cents: "12.5" },
-    ] }, ctx);
+    ] }, ctx)) as ImportResult;
     expect(r.inserted).toBe(0);
     expect(r.errors).toHaveLength(1);
     expect(r.errors[0].message).toMatch(/unit_price_cents/i);
   });
 
   it("imports a price_list_items row when product + sku_name resolve unambiguously", async () => {
-    const r = await runCommand<ImportResult>("import_csv", { kind: "price_list_items", rows: [
+    const r = (await runCommand("import_csv", { kind: "price_list_items", rows: [
       { price_list: "Standard", product: "Hazy IPA", sku_name: "1/2 bbl keg", unit_price_cents: "12500" },
-    ] }, ctx);
+    ] }, ctx)) as ImportResult;
     expect(r.errors).toHaveLength(0);
     expect(r.inserted).toBe(1);
   });
@@ -108,9 +108,9 @@ describe("import_csv", () => {
       correlationId: crypto.randomUUID(),
     };
 
-    const first = await runCommand<ImportResult>("import_csv", input, ctx, firstExecution);
-    const second = await runCommand<ImportResult>("import_csv", input, ctx, secondExecution);
-    const replay = await runCommand<ImportResult>("import_csv", input, ctx, secondExecution);
+    const first = (await runCommand("import_csv", input, ctx, firstExecution)) as ImportResult;
+    const second = (await runCommand("import_csv", input, ctx, secondExecution)) as ImportResult;
+    const replay = (await runCommand("import_csv", input, ctx, secondExecution)) as ImportResult;
     expect(first.errors).toEqual([]);
     expect(second.errors).toEqual([]);
     expect(replay).toEqual(second);
@@ -125,6 +125,6 @@ describe("import_csv", () => {
 
   it("rejects a batch over the 5000-row cap before touching the database", async () => {
     const rows = Array.from({ length: 5001 }, () => ({ name: "x", state: "PA" }));
-    await expect(runCommand<ImportResult>("import_csv", { kind: "customers", rows }, ctx)).rejects.toThrow(/validation/i);
+    await expect(runCommand("import_csv", { kind: "customers", rows }, ctx)).rejects.toThrow(/validation/i);
   });
 });

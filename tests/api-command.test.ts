@@ -60,6 +60,37 @@ describe("POST /api/command bearer auth", () => {
     }
   });
 
+  it("rejects a malformed JSON body with 400 invalid_request", async () => {
+    const req = new Request("http://localhost/api/command", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${adminToken}` },
+      body: "{not json",
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    const json = await res.json() as { ok: boolean; error: { code: string } };
+    expect(json.ok).toBe(false);
+    expect(json.error.code).toBe("invalid_request");
+  });
+
+  it("browser client rejects a non-envelope response instead of crashing on its shape", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 502, json: async () => ({ unexpected: true }) }));
+    try {
+      await expect(command("brewery-id", "create_product", { name: "Pils" })).rejects.toThrow(/malformed response \(502\)/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("browser client rejects a non-JSON response body", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 504, json: async () => { throw new SyntaxError("Unexpected token <"); } }));
+    try {
+      await expect(command("brewery-id", "create_product", { name: "Pils" })).rejects.toThrow(/malformed response \(504\)/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("runs a query without a request id and returns a correlation id", async () => {
     const res = await POST(commandReq({ breweryId, name: "list_products", input: {} }, adminToken));
     const json = await res.json();

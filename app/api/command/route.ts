@@ -45,7 +45,9 @@ export async function POST(req: Request) {
   let requestId: string | undefined;
 
   try {
-    const body: unknown = await req.json();
+    const body: unknown = await req.json().catch(() => {
+      throw new CommandError("request body must be JSON", 400, "invalid_request");
+    });
     if (!isCommandRequest(body)) {
       throw new CommandError("invalid command request", 400, "invalid_request");
     }

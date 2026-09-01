@@ -139,7 +139,10 @@ function createExecution(): CommandExecution {
   return { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
 }
 
-export async function runCommand<Out>(name: string, rawInput: unknown, ctx: Ctx, execution?: CommandExecution): Promise<Out> {
+// Returns unknown on purpose: the registry cannot know a handler's output type
+// from a string name, so callers narrow explicitly instead of asserting via a
+// type parameter that was never checked.
+export async function runCommand(name: string, rawInput: unknown, ctx: Ctx, execution?: CommandExecution): Promise<unknown> {
   const def = registry.get(name);
   if (!def) throw new CommandError(`unknown command: ${name}`, 404, "unknown_command");
   const allowed = def.roles === "any" || (def.roles === "customer" ? ctx.role === "customer" : def.roles.includes(ctx.role as StaffRole));
@@ -147,7 +150,7 @@ export async function runCommand<Out>(name: string, rawInput: unknown, ctx: Ctx,
   const parsed = def.input.safeParse(rawInput);
   if (!parsed.success) throw new CommandError(`validation failed: ${parsed.error.message}`, 400, "invalid_input");
   try {
-    return await def.execute(ctx, parsed.data, def.kind === "command" ? execution ?? createExecution() : undefined) as Out;
+    return await def.execute(ctx, parsed.data, def.kind === "command" ? execution ?? createExecution() : undefined);
   } catch (e: unknown) {
     if (e instanceof CommandError) throw e;
     console.error(`handler error in ${name}:`, e);
