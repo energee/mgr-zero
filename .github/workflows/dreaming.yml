@@ -94,7 +94,9 @@ jobs:
           # github-actions bot; the action refuses non-human actors unless
           # they are listed here.
           allowed_bots: 'github-actions'
-          prompt: 'Read .agents/agents/dreaming.md and follow it exactly.'
+          # State the CI fact up front: the allowlist has no echo/env/printenv,
+          # so the agent cannot verify GITHUB_ACTIONS itself and would stop.
+          prompt: 'You are running inside GitHub Actions (GITHUB_ACTIONS=true); the CI-only guard is satisfied — do not run shell commands to check it. Read .agents/agents/dreaming.md and follow it exactly.'
           # The push entries below are exact-match on purpose (not `git push:*`),
           # so an injected dream cannot push to any branch but dreaming/main —
           # in particular, never to main — and gh is limited to PR list/create/
