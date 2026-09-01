@@ -3,9 +3,10 @@
 Running log of what's done, in flight, and next. Newest at top. Keep entries to one line each; details belong in commits and docs.
 
 ## Now
-- [ ] Slice 1B starts with UI-plan rev-3 Step 1 contracts/schema gates, then orders → allocations → ship → invoices.
+- [ ] Slice 1C: QBO invoices-out/payments-back + AI chat composer (`.agents/superpowers/specs/2026-08-31-slice1c-qbo-ai-chat.md`).
 
 ## Done
+- 2026-08-31 — Slice 1B (orders) complete on `slice1b-orders`: order lifecycle (create/submit/confirm/adjust/cancel), allocations, pick/ship, per-shipment invoices, credit memos, taproom replenishment, customer/ship-to/price-list CRUD, wholesale customer portal (shop, orders, invoices), Playwright e2e smoke (`npm run test:e2e`). Branch awaiting PR.
 - 2026-08-31 — Wireframes raised 50 → 63 for the slice 1/1B exception paths: short pick, order detail (+restock), role Today landings (sales/brewer/driver), three ship bodies (invoice now / on-delivery gated / complete transfer), Product/SKU TTB facts, cellar addition, portal Review, Me, Team, set-password; existing frames patched (Square-vs-count rule, POS refunds, keg return + deposit refund, PO send/over, blend into occupied, recipe stage/timing, TTB file checks, print labels); plan §1–§4/§8 + `brewing-domain.md` yeast/water deferral in step.
 - 2026-08-31 — Customer user guide established as the complete plain-language manual for every available screen/action; post-merge Claude audit enforces action steps, fields/options, permissions, results, corrections, and errors.
 - 2026-08-31 — Read-only Claude Code post-merge documentation agent audits each merged PR against the owning docs and opens one idempotent follow-up issue for high-confidence drift; review tools are denied common runner secret paths and credential dotfiles.

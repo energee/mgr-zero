@@ -128,3 +128,10 @@
     @apply font-sans;
   }
 }
+
+/* Print the pick sheet (and any other page) without the nav sidebar. */
+@media print {
+  aside {
+    display: none;
+  }
+}

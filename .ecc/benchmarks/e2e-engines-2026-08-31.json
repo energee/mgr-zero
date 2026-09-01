@@ -1,0 +1,26 @@
+{
+  "date": "2026-08-31",
+  "machine": "darwin-arm64 (Ted's laptop, ambient load)",
+  "harness": "agent-browser 0.35.2; lightpanda 2026.07 nightly (brew); next dev, local supabase",
+  "scenario": {
+    "launch": "agent-browser session start + open about:blank",
+    "coldnav": "first open of /login after launch",
+    "warmnav": "second open of /login",
+    "full_flow": "npm run test:e2e — seed, next dev :3100, lightpanda attempt (fails at React controlled inputs), chrome fallback passes"
+  },
+  "lightpanda": {
+    "launch_s": [1.59, 1.0, 0.77],
+    "coldnav_s": [1.13, 1.05, 0.71],
+    "warmnav_s": [0.9, 0.68, 0.68],
+    "rss_mb_login_open": 32,
+    "full_flow": "cannot complete — fill/type does not propagate to React controlled-input state; Radix select option role missing"
+  },
+  "chrome_via_agent_browser": {
+    "launch_s": [2.76, 2.08, 1.14],
+    "coldnav_s": [0.83, 0.8, 0.54],
+    "warmnav_s": [0.91, 0.62, 0.33],
+    "rss_mb_login_open": 351,
+    "full_flow_total_s": [13.1, 11.3, 10.3],
+    "full_flow_note": "totals include seeding, next dev boot on 3100, and the doomed lightpanda attempt (~3-5s)"
+  }
+}

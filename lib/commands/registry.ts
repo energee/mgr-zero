@@ -4,7 +4,7 @@ import { ZodType } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type StaffRole = "admin" | "sales" | "warehouse" | "brewer";
-export type Ctx = { db: SupabaseClient; userId: string; breweryId: string; role: StaffRole | "customer" };
+export type Ctx = { db: SupabaseClient; userId: string; breweryId: string; role: StaffRole | "customer"; customerId?: string };
 
 export class CommandError extends Error {
   constructor(message: string, readonly status = 400) {
