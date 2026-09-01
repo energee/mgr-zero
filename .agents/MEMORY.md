@@ -13,14 +13,14 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
 - Schema conventions live in `.agents/ARCHITECTURE.md`; the quote behind "no status columns" is Ted's: "if it won't be accurate I don't want it".
 - Cross-provider agent work is harness-neutral and owned by `.agents/orchestration/`: Codex is the sole writer, Grok plans/critiques, Claude reviews high-risk work, and complex/high-risk implementation requires a separate approval command.
 - UI source of truth is UI plan rev 3 plus the exactly 63-frame
-- Every merged PR gets one read-only Claude Code documentation audit; high-confidence omissions or contradictions are tracked in one follow-up issue rather than committed directly to `main` by a bot. The Claude review job has read-only repo permissions, only Read/Grep/Glob tools, and Claude Code permission denies for common runner secret paths and credential dotfiles.
-- `docs/user-guide.md` is the customer-facing owner for the entire available application. It documents every screen/action in customer language (steps, fields/options, permissions, results, corrections, and errors) and never exposes development phases or internals.
   `2026-08-31-mgr-wireframes.html`; change navigation/flows and the `SCREENS`
   array together (the count is not sacred — a real operator job gets a real
   body, never an annotation chip). Staff uses Today/Beer/Work/More; the wholesale portal has its
   own Order/Orders/Invoices/Account shell. Frames draw only user-visible UI —
   the annotation, gate-copy, and Today-exemplar rules live in the plan
   preamble and §5, not here.
+- Every merged PR gets one read-only Claude Code documentation audit; high-confidence omissions or contradictions are tracked in one follow-up issue rather than committed directly to `main` by a bot. The Claude review job has read-only repo permissions, only Read/Grep/Glob tools, and Claude Code permission denies for common runner secret paths and credential dotfiles.
+- `docs/user-guide.md` is the customer-facing owner for the entire available application. It documents every screen/action in customer language (steps, fields/options, permissions, results, corrections, and errors) and never exposes development phases or internals.
 - Every AI mutation is proposal-only: registry-owned server preview,
   canonical effects, explicit user confirmation, same `requestId` +
   `previewToken`, and stale revalidation. There is no generic Undo. Replay and
