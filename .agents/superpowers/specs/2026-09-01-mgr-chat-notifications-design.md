@@ -1,7 +1,7 @@
 # MGR chat notifications — Slack-first portable design
 
 **Date:** 2026-09-01
-**Status:** Approved design; implementation plan not yet written
+**Status:** Approved design; implementation plan at `.agents/superpowers/plans/2026-09-01-chat-notifications.md`
 **Initial provider:** Slack
 **Future providers:** Microsoft Teams, Discord, Telegram, and other Chat SDK adapters
 
@@ -34,6 +34,7 @@ The first implementation is Slack-only. The MGR data model and notification cont
 - Brewery timezone and default quiet hours control delivery; linked users may override their own quiet hours.
 - No notification class bypasses quiet hours in the first release. App Home remains current during quiet hours.
 - The first notification bundle is submitted orders, picks due, assigned next delivery, and overdue fermentation readings.
+- MGR owns a brewery-level fermentation reading cadence, default 24 hours and bounded to 1–168 hours. The same value drives Today and every chat provider.
 - Projection-only ships before any MGR domain mutation from Slack.
 - Fermentation reading is the first candidate operational modal after the trust and replay gates close.
 - Clean-order confirmation is a later conditional action requiring a separate eligibility proof.
@@ -106,6 +107,14 @@ The channel receives one morning and one midday summary of unresolved work. It c
 The digest message is updated within its cadence window rather than appended repeatedly.
 Each digest is a synthetic time-window occurrence whose owning summary query reloads current unresolved work. It is not modeled as multiple item deliveries sharing one provider message.
 
+### 4.4 Production chat preview gallery
+
+MGR Settings → Integrations → Chat includes a preview gallery before and after provider installation. It shows the disconnected and active settings states plus App Home, personal DM, private team digest, preferences, gated fermentation reading, gated clean-order confirmation, and reauthorization failure.
+
+Previews use a committed provider-neutral fixture catalog. They never query live brewery/customer data, send provider messages, or imply that a gated action is available. Provider render-contract tests consume the same fixtures; an accessible web renderer displays them inside Settings. Sharing fixture inputs prevents product copy and data-minimization rules from drifting while allowing Slack Block Kit and web markup to remain platform-correct.
+
+The canonical low-fidelity frames live in `.agents/superpowers/specs/2026-08-31-mgr-wireframes.html` under build step 8 and the **Chat** filter.
+
 ## 5. Initial notification reasons
 
 | Reason | Eligible actor | Trigger owner | Personal content | Resolution | Initial action |
@@ -113,7 +122,7 @@ Each digest is a synthetic time-window occurrence whose owning summary query rel
 | Submitted order awaits confirmation | Sales, admin | Owning Today/order query; submitted transition | Safe order label, requested date, reason review is required | Order no longer submitted or actor no longer eligible | Open authenticated MGR order confirmation |
 | Confirmed order is due to pick | Warehouse, admin | Owning Today/pick query using requested ship date and state | Order label, source, line count, due time | Order leaves eligible pick state or assignment/role changes | Open authenticated MGR pick flow |
 | Assigned next delivery is ready | Assigned driver, admin | Owning Today/route query using current route and open stop | Stop label, destination-safe label, scheduled time | Stop completes, route changes, or assignment changes | Open authenticated MGR delivery flow |
-| Fermentation reading is overdue | Brewer, admin | Owning Today/cellar query | Vessel, reading age, prior-reading time | A qualifying reading lands, occupancy closes, or actor loses access | Open authenticated MGR reading flow |
+| Fermentation reading is overdue | Brewer, admin | Owning Today/cellar query; open occupancy whose latest reading (or occupancy start when none) is at least the brewery's configured 1–168-hour cadence old | Vessel, reading age, prior-reading time | A qualifying reading lands, occupancy closes, cadence changes so it is no longer overdue, or actor loses access | Open authenticated MGR reading flow |
 
 The notification layer does not invent due rules. Each reason depends on an owning MGR query that returns a stable subject reference, current reason, due time, state/version token, eligible actors, and resolution condition. If the application cannot provide that contract, the reason does not ship.
 
@@ -138,6 +147,8 @@ Future notification reasons are added one at a time from measured demand. Candid
 ## 7. Provider-neutral data model
 
 All new tenant-visible tables carry `brewery_id`, RLS, and tenant-safe foreign keys. Secret-bearing Chat SDK tables remain outside the tenant schema.
+
+`breweries` gains `fermentation_reading_due_hours`, an integer constrained to 1–168 with default 24. It is an MGR operating default, not a chat preference. An admin update affects Today and subsequent occurrence scans; existing occurrences are revalidated against the new value before delivery.
 
 ### 7.1 `chat_installations`
 
@@ -321,6 +332,8 @@ Each provider adapter consumes the same portable notification payload and return
 
 - minimum-data policy;
 - personal versus shared distinction;
+- the shared provider-neutral preview fixture catalog;
+- a platform-correct renderer output schema consumed by contract tests and the Settings preview renderer;
 - opaque action intents;
 - authenticated MGR deep-link fallback;
 - resolution/update semantics;
@@ -649,6 +662,7 @@ Any cross-tenant disclosure, unauthorized action, token exposure, repeated dupli
 - destination fan-out and preference/quiet-hour precedence;
 - delivery leasing, retry, suppression, update, terminal failure, and lease recovery;
 - brewery timezones and daylight-saving transitions;
+- default 24-hour fermentation cadence, 1–168 validation, admin-only update, no-reading occupancy fallback to `started_at`, and occurrence revalidation after cadence changes;
 - disconnect/uninstall stops queued delivery and invalidates intents;
 - request/result replay, preview token, expected version, and stale behavior before writes are enabled.
 
@@ -662,7 +676,17 @@ Any cross-tenant disclosure, unauthorized action, token exposure, repeated dupli
 - Postgres state adapter works inside the isolated schema with no runtime DDL or public-schema access;
 - concurrent workspace token resolution cannot bleed across installations.
 
-### 22.3 Adapter conformance suite
+### 22.3 Preview and wireframe verification
+
+- fixture coverage for disconnected, active, link, App Home, DM, digest, preferences, gated forms, and reauthorization states;
+- fixture content contains no contact, price, license, credential, signature, free-text note, or hidden identifier fields;
+- web previews and Slack contract tests consume the same fixture identifiers and portable payloads;
+- Settings previews make no provider API call and do not read live tenant subjects;
+- pure renderer tests cover fixture labels and gated-state copy without a provider call;
+- browser verification covers keyboard selection, visible focus, modal focus return, responsive reflow, and the production Settings gallery at phone and desktop widths;
+- the wireframe artifact renders 73 total frames, 10 Chat frames, both phone/desk modes, and no horizontal overflow.
+
+### 22.4 Adapter conformance suite
 
 Every future Chat SDK adapter must prove:
 
@@ -678,7 +702,7 @@ Every future Chat SDK adapter must prove:
 - unsupported-form fallback to authenticated MGR;
 - redacted audit output.
 
-### 22.4 Manual Slack sandbox
+### 22.5 Manual Slack sandbox
 
 - install one brewery workspace;
 - link each staff role;
