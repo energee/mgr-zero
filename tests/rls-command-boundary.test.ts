@@ -1,7 +1,8 @@
 // tests/rls-command-boundary.test.ts — live PostgREST proof that staff writes use only role-scoped RPCs.
 import { beforeAll, describe, expect, it } from "vitest";
 import { admin, makeBrewery, makeStaffCtx } from "./helpers";
-import type { Ctx } from "../lib/commands/registry";
+import { runCommand, type Ctx } from "../lib/commands/registry";
+import "../lib/commands/all";
 
 type StaffCtx = Ctx;
 
@@ -10,8 +11,11 @@ let adminCtx: StaffCtx;
 let salesCtx: StaffCtx;
 let warehouseCtx: StaffCtx;
 let brewerCtx: StaffCtx;
+let productId: string;
 let skuId: string;
 let locationId: string;
+let taproomId: string;
+let priceListId: string;
 let customerId: string;
 let shipToId: string;
 
@@ -25,6 +29,7 @@ beforeAll(async () => {
   const { data: product, error: productError } = await admin.from("products")
     .insert({ brewery_id: brewery.id, name: "Boundary IPA" }).select().single();
   if (productError) throw productError;
+  productId = product.id;
   const { data: sku, error: skuError } = await admin.from("skus")
     .insert({ brewery_id: brewery.id, product_id: product.id, name: "Boundary case", package_type: "can", bbl_per_unit: 0.0645 })
     .select().single();
@@ -35,6 +40,10 @@ beforeAll(async () => {
     .insert({ brewery_id: brewery.id, name: "Boundary warehouse", kind: "warehouse" }).select().single();
   if (locationError) throw locationError;
   locationId = location.id;
+  const { data: taproom, error: taproomError } = await admin.from("locations")
+    .insert({ brewery_id: brewery.id, name: "Boundary taproom", kind: "taproom" }).select().single();
+  if (taproomError) throw taproomError;
+  taproomId = taproom.id;
 
   const { data: priceList, error: priceListError } = await admin.from("price_lists")
     .insert({ brewery_id: brewery.id, name: "Boundary wholesale" }).select().single();
@@ -42,6 +51,7 @@ beforeAll(async () => {
   const { error: priceError } = await admin.from("price_list_items")
     .insert({ brewery_id: brewery.id, price_list_id: priceList.id, sku_id: skuId, unit_price_cents: 1200 });
   if (priceError) throw priceError;
+  priceListId = priceList.id;
   const { data: customer, error: customerError } = await admin.from("customers")
     .insert({ brewery_id: brewery.id, name: "Boundary customer", type: "retailer", state: "PA", price_list_id: priceList.id })
     .select().single();
@@ -135,4 +145,280 @@ describe("staff command database boundary", () => {
     expect(order.error).toBeNull();
     expect(warehouseOrder.error?.code).toBe("42501");
   });
+});
+
+type StaffRole = "admin" | "sales" | "warehouse" | "brewer";
+type MatrixInput = { command: Record<string, unknown>; rpc: Record<string, unknown> };
+type MatrixCase = {
+  command: string;
+  rpc: string;
+  allowed: StaffRole[];
+  input: (role: StaffRole) => Promise<MatrixInput>;
+};
+
+const staffRoles: StaffRole[] = ["admin", "sales", "warehouse", "brewer"];
+const contexts = (): Record<StaffRole, StaffCtx> => ({
+  admin: adminCtx,
+  sales: salesCtx,
+  warehouse: warehouseCtx,
+  brewer: brewerCtx,
+});
+const unique = (label: string, role: StaffRole) => `${label} ${role} ${crypto.randomUUID().slice(0, 8)}`;
+
+async function draftOrder() {
+  const order = await runCommand("create_order", {
+    kind: "wholesale", customerId, shipToId, fromLocationId: locationId, lines: [{ skuId, qty: 1 }],
+  }, adminCtx) as { order_id: string };
+  return order.order_id;
+}
+
+async function orderLine(orderId: string) {
+  const { data, error } = await admin.from("order_lines").select("id").eq("order_id", orderId).single();
+  if (error) throw error;
+  return data.id;
+}
+
+async function submittedOrder() {
+  const orderId = await draftOrder();
+  await runCommand("submit_order", { orderId }, adminCtx);
+  return orderId;
+}
+
+async function confirmedOrder() {
+  const orderId = await submittedOrder();
+  await runCommand("confirm_order", { orderId }, adminCtx);
+  return orderId;
+}
+
+async function pickedOrder() {
+  const orderId = await confirmedOrder();
+  const lineId = await orderLine(orderId);
+  await runCommand("record_pick", { orderId, picks: [{ lineId, qty: 1 }] }, adminCtx);
+  return { orderId, lineId };
+}
+
+async function invoicedOrder() {
+  const { orderId, lineId } = await pickedOrder();
+  const shipped = await runCommand("ship_order", {
+    orderId, ship: [{ lineId, qty: 1 }],
+  }, adminCtx) as { invoice_id: string };
+  const { data, error } = await admin.from("invoice_lines").select("id").eq("invoice_id", shipped.invoice_id).single();
+  if (error) throw error;
+  return { invoiceId: shipped.invoice_id, invoiceLineId: data.id };
+}
+
+describe("registered staff mutation role × RPC matrix", () => {
+  const matrix: MatrixCase[] = [
+    {
+      command: "create_product", rpc: "create_product", allowed: ["admin", "sales"],
+      input: async role => {
+        const name = unique("matrix product", role);
+        return {
+          command: { name },
+          rpc: { p_brewery: brewery.id, p_name: name, p_style: null, p_abv: null },
+        };
+      },
+    },
+    {
+      command: "create_sku", rpc: "create_sku", allowed: ["admin", "sales"],
+      input: async role => {
+        const name = unique("matrix sku", role);
+        return {
+          command: { productId, name, packageType: "can", bblPerUnit: "0.0645" },
+          rpc: {
+            p_brewery: brewery.id, p_product: productId, p_name: name, p_package_type: "can",
+            p_units_per_case: null, p_bbl_per_unit: "0.0645",
+          },
+        };
+      },
+    },
+    {
+      command: "create_location", rpc: "create_location", allowed: ["admin"],
+      input: async role => {
+        const name = unique("matrix location", role);
+        return {
+          command: { name, kind: "taproom" },
+          rpc: { p_brewery: brewery.id, p_name: name, p_kind: "taproom" },
+        };
+      },
+    },
+    {
+      command: "upsert_customer", rpc: "upsert_customer", allowed: ["admin", "sales"],
+      input: async role => {
+        const name = unique("matrix customer", role);
+        return {
+          command: { name, type: "retailer", state: "PA" },
+          rpc: {
+            p_id: null, p_brewery: brewery.id, p_name: name, p_type: "retailer", p_state: "PA",
+            p_price_list: null, p_license_no: null, p_payment_terms: null,
+          },
+        };
+      },
+    },
+    {
+      command: "upsert_ship_to", rpc: "upsert_ship_to", allowed: ["admin", "sales"],
+      input: async role => {
+        const label = unique("matrix ship-to", role);
+        return {
+          command: { customerId, label, address1: "1 Matrix Way", city: "Phila", state: "PA", zip: "19107" },
+          rpc: {
+            p_id: null, p_brewery: brewery.id, p_customer: customerId, p_label: label,
+            p_address1: "1 Matrix Way", p_address2: null, p_city: "Phila", p_state: "PA", p_zip: "19107",
+          },
+        };
+      },
+    },
+    {
+      command: "upsert_price_list", rpc: "upsert_price_list", allowed: ["admin", "sales"],
+      input: async role => {
+        const name = unique("matrix price list", role);
+        return {
+          command: { name },
+          rpc: { p_id: null, p_brewery: brewery.id, p_name: name },
+        };
+      },
+    },
+    {
+      command: "set_price", rpc: "set_price", allowed: ["admin", "sales"],
+      input: async () => ({
+        command: { priceListId: priceListId, skuId, unitPriceCents: 1300 },
+        rpc: { p_brewery: brewery.id, p_price_list: priceListId, p_sku: skuId, p_unit_price_cents: 1300 },
+      }),
+    },
+    {
+      command: "record_movement", rpc: "record_movement", allowed: ["admin", "warehouse"],
+      input: async () => ({
+        command: { skuId, locationId, qty: 1, type: "opening_balance" },
+        rpc: {
+          p_brewery: brewery.id, p_sku: skuId, p_location: locationId, p_qty: 1,
+          p_type: "opening_balance", p_channel: null, p_dest_state: null, p_note: null,
+        },
+      }),
+    },
+    {
+      command: "set_taproom_par", rpc: "set_taproom_par", allowed: ["admin", "sales"],
+      input: async () => ({
+        command: { locationId, skuId, parQty: 3 },
+        rpc: { p_brewery: brewery.id, p_location: locationId, p_sku: skuId, p_par_qty: 3 },
+      }),
+    },
+    {
+      command: "set_standing_allocation", rpc: "set_standing_allocation", allowed: ["admin", "sales"],
+      input: async () => ({
+        command: { locationId, skuId, qty: 2 },
+        rpc: { p_location: locationId, p_sku: skuId, p_qty: 2 },
+      }),
+    },
+    {
+      command: "create_order", rpc: "create_order", allowed: ["admin", "sales"],
+      input: async () => ({
+        command: { kind: "wholesale", customerId, shipToId, fromLocationId: locationId, lines: [{ skuId, qty: 1 }] },
+        rpc: {
+          p_brewery: brewery.id, p_kind: "wholesale", p_customer: customerId, p_ship_to: shipToId,
+          p_from_location: locationId, p_to_location: null, p_requested: null, p_po: null, p_note: null,
+          p_lines: [{ sku_id: skuId, qty: 1 }],
+        },
+      }),
+    },
+    {
+      command: "update_draft_order", rpc: "update_draft_order", allowed: ["admin", "sales"],
+      input: async () => {
+        const orderId = await draftOrder();
+        return {
+          command: { orderId, lines: [{ skuId, qty: 1 }] },
+          rpc: { p_order: orderId, p_ship_to: null, p_requested: null, p_po: null, p_note: null, p_lines: [{ sku_id: skuId, qty: 1 }] },
+        };
+      },
+    },
+    {
+      command: "submit_order", rpc: "submit_order", allowed: ["admin", "sales"],
+      input: async () => {
+        const orderId = await draftOrder();
+        return { command: { orderId }, rpc: { p_order: orderId } };
+      },
+    },
+    {
+      command: "confirm_order", rpc: "confirm_order", allowed: ["admin", "sales"],
+      input: async () => {
+        const orderId = await submittedOrder();
+        return { command: { orderId }, rpc: { p_order: orderId } };
+      },
+    },
+    {
+      command: "adjust_order_lines", rpc: "adjust_order_lines", allowed: ["admin", "sales"],
+      input: async () => {
+        const orderId = await confirmedOrder();
+        return {
+          command: { orderId, reason: "matrix adjustment", lines: [{ skuId, qty: 1 }] },
+          rpc: { p_order: orderId, p_lines: [{ sku_id: skuId, qty: 1 }], p_reason: "matrix adjustment" },
+        };
+      },
+    },
+    {
+      command: "cancel_order", rpc: "cancel_order", allowed: ["admin", "sales"],
+      input: async () => {
+        const orderId = await draftOrder();
+        return {
+          command: { orderId, reason: "matrix cancellation" },
+          rpc: { p_order: orderId, p_reason: "matrix cancellation" },
+        };
+      },
+    },
+    {
+      command: "record_pick", rpc: "record_pick", allowed: ["admin", "warehouse"],
+      input: async () => {
+        const orderId = await confirmedOrder();
+        const lineId = await orderLine(orderId);
+        return {
+          command: { orderId, picks: [{ lineId, qty: 1 }] },
+          rpc: { p_order: orderId, p_picks: [{ line_id: lineId, qty_picked: 1 }] },
+        };
+      },
+    },
+    {
+      command: "ship_order", rpc: "ship_order", allowed: ["admin", "warehouse"],
+      input: async () => {
+        const { orderId, lineId } = await pickedOrder();
+        return {
+          command: { orderId, ship: [{ lineId, qty: 1 }] },
+          rpc: { p_order: orderId, p_ship: [{ line_id: lineId, qty_shipped: 1 }], p_carrier: null, p_tracking: null },
+        };
+      },
+    },
+    {
+      command: "create_credit_memo", rpc: "create_credit_memo", allowed: ["admin", "sales"],
+      input: async () => {
+        const { invoiceId, invoiceLineId } = await invoicedOrder();
+        return {
+          command: { invoiceId, locationId, reason: "matrix credit", lines: [{ invoiceLineId, qty: 1 }] },
+          rpc: {
+            p_invoice: invoiceId, p_lines: [{ invoice_line_id: invoiceLineId, qty: 1 }],
+            p_location: locationId, p_reason: "matrix credit",
+          },
+        };
+      },
+    },
+    {
+      command: "create_replenishment_order", rpc: "create_replenishment_order", allowed: ["admin", "sales"],
+      input: async () => ({
+        command: { fromLocationId: locationId, toLocationId: taproomId, lines: [{ skuId, qty: 1 }] },
+        rpc: { p_from: locationId, p_to: taproomId, p_lines: [{ sku_id: skuId, qty: 1 }] },
+      }),
+    },
+  ];
+
+  for (const entry of matrix) {
+    it(`${entry.command} allows only its registered staff roles through the command registry`, async () => {
+      for (const role of entry.allowed) {
+        const input = await entry.input(role);
+        await expect(runCommand(entry.command, input.command, contexts()[role]), `${entry.command} allows ${role}`)
+          .resolves.toBeTruthy();
+      }
+      for (const role of staffRoles.filter(role => !entry.allowed.includes(role))) {
+        const input = await entry.input(role);
+        const { error } = await contexts()[role].db.rpc(entry.rpc, input.rpc);
+        expect(error?.code, `${entry.command} RPC rejects ${role}`).toBe("42501");
+      }
+    });
+  }
 });

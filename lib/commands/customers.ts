@@ -18,7 +18,7 @@ defineCommand({
   handler: (ctx, i) => unwrap(ctx.db.rpc("upsert_customer", {
     p_id: i.id ?? null, p_brewery: ctx.breweryId, p_name: i.name, p_type: i.type, p_state: i.state,
     p_price_list: i.priceListId ?? null, p_license_no: i.licenseNumber ?? null,
-    p_payment_terms: i.paymentTerms ?? null,
+    p_payment_terms: i.paymentTerms || null,
   })),
 });
 

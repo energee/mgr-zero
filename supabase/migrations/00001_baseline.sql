@@ -1256,6 +1256,16 @@ language sql stable security invoker set search_path = '' as $$
     and public.staff_role(p_brewery) = any(p_roles);
 $$;
 
+create function require_authorized_staff_rpc(
+  p_brewery uuid, p_rpc text, p_roles public.staff_role[]
+) returns void
+language plpgsql security invoker set search_path = '' as $$
+begin
+  if not coalesce(public.is_authorized_staff_rpc(p_brewery, p_rpc, p_roles), false) then
+    raise exception 'permission denied for %', p_rpc using errcode = '42501';
+  end if;
+end $$;
+
 create function create_product(
   p_brewery uuid, p_name text, p_style text, p_abv numeric
 ) returns jsonb
@@ -1437,6 +1447,13 @@ create function create_order(
 ) returns jsonb language plpgsql set search_path = '' as $$
 declare v_order uuid; v_pl uuid; l record;
 begin
+  if not coalesce(
+    public.is_authorized_staff_rpc(p_brewery, 'create_order', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc(p_brewery, 'create_replenishment_order', array['admin','sales']::public.staff_role[]),
+    false
+  ) then
+    raise exception 'permission denied for create_order' using errcode = '42501';
+  end if;
   if p_kind = 'wholesale' then
     select price_list_id into v_pl from public.customers where id = p_customer and brewery_id = p_brewery;
     if v_pl is null then raise exception 'customer has no price list'; end if;
@@ -1472,6 +1489,10 @@ create function update_draft_order(
 ) returns jsonb language plpgsql set search_path = '' as $$
 declare o public.orders; l record;
 begin
+  perform public.require_authorized_staff_rpc(
+    (select brewery_id from public.orders where id = p_order),
+    'update_draft_order', array['admin','sales']::public.staff_role[]
+  );
   o := public.lock_order(p_order, array['draft']::public.order_status[]);
   update public.orders set ship_to_id = coalesce(p_ship_to, ship_to_id),
     requested_ship_date = coalesce(p_requested, requested_ship_date),
@@ -1492,6 +1513,13 @@ create function submit_order(p_order uuid) returns jsonb
 language plpgsql set search_path = '' as $$
 declare o public.orders;
 begin
+  if not coalesce(
+    public.is_authorized_staff_rpc((select brewery_id from public.orders where id = p_order), 'submit_order', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc((select brewery_id from public.orders where id = p_order), 'create_replenishment_order', array['admin','sales']::public.staff_role[]),
+    false
+  ) then
+    raise exception 'permission denied for submit_order' using errcode = '42501';
+  end if;
   o := public.lock_order(p_order, array['draft']::public.order_status[]);
   update public.orders set status = 'submitted' where id = p_order;
   insert into public.order_events (brewery_id, order_id, actor, event)
@@ -1503,6 +1531,13 @@ create function confirm_order(p_order uuid) returns jsonb
 language plpgsql set search_path = '' as $$
 declare o public.orders; w jsonb;
 begin
+  if not coalesce(
+    public.is_authorized_staff_rpc((select brewery_id from public.orders where id = p_order), 'confirm_order', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc((select brewery_id from public.orders where id = p_order), 'create_replenishment_order', array['admin','sales']::public.staff_role[]),
+    false
+  ) then
+    raise exception 'permission denied for confirm_order' using errcode = '42501';
+  end if;
   o := public.lock_order(p_order, array['submitted']::public.order_status[]);
   insert into public.allocations (brewery_id, sku_id, qty, source, ref, status)
   select o.brewery_id, sku_id, qty_ordered, 'order_line', id, 'open'
@@ -1520,6 +1555,10 @@ create function adjust_order_lines(p_order uuid, p_lines jsonb, p_reason text) r
 language plpgsql set search_path = '' as $$
 declare o public.orders; l record; v_line uuid; v_before jsonb;
 begin
+  perform public.require_authorized_staff_rpc(
+    (select brewery_id from public.orders where id = p_order),
+    'adjust_order_lines', array['admin','sales']::public.staff_role[]
+  );
   o := public.lock_order(p_order, array['confirmed','picked']::public.order_status[]);
   select jsonb_object_agg(ol.sku_id, ol.qty_ordered) into v_before
   from public.order_lines ol where ol.order_id = p_order;
@@ -1553,6 +1592,10 @@ create function cancel_order(p_order uuid, p_reason text) returns jsonb
 language plpgsql set search_path = '' as $$
 declare o public.orders;
 begin
+  perform public.require_authorized_staff_rpc(
+    (select brewery_id from public.orders where id = p_order),
+    'cancel_order', array['admin','sales']::public.staff_role[]
+  );
   o := public.lock_order(p_order, array['draft','submitted','confirmed','picked']::public.order_status[]);
   update public.allocations set status = 'released'
   where source = 'order_line' and status = 'open'
@@ -1567,6 +1610,10 @@ create function record_pick(p_order uuid, p_picks jsonb) returns jsonb
 language plpgsql set search_path = '' as $$
 declare o public.orders; pk record;
 begin
+  perform public.require_authorized_staff_rpc(
+    (select brewery_id from public.orders where id = p_order),
+    'record_pick', array['admin','warehouse']::public.staff_role[]
+  );
   o := public.lock_order(p_order, array['confirmed','picked']::public.order_status[]);
   for pk in select (e->>'line_id')::uuid as line_id, (e->>'qty_picked')::numeric as qty from jsonb_array_elements(p_picks) e loop
     update public.order_lines set qty_picked = pk.qty where id = pk.line_id and order_id = p_order;
@@ -1581,6 +1628,10 @@ create function ship_order(p_order uuid, p_ship jsonb, p_carrier text, p_trackin
 language plpgsql set search_path = '' as $$
 declare o public.orders; sp record; v_state text; v_invoice uuid; v_shipment uuid;
 begin
+  perform public.require_authorized_staff_rpc(
+    (select brewery_id from public.orders where id = p_order),
+    'ship_order', array['admin','warehouse']::public.staff_role[]
+  );
   o := public.lock_order(p_order, array['picked']::public.order_status[]);
   -- Full-coverage guard: ensure p_ship covers every order line. Runs after the
   -- lock so the line set can't change between the check and the lock (TOCTOU).
@@ -1641,6 +1692,10 @@ create function create_credit_memo(p_invoice uuid, p_lines jsonb, p_location uui
 language plpgsql set search_path = '' as $$
 declare v_inv public.invoices; v_cm uuid; v_order uuid; cl record; v_orig_qty numeric; v_already_credited numeric;
 begin
+  perform public.require_authorized_staff_rpc(
+    (select brewery_id from public.invoices where id = p_invoice),
+    'create_credit_memo', array['admin','sales']::public.staff_role[]
+  );
   select * into v_inv from public.invoices where id = p_invoice;
   if not found then raise exception 'invoice not found'; end if;
   if v_inv.kind <> 'invoice' then raise exception 'can only credit an invoice'; end if;
@@ -1681,6 +1736,10 @@ create function set_standing_allocation(p_location uuid, p_sku uuid, p_qty numer
 language plpgsql set search_path = '' as $$
 declare v_brewery uuid; v_alloc uuid; v_status public.allocation_status;
 begin
+  perform public.require_authorized_staff_rpc(
+    (select brewery_id from public.locations where id = p_location),
+    'set_standing_allocation', array['admin','sales']::public.staff_role[]
+  );
   select brewery_id into v_brewery from public.locations where id = p_location;
   if v_brewery is null then raise exception 'location not found'; end if;
   select id into v_alloc from public.allocations
@@ -1706,6 +1765,10 @@ create function create_replenishment_order(p_from uuid, p_to uuid, p_lines jsonb
 language plpgsql set search_path = '' as $$
 declare v_brewery uuid; v jsonb;
 begin
+  perform public.require_authorized_staff_rpc(
+    (select brewery_id from public.locations where id = p_to),
+    'create_replenishment_order', array['admin','sales']::public.staff_role[]
+  );
   select brewery_id into v_brewery from public.locations where id = p_to;
   if v_brewery is null then raise exception 'location not found'; end if;
   v := public.create_order(v_brewery, 'taproom_transfer', null, null, p_from, p_to, null, null, null, p_lines);
