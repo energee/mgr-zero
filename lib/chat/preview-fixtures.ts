@@ -111,9 +111,9 @@ export const CHAT_PREVIEW_FIXTURES: readonly ChatPreviewFixture[] = [
       { label: "Vessel", value: "FV2 · Hazy IPA" },
       { label: "Last reading", value: "26 h ago" },
       { label: "Reading", value: "4.2 °Plato · 68 °F" },
-      { label: "Record reading", value: "Open this reading in MGR for now" },
     ],
     items: [],
+    gated: { label: "Record reading", reason: "Open this reading in MGR for now" },
     actions: [openMgr("Open in MGR")],
   },
   {
@@ -125,9 +125,9 @@ export const CHAT_PREVIEW_FIXTURES: readonly ChatPreviewFixture[] = [
     fields: [
       { label: "Order", value: "ORD-0231 · 3 lines · requested Thu · Submitted" },
       { label: "Warning", value: "Hazy IPA · 16 oz case is 8 units short. Review allocations and restock in MGR." },
-      { label: "Confirm order", value: "This order needs the full MGR review" },
     ],
     items: [],
+    gated: { label: "Confirm order", reason: "This order needs the full MGR review" },
     actions: [openMgr("Open order in MGR")],
   },
   {

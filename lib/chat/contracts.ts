@@ -50,6 +50,8 @@ export type ChatPreviewFixture = {
   status?: { label: string; tone: "neutral" | "healthy" | "attention" };
   fields: readonly { label: string; value: string }[];
   items: readonly PortableNotification[];
+  /** A future-phase control drawn disabled with a visible reason (wireframe `E.gated`). */
+  gated?: { label: string; reason: string };
   actions: readonly PortableAction[];
 };
 
