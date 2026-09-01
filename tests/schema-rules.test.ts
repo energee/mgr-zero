@@ -195,6 +195,17 @@ describe("schema rules", () => {
     `)).toEqual([]);
   });
 
+  it("staff RPC authorization fails closed when PostgREST's request.path GUC is absent", () => {
+    // Every write policy hangs off is_authorized_staff_rpc; a connection that
+    // is not a PostgREST request (no request.path) must be denied, not nulled through.
+    expect(sql(`
+      select coalesce(public.is_authorized_staff_rpc(gen_random_uuid(), 'create_product', array['admin']::public.staff_role[])::text, 'null')
+    `)).toEqual(["null"]);
+    expect(() => sql(`
+      select public.require_authorized_staff_rpc(gen_random_uuid(), 'create_product', array['admin']::public.staff_role[])
+    `)).toThrow(/permission denied for create_product/);
+  });
+
   it("restricts brewery_counters keys to committed document kinds", () => {
     expect(sql(`
       select pg_get_constraintdef(oid) from pg_constraint

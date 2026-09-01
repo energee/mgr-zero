@@ -10,7 +10,7 @@ never copy it into a second place.
 | --- | --- |
 | `supabase/migrations/*.sql` | Schema, RLS policies, triggers, grants. The only source of truth for data rules. Pre-deploy, the baseline is edited in place (see `.agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md`). Order lifecycle (`create_order`, `submit_order`, `confirm_order`, `adjust_order_lines`, `cancel_order`, `record_pick`, `ship_order`, `create_credit_memo`, `create_replenishment_order`) lives here as one `security invoker` plpgsql function per transition (iron rule 5); each appends to `order_events`, the append-only per-order change log (staff + customer RLS read/insert policies, no update/delete). |
 | `lib/commands/registry.ts` | `defineCommand` / `defineQuery`, `Ctx`, role checks, `CommandError`. Every domain operation the app performs is registered here. |
-| `lib/commands/<area>.ts` | Business logic per area (catalog, inventory, import, invites, orders, customers, portal). Handlers get an RLS-bound `ctx.db`. `orders.ts` owns order lifecycle (create/submit/confirm/adjust/cancel), allocations, pick/ship, per-shipment invoices, credit memos, and replenishment — each multi-row transition is a thin caller into the one plpgsql function per iron rule 5. `customers.ts` owns customer/ship-to/price-list CRUD. `portal.ts` owns the customer-role commands (`portal_create_order`, `portal_submit_order`, `portal_catalog`, `portal_orders`, `portal_order`, `portal_invoices`) — the only commands a `customer` role may call. |
+| `lib/commands/<area>.ts` | Business logic per area (catalog, inventory, orders, customers, portal; `import.ts` and `invites.ts` are registered fail-closed stubs). Handlers get an RLS-bound `ctx.db`. `orders.ts` owns order lifecycle (create/submit/confirm/adjust/cancel), allocations, pick/ship, per-shipment invoices, credit memos, and replenishment — each multi-row transition is a thin caller into the one plpgsql function per iron rule 5. `customers.ts` owns customer/ship-to/price-list CRUD. `portal.ts` owns the customer-role commands (`portal_create_order`, `portal_submit_order`, `portal_catalog`, `portal_orders`, `portal_order`, `portal_invoices`) — the only commands a `customer` role may call. |
 | `lib/commands/all.ts` | The one side-effecting import that registers every command module. |
 | `app/api/command/route.ts` | The single HTTP entry point. Dispatches to the registry; contains no business logic. Cookie session or `Authorization: Bearer <supabase access_token>`. |
 | `lib/commands/client.ts`, `use-command-form.ts` | How the UI calls commands. |
@@ -72,25 +72,24 @@ a gap to close, not a convention to trust.
    to assert RLS on every table, `security_invoker` on every view,
    `search_path` on every function, and an `RLS-EXCEPTION:` comment on any
    permissive policy.
-4. **`createAdminClient()` is restricted to `lib/commands/invites.ts` and
-   `lib/supabase/integration-tokens.ts`.** Inviting requires
-   `auth.admin.inviteUserByEmail` and a membership insert for a user who is not
-   the caller; both handlers permission-check via the RLS-bound `Ctx` first.
+4. **`createAdminClient()` is restricted to `lib/supabase/integration-tokens.ts`.**
    The token boundary is the sole credential path: it admits only `admin`/`sales`,
    proves the concrete connection is visible through `ctx.db`, then passes the
    verified actor to a service-only RPC that rechecks current membership and role
    in the same token read/write statement. Integration modules must use this
-   boundary; they never receive a service-client allowlist. Because Auth and
-   Postgres cannot share a transaction, the current invite-then-membership
-   handlers are not UI-ready until the external-write gate below is implemented.
+   boundary; they never receive a service-client allowlist. `invite_staff` and
+   `invite_customer_user` (which needed `auth.admin.inviteUserByEmail` plus a
+   membership insert) are registered but fail closed until the external-write
+   gate below is implemented; their working handlers are in git history.
    *Enforced by:* `no-restricted-imports` in `eslint.config.mjs`, run in CI.
 5. **A command that writes more than one row is one Postgres function.**
    supabase-js cannot span a transaction across statements, so a handler that
    does `insert` then `update` can half-commit. Such commands call a single
    `security invoker` plpgsql function (`ctx.db.rpc(...)`); the handler is a
    thin caller. One committed user action cannot be split across dependent
-   commands to evade this boundary. Per-row-independent bulk work (CSV import)
-   is the one exemption and says so with an `// atomic-exempt:` comment. MGR v1
+   commands to evade this boundary. Per-row-independent bulk work (CSV import,
+   currently fail-closed) is the one exemption and says so with an
+   `// atomic-exempt:` comment. MGR v1
    learned this after real data loss
    (`.agents/superpowers/specs/2026-08-31-mgr-v1-review.md`). *Enforced by:*
    `tests/write-atomicity.test.ts`.
@@ -121,10 +120,11 @@ a gap to close, not a convention to trust.
   count would disappear entirely. Before either UI ships, the baseline must add
   auditable correction identity and a durable taproom count occurrence/snapshot,
   and their registered one-RPC commands must have real-Postgres/report proofs.
-- **Auth invitations need a durable external-write workflow.** The implemented
-  invite handlers call Supabase Auth before inserting membership. A failed DB
-  write can therefore leave an invited Auth user without the intended access.
-  Before either invite UI ships, retries must reuse one durable request identity
+- **Auth invitations need a durable external-write workflow.** The former
+  invite handlers called Supabase Auth before inserting membership, so a failed
+  DB write could leave an invited Auth user without the intended access; they
+  now fail closed (audit P1.9) and no invite UI exists.
+  Before either invite ships again, retries must reuse one durable request identity
   and an incomplete second step must be recoverable or compensate the created
   Auth account. Tests must force failure after Auth success for staff and customer
   invites; an implemented registry name alone is not evidence that this gate is met.

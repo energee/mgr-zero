@@ -74,37 +74,41 @@ describe("integration token isolation", () => {
     ];
   });
 
-  it("denies every browser role reading or writing QBO token columns", async () => {
+  // Schema guard, not an RLS proof: the public qbo_connections row has no token
+  // columns at all, so every role — including service_role — gets 42703
+  // (undefined column). RLS on the private relation is proven separately below.
+  it("keeps token columns out of the public qbo_connections row for every browser role", async () => {
     for (const { name, db } of browsers) {
-      const [{ data: readData, error: readError }, { data: writeData, error: writeError }] = await Promise.all([
+      const [{ error: readError }, { error: writeError }] = await Promise.all([
         db.from("qbo_connections").select("access_token, refresh_token").eq("brewery_id", brewery.id),
         db.from("qbo_connections")
           .update({ access_token: "browser-access-token", refresh_token: "browser-refresh-token" })
           .eq("brewery_id", brewery.id)
           .select("access_token, refresh_token"),
       ]);
-      expect({ name, readData, readError, writeData, writeError }).toMatchObject({
-        name,
-        readError: expect.anything(),
-        writeError: expect.anything(),
-      });
+      // 42703 = column does not exist; 42501 = anon has no table privilege at all.
+      // PGRST204 = the write names a column PostgREST's schema cache has never seen.
+      expect({ name, read: readError?.code, write: writeError?.code })
+        .toEqual({ name, read: expect.stringMatching(/^(42703|42501)$/), write: "PGRST204" });
     }
   });
 
-  it("denies every browser role reading or writing POS token columns", async () => {
+  // Schema guard, not an RLS proof: the public pos_connections row has no token
+  // columns at all, so every role — including service_role — gets 42703
+  // (undefined column). RLS on the private relation is proven separately below.
+  it("keeps token columns out of the public pos_connections row for every browser role", async () => {
     for (const { name, db } of browsers) {
-      const [{ data: readData, error: readError }, { data: writeData, error: writeError }] = await Promise.all([
+      const [{ error: readError }, { error: writeError }] = await Promise.all([
         db.from("pos_connections").select("access_token, refresh_token").eq("brewery_id", brewery.id),
         db.from("pos_connections")
           .update({ access_token: "browser-access-token", refresh_token: "browser-refresh-token" })
           .eq("brewery_id", brewery.id)
           .select("access_token, refresh_token"),
       ]);
-      expect({ name, readData, readError, writeData, writeError }).toMatchObject({
-        name,
-        readError: expect.anything(),
-        writeError: expect.anything(),
-      });
+      // 42703 = column does not exist; 42501 = anon has no table privilege at all.
+      // PGRST204 = the write names a column PostgREST's schema cache has never seen.
+      expect({ name, read: readError?.code, write: writeError?.code })
+        .toEqual({ name, read: expect.stringMatching(/^(42703|42501)$/), write: "PGRST204" });
     }
   });
 

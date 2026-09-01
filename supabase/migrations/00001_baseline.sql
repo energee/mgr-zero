@@ -926,6 +926,7 @@ create table invoice_lines (
 );
 create index invoice_lines_invoice_idx on invoice_lines (invoice_id);
 create index invoice_lines_keg_pool_idx on invoice_lines (keg_pool_id) where keg_pool_id is not null;
+create index invoice_lines_credited_line_idx on invoice_lines (credited_invoice_line_id) where credited_invoice_line_id is not null;
 
 -- ---------------------------------------------------------------- kegs (count ledger)
 create table keg_events (   -- ledger
