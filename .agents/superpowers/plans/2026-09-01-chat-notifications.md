@@ -929,14 +929,14 @@ export interface ChatProviderTransport {
 }
 ```
 
-- [ ] **Step 1: Write adapter conformance and fixture-driven Slack renderer tests**
+- [x] **Step 1: Write adapter conformance and fixture-driven Slack renderer tests**
 
 Define a reusable conformance suite that accepts a provider transport factory plus a fake provider client. Assert declared capabilities, private-destination validation, stable message references, idempotent update semantics, and retriable-versus-permanent error classification. Run it against `SlackTransport`; future adapters must pass the same suite. Separately assert every provider-surface fixture item renders a valid Block Kit structure, text blocks stay within Slack limits, shared digest omits item detail, gated forms expose only an MGR URL, action metadata contains an opaque intent ID only, and resolved messages remove actions.
-- [ ] **Step 2: Write webhook contract tests**
+- [x] **Step 2: Write webhook contract tests**
 
 Use signed fixture requests for valid, old timestamp, invalid signature, URL verification, duplicate `event_id`, App Home open, action replay, and disabled installation. Assert the route returns within three seconds while slow work is persisted for asynchronous handling.
 
-- [ ] **Step 3: Implement the Chat singleton and handlers**
+- [x] **Step 3: Implement the Chat singleton and handlers**
 
 ```ts
 export const slackAdapter = createSlackAdapter({
@@ -958,11 +958,11 @@ export const bot = new Chat({
 
 Register `onAppHomeOpened` as a durable callback: verify and dedupe the event, insert a `chat_callback_receipts` row with `disposition = 'pending'`, and return the Slack acknowledgement without scanning or publishing inline. Task 10's worker claims the receipt, scans the linked brewery when applicable, then publishes either the link fixture or the linked user's current active occurrences. It never creates an RLS user token.
 
-- [ ] **Step 4: Implement destination validation**
+- [x] **Step 4: Implement destination validation**
 
 Use Slack conversation metadata to require `is_private`, `!is_archived`, bot membership, and no external/shared flags. A failed validation blocks the team destination and never falls back to another channel.
 
-- [ ] **Step 5: Run green and commit**
+- [x] **Step 5: Run green and commit**
 
 Run:
 
@@ -994,19 +994,19 @@ git commit -m "feat: render Slack notification surfaces"
 - Consumes: lease RPCs, pending callback receipts, `SlackTransport`, installation-scoped `withBotToken`.
 - Produces: `runChatScan(now)`, `runChatCallbackBatch(limit, now)`, `runChatDeliveryBatch(limit, now)`, `cleanupChatState(now)`, and authenticated POST routes.
 
-- [ ] **Step 1: Write failing worker tests**
+- [x] **Step 1: Write failing worker tests**
 
 Cover missing/incorrect job bearer, maximum batch 100, pending callback claim/recovery, App Home link/current-item publication, per-conversation one-second serialization, update using stored message ID, 429 `Retry-After`, transient 5xx backoff with jitter bounds, permanent 4xx terminal state, lease expiry, resolved suppression, invalid channel, revoked token, disconnect, and cleanup limited to expired private state rows.
 
-- [ ] **Step 2: Run red**
+- [x] **Step 2: Run red**
 
 Run: `npx vitest run tests/chat-jobs.test.ts`
 
-- [ ] **Step 3: Add constant-time job authentication**
+- [x] **Step 3: Add constant-time job authentication**
 
 Compare `Authorization: Bearer ...` to `CHAT_JOB_SECRET` using SHA-256 digests and `timingSafeEqual`. Return generic 401; never log either value.
 
-- [ ] **Step 4: Implement bounded orchestration**
+- [x] **Step 4: Implement bounded orchestration**
 
 First claim `chat_callback_receipts` with `disposition = 'pending'` using `FOR UPDATE SKIP LOCKED`, transition them to `processing`, and complete them as `processed`, `ignored`, or `failed` with redacted codes. For App Home opens, scan the linked brewery if present, then publish either the link fixture or current active items.
 
@@ -1014,11 +1014,11 @@ For each delivery lease: reload occurrence state, preference, destination, insta
 
 Backoff uses `min(3600, 2 ** min(attempt, 10))` seconds plus 0–25% jitter unless Slack supplies `Retry-After`. A conversation cannot send more than once per second.
 
-- [ ] **Step 5: Add adapter-state cleanup**
+- [x] **Step 5: Add adapter-state cleanup**
 
 Delete only rows where `expires_at <= now()` from `chat_sdk.chat_state_locks`, `chat_state_cache`, `chat_state_lists`, and `chat_state_queues`. Keep subscriptions. Run through the restricted pool.
 
-- [ ] **Step 6: Run green and commit**
+- [x] **Step 6: Run green and commit**
 
 Run:
 
