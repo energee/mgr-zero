@@ -1661,3 +1661,82 @@ revoke execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid
   from public, anon;
 grant execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), next_no(uuid, text), portal_availability(uuid)
   to authenticated;
+
+-- ---------------------------------------------------------------- private Chat SDK state
+do $$
+begin
+  create role mgr_chat_sdk nologin;
+exception when duplicate_object then null;
+end $$;
+
+-- The migration executor temporarily joins the group to transfer table ownership.
+grant mgr_chat_sdk to postgres;
+
+create schema chat_sdk;
+revoke all on schema chat_sdk from public;
+grant create on schema chat_sdk to mgr_chat_sdk;
+grant usage on schema chat_sdk to mgr_chat_sdk;
+
+create table chat_sdk.chat_state_subscriptions (
+  key_prefix text not null,
+  thread_id text not null,
+  created_at timestamptz not null default now(),
+  primary key (key_prefix, thread_id)
+);
+
+create table chat_sdk.chat_state_locks (
+  key_prefix text not null,
+  thread_id text not null,
+  token text not null,
+  expires_at timestamptz not null,
+  updated_at timestamptz not null default now(),
+  primary key (key_prefix, thread_id)
+);
+create index chat_state_locks_expires_idx on chat_sdk.chat_state_locks (expires_at);
+
+create table chat_sdk.chat_state_cache (
+  key_prefix text not null,
+  cache_key text not null,
+  value text not null,
+  expires_at timestamptz,
+  updated_at timestamptz not null default now(),
+  primary key (key_prefix, cache_key)
+);
+create index chat_state_cache_expires_idx on chat_sdk.chat_state_cache (expires_at);
+
+create table chat_sdk.chat_state_lists (
+  key_prefix text not null,
+  list_key text not null,
+  seq bigserial not null,
+  value text not null,
+  expires_at timestamptz,
+  primary key (key_prefix, list_key, seq)
+);
+create index chat_state_lists_expires_idx on chat_sdk.chat_state_lists (expires_at);
+
+create table chat_sdk.chat_state_queues (
+  key_prefix text not null,
+  thread_id text not null,
+  seq bigserial not null,
+  value text not null,
+  expires_at timestamptz not null,
+  primary key (key_prefix, thread_id, seq)
+);
+create index chat_state_queues_expires_idx on chat_sdk.chat_state_queues (expires_at);
+
+-- The adapter idempotently creates these indexes at connection time, which
+-- PostgreSQL permits only for the table owner.
+alter table chat_sdk.chat_state_subscriptions owner to mgr_chat_sdk;
+alter table chat_sdk.chat_state_locks owner to mgr_chat_sdk;
+alter table chat_sdk.chat_state_cache owner to mgr_chat_sdk;
+alter table chat_sdk.chat_state_lists owner to mgr_chat_sdk;
+alter table chat_sdk.chat_state_queues owner to mgr_chat_sdk;
+
+revoke mgr_chat_sdk from postgres;
+
+grant select, insert, update, delete on all tables in schema chat_sdk to mgr_chat_sdk;
+grant usage, select on all sequences in schema chat_sdk to mgr_chat_sdk;
+alter default privileges in schema chat_sdk
+  grant select, insert, update, delete on tables to mgr_chat_sdk;
+alter default privileges in schema chat_sdk
+  grant usage, select on sequences to mgr_chat_sdk;
