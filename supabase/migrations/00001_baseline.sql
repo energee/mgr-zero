@@ -1733,6 +1733,7 @@ create table chat_callback_receipts (
   provider text not null check (provider ~ '^[a-z][a-z0-9_-]{1,31}$'),
   callback_id text not null,
   callback_kind text not null,
+  external_user_id text, -- provider user who triggered it (routing claim; resolved at processing time)
   disposition text not null check (disposition in ('pending','processing','processed','ignored','failed')),
   payload_hash text not null,
   error_code text,
@@ -2640,6 +2641,31 @@ grant execute on function chat_quiet_release(timestamptz, time, time, text),
   complete_chat_delivery(uuid, timestamptz, text, text), retry_chat_delivery(uuid, timestamptz, timestamptz, text),
   suppress_chat_delivery(uuid, timestamptz, text, text), record_submitted_order_occurrence(uuid)
   to service_role;
+
+-- Durable provider callback receipt (App Home opens, later actions). Recorded
+-- only after transport authenticity was verified; deduped by the provider's
+-- event id. Returns null when the workspace has no active installation.
+create function record_chat_callback_receipt(
+  p_provider text, p_external_installation_id text, p_callback_id text, p_callback_kind text,
+  p_external_user_id text, p_payload_hash text
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare i public.chat_installations; v_id uuid;
+begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'permission denied: internal job only' using errcode = '42501';
+  end if;
+  select * into i from public.chat_installations
+    where provider = p_provider and external_installation_id = p_external_installation_id and state = 'active';
+  if not found then return null; end if;
+  insert into public.chat_callback_receipts
+    (brewery_id, installation_id, provider, callback_id, callback_kind, external_user_id, disposition, payload_hash, received_at)
+  values (i.brewery_id, i.id, i.provider, p_callback_id, p_callback_kind, p_external_user_id, 'pending', p_payload_hash, now())
+  on conflict (installation_id, callback_id) do nothing
+  returning id into v_id;
+  return jsonb_build_object('receipt_id', v_id, 'installation_id', i.id, 'brewery_id', i.brewery_id, 'duplicate', v_id is null);
+end $$;
+revoke execute on function record_chat_callback_receipt(text, text, text, text, text, text) from public, anon, authenticated;
+grant execute on function record_chat_callback_receipt(text, text, text, text, text, text) to service_role;
 -- ---------------------------------------------------------------- immutability grants
 revoke update, delete on recipe_versions, recipe_ingredients from authenticated, anon;
 revoke update, delete on pos_sales from authenticated, anon;
