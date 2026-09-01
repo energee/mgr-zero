@@ -89,14 +89,20 @@ npm test          # vitest run — 47 tests across 9 files
 npm run lint       # eslint, incl. the admin-client import guard
 npx tsc --noEmit   # typecheck
 npm run build      # production build
-npm run test:e2e   # Playwright smoke — local only, not run in CI
+npm run test:e2e   # agent-browser smoke — local only, not run in CI
 ```
 
-`npm run test:e2e` runs Playwright's own `next dev` on port 3100 (not 3000,
-so it never collides with another worktree's dev server on the same repo)
-and reuses one already running there. It needs `npx supabase start` and a
-`.env.local` in place, same as the vitest suite. See `playwright.config.ts`
-and `tests-e2e/`.
+`npm run test:e2e` drives the browser with `agent-browser` (Vercel's browser
+automation CLI) instead of Playwright: it tries the Lightpanda engine first
+(`agent-browser --engine lightpanda`, launching the `lightpanda` binary at
+`/opt/homebrew/bin/lightpanda` itself) and, on any failure — connect error,
+crash, page error, or a failed assertion — falls back to agent-browser's
+bundled Chrome and re-runs the whole flow against freshly seeded data. It
+prints which engine passed. The script starts its own `next dev` on port
+3100 (not 3000, so it never collides with another worktree's dev server on
+the same repo), reusing one already running there, and stops what it
+started on both success and failure. It needs `npx supabase start` and a
+`.env.local` in place, same as the vitest suite. See `tests-e2e/portal-smoke.ts`.
 
 Test files: `tests/rls-tenancy.test.ts`, `tests/rls-ledger.test.ts` (RLS
 isolation, ledger immutability, CHECK constraints, ATP math),
