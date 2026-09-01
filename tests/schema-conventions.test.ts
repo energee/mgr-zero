@@ -38,14 +38,14 @@ describe("schema conventions (live DB)", () => {
 
   it("lot_tracked material: consumption without lot_id is rejected; with lot_id accepted", async () => {
     const base = { brewery_id: s.b.id, material_id: s.tracked.id, qty: -1, type: "consumption", created_by: s.staff.id };
-    const { error } = await s.db.from("material_movements").insert(base);
+    const { error } = await admin.from("material_movements").insert(base);
     expect(error?.code).toBe("23514"); // check_violation raised by enforce_material_lot()
-    const ok = await s.db.from("material_movements").insert({ ...base, lot_id: s.lot.id });
+    const ok = await admin.from("material_movements").insert({ ...base, lot_id: s.lot.id });
     expect(ok.error).toBeNull();
   });
 
   it("untracked material: a lot_id is rejected", async () => {
-    const { error } = await s.db.from("material_movements").insert({
+    const { error } = await admin.from("material_movements").insert({
       brewery_id: s.b.id, material_id: s.untracked.id, lot_id: s.lot.id, qty: 1, type: "receipt", created_by: s.staff.id,
     });
     // the composite FK (lot_id, material_id) fails before the trigger runs; either way it is rejected
@@ -53,11 +53,11 @@ describe("schema conventions (live DB)", () => {
   });
 
   it("material_movements and keg_events reject UPDATE and DELETE", async () => {
-    const { data: mm, error: e1 } = await s.db.from("material_movements")
+    const { data: mm, error: e1 } = await admin.from("material_movements")
       .insert({ brewery_id: s.b.id, material_id: s.untracked.id, qty: 100, type: "opening_balance", created_by: s.staff.id })
       .select().single();
     expect(e1).toBeNull();
-    const { data: ke, error: e2 } = await s.db.from("keg_events")
+    const { data: ke, error: e2 } = await admin.from("keg_events")
       .insert({ brewery_id: s.b.id, pool_id: s.pool.id, keg_size: "half_bbl", qty: 10, reason: "acquired", created_by: s.staff.id })
       .select().single();
     expect(e2).toBeNull();

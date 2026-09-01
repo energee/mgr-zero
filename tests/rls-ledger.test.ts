@@ -12,19 +12,19 @@ describe("ledger integrity + RLS", () => {
     ({ data: loc } = await admin.from("locations").insert({ brewery_id: b.id, name: "Main WH", kind: "warehouse" }).select().single());
   });
 
-  it("staff can insert movements; ledger is append-only", async () => {
+  it("staff cannot write the ledger directly; it is append-only even for service_role", async () => {
     const db = await asUser(staff.email);
     const { data: { user } } = await db.auth.getUser();
-    const { data: m, error } = await db.from("inventory_movements").insert({
-      brewery_id: b.id, sku_id: sku.id, location_id: loc.id,
-      qty: 10, bbl: 5, type: "opening_balance", created_by: user!.id,
-    }).select().single();
+    const row = { brewery_id: b.id, sku_id: sku.id, location_id: loc.id, qty: 10, bbl: 5, type: "opening_balance", created_by: user!.id } as const;
+    // No INSERT/UPDATE/DELETE grants for app roles: writes go through record_inventory_movement().
+    const direct = await db.from("inventory_movements").insert(row).select().single();
+    expect(direct.error?.code).toBe("42501");
+    const { data: m, error } = await admin.from("inventory_movements").insert(row).select().single();
     expect(error).toBeNull();
-    // No UPDATE/DELETE grants: PostgREST returns a permission error (or zero affected rows).
     const upd = await db.from("inventory_movements").update({ qty: 99 }).eq("id", m!.id).select();
-    expect(upd.error !== null || upd.data?.length === 0).toBe(true);
+    expect(upd.error?.code).toBe("42501");
     const del = await db.from("inventory_movements").delete().eq("id", m!.id).select();
-    expect(del.error !== null || del.data?.length === 0).toBe(true);
+    expect(del.error?.code).toBe("42501");
     const { data: still } = await admin.from("inventory_movements").select("qty").eq("id", m!.id).single();
     expect(Number(still!.qty)).toBe(10);
   });
@@ -32,7 +32,7 @@ describe("ledger integrity + RLS", () => {
   it("sale_removal without dest_state is rejected by CHECK", async () => {
     const db = await asUser(staff.email);
     const { data: { user } } = await db.auth.getUser();
-    const { error } = await db.from("inventory_movements").insert({
+    const { error } = await admin.from("inventory_movements").insert({
       brewery_id: b.id, sku_id: sku.id, location_id: loc.id,
       qty: -1, bbl: -0.5, type: "sale_removal", channel: "wholesale", created_by: user!.id,
     });
@@ -52,7 +52,7 @@ describe("ledger integrity + RLS", () => {
     const db = await asUser(staff.email);
     const { data: { user } } = await db.auth.getUser();
     // Insert with deliberately wrong bbl (should be 2 * 0.5 = 1, not 999)
-    const { data: m, error } = await db.from("inventory_movements").insert({
+    const { data: m, error } = await admin.from("inventory_movements").insert({
       brewery_id: b.id, sku_id: sku.id, location_id: loc.id,
       qty: 2, bbl: 999, type: "production_in", created_by: user!.id,
     }).select().single();
@@ -81,12 +81,12 @@ describe("removal_shape CHECK: channel/dest_state required on removals, null oth
     const db = await asUser(staff.email);
     const { data: { user } } = await db.auth.getUser();
     for (const type of ["festival_removal", "sample"] as const) {
-      const { error } = await db.from("inventory_movements").insert({
+      const { error } = await admin.from("inventory_movements").insert({
         brewery_id: b.id, sku_id: sku.id, location_id: loc.id,
         qty: -1, bbl: -0.5, type, created_by: user!.id,
       });
       expect(error, `${type} without dest_state should be rejected`).not.toBeNull();
-      const ok = await db.from("inventory_movements").insert({
+      const ok = await admin.from("inventory_movements").insert({
         brewery_id: b.id, sku_id: sku.id, location_id: loc.id,
         qty: -1, bbl: -0.5, type, dest_state: "PA", created_by: user!.id,
       });
@@ -105,7 +105,7 @@ describe("removal_shape CHECK: channel/dest_state required on removals, null oth
       { type: "taproom_transfer", qty: 1 },
     ];
     for (const { type, qty } of nonRemovals) {
-      const { error } = await db.from("inventory_movements").insert({
+      const { error } = await admin.from("inventory_movements").insert({
         brewery_id: b.id, sku_id: sku.id, location_id: loc.id,
         qty, bbl: qty * 0.5, type, channel: "wholesale", created_by: user!.id,
       });
@@ -116,7 +116,7 @@ describe("removal_shape CHECK: channel/dest_state required on removals, null oth
   it("depletion requires channel=taproom and rejects a dest_state", async () => {
     const db = await asUser(staff.email);
     const { data: { user } } = await db.auth.getUser();
-    const { error } = await db.from("inventory_movements").insert({
+    const { error } = await admin.from("inventory_movements").insert({
       brewery_id: b.id, sku_id: sku.id, location_id: loc.id,
       qty: -1, bbl: -0.5, type: "depletion", channel: "taproom", dest_state: "PA", created_by: user!.id,
     });
@@ -149,7 +149,7 @@ describe("cross-brewery tenant consistency (composite FKs)", () => {
   it("rejects an inventory_movement whose sku_id belongs to a different brewery than brewery_id", async () => {
     const db = await asUser(staffA.email);
     const { data: { user } } = await db.auth.getUser();
-    const { error } = await db.from("inventory_movements").insert({
+    const { error } = await admin.from("inventory_movements").insert({
       brewery_id: bA.id, sku_id: skuB.id, location_id: locA.id,
       qty: 1, bbl: 0.5, type: "opening_balance", created_by: user!.id,
     });
@@ -159,7 +159,7 @@ describe("cross-brewery tenant consistency (composite FKs)", () => {
   it("rejects an inventory_movement whose location_id belongs to a different brewery than brewery_id", async () => {
     const db = await asUser(staffA.email);
     const { data: { user } } = await db.auth.getUser();
-    const { error } = await db.from("inventory_movements").insert({
+    const { error } = await admin.from("inventory_movements").insert({
       brewery_id: bA.id, sku_id: skuA.id, location_id: locB.id,
       qty: 1, bbl: 0.5, type: "opening_balance", created_by: user!.id,
     });
