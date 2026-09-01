@@ -16,7 +16,7 @@ describe("integration token isolation", () => {
   let adminCtx: Ctx;
   let salesCtx: Ctx;
   let warehouseCtx: Ctx;
-
+  let qboConnectionId: string;
   beforeAll(async () => {
     brewery = await makeBrewery();
     const [adminUser, salesUser, warehouseUser, brewerUser] = await Promise.all([
@@ -33,11 +33,12 @@ describe("integration token isolation", () => {
     expect(customerError).toBeNull();
     const customerUser = await makeCustomerUser(customer!.id);
 
-    const { error: qboError } = await admin.from("qbo_connections").insert({
+    const { data: qboConnection, error: qboError } = await admin.from("qbo_connections").insert({
       brewery_id: brewery.id,
       realm_id: `realm-${crypto.randomUUID()}`,
-    });
+    }).select("id").single();
     expect(qboError).toBeNull();
+    qboConnectionId = qboConnection!.id;
     const { error: posError } = await admin.from("pos_connections").insert({
       brewery_id: brewery.id,
       provider: "square",
@@ -103,10 +104,17 @@ describe("integration token isolation", () => {
     for (const { name, db } of browsers) {
       const [{ error: relationError }, { error: readError }, { error: storeError }] = await Promise.all([
         db.schema("private").from("integration_tokens").select("access_token, refresh_token"),
-        db.rpc("read_integration_tokens", { p_brewery: brewery.id, p_provider: "qbo" }),
+        db.rpc("read_integration_tokens", {
+          p_brewery: brewery.id,
+          p_provider: "qbo",
+          p_connection: qboConnectionId,
+          p_actor: adminCtx.userId,
+        }),
         db.rpc("store_integration_tokens", {
           p_brewery: brewery.id,
           p_provider: "qbo",
+          p_connection: qboConnectionId,
+          p_actor: adminCtx.userId,
           p_access_token: "browser-access-token",
           p_refresh_token: "browser-refresh-token",
         }),
@@ -142,10 +150,101 @@ describe("integration token isolation", () => {
     });
   });
 
-  it("rejects server token access outside the integration roles or visible tenant connection", async () => {
+  it("rechecks current actor membership inside the service-only token statements", async () => {
+    const { error: demoteError } = await admin
+      .from("brewery_users")
+      .update({ role: "brewer" })
+      .eq("brewery_id", brewery.id)
+      .eq("user_id", adminCtx.userId);
+    expect(demoteError).toBeNull();
+
+    try {
+      const { data: storeData, error: storeError } = await admin.rpc("store_integration_tokens", {
+        p_brewery: brewery.id,
+        p_provider: "qbo",
+        p_connection: qboConnectionId,
+        p_actor: adminCtx.userId,
+        p_access_token: "revoked-access-token",
+        p_refresh_token: "revoked-refresh-token",
+      });
+      const { data: readData, error: readError } = await admin
+        .rpc("read_integration_tokens", {
+          p_brewery: brewery.id,
+          p_provider: "qbo",
+          p_connection: qboConnectionId,
+          p_actor: adminCtx.userId,
+        })
+        .maybeSingle();
+      expect(storeError).toBeNull();
+      expect(storeData).toBe(false);
+      expect(readError).toBeNull();
+      expect(readData).toBeNull();
+    } finally {
+      const { error: restoreError } = await admin
+        .from("brewery_users")
+        .update({ role: "admin" })
+        .eq("brewery_id", brewery.id)
+        .eq("user_id", adminCtx.userId);
+      expect(restoreError).toBeNull();
+    }
+  });
+
+  it("rejects server token access outside the integration roles and across a real target tenant", async () => {
     await expect(readIntegrationTokens(warehouseCtx, "qbo")).rejects.toMatchObject({ status: 403 });
     const otherBrewery = await makeBrewery();
+    const otherAdmin = await makeStaff(otherBrewery.id, "admin");
+    const otherDb = await asUser(otherAdmin.email);
+    const otherCtx: Ctx = { db: otherDb, userId: otherAdmin.id, breweryId: otherBrewery.id, role: "admin" };
+    const { error: connectionError } = await admin.from("qbo_connections").insert({
+      brewery_id: otherBrewery.id,
+      realm_id: `realm-${crypto.randomUUID()}`,
+    });
+    expect(connectionError).toBeNull();
+    await storeIntegrationTokens(otherCtx, {
+      provider: "qbo",
+      accessToken: "other-tenant-access-token",
+      refreshToken: "other-tenant-refresh-token",
+    });
+
     const forgedCtx: Ctx = { ...adminCtx, breweryId: otherBrewery.id };
     await expect(readIntegrationTokens(forgedCtx, "qbo")).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("keeps one POS connection per provider and never resurrects credentials after QBO replacement", async () => {
+    const { error: duplicatePosError } = await admin.from("pos_connections").insert({
+      brewery_id: brewery.id,
+      provider: "square",
+      merchant_id: `merchant-${crypto.randomUUID()}`,
+    });
+    expect(duplicatePosError?.code).toBe("23505");
+
+    const lifecycleBrewery = await makeBrewery();
+    const lifecycleAdmin = await makeStaff(lifecycleBrewery.id, "admin");
+    const lifecycleDb = await asUser(lifecycleAdmin.email);
+    const lifecycleCtx: Ctx = {
+      db: lifecycleDb,
+      userId: lifecycleAdmin.id,
+      breweryId: lifecycleBrewery.id,
+      role: "admin",
+    };
+    const { data: firstConnection, error: firstConnectionError } = await admin
+      .from("qbo_connections")
+      .insert({ brewery_id: lifecycleBrewery.id, realm_id: `realm-${crypto.randomUUID()}` })
+      .select("id")
+      .single();
+    expect(firstConnectionError).toBeNull();
+    await storeIntegrationTokens(lifecycleCtx, {
+      provider: "qbo",
+      accessToken: "old-access-token",
+      refreshToken: "old-refresh-token",
+    });
+    const { error: deleteError } = await admin.from("qbo_connections").delete().eq("id", firstConnection!.id);
+    expect(deleteError).toBeNull();
+    const { error: replacementError } = await admin.from("qbo_connections").insert({
+      brewery_id: lifecycleBrewery.id,
+      realm_id: `realm-${crypto.randomUUID()}`,
+    });
+    expect(replacementError).toBeNull();
+    await expect(readIntegrationTokens(lifecycleCtx, "qbo")).rejects.toMatchObject({ status: 404 });
   });
 });

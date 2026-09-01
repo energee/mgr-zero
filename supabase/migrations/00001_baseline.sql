@@ -947,31 +947,33 @@ create index keg_events_shipment_idx on keg_events (shipment_id) where shipment_
 
 -- ---------------------------------------------------------------- integrations
 create table qbo_connections (
+  id uuid not null default gen_random_uuid(),
   brewery_id uuid primary key references breweries(id),
   realm_id text not null,
   access_expires_at timestamptz, refresh_expires_at timestamptz,
   connected_by uuid references auth.users(id),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  unique (id, brewery_id)
 );
 
 create table pos_connections (
   id uuid primary key default gen_random_uuid(),
   brewery_id uuid not null references breweries(id),
-  provider text not null default 'square',
+  provider text not null default 'square' check (provider = 'square'),
   merchant_id text,
   expires_at timestamptz,
   connected_by uuid references auth.users(id),
   updated_at timestamptz not null default now(),
   unique (id, brewery_id),
-  unique (brewery_id, provider, merchant_id)
+  unique (brewery_id, provider)
 );
 
--- This private relation is keyed by the same tenant/provider pair selected by
--- the public connection metadata. It is not an API schema and has no browser
--- grants; the two service-only functions below are its sole application path.
+-- A token is bound to exactly one current public connection identity. The
+-- lifecycle triggers below erase it when that identity is removed or replaced.
 create table private.integration_tokens (
   brewery_id uuid not null references public.breweries(id),
   provider text not null check (provider in ('qbo', 'square')),
+  connection_id uuid not null,
   access_token text not null,
   refresh_token text not null,
   updated_at timestamptz not null default now(),
@@ -981,58 +983,102 @@ alter table private.integration_tokens enable row level security;
 revoke all on schema private from public, anon, authenticated, service_role;
 revoke all privileges on table private.integration_tokens from public, anon, authenticated, service_role;
 
--- Security definer is intentionally limited to service_role below. These
--- functions also reject orphaned or cross-tenant provider pairs even for a
--- privileged caller, so token storage cannot outlive its public connection.
+-- These one-statement service-only functions recheck current membership and
+-- the concrete public connection identity before touching credentials. Passing
+-- the RLS-validated actor from the TypeScript boundary closes role-revocation
+-- races between its metadata lookup and service-role escalation.
 create function public.store_integration_tokens(
-  p_brewery uuid, p_provider text, p_access_token text, p_refresh_token text
-) returns void
-language plpgsql security definer set search_path = '' as $$
-begin
-  if not (
-    (p_provider = 'qbo' and exists (
-      select 1 from public.qbo_connections q where q.brewery_id = p_brewery
-    ))
-    or
-    (p_provider <> 'qbo' and exists (
-      select 1 from public.pos_connections p
-      where p.brewery_id = p_brewery and p.provider = p_provider
-    ))
-  ) then
-    raise exception 'integration connection not found' using errcode = '23503';
-  end if;
-
-  insert into private.integration_tokens as t (
-    brewery_id, provider, access_token, refresh_token
-  ) values (
-    p_brewery, p_provider, p_access_token, p_refresh_token
+  p_brewery uuid, p_provider text, p_connection uuid, p_actor uuid,
+  p_access_token text, p_refresh_token text
+) returns boolean
+language sql security definer set search_path = '' as $$
+  with authorized as (
+    select true
+    where exists (
+      select 1 from public.brewery_users u
+      where u.brewery_id = p_brewery
+        and u.user_id = p_actor
+        and u.role in ('admin', 'sales')
+    )
+    and (
+      (p_provider = 'qbo' and exists (
+        select 1 from public.qbo_connections q
+        where q.brewery_id = p_brewery and q.id = p_connection
+      ))
+      or
+      (p_provider = 'square' and exists (
+        select 1 from public.pos_connections p
+        where p.brewery_id = p_brewery
+          and p.provider = p_provider
+          and p.id = p_connection
+      ))
+    )
+  ),
+  written as (
+    insert into private.integration_tokens as t (
+      brewery_id, provider, connection_id, access_token, refresh_token
+    )
+    select p_brewery, p_provider, p_connection, p_access_token, p_refresh_token
+    from authorized
+    on conflict (brewery_id, provider) do update
+      set connection_id = excluded.connection_id,
+          access_token = excluded.access_token,
+          refresh_token = excluded.refresh_token,
+          updated_at = now()
+    returning true
   )
-  on conflict (brewery_id, provider) do update
-    set access_token = excluded.access_token,
-        refresh_token = excluded.refresh_token,
-        updated_at = now();
-end;
+  select coalesce((select true from written), false);
 $$;
 
 create function public.read_integration_tokens(
-  p_brewery uuid, p_provider text
+  p_brewery uuid, p_provider text, p_connection uuid, p_actor uuid
 ) returns table (access_token text, refresh_token text)
 language sql security definer set search_path = '' as $$
   select t.access_token, t.refresh_token
   from private.integration_tokens t
   where t.brewery_id = p_brewery
     and t.provider = p_provider
+    and t.connection_id = p_connection
+    and exists (
+      select 1 from public.brewery_users u
+      where u.brewery_id = p_brewery
+        and u.user_id = p_actor
+        and u.role in ('admin', 'sales')
+    )
     and (
       (p_provider = 'qbo' and exists (
-        select 1 from public.qbo_connections q where q.brewery_id = p_brewery
+        select 1 from public.qbo_connections q
+        where q.brewery_id = p_brewery and q.id = p_connection
       ))
       or
-      (p_provider <> 'qbo' and exists (
+      (p_provider = 'square' and exists (
         select 1 from public.pos_connections p
-        where p.brewery_id = p_brewery and p.provider = p_provider
+        where p.brewery_id = p_brewery
+          and p.provider = p_provider
+          and p.id = p_connection
       ))
     );
 $$;
+
+-- A reconnect replaces the concrete external connection. Remove credentials
+-- before the replacement can make an old token pair visible again.
+create function private.purge_integration_tokens() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  delete from private.integration_tokens
+  where brewery_id = old.brewery_id and provider = tg_argv[0];
+  return old;
+end;
+$$;
+revoke execute on function private.purge_integration_tokens() from public, anon, authenticated, service_role;
+
+create trigger qbo_connections_purge_tokens
+after delete or update of id, realm_id on qbo_connections
+for each row execute function private.purge_integration_tokens('qbo');
+
+create trigger pos_connections_purge_tokens
+after delete or update of id, provider, merchant_id on pos_connections
+for each row execute function private.purge_integration_tokens('square');
 
 create table pos_locations (
   brewery_id uuid not null references breweries(id),
@@ -2106,8 +2152,8 @@ grant execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid)
 
 -- Token RPCs are a server-only escape hatch. The service-role grant appears
 -- with the explicit ACL catalog below; no browser role ever receives EXECUTE.
-revoke execute on function public.store_integration_tokens(uuid, text, text, text),
-  public.read_integration_tokens(uuid, text)
+revoke execute on function public.store_integration_tokens(uuid, text, uuid, uuid, text, text),
+  public.read_integration_tokens(uuid, text, uuid, uuid)
   from public, anon, authenticated;
 
 -- ---------------------------------------------------------------- explicit Data API ACLs
@@ -2148,8 +2194,8 @@ grant usage, select, update on all sequences in schema public to service_role;
 grant execute on all functions in schema public to service_role;
 -- Pin the service-only credential RPCs even though service_role also receives
 -- the catalogued public function surface above.
-grant execute on function public.store_integration_tokens(uuid, text, text, text),
-  public.read_integration_tokens(uuid, text)
+grant execute on function public.store_integration_tokens(uuid, text, uuid, uuid, text, text),
+  public.read_integration_tokens(uuid, text, uuid, uuid)
   to service_role;
 
 -- Every authenticated EXECUTE grant is either a Data API RPC, an RLS

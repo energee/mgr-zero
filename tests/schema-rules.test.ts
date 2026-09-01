@@ -228,8 +228,8 @@ describe("schema rules", () => {
         select p.oid, p.oid::regprocedure::text as signature
         from pg_proc p
         where p.oid::regprocedure::text in (
-          'store_integration_tokens(uuid,text,text,text)',
-          'read_integration_tokens(uuid,text)'
+          'store_integration_tokens(uuid,text,uuid,uuid,text,text)',
+          'read_integration_tokens(uuid,text,uuid,uuid)'
         )
       ),
       actual as (
@@ -240,8 +240,8 @@ describe("schema rules", () => {
       ),
       expected(role, signature) as (
         values
-          ('service_role'::name, 'store_integration_tokens(uuid,text,text,text)'::text),
-          ('service_role'::name, 'read_integration_tokens(uuid,text)'::text)
+          ('service_role'::name, 'store_integration_tokens(uuid,text,uuid,uuid,text,text)'::text),
+          ('service_role'::name, 'read_integration_tokens(uuid,text,uuid,uuid)'::text)
       )
       select 'extra:' || role || ':' || signature
       from (select * from actual except select * from expected) extra

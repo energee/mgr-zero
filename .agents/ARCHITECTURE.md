@@ -72,15 +72,18 @@ a gap to close, not a convention to trust.
    to assert RLS on every table, `security_invoker` on every view,
    `search_path` on every function, and an `RLS-EXCEPTION:` comment on any
    permissive policy.
-4. **`createAdminClient()` is restricted to `lib/commands/invites.ts`.**
-   Inviting requires `auth.admin.inviteUserByEmail` and a membership insert for
-   a user who isn't the caller. Both handlers permission-check via the
-   RLS-bound `Ctx` first. Because Auth and Postgres cannot share a transaction,
-   the current invite-then-membership handlers are not UI-ready until the
-   external-write gate below is implemented. *Enforced by:* `no-restricted-imports` in
-   `eslint.config.mjs`, run in CI. Integration sync modules (`qbo.ts`, `pos.ts`,
-   slices 1C/7) will need the same client for token storage; each is added to the
-   eslint allowlist explicitly with its own permission check — never a blanket exemption.
+4. **`createAdminClient()` is restricted to `lib/commands/invites.ts` and
+   `lib/supabase/integration-tokens.ts`.** Inviting requires
+   `auth.admin.inviteUserByEmail` and a membership insert for a user who is not
+   the caller; both handlers permission-check via the RLS-bound `Ctx` first.
+   The token boundary is the sole credential path: it admits only `admin`/`sales`,
+   proves the concrete connection is visible through `ctx.db`, then passes the
+   verified actor to a service-only RPC that rechecks current membership and role
+   in the same token read/write statement. Integration modules must use this
+   boundary; they never receive a service-client allowlist. Because Auth and
+   Postgres cannot share a transaction, the current invite-then-membership
+   handlers are not UI-ready until the external-write gate below is implemented.
+   *Enforced by:* `no-restricted-imports` in `eslint.config.mjs`, run in CI.
 5. **A command that writes more than one row is one Postgres function.**
    supabase-js cannot span a transaction across statements, so a handler that
    does `insert` then `update` can half-commit. Such commands call a single
