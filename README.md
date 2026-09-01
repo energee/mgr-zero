@@ -22,6 +22,9 @@ and what enforces each one. Agents start at `AGENTS.md`.
 
 ## Local development
 
+Requires Node.js 22.x. The repository pins the major in `.node-version` and
+`package.json`; use that runtime for installs, tests, builds, and deployment.
+
 Local Supabase runs on non-default ports (54341/54342/54343) configured
 in the committed `supabase/config.toml`. These ports are used by every
 developer and in CI — they were chosen to avoid colliding with a
@@ -35,7 +38,7 @@ Studio:   http://127.0.0.1:54343
 ```
 
 CI (`.github/workflows/ci.yml`) derives env vars from
-`supabase status -o env` rather than hardcoding them, so the setup
+`npx supabase status -o env` rather than hardcoding them, so the setup
 automatically adapts to the values in `config.toml`.
 
 ### Setup
@@ -43,21 +46,16 @@ automatically adapts to the values in `config.toml`.
 ```bash
 npm install
 npx supabase start        # starts the local Postgres/Auth/Studio stack
-npx supabase status       # prints the real local URL + anon/service keys
+npx supabase status -o env | node scripts/supabase-env.mjs > .env.local
 ```
 
-Create `.env.local` with the values `supabase status` printed:
+The mapper converts the Supabase CLI's local key labels into the application's
+modern environment contract. Add a separate random HMAC secret of at least 32
+characters to `.env.local`:
 
+```dotenv
+COMMAND_RATE_LIMIT_HMAC_SECRET=<random secret of at least 32 characters>
 ```
-NEXT_PUBLIC_SUPABASE_URL=<API URL from supabase status>
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key from supabase status>
-SUPABASE_SERVICE_ROLE_KEY=<service_role key from supabase status>
-DEPLOYMENT_MODE=saas
-```
-
-`DEPLOYMENT_MODE` is `saas` (multi-brewery, with a brewery switcher) or
-`dedicated` (single-tenant deployment, switcher hidden). The schema is
-identical in both modes — deployment mode is config, not schema.
 
 Apply migrations and seed a dev user/brewery:
 
@@ -100,7 +98,7 @@ Exchange email/password for a token at the project's Auth URL (`/auth/v1/token?g
 
 ```bash
 TOKEN=$(curl -sS "$NEXT_PUBLIC_SUPABASE_URL/auth/v1/token?grant_type=password" \
-  -H "apikey: $NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+  -H "apikey: $NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
   -H "content-type: application/json" \
   -d '{"email":"you@brewery.example","password":"..."}' \
   | jq -r .access_token)
@@ -358,11 +356,11 @@ orders are wholesale orders shipped from the brewery's warehouse.
 
 ## Deployment
 
-**Not yet provisioned.** No hosted Supabase project or Vercel project
-exists for this repo yet. When that's set up: create the hosted Supabase
-project and Vercel project, set `NEXT_PUBLIC_SUPABASE_URL`,
-`NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and
-`DEPLOYMENT_MODE=saas` as Vercel env vars, run `supabase db push` against
+**Not yet provisioned.** No hosted Supabase project or Vercel project exists
+for this repo yet. When that is set up, create the hosted Supabase and Vercel
+projects and configure `NEXT_PUBLIC_SUPABASE_URL`,
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, and
+`COMMAND_RATE_LIMIT_HMAC_SECRET` in Vercel. Then run `npx supabase db push` against
 the hosted project, deploy, and verify login → catalog → inventory on the
 preview URL.
 

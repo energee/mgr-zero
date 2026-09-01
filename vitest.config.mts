@@ -1,11 +1,17 @@
 import { defineConfig } from "vitest/config";
 import { loadEnv } from "vite";
-import path from "path";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineConfig({
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "."),
+      "@": path.resolve(projectRoot, "."),
+      "server-only": fileURLToPath(
+        new URL("./node_modules/next/dist/compiled/server-only/empty.js", import.meta.url)
+      ),
     },
   },
   test: {
