@@ -1556,6 +1556,7 @@ create table chat_installations (
   oauth_expires_at timestamptz,
   oauth_consumed_at timestamptz,
   oauth_reconciled_at timestamptz,
+  oauth_intent_kind text check (oauth_intent_kind in ('install','reauthorize')),
   granted_capabilities jsonb not null default '{}',
   quiet_hours_start time,
   quiet_hours_end time,
@@ -1924,6 +1925,206 @@ grant select (id, brewery_id, provider, display_label, state, installed_at, disa
   last_health_checked_at, last_healthy_at, last_failure_code, created_at, updated_at)
   on chat_installations to authenticated;
 grant select on chat_user_links, notification_destinations, notification_preferences to authenticated;
+
+-- ---------------------------------------------------------------- chat installation lifecycle
+-- Security definer RPCs: the only writers to chat_installations. Every
+-- user-facing one pins the row's brewery and requires a current admin.
+-- coalesce() matters: staff_role() is null for non-members and for the
+-- service role, and `null <> 'admin'` would silently pass an `if`.
+create function assert_chat_admin(b uuid) returns void
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if coalesce(public.staff_role(b)::text, '') <> 'admin' then
+    raise exception 'permission denied: brewery admin required' using errcode = '42501';
+  end if;
+end $$;
+
+-- Single-use OAuth intent: sha256(state), exact redirect URI, ten-minute expiry.
+-- A pending row is reused so a cancelled OAuth never leaves duplicates.
+create function begin_chat_installation(p_brewery uuid, p_provider text, p_redirect_uri text, p_state_hash text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare r public.chat_installations; v_id uuid; v_exp timestamptz := now() + interval '10 minutes';
+begin
+  perform public.assert_chat_admin(p_brewery);
+  select * into r from public.chat_installations
+    where brewery_id = p_brewery and provider = p_provider and state <> 'disconnected' for update;
+  if found and r.state <> 'pending' then
+    raise exception 'installation already exists; reauthorize instead';
+  end if;
+  if found then
+    update public.chat_installations
+      set oauth_intent_hash = p_state_hash, oauth_intent_kind = 'install', oauth_redirect_uri = p_redirect_uri,
+          oauth_expires_at = v_exp, oauth_consumed_at = null, installer_user_id = auth.uid(), updated_at = now()
+      where id = r.id returning id into v_id;
+  else
+    v_id := gen_random_uuid();
+    insert into public.chat_installations
+      (id, brewery_id, provider, external_installation_id, display_label, state, oauth_intent_hash, oauth_intent_kind,
+       oauth_redirect_uri, oauth_expires_at, installer_user_id, token_store_key)
+    values (v_id, p_brewery, p_provider, 'pending:' || v_id, 'Pending', 'pending', p_state_hash, 'install',
+            p_redirect_uri, v_exp, auth.uid(), 'pending:' || v_id);
+  end if;
+  return jsonb_build_object('installation_id', v_id, 'expires_at', v_exp);
+end $$;
+
+create function begin_chat_reauthorization(p_installation uuid, p_redirect_uri text, p_state_hash text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare r public.chat_installations; v_exp timestamptz := now() + interval '10 minutes';
+begin
+  select * into r from public.chat_installations where id = p_installation for update;
+  if not found then raise exception 'installation not found'; end if;
+  perform public.assert_chat_admin(r.brewery_id);
+  if r.state not in ('active', 'disabled', 'needs_reauthorization') then
+    raise exception 'installation cannot be reauthorized from state %', r.state;
+  end if;
+  update public.chat_installations
+    set oauth_intent_hash = p_state_hash, oauth_intent_kind = 'reauthorize', oauth_redirect_uri = p_redirect_uri,
+        oauth_expires_at = v_exp, oauth_consumed_at = null, installer_user_id = auth.uid(), updated_at = now()
+    where id = r.id;
+  return jsonb_build_object('installation_id', r.id, 'expires_at', v_exp);
+end $$;
+
+-- Callback lookup before any token exchange. Null for forged state and for
+-- callers who are no longer an admin of the owning brewery.
+create function find_chat_oauth_intent(p_state_hash text) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare r public.chat_installations;
+begin
+  select * into r from public.chat_installations where oauth_intent_hash = p_state_hash;
+  if not found or coalesce(public.staff_role(r.brewery_id)::text, '') <> 'admin' then return null; end if;
+  return jsonb_build_object(
+    'installation_id', r.id, 'brewery_id', r.brewery_id, 'state', r.state, 'kind', r.oauth_intent_kind,
+    'redirect_uri', r.oauth_redirect_uri, 'expires_at', r.oauth_expires_at, 'consumed_at', r.oauth_consumed_at,
+    'external_installation_id', r.external_installation_id);
+end $$;
+
+-- Consumes the intent and activates the mapping. Replaying a consumed intent
+-- for the same workspace is a no-op success; anything else fails closed.
+create function activate_chat_installation(
+  p_installation uuid, p_state_hash text, p_redirect_uri text, p_external_installation_id text,
+  p_external_enterprise_id text, p_display_label text, p_token_store_key text, p_granted_capabilities jsonb
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare r public.chat_installations;
+begin
+  select * into r from public.chat_installations where id = p_installation for update;
+  if not found then raise exception 'installation not found'; end if;
+  perform public.assert_chat_admin(r.brewery_id);
+  if r.oauth_intent_hash is distinct from p_state_hash then raise exception 'oauth state mismatch'; end if;
+  if r.oauth_consumed_at is not null then
+    if r.state = 'active' and r.external_installation_id = p_external_installation_id then
+      return jsonb_build_object('installation_id', r.id, 'replayed', true);
+    end if;
+    raise exception 'oauth state already used';
+  end if;
+  if r.oauth_expires_at < now() then raise exception 'oauth state expired'; end if;
+  if r.oauth_redirect_uri is distinct from p_redirect_uri then raise exception 'oauth redirect mismatch'; end if;
+  if r.oauth_intent_kind = 'reauthorize' and r.external_installation_id <> p_external_installation_id then
+    raise exception 'reauthorization returned a different workspace';
+  end if;
+  if exists (select 1 from public.chat_installations
+             where provider = r.provider and external_installation_id = p_external_installation_id
+               and state = 'active' and id <> r.id) then
+    raise exception 'workspace is already connected to another brewery';
+  end if;
+  update public.chat_installations
+    set state = 'active', external_installation_id = p_external_installation_id,
+        external_enterprise_id = p_external_enterprise_id, display_label = p_display_label,
+        token_store_key = p_token_store_key, granted_capabilities = coalesce(p_granted_capabilities, '{}'),
+        oauth_consumed_at = now(), installed_at = coalesce(installed_at, now()), disabled_at = null,
+        last_failure_code = null, last_healthy_at = now(), last_health_checked_at = now(), updated_at = now()
+    where id = r.id;
+  return jsonb_build_object('installation_id', r.id, 'replayed', false);
+end $$;
+
+-- Health path (jobs run as service_role; admins may also call it).
+create function mark_chat_installation_reauthorization(p_installation uuid, p_failure_code text) returns void
+language plpgsql security definer set search_path = '' as $$
+declare r public.chat_installations;
+begin
+  select * into r from public.chat_installations where id = p_installation for update;
+  if not found then raise exception 'installation not found'; end if;
+  if auth.role() is distinct from 'service_role' then perform public.assert_chat_admin(r.brewery_id); end if;
+  if r.state in ('active', 'needs_reauthorization') then
+    update public.chat_installations
+      set state = 'needs_reauthorization', last_failure_code = p_failure_code,
+          last_health_checked_at = now(), updated_at = now()
+      where id = r.id;
+  end if;
+end $$;
+
+create function disable_chat_installation(p_installation uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+declare r public.chat_installations;
+begin
+  select * into r from public.chat_installations where id = p_installation for update;
+  if not found then raise exception 'installation not found'; end if;
+  perform public.assert_chat_admin(r.brewery_id);
+  if r.state not in ('active', 'needs_reauthorization') then
+    raise exception 'installation cannot be disabled from state %', r.state;
+  end if;
+  update public.chat_installations set state = 'disabled', disabled_at = now(), updated_at = now() where id = r.id;
+end $$;
+
+-- Disable first, then invalidate everything that could still route a send or
+-- an action; provider credential deletion happens afterwards in app code.
+create function disconnect_chat_installation(p_installation uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare r public.chat_installations;
+begin
+  select * into r from public.chat_installations where id = p_installation for update;
+  if not found then raise exception 'installation not found'; end if;
+  perform public.assert_chat_admin(r.brewery_id);
+  if r.state = 'disconnected' then
+    return jsonb_build_object('installation_id', r.id, 'external_installation_id', r.external_installation_id);
+  end if;
+  update public.chat_installations
+    set state = 'disconnected', disabled_at = coalesce(disabled_at, now()), disconnected_at = now(),
+        oauth_intent_hash = null, oauth_intent_kind = null, oauth_redirect_uri = null,
+        oauth_expires_at = null, oauth_reconciled_at = null, updated_at = now()
+    where id = r.id;
+  update public.notification_destinations
+    set state = 'blocked', blocked_reason = 'installation_disconnected', updated_at = now()
+    where installation_id = r.id and state = 'active';
+  update public.chat_user_links
+    set state = 'unlinked', unlinked_at = now(), updated_at = now()
+    where installation_id = r.id and state <> 'unlinked';
+  update public.chat_action_intents
+    set expires_at = least(expires_at, now())
+    where installation_id = r.id and consumed_at is null;
+  return jsonb_build_object('installation_id', r.id, 'external_installation_id', r.external_installation_id);
+end $$;
+
+-- Records the outcome of provider credential cleanup after a partial install
+-- or a disconnect. Reconciler jobs run as service_role.
+create function reconcile_chat_installation(p_installation uuid, p_credential_deleted boolean, p_failure_code text)
+returns void language plpgsql security definer set search_path = '' as $$
+declare r public.chat_installations;
+begin
+  select * into r from public.chat_installations where id = p_installation for update;
+  if not found then raise exception 'installation not found'; end if;
+  if auth.role() is distinct from 'service_role' then perform public.assert_chat_admin(r.brewery_id); end if;
+  update public.chat_installations
+    set oauth_reconciled_at = case when p_credential_deleted then now() else null end,
+        last_failure_code = p_failure_code, updated_at = now()
+    where id = r.id;
+end $$;
+
+revoke execute on function assert_chat_admin(uuid),
+  begin_chat_installation(uuid, text, text, text), begin_chat_reauthorization(uuid, text, text),
+  find_chat_oauth_intent(text),
+  activate_chat_installation(uuid, text, text, text, text, text, text, jsonb),
+  mark_chat_installation_reauthorization(uuid, text), disable_chat_installation(uuid),
+  disconnect_chat_installation(uuid), reconcile_chat_installation(uuid, boolean, text)
+  from public, anon;
+grant execute on function
+  begin_chat_installation(uuid, text, text, text), begin_chat_reauthorization(uuid, text, text),
+  find_chat_oauth_intent(text),
+  activate_chat_installation(uuid, text, text, text, text, text, text, jsonb),
+  mark_chat_installation_reauthorization(uuid, text), disable_chat_installation(uuid),
+  disconnect_chat_installation(uuid), reconcile_chat_installation(uuid, boolean, text)
+  to authenticated;
+grant execute on function mark_chat_installation_reauthorization(uuid, text), reconcile_chat_installation(uuid, boolean, text)
+  to service_role;
 -- ---------------------------------------------------------------- immutability grants
 revoke update, delete on recipe_versions, recipe_ingredients from authenticated, anon;
 revoke update, delete on pos_sales from authenticated, anon;
