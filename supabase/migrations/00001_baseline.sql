@@ -1886,6 +1886,7 @@ create policy chat_installations_admin_read on chat_installations for select to 
 create policy chat_user_links_self_read on chat_user_links for select to authenticated
   using (
     user_id = (select auth.uid())
+    and state = 'active'
     and (select is_staff_of(brewery_id))
   );
 create policy notification_destinations_admin_shared_read on notification_destinations for select to authenticated

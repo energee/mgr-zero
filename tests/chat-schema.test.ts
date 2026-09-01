@@ -394,12 +394,17 @@ describe("chat schema (live DB)", () => {
     await admin.from("chat_user_links").update({ state: "disabled" }).eq("id", disabledLink.id);
 
     for (const [table, id] of [
+      ["chat_user_links", disabledLink.id],
       ["notification_destinations", disabledDestination.id],
       ["notification_preferences", disabledPreference.id],
     ] as const) {
       const { data } = await disabledCtx.db.from(table).select("id").eq("id", id);
       expect(data, `${table} after link disable`).toEqual([]);
     }
+
+    await admin.from("chat_user_links").update({ state: "unlinked" }).eq("id", disabledLink.id);
+    const { data: unlinked } = await disabledCtx.db.from("chat_user_links").select("id").eq("id", disabledLink.id);
+    expect(unlinked, "chat_user_links after unlink").toEqual([]);
   });
 
   it("requires preferences to name the same user's personal direct destination", async () => {
