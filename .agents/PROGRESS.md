@@ -4,7 +4,7 @@ Running log of what's done, in flight, and next. Newest at top. Keep entries to 
 
 ## Now
 - [ ] Slice 1C: QBO invoices-out/payments-back + AI chat composer (`.agents/superpowers/specs/2026-08-31-slice1c-qbo-ai-chat.md`).
-- [ ] Slack-first staff chat notification design is approved; rev-4 wireframes and the implementation plan are ready for approval on `plan/chat-notifications`. Execution remains gated by the Chat SDK state-privilege spike and the cellar/delivery domain routes.
+- [ ] Slack-first staff chat notification design is approved; rev-4 wireframes and implementation plan live on `plan/chat-notifications`. The first compatibility spike proved state-pg requires schema `CREATE`; the approved boundary now permits it only inside private `chat_sdk`, and Task 1 is being rerun.
 
 ## Done
 - 2026-08-31 — Dreaming workflow (spec: `.agents/superpowers/specs/2026-08-31-dreaming-design.md`) reached working order after four post-merge fixes: docs-agent dropped the top-level `allOf` from `--json-schema` (claude-code-action's strict tool schema rejects it, 400); dreaming self-redispatches a main `push` as `workflow_dispatch` (the action rejects the `push` event) and allowlists the `github-actions` bot actor those redispatches run as; the CI-only guard is now stated directly in the workflow prompt because the tool allowlist has no `echo`/`env` for the agent to check `GITHUB_ACTIONS` itself. This PR is its first live run.

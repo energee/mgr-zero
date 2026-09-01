@@ -14,7 +14,7 @@
 
 - Work only in `.agents/worktrees/plan-chat-notifications` on branch `plan/chat-notifications`.
 - Run `pwd`, `git branch --show-current`, and `git status --short` before the first edit and before every commit.
-- Stop after Task 1 if Chat SDK 4.39 cannot operate in `chat_sdk` without runtime DDL privileges; return to architecture review instead of weakening the database boundary.
+- Task 1 must prove that Chat SDK runtime DDL is confined to private `chat_sdk`: the dedicated role may `CREATE` only there and must remain unable to access MGR public tenant data or any other application schema.
 - Edit `supabase/migrations/00001_baseline.sql` in place; do not add a second migration.
 - Every tenant table carries `brewery_id`, `unique (id, brewery_id)`, tenant-safe composite foreign keys, and RLS.
 - Every multi-row user action is one Postgres RPC.
@@ -184,18 +184,22 @@ beforeAll(async () => {
 afterAll(async () => {
   await restricted?.end();
   await admin.query(`revoke mgr_chat_sdk from ${role}`);
-  await admin.query(`drop owned by ${role}`);
   await admin.query(`drop role if exists ${role}`);
   await admin.end();
 });
 
 describe("Chat SDK Postgres state isolation", () => {
-  it("connects and exercises state without CREATE on chat_sdk or public access", async () => {
+  it("confines adapter CREATE to chat_sdk and denies public data access", async () => {
     const privilege = await admin.query(
-      "select has_schema_privilege($1, 'chat_sdk', 'CREATE') as can_create",
+      `select
+         has_schema_privilege($1, 'chat_sdk', 'CREATE') as can_create_chat,
+         has_schema_privilege($1, 'public', 'CREATE') as can_create_public`,
       [role],
     );
-    expect(privilege.rows[0].can_create).toBe(false);
+    expect(privilege.rows[0]).toEqual({
+      can_create_chat: true,
+      can_create_public: false,
+    });
 
     const state = createPostgresState({ client: restricted, keyPrefix: `mgr-test-${process.pid}` });
     await state.connect();
@@ -217,9 +221,9 @@ Run: `npx vitest run tests/chat-state-adapter.test.ts`
 
 Expected: FAIL because `chat_sdk` and its exact adapter tables/grants do not exist.
 
-- [ ] **Step 4: Pre-create the exact adapter schema**
+- [ ] **Step 4: Pre-create and isolate the exact adapter schema**
 
-Add the exact five table definitions and four expiry indexes from `@chat-adapter/state-pg@4.39.0` to the baseline migration, schema-qualified under `chat_sdk`. A no-login group role owns only runtime DML privileges; the provisioned login receives membership. Do not grant `CREATE`.
+Add the exact five table definitions and four expiry indexes from `@chat-adapter/state-pg@4.39.0` to the baseline migration, schema-qualified under `chat_sdk`. The no-login group role receives `USAGE`, `CREATE`, required runtime DML, and sequence privileges only in `chat_sdk`; the provisioned login receives membership. Grant it nothing on MGR application schemas.
 
 ```sql
 do $$
@@ -230,6 +234,7 @@ end $$;
 
 create schema chat_sdk;
 revoke all on schema chat_sdk from public;
+grant create on schema chat_sdk to mgr_chat_sdk;
 grant usage on schema chat_sdk to mgr_chat_sdk;
 
 create table chat_sdk.chat_state_subscriptions (
@@ -297,7 +302,7 @@ npx vitest run tests/chat-state-adapter.test.ts
 npx tsc --noEmit
 ```
 
-Expected: PASS. If the adapter still raises `permission denied for schema chat_sdk` because its unconditional `CREATE ... IF NOT EXISTS` statements require namespace DDL, stop. Do not grant `CREATE`, patch the package, or continue to Task 2. Record the exact failure and return to architecture review.
+Expected: PASS. If the adapter reads or creates outside `chat_sdk`, can access `public.breweries`, or needs broader database privileges, stop and return to architecture review. Do not grant any application-schema access or use owner/service-role database credentials.
 
 - [ ] **Step 6: Commit the passed compatibility spike**
 
@@ -1320,7 +1325,7 @@ git commit -m "docs: explain Slack chat notifications"
 
 Stop immediately and return to design review if any of these occurs:
 
-- Chat SDK Postgres state needs runtime DDL or public-schema access.
+- Chat SDK Postgres state needs access or object creation outside private `chat_sdk`.
 - Slack OAuth cannot isolate concurrent installation tokens or safely handle rotation.
 - A callback path needs a stored Supabase refresh token or service-role user impersonation.
 - A shared destination cannot be proven private and non-external.

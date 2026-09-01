@@ -273,17 +273,17 @@ Use `@chat-adapter/state-pg` for Chat SDK subscriptions, locks, cache, lists, an
 - `chat_state_lists`;
 - `chat_state_queues`.
 
-MGR migrations remain the only schema authority. Before feature implementation, a compatibility spike must prove this deployment:
+The baseline migration records the adapter's reviewed schema, but `@chat-adapter/state-pg@4.39.0` unconditionally executes idempotent `CREATE TABLE IF NOT EXISTS` during `connect()`. The compatibility spike proved that PostgreSQL therefore requires schema `CREATE` even when every table already exists. The approved deployment boundary is:
 
 1. Pre-create the adapter's exact tables in a private `chat_sdk` schema through the baseline migration.
 2. Use a dedicated server-only Postgres role with `search_path` restricted to `chat_sdk`.
-3. Grant that role no access to MGR public tenant data.
-4. Connect the adapter without runtime table-creation privileges.
+3. Grant that role `USAGE`, `CREATE`, required table DML, and sequence usage only inside `chat_sdk`.
+4. Grant that role no access to MGR public tenant data or any other application schema.
 5. Use an environment-specific key prefix.
 6. Exercise multiple instances and concurrent installations without key or token bleed.
 7. Define periodic cleanup for expired lock/cache/list/queue rows.
 
-If the current adapter cannot operate under those constraints, implementation stops for architecture review. It must not auto-create state tables in the public schema or gain broad database privileges.
+Runtime DDL is an explicit exception limited to Chat SDK's isolated operational schema; it is not a general application-migration pattern. Implementation stops if the adapter needs public-schema access, broader database privileges, or object creation outside `chat_sdk`.
 
 ## 9. Component boundaries
 
@@ -673,7 +673,7 @@ Any cross-tenant disclosure, unauthorized action, token exposure, repeated dupli
 - response path meets Slack's three-second acknowledgment deadline without running slow work inline;
 - OAuth state replay, workspace mismatch, partial completion, reinstall, encrypted installation lookup, and deletion;
 - App Home, DM, Block Kit action, modal, message update, `429 Retry-After`, revoked token, missing scope, channel externalization, and uninstall fixtures;
-- Postgres state adapter works inside the isolated schema with no runtime DDL or public-schema access;
+- Postgres state adapter works with runtime DDL confined to the isolated `chat_sdk` schema and no public-schema access;
 - concurrent workspace token resolution cannot bleed across installations.
 
 ### 22.3 Preview and wireframe verification
@@ -721,7 +721,7 @@ Automated tests do not call production Slack APIs.
 
 Prove:
 
-- Chat SDK Postgres schema isolation without runtime DDL;
+- Chat SDK Postgres runtime DDL is confined to the isolated `chat_sdk` schema with no public-data privilege;
 - multi-workspace OAuth and encrypted installation lifecycle;
 - callback acknowledgment and durable handoff;
 - App Home, DM, update, modal, rate-limit, uninstall, and token-rotation behavior;
