@@ -1,18 +1,18 @@
 # MGR — UI layout plan (all slices, mobile-first, chat-assisted input)
 
 Date: 2026-08-31
-Status: Draft for Ted; rev 3 incorporates the fresh-eyes product, architecture, schema,
-navigation, state, build-order, and wet-phone review. Nothing in this plan is built yet;
+Status: Draft for Ted; rev 4 incorporates the fresh-eyes product, architecture, schema,
+navigation, state, build-order, wet-phone, and Slack-first chat-preview review. Nothing in this plan is built yet;
 the current shell (`app/(app)/layout.tsx`, a 208px left rail with five links and Geist) is
 the placeholder it replaces.
-Wireframes: `2026-08-31-mgr-wireframes.html` — 63 frames (product destinations plus
-separately identified sheets, overlays, and flow states) tagged with tab, slice, build
-step, registered reads, and registered writes; the phone/desk toggle re-renders every
-frame from the same body (desk = rail/top-nav shell, dialog sheets, 32 px
-cursor-density controls). Update it in the same commit as any change
-to §3 or §4. The repository HTML is the canonical rev-3 artifact; republish that exact
+Wireframes: `2026-08-31-mgr-wireframes.html` — 73 frames (product destinations plus
+separately identified sheets, overlays, flow states, and provider previews) tagged with
+tab/group, slice, build step, registered reads, and registered writes; the phone/desk
+toggle re-renders every frame from the same body (desk = rail/top-nav shell, dialog
+sheets, 32 px cursor-density controls). Update it in the same commit as any change
+to §3 or §4. The repository HTML is the canonical rev-4 artifact; republish that exact
 source before sharing an external artifact URL.
-The wireframe catalog is drawn compressed to fit 63-up; implementers build from the §5
+The wireframe catalog is drawn compressed to fit 73-up; implementers build from the §5
 tokens (16px phone body), not the artifact's pixels — the warehouse Today frame is the
 full-size exemplar. Frames draw only what a user sees; state variants, tap audits, gate
 names, and transaction notes are annotations under each frame, never in-device chrome.
@@ -20,6 +20,9 @@ The 13 frames added after the slice 1/1B exception review (short pick, order det
 Today landings, three ship bodies, product/SKU TTB facts, cellar addition, portal review,
 Me, Team, set-password) are real bodies; an annotation chip is never a substitute for a
 different in-device body.
+The 10 build-step-8 Chat frames add the production Settings preview gallery, Slack link,
+App Home, DM, private digest, preferences, gated operational forms, and health recovery.
+They use committed fixture data and never imply that a gated provider action is active.
 Registry note: the open slice-1B branch (PR #15) implements several §2 commands under
 other names (`adjust_order_lines`, `create_credit_memo`, `create_replenishment_order`,
 `set_price`, no `resolve_short_pick`). §2 remains the contract; that branch reconciles its
@@ -353,14 +356,14 @@ Dialog/Sheet on desk.
 | **Onboarding / first run** (1) | Make empty brewery usable | SaaS provision → Add location, Add/import catalog, Invite team; dedicated skips provision | Full forms and import handoff |
 | **Import wizard** (1) | Map/validate launch data | Phone inspects/hands off; no cramped mapper | Upload → map → row errors → commit → mixed result → stable rerun |
 | **Returns / credit memos** (1) | Take shipped beer back | Positive returned qty + reason → exact return rows + negative invoice preview | Same plus QBO credit status |
-| **Settings** | Rare configuration | Brewery (name, timezone, **TTB registry number**, **PA license**), Locations (**Add location**), Team, Integrations, Import; deployment mode read-only if shown; no Notifications history | Same, wider tables |
+| **Settings** | Rare configuration | Brewery (name, timezone, **TTB registry number**, **PA license**, fermentation-reading cadence default 24 h), Locations (**Add location**), Team, Chat Integrations, Import; deployment mode read-only if shown; no Notifications history. Chat includes disconnected/active/health controls and a fixture-only preview gallery for App Home, personal DM, private digest, preferences, gated forms, and reauthorization. | Same, wider controls with the preview beside settings when space permits |
 
 Portal frames are **Portal · Order** (steppers + Same as last week), **Portal · Review**
 (quantities, ship-to, "Ships from Warehouse", **Place order** — buyer copy only, disabled
 until the source contract exists; no persistent cart), **Portal · Orders** (rows expand
 into lines and adjusted-quantity copy; no staff verbs; read-only after submit), **Portal ·
-Invoices**, and **Portal · Account**. Account is read-only under current RLS. Together
-with staff/auth screens they make the 63-frame inventory.
+Invoices**, and **Portal · Account**. Account is read-only under current RLS. Staff/auth
+and portal screens make 63 frames; the 10 Chat integration/provider frames make 73.
 
 ## 5. Visual system
 
