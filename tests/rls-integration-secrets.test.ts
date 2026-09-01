@@ -270,6 +270,13 @@ describe("integration token isolation", () => {
       .eq("id", firstConnection!.id);
     expect(realmChangeError).toBeNull();
     expect(privateTokenCount(lifecycleBrewery.id, "qbo")).toBe(0);
+    await storeIntegrationTokens(lifecycleCtx, {
+      provider: "qbo",
+      accessToken: "delete-access-token",
+      refreshToken: "delete-refresh-token",
+    });
+    expect(privateTokenCount(lifecycleBrewery.id, "qbo")).toBe(1);
+
 
     const { error: deleteError } = await admin.from("qbo_connections").delete().eq("id", firstConnection!.id);
     expect(deleteError).toBeNull();
