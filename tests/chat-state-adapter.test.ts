@@ -30,6 +30,38 @@ afterAll(async () => {
 
 describe("Chat SDK Postgres state isolation", () => {
   it("confines adapter CREATE to chat_sdk and denies public data access", async () => {
+    const groupRole = await admin.query(
+      `select
+         child.rolcanlogin,
+         child.rolsuper,
+         child.rolcreatedb,
+         child.rolcreaterole,
+         child.rolbypassrls,
+         coalesce(
+           json_agg(parent.rolname order by parent.rolname)
+             filter (where parent.rolname is not null),
+           '[]'::json
+         ) as member_of
+       from pg_roles child
+       left join pg_auth_members membership on membership.member = child.oid
+       left join pg_roles parent on parent.oid = membership.roleid
+       where child.rolname = 'mgr_chat_sdk'
+       group by
+         child.rolcanlogin,
+         child.rolsuper,
+         child.rolcreatedb,
+         child.rolcreaterole,
+         child.rolbypassrls`,
+    );
+    expect(groupRole.rows[0]).toEqual({
+      rolcanlogin: false,
+      rolsuper: false,
+      rolcreatedb: false,
+      rolcreaterole: false,
+      rolbypassrls: false,
+      member_of: [],
+    });
+
     const privilege = await admin.query(
       `select
          has_schema_privilege($1, 'chat_sdk', 'CREATE') as can_create_chat,

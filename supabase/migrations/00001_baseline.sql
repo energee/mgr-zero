@@ -1663,11 +1663,8 @@ grant execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid)
   to authenticated;
 
 -- ---------------------------------------------------------------- private Chat SDK state
-do $$
-begin
-  create role mgr_chat_sdk nologin;
-exception when duplicate_object then null;
-end $$;
+drop role if exists mgr_chat_sdk;
+create role mgr_chat_sdk nologin;
 
 -- The migration executor temporarily joins the group to transfer table ownership.
 grant mgr_chat_sdk to postgres;
