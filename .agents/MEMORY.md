@@ -43,10 +43,7 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
 - `Unregistered API key` / `Invalid API key` with no Postgres error code means the key was rejected before PostgREST: URL and key are from different Supabase instances. Check `NEXT_PUBLIC_SUPABASE_URL` first; `curl -sD- -H "apikey: $KEY" "$URL/rest/v1/"` gives the real answer.
 - `security definer` functions get PUBLIC execute by default; revoke from `public, anon` or the RLS helpers are callable unauthenticated (gated by `tests/schema-rules.test.ts`).
 - Worktrees don't inherit `.env.local` (gitignored, per-checkout) — `npm test`/`npm run dev`/`npm run test:e2e` in a fresh worktree fail silently with `supabaseKey is required` until it's copied in from the main checkout.
-- claude-code-action's `--json-schema` becomes a strict tool `input_schema`; the API rejects a top-level `oneOf`/`allOf`/`anyOf` with a 400 before the model runs. Put cross-field consistency rules (e.g. status↔findings) in the agent prompt, not the schema.
-- claude-code-action rejects the `push` event and non-human actors by default. A workflow that must react to a `main` push needs a `redispatch` job that re-fires itself via `workflow_dispatch` (GITHUB_TOKEN-created dispatches are exempt from GitHub's no-recursive-triggers rule) plus `allowed_bots: 'github-actions'` for the dispatched run, which starts as that bot.
-- A claude-code-action prompt can't shell out to check env vars like `GITHUB_ACTIONS` unless `echo`/`env`/`printenv` are allowlisted — state such facts directly in the workflow's `prompt:` instead of asking the agent to check.
-- Local Supabase Auth delivers invite emails through mailpit's SMTP sink; excluding `mailpit` from `supabase start -x` breaks `inviteUserByEmail` (`tests/commands-invites.test.ts`).
+- `claude-code-action` rejects non-human PR authors unless `allowed_bots` is set. Dream PRs (`dreaming/main`) skip the `claude-review` job entirely so the check is skipped, not failed — do not allowlist the bot just to review its own doc PR.
 
 ## Process
 - Reviewers that verify by execution (writing to the live DB) find real bugs; read-only reviews find style.
