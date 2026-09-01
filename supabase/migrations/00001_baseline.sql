@@ -56,6 +56,7 @@ create table breweries (
   pa_license_no text,
   timezone text not null default 'America/New_York',
   settings jsonb not null default '{}',
+  fermentation_reading_due_hours int not null default 24 check (fermentation_reading_due_hours between 1 and 168),
   created_at timestamptz not null default now()
 );
 comment on column breweries.settings is 'staff-only; never store secrets here';
@@ -1834,6 +1835,8 @@ begin
   update public.orders set status = 'submitted' where id = p_order;
   insert into public.order_events (brewery_id, order_id, actor, event)
   values (o.brewery_id, p_order, auth.uid(), 'submitted');
+  -- chat: the submitted_order occurrence commits with the state change
+  perform public.record_submitted_order_occurrence(p_order);
   return jsonb_build_object('order_id', p_order);
 end $$;
 
@@ -2086,6 +2089,240 @@ begin
   perform public.confirm_order((v->>'order_id')::uuid);
   return v;
 end $$;
+-- ------------------------------------------------------- chat notifications
+create table chat_installations (
+  id uuid primary key default gen_random_uuid(),
+  brewery_id uuid not null references breweries(id),
+  provider text not null check (provider ~ '^[a-z][a-z0-9_-]{1,31}$'),
+  external_installation_id text not null,
+  external_enterprise_id text,
+  display_label text not null,
+  state text not null check (state in ('pending','active','disabled','needs_reauthorization','disconnected')),
+  oauth_intent_hash text,
+  oauth_redirect_uri text,
+  oauth_expires_at timestamptz,
+  oauth_consumed_at timestamptz,
+  oauth_reconciled_at timestamptz,
+  oauth_intent_kind text check (oauth_intent_kind in ('install','reauthorize')),
+  granted_capabilities jsonb not null default '{}',
+  quiet_hours_start time,
+  quiet_hours_end time,
+  quiet_hours_timezone text,
+  installer_user_id uuid not null references auth.users(id),
+  token_store_key text not null unique, -- encrypted Chat SDK state reference, never credential material
+  installed_at timestamptz,
+  disabled_at timestamptz,
+  disconnected_at timestamptz,
+  last_health_checked_at timestamptz,
+  last_healthy_at timestamptz,
+  last_failure_code text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (id, brewery_id),
+  unique (id, brewery_id, provider)
+);
+create unique index chat_installations_brewery_provider_live_key
+  on chat_installations (brewery_id, provider) where state <> 'disconnected';
+create unique index chat_installations_provider_external_active_key
+  on chat_installations (provider, external_installation_id) where state = 'active';
+create index chat_installations_brewery_health_idx
+  on chat_installations (brewery_id, state, last_health_checked_at desc);
+create index chat_installations_installer_user_idx on chat_installations (installer_user_id);
+
+create table chat_user_links (
+  id uuid primary key default gen_random_uuid(),
+  brewery_id uuid not null references breweries(id),
+  installation_id uuid not null,
+  provider text not null check (provider ~ '^[a-z][a-z0-9_-]{1,31}$'),
+  external_user_id text not null,
+  user_id uuid references auth.users(id), -- null only while a link proof is pending
+  state text not null check (state in ('pending','active','disabled','unlinked')),
+  check ((state = 'pending') = (user_id is null)),
+  proof_hash text,
+  proof_issued_at timestamptz,
+  proof_expires_at timestamptz,
+  proof_consumed_at timestamptz,
+  linked_at timestamptz,
+  disabled_at timestamptz,
+  unlinked_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (id, brewery_id),
+  unique (installation_id, external_user_id),
+  foreign key (installation_id, brewery_id, provider) references chat_installations(id, brewery_id, provider)
+);
+create unique index chat_user_links_installation_user_active_key
+  on chat_user_links (installation_id, user_id) where state = 'active';
+create index chat_user_links_installation_brewery_provider_idx
+  on chat_user_links (installation_id, brewery_id, provider);
+create index chat_user_links_user_brewery_idx on chat_user_links (user_id, brewery_id);
+create index chat_user_links_brewery_idx on chat_user_links (brewery_id);
+
+create table notification_destinations (
+  id uuid primary key default gen_random_uuid(),
+  brewery_id uuid not null references breweries(id),
+  installation_id uuid not null,
+  kind text not null check (kind in ('personal','private_channel')),
+  external_destination_id text not null,
+  user_id uuid references auth.users(id),
+  privacy_class text not null check (privacy_class in ('direct','private_internal')),
+  capabilities jsonb not null default '{}',
+  state text not null default 'active' check (state in ('active','blocked')),
+  blocked_reason text,
+  validated_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (id, brewery_id),
+  unique (id, brewery_id, user_id),
+  unique (installation_id, external_destination_id),
+  check (
+    (kind = 'personal' and user_id is not null and privacy_class = 'direct')
+    or
+    (kind = 'private_channel' and user_id is null and privacy_class = 'private_internal')
+  ),
+  check (blocked_reason is null or state = 'blocked'),
+  foreign key (installation_id, brewery_id) references chat_installations(id, brewery_id)
+);
+create unique index notification_destinations_active_shared_installation_key
+  on notification_destinations (installation_id) where kind = 'private_channel' and state = 'active';
+create index notification_destinations_brewery_idx on notification_destinations (brewery_id);
+create index notification_destinations_installation_brewery_idx
+  on notification_destinations (installation_id, brewery_id);
+create index notification_destinations_user_brewery_idx
+  on notification_destinations (user_id, brewery_id);
+
+create table notification_preferences (
+  id uuid primary key default gen_random_uuid(),
+  brewery_id uuid not null references breweries(id),
+  user_id uuid not null references auth.users(id),
+  reason text not null check (reason in ('submitted_order','pick_due','delivery_next','fermentation_reading_overdue','operations_digest')),
+  enabled boolean not null default true,
+  personal_destination_id uuid,
+  quiet_hours_start time,
+  quiet_hours_end time,
+  quiet_hours_timezone text,
+  use_brewery_timezone boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (id, brewery_id),
+  unique (brewery_id, user_id, reason),
+  foreign key (personal_destination_id, brewery_id, user_id)
+    references notification_destinations(id, brewery_id, user_id)
+);
+create index notification_preferences_brewery_idx on notification_preferences (brewery_id);
+create index notification_preferences_user_brewery_idx on notification_preferences (user_id, brewery_id);
+create index notification_preferences_personal_destination_brewery_user_idx
+  on notification_preferences (personal_destination_id, brewery_id, user_id);
+
+create table notification_occurrences (
+  id uuid primary key default gen_random_uuid(),
+  brewery_id uuid not null references breweries(id),
+  reason text not null check (reason in ('submitted_order','pick_due','delivery_next','fermentation_reading_overdue','operations_digest')),
+  subject_type text not null,
+  subject_id text not null,
+  source_version text not null,
+  occurred_at timestamptz not null,
+  owner_query text not null check (owner_query in ('orders','picks','deliveries','fermentation','digest')),
+  due_at timestamptz,
+  urgency text not null check (urgency in ('normal','attention')),
+  payload jsonb not null,
+  semantic_key text not null,
+  state text not null default 'active' check (state in ('active','resolved','suppressed')),
+  resolved_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (id, brewery_id),
+  unique (brewery_id, semantic_key)
+);
+create index notification_occurrences_active_due_idx
+  on notification_occurrences (brewery_id, due_at) where state = 'active';
+
+create table notification_deliveries (
+  id uuid primary key default gen_random_uuid(),
+  brewery_id uuid not null references breweries(id),
+  occurrence_id uuid not null,
+  destination_id uuid not null,
+  installation_id uuid not null,
+  provider text not null check (provider ~ '^[a-z][a-z0-9_-]{1,31}$'),
+  semantic_key text not null,
+  state text not null default 'queued' check (state in ('queued','leased','retrying','sent','updated','suppressed','terminal')),
+  attempt_count int not null default 0 check (attempt_count >= 0),
+  lease_expires_at timestamptz,
+  next_attempt_at timestamptz not null default now(),
+  provider_conversation_id text,
+  provider_message_id text,
+  last_error_code text,
+  sent_at timestamptz,
+  resolved_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (id, brewery_id),
+  unique (brewery_id, semantic_key),
+  foreign key (occurrence_id, brewery_id) references notification_occurrences(id, brewery_id),
+  foreign key (destination_id, brewery_id) references notification_destinations(id, brewery_id),
+  foreign key (installation_id, brewery_id, provider) references chat_installations(id, brewery_id, provider)
+);
+create index notification_deliveries_occurrence_brewery_idx
+  on notification_deliveries (occurrence_id, brewery_id);
+create index notification_deliveries_destination_brewery_idx
+  on notification_deliveries (destination_id, brewery_id);
+create index notification_deliveries_installation_brewery_provider_idx
+  on notification_deliveries (installation_id, brewery_id, provider);
+create index notification_deliveries_dispatch_idx
+  on notification_deliveries (next_attempt_at) where state in ('queued','retrying');
+
+create table chat_callback_receipts (
+  id uuid primary key default gen_random_uuid(),
+  brewery_id uuid not null references breweries(id),
+  installation_id uuid not null,
+  provider text not null check (provider ~ '^[a-z][a-z0-9_-]{1,31}$'),
+  callback_id text not null,
+  callback_kind text not null,
+  external_user_id text, -- provider user who triggered it (routing claim; resolved at processing time)
+  disposition text not null check (disposition in ('pending','processing','processed','ignored','failed')),
+  payload_hash text not null,
+  error_code text,
+  received_at timestamptz not null,
+  processing_at timestamptz,
+  completed_at timestamptz,
+  unique (id, brewery_id),
+  unique (installation_id, callback_id),
+  foreign key (installation_id, brewery_id, provider) references chat_installations(id, brewery_id, provider)
+);
+create index chat_callback_receipts_brewery_idx on chat_callback_receipts (brewery_id);
+create index chat_callback_receipts_installation_brewery_provider_idx
+  on chat_callback_receipts (installation_id, brewery_id, provider);
+create index chat_callback_receipts_pending_idx
+  on chat_callback_receipts (received_at) where disposition = 'pending';
+
+create table chat_action_intents (
+  id uuid primary key default gen_random_uuid(),
+  brewery_id uuid not null references breweries(id),
+  installation_id uuid not null,
+  user_id uuid not null references auth.users(id),
+  provider text not null check (provider ~ '^[a-z][a-z0-9_-]{1,31}$'),
+  action_origin_hash text not null,
+  command_name text not null,
+  input_hash text not null,
+  subject_type text not null,
+  subject_id text not null,
+  subject_version text not null,
+  request_id uuid not null unique,
+  preview_token_hash text not null,
+  allowed_action text not null,
+  expires_at timestamptz not null,
+  consumed_at timestamptz,
+  first_result_reference text,
+  created_at timestamptz not null default now(),
+  unique (id, brewery_id),
+  foreign key (installation_id, brewery_id, provider) references chat_installations(id, brewery_id, provider)
+);
+create index chat_action_intents_brewery_idx on chat_action_intents (brewery_id);
+create index chat_action_intents_installation_brewery_provider_idx
+  on chat_action_intents (installation_id, brewery_id, provider);
+create index chat_action_intents_user_idx on chat_action_intents (user_id);
+create index chat_action_intents_expiry_idx on chat_action_intents (expires_at) where consumed_at is null;
+
 -- ---------------------------------------------------------------- RLS
 do $$
 declare t text;
@@ -2345,6 +2582,923 @@ create policy order_events_command_insert on order_events for insert
     )
   );
 
+-- Chat configuration is read-only to ordinary clients. Registered operations
+-- own all mutations; installation reads expose health columns only.
+alter table chat_installations enable row level security;
+alter table chat_user_links enable row level security;
+alter table notification_destinations enable row level security;
+alter table notification_preferences enable row level security;
+alter table notification_occurrences enable row level security;
+alter table notification_deliveries enable row level security;
+alter table chat_callback_receipts enable row level security;
+alter table chat_action_intents enable row level security;
+
+create policy chat_installations_admin_read on chat_installations for select to authenticated
+  using ((select staff_role(brewery_id)) = 'admin');
+create policy chat_user_links_self_read on chat_user_links for select to authenticated
+  using (
+    user_id = (select auth.uid())
+    and state = 'active'
+    and (select is_staff_of(brewery_id))
+  );
+create policy notification_destinations_admin_shared_read on notification_destinations for select to authenticated
+  using (kind = 'private_channel' and (select staff_role(brewery_id)) = 'admin');
+create policy notification_destinations_personal_read on notification_destinations for select to authenticated
+  using (
+    kind = 'personal'
+    and user_id = (select auth.uid())
+    and (select is_staff_of(brewery_id))
+    and exists (
+      select 1
+      from chat_user_links l
+      where l.brewery_id = notification_destinations.brewery_id
+        and l.user_id = (select auth.uid())
+        and l.state = 'active'
+    )
+  );
+create policy notification_preferences_self_read on notification_preferences for select to authenticated
+  using (
+    user_id = (select auth.uid())
+    and (select is_staff_of(brewery_id))
+    and exists (
+      select 1
+      from chat_user_links l
+      where l.brewery_id = notification_preferences.brewery_id
+        and l.user_id = (select auth.uid())
+        and l.state = 'active'
+    )
+  );
+
+revoke all on chat_installations, chat_user_links, notification_destinations, notification_preferences,
+  notification_occurrences, notification_deliveries, chat_callback_receipts, chat_action_intents
+  from anon, authenticated;
+grant select (id, brewery_id, provider, display_label, state, installed_at, disabled_at, disconnected_at,
+  last_health_checked_at, last_healthy_at, last_failure_code, created_at, updated_at)
+  on chat_installations to authenticated;
+grant select on chat_user_links, notification_destinations, notification_preferences to authenticated;
+
+-- ---------------------------------------------------------------- chat installation lifecycle
+-- Security definer RPCs: the only writers to chat_installations. Every
+-- user-facing one pins the row's brewery and requires a current admin.
+-- coalesce() matters: staff_role() is null for non-members and for the
+-- service role, and `null <> 'admin'` would silently pass an `if`.
+create function assert_chat_admin(b uuid) returns void
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if coalesce(public.staff_role(b)::text, '') <> 'admin' then
+    raise exception 'permission denied: brewery admin required' using errcode = '42501';
+  end if;
+end $$;
+
+-- Single-use OAuth intent: sha256(state), exact redirect URI, ten-minute expiry.
+-- A pending row is reused so a cancelled OAuth never leaves duplicates.
+create function begin_chat_installation(p_brewery uuid, p_provider text, p_redirect_uri text, p_state_hash text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare r public.chat_installations; v_id uuid; v_exp timestamptz := now() + interval '10 minutes';
+begin
+  perform public.assert_chat_admin(p_brewery);
+  select * into r from public.chat_installations
+    where brewery_id = p_brewery and provider = p_provider and state <> 'disconnected' for update;
+  if found and r.state <> 'pending' then
+    raise exception 'installation already exists; reauthorize instead';
+  end if;
+  if found then
+    update public.chat_installations
+      set oauth_intent_hash = p_state_hash, oauth_intent_kind = 'install', oauth_redirect_uri = p_redirect_uri,
+          oauth_expires_at = v_exp, oauth_consumed_at = null, installer_user_id = auth.uid(), updated_at = now()
+      where id = r.id returning id into v_id;
+  else
+    v_id := gen_random_uuid();
+    insert into public.chat_installations
+      (id, brewery_id, provider, external_installation_id, display_label, state, oauth_intent_hash, oauth_intent_kind,
+       oauth_redirect_uri, oauth_expires_at, installer_user_id, token_store_key)
+    values (v_id, p_brewery, p_provider, 'pending:' || v_id, 'Pending', 'pending', p_state_hash, 'install',
+            p_redirect_uri, v_exp, auth.uid(), 'pending:' || v_id);
+  end if;
+  return jsonb_build_object('installation_id', v_id, 'expires_at', v_exp);
+end $$;
+
+create function begin_chat_reauthorization(p_installation uuid, p_redirect_uri text, p_state_hash text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare r public.chat_installations; v_exp timestamptz := now() + interval '10 minutes';
+begin
+  select * into r from public.chat_installations where id = p_installation for update;
+  if not found then raise exception 'installation not found'; end if;
+  perform public.assert_chat_admin(r.brewery_id);
+  if r.state not in ('active', 'disabled', 'needs_reauthorization') then
+    raise exception 'installation cannot be reauthorized from state %', r.state;
+  end if;
+  update public.chat_installations
+    set oauth_intent_hash = p_state_hash, oauth_intent_kind = 'reauthorize', oauth_redirect_uri = p_redirect_uri,
+        oauth_expires_at = v_exp, oauth_consumed_at = null, installer_user_id = auth.uid(), updated_at = now()
+    where id = r.id;
+  return jsonb_build_object('installation_id', r.id, 'expires_at', v_exp);
+end $$;
+
+-- Callback lookup before any token exchange. Null for forged state and for
+-- callers who are no longer an admin of the owning brewery.
+create function find_chat_oauth_intent(p_state_hash text) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare r public.chat_installations;
+begin
+  select * into r from public.chat_installations where oauth_intent_hash = p_state_hash;
+  if not found or coalesce(public.staff_role(r.brewery_id)::text, '') <> 'admin' then return null; end if;
+  return jsonb_build_object(
+    'installation_id', r.id, 'brewery_id', r.brewery_id, 'state', r.state, 'kind', r.oauth_intent_kind,
+    'redirect_uri', r.oauth_redirect_uri, 'expires_at', r.oauth_expires_at, 'consumed_at', r.oauth_consumed_at,
+    'external_installation_id', r.external_installation_id);
+end $$;
+
+-- Consumes the intent and activates the mapping. Replaying a consumed intent
+-- for the same workspace is a no-op success; anything else fails closed.
+create function activate_chat_installation(
+  p_installation uuid, p_state_hash text, p_redirect_uri text, p_external_installation_id text,
+  p_external_enterprise_id text, p_display_label text, p_token_store_key text, p_granted_capabilities jsonb
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare r public.chat_installations;
+begin
+  select * into r from public.chat_installations where id = p_installation for update;
+  if not found then raise exception 'installation not found'; end if;
+  perform public.assert_chat_admin(r.brewery_id);
+  if r.oauth_intent_hash is distinct from p_state_hash then raise exception 'oauth state mismatch'; end if;
+  if r.oauth_consumed_at is not null then
+    if r.state = 'active' and r.external_installation_id = p_external_installation_id then
+      return jsonb_build_object('installation_id', r.id, 'replayed', true);
+    end if;
+    raise exception 'oauth state already used';
+  end if;
+  if r.oauth_expires_at < now() then raise exception 'oauth state expired'; end if;
+  if r.oauth_redirect_uri is distinct from p_redirect_uri then raise exception 'oauth redirect mismatch'; end if;
+  if r.oauth_intent_kind = 'reauthorize' and r.external_installation_id <> p_external_installation_id then
+    raise exception 'reauthorization returned a different workspace';
+  end if;
+  if exists (select 1 from public.chat_installations
+             where provider = r.provider and external_installation_id = p_external_installation_id
+               and state = 'active' and id <> r.id) then
+    raise exception 'workspace is already connected to another brewery';
+  end if;
+  update public.chat_installations
+    set state = 'active', external_installation_id = p_external_installation_id,
+        external_enterprise_id = p_external_enterprise_id, display_label = p_display_label,
+        token_store_key = p_token_store_key, granted_capabilities = coalesce(p_granted_capabilities, '{}'),
+        oauth_consumed_at = now(), installed_at = coalesce(installed_at, now()), disabled_at = null,
+        last_failure_code = null, last_healthy_at = now(), last_health_checked_at = now(), updated_at = now()
+    where id = r.id;
+  return jsonb_build_object('installation_id', r.id, 'replayed', false);
+end $$;
+
+-- Health path (jobs run as service_role; admins may also call it).
+create function mark_chat_installation_reauthorization(p_installation uuid, p_failure_code text) returns void
+language plpgsql security definer set search_path = '' as $$
+declare r public.chat_installations;
+begin
+  select * into r from public.chat_installations where id = p_installation for update;
+  if not found then raise exception 'installation not found'; end if;
+  if auth.role() is distinct from 'service_role' then perform public.assert_chat_admin(r.brewery_id); end if;
+  if r.state in ('active', 'needs_reauthorization') then
+    update public.chat_installations
+      set state = 'needs_reauthorization', last_failure_code = p_failure_code,
+          last_health_checked_at = now(), updated_at = now()
+      where id = r.id;
+  end if;
+end $$;
+
+create function disable_chat_installation(p_installation uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+declare r public.chat_installations;
+begin
+  select * into r from public.chat_installations where id = p_installation for update;
+  if not found then raise exception 'installation not found'; end if;
+  perform public.assert_chat_admin(r.brewery_id);
+  if r.state not in ('active', 'needs_reauthorization') then
+    raise exception 'installation cannot be disabled from state %', r.state;
+  end if;
+  update public.chat_installations set state = 'disabled', disabled_at = now(), updated_at = now() where id = r.id;
+end $$;
+
+-- Disable first, then invalidate everything that could still route a send or
+-- an action; provider credential deletion happens afterwards in app code.
+create function disconnect_chat_installation(p_installation uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare r public.chat_installations;
+begin
+  select * into r from public.chat_installations where id = p_installation for update;
+  if not found then raise exception 'installation not found'; end if;
+  perform public.assert_chat_admin(r.brewery_id);
+  if r.state = 'disconnected' then
+    return jsonb_build_object('installation_id', r.id, 'external_installation_id', r.external_installation_id);
+  end if;
+  update public.chat_installations
+    set state = 'disconnected', disabled_at = coalesce(disabled_at, now()), disconnected_at = now(),
+        oauth_intent_hash = null, oauth_intent_kind = null, oauth_redirect_uri = null,
+        oauth_expires_at = null, oauth_reconciled_at = null, updated_at = now()
+    where id = r.id;
+  update public.notification_destinations
+    set state = 'blocked', blocked_reason = 'installation_disconnected', updated_at = now()
+    where installation_id = r.id and state = 'active';
+  update public.chat_user_links
+    set state = 'unlinked', unlinked_at = now(), updated_at = now()
+    where installation_id = r.id and state <> 'unlinked';
+  update public.chat_action_intents
+    set expires_at = least(expires_at, now())
+    where installation_id = r.id and consumed_at is null;
+  return jsonb_build_object('installation_id', r.id, 'external_installation_id', r.external_installation_id);
+end $$;
+
+-- Records the outcome of provider credential cleanup after a partial install
+-- or a disconnect. Reconciler jobs run as service_role.
+create function reconcile_chat_installation(p_installation uuid, p_credential_deleted boolean, p_failure_code text)
+returns void language plpgsql security definer set search_path = '' as $$
+declare r public.chat_installations;
+begin
+  select * into r from public.chat_installations where id = p_installation for update;
+  if not found then raise exception 'installation not found'; end if;
+  if auth.role() is distinct from 'service_role' then perform public.assert_chat_admin(r.brewery_id); end if;
+  update public.chat_installations
+    set oauth_reconciled_at = case when p_credential_deleted then now() else null end,
+        last_failure_code = p_failure_code, updated_at = now()
+    where id = r.id;
+end $$;
+
+revoke execute on function assert_chat_admin(uuid),
+  begin_chat_installation(uuid, text, text, text), begin_chat_reauthorization(uuid, text, text),
+  find_chat_oauth_intent(text),
+  activate_chat_installation(uuid, text, text, text, text, text, text, jsonb),
+  mark_chat_installation_reauthorization(uuid, text), disable_chat_installation(uuid),
+  disconnect_chat_installation(uuid), reconcile_chat_installation(uuid, boolean, text)
+  from public, anon;
+grant execute on function
+  begin_chat_installation(uuid, text, text, text), begin_chat_reauthorization(uuid, text, text),
+  find_chat_oauth_intent(text),
+  activate_chat_installation(uuid, text, text, text, text, text, text, jsonb),
+  mark_chat_installation_reauthorization(uuid, text), disable_chat_installation(uuid),
+  disconnect_chat_installation(uuid), reconcile_chat_installation(uuid, boolean, text)
+  to authenticated;
+grant execute on function mark_chat_installation_reauthorization(uuid, text), reconcile_chat_installation(uuid, boolean, text)
+  to service_role;
+
+-- ---------------------------------------------------------------- chat staff linking
+-- Issued by the App Home handler (service role, no user): one pending row per
+-- (installation, external user) holding only sha256(proof) for ten minutes.
+create function issue_chat_link_proof(p_installation uuid, p_external_user_id text, p_proof_hash text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare i public.chat_installations; l public.chat_user_links; v_id uuid; v_exp timestamptz := now() + interval '10 minutes';
+begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'permission denied: internal job only' using errcode = '42501';
+  end if;
+  select * into i from public.chat_installations where id = p_installation;
+  if not found then raise exception 'installation not found'; end if;
+  if i.state <> 'active' then raise exception 'installation is not active'; end if;
+  select * into l from public.chat_user_links
+    where installation_id = p_installation and external_user_id = p_external_user_id for update;
+  if found and l.state = 'active' then raise exception 'external user already linked'; end if;
+  if found then
+    update public.chat_user_links
+      set state = 'pending', user_id = null, proof_hash = p_proof_hash, proof_issued_at = now(), proof_expires_at = v_exp,
+          proof_consumed_at = null, linked_at = null, disabled_at = null, unlinked_at = null, updated_at = now()
+      where id = l.id returning id into v_id;
+  else
+    insert into public.chat_user_links
+      (brewery_id, installation_id, provider, external_user_id, state, proof_hash, proof_issued_at, proof_expires_at)
+    values (i.brewery_id, i.id, i.provider, p_external_user_id, 'pending', p_proof_hash, now(), v_exp)
+    returning id into v_id;
+  end if;
+  return jsonb_build_object('link_id', v_id, 'expires_at', v_exp);
+end $$;
+
+-- Consumed by the authenticated staff member who opened the link. Membership
+-- is checked here against the installation's brewery, never against Slack
+-- profile data. Customers have no brewery_users row and are rejected.
+create function consume_chat_link_proof(p_proof_hash text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare l public.chat_user_links; v_state text;
+begin
+  select * into l from public.chat_user_links where proof_hash = p_proof_hash and state = 'pending' for update;
+  if not found or l.proof_consumed_at is not null or l.proof_expires_at < now() then
+    raise exception 'link proof invalid or expired';
+  end if;
+  select state into v_state from public.chat_installations where id = l.installation_id;
+  if v_state <> 'active' then raise exception 'installation is not active'; end if;
+  if not public.is_staff_of(l.brewery_id) then
+    raise exception 'not a member of this brewery' using errcode = '42501';
+  end if;
+  if exists (select 1 from public.chat_user_links
+             where installation_id = l.installation_id and user_id = auth.uid() and state = 'active') then
+    raise exception 'you are already linked in this workspace';
+  end if;
+  update public.chat_user_links
+    set user_id = auth.uid(), state = 'active', linked_at = now(), proof_consumed_at = now(), proof_hash = null, updated_at = now()
+    where id = l.id;
+  return jsonb_build_object('link_id', l.id, 'installation_id', l.installation_id, 'brewery_id', l.brewery_id);
+end $$;
+
+create function unlink_chat_user(p_link uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+declare l public.chat_user_links;
+begin
+  select * into l from public.chat_user_links where id = p_link for update;
+  if not found then raise exception 'link not found'; end if;
+  if l.user_id is distinct from auth.uid() and coalesce(public.staff_role(l.brewery_id)::text, '') <> 'admin' then
+    raise exception 'permission denied' using errcode = '42501';
+  end if;
+  if l.state <> 'unlinked' then
+    update public.chat_user_links
+      set state = 'unlinked', unlinked_at = now(), proof_hash = null, updated_at = now()
+      where id = l.id;
+  end if;
+end $$;
+
+-- Every provider callback re-resolves the actor from server state: active
+-- installation, active link, and current membership/role. Returns no token.
+create function resolve_chat_actor(p_provider text, p_external_installation_id text, p_external_user_id text)
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+declare r record;
+begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'permission denied: internal job only' using errcode = '42501';
+  end if;
+  select i.id as installation_id, i.brewery_id, l.user_id, bu.role into r
+    from public.chat_installations i
+    join public.chat_user_links l on l.installation_id = i.id and l.external_user_id = p_external_user_id and l.state = 'active'
+    join public.brewery_users bu on bu.brewery_id = i.brewery_id and bu.user_id = l.user_id
+    where i.provider = p_provider and i.external_installation_id = p_external_installation_id and i.state = 'active';
+  if not found then return null; end if;
+  return jsonb_build_object('installation_id', r.installation_id, 'brewery_id', r.brewery_id,
+    'external_user_id', p_external_user_id, 'user_id', r.user_id, 'role', r.role);
+end $$;
+
+revoke execute on function issue_chat_link_proof(uuid, text, text), consume_chat_link_proof(text),
+  unlink_chat_user(uuid), resolve_chat_actor(text, text, text)
+  from public, anon, authenticated;
+grant execute on function consume_chat_link_proof(text), unlink_chat_user(uuid) to authenticated;
+grant execute on function issue_chat_link_proof(uuid, text, text), resolve_chat_actor(text, text, text) to service_role;
+
+-- ---------------------------------------------------------------- Today reasons (shared projection)
+-- The four due rules are defined once here and read two ways: get_today_items
+-- (RLS-bound, role-filtered, for MGR Today and App Home) and
+-- scan_chat_today_candidates (service_role only, one brewery, for occurrence
+-- generation). due_at is brewery-local; the readers apply p_now so tests and
+-- jobs can evaluate "due" at any instant. source_version is a non-secret
+-- stale token over the columns that define the row.
+-- `private` (server-only; no Data API role holds usage) is created at the top
+-- of this file. The view is reached only through the definer readers below.
+create view private.today_candidates with (security_invoker = true) as
+  select o.brewery_id, 'submitted_order'::text as reason, 'order'::text as subject_type, o.id::text as subject_id,
+         md5(concat_ws('|', o.status, o.requested_ship_date, o.needs_restock)) as source_version,
+         'ORD-' || lpad(o.order_no::text, 4, '0') as safe_label,
+         'submitted' || coalesce(' · ships ' || to_char(o.requested_ship_date, 'Dy FMMM/FMDD'), '') as detail,
+         (o.requested_ship_date::timestamp at time zone b.timezone) as due_at,
+         '/orders/' || o.id as href,
+         array['admin','sales']::text[] as recipient_roles,
+         null::uuid as assigned_user_id
+    from orders o join breweries b on b.id = o.brewery_id
+    where o.status = 'submitted'
+  union all
+  select o.brewery_id, 'pick_due', 'order', o.id::text,
+         md5(concat_ws('|', o.status, o.requested_ship_date, o.needs_restock)),
+         'ORD-' || lpad(o.order_no::text, 4, '0'),
+         'pick due' || coalesce(' · ships ' || to_char(o.requested_ship_date, 'Dy FMMM/FMDD'), ''),
+         (o.requested_ship_date::timestamp at time zone b.timezone),
+         '/orders/' || o.id,
+         array['admin','warehouse']::text[],
+         null::uuid
+    from orders o join breweries b on b.id = o.brewery_id
+    where o.status = 'confirmed' and o.requested_ship_date is not null
+  union all
+  -- only the lowest undelivered stop of an open route is "next"
+  select r.brewery_id, 'delivery_next', 'delivery', d.id::text,
+         md5(concat_ws('|', r.driver_user_id, r.delivery_date, d.stop_no, d.delivered_at, r.returned_at)),
+         coalesce(r.name, 'Route') || ' · stop ' || d.stop_no,
+         'next stop',
+         (r.delivery_date::timestamp at time zone b.timezone),
+         '/work/deliveries/' || d.id,
+         array['admin','warehouse']::text[],
+         r.driver_user_id
+    from deliveries d
+    join routes r on r.id = d.route_id
+    join breweries b on b.id = r.brewery_id
+    where d.delivered_at is null and r.returned_at is null
+      and d.stop_no = (select min(d2.stop_no) from deliveries d2 where d2.route_id = d.route_id and d2.delivered_at is null)
+  union all
+  -- overdue when the latest reading (or occupancy start when none) plus the
+  -- brewery cadence has passed; never synthesizes a reading
+  select vo.brewery_id, 'fermentation_reading_overdue', 'occupancy', vo.id::text,
+         md5(concat_ws('|', last.at, vo.started_at, b.fermentation_reading_due_hours)),
+         v.name,
+         'reading due',
+         coalesce(last.at, vo.started_at) + make_interval(hours => b.fermentation_reading_due_hours),
+         '/beer/cellar/' || vo.id || '/reading',
+         array['admin','brewer']::text[],
+         null::uuid
+    from vessel_occupancies vo
+    join vessels v on v.id = vo.vessel_id
+    join breweries b on b.id = vo.brewery_id
+    left join lateral (select max(fr.at) as at from fermentation_readings fr where fr.occupancy_id = vo.id) last on true
+    where vo.ended_at is null;
+grant select on private.today_candidates to service_role;
+
+-- ponytail: delivery_next and fermentation_reading_overdue join this list when
+-- their MGR pages/commands ship (slice 4 cellar reading, slice 10 delivery stop).
+create function today_live_reasons() returns text[]
+language sql immutable set search_path = '' as $$ select array['submitted_order','pick_due'] $$;
+
+create function get_today_items(p_brewery uuid, p_now timestamptz default now())
+returns setof private.today_candidates
+language sql stable security definer set search_path = '' as $$
+  -- definer only to reach the private view; visibility is re-derived from the
+  -- caller's own brewery_users row below, never widened.
+  select c.*
+    from private.today_candidates c
+    join public.brewery_users bu on bu.brewery_id = c.brewery_id and bu.user_id = auth.uid()
+    where c.brewery_id = p_brewery
+      and c.reason = any (public.today_live_reasons())
+      and (c.reason = 'submitted_order' or c.due_at <= p_now)
+      and (bu.role = 'admin'
+           or (bu.role::text = any (c.recipient_roles) and (c.assigned_user_id is null or c.assigned_user_id = auth.uid())))
+    order by c.due_at nulls last, c.safe_label
+$$;
+
+create function scan_chat_today_candidates(p_brewery_id uuid, p_now timestamptz)
+returns setof private.today_candidates
+language sql stable security definer set search_path = '' as $$
+  select c.*
+    from private.today_candidates c
+    where c.brewery_id = p_brewery_id
+      and c.reason = any (public.today_live_reasons())
+      and (c.reason = 'submitted_order' or c.due_at <= p_now)
+$$;
+
+revoke execute on function today_live_reasons(), get_today_items(uuid, timestamptz), scan_chat_today_candidates(uuid, timestamptz)
+  from public, anon, authenticated;
+grant execute on function today_live_reasons(), get_today_items(uuid, timestamptz) to authenticated, service_role;
+grant execute on function scan_chat_today_candidates(uuid, timestamptz) to service_role;
+
+-- ---------------------------------------------------------------- notification occurrences, deliveries, leases
+-- Quiet hours: p_now when outside the window, else the first instant after the
+-- window ends in local time. Windows may cross midnight; `at time zone`
+-- handles DST so 03:00 means local 03:00 on either side of a transition.
+create function chat_quiet_release(p_now timestamptz, p_start time, p_end time, p_tz text) returns timestamptz
+language plpgsql stable set search_path = '' as $$
+declare v_local timestamp; v_t time; v_d date;
+begin
+  if p_start is null or p_end is null or p_start = p_end then return p_now; end if;
+  v_local := p_now at time zone p_tz; v_t := v_local::time; v_d := v_local::date;
+  if p_start < p_end then
+    return case when v_t >= p_start and v_t < p_end then (v_d + p_end) at time zone p_tz else p_now end;
+  end if;
+  if v_t >= p_start then return ((v_d + 1) + p_end) at time zone p_tz; end if;
+  if v_t < p_end then return (v_d + p_end) at time zone p_tz; end if;
+  return p_now;
+end $$;
+
+-- Upserts active occurrences from the gated Today candidates. Semantic key:
+-- reason:subject:source_version, so a repeated scan or a retry can never
+-- duplicate one and a state change (new version) yields a new occurrence.
+create function chat_upsert_occurrences(p_brewery uuid, p_now timestamptz, p_subject_id text default null) returns int
+language plpgsql security definer set search_path = '' as $$
+declare n int;
+begin
+  insert into public.notification_occurrences
+    (brewery_id, reason, subject_type, subject_id, source_version, occurred_at, owner_query, due_at, urgency, payload, semantic_key)
+  select c.brewery_id, c.reason, c.subject_type, c.subject_id, c.source_version, p_now,
+         case c.reason when 'submitted_order' then 'orders' when 'pick_due' then 'picks'
+                       when 'delivery_next' then 'deliveries' else 'fermentation' end,
+         c.due_at,
+         case when c.reason in ('submitted_order', 'fermentation_reading_overdue') then 'attention' else 'normal' end,
+         jsonb_build_object('safe_label', c.safe_label, 'detail', c.detail, 'href', c.href,
+                            'recipient_roles', to_jsonb(c.recipient_roles), 'assigned_user_id', c.assigned_user_id, 'due_at', c.due_at),
+         c.reason || ':' || c.subject_id || ':' || c.source_version
+    from public.scan_chat_today_candidates(p_brewery, p_now) c
+    where p_subject_id is null or c.subject_id = p_subject_id
+  on conflict (brewery_id, semantic_key) do update
+    set state = 'active', resolved_at = null, updated_at = now()
+    where notification_occurrences.state <> 'active';
+  get diagnostics n = row_count;
+  return n;
+end $$;
+
+-- One personal delivery per (occurrence, linked recipient destination):
+-- role or assignment must match (admins always), the link and destination
+-- must be active, the reason must not be muted, and the first attempt waits
+-- for quiet hours (personal override when set, else the installation's).
+create function chat_fanout_deliveries(p_brewery uuid, p_now timestamptz, p_occurrence uuid default null) returns int
+language plpgsql security definer set search_path = '' as $$
+declare n int;
+begin
+  insert into public.notification_deliveries
+    (brewery_id, occurrence_id, destination_id, installation_id, provider, semantic_key, next_attempt_at)
+  select o.brewery_id, o.id, d.id, i.id, i.provider, o.semantic_key || ':' || d.id,
+         public.chat_quiet_release(p_now,
+           coalesce(p.quiet_hours_start, i.quiet_hours_start),
+           case when p.quiet_hours_start is not null then p.quiet_hours_end else i.quiet_hours_end end,
+           case when p.quiet_hours_start is not null then coalesce(p.quiet_hours_timezone, b.timezone) else coalesce(i.quiet_hours_timezone, b.timezone) end)
+    from public.notification_occurrences o
+    join public.breweries b on b.id = o.brewery_id
+    join public.chat_installations i on i.brewery_id = o.brewery_id and i.state = 'active'
+    join public.brewery_users bu on bu.brewery_id = o.brewery_id
+      and (bu.role = 'admin' or o.payload->'recipient_roles' ? bu.role::text)
+      and ((o.payload->>'assigned_user_id') is null or (o.payload->>'assigned_user_id')::uuid = bu.user_id)
+    join public.chat_user_links l on l.installation_id = i.id and l.user_id = bu.user_id and l.state = 'active'
+    join public.notification_destinations d on d.installation_id = i.id and d.user_id = bu.user_id
+      and d.kind = 'personal' and d.state = 'active'
+    left join public.notification_preferences p on p.brewery_id = o.brewery_id and p.user_id = bu.user_id and p.reason = o.reason
+    where o.brewery_id = p_brewery and o.state = 'active' and o.reason <> 'operations_digest'
+      and (p_occurrence is null or o.id = p_occurrence)
+      and coalesce(p.enabled, true)
+  on conflict (brewery_id, semantic_key) do nothing;
+  get diagnostics n = row_count;
+  return n;
+end $$;
+
+-- Called inside submit_order so the occurrence and its deliveries commit with
+-- the order. Callable by whoever could submit: staff, or the order's customer.
+create function record_submitted_order_occurrence(p_order uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+declare o public.orders;
+begin
+  select * into o from public.orders where id = p_order;
+  if not found then return; end if;
+  if auth.role() is distinct from 'service_role' and not public.is_staff_of(o.brewery_id)
+     and not coalesce(o.customer_id in (select public.my_customer_ids()), false) then
+    raise exception 'permission denied' using errcode = '42501';
+  end if;
+  perform public.chat_upsert_occurrences(o.brewery_id, now(), p_order::text);
+  perform public.chat_fanout_deliveries(o.brewery_id, now(),
+    (select id from public.notification_occurrences
+      where brewery_id = o.brewery_id and reason = 'submitted_order' and subject_id = p_order::text and state = 'active'
+      order by created_at desc limit 1));
+end $$;
+
+-- Scheduled catch-up scan for one brewery: upsert current occurrences,
+-- resolve stale ones (suppress their queued deliveries, flag sent ones for a
+-- resolved update), create the 08:00/12:00 digest occurrences for every
+-- window already open today (missed windows recover), then fan out. Never
+-- posts a message.
+create function scan_chat_notification_occurrences(p_brewery uuid, p_now timestamptz) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare b public.breweries; v_up int; v_res int; v_del int; v_dig int := 0; n int;
+        v_local timestamp; v_date date; v_t time; w record;
+begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'permission denied: internal job only' using errcode = '42501';
+  end if;
+  select * into b from public.breweries where id = p_brewery;
+  if not found then return jsonb_build_object('upserted', 0, 'resolved', 0, 'deliveries', 0, 'digests', 0); end if;
+
+  v_up := public.chat_upsert_occurrences(p_brewery, p_now, null);
+
+  with current as (
+    select c.reason || ':' || c.subject_id || ':' || c.source_version as k
+      from public.scan_chat_today_candidates(p_brewery, p_now) c
+  ), stale as (
+    update public.notification_occurrences o
+      set state = 'resolved', resolved_at = p_now, updated_at = now()
+      where o.brewery_id = p_brewery and o.state = 'active' and o.reason <> 'operations_digest'
+        and o.semantic_key not in (select k from current)
+      returning o.id
+  )
+  select count(*) into v_res from stale;
+
+  v_local := p_now at time zone b.timezone; v_date := v_local::date; v_t := v_local::time;
+  update public.notification_occurrences
+    set state = 'resolved', resolved_at = p_now, updated_at = now()
+    where brewery_id = p_brewery and reason = 'operations_digest' and state = 'active'
+      and (due_at at time zone b.timezone)::date < v_date;
+  for w in select * from (values ('morning', time '08:00'), ('midday', time '12:00')) as t(name, starts) loop
+    if v_t >= w.starts then
+      insert into public.notification_occurrences
+        (brewery_id, reason, subject_type, subject_id, source_version, occurred_at, owner_query, due_at, urgency, payload, semantic_key)
+      select p_brewery, 'operations_digest', 'digest', d.id::text, w.name, p_now, 'digest',
+             (v_date + w.starts) at time zone b.timezone, 'normal',
+             jsonb_build_object('window', w.name, 'local_date', v_date),
+             'operations_digest:' || d.id || ':' || v_date || ':' || w.name
+        from public.notification_destinations d
+        join public.chat_installations i on i.id = d.installation_id and i.state = 'active'
+        where d.brewery_id = p_brewery and d.kind = 'private_channel' and d.state = 'active'
+      on conflict (brewery_id, semantic_key) do nothing;
+      get diagnostics n = row_count;
+      v_dig := v_dig + n;
+    end if;
+  end loop;
+  insert into public.notification_deliveries
+    (brewery_id, occurrence_id, destination_id, installation_id, provider, semantic_key, next_attempt_at)
+  select o.brewery_id, o.id, d.id, i.id, i.provider, o.semantic_key || ':' || d.id, o.due_at
+    from public.notification_occurrences o
+    join public.notification_destinations d on d.id = o.subject_id::uuid and d.state = 'active'
+    join public.chat_installations i on i.id = d.installation_id and i.state = 'active'
+    where o.brewery_id = p_brewery and o.reason = 'operations_digest' and o.state = 'active'
+  on conflict (brewery_id, semantic_key) do nothing;
+
+  update public.notification_deliveries dl
+    set state = 'suppressed', resolved_at = p_now, lease_expires_at = null, updated_at = now()
+    from public.notification_occurrences o
+    where dl.occurrence_id = o.id and o.brewery_id = p_brewery and o.state = 'resolved'
+      and dl.state in ('queued', 'retrying', 'leased') and dl.provider_message_id is null;
+  -- sent messages get one resolved update: re-queue them keeping the message id
+  update public.notification_deliveries dl
+    set state = 'queued', next_attempt_at = p_now, resolved_at = p_now, updated_at = now()
+    from public.notification_occurrences o
+    where dl.occurrence_id = o.id and o.brewery_id = p_brewery and o.state = 'resolved'
+      and dl.state in ('sent', 'updated') and dl.resolved_at is null;
+
+  v_del := public.chat_fanout_deliveries(p_brewery, p_now, null);
+  return jsonb_build_object('upserted', v_up, 'resolved', v_res, 'deliveries', v_del, 'digests', v_dig);
+end $$;
+
+-- Bounded lease: recovers expired leases, then takes up to 100 due rows with
+-- skip locked. Returns routing ids only; the lease expiry is the outcome token.
+create function lease_chat_deliveries(p_limit int, p_lease_seconds int, p_now timestamptz)
+returns table (id uuid, occurrence_id uuid, destination_id uuid, installation_id uuid, provider text, lease_expires_at timestamptz, attempt_count int)
+language plpgsql security definer set search_path = '' as $$
+#variable_conflict use_column
+begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'permission denied: internal job only' using errcode = '42501';
+  end if;
+  update public.notification_deliveries d
+    set state = 'retrying', lease_expires_at = null, updated_at = now()
+    where d.state = 'leased' and d.lease_expires_at < p_now;
+  return query
+    with picked as (
+      select d.id from public.notification_deliveries d
+        where d.state in ('queued', 'retrying') and d.next_attempt_at <= p_now
+        order by d.next_attempt_at
+        limit least(greatest(coalesce(p_limit, 1), 1), 100)
+        for update skip locked
+    )
+    update public.notification_deliveries d
+      set state = 'leased', lease_expires_at = p_now + make_interval(secs => p_lease_seconds),
+          attempt_count = d.attempt_count + 1, updated_at = now()
+      from picked where d.id = picked.id
+      returning d.id, d.occurrence_id, d.destination_id, d.installation_id, d.provider, d.lease_expires_at, d.attempt_count;
+end $$;
+
+create function chat_take_lease(p_delivery uuid, p_lease timestamptz) returns public.notification_deliveries
+language plpgsql set search_path = '' as $$
+declare d public.notification_deliveries;
+begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'permission denied: internal job only' using errcode = '42501';
+  end if;
+  select * into d from public.notification_deliveries where id = p_delivery for update;
+  if not found or d.state <> 'leased' or d.lease_expires_at is distinct from p_lease then
+    raise exception 'delivery lease mismatch';
+  end if;
+  return d;
+end $$;
+
+create function complete_chat_delivery(p_delivery uuid, p_lease timestamptz, p_conversation_id text, p_message_id text) returns void
+language plpgsql security definer set search_path = '' as $$
+declare d public.notification_deliveries;
+begin
+  d := public.chat_take_lease(p_delivery, p_lease);
+  update public.notification_deliveries
+    set state = case when d.provider_message_id is null then 'sent' else 'updated' end,
+        provider_conversation_id = p_conversation_id, provider_message_id = p_message_id,
+        sent_at = coalesce(sent_at, now()), lease_expires_at = null, last_error_code = null, updated_at = now()
+    where id = d.id;
+end $$;
+
+create function retry_chat_delivery(p_delivery uuid, p_lease timestamptz, p_next_attempt_at timestamptz, p_error_code text) returns void
+language plpgsql security definer set search_path = '' as $$
+declare d public.notification_deliveries;
+begin
+  d := public.chat_take_lease(p_delivery, p_lease);
+  update public.notification_deliveries
+    set state = 'retrying', next_attempt_at = p_next_attempt_at, last_error_code = p_error_code,
+        lease_expires_at = null, updated_at = now()
+    where id = d.id;
+end $$;
+
+create function suppress_chat_delivery(p_delivery uuid, p_lease timestamptz, p_state text, p_error_code text) returns void
+language plpgsql security definer set search_path = '' as $$
+declare d public.notification_deliveries;
+begin
+  if p_state not in ('suppressed', 'terminal') then raise exception 'invalid delivery outcome %', p_state; end if;
+  d := public.chat_take_lease(p_delivery, p_lease);
+  update public.notification_deliveries
+    set state = p_state, last_error_code = p_error_code, resolved_at = coalesce(resolved_at, now()),
+        lease_expires_at = null, updated_at = now()
+    where id = d.id;
+end $$;
+
+-- Integration-owned settings (never touch MGR due state).
+create function set_notification_preference(p_brewery uuid, p_reason text, p_enabled boolean, p_quiet_start time, p_quiet_end time, p_quiet_tz text) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not public.is_staff_of(p_brewery) then raise exception 'permission denied' using errcode = '42501'; end if;
+  if (p_quiet_start is null) <> (p_quiet_end is null) then raise exception 'quiet hours need both a start and an end'; end if;
+  insert into public.notification_preferences (brewery_id, user_id, reason, enabled, quiet_hours_start, quiet_hours_end, quiet_hours_timezone)
+  values (p_brewery, auth.uid(), p_reason, p_enabled, p_quiet_start, p_quiet_end, p_quiet_tz)
+  on conflict (brewery_id, user_id, reason) do update
+    set enabled = excluded.enabled, quiet_hours_start = excluded.quiet_hours_start, quiet_hours_end = excluded.quiet_hours_end,
+        quiet_hours_timezone = excluded.quiet_hours_timezone, updated_at = now();
+end $$;
+
+-- One active private operations channel per installation; replacing it blocks
+-- the previous destination so no further digest routes there.
+create function set_notification_destination(p_installation uuid, p_external_destination_id text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare i public.chat_installations; v_id uuid;
+begin
+  select * into i from public.chat_installations where id = p_installation for update;
+  if not found then raise exception 'installation not found'; end if;
+  perform public.assert_chat_admin(i.brewery_id);
+  update public.notification_destinations
+    set state = 'blocked', blocked_reason = 'replaced', updated_at = now()
+    where installation_id = i.id and kind = 'private_channel' and state = 'active'
+      and external_destination_id <> p_external_destination_id;
+  insert into public.notification_destinations (brewery_id, installation_id, kind, external_destination_id, privacy_class)
+  values (i.brewery_id, i.id, 'private_channel', p_external_destination_id, 'private_internal')
+  on conflict (installation_id, external_destination_id) do update
+    set state = 'active', blocked_reason = null, updated_at = now()
+  returning id into v_id;
+  return jsonb_build_object('id', v_id);
+end $$;
+
+create function set_brewery_quiet_hours(p_installation uuid, p_start time, p_end time) returns void
+language plpgsql security definer set search_path = '' as $$
+declare i public.chat_installations;
+begin
+  select * into i from public.chat_installations where id = p_installation for update;
+  if not found then raise exception 'installation not found'; end if;
+  perform public.assert_chat_admin(i.brewery_id);
+  if (p_start is null) <> (p_end is null) then raise exception 'quiet hours need both a start and an end'; end if;
+  update public.chat_installations
+    set quiet_hours_start = p_start, quiet_hours_end = p_end,
+        quiet_hours_timezone = (select timezone from public.breweries where id = i.brewery_id), updated_at = now()
+    where id = i.id;
+end $$;
+
+revoke execute on function chat_quiet_release(timestamptz, time, time, text),
+  chat_upsert_occurrences(uuid, timestamptz, text), chat_fanout_deliveries(uuid, timestamptz, uuid),
+  record_submitted_order_occurrence(uuid), scan_chat_notification_occurrences(uuid, timestamptz),
+  lease_chat_deliveries(int, int, timestamptz), chat_take_lease(uuid, timestamptz),
+  complete_chat_delivery(uuid, timestamptz, text, text), retry_chat_delivery(uuid, timestamptz, timestamptz, text),
+  suppress_chat_delivery(uuid, timestamptz, text, text),
+  set_notification_preference(uuid, text, boolean, time, time, text), set_notification_destination(uuid, text),
+  set_brewery_quiet_hours(uuid, time, time)
+  from public, anon, authenticated;
+grant execute on function record_submitted_order_occurrence(uuid),
+  set_notification_preference(uuid, text, boolean, time, time, text), set_notification_destination(uuid, text),
+  set_brewery_quiet_hours(uuid, time, time)
+  to authenticated;
+grant execute on function chat_quiet_release(timestamptz, time, time, text),
+  scan_chat_notification_occurrences(uuid, timestamptz), lease_chat_deliveries(int, int, timestamptz),
+  complete_chat_delivery(uuid, timestamptz, text, text), retry_chat_delivery(uuid, timestamptz, timestamptz, text),
+  suppress_chat_delivery(uuid, timestamptz, text, text), record_submitted_order_occurrence(uuid)
+  to service_role;
+
+-- Durable provider callback receipt (App Home opens, later actions). Recorded
+-- only after transport authenticity was verified; deduped by the provider's
+-- event id. Returns null when the workspace has no active installation.
+create function record_chat_callback_receipt(
+  p_provider text, p_external_installation_id text, p_callback_id text, p_callback_kind text,
+  p_external_user_id text, p_payload_hash text
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare i public.chat_installations; v_id uuid;
+begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'permission denied: internal job only' using errcode = '42501';
+  end if;
+  select * into i from public.chat_installations
+    where provider = p_provider and external_installation_id = p_external_installation_id and state = 'active';
+  if not found then return null; end if;
+  insert into public.chat_callback_receipts
+    (brewery_id, installation_id, provider, callback_id, callback_kind, external_user_id, disposition, payload_hash, received_at)
+  values (i.brewery_id, i.id, i.provider, p_callback_id, p_callback_kind, p_external_user_id, 'pending', p_payload_hash, now())
+  on conflict (installation_id, callback_id) do nothing
+  returning id into v_id;
+  return jsonb_build_object('receipt_id', v_id, 'installation_id', i.id, 'brewery_id', i.brewery_id, 'duplicate', v_id is null);
+end $$;
+revoke execute on function record_chat_callback_receipt(text, text, text, text, text, text) from public, anon, authenticated;
+grant execute on function record_chat_callback_receipt(text, text, text, text, text, text) to service_role;
+
+-- ---------------------------------------------------------------- chat worker reads/claims (service_role only)
+create function chat_assert_job() returns void language plpgsql stable set search_path = '' as $$
+begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'permission denied: internal job only' using errcode = '42501';
+  end if;
+end $$;
+
+create function list_chat_scan_targets() returns setof uuid
+language sql stable security definer set search_path = '' as $$
+  select public.chat_assert_job();
+  select distinct brewery_id from public.chat_installations where state = 'active';
+$$;
+
+-- Claims pending callback receipts (recovering ones stuck in processing).
+create function claim_chat_callback_receipts(p_limit int, p_now timestamptz)
+returns table (id uuid, brewery_id uuid, installation_id uuid, external_installation_id text, external_user_id text, callback_kind text)
+language plpgsql security definer set search_path = '' as $$
+#variable_conflict use_column
+begin
+  perform public.chat_assert_job();
+  update public.chat_callback_receipts r set disposition = 'pending', processing_at = null
+    where r.disposition = 'processing' and r.processing_at < p_now - interval '5 minutes';
+  return query
+    with picked as (
+      select r.id from public.chat_callback_receipts r
+        where r.disposition = 'pending' order by r.received_at
+        limit least(greatest(coalesce(p_limit, 1), 1), 100)
+        for update skip locked
+    )
+    update public.chat_callback_receipts r
+      set disposition = 'processing', processing_at = p_now
+      from picked, public.chat_installations i
+      where r.id = picked.id and i.id = r.installation_id
+      returning r.id, r.brewery_id, r.installation_id, i.external_installation_id, r.external_user_id, r.callback_kind;
+end $$;
+
+create function complete_chat_callback_receipt(p_receipt uuid, p_disposition text, p_error_code text) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  perform public.chat_assert_job();
+  if p_disposition not in ('processed', 'ignored', 'failed') then raise exception 'invalid disposition %', p_disposition; end if;
+  update public.chat_callback_receipts
+    set disposition = p_disposition, error_code = p_error_code, completed_at = now()
+    where id = p_receipt;
+end $$;
+
+-- Active occurrences visible to one linked external user (role/assignment
+-- filtered, same rule as get_today_items). Null when not actively linked.
+create function get_chat_home_items(p_installation uuid, p_external_user_id text) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare r record;
+begin
+  perform public.chat_assert_job();
+  select i.brewery_id, l.user_id, bu.role into r
+    from public.chat_installations i
+    join public.chat_user_links l on l.installation_id = i.id and l.external_user_id = p_external_user_id and l.state = 'active'
+    join public.brewery_users bu on bu.brewery_id = i.brewery_id and bu.user_id = l.user_id
+    where i.id = p_installation and i.state = 'active';
+  if not found then return null; end if;
+  return coalesce((
+    select jsonb_agg(jsonb_build_object('id', o.id, 'reason', o.reason, 'state', o.state, 'subject_type', o.subject_type,
+      'subject_id', o.subject_id, 'urgency', o.urgency, 'due_at', o.due_at, 'payload', o.payload, 'semantic_key', o.semantic_key)
+      order by o.due_at nulls last, o.created_at)
+    from public.notification_occurrences o
+    where o.brewery_id = r.brewery_id and o.state = 'active' and o.reason <> 'operations_digest'
+      and (r.role = 'admin' or o.payload->'recipient_roles' ? r.role::text)
+      and ((o.payload->>'assigned_user_id') is null or (o.payload->>'assigned_user_id')::uuid = r.user_id)
+  ), '[]'::jsonb);
+end $$;
+
+-- Everything the worker must re-check before touching the provider, in one read.
+create function get_chat_delivery_context(p_delivery uuid) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select public.chat_assert_job();
+  select jsonb_build_object(
+    'delivery', jsonb_build_object('id', d.id, 'state', d.state, 'attempt_count', d.attempt_count,
+      'provider_conversation_id', d.provider_conversation_id, 'provider_message_id', d.provider_message_id,
+      'resolved_at', d.resolved_at, 'semantic_key', d.semantic_key),
+    'occurrence', jsonb_build_object('id', o.id, 'reason', o.reason, 'state', o.state, 'subject_type', o.subject_type,
+      'subject_id', o.subject_id, 'urgency', o.urgency, 'due_at', o.due_at, 'payload', o.payload, 'semantic_key', o.semantic_key),
+    'destination', jsonb_build_object('id', dest.id, 'kind', dest.kind, 'external_destination_id', dest.external_destination_id,
+      'state', dest.state, 'user_id', dest.user_id),
+    'installation', jsonb_build_object('id', i.id, 'state', i.state, 'external_installation_id', i.external_installation_id,
+      'provider', i.provider, 'brewery_id', i.brewery_id),
+    'link_active', exists (select 1 from public.chat_user_links l
+      where l.installation_id = i.id and l.user_id = dest.user_id and l.state = 'active'),
+    'preference_enabled', coalesce((select p.enabled from public.notification_preferences p
+      where p.brewery_id = d.brewery_id and p.user_id = dest.user_id and p.reason = o.reason), true),
+    'counts', case when o.reason = 'operations_digest' then
+      (select coalesce(jsonb_object_agg(x.reason, x.n), '{}'::jsonb)
+         from (select reason, count(*) as n from public.notification_occurrences
+                 where brewery_id = d.brewery_id and state = 'active' and reason <> 'operations_digest' group by reason) x)
+      else null end)
+  from public.notification_deliveries d
+  join public.notification_occurrences o on o.id = d.occurrence_id
+  join public.notification_destinations dest on dest.id = d.destination_id
+  join public.chat_installations i on i.id = d.installation_id
+  where d.id = p_delivery;
+$$;
+
+create function block_notification_destination(p_destination uuid, p_reason text) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  perform public.chat_assert_job();
+  update public.notification_destinations
+    set state = 'blocked', blocked_reason = p_reason, updated_at = now()
+    where id = p_destination and state = 'active';
+end $$;
+
+revoke execute on function chat_assert_job(), list_chat_scan_targets(), claim_chat_callback_receipts(int, timestamptz),
+  complete_chat_callback_receipt(uuid, text, text), get_chat_home_items(uuid, text), get_chat_delivery_context(uuid),
+  block_notification_destination(uuid, text)
+  from public, anon, authenticated;
+grant execute on function list_chat_scan_targets(), claim_chat_callback_receipts(int, timestamptz),
+  complete_chat_callback_receipt(uuid, text, text), get_chat_home_items(uuid, text), get_chat_delivery_context(uuid),
+  block_notification_destination(uuid, text)
+  to service_role;
+-- ---------------------------------------------------------------- immutability grants
+revoke update, delete on recipe_versions, recipe_ingredients from authenticated, anon;
+revoke update, delete on pos_sales from authenticated, anon;
+grant update (movement_id) on pos_sales to authenticated;
+-- The existing staff insert policies are effective only with these bounded DML grants.
+grant select, insert on material_movements, keg_events to authenticated;
 
 -- Availability badge tiers for portal customers: coarse tiers only, never raw
 -- quantities (spec 1B decision 7). security definer on purpose — customers
@@ -2453,3 +3607,109 @@ grant execute on function
   portal_availability(uuid),
   portal_brewery_rows()
   to authenticated;
+
+-- ---------------------------------------------------------------- chat Data API ACLs
+-- Re-applied after the blanket revoke above. Chat configuration stays
+-- read-bounded: installations expose health columns only; occurrences,
+-- deliveries, callback receipts and action intents are server-only.
+revoke all on chat_installations, chat_user_links, notification_destinations, notification_preferences,
+  notification_occurrences, notification_deliveries, chat_callback_receipts, chat_action_intents
+  from authenticated;
+grant select (id, brewery_id, provider, display_label, state, installed_at, disabled_at, disconnected_at,
+  last_health_checked_at, last_healthy_at, last_failure_code, created_at, updated_at)
+  on chat_installations to authenticated;
+grant select on chat_user_links, notification_destinations, notification_preferences to authenticated;
+grant execute on function
+  begin_chat_installation(uuid, text, text, text),
+  begin_chat_reauthorization(uuid, text, text),
+  find_chat_oauth_intent(text),
+  activate_chat_installation(uuid, text, text, text, text, text, text, jsonb),
+  mark_chat_installation_reauthorization(uuid, text),
+  disable_chat_installation(uuid),
+  disconnect_chat_installation(uuid),
+  reconcile_chat_installation(uuid, boolean, text),
+  consume_chat_link_proof(text),
+  unlink_chat_user(uuid),
+  today_live_reasons(),
+  get_today_items(uuid, timestamptz),
+  record_submitted_order_occurrence(uuid),
+  set_notification_preference(uuid, text, boolean, time, time, text),
+  set_notification_destination(uuid, text),
+  set_brewery_quiet_hours(uuid, time, time)
+  to authenticated;
+
+-- ---------------------------------------------------------------- private Chat SDK state
+drop role if exists mgr_chat_sdk;
+create role mgr_chat_sdk nologin nosuperuser nocreatedb nocreaterole noreplication nobypassrls;
+
+-- The migration executor temporarily joins the group to transfer table ownership.
+grant mgr_chat_sdk to postgres;
+
+create schema chat_sdk;
+revoke all on schema chat_sdk from public;
+grant create on schema chat_sdk to mgr_chat_sdk;
+grant usage on schema chat_sdk to mgr_chat_sdk;
+
+create table chat_sdk.chat_state_subscriptions (
+  key_prefix text not null,
+  thread_id text not null,
+  created_at timestamptz not null default now(),
+  primary key (key_prefix, thread_id)
+);
+
+create table chat_sdk.chat_state_locks (
+  key_prefix text not null,
+  thread_id text not null,
+  token text not null,
+  expires_at timestamptz not null,
+  updated_at timestamptz not null default now(),
+  primary key (key_prefix, thread_id)
+);
+create index chat_state_locks_expires_idx on chat_sdk.chat_state_locks (expires_at);
+
+create table chat_sdk.chat_state_cache (
+  key_prefix text not null,
+  cache_key text not null,
+  value text not null,
+  expires_at timestamptz,
+  updated_at timestamptz not null default now(),
+  primary key (key_prefix, cache_key)
+);
+create index chat_state_cache_expires_idx on chat_sdk.chat_state_cache (expires_at);
+
+create table chat_sdk.chat_state_lists (
+  key_prefix text not null,
+  list_key text not null,
+  seq bigserial not null,
+  value text not null,
+  expires_at timestamptz,
+  primary key (key_prefix, list_key, seq)
+);
+create index chat_state_lists_expires_idx on chat_sdk.chat_state_lists (expires_at);
+
+create table chat_sdk.chat_state_queues (
+  key_prefix text not null,
+  thread_id text not null,
+  seq bigserial not null,
+  value text not null,
+  expires_at timestamptz not null,
+  primary key (key_prefix, thread_id, seq)
+);
+create index chat_state_queues_expires_idx on chat_sdk.chat_state_queues (expires_at);
+
+-- The adapter idempotently creates these indexes at connection time, which
+-- PostgreSQL permits only for the table owner.
+alter table chat_sdk.chat_state_subscriptions owner to mgr_chat_sdk;
+alter table chat_sdk.chat_state_locks owner to mgr_chat_sdk;
+alter table chat_sdk.chat_state_cache owner to mgr_chat_sdk;
+alter table chat_sdk.chat_state_lists owner to mgr_chat_sdk;
+alter table chat_sdk.chat_state_queues owner to mgr_chat_sdk;
+
+revoke mgr_chat_sdk from postgres;
+
+grant select, insert, update, delete on all tables in schema chat_sdk to mgr_chat_sdk;
+grant usage, select on all sequences in schema chat_sdk to mgr_chat_sdk;
+alter default privileges in schema chat_sdk
+  grant select, insert, update, delete on tables to mgr_chat_sdk;
+alter default privileges in schema chat_sdk
+  grant usage, select on sequences to mgr_chat_sdk;

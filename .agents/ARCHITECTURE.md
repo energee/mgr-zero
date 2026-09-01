@@ -75,7 +75,8 @@ a gap to close, not a convention to trust.
    to assert RLS on every table, `security_invoker` on every view,
    `search_path` on every function, and an `RLS-EXCEPTION:` comment on any
    permissive policy.
-4. **`createAdminClient()` is restricted to `lib/supabase/integration-tokens.ts`.**
+4. **`createAdminClient()` is restricted to `lib/supabase/integration-tokens.ts`
+   and `lib/chat/jobs.ts`.**
    The token boundary is the sole credential path: it admits only `admin`/`sales`,
    proves the concrete connection is visible through `ctx.db`, then passes the
    verified actor to a service-only RPC that rechecks current membership and role
@@ -84,7 +85,14 @@ a gap to close, not a convention to trust.
    `invite_customer_user` (which needed `auth.admin.inviteUserByEmail` plus a
    membership insert) are registered but fail closed until the external-write
    gate below is implemented; their working handlers are in git history.
+   `lib/chat/jobs.ts` is the one internal-job owner: it serves chat provider
+   webhooks and scheduled jobs where no user exists, may call only the named
+   `service_role` chat RPCs (`scan_chat_*`, `lease_chat_deliveries`,
+   `complete/retry/suppress_chat_delivery`, `claim/complete_chat_callback_receipt`,
+   `issue_chat_link_proof`, `resolve_chat_actor`, `reconcile_chat_installation`),
+   never ordinary domain commands, and never mints a user token.
    *Enforced by:* `no-restricted-imports` in `eslint.config.mjs`, run in CI.
+>>>>>>> origin/main
 5. **A command that writes more than one row is one Postgres function.**
    supabase-js cannot span a transaction across statements, so a handler that
    does `insert` then `update` can half-commit. Such commands call a single

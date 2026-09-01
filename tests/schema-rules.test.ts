@@ -82,6 +82,10 @@ describe("schema rules", () => {
       expected as (
         select 'authenticated'::name as role, relname, 'SELECT'::text as privilege
         from domain_relations where relkind in ('r', 'v')
+          -- chat: installations are column-bounded (no table-level SELECT);
+          -- occurrences, deliveries, receipts and action intents are server-only
+          and relname not in ('chat_installations', 'notification_occurrences', 'notification_deliveries',
+                              'chat_callback_receipts', 'chat_action_intents')
         union all
         select 'authenticated'::name, relname, privilege
         from (values
@@ -182,7 +186,24 @@ describe("schema rules", () => {
           ('set_standing_allocation(uuid,uuid,numeric)'),
           ('create_replenishment_order(uuid,uuid,jsonb)'),
           ('portal_availability(uuid)'),
-          ('portal_brewery_rows()')
+          ('portal_brewery_rows()'),
+          -- chat (admin/self-gated security definer RPCs; see baseline § chat Data API ACLs)
+          ('begin_chat_installation(uuid,text,text,text)'),
+          ('begin_chat_reauthorization(uuid,text,text)'),
+          ('find_chat_oauth_intent(text)'),
+          ('activate_chat_installation(uuid,text,text,text,text,text,text,jsonb)'),
+          ('mark_chat_installation_reauthorization(uuid,text)'),
+          ('disable_chat_installation(uuid)'),
+          ('disconnect_chat_installation(uuid)'),
+          ('reconcile_chat_installation(uuid,boolean,text)'),
+          ('consume_chat_link_proof(text)'),
+          ('unlink_chat_user(uuid)'),
+          ('today_live_reasons()'),
+          ('get_today_items(uuid,timestamp with time zone)'),
+          ('record_submitted_order_occurrence(uuid)'),
+          ('set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text)'),
+          ('set_notification_destination(uuid,text)'),
+          ('set_brewery_quiet_hours(uuid,time without time zone,time without time zone)')
         ) callable(signature)
         union all
         select 'service_role'::name, signature from domain_functions
