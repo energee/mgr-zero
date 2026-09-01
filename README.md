@@ -7,6 +7,7 @@ invitations, built on Next.js (App Router, TypeScript) and Supabase
 (tenancy, ledger, catalog, import, invites). Orders/shipments/portal are
 Slice 1B; QBO integration and AI chat are Slice 1C.
 
+- Customer user guide: [`docs/user-guide.md`](docs/user-guide.md)
 - Spec: `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md`
 - Plan: `.agents/superpowers/plans/2026-08-30-slice1a-foundation.md`
 - Schema: `.agents/superpowers/specs/2026-08-31-mgr-schema-design.md` (tables) and `2026-08-31-mgr-schema-decisions.md` (why)
@@ -204,3 +205,14 @@ deps, starts a local Supabase stack, applies migrations
 (`supabase db reset`), runs the full vitest suite against it, then
 `npm run lint`, `tsc --noEmit` and `npm run build`. This is the merge gate — RLS and
 command-registry correctness are enforced here, not just locally.
+
+After a pull request merges, `.github/workflows/documentation-agent.yml` runs a
+read-only Claude Code review and opens or refreshes a follow-up issue when the
+merged behavior is missing from its owning documentation or contradicts it. The
+Claude job uses the same `CLAUDE_CODE_OAUTH_TOKEN` secret as the existing Claude
+workflows, has only repository read permissions, may use only Read, Grep, and
+Glob, and carries Claude Code permission denies for common runner secret locations
+and credential dotfiles outside the checked-out repository. A separate
+deterministic job with issue-write permission turns Claude's schema-validated
+`DOCS_GAP` output into one idempotent issue per merged PR; the bot never commits
+documentation directly to `main`.

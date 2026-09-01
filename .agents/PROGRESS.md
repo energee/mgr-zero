@@ -7,6 +7,8 @@ Running log of what's done, in flight, and next. Newest at top. Keep entries to 
 
 ## Done
 - 2026-08-31 — Wireframes raised 50 → 63 for the slice 1/1B exception paths: short pick, order detail (+restock), role Today landings (sales/brewer/driver), three ship bodies (invoice now / on-delivery gated / complete transfer), Product/SKU TTB facts, cellar addition, portal Review, Me, Team, set-password; existing frames patched (Square-vs-count rule, POS refunds, keg return + deposit refund, PO send/over, blend into occupied, recipe stage/timing, TTB file checks, print labels); plan §1–§4/§8 + `brewing-domain.md` yeast/water deferral in step.
+- 2026-08-31 — Customer user guide established as the complete plain-language manual for every available screen/action; post-merge Claude audit enforces action steps, fields/options, permissions, results, corrections, and errors.
+- 2026-08-31 — Read-only Claude Code post-merge documentation agent audits each merged PR against the owning docs and opens one idempotent follow-up issue for high-confidence drift; review tools are denied common runner secret paths and credential dotfiles.
 - 2026-08-31 — `http-api` agent keeps README § HTTP API in lockstep with registered commands (`/http-api`).
 - 2026-08-31 — Public API is the existing command endpoint; Bearer Supabase access tokens accepted alongside cookie sessions (`tests/api-command.test.ts`).
 - 2026-08-31 — Slice 1B orders design spec (`2026-08-31-mgr-slice1b-orders-design.md`) and slice 1C implementation plan (`2026-08-31-slice1c-qbo-ai-chat.md`: QBO invoices-out/payments-back + AI chat composer, 11 TDD tasks in two independent tracks) written; PR #11.
