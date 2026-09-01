@@ -87,7 +87,7 @@ async function requireId(ctx: Ctx, table: string, name: string, label: string) {
 const findOrCreateProduct = (ctx: Ctx, L: Lookups, name: string, style?: string, abv?: number) =>
   memo(L.product, name, async () =>
     (await findId(ctx, "products", name)) ??
-    (await runCommand("create_product", { name, style: style || undefined, abv }, ctx)).id);
+    (await runCommand<{ id: string }>("create_product", { name, style: style || undefined, abv }, ctx)).id);
 
 const findOrCreatePriceList = (ctx: Ctx, L: Lookups, name: string) =>
   memo(L.priceList, name, async () =>

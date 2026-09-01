@@ -14,7 +14,7 @@ describe("invitations", () => {
 
   it("admin invites staff; membership row created with role", async () => {
     const email = `${crypto.randomUUID()}@test.local`;
-    const { userId } = await runCommand("invite_staff", { email, role: "sales" }, adminCtx);
+    const { userId } = await runCommand<{ userId: string }>("invite_staff", { email, role: "sales" }, adminCtx);
     const { data } = await admin.from("brewery_users").select().eq("user_id", userId).eq("brewery_id", b.id).single();
     expect(data!.role).toBe("sales");
   });

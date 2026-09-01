@@ -1,7 +1,7 @@
-// lib/commands/use-command-form.ts — the one dialog-form lifecycle every
-// mutation dialog shares: open/close, submit via the command endpoint, inline
-// error, refresh on success. Forms own only their fields and how to build
-// the command input.
+// lib/commands/use-command-form.ts — the dialog-form lifecycle every mutation
+// dialog shares: open/close, one command action (with its serialized request
+// ID), inline error, and refresh on success. Forms own only their fields and
+// how to build the command input.
 "use client";
 
 import { useState } from "react";

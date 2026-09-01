@@ -1,13 +1,16 @@
 // lib/commands/client.ts — the one way client components mutate anything.
-// Posts to /api/command, which validates against the registered command's zod
-// schema, enforces RLS/role checks via buildContext, and runs the handler.
+// Each invocation serializes a UUID request ID once, so any transport retry
+// reuses the identical request body while the server adds correlation metadata.
+import type { CommandFailure, CommandSuccess } from "./registry";
+
 export async function command(breweryId: string, name: string, input: unknown) {
+  const requestId = crypto.randomUUID();
   const res = await fetch("/api/command", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ breweryId, name, input }),
+    body: JSON.stringify({ breweryId, name, input, requestId }),
   });
-  const json = await res.json();
-  if (!json.ok) throw new Error(json.error);
+  const json = await res.json() as CommandSuccess<unknown> | CommandFailure;
+  if (!json.ok) throw new Error(json.error.message);
   return json.data;
 }
