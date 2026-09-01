@@ -55,6 +55,17 @@ describe("order commands", () => {
 });
 
 describe("standing taproom allocations", () => {
+  it("concurrent sets for the same (location, sku) leave exactly one open allocation", async () => {
+    const { data: tap } = await admin.from("locations").insert({ brewery_id: b.id, name: "Tap race", kind: "taproom" }).select().single();
+    await Promise.all([
+      runCommand("set_standing_allocation", { locationId: tap!.id, skuId, qty: 3 }, adminCtx),
+      runCommand("set_standing_allocation", { locationId: tap!.id, skuId, qty: 5 }, adminCtx),
+    ]);
+    const { data: open } = await admin.from("allocations").select("id")
+      .eq("source", "taproom_standing").eq("ref", tap!.id).eq("sku_id", skuId).eq("status", "open");
+    expect(open!.length).toBe(1);
+  });
+
   it("set creates an open allocation, shows in list, and reduces ATP; qty 0 releases it", async () => {
     const { data: tap } = await admin.from("locations").insert({ brewery_id: b.id, name: "Tap", kind: "taproom" }).select().single();
     const tapId = tap!.id;

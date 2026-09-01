@@ -371,6 +371,9 @@ create table allocations (
 );
 create index allocations_open_idx on allocations (brewery_id, sku_id) where status = 'open';
 create index allocations_ref_idx on allocations (ref);
+-- One open standing taproom allocation per (location, sku).
+create unique index allocations_standing_open_uidx on allocations (ref, sku_id)
+  where source = 'taproom_standing' and status = 'open';
 
 create table taproom_pars (
   brewery_id uuid not null references breweries(id),
@@ -1490,7 +1493,9 @@ create function private.create_credit_memo_impl(p_invoice uuid, p_lines jsonb, p
 language plpgsql set search_path = '' as $$
 declare v_inv public.invoices; v_cm uuid; v_order uuid; cl record; v_orig_qty numeric; v_already_credited numeric;
 begin
-  select * into v_inv from public.invoices where id = p_invoice;
+  -- for update: concurrent memos against one invoice serialize here, so the
+  -- over-credit guard below always sees the other memo's lines.
+  select * into v_inv from public.invoices where id = p_invoice for update;
   if not found then raise exception 'invoice not found'; end if;
   if v_inv.kind <> 'invoice' then raise exception 'can only credit an invoice'; end if;
   insert into public.invoices (brewery_id, kind, customer_id, issued_on)
@@ -1530,7 +1535,9 @@ create function private.set_standing_allocation_impl(p_location uuid, p_sku uuid
 language plpgsql set search_path = '' as $$
 declare v_brewery uuid; v_alloc uuid; v_status public.allocation_status;
 begin
-  select brewery_id into v_brewery from public.locations where id = p_location;
+  -- for update on the location serializes concurrent sets for one (location, sku);
+  -- allocations_standing_open_uidx backstops the one-open-row invariant.
+  select brewery_id into v_brewery from public.locations where id = p_location for update;
   if v_brewery is null then raise exception 'location not found'; end if;
   select id into v_alloc from public.allocations
     where source = 'taproom_standing' and ref = p_location and sku_id = p_sku and status = 'open';
@@ -2138,6 +2145,7 @@ revoke all on schema public, private, extensions from public, anon, authenticate
 grant usage on schema public to anon, authenticated, service_role;
 revoke all on all tables in schema public from public, anon, authenticated;
 revoke all on all sequences in schema public from public, anon, authenticated;
+-- qbo_connections and pos_connections hold OAuth tokens: service_role only.
 grant select on breweries, brewery_users, customer_users,
   customers, ship_tos, vendors, materials, material_lots, products, keg_pools, skus,
   price_lists, price_list_items, sku_bom, locations, inventory_movements, allocations, taproom_pars,
@@ -2145,7 +2153,7 @@ grant select on breweries, brewery_users, customer_users,
   volume_adjustments, fermentation_readings, material_movements, batch_additions, packaging_runs,
   lots, packaging_run_outputs, packaging_run_consumptions, material_contracts, purchase_orders,
   purchase_order_lines, receipts, receipt_lines, material_counts, material_count_lines, orders,
-  order_lines, order_events, shipments, invoices, invoice_lines, keg_events, pos_connections,
+  order_lines, order_events, shipments, invoices, invoice_lines, keg_events,
   pos_locations, pos_item_mappings, pos_sales, product_approvals, state_registrations,
   brewery_state_licenses, report_filings, routes, deliveries
   to authenticated;

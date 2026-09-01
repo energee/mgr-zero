@@ -52,10 +52,20 @@ export class CommandError extends Error {
 // Awaits a Supabase query and turns its { data, error } into data-or-throw,
 // so handlers don't each repeat `if (error) throw new CommandError(...)`.
 // Raw Postgres errors remain user-facing until Task 12 centralizes sanitization.
-export async function unwrap<T>(query: PromiseLike<{ data: T; error: { message: string } | null }>): Promise<T> {
+export async function unwrap<T>(query: PromiseLike<{ data: T; error: { message: string; code?: string } | null }>): Promise<T> {
   const { data, error } = await query;
-  if (error) throw new CommandError(error.message);
+  if (error) throw rpcError(error);
   return data;
+}
+
+// The definer RPCs signal authorization failures as 42501 and request-id
+// reuse as 23505; keep those distinguishable from ordinary 400s.
+function rpcError(error: { message: string; code?: string }): CommandError {
+  switch (error.code) {
+    case "42501": return new CommandError(error.message, 403, "permission_denied");
+    case "23505": return new CommandError(error.message, 409, "conflict");
+    default: return new CommandError(error.message);
+  }
 }
 
 type DefinitionBase<In> = {

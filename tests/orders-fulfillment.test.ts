@@ -142,6 +142,24 @@ describe("credit memo", () => {
   });
 });
 
+describe("credit memo concurrency", () => {
+  it("two concurrent credit memos for the full qty produce exactly one credit", async () => {
+    const id = await confirmedOrder(4);
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 4 }], p_request_id: crypto.randomUUID() });
+    const { data: shipped } = await staffDb.rpc("ship_order", { p_order: id, p_ship: [{ line_id: line.id, qty_shipped: 4 }], p_carrier: null, p_tracking: null, p_request_id: crypto.randomUUID() });
+    const invId = (shipped as { invoice_id: string }).invoice_id;
+    const { data: il } = await admin.from("invoice_lines").select().eq("invoice_id", invId).single();
+    const memo = () => staffDb.rpc("create_credit_memo", {
+      p_invoice: invId, p_lines: [{ invoice_line_id: il!.id, qty: 4 }], p_location: whId, p_reason: "race", p_request_id: crypto.randomUUID(),
+    });
+    const results = await Promise.all([memo(), memo()]);
+    expect(results.filter(r => r.error === null).length).toBe(1);
+    const { data: credits } = await admin.from("invoice_lines").select("qty").eq("credited_invoice_line_id", il!.id);
+    expect(credits!.reduce((sum, c) => sum + Number(c.qty), 0)).toBe(-4);
+  });
+});
+
 describe("replenishment", () => {
   it("creates a confirmed taproom_transfer order; shipping it moves stock between locations, no invoice", async () => {
     const { data, error } = await staffDb.rpc("create_replenishment_order", {

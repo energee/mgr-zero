@@ -3,7 +3,7 @@
 Running log of what's done, in flight, and next. Newest at top. Keep entries to one line each; details belong in commits and docs.
 
 ## Now
-- [ ] Vercel production-readiness (PR #29) at the Task 3 boundary: Tasks 1, 2 (incl. envelope follow-ups: non-JSON 400, browser envelope validation, `runCommand` returns `unknown`), 6, and 8 committed; Task 3 RPC/ACL boundary green on the full suite (25 files / 138 tests), typecheck, lint. Remaining: specialist re-review of the Task 3 fix round, then Tasks 4–19.
+- [ ] Vercel production-readiness (PR #29) at the Task 3 boundary: Tasks 1, 2 (incl. envelope follow-ups: non-JSON 400, browser envelope validation, `runCommand` returns `unknown`), 6, and 8 committed; Task 3 RPC/ACL boundary green on the full suite (25 files / 138 tests), typecheck, lint. Task 3 specialist re-review done (DB/security/TS): fixed pos_connections token exposure, credit-memo lock, standing-allocation uniqueness, RPC SQLSTATE→403/409 mapping. Deferred by plan: raw error sanitization + blind `as` narrowing (Task 12/17), serial CSV import (Task 13). Next: Tasks 4–19 — note a concurrent session was working Task 4 on `main` on 2026-09-01.
 - [ ] Slice 1C: QBO invoices-out/payments-back + AI chat composer (`.agents/superpowers/specs/2026-08-31-slice1c-qbo-ai-chat.md`).
 
 ## Done

@@ -137,6 +137,7 @@ one was supplied.
 | 400 | Non-JSON body, invalid request, missing/malformed command `requestId`, invalid `input`, or a data rule rejected the write |
 | 401 | Missing, malformed, expired, or revoked token |
 | 403 | Authenticated, but not a member of `breweryId`, or your role cannot run this command |
+| 409 | A `requestId` was reused with a different payload, command, or brewery (`conflict`) |
 | 404 | Unknown operation |
 | 500 | Server error (message is generic) |
 
@@ -259,6 +260,7 @@ envelope `{ "ok": false, "error": { "code": "...", "message": "..." },
 | 400 | Non-JSON body, invalid request, missing/malformed command `requestId`, invalid input, or a domain rule |
 | 401 | Unauthenticated |
 | 403 | Not a member of the brewery or permission denied |
+| 409 | `requestId` reused with a different payload (`conflict`) |
 | 404 | Unknown operation |
 | 500 | Unexpected failure |
 

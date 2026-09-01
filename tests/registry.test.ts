@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { z } from "zod";
-import { defineCommand, defineQuery, runCommand, _clearRegistry, CommandError, getCommandDefinition, type CommandExecution, type Ctx } from "@/lib/commands/registry";
+import { defineCommand, defineQuery, runCommand, unwrap, _clearRegistry, CommandError, getCommandDefinition, type CommandExecution, type Ctx } from "@/lib/commands/registry";
 
 // These unit tests never access the database; handlers exercise registry behavior only.
 const testDb = null as unknown as Ctx["db"];
@@ -95,5 +95,18 @@ describe("command registry", () => {
       expect(e instanceof CommandError && e.code).toBe("bad_request");
       expect(e instanceof Error && e.message).toBe("validation failed: item not found");
     }
+  });
+});
+
+describe("unwrap maps RPC SQLSTATEs to command errors", () => {
+  const failing = (code: string) => Promise.resolve({ data: null, error: { message: "boom", code } });
+  it("42501 (definer authorization) → 403 permission_denied", async () => {
+    await expect(unwrap(failing("42501"))).rejects.toMatchObject({ status: 403, code: "permission_denied" });
+  });
+  it("23505 (request-id reuse / uniqueness) → 409 conflict", async () => {
+    await expect(unwrap(failing("23505"))).rejects.toMatchObject({ status: 409, code: "conflict" });
+  });
+  it("anything else stays 400 bad_request", async () => {
+    await expect(unwrap(failing("23514"))).rejects.toMatchObject({ status: 400, code: "bad_request" });
   });
 });
