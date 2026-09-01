@@ -429,11 +429,11 @@ create table notification_deliveries (
 | `chat_callback_receipts` | `id`, `brewery_id`, `installation_id`, `provider`, `callback_id`, `callback_kind`, `disposition` (`pending`, `processing`, `processed`, `ignored`, `failed`), `payload_hash`, nullable redacted `error_code`, received/processing/completed timestamps. Unique `(installation_id, callback_id)`; no raw callback body. |
 | `chat_action_intents` | `id`, `brewery_id`, `installation_id`, `user_id`, `provider`, `action_origin_hash`, `command_name`, `input_hash`, `subject_type`, `subject_id`, `subject_version`, `request_id`, `preview_token_hash`, `allowed_action`, expiry/consumed timestamps, nullable `first_result_reference`, created timestamp. Unique `request_id`; no canonical input, provider payload, or token material. |
 
-All tenant references use `(id, brewery_id)` composite foreign keys. `token_store_key` identifies an encrypted Chat SDK state entry; it is never a credential.
+All tenant references use `(id, brewery_id)` composite foreign keys. `token_store_key` is globally unique, identifies an encrypted Chat SDK state entry, and is never a credential.
 
 - [ ] **Step 4: Add least-privilege RLS**
 
-Enable RLS everywhere. Admins may read installation health and manage the shared destination. Linked users may read/update only their own link/preferences/personal destination. `notification_occurrences`, `notification_deliveries`, `chat_callback_receipts`, and `chat_action_intents` have no authenticated policies; named internal functions expose only bounded results.
+Enable RLS everywhere. Ordinary authenticated clients receive bounded `SELECT` only: admins receive installation-health columns only; linked users receive their own link, personal destination, and preferences only while current brewery membership and an active same-brewery link remain valid. All writes are reserved for later named registered RPCs/commands, including shared-destination administration. `notification_occurrences`, `notification_deliveries`, `chat_callback_receipts`, and `chat_action_intents` have no authenticated access; named internal functions expose only bounded results.
 
 - [ ] **Step 5: Reset and prove tenancy**
 

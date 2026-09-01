@@ -146,7 +146,7 @@ Future notification reasons are added one at a time from measured demand. Candid
 
 ## 7. Provider-neutral data model
 
-All new tenant-visible tables carry `brewery_id`, RLS, and tenant-safe foreign keys. Secret-bearing Chat SDK tables remain outside the tenant schema.
+All new tenant-visible tables carry `brewery_id`, RLS, and tenant-safe foreign keys. Secret-bearing Chat SDK tables remain outside the tenant schema. Ordinary authenticated clients receive bounded `SELECT` only on their permitted configuration rows: installation health is column-bounded for admins, while personal links, destinations, and preferences require current brewery membership and an active same-brewery link. All configuration writes, including installation, linking, destination, and preference changes, are deferred to later named registered RPCs/commands.
 
 `breweries` gains `fermentation_reading_due_hours`, an integer constrained to 1–168 with default 24. It is an MGR operating default, not a chat preference. An admin update affects Today and subsequent occurrence scans; existing occurrences are revalidated against the new value before delivery.
 

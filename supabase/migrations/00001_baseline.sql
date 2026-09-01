@@ -1561,7 +1561,7 @@ create table chat_installations (
   quiet_hours_end time,
   quiet_hours_timezone text,
   installer_user_id uuid not null references auth.users(id),
-  token_store_key text not null, -- encrypted Chat SDK state reference, never credential material
+  token_store_key text not null unique, -- encrypted Chat SDK state reference, never credential material
   installed_at timestamptz,
   disabled_at timestamptz,
   disconnected_at timestamptz,
@@ -1570,7 +1570,8 @@ create table chat_installations (
   last_failure_code text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (id, brewery_id)
+  unique (id, brewery_id),
+  unique (id, brewery_id, provider)
 );
 create unique index chat_installations_brewery_provider_live_key
   on chat_installations (brewery_id, provider) where state <> 'disconnected';
@@ -1578,6 +1579,7 @@ create unique index chat_installations_provider_external_active_key
   on chat_installations (provider, external_installation_id) where state = 'active';
 create index chat_installations_brewery_health_idx
   on chat_installations (brewery_id, state, last_health_checked_at desc);
+create index chat_installations_installer_user_idx on chat_installations (installer_user_id);
 
 create table chat_user_links (
   id uuid primary key default gen_random_uuid(),
@@ -1598,11 +1600,14 @@ create table chat_user_links (
   updated_at timestamptz not null default now(),
   unique (id, brewery_id),
   unique (installation_id, external_user_id),
-  foreign key (installation_id, brewery_id) references chat_installations(id, brewery_id)
+  foreign key (installation_id, brewery_id, provider) references chat_installations(id, brewery_id, provider)
 );
 create unique index chat_user_links_installation_user_active_key
   on chat_user_links (installation_id, user_id) where state = 'active';
+create index chat_user_links_installation_brewery_provider_idx
+  on chat_user_links (installation_id, brewery_id, provider);
 create index chat_user_links_user_brewery_idx on chat_user_links (user_id, brewery_id);
+create index chat_user_links_brewery_idx on chat_user_links (brewery_id);
 
 create table notification_destinations (
   id uuid primary key default gen_random_uuid(),
@@ -1619,6 +1624,7 @@ create table notification_destinations (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (id, brewery_id),
+  unique (id, brewery_id, user_id),
   unique (installation_id, external_destination_id),
   check (
     (kind = 'personal' and user_id is not null and privacy_class = 'direct')
@@ -1630,8 +1636,11 @@ create table notification_destinations (
 );
 create unique index notification_destinations_active_shared_installation_key
   on notification_destinations (installation_id) where kind = 'private_channel' and state = 'active';
+create index notification_destinations_brewery_idx on notification_destinations (brewery_id);
+create index notification_destinations_installation_brewery_idx
+  on notification_destinations (installation_id, brewery_id);
 create index notification_destinations_user_brewery_idx
-  on notification_destinations (user_id, brewery_id) where kind = 'personal';
+  on notification_destinations (user_id, brewery_id);
 
 create table notification_preferences (
   id uuid primary key default gen_random_uuid(),
@@ -1648,9 +1657,13 @@ create table notification_preferences (
   updated_at timestamptz not null default now(),
   unique (id, brewery_id),
   unique (brewery_id, user_id, reason),
-  foreign key (personal_destination_id, brewery_id) references notification_destinations(id, brewery_id)
+  foreign key (personal_destination_id, brewery_id, user_id)
+    references notification_destinations(id, brewery_id, user_id)
 );
+create index notification_preferences_brewery_idx on notification_preferences (brewery_id);
 create index notification_preferences_user_brewery_idx on notification_preferences (user_id, brewery_id);
+create index notification_preferences_personal_destination_brewery_user_idx
+  on notification_preferences (personal_destination_id, brewery_id, user_id);
 
 create table notification_occurrences (
   id uuid primary key default gen_random_uuid(),
@@ -1698,8 +1711,14 @@ create table notification_deliveries (
   unique (brewery_id, semantic_key),
   foreign key (occurrence_id, brewery_id) references notification_occurrences(id, brewery_id),
   foreign key (destination_id, brewery_id) references notification_destinations(id, brewery_id),
-  foreign key (installation_id, brewery_id) references chat_installations(id, brewery_id)
+  foreign key (installation_id, brewery_id, provider) references chat_installations(id, brewery_id, provider)
 );
+create index notification_deliveries_occurrence_brewery_idx
+  on notification_deliveries (occurrence_id, brewery_id);
+create index notification_deliveries_destination_brewery_idx
+  on notification_deliveries (destination_id, brewery_id);
+create index notification_deliveries_installation_brewery_provider_idx
+  on notification_deliveries (installation_id, brewery_id, provider);
 create index notification_deliveries_dispatch_idx
   on notification_deliveries (next_attempt_at) where state in ('queued','retrying');
 
@@ -1718,8 +1737,11 @@ create table chat_callback_receipts (
   completed_at timestamptz,
   unique (id, brewery_id),
   unique (installation_id, callback_id),
-  foreign key (installation_id, brewery_id) references chat_installations(id, brewery_id)
+  foreign key (installation_id, brewery_id, provider) references chat_installations(id, brewery_id, provider)
 );
+create index chat_callback_receipts_brewery_idx on chat_callback_receipts (brewery_id);
+create index chat_callback_receipts_installation_brewery_provider_idx
+  on chat_callback_receipts (installation_id, brewery_id, provider);
 create index chat_callback_receipts_pending_idx
   on chat_callback_receipts (received_at) where disposition = 'pending';
 
@@ -1743,8 +1765,12 @@ create table chat_action_intents (
   first_result_reference text,
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
-  foreign key (installation_id, brewery_id) references chat_installations(id, brewery_id)
+  foreign key (installation_id, brewery_id, provider) references chat_installations(id, brewery_id, provider)
 );
+create index chat_action_intents_brewery_idx on chat_action_intents (brewery_id);
+create index chat_action_intents_installation_brewery_provider_idx
+  on chat_action_intents (installation_id, brewery_id, provider);
+create index chat_action_intents_user_idx on chat_action_intents (user_id);
 create index chat_action_intents_expiry_idx on chat_action_intents (expires_at) where consumed_at is null;
 
 -- ---------------------------------------------------------------- RLS
@@ -1844,7 +1870,8 @@ create policy customer_insert on order_events for insert
 create policy customer_read on locations for select
   using (kind = 'warehouse' and brewery_id in (select c.brewery_id from customers c where c.id in (select my_customer_ids())));
 
--- Chat tables intentionally expose only the configuration rows users need.
+-- Chat configuration is read-only to ordinary clients. Registered operations
+-- own all mutations; installation reads expose health columns only.
 alter table chat_installations enable row level security;
 alter table chat_user_links enable row level security;
 alter table notification_destinations enable row level security;
@@ -1857,31 +1884,45 @@ alter table chat_action_intents enable row level security;
 create policy chat_installations_admin_read on chat_installations for select to authenticated
   using ((select staff_role(brewery_id)) = 'admin');
 create policy chat_user_links_self_read on chat_user_links for select to authenticated
-  using (user_id = (select auth.uid()));
-create policy chat_user_links_self_update on chat_user_links for update to authenticated
-  using (user_id = (select auth.uid()))
-  with check (user_id = (select auth.uid()));
-create policy notification_destinations_admin_shared on notification_destinations for all to authenticated
-  using (kind = 'private_channel' and (select staff_role(brewery_id)) = 'admin')
-  with check (kind = 'private_channel' and (select staff_role(brewery_id)) = 'admin');
+  using (
+    user_id = (select auth.uid())
+    and (select is_staff_of(brewery_id))
+  );
+create policy notification_destinations_admin_shared_read on notification_destinations for select to authenticated
+  using (kind = 'private_channel' and (select staff_role(brewery_id)) = 'admin');
 create policy notification_destinations_personal_read on notification_destinations for select to authenticated
-  using (kind = 'personal' and user_id = (select auth.uid()));
-create policy notification_destinations_personal_update on notification_destinations for update to authenticated
-  using (kind = 'personal' and user_id = (select auth.uid()))
-  with check (kind = 'personal' and user_id = (select auth.uid()));
+  using (
+    kind = 'personal'
+    and user_id = (select auth.uid())
+    and (select is_staff_of(brewery_id))
+    and exists (
+      select 1
+      from chat_user_links l
+      where l.brewery_id = notification_destinations.brewery_id
+        and l.user_id = (select auth.uid())
+        and l.state = 'active'
+    )
+  );
 create policy notification_preferences_self_read on notification_preferences for select to authenticated
-  using (user_id = (select auth.uid()));
-create policy notification_preferences_self_update on notification_preferences for update to authenticated
-  using (user_id = (select auth.uid()))
-  with check (user_id = (select auth.uid()));
+  using (
+    user_id = (select auth.uid())
+    and (select is_staff_of(brewery_id))
+    and exists (
+      select 1
+      from chat_user_links l
+      where l.brewery_id = notification_preferences.brewery_id
+        and l.user_id = (select auth.uid())
+        and l.state = 'active'
+    )
+  );
 
 revoke all on chat_installations, chat_user_links, notification_destinations, notification_preferences,
   notification_occurrences, notification_deliveries, chat_callback_receipts, chat_action_intents
   from anon, authenticated;
-grant select on chat_installations, chat_user_links, notification_destinations, notification_preferences,
-  notification_occurrences, notification_deliveries, chat_callback_receipts, chat_action_intents to authenticated;
-grant update on chat_user_links, notification_destinations, notification_preferences to authenticated;
-grant insert, delete on notification_destinations to authenticated;
+grant select (id, brewery_id, provider, display_label, state, installed_at, disabled_at, disconnected_at,
+  last_health_checked_at, last_healthy_at, last_failure_code, created_at, updated_at)
+  on chat_installations to authenticated;
+grant select on chat_user_links, notification_destinations, notification_preferences to authenticated;
 -- ---------------------------------------------------------------- immutability grants
 revoke update, delete on recipe_versions, recipe_ingredients from authenticated, anon;
 revoke update, delete on pos_sales from authenticated, anon;

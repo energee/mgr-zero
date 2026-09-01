@@ -1,4 +1,5 @@
 // tests/chat-schema.test.ts — real-Postgres proof for provider-neutral chat tenancy and visibility.
+import { execFileSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import { admin, asUser, makeBrewery, makeStaff, makeStaffCtx } from "./helpers";
 
@@ -14,6 +15,7 @@ async function installation(
   breweryId: string,
   installerUserId: string,
   externalInstallationId = `workspace-${crypto.randomUUID()}`,
+  tokenStoreKey = `chat-sdk/${crypto.randomUUID()}`,
 ) {
   return insert<{ id: string }>("chat_installations", {
     brewery_id: breweryId,
@@ -22,7 +24,7 @@ async function installation(
     display_label: "Test workspace",
     state: "active",
     installer_user_id: installerUserId,
-    token_store_key: `chat-sdk/${crypto.randomUUID()}`,
+    token_store_key: tokenStoreKey,
   });
 }
 
@@ -226,8 +228,8 @@ describe("chat schema (live DB)", () => {
       "chat_action_intents",
     ]) {
       const { data, error } = await ctx.db.from(table).select("id");
-      expect(error).toBeNull();
-      expect(data).toEqual([]);
+      expect(data).toBeNull();
+      expect(error?.code).toBe("42501");
     }
   });
 
@@ -277,5 +279,336 @@ describe("chat schema (live DB)", () => {
       state: "blocked",
     });
     expect(duplicateDestination.error?.code).toBe("23505");
+  });
+
+  it("denies direct re-parenting, lifecycle, and server-field updates", async () => {
+    const brewery = await makeBrewery();
+    const ctx = await makeStaffCtx(brewery.id);
+    const chatInstallation = await installation(brewery.id, ctx.userId);
+    const destination = await insert<{ id: string }>("notification_destinations", {
+      brewery_id: brewery.id,
+      installation_id: chatInstallation.id,
+      kind: "personal",
+      external_destination_id: `dm-${crypto.randomUUID()}`,
+      user_id: ctx.userId,
+      privacy_class: "direct",
+      capabilities: {},
+      state: "active",
+    });
+    const link = await insert<{ id: string }>("chat_user_links", {
+      brewery_id: brewery.id,
+      installation_id: chatInstallation.id,
+      provider,
+      external_user_id: `user-${crypto.randomUUID()}`,
+      user_id: ctx.userId,
+      state: "active",
+    });
+    const preference = await insert<{ id: string }>("notification_preferences", {
+      brewery_id: brewery.id,
+      user_id: ctx.userId,
+      reason: "operations_digest",
+      enabled: true,
+      personal_destination_id: destination.id,
+      use_brewery_timezone: true,
+    });
+
+    for (const [table, id, update] of [
+      ["chat_user_links", link.id, { state: "disabled", external_user_id: "re-parented" }],
+      ["notification_destinations", destination.id, { state: "blocked", blocked_reason: "user-written" }],
+      ["notification_preferences", preference.id, { enabled: false }],
+    ] as const) {
+      const { error } = await ctx.db.from(table).update(update).eq("id", id);
+      expect(error?.code, table).toBe("42501");
+    }
+  });
+
+  it("requires current membership and an active same-brewery link for personal reads", async () => {
+    const removed = await makeBrewery();
+    const removedCtx = await makeStaffCtx(removed.id);
+    const removedInstallation = await installation(removed.id, removedCtx.userId);
+    const removedDestination = await insert<{ id: string }>("notification_destinations", {
+      brewery_id: removed.id,
+      installation_id: removedInstallation.id,
+      kind: "personal",
+      external_destination_id: `dm-${crypto.randomUUID()}`,
+      user_id: removedCtx.userId,
+      privacy_class: "direct",
+      capabilities: {},
+      state: "active",
+    });
+    await insert("chat_user_links", {
+      brewery_id: removed.id,
+      installation_id: removedInstallation.id,
+      provider,
+      external_user_id: `user-${crypto.randomUUID()}`,
+      user_id: removedCtx.userId,
+      state: "active",
+    });
+    const removedPreference = await insert<{ id: string }>("notification_preferences", {
+      brewery_id: removed.id,
+      user_id: removedCtx.userId,
+      reason: "operations_digest",
+      enabled: true,
+      personal_destination_id: removedDestination.id,
+      use_brewery_timezone: true,
+    });
+    await admin.from("brewery_users").delete().eq("brewery_id", removed.id).eq("user_id", removedCtx.userId);
+
+    for (const [table, id] of [
+      ["notification_destinations", removedDestination.id],
+      ["notification_preferences", removedPreference.id],
+    ] as const) {
+      const { data } = await removedCtx.db.from(table).select("id").eq("id", id);
+      expect(data, `${table} after membership removal`).toEqual([]);
+    }
+
+    const disabled = await makeBrewery();
+    const disabledCtx = await makeStaffCtx(disabled.id);
+    const disabledInstallation = await installation(disabled.id, disabledCtx.userId);
+    const disabledDestination = await insert<{ id: string }>("notification_destinations", {
+      brewery_id: disabled.id,
+      installation_id: disabledInstallation.id,
+      kind: "personal",
+      external_destination_id: `dm-${crypto.randomUUID()}`,
+      user_id: disabledCtx.userId,
+      privacy_class: "direct",
+      capabilities: {},
+      state: "active",
+    });
+    const disabledLink = await insert<{ id: string }>("chat_user_links", {
+      brewery_id: disabled.id,
+      installation_id: disabledInstallation.id,
+      provider,
+      external_user_id: `user-${crypto.randomUUID()}`,
+      user_id: disabledCtx.userId,
+      state: "active",
+    });
+    const disabledPreference = await insert<{ id: string }>("notification_preferences", {
+      brewery_id: disabled.id,
+      user_id: disabledCtx.userId,
+      reason: "operations_digest",
+      enabled: true,
+      personal_destination_id: disabledDestination.id,
+      use_brewery_timezone: true,
+    });
+    await admin.from("chat_user_links").update({ state: "disabled" }).eq("id", disabledLink.id);
+
+    for (const [table, id] of [
+      ["notification_destinations", disabledDestination.id],
+      ["notification_preferences", disabledPreference.id],
+    ] as const) {
+      const { data } = await disabledCtx.db.from(table).select("id").eq("id", id);
+      expect(data, `${table} after link disable`).toEqual([]);
+    }
+  });
+
+  it("requires preferences to name the same user's personal direct destination", async () => {
+    const brewery = await makeBrewery();
+    const ctx = await makeStaffCtx(brewery.id);
+    const chatInstallation = await installation(brewery.id, ctx.userId);
+    const shared = await insert<{ id: string }>("notification_destinations", {
+      brewery_id: brewery.id,
+      installation_id: chatInstallation.id,
+      kind: "private_channel",
+      external_destination_id: `channel-${crypto.randomUUID()}`,
+      privacy_class: "private_internal",
+      capabilities: {},
+      state: "active",
+    });
+    const otherUser = await makeStaff(brewery.id);
+    const otherDestination = await insert<{ id: string }>("notification_destinations", {
+      brewery_id: brewery.id,
+      installation_id: chatInstallation.id,
+      kind: "personal",
+      external_destination_id: `dm-${crypto.randomUUID()}`,
+      user_id: otherUser.id,
+      privacy_class: "direct",
+      capabilities: {},
+      state: "active",
+    });
+
+    for (const [reason, destinationId] of [
+      ["operations_digest", shared.id],
+      ["submitted_order", otherDestination.id],
+    ]) {
+      const { error } = await admin.from("notification_preferences").insert({
+        brewery_id: brewery.id,
+        user_id: ctx.userId,
+        reason,
+        enabled: true,
+        personal_destination_id: destinationId,
+        use_brewery_timezone: true,
+      });
+      expect(error?.code, reason).toBe("23503");
+    }
+  });
+
+  it("limits admin installation reads to health columns", async () => {
+    const brewery = await makeBrewery();
+    const ctx = await makeStaffCtx(brewery.id);
+    const chatInstallation = await insert<{ id: string }>("chat_installations", {
+      brewery_id: brewery.id,
+      provider,
+      external_installation_id: `workspace-${crypto.randomUUID()}`,
+      display_label: "Test workspace",
+      state: "active",
+      oauth_intent_hash: "hash-that-must-not-be-readable",
+      installer_user_id: ctx.userId,
+      token_store_key: `chat-sdk/${crypto.randomUUID()}`,
+    });
+
+    const health = await ctx.db
+      .from("chat_installations")
+      .select("id, state, last_health_checked_at, last_failure_code")
+      .eq("id", chatInstallation.id);
+    expect(health.data).toEqual([{ id: chatInstallation.id, state: "active", last_health_checked_at: null, last_failure_code: null }]);
+    const sensitive = await ctx.db
+      .from("chat_installations")
+      .select("oauth_intent_hash, token_store_key")
+      .eq("id", chatInstallation.id);
+    expect(sensitive.error?.code).toBe("42501");
+  });
+
+  it("enforces parent provider consistency and unique token-store keys", async () => {
+    const brewery = await makeBrewery();
+    const ctx = await makeStaffCtx(brewery.id);
+    const key = `chat-sdk/${crypto.randomUUID()}`;
+    const chatInstallation = await installation(brewery.id, ctx.userId, undefined, key);
+    const destination = await insert<{ id: string }>("notification_destinations", {
+      brewery_id: brewery.id,
+      installation_id: chatInstallation.id,
+      kind: "personal",
+      external_destination_id: `dm-${crypto.randomUUID()}`,
+      user_id: ctx.userId,
+      privacy_class: "direct",
+      capabilities: {},
+      state: "active",
+    });
+    const occurrence = await insert<{ id: string }>("notification_occurrences", {
+      brewery_id: brewery.id,
+      reason: "operations_digest",
+      subject_type: "brewery",
+      subject_id: brewery.id,
+      source_version: "2026-09-01",
+      occurred_at: new Date().toISOString(),
+      owner_query: "digest",
+      urgency: "normal",
+      payload: {},
+      semantic_key: `occurrence-${crypto.randomUUID()}`,
+    });
+    const providerMismatch = await admin.from("chat_user_links").insert({
+      brewery_id: brewery.id,
+      installation_id: chatInstallation.id,
+      provider: "discord",
+      external_user_id: `user-${crypto.randomUUID()}`,
+      user_id: ctx.userId,
+      state: "active",
+    });
+    expect(providerMismatch.error?.code).toBe("23503");
+
+    for (const [table, row] of [
+      [
+        "notification_deliveries",
+        {
+          brewery_id: brewery.id,
+          occurrence_id: occurrence.id,
+          destination_id: destination.id,
+          installation_id: chatInstallation.id,
+          provider: "discord",
+          semantic_key: `delivery-${crypto.randomUUID()}`,
+        },
+      ],
+      [
+        "chat_callback_receipts",
+        {
+          brewery_id: brewery.id,
+          installation_id: chatInstallation.id,
+          provider: "discord",
+          callback_id: `callback-${crypto.randomUUID()}`,
+          callback_kind: "event_callback",
+          disposition: "pending",
+          payload_hash: `sha256:${crypto.randomUUID()}`,
+          received_at: new Date().toISOString(),
+        },
+      ],
+      [
+        "chat_action_intents",
+        {
+          brewery_id: brewery.id,
+          installation_id: chatInstallation.id,
+          user_id: ctx.userId,
+          provider: "discord",
+          action_origin_hash: `sha256:${crypto.randomUUID()}`,
+          command_name: "dismiss_notification",
+          input_hash: `sha256:${crypto.randomUUID()}`,
+          subject_type: "brewery",
+          subject_id: brewery.id,
+          subject_version: "2026-09-01",
+          request_id: crypto.randomUUID(),
+          preview_token_hash: `sha256:${crypto.randomUUID()}`,
+          allowed_action: "dismiss",
+          expires_at: new Date(Date.now() + 60_000).toISOString(),
+        },
+      ],
+    ] as const) {
+      const { error } = await admin.from(table).insert(row);
+      expect(error?.code, table).toBe("23503");
+    }
+
+    const otherBrewery = await makeBrewery();
+    const otherStaff = await makeStaff(otherBrewery.id);
+    const duplicateKey = await admin.from("chat_installations").insert({
+      brewery_id: otherBrewery.id,
+      provider,
+      external_installation_id: `workspace-${crypto.randomUUID()}`,
+      display_label: "Other workspace",
+      state: "active",
+      installer_user_id: otherStaff.id,
+      token_store_key: key,
+    });
+    expect(duplicateKey.error?.code).toBe("23505");
+  });
+
+  it("indexes every chat-table foreign key by its leading columns", () => {
+    const databaseUrl = process.env.DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:54342/postgres";
+    const missing = execFileSync(
+      "psql",
+      [
+        databaseUrl,
+        "-Atc",
+        `
+          select c.conrelid::regclass || ':' || c.conname
+          from pg_constraint c
+          join pg_class t on t.oid = c.conrelid
+          where c.contype = 'f'
+            and t.relnamespace = 'public'::regnamespace
+            and t.relname in (
+              'chat_installations',
+              'chat_user_links',
+              'notification_destinations',
+              'notification_preferences',
+              'notification_occurrences',
+              'notification_deliveries',
+              'chat_callback_receipts',
+              'chat_action_intents'
+            )
+            and not exists (
+              select 1
+              from pg_index i
+              where i.indrelid = c.conrelid
+                and i.indisvalid
+                and i.indpred is null
+                and (i.indkey::smallint[])[0:array_length(c.conkey, 1) - 1] = c.conkey
+            )
+          order by 1
+        `,
+      ],
+      { encoding: "utf8" },
+    )
+      .trim()
+      .split("\n")
+      .filter(Boolean);
+
+    expect(missing).toEqual([]);
   });
 });
