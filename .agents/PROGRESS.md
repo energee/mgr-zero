@@ -3,7 +3,8 @@
 Running log of what's done, in flight, and next. Newest at top. Keep entries to one line each; details belong in commits and docs.
 
 ## Now
-- [ ] Audit P1 remediation on `audit-p1-authz` (PR #27, draft): P1.1–P1.5 and P1.9 done; remaining before merge — CI green, Supabase advisors on a hosted project (local `db lint` is clean), and the intact backlog: P1.6–P1.8, P1.10/P1.11, P2/P3 as listed in the audit (audit document is not in the repo; the plan is `docs/plans/audit-p1-authz.md`).
+- [ ] Audit P1 remediation on `audit-p1-authz` (PR #27, draft): P1.1–P1.5 and P1.9 done; before merge — CI green, hosted Supabase advisors (local `db lint` clean). The original audit was lost; `docs/audits/2026-09-01-authz-audit.md` is the re-audit of the current state and the backlog below replaces the old P1.6–P1.8/P1.10/P1.11/P2/P3 numbering.
+- [ ] Authz backlog (from `docs/audits/2026-09-01-authz-audit.md`): **D1 P1** customer-safe `breweries` projection (customers currently read `ttb_registry_no`/`pa_license_no`/`settings`); **D2 P2** gate or revoke `lock_order`/`order_line_price`; **A1 P2** body-size cap + rate limit on `/api/command`; **A2 P2** generic client message for 42501/23503/23505 in `unwrap`; **A3 P3** explicit `require_authorized_staff_rpc` in `record_movement`/`set_taproom_par`; **A4 P3** security headers/CSP; **A5 P3** local-only guard in `seed-dev.ts`; **D3 P3** constrain/drop `breweries.settings`.
 - [ ] Slice 1C: QBO invoices-out/payments-back + AI chat composer (`.agents/superpowers/plans/2026-08-31-slice1c-qbo-ai-chat.md`, revised 2026-09-01 for the token boundary and RPC-path pattern).
 
 ## Done
