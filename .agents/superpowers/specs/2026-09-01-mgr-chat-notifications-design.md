@@ -276,7 +276,7 @@ Use `@chat-adapter/state-pg` for Chat SDK subscriptions, locks, cache, lists, an
 The baseline migration records the adapter's reviewed schema, but `@chat-adapter/state-pg@4.39.0` unconditionally executes idempotent `CREATE TABLE IF NOT EXISTS` during `connect()`. The compatibility spike proved that PostgreSQL therefore requires schema `CREATE` even when every table already exists. The approved deployment boundary is:
 
 1. Pre-create the adapter's exact tables in a private `chat_sdk` schema through the baseline migration.
-2. Use a dedicated server-only Postgres role with `search_path` restricted to `chat_sdk`.
+2. Drop and recreate the cluster-scoped `mgr_chat_sdk` group role during a baseline reset so stale attributes, memberships, or grants fail closed; use a dedicated server-only login with `search_path` restricted to `chat_sdk`.
 3. Grant that role `USAGE`, `CREATE`, required table DML, and sequence usage only inside `chat_sdk`.
 4. Grant that role no access to MGR public tenant data or any other application schema.
 5. Use an environment-specific key prefix.

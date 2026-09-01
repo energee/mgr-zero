@@ -201,6 +201,26 @@ describe("Chat SDK Postgres state isolation", () => {
       can_create_public: false,
     });
 
+    const groupRole = await admin.query(`
+      select rolcanlogin, rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls
+      from pg_roles
+      where rolname = 'mgr_chat_sdk'
+    `);
+    expect(groupRole.rows).toEqual([{
+      rolcanlogin: false,
+      rolsuper: false,
+      rolcreatedb: false,
+      rolcreaterole: false,
+      rolreplication: false,
+      rolbypassrls: false,
+    }]);
+    const inheritedRoles = await admin.query(`
+      select 1
+      from pg_auth_members
+      where member = (select oid from pg_roles where rolname = 'mgr_chat_sdk')
+    `);
+    expect(inheritedRoles.rows).toEqual([]);
+
     const state = createPostgresState({ client: restricted, keyPrefix: `mgr-test-${process.pid}` });
     await state.connect();
     await state.set("probe", { ok: true }, 60_000);
@@ -223,14 +243,12 @@ Expected: FAIL because `chat_sdk` and its exact adapter tables/grants do not exi
 
 - [ ] **Step 4: Pre-create and isolate the exact adapter schema**
 
-Add the exact five table definitions and four expiry indexes from `@chat-adapter/state-pg@4.39.0` to the baseline migration, schema-qualified under `chat_sdk`. The no-login group role receives `USAGE`, `CREATE`, required runtime DML, and sequence privileges only in `chat_sdk`; the provisioned login receives membership. Grant it nothing on MGR application schemas.
+Add the exact five table definitions and four expiry indexes from `@chat-adapter/state-pg@4.39.0` to the baseline migration, schema-qualified under `chat_sdk`. Drop and recreate the cluster-scoped group role so a reset cannot inherit stale LOGIN/elevated attributes, memberships, or grants; `DROP ROLE` must fail closed if outside dependencies exist. The recreated no-login role receives `USAGE`, `CREATE`, required runtime DML, and sequence privileges only in `chat_sdk`; the provisioned login receives membership. Grant it nothing on MGR application schemas.
 
 ```sql
-do $$
-begin
-  create role mgr_chat_sdk nologin;
-exception when duplicate_object then null;
-end $$;
+drop role if exists mgr_chat_sdk;
+create role mgr_chat_sdk
+  nologin nosuperuser nocreatedb nocreaterole noreplication nobypassrls;
 
 create schema chat_sdk;
 revoke all on schema chat_sdk from public;
