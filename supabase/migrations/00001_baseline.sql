@@ -12,6 +12,11 @@
 -- Pre-deploy this file is edited in place; never add a second migration.
 
 create extension if not exists btree_gist;
+-- `private` is deliberately absent from supabase/config.toml's API schemas.
+-- It holds server-only integration credentials; public connection tables hold
+-- only metadata safe for staff queries.
+create schema private;
+
 
 -- ---------------------------------------------------------------- enums
 create type staff_role as enum ('admin','sales','warehouse','brewer');
@@ -944,7 +949,6 @@ create index keg_events_shipment_idx on keg_events (shipment_id) where shipment_
 create table qbo_connections (
   brewery_id uuid primary key references breweries(id),
   realm_id text not null,
-  access_token text, refresh_token text,
   access_expires_at timestamptz, refresh_expires_at timestamptz,
   connected_by uuid references auth.users(id),
   updated_at timestamptz not null default now()
@@ -955,12 +959,80 @@ create table pos_connections (
   brewery_id uuid not null references breweries(id),
   provider text not null default 'square',
   merchant_id text,
-  access_token text, refresh_token text, expires_at timestamptz,
+  expires_at timestamptz,
   connected_by uuid references auth.users(id),
   updated_at timestamptz not null default now(),
   unique (id, brewery_id),
   unique (brewery_id, provider, merchant_id)
 );
+
+-- This private relation is keyed by the same tenant/provider pair selected by
+-- the public connection metadata. It is not an API schema and has no browser
+-- grants; the two service-only functions below are its sole application path.
+create table private.integration_tokens (
+  brewery_id uuid not null references public.breweries(id),
+  provider text not null check (provider in ('qbo', 'square')),
+  access_token text not null,
+  refresh_token text not null,
+  updated_at timestamptz not null default now(),
+  primary key (brewery_id, provider)
+);
+alter table private.integration_tokens enable row level security;
+revoke all on schema private from public, anon, authenticated, service_role;
+revoke all privileges on table private.integration_tokens from public, anon, authenticated, service_role;
+
+-- Security definer is intentionally limited to service_role below. These
+-- functions also reject orphaned or cross-tenant provider pairs even for a
+-- privileged caller, so token storage cannot outlive its public connection.
+create function public.store_integration_tokens(
+  p_brewery uuid, p_provider text, p_access_token text, p_refresh_token text
+) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not (
+    (p_provider = 'qbo' and exists (
+      select 1 from public.qbo_connections q where q.brewery_id = p_brewery
+    ))
+    or
+    (p_provider <> 'qbo' and exists (
+      select 1 from public.pos_connections p
+      where p.brewery_id = p_brewery and p.provider = p_provider
+    ))
+  ) then
+    raise exception 'integration connection not found' using errcode = '23503';
+  end if;
+
+  insert into private.integration_tokens as t (
+    brewery_id, provider, access_token, refresh_token
+  ) values (
+    p_brewery, p_provider, p_access_token, p_refresh_token
+  )
+  on conflict (brewery_id, provider) do update
+    set access_token = excluded.access_token,
+        refresh_token = excluded.refresh_token,
+        updated_at = now();
+end;
+$$;
+
+create function public.read_integration_tokens(
+  p_brewery uuid, p_provider text
+) returns table (access_token text, refresh_token text)
+language sql security definer set search_path = '' as $$
+  select t.access_token, t.refresh_token
+  from private.integration_tokens t
+  where t.brewery_id = p_brewery
+    and t.provider = p_provider
+    and (
+      (p_provider = 'qbo' and exists (
+        select 1 from public.qbo_connections q where q.brewery_id = p_brewery
+      ))
+      or
+      (p_provider <> 'qbo' and exists (
+        select 1 from public.pos_connections p
+        where p.brewery_id = p_brewery and p.provider = p_provider
+      ))
+    );
+$$;
 
 create table pos_locations (
   brewery_id uuid not null references breweries(id),
@@ -1807,11 +1879,12 @@ begin
   -- order_events is append-only but has custom staff + customer policies below.
   execute format('alter table %I enable row level security', 'order_events');
   execute format('revoke update, delete on %I from authenticated, anon', 'order_events');
-  -- Connection records remain admin-readable; Task 3 owns their token isolation.
+  -- Integration operators can inspect non-secret connection health; private
+  -- credential storage is never covered by this public-table policy.
   foreach t in array array['qbo_connections','pos_connections']
   loop
     execute format('alter table %I enable row level security', t);
-    execute format('create policy admin_read on %I for select using (public.staff_role(brewery_id) = ''admin'')', t);
+    execute format('create policy integration_operator_read on %I for select using (public.staff_role(brewery_id) in (''admin'', ''sales''))', t);
   end loop;
 end $$;
 
@@ -2031,6 +2104,12 @@ revoke execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid
 grant execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), next_no(uuid, text), portal_availability(uuid)
   to authenticated;
 
+-- Token RPCs are a server-only escape hatch. The service-role grant appears
+-- with the explicit ACL catalog below; no browser role ever receives EXECUTE.
+revoke execute on function public.store_integration_tokens(uuid, text, text, text),
+  public.read_integration_tokens(uuid, text)
+  from public, anon, authenticated;
+
 -- ---------------------------------------------------------------- explicit Data API ACLs
 -- RLS decides which rows a signed-in caller may see. These ACLs separately
 -- define which public objects the Data API can reach: no anonymous MGR surface,
@@ -2067,6 +2146,11 @@ begin
 end $$;
 grant usage, select, update on all sequences in schema public to service_role;
 grant execute on all functions in schema public to service_role;
+-- Pin the service-only credential RPCs even though service_role also receives
+-- the catalogued public function surface above.
+grant execute on function public.store_integration_tokens(uuid, text, text, text),
+  public.read_integration_tokens(uuid, text)
+  to service_role;
 
 -- Every authenticated EXECUTE grant is either a Data API RPC, an RLS
 -- predicate helper, or a direct invoker-call dependency of an RPC.

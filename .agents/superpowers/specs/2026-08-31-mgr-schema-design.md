@@ -278,17 +278,21 @@ not null <> 0, unit_price_cents int not null, amount_cents int generated always 
 ## 6. Integrations
 
 ### `qbo_connections`
-pk `brewery_id`, `realm_id text not null`, `access_token text`, `refresh_token text`,
-`access_expires_at`, `refresh_expires_at`, `connected_by`, `updated_at`. RLS: `P-admin`
-(admins of the brewery). Token handling is open choice §14.
-`connect_qbo` owns OAuth completion/upsert through the narrow integration-client
-exception; `get_qbo_connection` returns health/realm/timestamps only and never tokens.
-Invoice mapping/push is unavailable until that health read is connected.
+pk `brewery_id`, `realm_id text not null`, `access_expires_at`,
+`refresh_expires_at`, `connected_by`, `updated_at`; no credential columns. RLS:
+integration operators (`admin`/`sales`) may read their brewery's non-secret
+metadata. `connect_qbo` owns OAuth completion/upsert through the narrow
+integration-client exception; `get_qbo_connection` returns health/realm/timestamps
+only. Invoice mapping/push is unavailable until that health read is connected.
 
 ### `pos_connections`
-`provider text not null default 'square'`, `merchant_id text`, `access_token`,
-`refresh_token`, `expires_at`, `connected_by`, `updated_at`. unique `(brewery_id,
-provider, merchant_id)`. RLS: `P-admin`.
+`provider text not null default 'square'`, `merchant_id text`, `expires_at`,
+`connected_by`, `updated_at`; no credential columns. unique `(brewery_id,
+provider, merchant_id)`. RLS: integration-operator metadata read.
+`private.integration_tokens` owns `access_token` and `refresh_token`, keyed by
+`(brewery_id, provider)`, with RLS/no browser grants in an unexposed schema.
+Only the empty-search-path service-role RPCs and the RLS-checking server token
+boundary may store or read those credentials.
 
 ### `pos_locations`
 `connection_id → pos_connections, external_location_id text, location_id → locations`.
@@ -583,10 +587,11 @@ shipment's order.
 3. **Keg deposits** are `invoice_lines` (`keg_deposit` / `keg_deposit_refund`) with
    `keg_pool_id + keg_size`, not order lines; balance is a view. Alternative was a
    `keg_deposits` ledger.
-4. **QBO/Square tokens** live in `qbo_connections` / `pos_connections` behind an
-   admin-only policy. A sync job needs the service-role client, which ARCHITECTURE rule 4
-   pins to `invites.ts`; resolved 2026-08-31: rule 4 now states each sync module is
-   added to the eslint allowlist explicitly when its slice lands.
+4. **QBO/Square tokens** live only in unexposed `private.integration_tokens`, keyed
+   by brewery/provider and without browser grants. Public connection tables retain
+   non-secret metadata for `admin`/`sales`; exact-signature service-role RPCs are
+   reachable only through the RLS-checking server token boundary. Each future sync
+   module still needs its own explicit eslint allowlist entry when its slice lands.
 5. **Payments** have no table; `invoices.paid_at / qbo_balance_cents` from QBO is enough
    while QBO is the book of record.
 6. **Materials have no locations**; one store per brewery. `material_movements` gains a

@@ -191,6 +191,67 @@ describe("schema rules", () => {
     `)).toEqual([]);
   });
 
+  it("keeps integration token storage private and token columns out of public metadata", () => {
+    expect(sql(`
+      select 'column:' || c.relname || ':' || a.attname
+      from pg_attribute a
+      join pg_class c on c.oid = a.attrelid
+      where c.relnamespace = 'public'::regnamespace
+        and c.relname in ('qbo_connections', 'pos_connections')
+        and a.attnum > 0 and not a.attisdropped
+        and a.attname in ('access_token', 'refresh_token')
+      union all
+      select 'schema:' || role || ':' || privilege
+      from (values
+        ('anon'::name, 'usage'::text), ('anon'::name, 'create'),
+        ('authenticated'::name, 'usage'), ('authenticated'::name, 'create'),
+        ('service_role'::name, 'usage'), ('service_role'::name, 'create')
+      ) checks(role, privilege)
+      where has_schema_privilege(role, 'private', privilege)
+      union all
+      select 'table:' || role || ':' || privilege
+      from (values
+        ('anon'::name), ('authenticated'::name), ('service_role'::name)
+      ) roles(role)
+      cross join (values ('select'), ('insert'), ('update'), ('delete'), ('truncate'), ('references'), ('trigger')) privileges(privilege)
+      where has_table_privilege(role, 'private.integration_tokens', privilege)
+      union all
+      select 'private:integration_tokens:rls'
+      where not (select relrowsecurity from pg_class where oid = 'private.integration_tokens'::regclass)
+      order by 1
+    `)).toEqual([]);
+  });
+
+  it("pins service-only integration token RPC execute privileges by signature", () => {
+    expect(sql(`
+      with token_functions as (
+        select p.oid, p.oid::regprocedure::text as signature
+        from pg_proc p
+        where p.oid::regprocedure::text in (
+          'store_integration_tokens(uuid,text,text,text)',
+          'read_integration_tokens(uuid,text)'
+        )
+      ),
+      actual as (
+        select role, signature
+        from token_functions
+        cross join (values ('anon'::name), ('authenticated'::name), ('service_role'::name)) roles(role)
+        where has_function_privilege(role, oid, 'execute')
+      ),
+      expected(role, signature) as (
+        values
+          ('service_role'::name, 'store_integration_tokens(uuid,text,text,text)'::text),
+          ('service_role'::name, 'read_integration_tokens(uuid,text)'::text)
+      )
+      select 'extra:' || role || ':' || signature
+      from (select * from actual except select * from expected) extra
+      union all
+      select 'missing:' || role || ':' || signature
+      from (select * from expected except select * from actual) missing
+      order by 1
+    `)).toEqual([]);
+  });
+
   // `supabase_admin` is a reserved bootstrap role; its exposure is controlled
   // by config, while migrations can safely audit only their own future defaults.
   it("revokes Data API roles from future public objects created by the migration role", () => {
