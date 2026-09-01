@@ -235,7 +235,12 @@ async function main() {
       await waitForServer();
     }
 
-    for (const engine of ["lightpanda", "chrome"] as Engine[]) {
+    // Chrome-only by default: lightpanda's nightly can't drive React
+    // controlled inputs yet (see .ecc/benchmarks/e2e-engines-2026-08-31.json),
+    // so the attempt is pure overhead. E2E_ENGINES=lightpanda,chrome re-enables
+    // the fallback chain for re-testing newer nightlies.
+    const engines = (process.env.E2E_ENGINES?.split(",") ?? ["chrome"]) as Engine[];
+    for (const engine of engines) {
       console.log(`[test:e2e] trying engine: ${engine}`);
       const session = `${SESSION_PREFIX}-${engine}`;
       try {

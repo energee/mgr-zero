@@ -93,12 +93,13 @@ npm run test:e2e   # agent-browser smoke — local only, not run in CI
 ```
 
 `npm run test:e2e` drives the browser with `agent-browser` (Vercel's browser
-automation CLI) instead of Playwright: it tries the Lightpanda engine first
-(`agent-browser --engine lightpanda`, launching the `lightpanda` binary at
-`/opt/homebrew/bin/lightpanda` itself) and, on any failure — connect error,
-crash, page error, or a failed assertion — falls back to agent-browser's
-bundled Chrome and re-runs the whole flow against freshly seeded data. It
-prints which engine passed. The script starts its own `next dev` on port
+automation CLI) instead of Playwright. It runs agent-browser's bundled Chrome
+by default; `E2E_ENGINES=lightpanda,chrome` re-enables the engine-fallback
+chain (each engine gets freshly seeded data; the script prints which engine
+passed). Lightpanda renders the app but is currently blocked by
+engine/adapter gaps — benchmark + status in
+`.ecc/benchmarks/e2e-engines-2026-08-31.json`; retest after
+`brew upgrade lightpanda` or an agent-browser release. The script starts its own `next dev` on port
 3100 (not 3000, so it never collides with another worktree's dev server on
 the same repo), reusing one already running there, and stops what it
 started on both success and failure. It needs `npx supabase start` and a
