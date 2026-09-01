@@ -41,6 +41,22 @@ defineCommand({
     }).select().single()),
 });
 
+/**
+ * Sets (or releases) the standing taproom allocation for a SKU at a location —
+ * inventory reserved against ATP without an order line (e.g. house pours,
+ * events). Find-then-write (open row may need update, insert, or release), so
+ * it is one plpgsql function per iron rule 5 (00001_baseline.sql,
+ * set_standing_allocation). qty 0 releases the open allocation, if any.
+ */
+defineCommand({
+  name: "set_standing_allocation", description: "Set or release a standing taproom allocation (source 'taproom_standing') for a SKU at a location",
+  input: z.object({ locationId: z.string().uuid(), skuId: z.string().uuid(), qty: z.number().nonnegative() }),
+  roles: ["admin", "sales"],
+  handler: (ctx, i) => unwrap(ctx.db.rpc("set_standing_allocation", {
+    p_location: i.locationId, p_sku: i.skuId, p_qty: i.qty,
+  })),
+});
+
 const bySku = z.object({ skuId: z.string().uuid().optional() });
 const readRoles = ["admin", "sales", "warehouse"] as const;
 
@@ -86,4 +102,15 @@ defineQuery({
   name: "list_locations", description: "Warehouses and taprooms, alphabetical",
   input: z.object({}), roles: [...readRoles],
   handler: (ctx) => unwrap(ctx.db.from("locations").select("id, name, kind").eq("brewery_id", ctx.breweryId).order("name")),
+});
+
+defineQuery({
+  name: "list_standing_allocations", description: "Open standing taproom allocations (source 'taproom_standing'), with SKU names",
+  input: z.object({ locationId: z.string().uuid().optional() }), roles: [...readRoles],
+  handler: (ctx, i) => {
+    let q = ctx.db.from("allocations").select("id, sku_id, qty, ref, skus(name)")
+      .eq("brewery_id", ctx.breweryId).eq("source", "taproom_standing").eq("status", "open");
+    if (i.locationId) q = q.eq("ref", i.locationId);
+    return unwrap(q);
+  },
 });

@@ -8,17 +8,19 @@ never copy it into a second place.
 
 | Path | Owns |
 | --- | --- |
-| `supabase/migrations/*.sql` | Schema, RLS policies, triggers, grants. The only source of truth for data rules. Pre-deploy, the baseline is edited in place (see `.agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md`). |
+| `supabase/migrations/*.sql` | Schema, RLS policies, triggers, grants. The only source of truth for data rules. Pre-deploy, the baseline is edited in place (see `.agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md`). Order lifecycle (`create_order`, `submit_order`, `confirm_order`, `adjust_order_lines`, `cancel_order`, `record_pick`, `ship_order`, `create_credit_memo`, `create_replenishment_order`) lives here as one `security invoker` plpgsql function per transition (iron rule 5); each appends to `order_events`, the append-only per-order change log (staff + customer RLS read/insert policies, no update/delete). |
 | `lib/commands/registry.ts` | `defineCommand` / `defineQuery`, `Ctx`, role checks, `CommandError`. Every domain operation the app performs is registered here. |
-| `lib/commands/<area>.ts` | Business logic per area (catalog, inventory, import, invites). Handlers get an RLS-bound `ctx.db`. |
+| `lib/commands/<area>.ts` | Business logic per area (catalog, inventory, import, invites, orders, customers, portal). Handlers get an RLS-bound `ctx.db`. `orders.ts` owns order lifecycle (create/submit/confirm/adjust/cancel), allocations, pick/ship, per-shipment invoices, credit memos, and replenishment — each multi-row transition is a thin caller into the one plpgsql function per iron rule 5. `customers.ts` owns customer/ship-to/price-list CRUD. `portal.ts` owns the customer-role commands (`portal_create_order`, `portal_submit_order`, `portal_catalog`, `portal_orders`, `portal_order`, `portal_invoices`) — the only commands a `customer` role may call. |
 | `lib/commands/all.ts` | The one side-effecting import that registers every command module. |
 | `app/api/command/route.ts` | The single HTTP entry point. Dispatches to the registry; contains no business logic. Cookie session or `Authorization: Bearer <supabase access_token>`. |
 | `lib/commands/client.ts`, `use-command-form.ts` | How the UI calls commands. |
 | `lib/supabase/server.ts` | RLS-bound client for request paths. |
 | `lib/supabase/admin.ts` | Service-role client. Import restricted by eslint (see rule 4). |
 | `lib/brewery.ts`, `app/(app)/brewery-provider.tsx` | Current-brewery resolution and switching (`DEPLOYMENT_MODE` saas vs dedicated). |
-| `proxy.ts`, `app/(auth)/` | Session refresh and login. |
-| `app/(app)/<area>/` | Pages and forms. Thin: read via queries, mutate via commands. |
+| `lib/portal.ts` | `getActiveCustomer()`: resolves which customer account the session operates as from `customer_users`, mirroring `lib/brewery.ts`. Redirects to `/login` with no membership. |
+| `proxy.ts`, `app/(auth)/` | Session refresh and login. Customer-only accounts (a `customer_users` row, no `brewery_users` row) land on `/portal` instead of `/`. |
+| `app/(app)/<area>/` | Staff pages and forms. Thin: read via queries, mutate via commands. |
+| `app/(portal)/` | Wholesale customer portal route group (own layout, `/portal` shop + cart, `/portal/orders`, `/portal/invoices`) — reads/writes only through the `portal.ts` customer-role commands above. |
 | `components/ui/` | shadcn primitives. Don't hand-edit; re-add with the shadcn CLI. |
 | `tests/` | Proof. Runs against the real local Supabase stack, never mocks. |
 | `scripts/seed-dev.ts` | Idempotent dev seed. |

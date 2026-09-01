@@ -778,6 +778,7 @@ create table orders (
   requested_ship_date date,
   po_number text,
   note text,
+  needs_restock boolean not null default false,
   created_by uuid not null references auth.users(id),
   shipped_at timestamptz,
   created_at timestamptz not null default now(),
@@ -813,6 +814,22 @@ create table order_lines (
   foreign key (sku_id, brewery_id) references skus (id, brewery_id)
 );
 create index order_lines_sku_idx on order_lines (sku_id);
+
+-- Append-only per-order change log (spec 1B decision 3). Written inside the
+-- same plpgsql command functions that make each change; payload is the
+-- minimal diff, e.g. {"sku": "...", "qty": [24, 18], "reason": "..."}.
+create table order_events (
+  id uuid primary key default gen_random_uuid(),
+  brewery_id uuid not null references breweries(id),
+  order_id uuid not null,
+  actor uuid not null references auth.users(id),
+  event text not null,
+  payload jsonb not null default '{}',
+  created_at timestamptz not null default now(),
+  unique (id, brewery_id),
+  foreign key (order_id, brewery_id) references orders (id, brewery_id)
+);
+create index order_events_order_idx on order_events (order_id, created_at);
 
 -- allocations.ref is polymorphic; enforce that it points at a same-brewery row.
 create function validate_allocation_ref() returns trigger language plpgsql set search_path = '' as $$
@@ -879,10 +896,13 @@ create table invoice_lines (
   qty numeric(12,2) not null check (qty <> 0),
   unit_price_cents int not null,
   amount_cents int generated always as (round(qty * unit_price_cents)::int) stored,
+  credited_invoice_line_id uuid,   -- set on a credit-memo line: the original invoice line it credits
+  unique (id, brewery_id),
   foreign key (invoice_id, brewery_id) references invoices (id, brewery_id),
   foreign key (sku_id, brewery_id) references skus (id, brewery_id),
   foreign key (order_line_id, brewery_id) references order_lines (id, brewery_id),
   foreign key (keg_pool_id, brewery_id) references keg_pools (id, brewery_id),
+  foreign key (credited_invoice_line_id, brewery_id) references invoice_lines (id, brewery_id),
   check (case kind
     when 'sku'                then sku_id is not null
     when 'keg_deposit'        then keg_pool_id is not null and keg_size is not null and qty > 0
@@ -1223,6 +1243,304 @@ create view route_loads with (security_invoker = true) as
   join orders o on o.id = s.order_id
   join order_lines l on l.order_id = o.id;
 
+-- ------------------------------------------------- order lifecycle commands
+-- One function per transition (iron rule 5). Invoker-rights: RLS does
+-- tenancy; each starts by locking the order row. p_lines is a full
+-- replacement: [{"sku_id": uuid, "qty": n}].
+
+-- Resolves the unit price for a sku from a price list; raises if missing.
+create function order_line_price(p_brewery uuid, p_price_list uuid, p_sku uuid) returns int
+language plpgsql stable set search_path = '' as $$
+declare v int;
+begin
+  select unit_price_cents into v from public.price_list_items
+    where brewery_id = p_brewery and price_list_id = p_price_list and sku_id = p_sku;
+  if v is null then raise exception 'no price for sku % on price list', p_sku; end if;
+  return v;
+end $$;
+
+create function create_order(
+  p_brewery uuid, p_kind public.order_kind, p_customer uuid, p_ship_to uuid,
+  p_from_location uuid, p_to_location uuid, p_requested date, p_po text, p_note text, p_lines jsonb
+) returns jsonb language plpgsql set search_path = '' as $$
+declare v_order uuid; v_pl uuid; l record;
+begin
+  if p_kind = 'wholesale' then
+    select price_list_id into v_pl from public.customers where id = p_customer and brewery_id = p_brewery;
+    if v_pl is null then raise exception 'customer has no price list'; end if;
+  end if;
+  insert into public.orders (brewery_id, kind, customer_id, ship_to_id, from_location_id, to_location_id,
+                             price_list_id, requested_ship_date, po_number, note, created_by)
+  values (p_brewery, p_kind, p_customer, p_ship_to, p_from_location, p_to_location,
+          v_pl, p_requested, p_po, p_note, auth.uid())
+  returning id into v_order;
+  for l in select (e->>'sku_id')::uuid as sku_id, (e->>'qty')::numeric as qty from jsonb_array_elements(p_lines) e loop
+    insert into public.order_lines (brewery_id, order_id, sku_id, qty_ordered, unit_price_cents)
+    values (p_brewery, v_order, l.sku_id, l.qty,
+            case when p_kind = 'wholesale' then public.order_line_price(p_brewery, v_pl, l.sku_id) else 0 end);
+  end loop;
+  insert into public.order_events (brewery_id, order_id, actor, event, payload)
+  values (p_brewery, v_order, auth.uid(), 'created', jsonb_build_object('lines', p_lines));
+  return jsonb_build_object('order_id', v_order);
+end $$;
+
+-- Shared guard: lock the order, check status, return the row.
+create function lock_order(p_order uuid, p_allowed public.order_status[]) returns public.orders
+language plpgsql set search_path = '' as $$
+declare o public.orders;
+begin
+  select * into o from public.orders where id = p_order for update;
+  if not found then raise exception 'order not found'; end if;
+  if not (o.status = any(p_allowed)) then raise exception 'order is %', o.status; end if;
+  return o;
+end $$;
+
+create function update_draft_order(
+  p_order uuid, p_ship_to uuid, p_requested date, p_po text, p_note text, p_lines jsonb
+) returns jsonb language plpgsql set search_path = '' as $$
+declare o public.orders; l record;
+begin
+  o := public.lock_order(p_order, array['draft']::public.order_status[]);
+  update public.orders set ship_to_id = coalesce(p_ship_to, ship_to_id),
+    requested_ship_date = coalesce(p_requested, requested_ship_date),
+    po_number = coalesce(p_po, po_number), note = coalesce(p_note, note)
+    where id = p_order;
+  delete from public.order_lines where order_id = p_order;
+  for l in select (e->>'sku_id')::uuid as sku_id, (e->>'qty')::numeric as qty from jsonb_array_elements(p_lines) e loop
+    insert into public.order_lines (brewery_id, order_id, sku_id, qty_ordered, unit_price_cents)
+    values (o.brewery_id, p_order, l.sku_id, l.qty,
+            case when o.kind = 'wholesale' then public.order_line_price(o.brewery_id, o.price_list_id, l.sku_id) else 0 end);
+  end loop;
+  insert into public.order_events (brewery_id, order_id, actor, event, payload)
+  values (o.brewery_id, p_order, auth.uid(), 'updated', jsonb_build_object('lines', p_lines));
+  return jsonb_build_object('order_id', p_order);
+end $$;
+
+create function submit_order(p_order uuid) returns jsonb
+language plpgsql set search_path = '' as $$
+declare o public.orders;
+begin
+  o := public.lock_order(p_order, array['draft']::public.order_status[]);
+  update public.orders set status = 'submitted' where id = p_order;
+  insert into public.order_events (brewery_id, order_id, actor, event)
+  values (o.brewery_id, p_order, auth.uid(), 'submitted');
+  return jsonb_build_object('order_id', p_order);
+end $$;
+
+create function confirm_order(p_order uuid) returns jsonb
+language plpgsql set search_path = '' as $$
+declare o public.orders; w jsonb;
+begin
+  o := public.lock_order(p_order, array['submitted']::public.order_status[]);
+  insert into public.allocations (brewery_id, sku_id, qty, source, ref, status)
+  select o.brewery_id, sku_id, qty_ordered, 'order_line', id, 'open'
+  from public.order_lines where order_id = p_order;
+  update public.orders set status = 'confirmed' where id = p_order;
+  insert into public.order_events (brewery_id, order_id, actor, event)
+  values (o.brewery_id, p_order, auth.uid(), 'confirmed');
+  select coalesce(jsonb_agg(jsonb_build_object('sku_id', a.sku_id, 'atp', a.qty)), '[]') into w
+  from public.atp a join public.order_lines ol on ol.sku_id = a.sku_id and ol.order_id = p_order
+  where a.brewery_id = o.brewery_id and a.qty < 0;
+  return jsonb_build_object('order_id', p_order, 'warnings', w);
+end $$;
+
+create function adjust_order_lines(p_order uuid, p_lines jsonb, p_reason text) returns jsonb
+language plpgsql set search_path = '' as $$
+declare o public.orders; l record; v_line uuid; v_before jsonb;
+begin
+  o := public.lock_order(p_order, array['confirmed','picked']::public.order_status[]);
+  select jsonb_object_agg(ol.sku_id, ol.qty_ordered) into v_before
+  from public.order_lines ol where ol.order_id = p_order;
+  -- Drop lines (and their open allocations) not present in the new set.
+  update public.allocations set status = 'released'
+  where source = 'order_line' and status = 'open'
+    and ref in (select id from public.order_lines where order_id = p_order
+                and sku_id not in (select (e->>'sku_id')::uuid from jsonb_array_elements(p_lines) e));
+  delete from public.order_lines where order_id = p_order
+    and sku_id not in (select (e->>'sku_id')::uuid from jsonb_array_elements(p_lines) e);
+  for l in select (e->>'sku_id')::uuid as sku_id, (e->>'qty')::numeric as qty from jsonb_array_elements(p_lines) e loop
+    insert into public.order_lines (brewery_id, order_id, sku_id, qty_ordered, unit_price_cents)
+    values (o.brewery_id, p_order, l.sku_id, l.qty,
+            case when o.kind = 'wholesale' then public.order_line_price(o.brewery_id, o.price_list_id, l.sku_id) else 0 end)
+    on conflict (order_id, sku_id) do update set qty_ordered = excluded.qty_ordered
+    returning id into v_line;
+    update public.allocations set qty = l.qty
+      where source = 'order_line' and ref = v_line and status = 'open';
+    insert into public.allocations (brewery_id, sku_id, qty, source, ref, status)
+    select o.brewery_id, l.sku_id, l.qty, 'order_line', v_line, 'open'
+    where not exists (select 1 from public.allocations where source = 'order_line' and ref = v_line and status = 'open');
+  end loop;
+  update public.orders set needs_restock = needs_restock or (o.status = 'picked') where id = p_order;
+  insert into public.order_events (brewery_id, order_id, actor, event, payload)
+  values (o.brewery_id, p_order, auth.uid(), 'lines_adjusted',
+          jsonb_build_object('before', v_before, 'lines', p_lines, 'reason', p_reason));
+  return jsonb_build_object('order_id', p_order);
+end $$;
+
+create function cancel_order(p_order uuid, p_reason text) returns jsonb
+language plpgsql set search_path = '' as $$
+declare o public.orders;
+begin
+  o := public.lock_order(p_order, array['draft','submitted','confirmed','picked']::public.order_status[]);
+  update public.allocations set status = 'released'
+  where source = 'order_line' and status = 'open'
+    and ref in (select id from public.order_lines where order_id = p_order);
+  update public.orders set status = 'cancelled', needs_restock = (o.status = 'picked') where id = p_order;
+  insert into public.order_events (brewery_id, order_id, actor, event, payload)
+  values (o.brewery_id, p_order, auth.uid(), 'cancelled', jsonb_build_object('reason', p_reason));
+  return jsonb_build_object('order_id', p_order);
+end $$;
+
+create function record_pick(p_order uuid, p_picks jsonb) returns jsonb
+language plpgsql set search_path = '' as $$
+declare o public.orders; pk record;
+begin
+  o := public.lock_order(p_order, array['confirmed','picked']::public.order_status[]);
+  for pk in select (e->>'line_id')::uuid as line_id, (e->>'qty_picked')::numeric as qty from jsonb_array_elements(p_picks) e loop
+    update public.order_lines set qty_picked = pk.qty where id = pk.line_id and order_id = p_order;
+  end loop;
+  update public.orders set status = 'picked', needs_restock = false where id = p_order;
+  insert into public.order_events (brewery_id, order_id, actor, event, payload)
+  values (o.brewery_id, p_order, auth.uid(), 'picked', jsonb_build_object('picks', p_picks));
+  return jsonb_build_object('order_id', p_order);
+end $$;
+
+create function ship_order(p_order uuid, p_ship jsonb, p_carrier text, p_tracking text) returns jsonb
+language plpgsql set search_path = '' as $$
+declare o public.orders; sp record; v_state text; v_invoice uuid; v_shipment uuid;
+begin
+  o := public.lock_order(p_order, array['picked']::public.order_status[]);
+  -- Full-coverage guard: ensure p_ship covers every order line. Runs after the
+  -- lock so the line set can't change between the check and the lock (TOCTOU).
+  if exists (
+    select 1 from public.order_lines ol
+    where ol.order_id = p_order
+    and not exists (
+      select 1 from jsonb_array_elements(p_ship) e
+      where (e->>'line_id')::uuid = ol.id
+    )
+  ) then
+    raise exception 'ship list must cover every order line';
+  end if;
+  insert into public.shipments (brewery_id, order_id, carrier, tracking, created_by)
+  values (o.brewery_id, p_order, p_carrier, p_tracking, auth.uid()) returning id into v_shipment;
+  if o.kind = 'wholesale' then
+    select state into v_state from public.ship_tos where id = o.ship_to_id;
+    -- Empty-invoice guard: only create invoice if at least one line ships qty > 0
+    if exists (select 1 from jsonb_array_elements(p_ship) e where (e->>'qty_shipped')::numeric > 0) then
+    insert into public.invoices (brewery_id, kind, customer_id, shipment_id, issued_on)
+    values (o.brewery_id, 'invoice', o.customer_id, v_shipment, current_date)
+    returning id into v_invoice;
+    end if;
+  end if;
+  for sp in select (e->>'line_id')::uuid as line_id, (e->>'qty_shipped')::numeric as qty from jsonb_array_elements(p_ship) e loop
+    update public.order_lines set qty_shipped = sp.qty where id = sp.line_id and order_id = p_order;
+    if sp.qty > 0 then
+      if o.kind = 'wholesale' then
+        insert into public.inventory_movements (brewery_id, sku_id, location_id, qty, type, channel, dest_state, ref, created_by)
+        select o.brewery_id, ol.sku_id, o.from_location_id, -sp.qty, 'sale_removal', 'wholesale', v_state, p_order, auth.uid()
+        from public.order_lines ol where ol.id = sp.line_id;
+        insert into public.invoice_lines (brewery_id, invoice_id, kind, sku_id, qty, unit_price_cents, description)
+        select o.brewery_id, v_invoice, 'sku', ol.sku_id, sp.qty, ol.unit_price_cents, s.name
+        from public.order_lines ol join public.skus s on s.id = ol.sku_id where ol.id = sp.line_id;
+      else
+        insert into public.inventory_movements (brewery_id, sku_id, location_id, qty, type, ref, created_by)
+        select o.brewery_id, ol.sku_id, o.from_location_id, -sp.qty, 'taproom_transfer', p_order, auth.uid()
+        from public.order_lines ol where ol.id = sp.line_id;
+        insert into public.inventory_movements (brewery_id, sku_id, location_id, qty, type, ref, created_by)
+        select o.brewery_id, ol.sku_id, o.to_location_id, sp.qty, 'taproom_transfer', p_order, auth.uid()
+        from public.order_lines ol where ol.id = sp.line_id;
+      end if;
+      update public.allocations set status = 'fulfilled'
+        where source = 'order_line' and ref = sp.line_id and status = 'open';
+    else
+      update public.allocations set status = 'released'
+        where source = 'order_line' and ref = sp.line_id and status = 'open';
+    end if;
+  end loop;
+  update public.orders set status = 'shipped', shipped_at = now(), needs_restock = false where id = p_order;
+  insert into public.order_events (brewery_id, order_id, actor, event, payload)
+  values (o.brewery_id, p_order, auth.uid(), 'shipped',
+          jsonb_build_object('ship', p_ship, 'carrier', p_carrier, 'invoice_id', v_invoice));
+  return jsonb_build_object('order_id', p_order, 'invoice_id', v_invoice);
+end $$;
+
+create function create_credit_memo(p_invoice uuid, p_lines jsonb, p_location uuid, p_reason text) returns jsonb
+language plpgsql set search_path = '' as $$
+declare v_inv public.invoices; v_cm uuid; v_order uuid; cl record; v_orig_qty numeric; v_already_credited numeric;
+begin
+  select * into v_inv from public.invoices where id = p_invoice;
+  if not found then raise exception 'invoice not found'; end if;
+  if v_inv.kind <> 'invoice' then raise exception 'can only credit an invoice'; end if;
+  insert into public.invoices (brewery_id, kind, customer_id, issued_on)
+  values (v_inv.brewery_id, 'credit_memo', v_inv.customer_id, current_date)
+  returning id into v_cm;
+  for cl in select (e->>'invoice_line_id')::uuid as line_id, (e->>'qty')::numeric as qty from jsonb_array_elements(p_lines) e loop
+    select qty into v_orig_qty from public.invoice_lines where id = cl.line_id and invoice_id = p_invoice;
+    if v_orig_qty is null then raise exception 'invoice line % not found on invoice', cl.line_id; end if;
+    -- Over-credit guard: qty already credited against this invoice line across
+    -- all prior credit memos, plus this request, must not exceed the original.
+    select coalesce(sum(-il.qty), 0) into v_already_credited
+      from public.invoice_lines il where il.credited_invoice_line_id = cl.line_id;
+    if cl.qty > (v_orig_qty - v_already_credited) then
+      raise exception 'credit exceeds remaining creditable qty for line %', cl.line_id;
+    end if;
+    insert into public.invoice_lines (brewery_id, invoice_id, kind, sku_id, qty, unit_price_cents, description, credited_invoice_line_id)
+    select v_inv.brewery_id, v_cm, 'sku', il.sku_id, -cl.qty, il.unit_price_cents, il.description, il.id
+    from public.invoice_lines il where il.id = cl.line_id and il.invoice_id = p_invoice;
+    insert into public.inventory_movements (brewery_id, sku_id, location_id, qty, type, note, created_by)
+    select v_inv.brewery_id, il.sku_id, p_location, cl.qty, 'return_in', p_reason, auth.uid()
+    from public.invoice_lines il where il.id = cl.line_id and il.invoice_id = p_invoice;
+  end loop;
+  -- Append to the originating order's event log, if this invoice came from a
+  -- shipment (credit memos on a manually-issued invoice have none).
+  select s.order_id into v_order from public.shipments s where s.id = v_inv.shipment_id;
+  if v_order is not null then
+    insert into public.order_events (brewery_id, order_id, actor, event, payload)
+    values (v_inv.brewery_id, v_order, auth.uid(), 'credit_memo',
+            jsonb_build_object('invoice_id', p_invoice, 'credit_memo_id', v_cm, 'lines', p_lines, 'reason', p_reason));
+  end if;
+  return jsonb_build_object('invoice_id', v_cm);
+end $$;
+
+-- One open standing taproom allocation per (sku, location): upsert by qty>0,
+-- release by qty<=0. One plpgsql function per iron rule 5 (find-then-write).
+create function set_standing_allocation(p_location uuid, p_sku uuid, p_qty numeric) returns jsonb
+language plpgsql set search_path = '' as $$
+declare v_brewery uuid; v_alloc uuid; v_status public.allocation_status;
+begin
+  select brewery_id into v_brewery from public.locations where id = p_location;
+  if v_brewery is null then raise exception 'location not found'; end if;
+  select id into v_alloc from public.allocations
+    where source = 'taproom_standing' and ref = p_location and sku_id = p_sku and status = 'open';
+  if p_qty <= 0 then
+    if v_alloc is not null then
+      update public.allocations set status = 'released' where id = v_alloc;
+      v_status := 'released';
+    end if;
+  elsif v_alloc is not null then
+    update public.allocations set qty = p_qty where id = v_alloc;
+    v_status := 'open';
+  else
+    insert into public.allocations (brewery_id, sku_id, qty, source, ref, status)
+    values (v_brewery, p_sku, p_qty, 'taproom_standing', p_location, 'open')
+    returning id into v_alloc;
+    v_status := 'open';
+  end if;
+  return jsonb_build_object('allocation_id', v_alloc, 'status', v_status);
+end $$;
+
+create function create_replenishment_order(p_from uuid, p_to uuid, p_lines jsonb) returns jsonb
+language plpgsql set search_path = '' as $$
+declare v_brewery uuid; v jsonb;
+begin
+  select brewery_id into v_brewery from public.locations where id = p_to;
+  if v_brewery is null then raise exception 'location not found'; end if;
+  v := public.create_order(v_brewery, 'taproom_transfer', null, null, p_from, p_to, null, null, null, p_lines);
+  perform public.submit_order((v->>'order_id')::uuid);
+  perform public.confirm_order((v->>'order_id')::uuid);
+  return v;
+end $$;
 -- ---------------------------------------------------------------- RLS
 do $$
 declare t text;
@@ -1250,6 +1568,9 @@ begin
     execute format('create policy staff_insert on %I for insert with check (is_staff_of(brewery_id) and created_by = auth.uid())', t);
     execute format('revoke update, delete on %I from authenticated, anon', t);
   end loop;
+  -- order_events: append-only but with custom staff + customer policies
+  execute format('alter table %I enable row level security', 'order_events');
+  execute format('revoke update, delete on %I from authenticated, anon', 'order_events');
   -- admin-only (hold OAuth tokens)
   foreach t in array array['qbo_connections','pos_connections']
   loop
@@ -1283,14 +1604,16 @@ create policy customer_own_prices on price_list_items for select
 create policy customer_read on orders for select using (customer_id in (select my_customer_ids()));
 create policy customer_insert on orders for insert
   with check (customer_id in (select my_customer_ids()) and kind = 'wholesale' and status in ('draft','submitted'));
+-- A submitted order is locked from customer edits (spec decision 2): only the
+-- draft->submitted transition remains writable for the portal.
 create policy customer_update on orders for update
-  using (customer_id in (select my_customer_ids()) and status in ('draft','submitted'))
+  using (customer_id in (select my_customer_ids()) and status = 'draft')
   with check (customer_id in (select my_customer_ids()) and kind = 'wholesale' and status in ('draft','submitted'));
 create policy customer_read on order_lines for select
   using (order_id in (select id from orders where customer_id in (select my_customer_ids())));
 create policy customer_write on order_lines for all
-  using (order_id in (select id from orders where customer_id in (select my_customer_ids()) and status in ('draft','submitted')))
-  with check (order_id in (select id from orders where customer_id in (select my_customer_ids()) and status in ('draft','submitted')));
+  using (order_id in (select id from orders where customer_id in (select my_customer_ids()) and status = 'draft'))
+  with check (order_id in (select id from orders where customer_id in (select my_customer_ids()) and status = 'draft'));
 create policy customer_read on shipments for select
   using (order_id in (select id from orders where customer_id in (select my_customer_ids())));
 create policy customer_read on invoices for select using (customer_id in (select my_customer_ids()));
@@ -1298,15 +1621,43 @@ create policy customer_read on invoice_lines for select
   using (invoice_id in (select id from invoices where customer_id in (select my_customer_ids())));
 create policy customer_read on deliveries for select
   using (shipment_id in (select s.id from shipments s join orders o on o.id = s.order_id where o.customer_id in (select my_customer_ids())));
+create policy staff_read on order_events for select using (is_staff_of(brewery_id));
+create policy staff_insert on order_events for insert
+  with check (is_staff_of(brewery_id) and actor = auth.uid());
+create policy customer_read on order_events for select
+  using (order_id in (select id from orders where customer_id in (select my_customer_ids())));
+-- Portal users write events only through their own lifecycle transitions
+-- (create/update/submit on their own draft/submitted orders).
+create policy customer_insert on order_events for insert
+  with check (actor = auth.uid() and order_id in
+    (select id from orders where customer_id in (select my_customer_ids()) and status in ('draft','submitted')));
+
+-- Customer portal needs the brewery's warehouse location(s) to place orders
+-- (portal_create_order looks up the default warehouse); nothing else on
+-- locations is exposed to customers.
+create policy customer_read on locations for select
+  using (kind = 'warehouse' and brewery_id in (select c.brewery_id from customers c where c.id in (select my_customer_ids())));
 
 -- ---------------------------------------------------------------- immutability grants
 revoke update, delete on recipe_versions, recipe_ingredients from authenticated, anon;
 revoke update, delete on pos_sales from authenticated, anon;
 grant update (movement_id) on pos_sales to authenticated;
 
+-- Availability badge tiers for portal customers: coarse tiers only, never raw
+-- quantities (spec 1B decision 7). security definer on purpose — customers
+-- cannot read the ledger; the where-clause pins the caller to their own account.
+create function portal_availability(p_customer uuid) returns table (sku_id uuid, badge text)
+language sql stable security definer set search_path = '' as $$
+  select a.sku_id, case when a.qty <= 0 then 'out' when a.qty < 20 then 'low' else 'in' end
+  from public.atp a
+  join public.customers c on c.brewery_id = a.brewery_id
+  where c.id = p_customer and c.id in (select public.my_customer_ids());
+$$;
+-- ponytail: fixed low-stock threshold, per-brewery setting when someone asks
+
 -- ---------------------------------------------------------------- definer functions: never callable by anon
 -- These bypass RLS; only logged-in users (and policies evaluated as them) may run them.
-revoke execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), next_no(uuid, text)
+revoke execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), next_no(uuid, text), portal_availability(uuid)
   from public, anon;
-grant execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), next_no(uuid, text)
+grant execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), next_no(uuid, text), portal_availability(uuid)
   to authenticated;
