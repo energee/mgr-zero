@@ -218,13 +218,17 @@ describe("integration token isolation", () => {
     await expect(readIntegrationTokens(forgedCtx, "qbo")).rejects.toMatchObject({ status: 403 });
   });
 
-  it("keeps one POS connection per provider and purges only changed QBO identities", async () => {
+  it("allows one POS connection per supported provider", async () => {
     const { error: duplicatePosError } = await admin.from("pos_connections").insert({
       brewery_id: brewery.id,
       provider: "square",
       merchant_id: `merchant-${crypto.randomUUID()}`,
     });
     expect(duplicatePosError?.code).toBe("23505");
+  });
+
+  it("physically purges QBO tokens only on actual connection lifecycle changes", async () => {
+
 
     const lifecycleBrewery = await makeBrewery();
     const lifecycleAdmin = await makeStaff(lifecycleBrewery.id, "admin");
@@ -259,6 +263,13 @@ describe("integration token isolation", () => {
       refreshToken: "old-refresh-token",
     });
     expect(privateTokenCount(lifecycleBrewery.id, "qbo")).toBe(1);
+
+    const { error: realmChangeError } = await admin
+      .from("qbo_connections")
+      .update({ realm_id: `realm-${crypto.randomUUID()}` })
+      .eq("id", firstConnection!.id);
+    expect(realmChangeError).toBeNull();
+    expect(privateTokenCount(lifecycleBrewery.id, "qbo")).toBe(0);
 
     const { error: deleteError } = await admin.from("qbo_connections").delete().eq("id", firstConnection!.id);
     expect(deleteError).toBeNull();
@@ -296,5 +307,39 @@ describe("integration token isolation", () => {
       .eq("id", movedConnection!.id);
     expect(moveError).toBeNull();
     expect(privateTokenCount(movedBrewery.id, "qbo")).toBe(0);
+  });
+
+  it("physically purges POS tokens on merchant identity changes", async () => {
+    const posBrewery = await makeBrewery();
+    const posAdmin = await makeStaff(posBrewery.id, "admin");
+    const posCtx: Ctx = {
+      db: await asUser(posAdmin.email),
+      userId: posAdmin.id,
+      breweryId: posBrewery.id,
+      role: "admin",
+    };
+    const { data: posConnection, error: posConnectionError } = await admin
+      .from("pos_connections")
+      .insert({
+        brewery_id: posBrewery.id,
+        provider: "square",
+        merchant_id: `merchant-${crypto.randomUUID()}`,
+      })
+      .select("id")
+      .single();
+    expect(posConnectionError).toBeNull();
+    await storeIntegrationTokens(posCtx, {
+      provider: "square",
+      accessToken: "pos-access-token",
+      refreshToken: "pos-refresh-token",
+    });
+    expect(privateTokenCount(posBrewery.id, "square")).toBe(1);
+
+    const { error: merchantChangeError } = await admin
+      .from("pos_connections")
+      .update({ merchant_id: `merchant-${crypto.randomUUID()}` })
+      .eq("id", posConnection!.id);
+    expect(merchantChangeError).toBeNull();
+    expect(privateTokenCount(posBrewery.id, "square")).toBe(0);
   });
 });
