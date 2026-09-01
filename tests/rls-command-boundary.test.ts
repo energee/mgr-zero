@@ -207,6 +207,35 @@ async function invoicedOrder() {
   return { invoiceId: shipped.invoice_id, invoiceLineId: data.id };
 }
 
+describe("tenant-safe document counters", () => {
+  it("no authenticated user can call next_no directly, for their own or another brewery", async () => {
+    const other = await makeBrewery();
+    for (const ctx of [adminCtx, salesCtx, warehouseCtx, brewerCtx]) {
+      for (const b of [brewery.id, other.id]) {
+        const { error } = await ctx.db.rpc("next_no", { b, k: "order" });
+        expect(error?.code, `${ctx.role} next_no(${b === other.id ? "other" : "own"})`).toBe("42501");
+      }
+    }
+    const { data: counters } = await admin.from("brewery_counters").select("key").eq("brewery_id", other.id);
+    expect(counters).toEqual([]);
+  });
+
+  it("orders created through the authorized lifecycle RPC still number from the owning brewery's counter only", async () => {
+    const other = await makeBrewery();
+    const { data: before } = await admin.from("brewery_counters").select("next").eq("brewery_id", brewery.id).eq("key", "order").maybeSingle();
+    const { data, error } = await salesCtx.db.rpc("create_order", {
+      p_brewery: brewery.id, p_kind: "wholesale", p_customer: customerId, p_ship_to: shipToId,
+      p_from_location: locationId, p_to_location: null, p_requested: null, p_po: null, p_note: null,
+      p_lines: [{ sku_id: skuId, qty: 1 }],
+    });
+    expect(error).toBeNull();
+    const { data: order } = await admin.from("orders").select("order_no").eq("id", data.order_id).single();
+    expect(order!.order_no).toBe((before?.next ?? 1));
+    const { data: foreign } = await admin.from("brewery_counters").select("key").eq("brewery_id", other.id);
+    expect(foreign).toEqual([]);
+  });
+});
+
 describe("registered staff mutation role × RPC matrix", () => {
   const matrix: MatrixCase[] = [
     {

@@ -152,7 +152,6 @@ describe("schema rules", () => {
           ('my_brewery_ids()'),
           ('is_staff_of(uuid)'),
           ('staff_role(uuid)'),
-          ('next_no(uuid,text)'),
           ('my_customer_ids()'),
           ('is_authorized_staff_rpc(uuid,text,staff_role[])'),
           ('require_authorized_staff_rpc(uuid,text,staff_role[])'),
@@ -194,6 +193,13 @@ describe("schema rules", () => {
       from (select * from expected except select * from actual) missing
       order by 1
     `)).toEqual([]);
+  });
+
+  it("restricts brewery_counters keys to committed document kinds", () => {
+    expect(sql(`
+      select pg_get_constraintdef(oid) from pg_constraint
+      where conrelid = 'public.brewery_counters'::regclass and contype = 'c'
+    `)).toEqual(["CHECK ((key = ANY (ARRAY['batch'::text, 'run'::text, 'po'::text, 'order'::text, 'invoice'::text])))"]);
   });
 
   it("keeps integration token storage private and token columns out of public metadata", () => {

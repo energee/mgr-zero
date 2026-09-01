@@ -85,8 +85,12 @@ create table brewery_counters (
   brewery_id uuid not null references breweries(id),
   key text not null,
   next bigint not null default 1,
-  primary key (brewery_id, key)
+  primary key (brewery_id, key),
+  check (key in ('batch', 'run', 'po', 'order', 'invoice'))   -- the committed document kinds
 );
+-- Internal only: no Data API role may execute this (see the grants section).
+-- Reached solely through the set_doc_no trigger below, which runs as the
+-- owner so it can advance the owning brewery's counter and no other.
 create function next_no(b uuid, k text) returns bigint
 language sql security definer set search_path = '' as $$
   insert into public.brewery_counters (brewery_id, key, next) values (b, k, 2)
@@ -94,7 +98,7 @@ language sql security definer set search_path = '' as $$
   returning next - 1
 $$;
 -- before insert trigger: set_doc_no('<column>', '<counter key>')
-create function set_doc_no() returns trigger language plpgsql set search_path = '' as $$
+create function set_doc_no() returns trigger language plpgsql security definer set search_path = '' as $$
 declare col text := tg_argv[0]; k text := tg_argv[1]; cur bigint;
 begin
   execute format('select ($1).%I', col) into cur using new;
@@ -2329,10 +2333,12 @@ $$;
 
 -- ---------------------------------------------------------------- definer functions: never callable by anon
 -- These bypass RLS; only logged-in users (and policies evaluated as them) may run them.
-revoke execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), next_no(uuid, text), portal_availability(uuid)
+revoke execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), portal_availability(uuid)
   from public, anon;
-grant execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), next_no(uuid, text), portal_availability(uuid)
+grant execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), portal_availability(uuid)
   to authenticated;
+-- Document counters advance only inside the owner-run set_doc_no trigger.
+revoke execute on function next_no(uuid, text), set_doc_no() from public, anon, authenticated;
 
 -- Token RPCs are a server-only escape hatch. The service-role grant appears
 -- with the explicit ACL catalog below; no browser role ever receives EXECUTE.
@@ -2388,7 +2394,6 @@ grant execute on function
   my_brewery_ids(),
   is_staff_of(uuid),
   staff_role(uuid),
-  next_no(uuid, text),
   my_customer_ids(),
   is_authorized_staff_rpc(uuid, text, public.staff_role[]),
   require_authorized_staff_rpc(uuid, text, public.staff_role[]),
