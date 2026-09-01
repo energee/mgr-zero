@@ -1,11 +1,49 @@
 // lib/commands/chat.ts — RLS-bound chat integration commands: staff linking
-// (consume proof, unlink, link status). Settings/health operations arrive with
-// the settings page task. Every write is one Postgres RPC.
+// (consume proof, unlink, link status) and integration-owned settings
+// (personal preferences/quiet hours, brewery quiet hours, operations channel).
+// None of these touch MGR due state. Every write is one Postgres RPC.
 import { z } from "zod";
 import { defineCommand, defineQuery, unwrap, type StaffRole } from "./registry";
 import { sha256 } from "@/lib/chat/linking";
 
 const STAFF: StaffRole[] = ["admin", "sales", "warehouse", "brewer"];
+const REASONS = ["submitted_order", "pick_due", "delivery_next", "fermentation_reading_overdue", "operations_digest"] as const;
+const hhmm = z.string().regex(/^\d{2}:\d{2}$/, "HH:MM");
+const quietHours = z.object({ start: hhmm, end: hhmm, timezone: z.string().min(1).optional() }).nullable().optional();
+
+defineCommand({
+  name: "set_notification_preference",
+  description: "Mute/unmute one notification reason for yourself and optionally override your quiet hours (chat delivery only; MGR Today is unaffected)",
+  input: z.object({ reason: z.enum(REASONS), enabled: z.boolean(), quietHours }),
+  roles: STAFF,
+  handler: async (ctx, i) => {
+    await unwrap(ctx.db.rpc("set_notification_preference", {
+      p_brewery: ctx.breweryId, p_reason: i.reason, p_enabled: i.enabled,
+      p_quiet_start: i.quietHours?.start ?? null, p_quiet_end: i.quietHours?.end ?? null, p_quiet_tz: i.quietHours?.timezone ?? null,
+    }));
+    return { ok: true };
+  },
+});
+
+defineCommand({
+  name: "set_brewery_quiet_hours",
+  description: "Set the brewery-wide quiet hours (brewery time) that delay every personal chat notification; null clears them",
+  input: z.object({ installationId: z.string().uuid(), start: hhmm.nullable(), end: hhmm.nullable() }),
+  roles: ["admin"],
+  handler: async (ctx, i) => {
+    await unwrap(ctx.db.rpc("set_brewery_quiet_hours", { p_installation: i.installationId, p_start: i.start, p_end: i.end }));
+    return { ok: true };
+  },
+});
+
+defineCommand({
+  name: "set_notification_destination",
+  description: "Choose the one private operations channel that receives the morning and midday digests (replaces the previous one)",
+  input: z.object({ installationId: z.string().uuid(), externalDestinationId: z.string().min(1) }),
+  roles: ["admin"],
+  handler: async (ctx, i) =>
+    await unwrap(ctx.db.rpc("set_notification_destination", { p_installation: i.installationId, p_external_destination_id: i.externalDestinationId })) as { id: string },
+});
 
 defineCommand({
   name: "consume_chat_link_proof",
