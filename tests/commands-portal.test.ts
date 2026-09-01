@@ -85,6 +85,31 @@ describe("portal commands", () => {
     await expect(runCommand("list_orders", {}, custCtx)).rejects.toThrow(/permission denied/);
   });
 
+  it("replays an identical portal order before re-resolving the default warehouse", async () => {
+    const input = {
+      shipToId,
+      poNumber: `replay-${crypto.randomUUID()}`,
+      lines: [{ skuId, qty: 1 }],
+    };
+    const execution = {
+      requestId: crypto.randomUUID(),
+      correlationId: crypto.randomUUID(),
+    };
+    const first = await runCommand("portal_create_order", input, custCtx, execution) as { order_id: string };
+
+    await admin.from("locations").insert({
+      id: "00000000-0000-4000-8000-000000000000",
+      brewery_id: b.id,
+      name: "Earlier warehouse",
+      kind: "warehouse",
+    });
+    const replay = await runCommand("portal_create_order", input, custCtx, execution);
+
+    expect(replay).toEqual(first);
+    const orders = await admin.from("orders").select("id").eq("id", first.order_id);
+    expect(orders.data).toHaveLength(1);
+  });
+
   it("portal_create_order still succeeds when the brewery has more than one warehouse", async () => {
     // Nothing constrains a brewery to a single warehouse; the lookup must
     // tolerate multiple rows (.single() would throw PGRST116 without a limit).

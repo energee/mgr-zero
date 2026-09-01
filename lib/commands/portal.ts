@@ -1,6 +1,6 @@
 // lib/commands/portal.ts — customer-portal commands. role: "customer" only;
-// ctx.customerId scopes everything. Mutations reuse the same plpgsql fns as
-// staff (RLS lets customers write only their own draft/submitted orders).
+// ctx.customerId scopes everything. Mutations call request-ledger-backed RPCs
+// that derive the caller's tenant and role inside the database.
 import { z } from "zod";
 import { defineCommand, defineQuery, unwrap, CommandError, Ctx } from "./registry";
 
@@ -15,20 +15,16 @@ defineCommand({
   name: "portal_create_order", description: "Portal: create a draft order for the caller's account",
   roles: "customer",
   input: z.object({ shipToId: z.string().uuid(), poNumber: z.string().optional(), note: z.string().optional(), lines }),
-  handler: async (ctx, i) => {
+  handler: (ctx, i, execution) => {
     const customerId = requireCustomer(ctx);
-    // The brewery's default shipping origin: one of its warehouses, picked
-    // deterministically. .single() errors if more than one row matches
-    // (PGRST116), and nothing constrains a brewery to one warehouse — so
-    // .limit(1) is load-bearing, not a no-op; locations has no created_at
-    // column, so order by id (stable, arbitrary but deterministic) rather
-    // than insertion order.
-    const wh = await unwrap(ctx.db.from("locations").select("id").eq("brewery_id", ctx.breweryId).eq("kind", "warehouse").order("id").limit(1).single());
-    return unwrap(ctx.db.rpc("create_order", {
-      p_brewery: ctx.breweryId, p_kind: "wholesale", p_customer: customerId, p_ship_to: i.shipToId,
-      p_from_location: wh!.id, p_to_location: null, p_requested: null,
-      p_po: i.poNumber ?? null, p_note: i.note ?? null,
+    return unwrap(ctx.db.rpc("portal_create_order", {
+      p_brewery: ctx.breweryId,
+      p_customer: customerId,
+      p_ship_to: i.shipToId,
+      p_po: i.poNumber ?? null,
+      p_note: i.note ?? null,
       p_lines: i.lines.map(l => ({ sku_id: l.skuId, qty: l.qty })),
+      p_request_id: execution.requestId,
     }));
   },
 });
@@ -37,10 +33,10 @@ defineCommand({
   name: "portal_update_draft_order", description: "Portal: replace a draft order's lines/fields",
   roles: "customer",
   input: z.object({ orderId: z.string().uuid(), shipToId: z.string().uuid().optional(), poNumber: z.string().optional(), note: z.string().optional(), lines }),
-  handler: (ctx, i) => unwrap(ctx.db.rpc("update_draft_order", {
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_draft_order", {
     p_order: i.orderId, p_ship_to: i.shipToId ?? null, p_requested: null,
     p_po: i.poNumber ?? null, p_note: i.note ?? null,
-    p_lines: i.lines.map(l => ({ sku_id: l.skuId, qty: l.qty })),
+    p_lines: i.lines.map(l => ({ sku_id: l.skuId, qty: l.qty })), p_request_id: execution.requestId,
   })),
 });
 
@@ -48,7 +44,7 @@ defineCommand({
   name: "portal_submit_order", description: "Portal: submit a draft order",
   roles: "customer",
   input: z.object({ orderId: z.string().uuid() }),
-  handler: (ctx, i) => unwrap(ctx.db.rpc("submit_order", { p_order: i.orderId })),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("submit_order", { p_order: i.orderId, p_request_id: execution.requestId })),
 });
 
 defineQuery({

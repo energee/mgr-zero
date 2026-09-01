@@ -20,14 +20,14 @@ describe("command registry", () => {
   it("retains command and query metadata without executing a definition lookup", async () => {
     _clearRegistry();
     let executions = 0;
-    const write = defineCommand({
+    defineCommand({
       name: "write", input: z.object({}), roles: ["admin"],
       handler: async (_ctx, _input, execution) => {
         executions += 1;
         return execution;
       },
     });
-    const read = defineQuery({
+    defineQuery({
       name: "read", input: z.object({}), roles: ["admin"],
       handler: async () => ({ ok: true }),
     });

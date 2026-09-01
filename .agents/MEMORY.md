@@ -37,6 +37,15 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
   `Authorization: Bearer <access_token>` from password grant against the
   Supabase Auth URL. No resource REST routes, no API keys, until a non-user
   machine client exists.
+- Public-schema table DML is revoked from `anon` and `authenticated`; writes use
+  explicitly granted `security definer` RPCs that derive actor/tenant/role and
+  bind `(actor, requestId)` to brewery, command, canonical payload, and result
+  in `private.command_requests`. Local Supabase disables automatic Data API
+  grants so the baseline ACL is self-contained.
+- Until the durable Task 13 import workflow lands, each import row operation
+  derives a deterministic UUIDv8 from SHA-256 of the complete top-level
+  `requestId`, row number, and operation number. This is replay-safe but not
+  durable job state.
 
 ## Gotchas (carried from MGR v1)
 - PostgREST caches the schema: after DDL, errors naming a column/enum that plainly exists are a stale cache — `NOTIFY pgrst, 'reload schema'` or restart the stack before debugging.

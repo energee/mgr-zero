@@ -6,8 +6,9 @@
 // row never aborts the good ones in the same batch.
 // atomic-exempt: rows are independent by design and re-import is idempotent
 // by name; a customer row's customer+ship_to pair is the one non-atomic pair.
+import { createHash } from "node:crypto";
 import { z } from "zod";
-import { defineCommand, runCommand, unwrap, CommandError, Ctx } from "./registry";
+import { defineCommand, runCommand, unwrap, CommandError, Ctx, CommandExecution } from "./registry";
 import { insertMovement } from "./inventory";
 import { IMPORT_ROW_CAP } from "./import-limits";
 
@@ -15,12 +16,12 @@ type Row = Record<string, string>;
 type ImportResult = { inserted: number; errors: { row: number; message: string }[] };
 
 // Runs `fn` once per row, collecting failures instead of aborting the batch.
-async function runRowImport(rows: Row[], fn: (r: Row) => Promise<void>): Promise<ImportResult> {
+async function runRowImport(rows: Row[], fn: (r: Row, row: number) => Promise<void>): Promise<ImportResult> {
   const errors: ImportResult["errors"] = [];
   let inserted = 0;
   for (let row = 0; row < rows.length; row++) {
     try {
-      await fn(rows[row]);
+      await fn(rows[row], row);
       inserted++;
     } catch (e) {
       errors.push({ row, message: e instanceof Error ? e.message : String(e) });
@@ -38,6 +39,23 @@ function memo<T>(cache: Map<string, Promise<T>>, key: string, fn: () => Promise<
 }
 type Lookups = Record<"product" | "priceList" | "sku" | "location" | "customer", Map<string, Promise<string>>>;
 const newLookups = (): Lookups => ({ product: new Map(), priceList: new Map(), sku: new Map(), location: new Map(), customer: new Map() });
+
+// Deterministic row-local request IDs keep every temporary import child replayable
+// until Task 13 replaces this in-memory loop with a durable import workflow.
+function importExecution(execution: CommandExecution, row: number, operation: number): CommandExecution {
+  const digest = createHash("sha256")
+    .update(`${execution.requestId}:${row}:${operation}`)
+    .digest("hex");
+  const variant = ((Number.parseInt(digest[16], 16) & 0x3) | 0x8).toString(16);
+  const requestId = [
+    digest.slice(0, 8),
+    digest.slice(8, 12),
+    `8${digest.slice(13, 16)}`,
+    `${variant}${digest.slice(17, 20)}`,
+    digest.slice(20, 32),
+  ].join("-");
+  return { requestId, correlationId: execution.correlationId };
+}
 
 function requireField(row: Row, field: string): string {
   const value = row[field]?.trim();
@@ -84,15 +102,15 @@ async function requireId(ctx: Ctx, table: string, name: string, label: string) {
   return id;
 }
 
-const findOrCreateProduct = (ctx: Ctx, L: Lookups, name: string, style?: string, abv?: number) =>
+const findOrCreateProduct = (ctx: Ctx, L: Lookups, name: string, execution: CommandExecution, style?: string, abv?: number) =>
   memo(L.product, name, async () =>
     (await findId(ctx, "products", name)) ??
-    (await runCommand<{ id: string }>("create_product", { name, style: style || undefined, abv }, ctx)).id);
+    ((await runCommand("create_product", { name, style: style || undefined, abv }, ctx, execution) as { id: string }).id));
 
-const findOrCreatePriceList = (ctx: Ctx, L: Lookups, name: string) =>
+const findOrCreatePriceList = (ctx: Ctx, L: Lookups, name: string, execution: CommandExecution) =>
   memo(L.priceList, name, async () =>
     (await findId(ctx, "price_lists", name)) ??
-    (await unwrap(ctx.db.from("price_lists").insert({ brewery_id: ctx.breweryId, name }).select("id").single()))!.id);
+    ((await runCommand("upsert_price_list", { name }, ctx, execution) as { id: string }).id));
 
 // skus are unique per (product_id, name), not per brewery — every brewery has a
 // "1/2 bbl keg" under many products — so resolve through the product name too.
@@ -109,53 +127,43 @@ const findCustomer = (ctx: Ctx, L: Lookups, name: string) => memo(L.customer, na
 
 // --- per-kind row inserters ---------------------------------------------------
 
-const importers: Record<string, (ctx: Ctx, L: Lookups, r: Row) => Promise<void>> = {
-  customers: async (ctx, _L, r) => {
-    await unwrap(ctx.db.from("customers").insert({
-      brewery_id: ctx.breweryId,
-      name: requireField(r, "name"),
-      state: requireField(r, "state"),
-      type: r.type?.trim() || undefined,
-      license_no: r.license_no?.trim() || null,
-      payment_terms: r.payment_terms?.trim() || undefined,
-    }));
+const importers: Record<string, (ctx: Ctx, lookups: Lookups, row: Row, index: number, execution: CommandExecution) => Promise<void>> = {
+  customers: async (ctx, _lookups, row, index, execution) => {
+    await runCommand("upsert_customer", {
+      name: requireField(row, "name"), state: requireField(row, "state"),
+      type: row.type?.trim() || "retailer", licenseNumber: row.license_no?.trim() || undefined,
+      paymentTerms: row.payment_terms?.trim() || undefined,
+    }, ctx, importExecution(execution, index, 1));
   },
-
-  ship_tos: async (ctx, L, r) => {
-    const customer_id = await findCustomer(ctx, L, requireField(r, "customer_name"));
-    await unwrap(ctx.db.from("ship_tos").insert({
-      brewery_id: ctx.breweryId, customer_id,
-      label: requireField(r, "label"), address1: requireField(r, "address1"),
-      city: requireField(r, "city"), state: requireField(r, "state"), zip: requireField(r, "zip"),
-    }));
+  ship_tos: async (ctx, lookups, row, index, execution) => {
+    const customerId = await findCustomer(ctx, lookups, requireField(row, "customer_name"));
+    await runCommand("upsert_ship_to", {
+      customerId, label: requireField(row, "label"), address1: requireField(row, "address1"),
+      city: requireField(row, "city"), state: requireField(row, "state"), zip: requireField(row, "zip"),
+    }, ctx, importExecution(execution, index, 2));
   },
-
-  products_skus: async (ctx, L, r) => {
-    const name = requireField(r, "sku_name");
-    const packageType = requireField(r, "package_type");
-    const bblPerUnit = numericString(r, "bbl_per_unit");
-    const unitsPerCase = optionalNumber(r, "units_per_case");
-    const productId = await findOrCreateProduct(ctx, L, requireField(r, "product"), r.style?.trim(), optionalNumber(r, "abv"));
-    await runCommand("create_sku", { productId, name, packageType, unitsPerCase, bblPerUnit }, ctx);
+  products_skus: async (ctx, lookups, row, index, execution) => {
+    const productId = await findOrCreateProduct(ctx, lookups, requireField(row, "product"), importExecution(execution, index, 3), row.style?.trim(), optionalNumber(row, "abv"));
+    await runCommand("create_sku", {
+      productId, name: requireField(row, "sku_name"), packageType: requireField(row, "package_type"),
+      unitsPerCase: optionalNumber(row, "units_per_case"), bblPerUnit: numericString(row, "bbl_per_unit"),
+    }, ctx, importExecution(execution, index, 4));
   },
-
-  price_list_items: async (ctx, L, r) => {
-    const unit_price_cents = integerField(r, "unit_price_cents");
-    const [sku_id, price_list_id] = await Promise.all([
-      findSku(ctx, L, requireField(r, "product"), requireField(r, "sku_name")),
-      findOrCreatePriceList(ctx, L, requireField(r, "price_list")),
+  price_list_items: async (ctx, lookups, row, index, execution) => {
+    const [skuId, priceListId] = await Promise.all([
+      findSku(ctx, lookups, requireField(row, "product"), requireField(row, "sku_name")),
+      findOrCreatePriceList(ctx, lookups, requireField(row, "price_list"), importExecution(execution, index, 5)),
     ]);
-    await unwrap(ctx.db.from("price_list_items").insert({ brewery_id: ctx.breweryId, price_list_id, sku_id, unit_price_cents }));
+    await runCommand("set_price", { priceListId, skuId, unitPriceCents: integerField(row, "unit_price_cents") }, ctx, importExecution(execution, index, 6));
   },
-
-  opening_balances: async (ctx, L, r) => {
-    const qty = numberField(r, "qty");
+  opening_balances: async (ctx, lookups, row, index, execution) => {
+    const qty = numberField(row, "qty");
     if (qty === 0) throw new Error(`invalid value for qty: "0" (qty cannot be 0)`);
     const [skuId, locationId] = await Promise.all([
-      findSku(ctx, L, requireField(r, "product"), requireField(r, "sku_name")),
-      findLocation(ctx, L, requireField(r, "location")),
+      findSku(ctx, lookups, requireField(row, "product"), requireField(row, "sku_name")),
+      findLocation(ctx, lookups, requireField(row, "location")),
     ]);
-    await insertMovement(ctx, { skuId, locationId, qty, type: "opening_balance" });
+    await insertMovement(ctx, { skuId, locationId, qty, type: "opening_balance" }, importExecution(execution, index, 7));
   },
 };
 
@@ -167,10 +175,10 @@ defineCommand({
     rows: z.array(z.record(z.string(), z.string())).max(IMPORT_ROW_CAP, `at most ${IMPORT_ROW_CAP} rows per import batch`),
   }),
   roles: ["admin"],
-  handler: (ctx, i) => {
-    const importer = importers[i.kind];
+  handler: (ctx, input, execution) => {
+    const importer = importers[input.kind];
     if (!importer) throw new CommandError("unknown import kind");
     const lookups = newLookups();
-    return runRowImport(i.rows, (r) => importer(ctx, lookups, r));
+    return runRowImport(input.rows, (row, index) => importer(ctx, lookups, row, index, execution));
   },
 });

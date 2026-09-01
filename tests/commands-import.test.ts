@@ -81,6 +81,48 @@ describe("import_csv", () => {
     expect(r.inserted).toBe(1);
   });
 
+  it("derives collision-resistant child request IDs from the full import request ID", async () => {
+    const productName = `Collision product ${crypto.randomUUID()}`;
+    const skuName = "Collision SKU";
+    const product = await admin.from("products")
+      .insert({ brewery_id: b.id, name: productName })
+      .select("id")
+      .single();
+    const sku = await admin.from("skus").insert({
+      brewery_id: b.id,
+      product_id: product.data!.id,
+      name: skuName,
+      package_type: "keg",
+      bbl_per_unit: 0.5,
+    }).select("id").single();
+    const input = {
+      kind: "opening_balances",
+      rows: [{ product: productName, sku_name: skuName, location: "WH", qty: "2" }],
+    };
+    const firstExecution = {
+      requestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaa1111",
+      correlationId: crypto.randomUUID(),
+    };
+    const secondExecution = {
+      requestId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaa2222",
+      correlationId: crypto.randomUUID(),
+    };
+
+    const first = await runCommand<ImportResult>("import_csv", input, ctx, firstExecution);
+    const second = await runCommand<ImportResult>("import_csv", input, ctx, secondExecution);
+    const replay = await runCommand<ImportResult>("import_csv", input, ctx, secondExecution);
+    expect(first.errors).toEqual([]);
+    expect(second.errors).toEqual([]);
+    expect(replay).toEqual(second);
+
+    const movements = await admin.from("inventory_movements")
+      .select("id")
+      .eq("brewery_id", b.id)
+      .eq("sku_id", sku.data!.id)
+      .eq("type", "opening_balance");
+    expect(movements.data).toHaveLength(2);
+  });
+
   it("rejects a batch over the 5000-row cap before touching the database", async () => {
     const rows = Array.from({ length: 5001 }, () => ({ name: "x", state: "PA" }));
     await expect(runCommand<ImportResult>("import_csv", { kind: "customers", rows }, ctx)).rejects.toThrow(/validation/i);

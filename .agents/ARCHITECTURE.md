@@ -8,9 +8,9 @@ never copy it into a second place.
 
 | Path | Owns |
 | --- | --- |
-| `supabase/migrations/*.sql` | Schema, RLS policies, triggers, grants. The only source of truth for data rules. Pre-deploy, the baseline is edited in place (see `.agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md`). Order lifecycle (`create_order`, `submit_order`, `confirm_order`, `adjust_order_lines`, `cancel_order`, `record_pick`, `ship_order`, `create_credit_memo`, `create_replenishment_order`) lives here as one `security invoker` plpgsql function per transition (iron rule 5); each appends to `order_events`, the append-only per-order change log (staff + customer RLS read/insert policies, no update/delete). |
+| `supabase/migrations/*.sql` | Schema, RLS policies, triggers, grants, and the transactional command-request ledger. The only source of truth for data rules. Pre-deploy, the baseline is edited in place (see `.agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md`). Application roles have read-only table access; every mutation enters through an explicitly granted, idempotent `security definer` RPC with `search_path = ''`, database-derived actor/tenant/role checks, and a canonical request hash. Private helpers and implementation functions are not executable by application roles. |
 | `lib/commands/registry.ts` | `defineCommand` / `defineQuery`, `Ctx`, role checks, `CommandError`. Every domain operation the app performs is registered here. |
-| `lib/commands/<area>.ts` | Business logic per area (catalog, inventory, import, invites, orders, customers, portal). Handlers get an RLS-bound `ctx.db`. `orders.ts` owns order lifecycle (create/submit/confirm/adjust/cancel), allocations, pick/ship, per-shipment invoices, credit memos, and replenishment — each multi-row transition is a thin caller into the one plpgsql function per iron rule 5. `customers.ts` owns customer/ship-to/price-list CRUD. `portal.ts` owns the customer-role commands (`portal_create_order`, `portal_submit_order`, `portal_catalog`, `portal_orders`, `portal_order`, `portal_invoices`) — the only commands a `customer` role may call. |
+| `lib/commands/<area>.ts` | Business logic per area (catalog, inventory, import, invites, orders, customers, portal). Handlers read through the RLS-bound `ctx.db`; public-schema writes call the narrow RPC boundary and forward `CommandExecution.requestId`. `orders.ts` owns order lifecycle (create/submit/confirm/adjust/cancel), allocations, pick/ship, per-shipment invoices, credit memos, and replenishment. `customers.ts` owns customer/ship-to/price-list CRUD. `portal.ts` owns the customer-role commands (`portal_create_order`, `portal_submit_order`, `portal_catalog`, `portal_orders`, `portal_order`, `portal_invoices`) — the only commands a `customer` role may call. |
 | `lib/commands/all.ts` | The one side-effecting import that registers every command module. |
 | `app/api/command/route.ts` | The single HTTP entry point. Dispatches to the registry; contains no business logic. Cookie session or `Authorization: Bearer <supabase access_token>`. |
 | `lib/commands/client.ts`, `use-command-form.ts` | How the UI calls commands. |
@@ -50,7 +50,7 @@ a gap to close, not a convention to trust.
    exception; they never authorize direct public-schema access. SaaS tenant
    provisioning is domain work: `provision_brewery` remains blocked until the
    registry has an explicit pre-tenant context, then invokes one
-   `security invoker` RPC for the brewery + first admin membership — never a fake
+   narrow `security definer` RPC for the brewery + first admin membership — never a fake
    `breweryId` or an RLS bypass. AI write tools only propose registered commands;
    an explicit user confirmation is required before execution. *Enforced by:*
    `tests/registry.test.ts` (validation and role checks); structure by review.
@@ -81,27 +81,30 @@ a gap to close, not a convention to trust.
    `eslint.config.mjs`, run in CI. Integration sync modules (`qbo.ts`, `pos.ts`,
    slices 1C/7) will need the same client for token storage; each is added to the
    eslint allowlist explicitly with its own permission check — never a blanket exemption.
-5. **A command that writes more than one row is one Postgres function.**
-   supabase-js cannot span a transaction across statements, so a handler that
-   does `insert` then `update` can half-commit. Such commands call a single
-   `security invoker` plpgsql function (`ctx.db.rpc(...)`); the handler is a
-   thin caller. One committed user action cannot be split across dependent
-   commands to evade this boundary. Per-row-independent bulk work (CSV import)
-   is the one exemption and says so with an `// atomic-exempt:` comment. MGR v1
-   learned this after real data loss
-   (`.agents/superpowers/specs/2026-08-31-mgr-v1-review.md`). *Enforced by:*
+5. **Every mutation is one idempotent Postgres transaction.**
+   Application roles have no direct table DML. A write handler calls one
+   explicitly granted `security definer` RPC (`ctx.db.rpc(...)`) that asserts
+   `auth.uid()`-derived tenant/role access, claims the actor/request ID against
+   the canonical payload, performs all dependent writes, and stores the result
+   before commit. An identical replay returns that result; changed command,
+   brewery, or payload conflicts. Private implementation helpers retain the
+   multi-row transaction rule and are not application-callable. Per-row
+   independent CSV work is the temporary exemption and derives deterministic
+   child request IDs until the durable import workflow replaces it. *Enforced
+   by:* `tests/data-api-boundary.test.ts`,
+   `tests/command-idempotency.test.ts`, `tests/schema-rules.test.ts`, and
    `tests/write-atomicity.test.ts`.
 
 ## Pre-implementation gates
 
-- **Replayable commands are idempotent at the server.** Before the composer or
-  any offline outbox may replay a write, `/api/command` must carry a stable
-  `requestId` end to end and the server must durably return the first result for
-  repeats of that ID. The server binds the ID to the authenticated actor, tenant
-  context, and full submitted write envelope; mismatched reuse is rejected.
-  Keeping an ID only in IndexedDB is not deduplication. The persistence shape is
-  deliberately deferred; replay stays disabled until the contract and its
-  real-Postgres proof exist.
+- **Replayable commands are idempotent at the server.** `/api/command` carries
+  one stable `requestId` per write action. `private.command_requests` binds it
+  to the authenticated actor, brewery, command, and canonical payload, commits
+  the first result with the domain effect, returns that result on replay, and
+  rejects mismatched reuse. This permits transport retries for current write
+  RPCs. It does not by itself enable the AI composer or an offline outbox;
+  registry-owned preview/version contracts and explicit eligibility remain
+  required below.
 - **AI proposals are registry-owned contracts.** Before composer writes ship,
   registry metadata must declare each write command's risk, preview/canonicalize
   hook, compensation, and offline/replay eligibility. The language layer emits

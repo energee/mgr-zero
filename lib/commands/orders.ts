@@ -20,11 +20,11 @@ defineCommand({
     requestedShipDate: z.string().date().optional(), poNumber: z.string().optional(), note: z.string().optional(),
     lines,
   }),
-  handler: (ctx, i) => unwrap(ctx.db.rpc("create_order", {
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_order", {
     p_brewery: ctx.breweryId, p_kind: i.kind, p_customer: i.customerId ?? null, p_ship_to: i.shipToId ?? null,
     p_from_location: i.fromLocationId, p_to_location: i.toLocationId ?? null,
     p_requested: i.requestedShipDate ?? null, p_po: i.poNumber ?? null, p_note: i.note ?? null,
-    p_lines: toLines(i.lines),
+    p_lines: toLines(i.lines), p_request_id: execution.requestId,
   })),
 });
 
@@ -36,9 +36,9 @@ defineCommand({
     requestedShipDate: z.string().date().optional(), poNumber: z.string().optional(), note: z.string().optional(),
     lines,
   }),
-  handler: (ctx, i) => unwrap(ctx.db.rpc("update_draft_order", {
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_draft_order", {
     p_order: i.orderId, p_ship_to: i.shipToId ?? null, p_requested: i.requestedShipDate ?? null,
-    p_po: i.poNumber ?? null, p_note: i.note ?? null, p_lines: toLines(i.lines),
+    p_po: i.poNumber ?? null, p_note: i.note ?? null, p_lines: toLines(i.lines), p_request_id: execution.requestId,
   })),
 });
 
@@ -46,28 +46,28 @@ defineCommand({
   name: "submit_order", description: "Submit a draft order for confirmation",
   roles: [...salesRoles],
   input: z.object({ orderId: z.string().uuid() }),
-  handler: (ctx, i) => unwrap(ctx.db.rpc("submit_order", { p_order: i.orderId })),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("submit_order", { p_order: i.orderId, p_request_id: execution.requestId })),
 });
 
 defineCommand({
   name: "confirm_order", description: "Confirm a submitted order; creates allocations and returns ATP soft warnings",
   roles: [...salesRoles],
   input: z.object({ orderId: z.string().uuid() }),
-  handler: (ctx, i) => unwrap(ctx.db.rpc("confirm_order", { p_order: i.orderId })),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("confirm_order", { p_order: i.orderId, p_request_id: execution.requestId })),
 });
 
 defineCommand({
   name: "adjust_order_lines", description: "Replace lines on a confirmed/picked order; re-syncs allocations; flags restocking when picked",
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({ orderId: z.string().uuid(), reason: z.string().min(1), lines }),
-  handler: (ctx, i) => unwrap(ctx.db.rpc("adjust_order_lines", { p_order: i.orderId, p_lines: toLines(i.lines), p_reason: i.reason })),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("adjust_order_lines", { p_order: i.orderId, p_lines: toLines(i.lines), p_reason: i.reason, p_request_id: execution.requestId })),
 });
 
 defineCommand({
   name: "cancel_order", description: "Cancel an unshipped order and release its allocations",
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({ orderId: z.string().uuid(), reason: z.string().min(1) }),
-  handler: (ctx, i) => unwrap(ctx.db.rpc("cancel_order", { p_order: i.orderId, p_reason: i.reason })),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("cancel_order", { p_order: i.orderId, p_reason: i.reason, p_request_id: execution.requestId })),
 });
 
 const pickLines = z.array(z.object({ lineId: z.string().uuid(), qty: z.number().nonnegative() })).min(1);
@@ -76,8 +76,8 @@ defineCommand({
   name: "record_pick", description: "Record picked quantities per line; order becomes picked",
   roles: [...warehouseRoles],
   input: z.object({ orderId: z.string().uuid(), picks: pickLines }),
-  handler: (ctx, i) => unwrap(ctx.db.rpc("record_pick", {
-    p_order: i.orderId, p_picks: i.picks.map(p => ({ line_id: p.lineId, qty_picked: p.qty })),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_pick", {
+    p_order: i.orderId, p_picks: i.picks.map(p => ({ line_id: p.lineId, qty_picked: p.qty })), p_request_id: execution.requestId,
   })),
 });
 
@@ -88,9 +88,9 @@ defineCommand({
     orderId: z.string().uuid(), carrier: z.string().optional(), tracking: z.string().optional(),
     ship: pickLines,
   }),
-  handler: (ctx, i) => unwrap(ctx.db.rpc("ship_order", {
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("ship_order", {
     p_order: i.orderId, p_ship: i.ship.map(s => ({ line_id: s.lineId, qty_shipped: s.qty })),
-    p_carrier: i.carrier ?? null, p_tracking: i.tracking ?? null,
+    p_carrier: i.carrier ?? null, p_tracking: i.tracking ?? null, p_request_id: execution.requestId,
   })),
 });
 
@@ -101,9 +101,9 @@ defineCommand({
     invoiceId: z.string().uuid(), locationId: z.string().uuid(), reason: z.string().min(1),
     lines: z.array(z.object({ invoiceLineId: z.string().uuid(), qty: z.number().positive() })).min(1),
   }),
-  handler: (ctx, i) => unwrap(ctx.db.rpc("create_credit_memo", {
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_credit_memo", {
     p_invoice: i.invoiceId, p_lines: i.lines.map(l => ({ invoice_line_id: l.invoiceLineId, qty: l.qty })),
-    p_location: i.locationId, p_reason: i.reason,
+    p_location: i.locationId, p_reason: i.reason, p_request_id: execution.requestId,
   })),
 });
 
@@ -111,8 +111,8 @@ defineCommand({
   name: "create_replenishment_order", description: "Create a confirmed taproom transfer order from par-gap quantities",
   roles: [...salesRoles],
   input: z.object({ fromLocationId: z.string().uuid(), toLocationId: z.string().uuid(), lines }),
-  handler: (ctx, i) => unwrap(ctx.db.rpc("create_replenishment_order", {
-    p_from: i.fromLocationId, p_to: i.toLocationId, p_lines: toLines(i.lines),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_replenishment_order", {
+    p_from: i.fromLocationId, p_to: i.toLocationId, p_lines: toLines(i.lines), p_request_id: execution.requestId,
   })),
 });
 
