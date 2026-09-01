@@ -58,8 +58,10 @@ contract:
 
 Trigger once via `workflow_dispatch`; verify the dream PR (a) edits only
 editable files, (b) cites evidence for each change, (c) correctly catches the
-known current drift (PROGRESS.md predates PRs #7/#8). Normal CI runs on the
-dream PR as the merge gate.
+known current drift (PROGRESS.md predates PRs #7/#8). `ci` runs on the dream
+PR as the merge gate. Claude Code Review is skipped on `dreaming/main` (job
+skipped, not failed): the action rejects non-human PR authors, and a Claude
+review of Claude's own doc-curation PR is not useful.
 
 Known limitation: the dream pushes with `github.token`, and GitHub suppresses
 workflow triggers for such pushes — the dream PR gets no CI run and there is
