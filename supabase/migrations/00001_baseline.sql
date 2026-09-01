@@ -2487,9 +2487,10 @@ begin
     set state = 'suppressed', resolved_at = p_now, lease_expires_at = null, updated_at = now()
     from public.notification_occurrences o
     where dl.occurrence_id = o.id and o.brewery_id = p_brewery and o.state = 'resolved'
-      and dl.state in ('queued', 'retrying', 'leased');
+      and dl.state in ('queued', 'retrying', 'leased') and dl.provider_message_id is null;
+  -- sent messages get one resolved update: re-queue them keeping the message id
   update public.notification_deliveries dl
-    set resolved_at = p_now, updated_at = now()
+    set state = 'queued', next_attempt_at = p_now, resolved_at = p_now, updated_at = now()
     from public.notification_occurrences o
     where dl.occurrence_id = o.id and o.brewery_id = p_brewery and o.state = 'resolved'
       and dl.state in ('sent', 'updated') and dl.resolved_at is null;
@@ -2666,6 +2667,125 @@ begin
 end $$;
 revoke execute on function record_chat_callback_receipt(text, text, text, text, text, text) from public, anon, authenticated;
 grant execute on function record_chat_callback_receipt(text, text, text, text, text, text) to service_role;
+
+-- ---------------------------------------------------------------- chat worker reads/claims (service_role only)
+create function chat_assert_job() returns void language plpgsql stable set search_path = '' as $$
+begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'permission denied: internal job only' using errcode = '42501';
+  end if;
+end $$;
+
+create function list_chat_scan_targets() returns setof uuid
+language sql stable security definer set search_path = '' as $$
+  select public.chat_assert_job();
+  select distinct brewery_id from public.chat_installations where state = 'active';
+$$;
+
+-- Claims pending callback receipts (recovering ones stuck in processing).
+create function claim_chat_callback_receipts(p_limit int, p_now timestamptz)
+returns table (id uuid, brewery_id uuid, installation_id uuid, external_installation_id text, external_user_id text, callback_kind text)
+language plpgsql security definer set search_path = '' as $$
+#variable_conflict use_column
+begin
+  perform public.chat_assert_job();
+  update public.chat_callback_receipts r set disposition = 'pending', processing_at = null
+    where r.disposition = 'processing' and r.processing_at < p_now - interval '5 minutes';
+  return query
+    with picked as (
+      select r.id from public.chat_callback_receipts r
+        where r.disposition = 'pending' order by r.received_at
+        limit least(greatest(coalesce(p_limit, 1), 1), 100)
+        for update skip locked
+    )
+    update public.chat_callback_receipts r
+      set disposition = 'processing', processing_at = p_now
+      from picked, public.chat_installations i
+      where r.id = picked.id and i.id = r.installation_id
+      returning r.id, r.brewery_id, r.installation_id, i.external_installation_id, r.external_user_id, r.callback_kind;
+end $$;
+
+create function complete_chat_callback_receipt(p_receipt uuid, p_disposition text, p_error_code text) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  perform public.chat_assert_job();
+  if p_disposition not in ('processed', 'ignored', 'failed') then raise exception 'invalid disposition %', p_disposition; end if;
+  update public.chat_callback_receipts
+    set disposition = p_disposition, error_code = p_error_code, completed_at = now()
+    where id = p_receipt;
+end $$;
+
+-- Active occurrences visible to one linked external user (role/assignment
+-- filtered, same rule as get_today_items). Null when not actively linked.
+create function get_chat_home_items(p_installation uuid, p_external_user_id text) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare r record;
+begin
+  perform public.chat_assert_job();
+  select i.brewery_id, l.user_id, bu.role into r
+    from public.chat_installations i
+    join public.chat_user_links l on l.installation_id = i.id and l.external_user_id = p_external_user_id and l.state = 'active'
+    join public.brewery_users bu on bu.brewery_id = i.brewery_id and bu.user_id = l.user_id
+    where i.id = p_installation and i.state = 'active';
+  if not found then return null; end if;
+  return coalesce((
+    select jsonb_agg(jsonb_build_object('id', o.id, 'reason', o.reason, 'state', o.state, 'subject_type', o.subject_type,
+      'subject_id', o.subject_id, 'urgency', o.urgency, 'due_at', o.due_at, 'payload', o.payload, 'semantic_key', o.semantic_key)
+      order by o.due_at nulls last, o.created_at)
+    from public.notification_occurrences o
+    where o.brewery_id = r.brewery_id and o.state = 'active' and o.reason <> 'operations_digest'
+      and (r.role = 'admin' or o.payload->'recipient_roles' ? r.role::text)
+      and ((o.payload->>'assigned_user_id') is null or (o.payload->>'assigned_user_id')::uuid = r.user_id)
+  ), '[]'::jsonb);
+end $$;
+
+-- Everything the worker must re-check before touching the provider, in one read.
+create function get_chat_delivery_context(p_delivery uuid) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select public.chat_assert_job();
+  select jsonb_build_object(
+    'delivery', jsonb_build_object('id', d.id, 'state', d.state, 'attempt_count', d.attempt_count,
+      'provider_conversation_id', d.provider_conversation_id, 'provider_message_id', d.provider_message_id,
+      'resolved_at', d.resolved_at, 'semantic_key', d.semantic_key),
+    'occurrence', jsonb_build_object('id', o.id, 'reason', o.reason, 'state', o.state, 'subject_type', o.subject_type,
+      'subject_id', o.subject_id, 'urgency', o.urgency, 'due_at', o.due_at, 'payload', o.payload, 'semantic_key', o.semantic_key),
+    'destination', jsonb_build_object('id', dest.id, 'kind', dest.kind, 'external_destination_id', dest.external_destination_id,
+      'state', dest.state, 'user_id', dest.user_id),
+    'installation', jsonb_build_object('id', i.id, 'state', i.state, 'external_installation_id', i.external_installation_id,
+      'provider', i.provider, 'brewery_id', i.brewery_id),
+    'link_active', exists (select 1 from public.chat_user_links l
+      where l.installation_id = i.id and l.user_id = dest.user_id and l.state = 'active'),
+    'preference_enabled', coalesce((select p.enabled from public.notification_preferences p
+      where p.brewery_id = d.brewery_id and p.user_id = dest.user_id and p.reason = o.reason), true),
+    'counts', case when o.reason = 'operations_digest' then
+      (select coalesce(jsonb_object_agg(x.reason, x.n), '{}'::jsonb)
+         from (select reason, count(*) as n from public.notification_occurrences
+                 where brewery_id = d.brewery_id and state = 'active' and reason <> 'operations_digest' group by reason) x)
+      else null end)
+  from public.notification_deliveries d
+  join public.notification_occurrences o on o.id = d.occurrence_id
+  join public.notification_destinations dest on dest.id = d.destination_id
+  join public.chat_installations i on i.id = d.installation_id
+  where d.id = p_delivery;
+$$;
+
+create function block_notification_destination(p_destination uuid, p_reason text) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  perform public.chat_assert_job();
+  update public.notification_destinations
+    set state = 'blocked', blocked_reason = p_reason, updated_at = now()
+    where id = p_destination and state = 'active';
+end $$;
+
+revoke execute on function chat_assert_job(), list_chat_scan_targets(), claim_chat_callback_receipts(int, timestamptz),
+  complete_chat_callback_receipt(uuid, text, text), get_chat_home_items(uuid, text), get_chat_delivery_context(uuid),
+  block_notification_destination(uuid, text)
+  from public, anon, authenticated;
+grant execute on function list_chat_scan_targets(), claim_chat_callback_receipts(int, timestamptz),
+  complete_chat_callback_receipt(uuid, text, text), get_chat_home_items(uuid, text), get_chat_delivery_context(uuid),
+  block_notification_destination(uuid, text)
+  to service_role;
 -- ---------------------------------------------------------------- immutability grants
 revoke update, delete on recipe_versions, recipe_ingredients from authenticated, anon;
 revoke update, delete on pos_sales from authenticated, anon;

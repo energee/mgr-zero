@@ -106,7 +106,7 @@ describe("notification occurrences", () => {
     expect((await recipientsOf(await deliveriesFor(occs[1].id))).sort()).toEqual([adminCtx.userId, warehouse.userId].sort());
   });
 
-  it("marks sent deliveries as resolved (for a message update) rather than re-queuing them", async () => {
+  it("re-queues sent deliveries once for a resolved update, keeping the message id", async () => {
     const id = await createOrder();
     await adminCtx.db.rpc("submit_order", { p_order: id });
     const [occ] = await occurrences(id);
@@ -115,8 +115,11 @@ describe("notification occurrences", () => {
     await adminCtx.db.rpc("cancel_order", { p_order: id, p_reason: "test" });
     await scan();
     const after = (await admin.from("notification_deliveries").select().eq("id", delivery.id).single()).data!;
-    expect(after.state).toBe("sent");
+    expect(after.state).toBe("queued");
+    expect(after.provider_message_id).toBe("m1");
     expect(after.resolved_at).not.toBeNull();
+    await scan();
+    expect((await admin.from("notification_deliveries").select("state").eq("id", delivery.id).single()).data?.state).toBe("queued"); // only once
     expect((await occurrences(id))[0].state).toBe("resolved");
   });
 
