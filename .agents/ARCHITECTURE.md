@@ -12,7 +12,7 @@ never copy it into a second place.
 | `lib/commands/registry.ts` | `defineCommand` / `defineQuery`, `Ctx`, role checks, `CommandError`. Every domain operation the app performs is registered here. |
 | `lib/commands/<area>.ts` | Business logic per area (catalog, inventory, import, invites, orders, customers, portal). Handlers get an RLS-bound `ctx.db`. `orders.ts` owns order lifecycle (create/submit/confirm/adjust/cancel), allocations, pick/ship, per-shipment invoices, credit memos, and replenishment — each multi-row transition is a thin caller into the one plpgsql function per iron rule 5. `customers.ts` owns customer/ship-to/price-list CRUD. `portal.ts` owns the customer-role commands (`portal_create_order`, `portal_submit_order`, `portal_catalog`, `portal_orders`, `portal_order`, `portal_invoices`) — the only commands a `customer` role may call. |
 | `lib/commands/all.ts` | The one side-effecting import that registers every command module. |
-| `app/api/command/route.ts` | The single HTTP entry point. Dispatches to the registry; contains no business logic. |
+| `app/api/command/route.ts` | The single HTTP entry point. Dispatches to the registry; contains no business logic. Cookie session or `Authorization: Bearer <supabase access_token>`. |
 | `lib/commands/client.ts`, `use-command-form.ts` | How the UI calls commands. |
 | `lib/supabase/server.ts` | RLS-bound client for request paths. |
 | `lib/supabase/admin.ts` | Service-role client. Import restricted by eslint (see rule 4). |
@@ -24,8 +24,10 @@ never copy it into a second place.
 | `components/ui/` | shadcn primitives. Don't hand-edit; re-add with the shadcn CLI. |
 | `tests/` | Proof. Runs against the real local Supabase stack, never mocks. |
 | `scripts/seed-dev.ts` | Idempotent dev seed. |
+| `docs/user-guide.md` | Complete customer-facing manual for every available screen and action: prerequisites, permissions, steps, fields/options, results, corrections, and errors. Uses customer language only and never exposes implementation phases or internals. |
 | `.agents/superpowers/specs/` | Product and schema design decisions (why). |
 | `.agents/orchestration/` | Cross-provider model roles, routing, budgets, prompts, approval gates, and run artifacts. |
+| `.agents/agents/documentation-maintainer.md`, `.github/workflows/documentation-agent.yml`, `.github/scripts/upsert-documentation-issue.mjs` | Post-merge documentation review criteria, GitHub trigger, structured-output handling, and deterministic issue upsert. The Claude reviewer is read-only; actionable drift becomes one follow-up issue per merged PR. |
 | `.agents/skills/` | Project-local, harness-compatible agent workflows loaded on demand. |
 | `.pi/prompts/` | Thin Pi slash-command aliases; workflow instructions remain owned by the corresponding skill. |
 | `.agents/` | This file, agent memory and progress; worktrees live under `.agents/worktrees/`. |
@@ -38,8 +40,10 @@ a gap to close, not a convention to trust.
 1. **Every domain operation is a command.** All public-schema mutations and
    queries go through `lib/commands/registry.ts` via
    `defineCommand`/`defineQuery` and the single
-   endpoint `app/api/command/route.ts`. No route handler or page contains
-   inline business logic. Handlers signal user-facing failures by throwing
+   endpoint `app/api/command/route.ts` (cookie session or Bearer access token).
+   No route handler or page contains
+   inline business logic. There is no resource REST API and no API-key table —
+   new operations are registered commands, not new routes. Handlers signal user-facing failures by throwing
    `CommandError`; anything else surfaces as a generic 500 with the real error
    logged server-side. Supabase Auth session primitives (sign-up, sign-in/out, magic-link
    exchange, password reset/update, session refresh) are the sole non-domain
