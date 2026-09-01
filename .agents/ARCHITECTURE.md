@@ -67,7 +67,10 @@ a gap to close, not a convention to trust.
 3. **Every tenant table carries `brewery_id` with RLS.** Access derives from
    `brewery_users` / `customer_users` via `my_brewery_ids()`, `is_staff_of()`,
    `staff_role()`, `my_customer_ids()` (the only RLS helpers; defined once in the baseline). Cross-tenant FKs are composite so a row can't reference
-   another brewery's data. *Enforced by:* RLS policies in migrations, proven by
+   another brewery's data. Portal customers never `SELECT` the `breweries` base
+   table (`ttb_registry_no`, `pa_license_no`, `settings` stay staff-only); they
+   read `portal_brewery` (`id`, `name`, `timezone`, `portal_fulfillment_location_id`).
+   *Enforced by:* RLS policies in migrations, proven by
    `tests/rls-tenancy.test.ts`; `tests/schema-rules.test.ts` reads `pg_catalog`
    to assert RLS on every table, `security_invoker` on every view,
    `search_path` on every function, and an `RLS-EXCEPTION:` comment on any

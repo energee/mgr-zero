@@ -74,6 +74,7 @@ create table breweries (
   settings jsonb not null default '{}',
   created_at timestamptz not null default now()
 );
+comment on column breweries.settings is 'staff-only; never store secrets here';
 
 create table brewery_users (
   brewery_id uuid not null references breweries(id),
@@ -1250,6 +1251,34 @@ create table deliveries (
 );
 
 -- ---------------------------------------------------------------- views (derived truth)
+-- Customer-safe brewery projection. security definer so it can read
+-- breweries without a customer SELECT policy on the base table; the
+-- where-clause pins the caller to their own account (same pattern as
+-- portal_availability). The wrapping view is security_invoker.
+-- security-definer: justified — no customer SELECT on breweries; returns
+-- only portal columns for my_customer_ids().
+create function portal_brewery_rows()
+returns table (
+  id uuid,
+  name text,
+  timezone text,
+  portal_fulfillment_location_id uuid
+)
+language sql stable security definer set search_path = '' as $$
+  select b.id, b.name, b.timezone, b.portal_fulfillment_location_id
+  from public.breweries b
+  where b.id in (
+    select c.brewery_id from public.customers c
+    where c.id in (select public.my_customer_ids())
+  );
+$$;
+
+create view portal_brewery with (security_invoker = true) as
+  select id, name, timezone, portal_fulfillment_location_id
+  from public.portal_brewery_rows();
+comment on function portal_brewery_rows() is
+  'portal brewery projection; never add staff-only columns';
+
 create view on_hand with (security_invoker = true) as
   select brewery_id, sku_id, location_id, sum(qty) as qty
   from inventory_movements group by 1,2,3;
@@ -2274,6 +2303,13 @@ create policy customer_read on skus for select
   using (active and brewery_id in (select c.brewery_id from customers c where c.id in (select my_customer_ids())));
 create policy customer_own_prices on price_list_items for select
   using (price_list_id in (select c.price_list_id from customers c where c.id in (select my_customer_ids())));
+create policy customer_read_portal_source on locations for select
+  using (
+    id in (
+      select b.portal_fulfillment_location_id from public.portal_brewery b
+      where b.id = locations.brewery_id
+    )
+  );
 create policy customer_read on orders for select using (customer_id in (select my_customer_ids()));
 create policy customer_read on order_lines for select
   using (order_id in (select id from public.orders where customer_id in (select public.my_customer_ids())));
@@ -2309,7 +2345,7 @@ grant select on breweries, brewery_users, customer_users,
   to authenticated;
 -- Security-invoker views retain the underlying tables' RLS predicates; expose
 -- only the derived reads consumed by registered commands.
-grant select on on_hand, atp, invoice_totals to authenticated;
+grant select on on_hand, atp, invoice_totals, portal_brewery to authenticated;
 grant all on all tables in schema public to service_role;
 grant all on all sequences in schema public to service_role;
 
@@ -2329,7 +2365,7 @@ $$;
 -- only the RLS-safe reads and the explicit command RPC contract.
 revoke all on all functions in schema public from public, anon, authenticated;
 revoke all on all functions in schema private from public, anon, authenticated;
-grant execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), portal_availability(uuid)
+grant execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), portal_availability(uuid), portal_brewery_rows()
   to authenticated;
 grant execute on function
   create_product(uuid,text,text,numeric,uuid),

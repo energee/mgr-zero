@@ -100,6 +100,36 @@ describe("schema rules", () => {
       order by 1`)).toEqual([]);
   });
 
+  it("pins customer brewery exposure to portal_brewery columns, not the base table", () => {
+    // Table-level SELECT on breweries is shared by staff and customers
+    // (both are `authenticated`); the customer path is a view projection
+    // plus no customer SELECT policy on the base table.
+    expect(sql(`
+      select attname from pg_attribute
+      where attrelid = 'public.portal_brewery'::regclass
+        and attnum > 0 and not attisdropped
+      order by attnum
+    `)).toEqual(["id", "name", "timezone", "portal_fulfillment_location_id"]);
+    expect(sql(`
+      select pg_get_function_result('public.portal_brewery_rows()'::regprocedure)
+    `)).toEqual(["TABLE(id uuid, name text, timezone text, portal_fulfillment_location_id uuid)"]);
+    expect(sql(`
+      select polname from pg_policy
+      where polrelid = 'public.breweries'::regclass
+      order by 1
+    `)).toEqual(["staff_read"]); // updates only via the definer set_portal_fulfillment_source RPC
+    expect(sql(`
+      select col_description('public.breweries'::regclass, attnum)
+      from pg_attribute
+      where attrelid = 'public.breweries'::regclass and attname = 'settings'
+    `)).toEqual(["staff-only; never store secrets here"]);
+    expect(sql(`
+      select coalesce(array_to_string(c.reloptions, ','), '')
+      from pg_class c
+      where c.oid = 'public.portal_brewery'::regclass
+    `)).toEqual(["security_invoker=true"]);
+  });
+
   it("restricts brewery_counters keys to committed document kinds", () => {
     expect(sql(`
       select pg_get_constraintdef(oid) from pg_constraint
