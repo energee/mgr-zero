@@ -18,10 +18,10 @@ const eslintConfig = defineConfig([
     // is only allowed in invites and the RLS-checking integration-token boundary.
     // Tests and scripts run outside request paths and are exempt below.
     files: ["app/**", "lib/**", "components/**", "proxy.ts"],
-    ignores: ["lib/commands/invites.ts", "lib/supabase/admin.ts", "lib/supabase/integration-tokens.ts"],
+    ignores: ["lib/supabase/admin.ts", "lib/supabase/integration-tokens.ts"],
     rules: {
       "no-restricted-imports": ["error", {
-        paths: [{ name: "@/lib/supabase/admin", message: "createAdminClient() bypasses RLS. Only lib/commands/invites.ts and lib/supabase/integration-tokens.ts may import it — see .agents/ARCHITECTURE.md iron rule 4." }],
+        paths: [{ name: "@/lib/supabase/admin", message: "createAdminClient() bypasses RLS. Only lib/supabase/integration-tokens.ts may import it — see .agents/ARCHITECTURE.md iron rule 4." }],
       }],
     },
   },

@@ -1,7 +1,7 @@
 # MGR user guide
 
 MGR helps brewery staff define sellable beer, track finished-goods inventory by
-location, import existing business data, and manage staff access.
+location, and see who has staff access.
 
 This guide covers every action currently available in MGR. If a control described
 here is not visible or an action is denied, your assigned role may not permit it.
@@ -17,11 +17,9 @@ Ask a brewery administrator for help.
 6. [Create a SKU](#create-a-sku)
 7. [Understand inventory](#understand-inventory)
 8. [Record an inventory movement](#record-an-inventory-movement)
-9. [Import data from CSV](#import-data-from-csv)
-10. [View the team](#view-the-team)
-11. [Invite a staff member](#invite-a-staff-member)
-12. [Roles and access](#roles-and-access)
-13. [Errors and corrections](#errors-and-corrections)
+9. [View the team](#view-the-team)
+10. [Roles and access](#roles-and-access)
+11. [Errors and corrections](#errors-and-corrections)
 
 ## Sign in
 
@@ -48,9 +46,7 @@ in the app belongs to that brewery.
 - **Inventory** — on-hand stock, available-to-promise quantities, recent movements,
   and the **Record Movement** action.
 - **Catalog** — products and their sellable package formats.
-- **Import** — CSV upload for customers, ship-tos, catalog, prices, and opening
-  inventory.
-- **Team** — staff memberships and the **Invite Staff** action.
+- **Team** — staff memberships (read-only).
 
 MGR prevents one brewery from seeing another brewery's records. If you expected a
 record but cannot find it, first confirm that the brewery name in the navigation is
@@ -58,7 +54,7 @@ correct.
 
 ### How forms behave
 
-Actions such as **New Product**, **New SKU**, **Record Movement**, and **Invite Staff**
+Actions such as **New Product**, **New SKU**, and **Record Movement**
 open a form over the current page. A successful action closes the form and refreshes the
 page. A validation or permission error appears inside the open form and preserves the
 values so you can correct them. Closing a form without submitting clears its entered
@@ -126,8 +122,7 @@ Available to administrators and sales staff.
      example is `0.5`.
 5. Select **Create**.
 
-The SKU appears beneath its product and becomes available in inventory forms and
-imports. A SKU name must be unique within its product.
+The SKU appears beneath its product and becomes available in inventory forms. A SKU name must be unique within its product.
 
 ## Understand inventory
 
@@ -209,134 +204,24 @@ what physically and legally happened, and include a note identifying the mistake
 you are unsure which correction is appropriate, stop and ask a brewery administrator
 before adding another movement.
 
-## Import data from CSV
-
-CSV import is available to administrators. It is intended for initial setup and
-controlled bulk entry. Review the file carefully before importing because successful
-rows are committed even when other rows fail.
-
-### General import steps
-
-1. Open **Import**.
-2. Under **What are you importing?**, choose the record type.
-3. Prepare a CSV with the exact column headings shown below.
-4. Select the CSV file.
-5. Confirm the displayed file name, parsed row count, and first five preview rows.
-6. Select **Import _N_ row(s)**.
-7. Review the result:
-   - **Inserted** is the number of successful rows;
-   - failed rows list their row number and error.
-8. Correct failed source rows and import only the rows that still need to be added.
-
-Large files are processed in batches. Do not close the page while an import is
-running. Re-uploading successful opening balances can add inventory a second time, so
-never rerun a file unchanged after a partial success.
-
-### Customers
-
-Required headings:
-
-```text
-name,type,license_no,state,payment_terms
-```
-
-- **name** — required customer account name.
-- **type** — optional; use `distributor`, `retailer`, `brewery`, or `other`. It defaults to `retailer` when blank.
-- **license_no** — optional license identifier.
-- **state** — required two-letter state code.
-- **payment_terms** — optional; defaults to `net30` when blank.
-
-### Ship-tos
-
-Required headings:
-
-```text
-customer_name,label,address1,city,state,zip
-```
-
-- **customer_name** must exactly match an existing customer in the brewery.
-- **label** identifies the destination, such as Main or Dock.
-- **address1**, **city**, **state**, and **zip** are required.
-
-Import customers before importing their ship-tos.
-
-### Products and SKUs
-
-Required headings:
-
-```text
-product,style,abv,sku_name,package_type,units_per_case,bbl_per_unit
-```
-
-- **product** — required; an existing product is reused by exact name, otherwise it
-  is created.
-- **style** and **abv** — optional product details used when creating a product.
-- **sku_name** — required.
-- **package_type** — required: `keg`, `can`, or `bottle`.
-- **units_per_case** — optional whole number.
-- **bbl_per_unit** — required decimal barrel conversion.
-
-### Price-list items
-
-Required headings:
-
-```text
-price_list,product,sku_name,unit_price_cents
-```
-
-- **price_list** — required; an existing list is reused by exact name, otherwise it
-  is created.
-- **product** and **sku_name** must identify an existing SKU together.
-- **unit_price_cents** — required whole cents. Enter `15000` for $150.00.
-
-Import products and SKUs before importing price-list items.
-
-### Opening balances
-
-Required headings:
-
-```text
-product,sku_name,location,qty
-```
-
-- **product** and **sku_name** must identify an existing SKU together.
-- **location** must exactly match an existing location.
-- **qty** is the nonzero opening quantity in SKU units.
-
-Opening balances create permanent inventory movements. Verify signs, units, SKU names,
-and locations before importing. Locations must already exist; this version does not offer
-a customer-facing Add Location action, so contact the person who configured your brewery
-if a required location is missing.
-
 ## View the team
 
 Administrators, sales staff, and warehouse staff can open **Team** to see current
 memberships. The table shows each member's user ID and role. Email addresses are not
 shown on this screen.
 
-## Invite a staff member
+## Invitations and CSV import
 
-Available to administrators.
-
-1. Open **Team**.
-2. Select **Invite Staff**.
-3. Enter the person's **Email**.
-4. Choose a **Role**. The form opens with **sales** selected.
-   - **admin**;
-   - **sales**;
-   - **warehouse**;
-   - **brewer**.
-5. Select **Invite**.
-
-MGR sends an invitation email and adds the person to the brewery. If the email already
-belongs to an account, MGR adds that existing account instead of creating a duplicate.
-A person who is already a member cannot be added again.
+Inviting staff, inviting customer portal users, and importing CSV files are not
+available in this release. The **Team** screen and customer pages show no invite
+action, and there is no **Import** screen. Adding people or bulk data is handled by the
+person who configured your brewery.
 
 ## Roles and access
 
 | Role | Available actions in this version |
 | --- | --- |
-| **Admin** | Create products and SKUs, read and record inventory, import CSV data, view the team, and invite staff. |
+| **Admin** | Create products and SKUs, read and record inventory, and view the team. |
 | **Sales** | Create products and SKUs, read inventory, and view the team. |
 | **Warehouse** | Read the catalog, read and record inventory, and view the team. |
 | **Brewer** | Reserved for brewery-production workflows; access to the currently available administrative screens may be limited. |
@@ -350,8 +235,6 @@ returns a permission error, ask an administrator rather than retrying repeatedly
 - **A form reports a permission error:** your assigned role does not permit the action.
 - **A product or SKU already exists:** use a unique name; MGR does not currently provide
   an edit action on the Catalog screen.
-- **An import row fails:** correct that row and import only records that were not already
-  inserted.
 - **Inventory is wrong:** perform a physical check, identify the event that caused the
   difference, and use the correct movement type. Inventory history cannot be deleted.
 - **A page fails to load:** select **Try again** once. If the problem continues, provide

@@ -5,7 +5,7 @@ import { admin, makeBrewery, makeStaff, makeCustomerUser, asUser } from "./helpe
 let b1: { id: string }, b2: { id: string };
 let staff1: { id: string; email: string }, staff2: { id: string; email: string };
 let customer: { id: string }, custUser: { id: string; email: string };
-let order: { id: string };
+let order: { id: string; ship_to_id: string };
 let whId: string;
 
 beforeAll(async () => {
