@@ -5,7 +5,7 @@ import { admin, makeBrewery, makeStaff, makeCustomerUser, asUser } from "./helpe
 let b1: { id: string }, b2: { id: string };
 let staff1: { id: string; email: string }, staff2: { id: string; email: string };
 let customer: { id: string }, custUser: { id: string; email: string };
-let order: { id: string };
+let order: { id: string; ship_to_id: string };
 let whId: string;
 
 beforeAll(async () => {
@@ -46,6 +46,41 @@ describe("order_events", () => {
   it("orders.needs_restock exists and defaults false", async () => {
     const { data } = await admin.from("orders").select("needs_restock").eq("id", order.id).single();
     expect(data!.needs_restock).toBe(false);
+  });
+
+  it("denies all customer raw order and event mutations outside portal RPC paths", async () => {
+    const db = await asUser(custUser.email);
+    // Mirror a valid row exactly (ship_to_id included) so the only thing that
+    // can reject it is RLS (42501), not an unrelated CHECK/NOT NULL.
+    const { error: orderInsert } = await db.from("orders").insert({
+      brewery_id: b1.id, kind: "wholesale", customer_id: customer.id, ship_to_id: order.ship_to_id,
+      from_location_id: whId, created_by: custUser.id,
+    });
+    expect(orderInsert?.code).toBe("42501");
+    const { data: updated, error: orderUpdate } = await db.from("orders")
+      .update({ note: "forged" }).eq("id", order.id).select();
+    expect(orderUpdate).toBeNull();
+    expect(updated).toEqual([]);
+    const { error: eventInsert } = await db.from("order_events")
+      .insert({ brewery_id: b1.id, order_id: order.id, actor: custUser.id, event: "forged" });
+    expect(eventInsert).not.toBeNull();
+  });
+});
+
+describe("customer raw draft order-line mutations are denied", () => {
+  it("insert, update, and delete on a draft order's lines all affect nothing", async () => {
+    const { data: p } = await admin.from("products").insert({ brewery_id: b1.id, name: "Draft Pale" }).select().single();
+    const { data: s } = await admin.from("skus").insert({ brewery_id: b1.id, product_id: p!.id, name: "case", package_type: "can", bbl_per_unit: 0.0645 }).select().single();
+    const { data: line } = await admin.from("order_lines").insert({ brewery_id: b1.id, order_id: order.id, sku_id: s!.id, qty_ordered: 1, unit_price_cents: 100 }).select().single();
+    const db = await asUser(custUser.email);
+    const { error: ins } = await db.from("order_lines").insert({ brewery_id: b1.id, order_id: order.id, sku_id: s!.id, qty_ordered: 5, unit_price_cents: 1 });
+    expect(ins?.code).toBe("42501");
+    const { data: upd, error: updErr } = await db.from("order_lines").update({ qty_ordered: 99 }).eq("id", line!.id).select();
+    expect(updErr).toBeNull(); expect(upd).toEqual([]);
+    const { data: del, error: delErr } = await db.from("order_lines").delete().eq("id", line!.id).select();
+    expect(delErr).toBeNull(); expect(del).toEqual([]);
+    const { data: still } = await admin.from("order_lines").select("qty_ordered").eq("id", line!.id).single();
+    expect(still!.qty_ordered).toBe(1);
   });
 });
 

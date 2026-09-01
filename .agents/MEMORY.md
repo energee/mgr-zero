@@ -38,10 +38,26 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
   Supabase Auth URL. No resource REST routes, no API keys, until a non-user
   machine client exists.
 
+- Staff writes are authorized in SQL, not only in the registry: each mutation
+  RPC is `security invoker`, calls `require_authorized_staff_rpc(brewery, '<rpc>',
+  roles)` first, and the table's insert/update policies admit rows only when
+  `current_setting('request.path') = '/rpc/<rpc>'` for an allowed role. Raw
+  Data API writes therefore affect 0 rows for every browser JWT. New writers
+  must also be pinned in `tests/schema-rules.test.ts` (explicit grants; nothing
+  is auto-exposed).
+- Integration credentials never sit in a public table. `private.integration_tokens`
+  is reachable only through `lib/supabase/integration-tokens.ts` (server-only,
+  admin/sales, visible-connection check, then service-only RPC that rechecks
+  membership); connection delete/identity change purges the token row.
+- `import_csv`, `invite_staff`, `invite_customer_user` stay registered but fail
+  closed (P1.9) until the durable external-write gate exists; the Import screen
+  and invite forms are removed rather than hidden.
+
 ## Gotchas (carried from MGR v1)
 - PostgREST caches the schema: after DDL, errors naming a column/enum that plainly exists are a stale cache — `NOTIFY pgrst, 'reload schema'` or restart the stack before debugging.
 - `Unregistered API key` / `Invalid API key` with no Postgres error code means the key was rejected before PostgREST: URL and key are from different Supabase instances. Check `NEXT_PUBLIC_SUPABASE_URL` first; `curl -sD- -H "apikey: $KEY" "$URL/rest/v1/"` gives the real answer.
 - `security definer` functions get PUBLIC execute by default; revoke from `public, anon` or the RLS helpers are callable unauthenticated (gated by `tests/schema-rules.test.ts`).
+- One local Supabase stack serves every worktree. A `supabase db reset` in another session silently swaps the loaded baseline; the tell is a burst of "relation does not exist" / undefined-column failures across suites. Reset from your own worktree and run the suite immediately; if it flips mid-run, check `docker ps` for a freshly restarted `supabase_db_mgr`.
 - Worktrees don't inherit `.env.local` (gitignored, per-checkout) — `npm test`/`npm run dev`/`npm run test:e2e` in a fresh worktree fail silently with `supabaseKey is required` until it's copied in from the main checkout.
 - `claude-code-action` rejects non-human PR authors unless `allowed_bots` is set. Dream PRs (`dreaming/main`) skip the `claude-review` job entirely so the check is skipped, not failed — do not allowlist the bot just to review its own doc PR.
 
