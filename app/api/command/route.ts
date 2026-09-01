@@ -15,6 +15,9 @@ import {
 } from "@/lib/commands/registry";
 import "@/lib/commands/all"; // side-effect: registers every command
 
+// null = no Authorization header (use the cookie session); "" = a header that
+// is present but malformed, which must fail closed as 401 rather than fall
+// back to cookies — keep the null/"" distinction.
 function bearerToken(req: Request): string | null {
   const header = req.headers.get("authorization");
   if (!header) return null;

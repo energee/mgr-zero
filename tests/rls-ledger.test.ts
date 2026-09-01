@@ -1,6 +1,7 @@
 // tests/rls-ledger.test.ts
 import { describe, it, expect, beforeAll } from "vitest";
 import { admin, makeBrewery, makeStaff, asUser } from "./helpers";
+import "../lib/commands/all";
 
 describe("ledger integrity + RLS", () => {
   let b: any, staff: any, sku: any, loc: any;
@@ -52,7 +53,6 @@ describe("ledger integrity + RLS", () => {
       qty: 2, bbl: 999, type: "production_in", created_by: staff.id,
     }).select().single();
     expect(error).toBeNull();
-    // Verify via admin that stored bbl was corrected to qty * bbl_per_unit = 2 * 0.5 = 1
     const { data: stored } = await admin.from("inventory_movements").select("qty, bbl").eq("id", m!.id).single();
     expect(Number(stored!.qty)).toBe(2);
     expect(Number(stored!.bbl)).toBe(1);
@@ -118,8 +118,7 @@ describe("cross-brewery tenant consistency (composite FKs)", () => {
   // brewery_id, so staff of brewery A could previously insert a movement
   // against brewery A that pointed at a location or sku belonging to
   // brewery B — a cross-tenant write RLS never caught. The composite FKs
-  // added in 00002 (child (fk_id, brewery_id) -> parent (id, brewery_id))
-  // make that combination impossible at the database level.
+  // added in the baseline migration make that combination impossible at the database level.
   let bA: any, bB: any, staffA: any;
   let skuA: any, skuB: any, locA: any, locB: any, productA: any, productB: any;
 

@@ -212,23 +212,27 @@ order's customer), `from_location_id → locations not null` (where removals pos
   `kind='taproom_transfer'` ⇒ `to_location_id not null and customer_id, ship_to_id null`.
 - unique `(brewery_id, order_no)`. idx `(brewery_id, status, requested_ship_date)`,
   `(customer_id, created_at desc)`.
-- RLS: `staff_all`; `P-customer` select; `customer_insert`/`customer_update` restricted to
-  `kind='wholesale' and status in ('draft','submitted')` (portal creates up to submitted).
+- RLS: staff lifecycle paths and customer reads remain separate. Customer writes
+  happen only inside the definer `portal_create_order` / `update_draft_order` /
+  `submit_order` RPCs, which assert the caller's customer membership and act
+  only on that customer's wholesale order; app roles hold no table DML.
 
-**SCHEMA/RLS-GATE — portal fulfillment source:** `from_location_id` is required,
-but the baseline defines neither a customer-visible allowed/default order source
-nor a portal-safe read for locations. Staff order entry must choose a source.
-Before `submit_order` is exposed to customers, define a brewery-configured source
-contract and narrow RLS/read path, then require the submitted source to belong to
-that allowlist. Do not infer the first warehouse or bypass RLS with a service role.
+**Portal fulfillment source:** `breweries.portal_fulfillment_location_id` is a
+brewery-scoped `(location_id, brewery_id)` FK. Admin-only
+`set_portal_fulfillment_source` accepts only a same-brewery warehouse.
+`portal_create_order` and `portal_update_draft_order` derive that source at
+execution time and fail closed when it is unset or invalid; they never choose a
+first warehouse. Customers need no direct read of the source location: the
+definer RPC resolves it server-side.
 
 ### `order_lines`
 `order_id → orders, sku_id → skus, qty_ordered numeric > 0, qty_picked numeric >= 0,
 qty_shipped numeric >= 0 check (<= qty_ordered), unit_price_cents int >= 0` (snapshot),
-`short_reason text`. unique `(order_id, sku_id)`. idx `(sku_id)`. RLS: `staff_all`;
-`P-customer` via `order_id in (orders the customer may see)`, insert/update only while the
-parent order is `draft/submitted`. Remainder after ship is always cancelled (decision):
-no backorder columns.
+`short_reason text`. unique `(order_id, sku_id)`. idx `(sku_id)`. RLS:
+`P-customer` read via `order_id in (orders the customer may see)`; customer
+line replacement happens only through the definer portal/draft RPCs on a draft
+order. Remainder after ship is
+always cancelled (decision): no backorder columns.
 
 ### `shipments`
 `order_id → orders unique` (one shipment per order; short-ship cancels the remainder),
@@ -278,17 +282,28 @@ not null <> 0, unit_price_cents int not null, amount_cents int generated always 
 ## 6. Integrations
 
 ### `qbo_connections`
-pk `brewery_id`, `realm_id text not null`, `access_token text`, `refresh_token text`,
-`access_expires_at`, `refresh_expires_at`, `connected_by`, `updated_at`. RLS: `P-admin`
-(admins of the brewery). Token handling is open choice §14.
-`connect_qbo` owns OAuth completion/upsert through the narrow integration-client
-exception; `get_qbo_connection` returns health/realm/timestamps only and never tokens.
-Invoice mapping/push is unavailable until that health read is connected.
+connection `id`, pk `brewery_id`, `realm_id text not null`,
+`access_expires_at`, `refresh_expires_at`, `connected_by`, `updated_at`; no
+credential columns. RLS: integration operators (`admin`/`sales`) may read their
+brewery's non-secret metadata. `connect_qbo` owns OAuth completion/upsert through
+the narrow integration-client exception; `get_qbo_connection` returns
+health/realm/timestamps only. Invoice mapping/push is unavailable until that
+health read is connected.
 
 ### `pos_connections`
-`provider text not null default 'square'`, `merchant_id text`, `access_token`,
-`refresh_token`, `expires_at`, `connected_by`, `updated_at`. unique `(brewery_id,
-provider, merchant_id)`. RLS: `P-admin`.
+`provider text not null default 'square' check provider='square'`, `merchant_id`,
+`expires_at`, `connected_by`, `updated_at`; no credential columns. One Square
+connection is allowed per `(brewery_id, provider)`. RLS: integration-operator
+metadata read.
+
+`private.integration_tokens` owns `access_token` and `refresh_token`, keyed by
+`(brewery_id, provider)` and bound to the concrete public `connection_id`, with
+RLS/no browser grants in an unexposed schema. Deletes always purge credentials;
+guarded updates purge only when the brewery key or external identity actually
+changes (QBO `id`/realm, Square `id`/provider/merchant), so no-op metadata updates
+retain the current token row. Empty-search-path service-role RPCs recheck the
+actor's current `admin`/`sales` membership and the exact connection in the same
+token statement; the RLS-checking server boundary is their only application caller.
 
 ### `pos_locations`
 `connection_id → pos_connections, external_location_id text, location_id → locations`.
@@ -583,10 +598,14 @@ shipment's order.
 3. **Keg deposits** are `invoice_lines` (`keg_deposit` / `keg_deposit_refund`) with
    `keg_pool_id + keg_size`, not order lines; balance is a view. Alternative was a
    `keg_deposits` ledger.
-4. **QBO/Square tokens** live in `qbo_connections` / `pos_connections` behind an
-   admin-only policy. A sync job needs the service-role client, which ARCHITECTURE rule 4
-   pins to `invites.ts`; resolved 2026-08-31: rule 4 now states each sync module is
-   added to the eslint allowlist explicitly when its slice lands.
+4. **QBO/Square tokens** live only in unexposed `private.integration_tokens`, keyed
+   by brewery/provider and bound to a concrete connection identity. Deletes and
+   actual identity/tenant-key changes purge credentials; no-op metadata updates
+   retain them. Public connection tables retain non-secret metadata for
+   `admin`/`sales`; service-only RPCs recheck current membership and connection
+   identity, and are reachable only through the RLS-checking server token boundary.
+   Future sync modules use that boundary and never receive a service-client eslint
+   allowlist.
 5. **Payments** have no table; `invoices.paid_at / qbo_balance_cents` from QBO is enough
    while QBO is the book of record.
 6. **Materials have no locations**; one store per brewery. `material_movements` gains a

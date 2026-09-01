@@ -55,4 +55,19 @@ describe("customer CRUD", () => {
     const got = await runCommand("get_customer", { customerId: cust.id }, ctx) as { customer: { name: string } };
     expect(got.customer.name).toBe("New Name");
   });
+
+  it("empty paymentTerms preserves the create default and an existing payment term", async () => {
+    const created = await runCommand("upsert_customer", {
+      name: "Default payment terms", type: "retailer", state: "PA", paymentTerms: "",
+    }, ctx) as { id: string; payment_terms: string };
+    expect(created.payment_terms).toBe("net30");
+
+    const configured = await runCommand("upsert_customer", {
+      name: "Configured payment terms", type: "retailer", state: "PA", paymentTerms: "net15",
+    }, ctx) as { id: string; payment_terms: string };
+    const updated = await runCommand("upsert_customer", {
+      id: configured.id, name: "Configured payment terms", type: "retailer", state: "PA", paymentTerms: "",
+    }, ctx) as { payment_terms: string };
+    expect(updated.payment_terms).toBe("net15");
+  });
 });

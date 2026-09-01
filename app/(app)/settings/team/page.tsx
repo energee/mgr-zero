@@ -1,4 +1,5 @@
-// app/(app)/settings/team/page.tsx — staff roster + invite entry point. Reads
+// app/(app)/settings/team/page.tsx — staff roster (read-only; invitations are
+// not available in this release — audit P1.9). Reads
 // through the command registry (list_team_members) with a brewery-scoped Ctx.
 // auth.users is not readable under RLS, so rows show role + user_id only; full
 // member management (remove, change role) is out of scope for this pass.
@@ -6,7 +7,6 @@ import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
-import { InviteForm } from "./invite-form";
 
 type Membership = { user_id: string; role: string };
 
@@ -17,10 +17,7 @@ export default async function TeamPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Team</h1>
-        <InviteForm />
-      </div>
+      <h1 className="text-xl font-semibold">Team</h1>
 
       <p className="text-sm text-muted-foreground">
         Emails aren&apos;t shown here — Supabase auth data isn&apos;t readable under

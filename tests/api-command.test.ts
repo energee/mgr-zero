@@ -168,6 +168,12 @@ describe("POST /api/command bearer auth", () => {
     expect(json).toMatchObject({ ok: false, error: { message: "not a member of this brewery" }, correlationId: expect.any(String) });
   });
 
+  it("treats a non-UUID breweryId as not-a-member, never a 500", async () => {
+    const res = await POST(commandReq({ breweryId: "not-a-uuid", name: "list_products", input: {} }, adminToken));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ ok: false, error: { message: "not a member of this brewery" }, correlationId: expect.any(String) });
+  });
+
   it("rejects a command the role cannot run", async () => {
     const res = await POST(commandReq({
       breweryId,

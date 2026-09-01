@@ -1,5 +1,5 @@
 // lib/commands/customers.ts — customer / ship-to / price-list CRUD. Single-row
-// writes; RLS scopes tenancy. Upsert style: pass `id` to update, omit to create.
+// writes call one explicit security-invoker RPC; pass `id` to update, omit to create.
 import { z } from "zod";
 import { defineCommand, defineQuery, unwrap } from "./registry";
 
@@ -18,7 +18,7 @@ defineCommand({
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_customer", {
     p_brewery: ctx.breweryId, p_id: i.id ?? null, p_name: i.name, p_type: i.type, p_state: i.state,
     p_price_list: i.priceListId ?? null, p_license_no: i.licenseNumber ?? null,
-    p_payment_terms: i.paymentTerms ?? null, p_request_id: execution.requestId,
+    p_payment_terms: i.paymentTerms || null, p_request_id: execution.requestId,
   })),
 });
 
@@ -53,6 +53,15 @@ defineCommand({
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_price", {
     p_brewery: ctx.breweryId, p_price_list: i.priceListId, p_sku: i.skuId,
     p_unit_price_cents: i.unitPriceCents, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "set_portal_fulfillment_source", description: "Set the warehouse used for customer portal orders",
+  roles: ["admin"],
+  input: z.object({ locationId: z.string().uuid() }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_portal_fulfillment_source", {
+    p_brewery: ctx.breweryId, p_location: i.locationId, p_request_id: execution.requestId,
   })),
 });
 

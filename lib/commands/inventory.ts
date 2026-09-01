@@ -12,10 +12,9 @@ const movementInput = z.object({
 });
 
 /**
- * Inserts an inventory movement. `bbl` is not supplied: the DB trigger
- * (enforce_bbl_integrity, 00001_baseline.sql) computes it from
- * `qty * skus.bbl_per_unit` and overwrites anything a client sends.
- * CHECK/FK failures surface as CommandError.
+ * Appends an inventory movement through its security-invoker RPC. `bbl` is
+ * not supplied: the DB trigger (enforce_bbl_integrity, 00001_baseline.sql)
+ * computes it from `qty * skus.bbl_per_unit`.
  */
 export function insertMovement(ctx: Ctx, input: z.infer<typeof movementInput>, execution: CommandExecution) {
   return unwrap(ctx.db.rpc("record_inventory_movement", {

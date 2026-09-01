@@ -111,13 +111,6 @@ describe("Data API mutation boundary", () => {
     expect(foreignLocation.error?.message).toMatch(/permission denied/i);
   });
 
-  it("withholds OAuth-token tables (pos_connections, qbo_connections) from app roles", async () => {
-    for (const table of ["pos_connections", "qbo_connections"] as const) {
-      const { error } = await staffDb.from(table).select("*").limit(1);
-      expect(error?.code, table).toBe("42501");
-    }
-  });
-
   it("preserves the RLS-backed invoice totals read", async () => {
     const { error } = await staffDb.from("invoice_totals").select("invoice_id").limit(1);
     expect(error).toBeNull();

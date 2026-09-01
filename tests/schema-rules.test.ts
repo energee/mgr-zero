@@ -99,4 +99,112 @@ describe("schema rules", () => {
       where not has_table_privilege('service_role', 'public.' || relname, 'insert')
       order by 1`)).toEqual([]);
   });
+
+  it("restricts brewery_counters keys to committed document kinds", () => {
+    expect(sql(`
+      select pg_get_constraintdef(oid) from pg_constraint
+      where conrelid = 'public.brewery_counters'::regclass and contype = 'c'
+    `)).toEqual(["CHECK ((key = ANY (ARRAY['batch'::text, 'run'::text, 'po'::text, 'order'::text, 'invoice'::text])))"]);
+  });
+
+  it("keeps integration token storage private and token columns out of public metadata", () => {
+    expect(sql(`
+      select 'column:' || c.relname || ':' || a.attname
+      from pg_attribute a
+      join pg_class c on c.oid = a.attrelid
+      where c.relnamespace = 'public'::regnamespace
+        and c.relname in ('qbo_connections', 'pos_connections')
+        and a.attnum > 0 and not a.attisdropped
+        and a.attname in ('access_token', 'refresh_token')
+      union all
+      select 'schema:' || role || ':' || privilege
+      from (values
+        ('anon'::name, 'usage'::text), ('anon'::name, 'create'),
+        ('authenticated'::name, 'usage'), ('authenticated'::name, 'create'),
+        ('service_role'::name, 'create')
+      ) checks(role, privilege)
+      -- service_role holds USAGE on private only for the new_uuid() column default.
+      where has_schema_privilege(role, 'private', privilege)
+      union all
+      select 'table:' || role || ':' || privilege
+      from (values
+        ('anon'::name), ('authenticated'::name), ('service_role'::name)
+      ) roles(role)
+      cross join (values ('select'), ('insert'), ('update'), ('delete'), ('truncate'), ('references'), ('trigger')) privileges(privilege)
+      where has_table_privilege(role, 'private.integration_tokens', privilege)
+      union all
+      select 'private:integration_tokens:rls'
+      where not (select relrowsecurity from pg_class where oid = 'private.integration_tokens'::regclass)
+      order by 1
+    `)).toEqual([]);
+  });
+
+  it("pins service-only integration token RPC execute privileges by signature", () => {
+    expect(sql(`
+      with token_functions as (
+        select p.oid, p.oid::regprocedure::text as signature
+        from pg_proc p
+        where p.oid::regprocedure::text in (
+          'store_integration_tokens(uuid,text,uuid,uuid,text,text)',
+          'read_integration_tokens(uuid,text,uuid,uuid)'
+        )
+      ),
+      actual as (
+        select role, signature
+        from token_functions
+        cross join (values ('anon'::name), ('authenticated'::name), ('service_role'::name)) roles(role)
+        where has_function_privilege(role, oid, 'execute')
+      ),
+      expected(role, signature) as (
+        values
+          ('service_role'::name, 'store_integration_tokens(uuid,text,uuid,uuid,text,text)'::text),
+          ('service_role'::name, 'read_integration_tokens(uuid,text,uuid,uuid)'::text)
+      )
+      select 'extra:' || role || ':' || signature
+      from (select * from actual except select * from expected) extra
+      union all
+      select 'missing:' || role || ':' || signature
+      from (select * from expected except select * from actual) missing
+      order by 1
+    `)).toEqual([]);
+  });
+
+  // `supabase_admin` is a reserved bootstrap role; its exposure is controlled
+  // by config, while migrations can safely audit only their own future defaults.
+  it("revokes Data API roles from future public objects created by the migration role", () => {
+    expect(sql(`
+      with creators as (
+        select oid, rolname from pg_roles where oid = current_user::regrole
+      ),
+      object_types(defaclobjtype) as (
+        values ('r'::"char"), ('S'::"char"), ('f'::"char")
+      ),
+      schema_defaults as (
+        select creators.oid, creators.rolname, object_types.defaclobjtype, d.defaclacl
+        from creators
+        cross join object_types
+        left join pg_default_acl d on d.defaclrole = creators.oid
+          and d.defaclnamespace = 'public'::regnamespace
+          and d.defaclobjtype = object_types.defaclobjtype
+      ),
+      forbidden as (
+        select 'schema:' || schema_defaults.rolname || ':' || defaclobjtype::text || ':' ||
+          coalesce(grantee.rolname, 'PUBLIC') || ':' || permissions.privilege_type
+        from schema_defaults
+        cross join lateral aclexplode(coalesce(defaclacl, acldefault(defaclobjtype, oid))) permissions
+        left join pg_roles grantee on grantee.oid = permissions.grantee
+        where permissions.grantee = 0 or grantee.rolname in ('anon', 'authenticated', 'service_role')
+        union all
+        select 'global:' || owner.rolname || ':' || d.defaclobjtype::text || ':' ||
+          coalesce(grantee.rolname, 'PUBLIC') || ':' || permissions.privilege_type
+        from pg_default_acl d
+        join creators owner on owner.oid = d.defaclrole
+        cross join lateral aclexplode(d.defaclacl) permissions
+        left join pg_roles grantee on grantee.oid = permissions.grantee
+        where d.defaclnamespace = 0
+          and (permissions.grantee = 0 or grantee.rolname in ('anon', 'authenticated', 'service_role'))
+      )
+      select * from forbidden order by 1
+    `)).toEqual([]);
+  });
 });

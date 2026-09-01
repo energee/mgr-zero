@@ -4,7 +4,7 @@ MGR is a multi-tenant brewery operations system: catalog, immutable
 inventory ledger, allocations/ATP, CSV import, and staff/customer
 invitations, built on Next.js (App Router, TypeScript) and Supabase
 (Postgres, Auth, RLS). This repo currently covers **Slice 1A — Foundation**
-(tenancy, ledger, catalog, import, invites) and **Slice 1B — Orders**
+(tenancy, ledger, catalog; import and invites registered but fail closed) and **Slice 1B — Orders**
 (orders, shipments, invoicing, customer portal). QBO integration and AI
 chat are Slice 1C.
 
@@ -163,6 +163,7 @@ On-hand is the sum of an append-only movement ledger. You never send `bbl`; it i
 | `list_movements` | admin, sales, warehouse | `{ skuId?, limit? }` — newest first; `limit` default 50, max 200 |
 | `record_movement` | admin, warehouse | `{ skuId, locationId, qty, type, channel?, destState?, note? }` — `qty` ≠ 0; `destState` is a 2-letter code |
 | `set_taproom_par` | admin, sales | `{ locationId, skuId, parQty }` |
+| `set_portal_fulfillment_source` | admin | `{ locationId }` |
 
 `record_movement` `type`: `opening_balance`, `production_in`, `adjustment`, `sale_removal`, `taproom_transfer`, `depletion`, `return_in`, `destruction`, `loss`, `sample`, `festival_removal`.
 
@@ -170,25 +171,15 @@ On-hand is the sum of an append-only movement ledger. You never send `bbl`; it i
 
 ### Import
 
-`import_csv` (admin). `{ kind, rows }` — at most 5000 rows per call. Each row is a string map. Per-row failures are returned, not thrown: `{ inserted, errors: [{ row, message }] }` (`row` is 0-based).
-
-| `kind` | Required columns | Optional |
-| --- | --- | --- |
-| `customers` | `name`, `state` | `type`, `license_no`, `payment_terms` |
-| `ship_tos` | `customer_name`, `label`, `address1`, `city`, `state`, `zip` | |
-| `products_skus` | `product`, `sku_name`, `package_type`, `bbl_per_unit` | `style`, `abv`, `units_per_case` |
-| `price_list_items` | `product`, `sku_name`, `price_list`, `unit_price_cents` | |
-| `opening_balances` | `product`, `sku_name`, `location`, `qty` | |
-
-Names resolve within the brewery. Missing products/price lists are created; missing SKUs, locations, and customers are errors.
+`import_csv` (admin) is registered but **not available in this release**: it validates `{ kind, rows }` (kinds `customers`, `ship_tos`, `products_skus`, `price_list_items`, `opening_balances`; at most 5000 rows) and then rejects with `CSV import is not available in this release`. No rows are written.
 
 ### Team
 
 | Command | Roles | `input` |
 | --- | --- | --- |
 | `list_team_members` | admin, sales, warehouse | `{}` — `{ user_id, role }` (no emails) |
-| `invite_staff` | admin | `{ email, role }` — `role` is `admin`, `sales`, `warehouse`, or `brewer` |
-| `invite_customer_user` | admin, sales | `{ email, customerId }` |
+| `invite_staff` | admin | `{ email, role }` — **not available in this release**; validates, then rejects with `Invitations are not available in this release` |
+| `invite_customer_user` | admin, sales | `{ email, customerId }` — **not available in this release**; same rejection |
 
 ## Tests
 
@@ -218,7 +209,7 @@ Test files: `tests/api-command.test.ts` (Bearer auth on `/api/command`),
 isolation, ledger immutability, CHECK constraints, ATP math),
 `tests/registry.test.ts` (command registry validation/permissions),
 `tests/commands-inventory.test.ts` (catalog/inventory commands),
-`tests/commands-import.test.ts` (CSV import), `tests/commands-invites.test.ts`
+`tests/commands-import.test.ts` (CSV import blocked), `tests/commands-invites.test.ts` (invitations blocked)
 (invitations), `tests/schema-rules.test.ts` (pg_catalog gates: RLS on every
 table, `security_invoker` views, `search_path` on functions, no anon-executable
 definer functions), `tests/schema-conventions.test.ts` (composite FKs, lot
@@ -296,6 +287,7 @@ are `YYYY-MM-DD` strings. `limit` parameters default to 50 (max 200).
 | `upsert_ship_to` | admin, sales | Create or update a ship-to address (`customerId`, `label`, `address1`, optional `address2`, `city`, `state`, `zip`); the state drives excise destination reporting |
 | `upsert_price_list` | admin, sales | Create or rename a price list |
 | `set_price` | admin, sales | Set a SKU's price on a price list (`unitPriceCents`, integer) |
+| `set_portal_fulfillment_source` | admin | Set the warehouse customer portal orders ship from (must be one of the brewery's warehouses; portal ordering fails until it is set) |
 | `list_customers` | admin, sales, warehouse | Customers alphabetical with price list name |
 | `get_customer` | admin, sales, warehouse | One customer with its ship-tos |
 | `list_price_lists` | admin, sales | Price lists with their per-SKU prices |
@@ -330,14 +322,14 @@ creation. Mutations return `{ order_id }` unless noted.
 
 | Command | Roles | Purpose |
 | --- | --- | --- |
-| `import_csv` | admin | Bulk-import parsed CSV rows (`kind`: customers, ship_tos, products_skus, price_list_items, opening_balances; `rows`: array of string-keyed objects, max 5000 per batch). Referenced entities are resolved by name; products and price lists are created on the fly. Returns `{ inserted, errors: [{ row, message }] }` — a bad row is reported, not fatal to the batch |
+| `import_csv` | admin | Not available in this release: validates `{ kind, rows }` then fails closed with a `CommandError`; nothing is written |
 
 ### Invitations & team
 
 | Command | Roles | Purpose |
 | --- | --- | --- |
-| `invite_staff` | admin | Invite an email to join the brewery's staff with a role. Returns `{ userId }` |
-| `invite_customer_user` | admin, sales | Invite an email to a customer's portal (`customerId`). Returns `{ userId }` |
+| `invite_staff` | admin | Not available in this release: validates then fails closed with a `CommandError` |
+| `invite_customer_user` | admin, sales | Not available in this release: validates then fails closed with a `CommandError` |
 | `list_team_members` | admin, sales, warehouse | Staff memberships (user id + role) |
 
 ### Customer portal

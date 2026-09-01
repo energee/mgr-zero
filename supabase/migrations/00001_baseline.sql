@@ -16,13 +16,13 @@ create schema if not exists private;
 
 -- New objects stay private until the explicit grants at the end of this file.
 alter default privileges for role postgres in schema public
-  revoke all on tables from public, anon, authenticated;
+  revoke all on tables from public, anon, authenticated, service_role;
 alter default privileges for role postgres in schema public
-  revoke all on sequences from public, anon, authenticated;
+  revoke all on sequences from public, anon, authenticated, service_role;
 alter default privileges for role postgres
   revoke execute on functions from public, anon, authenticated;
 alter default privileges for role postgres in schema public
-  revoke execute on functions from public, anon, authenticated;
+  revoke all on functions from public, anon, authenticated, service_role;
 create extension if not exists btree_gist with schema extensions;
 create extension if not exists pgcrypto with schema extensions;
 alter extension btree_gist set schema extensions;
@@ -101,7 +101,8 @@ create table brewery_counters (
   brewery_id uuid not null references breweries(id),
   key text not null,
   next bigint not null default 1,
-  primary key (brewery_id, key)
+  primary key (brewery_id, key),
+  check (key in ('batch', 'run', 'po', 'order', 'invoice'))   -- the committed document kinds
 );
 create function private.next_no(b uuid, k text) returns bigint
 language sql security definer set search_path = '' as $$
@@ -110,7 +111,7 @@ language sql security definer set search_path = '' as $$
   returning next - 1
 $$;
 -- Trigger-only document numbering remains private so application roles cannot consume numbers.
-create function private.set_doc_no() returns trigger language plpgsql set search_path = '' as $$
+create function private.set_doc_no() returns trigger language plpgsql security definer set search_path = '' as $$
 declare col text := tg_argv[0]; k text := tg_argv[1]; cur bigint;
 begin
   execute format('select ($1).%I', col) into cur using new;
@@ -309,6 +310,12 @@ create table locations (
   unique (id, brewery_id),
   unique (brewery_id, name)
 );
+
+-- The portal's shipping source is selected by an administrator, never by a
+-- customer request or an arbitrary warehouse lookup.
+alter table breweries add column portal_fulfillment_location_id uuid;
+alter table breweries add foreign key (portal_fulfillment_location_id, id)
+  references locations (id, brewery_id);
 
 create table inventory_movements (
   id uuid primary key default private.new_uuid(),
@@ -935,6 +942,7 @@ create table invoice_lines (
 );
 create index invoice_lines_invoice_idx on invoice_lines (invoice_id);
 create index invoice_lines_keg_pool_idx on invoice_lines (keg_pool_id) where keg_pool_id is not null;
+create index invoice_lines_credited_line_idx on invoice_lines (credited_invoice_line_id) where credited_invoice_line_id is not null;
 
 -- ---------------------------------------------------------------- kegs (count ledger)
 create table keg_events (   -- ledger
@@ -966,25 +974,160 @@ create index keg_events_shipment_idx on keg_events (shipment_id) where shipment_
 
 -- ---------------------------------------------------------------- integrations
 create table qbo_connections (
+  id uuid not null default gen_random_uuid(),
   brewery_id uuid primary key references breweries(id),
   realm_id text not null,
-  access_token text, refresh_token text,
   access_expires_at timestamptz, refresh_expires_at timestamptz,
   connected_by uuid references auth.users(id),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  unique (id, brewery_id)
 );
 
 create table pos_connections (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
-  provider text not null default 'square',
+  provider text not null default 'square' check (provider = 'square'),
   merchant_id text,
-  access_token text, refresh_token text, expires_at timestamptz,
+  expires_at timestamptz,
   connected_by uuid references auth.users(id),
   updated_at timestamptz not null default now(),
   unique (id, brewery_id),
-  unique (brewery_id, provider, merchant_id)
+  unique (brewery_id, provider)
 );
+
+-- A token is bound to exactly one current public connection identity. The
+-- lifecycle triggers below erase it when that identity is removed or replaced.
+create table private.integration_tokens (
+  brewery_id uuid not null references public.breweries(id),
+  provider text not null check (provider in ('qbo', 'square')),
+  connection_id uuid not null,
+  access_token text not null,
+  refresh_token text not null,
+  updated_at timestamptz not null default now(),
+  primary key (brewery_id, provider)
+);
+alter table private.integration_tokens enable row level security;
+revoke all on schema private from public, anon, authenticated, service_role;
+revoke all privileges on table private.integration_tokens from public, anon, authenticated, service_role;
+
+-- These one-statement service-only functions recheck current membership and
+-- the concrete public connection identity before touching credentials. Passing
+-- the RLS-validated actor from the TypeScript boundary closes role-revocation
+-- races between its metadata lookup and service-role escalation.
+create function public.store_integration_tokens(
+  p_brewery uuid, p_provider text, p_connection uuid, p_actor uuid,
+  p_access_token text, p_refresh_token text
+) returns boolean
+language sql security definer set search_path = '' as $$
+  with authorized as (
+    select true
+    where exists (
+      select 1 from public.brewery_users u
+      where u.brewery_id = p_brewery
+        and u.user_id = p_actor
+        and u.role in ('admin', 'sales')
+    )
+    and (
+      (p_provider = 'qbo' and exists (
+        select 1 from public.qbo_connections q
+        where q.brewery_id = p_brewery and q.id = p_connection
+      ))
+      or
+      (p_provider = 'square' and exists (
+        select 1 from public.pos_connections p
+        where p.brewery_id = p_brewery
+          and p.provider = p_provider
+          and p.id = p_connection
+      ))
+    )
+  ),
+  written as (
+    insert into private.integration_tokens as t (
+      brewery_id, provider, connection_id, access_token, refresh_token
+    )
+    select p_brewery, p_provider, p_connection, p_access_token, p_refresh_token
+    from authorized
+    on conflict (brewery_id, provider) do update
+      set connection_id = excluded.connection_id,
+          access_token = excluded.access_token,
+          refresh_token = excluded.refresh_token,
+          updated_at = now()
+    returning true
+  )
+  select coalesce((select true from written), false);
+$$;
+
+create function public.read_integration_tokens(
+  p_brewery uuid, p_provider text, p_connection uuid, p_actor uuid
+) returns table (access_token text, refresh_token text)
+language sql security definer set search_path = '' as $$
+  select t.access_token, t.refresh_token
+  from private.integration_tokens t
+  where t.brewery_id = p_brewery
+    and t.provider = p_provider
+    and t.connection_id = p_connection
+    and exists (
+      select 1 from public.brewery_users u
+      where u.brewery_id = p_brewery
+        and u.user_id = p_actor
+        and u.role in ('admin', 'sales')
+    )
+    and (
+      (p_provider = 'qbo' and exists (
+        select 1 from public.qbo_connections q
+        where q.brewery_id = p_brewery and q.id = p_connection
+      ))
+      or
+      (p_provider = 'square' and exists (
+        select 1 from public.pos_connections p
+        where p.brewery_id = p_brewery
+          and p.provider = p_provider
+          and p.id = p_connection
+      ))
+    );
+$$;
+
+-- A reconnect replaces the concrete external connection. Delete purges always;
+-- guarded updates purge only on an actual identity or tenant-key change, so a
+-- no-op metadata update cannot discard still-current credentials.
+create function private.purge_integration_tokens() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  delete from private.integration_tokens
+  where brewery_id = old.brewery_id and provider = tg_argv[0];
+  return old;
+end;
+$$;
+revoke execute on function private.purge_integration_tokens() from public, anon, authenticated, service_role;
+
+create trigger qbo_connections_delete_purge_tokens
+after delete on qbo_connections
+for each row execute function private.purge_integration_tokens('qbo');
+
+create trigger qbo_connections_identity_purge_tokens
+after update of brewery_id, id, realm_id on qbo_connections
+for each row
+when (
+  old.brewery_id is distinct from new.brewery_id
+  or old.id is distinct from new.id
+  or old.realm_id is distinct from new.realm_id
+)
+execute function private.purge_integration_tokens('qbo');
+
+create trigger pos_connections_delete_purge_tokens
+after delete on pos_connections
+for each row execute function private.purge_integration_tokens('square');
+
+create trigger pos_connections_identity_purge_tokens
+after update of brewery_id, id, provider, merchant_id on pos_connections
+for each row
+when (
+  old.brewery_id is distinct from new.brewery_id
+  or old.id is distinct from new.id
+  or old.provider is distinct from new.provider
+  or old.merchant_id is distinct from new.merchant_id
+)
+execute function private.purge_integration_tokens('square');
 
 create table pos_locations (
   brewery_id uuid not null references breweries(id),
@@ -1277,12 +1420,12 @@ create function private.order_line_price(p_brewery uuid, p_price_list uuid, p_sk
 language plpgsql stable set search_path = '' as $$
 declare v int;
 begin
+
   select unit_price_cents into v from public.price_list_items
     where brewery_id = p_brewery and price_list_id = p_price_list and sku_id = p_sku;
   if v is null then raise exception 'no price for sku % on price list', p_sku; end if;
   return v;
 end $$;
-
 create function private.create_order_impl(
   p_brewery uuid, p_kind public.order_kind, p_customer uuid, p_ship_to uuid,
   p_from_location uuid, p_to_location uuid, p_requested date, p_po text, p_note text, p_lines jsonb
@@ -1866,16 +2009,50 @@ begin
   v_replay := private.claim_command_request(p_brewery, 'portal_create_order', p_request_id,
     jsonb_build_object('brewery',p_brewery,'customer',p_customer,'ship_to',p_ship_to,'po',p_po,'note',p_note,'lines',p_lines));
   if v_replay is not null then return v_replay; end if;
-  select id into v_from_location
-  from public.locations
-  where brewery_id = p_brewery and kind = 'warehouse'
-  order by id
-  limit 1;
-  if v_from_location is null then raise exception 'warehouse not found'; end if;
+  -- Customers supply only ship-to, PO, note, and lines; everything else is
+  -- derived here (audit P1.4). Validate the customer-editable inputs first.
+  if not exists (
+    select 1 from public.ship_tos where id = p_ship_to and customer_id = p_customer and brewery_id = p_brewery
+  ) then raise exception 'ship-to not found'; end if;
+  if jsonb_typeof(p_lines) <> 'array' or jsonb_array_length(p_lines) = 0 then
+    raise exception 'order requires at least one line';
+  end if;
+  if exists (
+    select 1 from jsonb_array_elements(p_lines) e
+    where not exists (
+      select 1 from public.customers c
+      join public.price_list_items pli on pli.price_list_id = c.price_list_id and pli.brewery_id = c.brewery_id
+      join public.skus s on s.id = pli.sku_id and s.brewery_id = pli.brewery_id
+      where c.id = p_customer and pli.sku_id = (e->>'sku_id')::uuid and s.active
+    )
+  ) then raise exception 'sku is not active and priced for this customer'; end if;
+  -- The admin-configured source only (audit P1.4): no first-warehouse inference.
+  select portal_fulfillment_location_id into v_from_location from public.breweries where id = p_brewery;
+  if v_from_location is null then raise exception 'portal fulfillment source is not configured'; end if;
   v_result := private.create_order_impl(
     p_brewery,'wholesale',p_customer,p_ship_to,v_from_location,null,null,p_po,p_note,p_lines
   );
   return private.complete_command_request(p_request_id,v_result);
+end $$;
+
+-- Admin-only configuration for the one warehouse customer portal orders ship
+-- from. The composite FK on breweries prevents cross-brewery sources; this
+-- additionally rejects a same-brewery location that is not a warehouse.
+create function set_portal_fulfillment_source(p_brewery uuid, p_location uuid, p_request_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb;
+begin
+  perform private.assert_staff(p_brewery, array['admin']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'set_portal_fulfillment_source', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'location', p_location));
+  if v_replay is not null then return v_replay; end if;
+  if not exists (
+    select 1 from public.locations where id = p_location and brewery_id = p_brewery and kind = 'warehouse'
+  ) then
+    raise exception 'portal fulfillment source must be a brewery warehouse';
+  end if;
+  update public.breweries set portal_fulfillment_location_id = p_location where id = p_brewery;
+  return private.complete_command_request(p_request_id, jsonb_build_object('brewery_id', p_brewery, 'location_id', p_location));
 end $$;
 
 create function update_draft_order(
@@ -2043,7 +2220,8 @@ end $$;
 do $$
 declare t text;
 begin
-  -- staff of the brewery may do anything
+  -- Staff read their tenant's registered query surface. Writes are explicitly
+  -- limited below to the exact RPC path and command roles that own them.
   foreach t in array array[
     'customers','ship_tos','vendors','materials','material_lots','products','keg_pools','skus',
     'price_lists','price_list_items','sku_bom','locations','allocations','taproom_pars',
@@ -2056,24 +2234,25 @@ begin
     'routes','deliveries']
   loop
     execute format('alter table %I enable row level security', t);
-    execute format('create policy staff_all on %I for all using (is_staff_of(brewery_id))', t);
+    execute format('create policy staff_read on %I for select using (public.is_staff_of(brewery_id))', t);
   end loop;
-  -- append-only ledgers: read + insert-as-self only; update/delete revoked
+  -- Append-only ledgers retain staff reads. Only the inventory command paths
+  -- below may append inventory movements; the other ledgers have no staff DML.
   foreach t in array array['inventory_movements','material_movements','keg_events','transfers','volume_adjustments']
   loop
     execute format('alter table %I enable row level security', t);
-    execute format('create policy staff_read on %I for select using (is_staff_of(brewery_id))', t);
-    execute format('create policy staff_insert on %I for insert with check (is_staff_of(brewery_id) and created_by = auth.uid())', t);
+    execute format('create policy staff_read on %I for select using (public.is_staff_of(brewery_id))', t);
     execute format('revoke update, delete on %I from authenticated, anon', t);
   end loop;
-  -- order_events: append-only but with custom staff + customer policies
+  -- order_events is append-only but has custom staff + customer policies below.
   execute format('alter table %I enable row level security', 'order_events');
   execute format('revoke update, delete on %I from authenticated, anon', 'order_events');
-  -- admin-only (hold OAuth tokens)
+  -- Integration operators can inspect non-secret connection health; private
+  -- credential storage is never covered by this public-table policy.
   foreach t in array array['qbo_connections','pos_connections']
   loop
     execute format('alter table %I enable row level security', t);
-    execute format('create policy admin_all on %I for all using (staff_role(brewery_id) = ''admin'')', t);
+    execute format('create policy integration_operator_read on %I for select using (public.staff_role(brewery_id) in (''admin'', ''sales''))', t);
   end loop;
 end $$;
 
@@ -2083,12 +2262,8 @@ alter table customer_users enable row level security;
 alter table brewery_counters enable row level security;   -- no policies: only via next_no()
 
 create policy staff_read on breweries for select using (is_staff_of(id));
-create policy admin_update on breweries for update using (staff_role(id) = 'admin');
 create policy member_read on brewery_users for select using (user_id = auth.uid() or is_staff_of(brewery_id));
-create policy admin_write on brewery_users for all using (staff_role(brewery_id) = 'admin');
 create policy self_read on customer_users for select using (user_id = auth.uid());
-create policy staff_manage on customer_users for all
-  using (exists(select 1 from customers c where c.id = customer_id and is_staff_of(c.brewery_id)));
 
 -- Portal customers
 create policy customer_read_own on customers for select using (id in (select my_customer_ids()));
@@ -2100,18 +2275,8 @@ create policy customer_read on skus for select
 create policy customer_own_prices on price_list_items for select
   using (price_list_id in (select c.price_list_id from customers c where c.id in (select my_customer_ids())));
 create policy customer_read on orders for select using (customer_id in (select my_customer_ids()));
-create policy customer_insert on orders for insert
-  with check (customer_id in (select my_customer_ids()) and kind = 'wholesale' and status in ('draft','submitted'));
--- A submitted order is locked from customer edits (spec decision 2): only the
--- draft->submitted transition remains writable for the portal.
-create policy customer_update on orders for update
-  using (customer_id in (select my_customer_ids()) and status = 'draft')
-  with check (customer_id in (select my_customer_ids()) and kind = 'wholesale' and status in ('draft','submitted'));
 create policy customer_read on order_lines for select
-  using (order_id in (select id from orders where customer_id in (select my_customer_ids())));
-create policy customer_write on order_lines for all
-  using (order_id in (select id from orders where customer_id in (select my_customer_ids()) and status = 'draft'))
-  with check (order_id in (select id from orders where customer_id in (select my_customer_ids()) and status = 'draft'));
+  using (order_id in (select id from public.orders where customer_id in (select public.my_customer_ids())));
 create policy customer_read on shipments for select
   using (order_id in (select id from orders where customer_id in (select my_customer_ids())));
 create policy customer_read on invoices for select using (customer_id in (select my_customer_ids()));
@@ -2119,23 +2284,9 @@ create policy customer_read on invoice_lines for select
   using (invoice_id in (select id from invoices where customer_id in (select my_customer_ids())));
 create policy customer_read on deliveries for select
   using (shipment_id in (select s.id from shipments s join orders o on o.id = s.order_id where o.customer_id in (select my_customer_ids())));
-create policy staff_read on order_events for select using (is_staff_of(brewery_id));
-create policy staff_insert on order_events for insert
-  with check (is_staff_of(brewery_id) and actor = auth.uid());
+create policy staff_read on order_events for select using (public.is_staff_of(brewery_id));
 create policy customer_read on order_events for select
   using (order_id in (select id from orders where customer_id in (select my_customer_ids())));
--- Portal users write events only through their own lifecycle transitions
--- (create/update/submit on their own draft/submitted orders).
-create policy customer_insert on order_events for insert
-  with check (actor = auth.uid() and order_id in
-    (select id from orders where customer_id in (select my_customer_ids()) and status in ('draft','submitted')));
-
--- Customer portal needs the brewery's warehouse location(s) to place orders
--- (portal_create_order looks up the default warehouse); nothing else on
--- locations is exposed to customers.
-create policy customer_read on locations for select
-  using (kind = 'warehouse' and brewery_id in (select c.brewery_id from customers c where c.id in (select my_customer_ids())));
-
 -- ---------------------------------------------------------------- Data API grants
 -- Table writes are deliberately unavailable to application roles. All state
 -- changes enter through the narrow, request-ledger-backed RPC list below.
@@ -2143,7 +2294,8 @@ revoke all on schema public, private, extensions from public, anon, authenticate
 grant usage on schema public to anon, authenticated, service_role;
 revoke all on all tables in schema public from public, anon, authenticated;
 revoke all on all sequences in schema public from public, anon, authenticated;
--- qbo_connections and pos_connections hold OAuth tokens: service_role only.
+-- qbo_connections and pos_connections hold connection metadata only; token
+-- material lives in private.integration_tokens behind service-only RPCs.
 grant select on breweries, brewery_users, customer_users,
   customers, ship_tos, vendors, materials, material_lots, products, keg_pools, skus,
   price_lists, price_list_items, sku_bom, locations, inventory_movements, allocations, taproom_pars,
@@ -2153,7 +2305,7 @@ grant select on breweries, brewery_users, customer_users,
   purchase_order_lines, receipts, receipt_lines, material_counts, material_count_lines, orders,
   order_lines, order_events, shipments, invoices, invoice_lines, keg_events,
   pos_locations, pos_item_mappings, pos_sales, product_approvals, state_registrations,
-  brewery_state_licenses, report_filings, routes, deliveries
+  brewery_state_licenses, report_filings, routes, deliveries, qbo_connections, pos_connections
   to authenticated;
 -- Security-invoker views retain the underlying tables' RLS predicates; expose
 -- only the derived reads consumed by registered commands.
@@ -2189,6 +2341,7 @@ grant execute on function
   set_price(uuid,uuid,uuid,int,uuid),
   record_inventory_movement(uuid,uuid,uuid,numeric,public.movement_type,public.sale_channel,text,text,uuid),
   set_taproom_par(uuid,uuid,uuid,numeric,uuid),
+  set_portal_fulfillment_source(uuid,uuid,uuid),
   create_order(uuid,public.order_kind,uuid,uuid,uuid,uuid,date,text,text,jsonb,uuid),
   portal_create_order(uuid,uuid,uuid,text,text,jsonb,uuid),
   update_draft_order(uuid,uuid,date,text,text,jsonb,uuid),
@@ -2203,6 +2356,7 @@ grant execute on function
   create_replenishment_order(uuid,uuid,jsonb,uuid)
   to authenticated;
 grant usage on schema private, extensions to service_role;
-grant all on all tables in schema private to service_role;
-grant execute on all functions in schema private to service_role;
+-- service_role reaches `private` only for the UUID default its seed inserts
+-- evaluate; the ledger and token store stay behind owner-run definer functions.
+grant execute on function private.new_uuid() to service_role;
 grant execute on all functions in schema public to service_role;
