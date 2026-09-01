@@ -61,9 +61,48 @@ describe("portal commands", () => {
     const { data: updated } = await admin.from("orders").select("po_number, note, status").eq("id", created.order_id).single();
     expect(updated).toEqual({ po_number: "PO-2", note: "revised", status: "draft" });
 
+    // Omitted fields are left alone; only what the caller sends changes.
+    await runCommand("portal_update_draft_order", { orderId: created.order_id, lines: [{ skuId, qty: 5 }] }, custCtx);
+    const { data: kept } = await admin.from("orders").select("po_number, note").eq("id", created.order_id).single();
+    expect(kept).toEqual({ po_number: "PO-2", note: "revised" });
+
     await runCommand("portal_submit_order", { orderId: created.order_id }, custCtx);
     const { data: after } = await admin.from("orders").select("status").eq("id", created.order_id).single();
     expect(after!.status).toBe("submitted");
+  });
+
+  it("rejects a ship-to that belongs to another customer", async () => {
+    const { data: other } = await admin.from("customers").insert({ brewery_id: b.id, name: "Foreign Bar", type: "retailer", state: "PA" }).select().single();
+    const { data: st } = await admin.from("ship_tos").insert({ brewery_id: b.id, customer_id: other!.id, label: "o", address1: "1", city: "P", state: "PA", zip: "19100" }).select().single();
+    await expect(runCommand("portal_create_order", { shipToId: st!.id, lines: [{ skuId, qty: 1 }] }, custCtx))
+      .rejects.toThrow(/ship-to not found/);
+  });
+
+  it("rejects a sku that is not priced on the caller's list or is inactive", async () => {
+    const { data: p } = await admin.from("products").insert({ brewery_id: b.id, name: "Unpriced" }).select().single();
+    const { data: unpriced } = await admin.from("skus").insert({ brewery_id: b.id, product_id: p!.id, name: "keg", package_type: "keg", bbl_per_unit: 0.5 }).select().single();
+    await expect(runCommand("portal_create_order", { shipToId, lines: [{ skuId: unpriced!.id, qty: 1 }] }, custCtx))
+      .rejects.toThrow(/not active and priced/);
+    await admin.from("skus").update({ active: false }).eq("id", skuId);
+    await expect(runCommand("portal_create_order", { shipToId, lines: [{ skuId, qty: 1 }] }, custCtx))
+      .rejects.toThrow(/not active and priced/);
+    await admin.from("skus").update({ active: true }).eq("id", skuId);
+  });
+
+  it("ignores any client-supplied price: the line price is always the list price", async () => {
+    const created = await runCommand("portal_create_order", {
+      shipToId, lines: [{ skuId, qty: 1, unitPriceCents: 1 } as unknown as { skuId: string; qty: number }],
+    }, custCtx) as { order_id: string };
+    const { data: line } = await admin.from("order_lines").select("unit_price_cents").eq("order_id", created.order_id).single();
+    expect(line!.unit_price_cents).toBe(3600);
+  });
+
+  it("fails closed when the brewery has no portal fulfillment source", async () => {
+    const { data: b2 } = await admin.from("breweries").select("portal_fulfillment_location_id").eq("id", b.id).single();
+    await admin.from("breweries").update({ portal_fulfillment_location_id: null }).eq("id", b.id);
+    await expect(runCommand("portal_create_order", { shipToId, lines: [{ skuId, qty: 1 }] }, custCtx))
+      .rejects.toThrow(/fulfillment source is not configured/);
+    await admin.from("breweries").update({ portal_fulfillment_location_id: b2!.portal_fulfillment_location_id }).eq("id", b.id);
   });
 
   it("portal_catalog returns priced skus with a coarse badge and never raw ATP quantities", async () => {
@@ -100,7 +139,9 @@ describe("portal commands", () => {
     const created = await runCommand("portal_create_order", {
       shipToId, lines: [{ skuId, qty: 1 }],
     }, custCtx) as { order_id: string };
+    const { data: brewery } = await admin.from("breweries").select("portal_fulfillment_location_id").eq("id", b.id).single();
     const { data: order } = await admin.from("orders").select("from_location_id").eq("id", created.order_id).single();
-    expect(order!.from_location_id).not.toBe(warehouseId);
+    expect(brewery!.portal_fulfillment_location_id).not.toBe(warehouseId);
+    expect(order!.from_location_id).toBe(brewery!.portal_fulfillment_location_id);
   });
 });

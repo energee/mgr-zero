@@ -1681,8 +1681,10 @@ begin
   if jsonb_typeof(p_lines) <> 'array' or jsonb_array_length(p_lines) = 0 then
     raise exception 'order requires at least one line';
   end if;
+  -- Omitted (null) PO/note keep their current values; send '' to clear.
   update public.orders set ship_to_id = v_ship_to, from_location_id = v_source,
-    price_list_id = v_price_list, po_number = p_po, note = p_note where id = p_order;
+    price_list_id = v_price_list, po_number = coalesce(p_po, po_number),
+    note = coalesce(p_note, note) where id = p_order;
   delete from public.order_lines where order_id = p_order;
   for l in select (e->>'sku_id')::uuid as sku_id, (e->>'qty')::numeric as qty
     from jsonb_array_elements(p_lines) e loop

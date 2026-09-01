@@ -1,6 +1,8 @@
 // lib/commands/portal.ts — customer-portal commands. role: "customer" only;
-// ctx.customerId scopes everything. Mutations reuse the same plpgsql fns as
-// staff (RLS lets customers write only their own draft/submitted orders).
+// ctx.customerId scopes everything. Mutations call dedicated portal_* RPCs
+// that derive every trusted field (tenant, customer, fulfillment source,
+// price-list prices, actor, status) from the authenticated caller's
+// relationships; customers have no raw Data API write path to orders.
 import { z } from "zod";
 import { defineCommand, defineQuery, unwrap, CommandError, Ctx } from "./registry";
 
