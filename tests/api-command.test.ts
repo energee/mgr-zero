@@ -2,7 +2,9 @@
 import { randomUUID } from "node:crypto";
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { createClient } from "@supabase/supabase-js";
+import { z } from "zod";
 import { command } from "@/lib/commands/client";
+import { type CommandExecution, type Ctx, defineCommand } from "@/lib/commands/registry";
 import { POST } from "@/app/api/command/route";
 import { makeBrewery, makeStaff } from "./helpers";
 
@@ -26,6 +28,7 @@ describe("POST /api/command bearer auth", () => {
   let breweryId: string;
   let adminToken: string;
   let warehouseToken: string;
+  const executionHandler = vi.fn(async (_ctx: Ctx, _input: {}, execution: CommandExecution) => execution);
 
   beforeAll(async () => {
     breweryId = (await makeBrewery()).id;
@@ -33,6 +36,12 @@ describe("POST /api/command bearer auth", () => {
     const warehouse = await makeStaff(breweryId, "warehouse");
     adminToken = await signIn(admin.email);
     warehouseToken = await signIn(warehouse.email);
+    defineCommand({
+      name: "execution_metadata_probe",
+      input: z.object({}),
+      roles: ["admin"],
+      handler: executionHandler,
+    });
   });
 
   it("serializes one UUID request id for a browser command action", async () => {
@@ -60,50 +69,58 @@ describe("POST /api/command bearer auth", () => {
     expect(Array.isArray(json.data)).toBe(true);
   });
 
-  it("rejects a command with no request id before executing it", async () => {
+  it("rejects a missing command request id without calling the handler", async () => {
     const res = await POST(commandReq({
       breweryId,
-      name: "create_product",
-      input: { name: `missing-request-id-${randomUUID()}` },
+      name: "execution_metadata_probe",
+      input: {},
     }, adminToken));
-    const json = await res.json();
+
     expect(res.status).toBe(400);
-    expect(json).toMatchObject({
+    await expect(res.json()).resolves.toMatchObject({
       ok: false,
       error: { code: "invalid_request_id", message: expect.any(String) },
       correlationId: expect.any(String),
     });
+    expect(executionHandler).not.toHaveBeenCalled();
   });
 
-  it("rejects a command with a malformed request id before executing it", async () => {
+  it("rejects a malformed command request id without calling the handler", async () => {
     const res = await POST(commandReq({
       breweryId,
-      name: "create_product",
-      input: { name: `malformed-request-id-${randomUUID()}` },
+      name: "execution_metadata_probe",
+      input: {},
       requestId: "not-a-uuid",
     }, adminToken));
-    const json = await res.json();
+
     expect(res.status).toBe(400);
-    expect(json).toMatchObject({
+    await expect(res.json()).resolves.toMatchObject({
       ok: false,
       error: { code: "invalid_request_id", message: expect.any(String) },
       requestId: "not-a-uuid",
       correlationId: expect.any(String),
     });
+    expect(executionHandler).not.toHaveBeenCalled();
   });
 
-  it("returns independent request and correlation ids for a command", async () => {
-    const requestId = randomUUID();
+  it("accepts a UUIDv7 command request id and passes response metadata to the handler", async () => {
+    const requestId = "018f46c6-9c3e-7c4b-8a59-7a4a8e66f923";
     const res = await POST(commandReq({
       breweryId,
-      name: "create_product",
-      input: { name: `command-metadata-${randomUUID()}` },
+      name: "execution_metadata_probe",
+      input: {},
       requestId,
     }, adminToken));
     const json = await res.json();
+
     expect(res.status).toBe(200);
     expect(json).toMatchObject({ ok: true, requestId, correlationId: expect.any(String) });
     expect(json.correlationId).not.toBe(requestId);
+    expect(executionHandler).toHaveBeenCalledExactlyOnceWith(
+      expect.anything(),
+      {},
+      { requestId, correlationId: json.correlationId },
+    );
   });
 
   it("rejects a bad token", async () => {

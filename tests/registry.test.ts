@@ -37,8 +37,14 @@ describe("command registry", () => {
     };
     const ctx = { db: testDb, userId: "u", breweryId: "b", role: "admin" as const };
 
-    expect(getCommandDefinition("write")).toMatchObject({ ...write, kind: "command" });
-    expect(getCommandDefinition("read")).toMatchObject({ ...read, kind: "query" });
+    const writeMetadata = getCommandDefinition("write");
+    const readMetadata = getCommandDefinition("read");
+    expect(writeMetadata).toMatchObject({ name: "write", kind: "command" });
+    expect(readMetadata).toMatchObject({ name: "read", kind: "query" });
+    expect(writeMetadata).not.toHaveProperty("handler");
+    expect(writeMetadata).not.toHaveProperty("execute");
+    expect(readMetadata).not.toHaveProperty("handler");
+    expect(readMetadata).not.toHaveProperty("execute");
     expect(executions).toBe(0);
     await expect(runCommand("write", {}, ctx, execution)).resolves.toEqual(execution);
     await expect(runCommand("read", {}, ctx)).resolves.toEqual({ ok: true });

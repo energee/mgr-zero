@@ -125,8 +125,14 @@ export function defineQuery<In, Out>(input: QueryDefinitionInput<In, Out>): Quer
 export function getCommandDefinition(name: string): CommandDefinitionMetadata | undefined {
   const definition = registry.get(name);
   if (!definition) return undefined;
-  const { execute: _execute, ...metadata } = definition;
-  return metadata;
+  return {
+    name: definition.name,
+    description: definition.description,
+    input: definition.input,
+    roles: definition.roles,
+    requiresConfirmation: definition.requiresConfirmation,
+    kind: definition.kind,
+  };
 }
 
 function createExecution(): CommandExecution {

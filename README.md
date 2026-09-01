@@ -83,9 +83,10 @@ npm run dev   # http://localhost:3000
 
 ## HTTP API
 
-One endpoint: `POST /api/command`. You authenticate as a brewery user, name the
-command, and pass its input. Data is always scoped to `breweryId` — you only
-see that brewery, and only if you are a member.
+One endpoint: `POST /api/command`. Registered operations are either queries
+(side-effect-free reads) or commands (writes). You authenticate as a brewery
+user, name the operation, and pass its input. Data is always scoped to
+`breweryId` — you only see that brewery, and only if you are a member.
 
 ### Auth
 
@@ -114,17 +115,31 @@ Staff roles: `admin`, `sales`, `warehouse`, `brewer`. Each command lists who may
 
 ### Request / response
 
+Every request has `breweryId`, `name`, and `input`. A query may omit
+`requestId`; a command **must** include a client-generated RFC 9562/4122 UUID
+as `requestId` before its handler runs.
+
 ```json
 { "breweryId": "<uuid>", "name": "list_products", "input": {} }
 ```
 
-Success: `{ "ok": true, "data": ... }` (HTTP 200). Failure: `{ "ok": false, "error": "..." }`.
+```json
+{ "breweryId": "<uuid>", "name": "create_product", "input": {}, "requestId": "<uuid>" }
+```
+
+Every response includes a server-generated `correlationId`. A successful query
+returns `{ "ok": true, "data": ..., "correlationId": "<uuid>" }`; a successful
+command additionally returns its submitted `requestId`. Failures use the
+structured public envelope `{ "ok": false, "error": { "code": "...", "message":
+"..." }, "correlationId": "<uuid>" }` and include a submitted `requestId` when
+one was supplied.
 
 | HTTP | Meaning |
 | --- | --- |
+| 400 | Invalid request, missing/malformed command `requestId`, invalid `input`, or a data rule rejected the write |
 | 401 | Missing, malformed, expired, or revoked token |
 | 403 | Authenticated, but not a member of `breweryId`, or your role cannot run this command |
-| 400 | Unknown command, invalid `input`, or a data rule rejected the write |
+| 404 | Unknown operation |
 | 500 | Server error (message is generic) |
 
 ### Catalog
@@ -213,14 +228,19 @@ mock) — `npx supabase start` must be running first.
 
 ## HTTP API
 
-All reads and writes go through one endpoint:
+All reads and writes go through one endpoint. Registered operations are
+classified as queries (side-effect-free reads) or commands (writes):
 
 ```
 POST /api/command
 Content-Type: application/json
 
-{ "breweryId": "<uuid>", "name": "<command name>", "input": { ... } }
+{ "breweryId": "<uuid>", "name": "<operation name>", "input": { ... }, "requestId": "<uuid for commands>" }
 ```
+
+`breweryId`, `name`, and `input` are required. A query may omit `requestId`; a
+command must submit a client-generated RFC 9562/4122 UUID `requestId` before
+the handler can run.
 
 Authentication is the Supabase cookie session of the logged-in user
 (established by the app's login flow). The caller must be a member of the
@@ -229,13 +249,20 @@ brewery named by `breweryId`: either staff (a `brewery_users` row with role
 `customer_users` row linked to one of the brewery's customers, which gives
 the `customer` role). Each command lists the roles allowed to call it.
 
-Responses:
+Every response includes a server-generated `correlationId`. Success is
+`{ "ok": true, "data": ..., "correlationId": "<uuid>" }`; command successes
+also include the submitted `requestId`. Failures use the structured public
+envelope `{ "ok": false, "error": { "code": "...", "message": "..." },
+"correlationId": "<uuid>" }` and include a submitted `requestId` when present.
 
-| Status | Body | Meaning |
-| --- | --- | --- |
-| 200 | `{ "ok": true, "data": ... }` | success; `data` is the command's result |
-| 400 | `{ "ok": false, "error": "<message>" }` | any expected failure: unauthenticated, not a member, permission denied, unknown command, input validation, or a domain rule (e.g. wrong order status) |
-| 500 | `{ "ok": false, "error": "internal error" }` | unexpected failure |
+| Status | Meaning |
+| --- | --- |
+| 200 | Success; `data` is the operation result |
+| 400 | Invalid request, missing/malformed command `requestId`, invalid input, or a domain rule |
+| 401 | Unauthenticated |
+| 403 | Not a member of the brewery or permission denied |
+| 404 | Unknown operation |
+| 500 | Unexpected failure |
 
 Input fields are camelCase; ids are UUIDs; money is integer cents; dates
 are `YYYY-MM-DD` strings. `limit` parameters default to 50 (max 200).

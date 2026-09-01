@@ -2,6 +2,7 @@
 // Commands require client-provided UUID request IDs; queries only receive a
 // server-generated correlation ID. Task 12 will sanitize unexpected errors.
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { buildContext, buildContextFromBearer } from "@/lib/commands/context";
 import {
   type CommandExecution,
@@ -32,8 +33,10 @@ function isCommandRequest(body: unknown): body is CommandRequest {
     && "input" in body;
 }
 
+const requestIdSchema = z.uuid();
+
 function isUuid(value: string | undefined): value is string {
-  return value !== undefined && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  return value !== undefined && requestIdSchema.safeParse(value).success;
 }
 
 
