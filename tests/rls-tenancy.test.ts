@@ -24,6 +24,12 @@ describe("tenancy RLS", () => {
     expect(error).not.toBeNull();
   });
 
+  it("staff of A cannot directly insert customers into their own brewery", async () => {
+    const db = await asUser(staffA.email);
+    const { error } = await db.from("customers").insert({ brewery_id: bA.id, name: "raw own brewery customer", state: "PA" });
+    expect(error?.code).toBe("42501");
+  });
+
   it("customer user sees only their own customer record", async () => {
     const db = await asUser(custB.user.email);
     const { data } = await db.from("customers").select("id");

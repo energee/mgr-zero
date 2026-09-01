@@ -1243,6 +1243,178 @@ create view route_loads with (security_invoker = true) as
   join orders o on o.id = s.order_id
   join order_lines l on l.order_id = o.id;
 
+-- ---------------------------------------------------------------- command RPC boundary
+-- Write policies admit only these exact PostgREST RPC paths, paired with the
+-- same staff-role sets as lib/commands/registry.ts. Direct table mutations
+-- therefore fail RLS even when the caller holds the table privilege needed by
+-- a security-invoker RPC.
+create function is_authorized_staff_rpc(
+  p_brewery uuid, p_rpc text, p_roles public.staff_role[]
+) returns boolean
+language sql stable security invoker set search_path = '' as $$
+  select current_setting('request.path', true) = '/rpc/' || p_rpc
+    and public.staff_role(p_brewery) = any(p_roles);
+$$;
+
+create function create_product(
+  p_brewery uuid, p_name text, p_style text, p_abv numeric
+) returns jsonb
+language plpgsql security invoker set search_path = '' as $$
+declare v_product public.products;
+begin
+  insert into public.products (brewery_id, name, style, abv)
+  values (p_brewery, p_name, p_style, p_abv)
+  returning * into v_product;
+  return to_jsonb(v_product);
+end $$;
+
+create function create_sku(
+  p_brewery uuid, p_product uuid, p_name text, p_package_type public.package_type,
+  p_units_per_case int, p_bbl_per_unit numeric
+) returns jsonb
+language plpgsql security invoker set search_path = '' as $$
+declare v_sku public.skus;
+begin
+  insert into public.skus (
+    brewery_id, product_id, name, package_type, units_per_case, bbl_per_unit
+  ) values (
+    p_brewery, p_product, p_name, p_package_type, p_units_per_case, p_bbl_per_unit
+  )
+  returning * into v_sku;
+  return to_jsonb(v_sku);
+end $$;
+
+create function create_location(
+  p_brewery uuid, p_name text, p_kind public.location_kind
+) returns jsonb
+language plpgsql security invoker set search_path = '' as $$
+declare v_location public.locations;
+begin
+  insert into public.locations (brewery_id, name, kind)
+  values (p_brewery, p_name, p_kind)
+  returning * into v_location;
+  return to_jsonb(v_location);
+end $$;
+
+create function upsert_customer(
+  p_id uuid, p_brewery uuid, p_name text, p_type public.customer_type, p_state text,
+  p_price_list uuid, p_license_no text, p_payment_terms text
+) returns jsonb
+language plpgsql security invoker set search_path = '' as $$
+declare v_customer public.customers;
+begin
+  insert into public.customers as c (
+    id, brewery_id, name, type, state, price_list_id, license_no, payment_terms
+  ) values (
+    coalesce(p_id, gen_random_uuid()), p_brewery, p_name, p_type, p_state,
+    p_price_list, p_license_no, coalesce(p_payment_terms, 'net30')
+  )
+  on conflict (id) do update set
+    brewery_id = excluded.brewery_id,
+    name = excluded.name,
+    type = excluded.type,
+    state = excluded.state,
+    price_list_id = excluded.price_list_id,
+    license_no = excluded.license_no,
+    payment_terms = coalesce(p_payment_terms, c.payment_terms)
+  returning * into v_customer;
+  return to_jsonb(v_customer);
+end $$;
+
+create function upsert_ship_to(
+  p_id uuid, p_brewery uuid, p_customer uuid, p_label text, p_address1 text,
+  p_address2 text, p_city text, p_state text, p_zip text
+) returns jsonb
+language plpgsql security invoker set search_path = '' as $$
+declare v_ship_to public.ship_tos;
+begin
+  insert into public.ship_tos as s (
+    id, brewery_id, customer_id, label, address1, address2, city, state, zip
+  ) values (
+    coalesce(p_id, gen_random_uuid()), p_brewery, p_customer, p_label,
+    p_address1, p_address2, p_city, p_state, p_zip
+  )
+  on conflict (id) do update set
+    brewery_id = excluded.brewery_id,
+    customer_id = excluded.customer_id,
+    label = excluded.label,
+    address1 = excluded.address1,
+    address2 = excluded.address2,
+    city = excluded.city,
+    state = excluded.state,
+    zip = excluded.zip
+  returning * into v_ship_to;
+  return to_jsonb(v_ship_to);
+end $$;
+
+create function upsert_price_list(
+  p_id uuid, p_brewery uuid, p_name text
+) returns jsonb
+language plpgsql security invoker set search_path = '' as $$
+declare v_price_list public.price_lists;
+begin
+  insert into public.price_lists as p (id, brewery_id, name)
+  values (coalesce(p_id, gen_random_uuid()), p_brewery, p_name)
+  on conflict (id) do update set
+    brewery_id = excluded.brewery_id,
+    name = excluded.name
+  returning * into v_price_list;
+  return to_jsonb(v_price_list);
+end $$;
+
+create function set_price(
+  p_brewery uuid, p_price_list uuid, p_sku uuid, p_unit_price_cents int
+) returns jsonb
+language plpgsql security invoker set search_path = '' as $$
+declare v_price public.price_list_items;
+begin
+  insert into public.price_list_items (
+    brewery_id, price_list_id, sku_id, unit_price_cents
+  ) values (
+    p_brewery, p_price_list, p_sku, p_unit_price_cents
+  )
+  on conflict (price_list_id, sku_id) do update set
+    brewery_id = excluded.brewery_id,
+    unit_price_cents = excluded.unit_price_cents
+  returning * into v_price;
+  return to_jsonb(v_price);
+end $$;
+
+create function record_movement(
+  p_brewery uuid, p_sku uuid, p_location uuid, p_qty numeric,
+  p_type public.movement_type, p_channel public.sale_channel,
+  p_dest_state text, p_note text
+) returns jsonb
+language plpgsql security invoker set search_path = '' as $$
+declare v_movement public.inventory_movements;
+begin
+  insert into public.inventory_movements (
+    brewery_id, sku_id, location_id, qty, type, channel, dest_state, note, created_by
+  ) values (
+    p_brewery, p_sku, p_location, p_qty, p_type, p_channel, p_dest_state, p_note, auth.uid()
+  )
+  returning * into v_movement;
+  return to_jsonb(v_movement);
+end $$;
+
+create function set_taproom_par(
+  p_brewery uuid, p_location uuid, p_sku uuid, p_par_qty numeric
+) returns jsonb
+language plpgsql security invoker set search_path = '' as $$
+declare v_par public.taproom_pars;
+begin
+  insert into public.taproom_pars (
+    brewery_id, location_id, sku_id, par_qty
+  ) values (
+    p_brewery, p_location, p_sku, p_par_qty
+  )
+  on conflict (location_id, sku_id) do update set
+    brewery_id = excluded.brewery_id,
+    par_qty = excluded.par_qty
+  returning * into v_par;
+  return to_jsonb(v_par);
+end $$;
+
 -- ------------------------------------------------- order lifecycle commands
 -- One function per transition (iron rule 5). Invoker-rights: RLS does
 -- tenancy; each starts by locking the order row. p_lines is a full
@@ -1545,7 +1717,8 @@ end $$;
 do $$
 declare t text;
 begin
-  -- staff of the brewery may do anything
+  -- Staff read their tenant's registered query surface. Writes are explicitly
+  -- limited below to the exact RPC path and command roles that own them.
   foreach t in array array[
     'customers','ship_tos','vendors','materials','material_lots','products','keg_pools','skus',
     'price_lists','price_list_items','sku_bom','locations','allocations','taproom_pars',
@@ -1558,24 +1731,24 @@ begin
     'routes','deliveries']
   loop
     execute format('alter table %I enable row level security', t);
-    execute format('create policy staff_all on %I for all using (is_staff_of(brewery_id))', t);
+    execute format('create policy staff_read on %I for select using (public.is_staff_of(brewery_id))', t);
   end loop;
-  -- append-only ledgers: read + insert-as-self only; update/delete revoked
+  -- Append-only ledgers retain staff reads. Only the inventory command paths
+  -- below may append inventory movements; the other ledgers have no staff DML.
   foreach t in array array['inventory_movements','material_movements','keg_events','transfers','volume_adjustments']
   loop
     execute format('alter table %I enable row level security', t);
-    execute format('create policy staff_read on %I for select using (is_staff_of(brewery_id))', t);
-    execute format('create policy staff_insert on %I for insert with check (is_staff_of(brewery_id) and created_by = auth.uid())', t);
+    execute format('create policy staff_read on %I for select using (public.is_staff_of(brewery_id))', t);
     execute format('revoke update, delete on %I from authenticated, anon', t);
   end loop;
-  -- order_events: append-only but with custom staff + customer policies
+  -- order_events is append-only but has custom staff + customer policies below.
   execute format('alter table %I enable row level security', 'order_events');
   execute format('revoke update, delete on %I from authenticated, anon', 'order_events');
-  -- admin-only (hold OAuth tokens)
+  -- Connection records remain admin-readable; Task 3 owns their token isolation.
   foreach t in array array['qbo_connections','pos_connections']
   loop
     execute format('alter table %I enable row level security', t);
-    execute format('create policy admin_all on %I for all using (staff_role(brewery_id) = ''admin'')', t);
+    execute format('create policy admin_read on %I for select using (public.staff_role(brewery_id) = ''admin'')', t);
   end loop;
 end $$;
 
@@ -1585,12 +1758,8 @@ alter table customer_users enable row level security;
 alter table brewery_counters enable row level security;   -- no policies: only via next_no()
 
 create policy staff_read on breweries for select using (is_staff_of(id));
-create policy admin_update on breweries for update using (staff_role(id) = 'admin');
 create policy member_read on brewery_users for select using (user_id = auth.uid() or is_staff_of(brewery_id));
-create policy admin_write on brewery_users for all using (staff_role(brewery_id) = 'admin');
 create policy self_read on customer_users for select using (user_id = auth.uid());
-create policy staff_manage on customer_users for all
-  using (exists(select 1 from customers c where c.id = customer_id and is_staff_of(c.brewery_id)));
 
 -- Portal customers
 create policy customer_read_own on customers for select using (id in (select my_customer_ids()));
@@ -1621,9 +1790,7 @@ create policy customer_read on invoice_lines for select
   using (invoice_id in (select id from invoices where customer_id in (select my_customer_ids())));
 create policy customer_read on deliveries for select
   using (shipment_id in (select s.id from shipments s join orders o on o.id = s.order_id where o.customer_id in (select my_customer_ids())));
-create policy staff_read on order_events for select using (is_staff_of(brewery_id));
-create policy staff_insert on order_events for insert
-  with check (is_staff_of(brewery_id) and actor = auth.uid());
+create policy staff_read on order_events for select using (public.is_staff_of(brewery_id));
 create policy customer_read on order_events for select
   using (order_id in (select id from orders where customer_id in (select my_customer_ids())));
 -- Portal users write events only through their own lifecycle transitions
@@ -1637,6 +1804,149 @@ create policy customer_insert on order_events for insert
 -- locations is exposed to customers.
 create policy customer_read on locations for select
   using (kind = 'warehouse' and brewery_id in (select c.brewery_id from customers c where c.id in (select my_customer_ids())));
+
+-- Staff command writes: every predicate requires both the exact RPC request
+-- path and the registered staff role. A matching table privilege alone cannot
+-- authorize a raw /rest/v1/<table> mutation.
+create policy products_create_product on products for insert
+  with check (public.is_authorized_staff_rpc(brewery_id, 'create_product', array['admin','sales']::public.staff_role[]));
+create policy skus_create_sku on skus for insert
+  with check (public.is_authorized_staff_rpc(brewery_id, 'create_sku', array['admin','sales']::public.staff_role[]));
+create policy locations_create_location on locations for insert
+  with check (public.is_authorized_staff_rpc(brewery_id, 'create_location', array['admin']::public.staff_role[]));
+
+create policy customers_upsert_insert on customers for insert
+  with check (public.is_authorized_staff_rpc(brewery_id, 'upsert_customer', array['admin','sales']::public.staff_role[]));
+create policy customers_upsert_update on customers for update
+  using (public.is_authorized_staff_rpc(brewery_id, 'upsert_customer', array['admin','sales']::public.staff_role[]))
+  with check (public.is_authorized_staff_rpc(brewery_id, 'upsert_customer', array['admin','sales']::public.staff_role[]));
+create policy ship_tos_upsert_insert on ship_tos for insert
+  with check (public.is_authorized_staff_rpc(brewery_id, 'upsert_ship_to', array['admin','sales']::public.staff_role[]));
+create policy ship_tos_upsert_update on ship_tos for update
+  using (public.is_authorized_staff_rpc(brewery_id, 'upsert_ship_to', array['admin','sales']::public.staff_role[]))
+  with check (public.is_authorized_staff_rpc(brewery_id, 'upsert_ship_to', array['admin','sales']::public.staff_role[]));
+create policy price_lists_upsert_insert on price_lists for insert
+  with check (public.is_authorized_staff_rpc(brewery_id, 'upsert_price_list', array['admin','sales']::public.staff_role[]));
+create policy price_lists_upsert_update on price_lists for update
+  using (public.is_authorized_staff_rpc(brewery_id, 'upsert_price_list', array['admin','sales']::public.staff_role[]))
+  with check (public.is_authorized_staff_rpc(brewery_id, 'upsert_price_list', array['admin','sales']::public.staff_role[]));
+create policy price_list_items_set_price_insert on price_list_items for insert
+  with check (public.is_authorized_staff_rpc(brewery_id, 'set_price', array['admin','sales']::public.staff_role[]));
+create policy price_list_items_set_price_update on price_list_items for update
+  using (public.is_authorized_staff_rpc(brewery_id, 'set_price', array['admin','sales']::public.staff_role[]))
+  with check (public.is_authorized_staff_rpc(brewery_id, 'set_price', array['admin','sales']::public.staff_role[]));
+
+create policy inventory_movements_command_insert on inventory_movements for insert
+  with check (
+    public.is_authorized_staff_rpc(brewery_id, 'record_movement', array['admin','warehouse']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'ship_order', array['admin','warehouse']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'create_credit_memo', array['admin','sales']::public.staff_role[])
+  );
+create policy taproom_pars_set_insert on taproom_pars for insert
+  with check (public.is_authorized_staff_rpc(brewery_id, 'set_taproom_par', array['admin','sales']::public.staff_role[]));
+create policy taproom_pars_set_update on taproom_pars for update
+  using (public.is_authorized_staff_rpc(brewery_id, 'set_taproom_par', array['admin','sales']::public.staff_role[]))
+  with check (public.is_authorized_staff_rpc(brewery_id, 'set_taproom_par', array['admin','sales']::public.staff_role[]));
+
+create policy allocations_command_insert on allocations for insert
+  with check (
+    public.is_authorized_staff_rpc(brewery_id, 'confirm_order', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'adjust_order_lines', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'set_standing_allocation', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'create_replenishment_order', array['admin','sales']::public.staff_role[])
+  );
+create policy allocations_command_update on allocations for update
+  using (
+    public.is_authorized_staff_rpc(brewery_id, 'adjust_order_lines', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'cancel_order', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'ship_order', array['admin','warehouse']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'set_standing_allocation', array['admin','sales']::public.staff_role[])
+  )
+  with check (
+    public.is_authorized_staff_rpc(brewery_id, 'adjust_order_lines', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'cancel_order', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'ship_order', array['admin','warehouse']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'set_standing_allocation', array['admin','sales']::public.staff_role[])
+  );
+
+create policy orders_command_insert on orders for insert
+  with check (
+    public.is_authorized_staff_rpc(brewery_id, 'create_order', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'create_replenishment_order', array['admin','sales']::public.staff_role[])
+  );
+create policy orders_command_update on orders for update
+  using (
+    public.is_authorized_staff_rpc(brewery_id, 'update_draft_order', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'submit_order', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'confirm_order', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'adjust_order_lines', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'cancel_order', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'record_pick', array['admin','warehouse']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'ship_order', array['admin','warehouse']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'create_replenishment_order', array['admin','sales']::public.staff_role[])
+  )
+  with check (
+    public.is_authorized_staff_rpc(brewery_id, 'update_draft_order', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'submit_order', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'confirm_order', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'adjust_order_lines', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'cancel_order', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'record_pick', array['admin','warehouse']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'ship_order', array['admin','warehouse']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'create_replenishment_order', array['admin','sales']::public.staff_role[])
+  );
+create policy order_lines_command_insert on order_lines for insert
+  with check (
+    public.is_authorized_staff_rpc(brewery_id, 'create_order', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'update_draft_order', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'adjust_order_lines', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'create_replenishment_order', array['admin','sales']::public.staff_role[])
+  );
+create policy order_lines_command_update on order_lines for update
+  using (
+    public.is_authorized_staff_rpc(brewery_id, 'adjust_order_lines', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'record_pick', array['admin','warehouse']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'ship_order', array['admin','warehouse']::public.staff_role[])
+  )
+  with check (
+    public.is_authorized_staff_rpc(brewery_id, 'adjust_order_lines', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'record_pick', array['admin','warehouse']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'ship_order', array['admin','warehouse']::public.staff_role[])
+  );
+create policy order_lines_command_delete on order_lines for delete
+  using (
+    public.is_authorized_staff_rpc(brewery_id, 'update_draft_order', array['admin','sales']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'adjust_order_lines', array['admin','sales']::public.staff_role[])
+  );
+
+create policy shipments_ship_order on shipments for insert
+  with check (public.is_authorized_staff_rpc(brewery_id, 'ship_order', array['admin','warehouse']::public.staff_role[]));
+create policy invoices_command_insert on invoices for insert
+  with check (
+    public.is_authorized_staff_rpc(brewery_id, 'ship_order', array['admin','warehouse']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'create_credit_memo', array['admin','sales']::public.staff_role[])
+  );
+create policy invoice_lines_command_insert on invoice_lines for insert
+  with check (
+    public.is_authorized_staff_rpc(brewery_id, 'ship_order', array['admin','warehouse']::public.staff_role[])
+    or public.is_authorized_staff_rpc(brewery_id, 'create_credit_memo', array['admin','sales']::public.staff_role[])
+  );
+create policy order_events_command_insert on order_events for insert
+  with check (
+    actor = auth.uid()
+    and (
+      public.is_authorized_staff_rpc(brewery_id, 'create_order', array['admin','sales']::public.staff_role[])
+      or public.is_authorized_staff_rpc(brewery_id, 'update_draft_order', array['admin','sales']::public.staff_role[])
+      or public.is_authorized_staff_rpc(brewery_id, 'submit_order', array['admin','sales']::public.staff_role[])
+      or public.is_authorized_staff_rpc(brewery_id, 'confirm_order', array['admin','sales']::public.staff_role[])
+      or public.is_authorized_staff_rpc(brewery_id, 'adjust_order_lines', array['admin','sales']::public.staff_role[])
+      or public.is_authorized_staff_rpc(brewery_id, 'cancel_order', array['admin','sales']::public.staff_role[])
+      or public.is_authorized_staff_rpc(brewery_id, 'record_pick', array['admin','warehouse']::public.staff_role[])
+      or public.is_authorized_staff_rpc(brewery_id, 'ship_order', array['admin','warehouse']::public.staff_role[])
+      or public.is_authorized_staff_rpc(brewery_id, 'create_credit_memo', array['admin','sales']::public.staff_role[])
+      or public.is_authorized_staff_rpc(brewery_id, 'create_replenishment_order', array['admin','sales']::public.staff_role[])
+    )
+  );
 
 -- ---------------------------------------------------------------- immutability grants
 revoke update, delete on recipe_versions, recipe_ingredients from authenticated, anon;
