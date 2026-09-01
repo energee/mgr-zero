@@ -846,17 +846,17 @@ git commit -m "feat: define Today notification reasons"
 - Consumes: `get_today_items`, active links/installations/destinations, quiet hours.
 - Produces: `scan_chat_notification_occurrences`, `lease_chat_deliveries`, `complete_chat_delivery`, `retry_chat_delivery`, `suppress_chat_delivery`, preference/destination commands.
 
-- [ ] **Step 1: Write failing occurrence tests**
+- [x] **Step 1: Write failing occurrence tests**
 
 Cover transition atomicity, catch-up scan, semantic keys, recipient-role fan-out, assigned driver, admin fan-out, user mute, quiet-hour `next_attempt_at`, timezone/DST, resolved suppression, cadence change, morning 08:00 digest, midday 12:00 digest, missed-window recovery, and concurrent lease exclusion.
 
-- [ ] **Step 2: Prove the transition is not yet atomic**
+- [x] **Step 2: Prove the transition is not yet atomic**
 
 Run: `npx vitest run tests/chat-occurrences.test.ts tests/chat-delivery-policy.test.ts`
 
 Expected: FAIL because `submit_order` does not insert an occurrence and scan/lease functions do not exist.
 
-- [ ] **Step 3: Add semantic occurrence upsert**
+- [x] **Step 3: Add semantic occurrence upsert**
 
 Use these key shapes:
 
@@ -870,15 +870,15 @@ operations_digest:{destination_id}:{brewery_local_date}:{morning|midday}
 
 The scan upserts active occurrences, resolves stale ones, creates personal deliveries for active linked recipients, and creates one synthetic digest occurrence per due window. It never posts messages.
 
-- [ ] **Step 4: Make submitted-order occurrence atomic**
+- [x] **Step 4: Make submitted-order occurrence atomic**
 
 Extend `submit_order(p_order uuid)` so the order state, order event, and `submitted_order` occurrence commit in the existing transaction. The scheduled scan uses the same semantic key for catch-up and cannot duplicate it.
 
-- [ ] **Step 5: Add bounded lease/outcome functions**
+- [x] **Step 5: Add bounded lease/outcome functions**
 
 `lease_chat_deliveries(p_limit int, p_lease_seconds int, p_now timestamptz)` uses `for update skip locked`, caps `p_limit` at 100, increments attempts, and returns only provider routing IDs plus the occurrence ID. Outcome functions require the current lease and clear it atomically.
 
-- [ ] **Step 6: Run green and commit**
+- [x] **Step 6: Run green and commit**
 
 Run:
 
