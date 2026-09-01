@@ -2011,10 +2011,6 @@ create policy order_events_command_insert on order_events for insert
     )
   );
 
--- ---------------------------------------------------------------- immutability grants
-revoke update, delete on recipe_versions, recipe_ingredients from authenticated, anon;
-revoke update, delete on pos_sales from authenticated, anon;
-grant update (movement_id) on pos_sales to authenticated;
 
 -- Availability badge tiers for portal customers: coarse tiers only, never raw
 -- quantities (spec 1B decision 7). security definer on purpose — customers
@@ -2048,6 +2044,9 @@ revoke all privileges on all functions in schema public from public, anon, authe
 alter default privileges for role postgres in schema public revoke all on tables from public, anon, authenticated, service_role;
 alter default privileges for role postgres in schema public revoke all on sequences from public, anon, authenticated, service_role;
 alter default privileges for role postgres in schema public revoke all on functions from public, anon, authenticated, service_role;
+-- `supabase_admin` is a reserved platform role. Its bootstrap defaults are
+-- owned by `auto_expose_new_tables = false`; migrations must not escalate into
+-- that role to alter them.
 
 grant usage on schema public to authenticated, service_role;
 grant select on all tables in schema public to authenticated;

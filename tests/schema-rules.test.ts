@@ -71,6 +71,10 @@ describe("schema rules", () => {
             ('INSERT', case when relkind in ('r', 'v') then has_table_privilege(role, oid, 'insert') else false end),
             ('UPDATE', case when relkind in ('r', 'v') then has_table_privilege(role, oid, 'update') else has_sequence_privilege(role, oid, 'update') end),
             ('DELETE', case when relkind in ('r', 'v') then has_table_privilege(role, oid, 'delete') else false end),
+            ('TRUNCATE', case when relkind in ('r', 'v') then has_table_privilege(role, oid, 'truncate') else false end),
+            ('REFERENCES', case when relkind in ('r', 'v') then has_table_privilege(role, oid, 'references') else false end),
+            ('TRIGGER', case when relkind in ('r', 'v') then has_table_privilege(role, oid, 'trigger') else false end),
+            ('MAINTAIN', case when relkind in ('r', 'v') then has_table_privilege(role, oid, 'maintain') else false end),
             ('USAGE', case when relkind = 'S' then has_sequence_privilege(role, oid, 'usage') else false end)
         ) privileges(privilege, granted)
         where granted
@@ -110,9 +114,13 @@ describe("schema rules", () => {
         ) privileges(privilege, granted)
         where granted
       )
-      select 'schema:' || role
-      from (values ('anon'::name, false), ('authenticated'::name, true), ('service_role'::name, true)) expected_schema(role, granted)
-      where has_schema_privilege(role, 'public', 'usage') <> granted
+      select 'schema:' || role || ':' || privilege
+      from (values
+        ('anon'::name, 'usage', false), ('anon'::name, 'create', false),
+        ('authenticated'::name, 'usage', true), ('authenticated'::name, 'create', false),
+        ('service_role'::name, 'usage', true), ('service_role'::name, 'create', false)
+      ) expected_schema(role, privilege, granted)
+      where has_schema_privilege(role, 'public', privilege) <> granted
       union all
       select 'extra:' || role || ':' || relname || ':' || privilege
       from (select * from role_privileges except select * from expected) extra
@@ -183,17 +191,42 @@ describe("schema rules", () => {
     `)).toEqual([]);
   });
 
-  it("revokes future public object ACL defaults", () => {
+  // `supabase_admin` is a reserved bootstrap role; its exposure is controlled
+  // by config, while migrations can safely audit only their own future defaults.
+  it("revokes Data API roles from future public objects created by the migration role", () => {
     expect(sql(`
-      select defaclobjtype::text || ':' || defaclacl::text
-      from pg_default_acl
-      where defaclrole = 'postgres'::regrole
-        and defaclnamespace = 'public'::regnamespace
-      order by 1
-    `)).toEqual([
-      'f:{postgres=X/postgres}',
-      'r:{postgres=arwdDxtm/postgres}',
-      'S:{postgres=rwU/postgres}',
-    ]);
+      with creators as (
+        select oid, rolname from pg_roles where oid = current_user::regrole
+      ),
+      object_types(defaclobjtype) as (
+        values ('r'::"char"), ('S'::"char"), ('f'::"char")
+      ),
+      schema_defaults as (
+        select creators.oid, creators.rolname, object_types.defaclobjtype, d.defaclacl
+        from creators
+        cross join object_types
+        left join pg_default_acl d on d.defaclrole = creators.oid
+          and d.defaclnamespace = 'public'::regnamespace
+          and d.defaclobjtype = object_types.defaclobjtype
+      ),
+      forbidden as (
+        select 'schema:' || schema_defaults.rolname || ':' || defaclobjtype::text || ':' ||
+          coalesce(grantee.rolname, 'PUBLIC') || ':' || permissions.privilege_type
+        from schema_defaults
+        cross join lateral aclexplode(coalesce(defaclacl, acldefault(defaclobjtype, oid))) permissions
+        left join pg_roles grantee on grantee.oid = permissions.grantee
+        where permissions.grantee = 0 or grantee.rolname in ('anon', 'authenticated', 'service_role')
+        union all
+        select 'global:' || owner.rolname || ':' || d.defaclobjtype::text || ':' ||
+          coalesce(grantee.rolname, 'PUBLIC') || ':' || permissions.privilege_type
+        from pg_default_acl d
+        join creators owner on owner.oid = d.defaclrole
+        cross join lateral aclexplode(d.defaclacl) permissions
+        left join pg_roles grantee on grantee.oid = permissions.grantee
+        where d.defaclnamespace = 0
+          and (permissions.grantee = 0 or grantee.rolname in ('anon', 'authenticated', 'service_role'))
+      )
+      select * from forbidden order by 1
+    `)).toEqual([]);
   });
 });
