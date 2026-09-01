@@ -1444,16 +1444,29 @@ create view route_loads with (security_invoker = true) as
 -- tenancy; each starts by locking the order row. p_lines is a full
 -- replacement: [{"sku_id": uuid, "qty": n}].
 
--- Resolves the unit price for a sku from a price list; raises if missing.
+-- Resolves the unit price for an *active* sku from a price list; raises
+-- otherwise. Shared by every order create/update path so an inactive or
+-- unpriced sku is rejected at the RPC boundary, not only in the TS layer.
 create function private.order_line_price(p_brewery uuid, p_price_list uuid, p_sku uuid) returns int
 language plpgsql stable set search_path = '' as $$
 declare v int;
 begin
-
-  select unit_price_cents into v from public.price_list_items
-    where brewery_id = p_brewery and price_list_id = p_price_list and sku_id = p_sku;
-  if v is null then raise exception 'no price for sku % on price list', p_sku; end if;
+  select pli.unit_price_cents into v
+  from public.price_list_items pli
+  join public.skus s on s.id = pli.sku_id and s.brewery_id = pli.brewery_id
+  where pli.brewery_id = p_brewery and pli.price_list_id = p_price_list and pli.sku_id = p_sku and s.active;
+  if v is null then raise exception 'sku % is not active and priced for this customer', p_sku; end if;
   return v;
+end $$;
+
+-- Every order write replaces its lines wholesale, so an empty list would leave
+-- a lineless draft that later transitions still process.
+create function private.assert_order_lines(p_lines jsonb) returns void
+language plpgsql immutable set search_path = '' as $$
+begin
+  if jsonb_typeof(p_lines) <> 'array' or jsonb_array_length(p_lines) = 0 then
+    raise exception 'order requires at least one line';
+  end if;
 end $$;
 create function private.create_order_impl(
   p_brewery uuid, p_kind public.order_kind, p_customer uuid, p_ship_to uuid,
@@ -1461,6 +1474,7 @@ create function private.create_order_impl(
 ) returns jsonb language plpgsql set search_path = '' as $$
 declare v_order uuid; v_pl uuid; l record;
 begin
+  perform private.assert_order_lines(p_lines);
   if p_kind = 'wholesale' then
     select price_list_id into v_pl from public.customers where id = p_customer and brewery_id = p_brewery;
     if v_pl is null then raise exception 'customer has no price list'; end if;
@@ -1496,6 +1510,7 @@ create function private.update_draft_order_impl(
 ) returns jsonb language plpgsql set search_path = '' as $$
 declare o public.orders; l record;
 begin
+  perform private.assert_order_lines(p_lines);
   o := private.lock_order(p_order, array['draft']::public.order_status[]);
   update public.orders set ship_to_id = coalesce(p_ship_to, ship_to_id),
     requested_ship_date = coalesce(p_requested, requested_ship_date),
