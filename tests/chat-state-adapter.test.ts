@@ -37,6 +37,7 @@ describe("Chat SDK Postgres state isolation", () => {
          child.rolcreatedb,
          child.rolcreaterole,
          child.rolbypassrls,
+         child.rolreplication,
          coalesce(
            json_agg(parent.rolname order by parent.rolname)
              filter (where parent.rolname is not null),
@@ -51,7 +52,8 @@ describe("Chat SDK Postgres state isolation", () => {
          child.rolsuper,
          child.rolcreatedb,
          child.rolcreaterole,
-         child.rolbypassrls`,
+         child.rolbypassrls,
+         child.rolreplication`,
     );
     expect(groupRole.rows[0]).toEqual({
       rolcanlogin: false,
@@ -59,6 +61,7 @@ describe("Chat SDK Postgres state isolation", () => {
       rolcreatedb: false,
       rolcreaterole: false,
       rolbypassrls: false,
+      rolreplication: false,
       member_of: [],
     });
 

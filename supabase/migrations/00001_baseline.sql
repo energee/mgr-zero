@@ -1664,7 +1664,7 @@ grant execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid)
 
 -- ---------------------------------------------------------------- private Chat SDK state
 drop role if exists mgr_chat_sdk;
-create role mgr_chat_sdk nologin;
+create role mgr_chat_sdk nologin nosuperuser nocreatedb nocreaterole noreplication nobypassrls;
 
 -- The migration executor temporarily joins the group to transfer table ownership.
 grant mgr_chat_sdk to postgres;
