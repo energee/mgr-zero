@@ -1,5 +1,6 @@
 // tests/rls-integration-secrets.test.ts — proves browser clients never receive integration tokens.
 import { beforeAll, describe, expect, it } from "vitest";
+import { execFileSync } from "node:child_process";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Ctx } from "@/lib/commands/registry";
 import { readIntegrationTokens, storeIntegrationTokens } from "@/lib/supabase/integration-tokens";
@@ -7,6 +8,13 @@ import { admin, asUser, makeBrewery, makeCustomerUser, makeStaff } from "./helpe
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54341";
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+const DB = process.env.DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:54342/postgres";
+
+function privateTokenCount(breweryId: string, provider: "qbo" | "square") {
+  const sql = `select count(*) from private.integration_tokens where brewery_id = '${breweryId}'::uuid and provider = '${provider}'`;
+  return Number(execFileSync("psql", [DB, "-Atc", sql], { encoding: "utf8" }).trim());
+}
 
 type BrowserClient = { name: string; db: SupabaseClient };
 
@@ -210,7 +218,7 @@ describe("integration token isolation", () => {
     await expect(readIntegrationTokens(forgedCtx, "qbo")).rejects.toMatchObject({ status: 403 });
   });
 
-  it("keeps one POS connection per provider and never resurrects credentials after QBO replacement", async () => {
+  it("keeps one POS connection per provider and purges only changed QBO identities", async () => {
     const { error: duplicatePosError } = await admin.from("pos_connections").insert({
       brewery_id: brewery.id,
       provider: "square",
@@ -227,9 +235,10 @@ describe("integration token isolation", () => {
       breweryId: lifecycleBrewery.id,
       role: "admin",
     };
+    const firstRealm = `realm-${crypto.randomUUID()}`;
     const { data: firstConnection, error: firstConnectionError } = await admin
       .from("qbo_connections")
-      .insert({ brewery_id: lifecycleBrewery.id, realm_id: `realm-${crypto.randomUUID()}` })
+      .insert({ brewery_id: lifecycleBrewery.id, realm_id: firstRealm })
       .select("id")
       .single();
     expect(firstConnectionError).toBeNull();
@@ -238,13 +247,54 @@ describe("integration token isolation", () => {
       accessToken: "old-access-token",
       refreshToken: "old-refresh-token",
     });
+    expect(privateTokenCount(lifecycleBrewery.id, "qbo")).toBe(1);
+
+    const { error: noOpError } = await admin
+      .from("qbo_connections")
+      .update({ realm_id: firstRealm })
+      .eq("id", firstConnection!.id);
+    expect(noOpError).toBeNull();
+    await expect(readIntegrationTokens(lifecycleCtx, "qbo")).resolves.toEqual({
+      accessToken: "old-access-token",
+      refreshToken: "old-refresh-token",
+    });
+    expect(privateTokenCount(lifecycleBrewery.id, "qbo")).toBe(1);
+
     const { error: deleteError } = await admin.from("qbo_connections").delete().eq("id", firstConnection!.id);
     expect(deleteError).toBeNull();
+    expect(privateTokenCount(lifecycleBrewery.id, "qbo")).toBe(0);
     const { error: replacementError } = await admin.from("qbo_connections").insert({
       brewery_id: lifecycleBrewery.id,
       realm_id: `realm-${crypto.randomUUID()}`,
     });
     expect(replacementError).toBeNull();
     await expect(readIntegrationTokens(lifecycleCtx, "qbo")).rejects.toMatchObject({ status: 404 });
+
+    const movedBrewery = await makeBrewery();
+    const { data: movedConnection, error: movedConnectionError } = await admin
+      .from("qbo_connections")
+      .insert({ brewery_id: movedBrewery.id, realm_id: `realm-${crypto.randomUUID()}` })
+      .select("id")
+      .single();
+    expect(movedConnectionError).toBeNull();
+    const movedAdmin = await makeStaff(movedBrewery.id, "admin");
+    const movedCtx: Ctx = {
+      db: await asUser(movedAdmin.email),
+      userId: movedAdmin.id,
+      breweryId: movedBrewery.id,
+      role: "admin",
+    };
+    await storeIntegrationTokens(movedCtx, {
+      provider: "qbo",
+      accessToken: "moved-access-token",
+      refreshToken: "moved-refresh-token",
+    });
+    const moveTarget = await makeBrewery();
+    const { error: moveError } = await admin
+      .from("qbo_connections")
+      .update({ brewery_id: moveTarget.id })
+      .eq("id", movedConnection!.id);
+    expect(moveError).toBeNull();
+    expect(privateTokenCount(movedBrewery.id, "qbo")).toBe(0);
   });
 });

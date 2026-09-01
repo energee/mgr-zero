@@ -1060,8 +1060,9 @@ language sql security definer set search_path = '' as $$
     );
 $$;
 
--- A reconnect replaces the concrete external connection. Remove credentials
--- before the replacement can make an old token pair visible again.
+-- A reconnect replaces the concrete external connection. Delete purges always;
+-- guarded updates purge only on an actual identity or tenant-key change, so a
+-- no-op metadata update cannot discard still-current credentials.
 create function private.purge_integration_tokens() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
@@ -1072,13 +1073,34 @@ end;
 $$;
 revoke execute on function private.purge_integration_tokens() from public, anon, authenticated, service_role;
 
-create trigger qbo_connections_purge_tokens
-after delete or update of id, realm_id on qbo_connections
+create trigger qbo_connections_delete_purge_tokens
+after delete on qbo_connections
 for each row execute function private.purge_integration_tokens('qbo');
 
-create trigger pos_connections_purge_tokens
-after delete or update of id, provider, merchant_id on pos_connections
+create trigger qbo_connections_identity_purge_tokens
+after update of brewery_id, id, realm_id on qbo_connections
+for each row
+when (
+  old.brewery_id is distinct from new.brewery_id
+  or old.id is distinct from new.id
+  or old.realm_id is distinct from new.realm_id
+)
+execute function private.purge_integration_tokens('qbo');
+
+create trigger pos_connections_delete_purge_tokens
+after delete on pos_connections
 for each row execute function private.purge_integration_tokens('square');
+
+create trigger pos_connections_identity_purge_tokens
+after update of brewery_id, id, provider, merchant_id on pos_connections
+for each row
+when (
+  old.brewery_id is distinct from new.brewery_id
+  or old.id is distinct from new.id
+  or old.provider is distinct from new.provider
+  or old.merchant_id is distinct from new.merchant_id
+)
+execute function private.purge_integration_tokens('square');
 
 create table pos_locations (
   brewery_id uuid not null references breweries(id),

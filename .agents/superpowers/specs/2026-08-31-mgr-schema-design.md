@@ -294,11 +294,12 @@ metadata read.
 
 `private.integration_tokens` owns `access_token` and `refresh_token`, keyed by
 `(brewery_id, provider)` and bound to the concrete public `connection_id`, with
-RLS/no browser grants in an unexposed schema. Deleting or replacing a QBO realm
-or Square merchant deletes the matching token row. Empty-search-path service-role
-RPCs recheck the actor's current `admin`/`sales` membership and the exact
-connection in the same token statement; the RLS-checking server boundary is their
-only application caller.
+RLS/no browser grants in an unexposed schema. Deletes always purge credentials;
+guarded updates purge only when the brewery key or external identity actually
+changes (QBO `id`/realm, Square `id`/provider/merchant), so no-op metadata updates
+retain the current token row. Empty-search-path service-role RPCs recheck the
+actor's current `admin`/`sales` membership and the exact connection in the same
+token statement; the RLS-checking server boundary is their only application caller.
 
 ### `pos_locations`
 `connection_id → pos_connections, external_location_id text, location_id → locations`.
@@ -594,12 +595,13 @@ shipment's order.
    `keg_pool_id + keg_size`, not order lines; balance is a view. Alternative was a
    `keg_deposits` ledger.
 4. **QBO/Square tokens** live only in unexposed `private.integration_tokens`, keyed
-   by brewery/provider and bound to a concrete connection identity. Lifecycle
-   triggers remove credentials when the connection is deleted or replaced. Public
-   connection tables retain non-secret metadata for `admin`/`sales`; service-only
-   RPCs recheck current membership and connection identity, and are reachable only
-   through the RLS-checking server token boundary. Future sync modules use that
-   boundary and never receive a service-client eslint allowlist.
+   by brewery/provider and bound to a concrete connection identity. Deletes and
+   actual identity/tenant-key changes purge credentials; no-op metadata updates
+   retain them. Public connection tables retain non-secret metadata for
+   `admin`/`sales`; service-only RPCs recheck current membership and connection
+   identity, and are reachable only through the RLS-checking server token boundary.
+   Future sync modules use that boundary and never receive a service-client eslint
+   allowlist.
 5. **Payments** have no table; `invoices.paid_at / qbo_balance_cents` from QBO is enough
    while QBO is the book of record.
 6. **Materials have no locations**; one store per brewery. `material_movements` gains a
