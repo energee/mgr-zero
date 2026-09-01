@@ -5,17 +5,25 @@ Status: Draft for Ted; rev 3 incorporates the fresh-eyes product, architecture, 
 navigation, state, build-order, and wet-phone review. Nothing in this plan is built yet;
 the current shell (`app/(app)/layout.tsx`, a 208px left rail with five links and Geist) is
 the placeholder it replaces.
-Wireframes: `2026-08-31-mgr-wireframes.html` — 50 frames (product destinations plus
+Wireframes: `2026-08-31-mgr-wireframes.html` — 63 frames (product destinations plus
 separately identified sheets, overlays, and flow states) tagged with tab, slice, build
 step, registered reads, and registered writes; the phone/desk toggle re-renders every
 frame from the same body (desk = rail/top-nav shell, dialog sheets, 32 px
 cursor-density controls). Update it in the same commit as any change
 to §3 or §4. The repository HTML is the canonical rev-3 artifact; republish that exact
 source before sharing an external artifact URL.
-The wireframe catalog is drawn compressed to fit 50-up; implementers build from the §5
-tokens (16px phone body), not the artifact's pixels — the Today frame is the full-size
-exemplar. Frames draw only what a user sees; state variants, tap audits, gate names, and
-transaction notes are annotations under each frame, never in-device chrome.
+The wireframe catalog is drawn compressed to fit 63-up; implementers build from the §5
+tokens (16px phone body), not the artifact's pixels — the warehouse Today frame is the
+full-size exemplar. Frames draw only what a user sees; state variants, tap audits, gate
+names, and transaction notes are annotations under each frame, never in-device chrome.
+The 13 frames added after the slice 1/1B exception review (short pick, order detail, role
+Today landings, three ship bodies, product/SKU TTB facts, cellar addition, portal review,
+Me, Team, set-password) are real bodies; an annotation chip is never a substitute for a
+different in-device body.
+Registry note: the open slice-1B branch (PR #15) implements several §2 commands under
+other names (`adjust_order_lines`, `create_credit_memo`, `create_replenishment_order`,
+`set_price`, no `resolve_short_pick`). §2 remains the contract; that branch reconciles its
+IDs to §2 (or §2 is revised in the same PR) before Step 5 UI is built.
 Inputs: `2026-08-30-mgr-slice1-core-orders-design.md` (roles, slices, interaction budget,
 AI-first command registry), `2026-08-31-mgr-schema-design.md` (what exists to show), and
 `brewing-domain.md` (units and compliance semantics).
@@ -47,7 +55,7 @@ not a claim that arbitrary numeric or multi-line data takes two literal taps.
 | Person and task | Fastest safe path from app open | Form fallback | Result |
 |---|---|---|---|
 | Cellar / brewer — gravity reading | Today `Reading` (1) → `1 . 0 1 9` on the SG pad (5) → **Record** (1) = **7 taps**. A future voice transport can make this mic (1) → **Record** (1), but voice is not in the current build. | Beer → vessel → Reading → five pad keys → Record = **9 taps**. | Over 3 by necessity; do not advertise a current two-tap path. The Reading screen exists and defaults the overdue vessel and last-used unit. |
-| Warehouse — pick a three-line order | Today **Pick** (1) → prefilled **Done picking** (1) = **2 taps**. | Today order (1) → Edit quantities (1) → three single-digit counts (3) → **Done picking** (1) = **6 taps minimum**; a short line adds reason/restock choices. | The two-tap path is only for all-as-ordered. `record_pick` is one atomic write for every line plus picked status. |
+| Warehouse — pick a three-line order | Today **Pick** (1) → prefilled **Done picking** (1) = **2 taps**. | Today order (1) → Edit quantities (1) → three single-digit counts (3) → **Done picking** (1) = **6 taps minimum**; a short line adds reason/restock choices. | The two-tap path is only for all-as-ordered. `record_pick` is one atomic write for every line plus picked status. A shortage opens the **Short pick** frame: reason (1) + resolution chip (1) + verb (1) on top of the counts — never claim ≤2 for a short line. Restock after a cancel/adjust is a further standing Today/Work row, not part of the pick count. |
 | Taproom lead — weekly three-SKU count | Today `Weekly count` (1) → three single-digit counts (3) → **Record count** (1) = **5 taps minimum**. | Beer (1) → Taproom (1) → Weekly count (1) → three counts (3) → Record count (1) = **7 taps minimum**. | Over 3. This is a target-state screen; its Today row and commit stay disabled until the durable count occurrence/lines SCHEMA-GATE is resolved. |
 | Sales / admin — confirm order | Today **Confirm** (1) → **Confirm order** (1) = **2 taps** when blocking review is absent. | Work (1) → order (1) → Confirm order (1) = **3 taps**. | Meets the ≤2 landing-page promise. Any ATP/registration warning inserts a review step rather than hiding risk. |
 | Wholesale customer — repeat last order | Portal Order → **Same as last week** (1) → proposal **Place order** (1) = **2 taps**. | For a three-line new order: three `+` taps (3) → Review (1) → Place order (1) = **5 taps minimum**. | Meets the promise only when the prior fulfillment source, ship-to, prices, and active SKUs revalidate unchanged. Portal submit stays gated until a customer-safe source allowlist/default and RLS read exist. |
@@ -146,36 +154,40 @@ sends a fresh logical write.
 |---|---|---|
 | `create_product`*, `create_sku`*, `create_location`*, `update_product`, `update_sku`, `update_location`, `create_price_list`, `update_price_list`, `set_price_list_item`, `create_customer`, `update_customer`, `create_ship_to`, `update_ship_to`, `update_brewery` | Mutable / hop green | Single row; explicit re-edit; dedupe, online commit. |
 | `provision_brewery` | Mutable / hop green | One RPC for brewery + admin membership; no automatic compensation; online only. |
-| `invite_staff`*, `invite_customer_user`* | **IMPLEMENTATION-GATE** / copper | Current handlers are not UI-ready: Auth invite precedes membership without durable intent/compensation. Step 1 must make retries reuse one request identity and recover or compensate Auth success + DB failure; online only. |
+| `invite_staff`*, `invite_customer_user`* | **IMPLEMENTATION-GATE** / copper | Current handlers are not UI-ready: Auth invite precedes membership without durable intent/compensation. Step 1 must make retries reuse one request identity and recover or compensate Auth success + DB failure; online only. The Team frame draws the invite disabled with human copy until then. |
+| `update_staff_role` | Mutable / hop green | Design. Single `brewery_users` row; explicit re-edit; dedupe, online. Never demotes the last admin. |
+| `revoke_staff` | Destructive local / copper | Design. Single membership row ends; Auth user is untouched; `compensation` is a fresh `invite_staff`; online only. |
 | `connect_qbo`, `connect_square` | External / copper | Durable OAuth workflow after admin permission check; connection/health reads precede downstream actions. `compensation: null` until exact disconnect commands exist; online only. |
 | `import_csv`* | **IMPLEMENTATION-GATE**; opening balances copper, mutable entity rows green | Existing ID, unsafe current implementation. Before UI: each dependent logical row uses one RPC; independence only between rows; every row persists a stable `requestId` + result so reruns—including opening balances—dedupe. Online only. |
 | `record_movement`* | Append-only / copper | One ledger row; outbox eligible only after durable dedupe and stale revalidation. |
 | `reverse_inventory_movement` | **SCHEMA-GATE** | Disabled until an auditable original/compensation link, legal opposite effect, and TTB report semantics exist. Never substitute an unlinked generic `adjustment`. |
 | `record_taproom_count` | **SCHEMA-GATE** | Disabled until a durable count occurrence + expected/observed lines exist. Then one RPC writes the complete snapshot and only the required movement deltas, including a zero-variance count with no movement rows. |
 | `set_taproom_par`*, `set_taproom_standing_allocation`, `release_allocation` | Mutable / hop green | Single row or one replacement RPC; re-edit/release; dedupe, online. |
-| `create_order`, `submit_order`, `confirm_order`, `record_pick`, `resolve_short_pick`, `adjust_order_line`, `create_taproom_transfer` | Mutable / hop green | One RPC whenever order + lines/allocations/status change together. Staff `create_order` and `create_taproom_transfer` require explicit source (and destination for transfer); neither guesses “Warehouse.” Portal `submit_order` is **SCHEMA/RLS-GATE** until it receives a customer-safe allowed/default source; then it creates order + all lines + submitted status in one RPC, never parent-then-lines. `record_pick` takes every entered line, sets picked status atomically, and is outbox eligible after dedupe/stale revalidation; the others commit online. |
+| `create_order`, `submit_order`, `confirm_order`, `record_pick`, `resolve_short_pick`, `adjust_order_line`, `create_taproom_transfer` | Mutable / hop green | One RPC whenever order + lines/allocations/status change together. Staff `create_order` (customer, source, ship-to, customer PO number, lines) and `create_taproom_transfer` require explicit source (and destination for transfer); neither guesses “Warehouse.” Staff `submit_order` moves a draft to submitted from **Order · detail**. Portal `submit_order` is **SCHEMA/RLS-GATE** until it receives a customer-safe allowed/default source; then it creates order + all lines + submitted status in one RPC, never parent-then-lines. `record_pick` takes every entered line, sets picked status atomically, and is outbox eligible after dedupe/stale revalidation. `resolve_short_pick` takes one short line + required reason + one resolution (adjust ordered qty down and re-allocate, or keep the remainder staged) in one RPC; it writes `short_reason` and the `order_events` row. `adjust_order_line` on a picked order sets `needs_restock`; the staged quantity to put back is derived from `qty_picked − qty_ordered`, and the flag clears only on re-pick or ship — there is no restock command. The others commit online; every transition appends its `order_events` row in the same function. |
 | `cancel_order` | Destructive local / copper | One RPC for terminal status + allocation release; staged-restock is derived from picked quantities. `compensation: null`; online only. |
-| `ship_order` | **SCHEMA-GATE** / copper | Requires explicit persisted invoice timing on the shipment; then one RPC writes shipment + intent + movements + allocation fulfillment + shipped status and invoices now unless self-delivery. Once slice 9 lands, owned-fleet keg SKUs append their shipment-linked keg events in this same RPC. Never infer mode from carrier/route. `return_shipment` is the named correction. |
+| `ship_order` | Append-only/financial / copper; on-delivery timing **SCHEMA-GATE** | One RPC writes shipment (optional carrier/tracking, never required) + per-line `qty_shipped` (prefilled from picked; a shortage needs a reason) + `sale_removal` movements with `dest_state` from the ship-to + allocation fulfillment/release + shipped status, and — for wholesale with invoice timing **now** — the invoice and lines, number assigned on commit. Three bodies share it: **Ship · invoice now** (default wholesale, enabled), **Complete transfer** (`taproom_transfer` kind: paired transfer movements, no invoice, no timing chip, enabled), and **Ship · confirmation** (on-delivery / self-delivery, disabled until the reviewed timing persists on the shipment so `confirm_delivery` can rely on it). Never infer timing from carrier or a future route. Once slice 9 lands, owned-fleet keg SKUs append their shipment-linked keg events in this same RPC. `return_shipment` is the named correction. |
 | `return_shipment` | Append-only/financial / copper | Explicitly shows the return destination (default may be the original fulfillment source); one RPC for destination-bound return movements + credit memo/lines and, after slice 9, matching owned-fleet returned-keg events. No generic reversal; online only. |
 | `set_qbo_customer_mapping`, `set_qbo_item_mapping` | Mutable / hop green | Single-row explicit remap; dedupe, online only. |
-| `push_invoice_to_qbo` | External / copper | Persist exact payload + stable request ID before POST, then remote result. Credit memo corrects money; uncertain response reconciles by the same ID before retry; online only. |
-| `receive_purchase_order`, `record_material_count` | Append-only / copper | One RPC each. A new `record_material_count` corrects a count; receipt `compensation: null` until an exact correction command exists. Only drafts work offline. |
+| `push_invoice_to_qbo` | External / copper | Persist exact payload + stable request ID before POST, then remote result. Credit memo corrects money; uncertain response reconciles by the same ID before retry; online only. Payments back (`paid_at`, `qbo_balance_cents`) are written by the sync job and read on the Invoices list; there is no user verb for them. |
+| `send_purchase_order` | Mutable / hop green | Design. Single row `draft → sent` with `ordered_on`; explicit; dedupe, online. Lives on the PO/receive frame, not a wizard. |
+| `receive_purchase_order`, `record_material_count` | Append-only / copper | One RPC each: receipt + lines (`qty_expected`, `qty_counted`, derived variance — over and short are both visible and both allowed) + lots with `best_by` + material movements for counted quantity only. A new `record_material_count` corrects a count; receipt `compensation: null` until an exact correction command exists. Only drafts work offline. |
 | `create_material`, `update_material`, `replace_sku_bom`, `create_purchase_order`, `upsert_vendor`, `upsert_material_contract`, `draft_purchase_order_from_requirements` | Mutable / hop green | Material/vendor rows re-edit explicitly; BOM replacement and any draft PO + lines use one RPC. Online. |
 | `create_recipe`, `create_recipe_version` | Mutable parent / immutable version | Recipe parent is a single mutable row. Version + ingredients use one immutable RPC; correction creates a newer version. Online. The version snapshots its inputs — assumptions (mash temp, brewhouse efficiency, yeast attenuation) and per-ingredient extract potential; OG/FG/ABV are computed by one shared registry-layer formula (the editor's live preview and server reads call the same function) and are never stored or duplicated in SQL — immutable inputs make the derivation drift-proof. **SCHEMA-GATE:** assumption columns on `recipe_versions`, extract snapshot on `recipe_ingredients`, extract potential on `materials`; the baseline's typed `target_og/fg/abv` columns become drop candidates. |
 | `create_vessel`, `update_vessel`, `schedule_batch`, `record_fermentation_reading` | Mutable / hop green | Single-row explicit edit; reading is outbox eligible after dedupe. Vessel state is still derived from occupancy, never a status field. |
-| `record_brew_day` | Append-only/finalizing / copper | One RPC for brewed timestamp + additions/material movements + knockout occupancy; `compensation: null`; online only. |
-| `record_cellar_transfer` | Append-only / copper | One RPC creates a zero-baseline target occupancy when the vessel is empty, appends the transfer with `loss_bbl`, and closes the source occupancy iff fully emptied; never writes a duplicate loss adjustment or vessel status. `compensation: null` until an exact append-only correction command exists; replay requires dedupe + occupancy revalidation. |
+| `record_brew_day` | Append-only/finalizing / copper | One RPC for brewed timestamp + additions/material movements + knockout occupancy; `compensation: null`; online only. Yeast is consumed here as a material lot, not as a culture ledger. |
+| `record_batch_addition` | Append-only / copper | Design. Post-knockout dry hop / fruit / adjunct against an open occupancy: one RPC appends `batch_additions` (stage, occupancy) + the material `consumption` movement; lot required when the material is lot-tracked. `compensation: null`; outbox eligible after dedupe + occupancy revalidation. Not `record_movement` (that is FG). |
+| `record_cellar_transfer` | Append-only / copper | One RPC creates a zero-baseline target occupancy when the vessel is empty, appends the transfer with `loss_bbl`, and closes the source occupancy iff fully emptied; never writes a duplicate loss adjustment or vessel status. The target may be occupied: a blend is a transfer into the surviving occupancy, whose batch keeps its identity; the preview shows both volumes and the result. **SCHEMA-GATE:** naming a blend as a new batch derived from two parents needs schema before the UI offers it. `compensation: null` until an exact append-only correction command exists; replay requires dedupe + occupancy revalidation. |
 | `complete_batch` | **SCHEMA-GATE** | Disabled until structured completion-reconciliation identity/classification exists. Then one RPC owns `batches.closed_at`, the remaining occupancy close, and any threshold-qualified reconciliation after rejecting open packaging runs. |
 | `reattribute_loss` | **SCHEMA-GATE** | Disabled until `volume_adjustments` has structured reconciliation origin/identity and cellar-removal classification. Never identify rows from free-text `note`. |
 | `schedule_packaging_run` | Mutable / hop green | Requires one exact open source occupancy; one RPC creates the run + all planned output rows. Explicit re-edit while open; online. |
-| `close_packaging_run` | Append-only/finalizing / copper | Revalidates and shows the run's exact source occupancy and requires explicit FG destination; one RPC for close + lot + destination-bound FG movements + actual outputs + material movements. `compensation: null` and correction UI disabled until an exact command exists; online. |
+| `close_packaging_run` | Append-only/finalizing / copper | Revalidates and shows the run's exact source occupancy and requires explicit FG destination; one RPC for close + lot + destination-bound FG movements + actual outputs + material movements. `compensation: null` and correction UI disabled until an exact command exists; online. **Print labels** (keg-collar / lot) is presentation after commit, not a write. |
 | `file_compliance_report` | Filed / copper | One generated snapshot write; `compensation: null` and amendment disabled until its schema workflow exists; online. |
 | `upsert_product_approval`, `upsert_state_registration`, `upsert_brewery_state_license` | Mutable / hop green | Single-row explicit re-edit; online. |
 | `set_pos_location_mapping`, `set_pos_item_mapping` | Mutable / hop green | Single-row explicit remap; item mapping requires exact package SKU + positive `qty_per_sale` and shows canonical bbl-per-sale before save. Online. |
 | `sync_square_sales` | External / copper | Online fetch uses the same requestId on retry; each fetched page is inserted by one security-invoker batch RPC and dedupes on the unique Square line ID. No durable cursor is claimed by the current schema; raw facts are never deleted. |
-| `reconcile_pos_sales` | Append-only / copper | One RPC for selected sales: all depletion rows + every `pos_sales.movement_id` link. Never a client loop; online. |
+| `reconcile_pos_sales` | Append-only / copper | One RPC for selected sales **and refunds**: depletion rows for sales, positive `adjustment` rows for refunds (inventory credit), and every `pos_sales.movement_id` link, under one `requestId`. Sales-only reconcile is how v1 lost units. When Square is connected the weekly taproom count is a variance check against POS and posts no depletion; only a disconnected taproom counts to post depletion. Never a client loop; online. |
 | `create_keg_pool`, `update_keg_pool` | Mutable / hop green | Single-row pool setup; explicit re-edit; online. |
-| `record_keg_event` | Append-only / copper | Append the specific correcting event; outbox eligible after dedupe. |
+| `record_keg_event` | Append-only / copper | Intents: `acquired`, `returned` (empty), `lost`/`found`, `retired`. `returned` is one RPC: the keg event **plus** a standalone credit memo with a `keg_deposit_refund` line for the customer's deposit — no third screen. Beer return + credit stays `return_shipment`. No CIP/clean status. Outbox eligible after dedupe. |
 | `save_route`, `depart_route`, `return_route` | Mutable / hop green | Route + delivery assignments use one RPC; timestamps single-row. No persisted loaded state; online. |
 | `confirm_delivery` | Finalizing/financial / copper | One RPC for existing delivery `delivered_at`/`signed_by` + deferred invoice/lines. It never ships or writes inventory; `compensation: null`; online. |
 
@@ -226,28 +238,42 @@ query owns it.
   stays here, not in More. Each row either performs a fully explicit safe action or opens
   its owning form prefilled. The first viewport is
   the brewery header, two or three role actions, the next real rows, and the composer —
-  never every persona's inventory at once; role-hidden rows leave no blank gaps.
+  never every persona's inventory at once; role-hidden rows leave no blank gaps. Four
+  role landings are drawn: **warehouse** (the full-size exemplar: Pick, Receive, a
+  restock row, next delivery), **sales** (submitted orders to Confirm, ATP/shortfall
+  rows; no Pick/Receive), **brewer** (overdue Reading, brew day due, packaging close
+  due), and **driver** (next stop → Resume). Restock ("Staged · ORD-0231 · restock 3
+  Pils") is standing Today/Work work whenever `needs_restock` is set; the row opens
+  Order · detail.
 - **Beer** is the landing page for physical truth: FG on-hand/ATP, taproom
   replenishment/count, cellar occupancies, materials, and keg fleet. Each summary opens
   its dedicated area; Beer does not become an indefinitely expanding accordion. There is
   no vessel status column; occupancy and timestamps derive presentation.
-- **Work** is in-motion work: new/existing orders, picks, shipments, transfer-order
+- **Work** is in-motion work: **New order**, existing orders (each opens Order ·
+  detail), picks, short picks, restock rows, shipments, transfer-order
   completion, batches, packaging runs, POs, routes, and deliveries. Sort by next due
   action, not recent activity. Role defaults reduce noise (warehouse: orders/POs/routes;
   brewer: batches/runs; sales: orders), and an explicit user filter is remembered. Every
   row names its next action.
-- **More** is desk-biased reference/admin work: Catalog, Customers, **Invoices & QBO**,
-  Price lists, Recipes, Compliance/Reports, Planning, Import, Team, Integrations, and
-  Brewery/Locations settings. Invoices appears here and in the desktop rail.
+- **More** is desk-biased reference/admin work: Catalog (list, BOM, prices; Product /
+  SKU facts open their own frame), Customers, **Invoices & QBO** (an AR list first;
+  mapping/push is the drill-in), Price lists, Recipes, Compliance/Reports, Planning,
+  Import, Integrations, and Settings (Brewery, Locations, **Team**). Invoices appears
+  here and in the desktop rail.
 
 Global **Search** lives in the header on phone and rail/palette on desktop; it is not a
 More destination. Lot trace is a Search result and can deep-link to printable detail.
-Brewery switching (SaaS only) and account actions live in the header.
+The header **Me** control opens the **Me** sheet: signed-in email, current brewery,
+brewery switcher (SaaS only; hidden in dedicated mode), Sign out. No notification
+history lives there.
 
 ### Staff desktop (> 768px)
 
 The same four groups become a left rail with the four tabs as group headers and their
-subareas beneath — hierarchy, not a flat sitemap of equal-weight links. Content gets two
+subareas beneath — Beer: Inventory, **Taproom**, Cellar, Materials, Kegs; Work: Orders,
+Batches, Packaging, POs, Deliveries; More: Invoices, Catalog, Customers, Price lists,
+Recipes, Compliance, Planning, Settings (the wireframe `RAIL` mirrors this list) —
+hierarchy, not a flat sitemap of equal-weight links. Content gets two
 columns only where comparison matters; the default is one column. Composer is available from the visible top entry
 and `⌘K`. Viewport chooses layout; `(pointer: coarse)` independently chooses larger
 controls, so a wall tablet is desktop layout with glove-safe targets.
@@ -297,38 +323,44 @@ Dialog/Sheet on desk.
 | **Today** | Tell me what needs doing | Role-filtered actions/quick commits; first-run checklist replaces normal empty inbox | Week strip for ship, receipt, brew, packaging, compliance dates |
 | **Beer / Inventory** (1) | Show physical and promiseable stock | SKU cards with on-hand, allocated, ATP; detail has per-location values + movement tape | Location table, filters, shortfall link |
 | **Record movement** (1) | Append one correct FG event | Intent/type choices cover add finished goods, depletion, loss, sample, festival removal, destruction, and adjustment; then SKU/location pickers, positive QtyPad, conditional channel/state/direction, canonical signed preview. Opening balances stay in onboarding/import and returns stay in shipment context. | Same form; keyboard entry secondary |
-| **Orders** (1) | Create and advance an order | Work includes **New order** with an explicit fulfillment source; detail leads with current state and exposes one valid next transition, while the full lifecycle is secondary | List/detail split, lines + ATP + ship-to; no priority/backorder state |
-| **Pick / short pick** (1) | Record pallet quantities | Pick-as-ordered fast path; complete line set editor; shortage requires adjust-down reason or cancel/release remainder; concurrent/staged-restock states | Daily pick sheet, print, explicit restock queue |
-| **Ship / transfer completion** (1) | Commit physical removal/move | Exact source/signed rows and explicit invoice timing, then copper **Ship order** or **Complete transfer**; `ship_order` waits for its persisted-timing SCHEMA-GATE | Wholesale invoice/QBO result; transfer has no invoice |
-| **Taproom** (1, 7) | Keep taproom stock honest | Separate **Weekly count / sales depletion** from **Needs replenishment**; mid-week keg-blown/depletion records immediately via the global Record movement sheet, never waiting for the weekly count; request transfer has explicit source/destination and is primary only when below par. **SCHEMA-GATE:** weekly count waits for a durable observation/snapshot; its later one-RPC commit writes that snapshot plus only required movements | Replenishment and Square reconciliation |
+| **Orders** (1) | Create and advance an order | Work includes **New order** (customer, explicit fulfillment source, ship-to, customer PO, lines; Save draft). **Order · detail** is the staff home for one order after create: current state + the one valid next action (Submit on draft, Confirm, Pick, Ship), fulfillment source, customer PO, lines with ATP and adjust/add/remove while confirmed/picked, a destination-registration warning that links to the Compliance registry, the `order_events` tape, and — when `needs_restock` — the staged quantities to put back (no verb; re-pick or ship clears it). **Order · confirm** remains the two-tap Today frame and carries the same registration warning | List/detail split, lines + ATP + ship-to; no priority/backorder state |
+| **Pick / short pick** (1) | Record pallet quantities | Pick-as-ordered fast path; complete line set editor. A short line opens the **Short pick** frame: order + source, the one short line (7 / 10), required reason, one resolution chip (adjust ordered qty down vs keep remainder staged) with the matching verb, and the restock implication in the preview — never a status column | Daily pick sheet, print, restock rows in Work |
+| **Ship / transfer completion** (1) | Commit physical removal/move | Three bodies on one `ship_order`: **Ship · invoice now** (default wholesale: source required, editable ship qty per line prefilled from picked, shortage reason when below picked, optional carrier/tracking, "Invoice now", preview of sale_removal + dest_state from ship-to + invoice number "assigned on commit", copper **Ship order**); **Complete transfer** (source + destination, quantities, copper **Complete transfer**, no invoice, no timing chip); **Ship · confirmation** (on-delivery / self-delivery, disabled with human copy until timing persists) | Wholesale invoice/QBO result; transfer has no invoice |
+| **Taproom** (1, 7) | Keep taproom stock honest | Separate **Weekly count / sales depletion** from **Needs replenishment**; mid-week keg-blown/depletion records immediately via the global Record movement sheet, never waiting for the weekly count; request transfer has explicit source/destination and is primary only when below par. In-device rule, impossible to miss: **when Square is connected the weekly count posts no depletion — it is a variance check against POS**; only a disconnected taproom count posts depletion. **SCHEMA-GATE:** weekly count waits for a durable observation/snapshot; its later one-RPC commit writes that snapshot plus only required movements | Replenishment and Square reconciliation |
 | **Shortfalls / pars / standing allocation** (1) | Choose who gets scarce beer | Competing allocations, release/adjust actions, par and standing-allocation editors | Full table; no priority/reprioritize field |
-| **Customers / ship-tos** (1) | Maintain buyer and destination | Search cards, customer/ship-to forms, portal invite | Table, price list, deposits, QBO customer map |
-| **Catalog / price lists** (1) | Define what is sold | Read-first cards; create/edit remains usable | Product → SKU tree, package facts, prices, full `replace_sku_bom` editor |
-| **Invoices / QBO** (1) | Connect, map, and push an invoice once | Connection/health precedes mapping; status/failure detail, picker, copper online-only push/retry | Invoice/credit detail, candidates, durable request result |
-| **Materials / receiving** (2) | Receive counted material | Expected vs counted, over/short, conditional lot, one copper receipt commit | PO list, requirements → draft PO |
+| **Customers / ship-tos** (1) | Maintain buyer and destination | Search cards; customer form carries `type`, `license_no`, `payment_terms` and price list; ship-to forms; copper portal invite behind its gate | Table, price list, deposits, QBO customer map |
+| **Catalog / price lists** (1) | Define what is sold | Read-first list + BOM + a simple list × SKU price item (no v1 price matrix). **Product / SKU** is its own frame for sellable facts without ledger writes: product name, style, ABV, TTB tax class; SKU name, package type, units per case, `bbl_per_unit` as exact fraction and decimal. No UPC scan; keg `container_source` waits for slice 5 | Product → SKU tree, package facts, prices, full `replace_sku_bom` editor |
+| **Invoices / QBO** (1) | Know what is owed; push an invoice once | **AR list first**: due, `push_failed`, `paid_at` (payments arrive from the QBO sync — no user verb), credit-memo QBO status on the row. Connect, mapping and push are the drill-in for one invoice; creating a credit memo stays Return shipment | Invoice/credit detail, candidates, durable request result |
+| **Materials / receiving** (2) | Receive counted material | **Send PO** is a green action while draft; expected vs counted with **over** and short both visible (only counted posts; no keypad clamp as the only guard), lot + `best_by`, one copper receipt commit | PO list, requirements → draft PO |
 | **Material count / materials / vendors / contracts** (2) | Keep material/supply truth | Create/edit material facts; positive counts → adjustment preview; vendor picker | Material/vendor/contracts and committed/received/remaining |
-| **Recipes** (3) | Create recipes and immutable versions; keep predictions honest | Create mutable recipe parent; read/scale; draft editor takes grain bill + mash temp + efficiency + attenuation and shows OG/FG/ABV computed live by the shared registry formula (never stored, no view); version view lists per-batch actuals (OG/FG/ABV from fermentation readings, realized efficiency/attenuation) with deltas vs predicted — one row per batch, amber when out of band | Version editor and costing; outcome table across batches |
+| **Recipes** (3) | Create recipes and immutable versions; keep predictions honest | Create mutable recipe parent; read/scale; draft editor takes grain bill (each ingredient with **stage + timing_minutes** — a boil hop is not a dry hop) + mash temp + efficiency + attenuation and shows OG/FG/ABV computed live by the shared registry formula (never stored, no view); version view lists per-batch actuals (OG/FG/ABV from fermentation readings, realized efficiency/attenuation) with deltas vs predicted — one row per batch, amber when out of band | Version editor and costing; outcome table across batches |
 | **Cellar / reading** (4) | Set up vessels, know occupancy, and log reading | Create/edit vessel facts without status; map derives contents; each tile leads with occupancy — volume/capacity, contents/gravity, and explicit reading age/overdue text, with color only supplemental. One reading accepts any combination of gravity, temperature, and pH while showing prior values; disabled `complete_batch` names its reconciliation schema gate | Timeline and lineage graph |
 | **Brew day** (4) | Establish batch baseline | Schedule/record brew day, lots/additions, knockout volume → free vessel | Calendar and scaled recipe |
-| **Transfer / loss** (4) | Move beer and account for remainder | From occupancy + target vessel/occupancy, positive bbl, then explicitly classify remainder as intentional hold or `loss_bbl`; never assume every partial transfer is loss. An empty target gets a zero-baseline occupancy and a fully emptied source closes. | Lineage and named correction |
-| **Packaging run / outputs** (5) | Plan and close real stock | Green schedule/edit selects one exact open source occupancy and writes run + planned outputs in one RPC; shortages surface before start. Close revalidates source and previews actual FG output, lot, explicit destination, material consumption/returns/damage, beer loss, and yield before copper commit. | Run list, yield/loss, labels |
+| **Cellar addition** (4) | Add to beer after knockout | Global sheet: occupancy/batch, material, stage chip (`dry_hop`, `fermentation`, `other`), qty + unit, lot when lot-tracked, copper **Record addition** (`record_batch_addition`). Not Record movement (that is FG) | Same sheet as dialog |
+| **Transfer / loss** (4) | Move beer and account for remainder | From occupancy + target vessel/occupancy, positive bbl, then explicitly classify remainder as intentional hold or `loss_bbl`; never assume every partial transfer is loss. An empty target gets a zero-baseline occupancy and a fully emptied source closes. **To may be occupied** (BT1 · Pils): the preview shows both volumes and the result, and the surviving occupancy's batch keeps its identity (renaming a blend as a new batch is a §8 schema gap). | Lineage and named correction |
+| **Packaging run / outputs** (5) | Plan and close real stock | One frame, two modes: green plan selects one exact open source occupancy and writes run + planned outputs in one RPC; shortages surface before start. Copper close is a review: revalidated source, actual FG output, lot, explicit destination, material consumption/returns/damage, beer loss, and yield before commit; **Print labels** (keg-collar / lot) after. No packaging-day-actuals screen. | Run list, yield/loss, labels |
 | **Lot trace / recall** (5) | Find where a lot went | Global lot search → material/batch/FG/shipment/customer tape | Printable trace; not hidden in More |
-| **Compliance month / loss review** (6) | Generate, review, and record filing | Review losses → review generated figures → confirm filing occurred outside MGR → **Save filed snapshot**. MGR does not imply it transmitted the report. **SCHEMA-GATE:** loss queue/reattribution stays disabled until structured reconciliation identity/classification exists. | Tax/state tables, filed snapshot; never `v_bro` |
+| **Compliance month / loss review** (6) | Generate, review, and record filing | Review losses → review generated figures → confirm filing occurred outside MGR → **Save filed snapshot**. The review step shows v1's identity checks in user copy: the report must balance or Save stays disabled; the cellar class is labelled in-process, not a packaged removal; zeros print `0.00`, never blank; MGR does not transmit. **SCHEMA-GATE:** loss queue/reattribution stays disabled until structured reconciliation identity/classification exists. | Tax/state tables, filed snapshot; never `v_bro` |
 | **Compliance registry** (6) | Know where product may ship | Read approvals/registrations/licenses; order warning links here | Editors and expiry Today rows |
-| **POS setup / mapping** (7) | Ingest and classify Square facts | Connection health; idempotent sales sync; exact package SKU + `qty_per_sale` conversion; reconciliation disabled until valid | Connect/sync/map/diff; one `reconcile_pos_sales` RPC |
+| **POS setup / mapping** (7) | Ingest and classify Square facts | Connection health; idempotent sales sync; exact package SKU + `qty_per_sale` conversion; the reconcile list includes **refund** lines (preview inventory credit as a positive `adjustment`); same Square-vs-weekly-count rule as Taproom; reconciliation disabled until valid | Connect/sync/map/diff; one `reconcile_pos_sales` RPC |
 | **Planning** (8) | Show demand/supply gap | Read shortfall cards | Calendar + draft PO; no planning status table |
-| **Keg fleet / deposits** (9) | Configure pools and know who holds containers | Create/edit pool; customer/pool balance; explicit return/loss event | Pools, deposit history, loss rates |
-| **Routes / truck loading** (10) | Build route and verify load | Route/load list; checks are local/session-only, then **Depart route** | **Route builder** saves route + existing shipments/stops atomically |
+| **Keg fleet / deposits** (9) | Configure pools and know who holds containers | Create/edit pool; customer/pool balance; intent chips **acquire · return empty · lost/found · retire**; return empty posts the deposit refund (credit memo + keg event in one RPC); beer return/credit stays Return shipment; no CIP/clean status | Pools, deposit history, loss rates |
+| **Routes / truck loading** (10) | Build route and verify load | Route/load list; **unassigned shipment → stop** with driver, vehicle and stop order; checks are local/session-only, then **Depart route**. A refused delivery is not a screen: leave the stop open and assign it to a later route | **Route builder** saves route + existing shipments/stops atomically |
 | **Driver delivery** (10) | Confirm existing shipment arrived | Next stop, shipment quantities, `signed_by`, copper **Delivered** | Route progress; `confirm_delivery` records delivery + deferred invoice, never ships |
-| **Sign in / invite / reset** (1) | Enter correct shell | Auth forms; token chooses staff Today vs portal Order | Same |
+| **Sign in / invite / reset / set password** (1) | Enter correct shell | Auth forms; token chooses staff Today vs portal Order. **Set new password** is the recovery-token landing (Choose a password → Save), distinct from Accept invite | Same |
+| **Me** | Who am I, which brewery, leave | Header sheet: signed-in email, current brewery, SaaS brewery switcher (hidden in dedicated mode), Sign out | Same as dialog |
+| **Team** (1) | Roster, roles, pending invites | From Settings: members + role (`update_staff_role`), pending invites, revoke (`revoke_staff`), invite email + role with the copper invite disabled behind its gate | Wider table |
 | **Onboarding / first run** (1) | Make empty brewery usable | SaaS provision → Add location, Add/import catalog, Invite team; dedicated skips provision | Full forms and import handoff |
 | **Import wizard** (1) | Map/validate launch data | Phone inspects/hands off; no cramped mapper | Upload → map → row errors → commit → mixed result → stable rerun |
 | **Returns / credit memos** (1) | Take shipped beer back | Positive returned qty + reason → exact return rows + negative invoice preview | Same plus QBO credit status |
-| **Settings** | Rare configuration | Brewery, Locations, Team, Integrations, Import; no Notifications history | Same, wider tables |
+| **Settings** | Rare configuration | Brewery (name, timezone, **TTB registry number**, **PA license**), Locations (**Add location**), Team, Integrations, Import; deployment mode read-only if shown; no Notifications history | Same, wider tables |
 
-Portal frames are **Portal · Order**, **Portal · Orders**, **Portal · Invoices**, and
-**Portal · Account**. Account is read-only under current RLS. Together with staff/auth
-screens they make the 50-frame inventory.
+Portal frames are **Portal · Order** (steppers + Same as last week), **Portal · Review**
+(quantities, ship-to, "Ships from Warehouse", **Place order** — buyer copy only, disabled
+until the source contract exists; no persistent cart), **Portal · Orders** (rows expand
+into lines and adjusted-quantity copy; no staff verbs; read-only after submit), **Portal ·
+Invoices**, and **Portal · Account**. Account is read-only under current RLS. Together
+with staff/auth screens they make the 63-frame inventory.
 
 ## 5. Visual system
 
@@ -407,7 +439,7 @@ Tailwind v4, with aliases from `components.json` and tokens in `app/globals.css`
   dense status. Buttons prefer words. Icon-only exceptions have accessible names; icons
   in buttons use `data-icon` and component sizing. Coarse pointers use 2px stroke.
 
-Every one of the 50 screens implements this shared baseline:
+Every one of the 63 screens implements this shared baseline:
 
 | State | Required behavior |
 |---|---|
@@ -512,3 +544,14 @@ vocabulary, both audience shells, and access boundaries for every later screen.
 - `get_loss_review`/`reattribute_loss` remain disabled behind **SCHEMA-GATE** until typed
   reconciliation origin/identity and cellar-removal classification exist; free-text note
   matching is forbidden.
+- **Yeast culture (pitch/harvest/brink/viability) and water chemistry / mash pH
+  estimators are not in the UI until a later slice.** Brew day may consume yeast as a
+  material lot. Do not draw generation as a culture ledger. The same sentence heads the
+  yeast & water section of `brewing-domain.md`.
+- Blending into an occupied vessel keeps the surviving occupancy's batch identity; naming
+  the blend as a new batch derived from two parents is a schema gap, not a UI decision.
+- Deferred on purpose (YAGNI at this scope): portal change-request or persistent cart,
+  warehouse FG cycle count, packaging-day actuals, refused-delivery and deposit-only
+  screens, required carrier/tracking, UPC/bins/waves, disconnect-QBO, CBMA settings,
+  dashboards/COGS, command palette frame, keg CIP status, DTC, export flow, free-form
+  credit memos, a `container_source` editor before slice 5.
