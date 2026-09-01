@@ -14,6 +14,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 } # TDD gate diffs against the PR base
+      # TDD gate: logic-layer changes must ship with test changes in the same
+      # PR (AGENTS.md operating loop step 3). UI layers (app/, components/)
+      # are exempt — rendering is verified visually, not by vitest. Escape
+      # hatch for genuinely test-free changes: put [no-tests] in the PR title.
+      - name: TDD gate — logic changes ship with tests
+        if: github.event_name == 'pull_request' && !contains(github.event.pull_request.title, '[no-tests]')
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          changed=$(git diff --name-only "origin/$BASE_REF"...HEAD)
+          code=$(echo "$changed" | grep -E '^(lib/|scripts/|supabase/|proxy\.ts)' | grep -vE '\.test\.' || true)
+          tests=$(echo "$changed" | grep -E '(^tests/|\.test\.)' || true)
+          if [ -n "$code" ] && [ -z "$tests" ]; then
+            echo "::error::Logic-layer files changed with no test changes. TDD: the failing test comes first and ships in the same PR. Exempt a test-free change with [no-tests] in the PR title."
+            echo "$code"
+            exit 1
+          fi
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci

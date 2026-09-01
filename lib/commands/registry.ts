@@ -7,7 +7,7 @@ export type StaffRole = "admin" | "sales" | "warehouse" | "brewer";
 export type Ctx = { db: SupabaseClient; userId: string; breweryId: string; role: StaffRole | "customer"; customerId?: string };
 
 export class CommandError extends Error {
-  constructor(message: string) {
+  constructor(message: string, readonly status = 400) {
     super(message);
     this.name = "CommandError";
   }
@@ -46,7 +46,7 @@ export async function runCommand(name: string, rawInput: unknown, ctx: Ctx) {
   const def = registry.get(name);
   if (!def) throw new CommandError(`unknown command: ${name}`);
   const allowed = def.roles === "any" || (def.roles === "customer" ? ctx.role === "customer" : def.roles.includes(ctx.role as StaffRole));
-  if (!allowed) throw new CommandError(`permission denied: ${name} requires ${JSON.stringify(def.roles)}`);
+  if (!allowed) throw new CommandError(`permission denied: ${name} requires ${JSON.stringify(def.roles)}`, 403);
   const parsed = def.input.safeParse(rawInput);
   if (!parsed.success) throw new CommandError(`validation failed: ${parsed.error.message}`);
   try {
