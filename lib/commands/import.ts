@@ -92,7 +92,7 @@ const findOrCreateProduct = (ctx: Ctx, L: Lookups, name: string, style?: string,
 const findOrCreatePriceList = (ctx: Ctx, L: Lookups, name: string) =>
   memo(L.priceList, name, async () =>
     (await findId(ctx, "price_lists", name)) ??
-    (await unwrap(ctx.db.from("price_lists").insert({ brewery_id: ctx.breweryId, name }).select("id").single()))!.id);
+    (await runCommand("upsert_price_list", { name }, ctx)).id);
 
 // skus are unique per (product_id, name), not per brewery — every brewery has a
 // "1/2 bbl keg" under many products — so resolve through the product name too.
@@ -110,24 +110,25 @@ const findCustomer = (ctx: Ctx, L: Lookups, name: string) => memo(L.customer, na
 // --- per-kind row inserters ---------------------------------------------------
 
 const importers: Record<string, (ctx: Ctx, L: Lookups, r: Row) => Promise<void>> = {
+  // Every row goes through the same RPC the screen uses: table RLS only admits
+  // inserts made inside upsert_*/set_price, so direct inserts affect 0 rows.
   customers: async (ctx, _L, r) => {
-    await unwrap(ctx.db.from("customers").insert({
-      brewery_id: ctx.breweryId,
+    await runCommand("upsert_customer", {
       name: requireField(r, "name"),
       state: requireField(r, "state"),
-      type: r.type?.trim() || undefined,
-      license_no: r.license_no?.trim() || null,
-      payment_terms: r.payment_terms?.trim() || undefined,
-    }));
+      type: r.type?.trim() || "retailer", // column default
+      licenseNumber: r.license_no?.trim() || undefined,
+      paymentTerms: r.payment_terms?.trim() || undefined, // RPC defaults to net30
+    }, ctx);
   },
 
   ship_tos: async (ctx, L, r) => {
-    const customer_id = await findCustomer(ctx, L, requireField(r, "customer_name"));
-    await unwrap(ctx.db.from("ship_tos").insert({
-      brewery_id: ctx.breweryId, customer_id,
+    const customerId = await findCustomer(ctx, L, requireField(r, "customer_name"));
+    await runCommand("upsert_ship_to", {
+      customerId,
       label: requireField(r, "label"), address1: requireField(r, "address1"),
       city: requireField(r, "city"), state: requireField(r, "state"), zip: requireField(r, "zip"),
-    }));
+    }, ctx);
   },
 
   products_skus: async (ctx, L, r) => {
@@ -140,12 +141,12 @@ const importers: Record<string, (ctx: Ctx, L: Lookups, r: Row) => Promise<void>>
   },
 
   price_list_items: async (ctx, L, r) => {
-    const unit_price_cents = integerField(r, "unit_price_cents");
-    const [sku_id, price_list_id] = await Promise.all([
+    const unitPriceCents = integerField(r, "unit_price_cents");
+    const [skuId, priceListId] = await Promise.all([
       findSku(ctx, L, requireField(r, "product"), requireField(r, "sku_name")),
       findOrCreatePriceList(ctx, L, requireField(r, "price_list")),
     ]);
-    await unwrap(ctx.db.from("price_list_items").insert({ brewery_id: ctx.breweryId, price_list_id, sku_id, unit_price_cents }));
+    await runCommand("set_price", { priceListId, skuId, unitPriceCents }, ctx);
   },
 
   opening_balances: async (ctx, L, r) => {

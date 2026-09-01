@@ -61,6 +61,25 @@ describe("import_csv", () => {
     expect(r.inserted).toBe(1);
   });
 
+  it("imports customers then ship_tos through the upsert RPCs (RLS blocks direct inserts)", async () => {
+    const r1 = await runCommand("import_csv", { kind: "customers", rows: [
+      { name: "Corner Bottle", state: "NC", type: "retailer", license_no: "ABC-1", payment_terms: "" },
+      { name: "Bad Type Co", state: "NC", type: "wholesaler" },
+    ] }, ctx);
+    expect(r1.errors).toHaveLength(1);
+    expect(r1.errors[0].message).toMatch(/type/i);
+    expect(r1.inserted).toBe(1);
+    const { data: c } = await ctx.db.from("customers").select("payment_terms").eq("brewery_id", b.id).eq("name", "Corner Bottle").single();
+    expect(c?.payment_terms).toBe("net30");
+    const r2 = await runCommand("import_csv", { kind: "ship_tos", rows: [
+      { customer_name: "Corner Bottle", label: "Main", address1: "1 Main St", city: "Raleigh", state: "NC", zip: "27601" },
+      { customer_name: "Nobody", label: "X", address1: "1", city: "C", state: "NC", zip: "1" },
+    ] }, ctx);
+    expect(r2.inserted).toBe(1);
+    expect(r2.errors).toHaveLength(1);
+    expect(r2.errors[0].message).toMatch(/customer not found/);
+  });
+
   it("rejects a fractional unit_price_cents instead of silently truncating it", async () => {
     const r = await runCommand("import_csv", { kind: "price_list_items", rows: [
       { price_list: "Standard", product: "Hazy IPA", sku_name: "1/2 bbl keg", unit_price_cents: "12.5" },
