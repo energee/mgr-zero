@@ -48,4 +48,9 @@ removals = ending. Rules that v1 got wrong at least once:
 
 ## Yeast & water chemistry assumptions
 
+**UI scope:** yeast culture (pitch/harvest/brink/viability) and water chemistry / mash pH
+estimators are not in the UI until a later slice. Brew day may consume yeast as a
+material lot; generation is not drawn as a culture ledger. The rules below are domain
+reference for that later slice, not missing screens (UI plan rev 3 §8).
+
 Yeast health is modeled as a daily decay: liquid yeast loses roughly 2% of its viability per day, while dry yeast — which is packaged to survive longer — loses only about 0.5% per day. A fresh liquid yeast pack is assumed to contain about 100 billion cells; a dry yeast packet, about 200 billion. Pitching-rate guidance (how much yeast to add per batch) follows standard brewing targets: ales need less yeast per gallon than lagers, and very high-gravity beers need a rate in between. Yeast can be reused ("repitched") across multiple batches, but strains degrade with each generation — most strains are recommended for replacement after about 8 generations, hardier lager strains after about 10, delicate Belgian strains after about 6, and highly stable Brettanomyces cultures after as many as 12. Water chemistry calculations model how brewing salts (gypsum, calcium chloride, Epsom salt, baking soda, chalk, table salt, magnesium chloride) shift a water profile's mineral content, and estimate the resulting mash pH from that mineral balance plus the color/roast level of the grain bill — darker grains naturally push pH lower. These are simplified estimation models meant to guide recipe formulation, not to replace a lab water report or a calibrated pH meter reading during an actual brew day.
