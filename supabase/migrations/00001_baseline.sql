@@ -1588,8 +1588,9 @@ create table chat_user_links (
   installation_id uuid not null,
   provider text not null check (provider ~ '^[a-z][a-z0-9_-]{1,31}$'),
   external_user_id text not null,
-  user_id uuid not null references auth.users(id),
+  user_id uuid references auth.users(id), -- null only while a link proof is pending
   state text not null check (state in ('pending','active','disabled','unlinked')),
+  check ((state = 'pending') = (user_id is null)),
   proof_hash text,
   proof_issued_at timestamptz,
   proof_expires_at timestamptz,
@@ -2125,6 +2126,103 @@ grant execute on function
   to authenticated;
 grant execute on function mark_chat_installation_reauthorization(uuid, text), reconcile_chat_installation(uuid, boolean, text)
   to service_role;
+
+-- ---------------------------------------------------------------- chat staff linking
+-- Issued by the App Home handler (service role, no user): one pending row per
+-- (installation, external user) holding only sha256(proof) for ten minutes.
+create function issue_chat_link_proof(p_installation uuid, p_external_user_id text, p_proof_hash text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare i public.chat_installations; l public.chat_user_links; v_id uuid; v_exp timestamptz := now() + interval '10 minutes';
+begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'permission denied: internal job only' using errcode = '42501';
+  end if;
+  select * into i from public.chat_installations where id = p_installation;
+  if not found then raise exception 'installation not found'; end if;
+  if i.state <> 'active' then raise exception 'installation is not active'; end if;
+  select * into l from public.chat_user_links
+    where installation_id = p_installation and external_user_id = p_external_user_id for update;
+  if found and l.state = 'active' then raise exception 'external user already linked'; end if;
+  if found then
+    update public.chat_user_links
+      set state = 'pending', user_id = null, proof_hash = p_proof_hash, proof_issued_at = now(), proof_expires_at = v_exp,
+          proof_consumed_at = null, linked_at = null, disabled_at = null, unlinked_at = null, updated_at = now()
+      where id = l.id returning id into v_id;
+  else
+    insert into public.chat_user_links
+      (brewery_id, installation_id, provider, external_user_id, state, proof_hash, proof_issued_at, proof_expires_at)
+    values (i.brewery_id, i.id, i.provider, p_external_user_id, 'pending', p_proof_hash, now(), v_exp)
+    returning id into v_id;
+  end if;
+  return jsonb_build_object('link_id', v_id, 'expires_at', v_exp);
+end $$;
+
+-- Consumed by the authenticated staff member who opened the link. Membership
+-- is checked here against the installation's brewery, never against Slack
+-- profile data. Customers have no brewery_users row and are rejected.
+create function consume_chat_link_proof(p_proof_hash text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare l public.chat_user_links; v_state text;
+begin
+  select * into l from public.chat_user_links where proof_hash = p_proof_hash and state = 'pending' for update;
+  if not found or l.proof_consumed_at is not null or l.proof_expires_at < now() then
+    raise exception 'link proof invalid or expired';
+  end if;
+  select state into v_state from public.chat_installations where id = l.installation_id;
+  if v_state <> 'active' then raise exception 'installation is not active'; end if;
+  if not public.is_staff_of(l.brewery_id) then
+    raise exception 'not a member of this brewery' using errcode = '42501';
+  end if;
+  if exists (select 1 from public.chat_user_links
+             where installation_id = l.installation_id and user_id = auth.uid() and state = 'active') then
+    raise exception 'you are already linked in this workspace';
+  end if;
+  update public.chat_user_links
+    set user_id = auth.uid(), state = 'active', linked_at = now(), proof_consumed_at = now(), proof_hash = null, updated_at = now()
+    where id = l.id;
+  return jsonb_build_object('link_id', l.id, 'installation_id', l.installation_id, 'brewery_id', l.brewery_id);
+end $$;
+
+create function unlink_chat_user(p_link uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+declare l public.chat_user_links;
+begin
+  select * into l from public.chat_user_links where id = p_link for update;
+  if not found then raise exception 'link not found'; end if;
+  if l.user_id is distinct from auth.uid() and coalesce(public.staff_role(l.brewery_id)::text, '') <> 'admin' then
+    raise exception 'permission denied' using errcode = '42501';
+  end if;
+  if l.state <> 'unlinked' then
+    update public.chat_user_links
+      set state = 'unlinked', unlinked_at = now(), proof_hash = null, updated_at = now()
+      where id = l.id;
+  end if;
+end $$;
+
+-- Every provider callback re-resolves the actor from server state: active
+-- installation, active link, and current membership/role. Returns no token.
+create function resolve_chat_actor(p_provider text, p_external_installation_id text, p_external_user_id text)
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+declare r record;
+begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'permission denied: internal job only' using errcode = '42501';
+  end if;
+  select i.id as installation_id, i.brewery_id, l.user_id, bu.role into r
+    from public.chat_installations i
+    join public.chat_user_links l on l.installation_id = i.id and l.external_user_id = p_external_user_id and l.state = 'active'
+    join public.brewery_users bu on bu.brewery_id = i.brewery_id and bu.user_id = l.user_id
+    where i.provider = p_provider and i.external_installation_id = p_external_installation_id and i.state = 'active';
+  if not found then return null; end if;
+  return jsonb_build_object('installation_id', r.installation_id, 'brewery_id', r.brewery_id,
+    'external_user_id', p_external_user_id, 'user_id', r.user_id, 'role', r.role);
+end $$;
+
+revoke execute on function issue_chat_link_proof(uuid, text, text), consume_chat_link_proof(text),
+  unlink_chat_user(uuid), resolve_chat_actor(text, text, text)
+  from public, anon, authenticated;
+grant execute on function consume_chat_link_proof(text), unlink_chat_user(uuid) to authenticated;
+grant execute on function issue_chat_link_proof(uuid, text, text), resolve_chat_actor(text, text, text) to service_role;
 -- ---------------------------------------------------------------- immutability grants
 revoke update, delete on recipe_versions, recipe_ingredients from authenticated, anon;
 revoke update, delete on pos_sales from authenticated, anon;

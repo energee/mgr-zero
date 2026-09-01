@@ -253,8 +253,7 @@ describe("chat schema (live DB)", () => {
       installation_id: chatInstallation.id,
       provider,
       external_user_id: externalUser,
-      user_id: ctx.userId,
-      state: "pending",
+      state: "pending", // pending links carry no user_id yet
     });
     expect(duplicateUser.error?.code).toBe("23505");
 

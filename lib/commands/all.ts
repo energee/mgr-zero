@@ -7,4 +7,5 @@ import "./invites";
 import "./orders";
 import "./customers";
 import "./portal";
+import "./chat";
 export {};
