@@ -12,17 +12,16 @@ const movementInput = z.object({
 });
 
 /**
- * Inserts an inventory movement. `bbl` is not supplied: the DB trigger
- * (enforce_bbl_integrity, 00001_baseline.sql) computes it from
- * `qty * skus.bbl_per_unit` and overwrites anything a client sends.
- * CHECK/FK failures surface as CommandError.
+ * Appends an inventory movement through its security-invoker RPC. `bbl` is
+ * not supplied: the DB trigger (enforce_bbl_integrity, 00001_baseline.sql)
+ * computes it from `qty * skus.bbl_per_unit`.
  */
 export function insertMovement(ctx: Ctx, input: z.infer<typeof movementInput>) {
-  return unwrap(ctx.db.from("inventory_movements").insert({
-    brewery_id: ctx.breweryId, sku_id: input.skuId, location_id: input.locationId,
-    qty: input.qty, type: input.type, channel: input.channel ?? null,
-    dest_state: input.destState ?? null, note: input.note ?? null, created_by: ctx.userId,
-  }).select().single());
+  return unwrap(ctx.db.rpc("record_movement", {
+    p_brewery: ctx.breweryId, p_sku: input.skuId, p_location: input.locationId,
+    p_qty: input.qty, p_type: input.type, p_channel: input.channel ?? null,
+    p_dest_state: input.destState ?? null, p_note: input.note ?? null,
+  }));
 }
 
 defineCommand({
@@ -35,10 +34,9 @@ defineCommand({
   name: "set_taproom_par", description: "Set par level for a SKU at a taproom",
   input: z.object({ locationId: z.string().uuid(), skuId: z.string().uuid(), parQty: z.number().nonnegative() }),
   roles: ["admin", "sales"],
-  handler: (ctx, i) =>
-    unwrap(ctx.db.from("taproom_pars").upsert({
-      brewery_id: ctx.breweryId, location_id: i.locationId, sku_id: i.skuId, par_qty: i.parQty,
-    }).select().single()),
+  handler: (ctx, i) => unwrap(ctx.db.rpc("set_taproom_par", {
+    p_brewery: ctx.breweryId, p_location: i.locationId, p_sku: i.skuId, p_par_qty: i.parQty,
+  })),
 });
 
 /**

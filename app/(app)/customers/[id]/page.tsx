@@ -1,5 +1,5 @@
-// app/(app)/customers/[id]/page.tsx — single customer: profile, ship-tos, and
-// portal-user invites. Reads through the command registry (get_customer) with
+// app/(app)/customers/[id]/page.tsx — single customer: profile and ship-tos
+// (portal-user invites are not available in this release). Reads through the command registry (get_customer) with
 // a brewery-scoped Ctx. Failures throw to the (app) error boundary.
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -7,7 +7,6 @@ import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { CustomerForm } from "../customer-form";
 import { ShipToForm } from "../ship-to-form";
-import { InvitePortalUserForm } from "./invite-portal-user-form";
 
 type CustomerType = "distributor" | "retailer" | "brewery" | "other";
 type Customer = {
@@ -59,7 +58,6 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
               priceListId: customer.price_list_id, licenseNumber: customer.license_no, paymentTerms: customer.payment_terms,
             }}
           />
-          <InvitePortalUserForm customerId={customer.id} />
         </div>
       </div>
 

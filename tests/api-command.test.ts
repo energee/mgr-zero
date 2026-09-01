@@ -61,6 +61,12 @@ describe("POST /api/command bearer auth", () => {
     expect(json).toEqual({ ok: false, error: "not a member of this brewery" });
   });
 
+  it("treats a non-UUID breweryId as not-a-member, never a 500", async () => {
+    const res = await POST(commandReq({ breweryId: "not-a-uuid", name: "list_products", input: {} }, adminToken));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ ok: false, error: "not a member of this brewery" });
+  });
+
   it("rejects a command the role cannot run", async () => {
     const res = await POST(commandReq({ breweryId, name: "create_product", input: { name: "Nope" } }, warehouseToken));
     expect(res.status).toBe(403);
