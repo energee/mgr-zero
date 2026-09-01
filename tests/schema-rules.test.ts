@@ -181,7 +181,8 @@ describe("schema rules", () => {
           ('create_credit_memo(uuid,jsonb,uuid,text)'),
           ('set_standing_allocation(uuid,uuid,numeric)'),
           ('create_replenishment_order(uuid,uuid,jsonb)'),
-          ('portal_availability(uuid)')
+          ('portal_availability(uuid)'),
+          ('portal_brewery_rows()')
         ) callable(signature)
         union all
         select 'service_role'::name, signature from domain_functions
@@ -204,6 +205,36 @@ describe("schema rules", () => {
     expect(() => sql(`
       select public.require_authorized_staff_rpc(gen_random_uuid(), 'create_product', array['admin']::public.staff_role[])
     `)).toThrow(/permission denied for create_product/);
+  });
+
+  it("pins customer brewery exposure to portal_brewery columns, not the base table", () => {
+    // Table-level SELECT on breweries is shared by staff and customers
+    // (both are `authenticated`); the customer path is a view projection
+    // plus no customer SELECT policy on the base table.
+    expect(sql(`
+      select attname from pg_attribute
+      where attrelid = 'public.portal_brewery'::regclass
+        and attnum > 0 and not attisdropped
+      order by attnum
+    `)).toEqual(["id", "name", "timezone", "portal_fulfillment_location_id"]);
+    expect(sql(`
+      select pg_get_function_result('public.portal_brewery_rows()'::regprocedure)
+    `)).toEqual(["TABLE(id uuid, name text, timezone text, portal_fulfillment_location_id uuid)"]);
+    expect(sql(`
+      select polname from pg_policy
+      where polrelid = 'public.breweries'::regclass
+      order by 1
+    `)).toEqual(["breweries_set_portal_fulfillment_source", "staff_read"]);
+    expect(sql(`
+      select col_description('public.breweries'::regclass, attnum)
+      from pg_attribute
+      where attrelid = 'public.breweries'::regclass and attname = 'settings'
+    `)).toEqual(["staff-only; never store secrets here"]);
+    expect(sql(`
+      select coalesce(array_to_string(c.reloptions, ','), '')
+      from pg_class c
+      where c.oid = 'public.portal_brewery'::regclass
+    `)).toEqual(["security_invoker=true"]);
   });
 
   it("restricts brewery_counters keys to committed document kinds", () => {

@@ -58,6 +58,7 @@ create table breweries (
   settings jsonb not null default '{}',
   created_at timestamptz not null default now()
 );
+comment on column breweries.settings is 'staff-only; never store secrets here';
 
 create table brewery_users (
   brewery_id uuid not null references breweries(id),
@@ -1234,6 +1235,34 @@ create table deliveries (
 );
 
 -- ---------------------------------------------------------------- views (derived truth)
+-- Customer-safe brewery projection. security definer so it can read
+-- breweries without a customer SELECT policy on the base table; the
+-- where-clause pins the caller to their own account (same pattern as
+-- portal_availability). The wrapping view is security_invoker.
+-- security-definer: justified — no customer SELECT on breweries; returns
+-- only portal columns for my_customer_ids().
+create function portal_brewery_rows()
+returns table (
+  id uuid,
+  name text,
+  timezone text,
+  portal_fulfillment_location_id uuid
+)
+language sql stable security definer set search_path = '' as $$
+  select b.id, b.name, b.timezone, b.portal_fulfillment_location_id
+  from public.breweries b
+  where b.id in (
+    select c.brewery_id from public.customers c
+    where c.id in (select public.my_customer_ids())
+  );
+$$;
+
+create view portal_brewery with (security_invoker = true) as
+  select id, name, timezone, portal_fulfillment_location_id
+  from public.portal_brewery_rows();
+comment on function portal_brewery_rows() is
+  'portal brewery projection; never add staff-only columns';
+
 create view on_hand with (security_invoker = true) as
   select brewery_id, sku_id, location_id, sum(qty) as qty
   from inventory_movements group by 1,2,3;
@@ -1627,7 +1656,7 @@ begin
     into v_customer, v_brewery, v_price_list, v_source
     from public.ship_tos st
     join public.customers c on c.id = st.customer_id and c.brewery_id = st.brewery_id
-    join public.breweries b on b.id = st.brewery_id
+    join public.portal_brewery b on b.id = st.brewery_id
     where st.id = p_ship_to and st.customer_id in (select public.my_customer_ids());
   if v_customer is null then raise exception 'ship-to not found'; end if;
   if v_price_list is null then raise exception 'customer has no price list'; end if;
@@ -1676,7 +1705,7 @@ begin
     where id = v_ship_to and customer_id = o.customer_id and brewery_id = o.brewery_id
   ) then raise exception 'ship-to not found'; end if;
   select c.price_list_id, b.portal_fulfillment_location_id into v_price_list, v_source
-    from public.customers c join public.breweries b on b.id = c.brewery_id
+    from public.customers c join public.portal_brewery b on b.id = c.brewery_id
     where c.id = o.customer_id and c.brewery_id = o.brewery_id;
   if v_price_list is null then raise exception 'customer has no price list'; end if;
   if v_source is null or not exists (
@@ -2103,10 +2132,7 @@ alter table customer_users enable row level security;
 alter table brewery_counters enable row level security;   -- no policies: only via next_no()
 
 create policy staff_read on breweries for select using (is_staff_of(id));
--- Portal RPCs are security invokers, so customers may read only their
--- brewery's configured source while the mutation itself stays RLS-constrained.
-create policy customer_read_portal_config on breweries for select
-  using (id in (select c.brewery_id from public.customers c where c.id in (select public.my_customer_ids())));
+-- Customers read brewery identity through portal_brewery, never the base table.
 create policy breweries_set_portal_fulfillment_source on breweries for update
   using (public.is_authorized_staff_rpc(id, 'set_portal_fulfillment_source', array['admin']::public.staff_role[]))
   with check (public.is_authorized_staff_rpc(id, 'set_portal_fulfillment_source', array['admin']::public.staff_role[]));
@@ -2125,7 +2151,7 @@ create policy customer_own_prices on price_list_items for select
 create policy customer_read_portal_source on locations for select
   using (
     id in (
-      select b.portal_fulfillment_location_id from public.breweries b
+      select b.portal_fulfillment_location_id from public.portal_brewery b
       where b.id = locations.brewery_id
     )
   );
@@ -2334,9 +2360,9 @@ $$;
 
 -- ---------------------------------------------------------------- definer functions: never callable by anon
 -- These bypass RLS; only logged-in users (and policies evaluated as them) may run them.
-revoke execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), portal_availability(uuid)
+revoke execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), portal_availability(uuid), portal_brewery_rows()
   from public, anon;
-grant execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), portal_availability(uuid)
+grant execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), portal_availability(uuid), portal_brewery_rows()
   to authenticated;
 -- Document counters advance only inside the owner-run set_doc_no trigger.
 revoke execute on function next_no(uuid, text), set_doc_no() from public, anon, authenticated;
@@ -2424,5 +2450,6 @@ grant execute on function
   create_credit_memo(uuid, jsonb, uuid, text),
   set_standing_allocation(uuid, uuid, numeric),
   create_replenishment_order(uuid, uuid, jsonb),
-  portal_availability(uuid)
+  portal_availability(uuid),
+  portal_brewery_rows()
   to authenticated;
