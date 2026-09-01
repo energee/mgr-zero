@@ -86,6 +86,7 @@ describe("schema rules", () => {
         select 'authenticated'::name, relname, privilege
         from (values
           ('allocations', 'INSERT'), ('allocations', 'UPDATE'),
+          ('breweries', 'UPDATE'),
           ('customers', 'INSERT'), ('customers', 'UPDATE'),
           ('inventory_movements', 'INSERT'),
           ('invoice_lines', 'INSERT'), ('invoices', 'INSERT'),
@@ -165,6 +166,10 @@ describe("schema rules", () => {
           ('record_movement(uuid,uuid,uuid,numeric,movement_type,sale_channel,text,text)'),
           ('set_taproom_par(uuid,uuid,uuid,numeric)'),
           ('order_line_price(uuid,uuid,uuid)'),
+          ('set_portal_fulfillment_source(uuid,uuid)'),
+          ('portal_create_order(uuid,text,text,jsonb)'),
+          ('portal_update_draft_order(uuid,uuid,text,text,jsonb)'),
+          ('portal_submit_order(uuid)'),
           ('create_order(uuid,order_kind,uuid,uuid,uuid,uuid,date,text,text,jsonb)'),
           ('lock_order(uuid,order_status[])'),
           ('update_draft_order(uuid,uuid,date,text,text,jsonb)'),

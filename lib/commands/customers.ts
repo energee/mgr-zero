@@ -56,6 +56,15 @@ defineCommand({
   })),
 });
 
+defineCommand({
+  name: "set_portal_fulfillment_source", description: "Set the warehouse used for customer portal orders",
+  roles: ["admin"],
+  input: z.object({ locationId: z.string().uuid() }),
+  handler: (ctx, i) => unwrap(ctx.db.rpc("set_portal_fulfillment_source", {
+    p_brewery: ctx.breweryId, p_location: i.locationId,
+  })),
+});
+
 defineQuery({
   name: "list_customers", description: "Customers alphabetical with price list name",
   roles: ["admin", "sales", "warehouse"],

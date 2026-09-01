@@ -7,13 +7,14 @@ import { runCommand } from "../lib/commands/registry";
 import "../lib/commands/all";
 
 let b: { id: string }, adminCtx: Awaited<ReturnType<typeof makeStaffCtx>>;
-let customerId: string, shipToId: string, skuId: string;
+let customerId: string, shipToId: string, skuId: string, warehouseId: string;
 let custCtx: { db: Awaited<ReturnType<typeof asUser>>; userId: string; breweryId: string; role: "customer"; customerId: string };
 
 beforeAll(async () => {
   b = await makeBrewery();
   adminCtx = await makeStaffCtx(b.id, "admin");
-  await admin.from("locations").insert({ brewery_id: b.id, name: "WH", kind: "warehouse" });
+  const { data: warehouse } = await admin.from("locations").insert({ brewery_id: b.id, name: "WH", kind: "warehouse" }).select().single();
+  warehouseId = warehouse!.id;
   const { data: p } = await admin.from("products").insert({ brewery_id: b.id, name: "IPA" }).select().single();
   const { data: s } = await admin.from("skus").insert({ brewery_id: b.id, product_id: p!.id, name: "IPA case", package_type: "can", bbl_per_unit: 0.0645 }).select().single();
   skuId = s!.id;
@@ -24,7 +25,7 @@ beforeAll(async () => {
   const { data: st } = await admin.from("ship_tos").insert({ brewery_id: b.id, customer_id: customerId, label: "m", address1: "1", city: "P", state: "PA", zip: "19100" }).select().single();
   shipToId = st!.id;
   // Put stock on hand so the "in" badge tier is reachable.
-  const { data: loc } = await admin.from("locations").select("id").eq("brewery_id", b.id).eq("kind", "warehouse").single();
+  const { data: loc } = await admin.from("locations").select("id").eq("id", warehouseId).single();
   await admin.from("inventory_movements").insert({
     brewery_id: b.id, sku_id: skuId, location_id: loc!.id, qty: 100, bbl: 100 * 0.0645,
     type: "production_in", created_by: adminCtx.userId,
@@ -35,24 +36,34 @@ beforeAll(async () => {
 });
 
 describe("portal commands", () => {
-  it("portal_create_order creates a draft for the caller's own customer, then portal_submit_order submits it", async () => {
+  it("derives trusted order fields from the configured fulfillment source and the authenticated customer", async () => {
+    const { data: configured } = await admin.from("locations").insert({ brewery_id: b.id, name: "Configured WH", kind: "warehouse" }).select().single();
+    await runCommand("set_portal_fulfillment_source", { locationId: configured!.id }, adminCtx);
     const created = await runCommand("portal_create_order", {
-      shipToId, lines: [{ skuId, qty: 3 }],
+      shipToId, poNumber: "PO-1", note: "dock after 9", lines: [{ skuId, qty: 3 }],
     }, custCtx) as { order_id: string };
-    const { data: order } = await admin.from("orders").select("customer_id, status").eq("id", created.order_id).single();
-    expect(order!.customer_id).toBe(customerId);
-    expect(order!.status).toBe("draft");
+    const { data: order } = await admin.from("orders")
+      .select("brewery_id, customer_id, ship_to_id, from_location_id, price_list_id, created_by, kind, status, po_number, note")
+      .eq("id", created.order_id).single();
+    const { data: line } = await admin.from("order_lines").select("unit_price_cents").eq("order_id", created.order_id).single();
+    const { data: event } = await admin.from("order_events").select("actor, event").eq("order_id", created.order_id).eq("event", "created").single();
+    expect(order).toMatchObject({
+      brewery_id: b.id, customer_id: customerId, ship_to_id: shipToId, from_location_id: configured!.id,
+      created_by: custCtx.userId, kind: "wholesale", status: "draft", po_number: "PO-1", note: "dock after 9",
+    });
+    expect(order!.price_list_id).not.toBeNull();
+    expect(line!.unit_price_cents).toBe(3600);
+    expect(event).toEqual({ actor: custCtx.userId, event: "created" });
+
+    await runCommand("portal_update_draft_order", {
+      orderId: created.order_id, poNumber: "PO-2", note: "revised", lines: [{ skuId, qty: 4 }],
+    }, custCtx);
+    const { data: updated } = await admin.from("orders").select("po_number, note, status").eq("id", created.order_id).single();
+    expect(updated).toEqual({ po_number: "PO-2", note: "revised", status: "draft" });
 
     await runCommand("portal_submit_order", { orderId: created.order_id }, custCtx);
     const { data: after } = await admin.from("orders").select("status").eq("id", created.order_id).single();
     expect(after!.status).toBe("submitted");
-
-    // R3: once submitted, the order is locked from customer writes — the row
-    // is no longer visible to the customer's UPDATE policy (SELECT ... FOR
-    // UPDATE inside lock_order enforces the UPDATE policy's USING clause), so
-    // a second submit surfaces as "not found" rather than "order is submitted".
-    await expect(runCommand("portal_submit_order", { orderId: created.order_id }, custCtx))
-      .rejects.toThrow(/order not found/);
   });
 
   it("portal_catalog returns priced skus with a coarse badge and never raw ATP quantities", async () => {
@@ -85,14 +96,11 @@ describe("portal commands", () => {
     await expect(runCommand("list_orders", {}, custCtx)).rejects.toThrow(/permission denied/);
   });
 
-  it("portal_create_order still succeeds when the brewery has more than one warehouse", async () => {
-    // Nothing constrains a brewery to a single warehouse; the lookup must
-    // tolerate multiple rows (.single() would throw PGRST116 without a limit).
-    await admin.from("locations").insert({ brewery_id: b.id, name: "WH2", kind: "warehouse" });
+  it("uses the configured warehouse rather than an arbitrary warehouse", async () => {
     const created = await runCommand("portal_create_order", {
       shipToId, lines: [{ skuId, qty: 1 }],
     }, custCtx) as { order_id: string };
-    const { data: order } = await admin.from("orders").select("status").eq("id", created.order_id).single();
-    expect(order!.status).toBe("draft");
+    const { data: order } = await admin.from("orders").select("from_location_id").eq("id", created.order_id).single();
+    expect(order!.from_location_id).not.toBe(warehouseId);
   });
 });

@@ -47,6 +47,22 @@ describe("order_events", () => {
     const { data } = await admin.from("orders").select("needs_restock").eq("id", order.id).single();
     expect(data!.needs_restock).toBe(false);
   });
+
+  it("denies all customer raw order and event mutations outside portal RPC paths", async () => {
+    const db = await asUser(custUser.email);
+    const { error: orderInsert } = await db.from("orders").insert({
+      brewery_id: b1.id, kind: "wholesale", customer_id: customer.id, from_location_id: whId,
+      created_by: custUser.id,
+    });
+    expect(orderInsert).not.toBeNull();
+    const { data: updated, error: orderUpdate } = await db.from("orders")
+      .update({ note: "forged" }).eq("id", order.id).select();
+    expect(orderUpdate).toBeNull();
+    expect(updated).toEqual([]);
+    const { error: eventInsert } = await db.from("order_events")
+      .insert({ brewery_id: b1.id, order_id: order.id, actor: custUser.id, event: "forged" });
+    expect(eventInsert).not.toBeNull();
+  });
 });
 
 // R3 (spec decision 2 enforcement): a submitted order is locked from customer

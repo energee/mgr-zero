@@ -294,6 +294,12 @@ create table locations (
   unique (brewery_id, name)
 );
 
+-- The portal's shipping source is selected by an administrator, never by a
+-- customer request or an arbitrary warehouse lookup.
+alter table breweries add column portal_fulfillment_location_id uuid;
+alter table breweries add foreign key (portal_fulfillment_location_id, id)
+  references locations (id, brewery_id);
+
 create table inventory_movements (
   id uuid primary key default gen_random_uuid(),
   brewery_id uuid not null references breweries(id),
@@ -1575,10 +1581,138 @@ create function order_line_price(p_brewery uuid, p_price_list uuid, p_sku uuid) 
 language plpgsql stable set search_path = '' as $$
 declare v int;
 begin
+
   select unit_price_cents into v from public.price_list_items
     where brewery_id = p_brewery and price_list_id = p_price_list and sku_id = p_sku;
   if v is null then raise exception 'no price for sku % on price list', p_sku; end if;
   return v;
+end $$;
+-- Admin-only configuration for the one warehouse customer portal orders ship
+-- from. The composite FK above prevents cross-brewery sources; this command
+-- additionally rejects a same-brewery location that is not a warehouse.
+create function set_portal_fulfillment_source(p_brewery uuid, p_location uuid) returns jsonb
+language plpgsql set search_path = '' as $$
+begin
+  perform public.require_authorized_staff_rpc(
+    p_brewery, 'set_portal_fulfillment_source', array['admin']::public.staff_role[]
+  );
+  if not exists (
+    select 1 from public.locations
+    where id = p_location and brewery_id = p_brewery and kind = 'warehouse'
+  ) then
+    raise exception 'portal fulfillment source must be a brewery warehouse';
+  end if;
+  update public.breweries set portal_fulfillment_location_id = p_location where id = p_brewery;
+  return jsonb_build_object('brewery_id', p_brewery, 'location_id', p_location);
+end $$;
+
+-- Customer portal mutations are deliberately separate from staff lifecycle
+-- RPCs. They accept only customer-editable fields and derive all identities,
+-- workflow state, fulfillment source, and price snapshots from the caller.
+create function portal_create_order(
+  p_ship_to uuid, p_po text, p_note text, p_lines jsonb
+) returns jsonb language plpgsql set search_path = '' as $$
+declare v_customer uuid; v_brewery uuid; v_price_list uuid; v_source uuid;
+  v_order uuid; v_price int; l record;
+begin
+  if current_setting('request.path', true) <> '/rpc/portal_create_order' then
+    raise exception 'permission denied for portal_create_order' using errcode = '42501';
+  end if;
+  select st.customer_id, st.brewery_id, c.price_list_id, b.portal_fulfillment_location_id
+    into v_customer, v_brewery, v_price_list, v_source
+    from public.ship_tos st
+    join public.customers c on c.id = st.customer_id and c.brewery_id = st.brewery_id
+    join public.breweries b on b.id = st.brewery_id
+    where st.id = p_ship_to and st.customer_id in (select public.my_customer_ids());
+  if v_customer is null then raise exception 'ship-to not found'; end if;
+  if v_price_list is null then raise exception 'customer has no price list'; end if;
+  if v_source is null or not exists (
+    select 1 from public.locations
+    where id = v_source and brewery_id = v_brewery and kind = 'warehouse'
+  ) then raise exception 'portal fulfillment source is not configured'; end if;
+  if jsonb_typeof(p_lines) <> 'array' or jsonb_array_length(p_lines) = 0 then
+    raise exception 'order requires at least one line';
+  end if;
+  insert into public.orders (brewery_id, kind, status, customer_id, ship_to_id, from_location_id,
+                             price_list_id, po_number, note, created_by)
+  values (v_brewery, 'wholesale', 'draft', v_customer, p_ship_to, v_source,
+          v_price_list, p_po, p_note, auth.uid())
+  returning id into v_order;
+  for l in select (e->>'sku_id')::uuid as sku_id, (e->>'qty')::numeric as qty
+    from jsonb_array_elements(p_lines) e loop
+    select pli.unit_price_cents into v_price from public.price_list_items pli
+      join public.skus s on s.id = pli.sku_id and s.brewery_id = pli.brewery_id
+      where pli.brewery_id = v_brewery and pli.price_list_id = v_price_list
+        and pli.sku_id = l.sku_id and s.active;
+    if v_price is null then raise exception 'sku is not active and priced for this customer'; end if;
+    insert into public.order_lines (brewery_id, order_id, sku_id, qty_ordered, unit_price_cents)
+      values (v_brewery, v_order, l.sku_id, l.qty, v_price);
+  end loop;
+  insert into public.order_events (brewery_id, order_id, actor, event, payload)
+    values (v_brewery, v_order, auth.uid(), 'created', jsonb_build_object('lines', p_lines));
+  return jsonb_build_object('order_id', v_order);
+end $$;
+
+create function portal_update_draft_order(
+  p_order uuid, p_ship_to uuid, p_po text, p_note text, p_lines jsonb
+) returns jsonb language plpgsql set search_path = '' as $$
+declare o public.orders; v_ship_to uuid; v_price_list uuid; v_source uuid;
+  v_price int; l record;
+begin
+  if current_setting('request.path', true) <> '/rpc/portal_update_draft_order' then
+    raise exception 'permission denied for portal_update_draft_order' using errcode = '42501';
+  end if;
+  select * into o from public.orders
+    where id = p_order and customer_id in (select public.my_customer_ids()) for update;
+  if not found or o.status <> 'draft' then raise exception 'order not found'; end if;
+  v_ship_to := coalesce(p_ship_to, o.ship_to_id);
+  if not exists (
+    select 1 from public.ship_tos
+    where id = v_ship_to and customer_id = o.customer_id and brewery_id = o.brewery_id
+  ) then raise exception 'ship-to not found'; end if;
+  select c.price_list_id, b.portal_fulfillment_location_id into v_price_list, v_source
+    from public.customers c join public.breweries b on b.id = c.brewery_id
+    where c.id = o.customer_id and c.brewery_id = o.brewery_id;
+  if v_price_list is null then raise exception 'customer has no price list'; end if;
+  if v_source is null or not exists (
+    select 1 from public.locations
+    where id = v_source and brewery_id = o.brewery_id and kind = 'warehouse'
+  ) then raise exception 'portal fulfillment source is not configured'; end if;
+  if jsonb_typeof(p_lines) <> 'array' or jsonb_array_length(p_lines) = 0 then
+    raise exception 'order requires at least one line';
+  end if;
+  update public.orders set ship_to_id = v_ship_to, from_location_id = v_source,
+    price_list_id = v_price_list, po_number = p_po, note = p_note where id = p_order;
+  delete from public.order_lines where order_id = p_order;
+  for l in select (e->>'sku_id')::uuid as sku_id, (e->>'qty')::numeric as qty
+    from jsonb_array_elements(p_lines) e loop
+    select pli.unit_price_cents into v_price from public.price_list_items pli
+      join public.skus s on s.id = pli.sku_id and s.brewery_id = pli.brewery_id
+      where pli.brewery_id = o.brewery_id and pli.price_list_id = v_price_list
+        and pli.sku_id = l.sku_id and s.active;
+    if v_price is null then raise exception 'sku is not active and priced for this customer'; end if;
+    insert into public.order_lines (brewery_id, order_id, sku_id, qty_ordered, unit_price_cents)
+      values (o.brewery_id, p_order, l.sku_id, l.qty, v_price);
+  end loop;
+  insert into public.order_events (brewery_id, order_id, actor, event, payload)
+    values (o.brewery_id, p_order, auth.uid(), 'updated', jsonb_build_object('lines', p_lines));
+  return jsonb_build_object('order_id', p_order);
+end $$;
+
+create function portal_submit_order(p_order uuid) returns jsonb
+language plpgsql set search_path = '' as $$
+declare o public.orders;
+begin
+  if current_setting('request.path', true) <> '/rpc/portal_submit_order' then
+    raise exception 'permission denied for portal_submit_order' using errcode = '42501';
+  end if;
+  select * into o from public.orders
+    where id = p_order and customer_id in (select public.my_customer_ids()) for update;
+  if not found or o.status <> 'draft' then raise exception 'order not found'; end if;
+  update public.orders set status = 'submitted' where id = p_order;
+  insert into public.order_events (brewery_id, order_id, actor, event)
+    values (o.brewery_id, p_order, auth.uid(), 'submitted');
+  return jsonb_build_object('order_id', p_order);
 end $$;
 
 create function create_order(
@@ -1962,6 +2096,13 @@ alter table customer_users enable row level security;
 alter table brewery_counters enable row level security;   -- no policies: only via next_no()
 
 create policy staff_read on breweries for select using (is_staff_of(id));
+-- Portal RPCs are security invokers, so customers may read only their
+-- brewery's configured source while the mutation itself stays RLS-constrained.
+create policy customer_read_portal_config on breweries for select
+  using (id in (select c.brewery_id from public.customers c where c.id in (select public.my_customer_ids())));
+create policy breweries_set_portal_fulfillment_source on breweries for update
+  using (public.is_authorized_staff_rpc(id, 'set_portal_fulfillment_source', array['admin']::public.staff_role[]))
+  with check (public.is_authorized_staff_rpc(id, 'set_portal_fulfillment_source', array['admin']::public.staff_role[]));
 create policy member_read on brewery_users for select using (user_id = auth.uid() or is_staff_of(brewery_id));
 create policy self_read on customer_users for select using (user_id = auth.uid());
 
@@ -1974,19 +2115,43 @@ create policy customer_read on skus for select
   using (active and brewery_id in (select c.brewery_id from customers c where c.id in (select my_customer_ids())));
 create policy customer_own_prices on price_list_items for select
   using (price_list_id in (select c.price_list_id from customers c where c.id in (select my_customer_ids())));
+create policy customer_read_portal_source on locations for select
+  using (
+    id in (
+      select b.portal_fulfillment_location_id from public.breweries b
+      where b.id = locations.brewery_id
+    )
+  );
 create policy customer_read on orders for select using (customer_id in (select my_customer_ids()));
-create policy customer_insert on orders for insert
-  with check (customer_id in (select my_customer_ids()) and kind = 'wholesale' and status in ('draft','submitted'));
--- A submitted order is locked from customer edits (spec decision 2): only the
--- draft->submitted transition remains writable for the portal.
-create policy customer_update on orders for update
-  using (customer_id in (select my_customer_ids()) and status = 'draft')
-  with check (customer_id in (select my_customer_ids()) and kind = 'wholesale' and status in ('draft','submitted'));
 create policy customer_read on order_lines for select
-  using (order_id in (select id from orders where customer_id in (select my_customer_ids())));
-create policy customer_write on order_lines for all
-  using (order_id in (select id from orders where customer_id in (select my_customer_ids()) and status = 'draft'))
-  with check (order_id in (select id from orders where customer_id in (select my_customer_ids()) and status = 'draft'));
+  using (order_id in (select id from public.orders where customer_id in (select public.my_customer_ids())));
+-- Raw customer DML remains denied: these predicates are true only inside the
+-- named portal RPC request and only for the caller's own wholesale order.
+create policy orders_portal_create on orders for insert
+  with check (
+    current_setting('request.path', true) = '/rpc/portal_create_order'
+    and customer_id in (select public.my_customer_ids())
+    and kind = 'wholesale' and status = 'draft' and created_by = auth.uid()
+  );
+create policy orders_portal_update on orders for update
+  using (
+    current_setting('request.path', true) in ('/rpc/portal_update_draft_order', '/rpc/portal_submit_order')
+    and customer_id in (select public.my_customer_ids())
+  )
+  with check (
+    current_setting('request.path', true) in ('/rpc/portal_update_draft_order', '/rpc/portal_submit_order')
+    and customer_id in (select public.my_customer_ids()) and kind = 'wholesale'
+  );
+create policy order_lines_portal_insert on order_lines for insert
+  with check (
+    current_setting('request.path', true) in ('/rpc/portal_create_order', '/rpc/portal_update_draft_order')
+    and order_id in (select id from public.orders where customer_id in (select public.my_customer_ids()) and status = 'draft')
+  );
+create policy order_lines_portal_delete on order_lines for delete
+  using (
+    current_setting('request.path', true) = '/rpc/portal_update_draft_order'
+    and order_id in (select id from public.orders where customer_id in (select public.my_customer_ids()) and status = 'draft')
+  );
 create policy customer_read on shipments for select
   using (order_id in (select id from orders where customer_id in (select my_customer_ids())));
 create policy customer_read on invoices for select using (customer_id in (select my_customer_ids()));
@@ -1997,17 +2162,12 @@ create policy customer_read on deliveries for select
 create policy staff_read on order_events for select using (public.is_staff_of(brewery_id));
 create policy customer_read on order_events for select
   using (order_id in (select id from orders where customer_id in (select my_customer_ids())));
--- Portal users write events only through their own lifecycle transitions
--- (create/update/submit on their own draft/submitted orders).
-create policy customer_insert on order_events for insert
-  with check (actor = auth.uid() and order_id in
-    (select id from orders where customer_id in (select my_customer_ids()) and status in ('draft','submitted')));
-
--- Customer portal needs the brewery's warehouse location(s) to place orders
--- (portal_create_order looks up the default warehouse); nothing else on
--- locations is exposed to customers.
-create policy customer_read on locations for select
-  using (kind = 'warehouse' and brewery_id in (select c.brewery_id from customers c where c.id in (select my_customer_ids())));
+create policy order_events_portal_insert on order_events for insert
+  with check (
+    current_setting('request.path', true) in ('/rpc/portal_create_order', '/rpc/portal_update_draft_order', '/rpc/portal_submit_order')
+    and actor = auth.uid()
+    and order_id in (select id from public.orders where customer_id in (select public.my_customer_ids()))
+  );
 
 -- Staff command writes: every predicate requires both the exact RPC request
 -- path and the registered staff role. A matching table privilege alone cannot
@@ -2200,7 +2360,7 @@ grant select on all tables in schema public to authenticated;
 grant insert on allocations, customers, inventory_movements, invoice_lines, invoices, locations, order_events,
   order_lines, orders, price_list_items, price_lists, products, ship_tos, shipments, skus, taproom_pars
   to authenticated;
-grant update on allocations, customers, order_lines, orders, price_list_items, price_lists, ship_tos, taproom_pars
+grant update on allocations, breweries, customers, order_lines, orders, price_list_items, price_lists, ship_tos, taproom_pars
   to authenticated;
 grant delete on order_lines to authenticated;
 
@@ -2240,6 +2400,10 @@ grant execute on function
   record_movement(uuid, uuid, uuid, numeric, public.movement_type, public.sale_channel, text, text),
   set_taproom_par(uuid, uuid, uuid, numeric),
   order_line_price(uuid, uuid, uuid),
+  set_portal_fulfillment_source(uuid, uuid),
+  portal_create_order(uuid, text, text, jsonb),
+  portal_update_draft_order(uuid, uuid, text, text, jsonb),
+  portal_submit_order(uuid),
   create_order(uuid, public.order_kind, uuid, uuid, uuid, uuid, date, text, text, jsonb),
   lock_order(uuid, public.order_status[]),
   update_draft_order(uuid, uuid, date, text, text, jsonb),

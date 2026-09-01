@@ -212,23 +212,26 @@ order's customer), `from_location_id → locations not null` (where removals pos
   `kind='taproom_transfer'` ⇒ `to_location_id not null and customer_id, ship_to_id null`.
 - unique `(brewery_id, order_no)`. idx `(brewery_id, status, requested_ship_date)`,
   `(customer_id, created_at desc)`.
-- RLS: `staff_all`; `P-customer` select; `customer_insert`/`customer_update` restricted to
-  `kind='wholesale' and status in ('draft','submitted')` (portal creates up to submitted).
+- RLS: staff lifecycle paths and customer reads remain separate. Customer writes
+  are possible only inside the exact `portal_*` RPC request paths and only on
+  the caller's own wholesale order; raw Data API DML is denied.
 
-**SCHEMA/RLS-GATE — portal fulfillment source:** `from_location_id` is required,
-but the baseline defines neither a customer-visible allowed/default order source
-nor a portal-safe read for locations. Staff order entry must choose a source.
-Before `submit_order` is exposed to customers, define a brewery-configured source
-contract and narrow RLS/read path, then require the submitted source to belong to
-that allowlist. Do not infer the first warehouse or bypass RLS with a service role.
+**Portal fulfillment source:** `breweries.portal_fulfillment_location_id` is a
+brewery-scoped `(location_id, brewery_id)` FK. Admin-only
+`set_portal_fulfillment_source` accepts only a same-brewery warehouse.
+`portal_create_order` and `portal_update_draft_order` derive that source at
+execution time and fail closed when it is unset or invalid; they never choose a
+first warehouse. The portal source is the only location row customers may read
+to support these security-invoker RPCs.
 
 ### `order_lines`
 `order_id → orders, sku_id → skus, qty_ordered numeric > 0, qty_picked numeric >= 0,
 qty_shipped numeric >= 0 check (<= qty_ordered), unit_price_cents int >= 0` (snapshot),
-`short_reason text`. unique `(order_id, sku_id)`. idx `(sku_id)`. RLS: `staff_all`;
-`P-customer` via `order_id in (orders the customer may see)`, insert/update only while the
-parent order is `draft/submitted`. Remainder after ship is always cancelled (decision):
-no backorder columns.
+`short_reason text`. unique `(order_id, sku_id)`. idx `(sku_id)`. RLS:
+`P-customer` read via `order_id in (orders the customer may see)`; customer
+line replacement is limited to the exact `portal_create_order` and
+`portal_update_draft_order` RPC paths on a draft order. Remainder after ship is
+always cancelled (decision): no backorder columns.
 
 ### `shipments`
 `order_id → orders unique` (one shipment per order; short-ship cancels the remainder),
