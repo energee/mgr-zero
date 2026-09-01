@@ -1,11 +1,12 @@
-// tests/helpers.ts — creates tenants/users via admin client; returns RLS-bound clients per user.
+// tests/helpers.ts — creates tenants/users via admin credentials; returns RLS-bound clients per user.
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { publicEnv } from "@/lib/env/public";
+import { readServerEnv } from "@/lib/env/server-parser";
 
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54341";
-const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-export const admin = createClient(URL, SERVICE, { auth: { persistSession: false } });
+const serverEnv = readServerEnv();
+export const admin = createClient(serverEnv.supabaseUrl, serverEnv.supabaseSecretKey, {
+  auth: { persistSession: false },
+});
 
 export async function makeBrewery(name = `b-${crypto.randomUUID().slice(0, 8)}`) {
   const { data, error } = await admin.from("breweries").insert({ name }).select().single();
@@ -35,7 +36,9 @@ export async function makeCustomerUser(customerId: string) {
 }
 
 export async function asUser(email: string): Promise<SupabaseClient> {
-  const c = createClient(URL, ANON, { auth: { persistSession: false } });
+  const c = createClient(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
+    auth: { persistSession: false },
+  });
   const { error } = await c.auth.signInWithPassword({ email, password: "test-password-1" });
   if (error) throw error;
   return c;

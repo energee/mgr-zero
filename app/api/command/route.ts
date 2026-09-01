@@ -3,7 +3,7 @@
 // server-generated correlation ID. Task 12 will sanitize unexpected errors.
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { buildContext, buildContextFromBearer } from "@/lib/commands/context";
+import { buildContextFromBearer, buildRouteContext } from "@/lib/commands/context";
 import {
   type CommandExecution,
   type CommandFailure,
@@ -65,7 +65,7 @@ export async function POST(req: Request) {
 
     const token = bearerToken(req);
     const ctx = token === null
-      ? await buildContext(body.breweryId)
+      ? await buildRouteContext(body.breweryId)
       : await buildContextFromBearer(body.breweryId, token);
     const response: CommandSuccess<unknown> = {
       ok: true,

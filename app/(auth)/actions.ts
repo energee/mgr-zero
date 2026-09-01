@@ -1,12 +1,10 @@
-// app/(auth)/actions.ts — the login server action, plus sign-out. Deliberately
-// NOT commands: no session exists yet (login) or none should remain
-// (logout), so the command endpoint's membership-based Ctx can't be built.
-// login is the one server-action mutation with errors traveling via a query
-// param instead of inline state. After sign-in, staff (brewery_users row)
-// land on "/"; portal-only accounts (customer_users row, no brewery_users
-// row) land on "/portal".
+// app/(auth)/actions.ts — login and logout stay outside the membership-based
+// command endpoint. Login reuses the newly signed-in client for its one
+// post-login identity and membership composition.
 "use server";
+
 import { redirect } from "next/navigation";
+import { createRequestAuthContext } from "@/lib/auth/request-context";
 import { createServerClient } from "@/lib/supabase/server";
 
 export async function login(form: FormData) {
@@ -16,12 +14,11 @@ export async function login(form: FormData) {
     password: String(form.get("password")),
   });
   if (error) redirect("/login?error=1");
-  const { data: { user } } = await db.auth.getUser();
-  const { count: staffCount } = await db.from("brewery_users").select("*", { count: "exact", head: true }).eq("user_id", user!.id);
-  if (!staffCount) {
-    const { count: customerCount } = await db.from("customer_users").select("*", { count: "exact", head: true }).eq("user_id", user!.id);
-    if (customerCount) redirect("/portal");
-  }
+
+  const auth = createRequestAuthContext(() => Promise.resolve(db));
+  if (!(await auth.getIdentity())) redirect("/login?error=1");
+  if ((await auth.getStaffMemberships()).length) redirect("/");
+  if ((await auth.getCustomerMemberships()).length) redirect("/portal");
   redirect("/");
 }
 

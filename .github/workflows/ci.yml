@@ -44,17 +44,12 @@ jobs:
       # there is no separate `db reset` step here.
       - run: supabase start -x studio,imgproxy,logflare,vector,edge-runtime,realtime,storage-api,supavisor,postgres-meta
       - name: Env from local stack
-        # `supabase status -o env` prints KEY="value" lines. Grep the three
-        # keys the app/tests need, then strip the surrounding quotes before
-        # appending to $GITHUB_ENV (GITHUB_ENV does no shell-quote parsing —
-        # a literal quote in the value would end up baked into the secret).
+        # The app accepts modern Supabase names only. The mapping script keeps
+        # local CLI output compatible without reintroducing runtime fallbacks.
         run: |
-          supabase status -o env | grep -E '^(ANON_KEY|SERVICE_ROLE_KEY|API_URL)=' | sed 's/"//g' >> "$GITHUB_ENV"
+          supabase status -o env | node scripts/supabase-env.mjs >> "$GITHUB_ENV"
+          echo "COMMAND_RATE_LIMIT_HMAC_SECRET=ci-command-rate-limit-hmac-secret-that-is-long-enough" >> "$GITHUB_ENV"
       - run: npx vitest run
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ env.API_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ env.SERVICE_ROLE_KEY }}
       - run: npm run lint
       - run: npx tsc --noEmit
       - run: npm run build

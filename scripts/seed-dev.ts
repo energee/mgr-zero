@@ -3,11 +3,12 @@
 // Creates "Demo Brewing" brewery and dev@mgr.local / password "dev-password-1" admin user.
 // NOTE: password "dev-password-1" is intentionally dev-only; use only in local development.
 import { createClient } from "@supabase/supabase-js";
+import { readServerEnv } from "@/lib/env/server-parser";
 
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54341";
-const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-const admin = createClient(URL, SERVICE, { auth: { persistSession: false } });
+const serverEnv = readServerEnv();
+const admin = createClient(serverEnv.supabaseUrl, serverEnv.supabaseSecretKey, {
+  auth: { persistSession: false },
+});
 
 async function seed() {
   try {

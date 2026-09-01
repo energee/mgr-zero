@@ -9,7 +9,7 @@ import { POST } from "@/app/api/command/route";
 import { makeBrewery, makeStaff } from "./helpers";
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54341";
-const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const ANON = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
 
 async function signIn(email: string) {
   const c = createClient(URL, ANON, { auth: { persistSession: false } });
@@ -28,7 +28,7 @@ describe("POST /api/command bearer auth", () => {
   let breweryId: string;
   let adminToken: string;
   let warehouseToken: string;
-  const executionHandler = vi.fn(async (_ctx: Ctx, _input: {}, execution: CommandExecution) => execution);
+  const executionHandler = vi.fn(async (_ctx: Ctx, _input: Record<string, never>, execution: CommandExecution) => execution);
 
   beforeAll(async () => {
     breweryId = (await makeBrewery()).id;
