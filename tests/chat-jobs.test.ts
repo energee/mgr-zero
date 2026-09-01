@@ -46,13 +46,13 @@ async function linkWithDm(ctx: Ctx, externalUserId: string) {
   return ins("notification_destinations", { brewery_id: b.id, installation_id: inst.id, kind: "personal", external_destination_id: `D-${externalUserId}`, user_id: ctx.userId, privacy_class: "direct" });
 }
 async function submittedOrder() {
-  const { data, error } = await adminCtx.db.rpc("create_order", {
+  const { data, error } = await adminCtx.db.rpc("create_order", { p_request_id: crypto.randomUUID(),
     p_brewery: b.id, p_kind: "wholesale", p_customer: customerId, p_ship_to: shipToId,
     p_from_location: whId, p_to_location: null, p_requested: "2026-09-05", p_po: null, p_note: null, p_lines: [{ sku_id: skuId, qty: 1 }],
   });
   if (error) throw error;
   const id = (data as { order_id: string }).order_id;
-  await adminCtx.db.rpc("submit_order", { p_order: id });
+  await adminCtx.db.rpc("submit_order", { p_request_id: crypto.randomUUID(), p_order: id });
   return id;
 }
 const deliveriesOf = async (orderId: string) => {
@@ -142,7 +142,7 @@ describe("delivery batch", () => {
     await deliver();
     const [sent] = await deliveriesOf(id);
     await admin.from("notification_deliveries").update({ state: "queued", provider_message_id: null, provider_conversation_id: null, sent_at: null }).eq("id", (await deliveriesOf(id))[1].id); // simulate one never sent
-    await adminCtx.db.rpc("cancel_order", { p_order: id, p_reason: "test" });
+    await adminCtx.db.rpc("cancel_order", { p_request_id: crypto.randomUUID(), p_order: id, p_reason: "test" });
     await runChatScan({ now: new Date(NOW), db: admin });
     const rows = await deliveriesOf(id);
     expect(rows.find((d) => d.id === sent.id)!.state).toBe("queued"); // queued for its resolved update

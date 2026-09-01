@@ -30,7 +30,7 @@ import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { loadEnv } from "vite";
 
 // agent-browser doesn't read .env.local itself; reuse the same loader
-// vitest.config.ts uses so tests-e2e's seeding via tests/helpers.ts sees
+// vitest.config.mts uses so tests-e2e's seeding via tests/helpers.ts sees
 // NEXT_PUBLIC_SUPABASE_URL etc., and so the spawned `next dev` inherits it.
 Object.assign(process.env, loadEnv("", process.cwd(), ""));
 

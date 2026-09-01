@@ -37,7 +37,7 @@ describe("invitations (blocked)", () => {
   });
 
   it("list_team_members still works", async () => {
-    const members = await runCommand("list_team_members", {}, adminCtx);
-    expect(members.some((m: any) => m.role === "admin")).toBe(true);
+    const members = await runCommand("list_team_members", {}, adminCtx) as { role: string }[];
+    expect(members.some(m => m.role === "admin")).toBe(true);
   });
 });

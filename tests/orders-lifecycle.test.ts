@@ -37,6 +37,7 @@ async function createOrder(qty = 10) {
     p_brewery: b.id, p_kind: "wholesale", p_customer: customerId, p_ship_to: shipToId,
     p_from_location: whId, p_to_location: null, p_requested: "2026-09-05", p_po: null, p_note: null,
     p_lines: [{ sku_id: skuId, qty }],
+    p_request_id: crypto.randomUUID(),
   });
   expect(error).toBeNull();
   return (data as { order_id: string }).order_id;
@@ -52,8 +53,8 @@ describe("order lifecycle", () => {
   });
   it("confirm creates allocations and returns no warning when ATP covers it", async () => {
     const id = await createOrder(10);
-    await staffDb.rpc("submit_order", { p_order: id });
-    const { data, error } = await staffDb.rpc("confirm_order", { p_order: id });
+    await staffDb.rpc("submit_order", { p_order: id, p_request_id: crypto.randomUUID() });
+    const { data, error } = await staffDb.rpc("confirm_order", { p_order: id, p_request_id: crypto.randomUUID() });
     expect(error).toBeNull();
     expect((data as { warnings: unknown[] }).warnings).toEqual([]);
     const { data: allocs } = await admin.from("allocations").select().eq("brewery_id", b.id).eq("status", "open");
@@ -61,8 +62,8 @@ describe("order lifecycle", () => {
   });
   it("confirm warns (but does not block) when overselling", async () => {
     const id = await createOrder(500);
-    await staffDb.rpc("submit_order", { p_order: id });
-    const { data, error } = await staffDb.rpc("confirm_order", { p_order: id });
+    await staffDb.rpc("submit_order", { p_order: id, p_request_id: crypto.randomUUID() });
+    const { data, error } = await staffDb.rpc("confirm_order", { p_order: id, p_request_id: crypto.randomUUID() });
     expect(error).toBeNull();
     const warnings = (data as { warnings: { sku_id: string; atp: number }[] }).warnings;
     expect(warnings.length).toBe(1);
@@ -70,15 +71,15 @@ describe("order lifecycle", () => {
   });
   it("adjust re-syncs allocations; cancel releases them", async () => {
     const id = await createOrder(10);
-    await staffDb.rpc("submit_order", { p_order: id });
-    await staffDb.rpc("confirm_order", { p_order: id });
-    const { error: adjErr } = await staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 4 }], p_reason: "short week" });
+    await staffDb.rpc("submit_order", { p_order: id, p_request_id: crypto.randomUUID() });
+    await staffDb.rpc("confirm_order", { p_order: id, p_request_id: crypto.randomUUID() });
+    const { error: adjErr } = await staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 4 }], p_reason: "short week", p_request_id: crypto.randomUUID() });
     expect(adjErr).toBeNull();
     const { data: line } = await admin.from("order_lines").select().eq("order_id", id).single();
     expect(Number(line!.qty_ordered)).toBe(4);
     const { data: alloc } = await admin.from("allocations").select().eq("ref", line!.id).eq("status", "open").single();
     expect(Number(alloc!.qty)).toBe(4);
-    await staffDb.rpc("cancel_order", { p_order: id, p_reason: "closed" });
+    await staffDb.rpc("cancel_order", { p_order: id, p_reason: "closed", p_request_id: crypto.randomUUID() });
     const { data: released } = await admin.from("allocations").select().eq("ref", line!.id).single();
     expect(released!.status).toBe("released");
     const { data: o } = await admin.from("orders").select("status").eq("id", id).single();
@@ -94,6 +95,7 @@ describe("order lifecycle", () => {
       p_po: "PO-123",
       p_note: null,
       p_lines: [{ sku_id: skuId, qty: 7 }],
+      p_request_id: crypto.randomUUID(),
     });
     expect(updErr).toBeNull();
     // Assert line qty_ordered is 7 with price re-snapshotted (12000)
@@ -109,7 +111,7 @@ describe("order lifecycle", () => {
   });
   it("update_draft_order rejects when order is submitted", async () => {
     const id = await createOrder(10);
-    await staffDb.rpc("submit_order", { p_order: id });
+    await staffDb.rpc("submit_order", { p_order: id, p_request_id: crypto.randomUUID() });
     const { error } = await staffDb.rpc("update_draft_order", {
       p_order: id,
       p_ship_to: null,
@@ -117,12 +119,13 @@ describe("order lifecycle", () => {
       p_po: "PO-456",
       p_note: null,
       p_lines: [{ sku_id: skuId, qty: 5 }],
+      p_request_id: crypto.randomUUID(),
     });
     expect(error!.message).toMatch(/order is/);
   });
   it("rejects wrong-status transitions", async () => {
     const id = await createOrder();
-    const { error } = await staffDb.rpc("confirm_order", { p_order: id }); // still draft
+    const { error } = await staffDb.rpc("confirm_order", { p_order: id, p_request_id: crypto.randomUUID() }); // still draft
     expect(error!.message).toMatch(/draft/);
   });
 });

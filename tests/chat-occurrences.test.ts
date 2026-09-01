@@ -23,7 +23,7 @@ async function linkWithDm(ctx: Ctx) {
 }
 
 async function createOrder(requested = "2026-09-05") {
-  const { data, error } = await adminCtx.db.rpc("create_order", {
+  const { data, error } = await adminCtx.db.rpc("create_order", { p_request_id: crypto.randomUUID(),
     p_brewery: b.id, p_kind: "wholesale", p_customer: customerId, p_ship_to: shipToId,
     p_from_location: whId, p_to_location: null, p_requested: requested, p_po: null, p_note: null, p_lines: [{ sku_id: skuId, qty: 1 }],
   });
@@ -65,7 +65,7 @@ describe("notification occurrences", () => {
   it("submit_order records the submitted_order occurrence in the same transaction and the scan cannot duplicate it", async () => {
     const id = await createOrder();
     expect(await occurrences(id)).toEqual([]);
-    await adminCtx.db.rpc("submit_order", { p_order: id });
+    await adminCtx.db.rpc("submit_order", { p_request_id: crypto.randomUUID(), p_order: id });
     const [occ] = await occurrences(id);
     expect(occ).toMatchObject({ reason: "submitted_order", subject_type: "order", state: "active", owner_query: "orders", urgency: "attention" });
     expect(occ.semantic_key).toBe(`submitted_order:${id}:${occ.source_version}`);
@@ -82,7 +82,7 @@ describe("notification occurrences", () => {
 
   it("fans out personal deliveries to linked, unmuted recipients whose role matches (admin always)", async () => {
     const id = await createOrder();
-    await adminCtx.db.rpc("submit_order", { p_order: id });
+    await adminCtx.db.rpc("submit_order", { p_request_id: crypto.randomUUID(), p_order: id });
     await scan();
     const [occ] = await occurrences(id);
     const rows = await deliveriesFor(occ.id);
@@ -94,9 +94,9 @@ describe("notification occurrences", () => {
 
   it("transitions submitted → pick due on confirm and resolves the stale occurrence, suppressing its queued deliveries", async () => {
     const id = await createOrder("2026-09-05");
-    await adminCtx.db.rpc("submit_order", { p_order: id });
+    await adminCtx.db.rpc("submit_order", { p_request_id: crypto.randomUUID(), p_order: id });
     await scan("2026-09-05T14:00:00Z");
-    await adminCtx.db.rpc("confirm_order", { p_order: id });
+    await adminCtx.db.rpc("confirm_order", { p_request_id: crypto.randomUUID(), p_order: id });
     const result = await scan("2026-09-05T15:00:00Z");
     const occs = await occurrences(id);
     expect(occs.map((o) => [o.reason, o.state])).toEqual([["submitted_order", "resolved"], ["pick_due", "active"]]);
@@ -108,11 +108,11 @@ describe("notification occurrences", () => {
 
   it("re-queues sent deliveries once for a resolved update, keeping the message id", async () => {
     const id = await createOrder();
-    await adminCtx.db.rpc("submit_order", { p_order: id });
+    await adminCtx.db.rpc("submit_order", { p_request_id: crypto.randomUUID(), p_order: id });
     const [occ] = await occurrences(id);
     const [delivery] = await deliveriesFor(occ.id);
     await admin.from("notification_deliveries").update({ state: "sent", sent_at: new Date().toISOString(), provider_message_id: "m1" }).eq("id", delivery.id);
-    await adminCtx.db.rpc("cancel_order", { p_order: id, p_reason: "test" });
+    await adminCtx.db.rpc("cancel_order", { p_request_id: crypto.randomUUID(), p_order: id, p_reason: "test" });
     await scan();
     const after = (await admin.from("notification_deliveries").select().eq("id", delivery.id).single()).data!;
     expect(after.state).toBe("queued");

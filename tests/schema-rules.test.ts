@@ -7,8 +7,10 @@ import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
 
 const DB = process.env.DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:54342/postgres";
-const sql = (q: string) =>
-  execFileSync("psql", [DB, "-Atc", q], { encoding: "utf8" }).trim().split("\n").filter(Boolean);
+function sql(q: string, quiet = false): string[] {
+  const args = quiet ? [DB, "-Atq", "-c", q] : [DB, "-Atc", q];
+  return execFileSync("psql", args, { encoding: "utf8" }).trim().split("\n").filter(Boolean);
+}
 
 describe("schema rules", () => {
   it("every public table has RLS enabled", () => {
@@ -52,180 +54,50 @@ describe("schema rules", () => {
       order by 1`)).toEqual([]);
   });
 
-  it("pins the public schema and relation ACL matrix", () => {
+  it("application roles cannot execute private functions", () => {
     expect(sql(`
-      with domain_relations as (
-        select c.oid, c.relname, c.relkind
-        from pg_class c
-        where c.relnamespace = 'public'::regnamespace
-          and c.relkind in ('r', 'v', 'S')
-          and not exists (select 1 from pg_depend d where d.objid = c.oid and d.deptype = 'e')
-      ),
-      role_privileges as (
-        select role, relname, privilege
-        from domain_relations
-        cross join (values ('anon'::name), ('authenticated'::name), ('service_role'::name)) roles(role)
-        cross join lateral (
-          values
-            ('SELECT', case when relkind in ('r', 'v') then has_table_privilege(role, oid, 'select') else has_sequence_privilege(role, oid, 'select') end),
-            ('INSERT', case when relkind in ('r', 'v') then has_table_privilege(role, oid, 'insert') else false end),
-            ('UPDATE', case when relkind in ('r', 'v') then has_table_privilege(role, oid, 'update') else has_sequence_privilege(role, oid, 'update') end),
-            ('DELETE', case when relkind in ('r', 'v') then has_table_privilege(role, oid, 'delete') else false end),
-            ('TRUNCATE', case when relkind in ('r', 'v') then has_table_privilege(role, oid, 'truncate') else false end),
-            ('REFERENCES', case when relkind in ('r', 'v') then has_table_privilege(role, oid, 'references') else false end),
-            ('TRIGGER', case when relkind in ('r', 'v') then has_table_privilege(role, oid, 'trigger') else false end),
-            ('MAINTAIN', case when relkind in ('r', 'v') then has_table_privilege(role, oid, 'maintain') else false end),
-            ('USAGE', case when relkind = 'S' then has_sequence_privilege(role, oid, 'usage') else false end)
-        ) privileges(privilege, granted)
-        where granted
-      ),
-      expected as (
-        select 'authenticated'::name as role, relname, 'SELECT'::text as privilege
-        from domain_relations where relkind in ('r', 'v')
-          -- chat: installations are column-bounded (no table-level SELECT);
-          -- occurrences, deliveries, receipts and action intents are server-only
-          and relname not in ('chat_installations', 'notification_occurrences', 'notification_deliveries',
-                              'chat_callback_receipts', 'chat_action_intents')
-        union all
-        select 'authenticated'::name, relname, privilege
-        from (values
-          ('allocations', 'INSERT'), ('allocations', 'UPDATE'),
-          ('breweries', 'UPDATE'),
-          ('customers', 'INSERT'), ('customers', 'UPDATE'),
-          ('inventory_movements', 'INSERT'),
-          ('invoice_lines', 'INSERT'), ('invoices', 'INSERT'),
-          ('locations', 'INSERT'),
-          ('order_events', 'INSERT'),
-          ('order_lines', 'DELETE'), ('order_lines', 'INSERT'), ('order_lines', 'UPDATE'),
-          ('orders', 'INSERT'), ('orders', 'UPDATE'),
-          ('price_list_items', 'INSERT'), ('price_list_items', 'UPDATE'),
-          ('price_lists', 'INSERT'), ('price_lists', 'UPDATE'),
-          ('products', 'INSERT'),
-          ('ship_tos', 'INSERT'), ('ship_tos', 'UPDATE'),
-          ('shipments', 'INSERT'),
-          ('skus', 'INSERT'),
-          ('taproom_pars', 'INSERT'), ('taproom_pars', 'UPDATE')
-        ) as dml(relname, privilege)
-        union all
-        select 'service_role'::name, relname, privilege
-        from domain_relations
-        cross join lateral (
-          values
-            ('SELECT', relkind in ('r', 'v', 'S')),
-            ('INSERT', relkind = 'r'),
-            ('UPDATE', relkind in ('r', 'S')),
-            ('DELETE', relkind = 'r'),
-            ('USAGE', relkind = 'S')
-        ) privileges(privilege, granted)
-        where granted
-      )
-      select 'schema:' || role || ':' || privilege
-      from (values
-        ('anon'::name, 'usage', false), ('anon'::name, 'create', false),
-        ('authenticated'::name, 'usage', true), ('authenticated'::name, 'create', false),
-        ('service_role'::name, 'usage', true), ('service_role'::name, 'create', false)
-      ) expected_schema(role, privilege, granted)
-      where has_schema_privilege(role, 'public', privilege) <> granted
-      union all
-      select 'extra:' || role || ':' || relname || ':' || privilege
-      from (select * from role_privileges except select * from expected) extra
-      union all
-      select 'missing:' || role || ':' || relname || ':' || privilege
-      from (select * from expected except select * from role_privileges) missing
-      order by 1
-    `)).toEqual([]);
+      select p.proname
+      from pg_proc p
+      where p.pronamespace = 'private'::regnamespace
+        and (
+          has_function_privilege('anon', p.oid, 'execute')
+          or has_function_privilege('authenticated', p.oid, 'execute')
+        )
+      order by 1`)).toEqual([]);
   });
 
-  it("pins exact public function execute privileges by signature", () => {
+  it("future public and private objects default to no application-role privileges", () => {
     expect(sql(`
-      with domain_functions as (
-        select p.oid, p.oid::regprocedure::text as signature
-        from pg_proc p
-        where p.pronamespace = 'public'::regnamespace and p.prokind = 'f'
-          and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')
-      ),
-      actual as (
-        select role, signature
-        from domain_functions
-        cross join (values ('anon'::name), ('authenticated'::name), ('service_role'::name)) roles(role)
-        where has_function_privilege(role, oid, 'execute')
-      ),
-      expected as (
-        select 'authenticated'::name as role, signature
-        from (values
-          ('my_brewery_ids()'),
-          ('is_staff_of(uuid)'),
-          ('staff_role(uuid)'),
-          ('my_customer_ids()'),
-          ('is_authorized_staff_rpc(uuid,text,staff_role[])'),
-          ('require_authorized_staff_rpc(uuid,text,staff_role[])'),
-          ('create_product(uuid,text,text,numeric)'),
-          ('create_sku(uuid,uuid,text,package_type,integer,numeric)'),
-          ('create_location(uuid,text,location_kind)'),
-          ('upsert_customer(uuid,uuid,text,customer_type,text,uuid,text,text)'),
-          ('upsert_ship_to(uuid,uuid,uuid,text,text,text,text,text,text)'),
-          ('upsert_price_list(uuid,uuid,text)'),
-          ('set_price(uuid,uuid,uuid,integer)'),
-          ('record_movement(uuid,uuid,uuid,numeric,movement_type,sale_channel,text,text)'),
-          ('set_taproom_par(uuid,uuid,uuid,numeric)'),
-          ('order_line_price(uuid,uuid,uuid)'),
-          ('set_portal_fulfillment_source(uuid,uuid)'),
-          ('portal_create_order(uuid,text,text,jsonb)'),
-          ('portal_update_draft_order(uuid,uuid,text,text,jsonb)'),
-          ('portal_submit_order(uuid)'),
-          ('create_order(uuid,order_kind,uuid,uuid,uuid,uuid,date,text,text,jsonb)'),
-          ('lock_order(uuid,order_status[])'),
-          ('update_draft_order(uuid,uuid,date,text,text,jsonb)'),
-          ('submit_order(uuid)'),
-          ('confirm_order(uuid)'),
-          ('adjust_order_lines(uuid,jsonb,text)'),
-          ('cancel_order(uuid,text)'),
-          ('record_pick(uuid,jsonb)'),
-          ('ship_order(uuid,jsonb,text,text)'),
-          ('create_credit_memo(uuid,jsonb,uuid,text)'),
-          ('set_standing_allocation(uuid,uuid,numeric)'),
-          ('create_replenishment_order(uuid,uuid,jsonb)'),
-          ('portal_availability(uuid)'),
-          ('portal_brewery_rows()'),
-          -- chat (admin/self-gated security definer RPCs; see baseline § chat Data API ACLs)
-          ('begin_chat_installation(uuid,text,text,text)'),
-          ('begin_chat_reauthorization(uuid,text,text)'),
-          ('find_chat_oauth_intent(text)'),
-          ('activate_chat_installation(uuid,text,text,text,text,text,text,jsonb)'),
-          ('mark_chat_installation_reauthorization(uuid,text)'),
-          ('disable_chat_installation(uuid)'),
-          ('disconnect_chat_installation(uuid)'),
-          ('reconcile_chat_installation(uuid,boolean,text)'),
-          ('consume_chat_link_proof(text)'),
-          ('unlink_chat_user(uuid)'),
-          ('today_live_reasons()'),
-          ('get_today_items(uuid,timestamp with time zone)'),
-          ('record_submitted_order_occurrence(uuid)'),
-          ('set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text)'),
-          ('set_notification_destination(uuid,text)'),
-          ('set_brewery_quiet_hours(uuid,time without time zone,time without time zone)')
-        ) callable(signature)
-        union all
-        select 'service_role'::name, signature from domain_functions
-      )
-      select 'extra:' || role || ':' || signature
-      from (select * from actual except select * from expected) extra
-      union all
-      select 'missing:' || role || ':' || signature
-      from (select * from expected except select * from actual) missing
-      order by 1
-    `)).toEqual([]);
+      begin;
+      create table public.task3_default_acl_table (id int);
+      create sequence public.task3_default_acl_sequence;
+      create function public.task3_default_acl_function() returns int
+        language sql set search_path = '' as $$ select 1 $$;
+      create function private.task3_default_acl_function() returns int
+        language sql set search_path = '' as $$ select 1 $$;
+      select object_name
+      from (
+        values
+          ('public table', has_table_privilege('anon', 'public.task3_default_acl_table', 'select')
+            or has_table_privilege('authenticated', 'public.task3_default_acl_table', 'select')),
+          ('public sequence', has_sequence_privilege('anon', 'public.task3_default_acl_sequence', 'usage')
+            or has_sequence_privilege('authenticated', 'public.task3_default_acl_sequence', 'usage')),
+          ('public function', has_function_privilege('anon', 'public.task3_default_acl_function()', 'execute')
+            or has_function_privilege('authenticated', 'public.task3_default_acl_function()', 'execute')),
+          ('private function', has_function_privilege('anon', 'private.task3_default_acl_function()', 'execute')
+            or has_function_privilege('authenticated', 'private.task3_default_acl_function()', 'execute'))
+      ) exposed(object_name, allowed)
+      where allowed;
+      rollback;
+    `, true)).toEqual([]);
   });
 
-  it("staff RPC authorization fails closed when PostgREST's request.path GUC is absent", () => {
-    // Every write policy hangs off is_authorized_staff_rpc; a connection that
-    // is not a PostgREST request (no request.path) must be denied, not nulled through.
+  it("service_role retains the explicit membership writes used by invitations", () => {
     expect(sql(`
-      select coalesce(public.is_authorized_staff_rpc(gen_random_uuid(), 'create_product', array['admin']::public.staff_role[])::text, 'null')
-    `)).toEqual(["null"]);
-    expect(() => sql(`
-      select public.require_authorized_staff_rpc(gen_random_uuid(), 'create_product', array['admin']::public.staff_role[])
-    `)).toThrow(/permission denied for create_product/);
+      select relname
+      from (values ('brewery_users'), ('customer_users')) as required(relname)
+      where not has_table_privilege('service_role', 'public.' || relname, 'insert')
+      order by 1`)).toEqual([]);
   });
 
   it("pins customer brewery exposure to portal_brewery columns, not the base table", () => {
@@ -245,7 +117,7 @@ describe("schema rules", () => {
       select polname from pg_policy
       where polrelid = 'public.breweries'::regclass
       order by 1
-    `)).toEqual(["breweries_set_portal_fulfillment_source", "staff_read"]);
+    `)).toEqual(["staff_read"]); // updates only via the definer set_portal_fulfillment_source RPC
     expect(sql(`
       select col_description('public.breweries'::regclass, attnum)
       from pg_attribute
@@ -279,8 +151,9 @@ describe("schema rules", () => {
       from (values
         ('anon'::name, 'usage'::text), ('anon'::name, 'create'),
         ('authenticated'::name, 'usage'), ('authenticated'::name, 'create'),
-        ('service_role'::name, 'usage'), ('service_role'::name, 'create')
+        ('service_role'::name, 'create')
       ) checks(role, privilege)
+      -- service_role holds USAGE on private only for the new_uuid() column default.
       where has_schema_privilege(role, 'private', privilege)
       union all
       select 'table:' || role || ':' || privilege

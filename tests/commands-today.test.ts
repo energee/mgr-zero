@@ -21,19 +21,19 @@ async function ins<T = { id: string }>(table: string, row: Record<string, unknow
 }
 
 async function createOrder(requested: string, submit = false, confirm = false) {
-  const { data, error } = await adminCtx.db.rpc("create_order", {
+  const { data, error } = await adminCtx.db.rpc("create_order", { p_request_id: crypto.randomUUID(),
     p_brewery: b.id, p_kind: "wholesale", p_customer: customerId, p_ship_to: shipToId,
     p_from_location: whId, p_to_location: null, p_requested: requested, p_po: null, p_note: null,
     p_lines: [{ sku_id: skuId, qty: 1 }],
   });
   if (error) throw error;
   const id = (data as { order_id: string }).order_id;
-  if (submit) await adminCtx.db.rpc("submit_order", { p_order: id });
-  if (confirm) await adminCtx.db.rpc("confirm_order", { p_order: id });
+  if (submit) await adminCtx.db.rpc("submit_order", { p_request_id: crypto.randomUUID(), p_order: id });
+  if (confirm) await adminCtx.db.rpc("confirm_order", { p_request_id: crypto.randomUUID(), p_order: id });
   return id;
 }
 
-const today = (ctx: CommandCtx, now: string): Promise<TodayItem[]> => runCommand("get_today", { now }, ctx);
+const today = (ctx: CommandCtx, now: string) => runCommand("get_today", { now }, ctx) as Promise<TodayItem[]>;
 
 beforeAll(async () => {
   b = await makeBrewery();

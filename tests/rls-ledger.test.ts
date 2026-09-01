@@ -1,7 +1,6 @@
 // tests/rls-ledger.test.ts
 import { describe, it, expect, beforeAll } from "vitest";
 import { admin, makeBrewery, makeStaff, asUser } from "./helpers";
-import { runCommand } from "../lib/commands/registry";
 import "../lib/commands/all";
 
 describe("ledger integrity + RLS", () => {
@@ -14,25 +13,28 @@ describe("ledger integrity + RLS", () => {
     ({ data: loc } = await admin.from("locations").insert({ brewery_id: b.id, name: "Main WH", kind: "warehouse" }).select().single());
   });
 
-  it("staff append movements through record_movement; the ledger is append-only", async () => {
+  it("staff cannot write the ledger directly; it is append-only even for service_role", async () => {
     const db = await asUser(staff.email);
-    const m = await runCommand("record_movement", {
-      skuId: sku.id, locationId: loc.id, qty: 10, type: "opening_balance",
-    }, { db, userId: staff.id, breweryId: b.id, role: "warehouse" }) as { id: string };
-    // No UPDATE/DELETE grants: PostgREST returns a permission error (or zero affected rows).
+    const row = { brewery_id: b.id, sku_id: sku.id, location_id: loc.id, qty: 10, bbl: 5, type: "opening_balance", created_by: staff.id } as const;
+    // No INSERT/UPDATE/DELETE grants for app roles: writes go through record_inventory_movement().
+    const direct = await db.from("inventory_movements").insert(row).select().single();
+    expect(direct.error?.code).toBe("42501");
+    const { data: m, error } = await admin.from("inventory_movements").insert(row).select().single();
+    expect(error).toBeNull();
     const upd = await db.from("inventory_movements").update({ qty: 99 }).eq("id", m!.id).select();
-    expect(upd.error !== null || upd.data?.length === 0).toBe(true);
+    expect(upd.error?.code).toBe("42501");
     const del = await db.from("inventory_movements").delete().eq("id", m!.id).select();
-    expect(del.error !== null || del.data?.length === 0).toBe(true);
+    expect(del.error?.code).toBe("42501");
     const { data: still } = await admin.from("inventory_movements").select("qty").eq("id", m!.id).single();
     expect(Number(still!.qty)).toBe(10);
   });
 
   it("sale_removal without dest_state is rejected by CHECK", async () => {
-    const db = await asUser(staff.email);
-    await expect(runCommand("record_movement", {
-      skuId: sku.id, locationId: loc.id, qty: -1, type: "sale_removal", channel: "wholesale",
-    }, { db, userId: staff.id, breweryId: b.id, role: "warehouse" })).rejects.toThrow();
+    const { error } = await admin.from("inventory_movements").insert({
+      brewery_id: b.id, sku_id: sku.id, location_id: loc.id,
+      qty: -1, bbl: -0.5, type: "sale_removal", channel: "wholesale", created_by: staff.id,
+    });
+    expect(error).not.toBeNull();
   });
 
   it("on_hand and atp views sum correctly", async () => {
@@ -44,9 +46,8 @@ describe("ledger integrity + RLS", () => {
     expect(Number(atp![0].qty)).toBe(6);
   });
 
-  it("trigger overwrites bbl for an admin fixture", async () => {
-    // The command RPC never accepts bbl, so the fixture uses admin to isolate
-    // the trigger contract from the command boundary.
+  it("trigger overwrites bbl: client-supplied value is ignored, computed from qty * bbl_per_unit", async () => {
+    // Insert with deliberately wrong bbl (should be 2 * 0.5 = 1, not 999)
     const { data: m, error } = await admin.from("inventory_movements").insert({
       brewery_id: b.id, sku_id: sku.id, location_id: loc.id,
       qty: 2, bbl: 999, type: "production_in", created_by: staff.id,

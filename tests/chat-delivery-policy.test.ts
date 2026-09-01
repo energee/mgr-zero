@@ -20,13 +20,13 @@ async function linkWithDm(ctx: Ctx) {
   return ins("notification_destinations", { brewery_id: b.id, installation_id: inst.id, kind: "personal", external_destination_id: `D-${ctx.userId.slice(0, 8)}`, user_id: ctx.userId, privacy_class: "direct" });
 }
 async function submittedOrder() {
-  const { data, error } = await adminCtx.db.rpc("create_order", {
+  const { data, error } = await adminCtx.db.rpc("create_order", { p_request_id: crypto.randomUUID(),
     p_brewery: b.id, p_kind: "wholesale", p_customer: customerId, p_ship_to: shipToId,
     p_from_location: whId, p_to_location: null, p_requested: "2026-09-05", p_po: null, p_note: null, p_lines: [{ sku_id: skuId, qty: 1 }],
   });
   if (error) throw error;
   const id = (data as { order_id: string }).order_id;
-  await adminCtx.db.rpc("submit_order", { p_order: id });
+  await adminCtx.db.rpc("submit_order", { p_request_id: crypto.randomUUID(), p_order: id });
   return id;
 }
 const scan = async (now: string) => {
@@ -94,7 +94,7 @@ describe("quiet hours", () => {
 describe("operations digest windows", () => {
   it("creates one morning and one midday occurrence per brewery-local day, recovering missed windows, for the private channel only", async () => {
     await expect(runCommand("set_notification_destination", { installationId: inst.id, externalDestinationId: "C-ops" }, sales)).rejects.toThrow(/permission/i);
-    channel = await runCommand("set_notification_destination", { installationId: inst.id, externalDestinationId: "C-ops" }, adminCtx);
+    channel = await runCommand("set_notification_destination", { installationId: inst.id, externalDestinationId: "C-ops" }, adminCtx) as { id: string };
     const digests = async () => (await admin.from("notification_occurrences").select("semantic_key, due_at, state").eq("brewery_id", b.id).eq("reason", "operations_digest").order("semantic_key")).data!;
 
     expect((await scan("2026-09-05T11:00:00Z")).digests).toBe(0); // 07:00 local: nothing yet

@@ -2,6 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Pattern update (2026-09-01 merge of PR #27 into PR #29):** the SQL
+> examples below still show the `security invoker` + `require_authorized_staff_rpc`
+> + `request.path` policy pattern, which no longer exists in the baseline. New
+> writers follow `.agents/ARCHITECTURE.md` iron rule 5 instead: a `security
+> definer` RPC taking `p_request_id`, opening with `private.assert_staff(...)`
+> and `private.claim_command_request(...)`, closing with
+> `private.complete_command_request(...)`, granted explicitly to `authenticated`.
+> The token boundary (`lib/supabase/integration-tokens.ts`) is unchanged.
+
 **Goal:** QuickBooks Online invoices-out / payments-back, and the AI chat composer that turns typed intent into a previewed, explicitly-confirmed registry command.
 
 **Architecture:** QBO is a thin `lib/qbo.ts` fetch wrapper (plain OAuth2, no Intuit SDK) plus registry commands. OAuth tokens never touch a public table: they are written and read only through `lib/supabase/integration-tokens.ts` (`storeIntegrationTokens` / `readIntegrationTokens`), which authorizes the caller with the RLS-bound client before calling the service-only `store_integration_tokens` / `read_integration_tokens` RPCs over `private.integration_tokens`. Every push persists its exact payload + the invoice's `qbo_idempotency_key` in an append-only `qbo_pushes` log before POSTing. All new SQL writers follow the audit-p1-authz pattern: `security invoker set search_path = ''`, first line `perform public.require_authorized_staff_rpc(brewery, '<rpc name>', roles)`, RLS insert/update policies keyed on `is_authorized_staff_rpc`, and explicit grants (the Data API exposes nothing by default). The composer is a registry query (`compose_command`) that gives the LLM only `aiExposed` command schemas; the server canonicalizes candidates through `preview_command`; the UI commits only on an explicit verb click.

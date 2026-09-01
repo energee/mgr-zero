@@ -7,7 +7,7 @@ import { readIntegrationTokens, storeIntegrationTokens } from "@/lib/supabase/in
 import { admin, asUser, makeBrewery, makeCustomerUser, makeStaff } from "./helpers";
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54341";
-const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const ANON = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
 
 const DB = process.env.DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:54342/postgres";
 

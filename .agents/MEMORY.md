@@ -37,14 +37,26 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
   `Authorization: Bearer <access_token>` from password grant against the
   Supabase Auth URL. No resource REST routes, no API keys, until a non-user
   machine client exists.
+- Public-schema table DML is revoked from `anon` and `authenticated`; writes use
+  explicitly granted `security definer` RPCs that derive actor/tenant/role and
+  bind `(actor, requestId)` to brewery, command, canonical payload, and result
+  in `private.command_requests`. Local Supabase disables automatic Data API
+  grants so the baseline ACL is self-contained.
+- Until the durable Task 13 import workflow lands, each import row operation
+  derives a deterministic UUIDv8 from SHA-256 of the complete top-level
+  `requestId`, row number, and operation number. This is replay-safe but not
+  durable job state.
 
 - Staff writes are authorized in SQL, not only in the registry: each mutation
-  RPC is `security invoker`, calls `require_authorized_staff_rpc(brewery, '<rpc>',
-  roles)` first, and the table's insert/update policies admit rows only when
-  `current_setting('request.path') = '/rpc/<rpc>'` for an allowed role. Raw
-  Data API writes therefore affect 0 rows for every browser JWT. New writers
-  must also be pinned in `tests/schema-rules.test.ts` (explicit grants; nothing
-  is auto-exposed).
+  RPC is `security definer`, calls `private.assert_staff(brewery, roles)` (or
+  `private.assert_customer`) first, then claims its `p_request_id` in the
+  ledger. Application roles hold no table DML, so raw Data API writes fail with
+  42501 for every browser JWT. (2026-09-01 merge decision: PR #27's
+  `security invoker` + `require_authorized_staff_rpc` + `request.path`
+  policies were superseded by this model; only its additive work was kept.)
+  New writers must be granted explicitly in the baseline's Data API grants
+  section and pinned in `tests/data-api-boundary.test.ts` /
+  `tests/rls-command-boundary.test.ts` (nothing is auto-exposed).
 - Integration credentials never sit in a public table. `private.integration_tokens`
   is reachable only through `lib/supabase/integration-tokens.ts` (server-only,
   admin/sales, visible-connection check, then service-only RPC that rechecks

@@ -213,24 +213,25 @@ order's customer), `from_location_id → locations not null` (where removals pos
 - unique `(brewery_id, order_no)`. idx `(brewery_id, status, requested_ship_date)`,
   `(customer_id, created_at desc)`.
 - RLS: staff lifecycle paths and customer reads remain separate. Customer writes
-  are possible only inside the exact `portal_*` RPC request paths and only on
-  the caller's own wholesale order; raw Data API DML is denied.
+  happen only inside the definer `portal_create_order` / `update_draft_order` /
+  `submit_order` RPCs, which assert the caller's customer membership and act
+  only on that customer's wholesale order; app roles hold no table DML.
 
 **Portal fulfillment source:** `breweries.portal_fulfillment_location_id` is a
 brewery-scoped `(location_id, brewery_id)` FK. Admin-only
 `set_portal_fulfillment_source` accepts only a same-brewery warehouse.
 `portal_create_order` and `portal_update_draft_order` derive that source at
 execution time and fail closed when it is unset or invalid; they never choose a
-first warehouse. The portal source is the only location row customers may read
-to support these security-invoker RPCs.
+first warehouse. Customers need no direct read of the source location: the
+definer RPC resolves it server-side.
 
 ### `order_lines`
 `order_id → orders, sku_id → skus, qty_ordered numeric > 0, qty_picked numeric >= 0,
 qty_shipped numeric >= 0 check (<= qty_ordered), unit_price_cents int >= 0` (snapshot),
 `short_reason text`. unique `(order_id, sku_id)`. idx `(sku_id)`. RLS:
 `P-customer` read via `order_id in (orders the customer may see)`; customer
-line replacement is limited to the exact `portal_create_order` and
-`portal_update_draft_order` RPC paths on a draft order. Remainder after ship is
+line replacement happens only through the definer portal/draft RPCs on a draft
+order. Remainder after ship is
 always cancelled (decision): no backorder columns.
 
 ### `shipments`

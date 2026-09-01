@@ -89,6 +89,27 @@ describe("portal commands", () => {
     await admin.from("skus").update({ active: true }).eq("id", skuId);
   });
 
+  it("update_draft_order enforces the portal invariants at the RPC, not only in zod", async () => {
+    // PR #29 review: the DB is the write boundary. A customer calling the RPC
+    // directly must not be able to leave a zero-line draft or price an inactive sku.
+    const created = await runCommand("portal_create_order", { shipToId, lines: [{ skuId, qty: 1 }] }, custCtx) as { order_id: string };
+    const empty = await custCtx.db.rpc("update_draft_order", {
+      p_order: created.order_id, p_ship_to: null, p_requested: null, p_po: null, p_note: null,
+      p_lines: [], p_request_id: crypto.randomUUID(),
+    });
+    expect(empty.error?.message).toMatch(/at least one line/);
+    const { data: lines } = await admin.from("order_lines").select("id").eq("order_id", created.order_id);
+    expect(lines).toHaveLength(1);
+
+    await admin.from("skus").update({ active: false }).eq("id", skuId);
+    const inactive = await custCtx.db.rpc("update_draft_order", {
+      p_order: created.order_id, p_ship_to: null, p_requested: null, p_po: null, p_note: null,
+      p_lines: [{ sku_id: skuId, qty: 2 }], p_request_id: crypto.randomUUID(),
+    });
+    await admin.from("skus").update({ active: true }).eq("id", skuId);
+    expect(inactive.error?.message).toMatch(/not active and priced/);
+  });
+
   it("ignores any client-supplied price: the line price is always the list price", async () => {
     const created = await runCommand("portal_create_order", {
       shipToId, lines: [{ skuId, qty: 1, unitPriceCents: 1 } as unknown as { skuId: string; qty: number }],
@@ -133,6 +154,31 @@ describe("portal commands", () => {
 
   it("staff-only commands reject a customer ctx", async () => {
     await expect(runCommand("list_orders", {}, custCtx)).rejects.toThrow(/permission denied/);
+  });
+
+  it("replays an identical portal order without re-running it", async () => {
+    const input = {
+      shipToId,
+      poNumber: `replay-${crypto.randomUUID()}`,
+      lines: [{ skuId, qty: 1 }],
+    };
+    const execution = {
+      requestId: crypto.randomUUID(),
+      correlationId: crypto.randomUUID(),
+    };
+    const first = await runCommand("portal_create_order", input, custCtx, execution) as { order_id: string };
+
+    await admin.from("locations").insert({
+      id: "00000000-0000-4000-8000-000000000000",
+      brewery_id: b.id,
+      name: "Earlier warehouse",
+      kind: "warehouse",
+    });
+    const replay = await runCommand("portal_create_order", input, custCtx, execution);
+
+    expect(replay).toEqual(first);
+    const orders = await admin.from("orders").select("id").eq("id", first.order_id);
+    expect(orders.data).toHaveLength(1);
   });
 
   it("uses the configured warehouse rather than an arbitrary warehouse", async () => {

@@ -1,43 +1,86 @@
-// lib/commands/context.ts — resolves the caller's membership into a Ctx. Throws if not a member.
-// Wrapped in React.cache so a layout, a page and its queries within one request
-// share a single membership lookup instead of each re-running it.
+// lib/commands/context.ts — resolves a command caller's verified identity and brewery membership.
 import { cache } from "react";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { createServerClient } from "@/lib/supabase/server";
+import {
+  createRequestAuthContext,
+  getRequestAuthContext,
+  type RequestAuthContext,
+} from "@/lib/auth/request-context";
+import { publicEnv } from "@/lib/env/public";
 import { CommandError } from "./registry";
 import type { Ctx } from "./registry";
 
-async function ctxFor(db: SupabaseClient, userId: string, breweryId: string): Promise<Ctx> {
-  const { data: staff } = await db.from("brewery_users").select("role").eq("brewery_id", breweryId).eq("user_id", userId).maybeSingle();
+async function ctxForBearer(db: SupabaseClient, userId: string, breweryId: string): Promise<Ctx> {
+  const { data: staff } = await db
+    .from("brewery_users")
+    .select("role")
+    .eq("brewery_id", breweryId)
+    .eq("user_id", userId)
+    .maybeSingle();
   if (staff) return { db, userId, breweryId, role: staff.role };
-  const { data: cust } = await db
+
+  const { data: customer } = await db
     .from("customer_users")
     .select("customer_id, customers!inner(brewery_id)")
     .eq("user_id", userId)
     .eq("customers.brewery_id", breweryId)
     .limit(1);
-  if (cust?.length) return { db, userId, breweryId, role: "customer", customerId: cust[0].customer_id };
-  throw new CommandError("not a member of this brewery", 403);
+  if (customer?.length) {
+    return { db, userId, breweryId, role: "customer", customerId: customer[0].customer_id };
+  }
+
+  throw new CommandError("not a member of this brewery", 403, "not_member");
 }
 
-export const buildContext = cache(async (breweryId: string): Promise<Ctx> => {
-  const db = await createServerClient();
-  const { data: { user } } = await db.auth.getUser();
-  if (!user) throw new CommandError("unauthenticated", 401);
-  return ctxFor(db, user.id, breweryId);
-});
+async function buildCookieContext(breweryId: string, request: RequestAuthContext): Promise<Ctx> {
+  const identity = await request.getIdentity();
+  if (!identity) throw new CommandError("unauthenticated", 401, "unauthenticated");
 
-// API clients send a Supabase access token; Auth validates it (revoked/expired
-// fail), then the same membership lookup runs under that JWT so RLS still binds.
+  const db = await request.getSupabaseClient();
+  const staff = await request.getStaffMembership(breweryId);
+  if (staff) return { db, userId: identity.userId, breweryId, role: staff.role };
+
+  const customer = await request.getCustomerMembership(breweryId);
+  if (customer) {
+    return {
+      db,
+      userId: identity.userId,
+      breweryId,
+      role: "customer",
+      customerId: customer.customerId,
+    };
+  }
+
+  throw new CommandError("not a member of this brewery", 403, "not_member");
+}
+
+// Server Components share React's request cache through the RSC composition.
+export const buildContext = cache(async (breweryId: string): Promise<Ctx> =>
+  buildCookieContext(breweryId, getRequestAuthContext())
+);
+
+// Route handlers have no React Server Component cache, so compose explicitly.
+export async function buildRouteContext(breweryId: string): Promise<Ctx> {
+  return buildCookieContext(breweryId, createRequestAuthContext());
+}
+
+// API clients supply a bearer token. Its validation and RLS-bound client are
+// intentionally explicit rather than sharing cookie-scoped request state.
 export async function buildContextFromBearer(breweryId: string, accessToken: string): Promise<Ctx> {
-  if (!accessToken) throw new CommandError("unauthenticated", 401);
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  const { data: { user }, error } = await createClient(url, anon, { auth: { persistSession: false, autoRefreshToken: false } }).auth.getUser(accessToken);
-  if (error || !user) throw new CommandError("unauthenticated", 401);
-  const db = createClient(url, anon, {
+  if (!accessToken) throw new CommandError("unauthenticated", 401, "unauthenticated");
+
+  const verifier = createClient(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data, error } = await verifier.auth.getClaims(accessToken);
+  const userId = data?.claims.sub;
+  if (error || typeof userId !== "string") {
+    throw new CommandError("unauthenticated", 401, "unauthenticated");
+  }
+
+  const db = createClient(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
     auth: { persistSession: false, autoRefreshToken: false },
     accessToken: async () => accessToken,
   });
-  return ctxFor(db, user.id, breweryId);
+  return ctxForBearer(db, userId, breweryId);
 }

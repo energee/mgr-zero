@@ -18,8 +18,9 @@ Ask a brewery administrator for help.
 7. [Understand inventory](#understand-inventory)
 8. [Record an inventory movement](#record-an-inventory-movement)
 9. [View the team](#view-the-team)
-10. [Roles and access](#roles-and-access)
-11. [Errors and corrections](#errors-and-corrections)
+10. [Customer portal orders](#customer-portal-orders)
+11. [Roles and access](#roles-and-access)
+12. [Errors and corrections](#errors-and-corrections)
 
 ## Sign in
 
@@ -209,6 +210,12 @@ before adding another movement.
 Administrators, sales staff, and warehouse staff can open **Team** to see current
 memberships. The table shows each member's user ID and role. Email addresses are not
 shown on this screen.
+
+## Customer portal orders
+
+Orders placed through the customer portal always ship from one warehouse that an
+administrator has set for your brewery. Until that warehouse is set, customers see
+an error when they try to place an order; ask your administrator to configure it.
 
 ## Invitations and CSV import
 

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap, Ctx } from "./registry";
+import { defineCommand, defineQuery, unwrap, Ctx, CommandExecution } from "./registry";
 
 const movementInput = z.object({
   skuId: z.string().uuid(), locationId: z.string().uuid(),
@@ -16,26 +16,27 @@ const movementInput = z.object({
  * not supplied: the DB trigger (enforce_bbl_integrity, 00001_baseline.sql)
  * computes it from `qty * skus.bbl_per_unit`.
  */
-export function insertMovement(ctx: Ctx, input: z.infer<typeof movementInput>) {
-  return unwrap(ctx.db.rpc("record_movement", {
-    p_brewery: ctx.breweryId, p_sku: input.skuId, p_location: input.locationId,
-    p_qty: input.qty, p_type: input.type, p_channel: input.channel ?? null,
-    p_dest_state: input.destState ?? null, p_note: input.note ?? null,
+export function insertMovement(ctx: Ctx, input: z.infer<typeof movementInput>, execution: CommandExecution) {
+  return unwrap(ctx.db.rpc("record_inventory_movement", {
+    p_brewery: ctx.breweryId, p_sku: input.skuId, p_location: input.locationId, p_qty: input.qty,
+    p_type: input.type, p_channel: input.channel ?? null, p_dest_state: input.destState ?? null,
+    p_note: input.note ?? null, p_request_id: execution.requestId,
   }));
 }
 
 defineCommand({
   name: "record_movement", description: "Append an inventory movement (immutable; corrections are reversals)",
   input: movementInput, roles: ["admin", "warehouse"],
-  handler: insertMovement,
+  handler: (ctx, input, execution) => insertMovement(ctx, input, execution),
 });
 
 defineCommand({
   name: "set_taproom_par", description: "Set par level for a SKU at a taproom",
   input: z.object({ locationId: z.string().uuid(), skuId: z.string().uuid(), parQty: z.number().nonnegative() }),
   roles: ["admin", "sales"],
-  handler: (ctx, i) => unwrap(ctx.db.rpc("set_taproom_par", {
-    p_brewery: ctx.breweryId, p_location: i.locationId, p_sku: i.skuId, p_par_qty: i.parQty,
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_taproom_par", {
+    p_brewery: ctx.breweryId, p_location: i.locationId, p_sku: i.skuId,
+    p_par_qty: i.parQty, p_request_id: execution.requestId,
   })),
 });
 
@@ -50,8 +51,8 @@ defineCommand({
   name: "set_standing_allocation", description: "Set or release a standing taproom allocation (source 'taproom_standing') for a SKU at a location",
   input: z.object({ locationId: z.string().uuid(), skuId: z.string().uuid(), qty: z.number().nonnegative() }),
   roles: ["admin", "sales"],
-  handler: (ctx, i) => unwrap(ctx.db.rpc("set_standing_allocation", {
-    p_location: i.locationId, p_sku: i.skuId, p_qty: i.qty,
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_standing_allocation", {
+    p_location: i.locationId, p_sku: i.skuId, p_qty: i.qty, p_request_id: execution.requestId,
   })),
 });
 

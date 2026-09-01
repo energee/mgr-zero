@@ -1,4 +1,5 @@
 // tests/rls-command-boundary.test.ts — live PostgREST proof that staff writes use only role-scoped RPCs.
+// Every mutation RPC takes a p_request_id (request ledger); direct calls here mint a fresh one.
 import { beforeAll, describe, expect, it } from "vitest";
 import { admin, makeBrewery, makeStaffCtx } from "./helpers";
 import { runCommand, type Ctx } from "../lib/commands/registry";
@@ -82,13 +83,13 @@ describe("staff command database boundary", () => {
   });
 
   it("allows sales to create products only through its RPC and rejects warehouse and brewer", async () => {
-    const allowed = await salesCtx.db.rpc("create_product", {
+    const allowed = await salesCtx.db.rpc("create_product", { p_request_id: crypto.randomUUID(),
       p_brewery: brewery.id, p_name: "sales rpc product", p_style: null, p_abv: null,
     });
-    const warehouse = await warehouseCtx.db.rpc("create_product", {
+    const warehouse = await warehouseCtx.db.rpc("create_product", { p_request_id: crypto.randomUUID(),
       p_brewery: brewery.id, p_name: "warehouse rpc product", p_style: null, p_abv: null,
     });
-    const brewer = await brewerCtx.db.rpc("create_product", {
+    const brewer = await brewerCtx.db.rpc("create_product", { p_request_id: crypto.randomUUID(),
       p_brewery: brewery.id, p_name: "brewer rpc product", p_style: null, p_abv: null,
     });
 
@@ -99,17 +100,17 @@ describe("staff command database boundary", () => {
   });
 
   it("keeps admin-only location and sales/admin customer RPCs role-bound", async () => {
-    const location = await adminCtx.db.rpc("create_location", {
+    const location = await adminCtx.db.rpc("create_location", { p_request_id: crypto.randomUUID(),
       p_brewery: brewery.id, p_name: "admin rpc location", p_kind: "taproom",
     });
-    const salesLocation = await salesCtx.db.rpc("create_location", {
+    const salesLocation = await salesCtx.db.rpc("create_location", { p_request_id: crypto.randomUUID(),
       p_brewery: brewery.id, p_name: "sales rpc location", p_kind: "taproom",
     });
-    const customer = await salesCtx.db.rpc("upsert_customer", {
+    const customer = await salesCtx.db.rpc("upsert_customer", { p_request_id: crypto.randomUUID(),
       p_id: null, p_brewery: brewery.id, p_name: "sales rpc customer", p_type: "retailer", p_state: "PA",
       p_price_list: null, p_license_no: null, p_payment_terms: null,
     });
-    const warehouseCustomer = await warehouseCtx.db.rpc("upsert_customer", {
+    const warehouseCustomer = await warehouseCtx.db.rpc("upsert_customer", { p_request_id: crypto.randomUUID(),
       p_id: null, p_brewery: brewery.id, p_name: "warehouse rpc customer", p_type: "retailer", p_state: "PA",
       p_price_list: null, p_license_no: null, p_payment_terms: null,
     });
@@ -121,20 +122,20 @@ describe("staff command database boundary", () => {
   });
 
   it("keeps warehouse movement and sales order lifecycle RPCs role-bound", async () => {
-    const movement = await warehouseCtx.db.rpc("record_movement", {
+    const movement = await warehouseCtx.db.rpc("record_inventory_movement", { p_request_id: crypto.randomUUID(),
       p_brewery: brewery.id, p_sku: skuId, p_location: locationId, p_qty: 10,
       p_type: "opening_balance", p_channel: null, p_dest_state: null, p_note: null,
     });
-    const salesMovement = await salesCtx.db.rpc("record_movement", {
+    const salesMovement = await salesCtx.db.rpc("record_inventory_movement", { p_request_id: crypto.randomUUID(),
       p_brewery: brewery.id, p_sku: skuId, p_location: locationId, p_qty: 10,
       p_type: "opening_balance", p_channel: null, p_dest_state: null, p_note: null,
     });
-    const order = await salesCtx.db.rpc("create_order", {
+    const order = await salesCtx.db.rpc("create_order", { p_request_id: crypto.randomUUID(),
       p_brewery: brewery.id, p_kind: "wholesale", p_customer: customerId, p_ship_to: shipToId,
       p_from_location: locationId, p_to_location: null, p_requested: null, p_po: null, p_note: null,
       p_lines: [{ sku_id: skuId, qty: 1 }],
     });
-    const warehouseOrder = await warehouseCtx.db.rpc("create_order", {
+    const warehouseOrder = await warehouseCtx.db.rpc("create_order", { p_request_id: crypto.randomUUID(),
       p_brewery: brewery.id, p_kind: "wholesale", p_customer: customerId, p_ship_to: shipToId,
       p_from_location: locationId, p_to_location: null, p_requested: null, p_po: null, p_note: null,
       p_lines: [{ sku_id: skuId, qty: 1 }],
@@ -212,8 +213,9 @@ describe("tenant-safe document counters", () => {
     const other = await makeBrewery();
     for (const ctx of [adminCtx, salesCtx, warehouseCtx, brewerCtx]) {
       for (const b of [brewery.id, other.id]) {
+        // next_no lives in `private`, outside the Data API: PostgREST cannot resolve it at all.
         const { error } = await ctx.db.rpc("next_no", { b, k: "order" });
-        expect(error?.code, `${ctx.role} next_no(${b === other.id ? "other" : "own"})`).toBe("42501");
+        expect(error?.code, `${ctx.role} next_no(${b === other.id ? "other" : "own"})`).toMatch(/^(42501|PGRST202)$/);
       }
     }
     const { data: counters } = await admin.from("brewery_counters").select("key").eq("brewery_id", other.id);
@@ -223,7 +225,7 @@ describe("tenant-safe document counters", () => {
   it("orders created through the authorized lifecycle RPC still number from the owning brewery's counter only", async () => {
     const other = await makeBrewery();
     const { data: before } = await admin.from("brewery_counters").select("next").eq("brewery_id", brewery.id).eq("key", "order").maybeSingle();
-    const { data, error } = await salesCtx.db.rpc("create_order", {
+    const { data, error } = await salesCtx.db.rpc("create_order", { p_request_id: crypto.randomUUID(),
       p_brewery: brewery.id, p_kind: "wholesale", p_customer: customerId, p_ship_to: shipToId,
       p_from_location: locationId, p_to_location: null, p_requested: null, p_po: null, p_note: null,
       p_lines: [{ sku_id: skuId, qty: 1 }],
@@ -315,7 +317,7 @@ describe("registered staff mutation role × RPC matrix", () => {
       }),
     },
     {
-      command: "record_movement", rpc: "record_movement", allowed: ["admin", "warehouse"],
+      command: "record_movement", rpc: "record_inventory_movement", allowed: ["admin", "warehouse"],
       input: async () => ({
         command: { skuId, locationId, qty: 1, type: "opening_balance" },
         rpc: {
@@ -445,7 +447,7 @@ describe("registered staff mutation role × RPC matrix", () => {
       }
       for (const role of staffRoles.filter(role => !entry.allowed.includes(role))) {
         const input = await entry.input(role);
-        const { error } = await contexts()[role].db.rpc(entry.rpc, input.rpc);
+        const { error } = await contexts()[role].db.rpc(entry.rpc, { ...input.rpc, p_request_id: crypto.randomUUID() });
         expect(error?.code, `${entry.command} RPC rejects ${role}`).toBe("42501");
       }
     });

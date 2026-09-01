@@ -29,6 +29,26 @@ describe("customer CRUD", () => {
     expect(got.customer.name).toBe("Green Bar");
     expect(got.shipTos.length).toBe(1);
   });
+  it("replays one customer mutation without creating a duplicate", async () => {
+    const execution = {
+      requestId: crypto.randomUUID(),
+      correlationId: crypto.randomUUID(),
+    };
+    const input = {
+      name: `Replay customer ${execution.requestId}`,
+      type: "retailer",
+      state: "PA",
+    };
+    const first = await runCommand("upsert_customer", input, ctx, execution) as { id: string };
+    const replay = await runCommand("upsert_customer", input, ctx, execution);
+    expect(replay).toEqual(first);
+
+    const rows = await admin.from("customers")
+      .select("id")
+      .eq("brewery_id", b.id)
+      .eq("name", input.name);
+    expect(rows.data).toHaveLength(1);
+  });
   it("update via same command with id", async () => {
     const cust = await runCommand("upsert_customer", { name: "Old Name", type: "retailer", state: "PA" }, ctx) as { id: string };
     await runCommand("upsert_customer", { id: cust.id, name: "New Name", type: "retailer", state: "PA" }, ctx);

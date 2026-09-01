@@ -13,7 +13,7 @@ type Membership = { user_id: string; role: string };
 export default async function TeamPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const members: Membership[] = await runCommand("list_team_members", {}, ctx);
+  const members = (await runCommand("list_team_members", {}, ctx)) as Membership[];
 
   return (
     <div className="flex flex-col gap-6">

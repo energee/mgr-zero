@@ -22,6 +22,9 @@ and what enforces each one. Agents start at `AGENTS.md`.
 
 ## Local development
 
+Requires Node.js 22.x. The repository pins the major in `.node-version` and
+`package.json`; use that runtime for installs, tests, builds, and deployment.
+
 Local Supabase runs on non-default ports (54341/54342/54343) configured
 in the committed `supabase/config.toml`. These ports are used by every
 developer and in CI — they were chosen to avoid colliding with a
@@ -35,7 +38,7 @@ Studio:   http://127.0.0.1:54343
 ```
 
 CI (`.github/workflows/ci.yml`) derives env vars from
-`supabase status -o env` rather than hardcoding them, so the setup
+`npx supabase status -o env` rather than hardcoding them, so the setup
 automatically adapts to the values in `config.toml`.
 
 ### Setup
@@ -43,21 +46,16 @@ automatically adapts to the values in `config.toml`.
 ```bash
 npm install
 npx supabase start        # starts the local Postgres/Auth/Studio stack
-npx supabase status       # prints the real local URL + anon/service keys
+npx supabase status -o env | node scripts/supabase-env.mjs > .env.local
 ```
 
-Create `.env.local` with the values `supabase status` printed:
+The mapper converts the Supabase CLI's local key labels into the application's
+modern environment contract. Add a separate random HMAC secret of at least 32
+characters to `.env.local`:
 
+```dotenv
+COMMAND_RATE_LIMIT_HMAC_SECRET=<random secret of at least 32 characters>
 ```
-NEXT_PUBLIC_SUPABASE_URL=<API URL from supabase status>
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key from supabase status>
-SUPABASE_SERVICE_ROLE_KEY=<service_role key from supabase status>
-DEPLOYMENT_MODE=saas
-```
-
-`DEPLOYMENT_MODE` is `saas` (multi-brewery, with a brewery switcher) or
-`dedicated` (single-tenant deployment, switcher hidden). The schema is
-identical in both modes — deployment mode is config, not schema.
 
 Apply migrations and seed a dev user/brewery:
 
@@ -83,9 +81,10 @@ npm run dev   # http://localhost:3000
 
 ## HTTP API
 
-One endpoint: `POST /api/command`. You authenticate as a brewery user, name the
-command, and pass its input. Data is always scoped to `breweryId` — you only
-see that brewery, and only if you are a member.
+One endpoint: `POST /api/command`. Registered operations are either queries
+(side-effect-free reads) or commands (writes). You authenticate as a brewery
+user, name the operation, and pass its input. Data is always scoped to
+`breweryId` — you only see that brewery, and only if you are a member.
 
 ### Auth
 
@@ -99,7 +98,7 @@ Exchange email/password for a token at the project's Auth URL (`/auth/v1/token?g
 
 ```bash
 TOKEN=$(curl -sS "$NEXT_PUBLIC_SUPABASE_URL/auth/v1/token?grant_type=password" \
-  -H "apikey: $NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+  -H "apikey: $NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
   -H "content-type: application/json" \
   -d '{"email":"you@brewery.example","password":"..."}' \
   | jq -r .access_token)
@@ -114,17 +113,32 @@ Staff roles: `admin`, `sales`, `warehouse`, `brewer`. Each command lists who may
 
 ### Request / response
 
+Every request has `breweryId`, `name`, and `input`. A query may omit
+`requestId`; a command **must** include a client-generated RFC 9562/4122 UUID
+as `requestId` before its handler runs.
+
 ```json
 { "breweryId": "<uuid>", "name": "list_products", "input": {} }
 ```
 
-Success: `{ "ok": true, "data": ... }` (HTTP 200). Failure: `{ "ok": false, "error": "..." }`.
+```json
+{ "breweryId": "<uuid>", "name": "create_product", "input": {}, "requestId": "<uuid>" }
+```
+
+Every response includes a server-generated `correlationId`. A successful query
+returns `{ "ok": true, "data": ..., "correlationId": "<uuid>" }`; a successful
+command additionally returns its submitted `requestId`. Failures use the
+structured public envelope `{ "ok": false, "error": { "code": "...", "message":
+"..." }, "correlationId": "<uuid>" }` and include a submitted `requestId` when
+one was supplied.
 
 | HTTP | Meaning |
 | --- | --- |
+| 400 | Non-JSON body, invalid request, missing/malformed command `requestId`, invalid `input`, or a data rule rejected the write |
 | 401 | Missing, malformed, expired, or revoked token |
 | 403 | Authenticated, but not a member of `breweryId`, or your role cannot run this command |
-| 400 | Unknown command, invalid `input`, or a data rule rejected the write |
+| 409 | A `requestId` was reused with a different payload, command, or brewery (`conflict`) |
+| 404 | Unknown operation |
 | 500 | Server error (message is generic) |
 
 ### Catalog
@@ -149,6 +163,7 @@ On-hand is the sum of an append-only movement ledger. You never send `bbl`; it i
 | `list_movements` | admin, sales, warehouse | `{ skuId?, limit? }` — newest first; `limit` default 50, max 200 |
 | `record_movement` | admin, warehouse | `{ skuId, locationId, qty, type, channel?, destState?, note? }` — `qty` ≠ 0; `destState` is a 2-letter code |
 | `set_taproom_par` | admin, sales | `{ locationId, skuId, parQty }` |
+| `set_portal_fulfillment_source` | admin | `{ locationId }` |
 
 `record_movement` `type`: `opening_balance`, `production_in`, `adjustment`, `sale_removal`, `taproom_transfer`, `depletion`, `return_in`, `destruction`, `loss`, `sample`, `festival_removal`.
 
@@ -203,14 +218,19 @@ mock) — `npx supabase start` must be running first.
 
 ## HTTP API
 
-All reads and writes go through one endpoint:
+All reads and writes go through one endpoint. Registered operations are
+classified as queries (side-effect-free reads) or commands (writes):
 
 ```
 POST /api/command
 Content-Type: application/json
 
-{ "breweryId": "<uuid>", "name": "<command name>", "input": { ... } }
+{ "breweryId": "<uuid>", "name": "<operation name>", "input": { ... }, "requestId": "<uuid for commands>" }
 ```
+
+`breweryId`, `name`, and `input` are required. A query may omit `requestId`; a
+command must submit a client-generated RFC 9562/4122 UUID `requestId` before
+the handler can run.
 
 Authentication is the Supabase cookie session of the logged-in user
 (established by the app's login flow). The caller must be a member of the
@@ -219,13 +239,21 @@ brewery named by `breweryId`: either staff (a `brewery_users` row with role
 `customer_users` row linked to one of the brewery's customers, which gives
 the `customer` role). Each command lists the roles allowed to call it.
 
-Responses:
+Every response includes a server-generated `correlationId`. Success is
+`{ "ok": true, "data": ..., "correlationId": "<uuid>" }`; command successes
+also include the submitted `requestId`. Failures use the structured public
+envelope `{ "ok": false, "error": { "code": "...", "message": "..." },
+"correlationId": "<uuid>" }` and include a submitted `requestId` when present.
 
-| Status | Body | Meaning |
-| --- | --- | --- |
-| 200 | `{ "ok": true, "data": ... }` | success; `data` is the command's result |
-| 400 | `{ "ok": false, "error": "<message>" }` | any expected failure: unauthenticated, not a member, permission denied, unknown command, input validation, or a domain rule (e.g. wrong order status) |
-| 500 | `{ "ok": false, "error": "internal error" }` | unexpected failure |
+| Status | Meaning |
+| --- | --- |
+| 200 | Success; `data` is the operation result |
+| 400 | Non-JSON body, invalid request, missing/malformed command `requestId`, invalid input, or a domain rule |
+| 401 | Unauthenticated |
+| 403 | Not a member of the brewery or permission denied |
+| 409 | `requestId` reused with a different payload (`conflict`) |
+| 404 | Unknown operation |
+| 500 | Unexpected failure |
 
 Input fields are camelCase; ids are UUIDs; money is integer cents; dates
 are `YYYY-MM-DD` strings. `limit` parameters default to 50 (max 200).
@@ -259,6 +287,7 @@ are `YYYY-MM-DD` strings. `limit` parameters default to 50 (max 200).
 | `upsert_ship_to` | admin, sales | Create or update a ship-to address (`customerId`, `label`, `address1`, optional `address2`, `city`, `state`, `zip`); the state drives excise destination reporting |
 | `upsert_price_list` | admin, sales | Create or rename a price list |
 | `set_price` | admin, sales | Set a SKU's price on a price list (`unitPriceCents`, integer) |
+| `set_portal_fulfillment_source` | admin | Set the warehouse customer portal orders ship from (must be one of the brewery's warehouses; portal ordering fails until it is set) |
 | `list_customers` | admin, sales, warehouse | Customers alphabetical with price list name |
 | `get_customer` | admin, sales, warehouse | One customer with its ship-tos |
 | `list_price_lists` | admin, sales | Price lists with their per-SKU prices |
@@ -321,11 +350,11 @@ orders are wholesale orders shipped from the brewery's warehouse.
 
 ## Deployment
 
-**Not yet provisioned.** No hosted Supabase project or Vercel project
-exists for this repo yet. When that's set up: create the hosted Supabase
-project and Vercel project, set `NEXT_PUBLIC_SUPABASE_URL`,
-`NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and
-`DEPLOYMENT_MODE=saas` as Vercel env vars, run `supabase db push` against
+**Not yet provisioned.** No hosted Supabase project or Vercel project exists
+for this repo yet. When that is set up, create the hosted Supabase and Vercel
+projects and configure `NEXT_PUBLIC_SUPABASE_URL`,
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, and
+`COMMAND_RATE_LIMIT_HMAC_SECRET` in Vercel. Then run `npx supabase db push` against
 the hosted project, deploy, and verify login → catalog → inventory on the
 preview URL.
 

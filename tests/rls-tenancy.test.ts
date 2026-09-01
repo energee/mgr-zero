@@ -134,7 +134,7 @@ describe("brewery column exposure", () => {
     if (otherError) throw otherError;
     const staffDb = await asUser(staff.email);
     const { error: setError } = await staffDb.rpc("set_portal_fulfillment_source", {
-      p_brewery: brewery.id, p_location: warehouse.id,
+      p_brewery: brewery.id, p_location: warehouse.id, p_request_id: crypto.randomUUID(),
     });
     expect(setError).toBeNull();
 
