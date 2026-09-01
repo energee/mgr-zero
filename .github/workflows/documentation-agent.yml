@@ -88,9 +88,13 @@ jobs:
                 ]
               }
             }
+          # --json-schema becomes a strict tool input_schema, and the API rejects
+          # top-level oneOf/allOf/anyOf (400) — so the status<->findings
+          # consistency rule (DOCS_OK => [], DOCS_GAP => 1..10) lives in the
+          # agent prompt and in track-gap's status gate, not in the schema.
           claude_args: >-
             --allowedTools "Read,Grep,Glob"
-            --json-schema '{"type":"object","properties":{"status":{"type":"string","enum":["DOCS_OK","DOCS_GAP"]},"findings":{"type":"array","maxItems":10,"items":{"type":"object","properties":{"kind":{"type":"string","enum":["missing","conflict"]},"implementation_location":{"type":"string","minLength":1},"documentation_owner":{"type":"string","minLength":1},"gap":{"type":"string","minLength":1},"correction":{"type":"string","minLength":1}},"required":["kind","implementation_location","documentation_owner","gap","correction"],"additionalProperties":false}}},"required":["status","findings"],"additionalProperties":false,"allOf":[{"if":{"properties":{"status":{"const":"DOCS_OK"}}},"then":{"properties":{"findings":{"maxItems":0}}}},{"if":{"properties":{"status":{"const":"DOCS_GAP"}}},"then":{"properties":{"findings":{"minItems":1}}}}]}'
+            --json-schema '{"type":"object","properties":{"status":{"type":"string","enum":["DOCS_OK","DOCS_GAP"]},"findings":{"type":"array","maxItems":10,"items":{"type":"object","properties":{"kind":{"type":"string","enum":["missing","conflict"]},"implementation_location":{"type":"string","minLength":1},"documentation_owner":{"type":"string","minLength":1},"gap":{"type":"string","minLength":1},"correction":{"type":"string","minLength":1}},"required":["kind","implementation_location","documentation_owner","gap","correction"],"additionalProperties":false}}},"required":["status","findings"],"additionalProperties":false}'
 
   track-gap:
     needs: review
