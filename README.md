@@ -342,8 +342,10 @@ preview URL.
 ## CI
 
 `.github/workflows/ci.yml` runs on every push and pull request: installs
-deps, starts a local Supabase stack, applies migrations
-(`supabase db reset`), runs the full vitest suite against it, then
+deps, starts a local Supabase stack with only the services the tests use
+(Postgres, Auth, PostgREST, Kong — `supabase start -x …` excludes the rest),
+which applies migrations on the fresh stack, runs the full vitest suite
+against it, then
 `npm run lint`, `tsc --noEmit` and `npm run build`. This is the merge gate — RLS and
 command-registry correctness are enforced here, not just locally.
 
