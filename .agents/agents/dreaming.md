@@ -1,7 +1,9 @@
 # Dreaming — curate the living agent docs
 
-**CI only.** If you are not running inside GitHub Actions (no `GITHUB_ACTIONS`
-env var), stop — this contract force-pushes and opens PRs.
+**CI only.** The workflow prompt tells you when you are inside GitHub Actions;
+if it does not, stop — this contract force-pushes and opens PRs. Do not shell
+out to check `GITHUB_ACTIONS`: the allowlist has no `echo`/`env`, so the check
+is denied and looks like "not CI".
 
 You are running unattended in CI after a merge to main. Your job is memory
 consolidation: make the living agent docs match reality, citing evidence.
