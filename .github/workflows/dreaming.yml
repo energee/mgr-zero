@@ -3,6 +3,10 @@ name: Dreaming
 on:
   push:
     branches: [main]
+    # claude-code-action does not accept the `push` event, so a push only
+    # runs the `redispatch` job below, which re-fires this workflow via
+    # workflow_dispatch (GITHUB_TOKEN-created dispatches are exempt from
+    # GitHub's no-recursive-triggers rule; pushes are not).
     # Loop guard: ignore only the dream-editable files (the list in
     # .agents/agents/dreaming.md), so a merged dream PR never retriggers a
     # dream. Specs, plans, and .remember digests are dream *signal* and must
@@ -26,11 +30,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  redispatch:
+    # Turns a main push into a workflow_dispatch of this same file; see the
+    # comment on `on.push`. Exits fast so the concurrency group frees up for
+    # the dispatched run.
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - run: gh workflow run dreaming.yml --ref main --repo "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
   dream:
-    # Guard workflow_dispatch on a non-main ref: a dream over a feature
-    # branch would force-push dreaming/main and open a PR to main with
-    # unmerged branch content.
-    if: github.ref == 'refs/heads/main'
+    # Never on the raw push event (unsupported by the action — redispatch
+    # handles it). Guard workflow_dispatch on a non-main ref: a dream over a
+    # feature branch would force-push dreaming/main and open a PR to main
+    # with unmerged branch content.
+    if: github.event_name != 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
