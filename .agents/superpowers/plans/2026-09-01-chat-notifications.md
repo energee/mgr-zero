@@ -144,7 +144,7 @@ After Task 3, Tasks 4 and 7 can run in parallel. Task 5 can run in parallel with
 - Consumes: Chat SDK 4.39.0 `StateAdapter` and Postgres 15.
 - Produces: `chat_sdk` schema, exact five adapter tables/indexes, and a verified connection contract for `createPostgresState({ client, keyPrefix })`.
 
-- [ ] **Step 1: Add the approved dependencies**
+- [x] **Step 1: Add the approved dependencies**
 
 Run:
 
@@ -154,7 +154,7 @@ npm install chat@^4.39.0 @chat-adapter/slack@^4.39.0 @chat-adapter/state-pg@^4.3
 
 Expected: `package.json` records the four runtime packages and one type-only dev package; no other package changes.
 
-- [ ] **Step 2: Write the failing restricted-role test**
+- [x] **Step 2: Write the failing restricted-role test**
 
 Create `tests/chat-state-adapter.test.ts` with a module comment and this contract:
 
@@ -235,13 +235,13 @@ describe("Chat SDK Postgres state isolation", () => {
 });
 ```
 
-- [ ] **Step 3: Run the test red**
+- [x] **Step 3: Run the test red**
 
 Run: `npx vitest run tests/chat-state-adapter.test.ts`
 
 Expected: FAIL because `chat_sdk` and its exact adapter tables/grants do not exist.
 
-- [ ] **Step 4: Pre-create and isolate the exact adapter schema**
+- [x] **Step 4: Pre-create and isolate the exact adapter schema**
 
 Add the exact five table definitions and four expiry indexes from `@chat-adapter/state-pg@4.39.0` to the baseline migration, schema-qualified under `chat_sdk`. Drop and recreate the cluster-scoped group role so a reset cannot inherit stale LOGIN/elevated attributes, memberships, or grants; `DROP ROLE` must fail closed if outside dependencies exist. The recreated no-login role receives `USAGE`, `CREATE`, required runtime DML, and sequence privileges only in `chat_sdk`; the provisioned login receives membership. Grant it nothing on MGR application schemas.
 
@@ -310,7 +310,7 @@ alter default privileges in schema chat_sdk
   grant usage, select on sequences to mgr_chat_sdk;
 ```
 
-- [ ] **Step 5: Reset and run the compatibility gate**
+- [x] **Step 5: Reset and run the compatibility gate**
 
 Run:
 
@@ -322,7 +322,7 @@ npx tsc --noEmit
 
 Expected: PASS. If the adapter reads or creates outside `chat_sdk`, can access `public.breweries`, or needs broader database privileges, stop and return to architecture review. Do not grant any application-schema access or use owner/service-role database credentials.
 
-- [ ] **Step 6: Commit the passed compatibility spike**
+- [x] **Step 6: Commit the passed compatibility spike**
 
 ```bash
 git add package.json package-lock.json supabase/migrations/00001_baseline.sql tests/chat-state-adapter.test.ts
@@ -343,7 +343,7 @@ git commit -m "test: prove isolated Chat SDK Postgres state"
 - Consumes: Task 1 private state schema.
 - Produces: typed rows for installations, links, destinations, preferences, occurrences, deliveries, callback receipts, action intents, and the brewery reading cadence.
 
-- [ ] **Step 1: Write failing schema and tenant-isolation tests**
+- [x] **Step 1: Write failing schema and tenant-isolation tests**
 
 Cover these exact invariants in `tests/chat-schema.test.ts`:
 
@@ -358,13 +358,13 @@ it("enforces installation-scoped external user and destination uniqueness", asyn
 
 Use `makeBrewery`, `makeStaffCtx`, `asUser`, and `admin` from `tests/helpers.ts`; do not mock Supabase.
 
-- [ ] **Step 2: Run the schema tests red**
+- [x] **Step 2: Run the schema tests red**
 
 Run: `npx vitest run tests/chat-schema.test.ts tests/schema-conventions.test.ts tests/schema-rules.test.ts`
 
 Expected: FAIL on missing cadence column and chat tables.
 
-- [ ] **Step 3: Add exact provider-neutral tables**
+- [x] **Step 3: Add exact provider-neutral tables**
 
 Add `fermentation_reading_due_hours int not null default 24 check (fermentation_reading_due_hours between 1 and 168)` to `breweries`.
 
@@ -431,11 +431,11 @@ create table notification_deliveries (
 
 All tenant references use `(id, brewery_id)` composite foreign keys. `token_store_key` is globally unique, identifies an encrypted Chat SDK state entry, and is never a credential.
 
-- [ ] **Step 4: Add least-privilege RLS**
+- [x] **Step 4: Add least-privilege RLS**
 
 Enable RLS everywhere. Ordinary authenticated clients receive bounded `SELECT` only: admins receive installation-health columns only; linked users receive their own link, personal destination, and preferences only while current brewery membership and an active same-brewery link remain valid. All writes are reserved for later named registered RPCs/commands, including shared-destination administration. `notification_occurrences`, `notification_deliveries`, `chat_callback_receipts`, and `chat_action_intents` have no authenticated access; named internal functions expose only bounded results.
 
-- [ ] **Step 5: Reset and prove tenancy**
+- [x] **Step 5: Reset and prove tenancy**
 
 Run:
 
@@ -447,7 +447,7 @@ npx tsc --noEmit
 
 Expected: PASS with no cross-tenant rows and no new schema-rule exclusions.
 
-- [ ] **Step 6: Commit schema foundation**
+- [x] **Step 6: Commit schema foundation**
 
 ```bash
 git add supabase/migrations/00001_baseline.sql tests/chat-schema.test.ts tests/schema-conventions.test.ts tests/schema-rules.test.ts
@@ -468,7 +468,7 @@ git commit -m "feat: add provider-neutral chat schema"
 - Consumes: spec §§5, 7, and 17.
 - Produces: `NotificationReason`, `PortableNotification`, `ChatCapabilitySet`, `ChatPreviewId`, `CHAT_PREVIEW_FIXTURES`, and `assertPortableNotification`.
 
-- [ ] **Step 1: Write failing contract tests**
+- [x] **Step 1: Write failing contract tests**
 
 Assert every portable item parses, every preview ID is unique, team fixtures contain only aggregate data, gated forms have `enabled: false`, and forbidden data keys/secret-like values are absent.
 
@@ -491,13 +491,13 @@ for (const fixture of CHAT_PREVIEW_FIXTURES) {
 }
 ```
 
-- [ ] **Step 2: Run red**
+- [x] **Step 2: Run red**
 
 Run: `npx vitest run tests/chat-contracts.test.ts tests/chat-preview.test.ts`
 
 Expected: FAIL because the contracts and fixtures do not exist.
 
-- [ ] **Step 3: Add exact portable types**
+- [x] **Step 3: Add exact portable types**
 
 ```ts
 export type NotificationReason =
@@ -555,11 +555,11 @@ export type ChatPreviewFixture = {
 
 Validate each `PortableNotification` with a Zod schema and export `assertPortableNotification(value: unknown): asserts value is PortableNotification`. Keep provider IDs and Block Kit types out of this file.
 
-- [ ] **Step 4: Add the ten committed fixtures**
+- [x] **Step 4: Add the ten committed fixtures**
 
 Use the exact scenarios and safe labels shown in wireframe build step 8. The fermentation and order-confirm fixtures expose only `open_mgr`; their provider actions remain disabled with human correction copy.
 
-- [ ] **Step 5: Run green and type-check**
+- [x] **Step 5: Run green and type-check**
 
 Run:
 
@@ -570,7 +570,7 @@ npx tsc --noEmit
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit contracts**
+- [x] **Step 6: Commit contracts**
 
 ```bash
 git add lib/chat/contracts.ts lib/chat/preview-fixtures.ts tests/chat-contracts.test.ts tests/chat-preview.test.ts
@@ -591,7 +591,7 @@ git commit -m "feat: define portable chat presentation contracts"
 - Consumes: `CHAT_PREVIEW_FIXTURES`, `ChatPreviewId`, `PortableNotification`.
 - Produces: `ChatPreview`, `ChatPreviewPicker`, and an accessible fixture-only preview panel reusable by the settings page.
 
-- [ ] **Step 1: Extend the renderer test red**
+- [x] **Step 1: Extend the renderer test red**
 
 Use `renderToStaticMarkup` from `react-dom/server` to assert every fixture renders a named surface, disabled actions carry visible reasons, and the output contains no provider request code or live IDs.
 
@@ -601,15 +601,15 @@ expect(html).toContain(fixture.title);
 expect(html).toContain("Preview data");
 ```
 
-- [ ] **Step 2: Implement the minimal web renderer**
+- [x] **Step 2: Implement the minimal web renderer**
 
 Use native `<button>`, `<fieldset>`, `<legend>`, and `<section aria-labelledby>`. The picker is keyboard-operable, uses a visible selected state plus text, and does not use color alone. Every target is at least 24×24 CSS pixels. Gated previews render `aria-disabled="true"` plus the same visible reason.
 
-- [ ] **Step 3: Verify the committed HTML artifact stays synchronized**
+- [x] **Step 3: Verify the committed HTML artifact stays synchronized**
 
 Assert the existing rev-4 artifact still has exactly 73 frames and 10 `group:'Chat'` entries with the Chat filter, build step 8, phone/desk rendering, 24-hour cadence field, and gated-form copy. Change it only when the production fixture contract changes.
 
-- [ ] **Step 4: Verify renderer and artifact**
+- [x] **Step 4: Verify renderer and artifact**
 
 Run:
 
@@ -620,7 +620,7 @@ npx tsc --noEmit
 
 Open the HTML artifact in a browser, select **Chat**, select phone and desk, and verify: total `73`, Chat frames `10`, no console exception, no horizontal overflow, and readable focus indicators.
 
-- [ ] **Step 5: Commit previews**
+- [x] **Step 5: Commit previews**
 
 ```bash
 git add lib/chat/preview-web.tsx app/'(app)'/settings/chat/chat-settings-client.tsx tests/chat-preview.test.ts
@@ -656,24 +656,24 @@ export type SlackOAuthPort = {
 };
 ```
 
-- [ ] **Step 1: Write failing lifecycle tests**
+- [x] **Step 1: Write failing lifecycle tests**
 
 Cover admin-only install/reauthorization start, ten-minute hashed state, exact redirect binding, reauthorization bound to the existing installation, state replay, forged state, removed installer, workspace already mapped elsewhere, partial token-store success, idempotent callback replay, scope mismatch, reconciliation, disable-first disconnect, and credential deletion failure.
 
-- [ ] **Step 2: Run red**
+- [x] **Step 2: Run red**
 
 Run: `npx vitest run tests/chat-oauth.test.ts`
 
 Expected: FAIL on missing lifecycle services/RPCs.
-- [ ] **Step 3: Add atomic lifecycle RPCs**
+- [x] **Step 3: Add atomic lifecycle RPCs**
 
 Add `begin_chat_installation`, `begin_chat_reauthorization`, `activate_chat_installation`, `mark_chat_installation_reauthorization`, `disable_chat_installation`, and `disconnect_chat_installation`. Each function pins `brewery_id`, enforces admin where user-facing, locks the row, and returns a bounded JSON result. Reauthorization binds the intent to the existing installation and preserves disabled delivery until activation succeeds. Disconnect marks disabled and invalidates active destinations/links/intents in one RPC before external credential deletion.
 
-- [ ] **Step 4: Build Slack authorize and callback routes**
+- [x] **Step 4: Build Slack authorize and callback routes**
 
 The install route reads `breweryId` plus optional `installationId`, builds normal cookie-auth `Ctx`, requires admin, records `sha256(state)` with intent kind (`install` or `reauthorize`), and returns a 303 redirect to `https://slack.com/oauth/v2/authorize` with exact scopes and redirect URI. The callback validates state before token exchange, calls `handleOAuthCallback`, verifies the returned installation/workspace and exact scopes, activates the new or bound installation, and redirects to `/settings/chat?installed=1`.
 
-- [ ] **Step 5: Run green**
+- [x] **Step 5: Run green**
 
 Run:
 
@@ -685,7 +685,7 @@ npx tsc --noEmit
 
 Expected: PASS; raw state and tokens never appear in logs or database snapshots outside encrypted Chat SDK state.
 
-- [ ] **Step 6: Commit lifecycle**
+- [x] **Step 6: Commit lifecycle**
 
 ```bash
 git add lib/chat/state.ts lib/chat/slack-adapter.ts lib/chat/oauth.ts app/api/chat/slack/install/route.ts app/api/chat/slack/oauth/route.ts supabase/migrations/00001_baseline.sql tests/chat-oauth.test.ts
@@ -708,19 +708,19 @@ git commit -m "feat: add Slack installation lifecycle"
 - Consumes: active installation, external Slack user ID, authenticated MGR `Ctx`.
 - Produces: `issueChatLinkProof(installationId, externalUserId)`, `consume_chat_link_proof`, `unlink_chat_user`, and `get_chat_link_status`.
 
-- [ ] **Step 1: Write failing link tests**
+- [x] **Step 1: Write failing link tests**
 
 Cover single use, ten-minute expiry, installation binding, external-user binding, brewery membership, customer rejection, email mismatch irrelevance, replay, role removal, unlink, and installation disable.
 
-- [ ] **Step 2: Run red**
+- [x] **Step 2: Run red**
 
 Run: `npx vitest run tests/chat-linking.test.ts`
 
-- [ ] **Step 3: Add proof and consume flow**
+- [x] **Step 3: Add proof and consume flow**
 
 Store only SHA-256 proof hashes. The App Home handler issues the raw proof once and builds `/settings/chat/link?proof=...`. The protected page uses the current MGR session and `runCommand("consume_chat_link_proof", { proof }, ctx)`. The RPC locks the pending link, checks expiry/consumption/installation/brewery membership, records `user_id`, and consumes the hash atomically.
 
-- [ ] **Step 4: Revalidate every callback**
+- [x] **Step 4: Revalidate every callback**
 
 Add:
 
@@ -742,7 +742,7 @@ export async function resolveChatActor(
 
 It reads active installation, active link, and current `brewery_users` membership each time. It does not return a Supabase user token.
 
-- [ ] **Step 5: Run green and commit**
+- [x] **Step 5: Run green and commit**
 
 Run:
 
@@ -788,7 +788,7 @@ export type TodayItem = {
 };
 ```
 
-- [ ] **Step 1: Write failing role/due tests**
+- [x] **Step 1: Write failing role/due tests**
 
 Cover:
 
@@ -801,21 +801,21 @@ Cover:
 - no customer role visibility;
 - safe labels and hrefs.
 
-- [ ] **Step 2: Run red**
+- [x] **Step 2: Run red**
 
 Run: `npx vitest run tests/commands-today.test.ts`
 
-- [ ] **Step 3: Add one shared candidate projection and two bounded readers**
+- [x] **Step 3: Add one shared candidate projection and two bounded readers**
 
 Define the four due rules once in a `security_invoker` `private.today_candidates` view. `get_today_items(p_now)` derives the caller's brewery/membership and filters by role; the internal scan function accepts one brewery and returns the same fixed safe columns for occurrence generation. Revoke the scan function from `PUBLIC`, `anon`, and `authenticated`; grant it only to `service_role`. Set an explicit safe `search_path`.
 
 Use brewery timezone for date comparisons. Use `md5(concat_ws('|', ...relevant columns...))` as a non-secret stale token. For no-reading occupancies, use `vessel_occupancies.started_at`; do not synthesize a reading. Driver rows require `routes.driver_user_id = auth.uid()` in the registered-reader path unless the current role is admin.
 
-- [ ] **Step 4: Register `get_today`**
+- [x] **Step 4: Register `get_today`**
 
 `lib/commands/today.ts` calls only `get_today_items`, maps snake_case to `TodayItem`, and rechecks role visibility in the registry. No Slack import enters the command layer.
 
-- [ ] **Step 5: Run green and commit**
+- [x] **Step 5: Run green and commit**
 
 Run:
 
