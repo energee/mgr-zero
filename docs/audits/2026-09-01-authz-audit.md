@@ -3,24 +3,24 @@
 Fresh database + application security/authorization audit of the current state.
 The original audit (snapshot `96ba05c`) was lost; its P1.1–P1.5 and P1.9 items
 were remediated on this branch (`docs/plans/audit-p1-authz.md`). Everything
-below is what is **still open now**, except D1/D3 which were fixed on
-`authz-d1-breweries-view`. Findings were produced by two reviewers
+below is what is **still open now**. Findings were produced by two reviewers
 that verified by execution against the local Supabase stack (schema reset from
 this worktree first).
 
 Severity: **P1** exploitable cross-tenant / privilege / credential issue ·
-**P2** fails open or weakens a guarantee without a direct exploit ·
-**P3** hardening / hygiene.
+**P2** fails open or weakens a guarantee without a direct exploit · **P3**
+hardening / hygiene.
 
 ## Database
 
-### D1 — P1: portal customers can read staff-only `breweries` columns — resolved
+### D1 — P1: portal customers can read staff-only `breweries` columns
 
-**Where:** `supabase/migrations/00001_baseline.sql` — was `staff_read` /
-`customer_read_portal_config` on `breweries`.
+**Where:** `supabase/migrations/00001_baseline.sql` — `staff_read` /
+`customer_read_portal_config` policies on `breweries`, plus
+`grant select on all tables in schema public to authenticated`.
 
 **Claim:** `authenticated` has table-wide `SELECT` on `breweries`. The customer
-policy filtered rows only, so a wholesale-customer portal user read every column
+policy filters rows only, so a wholesale-customer portal user reads every column
 of their brewery's row, including `ttb_registry_no`, `pa_license_no`, and the
 free-form `settings` jsonb — none of which is customer-facing.
 
@@ -28,15 +28,12 @@ free-form `settings` jsonb — none of which is customer-facing.
 `settings={"internal_note":"do not show customers"}`; created a real Auth user
 linked via `customer_users`; `GET /rest/v1/breweries?id=eq.<id>&select=*` with that
 user's bearer token returned the full row. `tests/schema-rules.test.ts`'s ACL
-matrix checks table-level privileges only, so it passed vacuously.
+matrix checks table-level privileges only, so it passes vacuously.
 
-**Fix (landed on `authz-d1-breweries-view`):** Dropped `customer_read_portal_config`.
-Customers read `portal_brewery` (`id`, `name`, `timezone`,
-`portal_fulfillment_location_id`) via `portal_brewery_rows()`; staff still
-`SELECT` the base table. Portal RPCs and `customer_read_portal_source` join the
-view. Proven by `tests/rls-tenancy.test.ts` (customer `select *` is empty; staff
-still sees the secrets; view is tenant-scoped) and a column pin in
-`tests/schema-rules.test.ts`.
+**Fix:** Give customers a `security_invoker` view (`id`, `name`, `timezone`,
+`portal_fulfillment_location_id`) and revoke base-table `SELECT` from the
+customer path; or move `ttb_registry_no` / `pa_license_no` / `settings` to a
+staff-only table. Add a column-exposure assertion to `tests/schema-rules.test.ts`.
 
 ### D2 — P2: internal lifecycle helpers `lock_order` and `order_line_price` are directly callable
 
