@@ -82,6 +82,10 @@ describe("schema rules", () => {
       expected as (
         select 'authenticated'::name as role, relname, 'SELECT'::text as privilege
         from domain_relations where relkind in ('r', 'v')
+          -- chat: installations are column-bounded (no table-level SELECT);
+          -- occurrences, deliveries, receipts and action intents are server-only
+          and relname not in ('chat_installations', 'notification_occurrences', 'notification_deliveries',
+                              'chat_callback_receipts', 'chat_action_intents')
         union all
         select 'authenticated'::name, relname, privilege
         from (values
@@ -181,7 +185,25 @@ describe("schema rules", () => {
           ('create_credit_memo(uuid,jsonb,uuid,text)'),
           ('set_standing_allocation(uuid,uuid,numeric)'),
           ('create_replenishment_order(uuid,uuid,jsonb)'),
-          ('portal_availability(uuid)')
+          ('portal_availability(uuid)'),
+          ('portal_brewery_rows()'),
+          -- chat (admin/self-gated security definer RPCs; see baseline § chat Data API ACLs)
+          ('begin_chat_installation(uuid,text,text,text)'),
+          ('begin_chat_reauthorization(uuid,text,text)'),
+          ('find_chat_oauth_intent(text)'),
+          ('activate_chat_installation(uuid,text,text,text,text,text,text,jsonb)'),
+          ('mark_chat_installation_reauthorization(uuid,text)'),
+          ('disable_chat_installation(uuid)'),
+          ('disconnect_chat_installation(uuid)'),
+          ('reconcile_chat_installation(uuid,boolean,text)'),
+          ('consume_chat_link_proof(text)'),
+          ('unlink_chat_user(uuid)'),
+          ('today_live_reasons()'),
+          ('get_today_items(uuid,timestamp with time zone)'),
+          ('record_submitted_order_occurrence(uuid)'),
+          ('set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text)'),
+          ('set_notification_destination(uuid,text)'),
+          ('set_brewery_quiet_hours(uuid,time without time zone,time without time zone)')
         ) callable(signature)
         union all
         select 'service_role'::name, signature from domain_functions
@@ -204,6 +226,36 @@ describe("schema rules", () => {
     expect(() => sql(`
       select public.require_authorized_staff_rpc(gen_random_uuid(), 'create_product', array['admin']::public.staff_role[])
     `)).toThrow(/permission denied for create_product/);
+  });
+
+  it("pins customer brewery exposure to portal_brewery columns, not the base table", () => {
+    // Table-level SELECT on breweries is shared by staff and customers
+    // (both are `authenticated`); the customer path is a view projection
+    // plus no customer SELECT policy on the base table.
+    expect(sql(`
+      select attname from pg_attribute
+      where attrelid = 'public.portal_brewery'::regclass
+        and attnum > 0 and not attisdropped
+      order by attnum
+    `)).toEqual(["id", "name", "timezone", "portal_fulfillment_location_id"]);
+    expect(sql(`
+      select pg_get_function_result('public.portal_brewery_rows()'::regprocedure)
+    `)).toEqual(["TABLE(id uuid, name text, timezone text, portal_fulfillment_location_id uuid)"]);
+    expect(sql(`
+      select polname from pg_policy
+      where polrelid = 'public.breweries'::regclass
+      order by 1
+    `)).toEqual(["breweries_set_portal_fulfillment_source", "staff_read"]);
+    expect(sql(`
+      select col_description('public.breweries'::regclass, attnum)
+      from pg_attribute
+      where attrelid = 'public.breweries'::regclass and attname = 'settings'
+    `)).toEqual(["staff-only; never store secrets here"]);
+    expect(sql(`
+      select coalesce(array_to_string(c.reloptions, ','), '')
+      from pg_class c
+      where c.oid = 'public.portal_brewery'::regclass
+    `)).toEqual(["security_invoker=true"]);
   });
 
   it("restricts brewery_counters keys to committed document kinds", () => {

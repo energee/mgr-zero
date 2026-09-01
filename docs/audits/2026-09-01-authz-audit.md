@@ -61,15 +61,16 @@ an in-function `request.path` check inside `lock_order` accepting only the
 lifecycle RPC names. Re-pin in `tests/schema-rules.test.ts` and prove with
 `tests/rls-command-boundary.test.ts`.
 
-### D3 — P3: `breweries.settings` jsonb is unconstrained
+### D3 — P3: `breweries.settings` jsonb is unconstrained — resolved
 
 **Where:** `supabase/migrations/00001_baseline.sql` — `settings jsonb not null default '{}'`.
 
 **Claim:** No current writer (`grep -rn settings lib/ app/`), no shape, readable by
 staff and (per D1) customers — a standing place to accidentally put secrets.
 
-**Fix:** `comment on column breweries.settings is 'never store secrets here'` or
-drop the column until a real use exists.
+**Fix (landed on `authz-d1-breweries-view`):**
+`comment on column breweries.settings is 'staff-only; never store secrets here'`.
+Customers no longer read the column (D1). The column is kept; no writer exists yet.
 
 ### Verified sound (database)
 
@@ -168,11 +169,11 @@ explicit override flag.
 
 | Item | Sev | Summary |
 | --- | --- | --- |
-| D1 | P1 | Customer-safe `breweries` projection; revoke base-table read from customers |
+| ~~D1~~ | P1 | **Resolved** — customer-safe `portal_brewery` projection; base-table read is staff-only |
 | D2 | P2 | Gate/revoke `lock_order`, `order_line_price` |
 | A1 | P2 | Body-size cap + rate limit on `/api/command` |
 | A2 | P2 | Generic client message for 42501/23503/23505 in `unwrap` |
 | A3 | P3 | Explicit RPC guard in `record_movement`, `set_taproom_par` |
 | A4 | P3 | Security headers / CSP |
 | A5 | P3 | Local-only guard in `seed-dev.ts` |
-| D3 | P3 | Constrain or drop `breweries.settings` |
+| ~~D3~~ | P3 | **Resolved** — `breweries.settings` commented staff-only; customers cannot read it |
