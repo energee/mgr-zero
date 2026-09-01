@@ -16,7 +16,7 @@ async function ctxFor(db: SupabaseClient, userId: string, breweryId: string): Pr
     .eq("user_id", userId)
     .eq("customers.brewery_id", breweryId)
     .limit(1);
-  if (cust?.length) return { db, userId: user.id, breweryId, role: "customer", customerId: cust[0].customer_id };
+  if (cust?.length) return { db, userId, breweryId, role: "customer", customerId: cust[0].customer_id };
   throw new CommandError("not a member of this brewery", 403);
 }
 
