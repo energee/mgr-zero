@@ -31,8 +31,9 @@ jobs:
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
           prompt: '/code-review:code-review --comment ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
-          claude_args: '--allowedTools "mcp__github_inline_comment__create_inline_comment"'
-          show_full_output: true # TEMP: identify the tool denied on every run
+          # Skill: the code-review plugin invokes sub-skills; without it every
+          # run logged one permission denial and a wasted retry.
+          claude_args: '--allowedTools "Skill,mcp__github_inline_comment__create_inline_comment"'
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
 
