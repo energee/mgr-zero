@@ -2223,6 +2223,106 @@ revoke execute on function issue_chat_link_proof(uuid, text, text), consume_chat
   from public, anon, authenticated;
 grant execute on function consume_chat_link_proof(text), unlink_chat_user(uuid) to authenticated;
 grant execute on function issue_chat_link_proof(uuid, text, text), resolve_chat_actor(text, text, text) to service_role;
+
+-- ---------------------------------------------------------------- Today reasons (shared projection)
+-- The four due rules are defined once here and read two ways: get_today_items
+-- (RLS-bound, role-filtered, for MGR Today and App Home) and
+-- scan_chat_today_candidates (service_role only, one brewery, for occurrence
+-- generation). due_at is brewery-local; the readers apply p_now so tests and
+-- jobs can evaluate "due" at any instant. source_version is a non-secret
+-- stale token over the columns that define the row.
+create schema private;
+revoke all on schema private from public;
+grant usage on schema private to authenticated, service_role;
+
+create view private.today_candidates with (security_invoker = true) as
+  select o.brewery_id, 'submitted_order'::text as reason, 'order'::text as subject_type, o.id::text as subject_id,
+         md5(concat_ws('|', o.status, o.requested_ship_date, o.needs_restock)) as source_version,
+         'ORD-' || lpad(o.order_no::text, 4, '0') as safe_label,
+         'submitted' || coalesce(' · ships ' || to_char(o.requested_ship_date, 'Dy FMMM/FMDD'), '') as detail,
+         (o.requested_ship_date::timestamp at time zone b.timezone) as due_at,
+         '/orders/' || o.id as href,
+         array['admin','sales']::text[] as recipient_roles,
+         null::uuid as assigned_user_id
+    from orders o join breweries b on b.id = o.brewery_id
+    where o.status = 'submitted'
+  union all
+  select o.brewery_id, 'pick_due', 'order', o.id::text,
+         md5(concat_ws('|', o.status, o.requested_ship_date, o.needs_restock)),
+         'ORD-' || lpad(o.order_no::text, 4, '0'),
+         'pick due' || coalesce(' · ships ' || to_char(o.requested_ship_date, 'Dy FMMM/FMDD'), ''),
+         (o.requested_ship_date::timestamp at time zone b.timezone),
+         '/orders/' || o.id,
+         array['admin','warehouse']::text[],
+         null::uuid
+    from orders o join breweries b on b.id = o.brewery_id
+    where o.status = 'confirmed' and o.requested_ship_date is not null
+  union all
+  -- only the lowest undelivered stop of an open route is "next"
+  select r.brewery_id, 'delivery_next', 'delivery', d.id::text,
+         md5(concat_ws('|', r.driver_user_id, r.delivery_date, d.stop_no, d.delivered_at, r.returned_at)),
+         coalesce(r.name, 'Route') || ' · stop ' || d.stop_no,
+         'next stop',
+         (r.delivery_date::timestamp at time zone b.timezone),
+         '/work/deliveries/' || d.id,
+         array['admin','warehouse']::text[],
+         r.driver_user_id
+    from deliveries d
+    join routes r on r.id = d.route_id
+    join breweries b on b.id = r.brewery_id
+    where d.delivered_at is null and r.returned_at is null
+      and d.stop_no = (select min(d2.stop_no) from deliveries d2 where d2.route_id = d.route_id and d2.delivered_at is null)
+  union all
+  -- overdue when the latest reading (or occupancy start when none) plus the
+  -- brewery cadence has passed; never synthesizes a reading
+  select vo.brewery_id, 'fermentation_reading_overdue', 'occupancy', vo.id::text,
+         md5(concat_ws('|', last.at, vo.started_at, b.fermentation_reading_due_hours)),
+         v.name,
+         'reading due',
+         coalesce(last.at, vo.started_at) + make_interval(hours => b.fermentation_reading_due_hours),
+         '/beer/cellar/' || vo.id || '/reading',
+         array['admin','brewer']::text[],
+         null::uuid
+    from vessel_occupancies vo
+    join vessels v on v.id = vo.vessel_id
+    join breweries b on b.id = vo.brewery_id
+    left join lateral (select max(fr.at) as at from fermentation_readings fr where fr.occupancy_id = vo.id) last on true
+    where vo.ended_at is null;
+grant select on private.today_candidates to authenticated, service_role;
+
+-- ponytail: delivery_next and fermentation_reading_overdue join this list when
+-- their MGR pages/commands ship (slice 4 cellar reading, slice 10 delivery stop).
+create function today_live_reasons() returns text[]
+language sql immutable set search_path = '' as $$ select array['submitted_order','pick_due'] $$;
+
+create function get_today_items(p_brewery uuid, p_now timestamptz default now())
+returns setof private.today_candidates
+language sql stable security invoker set search_path = '' as $$
+  select c.*
+    from private.today_candidates c
+    join public.brewery_users bu on bu.brewery_id = c.brewery_id and bu.user_id = auth.uid()
+    where c.brewery_id = p_brewery
+      and c.reason = any (public.today_live_reasons())
+      and (c.reason = 'submitted_order' or c.due_at <= p_now)
+      and (bu.role = 'admin'
+           or (bu.role::text = any (c.recipient_roles) and (c.assigned_user_id is null or c.assigned_user_id = auth.uid())))
+    order by c.due_at nulls last, c.safe_label
+$$;
+
+create function scan_chat_today_candidates(p_brewery_id uuid, p_now timestamptz)
+returns setof private.today_candidates
+language sql stable security definer set search_path = '' as $$
+  select c.*
+    from private.today_candidates c
+    where c.brewery_id = p_brewery_id
+      and c.reason = any (public.today_live_reasons())
+      and (c.reason = 'submitted_order' or c.due_at <= p_now)
+$$;
+
+revoke execute on function today_live_reasons(), get_today_items(uuid, timestamptz), scan_chat_today_candidates(uuid, timestamptz)
+  from public, anon, authenticated;
+grant execute on function today_live_reasons(), get_today_items(uuid, timestamptz) to authenticated, service_role;
+grant execute on function scan_chat_today_candidates(uuid, timestamptz) to service_role;
 -- ---------------------------------------------------------------- immutability grants
 revoke update, delete on recipe_versions, recipe_ingredients from authenticated, anon;
 revoke update, delete on pos_sales from authenticated, anon;
