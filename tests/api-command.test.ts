@@ -73,19 +73,13 @@ describe("POST /api/command bearer auth", () => {
     expect(json.error.code).toBe("invalid_request");
   });
 
-  it("browser client rejects a non-envelope response instead of crashing on its shape", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 502, json: async () => ({ unexpected: true }) }));
+  it.each([
+    [502, async () => ({ unexpected: true })],
+    [504, async () => { throw new SyntaxError("Unexpected token <"); }],
+  ])("browser client rejects a non-envelope response (%i) instead of crashing on its shape", async (status, json) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status, json }));
     try {
-      await expect(command("brewery-id", "create_product", { name: "Pils" })).rejects.toThrow(/malformed response \(502\)/);
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-
-  it("browser client rejects a non-JSON response body", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 504, json: async () => { throw new SyntaxError("Unexpected token <"); } }));
-    try {
-      await expect(command("brewery-id", "create_product", { name: "Pils" })).rejects.toThrow(/malformed response \(504\)/);
+      await expect(command("brewery-id", "create_product", { name: "Pils" })).rejects.toThrow(`malformed response (${status})`);
     } finally {
       vi.unstubAllGlobals();
     }

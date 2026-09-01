@@ -1530,28 +1530,24 @@ begin
 end $$;
 
 -- One open standing taproom allocation per (sku, location): upsert by qty>0,
--- release by qty<=0. One plpgsql function per iron rule 5 (find-then-write).
+-- release by qty<=0. One plpgsql function per iron rule 5.
 create function private.set_standing_allocation_impl(p_location uuid, p_sku uuid, p_qty numeric) returns jsonb
 language plpgsql set search_path = '' as $$
 declare v_brewery uuid; v_alloc uuid; v_status public.allocation_status;
 begin
-  -- for update on the location serializes concurrent sets for one (location, sku);
-  -- allocations_standing_open_uidx backstops the one-open-row invariant.
-  select brewery_id into v_brewery from public.locations where id = p_location for update;
+  select brewery_id into v_brewery from public.locations where id = p_location;
   if v_brewery is null then raise exception 'location not found'; end if;
-  select id into v_alloc from public.allocations
-    where source = 'taproom_standing' and ref = p_location and sku_id = p_sku and status = 'open';
   if p_qty <= 0 then
-    if v_alloc is not null then
-      update public.allocations set status = 'released' where id = v_alloc;
-      v_status := 'released';
-    end if;
-  elsif v_alloc is not null then
-    update public.allocations set qty = p_qty where id = v_alloc;
-    v_status := 'open';
+    update public.allocations set status = 'released'
+      where source = 'taproom_standing' and ref = p_location and sku_id = p_sku and status = 'open'
+      returning id into v_alloc;
+    if v_alloc is not null then v_status := 'released'; end if;
   else
+    -- allocations_standing_open_uidx arbitrates concurrent sets for one (location, sku).
     insert into public.allocations (brewery_id, sku_id, qty, source, ref, status)
     values (v_brewery, p_sku, p_qty, 'taproom_standing', p_location, 'open')
+    on conflict (ref, sku_id) where source = 'taproom_standing' and status = 'open'
+      do update set qty = excluded.qty
     returning id into v_alloc;
     v_status := 'open';
   end if;
@@ -1620,7 +1616,9 @@ begin
     where actor_id = v_actor and request_id = p_request_id for update;
   if v_request.brewery_id <> p_brewery or v_request.command_name <> p_command
      or v_request.payload_hash <> extensions.digest(p_payload::text, 'sha256') then
-    raise exception 'request id was already used with a different payload' using errcode = '23505';
+    -- Application SQLSTATE (class MG): every unique index raises 23505, so the
+    -- replay mismatch gets its own code for the HTTP layer to map to 409.
+    raise exception 'request id was already used with a different payload' using errcode = 'MG409';
   end if;
   if v_request.result is null then raise exception 'request is incomplete'; end if;
   return v_request.result;

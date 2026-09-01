@@ -59,11 +59,11 @@ export async function unwrap<T>(query: PromiseLike<{ data: T; error: { message: 
 }
 
 // The definer RPCs signal authorization failures as 42501 and request-id
-// reuse as 23505; keep those distinguishable from ordinary 400s.
+// reuse as the application SQLSTATE MG409; keep those distinguishable from 400s.
 function rpcError(error: { message: string; code?: string }): CommandError {
   switch (error.code) {
     case "42501": return new CommandError(error.message, 403, "permission_denied");
-    case "23505": return new CommandError(error.message, 409, "conflict");
+    case "MG409": return new CommandError(error.message, 409, "conflict");
     default: return new CommandError(error.message);
   }
 }
@@ -149,9 +149,7 @@ function createExecution(): CommandExecution {
   return { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
 }
 
-// Returns unknown on purpose: the registry cannot know a handler's output type
-// from a string name, so callers narrow explicitly instead of asserting via a
-// type parameter that was never checked.
+// Output is unknown: a string name cannot carry the handler's type; callers narrow.
 export async function runCommand(name: string, rawInput: unknown, ctx: Ctx, execution?: CommandExecution): Promise<unknown> {
   const def = registry.get(name);
   if (!def) throw new CommandError(`unknown command: ${name}`, 404, "unknown_command");

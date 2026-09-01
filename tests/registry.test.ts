@@ -103,8 +103,8 @@ describe("unwrap maps RPC SQLSTATEs to command errors", () => {
   it("42501 (definer authorization) → 403 permission_denied", async () => {
     await expect(unwrap(failing("42501"))).rejects.toMatchObject({ status: 403, code: "permission_denied" });
   });
-  it("23505 (request-id reuse / uniqueness) → 409 conflict", async () => {
-    await expect(unwrap(failing("23505"))).rejects.toMatchObject({ status: 409, code: "conflict" });
+  it("MG409 (request-id reuse) → 409 conflict", async () => {
+    await expect(unwrap(failing("MG409"))).rejects.toMatchObject({ status: 409, code: "conflict" });
   });
   it("anything else stays 400 bad_request", async () => {
     await expect(unwrap(failing("23514"))).rejects.toMatchObject({ status: 400, code: "bad_request" });
