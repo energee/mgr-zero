@@ -3,12 +3,13 @@ name: Claude Code
 on:
   issue_comment:
     types: [created]
+  # No pull_request_review trigger: every inline comment is also a one-comment
+  # review, so it would fire a second (skipped) run per comment. @claude in a
+  # review's summary box is the one place this leaves uncovered.
   pull_request_review_comment:
     types: [created]
   issues:
     types: [opened, assigned]
-  pull_request_review:
-    types: [submitted]
 
 jobs:
   claude:

@@ -37,8 +37,11 @@ jobs:
       - run: npm ci
       - uses: supabase/setup-cli@v1
         with: { version: 2.116.0 }
-      - run: supabase start
-      - run: supabase db reset
+      # Only the services the tests touch (Postgres, Auth, PostgREST, Kong).
+      # Everything excluded is an image pull we'd otherwise wait ~60s+ for.
+      # `start` on a fresh stack already applies supabase/migrations/*, so
+      # there is no separate `db reset` step here.
+      - run: supabase start -x studio,imgproxy,logflare,vector,edge-runtime,realtime,storage-api,mailpit,supavisor,postgres-meta
       - name: Env from local stack
         # `supabase status -o env` prints KEY="value" lines. Grep the three
         # keys the app/tests need, then strip the surrounding quotes before
