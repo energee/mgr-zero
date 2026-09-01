@@ -81,6 +81,12 @@ a gap to close, not a convention to trust.
    `eslint.config.mjs`, run in CI. Integration sync modules (`qbo.ts`, `pos.ts`,
    slices 1C/7) will need the same client for token storage; each is added to the
    eslint allowlist explicitly with its own permission check — never a blanket exemption.
+   Current additions: `lib/chat/jobs.ts` — the single owner of the service-role
+   client for chat provider webhooks and scheduled jobs (no user in the request).
+   It may call only the named `service_role` chat RPCs (`scan_chat_*`,
+   `lease_chat_deliveries`, `complete/retry/suppress_chat_delivery`,
+   `issue_chat_link_proof`, `resolve_chat_actor`, `reconcile_chat_installation`),
+   never ordinary domain commands, and never mints a user token.
 5. **A command that writes more than one row is one Postgres function.**
    supabase-js cannot span a transaction across statements, so a handler that
    does `insert` then `update` can half-commit. Such commands call a single

@@ -18,10 +18,10 @@ const eslintConfig = defineConfig([
     // is only allowed in lib/commands/invites.ts. Tests and scripts run
     // outside request paths and are exempt below.
     files: ["app/**", "lib/**", "components/**", "proxy.ts"],
-    ignores: ["lib/commands/invites.ts", "lib/supabase/admin.ts"],
+    ignores: ["lib/commands/invites.ts", "lib/supabase/admin.ts", "lib/chat/jobs.ts"],
     rules: {
       "no-restricted-imports": ["error", {
-        paths: [{ name: "@/lib/supabase/admin", message: "createAdminClient() bypasses RLS. Only lib/commands/invites.ts may import it — see .agents/ARCHITECTURE.md iron rule 4." }],
+        paths: [{ name: "@/lib/supabase/admin", message: "createAdminClient() bypasses RLS. Only lib/commands/invites.ts and lib/chat/jobs.ts (chat internal jobs: named service_role RPCs, no user) may import it — see .agents/ARCHITECTURE.md iron rule 4." }],
       }],
     },
   },
