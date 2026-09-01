@@ -18,8 +18,9 @@ Ask a brewery administrator for help.
 7. [Understand inventory](#understand-inventory)
 8. [Record an inventory movement](#record-an-inventory-movement)
 9. [View the team](#view-the-team)
-10. [Roles and access](#roles-and-access)
-11. [Errors and corrections](#errors-and-corrections)
+10. [Customer portal orders](#customer-portal-orders)
+11. [Roles and access](#roles-and-access)
+12. [Errors and corrections](#errors-and-corrections)
 
 ## Sign in
 
