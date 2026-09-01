@@ -21,6 +21,10 @@ never copy it into a second place.
 | `proxy.ts`, `app/(auth)/` | Session refresh and login. Customer-only accounts (a `customer_users` row, no `brewery_users` row) land on `/portal` instead of `/`. |
 | `app/(app)/<area>/` | Staff pages and forms. Thin: read via queries, mutate via commands. |
 | `app/(portal)/` | Wholesale customer portal route group (own layout, `/portal` shop + cart, `/portal/orders`, `/portal/invoices`) — reads/writes only through the `portal.ts` customer-role commands above. |
+| `lib/chat/` | Provider-neutral chat notification core: portable presentation contracts and validation (`contracts.ts`); the provider transport interface every adapter implements (`provider.ts`); the restricted Chat SDK Postgres state singleton (`state.ts`, role may `CREATE` only in `chat_sdk`); the Slack adapter, transport, and renderer (`slack-*.ts`); Slack OAuth installation lifecycle (`oauth.ts`); explicit staff Slack↔MGR linking (`linking.ts`); job-route bearer auth (`job-auth.ts`); committed preview fixtures (`preview-fixtures.ts`, `preview-web.tsx`); and `jobs.ts`, the rule-4 service-role owner for scan/lease/deliver/cleanup. |
+| `lib/commands/chat.ts`, `lib/commands/today.ts` | Staff chat linking and integration-owned notification preference/quiet-hours/destination commands; `get_today`, the role-filtered Today projection over `private.today_candidates`. |
+| `app/api/chat/`, `app/api/webhooks/slack/` | Slack OAuth install/callback and bearer-guarded scan/deliver/cleanup job routes; the Slack events/App Home webhook. Thin — delegate to `lib/chat/`. |
+| `app/(app)/settings/chat/` | Staff chat notification settings and the Slack account-linking flow. |
 | `components/ui/` | shadcn primitives. Don't hand-edit; re-add with the shadcn CLI. |
 | `tests/` | Proof. Runs against the real local Supabase stack, never mocks. |
 | `scripts/seed-dev.ts` | Idempotent dev seed. |

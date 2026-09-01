@@ -64,6 +64,15 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
 - `import_csv`, `invite_staff`, `invite_customer_user` stay registered but fail
   closed (P1.9) until the durable external-write gate exists; the Import screen
   and invite forms are removed rather than hidden.
+- Chat notifications are staff-only and Slack-first but provider-neutral (schema
+  and contracts never name Slack): one active installation per brewery/provider,
+  personal App Home/DM plus one admin-approved digest channel, no quiet-hours
+  bypass in the first release, and Slack→MGR writes stay projection-only until
+  the trust/replay gates close. `lib/chat/jobs.ts` is the one additional
+  iron-rule-4 service-role owner (scan/lease/deliver/cleanup), gated by a
+  constant-time bearer check, never a user token. Design:
+  `.agents/superpowers/specs/2026-09-01-mgr-chat-notifications-design.md`;
+  plan and current task status: `.agents/PROGRESS.md`.
 
 ## Gotchas (carried from MGR v1)
 - PostgREST caches the schema: after DDL, errors naming a column/enum that plainly exists are a stale cache — `NOTIFY pgrst, 'reload schema'` or restart the stack before debugging.
