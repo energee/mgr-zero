@@ -10,6 +10,7 @@ import type pg from "pg";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { unwrap } from "@/lib/commands/registry";
+import { paced } from "@/lib/chat/pacing";
 import { assertPortableNotification, type NotificationReason, type PortableNotification } from "./contracts";
 import type { ChatProviderTransport, ProviderMessageRef } from "./provider";
 import { issueChatLinkProof } from "./linking";
@@ -114,15 +115,6 @@ function digestNotification(ctx: DeliveryContext): PortableNotification {
 
 export const backoffMs = (attempt: number) => Math.min(3600, 2 ** Math.min(attempt, 10)) * 1000 * (1 + Math.random() * 0.25);
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-// ponytail: in-process per-conversation pacing (one send/second); a shared
-// limiter is needed only if the worker ever runs on more than one instance.
-const lastSend = new Map<string, number>();
-async function paceConversation(key: string) {
-  const wait = (lastSend.get(key) ?? 0) + 1000 - Date.now();
-  if (wait > 0) await sleep(wait);
-  lastSend.set(key, Date.now());
-}
 
 export async function runChatScan({ now = new Date(), db = serviceClient() }: Deps = {}) {
   const targets = (await unwrap(db.rpc("list_chat_scan_targets"))) as string[];
@@ -194,12 +186,12 @@ export async function runChatDeliveryBatch({ limit = 50, now = new Date(), db = 
           await stop("terminal", check.reason); continue;
         }
       }
-      await paceConversation(`${installationId}:${ctx.destination.external_destination_id}`);
+      const paceKey = `${installationId}:${ctx.destination.external_destination_id}`;
       if (existing) {
-        await transport.update({ installationId, ref: existing, notification, intentId: lease.id, resolved });
+        await paced(paceKey, () => transport.update({ installationId, ref: existing, notification, intentId: lease.id, resolved }));
         await complete(existing, "updated");
       } else {
-        const ref = await transport.send({ installationId, destinationId: ctx.destination.external_destination_id, notification, intentId: lease.id });
+        const ref = await paced(paceKey, () => transport.send({ installationId, destinationId: ctx.destination.external_destination_id, notification, intentId: lease.id }));
         await complete(ref, "sent");
       }
     } catch (e) {
