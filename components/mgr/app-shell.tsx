@@ -26,34 +26,39 @@ export type AppShellProps = {
   composer?: React.ReactNode;
   /** Force the active tab (the gallery renders screens off their real route). */
   active?: string;
+  /** Initial rail state; layouts read it from the sidebar_state cookie. */
+  sidebarOpen?: boolean;
   children: React.ReactNode;
 };
 
-export function AppShell({ brand, items, headerRight, composer, active, children }: AppShellProps) {
+export function AppShell({ brand, items, headerRight, composer, active, sidebarOpen, children }: AppShellProps) {
   const pathname = usePathname();
   const current = active ?? activeTab(items, pathname)?.label;
+  const brandMark = (
+    <span className="flex items-center gap-2 truncate">
+      <MgrIcon size={16} className="shrink-0" />
+      {brand}
+    </span>
+  );
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={sidebarOpen}>
       <Sidebar collapsible="offcanvas">
-        <SidebarHeader className="h-12 justify-center px-4 text-sm font-medium">
-          <span className="flex items-center gap-2 truncate">
-            <MgrIcon size={16} className="shrink-0" />
-            {brand}
-          </span>
-        </SidebarHeader>
+        <SidebarHeader className="h-12 justify-center px-4 text-sm font-medium">{brandMark}</SidebarHeader>
         <SidebarContent>
-          {items.map((tab) => (
+          {items.map((tab) => {
+            const leaf = !tab.children?.length;
+            return (
             <SidebarGroup key={tab.label}>
-              {tab.children?.length ? (
+              {!leaf && (
                 <SidebarGroupLabel asChild>
                   <Link href={tab.href}>{tab.label}</Link>
                 </SidebarGroupLabel>
-              ) : null}
+              )}
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {(tab.children?.length ? tab.children : [tab]).map((c) => (
+                  {(leaf ? [tab] : tab.children!).map((c) => (
                     <SidebarMenuItem key={c.href}>
-                      <SidebarMenuButton asChild isActive={c.label === current || (tab.label === current && pathname === c.href)}>
+                      <SidebarMenuButton asChild isActive={tab.label === current && (leaf || pathname === c.href)}>
                         <Link href={c.href}>{c.label}</Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -61,17 +66,15 @@ export function AppShell({ brand, items, headerRight, composer, active, children
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
-          ))}
+            );
+          })}
         </SidebarContent>
       </Sidebar>
       <SidebarInset className="min-h-svh">
         <header className="flex h-12 items-center justify-between gap-2 border-b px-2">
           <span className="flex min-w-0 items-center gap-1 text-sm font-medium">
             <SidebarTrigger className="hidden md:inline-flex" />
-            <span className="flex items-center gap-2 truncate md:hidden">
-              <MgrIcon size={16} className="shrink-0" />
-              {brand}
-            </span>
+            <span className="md:hidden">{brandMark}</span>
           </span>
           {headerRight && <span className="flex shrink-0 items-center gap-1">{headerRight}</span>}
         </header>
@@ -83,7 +86,7 @@ export function AppShell({ brand, items, headerRight, composer, active, children
   );
 }
 
-/** Phone tab bar; also what E.tabs / E.portal render. */
+/** Phone tab bar. */
 export function TabBar({ items, active, className }: { items: readonly NavItem[]; active?: string; className?: string }) {
   return (
     <nav

@@ -382,7 +382,6 @@ recorded. It is an audit surface, not decoration, and never implies a row can be
 | `--irreversible` | `#0F6B78` | `#0F6B78` | Append-only, filed, external, sign-out actions only |
 | `--warning` / `--warning-foreground` | `#FDECD2` / `#8A4A00` | `#3B2A12` / `#FDB44B` | Attention surface and text; never yellow on white |
 | `--border` | `#E3E3DC` | `#33342E` | Hairline dividers |
-| `--rule` | `#C9C9C0` | `#454640` | Ledger left rule |
 
 The remaining shadcn tokens (secondary, muted, accent, destructive, sidebar,
 chart) are set in `app/globals.css`; that file is the source of truth. The
