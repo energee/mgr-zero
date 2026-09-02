@@ -200,9 +200,10 @@ implements. Tests hit the real database (`npx supabase start`).
     Depends: 7.
 
 11. **Docs.**
-    Files: `docs/user-guide.md` (customer language: creating a channel,
-    why one cannot be deleted while in use); `.agents/MEMORY.md` (the enum →
-    table decision and its reason).
+    Files: `docs/staff-guide.html` (customer language: creating a channel,
+    why one cannot be deleted while in use — `docs/user-guide.md` was replaced
+    by the three HTML guides); `.agents/MEMORY.md` (the enum → table decision
+    and its reason).
     Depends: 10.
 
 ## Final validation

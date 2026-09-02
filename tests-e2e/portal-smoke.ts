@@ -237,7 +237,13 @@ async function main() {
     // controlled inputs yet (see .ecc/benchmarks/e2e-engines-2026-08-31.json),
     // so the attempt is pure overhead. E2E_ENGINES=lightpanda,chrome re-enables
     // the fallback chain for re-testing newer nightlies.
-    const engines = (process.env.E2E_ENGINES?.split(",") ?? ["chrome"]) as Engine[];
+    // ?? only covers undefined: E2E_ENGINES="" yielded [""] and the suite ran once
+    // against a nameless engine, failing deep inside agent-browser. Trim too, so
+    // "lightpanda, chrome" does not pass " chrome".
+    const engines = (process.env.E2E_ENGINES || "chrome")
+      .split(",")
+      .map((e) => e.trim())
+      .filter(Boolean) as Engine[];
     for (const engine of engines) {
       console.log(`[test:e2e] trying engine: ${engine}`);
       const session = `${SESSION_PREFIX}-${engine}`;

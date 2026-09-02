@@ -117,6 +117,31 @@ describe("Slack renderer · surface polish", () => {
     }
   });
 
+  // rowLabel tested `safeLabel.includes(title)` — a raw substring match, not
+  // "this label already ends with the reason". A label whose own words happen
+  // to contain the reason swallowed it, and the row lost why it was sent.
+  it("keeps the reason when a label merely contains the word", () => {
+    const item = {
+      ...CHAT_PREVIEW_FIXTURES.find((f) => f.id === "app-home")!.items[0],
+      title: "Pick",
+      subject: { id: "o-1", type: "order" as const, safeLabel: "Order #1042 · picked short" },
+    };
+    const { text } = renderSlackMessage(item, { mgrBaseUrl: MGR, intentId: "intent-1" });
+    expect(text).toBe("Order #1042 · picked short · Pick");
+  });
+
+  // An empty title made `includes("")` unconditionally true, so the separator
+  // was dropped along with nothing — harmless output, but the branch was lying.
+  it("appends nothing when there is no reason to append", () => {
+    const item = {
+      ...CHAT_PREVIEW_FIXTURES.find((f) => f.id === "app-home")!.items[0],
+      title: "",
+      subject: { id: "o-1", type: "order" as const, safeLabel: "Order #1042" },
+    };
+    const { text } = renderSlackMessage(item, { mgrBaseUrl: MGR, intentId: "intent-1" });
+    expect(text).toBe("Order #1042");
+  });
+
   // Every button was rendered without a `style`, so the sole call to action on
   // an unlinked App Home was indistinguishable from a secondary control.
   it("marks the point of each surface primary, and never more than one", () => {

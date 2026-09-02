@@ -24,10 +24,16 @@ const actions = (elements: Block[]): Block[] => (elements.length ? [{ type: "act
 // overdue"), so appending the title would read "… · Reading overdue" twice.
 // Used by every surface that composes label and title on one line: App Home
 // rows and the message fallback text Slack shows in the notification list.
-const rowLabel = (n: PortableNotification) =>
-  n.subject.safeLabel.toLowerCase().includes(n.title.toLowerCase())
-    ? n.subject.safeLabel
-    : `${n.subject.safeLabel} · ${n.title}`;
+// endsWith, not includes: a label whose own words happen to contain the reason
+// ("Order #1042 · picked short" against the title "Pick") would swallow it and
+// the row would lose why it was sent. An empty title has nothing to append.
+const rowLabel = (n: PortableNotification) => {
+  const title = n.title.trim();
+  const label = n.subject.safeLabel;
+  return title === "" || label.toLowerCase().endsWith(title.toLowerCase())
+    ? label
+    : `${label} · ${title}`;
+};
 
 // The open_mgr action carries the deep link; orders are the default subject.
 const openPathFor = (n: PortableNotification) =>
