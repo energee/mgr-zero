@@ -19,8 +19,9 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
   own Order/Orders/Invoices/Account shell. Frames draw only user-visible UI —
   the annotation, gate-copy, and Today-exemplar rules live in the plan
   preamble and §5, not here.
-- Every merged PR gets one read-only Claude Code documentation audit; high-confidence omissions or contradictions are tracked in one follow-up issue rather than committed directly to `main` by a bot. The Claude review job has read-only repo permissions, only Read/Grep/Glob tools, and Claude Code permission denies for common runner secret paths and credential dotfiles.
-- `docs/user-guide.md` is the customer-facing owner for the entire available application. It documents every screen/action in customer language (steps, fields/options, permissions, results, corrections, and errors) and never exposes development phases or internals.
+- Every merged PR gets a full customer-documentation pass, with `workflow_dispatch` on `main` as the recovery path. Claude has read-only GitHub permissions and may edit only the master, staff, and portal guide HTML files; a separate deterministic job rejects any wider or active-content diff and maintains one reviewable `documentation/user-guide` PR. The agent never commits directly to `main`.
+- `docs/user-guide.html` is the documentation master linking audience-separated `staff-guide.html` and `portal-guide.html`. Together they cover every current screen/action in customer language (steps, fields/options/defaults/limits, permissions, connected effects, corrections, empty/error states, and unavailable controls) without mixing staff and portal instructions or exposing internals.
+- Customer guides stay visually neutral and close to browser defaults for now. A future MGR design language will be developed once and carried across the application, API documentation, and customer documentation rather than designed separately in any one surface.
 - Every AI mutation is proposal-only: registry-owned server preview,
   canonical effects, explicit user confirmation, same `requestId` +
   `previewToken`, and stale revalidation. There is no generic Undo. Replay and
@@ -77,3 +78,4 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
 - Reviewers that verify by execution (writing to the live DB) find real bugs; read-only reviews find style.
 - Visually check rendered UI before calling UI work done (a serif-font regression went unnoticed).
 - Operating loop and authority boundaries are in `AGENTS.md`; don't repeat them here.
+- Tests never read design docs. `tests/chat-preview.test.ts` once grepped the wireframes HTML as a drift guard; the wireframe moved and the test went red for the wrong reason. Code-to-code assertions (fixtures ↔ renderer) carry the guarantee; docs drift by design (2026-09-02).

@@ -24,10 +24,10 @@ never copy it into a second place.
 | `components/ui/` | shadcn primitives. Don't hand-edit; re-add with the shadcn CLI. |
 | `tests/` | Proof. Runs against the real local Supabase stack, never mocks. |
 | `scripts/seed-dev.ts` | Idempotent dev seed. |
-| `docs/user-guide.md` | Complete customer-facing manual for every available screen and action: prerequisites, permissions, steps, fields/options, results, corrections, and errors. Uses customer language only and never exposes implementation phases or internals. |
+| `docs/{user,staff,portal}-guide.html` | Self-contained customer documentation: `user-guide.html` is the master audience chooser; staff and portal guides separately cover every available screen and action for their users. Uses customer language only and never exposes implementation phases or internals. |
 | `.agents/superpowers/specs/` | Product and schema design decisions (why). |
 | `.agents/orchestration/` | Cross-provider model roles, routing, budgets, prompts, approval gates, and run artifacts. |
-| `.agents/agents/documentation-maintainer.md`, `.github/workflows/documentation-agent.yml`, `.github/scripts/upsert-documentation-issue.mjs` | Post-merge documentation review criteria, GitHub trigger, structured-output handling, and deterministic issue upsert. The Claude reviewer is read-only; actionable drift becomes one follow-up issue per merged PR. |
+| `.agents/agents/documentation-maintainer.md`, `.github/workflows/documentation-agent.yml` | Post-merge and manual customer-documentation contract and automation. Claude may edit only the three guide HTML files in a read-only GitHub job; a separate deterministic job validates that bounded diff and maintains the reviewable `documentation/user-guide` pull request. |
 | `.agents/skills/` | Project-local, harness-compatible agent workflows loaded on demand. |
 | `.pi/prompts/` | Thin Pi slash-command aliases; workflow instructions remain owned by the corresponding skill. |
 | `.agents/` | This file, agent memory and progress; worktrees live under `.agents/worktrees/`. |

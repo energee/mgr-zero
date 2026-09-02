@@ -768,7 +768,7 @@ Implementation updates all affected owners in the same logical changes:
 - `.agents/ARCHITECTURE.md`;
 - schema design and schema decisions;
 - UI layout plan and wireframes;
-- `docs/user-guide.md`;
+- `docs/user-guide.html`;
 - `README.md` environment, setup, OAuth, and local Slack testing;
 - Slack app manifest and scope rationale;
 - HTTP/command documentation for every registered integration operation;
