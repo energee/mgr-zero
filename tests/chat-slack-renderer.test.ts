@@ -107,6 +107,16 @@ describe("Slack renderer · surface polish", () => {
     }
   });
 
+  // Same repetition on the message fallback `text` — the string Slack shows in
+  // the notification list and channel preview, which is the surface a person
+  // actually reads first.
+  it("never repeats the reason in the message fallback text", () => {
+    for (const item of CHAT_PREVIEW_FIXTURES.find((f) => f.id === "app-home")!.items) {
+      const { text } = renderSlackMessage(item, { mgrBaseUrl: MGR, intentId: "intent-1" });
+      expect(text.toLowerCase().split(item.title.toLowerCase()).length - 1, `"${text}"`).toBe(1);
+    }
+  });
+
   // Every button was rendered without a `style`, so the sole call to action on
   // an unlinked App Home was indistinguishable from a secondary control.
   it("marks the point of each surface primary, and never more than one", () => {
