@@ -78,7 +78,7 @@ money cents.
 
 | Enum | Values | Notes |
 |---|---|---|
-| `staff_role` | `admin, sales, warehouse, brewer` | `brewer` added at review |
+| `staff_role` | `admin, sales, warehouse, brewer` | `brewer` added at review **· `taproom` added by §16.13** |
 | `customer_type` | `distributor, retailer, brewery, other` | unchanged |
 | `package_type` | `keg, can, bottle` | unchanged |
 | `keg_size` | `half_bbl, quarter_bbl, sixth_bbl, fifty_l, thirty_l, twenty_l` | physical set; safe as enum |
@@ -945,7 +945,36 @@ website is a client, not a second store, so nothing can diverge — unlike
 `tap_label` (§16.8), where two systems would each keep their own copy. MGR's own
 tap board issues the same commands.
 
-**Concurrency, still open:** `request_id` makes a retry safe but does not stop
+**`taproom` role — new.** `staff_role` gains `taproom`. It is the first role that
+maps to a shift rather than a function: a bartender needs the tap board and POS
+reconciliation and nothing else, which is a narrow read surface and good for RLS.
+
+**Tapping a keg that is not in taproom stock is allowed.** The interval is
+flagged `not_in_inventory` and posts no depletion — an event keg or one carried
+over still gets a yield number from its nominal size, it simply does not touch
+the ledger.
+
+**Concurrency.** The realistic failure is not two simultaneous clicks; it is a
+duplicate action from uncertainty — the website posts a swap, the bartender does
+not see it land, and swaps again on the board a minute later, producing two
+intervals or a phantom keg. Two guards:
+
+1. **Compare-and-swap.** The command carries the open interval's id and the RPC
+   requires `closed_at is null`. The second call fails with copy a human can act
+   on: *"Hazy IPA was already swapped out at 7:42pm."* No infrastructure, and it
+   makes the duplicate impossible rather than merely visible.
+2. **Recent tap events on the board** — last few actions with who and when. This
+   does not prevent anything; it is the correction path.
+
+**Live updates.** Subscribe to `keg_taps` filtered by brewery via Supabase
+Realtime, on the tap board page only, unsubscribed on navigate away. RLS applies
+to the subscription. One socket per open page in one taproom is single-digit
+connections. A 30-second poll of `list_open_taps` is an adequate fallback — the
+data changes a handful of times a day. Realtime is a nicety here; guard 1 is what
+prevents the bug, so if Realtime ever becomes a burden it can be deleted with
+nothing else breaking. Do not build a general realtime layer for it.
+
+**Still open:** `request_id` makes a retry safe but does not stop
 two people acting at once. A swap should carry the open interval's id and fail
 loudly if it is already closed, rather than opening a second interval.
 
@@ -991,10 +1020,15 @@ Still open:
    missing role the actual gap? (§16.13)
 5. Quarters or eighths for fill — and do you weigh kegs? Tare weights are known
    per keg size, so weighing turns an estimate into a measurement. (§16.8)
-6. Can a keg be tapped that was never `taproom_transfer`red into taproom stock?
-   Block it, or auto-post the transfer as part of tapping? (§16.13)
-7. Concurrency on swap — carry the open interval's id and fail on a closed one?
-   (§16.13)
+6. **When does the depletion post — transfer, tap, or kick?** §16.13 currently
+   says tap, and that is probably wrong. TTB removal happens when beer leaves
+   the bonded area, which is `taproom_transfer`; posting there makes tap and
+   kick purely operational and therefore freely correctable, which matters a
+   great deal now that two systems write them. Posting at tap means a mis-tap
+   writes a false depletion that needs a compensating movement in an append-only
+   ledger. Posting at kick keeps on-hand accurate while pouring but leaves a keg
+   that has been on for three weeks reading as full stock. **This one blocks
+   §16.8 and §16.13 and should be answered before either is built.**
 
 ### 16.16 Build order when this is migrated
 
