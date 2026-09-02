@@ -125,7 +125,7 @@ A file may have only one active owner. Sequential tasks may transfer ownership a
 
 | Owner | Exclusive files while active |
 |---|---|
-| Coordinator | this plan, task integration, conflict resolution, final traceability, and shared truth docs: `README.md`, `docs/user-guide.md`, `.agents/ARCHITECTURE.md`, `.agents/MEMORY.md`, `.agents/PROGRESS.md` |
+| Coordinator | this plan, task integration, conflict resolution, final traceability, and shared truth docs: `README.md`, `docs/user-guide.html`, `.agents/ARCHITECTURE.md`, `.agents/MEMORY.md`, `.agents/PROGRESS.md` |
 | Database boundary owner | `supabase/migrations/00001_baseline.sql`, database exploit/invariant tests, and the mutation command modules named in Tasks 3–5 |
 | Auth/session owner | environment modules, Supabase clients, `proxy.ts`, auth routes/actions/pages, brewery/customer request context, invitation UI |
 | Framework owner | `package.json`, `package-lock.json`, `.node-version`, Vitest config, bundle evidence |
@@ -189,7 +189,7 @@ graph TD
 **Wave 0:** Task 1, then Task 2.
 **Wave 1:** one sequential database lane (Tasks 3 → 4 → 5), one auth foundation lane (Task 6, then Task 7 after Task 5), and one framework lane (Task 8) may run concurrently. The automation lane starts Task 9 only after Tasks 6 and 8; Tasks 10 and 11 may then run concurrently because shared truth-doc edits are coordinator-serialized. At most six specialists run concurrently.
 **Wave 1 review gate:** database, security, and performance reviewers must approve the Data API boundary, idempotency semantics, and request-auth/environment contracts before Wave 2.
-**Wave 2:** Task 12, then Tasks 13 and 14 in parallel; Task 15 follows Task 14. Shared `docs/user-guide.md` deltas from Tasks 13 and 14 are applied serially by the coordinator before their separate commits.
+**Wave 2:** Task 12, then Tasks 13 and 14 in parallel; Task 15 follows Task 14. Shared `docs/user-guide.html` deltas from Tasks 13 and 14 are applied serially by the coordinator before their separate commits.
 **Wave 2 review gate:** database, security, performance, and accessibility reviewers approve the end-to-end application paths.
 **Wave 3:** Tasks 16, 17, and 18 may run by code ownership, while coordinator-owned README/current-state edits are integrated serially; then Task 19. Stop for a checkpoint after each wave because each wave can be multi-hour.
 
@@ -313,16 +313,16 @@ graph TD
 ### Task 10 — Separate interactive agents and make docs/dreaming recovery deterministic
 
 - **Findings:** DOC06, DOC07, DOC09, DOC10, DOC11, DOC12; supersedes PR #21.
-- **Test first:** create `tests/agent-automation.test.ts` and extend `.github/scripts/upsert-documentation-issue.test.mjs`. Prove that the interactive agent directory cannot see the CI dreaming prompt, the workflow uses the primary `refs/dreaming/last-checked` base, flag-only drift creates a tracked diff, invalid/missing model output creates a deterministic recovery issue, and hostile model fields cannot create headings, links, HTML, or mentions.
+- **Test first:** create `tests/agent-automation.test.ts` for dreaming and retain `tests/documentation-agent.test.ts` for the customer guide. Prove that the interactive agent directory cannot see the CI dreaming prompt, the workflow uses the primary `refs/dreaming/last-checked` base, flag-only drift creates a tracked diff, and the documentation workflow accepts only a self-contained `docs/user-guide.html` diff.
 - **Create:** `.github/agents/dreaming.md`, `.agents/DRIFT.md` with a module-level purpose comment/heading.
 - **Move/remove:** move CI-only content out of `.agents/agents/dreaming.md`; remove the old interactive projection rather than leaving an alias.
-- **Modify:** `.github/workflows/dreaming.yml`, `.github/workflows/documentation-agent.yml`, `.github/scripts/upsert-documentation-issue.mjs`, `.github/scripts/upsert-documentation-issue.test.mjs`, `tests/agent-automation.test.ts`, `AGENTS.md`. The coordinator applies the architecture delta before commit.
+- **Modify:** `.github/workflows/dreaming.yml`, `.github/workflows/documentation-agent.yml`, `.agents/agents/documentation-maintainer.md`, `docs/user-guide.html`, `tests/agent-automation.test.ts`, `tests/documentation-agent.test.ts`, `AGENTS.md`. The coordinator applies the architecture delta before commit.
 - **Dreaming contract:** the workflow calculates one base SHA from `refs/dreaming/last-checked`, injects it as trusted context, and advances the marker only after successful push/PR handling. Flag-only results update `.agents/DRIFT.md`, ensuring a commit and PR exist. Preserve PR #21’s useful CI-context statement without its divergent last-`dream:` base logic.
-- **Docs-agent contract:** an always-running tracking step parses model output inside JavaScript. `DOCS_OK` closes the path; valid `DOCS_GAP` upserts the ordinary gap issue; failure, empty output, or invalid JSON upserts a distinct automation-recovery issue with a manual checklist. Render each model field with a per-field character cap inside escaped `<pre>` content, break `@` mentions with a zero-width separator, cap finding count, and retain the 60,000-character total ceiling.
-- **Acceptance:** hostile fixtures remain inert in rendered issue Markdown; failure fixtures always produce a recovery payload; last-checked and flag-only tests pass; workflow contract tests pass; `npx tsc --noEmit`; `npm run lint`.
+- **Docs-agent contract:** after each merge, the read-only GitHub job audits every current user-facing route and may edit only the self-contained customer field manual. A separate deterministic job rejects wider or active-content changes and maintains one reviewable documentation branch and pull request; the model never commits to `main` or receives a write-capable GitHub token.
+- **Acceptance:** the guide covers every current staff and portal surface; the model edit allowlist and deterministic single-file validator are pinned by tests; last-checked and flag-only tests pass; workflow contract tests pass; `npx tsc --noEmit`; `npm run lint`.
 - **Depends on:** Task 9. May run in parallel with Task 11 because specialist-owned files do not overlap; coordinator-owned documentation deltas are applied serially.
 - **Commit boundary:** `security(agents): isolate prompts and persist recovery state`.
-- **Rollback:** revert workflow, prompt move, ledger, script, tests, and docs together; do not advance any real marker during local validation.
+- **Rollback:** revert workflow, prompt move, ledger, customer guide, tests, and docs together; do not advance any real marker during local validation.
 
 ### Task 11 — Replace model-controlled approval with signed external authorization
 
@@ -409,7 +409,7 @@ graph TD
 
 - **Findings:** DOC01, DOC02, DOC03, DOC04, DOC05, DOC13; final documentation consistency for all behavioral findings.
 - **Test first:** create `tests/documentation-contract.test.ts`. Prove one canonical HTTP API document exists, the HTTP API agent reads it deterministically, all registry operations are documented, user-guide journeys include implemented customer/order/portal/import/invitation/recovery behavior, stale completion claims are absent, and no unused `DEPLOYMENT_MODE` claim remains.
-- **Modify:** `docs/api/command.md`, `README.md`, `docs/user-guide.md`, `.agents/agents/http-api.md`, `.agents/ARCHITECTURE.md`, `.agents/MEMORY.md`, `.agents/PROGRESS.md`, `tests/documentation-contract.test.ts`.
+- **Modify:** `docs/api/command.md`, `README.md`, `docs/user-guide.html`, `.agents/agents/http-api.md`, `.agents/ARCHITECTURE.md`, `.agents/MEMORY.md`, `.agents/PROGRESS.md`, `tests/documentation-contract.test.ts`.
 - **Canonical API contract:** README contains one concise link/summary, not two `## HTTP API` sections. The HTTP API agent reads `docs/api/command.md`, verifies exactly one marker pair, and fails closed on duplication. Document request ids, correlation ids, final success/failure envelopes, rate-limit responses, auth, query/write distinctions, and all registry operations.
 - **User/current-state contract:** explain complete customer/order/invoice/portal/import/invitation/password-recovery correction flows in plain customer language; align progress with actual delivered behavior; record durable architecture changes, especially the narrow security-definer boundary and transactional idempotency. Remove the unused `DEPLOYMENT_MODE` claim rather than inventing runtime behavior.
 - **Acceptance:** documentation contract tests pass; `listTools()` and the canonical API operation list are exact set equals; duplicated HTTP heading count is zero outside the canonical document; stale claims are corrected; `npx tsc --noEmit`; `npm run lint`.
