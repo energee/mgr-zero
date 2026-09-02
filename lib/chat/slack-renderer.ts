@@ -9,11 +9,23 @@ const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + "…"
 const header = (text: string): Block => ({ type: "header", text: { type: "plain_text", text: clip(text, 150), emoji: false } });
 const section = (text: string): Block => ({ type: "section", text: { type: "mrkdwn", text: clip(text, 3000) } });
 const context = (text: string): Block => ({ type: "context", elements: [{ type: "mrkdwn", text: clip(text, 2000) }] });
-const linkButton = (label: string, url: string): Block => ({ type: "button", action_id: "open_mgr", text: { type: "plain_text", text: clip(label, 75), emoji: false }, url });
+// `primary` marks the one action a surface exists for. Never set it on a
+// repeated row accessory: Slack expects at most one primary button in view.
+const linkButton = (label: string, url: string, primary = false): Block => ({
+  type: "button", action_id: "open_mgr", text: { type: "plain_text", text: clip(label, 75), emoji: false }, url,
+  ...(primary ? { style: "primary" } : {}),
+});
 const intentButton = (action: PortableAction, intentId: string): Block => ({
   type: "button", action_id: action.id, text: { type: "plain_text", text: clip(action.label, 75), emoji: false }, value: intentId,
 });
 const actions = (elements: Block[]): Block[] => (elements.length ? [{ type: "actions", elements: elements.slice(0, 25) }] : []);
+
+// A subject's safeLabel sometimes already carries its reason ("FV2 · reading
+// overdue"), so appending the title would read "… · Reading overdue" twice.
+const rowLabel = (n: PortableNotification) =>
+  n.subject.safeLabel.toLowerCase().includes(n.title.toLowerCase())
+    ? n.subject.safeLabel
+    : `${n.subject.safeLabel} · ${n.title}`;
 
 const REASON_LABEL: Record<PortableNotification["reason"], string> = {
   submitted_order: "Review submitted order", pick_due: "Pick due", delivery_next: "Next stop",
@@ -29,7 +41,7 @@ export function renderSlackMessage(n: PortableNotification, o: MessageOptions): 
   const blocks: Block[] = [header(n.subject.safeLabel), section(`*${n.title}*\n${n.detail}`), context(status)];
   if (!o.resolved) {
     const buttons = n.actions.filter((a) => a.enabled).map((a) =>
-      a.id === "open_mgr" ? linkButton(a.label, `${o.mgrBaseUrl}${openPath}`) : intentButton(a, o.intentId),
+      a.id === "open_mgr" ? linkButton(a.label, `${o.mgrBaseUrl}${openPath}`, true) : intentButton(a, o.intentId),
     );
     blocks.push(...actions(buttons));
   }
@@ -58,7 +70,7 @@ export function renderSlackHome(o: HomeOptions): { type: "home"; blocks: Block[]
     return { type: "home", blocks: [
       header("Your MGR work"),
       section("Link your account to see only work your current brewery role permits."),
-      ...actions([linkButton("Link MGR account", o.linkUrl)]),
+      ...actions([linkButton("Link MGR account", o.linkUrl, true)]),
       context("No customer contacts, prices or notes are posted here."),
     ] };
   }
@@ -68,10 +80,10 @@ export function renderSlackHome(o: HomeOptions): { type: "home"; blocks: Block[]
     const openPath = n.actions.find((a) => a.id === "open_mgr")?.url ?? `/orders/${n.subject.id}`;
     blocks.push({
       type: "section",
-      text: { type: "mrkdwn", text: clip(`*${n.subject.safeLabel} · ${n.title}*\n${n.detail}`, 3000) },
+      text: { type: "mrkdwn", text: clip(`*${rowLabel(n)}*\n${n.detail}`, 3000) },
       accessory: linkButton("Open", `${o.mgrBaseUrl}${openPath}`),
     });
   }
-  blocks.push(...actions([linkButton("Open Today in MGR", `${o.mgrBaseUrl}/`)]));
+  blocks.push(...actions([linkButton("Open Today in MGR", `${o.mgrBaseUrl}/`, true)]));
   return { type: "home", blocks };
 }
