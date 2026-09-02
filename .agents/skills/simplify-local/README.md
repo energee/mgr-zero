@@ -6,7 +6,7 @@ Invoke it directly with:
 
 ```text
 /skill:simplify
-/skill:simplify lib/commands/orders.ts
+/skill:simplify-local lib/commands/orders.ts
 ```
 
 The project prompt template at `.pi/prompts/simplify.md` also provides the

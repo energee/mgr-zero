@@ -16,12 +16,15 @@ npx agent-browser skills get core --full
 
 Then follow that guide. Repo-specific rules on top of it:
 
-1. **Always pass `--session <branch>`** (e.g. `--session $(git branch --show-current)`).
+1. **Always pass `--session <name>`**, with `/` turned into `-` — agent-browser's
+   daemon fails to start on a name containing a slash, and every branch here is
+   `type/name`:
+   `S=$(git branch --show-current | tr / -)` then `npx agent-browser --session "$S" …`.
    Sessions isolate cookies/tabs; without one, parallel `.agents/worktrees/<branch>`
    runs share a browser and log each other out.
 2. **Target the right port.** `npm run dev` is 3000; `npm run test:e2e` runs its own
    `next dev` on 3100. Log in via the dev accounts in `README.md`.
-3. **Close your session when done:** `npx agent-browser --session <branch> close`.
+3. **Close your session when done:** `npx agent-browser --session "$S" close`.
 4. **Prefer `snapshot` → `@ref` clicks** over guessing CSS selectors; prefer
    `get text` / `eval` over screenshots when you need a value, not a look.
 5. Lightpanda is not a supported engine here (see `tests-e2e/portal-smoke.ts`);

@@ -1,5 +1,5 @@
 ---
-name: simplify
+name: simplify-local
 description: Simplifies recently modified code for clarity, consistency, and maintainability while preserving behavior. Use after implementing or refactoring code, or when the user asks to simplify, clean up, reduce complexity, or perform a final code-quality pass.
 ---
 
