@@ -41,4 +41,13 @@ describe("MGR mark", () => {
     }
     expect(match[1]).toBe(MGR_ICON_PATH);
   });
+
+  it("keeps a favicon.ico fallback for clients without SVG icon support", () => {
+    // app/icon.svg alone leaves the conventional /favicon.ico a 404, which
+    // crawlers and link unfurlers still request. Raster, so only presence and
+    // the ICO magic number are checked - the geometry guard is the SVG above.
+    const ico = readFileSync(resolve(root, "app/favicon.ico"));
+    expect(ico.subarray(0, 4)).toEqual(Buffer.from([0, 0, 1, 0]));
+    expect(ico.byteLength).toBeGreaterThan(0);
+  });
 });
