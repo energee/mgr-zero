@@ -749,7 +749,23 @@ of one item, so the current key collapses them into one depletion number.
 Add `external_variation_id` to the key and let `qty_per_sale` derive from the
 poured format rather than being hand-entered.
 
-### 16.6 `bins` — new
+### 16.6 `bins` — new, one per location minimum (decided 2026-09-02)
+
+**Every location gets a default bin**, created with it and named for it. `bin_id`
+is therefore `NOT NULL` everywhere it appears — movements, pars, menus — and
+there is no nullable branch anywhere downstream. A brewery that never subdivides
+sees one bin it can ignore; one that does adds bins beside the default.
+
+This supersedes the earlier "nullable, required once a location has bins"
+proposal. That version was correct but bought a permanent "or null" in every
+on-hand, availability and par query to avoid one setup artifact. Trading a bin
+nobody asked for against deleting a class of null-handling is worth it.
+
+`taproom_pars` re-keys on bin for the same reason: "keep 4 cases in the to-go
+fridge" becomes expressible, and a brewery that does not care sets it on the
+default bin.
+
+#### original note
 
 Physical subdivisions of a location: cooler, walk-in, to-go fridge. Menus read
 them, so availability is derived from stock rather than hand-flipped.
@@ -896,18 +912,91 @@ is a strictly additive change, so starting format-only is safe.
 `packaging_run_consumptions` already records what was actually consumed, so
 history is unaffected either way — the BOM is a plan, not a fact of record.
 
-### 16.13 Open questions
+### 16.13 Tap events: swap is the primitive (decided 2026-09-02)
+
+A bartender changing a keg performs **one** act, but a kick-then-tap model asks
+for two records. The gap between them is where data goes missing, and it is
+worst exactly when it matters — a follow keg of the same beer, where nothing
+looks wrong afterwards.
+
+So the primitive is the swap:
+
+| Command | Effect |
+| --- | --- |
+| `tap_keg` | opens an interval |
+| `swap_keg` | closes A and opens B **in one RPC**, defaulting to the same SKU |
+| `kick_keg` | closes A with a reason; tap goes empty |
+
+`swap_keg` being one transaction is the same discipline as the keg-return RPC:
+an interval can never be left open by a half-finished swap.
+
+**This is also why tap lines were the wrong model.** The follow-keg ambiguity is
+not about where a keg is plugged in — it is about whether the handoff was
+recorded atomically. Model the swap and the ambiguity disappears with zero
+knowledge of physical lines.
+
+Two kegs of one SKU open at once still happens (two taps of the flagship).
+Sales split proportionally across open intervals, and any per-keg yield derived
+from an overlap is labelled *split*, never presented as measured.
+
+**Two writers, one truth.** MGR stores tap state; the brewery website drives it
+through `tap_keg` / `swap_keg` / `kick_keg` and reads `list_open_taps`. The
+website is a client, not a second store, so nothing can diverge — unlike
+`tap_label` (§16.8), where two systems would each keep their own copy. MGR's own
+tap board issues the same commands.
+
+**Concurrency, still open:** `request_id` makes a retry safe but does not stop
+two people acting at once. A swap should carry the open interval's id and fail
+loudly if it is already closed, rather than opening a second interval.
+
+**Tap board.** One row per open keg, showing what is on, since when, and an
+estimated remaining percentage derived from POS sales against nominal volume,
+with `Swap` and `Kicked` actions. The estimate is what makes the screen worth
+opening — a screen that only takes data from people gets ignored; one that says
+what is about to run out gets used. Frame drawn in the wireframes.
+
+### 16.14 POS reconciliation: partial posting, taproom items ignored (decided 2026-09-02)
+
+**A mapped line posts its depletion even if another line on the same sale is
+unmapped.** Three pints and an unmapped pretzel: the pints deplete, the pretzel
+does not hold the sale.
+
+**Items created in Square are ignored, not queued.** MGR auto-maps the variations
+it published, so it already knows their ids — mapping is born rather than
+discovered. Anything else was created by the taproom (food, merch, guest taps)
+and will never map, so it carries an `ignored` state instead of sitting in the
+unmapped list forever. A list permanently showing forty unmappable rows is a
+list nobody reads, and a genuinely unmapped beer would hide in it.
+
+`pos_unmapped_items` therefore keys on variation and means *needs attention*,
+not *everything Square sells that is not ours*.
+
+### 16.15 Open questions
+
+**Resolved 2026-09-02:** BOM belongs to the format (§16.12); every location has
+a default bin and `bin_id` is `NOT NULL` (§16.6); a COLA attaches to a **brand**,
+so `product_approvals` becomes `brand_approvals` keyed by `brand_id` — a blend
+shipping as a new brand needs its own approval, which is correct because it is a
+different label; swap is the tap primitive (§16.13); partial posting and ignored
+taproom items (§16.14).
+
+Still open:
 
 1. Formats fully sized, or shape-only? (§16.2)
 2. Tiers priced by format with SKU override, or the reverse? (§16.4)
 3. Does a poured format bind to one packaged format, or to a brand? Binding to a
    format makes bin-derived availability exact. (§16.2)
-4. Do bartenders post the tap event, or only the kick? If only the kick, the
-   interval must be inferred from the previous kick of the same SKU. (§16.8)
+4. Which role runs the tap board? Roles are `admin | sales | warehouse | brewer`
+   and there is no `taproom` role — does a bartender get `warehouse`, or is the
+   missing role the actual gap? (§16.13)
 5. Quarters or eighths for fill — and do you weigh kegs? Tare weights are known
    per keg size, so weighing turns an estimate into a measurement. (§16.8)
+6. Can a keg be tapped that was never `taproom_transfer`red into taproom stock?
+   Block it, or auto-post the transfer as part of tapping? (§16.13)
+7. Concurrency on swap — carry the open interval's id and fail on a closed one?
+   (§16.13)
 
-### 16.14 Build order when this is migrated
+### 16.16 Build order when this is migrated
 
 `brands` rename → `formats` + `skus.format_id` + `format_bom` → `bins` → `sale_channels`
 (most dangerous, needs movement tests green) → price tiers → `pos_menus` →
