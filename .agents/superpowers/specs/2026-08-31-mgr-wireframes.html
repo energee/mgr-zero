@@ -43,7 +43,11 @@ h1{font:700 30px/1.05 "Familjen Grotesk",sans-serif;margin:0 0 6px;letter-spacin
 /* frame — one surface language inside the device: hairline --line2 structure; the
    ledger tape is the only left rule; dashed survives only as the disabled affordance */
 .ph{background:var(--sf);border:1.5px solid var(--line);border-radius:20px;height:900px;display:flex;flex-direction:column;min-width:0;max-width:100%;overflow:hidden;font-size:11.5px}
-.ph.desk{height:520px;border-radius:6px;flex-direction:row}
+.ph.desk{height:520px;border-radius:6px;flex-direction:row;width:100%;max-width:880px}
+/* Desk frames tile like windows rather than each claiming a full row; a wide
+   frame (Square tables, QBO invoices) still spans, and on a large display the
+   grid simply fits more per row. */
+.grid.deskgrid{grid-template-columns:repeat(auto-fill,minmax(min(880px,100%),1fr));justify-items:start}
 .ph.desk .rail{width:150px;border-right:1px solid var(--line2);padding:10px;color:var(--ink2);font-size:11px;display:flex;flex-direction:column;gap:3px}
 .ph.desk .rail b{margin-top:8px;font:600 9.5px "JetBrains Mono",monospace;text-transform:uppercase;letter-spacing:.05em;color:var(--ink2)}
 .ph.desk .rail b:first-child{margin-top:0}
@@ -659,9 +663,9 @@ function render(view='phone'){
   for(const s of SCREENS){
     if(venueOf(s)!==HOME)continue; // other venues get their own sections
     if(s.step!==last){out+=`<h2 class="grp">Build step ${s.step} — ${STEPS[s.step]}</h2>`;last=s.step;}
-    out+=card(s,(view==='desk'||s.desk)?deskView(s):phone(s),(s.desk||s.ex||view==='desk'));
+    out+=card(s,(view==='desk'||s.desk)?deskView(s):phone(s),(s.wide||((s.desk||s.ex)&&view!=='desk')));
   }
-  document.getElementById('grid').innerHTML=out;
+  const g=document.getElementById('grid');g.classList.toggle('deskgrid',view==='desk');g.innerHTML=out;
 }
 // Foreign-venue frames ignore the phone/desk toggle: Slack looks like Slack on
 // both. Each venue gets its own section so the chrome switch is unmistakable.
