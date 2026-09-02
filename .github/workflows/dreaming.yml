@@ -79,7 +79,7 @@ jobs:
           fetch-depth: 0 # the dream reads history since the last dream
           token: ${{ steps.mgr-app.outputs.token }}
 
-      - name: Resolve MGR bot identity
+      - name: Set git identity for the dream
         id: mgr-bot
         env:
           GH_TOKEN: ${{ github.token }}
@@ -87,16 +87,12 @@ jobs:
           slug="${{ steps.mgr-app.outputs.app-slug }}"
           login="${slug}[bot]"
           id="$(gh api "users/${login}" --jq .id)"
+          git config user.name "$login"
+          git config user.email "${id}+${login}@users.noreply.github.com"
           {
             echo "login=$login"
             echo "id=$id"
-            echo "email=${id}+${login}@users.noreply.github.com"
           } >> "$GITHUB_OUTPUT"
-
-      - name: Set git identity for the dream
-        run: |
-          git config user.name "${{ steps.mgr-bot.outputs.login }}"
-          git config user.email "${{ steps.mgr-bot.outputs.email }}"
 
       - name: Check for new commits since the last dream
         id: window

@@ -1,6 +1,6 @@
 // tests/workflow-contract.test.ts — preserves the production-readiness workflow fixes merged in PRs #21 and #22.
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { matchesGlob, resolve } from "node:path";
 import { configDefaults } from "vitest/config";
 import { describe, expect, it } from "vitest";
@@ -218,11 +218,9 @@ describe("production-readiness workflow contract", () => {
       botId: "${{ steps.mgr-bot.outputs.id }}",
       botName: "${{ steps.mgr-bot.outputs.login }}",
     });
+    expect(dreaming).toContain('git config user.name "$login"');
     expect(dreaming).toContain(
-      'git config user.name "${{ steps.mgr-bot.outputs.login }}"'
-    );
-    expect(dreaming).toContain(
-      'git config user.email "${{ steps.mgr-bot.outputs.email }}"'
+      'git config user.email "${id}+${login}@users.noreply.github.com"'
     );
     expect(dreaming).not.toContain("dreaming-bot");
     expect(dreaming).toContain(
@@ -235,10 +233,9 @@ describe("production-readiness workflow contract", () => {
     const png = readFileSync(icon);
 
     expect({
-      exists: existsSync(icon),
       isPng: png.subarray(1, 4).toString("ascii") === "PNG",
       width: png.readUInt32BE(16),
       height: png.readUInt32BE(20),
-    }).toEqual({ exists: true, isPng: true, width: 1024, height: 1024 });
+    }).toEqual({ isPng: true, width: 1024, height: 1024 });
   });
 });

@@ -30,7 +30,7 @@ export function LoginForm({
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
         <CardHeader className="text-center">
-          <MgrIcon size={40} className="mx-auto text-foreground" />
+          <MgrIcon size={40} className="mx-auto" />
           <CardTitle className="text-xl">Sign in to MGR</CardTitle>
           <CardDescription>Brewery operations management</CardDescription>
         </CardHeader>
