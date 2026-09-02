@@ -27,6 +27,10 @@ const rowLabel = (n: PortableNotification) =>
     ? n.subject.safeLabel
     : `${n.subject.safeLabel} · ${n.title}`;
 
+// The open_mgr action carries the deep link; orders are the default subject.
+const openPathFor = (n: PortableNotification) =>
+  n.actions.find((a) => a.id === "open_mgr")?.url ?? `/orders/${n.subject.id}`;
+
 const REASON_LABEL: Record<PortableNotification["reason"], string> = {
   submitted_order: "Review submitted order", pick_due: "Pick due", delivery_next: "Next stop",
   fermentation_reading_overdue: "Reading overdue", operations_digest: "Operations",
@@ -35,7 +39,7 @@ const REASON_LABEL: Record<PortableNotification["reason"], string> = {
 type MessageOptions = { mgrBaseUrl: string; intentId: string; resolved?: boolean };
 
 export function renderSlackMessage(n: PortableNotification, o: MessageOptions): { text: string; blocks: Block[] } {
-  const openPath = n.actions.find((a) => a.id === "open_mgr")?.url ?? `/orders/${n.subject.id}`;
+  const openPath = openPathFor(n);
   const status = o.resolved ? "Resolved" : REASON_LABEL[n.reason] + (n.urgency === "attention" ? " · needs attention" : "");
   const text = `${n.subject.safeLabel} · ${n.title}${o.resolved ? " · Resolved" : ""}`;
   const blocks: Block[] = [header(n.subject.safeLabel), section(`*${n.title}*\n${n.detail}`), context(status)];
@@ -77,7 +81,7 @@ export function renderSlackHome(o: HomeOptions): { type: "home"; blocks: Block[]
   const blocks: Block[] = [header(o.items.length ? `Today · ${o.items.length} waiting` : "Today")];
   if (!o.items.length) blocks.push(section("You're caught up."));
   for (const n of o.items.slice(0, 20)) {
-    const openPath = n.actions.find((a) => a.id === "open_mgr")?.url ?? `/orders/${n.subject.id}`;
+    const openPath = openPathFor(n);
     blocks.push({
       type: "section",
       text: { type: "mrkdwn", text: clip(`*${rowLabel(n)}*\n${n.detail}`, 3000) },

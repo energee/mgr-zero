@@ -25,7 +25,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
-          fetch-depth: 0
           persist-credentials: false
 
       - name: Capture change context
@@ -149,7 +148,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
-          fetch-depth: 0
 
       - uses: actions/download-artifact@v4
         with:
@@ -162,7 +160,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          git diff --quiet -- docs/user-guide.html docs/staff-guide.html docs/portal-guide.html && exit 0
           git config user.name "documentation-bot"
           git config user.email "documentation@users.noreply.github.com"
           git checkout -B documentation/user-guide
