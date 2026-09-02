@@ -373,7 +373,7 @@ h2.grp.hide{display:none}
 
 <div class="wrap">
   <h1>MGR wireframes · rev 4</h1>
-  <p class="sub"><span class="count"></span> product-destination, flow-state, overlay, chat-preview or external-record frames—not <span class="count"></span> navigation destinations. Each is implementation-ready or explicitly gated. Green = mutable, copper = append-only / finalizing / external / destructive, amber = attention. Every authenticated page receives its shell automatically; entry screens and open sheets stay focused. Frames are filtered first by <b>venue</b> — where the behaviour happens. <b>MGR app</b> is everything MGR renders itself (staff shell, portal, entry, desk); a surface the brewery touches inside somebody else’s product gets its own venue and its own chrome, drawn in that product’s design language. Slack, QuickBooks and Square are drawn; a further venue appears here the moment a screen declares it. Direction differs and is stated per venue — MGR renders the Slack surfaces itself, QuickBooks renders records MGR writes, and Square holds records MGR reads. Group and step narrow within MGR app. MGR’s own Settings screens <i>about</i> an integration stay under MGR app. Controls model shadcn composition at 48 px minimum (56 px primary/keypad on coarse pointers; 32 px cursor density in the desk view — toggle above); Hugeicons are reserved for tabs, back and close at a 2 px coarse-pointer stroke.</p>
+  <p class="sub"><span class="count"></span> product-destination, flow-state, overlay, chat-preview or external-record frames—not that many navigation destinations. Each is implementation-ready or explicitly gated. Green = mutable, copper = append-only / finalizing / external / destructive, amber = attention. Every authenticated page receives its shell automatically; entry screens and open sheets stay focused. Frames are filtered first by <b>venue</b> — where the behaviour happens. <b>MGR app</b> is everything MGR renders itself (staff shell, portal, entry, desk); a surface the brewery touches inside somebody else’s product gets its own venue and its own chrome, drawn in that product’s design language. Slack, QuickBooks and Square are drawn; a further venue appears here the moment a screen declares it. Direction differs and is stated per venue — MGR renders the Slack surfaces itself, QuickBooks renders records MGR writes, and Square holds records MGR reads. Group and step narrow within MGR app. MGR’s own Settings screens <i>about</i> an integration stay under MGR app. Controls model shadcn composition at 48 px minimum (56 px primary/keypad on coarse pointers; 32 px cursor density in the desk view — toggle above); Hugeicons are reserved for tabs, back and close at a 2 px coarse-pointer stroke.</p>
   <p class="note ship"><b>Vocabulary &mdash; decided 2026-09-02, supersedes earlier wording in this file:</b>
   a <b>brand</b> is the sellable identity (&ldquo;Lupula&rdquo;, &ldquo;Waves&rdquo;) and is what SKUs, price tiers and every
   published menu hang off &mdash; it replaces the word <i>product</i> throughout, because a
@@ -651,9 +651,15 @@ function card(s,frame,wide){
 const EXPECTED=100;
 function render(view='phone'){
   if(SCREENS.length!==EXPECTED)throw new Error(`Expected ${EXPECTED} screens, found ${SCREENS.length}`);
+  // A group with no chip is unreachable under any filter but "all" — the silent
+  // failure GROUPS earns this guard for. Chip order stays hand-authored above.
+  const missing=[...new Set(SCREENS.map(groupOf))].filter(g=>g&&!GROUPS.includes(g));
+  if(missing.length)throw new Error(`No filter chip for group(s): ${missing.join(', ')}`);
   for(const el of document.querySelectorAll('.count'))el.textContent=SCREENS.length;
   let out='',last=null;
-  for(const s of SCREENS){
+  // Sorted by step so a frame appended out of order can't split a step heading
+  // in two; the sort is stable, so within a step the authored order holds.
+  for(const s of [...SCREENS].sort((a,b)=>a.step-b.step)){
     if(venueOf(s)!==HOME)continue; // other venues get their own sections
     if(s.step!==last){out+=`<h2 class="grp">Build step ${s.step} — ${STEPS[s.step]}</h2>`;last=s.step;}
     // Spanning is for always-desk and exemplar frames in phone view only; wide is a

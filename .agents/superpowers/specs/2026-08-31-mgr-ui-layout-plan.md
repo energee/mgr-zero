@@ -276,10 +276,9 @@ The same four groups become a left rail with the four tabs as group headers and 
 subareas beneath — Beer: Inventory, **Taproom**, **Taps**, Cellar, Materials, Kegs; Work:
 Orders, Batches, Packaging, POs, Deliveries; More: Invoices, Catalog, **Menu**, Customers,
 Price lists, Recipes, Compliance, Planning, Settings (the wireframe `RAIL` mirrors this
-list) —
-hierarchy, not a flat sitemap of equal-weight links. Content gets two
-columns only where comparison matters; the default is one column. Composer is available from the visible top entry
-and `⌘K`. Viewport chooses layout; `(pointer: coarse)` independently chooses larger
+list) — hierarchy, not a flat sitemap of equal-weight links. Content gets two columns
+only where comparison matters; the default is one column. Composer is available from
+the visible top entry and `⌘K`. Viewport chooses layout; `(pointer: coarse)` independently chooses larger
 controls, so a wall tablet is desktop layout with glove-safe targets.
 
 ### Wholesale portal
