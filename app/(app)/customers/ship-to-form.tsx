@@ -1,11 +1,11 @@
-// app/(app)/customers/ship-to-form.tsx — dialog form for the upsert_ship_to
+// app/(app)/customers/ship-to-form.tsx — CommandForm (bottom sheet on phone, dialog on desk) for the upsert_ship_to
 // command. Doubles as create (no `shipTo` prop) and edit (`shipTo` prop
 // pre-fills fields and the command input carries `id`, per plan decision 8).
 "use client";
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCommandForm } from "@/lib/commands/use-command-form";
@@ -45,16 +45,9 @@ export function ShipToForm({ customerId, shipTo }: { customerId: string; shipTo?
   });
 
   return (
-    <Dialog open={form.open} onOpenChange={form.setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title={isEdit ? "Edit Ship-To" : "New Ship-To"} trigger={<Button variant="outline" size="sm">
           {isEdit ? "Edit" : "New Ship-To"}
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit Ship-To" : "New Ship-To"}</DialogTitle>
-        </DialogHeader>
+        </Button>}>
         <form onSubmit={form.submit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="ship-to-label">Label</Label>
@@ -87,14 +80,13 @@ export function ShipToForm({ customerId, shipTo }: { customerId: string; shipTo?
             <Label htmlFor="ship-to-zip">Zip</Label>
             <Input id="ship-to-zip" value={zip} onChange={(e) => setZip(e.target.value)} required />
           </div>
-          {form.error && <p className="text-sm text-red-600">{form.error}</p>}
-          <DialogFooter>
+          {form.error && <p className="text-sm text-destructive">{form.error}</p>}
+          <CommandFormFooter>
             <Button type="submit" disabled={form.submitting}>
               {form.submitting ? (isEdit ? "Saving…" : "Creating…") : isEdit ? "Save" : "Create"}
             </Button>
-          </DialogFooter>
+          </CommandFormFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </CommandForm>
   );
 }

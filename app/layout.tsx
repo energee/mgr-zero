@@ -1,7 +1,9 @@
 // app/layout.tsx — root document: plan §5 fonts (Instrument Sans body, Familjen
 // Grotesk display, JetBrains Mono data) exposed as CSS variables that
 // app/globals.css maps onto --font-sans/--font-heading/--font-mono, plus
-// viewport-fit=cover so the shells can pad for the safe area.
+// viewport-fit=cover so the shells can pad for the safe area. A tiny inline
+// script applies the `.dark` class before paint from localStorage.theme or the
+// OS preference; components/mgr/theme-toggle.tsx flips it.
 import type { Metadata, Viewport } from "next";
 import { Familjen_Grotesk, Instrument_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
@@ -15,6 +17,9 @@ export const metadata: Metadata = {
   description: "Brewery operations management",
 };
 
+const THEME_BOOT =
+  "(()=>{try{const t=localStorage.theme;if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch{}})()";
+
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -23,6 +28,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="en"
       className={`${instrumentSans.variable} ${familjenGrotesk.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
+      <head>
+        <script
+          // ponytail: inline boot script; a theme provider dependency would be more code for the same result
+          dangerouslySetInnerHTML={{ __html: THEME_BOOT }}
+        />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

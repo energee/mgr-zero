@@ -1,4 +1,4 @@
-// app/(app)/pricing/price-list-form.tsx — dialog form for the
+// app/(app)/pricing/price-list-form.tsx — CommandForm (bottom sheet on phone, dialog on desk) for the
 // upsert_price_list command. Doubles as create (no `priceList` prop) and edit
 // (`priceList` prop pre-fills the name and the command input carries `id`,
 // per plan decision 8).
@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCommandForm } from "@/lib/commands/use-command-form";
@@ -22,29 +22,21 @@ export function PriceListForm({ priceList }: { priceList?: PriceListEditData }) 
   });
 
   return (
-    <Dialog open={form.open} onOpenChange={form.setOpen}>
-      <DialogTrigger asChild>
-        <Button variant={isEdit ? "outline" : "default"} size={isEdit ? "sm" : "default"}>
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title={isEdit ? "Edit Price List" : "New Price List"} trigger={<Button variant={isEdit ? "outline" : "default"} size={isEdit ? "sm" : "default"}>
           {isEdit ? "Edit" : "New Price List"}
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit Price List" : "New Price List"}</DialogTitle>
-        </DialogHeader>
+        </Button>}>
         <form onSubmit={form.submit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="price-list-name">Name</Label>
             <Input id="price-list-name" value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
-          {form.error && <p className="text-sm text-red-600">{form.error}</p>}
-          <DialogFooter>
+          {form.error && <p className="text-sm text-destructive">{form.error}</p>}
+          <CommandFormFooter>
             <Button type="submit" disabled={form.submitting}>
               {form.submitting ? (isEdit ? "Saving…" : "Creating…") : isEdit ? "Save" : "Create"}
             </Button>
-          </DialogFooter>
+          </CommandFormFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </CommandForm>
   );
 }

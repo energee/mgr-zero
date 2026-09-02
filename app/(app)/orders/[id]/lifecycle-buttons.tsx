@@ -10,7 +10,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useBrewery } from "../../brewery-provider";
@@ -96,46 +96,29 @@ export function LifecycleButtons({
         {(status === "confirmed" || status === "picked") && <PickForm orderId={orderId} lines={pickLines} />}
         {status === "picked" && <ShipForm orderId={orderId} lines={pickLines} />}
         {canCancel && (
-          <Dialog
-            open={cancelOpen}
-            onOpenChange={(next) => {
-              setCancelOpen(next);
-              if (!next) {
-                setCancelReason("");
-                setError(null);
-              }
-            }}
-          >
-            <DialogTrigger asChild>
-              <Button size="sm" variant="destructive" disabled={busy}>
+          <CommandForm open={cancelOpen} onOpenChange={(next) => { setCancelOpen(next); if (!next) { setCancelReason(""); setError(null); } }} title="Cancel order" trigger={<Button size="sm" variant="destructive" disabled={busy}>
                 Cancel
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Cancel order</DialogTitle>
-              </DialogHeader>
+              </Button>}>
               <form onSubmit={submitCancel} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="cancel-reason">Reason</Label>
                   <Input id="cancel-reason" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} required />
                 </div>
-                {error && <p className="text-sm text-red-600">{error}</p>}
-                <DialogFooter>
+                {error && <p className="text-sm text-destructive">{error}</p>}
+                <CommandFormFooter>
                   <Button type="submit" disabled={busy}>
                     {busy ? "Cancelling…" : "Cancel order"}
                   </Button>
-                </DialogFooter>
+                </CommandFormFooter>
               </form>
-            </DialogContent>
-          </Dialog>
+            </CommandForm>
         )}
       </div>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-destructive">{error}</p>}
       {warnings.length > 0 && (
         <div className="flex flex-col gap-1">
           {warnings.map((w) => (
-            <p key={w.sku_id} className="text-sm text-amber-700">
+            <p key={w.sku_id} className="text-sm text-warning-foreground">
               ATP negative for {skuNames.get(w.sku_id) ?? w.sku_id}
             </p>
           ))}

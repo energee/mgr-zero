@@ -1,4 +1,4 @@
-// app/(app)/orders/[id]/ship-form.tsx — dialog form for the ship_order
+// app/(app)/orders/[id]/ship-form.tsx — CommandForm (bottom sheet on phone, dialog on desk) for the ship_order
 // command. The plpgsql fn requires the ship array to cover every order line,
 // so unpicked/held-back lines are sent with qty 0; qty defaults to each
 // line's qty_picked. On success shows a link to the created invoice when the
@@ -11,7 +11,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useBrewery } from "../../brewery-provider";
@@ -66,20 +66,7 @@ export function ShipForm({ orderId, lines }: { orderId: string; lines: ShipLine[
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) reset();
-      }}
-    >
-      <DialogTrigger asChild>
-        <Button size="sm">Ship</Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Ship order</DialogTitle>
-        </DialogHeader>
+    <CommandForm open={open} onOpenChange={(next) => { setOpen(next); if (!next) reset(); }} title="Ship order" trigger={<Button size="sm">Ship</Button>}>
         {shipped ? (
           <div className="flex flex-col gap-4">
             <p className="text-sm">Order shipped.</p>
@@ -90,9 +77,9 @@ export function ShipForm({ orderId, lines }: { orderId: string; lines: ShipLine[
             ) : (
               <p className="text-sm text-muted-foreground">No invoice was created.</p>
             )}
-            <DialogFooter>
+            <CommandFormFooter>
               <Button onClick={() => setOpen(false)}>Close</Button>
-            </DialogFooter>
+            </CommandFormFooter>
           </div>
         ) : (
           <form onSubmit={submit} className="flex flex-col gap-4">
@@ -123,15 +110,14 @@ export function ShipForm({ orderId, lines }: { orderId: string; lines: ShipLine[
                 <Input id="ship-tracking" value={tracking} onChange={(e) => setTracking(e.target.value)} />
               </div>
             </div>
-            {error && <p className="text-sm text-red-600">{error}</p>}
-            <DialogFooter>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <CommandFormFooter>
               <Button type="submit" disabled={busy}>
                 {busy ? "Shipping…" : "Ship"}
               </Button>
-            </DialogFooter>
+            </CommandFormFooter>
           </form>
         )}
-      </DialogContent>
-    </Dialog>
+      </CommandForm>
   );
 }

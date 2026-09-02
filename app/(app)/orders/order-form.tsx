@@ -1,4 +1,4 @@
-// app/(app)/orders/order-form.tsx — dialog form for the create_order command.
+// app/(app)/orders/order-form.tsx — CommandForm (bottom sheet on phone, dialog on desk) for the create_order command.
 // Customer selection cascades to that customer's ship-tos (data pre-loaded by
 // the server page, no extra round trip); kind toggles wholesale (customer +
 // ship-to) vs taproom transfer (to-location only), per the orders check
@@ -8,7 +8,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -84,14 +84,7 @@ export function OrderForm({
   }
 
   return (
-    <Dialog open={form.open} onOpenChange={form.setOpen}>
-      <DialogTrigger asChild>
-        <Button>New Order</Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>New Order</DialogTitle>
-        </DialogHeader>
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title="New Order" trigger={<Button>New Order</Button>}>
         <form onSubmit={form.submit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="order-kind">Kind</Label>
@@ -228,14 +221,13 @@ export function OrderForm({
             </Button>
           </div>
 
-          {form.error && <p className="text-sm text-red-600">{form.error}</p>}
-          <DialogFooter>
+          {form.error && <p className="text-sm text-destructive">{form.error}</p>}
+          <CommandFormFooter>
             <Button type="submit" disabled={form.submitting}>
               {form.submitting ? "Creating…" : "Create"}
             </Button>
-          </DialogFooter>
+          </CommandFormFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </CommandForm>
   );
 }
