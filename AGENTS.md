@@ -32,6 +32,7 @@ below just in time — don't preload everything.
 | Simplifying recently modified code without behavior changes | `.agents/skills/simplify/SKILL.md`; in Pi use `/simplify` or `/skill:simplify` |
 | HTTP API / command-docs sync | `.agents/agents/http-api.md`; in Pi `/http-api` |
 | Next.js APIs | `node_modules/next/dist/docs/` (this version differs from training data) |
+| Driving a browser (view the running app, E2E) | `npx agent-browser skills get core --full`; the only browser tool here — not `mcp__claude-in-chrome__*` |
 
 ## Operating loop
 
@@ -42,7 +43,10 @@ below just in time — don't preload everything.
    (Claude Code, pi, Codex, or other). Exception: UI rendering — TDD the
    logic below the component boundary; step 4 covers the eyeball check.
 4. Prove it: `npx vitest run && npx tsc --noEmit && npm run lint`. For UI, look
-   at the rendered page — tests don't cover rendering.
+   at the rendered page — tests don't cover rendering. Drive it with
+   `npx agent-browser --session <branch> open http://localhost:3000/...` then
+   `snapshot` / `get text` / `screenshot`; `--session` keeps parallel worktrees
+   out of each other's browser, and `close` when done.
 5. `git diff` before committing (a stray NUL byte once made a file binary).
 6. Update `.agents/PROGRESS.md`; update `.agents/MEMORY.md` only if a durable
    decision changed.
