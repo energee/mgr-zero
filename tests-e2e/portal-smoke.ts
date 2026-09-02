@@ -7,20 +7,18 @@
 //
 // Drives the browser with `agent-browser` (Vercel's browser automation
 // CLI, https://www.npmjs.com/package/agent-browser) instead of Playwright.
-// Each attempt tries the Lightpanda engine (`agent-browser --engine
-// lightpanda`, which launches the `lightpanda` binary at
-// /opt/homebrew/bin/lightpanda itself — no manual `lightpanda serve` CDP
-// server needed) first; on ANY failure — connect error, crash, page error,
-// or a failed assertion — it falls back to agent-browser's bundled Chrome
-// and re-runs the full flow from scratch against a freshly seeded
-// brewery/customer (so a partially-completed Lightpanda attempt can never
-// leave stray state for the Chrome attempt to trip over). In practice
-// Lightpanda's `fill`/`type` don't reliably drive React's controlled-input
-// state here (the DOM value updates but the qty state that gates the
-// Submit button never does — see the `submitState` assertion below), so
-// this smoke test exercises the fallback path on every run; Chrome always
-// completes the flow. Whichever engine's attempt satisfies every assertion
-// wins, and its name is printed.
+// Chrome-only: agent-browser's bundled Chrome is the sole engine tried on a
+// normal run. Lightpanda is NOT attempted — its `fill`/`type` don't reliably
+// drive React's controlled-input state here (the DOM value updates but the
+// qty state gating the Submit button never does — see the `submitState`
+// assertion below), so trying it first was pure latency. Benchmark and
+// status: `.ecc/benchmarks/e2e-engines-2026-08-31.json`.
+//
+// The engine list is still a loop, so re-testing a newer lightpanda nightly
+// is `E2E_ENGINES=lightpanda,chrome npm run test:e2e`: each engine gets a
+// fresh seed and the full flow, on ANY failure (connect error, crash, page
+// error, or failed assertion) it moves to the next, and the name of the
+// engine that satisfied every assertion is printed.
 //
 // Starts its own `next dev` on port 3100 (not 3000, so it never collides
 // with another worktree's dev server checked out from the same repo) if
