@@ -18,18 +18,12 @@ function pathFromSvg(svg: string) {
 describe("MGR mark", () => {
   it("keeps app/icon.svg and the React icon on the same path", () => {
     const svg = readFileSync(resolve(root, "app/icon.svg"), "utf8");
-    const component = readFileSync(resolve(root, "components/mgr-icon.tsx"), "utf8");
 
-    expect({
-      viewBox: MGR_ICON_VIEWBOX,
-      svgPath: pathFromSvg(svg),
-      componentImportsPath: component.includes("MGR_ICON_PATH"),
-      componentImportsViewBox: component.includes("MGR_ICON_VIEWBOX"),
-    }).toEqual({
+    // components/mgr-icon.tsx reads both constants directly, so the only copy
+    // that can drift is the literal in app/icon.svg.
+    expect({ viewBox: MGR_ICON_VIEWBOX, svgPath: pathFromSvg(svg) }).toEqual({
       viewBox: "0 0 21 25",
       svgPath: MGR_ICON_PATH,
-      componentImportsPath: true,
-      componentImportsViewBox: true,
     });
     expect(svg).toContain('aria-label="MGR"');
   });

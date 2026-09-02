@@ -19,7 +19,6 @@ export function MgrIcon({
       xmlns="http://www.w3.org/2000/svg"
       className={className}
     >
-      <title>MGR</title>
       <path fill="currentColor" fillRule="evenodd" d={MGR_ICON_PATH} />
     </svg>
   );
