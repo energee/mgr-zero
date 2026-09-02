@@ -6,6 +6,7 @@
 import { getActiveCustomer } from "@/lib/portal";
 import { BreweryProvider } from "@/app/(app)/brewery-provider";
 import { logout } from "@/app/(auth)/actions";
+import { MgrIcon } from "@/components/mgr-icon";
 import Link from "next/link";
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
@@ -14,7 +15,10 @@ export default async function PortalLayout({ children }: { children: React.React
     <BreweryProvider id={customer.breweryId}>
       <div className="flex min-h-screen">
         <aside className="w-52 border-r p-4">
-          <div className="mb-6 font-semibold">{customer.customerName}</div>
+          <div className="mb-6 flex items-center gap-2 font-semibold">
+            <MgrIcon size={20} className="shrink-0" />
+            {customer.customerName}
+          </div>
           <nav className="flex flex-col gap-2 text-sm">
             <Link href="/portal">Shop</Link>
             <Link href="/portal/orders">Orders</Link>

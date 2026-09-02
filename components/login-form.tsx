@@ -19,6 +19,7 @@ import {
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { login } from "@/app/(auth)/actions"
+import { MgrIcon } from "@/components/mgr-icon"
 
 export function LoginForm({
   className,
@@ -29,6 +30,7 @@ export function LoginForm({
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
         <CardHeader className="text-center">
+          <MgrIcon size={40} className="mx-auto text-foreground" />
           <CardTitle className="text-xl">Sign in to MGR</CardTitle>
           <CardDescription>Brewery operations management</CardDescription>
         </CardHeader>

@@ -1,5 +1,6 @@
 import { getActiveBrewery } from "@/lib/brewery";
 import { BreweryProvider } from "./brewery-provider";
+import { MgrIcon } from "@/components/mgr-icon";
 import Link from "next/link";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -8,7 +9,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <BreweryProvider id={brewery.id}>
       <div className="flex min-h-screen">
         <aside className="w-52 border-r p-4">
-          <div className="mb-6 font-semibold">{brewery.name}</div>
+          <div className="mb-6 flex items-center gap-2 font-semibold">
+            <MgrIcon size={20} className="shrink-0" />
+            {brewery.name}
+          </div>
           <nav className="flex flex-col gap-2 text-sm">
             <Link href="/">Dashboard</Link>
             <Link href="/inventory">Inventory</Link>

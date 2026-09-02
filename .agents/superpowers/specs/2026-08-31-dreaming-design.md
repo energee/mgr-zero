@@ -57,17 +57,38 @@ contract:
 ## Testing
 
 Trigger once via `workflow_dispatch`; verify the dream PR (a) edits only
-editable files, (b) cites evidence for each change, (c) correctly catches the
-known current drift (PROGRESS.md predates PRs #7/#8). `ci` runs on the dream
-PR as the merge gate. Claude Code Review is skipped on `dreaming/main` (job
-skipped, not failed): the action rejects non-human PR authors, and a Claude
-review of Claude's own doc-curation PR is not useful.
+editable files, (b) cites evidence for each change, (c) is authored by
+`mgr[bot]` with the MGR GitHub App icon. `ci` runs on the dream PR as the
+merge gate (the MGR app token is not `github.token`, so GitHub does trigger
+workflows on the push). Claude Code Review is skipped on `dreaming/main`
+(job skipped, not failed): the action rejects non-human PR authors, and a
+review of the doc-curation PR is not useful.
 
-Known limitation: the dream pushes with `github.token`, and GitHub suppresses
-workflow triggers for such pushes — the dream PR gets no CI run and there is
-no branch protection; the human review of the dream PR is the entire merge
-gate. Workaround: close/reopen the dream PR to trigger CI, or switch the push
-to a PAT later.
+## MGR GitHub App identity
+
+Dream commits and PRs are the MGR GitHub App (`mgr[bot]`), not
+`claude[bot]` and not `github-actions[bot]`. The workflow mints an
+installation token (`actions/create-github-app-token@v2`) and passes it as
+`github_token` to `anthropics/claude-code-action` — without that input the
+action exchanges OIDC for Claude's app and every dream PR is authored by
+`claude[bot]`.
+
+Create the app once (GitHub → Settings → Developer settings → GitHub Apps →
+New GitHub App):
+
+1. Name **MGR** (slug `mgr`; PRs then show as `mgr[bot]`). Homepage
+   `https://github.com/energee/mgr-zero`. Uncheck webhooks.
+2. Repository permissions: **Contents** Read and write, **Pull requests**
+   Read and write, **Issues** Read-only, **Metadata** Read-only.
+3. Install on this account, only on `mgr-zero`.
+4. Upload `docs/brand/mgr-github-app-icon.png` as the app logo (GitHub
+   circle-crops it). That PNG is a 1024px raster of the canonical mark in
+   `app/icon.svg` / `lib/mgr-icon.ts` — do not draw a second logo.
+5. Generate a private key. Then:
+   `gh variable set MGR_APP_ID --body '<app id>'`
+   `gh secret set MGR_APP_PRIVATE_KEY < /path/to/mgr-private-key.pem`
+
+The next dream run fails closed until those two values exist.
 
 ## Out of scope (add if needed)
 

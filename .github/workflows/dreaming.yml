@@ -56,15 +56,47 @@ jobs:
       issues: read # gh pr list reads PR data through the issues API
       id-token: write
     steps:
+      # Mint a token for the MGR GitHub App so dream commits and PRs show as
+      # mgr[bot] with the app icon (raster of app/icon.svg at
+      # docs/brand/mgr-github-app-icon.png), and so the push can trigger CI —
+      # github.token pushes do not. Setup: create the "MGR" GitHub App
+      # (Contents R/W, Pull requests R/W, Issues R), install it on this repo,
+      # then set vars.MGR_APP_ID and secrets.MGR_APP_PRIVATE_KEY.
+      # Spec: 2026-08-31-dreaming-design.md.
+      - name: Mint MGR GitHub App token
+        id: mgr-app
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.MGR_APP_ID }}
+          private-key: ${{ secrets.MGR_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: read
+
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
           fetch-depth: 0 # the dream reads history since the last dream
+          token: ${{ steps.mgr-app.outputs.token }}
+
+      - name: Resolve MGR bot identity
+        id: mgr-bot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          slug="${{ steps.mgr-app.outputs.app-slug }}"
+          login="${slug}[bot]"
+          id="$(gh api "users/${login}" --jq .id)"
+          {
+            echo "login=$login"
+            echo "id=$id"
+            echo "email=${id}+${login}@users.noreply.github.com"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Set git identity for the dream
         run: |
-          git config user.name "dreaming-bot"
-          git config user.email "dreaming@users.noreply.github.com"
+          git config user.name "${{ steps.mgr-bot.outputs.login }}"
+          git config user.email "${{ steps.mgr-bot.outputs.email }}"
 
       - name: Check for new commits since the last dream
         id: window
@@ -90,6 +122,9 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: '${{ steps.mgr-app.outputs.token }}'
+          bot_id: '${{ steps.mgr-bot.outputs.id }}'
+          bot_name: '${{ steps.mgr-bot.outputs.login }}'
           # The redispatch job (and the daily cron) start this run as the
           # github-actions bot; the action refuses non-human actors unless
           # they are listed here.
@@ -108,10 +143,10 @@ jobs:
           # cannot touch code, migrations, or .git/** (hooks, config).
           claude_args: '--allowedTools "Read,Glob,Grep,Edit(.agents/MEMORY.md),Edit(.agents/PROGRESS.md),Edit(.agents/ARCHITECTURE.md),Edit(.agents/agents/*.md),Edit(AGENTS.md),Write(.agents/MEMORY.md),Write(.agents/PROGRESS.md),Write(.agents/ARCHITECTURE.md),Write(.agents/agents/*.md),Write(AGENTS.md),Bash(git status:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(git checkout:*),Bash(git push -f origin dreaming/main),Bash(git push --force origin dreaming/main),Bash(git push --force-with-lease origin dreaming/main),Bash(git push -u origin dreaming/main),Bash(git push origin dreaming/main),Bash(gh pr list:*),Bash(gh pr create:*),Bash(gh pr edit:*),Bash(gh pr view:*)"'
         env:
-          # github.token pushes suppress workflow triggers: the dream PR gets
-          # no CI run — close/reopen it to trigger CI, or switch to a PAT
-          # (known limitation; see the dreaming design spec).
-          GH_TOKEN: ${{ github.token }}
+          # Installation token for the MGR GitHub App — gh pr create/edit and
+          # git push then run as mgr[bot], and unlike github.token they do
+          # trigger CI on the dream PR.
+          GH_TOKEN: ${{ steps.mgr-app.outputs.token }}
 
       - name: Advance the last-checked marker
         if: steps.window.outputs.new == 'true'

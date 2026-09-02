@@ -75,4 +75,5 @@ production data (there is none yet — keep it that way by asking).
 - `.agents/worktrees/<branch>/` — the only place for worktrees: `git worktree add .agents/worktrees/<branch> -b <branch>`. Gitignored.
 - `.agents/agents/dreaming.md` — prompt for the dreaming workflow
   (`.github/workflows/dreaming.yml`) that curates the agent docs via a
-  `dreaming/main` PR; committed `.remember/today-*.md` digests are its input.
+  `dreaming/main` PR authored by the MGR GitHub App (`mgr[bot]`);
+  committed `.remember/today-*.md` digests are its input.

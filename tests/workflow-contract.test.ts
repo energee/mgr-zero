@@ -1,6 +1,6 @@
 // tests/workflow-contract.test.ts — preserves the production-readiness workflow fixes merged in PRs #21 and #22.
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { matchesGlob, resolve } from "node:path";
 import { configDefaults } from "vitest/config";
 import { describe, expect, it } from "vitest";
@@ -183,5 +183,62 @@ describe("production-readiness workflow contract", () => {
     expect(prompt).toContain(
       "You are running inside GitHub Actions (GITHUB_ACTIONS=true); the CI-only guard is satisfied"
     );
+  });
+
+  it("opens dream PRs as the MGR GitHub App, not github.token or claude[bot]", () => {
+    expect(dreaming).toMatch(
+      /^ {8}uses: actions\/create-github-app-token@v2(?:\s+#.*)?\s*$/m
+    );
+    expect(dreaming).toContain("app-id: ${{ vars.MGR_APP_ID }}");
+    expect(dreaming).toContain(
+      "private-key: ${{ secrets.MGR_APP_PRIVATE_KEY }}"
+    );
+    expect(dreaming).toContain("permission-contents: write");
+    expect(dreaming).toContain("permission-pull-requests: write");
+    expect(dreaming).toContain("permission-issues: read");
+
+    const githubToken = readActionField(
+      dreaming,
+      "anthropics/claude-code-action@v1",
+      "github_token"
+    );
+    const botId = readActionField(
+      dreaming,
+      "anthropics/claude-code-action@v1",
+      "bot_id"
+    );
+    const botName = readActionField(
+      dreaming,
+      "anthropics/claude-code-action@v1",
+      "bot_name"
+    );
+
+    expect({ githubToken, botId, botName }).toEqual({
+      githubToken: "${{ steps.mgr-app.outputs.token }}",
+      botId: "${{ steps.mgr-bot.outputs.id }}",
+      botName: "${{ steps.mgr-bot.outputs.login }}",
+    });
+    expect(dreaming).toContain(
+      'git config user.name "${{ steps.mgr-bot.outputs.login }}"'
+    );
+    expect(dreaming).toContain(
+      'git config user.email "${{ steps.mgr-bot.outputs.email }}"'
+    );
+    expect(dreaming).not.toContain("dreaming-bot");
+    expect(dreaming).toContain(
+      "token: ${{ steps.mgr-app.outputs.token }}"
+    );
+  });
+
+  it("ships a square MGR GitHub App icon rasterized from the app mark", () => {
+    const icon = resolve(__dirname, "..", "docs/brand/mgr-github-app-icon.png");
+    const png = readFileSync(icon);
+
+    expect({
+      exists: existsSync(icon),
+      isPng: png.subarray(1, 4).toString("ascii") === "PNG",
+      width: png.readUInt32BE(16),
+      height: png.readUInt32BE(20),
+    }).toEqual({ exists: true, isPng: true, width: 1024, height: 1024 });
   });
 });

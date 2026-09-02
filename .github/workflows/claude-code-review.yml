@@ -10,7 +10,8 @@ jobs:
   claude-review:
     # Skip drafts (ready_for_review retriggers). Skip dreaming/main so the
     # check is skipped, not failed: claude-code-action rejects non-human PR
-    # authors, and we don't want Claude reviewing its own doc-curation PR.
+    # authors (dream PRs are mgr[bot]), and a review of the doc-curation PR
+    # is not useful.
     if: github.event.pull_request.draft == false && github.head_ref != 'dreaming/main'
     runs-on: ubuntu-latest
     permissions:

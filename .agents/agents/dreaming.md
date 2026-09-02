@@ -47,7 +47,8 @@ Never delete a spec. Never copy secret-shaped strings out of digests.
      single-commit squash merge reuses the commit subject, and the next
      dream finds it by the `dream:` prefix) and a body listing each change
      with its evidence (commit SHA or PR number). (The workflow sets the
-     git identity before you run.)
+     git identity to the MGR GitHub App, `mgr[bot]`, before you run; the
+     PR is opened as that app, not as claude[bot].)
   3. `git push -f origin dreaming/main`
   4. `gh pr create --base main --head dreaming/main --title "dream: agent doc maintenance" --body <changes+flags>`
      — if a PR for dreaming/main already exists, `gh pr edit` its body instead.

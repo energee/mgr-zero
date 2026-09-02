@@ -28,6 +28,8 @@ never copy it into a second place.
 | `.agents/superpowers/specs/` | Product and schema design decisions (why). |
 | `.agents/orchestration/` | Cross-provider model roles, routing, budgets, prompts, approval gates, and run artifacts. |
 | `.agents/agents/documentation-maintainer.md`, `.github/workflows/documentation-agent.yml` | Post-merge and manual customer-documentation contract and automation. Claude may edit only the three guide HTML files in a read-only GitHub job; a separate deterministic job validates that bounded diff and maintains the reviewable `documentation/user-guide` pull request. |
+| `app/icon.svg`, `lib/mgr-icon.ts`, `components/mgr-icon.tsx` | Canonical MGR mark. The SVG is the Next.js favicon; the module owns the path; the component is the in-app reuse. `docs/brand/mgr-github-app-icon.png` is a 1024px raster of the same path for the MGR GitHub App avatar. |
+| `.agents/agents/dreaming.md`, `.github/workflows/dreaming.yml` | Post-merge agent-doc curation. Dream PRs are authored by the MGR GitHub App (`mgr[bot]`) using `vars.MGR_APP_ID` + `secrets.MGR_APP_PRIVATE_KEY`. |
 | `.agents/skills/` | Project-local, harness-compatible agent workflows loaded on demand. |
 | `.pi/prompts/` | Thin Pi slash-command aliases; workflow instructions remain owned by the corresponding skill. |
 | `.agents/` | This file, agent memory and progress; worktrees live under `.agents/worktrees/`. |
