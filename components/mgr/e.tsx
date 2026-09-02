@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 type RowClass = "" | "w" | "ok" | "dis";
 const dot: Partial<Record<RowClass, string>> = { w: "bg-warning-foreground", ok: "bg-primary" };
 
-/** Button kinds: p = primary, g = secondary/outline, irr = irreversible (copper). */
+/** Button kinds: p = primary, g = secondary/outline, irr = irreversible (teal). */
 type BtnKind = "p" | "g" | "irr";
 
 export const E = {

@@ -368,27 +368,31 @@ all since raised it.
 
 ## 5. Visual system
 
-The subject is a working brewhouse: stainless, hop green, copper fittings, wort warnings,
-chalk-marker utility. The one aesthetic risk is the **ledger tape**: append-only rows use
+The subject is a working brewhouse rendered quietly: neutral surfaces, one accent,
+color only where it carries meaning. The one aesthetic risk is the **ledger tape**: append-only rows use
 JetBrains Mono, a sturdy left rule, and chronological rhythm wherever physical truth is
 recorded. It is an audit surface, not decoration, and never implies a row can be deleted.
 
-| Product token | Light | Dark | Role / shadcn mapping |
+| Token | Light | Dark | Role |
 |---|---|---|---|
-| `--ground` | `#EEF0EE` | `#101713` | Stainless page → `--background` |
-| `--surface` | `#FFFFFF` | `#18211C` | Cards/sheets → `--card`/`--popover` |
-| `--ink` | `#16201B` | `#F2F5F2` | Text → `--foreground` |
-| `--hop` | `#1F4D3A` | `#8AC5A6` | Mutable primary action/active nav → `--primary` |
-| `--copper` | `#9A4E20` | `#E2A06F` | Append-only, immutable, filed, external, destructive-local action only → `--irreversible` |
-| `--warning` | `#FFF5D8` | `#30260E` | Warning surface |
-| `--warning-foreground` | `#7A5600` | `#F0C766` | Warning text; never yellow text on white |
-| `--rule` | `#9EA8A1` | `#5C6B62` | Dividers and ledger rule |
+| `--background` | `#FAFAF7` | `#1B1C18` | Page ground |
+| `--card` / `--popover` | `#FFFFFF` | `#22231F` / `#262721` | Cards, sheets, menus |
+| `--foreground` | `#1E1F1A` | `#EDEDE6` | Text |
+| `--primary` | `#6F4FD6` | `#AE81FF` | Mutable primary action, active nav, progress |
+| `--irreversible` | `#0F6B78` | `#0F6B78` | Append-only, filed, external, sign-out actions only |
+| `--warning` / `--warning-foreground` | `#FDECD2` / `#8A4A00` | `#3B2A12` / `#FDB44B` | Attention surface and text; never yellow on white |
+| `--border` | `#E3E3DC` | `#33342E` | Hairline dividers |
+| `--rule` | `#C9C9C0` | `#454640` | Ledger left rule |
 
-On-accent text is white on light hop/copper; dark mode uses `#0E241A` on hop and
-`#2B1205` on copper. Those pairs, warning text/surface, and ground/ink pass WCAG AA.
-Semantic pairs replace manual `dark:` overrides. Copper never decorates headings, tabs,
-validation/errors, neutral selections, or mutable saves; risk metadata selects it only
-for the five command classes named above.
+The remaining shadcn tokens (secondary, muted, accent, destructive, sidebar,
+chart) are set in `app/globals.css`; that file is the source of truth. The
+mood is Linear-quiet: near-grayscale neutrals with a faint warm tint, one
+violet accent, teal reserved for irreversible actions, amber for attention.
+
+Every pair passes WCAG AA in both modes. Semantic pairs replace manual `dark:`
+overrides. The irreversible accent never decorates headings, tabs, validation/errors,
+neutral selections, or mutable saves; risk metadata selects it only for the five
+command classes named above.
 
 - Display: **Familjen Grotesk**, restrained to headings and one large operational number.
 - Body: **Instrument Sans**, 16px default on phone; 14px is supporting copy, never a wet-
