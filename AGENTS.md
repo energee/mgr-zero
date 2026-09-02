@@ -46,7 +46,8 @@ below just in time — don't preload everything.
    at the rendered page — tests don't cover rendering. Drive it with
    `npx agent-browser --session <branch> open http://localhost:3000/...` then
    `snapshot` / `get text` / `screenshot`; `--session` keeps parallel worktrees
-   out of each other's browser, and `close` when done.
+   out of each other's browser, and `npx agent-browser --session <branch> close`
+   when done.
 5. `git diff` before committing (a stray NUL byte once made a file binary).
 6. Update `.agents/PROGRESS.md`; update `.agents/MEMORY.md` only if a durable
    decision changed.
