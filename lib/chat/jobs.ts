@@ -10,6 +10,7 @@ import type pg from "pg";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { unwrap } from "@/lib/commands/registry";
+import { paced } from "@/lib/chat/pacing";
 import { assertPortableNotification, type NotificationReason, type PortableNotification } from "./contracts";
 import type { ChatProviderTransport, ProviderMessageRef } from "./provider";
 import { issueChatLinkProof } from "./linking";
@@ -114,24 +115,6 @@ function digestNotification(ctx: DeliveryContext): PortableNotification {
 
 export const backoffMs = (attempt: number) => Math.min(3600, 2 ** Math.min(attempt, 10)) * 1000 * (1 + Math.random() * 0.25);
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-// ponytail: in-process per-conversation pacing (one send/second); a shared
-// limiter is needed only if the worker ever runs on more than one instance.
-// The stamp is taken when the call *returns*, not before it is issued: pacing
-// from a pre-send stamp measures the wait, not the sends, so any work between
-// the two lands inside the second and consecutive sends can be under a second
-// apart - which is the gap a provider rate limit actually counts. Stamping in
-// `finally` also charges a failed attempt, which the provider counted too.
-const lastSend = new Map<string, number>();
-async function paced<T>(key: string, call: () => Promise<T>): Promise<T> {
-  const wait = (lastSend.get(key) ?? 0) + 1000 - Date.now();
-  if (wait > 0) await sleep(wait);
-  try {
-    return await call();
-  } finally {
-    lastSend.set(key, Date.now());
-  }
-}
 
 export async function runChatScan({ now = new Date(), db = serviceClient() }: Deps = {}) {
   const targets = (await unwrap(db.rpc("list_chat_scan_targets"))) as string[];
