@@ -1,11 +1,11 @@
-// app/(app)/customers/customer-form.tsx — dialog form for the upsert_customer
+// app/(app)/customers/customer-form.tsx — CommandForm (bottom sheet on phone, dialog on desk) for the upsert_customer
 // command. Doubles as create (no `customer` prop) and edit (`customer` prop
 // pre-fills fields and the command input carries `id`, per plan decision 8).
 "use client";
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -61,16 +61,9 @@ export function CustomerForm({
   });
 
   return (
-    <Dialog open={form.open} onOpenChange={form.setOpen}>
-      <DialogTrigger asChild>
-        <Button variant={isEdit ? "outline" : "default"} size={isEdit ? "sm" : "default"}>
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title={isEdit ? "Edit Customer" : "New Customer"} trigger={<Button variant={isEdit ? "outline" : "default"} size={isEdit ? "sm" : "default"}>
           {isEdit ? "Edit" : "New Customer"}
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit Customer" : "New Customer"}</DialogTitle>
-        </DialogHeader>
+        </Button>}>
         <form onSubmit={form.submit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="customer-name">Name</Label>
@@ -126,14 +119,13 @@ export function CustomerForm({
             <Label htmlFor="customer-terms">Payment terms</Label>
             <Input id="customer-terms" value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} placeholder="net30" />
           </div>
-          {form.error && <p className="text-sm text-red-600">{form.error}</p>}
-          <DialogFooter>
+          {form.error && <p className="text-sm text-destructive">{form.error}</p>}
+          <CommandFormFooter>
             <Button type="submit" disabled={form.submitting}>
               {form.submitting ? (isEdit ? "Saving…" : "Creating…") : isEdit ? "Save" : "Create"}
             </Button>
-          </DialogFooter>
+          </CommandFormFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </CommandForm>
   );
 }

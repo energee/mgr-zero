@@ -1,9 +1,9 @@
-// app/(app)/catalog/product-form.tsx — dialog form for the create_product command.
+// app/(app)/catalog/product-form.tsx — CommandForm (bottom sheet on phone, dialog on desk) for the create_product command.
 "use client";
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCommandForm } from "@/lib/commands/use-command-form";
@@ -18,14 +18,7 @@ export function ProductForm() {
   });
 
   return (
-    <Dialog open={form.open} onOpenChange={form.setOpen}>
-      <DialogTrigger asChild>
-        <Button>New Product</Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>New Product</DialogTitle>
-        </DialogHeader>
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title="New Product" trigger={<Button>New Product</Button>}>
         <form onSubmit={form.submit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="product-name">Name</Label>
@@ -39,14 +32,13 @@ export function ProductForm() {
             <Label htmlFor="product-abv">ABV</Label>
             <Input id="product-abv" type="number" step="0.01" value={abv} onChange={(e) => setAbv(e.target.value)} />
           </div>
-          {form.error && <p className="text-sm text-red-600">{form.error}</p>}
-          <DialogFooter>
+          {form.error && <p className="text-sm text-destructive">{form.error}</p>}
+          <CommandFormFooter>
             <Button type="submit" disabled={form.submitting}>
               {form.submitting ? "Creating…" : "Create"}
             </Button>
-          </DialogFooter>
+          </CommandFormFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </CommandForm>
   );
 }

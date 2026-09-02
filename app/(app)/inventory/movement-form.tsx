@@ -1,9 +1,9 @@
-// app/(app)/inventory/movement-form.tsx — dialog form for the record_movement command.
+// app/(app)/inventory/movement-form.tsx — CommandForm (bottom sheet on phone, dialog on desk) for the record_movement command.
 "use client";
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -47,14 +47,7 @@ export function MovementForm({
   }
 
   return (
-    <Dialog open={form.open} onOpenChange={form.setOpen}>
-      <DialogTrigger asChild>
-        <Button>Record Movement</Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Record Movement</DialogTitle>
-        </DialogHeader>
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Record Movement" trigger={<Button>Record Movement</Button>}>
         <form onSubmit={form.submit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="movement-sku">SKU</Label>
@@ -128,14 +121,13 @@ export function MovementForm({
             <Label htmlFor="movement-note">Note</Label>
             <Input id="movement-note" value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
-          {form.error && <p className="text-sm text-red-600">{form.error}</p>}
-          <DialogFooter>
+          {form.error && <p className="text-sm text-destructive">{form.error}</p>}
+          <CommandFormFooter>
             <Button type="submit" disabled={form.submitting || !skuId || !locationId}>
               {form.submitting ? "Recording…" : "Record"}
             </Button>
-          </DialogFooter>
+          </CommandFormFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </CommandForm>
   );
 }

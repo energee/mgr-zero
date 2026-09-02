@@ -1,4 +1,4 @@
-// app/(app)/invoices/[id]/credit-memo-form.tsx — dialog form for the
+// app/(app)/invoices/[id]/credit-memo-form.tsx — CommandForm (bottom sheet on phone, dialog on desk) for the
 // create_credit_memo command: qty per invoice line to credit (0 = skip), a
 // return-to location, and a reason. The plpgsql fn writes negative invoice
 // lines at the original prices plus return_in movements at the chosen
@@ -7,7 +7,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -47,16 +47,9 @@ export function CreditMemoForm({
   });
 
   return (
-    <Dialog open={form.open} onOpenChange={form.setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" variant="outline">
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Create credit memo" trigger={<Button size="sm" variant="outline">
           Credit memo
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Create credit memo</DialogTitle>
-        </DialogHeader>
+        </Button>}>
         <form onSubmit={form.submit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label>Lines to credit</Label>
@@ -97,14 +90,13 @@ export function CreditMemoForm({
             <Label htmlFor="cm-reason">Reason</Label>
             <Input id="cm-reason" value={reason} onChange={(e) => setReason(e.target.value)} required />
           </div>
-          {form.error && <p className="text-sm text-red-600">{form.error}</p>}
-          <DialogFooter>
+          {form.error && <p className="text-sm text-destructive">{form.error}</p>}
+          <CommandFormFooter>
             <Button type="submit" disabled={form.submitting}>
               {form.submitting ? "Saving…" : "Create"}
             </Button>
-          </DialogFooter>
+          </CommandFormFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </CommandForm>
   );
 }
