@@ -5,7 +5,7 @@ Status: Draft for Ted; rev 4 incorporates the fresh-eyes product, architecture, 
 navigation, state, build-order, wet-phone, and Slack-first chat-preview review. Nothing in this plan is built yet;
 the current shell (`app/(app)/layout.tsx`, a 208px left rail with five links and Geist) is
 the placeholder it replaces.
-Wireframes: `2026-08-31-mgr-wireframes.html` — 73 frames (product destinations plus
+Wireframes: `2026-08-31-mgr-wireframes.html` — the frame inventory (product destinations plus
 separately identified sheets, overlays, flow states, and provider previews) tagged with
 tab/group, slice, build step, registered reads, and registered writes; the phone/desk
 toggle re-renders every frame from the same body (desk = rail/top-nav shell, dialog
@@ -362,8 +362,9 @@ Portal frames are **Portal · Order** (steppers + Same as last week), **Portal �
 (quantities, ship-to, "Ships from Warehouse", **Place order** — buyer copy only, disabled
 until the source contract exists; no persistent cart), **Portal · Orders** (rows expand
 into lines and adjusted-quantity copy; no staff verbs; read-only after submit), **Portal ·
-Invoices**, and **Portal · Account**. Account is read-only under current RLS. Staff/auth
-and portal screens make 63 frames; the 10 Chat integration/provider frames make 73.
+Invoices**, and **Portal · Account**. Account is read-only under current RLS. The count lives in the wireframes document alone (`EXPECTED`), because it moves
+every time a screen is drawn; taps, the POS redraw and the foreign venues have
+all since raised it.
 
 ## 5. Visual system
 
@@ -442,7 +443,7 @@ Tailwind v4, with aliases from `components.json` and tokens in `app/globals.css`
   dense status. Buttons prefer words. Icon-only exceptions have accessible names; icons
   in buttons use `data-icon` and component sizing. Coarse pointers use 2px stroke.
 
-Every one of the 63 screens implements this shared baseline:
+Every screen implements this shared baseline:
 
 | State | Required behavior |
 |---|---|
