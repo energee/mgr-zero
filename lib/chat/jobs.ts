@@ -117,11 +117,20 @@ export const backoffMs = (attempt: number) => Math.min(3600, 2 ** Math.min(attem
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // ponytail: in-process per-conversation pacing (one send/second); a shared
 // limiter is needed only if the worker ever runs on more than one instance.
+// The stamp is taken when the call *returns*, not before it is issued: pacing
+// from a pre-send stamp measures the wait, not the sends, so any work between
+// the two lands inside the second and consecutive sends can be under a second
+// apart - which is the gap a provider rate limit actually counts. Stamping in
+// `finally` also charges a failed attempt, which the provider counted too.
 const lastSend = new Map<string, number>();
-async function paceConversation(key: string) {
+async function paced<T>(key: string, call: () => Promise<T>): Promise<T> {
   const wait = (lastSend.get(key) ?? 0) + 1000 - Date.now();
   if (wait > 0) await sleep(wait);
-  lastSend.set(key, Date.now());
+  try {
+    return await call();
+  } finally {
+    lastSend.set(key, Date.now());
+  }
 }
 
 export async function runChatScan({ now = new Date(), db = serviceClient() }: Deps = {}) {
@@ -194,12 +203,12 @@ export async function runChatDeliveryBatch({ limit = 50, now = new Date(), db = 
           await stop("terminal", check.reason); continue;
         }
       }
-      await paceConversation(`${installationId}:${ctx.destination.external_destination_id}`);
+      const paceKey = `${installationId}:${ctx.destination.external_destination_id}`;
       if (existing) {
-        await transport.update({ installationId, ref: existing, notification, intentId: lease.id, resolved });
+        await paced(paceKey, () => transport.update({ installationId, ref: existing, notification, intentId: lease.id, resolved }));
         await complete(existing, "updated");
       } else {
-        const ref = await transport.send({ installationId, destinationId: ctx.destination.external_destination_id, notification, intentId: lease.id });
+        const ref = await paced(paceKey, () => transport.send({ installationId, destinationId: ctx.destination.external_destination_id, notification, intentId: lease.id }));
         await complete(ref, "sent");
       }
     } catch (e) {
