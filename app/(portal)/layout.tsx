@@ -5,10 +5,8 @@
 // BreweryProvider so lib/commands/client.ts's command() works unmodified.
 import { getActiveCustomer } from "@/lib/portal";
 import { BreweryProvider } from "@/app/(app)/brewery-provider";
-import { logout } from "@/app/(auth)/actions";
 import { PortalShell } from "@/components/mgr/app-shell";
 import { MeSheet } from "@/components/mgr/me-sheet";
-import { Button } from "@/components/ui/button";
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const customer = await getActiveCustomer();
@@ -17,11 +15,7 @@ export default async function PortalLayout({ children }: { children: React.React
       <PortalShell
         brand={customer.customerName}
         headerRight={
-          <MeSheet fields={[["Account", customer.customerName]]}>
-            <form action={logout} className="mt-auto">
-              <Button type="submit" variant="outline" className="w-full">Sign out</Button>
-            </form>
-          </MeSheet>
+          <MeSheet fields={[["Account", customer.customerName]]} />
         }
       >
         {children}

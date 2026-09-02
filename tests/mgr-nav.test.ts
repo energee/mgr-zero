@@ -17,9 +17,6 @@ describe("navFor", () => {
     expect(sales.map((t) => t.label)).toEqual(["Today", "Beer", "Work", "More"]);
     expect(navFor(STAFF_NAV, "sales").flatMap((t) => t.children ?? []).some((c) => c.label === "Settings")).toBe(false);
   });
-  it("customer role gets the portal nav untouched", () => {
-    expect(navFor(PORTAL_NAV, "customer")).toEqual(PORTAL_NAV);
-  });
 });
 
 describe("activeTab", () => {

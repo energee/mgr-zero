@@ -5,8 +5,6 @@
 // listed; the plan's fuller rail grows here as pages ship.
 import type { StaffRole } from "@/lib/commands/registry";
 
-export type NavRole = StaffRole | "customer";
-
 export type NavItem = {
   label: string;
   href: string;
@@ -36,7 +34,7 @@ export const STAFF_NAV: readonly NavItem[] = [
       { label: "Catalog", href: "/catalog", roles: ["sales"] },
       { label: "Customers", href: "/customers", roles: ["sales"] },
       { label: "Price lists", href: "/pricing", roles: ["sales"] },
-      { label: "Settings", href: "/settings/team", roles: [] },
+      { label: "Settings", href: "/settings/team", roles: ["admin"] },
     ],
   },
 ];
@@ -47,11 +45,10 @@ export const PORTAL_NAV: readonly NavItem[] = [
   { label: "Invoices", href: "/portal/invoices" },
 ];
 
-const allowed = (item: NavItem, role: NavRole) =>
-  role === "admin" || !item.roles || item.roles.includes(role as StaffRole);
+const allowed = (item: NavItem, role: StaffRole) => role === "admin" || !item.roles || item.roles.includes(role);
 
 /** Drop entries the role may not see. Tabs stay; only their children thin out. */
-export function navFor(items: readonly NavItem[], role: NavRole): NavItem[] {
+export function navFor(items: readonly NavItem[], role: StaffRole): NavItem[] {
   return items
     .filter((i) => allowed(i, role))
     .map((i) => (i.children ? { ...i, children: i.children.filter((c) => allowed(c, role)) } : i));

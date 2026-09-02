@@ -16,13 +16,12 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, 
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { TabBar } from "@/components/mgr/app-shell";
-import { PORTAL_NAV, STAFF_NAV } from "@/lib/mgr/nav";
 import { cn } from "@/lib/utils";
 
 /** Row modifiers from the wireframe: w = needs attention, ok = current, dis = gated. */
 type RowClass = "" | "w" | "ok" | "dis";
-const dot: Partial<Record<RowClass, string>> = { w: "bg-warning-foreground", ok: "bg-primary" };
+const dotColor: Partial<Record<RowClass, string>> = { w: "bg-warning-foreground", ok: "bg-primary" };
+const Dot = ({ cls }: { cls: RowClass }) => (dotColor[cls] ? <span className={cn("size-2 rounded-full", dotColor[cls])} /> : null);
 
 /** Button kinds: p = primary, g = secondary/outline, irr = irreversible (teal); " disabled" suffix draws a gated action. */
 type BtnBase = "p" | "g" | "irr";
@@ -38,9 +37,9 @@ export const E = {
   ttl: (t: React.ReactNode) => <h2 className="mt-2 text-sm font-medium text-muted-foreground">{t}</h2>,
   row: (t: React.ReactNode, s: React.ReactNode = "", n: React.ReactNode = "", cls: RowClass = "") => (
     <Item variant="outline" className={cn(cls === "dis" && "opacity-50")}>
-      {dot[cls] && (
+      {dotColor[cls] && (
         <ItemMedia>
-          <span className={cn("size-2 rounded-full", dot[cls])} />
+          <Dot cls={cls} />
         </ItemMedia>
       )}
       <ItemContent>
@@ -146,7 +145,7 @@ export const E = {
       {arr.map(([n, s, g, w, f], i) => (
         <Item key={i} variant="outline" size="sm" className="flex-col items-start gap-0.5">
           <ItemTitle className="flex items-center gap-1.5">
-            {w ? <span className="size-2 rounded-full bg-warning-foreground" /> : null}
+            {w ? <Dot cls="w" /> : null}
             {n}
           </ItemTitle>
           <ItemDescription>{s}</ItemDescription>
@@ -204,6 +203,4 @@ export const E = {
       </InputGroupAddon>
     </InputGroup>
   ),
-  tabs: (on: string) => <TabBar items={STAFF_NAV} active={on} />,
-  portal: (on: string) => <TabBar items={PORTAL_NAV} active={on} />,
 };
