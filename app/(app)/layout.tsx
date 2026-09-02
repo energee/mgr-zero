@@ -19,7 +19,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         headerRight={
           <MeSheet fields={[["Brewery", brewery.name], ["Role", brewery.role]]}>
             <form action={logout} className="mt-auto">
-              <Button type="submit" variant="outline" className="min-h-12 w-full">Sign out</Button>
+              <Button type="submit" variant="outline" className="w-full">Sign out</Button>
             </form>
           </MeSheet>
         }

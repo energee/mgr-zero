@@ -10,6 +10,7 @@ import { E } from "@/components/mgr/e";
 import { SCREENS, type Screen } from "@/components/mgr/screens";
 import { navFor, STAFF_NAV } from "@/lib/mgr/nav";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 const WIDTHS = [390, 1280] as const;
 
@@ -17,7 +18,7 @@ function Frame({ s, width }: { s: Screen; width: number }) {
   const panel = s.surface === "sheet" || s.surface === "entry";
   const body = panel ? (
     <div className="flex min-h-0 flex-1 flex-col @md:justify-start @max-md:justify-end">
-      <div className="flex flex-col gap-2 rounded-t-lg border bg-popover p-4 shadow-lg @md:mx-auto @md:mt-8 @md:w-full @md:max-w-md @md:rounded-lg">
+      <div className="flex flex-col gap-2 rounded-t-xl border bg-popover p-4 shadow-lg @md:mx-auto @md:mt-8 @md:w-full @md:max-w-md @md:rounded-xl">
         {s.hd}
         {s.body}
       </div>
@@ -33,7 +34,7 @@ function Frame({ s, width }: { s: Screen; width: number }) {
     <AppShell
       brand="Demo Brewing"
       items={navFor(STAFF_NAV, "admin")}
-      headerRight={<><span className="rounded-sm border px-2 py-1">Search</span><span className="rounded-sm border px-2 py-1">Me</span></>}
+      headerRight={<><Button variant="ghost" size="sm">Search</Button><Button variant="ghost" size="sm">Me</Button></>}
       composer={E.comp()}
       active={s.tab}
     >
@@ -52,7 +53,7 @@ export default function DesignGallery() {
   const steps = [...new Set(SCREENS.map((s) => s.step))];
   return (
     <div className="flex flex-col gap-10 p-6">
-      <h1 className="font-heading text-3xl font-bold">MGR components · {SCREENS.length} screens</h1>
+      <h1 className="text-2xl font-semibold">MGR components · {SCREENS.length} screens</h1>
       {steps.map((step) => (
         <section key={step} className="flex flex-col gap-8">
           <h2 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Build step {step}</h2>

@@ -19,7 +19,7 @@ export default async function PortalLayout({ children }: { children: React.React
         headerRight={
           <MeSheet fields={[["Account", customer.customerName]]}>
             <form action={logout} className="mt-auto">
-              <Button type="submit" variant="outline" className="min-h-12 w-full">Sign out</Button>
+              <Button type="submit" variant="outline" className="w-full">Sign out</Button>
             </form>
           </MeSheet>
         }
