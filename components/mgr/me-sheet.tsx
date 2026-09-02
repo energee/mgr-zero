@@ -12,11 +12,11 @@ export function MeSheet({ fields, children }: { fields: [string, string][]; chil
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <Button variant="outline" size="sm" className="min-h-9">Me</Button>
+        <Button variant="ghost" size="sm">Me</Button>
       </SheetTrigger>
       {/* ponytail: viewport md, not container — the sheet portals out of the shell's @container */}
       <SheetContent side="bottom" className="gap-2 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:inset-y-0 md:right-0 md:left-auto md:h-full md:w-3/4 md:max-w-sm md:border-t-0 md:border-l">
-        <SheetHeader className="p-0"><SheetTitle className="font-heading text-lg">Me</SheetTitle></SheetHeader>
+        <SheetHeader className="p-0"><SheetTitle>Me</SheetTitle></SheetHeader>
         {fields.map(([k, v]) => <div key={k}>{E.fld(k, v)}</div>)}
         {children}
       </SheetContent>

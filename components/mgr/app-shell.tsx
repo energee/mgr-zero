@@ -29,35 +29,35 @@ export function AppShell({ brand, items, headerRight, composer, active, children
   const current = active ?? activeTab(items, pathname)?.label;
   return (
     <div className="@container/shell flex min-h-full flex-1 flex-col bg-background text-foreground">
-      <header className="flex min-h-12 items-center justify-between gap-3 border-b bg-card px-4 py-2 font-heading text-base font-semibold">
+      <header className="flex h-12 items-center justify-between gap-3 border-b px-4 text-sm font-medium">
         <span className="flex min-w-0 items-center gap-2 truncate">
-          <MgrIcon size={18} className="shrink-0 fill-primary" />
+          <MgrIcon size={16} className="shrink-0" />
           {brand}
         </span>
-        {headerRight && <span className="flex shrink-0 items-center gap-2 font-sans text-sm font-medium">{headerRight}</span>}
+        {headerRight && <span className="flex shrink-0 items-center gap-1">{headerRight}</span>}
       </header>
       <div className="flex min-h-0 flex-1 @md:flex-row">
-        <nav aria-label="Sections" className="hidden w-44 shrink-0 flex-col gap-0.5 border-r bg-card p-3 text-sm @md:flex">
+        <nav aria-label="Sections" className="hidden w-48 shrink-0 flex-col gap-3 border-r p-2 text-sm @md:flex">
           {items.map((tab) => (
             <div key={tab.label} className="flex flex-col">
               <Link
                 href={tab.href}
-                className={cn("rounded-sm px-2 py-1.5 font-semibold", tab.label === current ? "text-primary" : "text-foreground")}
+                className={cn("rounded-md px-2 py-1 font-medium", tab.label === current ? "bg-accent text-accent-foreground" : "text-foreground hover:bg-muted")}
                 aria-current={tab.label === current ? "page" : undefined}
               >
                 {tab.label}
               </Link>
               {tab.children?.map((c) => (
-                <Link key={c.href} href={c.href} className="rounded-sm px-2 py-1 pl-4 text-muted-foreground hover:bg-muted hover:text-foreground">
+                <Link key={c.href} href={c.href} className="rounded-md px-2 py-1 pl-4 text-muted-foreground hover:bg-muted hover:text-foreground">
                   {c.label}
                 </Link>
               ))}
             </div>
           ))}
         </nav>
-        <main className="flex min-w-0 flex-1 flex-col gap-2 p-4 @md:max-w-2xl">{children}</main>
+        <main className="flex min-w-0 flex-1 flex-col gap-3 p-4 @md:max-w-2xl @md:px-8 @md:py-6">{children}</main>
       </div>
-      {composer && <div className="border-t bg-card px-3 py-2">{composer}</div>}
+      {composer && <div className="border-t px-3 py-2">{composer}</div>}
       <TabBar items={items} active={current} className="@md:hidden" />
     </div>
   );
@@ -68,7 +68,7 @@ export function TabBar({ items, active, className }: { items: readonly NavItem[]
   return (
     <nav
       aria-label="Tabs"
-      className={cn("grid border-t bg-card pb-[env(safe-area-inset-bottom)] text-xs", className)}
+      className={cn("grid border-t pb-[env(safe-area-inset-bottom)] text-xs", className)}
       style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
     >
       {items.map((t) => (
@@ -76,7 +76,7 @@ export function TabBar({ items, active, className }: { items: readonly NavItem[]
           key={t.label}
           href={t.href}
           aria-current={t.label === active ? "page" : undefined}
-          className={cn("flex min-h-12 items-center justify-center", t.label === active ? "font-semibold text-primary" : "text-muted-foreground")}
+          className={cn("flex min-h-12 items-center justify-center", t.label === active ? "font-medium text-foreground" : "text-muted-foreground")}
         >
           {t.label}
         </Link>

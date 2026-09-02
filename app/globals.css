@@ -57,7 +57,7 @@
    pairs replace manual dark: overrides; copper is reserved for irreversible
    actions and is never a heading, tab or validation color. */
 :root {
-  --ground: #EEF0EE;
+  --ground: #FAFAF9;
   --surface: #FFFFFF;
   --ink: #16201B;
   --hop: #1F4D3A;
@@ -83,8 +83,8 @@
   --accent: #DCEBE2;
   --accent-foreground: var(--hop);
   --destructive: #9A2A1F;
-  --border: #CBD2CD;
-  --input: #CBD2CD;
+  --border: #E4E7E4;
+  --input: #E4E7E4;
   --ring: var(--hop);
   --chart-1: var(--hop);
   --chart-2: var(--copper);
@@ -171,7 +171,8 @@
   [data-slot="button"],
   [data-slot="input"],
   [data-slot="select-trigger"],
-  [data-slot="toggle-group-item"] {
+  [data-slot="toggle-group-item"],
+  [data-slot="item"] {
     min-height: 48px;
   }
   [data-slot="button"][data-variant="default"],
