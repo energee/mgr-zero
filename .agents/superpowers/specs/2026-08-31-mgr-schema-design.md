@@ -153,7 +153,7 @@ RLS: `staff_all`; `customer_read` select `active and brewery_id in (customer's b
 ### `price_list_items` — + `srp_cents int check (>= 0)` (suggested retail, nullable) **· revised by §16.4**
 pk `(price_list_id, sku_id)`, both composite. RLS: `staff_all`, `customer_own_prices`.
 
-### `sku_bom` — new (slice 5 packaging BOM)
+### `sku_bom` — new (slice 5 packaging BOM) **· superseded by §16.12 (`format_bom`)**
 `sku_id → skus, material_id → materials, qty_per_unit numeric check (> 0)` (in the
 material's `base_uom`, per single SKU unit). pk `(sku_id, material_id)`. idx `(material_id)`.
 
@@ -875,7 +875,28 @@ Also rename `qbo_idempotency_key` in spirit: Intuit's mechanism is a `requestid`
 query parameter, not a body field. The column name is MGR-side and may stay, but
 the docs should stop calling it an idempotency key.
 
-### 16.12 Open questions
+### 16.12 `sku_bom` → `format_bom` (decided 2026-09-02)
+
+**The packaging BOM belongs to the format, not the SKU.** A case box, a divider,
+a can end and a keg cap are properties of the shape, identical across every
+brand packaged in it. Keying the BOM per SKU means re-entering the same bill for
+every brand, which is the same duplication `formats` exists to remove.
+
+```
+format_bom (format_id, material_id, qty_per_unit)   -- was sku_bom (sku_id, ...)
+```
+
+**Consequence to watch:** brand-specific print — labels, printed cans, keg
+collars — is materially brand-dependent, and a format-level BOM cannot express
+it. Two ways that resolves, and this does not need deciding now: treat print as
+a generic material line on the format and let cost roll up at the material
+level, or add a narrow per-SKU override table later for print only. The second
+is a strictly additive change, so starting format-only is safe.
+
+`packaging_run_consumptions` already records what was actually consumed, so
+history is unaffected either way — the BOM is a plan, not a fact of record.
+
+### 16.13 Open questions
 
 1. Formats fully sized, or shape-only? (§16.2)
 2. Tiers priced by format with SKU override, or the reverse? (§16.4)
@@ -886,9 +907,9 @@ the docs should stop calling it an idempotency key.
 5. Quarters or eighths for fill — and do you weigh kegs? Tare weights are known
    per keg size, so weighing turns an estimate into a measurement. (§16.8)
 
-### 16.13 Build order when this is migrated
+### 16.14 Build order when this is migrated
 
-`brands` rename → `formats` + `skus.format_id` → `bins` → `sale_channels`
+`brands` rename → `formats` + `skus.format_id` + `format_bom` → `bins` → `sale_channels`
 (most dangerous, needs movement tests green) → price tiers → `pos_menus` →
 `keg_taps` → `repack` → invoice drift.
 

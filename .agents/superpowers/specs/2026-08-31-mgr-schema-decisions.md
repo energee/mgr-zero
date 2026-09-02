@@ -137,3 +137,11 @@ where MGR may only touch rows it published.
 setting that makes one. `SyncToken` already rides the response the sync job
 reads, so detection is one column. Re-pushing over an accountant's correction
 would be hostile and needs their token anyway.
+
+**The packaging BOM belongs to the format.** A case box and a can end are
+properties of the shape, not of the beer in it — keying the BOM per SKU
+re-enters the same bill for every brand, the same duplication `formats` exists
+to remove. Brand-specific print is the exception, and it is left unresolved on
+purpose: a per-SKU override for print only is strictly additive, so
+format-only is safe to start from, and `packaging_run_consumptions` records what
+was actually used regardless.
