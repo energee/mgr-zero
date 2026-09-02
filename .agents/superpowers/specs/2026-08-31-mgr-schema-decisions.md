@@ -161,3 +161,29 @@ that editing a customer in March silently restates January's excise, which
 `brewing-domain.md` forbids — a filed month is never rewritten. Same discipline
 as `bbl`, frozen by trigger at write. Resolution is customer override → channel
 default, once, at write time.
+
+**Detection belongs on the read side, not in a CHECK.** A draft of §16.11 carried
+`check (paid_at is null or qbo_remote_state = 'live')`. It contradicted the rule
+directly above: push → paid → an accountant voids it, and the sync job cannot
+record the void without first nulling `paid_at`. A constraint that forces the
+sync job to remember a write order is the rule it claimed to replace, and
+paid-then-voided is real history that must stay representable. The guarantee —
+never read a voided invoice as collected — is stated once in the reporting view
+instead, where it costs nothing and forbids nothing.
+
+**A role in the enum is not a permission boundary.** `staff_role` gains
+`taproom` (§16.13), but §0's `P-staff` template is role-agnostic, so the enum
+value on its own hands a bartender full staff write on customers, invoices and
+compliance. The narrow surface a taproom role implies is per-role policy work
+that has not been done. Naming the gap in the spec is the cheap part; the role
+does not ship until the policies exist.
+
+**Unmapped POS items are a measurement problem, so a person clears them.** POS
+posts nothing to the ledger (§16.15), so an unmapped item does not lose
+inventory — it makes expected consumption too low, and the variance report shows
+loss that never happened. Auto-ignoring anything MGR did not publish would file
+away a beer a bartender typed straight into Square, which is the same silent
+failure in a new place. Two human acts instead: archive it in Square, through
+the same Catalog write that retires a SKU out of inventory — Square owns its own
+catalog, so MGR reads that state rather than mirroring it — or mark it ignored
+by hand. `ignored` then means someone looked, never that something was inferred.
