@@ -32,7 +32,7 @@ below just in time — don't preload everything.
 | Simplifying recently modified code without behavior changes | `.agents/skills/simplify/SKILL.md`; in Pi use `/simplify` or `/skill:simplify` |
 | HTTP API / command-docs sync | `.agents/agents/http-api.md`; in Pi `/http-api` |
 | Next.js APIs | `node_modules/next/dist/docs/` (this version differs from training data) |
-| Driving a browser (view the running app, E2E) | `npx agent-browser skills get core --full`; the only browser tool here — not `mcp__claude-in-chrome__*` |
+| Driving a browser (view the running app, reproduce a UI bug, E2E) | `.agents/skills/browse/SKILL.md` — `/browse` in Claude Code; wraps `agent-browser`, the only browser tool here (never `mcp__claude-in-chrome__*`) |
 
 ## Operating loop
 
@@ -71,7 +71,7 @@ production data (there is none yet — keep it that way by asking).
 - `.agents/superpowers/{specs,plans}` — design specs and plans; `docs/superpowers` is a symlink to it (the superpowers skills write there).
 - `.agents/agents/` — subagent definitions; `.claude/agents` is a symlink to it (Claude Code only reads `.claude/agents`).
 - `.agents/orchestration/` — harness-neutral multi-model routing, budgets, prompts, and generated run artifacts. Its CLI is the only owner of cross-provider workflow policy.
-- `.agents/skills/` — project-local reusable workflows; `.pi/prompts/` may provide thin Pi command aliases without duplicating skill instructions.
+- `.agents/skills/` — project-local reusable workflows; `.claude/skills` is a symlink to it (Claude Code only reads `.claude/skills`); `.pi/prompts/` may provide thin Pi command aliases without duplicating skill instructions.
 - `.agents/worktrees/<branch>/` — the only place for worktrees: `git worktree add .agents/worktrees/<branch> -b <branch>`. Gitignored.
 - `.agents/agents/dreaming.md` — prompt for the dreaming workflow
   (`.github/workflows/dreaming.yml`) that curates the agent docs via a
