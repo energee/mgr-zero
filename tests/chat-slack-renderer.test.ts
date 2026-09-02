@@ -90,3 +90,48 @@ describe("Slack renderer", () => {
     }
   });
 });
+
+describe("Slack renderer · surface polish", () => {
+  // renderSlackHome built each row as `*${safeLabel} · ${title}*`, but two
+  // fixtures already carry the reason inside safeLabel, so the row read
+  // "Route A · next stop · Next stop".
+  it("never repeats the reason when a subject label already carries it", () => {
+    const items = CHAT_PREVIEW_FIXTURES.find((f) => f.id === "app-home")!.items;
+    const home = renderSlackHome({ linked: true, items, mgrBaseUrl: MGR });
+    const rows = (home.blocks as Block[]).filter((b) => b.type === "section" && b.accessory);
+    expect(rows.length).toBe(items.length);
+    for (const [i, row] of rows.entries()) {
+      const label = row.text!.text.split("\n")[0].toLowerCase();
+      const title = items[i].title.toLowerCase();
+      expect(label.split(title).length - 1, `"${row.text!.text.split("\n")[0]}"`).toBe(1);
+    }
+  });
+
+  // Every button was rendered without a `style`, so the sole call to action on
+  // an unlinked App Home was indistinguishable from a secondary control.
+  it("marks the point of each surface primary, and never more than one", () => {
+    const primaries = (blocks: Block[]) =>
+      blocks.filter((b) => b.type === "actions").flatMap((b) => b.elements!).filter((e) => e.style === "primary");
+
+    const link = renderSlackHome({ linked: false, linkUrl: `${MGR}/x`, mgrBaseUrl: MGR });
+    expect(primaries(link.blocks as Block[]).length).toBe(1);
+
+    const item = CHAT_PREVIEW_FIXTURES.find((f) => f.id === "personal-dm")!.items[0];
+    const msg = renderSlackMessage(item, { mgrBaseUrl: MGR, intentId: "intent-1" });
+    const msgPrimary = primaries(msg.blocks as Block[]);
+    expect(msgPrimary.length).toBe(1);
+    expect(msgPrimary[0].action_id).toBe("open_mgr");
+
+    // Repeated row accessories must stay default; only the footer is primary.
+    const items = CHAT_PREVIEW_FIXTURES.find((f) => f.id === "app-home")!.items;
+    const home = renderSlackHome({ linked: true, items, mgrBaseUrl: MGR });
+    expect(primaries(home.blocks as Block[]).length).toBe(1);
+    for (const row of (home.blocks as Block[]).filter((b) => b.type === "section" && b.accessory)) {
+      expect((row.accessory as { style?: string }).style).toBeUndefined();
+    }
+
+    // A resolved message has no actions at all, so it has no primary.
+    const resolved = renderSlackMessage(item, { mgrBaseUrl: MGR, intentId: "i", resolved: true });
+    expect(primaries(resolved.blocks as Block[]).length).toBe(0);
+  });
+});
