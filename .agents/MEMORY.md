@@ -12,7 +12,7 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
 - Product spec: `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md`.
 - Schema conventions live in `.agents/ARCHITECTURE.md`; the quote behind "no status columns" is Ted's: "if it won't be accurate I don't want it".
 - Cross-provider agent work is harness-neutral and owned by `.agents/orchestration/`: Codex is the sole writer, Grok plans/critiques, Claude reviews high-risk work, and complex/high-risk implementation requires a separate approval command.
-- UI source of truth is UI plan rev 3 plus the exactly 63-frame
+- UI source of truth is UI plan rev 4 plus the exactly 73-frame
   `2026-08-31-mgr-wireframes.html`; change navigation/flows and the `SCREENS`
   array together (the count is not sacred — a real operator job gets a real
   body, never an annotation chip). Staff uses Today/Beer/Work/More; the wholesale portal has its
@@ -28,37 +28,35 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
   `previewToken`, and stale revalidation. There is no generic Undo. Replay and
   offline outbox stay disabled until durable server dedupe/result replay exists;
   voice and server chat history are deferred.
-- Before affected UI work, close the explicit rev-3 gates: pre-tenant
+- Before affected UI work, close the explicit rev-4 gates: pre-tenant
   provisioning, invite compensation, import per-row RPC/dedupe, FG correction
   identity/report semantics, durable taproom count snapshots, shipment invoice
-  timing, portal-safe fulfillment source, exact QBO payload persistence, and
-  typed batch-completion/loss reconciliation. A registry name or client-held ID
+  timing, exact QBO payload persistence, and typed batch-completion/loss
+  reconciliation. Portal fulfillment source is closed
+  (`set_portal_fulfillment_source`, PR #29). A registry name or client-held ID
   does not prove a gate is met.
 - The public HTTP API is `POST /api/command` (the command registry). Auth is
   the existing Supabase user session: browser cookies, or
   `Authorization: Bearer <access_token>` from password grant against the
   Supabase Auth URL. No resource REST routes, no API keys, until a non-user
   machine client exists.
-- Public-schema table DML is revoked from `anon` and `authenticated`; writes use
-  explicitly granted `security definer` RPCs that derive actor/tenant/role and
-  bind `(actor, requestId)` to brewery, command, canonical payload, and result
-  in `private.command_requests`. Local Supabase disables automatic Data API
-  grants so the baseline ACL is self-contained.
-- Until the durable Task 13 import workflow lands, each import row operation
-  derives a deterministic UUIDv8 from SHA-256 of the complete top-level
-  `requestId`, row number, and operation number. This is replay-safe but not
-  durable job state.
-
-- Staff writes are authorized in SQL, not only in the registry: each mutation
-  RPC is `security definer`, calls `private.assert_staff(brewery, roles)` (or
-  `private.assert_customer`) first, then claims its `p_request_id` in the
-  ledger. Application roles hold no table DML, so raw Data API writes fail with
+- Public-schema table DML is revoked from `anon` and `authenticated`; local
+  Supabase also disables automatic Data API grants so the baseline ACL is
+  self-contained. Staff writes are authorized in SQL, not only in the
+  registry: each mutation RPC is `security definer`, calls
+  `private.assert_staff(brewery, roles)` (or `private.assert_customer`)
+  first, then claims `(actor, requestId)` against brewery, command, canonical
+  payload, and result in `private.command_requests`. Raw Data API writes fail
   42501 for every browser JWT. (2026-09-01 merge decision: PR #27's
   `security invoker` + `require_authorized_staff_rpc` + `request.path`
   policies were superseded by this model; only its additive work was kept.)
   New writers must be granted explicitly in the baseline's Data API grants
   section and pinned in `tests/data-api-boundary.test.ts` /
   `tests/rls-command-boundary.test.ts` (nothing is auto-exposed).
+- Until the durable Task 13 import workflow lands, each import row operation
+  derives a deterministic UUIDv8 from SHA-256 of the complete top-level
+  `requestId`, row number, and operation number. This is replay-safe but not
+  durable job state.
 - Integration credentials never sit in a public table. `private.integration_tokens`
   is reachable only through `lib/supabase/integration-tokens.ts` (server-only,
   admin/sales, visible-connection check, then service-only RPC that rechecks
