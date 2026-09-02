@@ -71,3 +71,69 @@ land (the rev-3 SCHEMA-GATE).
 `price_lists`, `price_list_items`, `locations`, `inventory_movements`, `allocations`,
 `taproom_pars` — see the slice-1A history (`git show 2802ae5:supabase/migrations/`)
 for the pre-baseline shape; the baseline preserved their semantics so the slice-1A tests kept passing.
+
+## Revision 2 decisions (2026-09-02) — why, for the tables in §16 of the design doc
+
+These came out of drawing the QuickBooks and Square surfaces accurately
+(`2026-08-31-mgr-wireframes.html`). Drawing someone else's product honestly is
+what exposed what was wrong in ours — each decision below traces to a specific
+live screenshot, not to a preference.
+
+**Held as a spec, not migrated.** The interface is still moving. Every table in
+§16 would otherwise be migrated two or three times before the first screen
+ships, and `AGENTS.md` allows editing the baseline in place, so there is no cost
+to deciding late and building once.
+
+**`product` → `brand`.** A batch is a production instance ("Lupula 3"); a brand
+is what you sell ("Lupula", and "Waves" when two batches blend). They were one
+word for two things. `brand` is what TTB grants label approval against, it is
+what actually gets renamed on a blend, and it does not collide with `sku` in
+speech. Rejected `label` — it collides with packaging materials.
+
+**Identity optional at brew, required at packaging.** `lots.brand_id NOT NULL`
+already enforced the real constraint; `batches.product_id NOT NULL` only forced
+the decision earlier than the business makes it. Dropping a redundant constraint
+buys flexibility without losing a guarantee.
+
+**Formats exist because `bbl_per_unit` was being re-typed per SKU.** 20 brands ×
+5 formats is 100 rows each restating the number the design doc calls the basis
+of all TTB math. The pricing win is real but secondary; the compliance argument
+is what makes it necessary.
+
+**Poured formats are not stock.** A tapped keg does not become 124 pints of
+inventory — nothing is created, the keg is consumed. This also happens to be
+what a Square *variation* is, discovered from a live item library where price
+reads as a range because the item carries no price at all.
+
+**Whole-keg depletion, fractional reporting.** `inventory_movements.qty` is
+`numeric(12,2)`; a 1/124 pour rounds to 0.01 and over-depletes a keg by 24%.
+Fractions belong in a view where `qty_per_serving` is `numeric(12,6)` and
+nothing rounds. The ledger stays exact and the yield report stays precise —
+neither model achieves both alone.
+
+**Fill levels never enter the ledger.** They are eyeball estimates. `bbl` feeds
+excise math, and a guess has no place in a federal filing. Keeping them on the
+keg event means they can be as rough as they are.
+
+**Tap lines are enrichment, never a dependency.** Hand-maintained state that
+nothing downstream validates, that Square has no concept of, and that a
+bartender changes for optics. Modelled as a bin it would be a stale foreign key;
+modelled as free text it is an honest note. It does not improve attribution — it
+enables diagnosis, by grouping yields across many kegs to find a bad line.
+
+**Push, not pull, for tap events.** The command API already exists with
+`request_id` idempotency and rate limiting, so a push is one new command; a pull
+would need a scheduler, credential storage and an adapter — to poll for an event
+that happens when a human changes a keg. Push's weakness is silent staleness,
+which lands harmlessly on the one field designed to gate nothing.
+
+**The website is a menu destination, not an integration.** It is the third
+consumer of the same catalog after Square and QuickBooks. A bespoke web feed
+would produce a third answer to "what are we selling right now", and would leak
+unannounced beer — the same ownership boundary Square's item library taught us,
+where MGR may only touch rows it published.
+
+**Detect drift, do not prevent it.** QuickBooks has no read-only invoice and no
+setting that makes one. `SyncToken` already rides the response the sync job
+reads, so detection is one column. Re-pushing over an accountant's correction
+would be hostile and needs their token anyway.
