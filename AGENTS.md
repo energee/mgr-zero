@@ -29,7 +29,7 @@ below just in time — don't preload everything.
 | What's done / next | `.agents/PROGRESS.md` |
 | Past decisions and lessons | `.agents/MEMORY.md` |
 | Multi-model planning, implementation, or review | `.agents/orchestration/README.md`; invoke `.agents/orchestration/bin/workflow` rather than provider CLIs directly |
-| Simplifying recently modified code without behavior changes | `.agents/skills/simplify-local/SKILL.md` (named `simplify-local` so it doesn't collide with Claude Code's built-in `/simplify`); in Pi use `/simplify` or `/skill:simplify-local` |
+| Simplifying recently modified code without behavior changes | `/simplify` — Claude Code's built-in; Pi's `.pi/prompts/simplify.md` says the same thing inline |
 | HTTP API / command-docs sync | `.agents/agents/http-api.md`; in Pi `/http-api` |
 | Next.js APIs | `node_modules/next/dist/docs/` (this version differs from training data) |
 | Driving a browser (view the running app, reproduce a UI bug, E2E) | `.agents/skills/browse/SKILL.md` — `/browse` in Claude Code; wraps `agent-browser`, the only browser tool here (never `mcp__claude-in-chrome__*`) |
