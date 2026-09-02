@@ -145,3 +145,19 @@ to remove. Brand-specific print is the exception, and it is left unresolved on
 purpose: a per-SKU override for print only is strictly additive, so
 format-only is safe to start from, and `packaging_run_consumptions` records what
 was actually used regardless.
+
+**Sale channels: defer to #42, and add tax treatment.** §16.3 originally moved
+removal classification onto the channel row. That was wrong — `brewing-domain.md`
+classifies removals by *type*, so channel columns would duplicate what
+`movement_type` carries, and #42 had already rejected a semantic column for the
+same underlying reason. What #42 does not answer: with four fixed channels,
+`export` implicitly meant an untaxpaid removal, and once a brewery names its own
+channels nothing distinguishes an export channel from a taxpaid one. So the
+channel carries a default `tax_treatment` and a customer may override or inherit
+it.
+
+**The resolved treatment is frozen on the movement.** A live lookup would mean
+that editing a customer in March silently restates January's excise, which
+`brewing-domain.md` forbids — a filed month is never rewritten. Same discipline
+as `bbl`, frozen by trigger at write. Resolution is customer override → channel
+default, once, at write time.

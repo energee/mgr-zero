@@ -703,21 +703,52 @@ cannot move past movements.
 Fully sized keeps `bbl_per_unit` on the format and is the assumption above; it
 means more format rows and no "case" abstraction above them.
 
-### 16.3 `sale_channels` — enum becomes a table
+### 16.3 `sale_channels` — see `docs/plans/sale-channels-customizable.md` (#42, merged)
 
-`sale_channel as enum ('wholesale','taproom','dtc','export')` becomes rows so a
-brewery can configure its own. This is the widest-blast-radius item here:
-`inventory_movements.channel` becomes an FK, and the `removal_shape` CHECK plus
-the taproom depletion constraint are both written against enum literals.
+**Superseded by #42, which is merged and is the authority.** This section
+originally proposed `sale_channels (… is_removal, ttb_category)`, moving removal
+classification from the `removal_shape` CHECK onto the channel row. That was
+wrong and #42 is right: `brewing-domain.md` classifies removals by *type* —
+"samples, donations, festival pours, destructions and losses are distinct
+removal types with distinct tax treatment; classify at the ledger" — so channel
+columns would have duplicated what `movement_type` already carries, and
+duplicated classification is how two sources drift apart. #42 had already
+rejected a `requires_dest_state` column for the same underlying reason.
+
+Take #42's shape as given: brewery-scoped table modelled on `locations`, the
+`channel = 'taproom'` literal dropped from the depletion CHECK,
+`on delete restrict` so "removable only if unused" is enforced by Postgres, and
+a trigger on `breweries` insert seeding the four defaults.
+
+Two things #42 leaves to slice 7, which belong here:
+
+**POS channel assignment.** `pos_locations.sale_channel_id` with an optional
+per-item override, per #42's own table of where a movement gets its channel.
+
+**Tax treatment (decided 2026-09-02).** With four fixed channels, `export`
+implicitly meant an untaxpaid removal. Once a brewery names its own channels,
+nothing distinguishes an export channel from a taxpaid one — `movement_type` is
+`sale_removal` for both. So the channel carries a **default tax treatment**
+(`taxable`), and a customer may override or inherit it:
 
 ```
-sale_channels (id, brewery_id, code, name, is_removal bool, ttb_category text)
+sale_channels + tax_treatment      not null default 'taxable'
+customers     + tax_treatment      null = inherit from the channel
+inventory_movements + tax_treatment  resolved and frozen at write time
 ```
 
-Removal classification must move from the CHECK onto the channel row, or TTB
-reporting silently loses its grouping. **Do not migrate this without the
-movement tests passing** — it is the one item in §16 that can corrupt excise
-math rather than merely inconvenience the UI.
+**The resolved value is stored on the movement, never looked up at report
+time.** `brewing-domain.md` requires that a filed month is never rewritten by a
+later change; a live lookup would mean editing a customer in March silently
+restates January's excise. This is the same discipline the schema already
+applies to `bbl`, frozen by trigger on insert. Resolution order is customer
+override → channel default; a movement with no customer (a taproom depletion)
+takes the channel default.
+
+**OPEN:** the value set. `taxable` plus what — `export` alone, or the full TTB
+vocabulary of removals without payment of tax (export, vessel supplies,
+research, transfer in bond)? Starting narrow is additive; starting wide risks
+inventing categories nobody files.
 
 ### 16.4 Price tiers scoped to a channel; formats priced
 
@@ -1067,7 +1098,7 @@ Still open:
 ### 16.17 Build order when this is migrated
 
 `brands` rename → `formats` + `skus.format_id` + `format_bom` → `bins` → `sale_channels`
-(most dangerous, needs movement tests green) → price tiers → `pos_menus` →
+(per #42's plan, plus tax treatment — needs movement tests green) → price tiers → `pos_menus` →
 `keg_taps` → `repack` → invoice drift.
 
 `AGENTS.md` authorises editing the baseline in place, so this lands as one
