@@ -23,7 +23,7 @@ substitutes repo-visible signals (see Signal).
 | --- | --- |
 | Trigger | Every push to `main`, a daily schedule, plus `workflow_dispatch` |
 | Loop guard | `paths-ignore` on the doc paths + a `dreaming` concurrency group — exact values live in `.github/workflows/dreaming.yml`, which is authoritative and self-documents the cancel-in-progress rationale |
-| Write path | One long-lived PR from branch `dreaming/main` (force-pushed each dream); never direct commits to main |
+| Write path | One long-lived PR from branch `dreaming/main` — while that PR is open each dream *appends* a commit, so unreviewed dreams and reviewer corrections survive; only a fresh branch (no open PR) is force-pushed. Never direct commits to main |
 | Editable | The living agent docs — the authoritative list lives in `.agents/agents/dreaming.md` (mirrored by the workflow's `paths-ignore`) |
 | Read-only (flag drift only) | Everything else — specs, wireframes, code, workflows (see `dreaming.md`) |
 | Signal | Git history + merged PR diffs/comments since last dream, plus committed `.remember/` digests |
