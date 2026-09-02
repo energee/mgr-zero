@@ -8,7 +8,7 @@ invitations, built on Next.js (App Router, TypeScript) and Supabase
 (orders, shipments, invoicing, customer portal). QBO integration and AI
 chat are Slice 1C.
 
-- Customer user guide: [`docs/user-guide.md`](docs/user-guide.md)
+- Documentation master: [`docs/user-guide.html`](docs/user-guide.html) (links separate staff and customer-portal guides)
 - Spec: `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md`
 - Plan: `.agents/superpowers/plans/2026-08-30-slice1a-foundation.md`
 - Schema: `.agents/superpowers/specs/2026-08-31-mgr-schema-design.md` (tables) and `2026-08-31-mgr-schema-decisions.md` (why)
@@ -369,13 +369,11 @@ against it, then
 `npm run lint`, `tsc --noEmit` and `npm run build`. This is the merge gate — RLS and
 command-registry correctness are enforced here, not just locally.
 
-After a pull request merges, `.github/workflows/documentation-agent.yml` runs a
-read-only Claude Code review and opens or refreshes a follow-up issue when the
-merged behavior is missing from its owning documentation or contradicts it. The
-Claude job uses the same `CLAUDE_CODE_OAUTH_TOKEN` secret as the existing Claude
-workflows, has only repository read permissions, may use only Read, Grep, and
-Glob, and carries Claude Code permission denies for common runner secret locations
-and credential dotfiles outside the checked-out repository. A separate
-deterministic job with issue-write permission turns Claude's schema-validated
-`DOCS_GAP` output into one idempotent issue per merged PR; the bot never commits
-documentation directly to `main`.
+After a pull request merges—or when manually dispatched on `main`—
+`.github/workflows/documentation-agent.yml` audits every current user-facing
+route, not only the triggering change, and updates the
+self-contained staff and portal field manuals linked from `docs/user-guide.html` when behavior has drifted. The
+Claude job has read-only GitHub permissions and may edit only those three HTML files. A separate
+deterministic job rejects wider or active-content changes, then maintains one
+reviewable `documentation/user-guide` pull request; the bot never commits directly
+to `main`.
