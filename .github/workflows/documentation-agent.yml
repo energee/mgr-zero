@@ -100,7 +100,12 @@ jobs:
       - name: Validate the generated guide
         id: validate
         run: |
-          changed=$(git diff --name-only)
+          # The agent may create a guide, not only edit one; git diff never sees
+          # an untracked file, so the run would report no changes and bin the work.
+          # The job's own scratch files go first so `git add -A` stays honest.
+          rm -f .docs-agent-pr.diff .docs-agent-pr.json
+          git add -A
+          changed=$(git diff --cached --name-only)
           if [ -z "$changed" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
@@ -111,7 +116,7 @@ jobs:
             echo "$changed"
             exit 1
           fi
-          git diff --check
+          git diff --cached --check
           for guide in docs/user-guide.html docs/staff-guide.html docs/portal-guide.html; do
             grep -qi '^<!doctype html>' "$guide"
             grep -q '<main' "$guide"
@@ -145,9 +150,22 @@ jobs:
       pull-requests: write
       issues: read
     steps:
+      # A GITHUB_TOKEN push does not trigger workflows, so the docs PR never ran
+      # ci.yml - the stated merge gate - and reached a human unchecked. An App
+      # token's pushes do trigger it. Same App as dreaming.yml.
+      - name: Mint MGR GitHub App token
+        id: mgr-app
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.MGR_APP_ID }}
+          private-key: ${{ secrets.MGR_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+          token: ${{ steps.mgr-app.outputs.token }}
 
       - uses: actions/download-artifact@v4
         with:
@@ -157,11 +175,13 @@ jobs:
       - name: Publish documentation pull request
         env:
           EVENT_NAME: ${{ github.event_name }}
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.mgr-app.outputs.token }}
+          APP_SLUG: ${{ steps.mgr-app.outputs.app-slug }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          git config user.name "documentation-bot"
-          git config user.email "documentation@users.noreply.github.com"
+          login="${APP_SLUG}[bot]"
+          git config user.name "$login"
+          git config user.email "$(gh api "users/${login}" --jq .id)+${login}@users.noreply.github.com"
           git checkout -B documentation/user-guide
           git add docs/user-guide.html docs/staff-guide.html docs/portal-guide.html
           if [ "$EVENT_NAME" = "pull_request" ]; then

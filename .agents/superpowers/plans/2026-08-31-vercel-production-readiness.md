@@ -20,7 +20,7 @@ The implementation must preserve these contracts:
 6. **No raw internal errors cross the public boundary.** Clients receive stable error codes and safe messages. Correlation ids join API responses, structured logs, command executions, and operational runbooks.
 7. **Modern environment names are the application contract.** The app consumes `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, and `COMMAND_RATE_LIMIT_HMAC_SECRET`. Local Supabase legacy values are mapped into those names by tooling rather than leaked into runtime code.
 8. **Import is durable and bounded without a new dependency.** This plan selects an operator-driven, Postgres-backed import job. The browser parses with Papa Parse’s worker mode; upload and processing are bounded; every row has durable status and an idempotency key. No autonomous workflow product is introduced.
-9. **Automation approval is external to the model.** `--approve` is removed. Apply actions require a detached SSH signature over a canonical request digest and a user-controlled allowed-signers file.
+9. **No model authorizes its own writes.** ~~`--approve` is removed; apply actions require a detached SSH signature over a canonical request digest and a user-controlled allowed-signers file.~~ Satisfied by deletion instead (2026-09-02): `.agents/orchestration/` — the only thing that had a model-controlled approval flag — was removed unused, so no self-approval path exists to sign. See dropped Task 11.
 10. **Measurement precedes bundle edits.** `next experimental-analyze` determines whether `lib/commands/all.ts` or `radix-ui` creates a client-bundle problem. No import rewrite is allowed without measured client inclusion.
 
 ## 2. Pre-execution reconciliation gate
@@ -129,7 +129,7 @@ A file may have only one active owner. Sequential tasks may transfer ownership a
 | Database boundary owner | `supabase/migrations/00001_baseline.sql`, database exploit/invariant tests, and the mutation command modules named in Tasks 3–5 |
 | Auth/session owner | environment modules, Supabase clients, `proxy.ts`, auth routes/actions/pages, brewery/customer request context, invitation UI |
 | Framework owner | `package.json`, `package-lock.json`, `.node-version`, Vitest config, bundle evidence |
-| Automation owner | `.github/workflows/*`, `.github/scripts/*`, `.agents/agents/dreaming.md`, `.github/agents/dreaming.md`, `.agents/orchestration/*`, `.agents/DRIFT.md` |
+| Automation owner | `.github/workflows/*`, `.github/scripts/*`, `.agents/agents/dreaming.md`, `.github/agents/dreaming.md`, `.agents/DRIFT.md` |
 | Command/API owner | registry, command route/client/form hook, public errors, rate policy, observability, health route |
 | Import owner | import command application layer and import UI after Task 5 transfers those files |
 | Query/UI owner | read queries, customer/order/portal pages, cart helper |
@@ -154,7 +154,6 @@ graph TD
   T8 --> T9[9 CI and supply-chain hardening]
   T6 --> T9
   T9 --> T10[10 Dreaming and docs automation]
-  T9 --> T11[11 Signed orchestration approval]
   T3 --> T12[12 API errors, rate limit, observability]
   T5 --> T12
   T6 --> T12
@@ -320,21 +319,22 @@ graph TD
 - **Dreaming contract:** the workflow calculates one base SHA from `refs/dreaming/last-checked`, injects it as trusted context, and advances the marker only after successful push/PR handling. Flag-only results update `.agents/DRIFT.md`, ensuring a commit and PR exist. Preserve PR #21’s useful CI-context statement without its divergent last-`dream:` base logic.
 - **Docs-agent contract:** after each merge, the read-only GitHub job audits every current user-facing route and may edit only the self-contained customer field manual. A separate deterministic job rejects wider or active-content changes and maintains one reviewable documentation branch and pull request; the model never commits to `main` or receives a write-capable GitHub token.
 - **Acceptance:** the guide covers every current staff and portal surface; the model edit allowlist and deterministic single-file validator are pinned by tests; last-checked and flag-only tests pass; workflow contract tests pass; `npx tsc --noEmit`; `npm run lint`.
-- **Depends on:** Task 9. May run in parallel with Task 11 because specialist-owned files do not overlap; coordinator-owned documentation deltas are applied serially.
+- **Depends on:** Task 9.
 - **Commit boundary:** `security(agents): isolate prompts and persist recovery state`.
 - **Rollback:** revert workflow, prompt move, ledger, customer guide, tests, and docs together; do not advance any real marker during local validation.
 
-### Task 11 — Replace model-controlled approval with signed external authorization
+### Task 11 — ~~Replace model-controlled approval with signed external authorization~~ (dropped 2026-09-02)
 
-- **Findings:** DOC08.
-- **Test first:** extend `.agents/orchestration/tests/workflow.test.mjs` with ephemeral fixture keys and a two-process apply harness. Prove that a Boolean flag, missing signature, wrong signer, changed run/action/plan hash, expired request, ordinary replay, and concurrent replay all fail closed; exactly one process can claim a valid approval.
-- **Modify:** `.agents/orchestration/bin/workflow`, `.agents/orchestration/lib/workflow.mjs`, `.agents/orchestration/tests/workflow.test.mjs`, `.agents/orchestration/README.md`. The coordinator applies the architecture delta before commit.
-- **Interface:** remove `--approve`. Add `workflow approval-request <run-dir> <action> --signer <identity>` to emit canonical JSON containing signer identity, run id, action, reviewed artifact SHA-256, nonce, and expiry. Apply commands accept `--approval <request.json> --signature <request.sig>` and verify the exact request bytes with `ssh-keygen -Y verify`, namespace `mgr-orchestration`, the signed identity, and `AGENT_WORKFLOW_ALLOWED_SIGNERS` outside the repository.
-- **Security contract:** after signature verification and before any apply side effect, atomically create a nonce-claim file with exclusive `open(..., "wx")`; a second process fails. Mark the claim consumed after success and failed after a caught error. A crash leaves a claimed approval that cannot replay; recovery requires operator inspection and a newly signed request referencing the prior claim. No private signing key, allowed-signers content, or test private fixture is committed.
-- **Acceptance:** all adversarial approval tests pass; the two-process test proves exactly one stub side effect; a claimed/interrupted request cannot replay; no Boolean approval path remains; help text and README describe exact signing and recovery commands; `npx vitest run .agents/orchestration/tests/workflow.test.mjs`; `npm run lint`.
-- **Depends on:** Task 9.
-- **Commit boundary:** `security(orchestration): require signed external approval`.
-- **Rollback:** revert code/tests/docs together; absence of approval must continue to fail closed.
+**Obsolete: the subject of this task no longer exists.** `.agents/orchestration/`
+was deleted after going from PR #8 to 2026-09-02 without producing a single run
+— `runs/` was empty for its whole life. DOC08's finding was that the harness's
+`--approve` flag let a model authorize its own high-risk implementation;
+deleting the harness removes that approval path entirely, which closes the
+finding more completely than signing it would have.
+
+Nothing replaces this task. If cross-provider orchestration is ever rebuilt,
+the signed-authorization design is recoverable from this file's history and
+should be a precondition of that work rather than a follow-up to it.
 
 ### Task 12 — Sanitize public errors, enforce rate limits, and add structured observability
 
