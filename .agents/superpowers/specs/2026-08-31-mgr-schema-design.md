@@ -699,6 +699,49 @@ New enum: `format_basis as enum ('packaged','poured')`.
 `inventory_movements.bbl` is frozen at write time, so correcting a format later
 cannot move past movements.
 
+### 16.2a `format_components` — composition (decided 2026-09-02)
+
+Formats compose. A four-pack is four cans plus a PakTech; a 16oz case is six
+four-packs plus a case tray. And a 16oz pour is 1/124 of a half bbl — **the same
+relation with a fractional quantity**, so `draws_from_format_id` and
+`qty_per_serving` retire into one table and `basis` shrinks to meaning only
+"does this hold stock".
+
+```
+format_components (parent_format_id, child_format_id, qty numeric(12,6))
+format_bom        (format_id, material_id, qty_per_unit,
+                   on_break format_material_disposition not null)
+```
+
+New enum: `format_material_disposition as enum ('consumed','return_to_stock')`.
+
+**`bbl_per_unit` is strictly derived.** Only *atomic* formats — a 16oz can, a
+half bbl keg — carry a typed volume; anything composed computes it from its
+children. This removes a whole class of typo from the number the design doc
+calls the basis of all TTB math, and it is stronger than merely moving
+`bbl_per_unit` off the SKU (§16.2). A composed format cannot be created before
+its children exist, which is the intended constraint.
+
+**Repack (§16.10) becomes validated rather than asserted.** Composition already
+knows that breaking one case yields exactly six four-packs, so the app offers
+the repack instead of asking someone to enter both halves and hoping they
+balance. **One level only** — case → four-packs, never case → cans in a step.
+That keeps material accounting honest: breaking a case releases the case tray
+and nothing else, because PakTechs are only released when a four-pack is broken.
+
+**Materials on break.** Each BOM line carries `on_break`, so a PakTech defaults
+to `consumed` and a case tray to `return_to_stock`; the repack sheet shows the
+default and allows a per-repack override. A question asked once, not every time
+— a brewery breaking twenty cases a week would click through a mandatory prompt
+without reading it. `material_movement_type` already has both `consumption` and
+`return_to_stock`, so no enum change is needed. The whole repack is one RPC
+sharing one `ref`, so beer and materials cannot disagree.
+
+**Build-direction repack is out of scope** — assembling four-packs from loose
+cans in inventory is YAGNI; packaging runs already produce composed formats with
+their own BOM. Partial material recovery (a tray damaged on break) is likewise
+left out; the cycle count handles it.
+
 **OPEN:** is a format fully sized (`case · 24×16oz`) or shape-only (`case`)?
 Fully sized keeps `bbl_per_unit` on the format and is the assumption above; it
 means more format rows and no "case" abstraction above them.
@@ -745,10 +788,9 @@ applies to `bbl`, frozen by trigger on insert. Resolution order is customer
 override → channel default; a movement with no customer (a taproom depletion)
 takes the channel default.
 
-**OPEN:** the value set. `taxable` plus what — `export` alone, or the full TTB
-vocabulary of removals without payment of tax (export, vessel supplies,
-research, transfer in bond)? Starting narrow is additive; starting wide risks
-inventing categories nobody files.
+**Value set (decided 2026-09-02): the full TTB vocabulary** of removals without
+payment of tax — `taxable`, `export`, `vessel_supplies`, `research`,
+`transfer_in_bond` — rather than starting with `export` alone.
 
 ### 16.4 Price tiers scoped to a channel; formats priced
 
@@ -893,6 +935,10 @@ repack; nothing left the brewery.
 
 Breakage stays named: `−1 case, +5 four-packs, +1 loss`, so the repack invariant
 stays absolute.
+
+**Superseded in part by §16.2a:** composition now derives the other side of a
+repack, so this is validated rather than asserted, and it is one level only.
+Materials released or consumed on a break follow each BOM line's `on_break`.
 
 Line cleaning likewise wants a named `loss` reason, or it lands in yield
 variance and makes every keg look slightly bad.
@@ -1084,7 +1130,8 @@ taproom items (§16.14).
 
 Still open:
 
-1. Formats fully sized, or shape-only? (§16.2)
+1. Formats fully sized, or shape-only? (§16.2) — note §16.2a makes this narrower:
+   only *atomic* formats carry a size at all.
 2. Tiers priced by format with SKU override, or the reverse? (§16.4)
 3. Does a poured format bind to one packaged format, or to a brand? Binding to a
    format makes bin-derived availability exact. (§16.2)
