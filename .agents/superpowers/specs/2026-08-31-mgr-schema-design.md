@@ -677,15 +677,11 @@ brand's excise numbers wrong.
 ```
 formats (
   id, brewery_id, name,
-  basis format_basis not null,              -- 'packaged' | 'poured'
+  basis format_basis not null,              -- 'packaged' | 'poured': does it hold stock
   package_type package_type,                -- container; null for poured
   keg_size keg_size,
   units_per_case int,
-  bbl_per_unit numeric(12,8),               -- packaged: absolute size
-  draws_from_format_id uuid,                -- poured: the packaged format it comes out of
-  qty_per_serving numeric(12,6),            -- poured: fraction of one packaged unit
-  check ((basis = 'packaged') = (bbl_per_unit is not null)),
-  check ((basis = 'poured')   = (draws_from_format_id is not null and qty_per_serving is not null))
+  bbl_per_unit numeric(12,8)                -- atomic formats only; composed ones derive it (§16.2a)
 )
 ```
 
@@ -706,17 +702,14 @@ cannot move past movements.
 
 Formats compose. A four-pack is four cans plus a PakTech; a 16oz case is six
 four-packs plus a case tray. And a 16oz pour is 1/124 of a half bbl — **the same
-relation with a fractional quantity**, so `draws_from_format_id` and
-`qty_per_serving` retire into one table and `basis` shrinks to meaning only
-"does this hold stock".
+relation with a fractional quantity**: a pour is a `format_components` row
+with a fractional `qty`, and `basis` means only "does this hold stock".
 
 ```
 format_components (parent_format_id, child_format_id, qty numeric(12,6))
-format_bom        (format_id, material_id, qty_per_unit,
-                   on_break format_material_disposition not null)
 ```
 
-New enum: `format_material_disposition as enum ('consumed','return_to_stock')`.
+The packaging BOM (`format_bom`, with its `on_break` disposition) is in §16.12.
 
 **`bbl_per_unit` is strictly derived.** Only *atomic* formats — a 16oz can, a
 half bbl keg — carry a typed volume; anything composed computes it from its
@@ -845,9 +838,13 @@ Physical subdivisions of a location: cooler, walk-in, to-go fridge. Menus read
 them, so availability is derived from stock rather than hand-flipped.
 
 ```
-bins (id, brewery_id, location_id, name, kind)
+bins (id, brewery_id, location_id, name, kind, unique (location_id, name))
 inventory_movements + bin_id not null
 ```
+
+`movements_onhand_idx` extends to `(brewery_id, sku_id, location_id, bin_id)`
+so bin on-hand is an index prefix, not a filter over the location; no second
+index.
 
 **Not tap lines.** Tap assignment is hand-maintained state that nothing
 downstream validates and that a bartender changes for optics; modelling it as a
@@ -884,9 +881,13 @@ keg_taps (
   close_fill numeric(3,2) default 0.00,
   tap_label text                             -- free text, unvalidated, never an FK
 )
+-- sku_id, lot_id, bin_id are §0 composite (x_id, brewery_id) FKs.
+-- keg_taps_open_idx (brewery_id) where closed_at is null — the board, the
+-- compare-and-swap guard and the realtime filter all select on it
+-- (same shape as occupancies_open_idx / allocations_open_idx).
 ```
 
-Yield = poured bbl ÷ (`nominal_bbl` × (`open_fill` − `close_fill`)). A half bbl
+Yield = poured bbl ÷ (`formats.bbl_per_unit` × (`open_fill` − `close_fill`)). A half bbl
 is 124 × 16oz on paper and 112–120 in life; a keg reading 95 has a problem.
 
 **Fill levels are estimates for a report, never ledger quantities.** They must
@@ -894,14 +895,9 @@ never reach `inventory_movements`, because `bbl` feeds excise math and a rough
 eyeball has no business in a federal filing. A yield derived from a non-default
 fill renders as *estimated*.
 
-**Why fractions live here and not in the ledger:** `inventory_movements.qty` is
-`numeric(12,2)`. A 16oz pour of a half bbl is 1/124 = 0.008065, which rounds to
-0.01 — post one movement per pint and 124 pints deplete **1.24 kegs**, a 24%
-over-depletion that propagates into `bbl` via the trigger. Keeping pours out of
-the ledger entirely keeps it exact; `qty_per_serving` is `numeric(12,6)` and
-sums without rounding in a view. §16.15 settles this by making the count the only
-thing that posts — the rounding hazard is why fill fractions and serving sizes
-must never become ledger quantities, which still holds.
+Fill fractions and serving sizes are never ledger quantities: only the count
+posts (§16.15), and `format_components.qty` is `numeric(12,6)` so pours sum
+without rounding in a view.
 
 Attribution when two kegs of one SKU are open: split proportionally, and label
 the number as split. `tap_label` does not improve attribution — Square has no
@@ -997,8 +993,12 @@ brand packaged in it. Keying the BOM per SKU means re-entering the same bill for
 every brand, which is the same duplication `formats` exists to remove.
 
 ```
-format_bom (format_id, material_id, qty_per_unit)   -- was sku_bom (sku_id, ...)
+format_bom (format_id, material_id, qty_per_unit,   -- was sku_bom (sku_id, ...)
+            on_break format_material_disposition not null)
 ```
+
+New enum: `format_material_disposition as enum ('consumed','return_to_stock')` —
+what happens to the material when a composed unit is broken open (§16.10).
 
 **Consequence to watch:** brand-specific print — labels, printed cans, keg
 collars — is materially brand-dependent, and a format-level BOM cannot express
@@ -1079,10 +1079,6 @@ connections. A 30-second poll of `list_open_taps` is an adequate fallback — th
 data changes a handful of times a day. Realtime is a nicety here; guard 1 is what
 prevents the bug, so if Realtime ever becomes a burden it can be deleted with
 nothing else breaking. Do not build a general realtime layer for it.
-
-**Still open:** `request_id` makes a retry safe but does not stop
-two people acting at once. A swap should carry the open interval's id and fail
-loudly if it is already closed, rather than opening a second interval.
 
 **Tap board.** One row per open keg, showing what is on, since when, and an
 estimated remaining percentage derived from POS sales against nominal volume,
@@ -1204,7 +1200,6 @@ Still open:
    and unscheduled — this blocks shipping the role. (§16.13)
 5. Quarters or eighths for fill — and do you weigh kegs? Tare weights are known
    per keg size, so weighing turns an estimate into a measurement. (§16.8)
-6. *(resolved 2026-09-02 — see §16.15.)*
 
 ### 16.17 Build order when this is migrated
 
@@ -1215,8 +1210,7 @@ per-role RLS policies exist (§16.16 item 4) — it is not a step in this order
 until they are designed.
 
 `AGENTS.md` authorises editing the baseline in place, so this lands as one
-revised `00001_baseline.sql` rather than a migration chain — which is the whole
-reason for holding it as a spec until the interface settles.
+revised `00001_baseline.sql` rather than a migration chain.
 
 **Verification note:** at the time of writing, `npx supabase start` fails
 locally on `staff_role already exists` and the test suite dies at import from
