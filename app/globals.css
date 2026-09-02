@@ -180,9 +180,10 @@
   }
 }
 
-/* Print the pick sheet (and any other page) without the nav sidebar. */
+/* Print the pick sheet (and any other page) without the shell chrome. */
 @media print {
-  aside {
+  header,
+  nav {
     display: none;
   }
 }

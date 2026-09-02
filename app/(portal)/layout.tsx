@@ -1,37 +1,31 @@
-// app/(portal)/layout.tsx — chrome for the customer portal: account name,
-// nav (Shop/Orders/Invoices), sign out. Mirrors app/(app)/layout.tsx but
-// resolves the caller's customer account instead of a brewery membership,
-// and provides breweryId to portal client components via the same
+// app/(portal)/layout.tsx — chrome for the customer portal: the same
+// AppShell as staff, fed the buyer-facing portal manifest (Order · Orders ·
+// Invoices) and the customer's account name. Resolves the caller's customer
+// account instead of a brewery membership and provides breweryId via the same
 // BreweryProvider so lib/commands/client.ts's command() works unmodified.
 import { getActiveCustomer } from "@/lib/portal";
 import { BreweryProvider } from "@/app/(app)/brewery-provider";
 import { logout } from "@/app/(auth)/actions";
-import { MgrIcon } from "@/components/mgr-icon";
-import Link from "next/link";
+import { PortalShell } from "@/components/mgr/app-shell";
+import { MeSheet } from "@/components/mgr/me-sheet";
+import { Button } from "@/components/ui/button";
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const customer = await getActiveCustomer();
   return (
     <BreweryProvider id={customer.breweryId}>
-      <div className="flex min-h-screen">
-        <aside className="w-52 border-r p-4">
-          <div className="mb-6 flex items-center gap-2 font-semibold">
-            <MgrIcon size={20} className="shrink-0" />
-            {customer.customerName}
-          </div>
-          <nav className="flex flex-col gap-2 text-sm">
-            <Link href="/portal">Shop</Link>
-            <Link href="/portal/orders">Orders</Link>
-            <Link href="/portal/invoices">Invoices</Link>
-          </nav>
-          <form action={logout} className="mt-6">
-            <button type="submit" className="text-sm text-muted-foreground underline underline-offset-2">
-              Sign out
-            </button>
-          </form>
-        </aside>
-        <main className="flex-1 p-6">{children}</main>
-      </div>
+      <PortalShell
+        brand={customer.customerName}
+        headerRight={
+          <MeSheet fields={[["Account", customer.customerName]]}>
+            <form action={logout} className="mt-auto">
+              <Button type="submit" variant="outline" className="min-h-12 w-full">Sign out</Button>
+            </form>
+          </MeSheet>
+        }
+      >
+        {children}
+      </PortalShell>
     </BreweryProvider>
   );
 }
