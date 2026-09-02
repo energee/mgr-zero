@@ -129,21 +129,184 @@ h2.grp.hide{display:none}
 .ph.ex .tabs{font-size:12px}
 @media(max-width:900px){.state-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:700px){.grid{grid-template-columns:minmax(0,1fr)}.state-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* ---- Slack surfaces: Slack's own design language, not MGR's. Greyscale plus
+   Slack aubergine in the chrome only, so these read as wireframes and never as
+   screenshots. Tokens are scoped to .slk and deliberately do not follow the page
+   theme — Slack's light surface is the thing being drawn. */
+.slk{--sk-bg:#FFFFFF;--sk-ink:#1D1C1D;--sk-ink2:#616061;--sk-line:#DDDDDD;--sk-aub:#3F0E40;--sk-btn:#BBBABB;--sk-green:#007A5A;--sk-red:#E01E5A;
+  background:var(--sk-bg);color:var(--sk-ink);border:1.5px solid var(--line);border-radius:8px;overflow:hidden;
+  display:flex;flex-direction:column;min-width:0;max-width:100%;font:13px/1.46 "Instrument Sans",system-ui,sans-serif}
+.slk-top{background:var(--sk-aub);color:#fff;padding:9px 12px;font-weight:600;font-size:12px;display:flex;justify-content:space-between;gap:8px}
+.slk-top i{font-style:normal;opacity:.75;font:10px "JetBrains Mono",monospace;display:flex;align-items:center}
+.slk-tabs{display:flex;gap:18px;padding:0 12px;border-bottom:1px solid var(--sk-line);font-size:12.5px;color:var(--sk-ink2)}
+.slk-tabs div{padding:9px 0}
+.slk-tabs div.on{color:var(--sk-ink);font-weight:700;box-shadow:inset 0 -2px 0 var(--sk-ink)}
+.slk-body{padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.slk-msg{display:flex;gap:8px;padding:12px;min-width:0}
+.slk-av{width:36px;height:36px;border-radius:4px;background:var(--sk-aub);color:#fff;display:grid;place-items:center;font:700 13px "Familjen Grotesk",sans-serif;flex:none}
+.slk-mb{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.slk-mh{display:flex;align-items:baseline;gap:6px;font-size:11px;color:var(--sk-ink2);flex-wrap:wrap}
+.slk-mh b{color:var(--sk-ink);font-size:13px;font-weight:700}
+.slk-badge{background:#E8E8E8;color:#616061;border-radius:2px;padding:0 4px;font:700 9.5px "JetBrains Mono",monospace}
+.slk-modtop{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:13px 14px;border-bottom:1px solid var(--sk-line);font:700 15px "Familjen Grotesk",sans-serif}
+.slk-modtop i{font-style:normal;color:var(--sk-ink2);font-size:15px}
+.slk-modft{display:flex;justify-content:flex-end;gap:8px;padding:12px 14px;border-top:1px solid var(--sk-line)}
+/* Block Kit blocks — one class per block type emitted by lib/chat/slack-renderer.ts */
+.sk-h{font:700 18px/1.25 "Familjen Grotesk",sans-serif;margin:0}
+.sk-s{font-size:13px;overflow-wrap:anywhere}
+.sk-ctx{font-size:11.5px;color:var(--sk-ink2);overflow-wrap:anywhere}
+.sk-sa{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.sk-sa .sk-s{flex:1;min-width:0}
+.sk-acts{display:flex;gap:8px;flex-wrap:wrap}
+.sk-b{border:1px solid var(--sk-btn);border-radius:4px;background:#fff;color:var(--sk-ink);padding:7px 12px;font-size:12.5px;font-weight:700;white-space:nowrap}
+.sk-b.pri{background:var(--sk-green);border-color:var(--sk-green);color:#fff}
+.sk-b.dan{color:var(--sk-red)}
+.sk-b.dis{opacity:.45}
+.sk-f{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px 16px;font-size:13px}
+.sk-f div{min-width:0;overflow-wrap:anywhere}
+.sk-f b{display:block;font-weight:700}
+.sk-gate{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+.bar{flex-direction:column;align-items:stretch;gap:6px}
+.barrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;min-width:0}
+.barrow>b{font:600 9.5px "JetBrains Mono",monospace;text-transform:uppercase;letter-spacing:.06em;color:var(--ink2);width:46px;flex:none}
+.barrow.dim,.barrow button.dim{opacity:.32;pointer-events:none}
+#home-sec.hide,.vsec.hide{display:none}
+.noshell{border:1.5px dashed var(--line);border-radius:8px;padding:18px;color:var(--ink2);font-size:12px}
+/* QuickBooks and Square shells. Same discipline as .slk: each owns its tokens,
+   stays light, and spends its brand colour only on chrome so the frame reads as a
+   wireframe. X.* primitives below are shared and resolve against --x-*. */
+.xf{background:#fff;border:1.5px solid var(--line);border-radius:8px;overflow:hidden;display:flex;flex-direction:column;min-width:0;max-width:100%;color:var(--x-ink);font:13px/1.45 "Instrument Sans",system-ui,sans-serif}
+.qbo{--x-ink:#393A3D;--x-ink2:#6B6C72;--x-line:#D4D7DC;--x-acc:#2CA01C;--x-bad:#B3261E}
+.sq{--x-ink:#1B1B1B;--x-ink2:#6A6A6A;--x-line:#E0E0E0;--x-acc:#006AFF;--x-bad:#B3261E}
+.xf-top{display:flex;justify-content:space-between;gap:8px;padding:9px 12px;color:#fff;font-weight:700;font-size:12px}
+.qbo .xf-top{background:#fff;color:var(--x-ink);border-bottom:1px solid var(--x-line);align-items:center}
+.qb-search{flex:1;max-width:420px;border:1px solid var(--x-line);border-radius:20px;padding:4px 11px;
+  color:var(--x-ink2);font:11px "Instrument Sans",sans-serif!important;opacity:1!important;overflow:hidden;
+  white-space:nowrap;text-overflow:ellipsis}
+.qb-rail{width:58px;flex:none;border-right:1px solid var(--x-line);padding:8px 4px;display:flex;
+  flex-direction:column;gap:9px;align-items:center;text-align:center;font-size:8px;color:var(--x-ink2)}
+.qb-rail div i{display:block;font-style:normal;font-size:14px;color:var(--x-ink);margin-bottom:1px}
+.qb-logo{width:22px;height:22px;border-radius:50%;background:var(--x-acc);color:#fff;
+  display:grid;place-items:center;font:700 10px "Familjen Grotesk",sans-serif;margin-bottom:4px}
+.qb-apps{width:158px;flex:none;border-right:1px solid var(--x-line);padding:8px 6px;font-size:11px;color:var(--x-ink)}
+.qb-ah{font:700 8.5px "JetBrains Mono",monospace;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--x-ink2);padding:0 6px 6px}
+.qb-ai{display:flex;justify-content:space-between;gap:6px;padding:5px 6px}
+.qb-ai i{font-style:normal;color:var(--x-ink2);font-size:9px}
+.qb-as{padding:4px 6px 4px 16px;color:var(--x-ink2)}
+.qb-as.on{background:#EDEEF0;border-radius:4px;color:var(--x-ink)}
+.qb-as b{font-weight:600}
+.sq .xf-top{background:#1B1B1B}
+.xf-top span{display:flex;align-items:center;gap:7px}
+.xf-mark{width:15px;height:15px;flex:none;fill:currentColor}
+.xf-top i{font-style:normal;font:10px "JetBrains Mono",monospace;opacity:.85;display:flex;align-items:center;font-weight:400}
+.xf-main{display:flex;min-width:0}
+.xf-nav{width:96px;flex:none;border-right:1px solid var(--x-line);padding:8px;color:var(--x-ink2);font-size:11px;display:flex;flex-direction:column;gap:5px}
+.xf-nav b{color:var(--x-ink);font-weight:700}
+.xf-body{flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:10px}
+.x-h{font:700 17px/1.2 "Familjen Grotesk",sans-serif}
+.x-h span{display:block;font:400 12px "Instrument Sans",sans-serif;color:var(--x-ink2);margin-top:2px}
+.x-pill{align-self:flex-start;border:1px solid var(--x-acc);color:var(--x-acc);border-radius:20px;padding:1px 9px;font:700 10.5px "JetBrains Mono",monospace}
+.x-pill.bad{border-color:var(--x-bad);color:var(--x-bad)}
+.x-kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px 14px;font-size:12px}
+.x-kv b{display:block;color:var(--x-ink2);font:400 10.5px "JetBrains Mono",monospace}
+.x-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.x-tbl th{text-align:left;font:700 10px "JetBrains Mono",monospace;color:var(--x-ink2);border-bottom:1px solid var(--x-line);padding:4px 6px 4px 0;text-transform:uppercase;letter-spacing:.04em}
+.x-tbl td{padding:5px 6px 5px 0;border-bottom:1px solid var(--x-line);vertical-align:top}
+.x-tbl th:not(:first-child),.x-tbl td:not(:first-child){text-align:right;white-space:nowrap}
+.x-tot{display:flex;flex-direction:column;gap:3px;font-size:12px;align-self:flex-end;min-width:180px}
+.x-tot div{display:flex;justify-content:space-between;gap:20px}
+.x-tot div.s{font-weight:700;border-top:1px solid var(--x-line);padding-top:4px;font-size:13px}
+.qbopanel .xf-main{min-height:520px}
+/* The list the panel opened over — dimmed, because it is context, not the subject. */
+.qp-back{flex:1;min-width:0;padding:12px;opacity:.45;display:flex;flex-direction:column;gap:6px}
+.qp-bh{font:700 15px "Familjen Grotesk",sans-serif}
+.qp-kpi{display:flex;gap:22px;margin:4px 0 2px}
+.qp-kpi b{display:block;font:600 17px "Familjen Grotesk",sans-serif}
+.qp-kpi span{font-size:10.5px;color:var(--x-ink2)}
+.qp-filt{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 2px}
+.qp-filt span{border:1px solid var(--x-line);border-radius:4px;padding:3px 8px;font-size:10.5px;color:var(--x-ink2)}
+.qp-br{display:grid;grid-template-columns:58px 66px 108px 1fr;gap:10px;font-size:11.5px;padding:6px 7px;
+  border-bottom:1px solid var(--x-line)}
+.qp-br.hd{font:700 9px "JetBrains Mono",monospace;text-transform:uppercase;color:var(--x-ink2)}
+.qp-br.on{background:#EDEEF0;border-radius:3px}
+.qa-panel{width:372px;flex:none;border-left:1px solid var(--x-line);background:#fff;
+  display:flex;flex-direction:column;box-shadow:-6px 0 16px rgba(0,0,0,.07)}
+.qa-top{display:flex;align-items:center;justify-content:center;position:relative;padding:11px 12px;
+  border-bottom:1px solid var(--x-line);font-weight:600;font-size:13.5px}
+.qa-top i{position:absolute;right:9px;top:7px;font-style:normal;font-size:12px;color:var(--x-ink2);
+  border:1.5px solid transparent;border-radius:4px;padding:2px 5px}
+.qa-body{display:flex;flex-direction:column;min-width:0;flex:1}
+.qa-stat{display:flex;align-items:center;gap:6px;color:var(--x-acc);font-weight:600;font-size:12.5px;padding:12px 14px 0}
+.qa-stat.plain{color:var(--x-ink)}
+.qa-amt{padding:6px 14px 0}
+.qa-amt b{display:block;font-size:12.5px;font-weight:600;margin-bottom:1px}
+.qa-amt span{font-size:15px;font-weight:500}
+.qa-amt em{font-style:normal;font-size:31px;font-weight:500;letter-spacing:-.5px}
+.qa-amt sup{font-size:15px;vertical-align:super;font-weight:500}
+.qa-when{padding:10px 14px 14px;font-size:12.5px}
+.qa-when b{display:block;font-weight:600;margin-bottom:1px}
+.qa-sec{border-top:1px solid var(--x-line);padding:13px 14px}
+.qa-sh{display:flex;justify-content:space-between;align-items:center;gap:10px;font:600 13.5px "Familjen Grotesk",sans-serif}
+.qa-sh i{font-style:normal;color:var(--x-ink2);font-size:12px}
+.qa-rows{display:flex;flex-direction:column;gap:7px;margin-top:11px;font-size:12.5px}
+.qa-rows div{display:flex;justify-content:space-between;gap:14px}
+.qa-rows span:last-child{white-space:nowrap;font-variant-numeric:tabular-nums}
+.qa-sub{margin-top:11px;font-size:12.5px;display:flex;flex-direction:column;gap:3px}
+.qa-sub b{font:600 13px "Familjen Grotesk",sans-serif}
+.qa-link{margin-top:6px;font-size:12.5px;color:#0077C5}
+.qa-life{margin-top:11px;display:flex;flex-direction:column}
+.qa-life>div{display:flex;gap:9px;align-items:flex-start;padding-bottom:13px;position:relative}
+.qa-life>div:not(:last-child)::after{content:"";position:absolute;left:5px;top:14px;bottom:0;width:1px;background:var(--x-line)}
+.qa-life b{width:11px;height:11px;border-radius:50%;border:1.5px solid var(--x-line);background:#fff;
+  flex:none;margin-top:2px;z-index:1}
+.qa-life .on b{background:#2CA01C;border-color:#2CA01C}
+.qa-life span{font-size:12.5px;color:var(--x-ink2)}
+.qa-life .on span{color:var(--x-ink);font-weight:600}
+.qa-ft{display:flex;justify-content:flex-end;gap:8px;padding:10px 12px;border-top:1px solid var(--x-line);background:#FAFAFA}
+.qa-b{border:1.5px solid var(--x-acc);color:var(--x-acc);border-radius:4px;padding:6px 11px;font-size:12px;font-weight:600}
+.qa-b.p{background:#0D5B23;border-color:#0D5B23;color:#fff}
+.x-meta{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--x-ink2)}
+.x-meta b{font-weight:400;color:var(--x-ink2)}
+.x-meta b::after{content:": "}
+.x-sect{font:700 10px "JetBrains Mono",monospace;text-transform:uppercase;letter-spacing:.06em;color:var(--x-ink2);border-top:1px solid var(--x-line);padding-top:9px}
+.x-li{display:flex;flex-direction:column;gap:3px;font-size:12.5px}
+.x-lr{display:flex;justify-content:space-between;gap:16px;font-weight:600}
+.x-lr span:last-child{white-space:nowrap;font-variant-numeric:tabular-nums}
+.x-ls{color:var(--x-ink2);font-size:11.5px;margin-bottom:4px}
+.x-note{font-size:11.5px;color:var(--x-ink2);border-top:1px solid var(--x-line);padding-top:7px;overflow-wrap:anywhere}
+.x-err{border:1px solid var(--x-bad);border-left-width:3px;border-radius:3px;padding:8px 10px;font-size:12px;color:var(--x-bad)}
+.x-err b{display:block;font:700 10px "JetBrains Mono",monospace;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px}
+.vsec>h2.grp{margin-bottom:8px}
+.vsec>.grid{grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr))}
+/* The two record venues are not the same shape. A QuickBooks invoice is a wide
+   browser record — 4-column line table, right-aligned totals — and clips in a
+   phone-width column. A Square transaction is a narrow receipt column in the
+   Square Dashboard, so it stays near its real width. */
+.vsec[data-v="QuickBooks"]>.grid{grid-template-columns:repeat(auto-fill,minmax(min(560px,100%),1fr))}
+.vsec[data-v="Square"]>.grid{grid-template-columns:repeat(auto-fill,minmax(min(400px,100%),1fr))}
+/* minmax() sets a floor, not a ceiling — cap the receipt so a wide column does not
+   stretch it past the width Square actually renders it at. */
+.vsec[data-v="Square"] .xf{max-width:460px}
+.x-scroll{overflow-x:auto;max-width:100%}
+.slknote{color:var(--ink2);max-width:70ch;font-size:12px;margin:0 0 16px}
 </style>
 
 <div class="wrap">
   <h1>MGR wireframes · rev 4</h1>
-  <p class="sub"><span id="count">73</span> product-destination, flow-state, overlay, or chat-preview frames—not 73 navigation destinations. Each is implementation-ready or explicitly gated. Green = mutable, copper = append-only / finalizing / external / destructive, amber = attention. Every authenticated page receives its shell automatically; entry screens and open sheets stay focused. Chat frames include the production Settings preview gallery plus provider surfaces driven by the same portable fixtures. Controls model shadcn composition at 48 px minimum (56 px primary/keypad on coarse pointers; 32 px cursor density in the desk view — toggle above); Hugeicons are reserved for tabs, back and close at a 2 px coarse-pointer stroke.</p>
+  <p class="sub"><span id="count">85</span> product-destination, flow-state, overlay, chat-preview or external-record frames—not 85 navigation destinations. Each is implementation-ready or explicitly gated. Green = mutable, copper = append-only / finalizing / external / destructive, amber = attention. Every authenticated page receives its shell automatically; entry screens and open sheets stay focused. Frames are filtered first by <b>venue</b> — where the behaviour happens. <b>MGR app</b> is everything MGR renders itself (staff shell, portal, entry, desk); a surface the brewery touches inside somebody else’s product gets its own venue and its own chrome, drawn in that product’s design language. Slack, QuickBooks and Square are drawn; a further venue appears here the moment a screen declares it. Direction differs and is stated per venue — MGR renders the Slack surfaces itself, QuickBooks renders records MGR writes, and Square holds records MGR reads. Group and step narrow within MGR app. MGR’s own Settings screens <i>about</i> an integration stay under MGR app. Controls model shadcn composition at 48 px minimum (56 px primary/keypad on coarse pointers; 32 px cursor density in the desk view — toggle above); Hugeicons are reserved for tabs, back and close at a 2 px coarse-pointer stroke.</p>
   <p class="note ship"><b>Ship at plan §5 scale, not this file's pixels:</b> 16px phone body on the 12 / 14 / 16 / 20 / 28 / 44 scale. The catalog is compressed to fit 73-up; the warehouse <b>Today</b> frame is the full-size exemplar — copy its density. Exception paths (short pick, order detail, three ship bodies, role landings) are real bodies, never annotation chips. Frames draw only what a user sees — state variants and builder notes render under each frame, never in the device. Gate names (SCHEMA-GATE etc.) never appear in-app: a gated action is drawn disabled with human copy.</p>
   <div class="bar" id="bar"></div>
   <details class="state-spec" open><summary>Shared six-state contract · drawn once, specialized below</summary><div class="state-grid" id="state-grid"></div></details>
-  <div class="grid" id="grid"></div>
+  <div id="home-sec"><div class="grid" id="grid"></div></div>
+  <div id="venue-secs"></div>
 </div>
 
 <script>
 // ---- tiny renderer -------------------------------------------------------
 const TABS=['Today','Beer','Work','More'];
-const GROUPS=[...TABS,'Entry','Global','Portal','Desk','Chat'];
+const GROUPS=[...TABS,'Entry','Global','Portal','Desk','Chat','POS'];
 // Desk rail: the four tabs as group headers, each with its areas (plan §3).
 const RAIL={Today:[],Beer:['Inventory','Taproom','Cellar','Materials','Kegs'],Work:['Orders','Batches','Packaging','POs','Deliveries'],More:['Invoices','Catalog','Customers','Price lists','Recipes','Compliance','Planning','Settings']};
 const RAIL_HTML=TABS.flatMap(t=>[RAIL[t].length?`<b>${t}</b>`:t,...RAIL[t]]).map(x=>`<div>${x}</div>`).join('');
@@ -174,6 +337,118 @@ const E={
   tabs:(on)=>`<div class="tabs">${TABS.map(t=>`<div class="${t===on?'on':''}">${t}</div>`).join('')}</div>`,
   portal:(on)=>`<div class="portalnav">${['Order','Orders','Invoices','Account'].map(t=>`<div class="${t===on?'on':''}">${t}</div>`).join('')}</div>`,
 };
+// ---- Slack surfaces ------------------------------------------------------
+// S.* mirrors the Block Kit block types lib/chat/slack-renderer.ts actually
+// emits, so a frame here cannot drift from the payload that ships. mrkdwn
+// *bold* is honoured; every button is drawn in Slack's default style because
+// the renderer sets no `style` property on any of them.
+const mrk=(t)=>t.replace(/\*(.+?)\*/g,'<b>$1</b>').replace(/\n/g,'<br>');
+const S={
+  h:(t)=>`<div class="sk-h">${t}</div>`,
+  s:(t)=>`<div class="sk-s">${mrk(t)}</div>`,
+  ctx:(t)=>`<div class="sk-ctx">${mrk(t)}</div>`,
+  sa:(t,btn)=>`<div class="sk-sa"><div class="sk-s">${mrk(t)}</div><span class="sk-b">${btn}</span></div>`,
+  acts:(arr)=>`<div class="sk-acts">${arr.map(([l,k])=>`<span class="sk-b ${k||''}">${l}</span>`).join('')}</div>`,
+  f:(arr)=>`<div class="sk-f">${arr.map(([k,v])=>`<div><b>${k}</b>${v}</div>`).join('')}</div>`,
+  dis:(label,why)=>`<div class="sk-gate"><span class="sk-b dis">${label}</span><span class="sk-ctx">${why}</span></div>`,
+};
+// Shared primitives for the record-shaped venues (QuickBooks, Square). They
+// resolve against --x-* so one set serves both shells.
+const X={
+  h:(t,sub='')=>`<div class="x-h">${t}${sub?`<span>${sub}</span>`:''}</div>`,
+  pill:(t,bad)=>`<div class="x-pill ${bad?'bad':''}">${t}</div>`,
+  kv:(arr)=>`<div class="x-kv">${arr.map(([k,v])=>`<div><b>${k}</b>${v}</div>`).join('')}</div>`,
+  tbl:(hd,rows)=>`<div class="x-scroll"><table class="x-tbl"><tr>${hd.map(h=>`<th>${h}</th>`).join('')}</tr>`+
+    `${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</table></div>`,
+  tot:(arr)=>`<div class="x-tot">${arr.map(([k,v,st])=>`<div class="${st?'s':''}"><span>${k}</span><span>${v}</span></div>`).join('')}</div>`,
+  err:(title,body)=>`<div class="x-err"><b>${title}</b>${body}</div>`,
+  note:(t)=>`<div class="x-note">${t}</div>`,
+  // QuickBooks sidebar primitives. The panel states money as a large dollar figure
+  // with raised cents, and hides detail behind collapsible sections rather than tables.
+  // The check mark is the paid badge, not a status prefix: an unsent invoice states
+  // its due date in plain ink. Pass plain=1 for anything that is not a paid state.
+  stat:(t,plain)=>`<div class="qa-stat${plain?' plain':''}">${plain?'':'&#10004; '}${t}</div>`,
+  amt:(label,d,c)=>`<div class="qa-amt"><b>${label}</b><span>$<em>${d}</em><sup>${c}</sup></span></div>`,
+  when:(label,v)=>`<div class="qa-when"><b>${label}</b>${v}</div>`,
+  sec:(t,inner='')=>`<div class="qa-sec"><div class="qa-sh">${t}<i>&#9662;</i></div>${inner}</div>`,
+  more:(t)=>`<div class="qa-sec"><div class="qa-sh">${t}<i>&#8250;</i></div></div>`,
+  rows:(arr)=>`<div class="qa-rows">${arr.map(([k,v])=>`<div><span>${k}</span><span>${v}</span></div>`).join('')}</div>`,
+  sub:(t,lines)=>`<div class="qa-sub"><b>${t}</b>${lines.map(l=>`<div>${l}</div>`).join('')}</div>`,
+  link:(t)=>`<div class="qa-link">${t}</div>`,
+  // Invoice activity: QuickBooks' own four-step lifecycle, shown as a vertical
+  // timeline in the sidebar. Reached steps are filled; the rest are hollow.
+  life:(steps,done)=>`<div class="qa-life">${steps.map((t,i)=>
+    `<div class="${i<done?'on':''}"><b></b><span>${t}</span></div>`).join('')}</div>`,
+  // Square receipt primitives. A Square transaction is not a table: quantity is a
+  // sub-line under the item, never a column, and the provenance block above the
+  // lines is where the register, device and channel are stated.
+  meta:(arr)=>`<div class="x-meta">${arr.map(([k,v])=>k?`<div><b>${k}</b>${v}</div>`:`<div>${v}</div>`).join('')}</div>`,
+  sect:(t)=>`<div class="x-sect">${t}</div>`,
+  li:(arr)=>`<div class="x-li">${arr.map(([n,amt,sub])=>`<div class="x-lr"><span>${n}</span><span>${amt}</span></div>`+
+    (sub?`<div class="x-ls">${sub}</div>`:'')).join('')}</div>`,
+};
+// QuickBooks chrome, taken from a live screenshot rather than memory: the top bar is
+// white with the company name and the omni-search — green is the logo and the accent,
+// never a band across the top. Navigation is two tiers, an icon rail then an app list,
+// and MGR's invoices live under 'Sales & Get Paid', not a top-level 'Sales'.
+const QBO_RAIL=[['Create','+'],['Bookmarks','&#9734;'],['Home','&#8962;'],['Reports','&#9021;'],['All apps','&#9638;']];
+const QBO_SALES=['Overview','<b>Sales transactions</b>','Invoices','Payment links','Recurring payments','Sales orders','Sales channels','QuickBooks payouts','Products &amp; services'];
+function qboNav(){
+  return `<div class="qb-rail"><div class="qb-logo">qb</div>`+
+    QBO_RAIL.map(([l,g])=>`<div><i>${g}</i>${l}</div>`).join('')+`</div>`+
+    `<div class="qb-apps"><div class="qb-ah">All apps</div>`+
+    ['Accounting','Expenses &amp; Bills'].map(x=>`<div class="qb-ai">${x}<i>&#9662;</i></div>`).join('')+
+    `<div class="qb-ai open">Sales &amp; Get Paid<i>&#9652;</i></div>`+
+    QBO_SALES.map(x=>`<div class="qb-as${x.includes('<b>')?' on':''}">${x}</div>`).join('')+
+    ['Customer Hub','Inventory','Sales Tax'].map(x=>`<div class="qb-ai">${x}<i>&#9662;</i></div>`).join('')+`</div>`;
+}
+const QBO_TOP=`<div class="xf-top"><span>Demo Brewing LLC</span>`+
+  `<i class="qb-search">Navigate. Find transactions, contacts, help, reports, and more.</i></div>`;
+
+const SQ_MARK=`<svg class="xf-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="`+
+  `M6.4 1h11.2A5.4 5.4 0 0 1 23 6.4v11.2a5.4 5.4 0 0 1-5.4 5.4H6.4A5.4 5.4 0 0 1 1 17.6V6.4A5.4 5.4 0 0 1 6.4 1Z`+
+  `m.9 3.6a2.7 2.7 0 0 0-2.7 2.7v9.4a2.7 2.7 0 0 0 2.7 2.7h9.4a2.7 2.7 0 0 0 2.7-2.7V7.3a2.7 2.7 0 0 0-2.7-2.7Z`+
+  `M10 9.1h4a.9.9 0 0 1 .9.9v4a.9.9 0 0 1-.9.9h-4a.9.9 0 0 1-.9-.9v-4a.9.9 0 0 1 .9-.9Z"/></svg>`;
+// QuickBooks' transaction sidebar: a panel that slides in over the desktop list
+// when a row is opened. Drawn docked, never free-floating — a 372px panel shown on
+// its own reads as a phone, which is the whole reason to draw the backdrop. The
+// panel leads with status and amount, then collapses everything else into sections.
+// It is the only record shape QuickBooks has, so it is the venue's only shell.
+const QBO_BACKDROP=`<div class="qp-back"><div class="qp-bh">Sales transactions</div>`+
+  `<div class="qp-kpi">${[['$0','0 estimates'],['$0','Unbilled income'],['$69K','9 overdue invoices'],['$113K','14 open invoices']]
+    .map(([a,b])=>`<div><b>${a}</b><span>${b}</span></div>`).join('')}</div>`+
+  `<div class="qp-filt">${['Batch actions','All transactions','Last 3 months','All statuses','Delivery method','Errors'].map(f=>`<span>${f} &#9662;</span>`).join('')}</div>`+
+  `<div class="qp-br hd"><span>Date</span><span>Type</span><span>No.</span><span>Customer</span></div>`+
+  [['9/11/26','Invoice','CM-LLB-00512','Sarene Craft Beer'],['9/10/26','Invoice','CM-LLB-00511','Sixth City Distribution'],
+   ['9/10/26','Invoice','CM-LLB-00510','Odyssey Club Inc'],['9/3/26','Invoice','CM-LLB-00509','Sixth City Distribution'],
+   ['9/1/26','Payment','','Sarene Craft Beer']]
+   .map((r,i)=>`<div class="qp-br${i===0?' on':''}">${r.map(c=>`<span>${c}</span>`).join('')}</div>`).join('')+
+  `</div>`;
+function qboPanelFrame(s){
+  return `<div class="xf qbo qbopanel">${QBO_TOP}`+
+    `<div class="xf-main">${qboNav()}`+
+    QBO_BACKDROP+
+    `<div class="qa-panel"><div class="qa-top"><span>${s.appTitle||'Transaction'}</span><i>&#10005;</i></div>`+
+      `<div class="qa-body">${s.body.join('')}</div>`+
+      (s.appActions?`<div class="qa-ft"><span class="qa-b">More actions &#9662;</span><span class="qa-b p">${s.appActions}</span></div>`:'')+
+    `</div></div></div>`;
+}
+function sqFrame(s){
+  return `<div class="xf sq"><div class="xf-top"><span>${SQ_MARK}Square</span><i>${s.sqCtx||'Taproom · Register 1'}</i></div>`+
+    `<div class="xf-body">${s.body.join('')}</div></div>`;
+}
+// Three shells, matching the three places MGR appears inside Slack.
+function slackFrame(s){
+  const body=`<div class="slk-body">${s.body.join('')}</div>`;
+  if(s.slack==='home')return `<div class="slk"><div class="slk-top"><span>MGR</span><i>${s.slackCtx||''}</i></div>`+
+    `<div class="slk-tabs"><div>Messages</div><div class="on">Home</div><div>About</div></div>${body}</div>`;
+  if(s.slack==='modal')return `<div class="slk"><div class="slk-modtop"><span>${s.slackCtx}</span><i>✕</i></div>${body}`+
+    `<div class="slk-modft">${(s.slackFoot||[]).map(([l,k])=>`<span class="sk-b ${k||''}">${l}</span>`).join('')}</div></div>`;
+  return `<div class="slk"><div class="slk-top"><span>${s.slackCtx}</span><i>${s.slackWho||''}</i></div>`+
+    `<div class="slk-msg"><div class="slk-av">M</div><div class="slk-mb">`+
+    `<div class="slk-mh"><b>MGR</b><span class="slk-badge">APP</span><span>${s.slackAt||'8:42 AM'}</span></div>`+
+    s.body.join('')+`</div></div></div>`;
+}
 // E.info/E.note carry only in-app helper copy a user should read; builder/spec prose belongs in spec:.
 const W=(t)=>`<span style="color:var(--warn-text)">${t}</span>`;
 const HCTL='<b class="hc">Search</b><b class="hc">Me</b>';
@@ -195,33 +470,93 @@ function deskView(s){
 // Mirrors plan §7 build order — change both together.
 const STEPS={1:'Foundations + authenticated shells',2:'Entry + first run',3:'Primitives + movement + import',4:'Composer + outbox',5:'Orders + QBO',6:'Portal content',7:'Later slices',8:'Slack-first chat projection + provider previews'};
 function groupOf(s){return s.group||(s.portal?'Portal':s.desk?'Desk':s.tab);}
+// Venue = WHERE the behaviour happens. Everything MGR renders itself — staff
+// shell, portal, entry, desk — is one venue; a surface the brewery touches in
+// somebody else's product (Slack today; Square or QuickBooks when drawn) is its
+// own. VENUES is derived from SCREENS, so a new venue appears in the bar the
+// moment a screen declares it — no list to keep in step.
+const HOME='MGR app';
+function venueOf(s){return s.venue||HOME;}
+const venues=()=>[HOME,...[...new Set(SCREENS.map(venueOf))].filter(v=>v!==HOME).sort()];
+// One shell per non-home venue. A venue with no shell yet still lists its
+// frames and says so, rather than borrowing MGR chrome and reading as a lie.
+const SHELLS={Slack:slackFrame,QuickBooks:qboPanelFrame,Square:sqFrame};
+const VENUE_NOTE={
+  QuickBooks:"Records MGR <i>writes</i> into QuickBooks, and the one that comes back. Anchored to real columns: <code>customers.qbo_customer_id</code>, <code>skus.qbo_item_id</code>, <code>invoices.qbo_invoice_id</code>, and the <code>qbo_tax_cents/qbo_total_cents/qbo_balance_cents</code> triple the baseline migration marks <i>written by the sync job only</i>. MGR owns lines, refs and each line&rsquo;s TAX / NON taxability; QuickBooks owns numbering and computes tax and balance. MGR must still send <code>TxnTaxDetail.TxnTaxCodeRef</code> to opt the transaction into Automated Sales Tax — omit it and the invoice books at zero tax. MGR's own Invoices &amp; QBO screens stay under MGR app.",
+  Square:"Two-way, and the directions are different things. MGR <i>publishes the catalog</i> — every sellable SKU becomes a Square item, and MGR retires it when it stops being available — while MGR <i>reads sales and refunds</i> back out. Name, serving and retail price are authored in MGR's provider-neutral POS menu; Square holds a copy. It does not push stock counts: Square decrements its own on sale, and a second writer on that number would erase sales not yet ingested. Retiring clears <code>present_at_location_ids</code> rather than deleting, so past orders still resolve and last month's sales still reconcile. The read direction is already schema-backed and already provider-neutral: <code>pos_connections</code>, <code>pos_locations</code> (external location → MGR location), <code>pos_item_mappings</code> (<code>external_item_id</code> → <code>sku_id</code> + <code>qty_per_sale</code>) and <code>pos_sales</code> (raw lines, <code>movement_id</code> → the depletion it posted, unique on <code>connection_id, external_line_id</code>). No column names Square. <b>The publish direction is not in the schema:</b> <code>pos_item_mappings</code> carries no MGR-authored name, retail price or availability, so the menu frames below are plan-derived where the sale and refund frames are not. The plan rule these frames exist to enforce: when Square is connected the weekly count posts no depletion — it is a variance check against POS.",
+  Slack:"MGR's three Slack surfaces drawn as Slack renders them: App Home tabs, an app message row with the <b>APP</b> badge, and a Block Kit modal with its footer submit. Blocks and copy come from <code>lib/chat/slack-renderer.ts</code> and the same fixtures the renderer tests use, so these frames and the shipped payload cannot drift. MGR's own Settings screens <i>about</i> Slack stay under MGR app, because that is where they live."};
+// One card chrome for both grids; only the frame inside it differs.
+function card(s,frame,wide){
+  const grp=groupOf(s);
+  return `<div class="sc ${wide?'wide':''}" data-g="${grp}" data-s="${s.step}">
+      <div class="meta"><b>${grp}</b><span class="b">slice ${s.slice}</span><span class="b">step ${s.step}</span></div>
+      <div class="name">${s.name}</div><div class="job">${s.job}</div>
+      ${frame}
+      ${s.states?E.states(s.states):''}${s.spec?`<div class="specnote"><b>builder</b> · ${s.spec}</div>`:''}
+      <div class="io">reads <span>${s.reads}</span><br>writes <span>${s.writes}</span></div></div>`;
+}
 function render(view='phone'){
-  if(SCREENS.length!==73)throw new Error(`Expected 73 screens, found ${SCREENS.length}`);
+  if(SCREENS.length!==88)throw new Error(`Expected 87 screens, found ${SCREENS.length}`);
   document.getElementById('count').textContent=SCREENS.length;
   let out='',last=null;
   for(const s of SCREENS){
-    const grp=groupOf(s);
+    if(venueOf(s)!==HOME)continue; // other venues get their own sections
     if(s.step!==last){out+=`<h2 class="grp">Build step ${s.step} — ${STEPS[s.step]}</h2>`;last=s.step;}
-    out+=`<div class="sc ${(s.desk||s.ex||view==='desk')?'wide':''}" data-g="${grp}" data-s="${s.step}">
-      <div class="meta"><b>${grp}</b><span class="b">slice ${s.slice}</span><span class="b">step ${s.step}</span></div>
-      <div class="name">${s.name}</div><div class="job">${s.job}</div>
-      ${(view==='desk'||s.desk)?deskView(s):phone(s)}
-      ${s.states?E.states(s.states):''}${s.spec?`<div class="specnote"><b>builder</b> · ${s.spec}</div>`:''}
-      <div class="io">reads <span>${s.reads}</span><br>writes <span>${s.writes}</span></div></div>`;
+    out+=card(s,(view==='desk'||s.desk)?deskView(s):phone(s),(s.desk||s.ex||view==='desk'));
   }
   document.getElementById('grid').innerHTML=out;
 }
-function filter(ft,fs){
+// Foreign-venue frames ignore the phone/desk toggle: Slack looks like Slack on
+// both. Each venue gets its own section so the chrome switch is unmistakable.
+function renderVenues(){
+  document.getElementById('venue-secs').innerHTML=venues().filter(v=>v!==HOME).map(v=>{
+    const shell=SHELLS[v],screens=SCREENS.filter(x=>venueOf(x)===v);
+    const note=VENUE_NOTE[v]||`Surfaces the brewery touches inside ${v}, outside MGR.`;
+    const cards=shell?screens.map(x=>card(x,(SHELLS[x.shell]||shell)(x),!!x.wide)).join('')
+      :screens.map(x=>card(x,`<div class="noshell">No ${v} shell drawn yet — add one beside <code>slackFrame</code>.</div>`,false)).join('');
+    return `<div class="vsec" data-v="${v}">
+      <h2 class="grp">Inside ${v} — the same work, in ${v}'s design language</h2>
+      <p class="slknote">${note}</p><div class="grid">${cards}</div></div>`;
+  }).join('');
+}
+function filter(ft,fs,fv){
+  // Venue picks the section; group/step narrow within it.
+  document.getElementById('home-sec').classList.toggle('hide',fv!==HOME);
+  document.querySelectorAll('#venue-secs .vsec').forEach(sec=>{
+    const mine=sec.dataset.v===fv;
+    sec.classList.toggle('hide',!mine);
+    if(mine)sec.querySelectorAll('.sc').forEach(c=>c.classList.toggle('hide',!(fs==='all'||c.dataset.s===fs)));
+  });
+  if(fv!==HOME)return;
   const g=document.getElementById('grid');
   g.querySelectorAll('.sc').forEach(c=>c.classList.toggle('hide',!((ft==='all'||c.dataset.g===ft)&&(fs==='all'||c.dataset.s===fs))));
   g.querySelectorAll('h2.grp').forEach(h=>{let n=h.nextElementSibling,any=false;while(n&&!n.classList.contains('grp')){if(!n.classList.contains('hide'))any=true;n=n.nextElementSibling;}h.classList.toggle('hide',!any);});
 }
 function bar(){
   const tabs=['all',...GROUPS],steps=['all',...Object.keys(STEPS)];
-  let t='all',st='all',v='phone';const b=document.getElementById('bar');
-  b.innerHTML=['phone','desk'].map(x=>`<button data-v="${x}">${x}</button>`).join('')+'<span class="sep"></span>'+tabs.map(x=>`<button data-t="${x}">${x==='all'?'all groups':x}</button>`).join('')+'<span class="sep"></span>'+steps.map(x=>`<button data-s="${x}">${x==='all'?'all steps':'step '+x}</button>`).join('');
-  const apply=()=>{b.querySelectorAll('button').forEach(k=>k.classList.toggle('on',k.dataset.t===t||k.dataset.s===st||k.dataset.v===v));filter(t,st);};
-  b.addEventListener('click',e=>{const k=e.target.closest('button');if(!k)return;if(k.dataset.t)t=k.dataset.t;if(k.dataset.s)st=k.dataset.s;if(k.dataset.v&&k.dataset.v!==v){v=k.dataset.v;render(v);}apply();});
+  let t='all',st='all',v='phone',ve=HOME;const b=document.getElementById('bar');
+  const row=(label,html)=>`<div class="barrow"><b>${label}</b>${html}</div>`;
+  b.innerHTML=
+    row('venue',venues().map(x=>`<button data-e="${x}">${x}</button>`).join(''))+
+    row('group',['phone','desk'].map(x=>`<button data-v="${x}">${x}</button>`).join('')+'<span class="sep"></span>'+tabs.map(x=>`<button data-t="${x}">${x==='all'?'all groups':x}</button>`).join(''))+
+    row('step',steps.map(x=>`<button data-s="${x}">${x==='all'?'all steps':'step '+x}</button>`).join(''));
+  const grpRow=b.querySelectorAll('.barrow')[1];
+  const apply=()=>{
+    // Groups describe MGR's own navigation; they mean nothing in a foreign venue.
+    grpRow.classList.toggle('dim',ve!==HOME);
+    // A filter with nothing behind it in this venue is dimmed rather than left
+    // clickable — every Slack frame is step 8, so steps 1-7 would just go blank.
+    const here=SCREENS.filter(x=>venueOf(x)===ve);
+    const steps=new Set(here.map(x=>String(x.step))),grps=new Set(here.map(groupOf));
+    b.querySelectorAll('[data-s]').forEach(k=>k.classList.toggle('dim',k.dataset.s!=='all'&&!steps.has(k.dataset.s)));
+    b.querySelectorAll('[data-t]').forEach(k=>k.classList.toggle('dim',k.dataset.t!=='all'&&!grps.has(k.dataset.t)));
+    b.querySelectorAll('button').forEach(k=>k.classList.toggle('on',k.dataset.t===t||k.dataset.s===st||k.dataset.v===v||k.dataset.e===ve));
+    filter(t,st,ve);
+  };
+  b.addEventListener('click',e=>{const k=e.target.closest('button');if(!k)return;
+    if(k.dataset.e){ve=k.dataset.e;t='all';st='all';}
+    if(k.dataset.t)t=k.dataset.t;if(k.dataset.s)st=k.dataset.s;
+    if(k.dataset.v&&k.dataset.v!==v){v=k.dataset.v;render(v);}apply();});
   apply();
 }
 
@@ -282,6 +617,10 @@ const SCREENS=[
 {step:6,slice:1,portal:'Order',name:'Portal · Order',job:'A buyer catalog: price, package, quantity, Place order',reads:'get_portal_catalog [SCHEMA/RLS-GATE: return customer-allowed fulfillment source]',writes:'submit_order [SCHEMA/RLS-GATE: validate allowed from_location_id; one RPC: order + lines + submitted status]',states:[['empty catalog','call brewery; nothing orderable'],['missing price','item cannot enter cart',1],['no ship-to','contact brewery; choose an existing ship-to',1],['repeat recheck','SKU, price, ship-to and source revalidate',1],['receipt','ORD number after commit']],spec:'Target 2 taps: Same as last week → Place order (the repeat proposal opens Review prefilled). Review stays disabled until the schema/RLS contract supplies and validates a customer-allowed source — never silently choose Warehouse. Stepper − and + each ship as 48×48 targets. No staff vocabulary (ATP, gates, fulfillment engineering) anywhere in the portal. No persistent cart: leaving the page keeps nothing.',body:[E.hd('Order','Sly Fox'),E.btn('Same as last week','g'),E.row('Hazy IPA · ½ bbl keg','$150.00',E.stq(4)),E.row('Pils · 16 oz case','$38.00',E.stq(6)),E.row('Stout · ⅙ bbl keg','$62.00',E.stq(0)),E.row('Ships from','Warehouse'),E.row('Ship-to · requested date','Main · Wed 9/9','Change'),E.sp(),E.btn('Review order · $828.00','p disabled')]},
 {step:6,slice:1,portal:'Order',surface:'sheet',name:'Portal · Review',job:'Confirm quantities, ship-to and fulfillment line, then place the order',reads:'get_portal_catalog [SCHEMA/RLS-GATE: return customer-allowed fulfillment source]',writes:'submit_order [SCHEMA/RLS-GATE: validate allowed from_location_id; one RPC: order + lines + submitted status]',hd:E.hd('Review order','Back'),states:[['price changed','revalidated price shown before Place order',1],['inactive SKU','line removed · told plainly',1],['submit error','keep quantities · Retry safe',1],['duplicate','same request returns the same ORD number']],spec:'The confirm step for both the stepper path and Same as last week. Buyer copy only: price, package, quantity, “Ships from Warehouse”, Place order. No ATP, no gate names. Place order stays disabled until the source contract exists. After submit the portal is read-only — changes go through the brewery.',body:[E.row('Hazy IPA · ½ bbl keg','4 × $150.00','$600.00'),E.row('Pils · 16 oz case','6 × $38.00','$228.00'),E.fld('Ship-to','Main · Phoenixville, PA'),E.fld('Requested date','Wed 9/9'),E.row('Ships from','Warehouse'),E.fld('Your PO number','optional'),E.info('Order number is assigned when you place the order.'),E.sp(),E.btn('Place order · $828.00','p disabled')]},
 {step:6,slice:1,portal:'Orders',name:'Portal · Orders',job:'See status and adjusted quantities without staff controls',reads:'list_portal_orders [design]',writes:'—',states:[['expanded row','lines with ordered vs shipped and plain adjusted copy'],['no orders','Start one from Order']],spec:'Each row expands in place into its lines; adjusted quantities are stated in buyer copy. No change-request, no cancel — the portal is read-only after submit; the row says whom to call.',body:[E.hd('Orders','Sly Fox'),E.row('ORD-0231','confirmed · ships Thu','$1,240'),E.row('ORD-0225','shipped 8/27','$980'),E.row('ORD-0221','adjusted · 2 cases short','$528','w'),E.row('Hazy IPA · ½ bbl keg','ordered 2 · shipped 2','$300.00'),E.row('Pils · 16 oz case','ordered 8 · shipped 6 · 2 not available','$228.00','w'),E.info('Need a change? Call Demo Brewing — orders can’t be edited here after they’re placed.')]},
+{step:6,slice:1,portal:'Invoices',name:'Portal · Invoice · Pay',job:'One stable MGR link that resolves to QuickBooks at the moment it is clicked',reads:'get_portal_invoice · get_qbo_connection [design; payments_enabled flag]',writes:'— [Intuit takes the payment; paid_at returns through the sync job]',states:[['payable','Pay opens QuickBooks in a new tab'],['no payments account','the button never renders; brewery has no QuickBooks Payments',1],['not pushed yet','no qbo_invoice_id; Pay is absent, not disabled'],['link unavailable','Intuit returned none — the unavailable page, never a 500',1],['already paid','Pay is gone; paid_at came back from the sync']],spec:'The whole design is one rule: MGR owns the link, Intuit owns the destination. What is shared — this row, the emailed reminder, the PDF footer — is always /portal/invoices/:id/pay, an MGR URL that is permanent because it resolves late. Intuit&rsquo;s InvoiceLink is read-only, is generated only for a pay-enabled invoice with a customer email, has no documented expiry, and is intermittently absent; fetching it seconds before the redirect makes every one of those someone else&rsquo;s problem. It is never stored in a column, never serialised to the client, never put in an email. It is a bearer URL — anyone holding it can pay — so authorization runs on every click before any Intuit call is made, and the 404 for a customer requesting somebody else&rsquo;s invoice must land before the fetch, not after.',body:[E.hd('Back · Invoices','INV-0198'),E.ttl('$1,240.00'),E.row('Due','9/18/2026'),E.row('Status','Sent · unpaid','','w'),E.tbl(['Item','Qty','Amount'],[['Hazy IPA · 1/2 bbl','4','740.00'],['Pils · 16 oz case','6','252.00']]),E.info('Pay by card or bank transfer through QuickBooks. You will not need an account.'),E.btn('Pay invoice'),E.note('Opens QuickBooks in a new tab. This link keeps working — it is re-checked each time you open it.')]},
+
+{step:6,slice:1,portal:'Invoices',name:'Portal · Payment unavailable',job:'The degraded page that replaces a 500 when Intuit returns no link',reads:'get_portal_invoice [design]',writes:'—',states:[['no link','Intuit generated none for this invoice',1],['no customer email','the cause push should have caught first',1],['payments off','brewery has no QuickBooks Payments account'],['reason logged','the customer sees one page; the brewery sees why']],spec:'Exists so that &ldquo;works every time&rdquo; is honest rather than aspirational. Every precondition is checked before the share — push refuses an invoice whose customer has no email, and the Payments capability is cached on the connection — but InvoiceLink can still come back empty, so the click path needs a designed floor. The customer gets one coherent page with the invoice still readable and a way to reach a human; MGR logs the distinguishing reason. Never a stack trace, never a dead redirect, never a Pay button that throws.',body:[E.hd('Back · Invoices','INV-0198'),E.ttl('$1,240.00'),E.info('Online payment isn&rsquo;t available for this invoice right now.'),E.row('Due','9/18/2026'),E.tbl(['Item','Qty','Amount'],[['Hazy IPA · 1/2 bbl','4','740.00'],['Pils · 16 oz case','6','252.00']]),E.note('Contact Demo Brewing to arrange payment — the invoice above is unchanged and still due.'),E.row('Demo Brewing','(610) 555-0142','›')]},
+
 {step:6,slice:1,portal:'Invoices',name:'Portal · Invoices',job:'See issued, due and paid invoices',reads:'list_portal_invoices [design]',writes:'—',body:[E.hd('Invoices','Sly Fox'),E.row('INV-0198','due 9/18','$1,240','w'),E.row('INV-0190','paid 8/29','$980','ok'),E.blank('No invoices yet. They appear after shipment or delivery.')]},
 {step:6,slice:1,portal:'Account',name:'Portal · Account',job:'Read own ship-to, signed-in membership and deposit details',reads:'get_portal_account [design]',writes:'—',spec:'Peer portal users are not listed; the composer exposes only account-safe reads and order commands.',body:[E.hd('Account','Sly Fox'),E.nav('Main ship-to','Phoenixville, PA'),E.nav('Dock ship-to','Royersford, PA'),E.row('You · buyer','signed-in membership','active'),E.row('Keg deposits held','38 × ½ bbl','$1,140'),E.info('Contact the brewery to change account details.')]},
 // step 7 — later slices reuse the same shells, forms and state contract
@@ -306,14 +645,40 @@ const SCREENS=[
 // step 8 — Slack-first chat projection and production preview gallery
 {step:8,slice:'chat',group:'Chat',tab:'More',name:'Chat settings · disconnected',job:'Explain the projection before an admin installs a provider',reads:'get_chat_integration_health [design]',writes:'begin_chat_installation [design; admin-only, single-use OAuth intent]',states:[['permission','admin only',1],['OAuth cancelled','remain disconnected · try again',1]],spec:'This is production Settings UI, not a developer demo. Preview surfaces remain available while disconnected and use non-sensitive fixtures.',body:[E.hd('Back · Settings','Chat'),E.ttl('Chat notifications'),E.info('Bring today’s assigned, due and overdue work into chat. MGR remains the source of truth.'),E.row('Slack','Not connected','Connect'),E.nav('Preview surfaces','App Home · personal DM · team digest'),E.btn('Connect Slack')]},
 {step:8,slice:'chat',group:'Chat',tab:'More',name:'Chat settings · active + previews',job:'Operate one brewery/provider installation and inspect every outbound surface',reads:'get_chat_integration_health · get_notification_preferences · get_brewery_operating_defaults [design] · chat_preview_fixtures [presentation]',writes:'set_notification_destination · set_brewery_quiet_hours · set_brewery_operating_defaults · disable_chat_installation · disconnect_chat_installation [design]',states:[['healthy','last callback and delivery shown'],['retrying','queue count + redacted reason',1],['disabled','no sends; previews still work',1]],spec:'Preview picker renders the same provider-neutral fixtures consumed by renderer contract tests. It never queries live customer data or sends a message. Reading cadence is MGR-owned and controls both Today and chat.',body:[E.hd('Back · Settings','Chat'),E.row('Slack · Demo Brewing','Connected · scopes healthy','Active','ok'),E.fld('Operations channel','#mgr-operations · private'),E.fld('Quiet hours','9:00 PM–6:00 AM · brewery time'),E.fld('Reading overdue after','24 hours · Today + chat'),E.chips(['App Home','Personal DM','Team digest','Preferences'],0),E.row('Preview · App Home','4 current work reasons · fixture data','Open'),E.btn('Disable','g'),E.btn('Disconnect Slack','irr')]},
-{step:8,slice:'chat',group:'Chat',surface:'entry',name:'Slack App Home · link identity',job:'Link one Slack user to one current brewery staff membership',reads:'get_chat_link_status [design]',writes:'issue_chat_link_proof · consume_chat_link_proof [design; single-use, authenticated MGR completion]',states:[['expired','link expired · create a new one',1],['not staff','customer and removed membership rejected',1],['linked','show personal queue']],spec:'Slack profile email and display name are never identity. The deep link requires normal MGR authentication.',hd:E.hd('Slack · MGR','App Home'),body:[E.ttl('Your MGR work'),E.info('Link your account to see only work your current brewery role permits.'),E.btn('Link MGR account'),E.row('Privacy','No customer contacts, prices or notes are posted here','')]},
-{step:8,slice:'chat',group:'Chat',surface:'entry',name:'Slack App Home · personal queue',job:'Show the current role-filtered Today projection privately',reads:'get_today [design; linked user + current membership] · get_chat_link_status',writes:'—',states:[['empty','You’re caught up'],['loading','row-shaped skeletons'],['stale','refresh removes resolved work'],['unlinked','return to link screen',1]],spec:'Rows are rebuilt from owning MGR queries. App Home remains current during quiet hours and is optional for future providers.',hd:E.hd('Slack · MGR','App Home · Refresh'),body:[E.ttl('Today · 4 waiting'),E.row('ORD-0231 · review submitted order','requested Thu · sales','Open','w'),E.row('ORD-0235 · pick due','ships Fri · warehouse','Open'),E.row('Route A · next stop','assigned to you · 9:30 AM','Open'),E.row('FV2 · reading overdue','last reading 26 h ago · brewer','Open','w'),E.btn('Open Today in MGR','g')]},
-{step:8,slice:'chat',group:'Chat',surface:'entry',name:'Slack personal DM · state change',job:'Notify once when linked work becomes assigned, due or overdue',reads:'get_notification_occurrence [design] · owning Today query revalidation',writes:'snooze_notification · set_notification_preference [integration state only]',states:[['quiet hours','queued until personal window opens'],['resolved','same message updates to Resolved'],['retry','same semantic delivery; no second message'],['unauthorized','suppress and unlink if membership ended',1]],spec:'The provider message is a projection. Deleting it does not change MGR. Deep links contain no trusted actor or tenant claims.',hd:E.hd('Slack · MGR','Direct message'),body:[E.info('Pick due · assigned to you'),E.ttl('ORD-0235'),E.fld('Requested ship date','Fri 9/4'),E.fld('What to do','Open the pick flow in MGR'),E.btn('Open pick in MGR'),E.btns([['Snooze','g'],['Mute picks','g']])]},
-{step:8,slice:'chat',group:'Chat',surface:'entry',name:'Slack team digest · private operations',job:'Summarize unresolved work without leaking personal or customer detail',reads:'get_chat_operations_digest [design; current unresolved counts]',writes:'—',states:[['morning','one message for local morning window'],['midday','same window message updates'],['channel invalid','shared delivery disabled; personal delivery continues',1]],spec:'The destination must stay private, bot-member and non-external. Counts and safe operational labels only; details remain personal.',hd:E.hd('Slack · #mgr-operations','MGR'),body:[E.ttl('Morning operations · 6 waiting'),E.row('Submitted orders','need sales review','2','w'),E.row('Picks due','warehouse queue','2'),E.row('Assigned deliveries','next stops ready','1'),E.row('Fermentation readings','overdue','1','w'),E.info('Details and actions are available in each person’s private MGR App Home.'),E.btn('Open my MGR work','g')]},
-{step:8,slice:'chat',group:'Chat',surface:'sheet',name:'Slack notification preferences',job:'Let a linked user control delivery without changing MGR due state',reads:'get_notification_preferences [design]',writes:'set_notification_preference · snooze_notification [design; integration state only]',states:[['saved','update App Home and close'],['invalid hours','name the correction',1],['unsupported provider','open authenticated MGR fallback',1]],spec:'Snooze and mute affect personal delivery only. App Home and MGR Today still show current work.',hd:E.hd('Notification preferences','Close'),body:[E.fld('Submitted orders','On'),E.fld('Picks due','On'),E.fld('Assigned deliveries','On'),E.fld('Fermentation readings','On'),E.fld('Quiet hours','9:00 PM–6:00 AM'),E.btn('Save preferences')]},
-{step:8,slice:'chat',group:'Chat',surface:'sheet',name:'Slack form · fermentation reading',job:'Preview the first eligible operational modal without enabling it early',reads:'get_fermentation_reading_preview [gated; current occupancy/version]',writes:'record_fermentation_reading [gated; request replay + version + correction contract]',states:[['not yet eligible','open the MGR reading flow instead',1],['stale','occupancy changed · refresh',1],['response lost','same requestId returns first result']],spec:'Future phase only. Personal destination, canonical preview and explicit Record reading confirmation. New reading corrects history; prior rows never edit.',hd:E.hd('Record fermentation reading','Close'),body:[E.fld('Vessel','FV2 · Hazy IPA'),E.fld('Last reading','26 h ago'),E.num('4.2','°Plato'),E.num('68','°F'),E.note('Chat entry becomes available only after secure delegated-action checks ship.'),E.gated('Record reading','Open this reading in MGR for now'),E.btn('Open in MGR','g')]},
-{step:8,slice:'chat',group:'Chat',surface:'sheet',name:'Slack form · clean order confirmation',job:'Show why warning-free order confirmation remains conditional',reads:'get_order_confirmation_preview [gated; canonical current preview]',writes:'confirm_order [gated; atomic allocation + request replay + expected version]',states:[['warning','ATP, registration, price or source warning routes to MGR',1],['stale','order changed · refresh',1],['eligible','only a warning-free preview can confirm']],spec:'Future phase only. This fixture intentionally carries an ATP warning, so Slack cannot confirm it.',hd:E.hd('Review order','Close'),body:[E.row('ORD-0231','3 lines · requested Thu','Submitted'),E.note('Hazy IPA · 16 oz case is 8 units short. Review allocations and restock in MGR.'),E.gated('Confirm order','This order needs the full MGR review'),E.btn('Open order in MGR','g')]},
+{step:8,slice:'chat',group:'Chat',surface:'entry',name:'Slack App Home · link identity',job:'Link one Slack user to one current brewery staff membership',reads:'get_chat_link_status [design]',writes:'issue_chat_link_proof · consume_chat_link_proof [design; single-use, authenticated MGR completion]',states:[['expired','link expired · create a new one',1],['not staff','customer and removed membership rejected',1],['linked','show personal queue']],spec:'Slack profile email and display name are never identity. The deep link requires normal MGR authentication.',venue:'Slack',slack:'home',slackCtx:'App Home',body:[S.h('Your MGR work'),S.s('Link your account to see only work your current brewery role permits.'),S.acts([['Link MGR account']]),S.ctx('No customer contacts, prices or notes are posted here.')]},
+{step:8,slice:'chat',group:'Chat',surface:'entry',name:'Slack App Home · personal queue',job:'Show the current role-filtered Today projection privately',reads:'get_today [design; linked user + current membership] · get_chat_link_status',writes:'—',states:[['empty','You’re caught up'],['loading','row-shaped skeletons'],['stale','refresh removes resolved work'],['unlinked','return to link screen',1]],spec:'Rows are rebuilt from owning MGR queries. App Home remains current during quiet hours and is optional for future providers.',venue:'Slack',slack:'home',slackCtx:'App Home · Refresh',body:[S.h('Today · 4 waiting'),S.sa('*ORD-0231 · Review submitted order*\nrequested Thu · sales','Open'),S.sa('*ORD-0235 · Pick due*\nships Fri · warehouse','Open'),S.sa('*Route A · next stop · Next stop*\nassigned to you · 9:30 AM','Open'),S.sa('*FV2 · reading overdue · Reading overdue*\nlast reading 26 h ago · brewer','Open'),S.acts([['Open Today in MGR']])]},
+{step:8,slice:'chat',group:'Chat',surface:'entry',name:'Slack personal DM · state change',job:'Notify once when linked work becomes assigned, due or overdue',reads:'get_notification_occurrence [design] · owning Today query revalidation',writes:'snooze_notification · set_notification_preference [integration state only]',states:[['quiet hours','queued until personal window opens'],['resolved','same message updates to Resolved'],['retry','same semantic delivery; no second message'],['unauthorized','suppress and unlink if membership ended',1]],spec:'The provider message is a projection. Deleting it does not change MGR. Deep links contain no trusted actor or tenant claims.',venue:'Slack',slack:'msg',slackCtx:'MGR',slackWho:'Direct message',slackAt:'8:43 AM',body:[S.h('ORD-0235'),S.s('*Pick due*\nassigned to you'),S.ctx('Pick due · needs attention'),S.acts([['Open pick in MGR'],['Snooze'],['Mute picks']])]},
+{step:8,slice:'chat',group:'Chat',surface:'entry',name:'Slack team digest · private operations',job:'Summarize unresolved work without leaking personal or customer detail',reads:'get_chat_operations_digest [design; current unresolved counts]',writes:'—',states:[['morning','one message for local morning window'],['midday','same window message updates'],['channel invalid','shared delivery disabled; personal delivery continues',1]],spec:'The destination must stay private, bot-member and non-external. Counts and safe operational labels only; details remain personal.',venue:'Slack',slack:'msg',slackCtx:'# mgr-operations',slackWho:'private · 6 members',slackAt:'7:00 AM',body:[S.h('Morning operations · 6 waiting'),S.s('*Submitted orders:* 2 · need sales review\n*Picks due:* 2 · warehouse queue\n*Assigned deliveries:* 1 · next stops ready\n*Fermentation readings:* 1 · overdue'),S.ctx('Details and actions are available in each person\u2019s private MGR App Home.'),S.acts([['Open my MGR work']])]},
+{step:8,slice:'chat',group:'Chat',surface:'sheet',name:'Slack notification preferences',job:'Let a linked user control delivery without changing MGR due state',reads:'get_notification_preferences [design]',writes:'set_notification_preference · snooze_notification [design; integration state only]',states:[['saved','update App Home and close'],['invalid hours','name the correction',1],['unsupported provider','open authenticated MGR fallback',1]],spec:'Snooze and mute affect personal delivery only. App Home and MGR Today still show current work.',venue:'Slack',slack:'modal',slackCtx:'Notification preferences',slackFoot:[['Save preferences','pri']],body:[S.f([['Submitted orders','On'],['Picks due','On'],['Assigned deliveries','On'],['Fermentation readings','On'],['Quiet hours','9:00 PM\u20136:00 AM']]),S.ctx('Snooze and mute affect personal delivery only. MGR still shows the work as due.')]},
+{step:8,slice:'chat',group:'Chat',surface:'sheet',name:'Slack form · fermentation reading',job:'Preview the first eligible operational modal without enabling it early',reads:'get_fermentation_reading_preview [gated; current occupancy/version]',writes:'record_fermentation_reading [gated; request replay + version + correction contract]',states:[['not yet eligible','open the MGR reading flow instead',1],['stale','occupancy changed · refresh',1],['response lost','same requestId returns first result']],spec:'Future phase only. Personal destination, canonical preview and explicit Record reading confirmation. New reading corrects history; prior rows never edit.',venue:'Slack',slack:'modal',slackCtx:'Record fermentation reading',slackFoot:[['Open in MGR']],body:[S.ctx('Future phase only'),S.f([['Vessel','FV2 · Hazy IPA'],['Last reading','26 h ago'],['Reading','4.2 °Plato · 68 °F']]),S.dis('Record reading','Open this reading in MGR for now')]},
+{step:8,slice:'chat',group:'Chat',surface:'sheet',name:'Slack form · clean order confirmation',job:'Show why warning-free order confirmation remains conditional',reads:'get_order_confirmation_preview [gated; canonical current preview]',writes:'confirm_order [gated; atomic allocation + request replay + expected version]',states:[['warning','ATP, registration, price or source warning routes to MGR',1],['stale','order changed · refresh',1],['eligible','only a warning-free preview can confirm']],spec:'Future phase only. This fixture intentionally carries an ATP warning, so Slack cannot confirm it.',venue:'Slack',slack:'modal',slackCtx:'Review order',slackFoot:[['Open order in MGR']],body:[S.ctx('Future phase only'),S.f([['Order','ORD-0231 · 3 lines · requested Thu · Submitted'],['Warning','Hazy IPA · 16 oz case is 8 units short. Review allocations and restock in MGR.']]),S.dis('Confirm order','This order needs the full MGR review')]},
 {step:8,slice:'chat',group:'Chat',tab:'More',name:'Chat health · reauthorization required',job:'Fail closed while keeping recovery understandable and personal delivery isolated',reads:'get_chat_integration_health [design]',writes:'begin_chat_reauthorization · disable_chat_installation · disconnect_chat_installation [design]',states:[['token revoked','all provider sends stop',1],['channel externalized','team digest stops; eligible personal sends continue',1],['uninstalled','links and queued actions invalidated',1]],spec:'Provider errors remain redacted. Emergency disable does not depend on Slack being reachable.',body:[E.hd('Back · Chat','Health'),E.note('Slack authorization expired. No messages are being sent.'),E.row('Last callback','Today · 8:42 AM','Succeeded'),E.row('Last delivery','Today · 8:43 AM','Succeeded'),E.row('Queued','3 deliveries','Paused','w'),E.btn('Reauthorize Slack'),E.btn('Disable integration','irr')]},
+
+// venue QuickBooks — what MGR's push produces, rendered by Intuit. Slice 1, step 5.
+{step:5,slice:1,group:'QBO',venue:'QuickBooks',wide:1,appTitle:'Invoice CM-LLB-00512',appActions:'Edit invoice',name:'Invoice · as MGR pushed it',job:'What the accountant opens after one shipment invoices — and the two steps the push does not perform',reads:'— [QuickBooks renders; MGR wrote it]',writes:'push_invoice [design; requestid, online-only, AllowOnlineACHPayment + AllowOnlineCreditCardPayment]',states:[['not sent','created by MGR; QuickBooks has emailed nobody',1],['accepted','qbo_invoice_id stored on the MGR invoice'],['rejected','qbo_sync_error shown in MGR; nothing created here',1],['response lost','the same requestid returns the first invoice, never a second'],['tax intent missing','AST does not engage and the invoice books at 0.00 tax',1],['no customer email','push refuses — an invoice without one can never be paid online',1],['viewed','the customer opened it — a signal MGR has no column for',1]],spec:'Not an MGR screen — drawn so the push contract is legible, and drawn as QuickBooks actually presents it: the Sales transactions list with a right sidebar. QuickBooks has no separate full-page record, so neither does this file. Every Product/Service line resolves through skus.qbo_item_id and the bill-to through customers.qbo_customer_id. MGR sends tax <i>intent</i>, never tax <i>amounts</i>: Intuit requires TxnTaxDetail.TxnTaxCodeRef to opt the transaction into Automated Sales Tax, and an unmarked line is treated as if it were TAX — so every non-taxable line (a keg deposit) must carry TaxCodeRef NON explicitly or it books as taxable revenue. QuickBooks computes the amounts and the sync job writes qbo_tax_cents/qbo_total_cents/qbo_balance_cents back. The header carries the second finding: a pushed invoice reads <b>Not sent</b>. Creating and delivering are different acts and push_invoice performs only the first, so AR can show a healthy invoice the customer has never seen — decide whether MGR&rsquo;s portal is the delivery channel, and if so never present Not sent as a fault. Invoices are pushed <i>born payable</i>: AllowOnlineACHPayment and AllowOnlineCreditCardPayment come from a brewery-level default, because Intuit generates no pay link without them and the omission is invisible until a customer clicks. QuickBooks also tracks Opened / Sent / Viewed / Paid; MGR models only the last. OPEN: numbering is QuickBooks&rsquo; only while CustomTxnNumbers is off. UNVERIFIED: how long Intuit retains a requestid for dedupe.',body:[X.stat('Due in 9 days (Not sent)',1),X.amt('Total due','1,051','52'),X.when('Invoice date','9/03/2026'),X.when('Due date','10/03/2026'),X.sec('Sly Fox Tap Room',X.sub('Billing address',['114 Bridge St.','Phoenixville, PA  19460'])+X.link('ap@slyfox.example')),X.sec('Invoice activity',X.life(['Opened','Sent','Viewed','Paid'],1)),X.more('Products and services')]},
+{step:5,slice:1,group:'QBO',venue:'QuickBooks',wide:1,appTitle:'Payment',appActions:'Edit',name:'Payment · flows back',job:'The accountant records payment here; MGR never offers a Mark paid verb',reads:'qbo sync job [design; writes invoices.paid_at]',writes:'— [no MGR user action]',states:[['paid','invoices.paid_at set on the next sync'],['fee deducted','the deposit is smaller than the payment',1],['partial','balance drops; the AR row stays due',1],['sync lagging','MGR AR shows the last synced balance',1]],spec:'This frame justifies an absence: there is deliberately no Mark paid button anywhere in MGR. paid_at and qbo_balance_cents arrive from the sync job only, which is why the AR list stops showing an invoice as due without anyone in the brewery doing anything. It also carries a number MGR does not model — QuickBooks Payments deducts a processing fee before deposit, so the bank deposit never equals the invoice. MGR reconciles against qbo_balance_cents, not the deposit, and must not read the gap as a short payment. ASSUMPTION: fee capture is out of scope for slice 1; if AR ever reconciles to bank it stops being optional.',body:[X.stat('Paid'),X.amt('Amount paid','1,051','52'),X.when('Payment date','9/28/2026'),X.sec('Sly Fox Tap Room',X.sub('Billing address',['114 Bridge St.','Phoenixville, PA  19460'])+X.rows([['Phone','(610) 933-7181']])),X.sec('Transaction Details',X.sub('Payment Details',['QuickBooks Payments-Bank *8837 | Fee: $10.52','$1,051.52'])+X.sub('Deposit Details',['JPMORGAN CHASE BANK, NA | *0753'])),X.more('More info')]},
+{step:5,slice:1,group:'QBO',venue:'QuickBooks',wide:1,appTitle:'Credit memo CM-0068',appActions:'Edit',name:'Credit memo · as pushed',job:'A return or keg deposit refund as it lands against the customer',reads:'—',writes:'create_credit_memo [design; kind=credit_memo, own requestid]',states:[['applied','reduces the customer balance here'],['unapplied','sits as available credit'],['rejected','qbo_sync_error on the MGR credit row',1],['deposit line untaxed','TaxCodeRef NON, or it refunds phantom tax',1]],spec:'Created by Return shipment or a keg return, never free-form — the plan lists free-form credit memos as deliberately deferred. Returning an empty keg posts the deposit refund and the keg event in one RPC, so the credit and the fleet balance cannot disagree. The deposit line carries TaxCodeRef NON: an unmarked line defaults to TAX and would refund tax that was never charged.',body:[X.stat('Applied'),X.amt('Total credit','114','00'),X.when('Credit date','9/12/2026'),X.when('Applied to','Invoice CM-LLB-00512'),X.sec('Sly Fox Tap Room',X.sub('Billing address',['114 Bridge St.','Phoenixville, PA  19460'])),X.sec('Products and services',X.rows([['Pils · 16 oz case · TAX','$84.00'],['Keg deposit refund · NON','$30.00']])),X.more('More info')]},
+{step:5,slice:1,group:'QBO',venue:'QuickBooks',wide:1,appTitle:'Invoice · not created',appActions:'Edit',name:'Push rejected · unmapped item',job:'What QuickBooks refuses when a SKU carries no usable item reference',reads:'—',writes:'push_invoice [design; rejected — no partial invoice]',states:[['failed','MGR AR row reads push_failed',1],['unmapped','the SKU carries no qbo_item_id'],['archived in QBO','mapped, but the item went inactive — same error, different fix',1],['never partial','no half invoice is left behind here']],spec:'Drawn because the failure is external and the recovery is not. MGR stores the raw provider reason in invoices.qbo_sync_error and leaves qbo_sync_status = failed; the row stays in AR. Re-pushing reuses the same requestid, so a fixed mapping cannot produce a second invoice. Two causes share this one message: the SKU was never mapped, or it was mapped and the QuickBooks item has since gone inactive. The recovery differs — map it here, or reactivate it there — so the error copy must not assume the first. Nothing appears in the Sales transactions list behind this panel, which is the point: no half invoice is left to clean up.',body:[X.err('Invalid reference','Invalid Reference Id : Item element id 0 not found.'),X.sec('Request',X.rows([['Invoice','ORD-0241'],['Failed line','Stout · 1/6 bbl'],['Created in QuickBooks','Nothing']])),X.note('Either the SKU has no qbo_item_id, or the item it points at is archived in QuickBooks. Map it here or reactivate it there, then re-push the same requestid.')]},
+// venue Square — records MGR reads, not writes. Slice 7, step 7.
+{step:7,slice:7,group:'POS',venue:'Square',name:'Taproom sale · Square POS',job:'The sale MGR ingests — and the truth the weekly count is checked against',reads:'sync_pos_sales [design; slice 7, idempotent per sale id]',writes:'— [Square owns the sale]',states:[['synced','depletion posted once per sale id'],['unmapped item','reconciliation stays disabled until mapped',1],['refund','arrives as its own line, credited back'],['disconnected','the weekly count posts depletion again',1]],spec:'Schema-backed: pos_sales stores the raw line and links the depletion it posted through movement_id, unique on (connection_id, external_line_id), so a replayed sync cannot double-count. The conversion runs through pos_item_mappings.qty_per_sale — MGR converts each item through the exact package SKU and qty_per_sale, because a pint is not a case. The in-device rule this frame exists for: when Square is connected the weekly count posts no depletion, it is a variance check against POS.',body:[X.h('$48.76 Payment','Thu Sep 3, 2026 6:42 pm'),X.meta([['','Point of Sale'],['Collected at','Taproom'],['Device','Square Register 0305'],['Order Source','Register'],['Channel','Taproom']]),X.sect('For here'),X.li([['Hazy IPA · pint','21.00','$7.00 × 3'],['Pils · pint','13.00','$6.50 × 2'],['Pils · crowler','12.00','$12.00 × 1']]),X.tot([['Subtotal','46.00'],['Sales Tax','2.76'],['Total','48.76',1],['Card','48.76']]),X.meta([['Receipt','#A7F2'],['Payment','Visa ····4242']]),X.note('MGR reads this. An item it cannot map to a package SKU blocks reconciliation rather than guessing a quantity.')]},
+{step:7,slice:7,group:'POS',venue:'Square',name:'Refund · Square POS',job:'The refund line that becomes a positive inventory adjustment in MGR',reads:'sync_pos_sales [design; refund lines included]',writes:'— [Square owns the refund]',states:[['previewed','MGR shows a positive adjustment, not a negative sale'],['partial refund','only the refunded units credit back'],['unmapped','same block as the sale it reverses',1]],spec:'The plan is explicit that the reconcile list includes refund lines and previews the inventory credit as a positive adjustment. Drawing it as a negative sale would invite a signed-quantity bug of exactly the kind the movement vocabulary exists to prevent.',body:[X.h('$12.72 Refund','Thu Sep 3, 2026 6:51 pm'),X.pill('Refunded',1),X.meta([['','Point of Sale'],['Collected at','Taproom'],['Device','Square Register 0305'],['Original sale','#A7F2']]),X.sect('Refunded items'),X.li([['Pils · crowler','−12.00','$12.00 × 1']]),X.tot([['Sales Tax','−0.72'],['Total refunded','−12.72',1]]),X.meta([['Reason','Wrong pour'],['Receipt','#A7F2-R1']]),X.note('Reaches MGR through the same reconcile_pos_sales RPC as the sale.')]},
+{step:7,slice:7,group:'POS',venue:'Square',sqCtx:'Item library · Dashboard',name:'Item library · ownership boundary',job:'Which items MGR maintains, and which it must never touch',reads:'—',writes:'— [mapping is written in MGR, not here]',states:[['MGR-owned','published, updated and retired by MGR'],['taproom-owned','left alone; sales still ingest if mapped'],['unmapped taproom item','reconcile disabled for that item only',1],['renamed in Square','id holds; ownership survives']],spec:'Drawn to fix a boundary before publishing can cross it: a taproom rings food, merch and guest taps MGR knows nothing about. MGR maintains only the items it published and leaves every other row alone — retire must never walk the whole catalog. Items predating the integration are adopted by mapping once, then maintained like the rest.',body:[X.h('Item library','12 items · 5 maintained by MGR'),X.tbl(['Item','Owner','MGR action'],[['Hazy IPA · pint','MGR','Maintained'],['Pils · pint','MGR','Maintained'],['Stout · pint','MGR','Retired'],['Pretzel','Taproom','None'],['Guest cider · pint','Taproom','None'],['Logo tee','Taproom','None']]),X.note('MGR touches only rows it published. A taproom item it did not create is never renamed, hidden or deleted.')]},
+
+{step:7,slice:7,group:'POS',venue:'Square',sqCtx:'Item library · Dashboard',name:'Item published by MGR',job:'A sellable SKU becomes a Square item, so the mapping is born rather than discovered',reads:'get_taproom_sellable [design]',writes:'publish_pos_item [design; upsert by MGR key, writes back skus.square_item_id]',states:[['created','square_item_id stored on the SKU'],['renamed in MGR','same item updated, id holds'],['collision','existing Square item adopted, never duplicated',1],['rejected','SKU stays unpublished; nothing half-created',1],['tax assignment','merged, never replaced — a republish must not retax',1],['off-premise twin','its own item and id; same source SKU']],spec:'This inverts the mapping problem. MGR creates the item, so it owns the id from birth and there is no unmapped-item backlog for beer it sells. MGR publishes identity and price both: name, category, the serving, and the retail price authored in the MGR POS menu. Retail could not reuse price lists — those are keyed (price_list_id, sku_id) and a pint is a serving, not a SKU — so it lives on the POS menu row.',body:[X.h('Hazy IPA · pint','Published by MGR · Draft'),X.pill('Available'),X.kv([['Square item id','SQ-8841'],['Present at','Taproom'],['Price','$7.00 · from MGR'],['Tax','On-premise · unchanged by publish']]),X.tbl(['Published by MGR','Value'],[['Package SKU','Hazy IPA · 1/2 bbl'],['qty_per_sale','0.008065 · 1/124 of a ½ bbl'],['Category','Draft']]),X.note('MGR upserts under its own key, so re-publishing updates rather than duplicating. Name, serving and retail price all come from the MGR POS menu.')]},
+{step:7,slice:7,group:'POS',venue:'Square',sqCtx:'Item library · Dashboard',name:'Item retired · hidden, not deleted',job:'Beer that stopped being available leaves the register without losing its history',reads:'get_taproom_sellable [design]',writes:'retire_pos_item [design; clears present_at_location_ids — never a delete]',states:[['retired','off the register; past sales still resolve'],['back in stock','re-published under the same id, no churn'],['sold while retiring','the sale still ingests; the id never went away'],['delete','not offered — it would break prior orders',1]],spec:'The removal half of maintenance, and deliberately not a delete. Deleting a catalog object breaks the orders that reference it and destroys the square_item_id the sales ingest maps through, so last month stops reconciling. Clearing the location takes it off the register just as completely. ASSUMPTION drawn here: available means sellable taproom stock on hand, so a keg blown Tuesday and tapped again Friday hides and returns under one stable id instead of churning create/delete/create.',body:[X.h('Stout · pint','Retired by MGR · Draft'),X.pill('Not available',1),X.kv([['Square item id','SQ-8790'],['Present at','— none'],['Last sold','Tue 9/1 · 8:12 PM']]),X.tbl(['State','Value'],[['Catalog object','Kept'],['Prior orders','Still resolve'],['Reconciliation','Unaffected']]),X.note('Hidden from the register, not deleted. Tapping it again re-publishes the same id.')]},
+
+// venue QuickBooks, sidebar shell — the panel that opens over the transaction list.
+// Drawn because it is not a narrow copy of the full record: it leads with status and
+// amount, hides everything else behind collapsible sections, and shows product lines
+// with no quantity at all.
+
+
+{step:7,slice:7,group:'POS',venue:'QuickBooks',wide:1,appTitle:'Sales receipt',appActions:'Edit',name:'Square sales receipt · sidebar',job:'Proof that a second integration is already posting taproom revenue to QuickBooks',reads:'— [Square\u2019s own QuickBooks connector wrote it; not MGR]',writes:'— [MGR must not create these]',states:[['exists already','taproom revenue reaches QBO without MGR',1],['MGR also pushes','wholesale invoices only \u2014 a different stream'],['tips line','Square posts a tips item MGR has no concept of',1],['no quantity','the sidebar shows amounts only; units are not here',1]],spec:'DISCOVERED, not designed \u2014 this is a real record from a live QuickBooks sidebar, and it changes the POS plan. Square has its own QuickBooks connector, and where the brewery has enabled it, taproom sales already land in QuickBooks as Sales receipts with a Square customer section and a Square sale tips item line. MGR must never create these: it pushes wholesale invoices, a different revenue stream, and duplicating taproom revenue would overstate sales. Settings \u00b7 Point of sale should detect the Square\u2192QBO connector and say so, because a brewery running both without knowing it is the failure mode. Note also that the sidebar renders product lines with no quantity column at all \u2014 the units MGR depletes against are not visible here, so this record can never be the reconciliation source; sync_pos_sales must read Square directly.',body:[X.stat('Paid'),X.amt('Amount','59','73'),X.when('Receipt date','09/03/2026'),X.sec('Square customer'),X.sec('Sales receipt activity',X.sub('Paid',['Credit Card'])),X.sec('Products and services',X.rows([['4-Pack Beer To Go','$19.00'],['Draft Sales','$30.00'],['Square sale tips item','$7.79']])+X.link('More details')),X.more('More info')]},
+
+// MGR app — the provider-neutral POS layer. Square is the only adapter today.
+{step:7,slice:7,tab:'More',group:'POS',name:'Settings · Point of sale',job:'Connect one POS provider and see both directions at a glance',reads:'get_pos_integration_health [design; provider-neutral]',writes:'begin_pos_installation · disable_pos_installation · disconnect_pos_installation [design; admin-only]',states:[['no provider','connect one before a menu can publish'],['healthy','catalog and sales both current'],['sales lagging','the menu still publishes',1],['token revoked','publishing and sync both stop',1]],spec:'Provider-neutral by construction, mirroring the chat integration that already solved this: portable contracts, one adapter per provider, and a conformance test every adapter must pass (see lib/chat/contracts.ts and chat-adapter-conformance.test.ts). Square is the only adapter today and the only value this screen can offer; nothing in the copy, the commands or the schema names it. integration_tokens already carries provider in (qbo, square), so the seam exists below this screen.',body:[E.hd('Back · Settings','Point of sale'),E.ttl('Point of sale'),E.info('Publish what the taproom can sell, and read its sales back. One provider is connected at a time.'),E.row('Square · Demo Brewing','catalog published · sales syncing','Active','ok'),E.fld('Location','Taproom'),E.fld('Menu','5 items published · 1 retired'),E.fld('Last sales sync','Today · 6:58 PM'),E.nav('POS menu','retail price, serving size, availability'),E.btn('Disable','g'),E.btn('Disconnect Square','irr')]},
+{step:7,slice:7,tab:'More',group:'POS',name:'POS menu',job:'Author what the register sells and what it charges',reads:'get_pos_menu [design]',writes:'set_pos_item · publish_pos_menu [design; upsert by MGR key, provider-neutral]',states:[['unpublished edits','Publish changes is the primary action'],['published','provider holds a copy of exactly this'],['no retail price','that row cannot publish until priced',1],['provider rejected','the row keeps its edit; nothing half-published',1],['out of stock','row retires itself; price and id are kept'],['same beer, both premises','two rows, two provider items, one source SKU']],spec:'MGR owns this list; the provider stores a copy. Retail price lives on the row rather than in a price list because price_list_items is keyed (price_list_id, sku_id) and a pint is not a SKU — it is a serving of one. srp_cents does not help: it is retail for a case, not for a pour. A Servings concept in the catalog would let price lists own this instead; that is a schema decision, not a POS one.',body:[E.hd('Back · Point of sale','Menu'),E.ttl('POS menu'),E.info('What the register can sell, and what it charges.'),E.tbl(['Item','Pours from','Premise','Retail'],[['Hazy IPA · pint','Hazy IPA · ½ bbl','On','$7.00'],['Pils · pint','Pils · ½ bbl','On','$6.00'],['Pils · crowler','Pils · ½ bbl','Off','$12.00']]),E.row('Stout · pint','no taproom stock · off the register','Retired','w'),E.row('Guest cider · pint','created in Square · not MGR’s','—'),E.btn('Publish changes')]},
+{step:7,slice:7,tab:'More',group:'POS',surface:'sheet',name:'POS item',job:'Price one serving and say when it may be sold',reads:'get_pos_menu_item [design]',writes:'set_pos_item [design; retail price + serving + availability rule]',states:[['saved','queued for the next publish'],['no price','Save stays disabled with human copy',1],['serving missing','cannot convert a sale to depletion',1],['renamed','same id; the provider row updates'],['premise changed','publishes as the other taxed item; the old id retires',1],['tax preserved','publishing never clears the provider’s tax assignment',1]],spec:'The serving is the conversion the whole POS layer depends on — it is what turns a rung pint into FG depletion, so it is authored here beside the price rather than hidden in a mapping table. Availability is a rule, not a switch a person flips per keg: MGR retires the row when taproom stock runs out and re-publishes when it returns, under one stable provider id. Premise rides the serving, not the SKU — the same ½ bbl pours an on-premise pint and an off-premise crowler — which is why breweries already keep them as two provider items and why publishing keeps them as two. MGR names the premise and the provider holds the rate; publishing must merge tax assignment rather than replace it, or a routine republish would silently retax the menu. **SCHEMA-GATE:** MGR can publish and price the split but cannot yet report on it — sale_channel is (wholesale, taproom, dtc, export) and depletion is constrained to channel = taproom, so both servings land in one bucket in MGR’s own ledger. Splitting that is a movement-model decision, not a POS one.',hd:E.hd('POS item','Close'),body:[E.fld('Name','Hazy IPA · pint'),E.fld('Pours from','Hazy IPA · ½ bbl'),E.fld('Serving','1/124 of a ½ bbl · 0.008065'),E.chips(['On-premise','Off-premise'],0),E.fld('Tax','On-premise rate · held by the provider'),E.inp('Retail price · $7.00'),E.row('Sell while taproom stock remains','retires itself when it runs out','On'),E.info('Retail price lives here, not in a price list: price lists are list × SKU, and a pint is a serving of a SKU rather than one of its own.'),E.btn('Save item')]},
 ];
-renderStates();render();bar();
+renderStates();render();renderVenues();bar();
 </script>
