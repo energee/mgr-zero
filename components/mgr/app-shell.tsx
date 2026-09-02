@@ -1,14 +1,19 @@
 // components/mgr/app-shell.tsx — the one navigation shell for staff and
-// portal (plan §3, §6). Header on top; below the md container width a bottom
-// tab bar (48px targets, safe-area padded), at md and up a left rail with the
-// tabs as group headers and their children beneath. Responsive breaks are
-// container queries so the design gallery can show a 390px and a 1280px
-// instance side by side; (pointer: coarse) sizing comes from app/globals.css.
+// portal (plan §3, §6), built on shadcn's Sidebar. At md and up the sidebar
+// is the left rail (tabs as group labels, children as menu items, ⌘B
+// collapses it); below md the sidebar is hidden and a bottom tab bar with
+// 48px targets and safe-area padding takes over. Breakpoints are viewport
+// media queries, which is why the design gallery renders each frame in an
+// iframe. (pointer: coarse) sizing comes from app/globals.css.
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MgrIcon } from "@/components/mgr-icon";
+import {
+  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInset,
+  SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger,
+} from "@/components/ui/sidebar";
 import { activeTab, PORTAL_NAV, type NavItem } from "@/lib/mgr/nav";
 import { cn } from "@/lib/utils";
 
@@ -28,38 +33,53 @@ export function AppShell({ brand, items, headerRight, composer, active, children
   const pathname = usePathname();
   const current = active ?? activeTab(items, pathname)?.label;
   return (
-    <div className="@container/shell flex min-h-full flex-1 flex-col bg-background text-foreground">
-      <header className="flex h-12 items-center justify-between gap-3 border-b px-4 text-sm font-medium">
-        <span className="flex min-w-0 items-center gap-2 truncate">
-          <MgrIcon size={16} className="shrink-0" />
-          {brand}
-        </span>
-        {headerRight && <span className="flex shrink-0 items-center gap-1">{headerRight}</span>}
-      </header>
-      <div className="flex min-h-0 flex-1 @md:flex-row">
-        <nav aria-label="Sections" className="hidden w-48 shrink-0 flex-col gap-3 border-r p-2 text-sm @md:flex">
+    <SidebarProvider>
+      <Sidebar collapsible="offcanvas">
+        <SidebarHeader className="h-12 justify-center px-4 text-sm font-medium">
+          <span className="flex items-center gap-2 truncate">
+            <MgrIcon size={16} className="shrink-0" />
+            {brand}
+          </span>
+        </SidebarHeader>
+        <SidebarContent>
           {items.map((tab) => (
-            <div key={tab.label} className="flex flex-col">
-              <Link
-                href={tab.href}
-                className={cn("rounded-md px-2 py-1 font-medium", tab.label === current ? "bg-accent text-accent-foreground" : "text-foreground hover:bg-muted")}
-                aria-current={tab.label === current ? "page" : undefined}
-              >
-                {tab.label}
-              </Link>
-              {tab.children?.map((c) => (
-                <Link key={c.href} href={c.href} className="rounded-md px-2 py-1 pl-4 text-muted-foreground hover:bg-muted hover:text-foreground">
-                  {c.label}
-                </Link>
-              ))}
-            </div>
+            <SidebarGroup key={tab.label}>
+              {tab.children?.length ? (
+                <SidebarGroupLabel asChild>
+                  <Link href={tab.href}>{tab.label}</Link>
+                </SidebarGroupLabel>
+              ) : null}
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {(tab.children?.length ? tab.children : [tab]).map((c) => (
+                    <SidebarMenuItem key={c.href}>
+                      <SidebarMenuButton asChild isActive={c.label === current || (tab.label === current && pathname === c.href)}>
+                        <Link href={c.href}>{c.label}</Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
           ))}
-        </nav>
-        <main className="flex min-w-0 flex-1 flex-col gap-3 p-4 @md:max-w-2xl @md:px-8 @md:py-6">{children}</main>
-      </div>
-      {composer && <div className="border-t px-3 py-2">{composer}</div>}
-      <TabBar items={items} active={current} className="@md:hidden" />
-    </div>
+        </SidebarContent>
+      </Sidebar>
+      <SidebarInset className="min-h-svh">
+        <header className="flex h-12 items-center justify-between gap-2 border-b px-2">
+          <span className="flex min-w-0 items-center gap-1 text-sm font-medium">
+            <SidebarTrigger className="hidden md:inline-flex" />
+            <span className="flex items-center gap-2 truncate md:hidden">
+              <MgrIcon size={16} className="shrink-0" />
+              {brand}
+            </span>
+          </span>
+          {headerRight && <span className="flex shrink-0 items-center gap-1">{headerRight}</span>}
+        </header>
+        <main className="flex min-w-0 flex-1 flex-col gap-3 p-4 md:max-w-2xl md:px-8 md:py-6">{children}</main>
+        {composer && <div className="border-t px-3 py-2">{composer}</div>}
+        <TabBar items={items} active={current} className="md:hidden" />
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
 
