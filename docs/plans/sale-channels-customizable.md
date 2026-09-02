@@ -73,22 +73,37 @@ the creation paths because there is no `create_brewery` RPC — rows arrive from
 `scripts/seed-dev.ts`, onboarding, and every test fixture. One trigger covers
 all of them.
 
-## OPEN — needs a decision before Task 6
+## Where a movement gets its channel — decided
 
-**`ship_order_impl` stamps `'wholesale'` literally.** With a table it must
-resolve to an id, and a brewery may have renamed or deleted that row. Three
-options:
+A brewery-wide default was considered and rejected. Breweries expect to ship
+under more than one channel (`Wholesale` and `Customer` were named), and to run
+**different channels for two Square locations** — so no single brewery-level
+value can be correct. The rule instead:
 
-- **(a) Brewery default.** `breweries.default_sale_channel_id`, seeded to
-  Wholesale, `on delete restrict`. One column, no new semantics, repointable.
-  *Recommended* — smallest change that keeps `ship_order` total.
-- **(b) Per order.** `orders.sale_channel_id`, chosen at create. Most flexible
-  and most honest (a brewery selling export vs wholesale picks per order), but
-  touches the order form, `create_order`, and the portal.
-- **(c) Resolve by name at ship time.** Rejected: reintroduces the literal and
-  fails at runtime the moment someone renames a row.
+> Every source that generates a movement names its own channel. MGR supplies
+> the list and never infers a channel from anything else.
 
-Tasks 1–5 do not depend on this. Task 6 does.
+| Source | Carries the channel | Lands in |
+| --- | --- | --- |
+| Shipped order | `orders.sale_channel_id` | this change (Task 6) |
+| POS sale / refund | `pos_locations.sale_channel_id`, with an optional per-item override | slice 7 |
+| Manual movement | chosen in the form | Task 9 |
+
+`breweries.default_sale_channel_id` survives only as a **pre-fill** for new
+orders and for portal-submitted orders where no one picks — never as the value
+read at ship time. `ship_order_impl` reads `o.sale_channel_id`, which is
+`not null`, so shipping cannot depend on a lookup that may have been renamed.
+
+This drops the coupling noted below: `ship_order_impl` currently infers the
+channel from `o.kind = 'wholesale'`, so channel and order kind are the same
+fact stored twice. After this they are independent, which is the point — a
+brewery adding `Export` can put an order on it.
+
+### POS assignment is not built here
+
+Slice 7 owns it; `pos_locations` and `pos_item_mappings` already exist. Recorded
+so that work resolves `coalesce(item.sale_channel_id, location.sale_channel_id)`
+rather than re-hardcoding a literal.
 
 ## Tasks
 
@@ -132,12 +147,27 @@ implements. Tests hit the real database (`npx supabase start`).
    `p_sale_channel uuid`, including the `claim_command_request` payload.
    Depends: 4. Parallel with 8, 9.
 
-6. **`ship_order_impl` — resolve the OPEN decision above.**
-   Test: `tests/orders-fulfillment.test.ts` — shipping a wholesale order posts
-   a `sale_removal` carrying the brewery's configured channel, and still posts
-   correctly after that channel is renamed.
-   Files: baseline :1654 (+ `breweries` column if (a)).
-   Depends: 4 and a decision.
+6. **`orders.sale_channel_id` + `ship_order_impl`.**
+   Test: `tests/orders-fulfillment.test.ts` — shipping posts a `sale_removal`
+   carrying the order's own channel; two orders on different channels produce
+   two differently-classified movements; renaming a channel does not affect
+   either. `tests/rls-orders.test.ts` — an order cannot reference another
+   brewery's channel.
+   Files: baseline — `orders.sale_channel_id uuid not null` with the composite
+   FK; `breweries.default_sale_channel_id` as the pre-fill only; :1654 selects
+   `o.sale_channel_id` instead of the literal, and stops keying off
+   `o.kind = 'wholesale'` for the channel (the `kind` branch still chooses
+   between `sale_removal` and the two `taproom_transfer` rows).
+   Depends: 4.
+
+6b. **Order create + portal.**
+   Test: `tests/commands-orders.test.ts` — `create_order` accepts a channel and
+   falls back to the brewery pre-fill; `tests/commands-portal.test.ts` — a
+   customer-submitted order gets the pre-fill and the customer cannot choose
+   one.
+   Files: `lib/commands/orders.ts`, `lib/commands/portal.ts`, baseline
+   (`create_order`); `app/(app)/orders/order-form.tsx` adds the picker.
+   Depends: 6, 7.
 
 7. **Channel commands.**
    Test: `tests/commands-inventory.test.ts` — `delete_sale_channel` on a
