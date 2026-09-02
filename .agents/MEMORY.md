@@ -77,3 +77,4 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
 - Reviewers that verify by execution (writing to the live DB) find real bugs; read-only reviews find style.
 - Visually check rendered UI before calling UI work done (a serif-font regression went unnoticed).
 - Operating loop and authority boundaries are in `AGENTS.md`; don't repeat them here.
+- Tests never read design docs. `tests/chat-preview.test.ts` once grepped the wireframes HTML as a drift guard; the wireframe moved and the test went red for the wrong reason. Code-to-code assertions (fixtures ↔ renderer) carry the guarantee; docs drift by design (2026-09-02).
