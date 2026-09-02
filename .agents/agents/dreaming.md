@@ -41,16 +41,30 @@ Never delete a spec. Never copy secret-shaped strings out of digests.
 
 ## Publish
 - No changes needed → print "Nothing to dream about" and stop. Do not open a PR.
-- Otherwise:
-  1. `git checkout -B dreaming/main`
-  2. Commit with subject exactly `dream: agent doc maintenance` (a
-     single-commit squash merge reuses the commit subject, and the next
-     dream finds it by the `dream:` prefix) and a body listing each change
-     with its evidence (commit SHA or PR number). (The workflow sets the
-     git identity to the MGR GitHub App, `mgr[bot]`, before you run; the
-     PR is opened as that app, not as claude[bot].)
-  3. `git push -f origin dreaming/main`
-  4. `gh pr create --base main --head dreaming/main --title "dream: agent doc maintenance" --body <changes+flags>`
-     — if a PR for dreaming/main already exists, `gh pr edit` its body instead.
+- Otherwise, first ask whether a dream PR is already open:
+  `gh pr list --base main --head dreaming/main --state open --json number --jq '.[0].number // empty'`
+  (`// empty` matters — without it the jq prints the string `null`, which reads
+  as "a PR exists".)
+  - **A PR is open** → add a commit to it; never replace it.
+    1. `git checkout dreaming/main` (the workflow fetches all branches, so the
+       branch is already local).
+    2. Commit on top of what is there.
+    3. `git push origin dreaming/main` — no `-f`. A force-push here would
+       silently discard the previous dream's edits, which are still unreviewed,
+       along with any correction a reviewer pushed onto the branch.
+    4. `gh pr edit <n> --body <cumulative changes+flags>` — the body describes
+       every commit on the branch, not just this run's.
+  - **No PR is open** → start the branch fresh.
+    1. `git checkout -B dreaming/main`
+    2. Commit.
+    3. `git push -f origin dreaming/main` (force is safe: any earlier branch is
+       merged or abandoned).
+    4. `gh pr create --base main --head dreaming/main --title "dream: agent doc maintenance" --body <changes+flags>`
+- Commit subject is exactly `dream: agent doc maintenance` (the squash merge
+  reuses it for a single-commit branch and the PR title otherwise — both start
+  with `dream:`, so the next dream still finds it) and the body lists each
+  change with its evidence (commit SHA or PR number). The workflow sets the git
+  identity to the MGR GitHub App, `mgr[bot]`, before you run; the PR is opened
+  as that app, not as claude[bot].
 - Keep the diff small. If everything seems wrong, flag it in an issue-sized
   PR-body note and change only what you can cite.
