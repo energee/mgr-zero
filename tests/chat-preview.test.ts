@@ -1,5 +1,6 @@
-// Proves committed chat previews contain only safe portable fixture data, render accessibly, and match the wireframe artifact.
-import { readFileSync } from "node:fs";
+// Proves committed chat previews contain only safe portable fixture data and render accessibly.
+// Deliberately reads no design docs: the wireframe HTML is a living spec and
+// is not a test fixture (it used to be — see git history for the drift guard).
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -86,19 +87,5 @@ describe("chat preview web renderer", () => {
     expect((html.match(/type="radio"/g) ?? []).length).toBe(CHAT_PREVIEW_FIXTURES.length);
     expect(html).toMatch(/<input[^>]*checked[^>]*value="app-home"/);
     expect(html).toContain("Selected");
-  });
-});
-
-describe("wireframe artifact stays synchronized with the fixture contract", () => {
-  const html = readFileSync(".agents/superpowers/specs/2026-08-31-mgr-wireframes.html", "utf8");
-  it("keeps 73 frames, 10 Chat frames at build step 8, phone/desk rendering, cadence, and gated copy", () => {
-    expect(html).toContain("SCREENS.length!==73");
-    expect(html.match(/group:'Chat'/g)).toHaveLength(10);
-    expect(html.match(/step:8,slice:'chat'/g)).toHaveLength(10);
-    expect(html).toContain("['phone','desk']");
-    expect(html).toContain("24 hours · Today + chat");
-    for (const fixture of CHAT_PREVIEW_FIXTURES) {
-      if (fixture.gated) expect(html).toContain(`E.gated('${fixture.gated.label}','${fixture.gated.reason}')`);
-    }
   });
 });
