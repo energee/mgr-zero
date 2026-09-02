@@ -83,7 +83,15 @@ describe("post-merge documentation maintainer", () => {
     expect(workflow).toContain("Edit(docs/staff-guide.html)");
     expect(workflow).toContain("Write(docs/portal-guide.html)");
     expect(workflow).toContain("documentation/user-guide");
-    expect(workflow).toContain("git diff --name-only");
+    // Staged, not working-tree: git diff never sees a guide the agent creates
+    // rather than edits, so the run reported no changes and binned the work.
+    expect(workflow).toContain("git add -A");
+    expect(workflow).toContain("git diff --cached --name-only");
+    // A GITHUB_TOKEN push does not trigger workflows, so the docs PR never ran
+    // ci.yml. The App token's pushes do.
+    expect(workflow).toContain("actions/create-github-app-token");
+    expect(workflow).toContain("GH_TOKEN: ${{ steps.mgr-app.outputs.token }}");
+    expect(workflow).toContain("token: ${{ steps.mgr-app.outputs.token }}");
     expect(workflow).toContain("docs/user-guide.html docs/staff-guide.html docs/portal-guide.html");
     expect(workflow).toContain("gh pr create");
     expect(workflow).not.toContain("issues: write");
