@@ -20,8 +20,11 @@ const lastSend = new Map<string, number>();
  * counted too.
  */
 export async function paced<T>(key: string, call: () => Promise<T>): Promise<T> {
-  const wait = (lastSend.get(key) ?? 0) + 1000 - Date.now();
-  if (wait > 0) await sleep(wait);
+  const until = (lastSend.get(key) ?? 0) + 1000;
+  // Re-check rather than trusting one sleep: setTimeout wakes up to a
+  // millisecond before its nominal deadline as Date.now() measures it (~1% of
+  // sleeps here), which would release the next send at until - 1.
+  for (let wait = until - Date.now(); wait > 0; wait = until - Date.now()) await sleep(wait);
   try {
     return await call();
   } finally {
