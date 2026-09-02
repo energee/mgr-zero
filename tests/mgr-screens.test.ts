@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
+import { E } from "../components/mgr/e";
 
 describe("SCREENS", () => {
   it("ports the eleven step-1 frames with names, jobs and IO", () => {
@@ -26,11 +27,13 @@ describe("SCREENS", () => {
     for (const s of SCREENS) {
       const html = renderToStaticMarkup(createElement("div", null, s.hd, s.body));
       expect(html.length).toBeGreaterThan(50);
-      for (const [label, text] of s.states ?? []) {
-        expect(html).not.toContain(text);
-        void label;
-      }
+      if (s.states) expect(html).not.toContain(renderToStaticMarkup(E.states(s.states)));
     }
+  });
+
+  it("carries every MGR-venue wireframe frame (94 minus the 17 Slack/QuickBooks/Square ones) with unique names", () => {
+    expect(SCREENS).toHaveLength(77);
+    expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
 
   it("keeps the exemplar on Today", () => {

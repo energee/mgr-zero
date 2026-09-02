@@ -24,8 +24,9 @@ import { cn } from "@/lib/utils";
 type RowClass = "" | "w" | "ok" | "dis";
 const dot: Partial<Record<RowClass, string>> = { w: "bg-warning-foreground", ok: "bg-primary" };
 
-/** Button kinds: p = primary, g = secondary/outline, irr = irreversible (teal). */
-type BtnKind = "p" | "g" | "irr";
+/** Button kinds: p = primary, g = secondary/outline, irr = irreversible (teal); " disabled" suffix draws a gated action. */
+type BtnBase = "p" | "g" | "irr";
+type BtnKind = BtnBase | `${BtnBase} disabled`;
 
 export const E = {
   hd: (t: React.ReactNode, r: React.ReactNode = "") => (
@@ -53,15 +54,19 @@ export const E = {
       ) : null}
     </Item>
   ),
-  btn: (t: React.ReactNode, k: BtnKind = "p") => (
-    <Button
-      variant={k === "g" ? "outline" : "default"}
-      className={cn(k === "irr" && "bg-irreversible text-irreversible-foreground hover:bg-irreversible/90")}
-      {...(k === "irr" ? { "data-variant": "irreversible" } : {})}
-    >
-      {t}
-    </Button>
-  ),
+  btn: (t: React.ReactNode, k: BtnKind = "p") => {
+    const [kind, disabled] = k.split(" ") as [BtnBase, string?];
+    return (
+      <Button
+        variant={kind === "g" ? "outline" : "default"}
+        disabled={Boolean(disabled)}
+        className={cn(kind === "irr" && "bg-irreversible text-irreversible-foreground hover:bg-irreversible/90")}
+        {...(kind === "irr" ? { "data-variant": "irreversible" } : {})}
+      >
+        {t}
+      </Button>
+    );
+  },
   btns: (arr: (React.ReactNode | [React.ReactNode, BtnKind])[], c: "c2" | "c3" = "c2") => (
     <div className={cn("grid gap-2", c === "c3" ? "grid-cols-3" : "grid-cols-2")}>
       {arr.map((v, i) => (
