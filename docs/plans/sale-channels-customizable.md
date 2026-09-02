@@ -24,8 +24,9 @@ asserting they agree:
 | 4 | `lib/commands/inventory.ts:9` | `z.enum(["wholesale","taproom","dtc","export"])` |
 | 5 | `app/(app)/inventory/movement-form.tsx:20` | `const CHANNELS = [...] as const` |
 
-4 and 5 disappear entirely: both become a fetched list. 1 becomes a table. 2 and
-3 are the two that need decisions, below.
+4 and 5 disappear entirely: both become a fetched list. 1 becomes a table. 2
+loses its literal without needing one. 3 is replaced by a column on the order —
+see "Where a movement gets its channel" below.
 
 ## Design
 
@@ -110,7 +111,7 @@ rather than re-hardcoding a literal.
 TDD throughout: each task writes its named test first, watches it fail, then
 implements. Tests hit the real database (`npx supabase start`).
 
-**Sequential spine: 1 → 2 → 3 → 4 → 6 → 7. Tasks 5, 8, 9 parallel after 4.**
+**Sequential spine: 1 → 2 → 3 → 4 → 6 → 7 → 6b. Tasks 5, 8, 9 parallel after 4.**
 
 1. **`sale_channels` table + RLS.**
    Test: `tests/sale-channels.test.ts` — staff of brewery A cannot read
