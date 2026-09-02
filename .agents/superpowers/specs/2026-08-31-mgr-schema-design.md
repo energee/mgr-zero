@@ -1000,7 +1000,49 @@ list nobody reads, and a genuinely unmapped beer would hide in it.
 `pos_unmapped_items` therefore keys on variation and means *needs attention*,
 not *everything Square sells that is not ours*.
 
-### 16.15 Open questions
+### 16.15 The count posts depletion; POS is the variance check (decided 2026-09-02)
+
+**This inverts a rule drawn in the wireframes** — the POS frames say "when Square
+is connected the weekly count posts no depletion, it is a variance check against
+POS". The opposite is correct and those frames need amending.
+
+| | Source | Posts to the ledger |
+| --- | --- | --- |
+| **Actual** | physical count | yes — `depletion`, channel `taproom` |
+| **Expected** | POS sales × serving size | no |
+| **Variance** | expected − actual | nothing; it is a report |
+
+**POS is not the source of truth for inventory.** It is the tool for seeing
+expected consumption against actual, and the gap is the product: bad pours,
+theft, staff drinks, comps, line cleaning. That number only exists because both
+halves are kept, and it is what a taproom manager will act on.
+
+**A keg moving warehouse → taproom is not a removal.** It stays on the books as
+taproom stock until a count says it is gone. `taproom_transfer` keeps
+`channel null`, unchanged. This keeps taproom on-hand a real number, which bins
+and menu availability need anyway, and a month-end count yields the month's
+removal cleanly — satisfying the domain rule that a removal belongs to the month
+the beer left.
+
+Three consequences worth stating:
+
+1. **`inventory_movements.qty` does not need widening.** The `numeric(12,2)`
+   rounding problem only existed if fractional pours became movements. Counts
+   are in kegs and cases. Earlier text in §16.8 arguing for whole-keg depletion
+   to dodge the rounding still holds for its own reason, but the rounding itself
+   is now moot.
+2. **Tap and kick have no ledger effect whatsoever.** They open and close an
+   interval and nothing else, so a mis-tap corrupts nothing and both the website
+   and MGR can write them freely. This is the property that makes two writers
+   safe (§16.13).
+3. **A keg tapped that is not in taproom stock** needs no special ledger rule —
+   depletion never came from tapping in the first place. The
+   `not_in_inventory` flag remains useful only for excluding it from variance.
+
+**Yield (§16.8) is unaffected**: it was always a report over POS data against
+nominal volume, never a ledger write.
+
+### 16.16 Open questions
 
 **Resolved 2026-09-02:** BOM belongs to the format (§16.12); every location has
 a default bin and `bin_id` is `NOT NULL` (§16.6); a COLA attaches to a **brand**,
@@ -1020,17 +1062,9 @@ Still open:
    missing role the actual gap? (§16.13)
 5. Quarters or eighths for fill — and do you weigh kegs? Tare weights are known
    per keg size, so weighing turns an estimate into a measurement. (§16.8)
-6. **When does the depletion post — transfer, tap, or kick?** §16.13 currently
-   says tap, and that is probably wrong. TTB removal happens when beer leaves
-   the bonded area, which is `taproom_transfer`; posting there makes tap and
-   kick purely operational and therefore freely correctable, which matters a
-   great deal now that two systems write them. Posting at tap means a mis-tap
-   writes a false depletion that needs a compensating movement in an append-only
-   ledger. Posting at kick keeps on-hand accurate while pouring but leaves a keg
-   that has been on for three weeks reading as full stock. **This one blocks
-   §16.8 and §16.13 and should be answered before either is built.**
+6. *(resolved 2026-09-02 — see §16.15.)*
 
-### 16.16 Build order when this is migrated
+### 16.17 Build order when this is migrated
 
 `brands` rename → `formats` + `skus.format_id` + `format_bom` → `bins` → `sale_channels`
 (most dangerous, needs movement tests green) → price tiers → `pos_menus` →
