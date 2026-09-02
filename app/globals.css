@@ -7,9 +7,14 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-geist-sans);
+  --font-sans: var(--font-instrument-sans), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+  --font-heading: var(--font-familjen-grotesk), var(--font-instrument-sans), sans-serif;
+  --color-irreversible: var(--irreversible);
+  --color-irreversible-foreground: var(--irreversible-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-rule: var(--rule);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -48,73 +53,98 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* Product tokens — plan §5 visual system (hop / copper / stainless). Semantic
+   pairs replace manual dark: overrides; copper is reserved for irreversible
+   actions and is never a heading, tab or validation color. */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --ground: #EEF0EE;
+  --surface: #FFFFFF;
+  --ink: #16201B;
+  --hop: #1F4D3A;
+  --copper: #9A4E20;
+  --warning: #FFF5D8;
+  --warning-foreground: #7A5600;
+  --rule: #9EA8A1;
+
+  --background: var(--ground);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: var(--hop);
+  --primary-foreground: #FFFFFF;
+  --irreversible: var(--copper);
+  --irreversible-foreground: #FFFFFF;
+  --secondary: #E2E6E3;
+  --secondary-foreground: var(--ink);
+  --muted: #E2E6E3;
+  --muted-foreground: #4E5B54;
+  --accent: #DCEBE2;
+  --accent-foreground: var(--hop);
+  --destructive: #9A2A1F;
+  --border: #CBD2CD;
+  --input: #CBD2CD;
+  --ring: var(--hop);
+  --chart-1: var(--hop);
+  --chart-2: var(--copper);
+  --chart-3: #4E5B54;
+  --chart-4: #9EA8A1;
+  --chart-5: #CBD2CD;
+  --radius: 0.25rem;
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--hop);
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #DCEBE2;
+  --sidebar-accent-foreground: var(--hop);
+  --sidebar-border: #CBD2CD;
+  --sidebar-ring: var(--hop);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --ground: #101713;
+  --surface: #18211C;
+  --ink: #F2F5F2;
+  --hop: #8AC5A6;
+  --copper: #E2A06F;
+  --warning: #30260E;
+  --warning-foreground: #F0C766;
+  --rule: #5C6B62;
+
+  --background: var(--ground);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: var(--hop);
+  --primary-foreground: #0E241A;
+  --irreversible: var(--copper);
+  --irreversible-foreground: #2B1205;
+  --secondary: #24302A;
+  --secondary-foreground: var(--ink);
+  --muted: #24302A;
+  --muted-foreground: #B6C0BA;
+  --accent: #1F3A2E;
+  --accent-foreground: var(--hop);
+  --destructive: #F0866F;
+  --border: #35413A;
+  --input: #35413A;
+  --ring: var(--hop);
+  --chart-1: var(--hop);
+  --chart-2: var(--copper);
+  --chart-3: #B6C0BA;
+  --chart-4: #5C6B62;
+  --chart-5: #35413A;
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--hop);
+  --sidebar-primary-foreground: #0E241A;
+  --sidebar-accent: #1F3A2E;
+  --sidebar-accent-foreground: var(--hop);
+  --sidebar-border: #35413A;
+  --sidebar-ring: var(--hop);
 }
 
 @layer base {
@@ -126,6 +156,27 @@
   }
   html {
     @apply font-sans;
+    font-variant-numeric: tabular-nums;
+    touch-action: manipulation;
+  }
+  h1, h2, h3, h4 {
+    @apply font-heading;
+  }
+}
+
+/* Pointer size, not viewport, chooses target height (plan §5): every control
+   is ≥48px under a coarse pointer, and the primary action is ≥56px. Applied
+   to the shadcn data-slot hooks so components/ui stays untouched. */
+@media (pointer: coarse) {
+  [data-slot="button"],
+  [data-slot="input"],
+  [data-slot="select-trigger"],
+  [data-slot="toggle-group-item"] {
+    min-height: 48px;
+  }
+  [data-slot="button"][data-variant="default"],
+  [data-slot="button"][data-variant="irreversible"] {
+    min-height: 56px;
   }
 }
 
