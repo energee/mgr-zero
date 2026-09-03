@@ -180,12 +180,24 @@ describe("SCREENS", () => {
     expect(history).toContain("Pay");
   });
 
+  it("gives Save screens a real input or select", () => {
+    // Issue 95: a Save button that would write a value must sit next to a
+    // typed Input or a Select, not a read-only key/value row.
+    for (const screen of SCREENS) {
+      const html = renderToStaticMarkup(createElement("div", null, screen.body));
+      if (!/<button[^>]*>Save/.test(html)) continue;
+      expect.soft(
+        /<input\b/.test(html) || html.includes('role="combobox"'),
+        `${screen.name}: Save without an input or select`,
+      ).toBe(true);
+    }
+  });
+
   it("marks pickable fields and never pins Required on a filled one", () => {
     const chevrons = new Map([
-      ["Create brewery", 1], ["Record movement", 4], ["Composer proposal", 3],
-      ["Return and credit", 1], ["New order", 4], ["Cellar addition", 2],
-      ["Brew day", 3], ["Schedule batch", 2], ["Cellar transfer", 2], ["Close packaging run", 2],
-      ["Schedule packaging run", 2], ["Cycle count", 1], ["Chat settings", 3],
+      ["Record movement", 1], ["Composer proposal", 1], ["Cellar addition", 1],
+      ["Brew day", 3], ["Schedule packaging run", 1], ["Cycle count", 1],
+      ["Chat settings", 2], ["Package BOM", 1], ["POS mapping", 4],
     ]);
     for (const s of SCREENS.filter((s) => !s.venue)) {
       const html = renderToStaticMarkup(createElement("div", null, s.body));
