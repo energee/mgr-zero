@@ -150,6 +150,10 @@ describe("SCREENS", () => {
     const tierText = renderToStaticMarkup(createElement("div", null, tier.body)).replace(/<[^>]*>/g, " ");
     expect(tierText).toContain("$150.00");
     expect(tierText).not.toContain("$185.00");
+    const history = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Invoice history")!.body));
+    expect(history.match(/INV-1042/g)).toHaveLength(1);
+    expect(history).not.toContain("INV-0198");
+    expect(history).toContain("Pay");
   });
 
   it("marks pickable fields and never pins Required on a filled one", () => {
@@ -242,6 +246,20 @@ describe("SCREENS", () => {
     expect(transferHtml).not.toMatch(/border-l-2/);
   });
 
+  it("uses one verb and buyer copy on the named landings", () => {
+    // Issue 85: Brewer Start vs Brew day, Sales ATP jargon, Driver after-as-button.
+    const brewer = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Brewer")!.body));
+    expect(brewer).toMatch(/Start/);
+    expect(brewer).not.toMatch(/>Brew day</);
+    const sales = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Sales")!.body));
+    expect(sales).toMatch(/Not enough Pils/);
+    expect(sales).not.toMatch(/ATP/);
+    const driver = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Driver")!.body));
+    expect(driver).not.toMatch(/>after</);
+    const me = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Me")!.body));
+    expect(me).toMatch(/Switch/);
+  });
+
   it("draws locked-out landings and the composer question", () => {
     // Issue 83: no-membership, expired invite/reset, session expiry with the
     // outbox kept, and the composer question (chips, no Commit).
@@ -268,6 +286,8 @@ describe("SCREENS", () => {
     expect(pickSheet).toMatch(/Thu/);
     const pick = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Pick")!.body));
     expect(pick).toMatch(/Print/);
+    const deliveryStatus = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Confirm delivery")!.body));
+    expect(deliveryStatus).not.toContain(">›<");
     const receive = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Receive PO")!.body));
     expect(receive).not.toMatch(/Send PO/);
     const close = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Close packaging run")!.body));
