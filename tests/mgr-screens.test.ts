@@ -36,9 +36,9 @@ describe("SCREENS", () => {
   it("carries every MGR-venue frame with unique names", () => {
     // A tripwire against a frame dropped by hand from a 1700-line array — the
     // uniqueness check below catches duplicates, nothing else catches a loss.
-    // Bump it deliberately when a frame lands; .agents/PROGRESS.md narrates
-    // what the number is made of — 153 MGR frames plus the 17 venue frames.
-    expect(SCREENS).toHaveLength(170);
+    // Bump it deliberately when a frame lands. 154 MGR frames plus the 17
+    // venue frames; Today empty is the extra MGR frame from issue 97.
+    expect(SCREENS).toHaveLength(171);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
 
@@ -282,6 +282,29 @@ describe("SCREENS", () => {
     const transfer = SCREENS.find((x) => x.name === "Cellar transfer")!;
     const transferHtml = renderToStaticMarkup(createElement("div", null, transfer.body));
     expect(transferHtml).not.toMatch(/border-l-2/);
+  });
+
+  it("puts the commit on the row, not a second copy at the top", () => {
+    // Issue 97: Today-family top buttons duplicated the row verb; Order had
+    // Adjust line plus trailing adjust; Confirm order said Next: confirm twice.
+    const html = (name: string) => renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === name)!.body));
+    expect(html("Today")).not.toMatch(/Pick · 3 ready/);
+    expect(html("Today")).toMatch(/data-row-action[^>]*>Pick</);
+    expect(html("Sales")).not.toMatch(/<button[^>]*>New order</);
+    expect(html("Sales")).toMatch(/New order/);
+    expect(html("Brewer")).not.toMatch(/grid-cols-2/);
+    expect(html("Taproom")).not.toMatch(/<button[^>]*>Swap keg</);
+    expect(html("Taproom")).toMatch(/data-row-action[^>]*>Swap</);
+    expect(html("Driver")).toMatch(/Resume/);
+    expect(html("Order")).not.toMatch(/Adjust line/);
+    expect(html("Order")).toMatch(/>Add line</);
+    expect(html("Order").match(/data-row-action[^>]*>Adjust</g)).toHaveLength(3);
+    expect(html("Confirm order")).toMatch(/Submitted · ships Thu/);
+    expect(html("Confirm order")).not.toMatch(/Next: confirm/);
+    expect(html("Confirm order")).toMatch(/>Confirm order</);
+    const empty = html("Today empty");
+    expect(empty).toMatch(/Nothing waiting/);
+    expect(empty).toMatch(/>Record movement</);
   });
 
   it("uses one verb and buyer copy on the named landings", () => {
