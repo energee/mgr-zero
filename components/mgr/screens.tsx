@@ -1281,8 +1281,8 @@ export const SCREENS: Screen[] = [
     states: [["price changed", "revalidated price shown before Place order", 1], ["inactive SKU", "line removed · told plainly", 1], ["submit error", "keep quantities · Retry safe", 1], ["duplicate", "same request returns the same ORD number"]],
     spec: "The confirm step for both the stepper path and Same as last week. Buyer copy only: price, package, quantity, “Ships from Warehouse”, Place order. No ATP, no gate names. Place order stays disabled until the source contract exists. After submit the portal is read-only; changes go through the brewery.",
     body: (<>
-      {E.row("Hazy IPA · ½ bbl keg", `4 × ${INV.hazyPrice}`, INV.hazyAmount)}
-      {E.row("Pils · 16 oz case", `6 × ${INV.pilsPrice}`, INV.pilsAmount)}
+      {E.row("Hazy IPA · ½ bbl keg", INV.hazyPrice, E.stq(4, "Hazy IPA quantity"))}
+      {E.row("Pils · 16 oz case", INV.pilsPrice, E.stq(6, "Pils quantity"))}
       {E.row("Keg deposit", "4 × $30.00", INV.depositAmount)}
       {E.fld("Subtotal", INV.total)}
       {E.fld("Tax", "$0.00 · sale for resale")}

@@ -106,6 +106,13 @@ describe("SCREENS", () => {
     expect(product).not.toContain("Save SKU");
   });
 
+  it("lets portal buyers type quantities in both order steps", () => {
+    const html = (name: string) => renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === name)!.body));
+    expect(html("Shop").match(/<input[^>]*type="number"/g)).toHaveLength(3);
+    for (const value of [4, 6, 0]) expect(html("Shop")).toContain(`value="${value}"`);
+    expect(html("Review order").match(/<input[^>]*type="number"/g)).toHaveLength(2);
+  });
+
   it("resolves detail back links to a screen or shell destination", () => {
     const shellDestinations = new Set([
       "Search", "Today", "Work", "More", "Beer", "Settings", "Catalog",

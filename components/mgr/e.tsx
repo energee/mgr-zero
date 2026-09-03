@@ -197,11 +197,11 @@ export const E = {
     </Empty>
   ),
   inp: (t: string) => <Input placeholder={t} aria-label={t} />,
-  stq: (v: React.ReactNode) => (
+  stq: (v: number, label = "Quantity") => (
     <ButtonGroup>
       <Button variant="outline" size="icon" aria-label="Decrease">−</Button>
+      <Input type="number" inputMode="numeric" min={0} defaultValue={v} aria-label={label} className="w-14 text-center" />
       <Button variant="outline" size="icon" aria-label="Increase">+</Button>
-      <span className="flex items-center px-2 text-sm">{v}</span>
     </ButtonGroup>
   ),
   gated: (t: React.ReactNode, why: React.ReactNode = "isn’t available yet") => E.row(t, why, "", "dis", SquareLock01Icon),
