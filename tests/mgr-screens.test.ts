@@ -36,9 +36,27 @@ describe("SCREENS", () => {
     // A tripwire against a frame dropped by hand from a 1700-line array — the
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands; .agents/PROGRESS.md narrates
-    // what the number is made of — 85 MGR frames plus the 17 venue frames.
-    expect(SCREENS).toHaveLength(102);
+    // what the number is made of — 93 MGR frames plus the 17 venue frames.
+    expect(SCREENS).toHaveLength(110);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
+  });
+
+  it("resolves detail back links to a screen or shell destination", () => {
+    const shellDestinations = new Set([
+      "Search", "Today", "Work", "More", "Beer", "Settings", "Catalog",
+      "Compliance", "Chat", "Invoices", "Pick",
+    ]);
+    const screenNames = new Set(SCREENS.map((s) => s.name));
+    for (const s of SCREENS) {
+      const html = renderToStaticMarkup(createElement("div", null, s.body));
+      for (const [, link] of html.matchAll(/<a [^>]*>(.*?)<\/a>/g)) {
+        const target = link.replace(/<[^>]*>/g, "");
+        expect.soft(
+          screenNames.has(target) || shellDestinations.has(target) || /^[A-Z]{2,3}-\d+$/.test(target),
+          `${s.name}: unresolved back target ${target}`,
+        ).toBe(true);
+      }
+    }
   });
 
   it("draws customer copy, not markup escapes, machine identifiers or em dashes", () => {

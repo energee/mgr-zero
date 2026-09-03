@@ -399,13 +399,31 @@ export const SCREENS: Screen[] = [
     step: 3,
     slice: 1,
     tab: "Beer",
+    name: "Finished goods",
+    job: "See sellable beer by SKU and act on shortages",
+    reads: "get_on_hand · get_atp",
+    writes: "none [SKU creation happens on its own surface]",
+    states: [["short", "ATP below zero links to the competing orders"], ["empty", "no finished goods yet: Add SKU is the only action"]],
+    spec: "The Beer landing's Finished goods row opens this list. On-hand, allocated and ATP stay together on each SKU; Review opens SKU detail and a shortage opens the shortfall. Add SKU opens the existing product and SKU flow.",
+    body: (<>
+      {E.back("Beer", "Finished goods")}
+      {E.btn("Add SKU")}
+      {E.row("Hazy IPA · ½ bbl keg", "15 on hand · 4 allocated · ATP 11", E.act("Review"))}
+      {E.row("Pils · 16 oz case", "18 on hand · 24 allocated · ATP −6", E.act("Shortfall"), "w")}
+      {E.row("Stout · ⅙ bbl keg", "9 on hand · 2 allocated · ATP 7", E.act("Review"))}
+    </>),
+  },
+  {
+    step: 3,
+    slice: 1,
+    tab: "Beer",
     name: "SKU detail",
     job: "See on-hand, ATP and immutable tape together",
     reads: "get_on_hand · get_atp · list_movements",
     writes: "reverse_inventory_movement [SCHEMA-GATE: auditable link + valid sign and TTB semantics]",
     spec: "Correction is not actionable yet: opposite-sign rows fail movement CHECKs; enable only after a structured reversal link and reporting semantics exist.",
     body: (<>
-      {E.back("Beer", "Hazy IPA · ½ bbl")}
+      {E.back("Finished goods", "Hazy IPA · ½ bbl")}
       {E.num("11", "ATP · 15 on hand · 4 allocated")}
       {E.row("Warehouse", "", "12")}
       {E.row("Taproom", "", "3")}
@@ -523,6 +541,27 @@ export const SCREENS: Screen[] = [
     step: 5,
     slice: 1,
     tab: "Work",
+    name: "Orders",
+    job: "Find every order by state and take its next valid action",
+    reads: "list_orders",
+    writes: "none [creation and state changes happen on their own surfaces]",
+    states: [["filtered", "one state chip selected"], ["empty", "no orders in this state: New order stays available"]],
+    spec: "The Work list with the orders chip active. Rows cover the active order states and name the next valid action; New order opens the order-entry sheet. Order and Confirm order return here.",
+    body: (<>
+      {E.hd("Work", "sales default")}
+      {E.btn("New order")}
+      {E.chips(["all", "orders", "batches", "runs", "POs", "routes"], 1)}
+      {E.chips(["all states", "draft", "submitted", "confirmed", "picked", "shipped"], 0)}
+      {E.row("ORD-0231 · Ridgeline", "submitted · ships Thu", E.act("Confirm"))}
+      {E.row("ORD-0229 · Al’s Bar", "picked · restock 3 Pils staged", E.act("Put back"), "w")}
+      {E.row("ORD-0234 · Teresa’s", "confirmed · ships Fri", E.act("Pick"))}
+      {E.row("ORD-0235 · Teresa’s", "draft · ships Fri", E.act("Finish"))}
+    </>),
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "Work",
     name: "Confirm order",
     job: "Confirm a submitted order in two taps from Today",
     reads: "get_order · get_atp",
@@ -530,7 +569,7 @@ export const SCREENS: Screen[] = [
     states: [["loading", "order-shaped skeleton"], ["stale", "line changed · refresh", 1], ["permission", "sales or admin required", 1], ["cancelled", "staged quantities become restock work"]],
     spec: "2 taps from Today: Confirm → Confirm order, only when no blocking review exists. The registration warning is the same one the Order screen shows; it links to the Compliance registry and never blocks.",
     body: (<>
-      {E.back("Work", "ORD-0231")}
+      {E.back("Orders", "ORD-0231")}
       {E.ttl("Ridgeline Tap Room")}
       {E.row("Current state", "Submitted · ships Thu", E.act("Next: confirm"))}
       {E.row("Fulfillment source", "Warehouse", E.act("Required"))}
@@ -554,7 +593,7 @@ export const SCREENS: Screen[] = [
     states: [["draft", "Submit is the one active verb"], ["confirmed / picked", "lines adjust; restock rows appear when picked qty exceeds ordered"], ["shipped", "read-only tape · Return shipment is the correction"], ["stale", "another user changed a line · refresh", 1], ["permission", "sales or admin to adjust; warehouse reads", 1]],
     spec: "Drawn as picked after a line was adjusted down: staged 3 Pils cases must go back to Warehouse; there is no restock write; re-picking or shipping clears the restock flag on the order. Every transition appends an order event row in the same RPC. Confirm still has its own two-tap Today frame.",
     body: (<>
-      {E.back("Work", "ORD-0229")}
+      {E.back("Orders", "ORD-0229")}
       {E.ttl("Al’s Bar · Columbus, OH")}
       {E.row("Current state", "Picked · restock pending", E.act("Next: ship"))}
       {E.fld("Fulfillment source · customer PO", "Warehouse · PO 4471")}
@@ -1145,13 +1184,34 @@ export const SCREENS: Screen[] = [
     step: 7,
     slice: 4,
     tab: "Work",
+    name: "Batches",
+    job: "See planned and active batches with the next brew or cellar action",
+    reads: "list_batches [design]",
+    writes: "none [batch creation and brew-day recording happen on Brew day]",
+    states: [["planned", "Start is the next action"], ["active", "the row names the next reading or transfer"], ["empty", "no batches yet: New batch is the only action"]],
+    spec: "The Work list with the batches chip active. Planned batches sort before active batches due for attention; every row names its next action. New batch opens Brew day in planned mode, and Brew day returns here.",
+    body: (<>
+      {E.hd("Work", "brewer default")}
+      {E.btn("New batch")}
+      {E.chips(["all", "orders", "batches", "runs", "POs", "routes"], 2)}
+      {E.ttl("Planned")}
+      {E.row("B-0416 · Hazy IPA v4", "Fri 9/4 · 15 bbl", E.act("Start"))}
+      {E.ttl("Active")}
+      {E.row("B-0409 · Pils", "FV1 · 1.9 °P · read 4 h ago", E.act("Reading"))}
+      {E.row("B-0412 · Stout", "FV3 · reading overdue 31 h", E.act("Reading"), "w")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 4,
+    tab: "Work",
     name: "Brew day",
     job: "Schedule first; later consume actual lots and set knockout baseline",
     reads: "get_brew_day [design]",
     writes: "schedule_batch [design; single planned-batch row] · record_brew_day [design; one RPC: additions + material movements + occupancy]",
     spec: "Two modes: planned (recipe · date · planned bbl) and brew day (actual lots · knockout vessel). Save schedule is green and independent; Record brew day posts immutable material consumption for mash/boil/whirlpool stages only; the 18 lb Citra dry hop is posted later from Cellar addition. Yeast is consumed as a material lot, not a culture generation (plan §8).",
     body: (<>
-      {E.back("Work", "B-0416 · Hazy")}
+      {E.back("Batches", "B-0416 · Hazy")}
       {E.fld("Recipe / date", "Hazy IPA v4 · 9/4 · 15 bbl")}
       {E.btn("Save schedule")}
       {E.row("2-row", "lot L-0821", "660 lb")}
@@ -1279,6 +1339,25 @@ export const SCREENS: Screen[] = [
     step: 7,
     slice: 2,
     tab: "Work",
+    name: "Purchase orders",
+    job: "See draft, sent and partially received purchase orders",
+    reads: "list_purchase_orders [design]",
+    writes: "none [creation and receiving happen on their own surfaces]",
+    states: [["draft", "Send is the next action"], ["partial", "Receive stays available for the remainder"], ["empty", "no open purchase orders: New PO is the only action"]],
+    spec: "The Work list with the POs chip active. Each row names the next action; New PO opens the existing vendor purchase draft, and Receive PO returns here.",
+    body: (<>
+      {E.hd("Work", "warehouse default")}
+      {E.btn("New PO")}
+      {E.chips(["all", "orders", "batches", "runs", "POs", "routes"], 4)}
+      {E.row("PO-0142 · Country Malt", "sent · due Thu", E.act("Receive"))}
+      {E.row("PO-0141 · YCH", "partially received · 1 Citra box due", E.act("Receive"), "w")}
+      {E.row("PO-0143 · CanSource", "draft · 4 pallets", E.act("Send"))}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 2,
+    tab: "Work",
     name: "Receive PO",
     job: "Count what arrived; trigger derives receipt status",
     reads: "get_purchase_order [design]",
@@ -1286,7 +1365,7 @@ export const SCREENS: Screen[] = [
     states: [["loading", "PO-line skeleton"], ["stale", "receipt changed · recheck", 1], ["offline", "keep counts; commit waits"], ["permission", "warehouse or admin", 1], ["success", "partially received"]],
     spec: "Send PO (green) shows while the PO is draft; receiving needs a sent PO. Only counted quantity posts; over and short are both visible and both allowed, and the keypad never clamps an over-count as the only guard. PO status is trigger-derived; never write a loaded/status flag.",
     body: (<>
-      {E.back("Work", "PO-0142 · Country Malt")}
+      {E.back("Purchase orders", "PO-0142 · Country Malt")}
       {E.row("Status", "sent Mon · expected Thu", E.act("Send PO"))}
       {E.row("2-row · 55 lb bags", "expected 40 · counted", "42", "w")}
       {E.row("Citra · 44 lb boxes", "expected 4 · counted", "3", "w")}
@@ -1296,6 +1375,25 @@ export const SCREENS: Screen[] = [
       {E.info("2-row is over by 2 bags and Citra short 1; the PO becomes partially received.")}
       {E.sp()}
       {E.btn("Receive purchase order", "irr")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 2,
+    tab: "Beer",
+    name: "Materials on hand",
+    job: "See material quantities, lots and best-by dates and start a count",
+    reads: "get_material_on_hand [design]",
+    writes: "none [counts happen in the Cycle count sheet]",
+    states: [["expiring", "the earliest best-by date needs attention"], ["empty", "no materials yet: Add material is the only action"]],
+    spec: "The Beer landing's Materials row opens this list. Count opens Cycle count for that material; Add material opens the existing material and vendor flow.",
+    body: (<>
+      {E.back("Beer", "Materials on hand")}
+      {E.btn("Add material")}
+      {E.row("Cans · 16 oz", "3,100 each · 2 lots · best by none", E.act("Count"))}
+      {E.row("Citra 2026 · YCH", "262 lb · 1 lot · best by 8/31/27", E.act("Count"))}
+      {E.row("2-row 2026 · Country Malt", "8,800 lb · 3 lots · best by 3/15/27", E.act("Count"))}
+      {E.row("Yeast · WLP066", "2 brinks · 2 lots · best by 9/8/26", E.act("Count"), "w")}
     </>),
   },
   {
@@ -1341,13 +1439,31 @@ export const SCREENS: Screen[] = [
     step: 7,
     slice: 3,
     tab: "More",
+    name: "Recipes",
+    job: "Find recipe versions and create the next recipe",
+    reads: "list_recipes [design]",
+    writes: "none [creation and versioning happen on Recipe]",
+    states: [["draft version", "Finish is the next action"], ["empty", "no recipes yet: Create recipe is the only action"]],
+    spec: "The More landing's Recipes row opens this list. Each row opens Recipe at its current version and names the next action; Create recipe opens the same surface with only name and style.",
+    body: (<>
+      {E.back("More", "Recipes")}
+      {E.btn("Create recipe")}
+      {E.row("Hazy IPA v4", "IPA · 15 bbl · updated Aug 28", E.act("Review"))}
+      {E.row("Pils v3", "German pils · 15 bbl · updated Aug 21", E.act("Review"))}
+      {E.row("Stout v2", "Stout · draft version", E.act("Finish"), "w")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 3,
+    tab: "More",
     name: "Recipe",
     job: "Author immutable versions from assumptions; actuals keep predictions honest",
     reads: "list_recipes · get_recipe [design] · get_recipe_outcomes [design; per-batch actual OG/FG/ABV + realized efficiency/attenuation, derived from fermentation readings, never stored]",
     writes: "create_recipe [design; mutable parent row] · create_recipe_version [design; one RPC: immutable version + ingredients; SCHEMA-GATE: assumption columns on recipe_versions + per-ingredient extract snapshot + extract potential on materials; typed target_og/fg/abv columns drop]",
     spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. Versioning is disabled behind its schema gate. A new parent takes name and style only; versions append, and history is never edited. Costing lives on desk.",
     body: (<>
-      {E.back("More", "Hazy IPA v4")}
+      {E.back("Recipes", "Hazy IPA v4")}
       {E.row("Recipe parent · Hazy IPA · IPA", "name and style only", E.act("Create"))}
       {E.chips(["per bbl", "15 bbl", "30 bbl"], 1)}
       {E.row("2-row", "mash · 44 lb / bbl", "660 lb")}
@@ -1515,6 +1631,25 @@ export const SCREENS: Screen[] = [
     step: 7,
     slice: 10,
     tab: "Work",
+    name: "Routes",
+    job: "See planned and active delivery routes and build the next one",
+    reads: "list_routes [design]",
+    writes: "none [route planning happens on Route]",
+    states: [["unassigned", "shipped orders waiting for a route are called out"], ["empty", "no routes yet: New route is the only action"]],
+    spec: "The Work list with the routes chip active. Every row names its next action; New route opens Route in builder mode, and Route returns here.",
+    body: (<>
+      {E.hd("Work", "driver default")}
+      {E.btn("New route")}
+      {E.chips(["all", "orders", "batches", "runs", "POs", "routes"], 5)}
+      {E.row("Route A · Thu", "3 stops · Maria · departed 8:10", E.act("Resume"))}
+      {E.row("Route B · Fri", "2 stops · driver not assigned", E.act("Assign"), "w")}
+      {E.row("ORD-0236 · Dock", "shipped · no route", E.act("Add to route"), "w")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 10,
+    tab: "Work",
     name: "Route",
     job: "Build route, inspect derived load and finish route timestamps",
     reads: "get_route_load · get_route_builder [design; require persisted shipment invoice timing]",
@@ -1522,7 +1657,7 @@ export const SCREENS: Screen[] = [
     states: [["post-route", "All stops complete · no return time yet"]],
     spec: "Load derives only from shipments with a persisted invoice mode; the checklist is presentation only, with no loaded status or mark-loaded command. Unassigned shipments become stops with driver, vehicle and stop order in the same route-save RPC. A refused delivery has no screen: leave the stop open and assign it to a later route. Resume opens the next incomplete stop for the assigned driver.",
     body: (<>
-      {E.back("Work", "Route A · Thu")}
+      {E.back("Routes", "Route A · Thu")}
       {E.fld("Driver · vehicle", "Maria · Box truck 2")}
       {E.row("Stop 1 · Ridgeline", "4 Hazy halves · 6 Pils cases", "next")}
       {E.row("Stop 2 · Al’s Bar", "2 Stout sixths", "after")}
@@ -1769,6 +1904,24 @@ export const SCREENS: Screen[] = [
     step: 8,
     slice: 1,
     tab: "More",
+    name: "Price lists",
+    job: "See customer price tiers and open the prices each tier owns",
+    reads: "list_price_lists",
+    writes: "none [creation and pricing happen on Price tiers]",
+    states: [["unused", "a tier with no customers can still be edited"], ["empty", "no price lists yet: Create price list is the only action"]],
+    spec: "Reached from Catalog. Each row names its next action and opens Price tiers; Create price list opens the same surface for a new tier.",
+    body: (<>
+      {E.back("Catalog", "Price lists")}
+      {E.btn("Create price list")}
+      {E.row("Wholesale · standard", "18 customers · 12 priced formats", E.act("Edit prices"))}
+      {E.row("Wholesale · distributor", "3 customers · 12 priced formats", E.act("Edit prices"))}
+      {E.row("Taproom", "no customers · 8 priced formats", E.act("Edit prices"))}
+    </>),
+  },
+  {
+    step: 8,
+    slice: 1,
+    tab: "More",
     name: "Price tiers",
     job: "Price a format once per tier and override only the exceptions",
     reads: "list_price_lists [design; + channel_id §16.4] · get_price_list [design; formats and SKU overrides]",
@@ -1776,7 +1929,7 @@ export const SCREENS: Screen[] = [
     states: [["inherited", "the format price is what the customer sees"], ["overridden", "one brand × format priced away from the tier", 1], ["poured", "a pour is priceable here and is not a SKU"], ["no price", "neither a format default nor an override · the line cannot be sold", 1]],
     spec: "Price lists are already tiers and the customer's assigned price list already assigns them; revision 2 adds the channel and makes a format priceable, so a taproom pour (which is not a SKU) can be priced at all. Drawn format-default with a per-SKU override, matching Menu and POS item, which already read “format default” and offer Reset to format price. §16.16 q2 leaves the direction open; drawing it the other way would make those two shipped frames inconsistent.",
     body: (<>
-      {E.back("Catalog", "Wholesale tier")}
+      {E.back("Price lists", "Wholesale tier")}
       {E.fld("Tier name", "Wholesale · standard")}
       {E.fld("Channel", "Wholesale")}
       {E.ttl("Format defaults")}
