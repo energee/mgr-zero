@@ -79,10 +79,10 @@ export const PORTAL_NAV: readonly NavItem[] = [
 const allowed = (item: NavItem, role: StaffRole) => role === "admin" || !item.roles || item.roles.includes(role);
 
 /**
- * Drop entries the role may not see. Children thin out; a group whose
- * children all fall away is dropped too, since its href is one of the routes
- * just hidden (a warehouse user must not get a bare "More" tab that opens
- * Invoices).
+ * Drop entries the role may not see. Children thin out, and a group whose
+ * children all fall away is dropped with them. A group that keeps at least one
+ * child keeps its own href too, so a phone tab can still land on the group
+ * route (warehouse More opens Invoices, which warehouse may read).
  */
 export function navFor(items: readonly NavItem[], role: StaffRole): NavItem[] {
   return items

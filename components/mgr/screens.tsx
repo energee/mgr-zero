@@ -71,6 +71,12 @@ const INV = {
   fee: "$9.48",
 } as const;
 
+// The Work list chips, in the order every Work list draws them.
+const WORK_CHIPS = ["all", "orders", "batches", "runs", "POs", "routes"];
+
+// The states every screen can reach; a record with designed states lists its own instead.
+const DEFAULT_STATES: NonNullable<Screen["states"]> = [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]];
+
 export const SCREENS: Screen[] = [
   // step 1 — foundations and both authenticated shells
   {
@@ -140,7 +146,7 @@ export const SCREENS: Screen[] = [
     body: today(<>
       {E.btn("Swap keg")}
       {E.row("Tap 5 · Pils", "nearly out · ~9% left", E.act("Swap"), "w", BeerIcon)}
-      {E.gated("Weekly count", "isn’t available yet; the count cannot be saved yet")}
+      {E.gated("Weekly count")}
       {E.row("Guest cider", "rung in Square · not mapped, blocks reconcile", "unmapped", "w", Tag01Icon)}
       {E.row("Variance · last week", "−0.5 bbl Hazy unaccounted", E.act("Review"), "", TaskDone01Icon)}
       {E.note("No picks, orders or invoices: the taproom role sees the taproom.")}
@@ -149,7 +155,7 @@ export const SCREENS: Screen[] = [
   {
     step: 1, slice: "all", tab: "Beer", name: "Beer", job: "Inventory, cellar, materials and kegs",
     reads: "get_beer_overview [design; one read across slices]", writes: "none",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     body: (<>
       {E.hd("Beer")}
       {E.nav("Finished goods", "2 shortages · ATP by SKU")}
@@ -164,12 +170,12 @@ export const SCREENS: Screen[] = [
   {
     step: 1, slice: "all", tab: "Work", name: "Work", job: "Everything currently in motion, ordered by next due action",
     reads: "list_work [design; role default + remembered explicit filter]", writes: "none",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     spec: "Warehouse default rows shown; the full chip set stays visible and an explicit chip choice is remembered. Rows sort by urgency/due time, not newest activity.",
     body: (<>
       {E.hd("Work", "warehouse default")}
       {E.btn("New order", "g")}
-      {E.chips(["all", "orders", "batches", "runs", "POs", "routes"], 1)}
+      {E.chips(WORK_CHIPS, 1)}
       {E.row("ORD-0231 · Ridgeline", "submitted · ships today", E.act("Confirm"), "", Package01Icon)}
       {E.row("ORD-0229 · Al’s Bar", "picked · restock 3 Pils staged", E.act("Put back"), "w", Package01Icon)}
       {E.row("PO-0142 · Country Malt", "due today", E.act("Receive"), "", DeliveryTruck01Icon)}
@@ -179,7 +185,7 @@ export const SCREENS: Screen[] = [
   {
     step: 1, slice: "all", tab: "More", name: "More", job: "Setup and desk review, never standing work",
     reads: "none [role navigation manifest]", writes: "none",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     spec: "Role-filtered; hidden entries leave no gaps. Standing work remains in Today, Beer or Work.",
     body: (<>
       {E.hd("More")}
@@ -229,7 +235,7 @@ export const SCREENS: Screen[] = [
   {
     step: 1, slice: "all", tab: "More", name: "Settings", job: "Edit brewery/location basics and route to rare setup",
     reads: "list_locations · list_team_members", writes: "update_brewery · update_location [design; mutable single rows]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     spec: "Invoices remains a first-class More and desk-rail destination. TTB registry number and PA license are brewery columns and feed the compliance report header. Deployment mode is read-only. Team opens the Team frame.",
     body: (<>
       {E.back("More", "Settings")}
@@ -367,7 +373,7 @@ export const SCREENS: Screen[] = [
     job: "Enter through the Supabase Auth platform boundary",
     reads: "none",
     writes: "supabase_auth_sign_in_with_password · supabase_auth_sign_in_with_otp [platform]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
     body: (<>
       {E.sp()}
@@ -389,7 +395,7 @@ export const SCREENS: Screen[] = [
     job: "Set a password and land in the correct shell",
     reads: "supabase_auth_get_session [platform]",
     writes: "supabase_auth_update_user [platform; membership already exists]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     spec: "Staff lands on Today; a customer lands on portal Order. The token decides; the person never chooses a shell. Name is collected here. Expired, wrong-audience and already-a-member are their own landings.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
     body: (<>
@@ -451,7 +457,7 @@ export const SCREENS: Screen[] = [
     job: "A wholesale buyer enters through the same Auth boundary",
     reads: "none",
     writes: "supabase_auth_sign_in_with_password [platform]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     spec: "Customer-only accounts land on Order. Forgot password is a text link, not a second primary.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
     body: (<>
@@ -460,7 +466,7 @@ export const SCREENS: Screen[] = [
       {E.inp("email")}
       {E.inp("password")}
       {E.btn("Sign in")}
-      {E.row("Forgot password?")}
+      {E.act("Forgot password?")}
       {E.sp()}
     </>),
   },
@@ -473,7 +479,7 @@ export const SCREENS: Screen[] = [
     job: "Recover a buyer login without saying whether the email exists",
     reads: "none",
     writes: "supabase_auth_reset_password_for_email [platform]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     spec: "The sent state is this same screen with the info. Enumeration is never confirmed.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
     body: (<>
@@ -494,7 +500,7 @@ export const SCREENS: Screen[] = [
     job: "Recovery-token landing for a buyer; lands in the portal",
     reads: "supabase_auth_get_session [platform; recovery token]",
     writes: "supabase_auth_update_user [platform]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     spec: "After Save, a customer membership opens Order, not Today.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
     body: (<>
@@ -515,7 +521,7 @@ export const SCREENS: Screen[] = [
     reads: "list_team_members",
     writes: "update_staff_role [design; single row] · revoke_staff [design; single membership row ends] · invite_staff [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI] · the taproom role [SCHEMA-GATE: revision 2 §16.13/§16.16 q4: staff_role gains taproom, but P-staff is role-agnostic, so the narrow per-role policies are undesigned]",
     states: [["last admin", "role change refused · keep one admin", 1], ["pending", "invite sent · not yet accepted"], ["permission", "admin only", 1]],
-    spec: "From Settings. Role chips change the member's role in one write; Remove is copper and ends the membership (Auth user untouched; re-invite is the compensation). The invite stays disabled with the same human copy as first run until its gate closes.",
+    spec: "From Settings. A member row opens the Team member sheet, where the role changes in one write and Remove ends the membership (Auth user untouched; re-invite is the compensation). The invite stays disabled with the same human copy as first run until its gate closes.",
     body: (<>
       {E.back("Settings", "Team")}
       {E.nav("Maria Alvarez", "maria@ · warehouse")}
@@ -554,7 +560,7 @@ export const SCREENS: Screen[] = [
     job: "Provision tenant and first owner atomically",
     reads: "none [deployment mode gate]",
     writes: "provision_brewery [design; one RPC: brewery + owner membership]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     spec: "Hidden in dedicated mode; this is the pre-brewery provisioning boundary.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
     body: (<>
@@ -573,7 +579,7 @@ export const SCREENS: Screen[] = [
     job: "Turn an empty brewery into usable truth",
     reads: "get_first_run_state [design]",
     writes: "create_location · invite_staff [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     spec: "Replaces Today until complete; app and portal shells already exist. Each step is one command: add a location, import a CSV, add a brand, invite staff, record a movement. The invite is drawn disabled with the same human copy as the Team frame until the invite workflow gate closes; the step can be skipped.",
     body: (<>
       {E.hd("Set up Demo Brewing", "4 steps")}
@@ -634,7 +640,7 @@ export const SCREENS: Screen[] = [
     job: "See on-hand, ATP and immutable tape together",
     reads: "get_on_hand · get_atp · list_movements",
     writes: "reverse_inventory_movement [SCHEMA-GATE: auditable link + valid sign and TTB semantics]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     spec: "Correction is not actionable yet: opposite-sign rows fail movement CHECKs; enable only after a structured reversal link and reporting semantics exist.",
     body: (<>
       {E.back("Finished goods", "Hazy IPA · ½ bbl")}
@@ -695,7 +701,7 @@ export const SCREENS: Screen[] = [
     job: "Recents first, then one registered search",
     reads: "search_entities · list_skus",
     writes: "none",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     spec: "48px rows; visible keyboard focus; one registered search behind the field.",
     body: (<>
       {E.inp("Search")}
@@ -800,12 +806,12 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Work", "sales default")}
       {E.btn("New order")}
-      {E.chips(["all", "orders", "batches", "runs", "POs", "routes"], 1)}
+      {E.chips(WORK_CHIPS, 1)}
       {E.chips(["all states", "draft", "submitted", "confirmed", "picked", "shipped"], 0)}
       {E.row("ORD-0231 · Ridgeline", "submitted · ships Thu", E.act("Confirm"))}
       {E.row("ORD-0229 · Al’s Bar", "picked · restock 3 Pils staged", E.act("Put back"), "w")}
       {E.row("ORD-0234 · Teresa’s", "confirmed · ships Fri", E.act("Pick"))}
-      {E.row("ORD-0235 · Teresa’s", "draft · ships Fri", E.act("Finish"))}
+      {E.row("ORD-0237 · Teresa’s", "draft · ships Fri", E.act("Finish"))}
     </>),
   },
   {
@@ -1011,7 +1017,7 @@ export const SCREENS: Screen[] = [
     job: "Group confirmed demand by ship date",
     reads: "get_daily_pick_sheet [design]",
     writes: "none",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     body: (<>
       {E.back("Work", "Pick sheet")}
       {E.chips(["Wed 9/2", "Thu 9/3", "Fri 9/4"], 1)}
@@ -1029,7 +1035,7 @@ export const SCREENS: Screen[] = [
     job: "Target-state count plus active suggested transfer",
     reads: "get_taproom_count_snapshot [SCHEMA-GATE] · get_taproom_replenishment [design] · list_locations",
     writes: "record_taproom_count [SCHEMA-GATE: durable count + lines + optional movements in one RPC] · create_taproom_transfer [design; one RPC: order with explicit source + destination + lines + allocations]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     spec: "Count is target-state only and disabled until durable count persistence lands; the taproom lead uses the warehouse permission bundle. INVERTED (this frame was drawn the other way round): the physical count is the source of truth and posts the depletion, connected or not. POS supplies expected consumption and posts nothing, so disconnecting removes the expected column and changes nothing about what the count writes. That is also why a keg moving warehouse → taproom stays on the books as taproom stock: a taproom transfer carries no channel, and the beer leaves only when a count says it is gone, which makes a month-end count yield the month’s removal cleanly. Variance is drawn twice on purpose: inline while someone can still recount, and as a report where a pattern across weeks (one line, one shift) is the only place it becomes legible. Counts are in kegs and cases, so qty never needs fractional widening.",
     body: (<>
       {E.back("Beer", "Taproom")}
@@ -1076,10 +1082,10 @@ export const SCREENS: Screen[] = [
     job: "Change named quantities; never invent priority",
     reads: "get_shortfalls · get_standing_allocations [design]",
     writes: "adjust_order_line [design; one RPC: line + allocation] · release_allocation · set_taproom_par · set_taproom_standing_allocation [design]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     spec: "There is no ranking command or priority column; every change is a named quantity edit.",
     body: (<>
-      {E.back("Beer", "Pils · 16 oz case")}
+      {E.back("Finished goods", "Pils · 16 oz case")}
       {E.num("−6 cases · −0.58 bbl", "ATP · 22 cases on hand · 28 allocated")}
       {E.row("ORD-0231 · Ridgeline", "10 cases · 0.97 bbl", E.act("Adjust"))}
       {E.row("ORD-0234 · Teresa’s", "12 cases · 1.16 bbl", E.act("Release"))}
@@ -1096,7 +1102,7 @@ export const SCREENS: Screen[] = [
     job: "Return beer and correct money atomically",
     reads: "get_order",
     writes: "return_shipment [design; one RPC: return_in movements at explicit destination + credit memo + owned-fleet keg_events linked to shipment when slice 9 is enabled]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     body: (<>
       {E.back("ORD-0231", "Beer return")}
       {E.row("Hazy IPA · ½ bbl keg", "shipped 4 · returning", E.stq(1))}
@@ -1117,10 +1123,10 @@ export const SCREENS: Screen[] = [
     job: "Complete customer, source, ship-to and line entry for staff",
     reads: "list_customers · list_locations · list_skus · get_atp",
     writes: "create_order [design; one RPC: draft order + all lines]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     spec: "Source is required and becomes the order's from-location; the app never guesses “Warehouse.” Save draft lands on the Order screen, where Submit lives.",
     body: (<>
-      {E.back("Work", "New order")}
+      {E.back("Orders", "New order")}
       {E.pick("Customer", "Ridgeline Tap Room")}
       {E.pick("Source location", "Warehouse")}
       {E.pick("Ship-to", "Main · Phoenixville, PA")}
@@ -1142,7 +1148,7 @@ export const SCREENS: Screen[] = [
     job: "Manage accounts, addresses and portal users",
     reads: "list_customers · get_customer [design]",
     writes: "create_customer · update_customer · create_ship_to · update_ship_to · invite_customer_user [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     body: (<>
       {E.back("More", "Customers")}
       {E.inp("Search customers")}
@@ -1377,7 +1383,7 @@ export const SCREENS: Screen[] = [
     job: "Define brands, SKUs, package BOMs and prices without ledger writes",
     reads: "list_brands · list_skus",
     writes: "create_brand · update_brand · create_sku · update_sku · replace_sku_bom [design; one RPC replaces selected SKU full BOM] · create_price_list · update_price_list · set_price_list_item [existing/design]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     spec: "BOM replacement is one RPC, never a client row loop. Brand and SKU facts (ABV, tax class, package, barrels per unit) edit on the Brand / SKU frame; this page stays list + BOM + a simple list × SKU price item, never the v1 price matrix.",
     body: (<>
       {E.back("More", "Catalog")}
@@ -1508,7 +1514,7 @@ export const SCREENS: Screen[] = [
       {E.fld("Your PO number", "optional")}
       {E.info("Order number is assigned when you place the order.")}
       {E.sp()}
-      {E.btn("Place order · $828.00", "p disabled")}
+      {E.btn(`Place order · ${INV.total}`, "p disabled")}
       {E.info("Placing an order isn’t available until the brewery sets where yours ship from.")}
     </>),
   },
@@ -1603,7 +1609,7 @@ export const SCREENS: Screen[] = [
     job: "Ask the brewery about a line, a total or a payment",
     reads: "get_portal_invoice [design]",
     writes: "none [email or chat to the brewery; no portal write]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     spec: "Off Pay invoice and Payment unavailable. The buyer writes a note; the brewery gets it. Nothing on the invoice changes.",
     body: (<>
       {E.fld("Invoice", "INV-0198 · $1,240.00")}
@@ -1619,7 +1625,7 @@ export const SCREENS: Screen[] = [
     job: "A paid invoice has no Pay; the date and PDF remain",
     reads: "get_portal_invoice [design]",
     writes: "none",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     spec: "The paid date arrived from QuickBooks. Pay is gone. Download PDF is the one action.",
     body: (<>
       {E.back("Invoices", "INV-0190")}
@@ -1637,10 +1643,10 @@ export const SCREENS: Screen[] = [
     job: "See issued, due and paid invoices",
     reads: "list_portal_invoices [design]",
     writes: "none",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     body: (<>
       {E.hd("Invoices", "Ridgeline")}
-      {E.row(INV.no, `overdue · due ${INV.dueShort} · ${INV.total}`, E.act("Pay"), "w")}
+      {E.row(INV.no, `due ${INV.dueShort} · ${INV.total}`, E.act("Pay"))}
       {E.row("INV-0190", "paid 8/29", "$980", "ok")}
     </>),
   },
@@ -1652,7 +1658,7 @@ export const SCREENS: Screen[] = [
     job: "Read own ship-to, signed-in membership and deposit details",
     reads: "get_portal_account [design]",
     writes: "none",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     spec: "Peer portal users are not listed; the composer exposes only account-safe reads and order commands.",
     body: (<>
       {E.hd("Account", "Ridgeline")}
@@ -1672,7 +1678,7 @@ export const SCREENS: Screen[] = [
     job: "Who I am on this customer account, leave, change password",
     reads: "supabase_auth_get_session [platform]",
     writes: "supabase_auth_sign_out [platform]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     spec: "Opened from the portal header Me control. No brewery switcher. Change password opens Portal set password. Sign out is outline here; the irreversible accent is a staff Me follow-up.",
     body: (<>
       {E.fld("Signed in as", "buyer@ridgeline.example")}
@@ -1689,11 +1695,11 @@ export const SCREENS: Screen[] = [
     job: "Occupancy is the subject: fill, gravity and overdue lead every tile",
     reads: "get_cellar_map [design]",
     writes: "create_vessel · update_vessel [design; mutable single rows] · complete_batch [SCHEMA-GATE: close/reconciliation identity + classifications; one RPC: batch close + occupancy close + automatic reconciliation]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
-    spec: "Complete batch stays disabled until close/reconciliation identity exists: the batch’s closing time, the occupancy close and the typed automatic reconciliation must commit atomically. Tile fill derives from occupancy vs vessel capacity, never from a status column. Reading is the one primary; Transfer and Brew day are outline. A tile opens the Vessel sheet to edit facts.",
+    states: DEFAULT_STATES,
+    spec: "Complete batch stays disabled until close/reconciliation identity exists: the batch’s closing time, the occupancy close and the typed automatic reconciliation must commit atomically. Tile fill derives from occupancy vs vessel capacity, never from a status column. Reading is the one primary; Transfer and Brew day are outline. A tile opens Vessel detail.",
     body: (<>
       {E.back("Beer", "Cellar")}
-      {E.tiles([["FV1", "Pils · 12.8 / 15 bbl", "1.9 °P · read 4 h", 0, 85, 1], ["FV2", "Hazy · 9.0 / 15 bbl", "7.5 °P · read 8 h", 0, 60, 1], ["FV3", "Stout · 13.5 / 15 bbl", "5.2 °P · overdue 31 h", 1, 90, 1], ["BT1", "Pils · 7.0 / 10 bbl", "carbing", 0, 70, 1], ["BT2", "Empty · 0 / 10 bbl", "available", 0, 0, 1], ["FB1", "Saison · 0.4 / 1 bbl", "aging · read 1 d", 0, 40, 1]], 2)}
+      {E.tiles([["FV1", "Pils · 12.8 / 15 bbl", "1.9 °P · read 4 h", 0, 85], ["FV2", "Hazy · 9.0 / 15 bbl", "7.5 °P · read 8 h", 0, 60], ["FV3", "Stout · 13.5 / 15 bbl", "5.2 °P · overdue 31 h", 1, 90], ["BT1", "Pils · 7.0 / 10 bbl", "carbing", 0, 70], ["BT2", "Empty · 0 / 10 bbl", "available", 0, 0], ["FB1", "Saison · 0.4 / 1 bbl", "aging · read 1 d", 0, 40]], "c2")}
       {E.btns([["Reading", "p"], ["Transfer", "g"], ["Brew day", "g"]], "c3")}
       {E.nav("FV3 · fermenter · 15 bbl", "occupancy, readings and vessel facts")}
       {E.btn("Add vessel", "g")}
@@ -1735,7 +1741,7 @@ export const SCREENS: Screen[] = [
     job: "Record any values taken; SG converts to stored Plato",
     reads: "get_cellar_map [design; occupancy + last reading]",
     writes: "record_fermentation_reading [design; mutable reading row]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     spec: "One reading may contain gravity, temperature, pH, or any combination. Blank values remain absent; prior values are reference only, never silently copied. Each value is typed; Gravity is the default.",
     body: (<>
       {E.qty("1.019", "SG · prior 1.021", "Gravity")}
@@ -1784,12 +1790,12 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Work", "brewer default")}
       {E.btn("New batch")}
-      {E.chips(["all", "orders", "batches", "runs", "POs", "routes"], 2)}
+      {E.chips(WORK_CHIPS, 2)}
       {E.ttl("Planned")}
       {E.row("B-0416 · Hazy IPA v4", "Fri 9/4 · 15 bbl", E.act("Start"))}
       {E.ttl("Active")}
       {E.row("B-0409 · Pils", "FV1 · 1.9 °P · read 4 h ago", E.act("Reading"))}
-      {E.row("B-0412 · Stout", "FV3 · reading overdue 31 h", E.act("Reading"), "w")}
+      {E.row("B-0413 · Stout", "FV3 · reading overdue 31 h", E.act("Reading"), "w")}
     </>),
   },
   {
@@ -1818,7 +1824,7 @@ export const SCREENS: Screen[] = [
     job: "Consume actual lots and set knockout baseline",
     reads: "get_brew_day [design]",
     writes: "record_brew_day [design; one RPC: additions + material movements + occupancy]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     spec: "Brew-day mode: actual lots and knockout vessel. Planned recipe/date/barrels live on Schedule batch so this page has one primary. Record brew day posts immutable material consumption for mash/boil/whirlpool stages only; the 18 lb Citra dry hop is posted later from Cellar addition. Yeast is consumed as a material lot, not a culture generation (plan §8).",
     body: (<>
       {E.back("Batches", "B-0416 · Hazy")}
@@ -1840,13 +1846,13 @@ export const SCREENS: Screen[] = [
     job: "Write one transfer row that carries its own loss volume",
     reads: "get_cellar_map [design; occupancy volumes]",
     writes: "record_cellar_transfer [design; one RPC: create target occupancy(initial_bbl=0) when empty + append transfer(loss_bbl) + close source occupancy iff fully emptied]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     spec: "Drawn as a blend into an occupied brite: BT1 keeps its occupancy and B-0412 keeps its identity: the schema has one batch per occupancy, and blends are transfers into the surviving one (renaming a blend as a new batch is a plan §8 schema gap). An empty target (BT2) gets a new occupancy starting at zero bbl in the same RPC; the transfer row stays immutable; a fully emptied source closes its occupancy. A partial transfer never implies loss: the person explicitly holds the remainder or records loss. No vessel status.",
     body: (<>
       {E.pick("From", "FV1 · Pils · B-0409 · 12.8 bbl")}
       {E.pick("To", "BT1 · Pils · B-0412 · 7.0 / 10 bbl")}
       {E.qty("3.0", "bbl", "Barrels moving")}
-      {E.info("Blend preview: BT1 7.0 + 3.0 = 10.0 bbl (full) · stays B-0412 · Pils. FV1 keeps 9.8 bbl.")}
+      {E.info("Blend preview: BT1 7.0 + 3.0 = 10.0 bbl (full) · stays B-0412 · Pils. FV1 keeps 9.8 bbl, or Record as loss books those 9.8 bbl as loss.")}
       {E.fld("Remainder in FV1", "9.8 bbl")}
       {E.chips(["Leave in FV1", "Record as loss"], 0)}
       {E.pin(<>
@@ -1862,8 +1868,8 @@ export const SCREENS: Screen[] = [
     job: "Plan a run separately, then create lot and movements on close",
     reads: "get_packaging_run [design; revalidate selected source occupancy] · list_locations",
     writes: "schedule_packaging_run [design; one RPC: run with explicit source occupancy + planned outputs] · close_packaging_run [design; one RPC: revalidate source + close + lot + outputs + material movements at explicit locations]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
-    spec: "The close half of the packaging frame; planning and editing the plan live in the Schedule packaging run sheet, reached from the Plan row until the run starts. Close is a copper review ( revalidated source, actual outputs, lot, explicit FG destination, material consumption/return/damage, yield/loss). Print labels is presentation after commit: measured thermal keg-collar/lot labels per plan §3. No packaging-day-actuals screen.",
+    states: DEFAULT_STATES,
+    spec: "The close half of the packaging frame; planning and editing the plan live in the Schedule packaging run sheet until the run starts. Close is a copper review ( revalidated source, actual outputs, lot, explicit FG destination, material consumption/return/damage, yield/loss). Print labels is presentation after commit: measured thermal keg-collar/lot labels per plan §3. No packaging-day-actuals screen.",
     body: (<>
       {E.back("Work", "RUN-0031 · started")}
       {E.fld("Packaging source", "FV3 · B-0416")}
@@ -1907,7 +1913,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Work", "brewer default")}
       {E.btn("Schedule run")}
-      {E.chips(["all", "orders", "batches", "runs", "POs", "routes"], 3)}
+      {E.chips(WORK_CHIPS, 3)}
       {E.ttl("Upcoming")}
       {E.row("RUN-0031 · Hazy cans", "Fri 9/5 · FV3 · 118 cases planned · 480 ends short", E.act("Resolve"), "w")}
       {E.row("RUN-0032 · Pils ½ bbl", "Tue 9/9 · FV1 · 40 kegs planned", E.act("Start"))}
@@ -1954,7 +1960,7 @@ export const SCREENS: Screen[] = [
     job: "Trace a lot globally from material to customer",
     reads: "trace_lot [design]",
     writes: "none",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     body: (<>
       {E.back("Search", "L-240831-HZ")}
       {E.row("Hazy IPA · 16 oz case", "RUN-0028 · packaged 8/31", "118 cases")}
@@ -1979,7 +1985,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Work", "warehouse default")}
       {E.btn("New PO")}
-      {E.chips(["all", "orders", "batches", "runs", "POs", "routes"], 4)}
+      {E.chips(WORK_CHIPS, 4)}
       {E.row("PO-0142 · Country Malt", "sent · due Thu", E.act("Receive"))}
       {E.row("PO-0141 · YCH", "partially received · 1 Citra box due", E.act("Receive"), "w")}
       {E.row("PO-0143 · CanSource", "draft · 4 pallets", E.act("Send"))}
@@ -2054,7 +2060,7 @@ export const SCREENS: Screen[] = [
     job: "Post only variance as an append-only movement",
     reads: "get_material_on_hand [design]",
     writes: "record_material_count [design; one RPC: count + lines + adjustment movements]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     body: (<>
       {E.pick("Material", "Cans · 16 oz")}
       {E.qty("3050", E.chips(["each", "case"]))}
@@ -2203,7 +2209,7 @@ export const SCREENS: Screen[] = [
     job: "Author immutable versions from assumptions; actuals keep predictions honest",
     reads: "list_recipes · get_recipe [design] · get_recipe_outcomes [design; per-batch actual OG/FG/ABV + realized efficiency/attenuation, derived from fermentation readings, never stored]",
     writes: "create_recipe [design; mutable parent row] · create_recipe_version [design; one RPC: immutable version + ingredients; SCHEMA-GATE: assumption columns on recipe_versions + per-ingredient extract snapshot + extract potential on materials; typed target_og/fg/abv columns drop]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. Versioning is disabled behind its schema gate. A new parent takes name and style only; versions append, and history is never edited. Costing lives on desk.",
     body: (<>
       {E.back("Recipes", "Hazy IPA v4")}
@@ -2248,7 +2254,7 @@ export const SCREENS: Screen[] = [
     job: "Generate from ledgers, review, then record the external filing",
     reads: "generate_compliance_report · get_loss_review [design; SCHEMA-GATE for typed completion-loss identity]",
     writes: "file_compliance_report [design; immutable snapshot] · reattribute_loss [SCHEMA-GATE; requires typed origin/classification + atomic compensation]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     spec: "Reattribution waits for schema that identifies completion rows and cellar removal class; correction must be atomic append-only compensation, never free-text note matching. The identity checks are v1 lessons drawn in user copy: balance per class, cellar as in-process, 0.00 never blank, no transmission.",
     body: (<>
       {E.back("Compliance months", "August 2026")}
@@ -2271,7 +2277,7 @@ export const SCREENS: Screen[] = [
     job: "Maintain brand and state permissions used by order warnings",
     reads: "get_compliance_registry [design]",
     writes: "upsert_brand_approval · upsert_state_registration · upsert_brewery_state_license [design]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     spec: "Unregistered destination/brand combinations warn during order confirm and link here.",
     body: (<>
       {E.back("Compliance months", "Registry")}
@@ -2481,7 +2487,7 @@ export const SCREENS: Screen[] = [
       {E.back("Beer", "Tap board")}
       {E.ttl("On tap")}
       {E.chips(["Taproom", "Warehouse"], 0)}
-      {E.tiles([["1", "Pils · ½ bbl", "on Mon", 0, 71, 1], ["2", "Hazy IPA · ½ bbl", "on Mon", 0, 62, 1], ["3", "Stout · ⅙ bbl", "on Tue · filled 60%", 0, 34, 1], ["4", "Amber · ½ bbl", "on Sat", 0, 88, 1], ["5", "Helles · ½ bbl", "on Wed · nearly out", 1, 9, 1], ["6", "Saison · ½ bbl", "on Thu", 0, 54, 1], ["8", "Porter · ⅙ bbl", "on Fri", 0, 46, 1], ["9", "Hazy IPA · ½ bbl", "on Thu · second keg", 1, 93, 1], ["10", "Kolsch · ½ bbl", "on Tue", 0, 27, 1], ["11", "Barrel Dark · ⅙ bbl", "on Sun", 0, 80, 1], ["unnumbered", "Wild Ale · ⅙ bbl", "on Thu · sorts last", 0, 66, 1]])}
+      {E.tiles([["1", "Pils · ½ bbl", "on Mon", 0, 71], ["2", "Hazy IPA · ½ bbl", "on Mon", 0, 62], ["3", "Stout · ⅙ bbl", "on Tue · filled 60%", 0, 34], ["4", "Amber · ½ bbl", "on Sat", 0, 88], ["5", "Helles · ½ bbl", "on Wed · nearly out", 1, 9], ["6", "Saison · ½ bbl", "on Thu", 0, 54], ["8", "Porter · ⅙ bbl", "on Fri", 0, 46], ["9", "Hazy IPA · ½ bbl", "on Thu · second keg", 1, 93], ["10", "Kolsch · ½ bbl", "on Tue", 0, 27], ["11", "Barrel Dark · ⅙ bbl", "on Sun", 0, 80], ["unnumbered", "Wild Ale · ⅙ bbl", "on Thu · sorts last", 0, 66]])}
       {E.row("7 · Guest cider · keg", "tapped here by Dana · not our stock, no depletion", E.act("Kick"), "w")}
       {E.ttl("Open, not on a tap")}
       {E.row("Amber · ½ bbl", "packaged short · filled 60% · 0.30 bbl", E.act("Tap"), "w")}
@@ -2554,7 +2560,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Work", "driver default")}
       {E.btn("New route")}
-      {E.chips(["all", "orders", "batches", "runs", "POs", "routes"], 5)}
+      {E.chips(WORK_CHIPS, 5)}
       {E.row("Route A · Thu", "3 stops · Maria · departed 8:10", E.act("Resume"))}
       {E.row("Route B · Fri", "2 stops · driver not assigned", E.act("Assign"), "w")}
       {E.row("ORD-0236 · Dock", "shipped · no route", E.act("Add to route"), "w")}
@@ -2574,8 +2580,8 @@ export const SCREENS: Screen[] = [
       {E.back("Routes", "Route A · Thu")}
       {E.fld("Driver · vehicle", "Maria · Box truck 2")}
       {E.row("Stop 1 · Ridgeline", "4 Hazy halves · 6 Pils cases", "next")}
-      {E.row("Stop 2 · Al’s Bar", "2 Stout sixths", "after")}
-      {E.row("Stop 3 · Teresa’s", "8 Hazy halves · 12 Pils cases", "after", "w")}
+      {E.row("Stop 2 · Al’s Bar", "2 Stout sixths · later")}
+      {E.row("Stop 3 · Teresa’s", "8 Hazy halves · 12 Pils cases · later", "", "w")}
       {E.row("Unassigned · ORD-0236 · Dock", "3 Hazy halves · shipped, no route", E.act("Add stop"), "w")}
       {E.btns([["Save route plan", "g"], ["Depart route", "p"]])}
     </>),
@@ -2591,7 +2597,7 @@ export const SCREENS: Screen[] = [
     states: [["planned", "Depart lives on Route"], ["departed", "Return is the one verb"], ["complete", "already returned"]],
     spec: "The departed state of a route. Planned routes Depart on Route; this screen is only Return.",
     body: (<>
-      {E.back("Work", "Route A · Thu")}
+      {E.back("Routes", "Route A · Thu")}
       {E.fld("Driver · vehicle", "Maria · Box truck 2")}
       {E.row("Stop 1 · Ridgeline", "delivered 8:42", "done", "ok")}
       {E.row("Stop 2 · Al’s Bar", "delivered 9:15", "done", "ok")}
@@ -2614,8 +2620,8 @@ export const SCREENS: Screen[] = [
       {E.back("Today", "Route A · Thu")}
       {E.fld("Load", "14 Hazy halves · 18 Pils cases · 2 Stout sixths")}
       {E.row("Stop 1 · Ridgeline Tap Room", "4 Hazy halves · 6 Pils cases", E.act("Resume"), "w")}
-      {E.row("Stop 2 · Al’s Bar", "2 Stout sixths", "after")}
-      {E.row("Stop 3 · Teresa’s", "8 Hazy halves · 12 Pils cases", "after")}
+      {E.row("Stop 2 · Al’s Bar", "2 Stout sixths · later")}
+      {E.row("Stop 3 · Teresa’s", "8 Hazy halves · 12 Pils cases · later")}
       {E.sp()}
       {E.btn("Return route")}
     </>),
@@ -2649,7 +2655,7 @@ export const SCREENS: Screen[] = [
     job: "See demand gaps and draft a PO without priority state",
     reads: "get_planning_shortfalls [design]",
     writes: "draft_purchase_order_from_requirements [design; one RPC: draft PO + lines]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: DEFAULT_STATES,
     body: (<>
       {E.back("More", "Planning")}
       {E.tbl(["week", "demand", "supply", "gap"], [["9/7", "48 bbl", "40 bbl", <><span className="text-warning-foreground">−8</span></>], ["9/14", "52 bbl", "60 bbl", "+8"]])}

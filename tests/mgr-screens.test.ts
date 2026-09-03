@@ -261,9 +261,11 @@ describe("SCREENS", () => {
     for (const name of named) {
       const s = SCREENS.find((x) => x.name === name);
       expect(s, name).toBeTruthy();
-      const html = renderToStaticMarkup(createElement("div", null, s!.body));
-      expect.soft(html, `${name}: number input`).toMatch(/<input[^>]*type="number"/);
-      expect(splitPinned(s!.body).pin.length, `${name}: pin lifted`).toBe(1);
+      const { pin } = splitPinned(s!.body);
+      expect(pin.length, `${name}: pin lifted`).toBe(1);
+      expect.soft(renderToStaticMarkup(createElement("div", null, s!.body)), `${name}: number input`).toMatch(/<input[^>]*type="number"/);
+      const pinHtml = renderToStaticMarkup(createElement("div", null, pin));
+      expect(pinHtml, `${name}: commit verb inside pin`).toMatch(/Record (movement|reading|addition|transfer|count|repack)/);
     }
     const transfer = SCREENS.find((x) => x.name === "Cellar transfer")!;
     const transferHtml = renderToStaticMarkup(createElement("div", null, transfer.body));

@@ -52,6 +52,7 @@
 .sk-control{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px}
 .sk-control b{font-weight:700}
 .sk-control button[role="switch"]{width:34px;height:20px;border:0;border-radius:999px;background:var(--sk-green);padding:2px;display:flex;justify-content:flex-end}
+.sk-control button[role="switch"][aria-checked="false"]{background:var(--sk-line);justify-content:flex-start}
 .sk-control button[role="switch"] i{width:16px;height:16px;border-radius:50%;background:#fff}
 .sk-control select{min-width:180px;border:1px solid var(--sk-line);border-radius:4px;background:#fff;padding:6px 28px 6px 8px;color:var(--sk-ink)}
 .sk-gate{display:flex;flex-direction:column;gap:4px;align-items:flex-start}

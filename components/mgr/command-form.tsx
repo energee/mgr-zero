@@ -30,7 +30,9 @@ export function CommandForm({
   footer?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const foot = footer ? <div className="shrink-0 border-t px-4 pt-2">{footer}</div> : null;
+  // bleed: the dialog body and footer pull out to DialogContent's own padding so a focus ring and the divider reach the edge; the sheet has none to undo.
+  const body = (bleed: string) => <div className={cn("min-h-0 flex-1 overflow-y-auto px-4 py-1", bleed)}>{children}</div>;
+  const foot = (bleed: string) => footer && <div className={cn("shrink-0 border-t px-4 pt-2", bleed)}>{footer}</div>;
   if (useIsMobile()) {
     return (
       <Sheet open={open} onOpenChange={onOpenChange}>
@@ -39,8 +41,8 @@ export function CommandForm({
           <SheetHeader className="shrink-0 pb-0">
             <SheetTitle>{title}</SheetTitle>
           </SheetHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto px-4">{children}</div>
-          {foot}
+          {body("")}
+          {foot("")}
         </SheetContent>
       </Sheet>
     );
@@ -52,8 +54,8 @@ export function CommandForm({
         <DialogHeader className="shrink-0">
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
-        {foot}
+        {body("-mx-4")}
+        {foot("-mx-4")}
       </DialogContent>
     </Dialog>
   );
