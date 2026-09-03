@@ -20,12 +20,13 @@ below just in time — don't preload everything.
 | --- | --- |
 | Any code change | `.agents/ARCHITECTURE.md` — ownership map and the five iron rules |
 | Setup, ports, dev login, env vars | `README.md` |
-| Any customer-visible screen, action, field, option, permission, result, error, or correction flow | `docs/user-guide.html` — master link to separate staff and portal field manuals; update the applicable guide with the behavior |
+| Any customer-visible screen, action, field, option, permission, result, error, or correction flow | `public/docs/user-guide.html` — served at `/docs/user-guide.html`; master link to separate staff and portal field manuals; update the applicable guide with the behavior |
 | Schema / migration work | `.agents/ARCHITECTURE.md` conventions, then `.agents/superpowers/specs/2026-08-31-mgr-schema-design.md` (tables) and `2026-08-31-mgr-schema-decisions.md` (why) |
 | Brewing/TTB domain rules (units, loss, removals) | `.agents/superpowers/specs/brewing-domain.md` |
 | Why v1 (`~/Repos/mgr`) was left behind | `.agents/superpowers/specs/2026-08-31-mgr-v1-review.md` |
 | Product intent, what a slice is | `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md` |
 | UI layout, navigation, input model (chat + forms) | `.agents/superpowers/specs/2026-08-31-mgr-ui-layout-plan.md`; screens: `2026-08-31-mgr-wireframes.html` (edit the `SCREENS` array; keep in step with the plan) |
+| Chat notifications (Slack today, provider-neutral design) | `.agents/superpowers/specs/2026-09-01-mgr-chat-notifications-design.md`; plan: `.agents/superpowers/plans/2026-09-01-chat-notifications.md` |
 | What's done / next | `.agents/PROGRESS.md` |
 | Past decisions and lessons | `.agents/MEMORY.md` |
 | Simplifying recently modified code without behavior changes | `/simplify` — Claude Code's built-in; Pi's `.pi/prompts/simplify.md` says the same thing inline |
@@ -67,6 +68,7 @@ production data (there is none yet — keep it that way by asking).
 
 - `.agents/MEMORY.md` — durable facts and decisions. Update when a decision changes.
 - `.agents/PROGRESS.md` — done / in flight / next. Update at the end of each session.
+- `.agents/DRIFT.md` — unresolved contradictions in artifacts the dreaming agent cannot edit.
 - `.agents/superpowers/{specs,plans}` — design specs and plans; `docs/superpowers` is a symlink to it (the superpowers skills write there).
 - `.agents/agents/` — subagent definitions; `.claude/agents` is a symlink to it (Claude Code only reads `.claude/agents`).
 - `.agents/skills/` — project-local reusable workflows; `.claude/skills` is a symlink to it (Claude Code only reads `.claude/skills`); `.pi/prompts/` may provide thin Pi command aliases without duplicating skill instructions.

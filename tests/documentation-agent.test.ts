@@ -8,9 +8,9 @@ const read = (path: string) => readFileSync(resolve(root, path), "utf8");
 
 describe("customer documentation", () => {
   it("separates staff and portal documentation behind one master guide", () => {
-    const master = read("docs/user-guide.html");
-    const staff = read("docs/staff-guide.html");
-    const portal = read("docs/portal-guide.html");
+    const master = read("public/docs/user-guide.html");
+    const staff = read("public/docs/staff-guide.html");
+    const portal = read("public/docs/portal-guide.html");
 
     for (const guide of [master, staff, portal]) {
       expect(guide).toMatch(/^<!doctype html>/i);
@@ -73,9 +73,9 @@ describe("post-merge documentation maintainer", () => {
   it("audits the complete live UI and may edit only the HTML guide suite", () => {
     const prompt = read(".agents/agents/documentation-maintainer.md");
 
-    expect(prompt).toContain("docs/user-guide.html");
-    expect(prompt).toContain("docs/staff-guide.html");
-    expect(prompt).toContain("docs/portal-guide.html");
+    expect(prompt).toContain("public/docs/user-guide.html");
+    expect(prompt).toContain("public/docs/staff-guide.html");
+    expect(prompt).toContain("public/docs/portal-guide.html");
     expect(prompt).toContain("every current user-facing route");
     expect(prompt).toContain("Do not limit the review to the merged diff");
     expect(prompt).toContain("Edit only those three HTML files");
@@ -93,8 +93,8 @@ describe("post-merge documentation maintainer", () => {
     expect(workflow).toContain("manual documentation audit");
     expect(workflow).toContain("contents: write");
     expect(workflow).toContain("pull-requests: write");
-    expect(workflow).toContain("Edit(docs/staff-guide.html)");
-    expect(workflow).toContain("Write(docs/portal-guide.html)");
+    expect(workflow).toContain("Edit(public/docs/staff-guide.html)");
+    expect(workflow).toContain("Write(public/docs/portal-guide.html)");
     expect(workflow).toContain("documentation/user-guide");
     // Staged, not working-tree: git diff never sees a guide the agent creates
     // rather than edits, so the run reported no changes and binned the work.
@@ -105,7 +105,7 @@ describe("post-merge documentation maintainer", () => {
     expect(workflow).toContain("actions/create-github-app-token");
     expect(workflow).toContain("GH_TOKEN: ${{ steps.mgr-app.outputs.token }}");
     expect(workflow).toContain("token: ${{ steps.mgr-app.outputs.token }}");
-    expect(workflow).toContain("docs/user-guide.html docs/staff-guide.html docs/portal-guide.html");
+    expect(workflow).toContain("public/docs/user-guide.html public/docs/staff-guide.html public/docs/portal-guide.html");
     expect(workflow).toContain("gh pr create");
     expect(workflow).toContain("<(script|base|link|iframe");
     expect(workflow).toContain("http-equiv");

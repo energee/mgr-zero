@@ -22,9 +22,9 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
   the annotation, gate-copy, and Today-exemplar rules live in the plan
   preamble and §5, not here.
 - Every merged PR gets a full customer-documentation pass, with `workflow_dispatch` on `main` as the recovery path. Claude has read-only GitHub permissions and may edit only the master, staff, and portal guide HTML files; a separate deterministic job rejects any wider or active-content diff and maintains one reviewable `documentation/user-guide` PR. The agent never commits directly to `main`. The publish step mints the MGR App token (same as `dreaming.yml`) rather than `github.token`, so the resulting push triggers `ci.yml` (PR #49).
-- `docs/user-guide.html` is the documentation master linking audience-separated `staff-guide.html` and `portal-guide.html`. Together they cover every current screen/action in customer language (steps, fields/options/defaults/limits, permissions, connected effects, corrections, empty/error states, and unavailable controls) without mixing staff and portal instructions or exposing internals.
+- `public/docs/user-guide.html` is the documentation master, served at `/docs/user-guide.html`, linking audience-separated `staff-guide.html` and `portal-guide.html`. Together they cover every current screen/action in customer language (steps, fields/options/defaults/limits, permissions, connected effects, corrections, empty/error states, and unavailable controls) without mixing staff and portal instructions or exposing internals.
 - Customer guides stay visually neutral and close to browser defaults for now. A future MGR design language will be developed once and carried across the application, API documentation, and customer documentation rather than designed separately in any one surface.
-- The MGR mark is the v1 tank/porthole SVG. `app/icon.svg` is the favicon; `lib/mgr-icon.ts` owns the path; `components/mgr-icon.tsx` is the in-app reuse. Dream PRs are the MGR GitHub App (`mgr[bot]`), not `claude[bot]`: identity is `vars.MGR_APP_ID` + `secrets.MGR_APP_PRIVATE_KEY` passed as `github_token` to `anthropics/claude-code-action`. Upload `docs/brand/mgr-github-app-icon.png` (a raster of the same mark) as the app logo.
+- The MGR mark is the v1 tank/porthole SVG. `app/icon.svg` is the favicon; `lib/mgr-icon.ts` owns the path; `components/mgr-icon.tsx` is the in-app reuse. Dream PRs are published by the MGR GitHub App (`mgr[bot]`), not `claude[bot]`; the model has read-only GitHub access and a separate deterministic job mints the App token from `vars.MGR_APP_ID` + `secrets.MGR_APP_PRIVATE_KEY`. Upload `docs/brand/mgr-github-app-icon.png` (a raster of the same mark) as the app logo.
 - Every AI mutation is proposal-only: registry-owned server preview,
   canonical effects, explicit user confirmation, same `requestId` +
   `previewToken`, and stale revalidation. There is no generic Undo. Replay and
@@ -66,6 +66,11 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
 - `import_csv`, `invite_staff`, `invite_customer_user` stay registered but fail
   closed (P1.9) until the durable external-write gate exists; the Import screen
   and invite forms are removed rather than hidden.
+- Chat notifications are staff-only and Slack-first but provider-neutral: one
+  active installation per brewery/provider, personal App Home/DM plus one
+  admin-approved digest channel, and no quiet-hours bypass in the first
+  release. Slack-to-MGR writes remain projection-only until the trust/replay
+  gates close; `lib/chat/jobs.ts` is the rule-4 service-role owner.
 
 ## Gotchas (carried from MGR v1)
 - PostgREST caches the schema: after DDL, errors naming a column/enum that plainly exists are a stale cache — `NOTIFY pgrst, 'reload schema'` or restart the stack before debugging.
@@ -73,10 +78,9 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
 - `security definer` functions get PUBLIC execute by default; revoke from `public, anon` or the RLS helpers are callable unauthenticated (gated by `tests/schema-rules.test.ts`).
 - One local Supabase stack serves every worktree. A `supabase db reset` in another session silently swaps the loaded baseline; the tell is a burst of "relation does not exist" / undefined-column failures across suites. Reset from your own worktree and run the suite immediately; if it flips mid-run, check `docker ps` for a freshly restarted `supabase_db_mgr`.
 - Worktrees don't inherit `.env.local` (gitignored, per-checkout) — `npm test`/`npm run dev`/`npm run test:e2e` in a fresh worktree fail silently with `supabaseKey is required` until it's copied in from the main checkout.
-- `claude-code-action` rejects non-human PR authors unless `allowed_bots` is set. Dream PRs (`dreaming/main`) are opened as `mgr[bot]` (MGR GitHub App) and skip the `claude-review` job entirely so the check is skipped, not failed — do not allowlist the bot just to review its own doc PR. Passing `github_token` is required: without it the action authenticates as `claude[bot]` even if `GH_TOKEN` is set in `env`.
+- `claude-code-action` rejects non-human workflow actors unless `allowed_bots` is set. Scheduled/manual dreaming runs as `github-actions[bot]`; its generated `dreaming/main` PR and the `documentation/user-guide` PR skip `claude-review` so the bot never reviews its own maintenance output.
 - A push authenticated with `github.token` (the default `GITHUB_TOKEN`) does not trigger other workflow runs — `ci.yml` silently never fires on a PR opened that way, and it can reach a human unchecked. Any job whose push must trigger CI (dreaming, the documentation agent) mints the MGR GitHub App token instead and takes its git identity from the app slug (PR #49; same pattern dreaming already used for its own push).
 - `git diff --name-only` never reports a file an agent created rather than edited, so a job that gates on that diff being empty will silently discard untracked output as "no changes". Stage first (`git add -A`) and diff the index instead (PR #49, documentation-agent.yml).
-- `lib/chat/pacing.ts`'s per-conversation rate limiter stamps `lastSend` in a `finally` after the transport call returns (a failed attempt still counts against the provider) and waits in a loop until `Date.now() >= until` rather than trusting a single `setTimeout` — stamping before the call, or trusting one sleep, both undercount the enforced interval by a few ms under load and flake intermittently (`tests/chat-pacing.test.ts`, PR #51).
 
 ## Process
 - Reviewers that verify by execution (writing to the live DB) find real bugs; read-only reviews find style.

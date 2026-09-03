@@ -226,7 +226,7 @@ Handler order (the ordering is the spec's durability requirement — payload per
 - [ ] **Step 2:** Today row: count of `push_failed` invoices linking to the integrations screen, admin/sales roles only.
 - [ ] **Step 3:** Look at the rendered pages against local Supabase with a seeded failed push; fix what's broken. `npx tsc --noEmit && npm run lint`.
 - [ ] **Step 4: Commit** `feat(1c): QBO integrations screen + Today failure row`
-- [ ] **Step 5:** Add the same **Push to QuickBooks** button (with the confirmation dialog) to `app/(app)/invoices/[id]/page.tsx`; update `docs/staff-guide.html` (Integrations screen, push action, failure row, corrections) in the same commit.
+- [ ] **Step 5:** Add the same **Push to QuickBooks** button (with the confirmation dialog) to `app/(app)/invoices/[id]/page.tsx`; update `public/docs/staff-guide.html` (Integrations screen, push action, failure row, corrections) in the same commit.
 
 ### Task 8: Registry — `aiExposed` flag + `preview_command`
 
@@ -278,7 +278,7 @@ Flow (UI plan §2 verbatim requirements): text → `compose_command`; if candida
 ### Task 11: Docs + final validation
 
 **Files:**
-- Modify: `.agents/ARCHITECTURE.md` (ownership rows for `lib/qbo.ts`, `lib/commands/{qbo,preview,compose}.ts`, `app/api/qbo/callback`; note the compose→preview→commit contract is now implemented and that `lib/supabase/integration-tokens.ts` stays the only token boundary), `README.md` (env table + § HTTP API rows for every new command — run `/http-api`), the applicable `docs/{staff,portal}-guide.html` files, `.agents/PROGRESS.md`; `2026-08-31-mgr-wireframes.html` only if the built Integrations/composer screens diverged from their frames (wireframes stay in step with the plan).
+- Modify: `.agents/ARCHITECTURE.md` (ownership rows for `lib/qbo.ts`, `lib/commands/{qbo,preview,compose}.ts`, `app/api/qbo/callback`; note the compose→preview→commit contract is now implemented and that `lib/supabase/integration-tokens.ts` stays the only token boundary), `README.md` (env table + § HTTP API rows for every new command — run `/http-api`), the applicable `public/docs/{staff,portal}-guide.html` files, `.agents/PROGRESS.md`; `2026-08-31-mgr-wireframes.html` only if the built Integrations/composer screens diverged from their frames (wireframes stay in step with the plan).
 
 - [ ] **Step 1:** Full gate: `npx vitest run && npx tsc --noEmit && npm run lint`; `git diff` review (NUL-byte check); one from-scratch `npx supabase db reset` to prove the baseline replays.
 - [ ] **Step 2:** Update the docs above; verify every new file carries its module-level comment.

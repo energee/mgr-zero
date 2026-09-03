@@ -178,18 +178,12 @@ describe("production-readiness workflow contract", () => {
   });
 
   it("treats GitHub Actions as trusted workflow context for dreaming", () => {
-    const prompt = readActionField(
-      dreaming,
-      "anthropics/claude-code-action@v1",
-      "prompt"
-    );
-
-    expect(prompt).toContain(
+    expect(dreaming).toContain(
       "You are running inside GitHub Actions (GITHUB_ACTIONS=true); the CI-only guard is satisfied"
     );
   });
 
-  it("opens dream PRs as the MGR GitHub App, not github.token or claude[bot]", () => {
+  it("keeps Claude read-only and publishes dream PRs as the MGR GitHub App", () => {
     expect(dreaming).toMatch(
       /^ {8}uses: actions\/create-github-app-token@v2(?:\s+#.*)?\s*$/m
     );
@@ -206,25 +200,13 @@ describe("production-readiness workflow contract", () => {
       "anthropics/claude-code-action@v1",
       "github_token"
     );
-    const botId = readActionField(
-      dreaming,
-      "anthropics/claude-code-action@v1",
-      "bot_id"
-    );
-    const botName = readActionField(
-      dreaming,
-      "anthropics/claude-code-action@v1",
-      "bot_name"
-    );
 
-    expect({ githubToken, botId, botName }).toEqual({
-      githubToken: "${{ steps.mgr-app.outputs.token }}",
-      botId: "${{ steps.mgr-bot.outputs.id }}",
-      botName: "${{ steps.mgr-bot.outputs.login }}",
-    });
+    expect(githubToken).toBe("${{ github.token }}");
+    expect(dreaming).not.toContain("bot_id:");
+    expect(dreaming).not.toContain("bot_name:");
     expect(dreaming).toContain('git config user.name "$login"');
     expect(dreaming).toContain(
-      'git config user.email "${id}+${login}@users.noreply.github.com"'
+      'git config user.email "$(gh api "users/${login}" --jq .id)+${login}@users.noreply.github.com"'
     );
     expect(dreaming).not.toContain("dreaming-bot");
     expect(dreaming).toContain(

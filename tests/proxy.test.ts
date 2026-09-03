@@ -16,7 +16,7 @@ type SsrOptions = {
 
 vi.mock("@supabase/ssr", () => ({ createServerClient }));
 
-import { proxy } from "@/proxy";
+import { config, proxy } from "@/proxy";
 
 beforeEach(() => {
   createServerClient.mockReset();
@@ -38,6 +38,10 @@ beforeEach(() => {
 });
 
 describe("Supabase proxy refresh", () => {
+  it("does not refresh sessions for public HTML guides", () => {
+    expect(new RegExp(config.matcher[0]).test("/docs/user-guide.html")).toBe(false);
+  });
+
   it("forwards refreshed cookies through one current request override", async () => {
     const response = await proxy(
       new NextRequest("http://localhost:3000/inventory", {

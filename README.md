@@ -8,7 +8,7 @@ invitations, built on Next.js (App Router, TypeScript) and Supabase
 (orders, shipments, invoicing, customer portal). QBO integration and AI
 chat are Slice 1C.
 
-- Documentation master: [`docs/user-guide.html`](docs/user-guide.html) (links separate staff and customer-portal guides)
+- Documentation master: [`public/docs/user-guide.html`](public/docs/user-guide.html) (served at `/docs/user-guide.html`; links separate staff and customer-portal guides)
 - Spec: `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md`
 - Plan: `.agents/superpowers/plans/2026-08-30-slice1a-foundation.md`
 - Schema: `.agents/superpowers/specs/2026-08-31-mgr-schema-design.md` (tables) and `2026-08-31-mgr-schema-decisions.md` (why)
@@ -232,7 +232,7 @@ creation. Mutations return `{ order_id }` unless noted.
 | `invite_customer_user` | admin, sales | Not available in this release: validates then fails closed with a `CommandError` |
 | `list_team_members` | admin, sales, warehouse | Staff memberships (user id + role) |
 
-### Today & chat
+### Chat notifications & Today
 
 | Command | Roles | Purpose |
 | --- | --- | --- |
@@ -287,7 +287,7 @@ command-registry correctness are enforced here, not just locally.
 After a pull request merges—or when manually dispatched on `main`—
 `.github/workflows/documentation-agent.yml` audits every current user-facing
 route, not only the triggering change, and updates the
-self-contained staff and portal field manuals linked from `docs/user-guide.html` when behavior has drifted. The
+self-contained staff and portal field manuals linked from `public/docs/user-guide.html` when behavior has drifted. The
 Claude job has read-only GitHub permissions and may edit only those three HTML files. A separate
 deterministic job rejects wider or active-content changes, then maintains one
 reviewable `documentation/user-guide` pull request; the bot never commits directly

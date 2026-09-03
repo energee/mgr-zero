@@ -95,7 +95,7 @@ jobs:
                 ]
               }
             }
-          claude_args: '--allowedTools "Read,Grep,Glob,Edit(docs/user-guide.html),Write(docs/user-guide.html),Edit(docs/staff-guide.html),Write(docs/staff-guide.html),Edit(docs/portal-guide.html),Write(docs/portal-guide.html)"'
+          claude_args: '--allowedTools "Read,Grep,Glob,Edit(public/docs/user-guide.html),Write(public/docs/user-guide.html),Edit(public/docs/staff-guide.html),Write(public/docs/staff-guide.html),Edit(public/docs/portal-guide.html),Write(public/docs/portal-guide.html)"'
 
       - name: Validate the generated guide
         id: validate
@@ -110,14 +110,14 @@ jobs:
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          unexpected=$(printf '%s\n' "$changed" | grep -Ev '^docs/(user|staff|portal)-guide\.html$' || true)
+          unexpected=$(printf '%s\n' "$changed" | grep -Ev '^public/docs/(user|staff|portal)-guide\.html$' || true)
           if [ -n "$unexpected" ]; then
             echo "Documentation agent changed files outside the guide suite:"
             echo "$changed"
             exit 1
           fi
           git diff --cached --check
-          for guide in docs/user-guide.html docs/staff-guide.html docs/portal-guide.html; do
+          for guide in public/docs/user-guide.html public/docs/staff-guide.html public/docs/portal-guide.html; do
             grep -qi '^<!doctype html>' "$guide"
             grep -q '<main' "$guide"
             grep -q '<nav' "$guide"
@@ -126,8 +126,8 @@ jobs:
               exit 1
             fi
           done
-          grep -q 'staff-guide.html' docs/user-guide.html
-          grep -q 'portal-guide.html' docs/user-guide.html
+          grep -q 'staff-guide.html' public/docs/user-guide.html
+          grep -q 'portal-guide.html' public/docs/user-guide.html
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
       - name: Save the updated guide
@@ -136,9 +136,9 @@ jobs:
         with:
           name: customer-guide
           path: |
-            docs/user-guide.html
-            docs/staff-guide.html
-            docs/portal-guide.html
+            public/docs/user-guide.html
+            public/docs/staff-guide.html
+            public/docs/portal-guide.html
           if-no-files-found: error
 
   publish:
@@ -169,7 +169,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: customer-guide
-          path: docs
+          path: public/docs
 
       - name: Publish documentation pull request
         env:
@@ -182,7 +182,7 @@ jobs:
           git config user.name "$login"
           git config user.email "$(gh api "users/${login}" --jq .id)+${login}@users.noreply.github.com"
           git checkout -B documentation/user-guide
-          git add docs/user-guide.html docs/staff-guide.html docs/portal-guide.html
+          git add public/docs/user-guide.html public/docs/staff-guide.html public/docs/portal-guide.html
           if [ "$EVENT_NAME" = "pull_request" ]; then
             doc_source="PR #$PR_NUMBER"
           else
