@@ -36,6 +36,8 @@ below just in time — don't preload everything.
 
 ## Operating loop
 
+0. Orient first: follow `.agents/skills/orient/SKILL.md` (`/orient` in Claude
+   Code) — report worktree, branch, status, PR base, then wait for confirmation.
 1. `bunx supabase start` must be running; tests hit the real database.
 2. Find the owner of the concept in `.agents/ARCHITECTURE.md` and change it there.
 3. TDD: new behavior starts with a failing vitest — write it, watch it fail,
@@ -49,8 +51,11 @@ below just in time — don't preload everything.
    `close` the same session when done. `<name>` is the branch with `/` → `-`;
    the skill has the exact incantation and why the session matters.
 5. `git diff` before committing (a stray NUL byte once made a file binary).
-6. Update `.agents/PROGRESS.md`; update `.agents/MEMORY.md` only if a durable
-   decision changed.
+6. Do not edit `.agents/PROGRESS.md`, `.agents/MEMORY.md`, or `.agents/DRIFT.md`
+   in a feature PR — every PR inserting at the top of the same log conflicts
+   with every other. Put the one-line progress note (and any durable decision)
+   in the PR description; the dreaming workflow reads merged PRs and writes the
+   logs serially on its own `dreaming/main` PR.
 
 CI (`.github/workflows/ci.yml`) runs the same checks plus `next build` on every
 push; it is the merge gate.
@@ -64,10 +69,14 @@ Ask first: provisioning hosted Supabase or Vercel, any deploy, adding a
 dependency, adding a second migration file, anything that would `DELETE`
 production data (there is none yet — keep it that way by asking).
 
+Do not move, rename, or delete files outside the explicit scope of the
+request. If a restructure seems necessary, list the proposed moves and wait for
+approval before touching anything.
+
 ## Working files
 
-- `.agents/MEMORY.md` — durable facts and decisions. Update when a decision changes.
-- `.agents/PROGRESS.md` — done / in flight / next. Update at the end of each session.
+- `.agents/MEMORY.md` — durable facts and decisions. Written by the dreaming PR from merged PR descriptions; edit directly only in a dedicated docs PR.
+- `.agents/PROGRESS.md` — done / in flight / next. Same rule: state the change in the PR description, the dreaming PR writes it here.
 - `.agents/DRIFT.md` — unresolved contradictions in artifacts the dreaming agent cannot edit.
 - `.agents/superpowers/{specs,plans}` — design specs and plans; `docs/superpowers` is a symlink to it (the superpowers skills write there).
 - `.agents/agents/` — subagent definitions; `.claude/agents` is a symlink to it (Claude Code only reads `.claude/agents`).
