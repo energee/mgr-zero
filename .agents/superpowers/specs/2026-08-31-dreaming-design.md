@@ -1,7 +1,7 @@
 # Dreaming — CI-maintained agent artifacts
 
 Date: 2026-08-31
-Status: shipped 2026-08-31; live run pending
+Status: shipped 2026-08-31; deterministic publication 2026-09-02
 Branch: agent-prompting
 
 ## What and why
@@ -21,22 +21,24 @@ substitutes repo-visible signals (see Signal).
 
 | Decision | Choice |
 | --- | --- |
-| Trigger | Every push to `main`, a daily schedule, plus `workflow_dispatch` |
-| Loop guard | `paths-ignore` on the doc paths + a `dreaming` concurrency group — exact values live in `.github/workflows/dreaming.yml`, which is authoritative and self-documents the cancel-in-progress rationale |
-| Write path | One long-lived PR from branch `dreaming/main` — while that PR is open each dream *appends* a commit, so unreviewed dreams and reviewer corrections survive; only a fresh branch (no open PR) is force-pushed. Never direct commits to main |
-| Editable | The living agent docs — the authoritative list lives in `.agents/agents/dreaming.md` (mirrored by the workflow's `paths-ignore`) |
-| Read-only (flag drift only) | Everything else — specs, wireframes, code, workflows (see `dreaming.md`) |
+| Trigger | Daily schedule plus `workflow_dispatch`; consolidation is batched instead of paid once per merge |
+| Loop guard | `refs/dreaming/last-checked` skips quiet scheduled runs; the `dreaming` concurrency group serializes runs |
+| Write path | Claude only edits the bounded documents. A separate deterministic job validates, commits, pushes, and creates/updates the `dreaming/main` PR; it refuses to publish or advance the marker if PR state changed during curation |
+| Editable | The living agent docs plus `.agents/DRIFT.md`; the authoritative list lives in `.agents/agents/dreaming.md` |
+| Read-only (flag drift only) | Everything else — unresolved drift is persisted in `.agents/DRIFT.md` |
 | Signal | Git history + merged PR diffs/comments since last dream, plus committed `.remember/` digests |
 
 ## Components
 
 1. `.github/workflows/dreaming.yml` — reuses `anthropics/claude-code-action@v1`
-   with the existing `CLAUDE_CODE_OAUTH_TOKEN`. Needs `contents: write` and
-   `pull-requests: write` (unlike the read-only review workflows).
+   with the existing `CLAUDE_CODE_OAUTH_TOKEN`. The model job has read-only
+   GitHub permissions; only the deterministic publish job can write.
 2. `.agents/agents/dreaming.md` — the committed dream prompt (the contract
    below). The workflow passes it as the prompt; changing dream behavior is a
    normal reviewed edit to this file.
-3. `.gitignore` change — un-ignore `.remember/today-*.md` digests so dated
+3. `.agents/DRIFT.md` — durable unresolved findings in artifacts the model may
+   inspect but not edit.
+4. `.gitignore` change — un-ignore `.remember/today-*.md` digests so dated
    session summaries ride along with normal commits and become dream input
    (rolling scratch like `now.md` stays local).
 
@@ -50,9 +52,8 @@ contract:
 - Transcript signal doesn't exist in CI, so the inputs are repo-visible
   substitutes: the git/PR window since the last dream plus committed
   `.remember/today-*.md` digests.
-- The editable set includes `dreaming.md` itself, so a dream may propose
-  changes to its own contract; this is deliberate and contained by human
-  review of the dream PR.
+- The editable set includes `dreaming.md` itself, but the workflow still
+  enforces the file boundary and owns publication.
 
 ## Testing
 
@@ -66,12 +67,11 @@ review of the doc-curation PR is not useful.
 
 ## MGR GitHub App identity
 
-Dream commits and PRs are the MGR GitHub App (`mgr[bot]`), not
-`claude[bot]` and not `github-actions[bot]`. The workflow mints an
-installation token (`actions/create-github-app-token@v2`) and passes it as
-`github_token` to `anthropics/claude-code-action` — without that input the
-action exchanges OIDC for Claude's app and every dream PR is authored by
-`claude[bot]`.
+Dream commits and PRs are the MGR GitHub App (`mgr[bot]`), not `claude[bot]`
+and not `github-actions[bot]`. Claude runs with the read-only workflow token
+and cannot publish. After its artifact passes the file-boundary check, the
+separate publish job mints an installation token with
+`actions/create-github-app-token@v2` and performs every git/PR write.
 
 Create the app once (GitHub → Settings → Developer settings → GitHub Apps →
 New GitHub App):

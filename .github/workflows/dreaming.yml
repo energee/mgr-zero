@@ -1,68 +1,127 @@
 name: Dreaming
 
 on:
-  push:
-    branches: [main]
-    # claude-code-action does not accept the `push` event, so a push only
-    # runs the `redispatch` job below, which re-fires this workflow via
-    # workflow_dispatch (GITHUB_TOKEN-created dispatches are exempt from
-    # GitHub's no-recursive-triggers rule; pushes are not).
-    # Loop guard: ignore only the dream-editable files (the list in
-    # .agents/agents/dreaming.md), so a merged dream PR never retriggers a
-    # dream. Specs, plans, and .remember digests are dream *signal* and must
-    # still trigger.
-    paths-ignore:
-      - '.agents/MEMORY.md'
-      - '.agents/PROGRESS.md'
-      - '.agents/ARCHITECTURE.md'
-      - '.agents/agents/**'
-      - 'AGENTS.md'
   workflow_dispatch:
   schedule:
-    - cron: '0 9 * * *' # daily dream at 09:00 UTC (~4-5am ET); no-ops when there's nothing to curate
+    - cron: '0 9 * * *' # daily at 09:00 UTC; manual dispatch is the recovery path
 
-# cancel-in-progress stays false: the publish sequence (force-push then PR
-# create/edit) is not atomic, and cancelling between those steps strands
-# pushed dream commits with a stale or missing PR. GitHub still collapses
-# queued runs in this group to the newest, so the latest push always dreams.
 concurrency:
   group: dreaming
   cancel-in-progress: false
 
 jobs:
-  redispatch:
-    # Turns a main push into a workflow_dispatch of this same file; see the
-    # comment on `on.push`. Exits fast so the concurrency group frees up for
-    # the dispatched run.
-    if: github.event_name == 'push'
+  maintain:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
-      actions: write
+      contents: read
+      pull-requests: read
+      issues: read
+      id-token: write
+    outputs:
+      new: ${{ steps.window.outputs.new }}
+      changed: ${{ steps.validate.outputs.changed }}
+      head: ${{ steps.window.outputs.head }}
+      open_pr: ${{ steps.prepare.outputs.open_pr }}
     steps:
-      - run: gh workflow run dreaming.yml --ref main --repo "$GITHUB_REPOSITORY"
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Find the accepted and checked windows
+        id: window
+        run: |
+          git fetch origin '+refs/dreaming/last-checked:refs/dreaming/last-checked' || true
+          checked=$(git rev-parse -q --verify refs/dreaming/last-checked || true)
+          base=$(git log origin/main --grep='^dream:' --format=%H -1)
+          if [ -z "$base" ]; then
+            base=$(git rev-list --max-count=26 origin/main | tail -1)
+          fi
+          head=$(git rev-parse origin/main)
+          {
+            echo "base=$base"
+            echo "head=$head"
+          } >> "$GITHUB_OUTPUT"
+          if [ -n "$checked" ] && [ "$checked" = "$head" ]; then
+            echo "Nothing new since last dream check $checked — skipping."
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Prepare cumulative dream documents
+        if: steps.window.outputs.new == 'true'
+        id: prepare
         env:
           GH_TOKEN: ${{ github.token }}
+        run: |
+          open_pr=$(gh pr list --base main --head dreaming/main --state open --json number --jq '.[0].number // empty')
+          echo "open_pr=$open_pr" >> "$GITHUB_OUTPUT"
+          if [ -n "$open_pr" ]; then
+            git checkout -B dreaming/main origin/dreaming/main
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git merge --no-edit origin/main
+          fi
 
-  dream:
-    # Never on the raw push event (unsupported by the action — redispatch
-    # handles it). Guard workflow_dispatch on a non-main ref: a dream over a
-    # feature branch would force-push dreaming/main and open a PR to main
-    # with unmerged branch content.
-    if: github.event_name != 'push' && github.ref == 'refs/heads/main'
+      - name: Run dream
+        if: steps.window.outputs.new == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: '${{ github.token }}'
+          allowed_bots: 'github-actions'
+          prompt: >-
+            You are running inside GitHub Actions (GITHUB_ACTIONS=true); the CI-only guard is satisfied.
+            The last accepted dream on main is ${{ steps.window.outputs.base }} and current main HEAD is
+            ${{ steps.window.outputs.head }}. Read .agents/agents/dreaming.md and follow it exactly.
+          claude_args: '--allowedTools "Read,Glob,Grep,Edit(.agents/MEMORY.md),Edit(.agents/PROGRESS.md),Edit(.agents/ARCHITECTURE.md),Edit(.agents/DRIFT.md),Edit(.agents/agents/*.md),Edit(AGENTS.md),Write(.agents/MEMORY.md),Write(.agents/PROGRESS.md),Write(.agents/ARCHITECTURE.md),Write(.agents/DRIFT.md),Write(.agents/agents/*.md),Write(AGENTS.md),Bash(git status:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(gh pr list:*),Bash(gh pr view:*)"'
+
+      - name: Validate dream changes
+        if: steps.window.outputs.new == 'true'
+        id: validate
+        run: |
+          git add -A
+          changed=$(git diff --cached --name-only)
+          if [ -z "$changed" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          while IFS= read -r path; do
+            case "$path" in
+              .agents/MEMORY.md|.agents/PROGRESS.md|.agents/ARCHITECTURE.md|.agents/DRIFT.md|.agents/agents/*.md|AGENTS.md) ;;
+              *) echo "Dream changed forbidden path: $path"; exit 1 ;;
+            esac
+          done <<EOF
+          $changed
+          EOF
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Save dream documents
+        if: steps.validate.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dream-documents
+          include-hidden-files: true
+          if-no-files-found: error
+          path: |
+            .agents/MEMORY.md
+            .agents/PROGRESS.md
+            .agents/ARCHITECTURE.md
+            .agents/DRIFT.md
+            .agents/agents/*.md
+            AGENTS.md
+
+  publish:
+    needs: maintain
+    if: needs.maintain.outputs.new == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
-      issues: read # gh pr list reads PR data through the issues API
-      id-token: write
+      issues: read
     steps:
-      # Mint a token for the MGR GitHub App so dream commits and PRs show as
-      # mgr[bot] with the app icon (raster of app/icon.svg at
-      # docs/brand/mgr-github-app-icon.png), and so the push can trigger CI —
-      # github.token pushes do not. Setup: create the "MGR" GitHub App
-      # (Contents R/W, Pull requests R/W, Issues R), install it on this repo,
-      # then set vars.MGR_APP_ID and secrets.MGR_APP_PRIVATE_KEY.
-      # Spec: 2026-08-31-dreaming-design.md.
       - name: Mint MGR GitHub App token
         id: mgr-app
         uses: actions/create-github-app-token@v2
@@ -73,82 +132,73 @@ jobs:
           permission-pull-requests: write
           permission-issues: read
 
-      - name: Checkout repository
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
         with:
-          fetch-depth: 0 # the dream reads history since the last dream
+          ref: main
+          fetch-depth: 0
           token: ${{ steps.mgr-app.outputs.token }}
 
-      - name: Set git identity for the dream
-        id: mgr-bot
+      - name: Prepare publication branch
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.mgr-app.outputs.token }}
+          EXPECTED_PR: ${{ needs.maintain.outputs.open_pr }}
+          APP_SLUG: ${{ steps.mgr-app.outputs.app-slug }}
         run: |
-          slug="${{ steps.mgr-app.outputs.app-slug }}"
-          login="${slug}[bot]"
-          id="$(gh api "users/${login}" --jq .id)"
+          current_pr=$(gh pr list --base main --head dreaming/main --state open --json number --jq '.[0].number // empty')
+          if [ "$current_pr" != "$EXPECTED_PR" ]; then
+            echo "Dream PR changed during curation; retry without advancing the marker."
+            exit 1
+          fi
+          login="${APP_SLUG}[bot]"
           git config user.name "$login"
-          git config user.email "${id}+${login}@users.noreply.github.com"
-          {
-            echo "login=$login"
-            echo "id=$id"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Check for new commits since the last dream
-        id: window
-        # Skip the paid agent run (daily cron, redundant queued runs) when
-        # nothing landed since the last dream *check*. The marker ref advances
-        # after every agent run — including a no-op dream, which produces no
-        # commit — so a quiet repo can't re-run the agent daily forever. The
-        # `dream:` commit grep (subject convention in .agents/agents/dreaming.md)
-        # is only the bootstrap fallback before the marker first exists.
-        run: |
-          git fetch origin '+refs/dreaming/last-checked:refs/dreaming/last-checked' || true
-          last=$(git rev-parse -q --verify refs/dreaming/last-checked || git log --grep='^dream:' --format=%H -1)
-          echo "head=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          if [ -n "$last" ] && [ "$(git rev-list --count "$last"..HEAD)" = "0" ]; then
-            echo "Nothing new since last dream check $last — skipping."
-            echo "new=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "new=true" >> "$GITHUB_OUTPUT"
+          git config user.email "$(gh api "users/${login}" --jq .id)+${login}@users.noreply.github.com"
+          if [ "${{ needs.maintain.outputs.changed }}" = "true" ]; then
+            if [ -n "$EXPECTED_PR" ]; then
+              git checkout -B dreaming/main origin/dreaming/main
+              git merge --no-edit origin/main
+            else
+              git checkout -B dreaming/main origin/main
+            fi
           fi
 
-      - name: Run dream
-        if: steps.window.outputs.new == 'true'
-        uses: anthropics/claude-code-action@v1
+      - name: Restore dream documents
+        if: needs.maintain.outputs.changed == 'true'
+        uses: actions/download-artifact@v4
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          github_token: '${{ steps.mgr-app.outputs.token }}'
-          bot_id: '${{ steps.mgr-bot.outputs.id }}'
-          bot_name: '${{ steps.mgr-bot.outputs.login }}'
-          # The redispatch job (and the daily cron) start this run as the
-          # github-actions bot; the action refuses non-human actors unless
-          # they are listed here.
-          allowed_bots: 'github-actions'
-          # State the CI fact up front: the allowlist has no echo/env/printenv,
-          # so the agent cannot verify GITHUB_ACTIONS itself and would stop.
-          prompt: 'You are running inside GitHub Actions (GITHUB_ACTIONS=true); the CI-only guard is satisfied — do not run shell commands to check it. Read .agents/agents/dreaming.md and follow it exactly.'
-          # The push entries below are exact-match on purpose (not `git push:*`),
-          # so an injected dream cannot push to any branch but dreaming/main —
-          # in particular, never to main — and gh is limited to PR list/create/
-          # edit/view, so a dream can never merge a PR. The run is unattended,
-          # so the common spellings of the same dreaming/main push are all
-          # listed; any other target is still denied. Edit/Write are scoped to
-          # the editable files in .agents/agents/dreaming.md so the docs-only
-          # contract is tool-enforced, not just prompt text — an injected dream
-          # cannot touch code, migrations, or .git/** (hooks, config).
-          claude_args: '--allowedTools "Read,Glob,Grep,Edit(.agents/MEMORY.md),Edit(.agents/PROGRESS.md),Edit(.agents/ARCHITECTURE.md),Edit(.agents/agents/*.md),Edit(AGENTS.md),Write(.agents/MEMORY.md),Write(.agents/PROGRESS.md),Write(.agents/ARCHITECTURE.md),Write(.agents/agents/*.md),Write(AGENTS.md),Bash(git status:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git add:*),Bash(git commit:*),Bash(git checkout:*),Bash(git push -f origin dreaming/main),Bash(git push --force origin dreaming/main),Bash(git push --force-with-lease origin dreaming/main),Bash(git push -u origin dreaming/main),Bash(git push origin dreaming/main),Bash(gh pr list:*),Bash(gh pr create:*),Bash(gh pr edit:*),Bash(gh pr view:*)"'
+          name: dream-documents
+          path: .
+
+      - name: Publish dream pull request
+        if: needs.maintain.outputs.changed == 'true'
         env:
-          # Installation token for the MGR GitHub App — gh pr create/edit and
-          # git push then run as mgr[bot], and unlike github.token they do
-          # trigger CI on the dream PR.
           GH_TOKEN: ${{ steps.mgr-app.outputs.token }}
+          EXPECTED_PR: ${{ needs.maintain.outputs.open_pr }}
+        run: |
+          git add -A
+          changed=$(git diff --cached --name-only)
+          if [ -z "$changed" ]; then
+            echo "Nothing to dream about"
+            exit 0
+          fi
+          while IFS= read -r path; do
+            case "$path" in
+              .agents/MEMORY.md|.agents/PROGRESS.md|.agents/ARCHITECTURE.md|.agents/DRIFT.md|.agents/agents/*.md|AGENTS.md) ;;
+              *) echo "Dream changed forbidden path: $path"; exit 1 ;;
+            esac
+          done <<EOF
+          $changed
+          EOF
+          git commit -m "dream: agent doc maintenance"
+          body="Curates the living agent documents from merged evidence. Outstanding read-only drift is tracked in .agents/DRIFT.md; the diff is the authoritative change summary."
+          if [ -n "$EXPECTED_PR" ]; then
+            [ "$(gh pr view "$EXPECTED_PR" --json state --jq .state)" = "OPEN" ] || exit 1
+            git push origin dreaming/main
+            [ "$(gh pr view "$EXPECTED_PR" --json state --jq .state)" = "OPEN" ] || exit 1
+            gh pr edit "$EXPECTED_PR" --title "dream: agent doc maintenance" --body "$body"
+          else
+            git push -f origin dreaming/main
+            gh pr create --base main --head dreaming/main --title "dream: agent doc maintenance" --body "$body"
+          fi
 
       - name: Advance the last-checked marker
-        if: steps.window.outputs.new == 'true'
-        # Runs after every successful agent run, including no-op dreams that
-        # leave no `dream:` commit — without it the window gate above never
-        # re-arms and the daily cron re-runs the paid agent forever. Uses the
-        # main HEAD captured before the dream (the agent may have checked out
-        # dreaming/main). Pushing a non-branch ref triggers no workflows.
-        run: git push -f origin '${{ steps.window.outputs.head }}:refs/dreaming/last-checked'
+        run: git push -f origin '${{ needs.maintain.outputs.head }}:refs/dreaming/last-checked'
