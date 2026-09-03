@@ -118,9 +118,9 @@ export const E = {
   tape: (arr: [React.ReactNode, React.ReactNode?][]) => (
     <ol className="ml-1 flex flex-col gap-1 border-l-2 pl-3 font-mono text-xs text-muted-foreground">
       {arr.map(([a, b], i) => (
-        <li key={i} className="flex justify-between gap-2">
+        <li key={i} className="flex justify-between gap-2 [overflow-wrap:anywhere]">
           <span className="text-foreground">{a}</span>
-          <span className="[overflow-wrap:anywhere]">{b ?? ""}</span>
+          <span>{b ?? ""}</span>
         </li>
       ))}
     </ol>
