@@ -94,7 +94,7 @@ export const E = {
     );
   },
   btns: (arr: (React.ReactNode | [React.ReactNode, BtnKind])[], c: "c2" | "c3" = "c2") => (
-    <div className={cn("grid gap-2", c === "c3" ? "grid-cols-3" : "grid-cols-2")}>
+    <div className={cn("grid gap-2 md:flex md:flex-wrap md:justify-end", c === "c3" ? "grid-cols-3" : "grid-cols-2")}>
       {arr.map((v, i) => (
         <React.Fragment key={i}>{Array.isArray(v) ? E.btn(v[0], v[1]) : E.btn(v)}</React.Fragment>
       ))}
@@ -199,7 +199,7 @@ export const E = {
     </div>
   ),
   tiles: (arr: [React.ReactNode, React.ReactNode, React.ReactNode?, (0 | 1)?, number?][], c: "c2" | "c3" = "c3") => (
-    <ItemGroup className={cn("grid gap-2", c === "c2" ? "grid-cols-2" : "grid-cols-3")}>
+    <ItemGroup className={cn("grid gap-2", c === "c2" ? "grid-cols-2" : "grid-cols-2 md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))]")}>
       {arr.map(([n, s, g, w, f], i) => (
         <Item key={i} variant="outline" size="sm" className="flex-col items-start gap-0.5" asChild>
           <button type="button"><TileContent {...{ n, s, g, w, f }} /></button>

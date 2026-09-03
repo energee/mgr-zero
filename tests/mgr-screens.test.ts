@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { SCREENS, type Screen } from "../components/mgr/screens";
 import { E, splitPinned } from "../components/mgr/e";
 import { VenueFrame } from "../components/mgr/venue";
+import { AppShell } from "../components/mgr/app-shell";
 
 describe("SCREENS", () => {
   it("ports the step-1 frames with names, jobs and IO", () => {
@@ -412,6 +413,21 @@ describe("SCREENS", () => {
       expect(html, name).toMatch(/required/);
       expect(html, `${name}: no reason chips`).not.toMatch(/>damaged</);
     }
+  });
+
+  it("uses the desktop width instead of a centred phone column (#98)", () => {
+    // Issue 98: the shell was capped at a phone column, buttons kept a fixed
+    // grid and tiles were locked to three, so desktop drew wide gutters.
+    const shell = renderToStaticMarkup(
+      createElement(AppShell, { brand: "Demo", items: [], active: "Today", children: "body" }),
+    );
+    expect(shell).toContain("md:max-w-5xl");
+    expect(shell).not.toContain("md:max-w-2xl");
+    const btns = renderToStaticMarkup(E.btns([["Save", "p"], ["Cancel", "g"], ["Third", "g"]], "c3"));
+    expect(btns).toContain("md:flex");
+    expect(btns).not.toContain("md:grid-cols-3");
+    const tiles = renderToStaticMarkup(E.tiles([["FV1", "Pils"], ["FV2", "Hazy"]]));
+    expect(tiles).toContain("auto-fill");
   });
 
   it("gives the named screens one filled primary each", () => {

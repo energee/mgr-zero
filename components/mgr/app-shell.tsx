@@ -80,7 +80,7 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
           {headerRight && <span className="flex shrink-0 items-center gap-1">{headerRight}</span>}
         </header>
         {/* SidebarInset is already the <main> landmark; this is the content column. */}
-        <div className="flex min-w-0 flex-1 flex-col gap-3 p-4 md:max-w-2xl md:px-8 md:py-6">{children}</div>
+        <div className="flex min-w-0 flex-1 flex-col gap-3 p-4 md:max-w-5xl md:px-8 md:py-6">{children}</div>
         {composer && <div className="border-t px-3 py-2">{composer}</div>}
         <TabBar items={items} active={current} className="md:hidden" />
       </SidebarInset>
