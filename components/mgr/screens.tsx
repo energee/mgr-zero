@@ -934,16 +934,7 @@ export const SCREENS: Screen[] = [
       {E.inp("Search customers")}
       {E.row("Ridgeline Tap Room", "retailer · PA · 2 portal users", E.act("Open"))}
       {E.row("Al’s Bar", "retailer · OH · brewery remits", E.act("Open"), "w")}
-      {E.chips(["distributor", "retailer", "brewery", "other"], 1)}
-      {E.fld("License no. · terms", "PA R-55821 · net30")}
-      {E.row("Price list", "", E.act("Wholesale"))}
-      {E.btn("Save customer")}
-      {E.row("Ship-tos", "Main · Dock", E.act("Add"))}
-      {E.row("Main", "114 Bridge St · Phoenixville, PA", E.act("Edit"))}
-      {E.nav("Customer keg balance", "38 out · $1,140 deposits held")}
-      {E.btn("Add ship-to", "g")}
-      {E.note("Sending an invite emails the recipient and cannot be recalled.")}
-      {E.btn("Invite portal user", "irr")}
+      {E.btn("Add customer")}
     </>),
   },
   {
@@ -964,9 +955,27 @@ export const SCREENS: Screen[] = [
       {E.pick("Terms", "Net 30")}
       {E.pick("Price list", "Wholesale · standard")}
       {E.nav("Ship-tos", "Main · Dock")}
+      {E.row("Portal users", "2 active", E.act("Invite"))}
       {E.nav("Customer keg balance", "38 out · $1,140 deposits held")}
       {E.nav("Orders", "3 open · 42 total")}
       {E.btn("Save customer")}
+    </>),
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "More",
+    surface: "sheet",
+    name: "Invite portal user",
+    job: "Invite one buyer to a customer account",
+    reads: "get_customer [design]",
+    writes: "invite_customer_user [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI]",
+    states: [["ready", "email is valid"], ["sent", "recipient receives a sign-in link"], ["existing member", "show the existing access instead", 1]],
+    body: (<>
+      {E.inp("Email · buyer@ridgeline.example")}
+      {E.chips(["buyer", "account admin"])}
+      {E.note("Sending an invite emails the recipient and cannot be recalled.")}
+      {E.gated("Send invite", "isn’t available yet: customer membership hardening comes first")}
     </>),
   },
   {
@@ -1106,14 +1115,44 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("More", "Invoices")}
       {E.row("QuickBooks", "connected · company 9341", "healthy", "ok", QuickBooksMark)}
-      {E.row(`${INV.no} · Ridgeline`, `due ${INV.dueShort} · pushed`, INV.total)}
-      {E.row("INV-0197 · Al’s Bar", "push failed · item unmapped", "$540", "w")}
-      {E.row("INV-0190 · Ridgeline", "paid 8/29 from QuickBooks Online", "$980", "ok")}
-      {E.row("CM-0012 · Teresa’s", "credit memo · pushed", "−$180")}
-      {E.ttl("INV-0197 · fix and push")}
-      {E.row("SKU · Pils case", "QuickBooks Online candidate: Pils 16 oz", E.act("Select"))}
-      {E.btn("Save item mapping")}
-      {E.btn("Push invoice to QuickBooks Online", "irr")}
+      {E.row(`${INV.no} · Ridgeline`, `due ${INV.dueShort} · pushed · ${INV.total}`, E.act("Open"))}
+      {E.row("INV-0197 · Al’s Bar", "push failed · item unmapped · $540", E.act("Review"), "w")}
+      {E.row("INV-0190 · Ridgeline", "paid 8/29 from QuickBooks Online · $980", E.act("Open"), "ok")}
+      {E.row("CM-0012 · Teresa’s", "credit memo · pushed · −$180", E.act("Open"))}
+    </>),
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "More",
+    name: "Invoice",
+    job: "Review one invoice, resolve its mappings and push it",
+    reads: "get_invoice · get_qbo_connection · get_qbo_mapping_candidates [design]",
+    writes: "push_invoice_to_qbo [design]",
+    states: [["unmapped", "push stays unavailable", 1], ["ready", "every customer and item is mapped"], ["pushed", "QuickBooks owns later accounting edits"]],
+    body: (<>
+      {E.back("Invoices", "INV-0197")}
+      {E.row("Al’s Bar", "due 10/03 · 3 lines", "$540")}
+      {E.row("Customer mapping", "Al’s Bar · customer 227", E.act("Fix"), "ok")}
+      {E.row("Pils · case", "QuickBooks item is missing", E.act("Fix"), "w")}
+      {E.info("Push becomes available after every customer and item has a QuickBooks match.")}
+      {E.btn("Push invoice to QuickBooks Online", "irr disabled")}
+    </>),
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "More",
+    surface: "sheet",
+    name: "Fix mapping",
+    job: "Choose the QuickBooks record for one invoice customer or item",
+    reads: "get_qbo_mapping_candidates [design]",
+    writes: "set_qbo_customer_mapping · set_qbo_item_mapping [design]",
+    states: [["candidate selected", "save enables invoice push"], ["no match", "create it in QuickBooks first", 1]],
+    body: (<>
+      {E.row("Pils 16 oz", "QuickBooks item 316 · active", E.act("Select"))}
+      {E.row("Pilsner case", "QuickBooks item 402 · active", E.act("Select"))}
+      {E.btn("Save mapping")}
     </>),
   },
   {
@@ -1130,10 +1169,26 @@ export const SCREENS: Screen[] = [
       {E.nav("Hazy IPA", "IPA · 6.8% · 3 SKUs")}
       {E.nav("Pils", "Lager · 4.9% · 2 SKUs")}
       {E.nav("Stout", "Stout · 7.2% · 1 SKU")}
-      {E.fld("Package BOM · Hazy case", "24 cans + 24 ends + 24 labels + tray")}
-      {E.btn("Replace selected SKU BOM")}
-      {E.fld("Wholesale · Hazy ½ bbl", "$150.00")}
-      {E.btn("Save price item")}
+      {E.btn("Add brand")}
+      {E.nav("Price lists", "3 tiers")}
+    </>),
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "More",
+    surface: "sheet",
+    name: "Package BOM",
+    job: "Replace the packaging materials consumed by one SKU",
+    reads: "get_sku · list_materials [design]",
+    writes: "replace_sku_bom [design; one RPC replaces the selected SKU full BOM]",
+    states: [["complete", "every material has a quantity"], ["empty", "the SKU consumes no tracked packaging"]],
+    body: (<>
+      {E.pick("SKU", "Hazy IPA · case · 24×16 oz")}
+      {E.row("16 oz can", "quantity 24", E.act("Edit"))}
+      {E.row("Can end", "quantity 24", E.act("Edit"))}
+      {E.row("Case tray", "quantity 1", E.act("Edit"))}
+      {E.btn("Replace BOM")}
     </>),
   },
   {
@@ -1153,6 +1208,25 @@ export const SCREENS: Screen[] = [
       {E.chips(["beer"], 0)}
       {E.btn("Save brand")}
       {E.nav("SKU list", "3 active packages")}
+    </>),
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "More",
+    surface: "sheet",
+    name: "SKU",
+    job: "Create or edit one sellable package under a brand",
+    reads: "get_sku",
+    writes: "create_sku · update_sku",
+    states: [["active", "available to price and sell"], ["inactive", "history remains", 1]],
+    body: (<>
+      {E.inp("SKU name · ½ bbl keg")}
+      {E.chips(["keg", "case", "each"])}
+      {E.inp("Units per case · 1")}
+      {E.inp("Barrels per unit · 0.50000000")}
+      {E.row("Package BOM", "Keg shell · quantity 1", E.act("Edit"))}
+      {E.btn("Save SKU")}
     </>),
   },
   {
@@ -1844,10 +1918,62 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Compliance months", "Registry")}
       {E.chips(["brands", "states", "licenses"])}
-      {E.row("Hazy IPA", "COLA approved · formula n/a", E.act("PA · OH"))}
-      {E.row("Stout", "COLA pending", E.act("PA"), "w")}
-      {E.row("Ohio", "supplier registered · expires 12/31", "we remit")}
+      {E.row("Hazy IPA", "COLA approved · formula n/a", E.act("Edit"))}
+      {E.row("Stout", "COLA pending", E.act("Edit"), "w")}
+      {E.row("Ohio", "supplier registered · expires 12/31", E.act("Edit"))}
+      {E.row("Pennsylvania brewery license", "expires 6/30/2027", E.act("Edit"))}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 6,
+    tab: "More",
+    surface: "sheet",
+    name: "Brand approval",
+    job: "Record one brand’s federal approval status",
+    reads: "get_compliance_registry [design]",
+    writes: "upsert_brand_approval [design]",
+    states: [["approved", "orders may proceed"], ["pending", "order confirmation warns", 1]],
+    body: (<>
+      {E.pick("Brand", "Stout")}
+      {E.inp("COLA number · pending")}
+      {E.inp("Formula number · not required")}
+      {E.btn("Save approval")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 6,
+    tab: "More",
+    surface: "sheet",
+    name: "State registration",
+    job: "Record permission to sell one brand in one state",
+    reads: "get_compliance_registry [design]",
+    writes: "upsert_state_registration [design]",
+    states: [["registered", "brand may ship to the state"], ["missing", "order confirmation warns", 1]],
+    body: (<>
+      {E.pick("Brand", "Hazy IPA")}
+      {E.pick("State", "Ohio")}
+      {E.inp("Registration number · OH-88214")}
+      {E.inp("Expires · 12/31/2026")}
       {E.btn("Save registration")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 6,
+    tab: "More",
+    surface: "sheet",
+    name: "License",
+    job: "Record one brewery state license",
+    reads: "get_compliance_registry [design]",
+    writes: "upsert_brewery_state_license [design]",
+    states: [["current", "orders may proceed"], ["expired", "order confirmation warns", 1]],
+    body: (<>
+      {E.pick("State", "Pennsylvania")}
+      {E.inp("License number · G-21884")}
+      {E.inp("Expires · 6/30/2027")}
+      {E.btn("Save license")}
     </>),
   },
   {
@@ -2433,11 +2559,25 @@ export const SCREENS: Screen[] = [
       {E.nav("Taproom", "taxable · 402 movements")}
       {E.nav("DTC", "taxable · 34 movements")}
       {E.nav("Export", "export · 6 movements")}
-      {E.fld("Channel name", "Export")}
+      {E.gated("Add channel", "isn’t available yet: channels are still a fixed list")}
+    </>),
+  },
+  {
+    step: 8,
+    slice: 1,
+    tab: "More",
+    surface: "sheet",
+    name: "Channel",
+    job: "Create or edit one sale channel and its default tax treatment",
+    reads: "get_sale_channel [design; §16.3]",
+    writes: "create_sale_channel · update_sale_channel · delete_sale_channel [SCHEMA-GATE: revision 2 §16.3]",
+    states: [["new", "name and tax treatment required"], ["in use", "delete is refused", 1]],
+    body: (<>
+      {E.inp("Channel name · Export")}
       {E.chips(["taxable", "export", "vessel supplies", "research", "transfer in bond"], 1)}
-      {E.info("Customers may override this. A taproom depletion has no customer and takes the channel default.")}
+      {E.info("Customers may override this. Sales without a customer take the channel default.")}
       {E.note("A channel with movements cannot be deleted.")}
-      {E.gated("Save channel", "isn’t available yet; channels are still a fixed list")}
+      {E.gated("Save channel", "isn’t available yet: channels are still a fixed list")}
     </>),
   },
   {
@@ -2453,12 +2593,26 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Settings", "Formats")}
       {E.tbl(["Format", "Basis", "bbl / unit", "From"], [["16 oz can", "packaged", "0.00403226", "typed"], ["four-pack", "packaged", "0.01612903", "4 × can"], ["case · 24×16oz", "packaged", "0.09677419", "6 × four-pack"], ["½ bbl keg", "packaged", "0.50000000", "typed"], ["pint", "poured", "0.00403226", "1/124 × ½ bbl"]])}
-      {E.fld("Format name", "case · 24×16oz")}
-      {E.chips(["packaged", "poured"], 0)}
+      {E.gated("Add format", "isn’t available yet: package facts still live on each SKU")}
+    </>),
+  },
+  {
+    step: 8,
+    slice: 1,
+    tab: "More",
+    surface: "sheet",
+    name: "Format",
+    job: "Create or edit one atomic or composed package format",
+    reads: "get_format [design; §16.2] · get_format_components [design; §16.2a]",
+    writes: "create_format · update_format · replace_format_components · replace_format_bom [SCHEMA-GATE: revision 2 §16.2/16.2a/16.12]",
+    states: [["atomic", "barrels per unit is typed"], ["composed", "volume derives from child formats"]],
+    body: (<>
+      {E.inp("Format name · case · 24×16oz")}
+      {E.chips(["packaged", "poured"])}
       {E.fld("Volume", "0.09677419 bbl · derived · read-only")}
       {E.ttl("Composition")}
-      {E.row("four-pack", "qty 6", E.act("Remove"))}
-      {E.row("+ add component", "child format · qty", "")}
+      {E.row("four-pack", "quantity 6", E.act("Remove"))}
+      {E.row("Add component", "child format · quantity", E.act("Add"))}
       {E.ttl("Packaging BOM")}
       {E.tbl(["Material", "Qty", "On break"], [["Case tray", "1", "return to stock"], ["PakTech", "0", "consumed"]])}
       {E.info("One level only: a case breaks into four-packs, never straight into cans.")}
@@ -2500,10 +2654,27 @@ export const SCREENS: Screen[] = [
       {E.ttl("Format defaults")}
       {E.tbl(["Format", "Price", "Source"], [["½ bbl keg", INV.hazyPrice, "tier default"], ["sixtel", "$95.00", "tier default"], ["case · 24×16oz", INV.pilsPrice, "tier default"]])}
       {E.ttl("Brand × format overrides")}
-      {E.row("Barrel-aged Stout · ½ bbl keg", `$240.00 · against a ${INV.hazyPrice} default`, E.act("Reset"), "w")}
-      {E.row("+ add override", "brand · format · price", "")}
+      {E.row("Barrel-aged Stout · ½ bbl keg", `$240.00 · against a ${INV.hazyPrice} default`, E.act("Edit"), "w")}
+      {E.row("Add override", "brand · format · price", E.act("Add"))}
       {E.info(`All halves are ${INV.hazyPrice}, except the barrel-aged one. Clear an override and the row rejoins the tier.`)}
-      {E.gated("Save tier", "isn’t available yet: a tier still prices one package at a time")}
+    </>),
+  },
+  {
+    step: 8,
+    slice: 1,
+    tab: "More",
+    surface: "sheet",
+    name: "Override",
+    job: "Price one brand and format away from its tier default",
+    reads: "get_price_list [design; §16.4]",
+    writes: "set_price_list_item · clear_price_list_item [SCHEMA-GATE: revision 2 §16.4]",
+    states: [["overridden", "customer sees this price"], ["cleared", "format default applies"]],
+    body: (<>
+      {E.pick("Brand", "Barrel-aged Stout")}
+      {E.pick("Format", "½ bbl keg")}
+      {E.inp("Price · $240.00")}
+      {E.info(`Clear this override to use the ${INV.hazyPrice} format default.`)}
+      {E.btns([["Clear override", "g"], "Save override"])}
     </>),
   },
   {
@@ -2521,9 +2692,23 @@ export const SCREENS: Screen[] = [
       {E.gated("Taproom", "the default bin · created with the location and cannot be removed")}
       {E.nav("Walk-in", "38 cases · 12 kegs")}
       {E.nav("To-go fridge", "22 cases · par 4 cases")}
-      {E.row("+ add bin", "name · kind", "")}
-      {E.fld("Bin name", "To-go fridge")}
-      {E.fld("Par", "4 cases · Hazy IPA")}
+      {E.gated("Add bin", "isn’t available yet: a location is still one undivided space")}
+    </>),
+  },
+  {
+    step: 8,
+    slice: 1,
+    tab: "More",
+    surface: "sheet",
+    name: "Bin",
+    job: "Create or edit one physical subdivision of a location",
+    reads: "get_bin [design; §16.6]",
+    writes: "create_bin · update_bin · delete_bin [SCHEMA-GATE: revision 2 §16.6]",
+    states: [["default", "cannot be removed", 1], ["in use", "delete is refused", 1], ["empty", "safe to remove"]],
+    body: (<>
+      {E.inp("Bin name · To-go fridge")}
+      {E.pick("Kind", "Packaged storage")}
+      {E.inp("Par · 4 cases · Hazy IPA")}
       {E.info("A brewery that never subdivides sees one bin and ignores it.")}
       {E.note("Tap lines are not bins. The tap board owns those.")}
       {E.gated("Save bin", "isn’t available yet: a location is still one undivided space")}
