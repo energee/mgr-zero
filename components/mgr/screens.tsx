@@ -51,6 +51,26 @@ const today = (rows: ReactNode) => (
   </>
 );
 
+const INV = {
+  no: "INV-1042",
+  order: "ORD-0231",
+  customer: "Ridgeline Tap Room",
+  invoiceDate: "9/03/2026",
+  due: "10/03/2026",
+  dueShort: "10/03",
+  total: "$948.00",
+  major: "948",
+  cents: "00",
+  hazyPrice: "$150.00",
+  hazyAmount: "$600.00",
+  pilsPrice: "$38.00",
+  pilsAmount: "$228.00",
+  depositAmount: "$120.00",
+  credit: "$106.00",
+  creditMajor: "106",
+  fee: "$9.48",
+} as const;
+
 export const SCREENS: Screen[] = [
   // step 1 — foundations and both authenticated shells
   {
@@ -903,10 +923,10 @@ export const SCREENS: Screen[] = [
     spec: <>QuickBooks has no read-only invoice. Once pushed, the accountant can edit, void or delete it from the Sales transactions sidebar and no API setting prevents that, so MGR detects rather than prevents. QuickBooks hands us the detector free: SyncToken increments on every modification and already rides the response the sync job reads for balance, so drift costs one column and no extra call. The rule this frame protects: <b>a voided invoice is not a paid invoice.</b> Voiding zeroes the amounts, so any logic inferring paid from a QuickBooks balance of zero books cancelled revenue as collected; the database refuses to record a paid date unless the remote state is live, rather than trusting the job to remember. MGR surfaces drift and stops: no re-push that overwrites an accountant’s correction, no field-level merge UI. ASSUMPTION: a drifted invoice stays in AR at QuickBooks’ numbers, because QuickBooks owns the invoice after push.</>,
     body: (<>
       {E.back("More", "Invoices")}
-      {E.row("INV-1042 · Ridgeline", "due 10/03 · pushed", "$1,051.52")}
+      {E.row(`${INV.no} · Ridgeline`, `due ${INV.dueShort} · pushed`, INV.total)}
       {E.row("INV-1041 · Al’s Bar", "edited in QuickBooks · $980 → $1,040", "$1,040", "w")}
       {E.row("INV-1040 · Teresa’s", "voided in QuickBooks · not paid", "$0.00", "w")}
-      {E.row("INV-1039 · Ridgeline", "deleted in QuickBooks · re-push or write off", "", "w")}
+      {E.row("INV-1039 · Al’s Bar", "deleted in QuickBooks · re-push or write off", "", "w")}
       {E.row("INV-1038 · Al’s Bar", "pushed · not sent from QuickBooks", "$540")}
       {E.row("INV-1037 · Ridgeline", "paid 8/29 from QuickBooks Online", "$980", "ok")}
       {E.info("MGR shows what changed over there. Corrections belong in QuickBooks, or as a credit memo here.")}
@@ -925,7 +945,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("More", "Invoices")}
       {E.row("QuickBooks", "connected · company 9341", "healthy", "ok", QuickBooksMark)}
-      {E.row("INV-0198 · Ridgeline", "due 9/18 · pushed", "$1,240")}
+      {E.row(`${INV.no} · Ridgeline`, `due ${INV.dueShort} · pushed`, INV.total)}
       {E.row("INV-0197 · Al’s Bar", "push failed · item unmapped", "$540", "w")}
       {E.row("INV-0190 · Ridgeline", "paid 8/29 from QuickBooks Online", "$980", "ok")}
       {E.row("CM-0012 · Teresa’s", "credit memo · pushed", "−$180")}
@@ -992,13 +1012,13 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Order", "Ridgeline")}
       {E.btn("Same as last week", "g")}
-      {E.row("Hazy IPA · ½ bbl keg", "$150.00", E.stq(4))}
-      {E.row("Pils · 16 oz case", "$38.00", E.stq(6))}
+      {E.row("Hazy IPA · ½ bbl keg", INV.hazyPrice, E.stq(4))}
+      {E.row("Pils · 16 oz case", INV.pilsPrice, E.stq(6))}
       {E.row("Stout · ⅙ bbl keg", "$62.00", E.stq(0))}
       {E.row("Ships from", "Warehouse")}
       {E.row("Ship-to · requested date", "Main · Wed 9/9", E.act("Change"))}
       {E.sp()}
-      {E.btn("Review order · $828.00", "p disabled")}
+      {E.btn(`Review order · ${INV.total}`, "p disabled")}
     </>),
   },
   {
@@ -1013,15 +1033,18 @@ export const SCREENS: Screen[] = [
     states: [["price changed", "revalidated price shown before Place order", 1], ["inactive SKU", "line removed · told plainly", 1], ["submit error", "keep quantities · Retry safe", 1], ["duplicate", "same request returns the same ORD number"]],
     spec: "The confirm step for both the stepper path and Same as last week. Buyer copy only: price, package, quantity, “Ships from Warehouse”, Place order. No ATP, no gate names. Place order stays disabled until the source contract exists. After submit the portal is read-only; changes go through the brewery.",
     body: (<>
-      {E.row("Hazy IPA · ½ bbl keg", "4 × $150.00", "$600.00")}
-      {E.row("Pils · 16 oz case", "6 × $38.00", "$228.00")}
+      {E.row("Hazy IPA · ½ bbl keg", `4 × ${INV.hazyPrice}`, INV.hazyAmount)}
+      {E.row("Pils · 16 oz case", `6 × ${INV.pilsPrice}`, INV.pilsAmount)}
+      {E.row("Keg deposit", "4 × $30.00", INV.depositAmount)}
+      {E.fld("Subtotal", INV.total)}
+      {E.fld("Tax", "$0.00 · sale for resale")}
       {E.fld("Ship-to", "Main · Phoenixville, PA")}
       {E.fld("Requested date", "Wed 9/9")}
       {E.row("Ships from", "Warehouse")}
       {E.fld("Your PO number", "optional")}
       {E.info("Order number is assigned when you place the order.")}
       {E.sp()}
-      {E.btn("Place order · $828.00", "p disabled")}
+      {E.btn(`Place order · ${INV.total}`, "p disabled")}
     </>),
   },
   {
@@ -1036,7 +1059,7 @@ export const SCREENS: Screen[] = [
     spec: "Each row expands in place into its lines; adjusted quantities are stated in buyer copy. No change request and no cancel: the portal is read-only after submit, and the row says whom to call.",
     body: (<>
       {E.hd("Orders", "Ridgeline")}
-      {E.row("ORD-0231", "confirmed · ships Thu", "$1,240")}
+      {E.row(INV.order, "confirmed · ships Thu", INV.total)}
       {E.row("ORD-0225", "shipped 8/27", "$980")}
       {E.row("ORD-0221", "adjusted · 2 cases short", "$528", "w")}
       {E.row("Hazy IPA · ½ bbl keg", "ordered 2 · shipped 2", "$300.00")}
@@ -1055,11 +1078,11 @@ export const SCREENS: Screen[] = [
     states: [["payable", "Pay opens QuickBooks in a new tab"], ["no payments account", "the button never renders; brewery has no QuickBooks Payments", 1], ["not pushed yet", "no QuickBooks invoice id yet; Pay is absent, not disabled"], ["link unavailable", "Intuit returned none: the unavailable page, never a 500", 1], ["already paid", "Pay is gone; the paid date came back from the sync"]],
     spec: "The whole design is one rule: MGR owns the link, Intuit owns the destination. What is shared (this row, the emailed reminder, the PDF footer) is always /portal/invoices/:id/pay, an MGR URL that is permanent because it resolves late. Intuit’s InvoiceLink is read-only, is generated only for a pay-enabled invoice with a customer email, has no documented expiry, and is intermittently absent; fetching it seconds before the redirect makes every one of those someone else’s problem. It is never stored in a column, never serialised to the client, never put in an email. It is a bearer URL (anyone holding it can pay), so authorization runs on every click before any Intuit call is made, and the 404 for a customer requesting somebody else’s invoice must land before the fetch, not after.",
     body: (<>
-      {E.back("Invoices", "INV-0198")}
-      {E.ttl("$1,240.00")}
-      {E.row("Due", "9/18/2026")}
-      {E.row("Status", "Sent · unpaid", "", "w")}
-      {E.tbl(["Item", "Qty", "Amount"], [["Hazy IPA · 1/2 bbl", "4", "740.00"], ["Pils · 16 oz case", "6", "252.00"]])}
+      {E.back("Invoices", INV.no)}
+      {E.ttl(INV.total)}
+      {E.row("Due", INV.due)}
+      {E.row("Status", "Unpaid", "", "w")}
+      {E.tbl(["Item", "Qty", "Amount"], [["Hazy IPA · ½ bbl", "4", INV.hazyAmount], ["Pils · 16 oz case", "6", INV.pilsAmount], ["Keg deposit · NON", "4", INV.depositAmount]])}
       {E.info("Pay by card or bank transfer through QuickBooks. You will not need an account.")}
       {E.btn("Pay invoice")}
       {E.note("Opens QuickBooks in a new tab. This link keeps working; it is re-checked each time you open it.")}
@@ -1076,11 +1099,11 @@ export const SCREENS: Screen[] = [
     states: [["no link", "Intuit generated none for this invoice", 1], ["no customer email", "the cause push should have caught first", 1], ["payments off", "brewery has no QuickBooks Payments account"], ["reason logged", "the customer sees one page; the brewery sees why"]],
     spec: "Exists so that “works every time” is honest rather than aspirational. Every precondition is checked before the share (push refuses an invoice whose customer has no email, and the Payments capability is cached on the connection), but InvoiceLink can still come back empty, so the click path needs a designed floor. The customer gets one coherent page with the invoice still readable and a way to reach a human; MGR logs the distinguishing reason. Never a stack trace, never a dead redirect, never a Pay button that throws.",
     body: (<>
-      {E.back("Invoices", "INV-0198")}
-      {E.ttl("$1,240.00")}
+      {E.back("Invoices", INV.no)}
+      {E.ttl(INV.total)}
       {E.info("Online payment isn’t available for this invoice right now.")}
-      {E.row("Due", "9/18/2026")}
-      {E.tbl(["Item", "Qty", "Amount"], [["Hazy IPA · 1/2 bbl", "4", "740.00"], ["Pils · 16 oz case", "6", "252.00"]])}
+      {E.row("Due", INV.due)}
+      {E.tbl(["Item", "Qty", "Amount"], [["Hazy IPA · ½ bbl", "4", INV.hazyAmount], ["Pils · 16 oz case", "6", INV.pilsAmount], ["Keg deposit · NON", "4", INV.depositAmount]])}
       {E.note("Contact Demo Brewing to arrange payment. The invoice above is unchanged and still due.")}
       {E.row("Demo Brewing", "(610) 555-0142", "›")}
     </>),
@@ -1095,7 +1118,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     body: (<>
       {E.hd("Invoices", "Ridgeline")}
-      {E.row("INV-0198", "due 9/18", "$1,240", "w")}
+      {E.row(INV.no, `due ${INV.dueShort}`, INV.total, "w")}
       {E.row("INV-0190", "paid 8/29", "$980", "ok")}
       {E.blank("No invoices yet. They appear after shipment or delivery.", Invoice01Icon)}
     </>),
@@ -1933,11 +1956,11 @@ export const SCREENS: Screen[] = [
       {E.fld("Tier name", "Wholesale · standard")}
       {E.fld("Channel", "Wholesale")}
       {E.ttl("Format defaults")}
-      {E.tbl(["Format", "Price", "Source"], [["½ bbl keg", "$185.00", "tier default"], ["sixtel", "$95.00", "tier default"], ["case · 24×16oz", "$38.00", "tier default"]])}
+      {E.tbl(["Format", "Price", "Source"], [["½ bbl keg", INV.hazyPrice, "tier default"], ["sixtel", "$95.00", "tier default"], ["case · 24×16oz", INV.pilsPrice, "tier default"]])}
       {E.ttl("Brand × format overrides")}
-      {E.row("Barrel-aged Stout · ½ bbl keg", "$240.00 · against a $185.00 default", E.act("Reset"), "w")}
+      {E.row("Barrel-aged Stout · ½ bbl keg", `$240.00 · against a ${INV.hazyPrice} default`, E.act("Reset"), "w")}
       {E.row("+ add override", "brand · format · price", "")}
-      {E.info("All halves are $185, except the barrel-aged one. Clear an override and the row rejoins the tier.")}
+      {E.info(`All halves are ${INV.hazyPrice}, except the barrel-aged one. Clear an override and the row rejoins the tier.`)}
       {E.gated("Save tier", "isn’t available yet: a tier still prices one package at a time")}
     </>),
   },
@@ -1993,7 +2016,7 @@ export const SCREENS: Screen[] = [
 
   // QuickBooks — what MGR's push produces, rendered by Intuit. Slice 1, step 5.
   {
-    step: 5, slice: 1, venue: { name: "QuickBooks Online", title: "Invoice INV-1042", actions: "Edit invoice" },
+    step: 5, slice: 1, venue: { name: "QuickBooks Online", title: `Invoice ${INV.no}`, actions: "Edit invoice" },
     name: "Pushed invoice",
     job: "What the accountant opens after one shipment invoices, and the two steps the push does not perform",
     reads: "none [QuickBooks renders; MGR wrote it]",
@@ -2001,11 +2024,11 @@ export const SCREENS: Screen[] = [
     states: [["not sent", "created by MGR; QuickBooks has emailed nobody", 1], ["accepted", "the QuickBooks invoice id is stored on the MGR invoice"], ["rejected", "the QuickBooks sync error is shown in MGR; nothing created here", 1], ["response lost", "the same requestid returns the first invoice, never a second"], ["tax intent missing", "AST does not engage and the invoice books at 0.00 tax", 1], ["no customer email", "push refuses; an invoice without one can never be paid online", 1], ["viewed", "the customer opened it, a signal MGR has no column for", 1]],
     spec: "Drawn as QuickBooks actually presents it: the Sales transactions list with a right sidebar, because QuickBooks has no separate full-page record. Every Product/Service line resolves through the SKU's QuickBooks item reference and the bill-to through the customer's QuickBooks customer reference. MGR sends tax intent, never tax amounts: Intuit requires a transaction-level tax code (TxnTaxCodeRef) to opt the transaction into Automated Sales Tax, and an unmarked line is treated as TAX, so a keg deposit must carry TaxCodeRef NON explicitly or it books as taxable revenue. The header carries the second finding: a pushed invoice reads Not sent. Creating and delivering are different acts and the push performs only the first.",
     body: (<>
-      {X.stat("Due in 9 days (Not sent)", 1)}
-      {X.amt("Total due", "1,051", "52")}
-      {X.when("Invoice date", "9/03/2026")}
-      {X.when("Due date", "10/03/2026")}
-      {X.sec("Ridgeline Tap Room", <>{X.sub("Billing address", ["114 Bridge St.", "Phoenixville, PA  19460"])}{X.link("ap@ridgeline.example")}</>)}
+      {X.stat("Due in 30 days (Not sent)", 1)}
+      {X.amt("Total due", INV.major, INV.cents)}
+      {X.when("Invoice date", INV.invoiceDate)}
+      {X.when("Due date", INV.due)}
+      {X.sec(INV.customer, <>{X.sub("Billing address", ["114 Bridge St.", "Phoenixville, PA  19460"])}{X.link("ap@ridgeline.example")}</>)}
       {X.sec("Invoice activity", X.life(["Opened", "Sent", "Viewed", "Paid"], 1))}
       {X.more("Products and services")}
     </>),
@@ -2020,10 +2043,10 @@ export const SCREENS: Screen[] = [
     spec: "This frame justifies an absence: there is deliberately no Mark paid button anywhere in MGR. The paid date and the QuickBooks balance arrive from the sync job only, which is why the AR list stops showing an invoice as due without anyone in the brewery doing anything. It also carries a number MGR does not model: QuickBooks Payments deducts a processing fee before deposit, so the bank deposit never equals the invoice. MGR reconciles against the QuickBooks balance, not the deposit, and must not read the gap as a short payment.",
     body: (<>
       {X.stat("Paid")}
-      {X.amt("Amount paid", "1,051", "52")}
+      {X.amt("Amount paid", INV.major, INV.cents)}
       {X.when("Payment date", "9/28/2026")}
-      {X.sec("Ridgeline Tap Room", <>{X.sub("Billing address", ["114 Bridge St.", "Phoenixville, PA  19460"])}{X.rows([["Phone", "(610) 933-7181"]])}</>)}
-      {X.sec("Transaction Details", <>{X.sub("Payment Details", ["QuickBooks Payments-Bank *8837 | Fee: $10.52", "$1,051.52"])}{X.sub("Deposit Details", ["JPMORGAN CHASE BANK, NA | *0753"])}</>)}
+      {X.sec(INV.customer, <>{X.sub("Billing address", ["114 Bridge St.", "Phoenixville, PA  19460"])}{X.rows([["Phone", "(610) 933-7181"]])}</>)}
+      {X.sec("Transaction Details", <>{X.sub("Payment Details", [`QuickBooks Payments-Bank *8837 | Fee: ${INV.fee}`, INV.total])}{X.sub("Deposit Details", ["JPMORGAN CHASE BANK, NA | *0753"])}</>)}
       {X.more("More info")}
     </>),
   },
@@ -2037,11 +2060,11 @@ export const SCREENS: Screen[] = [
     spec: "Created by Return shipment or a keg return, never free-form; the plan lists free-form credit memos as deliberately deferred. Returning an empty keg posts the deposit refund and the keg event in one RPC, so the credit and the fleet balance cannot disagree. The deposit line carries TaxCodeRef NON: an unmarked line defaults to TAX and would refund tax that was never charged.",
     body: (<>
       {X.stat("Applied")}
-      {X.amt("Total credit", "114", "00")}
+      {X.amt("Total credit", INV.creditMajor, "00")}
       {X.when("Credit date", "9/12/2026")}
-      {X.when("Applied to", "Invoice INV-1042")}
-      {X.sec("Ridgeline Tap Room", X.sub("Billing address", ["114 Bridge St.", "Phoenixville, PA  19460"]))}
-      {X.sec("Products and services", X.rows([["Pils · 16 oz case · TAX", "$84.00"], ["Keg deposit refund · NON", "$30.00"]]))}
+      {X.when("Applied to", `Invoice ${INV.no} · original ${INV.total}`)}
+      {X.sec(INV.customer, X.sub("Billing address", ["114 Bridge St.", "Phoenixville, PA  19460"]))}
+      {X.sec("Products and services", X.rows([["Pils · 16 oz case · TAX", "$76.00"], ["Keg deposit refund · NON", "$30.00"], ["Total", INV.credit]]))}
       {X.more("More info")}
     </>),
   },
