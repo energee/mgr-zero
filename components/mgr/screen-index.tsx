@@ -10,7 +10,7 @@
 // the desktop rail and the phone tab bar switch on viewport breakpoints, and an
 // inline render in a narrow box would show the desktop layout at every size.
 import { SCREENS, type Screen } from "@/components/mgr/screens";
-import { SlackIcon } from "@hugeicons/core-free-icons";
+import { VENUE_MARKS } from "@/components/mgr/brand-icons";
 import { Icon } from "@/components/mgr/icon";
 import { ScreenEmbed, ScreenWidth } from "@/components/mgr/screen-width";
 
@@ -54,27 +54,37 @@ export function ScreenIndex({ kind = "mgr" }: { kind?: "mgr" | "venues" }) {
       {sections(kind).map(([name, screens]) => (
         <section key={name} className="flex flex-col gap-8">
           <h2 id={slug(name)} className="flex items-center gap-2 scroll-m-20 border-b pb-2 text-xl font-semibold">
-            {/* Slack has a mark in Hugeicons; QuickBooks and Square do not, and a stand-in shape would fake a brand. */}
-            {name === "Slack" && <Icon icon={SlackIcon} size={20} />}
+            {VENUE_MARKS[name] && <Icon icon={VENUE_MARKS[name]} size={20} />}
             {name} <span className="text-sm font-normal text-fd-muted-foreground">· {screens.length} screens</span>
           </h2>
           {screens.map((s) => (
             <article key={s.name}>
               <h3 id={screenSlug(s.name)} className="scroll-m-20 text-base font-medium">{s.name}</h3>
               <p className="mt-1 text-sm text-fd-muted-foreground">{s.job}</p>
-              <dl className="mt-3 grid gap-1 font-mono text-xs text-fd-muted-foreground">
-                <div><dt className="inline font-semibold">reads </dt><dd className="inline">{s.reads}</dd></div>
-                <div><dt className="inline font-semibold">writes </dt><dd className="inline">{s.writes}</dd></div>
-                <div><dt className="inline font-semibold">where </dt><dd className="inline">slice {s.slice} · step {s.step}{s.surface ? ` · ${s.surface}` : ""}</dd></div>
-              </dl>
               {s.states && (
                 <ul className="mt-3 flex flex-col gap-1 text-sm">
                   {s.states.map(([state, note], i) => (
-                    <li key={i}><b className="font-medium">{state}</b> — {note}</li>
+                    <li key={i}><b className="font-medium">{state}</b>: {note}</li>
                   ))}
                 </ul>
               )}
-              {s.spec && <p className="mt-3 text-sm">{s.spec}</p>}
+              {s.spec && !s.redrawn && <p className="mt-3 text-sm">{s.spec}</p>}
+              {/* A redrawn screen carries the reasoning for the change; readers
+                  who want the screen, not its history, get it folded. */}
+              {s.spec && s.redrawn && (
+                <details className="mt-3 text-sm">
+                  <summary className="cursor-pointer text-fd-muted-foreground">Why this was redrawn</summary>
+                  <p className="mt-2">{s.spec}</p>
+                </details>
+              )}
+              <details className="mt-3 text-xs text-fd-muted-foreground">
+                <summary className="cursor-pointer">Reads and writes</summary>
+                <dl className="mt-2 grid gap-1 font-mono">
+                  <div><dt className="inline font-semibold">reads </dt><dd className="inline">{s.reads}</dd></div>
+                  <div><dt className="inline font-semibold">writes </dt><dd className="inline">{s.writes}</dd></div>
+                  <div><dt className="inline font-semibold">where </dt><dd className="inline">slice {s.slice} · step {s.step}{s.surface ? ` · ${s.surface}` : ""}</dd></div>
+                </dl>
+              </details>
               <div className="mt-4 overflow-x-auto">
                 <ScreenEmbed index={SCREENS.indexOf(s)} title={s.name} />
               </div>

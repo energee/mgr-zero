@@ -18,7 +18,7 @@ const WidthContext = createContext<Mode>("phone");
 /** One frame, embedded at a real viewport width — see app/(frames)/screens/frame. */
 export function ScreenEmbed({ index, title }: { index: number; title: string }) {
   const mode = useContext(WidthContext);
-  // Phone is a real 390px viewport. Desk fills the column: the shell draws its
+  // Mobile is a real 390px viewport. Desktop fills the column: the shell draws its
   // rail at any width from 768 up, and a fixed 1280 only guaranteed a
   // horizontal scroll on most screens. The page lifts Fumadocs' width caps so
   // the column is wide enough to clear the breakpoint.
@@ -36,7 +36,7 @@ export function ScreenEmbed({ index, title }: { index: number; title: string }) 
 
 /** `deskOnly` pins the width and hides the switch — the external venues are
  * desktop products (QuickBooks and Square Dashboard have no phone layout to
- * show), so offering Phone there would only draw them broken. */
+ * show), so offering Mobile there would only draw them broken. */
 export function ScreenWidth({ children, deskOnly = false }: { children: React.ReactNode; deskOnly?: boolean }) {
   const [mode, setMode] = useState<Mode>(deskOnly ? "desk" : "phone");
   return (
@@ -44,8 +44,8 @@ export function ScreenWidth({ children, deskOnly = false }: { children: React.Re
       <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 bg-fd-background/95 py-2 backdrop-blur">
         {!deskOnly && (
           <ToggleGroup type="single" variant="outline" size="sm" value={mode} onValueChange={(v) => v && setMode(v as Mode)}>
-            <ToggleGroupItem value="phone">Phone · 390</ToggleGroupItem>
-            <ToggleGroupItem value="desk">Desk</ToggleGroupItem>
+            <ToggleGroupItem value="phone">Mobile</ToggleGroupItem>
+            <ToggleGroupItem value="desk">Desktop</ToggleGroupItem>
           </ToggleGroup>
         )}
         <div className="w-40"><ThemeToggle /></div>

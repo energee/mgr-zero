@@ -41,15 +41,23 @@ describe("SCREENS", () => {
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
 
-  it("draws customer copy, not markup escapes or machine identifiers", () => {
-    // Bodies are what a brewer reads on the glass. A literal "&frac12;" is a
-    // string React never decodes, and "record_movement" is the wire name of a
-    // command, not its label. reads/writes/spec/states are builder-facing and
-    // exempt — they name registry IDs on purpose.
+  it("draws customer copy, not markup escapes, machine identifiers or em dashes", () => {
+    // Bodies are what a brewer reads on the glass; job, states and spec are
+    // what a reader sees on /docs/screens. A literal "&frac12;" is a string
+    // React never decodes, "record_movement" is the wire name of a command, not
+    // its label, and an em dash is a tell that a sentence was never finished.
+    // reads/writes are exempt from the identifier rule only: they name
+    // registry IDs on purpose.
+    const text = (...n: unknown[]) =>
+      n.map((x) => renderToStaticMarkup(createElement("div", null, x as never)).replace(/<[^>]*>/g, " ")).join(" ")
+        // Email addresses are copy, not identifiers.
+        .replace(/\S+@\S+/g, "");
     for (const s of SCREENS) {
-      const text = renderToStaticMarkup(createElement("div", null, s.hd, s.body)).replace(/<[^>]*>/g, " ");
-      expect.soft(text, `${s.name}: HTML entity in copy`).not.toMatch(/&(?:[a-z]+|#\d+);/);
-      expect.soft(text, `${s.name}: snake_case identifier in copy`).not.toMatch(/[a-z]+_[a-z_]+/);
+      const body = text(s.hd, s.body);
+      const notes = text(s.job, s.spec, ...(s.states ?? []).flat());
+      expect.soft(body, `${s.name}: HTML entity in copy`).not.toMatch(/&(?:[a-z]+|#\d+);/);
+      expect.soft(body + notes, `${s.name}: snake_case or dotted identifier`).not.toMatch(/[a-z]+_[a-z_]+|\b[a-z]+\.[a-z_]+\(?/);
+      expect.soft(body + notes + text(s.reads, s.writes), `${s.name}: em dash`).not.toContain("—");
     }
   });
 
