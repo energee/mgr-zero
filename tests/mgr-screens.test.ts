@@ -167,6 +167,17 @@ describe("SCREENS", () => {
     }
   });
 
+  it("keeps phone tables contained and avoids duplicate page titles", () => {
+    const menu = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Menu")!.body));
+    const pos = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Point of sale")!.body));
+    const formats = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Formats")!.body));
+    expect(menu.match(/<h[12][^>]*>[^<]*(?:POS )?menu/gi)).toHaveLength(1);
+    expect(pos.match(/<h[12][^>]*>Point of sale/gi)).toHaveLength(1);
+    expect(menu + formats).toContain("min-w-max");
+    const slack = SCREENS.find((s) => s.name === "Notification preferences")!;
+    expect(renderToStaticMarkup(VenueFrame({ venue: slack.venue!, children: slack.body }))).toContain('class="slk modal"');
+  });
+
   it("gives sheets no separate header; their title is the record name", () => {
     expect(SCREENS.filter((s) => s.surface === "sheet" && s.hd)).toEqual([]);
   });

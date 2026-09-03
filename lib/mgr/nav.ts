@@ -2,7 +2,8 @@
 // the four staff tabs with their desktop-rail children, the portal's tabs,
 // and the two pure helpers AppShell needs — role filtering (a hidden entry
 // leaves no gap) and active-tab resolution. Only routes that exist today are
-// listed; the plan's fuller rail grows here as pages ship.
+// listed; planned subareas use anchors on their existing parent route until
+// their dedicated route ships, so the rail never points at a 404.
 import {
   BeerIcon, Home01Icon, Invoice01Icon, Package01Icon, Settings01Icon, ShoppingCart01Icon,
 } from "@hugeicons/core-free-icons";
@@ -23,9 +24,19 @@ export type NavItem = {
 
 export const STAFF_NAV: readonly NavItem[] = [
   { label: "Today", href: "/", icon: Home01Icon },
-  // Inventory and Orders reads exclude brewer today (lib/commands/*.ts readRoles); the
-  // brewer's Cellar/Brew day/Packaging areas arrive with their slices.
-  { label: "Beer", href: "/inventory", icon: BeerIcon, children: [{ label: "Inventory", href: "/inventory", roles: ["sales", "warehouse"] }] },
+  {
+    label: "Beer",
+    href: "/inventory",
+    icon: BeerIcon,
+    children: [
+      { label: "Inventory", href: "/inventory", roles: ["sales", "warehouse"] },
+      { label: "Taproom", href: "/inventory#taproom", roles: ["warehouse"] },
+      { label: "Taps", href: "/inventory#taps", roles: ["warehouse"] },
+      { label: "Cellar", href: "/inventory#cellar", roles: ["brewer"] },
+      { label: "Materials", href: "/inventory#materials", roles: ["brewer", "warehouse"] },
+      { label: "Kegs", href: "/inventory#kegs", roles: ["warehouse"] },
+    ],
+  },
   {
     label: "Work",
     href: "/orders",
@@ -34,6 +45,10 @@ export const STAFF_NAV: readonly NavItem[] = [
       { label: "Orders", href: "/orders", roles: ["sales", "warehouse"] },
       { label: "Pick", href: "/pick", roles: ["warehouse"] },
       { label: "Replenishment", href: "/replenishment", roles: ["warehouse"] },
+      { label: "Batches", href: "/orders#batches", roles: ["brewer"] },
+      { label: "Packaging", href: "/orders#packaging", roles: ["brewer", "warehouse"] },
+      { label: "POs", href: "/orders#purchase-orders", roles: ["warehouse"] },
+      { label: "Deliveries", href: "/orders#deliveries", roles: ["warehouse"] },
     ],
   },
   {
@@ -45,6 +60,10 @@ export const STAFF_NAV: readonly NavItem[] = [
       { label: "Catalog", href: "/catalog", roles: ["sales"] },
       { label: "Customers", href: "/customers", roles: ["sales"] },
       { label: "Price lists", href: "/pricing", roles: ["sales"] },
+      { label: "Recipes", href: "/catalog#recipes", roles: ["brewer"] },
+      { label: "Compliance", href: "/invoices#compliance", roles: ["sales"] },
+      { label: "Planning", href: "/orders#planning", roles: ["brewer", "warehouse"] },
+      { label: "Import", href: "/settings/team#import", roles: ["admin"] },
       { label: "Settings", href: "/settings/team", roles: ["admin"] },
     ],
   },
