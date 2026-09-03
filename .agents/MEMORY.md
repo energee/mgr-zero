@@ -8,6 +8,7 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
 - Setup, ports, dev login: `README.md`. Ownership + iron rules: `.agents/ARCHITECTURE.md`.
 
 ## Decisions
+- **2026-09-02 — `components/mgr/screens.tsx` is the source of truth for MGR screens.** The HTML wireframe seeded the records once and is retired for MGR-venue frames (kept for Slack/QuickBooks/Square venue drawings). Design review happens at `/design`; edit the typed records directly, never regenerate.
 - One baseline migration covering all ten slices (58 tables) instead of accumulating migrations. Pre-deploy, the baseline is edited in place. Details: `.agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md`.
 - Product spec: `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md`.
 - Schema revision 2 (2026-09-02, §16 of the design doc — held as a spec, not migrated): `products` → `brands`, and a batch's identity becomes `intended_brand_id`, nullable, because identity is optional at brew and already enforced at packaging by `lots.brand_id NOT NULL`. `formats` own `bbl_per_unit`; SKUs stop carrying it.

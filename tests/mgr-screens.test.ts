@@ -1,4 +1,5 @@
-// tests/mgr-screens.test.ts — the screen inventory is a typed record set:
+// tests/mgr-screens.test.ts — the screen inventory (the source of truth for
+// MGR screens) is a typed record set:
 // every record carries its metadata, `states` is a caption (never rendered
 // into the body), and each body renders through the E vocabulary without
 // throwing. Rendering uses react-dom/server, so no DOM is needed.
@@ -36,7 +37,7 @@ describe("SCREENS", () => {
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
 
-  it("keeps the exemplar on Today", () => {
-    expect(SCREENS.filter((s) => s.ex).map((s) => s.name)).toEqual(["Today"]);
+  it("gives sheets no separate header; their title is the record name", () => {
+    expect(SCREENS.filter((s) => s.surface === "sheet" && s.hd)).toEqual([]);
   });
 });
