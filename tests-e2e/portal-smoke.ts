@@ -111,6 +111,7 @@ async function seed() {
     .from("ship_tos")
     .insert({ brewery_id: b.id, customer_id: c!.id, label: "Main", address1: "1 Main St", city: "Philadelphia", state: "PA", zip: "19100" });
   const { data: loc } = await admin.from("locations").select("id").eq("brewery_id", b.id).eq("kind", "warehouse").single();
+  await admin.from("breweries").update({ portal_fulfillment_location_id: loc!.id }).eq("id", b.id);
   await admin.from("inventory_movements").insert({
     brewery_id: b.id,
     sku_id: s!.id,
@@ -156,7 +157,12 @@ function runFlow(session: string, engine: Engine, customerEmail: string, skuName
   }
 
   ab(session, ["find", "role", "button", "click", "--name", "Submit order"]);
-  ab(session, ["wait", "--url", "**/portal/orders/*"]);
+  try {
+    ab(session, ["wait", "--url", "**/portal/orders/*"]);
+  } catch (err) {
+    const page = ab(session, ["get", "text", "body"]) as { text: string };
+    throw new Error(`${err instanceof Error ? err.message : String(err)}; page: ${page.text.slice(-1000)}`);
+  }
 
   ab(session, ["find", "role", "link", "click", "--name", "Orders"]);
   ab(session, ["wait", "--url", "**/portal/orders"]);

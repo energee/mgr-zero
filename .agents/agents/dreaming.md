@@ -23,7 +23,8 @@ consolidation: make the living agent docs match reality, citing evidence.
    sorted by creation date, so also check `mergedAt` against the last-dream
    date — a long-open PR merged recently may need
    `--search 'merged:>=<last-dream date>'` to appear.
-3. Read the .remember/today-*.md session digests.
+3. Read any committed .remember/today-*.md session digests (there may be
+   none; the remember plugin retires them locally once a day rolls over).
 4. Read every editable file end to end.
 
 ## Curate (editable files only)

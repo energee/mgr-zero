@@ -1,9 +1,13 @@
 # Authorization audit — 2026-09-01 (branch `audit-p1-authz` @ `0bbf07a`)
 
+> **Historical snapshot, not current authority.** The database write model was
+> replaced after this audit, and D1/D3 were resolved. Use `.agents/ARCHITECTURE.md`
+> for current invariants and `.agents/PROGRESS.md` for the re-triaged backlog.
+
 Fresh database + application security/authorization audit of the current state.
 The original audit (snapshot `96ba05c`) was lost; its P1.1–P1.5 and P1.9 items
 were remediated on this branch (`docs/plans/audit-p1-authz.md`). Everything
-below is what is **still open now**. Findings were produced by two reviewers
+below records what was open at this snapshot. Findings were produced by two reviewers
 that verified by execution against the local Supabase stack (schema reset from
 this worktree first).
 
