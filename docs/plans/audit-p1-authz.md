@@ -69,7 +69,7 @@
 
 **Test first:** Replace success expectations in `tests/commands-import.test.ts` and `tests/commands-invites.test.ts` with `CommandError` fail-closed assertions; verify the rendered Team, Customer, navigation, and Import surfaces offer no invite/import action.
 
-**Modify:** `lib/commands/import.ts`; `lib/commands/invites.ts`; `app/(app)/layout.tsx`; `app/(app)/settings/team/page.tsx`; `app/(app)/customers/[id]/page.tsx`; remove the now-unused invite/import form modules and import route; `docs/user-guide.html`.
+**Modify:** `lib/commands/import.ts`; `lib/commands/invites.ts`; `app/(app)/layout.tsx`; `app/(app)/settings/team/page.tsx`; `app/(app)/customers/[id]/page.tsx`; remove the now-unused invite/import form modules and import route; `public/docs/user-guide.html`.
 
 **Types/interfaces:** Keep registered names and input validation contracts so direct `/api/command` posts fail with controlled `CommandError` instead of becoming unknown commands.
 

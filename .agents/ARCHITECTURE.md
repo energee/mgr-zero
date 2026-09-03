@@ -24,7 +24,7 @@ never copy it into a second place.
 | `components/ui/` | shadcn primitives. Don't hand-edit; re-add with the shadcn CLI. |
 | `tests/` | Proof. Runs against the real local Supabase stack, never mocks. |
 | `scripts/seed-dev.ts` | Idempotent dev seed. |
-| `docs/{user,staff,portal}-guide.html` | Self-contained customer documentation: `user-guide.html` is the master audience chooser; staff and portal guides separately cover every available screen and action for their users. Uses customer language only and never exposes implementation phases or internals. |
+| `public/docs/{user,staff,portal}-guide.html` | Self-contained customer documentation served at `/docs/*.html`: `user-guide.html` is the master audience chooser; staff and portal guides separately cover every available screen and action for their users. Uses customer language only and never exposes implementation phases or internals. |
 | `.agents/superpowers/specs/` | Product and schema design decisions (why). |
 | `.agents/agents/documentation-maintainer.md`, `.github/workflows/documentation-agent.yml` | Post-merge and manual customer-documentation contract and automation. Claude may edit only the three guide HTML files in a read-only GitHub job; a separate deterministic job validates that bounded diff and maintains the reviewable `documentation/user-guide` pull request. |
 | `app/icon.svg`, `lib/mgr-icon.ts`, `components/mgr-icon.tsx` | Canonical MGR mark. The SVG is the Next.js favicon; the module owns the path; the component is the in-app reuse. `docs/brand/mgr-github-app-icon.png` is a 1024px raster of the same path for the MGR GitHub App avatar. |
