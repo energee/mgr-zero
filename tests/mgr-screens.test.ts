@@ -256,11 +256,11 @@ describe("SCREENS", () => {
     for (const name of named) {
       const s = SCREENS.find((x) => x.name === name);
       expect(s, name).toBeTruthy();
-      const html = renderToStaticMarkup(createElement("div", null, s!.body));
-      const pinAt = html.indexOf("data-pin");
-      expect(pinAt, name).toBeGreaterThan(-1);
-      expect(html.indexOf("⌫", pinAt), `${name}: pad inside pin`).toBeGreaterThan(pinAt);
-      expect(splitPinned(s!.body).pin.length, `${name}: pin lifted`).toBe(1);
+      const { pin } = splitPinned(s!.body);
+      expect(pin.length, `${name}: pin lifted`).toBe(1);
+      const pinHtml = renderToStaticMarkup(createElement("div", null, pin));
+      expect(pinHtml, `${name}: pad inside pin`).toContain("⌫");
+      expect(pinHtml, `${name}: commit verb inside pin`).toMatch(/Record (movement|reading|addition|transfer|count|repack)/);
     }
     const reading = SCREENS.find((x) => x.name === "Fermentation reading")!;
     const readingHtml = renderToStaticMarkup(createElement("div", null, reading.body));

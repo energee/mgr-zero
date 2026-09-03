@@ -125,9 +125,9 @@ export const E = {
     </div>
   ),
   tape: (arr: [React.ReactNode, React.ReactNode?][]) => (
-    <ol className="ml-1 flex flex-col gap-1 border-l-2 pl-3 font-mono text-xs text-muted-foreground break-all">
+    <ol className="ml-1 flex flex-col gap-1 border-l-2 pl-3 font-mono text-xs text-muted-foreground">
       {arr.map(([a, b], i) => (
-        <li key={i} className="flex justify-between gap-2">
+        <li key={i} className="flex justify-between gap-2 [overflow-wrap:anywhere]">
           <span className="text-foreground">{a}</span>
           <span>{b ?? ""}</span>
         </li>
@@ -177,11 +177,11 @@ export const E = {
       ))}
     </div>
   ),
-  tiles: (arr: [React.ReactNode, React.ReactNode, React.ReactNode?, (0 | 1)?, number?, (0 | 1)?][], cols: 2 | 3 = 3) => (
-    <ItemGroup className={cn("grid gap-2", cols === 2 ? "grid-cols-2" : "grid-cols-3")}>
-      {arr.map(([n, s, g, w, f, actionable], i) => (
-        <Item key={i} variant="outline" size="sm" className="flex-col items-start gap-0.5" asChild={Boolean(actionable)}>
-          {actionable ? <button type="button"><TileContent {...{ n, s, g, w, f }} /></button> : <div><TileContent {...{ n, s, g, w, f }} /></div>}
+  tiles: (arr: [React.ReactNode, React.ReactNode, React.ReactNode?, (0 | 1)?, number?][], c: "c2" | "c3" = "c3") => (
+    <ItemGroup className={cn("grid gap-2", c === "c2" ? "grid-cols-2" : "grid-cols-3")}>
+      {arr.map(([n, s, g, w, f], i) => (
+        <Item key={i} variant="outline" size="sm" className="flex-col items-start gap-0.5" asChild>
+          <button type="button"><TileContent {...{ n, s, g, w, f }} /></button>
         </Item>
       ))}
     </ItemGroup>
