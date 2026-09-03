@@ -153,6 +153,7 @@ export const SCREENS: Screen[] = [
       {E.hd("Beer")}
       {E.nav("Finished goods", "2 shortages · ATP by SKU")}
       {E.nav("Taproom", "2 below par · weekly count due")}
+      {E.nav("Taps", "11 pouring · Tap board")}
       {E.nav("Cellar", "6 vessels · 1 reading overdue")}
       {E.nav("Materials", "3 shortages")}
       {E.nav("Kegs", "142 out · 9 overdue")}
@@ -765,10 +766,10 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Beer", "Taproom")}
       {E.ttl("Weekly count / sales depletion")}
-      {E.note("This count posts the depletion. POS sales are the expected number beside it; the gap is what the taproom lost to pours, comps, staff drinks and line cleaning.")}
-      {E.row("Pils · 16 oz case", "expected 4 · counted", "4")}
-      {E.row("Hazy · ½ bbl keg", "expected 3 · counted", "2", "w")}
-      {E.row("Stout · ⅙ bbl keg", "expected 2 · counted", "2")}
+      {E.info("Counted units post depletion; POS is expected only. Review the converted barrels beside each entry.")}
+      {E.inp("Pils · expected 4 cases · counted 4 · 0.19 bbl")}
+      {E.inp("Hazy · expected 3 half bbl kegs · counted 2 · 1.00 bbl")}
+      {E.inp("Stout · expected 2 sixth bbl kegs · counted 2 · 0.33 bbl")}
       {E.info("Variance −1 Hazy · 0.5 bbl unaccounted. Recording posts 4 Pils + 4 Hazy + 2 Stout depletion; the variance is reported, never posted.")}
       {E.nav("Variance by brand", "four weeks · where the gap keeps showing up")}
       {E.gated("Record count")}
@@ -794,7 +795,7 @@ export const SCREENS: Screen[] = [
       {E.ttl("Variance by brand")}
       {E.chips(["4 weeks", "12 weeks"], 0)}
       {E.tbl(["Brand", "Expected", "Counted", "Variance"], [["Hazy IPA", "11.5 bbl", "11.0 bbl", "−0.5"], ["Pils", "8.0 bbl", "7.9 bbl", "−0.1"], ["Stout", "3.0 bbl", "3.0 bbl", "0.0"]])}
-      {E.row("Hazy IPA", "short 4 weeks running · 1.8 bbl total", "−4%", "w")}
+      {E.row("Hazy IPA", "short 4 weeks running · 1.8 bbl total · −4%", E.act("Review sales"), "w")}
       {E.info("A brand short every week points at one line or one shift. A single short week is noise.")}
       {E.note("Reported, never posted. The count already wrote the depletion; this is the explanation for it.")}
     </>),
@@ -810,11 +811,11 @@ export const SCREENS: Screen[] = [
     spec: "There is no ranking command or priority column; every change is a named quantity edit.",
     body: (<>
       {E.back("Beer", "Pils · 16 oz case")}
-      {E.num("−6", "ATP · 22 on hand · 28 allocated")}
-      {E.row("ORD-0231 · Ridgeline", "adjust line", "10")}
-      {E.row("ORD-0234 · Teresa’s", "release allocation", "12")}
-      {E.row("Taproom standing", "edit protected qty", "6")}
-      {E.row("Taproom par", "edit replenishment target", "8")}
+      {E.num("−6 cases · −0.58 bbl", "ATP · 22 cases on hand · 28 allocated")}
+      {E.row("ORD-0231 · Ridgeline", "10 cases · 0.97 bbl", E.act("Adjust"))}
+      {E.row("ORD-0234 · Teresa’s", "12 cases · 1.16 bbl", E.act("Release"))}
+      {E.row("Taproom standing", "6 cases · 0.58 bbl", E.act("Edit"))}
+      {E.row("Taproom par", "8 cases · 0.77 bbl", E.act("Edit"))}
       {E.btns([["Adjust selected", "p"], ["Edit par", "g"]])}
     </>),
   },
@@ -880,6 +881,7 @@ export const SCREENS: Screen[] = [
       {E.row("Price list", "", E.act("Wholesale"))}
       {E.btn("Save customer")}
       {E.nav("Ship-tos", "Main · Dock")}
+      {E.nav("Customer keg balance", "38 out · $1,140 deposits held")}
       {E.btn("Add ship-to", "g")}
       {E.note("Sending an invite emails the recipient and cannot be recalled.")}
       {E.btn("Invite portal user", "irr")}
@@ -1207,12 +1209,37 @@ export const SCREENS: Screen[] = [
     spec: "Complete batch stays disabled until close/reconciliation identity exists: the batch’s closing time, the occupancy close and the typed automatic reconciliation must commit atomically. Tile fill derives from occupancy vs vessel capacity, never from a status column.",
     body: (<>
       {E.back("Beer", "Cellar")}
-      {E.tiles([["FV1", "Pils · 12.8 / 15 bbl", "1.9 °P · read 4 h", 0, 85], ["FV2", "Hazy · 9.0 / 15 bbl", "7.5 °P · read 8 h", 0, 60], ["FV3", "Stout · 13.5 / 15 bbl", "5.2 °P · overdue 31 h", 1, 90], ["BT1", "Pils · 7.0 / 10 bbl", "carbing", 0, 70], ["BT2", "Empty · 0 / 10 bbl", "available", 0, 0], ["FB1", "Saison · 0.4 / 1 bbl", "aging · read 1 d", 0, 40]])}
+      {E.tiles([["FV1", "Pils · 12.8 / 15 bbl", "1.9 °P · read 4 h", 0, 85, 1], ["FV2", "Hazy · 9.0 / 15 bbl", "7.5 °P · read 8 h", 0, 60, 1], ["FV3", "Stout · 13.5 / 15 bbl", "5.2 °P · overdue 31 h", 1, 90, 1], ["BT1", "Pils · 7.0 / 10 bbl", "carbing", 0, 70, 1], ["BT2", "Empty · 0 / 10 bbl", "available", 0, 0, 1], ["FB1", "Saison · 0.4 / 1 bbl", "aging · read 1 d", 0, 40, 1]])}
       {E.btns(["Reading", "Transfer", "Brew day"], "c3")}
       {E.fld("Selected vessel", "FV3 · 15 bbl · fermenter")}
       {E.btns([["Add vessel", "g"], ["Save vessel", "g"]])}
       {E.gated("Complete batch")}
       {E.sp()}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 4,
+    tab: "Beer",
+    name: "Vessel detail",
+    job: "Inspect one vessel's occupancy and readings and edit its physical facts",
+    reads: "get_vessel · list_fermentation_readings [design]",
+    writes: "update_vessel [design; mutable facts only]",
+    states: [["occupied", "batch and fill shown"], ["empty", "available for a batch"], ["reading overdue", "last reading flagged", 1]],
+    spec: "Batch occupancy and reading history are records; only the vessel name, type and capacity are editable here.",
+    body: (<>
+      {E.back("Cellar map", "FV3")}
+      {E.row("Stout · BATCH-0168", "13.5 / 15 bbl · 90% full", E.act("Open batch"), "w")}
+      {E.fld("Current reading", "5.2 °P · 68.2 °F · overdue 31 h")}
+      {E.ttl("Reading history")}
+      {E.row("9/02 · 7:10 AM", "5.2 °P · 68.2 °F", "Dana")}
+      {E.row("9/01 · 7:04 AM", "6.8 °P · 67.9 °F", "Ali")}
+      {E.row("8/31 · 6:58 AM", "8.6 °P · 67.5 °F", "Dana")}
+      {E.ttl("Vessel facts")}
+      {E.inp("Name · FV3")}
+      {E.pick("Type", "Fermenter")}
+      {E.inp("Capacity · 15 bbl")}
+      {E.btn("Save vessel")}
     </>),
   },
   {
@@ -1619,10 +1646,31 @@ export const SCREENS: Screen[] = [
       {E.fld("Qty per sale", "1/124 keg per 16 oz")}
       {E.fld("Channel override", "none · inherits Taproom")}
       {E.btn("Save item mapping")}
-      {E.row("7 sales · Hazy 16 oz", "depletion", "−0.0282 bbl")}
+      {E.row("7 sales · Hazy 16 oz", "expected consumption · −0.0282 bbl", E.act("Review"))}
       {E.row("1 refund · Hazy 16 oz", "inventory credit · adjustment", "+0.0040 bbl", "w")}
       {E.note("The weekly count posts the depletion. These sales are the expected number the count is measured against.")}
       {E.btn("Reconcile 7 sales + 1 refund", "irr")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 7,
+    tab: "More",
+    group: "POS",
+    name: "POS sale detail",
+    job: "Trace one Square sale through mapping, expected barrels and reconciliation",
+    reads: "get_pos_sale [design]",
+    writes: "none [mapping changes on POS mapping]",
+    states: [["reconciled", "linked to a count", 0], ["unmapped", "held until item mapping validates", 1], ["refund", "expected consumption reverses"]],
+    spec: "The sale detail explains expected consumption only. The physical count remains the inventory write.",
+    body: (<>
+      {E.back("POS mapping", "Square sale SQ-88421")}
+      {E.row("Square Taproom · 9/02 8:14 PM", "$7.00 · completed", "SQ-88421", "ok", SquareMark)}
+      {E.row("Hazy 16 oz draft × 1", "mapped to Hazy IPA · ½ bbl keg", E.act("Open mapping"))}
+      {E.fld("Expected consumption", "1/124 keg · 0.0040 bbl")}
+      {E.fld("Sales channel", "Taproom · inherited from location")}
+      {E.row("Weekly count · 9/03", "included in expected total · count posted depletion", E.act("Open count"), "ok")}
+      {E.info("Square supplied the expected amount. No inventory movement was posted by this sale.")}
     </>),
   },
   {
@@ -1640,13 +1688,72 @@ export const SCREENS: Screen[] = [
       {E.fld("Selected pool", "Owned ½ bbl · 203 kegs · $30 deposit")}
       {E.btns([["Add keg pool", "g"], ["Save keg pool", "g"]])}
       {E.row("Owned ½ bbl", "142 out · 61 in", "203")}
-      {E.row("Ridgeline", "38 out", "$1,140")}
-      {E.row("Unreturned over 90 days", "", "9", "w")}
+      {E.nav("Customer keg balance", "Ridgeline · 38 out · $1,140")}
+      {E.nav("Keg report", "9 unreturned over 90 days")}
+      {E.nav("Keg event history", "acquired, returned, lost, found, retired")}
       {E.chips(["acquire", "return empty", "lost / found", "retire"], 1)}
       {E.fld("Customer · qty", "Ridgeline · 4 × ½ bbl")}
       {E.info("Preview: +4 returned · Ridgeline 38 → 34 out · credit memo −$120.00 deposit refund")}
       {E.note("Empty kegs only; beer return/credit is Return shipment.")}
       {E.btn("Record keg return · refund $120", "irr")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 9,
+    tab: "Beer",
+    name: "Customer keg balance",
+    job: "See every keg pool one customer has out and the deposit exposure",
+    reads: "get_customer_keg_balance [design]",
+    writes: "none",
+    states: [["current", "all pools and deposits shown"], ["overdue", "oldest unreturned kegs flagged", 1], ["none", "no kegs currently out"]],
+    spec: "The same customer-owned detail is reachable from Customers and Keg fleet.",
+    body: (<>
+      {E.back("Keg fleet", "Ridgeline Tap Room")}
+      {E.num("38 kegs", "$1,140 deposits held")}
+      {E.row("Owned ½ bbl", "34 out · $30 deposit each", "$1,020")}
+      {E.row("Owned ⅙ bbl", "4 out · $30 deposit each", "$120")}
+      {E.row("Over 90 days", "9 kegs · oldest shipped 5/12/2026", E.act("Review history"), "w")}
+      {E.info("Beer returns use Return shipment. Empty keg returns are recorded from Keg fleet.")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 9,
+    tab: "Beer",
+    name: "Keg event history",
+    job: "Audit acquired, returned, lost, found and retired keg events",
+    reads: "list_keg_events [design]",
+    writes: "none",
+    states: [["all", "newest first"], ["filtered", "customer and pool filters combine"], ["empty", "no matching events"]],
+    spec: "This is the immutable keg ledger, not an editor.",
+    body: (<>
+      {E.back("Keg fleet", "Keg event history")}
+      {E.pick("Customer", "All customers")}
+      {E.pick("Keg pool", "All pools")}
+      {E.row("Returned · Ridgeline", "9/03 · 4 × Owned ½ bbl", "Dana", "ok")}
+      {E.row("Lost · Al’s Bar", "9/01 · 1 × Owned ½ bbl", "Ali", "w")}
+      {E.row("Found · Al’s Bar", "8/30 · 1 × Owned ½ bbl", "Dana")}
+      {E.row("Acquired", "8/28 · 12 × Owned ⅙ bbl", "Avery")}
+      {E.row("Retired", "8/22 · 2 × Owned ½ bbl", "Avery")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 9,
+    tab: "Beer",
+    name: "Keg report",
+    job: "Review unreturned aging and utilization across the keg fleet",
+    reads: "get_keg_report [design]",
+    writes: "none",
+    states: [["aging", "customer balances grouped by age"], ["utilization", "out divided by active fleet"], ["empty", "no owned keg pools"]],
+    spec: "Aging identifies who needs follow-up; utilization shows whether the fleet is working or sitting.",
+    body: (<>
+      {E.back("Keg fleet", "Keg report")}
+      {E.num("70%", "142 of 203 owned half bbl kegs out")}
+      {E.tbl(["Age", "Kegs", "Deposits"], [["0–30 days", "96", "$2,880"], ["31–60 days", "25", "$750"], ["61–90 days", "12", "$360"], ["Over 90 days", "9", "$270"]])}
+      {E.row("Ridgeline Tap Room", "9 over 90 days · oldest 5/12", E.act("Open balance"), "w")}
+      {E.row("Owned ⅙ bbl", "18 of 36 out", "50% utilized")}
     </>),
   },
   {
@@ -1664,7 +1771,7 @@ export const SCREENS: Screen[] = [
       {E.back("Beer", "Tap board")}
       {E.ttl("On tap")}
       {E.chips(["Taproom", "Warehouse"], 0)}
-      {E.tiles([["1", "Pils · ½ bbl", "on Mon", 0, 71], ["2", "Hazy IPA · ½ bbl", "on Mon", 0, 62], ["3", "Stout · ⅙ bbl", "on Tue · filled 60%", 0, 34], ["4", "Amber · ½ bbl", "on Sat", 0, 88], ["5", "Helles · ½ bbl", "on Wed · nearly out", 1, 9], ["6", "Saison · ½ bbl", "on Thu", 0, 54], ["8", "Porter · ⅙ bbl", "on Fri", 0, 46], ["9", "Hazy IPA · ½ bbl", "on Thu · second keg", 1, 93], ["10", "Kolsch · ½ bbl", "on Tue", 0, 27], ["11", "Barrel Dark · ⅙ bbl", "on Sun", 0, 80], ["unnumbered", "Wild Ale · ⅙ bbl", "on Thu · sorts last", 0, 66]])}
+      {E.tiles([["1", "Pils · ½ bbl", "on Mon", 0, 71, 1], ["2", "Hazy IPA · ½ bbl", "on Mon", 0, 62, 1], ["3", "Stout · ⅙ bbl", "on Tue · filled 60%", 0, 34, 1], ["4", "Amber · ½ bbl", "on Sat", 0, 88, 1], ["5", "Helles · ½ bbl", "on Wed · nearly out", 1, 9, 1], ["6", "Saison · ½ bbl", "on Thu", 0, 54, 1], ["8", "Porter · ⅙ bbl", "on Fri", 0, 46, 1], ["9", "Hazy IPA · ½ bbl", "on Thu · second keg", 1, 93, 1], ["10", "Kolsch · ½ bbl", "on Tue", 0, 27, 1], ["11", "Barrel Dark · ⅙ bbl", "on Sun", 0, 80, 1], ["unnumbered", "Wild Ale · ⅙ bbl", "on Thu · sorts last", 0, 66, 1]])}
       {E.row("7 · Guest cider · keg", "tapped here by Dana · not our stock, no depletion", E.act("Kick"), "w")}
       {E.ttl("Open, not on a tap")}
       {E.row("Amber · ½ bbl", "packaged short · filled 60% · 0.30 bbl", E.act("Tap"), "w")}
@@ -1675,6 +1782,27 @@ export const SCREENS: Screen[] = [
       {E.row("Recent · Kolsch tapped", "Dana · Tue 4:10pm")}
       {E.row("Recent · Saison swapped in", "Ali · Thu 11:20am")}
       {E.note("Remaining is estimated from POS sales against nominal volume. Nothing on this board posts to the ledger; the weekly count does that.")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 7,
+    tab: "Beer",
+    surface: "sheet",
+    name: "Kick keg",
+    job: "Close one tap without opening a replacement keg",
+    reads: "list_open_taps [design]",
+    writes: "kick_keg [design; compare-and-swap on open interval id]",
+    states: [["empty", "tap becomes empty"], ["beer remaining", "open keg stays in taproom stock"], ["already closed", "reload before acting", 1]],
+    spec: "Kick is separate from Swap because it leaves the tap empty and needs a closing reason.",
+    body: (<>
+      {E.ttl("Kick tap 5")}
+      {E.fld("Coming off", "Helles · ½ bbl · on since Wed")}
+      {E.pick("Reason", "Kicked empty")}
+      {E.ttl("Remaining")}
+      {E.chips(["empty", "about ¼ left", "about ½ left"], 0)}
+      {E.info("Beer left in the keg remains open taproom stock and can be tapped again.")}
+      {E.btn("Kick keg", "irr")}
     </>),
   },
   {

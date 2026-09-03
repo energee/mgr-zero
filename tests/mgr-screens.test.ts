@@ -37,8 +37,8 @@ describe("SCREENS", () => {
     // A tripwire against a frame dropped by hand from a 1700-line array — the
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands; .agents/PROGRESS.md narrates
-    // what the number is made of — 103 MGR frames plus the 17 venue frames.
-    expect(SCREENS).toHaveLength(120);
+    // what the number is made of — 109 MGR frames plus the 17 venue frames.
+    expect(SCREENS).toHaveLength(126);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
 
@@ -52,6 +52,24 @@ describe("SCREENS", () => {
       const screen = SCREENS.find((s) => s.name === name);
       expect.soft(screen, name).toBeTruthy();
       expect.soft(screen?.surface, name).toBe(surface);
+    }
+  });
+
+  it("draws the missing Beer detail and history surfaces", () => {
+    const expected = new Map<string, Screen["surface"]>([
+      ["Vessel detail", undefined], ["Kick keg", "sheet"],
+      ["Customer keg balance", undefined], ["Keg event history", undefined],
+      ["Keg report", undefined], ["POS sale detail", undefined],
+    ]);
+    for (const [name, surface] of expected) {
+      const screen = SCREENS.find((s) => s.name === name);
+      expect.soft(screen, name).toBeTruthy();
+      expect.soft(screen?.surface, name).toBe(surface);
+    }
+    for (const [name, count] of [["Cellar map", 6], ["Tap board", 11]] as const) {
+      const screen = SCREENS.find((s) => s.name === name)!;
+      const html = renderToStaticMarkup(createElement("div", null, screen.body));
+      expect.soft(html.match(/<button/g)?.length ?? 0, `${name}: actionable tiles`).toBeGreaterThanOrEqual(count);
     }
   });
 
