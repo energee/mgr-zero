@@ -669,11 +669,9 @@ export const SCREENS: Screen[] = [
       {E.pick("Location", "Warehouse")}
       {E.pick("Channel", "taproom")}
       {E.pick("Destination state", "PA · where the beer is poured")}
-      {E.num("1", "keg · amounts are entered positive")}
-      {E.info("Preview: −1 keg · 0.50 bbl · festival removal · PA")}
-      {E.chips(["keg", "case", "bbl"])}
+      {E.qty("1", E.chips(["keg", "case", "bbl"]))}
+      {E.info("Preview: −1 keg · 0.50 bbl · festival removal · PA · amounts are entered positive")}
       {E.pin(<>
-        {E.pad()}
         {E.btn("Record movement", "irr")}
       </>)}
     </>),
@@ -1744,16 +1742,15 @@ export const SCREENS: Screen[] = [
     reads: "get_cellar_map [design; occupancy + last reading]",
     writes: "record_fermentation_reading [design; mutable reading row]",
     states: DEFAULT_STATES,
-    spec: "One reading may contain gravity, temperature, pH, or any combination. Blank values remain absent; prior values are reference only, never silently copied. The pad fills the highlighted field; Gravity is the default.",
+    spec: "One reading may contain gravity, temperature, pH, or any combination. Blank values remain absent; prior values are reference only, never silently copied. Each value is typed; Gravity is the default.",
     body: (<>
-      {E.row("Gravity", "1.019 SG · prior 1.021", "on pad", "w")}
-      {E.fld("Temperature", "68.2 °F · prior 67.8")}
-      {E.fld("pH", "blank · prior 4.21")}
+      {E.qty("1.019", "SG · prior 1.021", "Gravity")}
+      {E.qty("68.2", "°F · prior 67.8", "Temperature")}
+      {E.qty("", "prior 4.21", "pH")}
       {E.chips(["SG", "°P"], 0)}
       {E.info("Enter only values taken now; blanks are not rewritten.")}
       {E.inp("Note · optional")}
       {E.pin(<>
-        {E.pad()}
         {E.btn("Record reading")}
       </>)}
     </>),
@@ -1773,11 +1770,9 @@ export const SCREENS: Screen[] = [
       {E.pick("Occupancy", "FV2 · B-0416 · Hazy IPA")}
       {E.pick("Material", "Citra · hop")}
       {E.chips(["dry hop", "fermentation", "other"], 0)}
-      {E.num("18", "lb · lot L-0790 · 262 on hand")}
-      {E.chips(["lb", "oz", "kg"])}
+      {E.qty("18", E.chips(["lb", "oz", "kg"]))}
       {E.info("Preview: −18 lb Citra · L-0790 · consumption · dry hop · B-0416")}
       {E.pin(<>
-        {E.pad()}
         {E.btn("Record addition", "irr")}
       </>)}
     </>),
@@ -1856,12 +1851,11 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.pick("From", "FV1 · Pils · B-0409 · 12.8 bbl")}
       {E.pick("To", "BT1 · Pils · B-0412 · 7.0 / 10 bbl")}
-      {E.num("3.0", "bbl moving")}
+      {E.qty("3.0", "bbl", "Barrels moving")}
       {E.info("Blend preview: BT1 7.0 + 3.0 = 10.0 bbl (full) · stays B-0412 · Pils. FV1 keeps 9.8 bbl, or Record as loss books those 9.8 bbl as loss.")}
       {E.fld("Remainder in FV1", "9.8 bbl")}
       {E.chips(["Leave in FV1", "Record as loss"], 0)}
       {E.pin(<>
-        {E.pad()}
         {E.btn("Record transfer", "irr")}
       </>)}
     </>),
@@ -2069,10 +2063,9 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     body: (<>
       {E.pick("Material", "Cans · 16 oz")}
-      {E.num("3,050", "system 3,100 · variance −50 each")}
-      {E.chips(["each", "case"])}
+      {E.qty("3050", E.chips(["each", "case"]))}
+      {E.info("system 3,100 · variance −50")}
       {E.pin(<>
-        {E.pad()}
         {E.btn("Record count", "irr")}
       </>)}
     </>),
@@ -3136,12 +3129,11 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.fld("Break", "Hazy IPA · case · 24×16oz")}
       {E.fld("Location · bin", "Warehouse · Walk-in")}
-      {E.num("1", "case · amounts are entered positive")}
+      {E.qty("1", "case")}
       {E.tape([["−1 case · repack", "0.09677419 bbl"], ["+6 four-pack · repack", "derived from the case total"], ["Case tray ×1", "return to stock"], ["PakTech ×6", "consumed"]])}
       {E.info("Preview: conserves 0.09677419 bbl · same location and bin · not a TTB removal")}
       {E.fld("Damaged on break", "0 four-pack · records as loss")}
       {E.pin(<>
-        {E.pad()}
         {E.gated("Record repack", "isn’t available yet: breaking a case has nowhere correct to land")}
       </>)}
     </>),
