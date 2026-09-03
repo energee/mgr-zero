@@ -88,6 +88,29 @@ describe("SCREENS", () => {
     expect(transferHtml).not.toMatch(/border-l-2/);
   });
 
+  it("puts a stepper on quantity rows and leaves reason unchosen", () => {
+    // Issue 75: quantities were static text. Pick had no way to change a
+    // count. Short pick and Ship and invoice preselected a reason.
+    const qty = [
+      "Pick", "Receive PO", "Return and credit", "New order",
+      "Weekly count", "Schedule packaging run",
+    ];
+    for (const name of qty) {
+      const s = SCREENS.find((x) => x.name === name);
+      expect(s, name).toBeTruthy();
+      const html = renderToStaticMarkup(createElement("div", null, s!.body));
+      expect(html, name).toMatch(/aria-label="Decrease"/);
+    }
+    for (const name of ["Short pick", "Ship and invoice"]) {
+      const s = SCREENS.find((x) => x.name === name);
+      expect(s, name).toBeTruthy();
+      const html = renderToStaticMarkup(createElement("div", null, s!.body));
+      expect(html, name).toMatch(/Reason/);
+      expect(html, name).toMatch(/required/);
+      expect(html, `${name}: no reason chips`).not.toMatch(/>damaged</);
+    }
+  });
+
   it("gives the named screens one filled primary each", () => {
     // Issue 71: two filled verbs on one body fight for the commit. Outline,
     // ghost, disabled, pad keys and steppers are not the primary. A tile or
