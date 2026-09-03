@@ -37,7 +37,7 @@ describe("SCREENS", () => {
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands; .agents/PROGRESS.md narrates
     // what the number is made of — 96 MGR frames plus the 17 venue frames.
-    expect(SCREENS).toHaveLength(113);
+    expect(SCREENS).toHaveLength(124);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
 
@@ -86,6 +86,20 @@ describe("SCREENS", () => {
     const transfer = SCREENS.find((x) => x.name === "Cellar transfer")!;
     const transferHtml = renderToStaticMarkup(createElement("div", null, transfer.body));
     expect(transferHtml).not.toMatch(/border-l-2/);
+  });
+
+  it("draws locked-out landings and the composer question", () => {
+    // Issue 83: no-membership, expired invite/reset, session expiry with the
+    // outbox kept, and the composer question (chips, no Commit).
+    for (const name of ["No membership", "Expired invite", "Expired reset", "Session expired", "Composer question"]) {
+      expect(SCREENS.some((s) => s.name === name), name).toBe(true);
+    }
+    const q = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Composer question")!.body));
+    expect(q).not.toMatch(/Commit/);
+    const accept = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Accept invite")!.body));
+    expect(accept).toMatch(/name|Name/i);
+    const search = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Search")!.body));
+    expect(search).toMatch(/SKU/);
   });
 
   it("draws the driver route, put back, and ship-on-delivery work screens", () => {
