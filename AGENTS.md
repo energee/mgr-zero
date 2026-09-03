@@ -20,7 +20,7 @@ below just in time — don't preload everything.
 | --- | --- |
 | Any code change | `.agents/ARCHITECTURE.md` — ownership map and the five iron rules |
 | Setup, ports, dev login, env vars | `README.md` |
-| Any customer-visible screen, action, field, option, permission, result, error, or correction flow | `public/docs/user-guide.html` — served at `/docs/user-guide.html`; master link to separate staff and portal field manuals; update the applicable guide with the behavior |
+| Any customer-visible screen, action, field, option, permission, result, error, or correction flow | `content/docs/user-guide.html` — served at `/docs/user-guide`; master link to separate staff and portal field manuals; update the applicable guide with the behavior |
 | Schema / migration work | `.agents/ARCHITECTURE.md` conventions, then `.agents/superpowers/specs/2026-08-31-mgr-schema-design.md` (tables) and `2026-08-31-mgr-schema-decisions.md` (why) |
 | Brewing/TTB domain rules (units, loss, removals) | `.agents/superpowers/specs/brewing-domain.md` |
 | Why v1 (`~/Repos/mgr`) was left behind | `.agents/superpowers/specs/2026-08-31-mgr-v1-review.md` |
