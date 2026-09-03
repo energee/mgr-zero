@@ -173,6 +173,10 @@ describe("production-readiness workflow contract", () => {
     expect(claudeArgs).not.toContain("show_full_output");
   });
 
+  it("skips bot-maintained documentation branches", () => {
+    expect(review).toContain("github.head_ref != 'documentation/user-guide'");
+  });
+
   it("treats GitHub Actions as trusted workflow context for dreaming", () => {
     const prompt = readActionField(
       dreaming,
