@@ -18,6 +18,7 @@
 .slk{--sk-bg:#FFFFFF;--sk-ink:#1D1C1D;--sk-ink2:#616061;--sk-line:#DDDDDD;--sk-aub:#3F0E40;--sk-btn:#BBBABB;--sk-green:#007A5A;--sk-red:#E01E5A;
   background:var(--sk-bg);color:var(--sk-ink);border:1.5px solid var(--line);border-radius:8px;overflow:hidden;
   display:flex;flex-direction:column;min-width:0;max-width:100%;font:13px/1.46 "Instrument Sans",system-ui,sans-serif}
+.slk.modal{width:100%;max-width:520px;margin-inline:auto}
 .slk-top{background:var(--sk-aub);color:#fff;padding:9px 12px;font-weight:600;font-size:12px;display:flex;justify-content:space-between;gap:8px}
 .slk-top i{font-style:normal;opacity:.75;font:10px "JetBrains Mono",monospace;display:flex;align-items:center}
 .slk-tabs{display:flex;gap:18px;padding:0 12px;border-bottom:1px solid var(--sk-line);font-size:12.5px;color:var(--sk-ink2)}
@@ -45,8 +46,15 @@
 .sk-b.dan{color:var(--sk-red)}
 .sk-b.dis{opacity:.45}
 .sk-f{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px 16px;font-size:13px}
+.slk.modal .sk-f{grid-template-columns:1fr}
 .sk-f div{min-width:0;overflow-wrap:anywhere}
 .sk-f b{display:block;font-weight:700}
+.sk-control{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px}
+.sk-control b{font-weight:700}
+.sk-control button[role="switch"]{width:34px;height:20px;border:0;border-radius:999px;background:var(--sk-green);padding:2px;display:flex;justify-content:flex-end}
+.sk-control button[role="switch"][aria-checked="false"]{background:var(--sk-line);justify-content:flex-start}
+.sk-control button[role="switch"] i{width:16px;height:16px;border-radius:50%;background:#fff}
+.sk-control select{min-width:180px;border:1px solid var(--sk-line);border-radius:4px;background:#fff;padding:6px 28px 6px 8px;color:var(--sk-ink)}
 .sk-gate{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
 .bar{flex-direction:column;align-items:stretch;gap:6px}
 .barrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;min-width:0}

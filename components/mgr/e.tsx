@@ -5,6 +5,7 @@
 // Target sizing under a coarse pointer lives in app/globals.css, so nothing
 // here sets heights. Screen authors use only these and never components/ui.
 import * as React from "react";
+import { Children, Fragment, isValidElement, type ReactNode } from "react";
 import { Alert02Icon, ArrowLeft01Icon, InformationCircleIcon, SquareLock01Icon } from "@hugeicons/core-free-icons";
 import { Icon, type IconSvgElement } from "@/components/mgr/icon";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -16,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupTextarea } from "@/components/ui/input-group";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
@@ -24,9 +26,15 @@ import { cn } from "@/lib/utils";
 type RowClass = "" | "w" | "ok" | "dis";
 const dotColor: Partial<Record<RowClass, string>> = { w: "bg-warning-foreground", ok: "bg-primary" };
 const Dot = ({ cls }: { cls: RowClass }) => (dotColor[cls] ? <span className={cn("size-2 rounded-full", dotColor[cls])} /> : null);
+const TileContent = ({ n, s, g, w, f }: { n: React.ReactNode; s: React.ReactNode; g?: React.ReactNode; w?: 0 | 1; f?: number }) => (<>
+  <span className="flex items-center gap-1.5 font-medium text-sm leading-none">{w ? <Dot cls="w" /> : null}{n}</span>
+  <span className="text-muted-foreground text-sm leading-normal">{s}</span>
+  {g ? <span className="text-muted-foreground text-sm leading-normal">{g}</span> : null}
+  {f != null && <span className="mt-1 block h-1 w-full overflow-hidden rounded-full bg-muted"><i className="block h-full bg-primary" style={{ width: `${f}%` }} /></span>}
+</>);
 
-/** Button kinds: p = primary, g = secondary/outline, irr = irreversible (teal); " disabled" suffix draws a gated action. */
-type BtnBase = "p" | "g" | "irr";
+/** Button kinds: p = primary, g = secondary/outline, ghost = quiet, irr = irreversible (teal); " disabled" suffix draws a gated action. */
+type BtnBase = "p" | "g" | "ghost" | "irr";
 type BtnKind = BtnBase | `${BtnBase} disabled`;
 
 export const E = {
@@ -61,12 +69,20 @@ export const E = {
     </Item>
   ),
   /** A row's trailing action verb (Pick, Confirm, Resume) as a real target. */
-  act: (t: React.ReactNode) => <Button variant="ghost" size="sm">{t}</Button>,
+  act: (t: React.ReactNode) => <Button variant="ghost" size="sm" data-row-action>{t}</Button>,
+  /** A status word. Never clickable. */
+  status: (t: React.ReactNode, tone: "ok" | "w" | "" = "") => (
+    <Badge variant={tone === "w" ? "secondary" : "outline"} className="gap-1.5">
+      {tone === "ok" ? <Dot cls="ok" /> : null}{t}
+    </Badge>
+  ),
+  /** An on/off setting. */
+  sw: (on: boolean, label: string) => <Switch defaultChecked={on} aria-label={label} />,
   btn: (t: React.ReactNode, k: BtnKind = "p") => {
     const [kind, disabled] = k.split(" ") as [BtnBase, string?];
     return (
       <Button
-        variant={kind === "g" ? "outline" : "default"}
+        variant={kind === "g" ? "outline" : kind === "ghost" ? "ghost" : "default"}
         disabled={Boolean(disabled)}
         className={cn(kind === "irr" && "bg-irreversible text-irreversible-foreground hover:bg-irreversible/90")}
         {...(kind === "irr" ? { "data-variant": "irreversible" } : {})}
@@ -96,16 +112,22 @@ export const E = {
     </ToggleGroup>
   ),
   pad: () => (
-    <div className="mt-auto grid grid-cols-3 gap-2">
+    <div className="grid grid-cols-3 gap-2">
       {"1 2 3 4 5 6 7 8 9 . 0 ⌫".split(" ").map((k) => (
         <Button key={k} variant="outline" size="lg">{k}</Button>
       ))}
     </div>
   ),
+  /** Pad + commit; CommandForm lifts this out of the scroll region so the verb stays on the phone. */
+  pin: (t: React.ReactNode) => (
+    <div data-pin className="flex flex-col gap-2">
+      {t}
+    </div>
+  ),
   tape: (arr: [React.ReactNode, React.ReactNode?][]) => (
     <ol className="ml-1 flex flex-col gap-1 border-l-2 pl-3 font-mono text-xs text-muted-foreground">
       {arr.map(([a, b], i) => (
-        <li key={i} className="flex justify-between gap-2">
+        <li key={i} className="flex justify-between gap-2 [overflow-wrap:anywhere]">
           <span className="text-foreground">{a}</span>
           <span>{b ?? ""}</span>
         </li>
@@ -118,6 +140,8 @@ export const E = {
       <span className="text-right">{v}</span>
     </div>
   ),
+  /** A filled value the user can change. */
+  pick: (k: React.ReactNode, v: React.ReactNode) => E.fld(k, <>{v}<span className="ml-2 text-muted-foreground">›</span></>),
   // The amber box and the quiet box differed only by tint; the glyph is the
   // second channel, so the difference survives a dim screen or a colorblind eye.
   note: (t: React.ReactNode) => (
@@ -153,27 +177,17 @@ export const E = {
       ))}
     </div>
   ),
-  tiles: (arr: [React.ReactNode, React.ReactNode, React.ReactNode?, (0 | 1)?, number?][]) => (
-    <ItemGroup className="grid grid-cols-3 gap-2">
+  tiles: (arr: [React.ReactNode, React.ReactNode, React.ReactNode?, (0 | 1)?, number?][], c: "c2" | "c3" = "c3") => (
+    <ItemGroup className={cn("grid gap-2", c === "c2" ? "grid-cols-2" : "grid-cols-3")}>
       {arr.map(([n, s, g, w, f], i) => (
-        <Item key={i} variant="outline" size="sm" className="flex-col items-start gap-0.5">
-          <ItemTitle className="flex items-center gap-1.5">
-            {w ? <Dot cls="w" /> : null}
-            {n}
-          </ItemTitle>
-          <ItemDescription>{s}</ItemDescription>
-          {g ? <ItemDescription>{g}</ItemDescription> : null}
-          {f != null && (
-            <span className="mt-1 block h-1 w-full overflow-hidden rounded-full bg-muted">
-              <i className="block h-full bg-primary" style={{ width: `${f}%` }} />
-            </span>
-          )}
+        <Item key={i} variant="outline" size="sm" className="flex-col items-start gap-0.5" asChild>
+          <button type="button"><TileContent {...{ n, s, g, w, f }} /></button>
         </Item>
       ))}
     </ItemGroup>
   ),
   tbl: (hd: React.ReactNode[], rows: React.ReactNode[][]) => (
-    <Table>
+    <Table className="min-w-max">
       <TableHeader>
         <TableRow>
           {hd.map((h, i) => (
@@ -199,11 +213,11 @@ export const E = {
     </Empty>
   ),
   inp: (t: string) => <Input placeholder={t} aria-label={t} />,
-  stq: (v: React.ReactNode) => (
+  stq: (v: number, label = "Quantity") => (
     <ButtonGroup>
       <Button variant="outline" size="icon" aria-label="Decrease">−</Button>
+      <Input type="number" inputMode="numeric" min={0} defaultValue={v} aria-label={label} className="w-14 text-center" />
       <Button variant="outline" size="icon" aria-label="Increase">+</Button>
-      <span className="flex items-center px-2 text-sm">{v}</span>
     </ButtonGroup>
   ),
   gated: (t: React.ReactNode, why: React.ReactNode = "isn’t available yet") => E.row(t, why, "", "dis", SquareLock01Icon),
@@ -218,3 +232,18 @@ export const E = {
     </InputGroup>
   ),
 };
+
+function isPin(n: ReactNode) {
+  return isValidElement(n) && Boolean((n.props as { "data-pin"?: unknown })["data-pin"]);
+}
+
+/** Lift `E.pin` out of a fragment body so CommandForm can keep it on screen. */
+export function splitPinned(body: ReactNode) {
+  const raw = isValidElement(body) && body.type === Fragment
+    ? (body.props as { children?: ReactNode }).children
+    : body;
+  const rest: ReactNode[] = [];
+  const pin: ReactNode[] = [];
+  for (const n of Children.toArray(raw)) (isPin(n) ? pin : rest).push(n);
+  return { rest, pin };
+}

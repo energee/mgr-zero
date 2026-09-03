@@ -17,6 +17,7 @@ export function CommandForm({
   onOpenChange,
   trigger,
   title,
+  footer,
   children,
 }: {
   open: boolean;
@@ -25,17 +26,23 @@ export function CommandForm({
   /** Omit when the caller controls `open` itself (the design gallery). */
   trigger?: React.ReactNode;
   title: React.ReactNode;
+  /** Stays on screen; the body scrolls. Keypad sheets put the pad and verb here. */
+  footer?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  // bleed: the dialog body and footer pull out to DialogContent's own padding so a focus ring and the divider reach the edge; the sheet has none to undo.
+  const body = (bleed: string) => <div className={cn("min-h-0 flex-1 overflow-y-auto px-4 py-1", bleed)}>{children}</div>;
+  const foot = (bleed: string) => footer && <div className={cn("shrink-0 border-t px-4 pt-2", bleed)}>{footer}</div>;
   if (useIsMobile()) {
     return (
       <Sheet open={open} onOpenChange={onOpenChange}>
         {trigger && <SheetTrigger asChild>{trigger}</SheetTrigger>}
-        <SheetContent side="bottom" className="max-h-[90svh] overflow-y-auto rounded-t-xl pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <SheetHeader className="pb-0">
+        <SheetContent side="bottom" className="flex max-h-[90svh] flex-col overflow-hidden rounded-t-xl pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <SheetHeader className="shrink-0 pb-0">
             <SheetTitle>{title}</SheetTitle>
           </SheetHeader>
-          <div className="px-4">{children}</div>
+          {body("")}
+          {foot("")}
         </SheetContent>
       </Sheet>
     );
@@ -43,11 +50,12 @@ export function CommandForm({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-      <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[90svh] flex-col overflow-hidden sm:max-w-md">
+        <DialogHeader className="shrink-0">
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        {children}
+        {body("-mx-4")}
+        {foot("-mx-4")}
       </DialogContent>
     </Dialog>
   );
