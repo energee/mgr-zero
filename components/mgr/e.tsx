@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Empty, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
-import { InputGroup, InputGroupAddon, InputGroupTextarea } from "@/components/ui/input-group";
+import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupTextarea } from "@/components/ui/input-group";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -104,6 +104,13 @@ export const E = {
       <div className="text-xs text-muted-foreground">{s}</div>
     </div>
   ),
+  /** A typed quantity: the OS keyboard is the keypad. unit renders as a trailing addon. */
+  qty: (value: string, unit?: React.ReactNode, label = "Quantity") => (
+    <InputGroup>
+      <InputGroupInput type="number" inputMode="decimal" step="any" defaultValue={value} aria-label={label} className="text-2xl font-semibold" />
+      {unit ? <InputGroupAddon align="inline-end">{unit}</InputGroupAddon> : null}
+    </InputGroup>
+  ),
   chips: (arr: string[], on = 0) => (
     <ToggleGroup type="single" value={arr[on]} variant="outline" size="sm" className="flex-wrap justify-start">
       {arr.map((c) => (
@@ -111,14 +118,7 @@ export const E = {
       ))}
     </ToggleGroup>
   ),
-  pad: () => (
-    <div className="grid grid-cols-3 gap-2">
-      {"1 2 3 4 5 6 7 8 9 . 0 ⌫".split(" ").map((k) => (
-        <Button key={k} variant="outline" size="lg">{k}</Button>
-      ))}
-    </div>
-  ),
-  /** Pad + commit; CommandForm lifts this out of the scroll region so the verb stays on the phone. */
+  /** Commit; CommandForm lifts this out of the scroll region so the verb stays on the phone. */
   pin: (t: React.ReactNode) => (
     <div data-pin className="flex flex-col gap-2">
       {t}

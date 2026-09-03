@@ -26,7 +26,7 @@ export function CommandForm({
   /** Omit when the caller controls `open` itself (the design gallery). */
   trigger?: React.ReactNode;
   title: React.ReactNode;
-  /** Stays on screen; the body scrolls. Keypad sheets put the pad and verb here. */
+  /** Stays on screen; the body scrolls. Quantity sheets put the commit verb here. */
   footer?: React.ReactNode;
   children: React.ReactNode;
 }) {
