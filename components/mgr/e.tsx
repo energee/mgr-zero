@@ -118,6 +118,8 @@ export const E = {
       <span className="text-right">{v}</span>
     </div>
   ),
+  /** A filled value the user can change. */
+  pick: (k: React.ReactNode, v: React.ReactNode) => E.fld(k, <>{v}<span className="ml-2 text-muted-foreground">›</span></>),
   // The amber box and the quiet box differed only by tint; the glyph is the
   // second channel, so the difference survives a dim screen or a colorblind eye.
   note: (t: React.ReactNode) => (
