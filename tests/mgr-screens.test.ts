@@ -41,6 +41,18 @@ describe("SCREENS", () => {
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
 
+  it("draws customer copy, not markup escapes or machine identifiers", () => {
+    // Bodies are what a brewer reads on the glass. A literal "&frac12;" is a
+    // string React never decodes, and "record_movement" is the wire name of a
+    // command, not its label. reads/writes/spec/states are builder-facing and
+    // exempt — they name registry IDs on purpose.
+    for (const s of SCREENS) {
+      const text = renderToStaticMarkup(createElement("div", null, s.hd, s.body)).replace(/<[^>]*>/g, " ");
+      expect.soft(text, `${s.name}: HTML entity in copy`).not.toMatch(/&(?:[a-z]+|#\d+);/);
+      expect.soft(text, `${s.name}: snake_case identifier in copy`).not.toMatch(/[a-z]+_[a-z_]+/);
+    }
+  });
+
   it("gives sheets no separate header; their title is the record name", () => {
     expect(SCREENS.filter((s) => s.surface === "sheet" && s.hd)).toEqual([]);
   });

@@ -395,7 +395,7 @@ export const SCREENS: Screen[] = [
       {E.num("11", "ATP · 15 on hand · 4 allocated")}
       {E.row("Warehouse", "", "12")}
       {E.row("Taproom", "", "3")}
-      {E.tape([["+8 production_in · Warehouse", "Mon"], ["−4 taproom_transfer", "Tue"], ["−1 depletion · Taproom", "Wed"]])}
+      {E.tape([["+8 production in · Warehouse", "Mon"], ["−4 taproom transfer", "Tue"], ["−1 depletion · Taproom", "Wed"]])}
       {E.btn("Record movement")}
       {E.gated("Reverse a movement")}
     </>),
@@ -497,9 +497,9 @@ export const SCREENS: Screen[] = [
     states: [["response lost", "Server dedupe returns prior result"], ["permanent", "Open form; preserve fields", 1], ["session expired", "Sign in; keep queue"], ["permission changed", "Do not replay; explain", 1]],
     spec: "The discard confirmation names every queued write; response loss resolves by requestId and shows the prior result.",
     body: (<>
-      {E.row("record_movement · Hazy", "waiting for wifi", E.act("Retry"))}
-      {E.row("record_fermentation_reading · FV3", "response lost", E.act("Check"))}
-      {E.row("record_cellar_transfer · FV2", "validation failed", E.act("Fix"), "w")}
+      {E.row("Record movement · Hazy", "waiting for wifi", E.act("Retry"))}
+      {E.row("Record fermentation reading · FV3", "response lost", E.act("Check"))}
+      {E.row("Record cellar transfer · FV2", "validation failed", E.act("Fix"), "w")}
       {E.btn("Retry eligible")}
       {E.note("Discarding deletes these 3 unsent writes.")}
       {E.btn("Discard 3 queued writes", "irr")}
@@ -614,7 +614,7 @@ export const SCREENS: Screen[] = [
       {E.chips(["damaged", "not found", "customer cut"], 0)}
       {E.fld("Carrier · tracking", "optional")}
       {E.chips(["Invoice now", "On delivery"], 0)}
-      {E.tape([["−4 Hazy ½ bbl · sale_removal · PA", "2.00 bbl"], ["−9 Pils cases · sale_removal · PA", "0.42 bbl"], ["1 Pils case released · restock", ""], ["invoice number", "assigned on commit"]])}
+      {E.tape([["−4 Hazy ½ bbl · sale removal · PA", "2.00 bbl"], ["−9 Pils cases · sale removal · PA", "0.42 bbl"], ["1 Pils case released · restock", ""], ["invoice number", "assigned on commit"]])}
       {E.sp()}
       {E.btn("Ship order", "irr")}
     </>),
@@ -635,7 +635,7 @@ export const SCREENS: Screen[] = [
       {E.row("Hazy IPA · ½ bbl keg", "ship / picked", "4 / 4", "ok")}
       {E.row("Pils · 16 oz case", "ship / picked", "10 / 10", "ok")}
       {E.chips(["Invoice now", "On delivery"], 1)}
-      {E.tape([["−4 Hazy ½ bbl · sale_removal · PA", "2.00 bbl"], ["−10 Pils cases · sale_removal · PA", "0.47 bbl"], ["invoice number", "deferred to delivery"]])}
+      {E.tape([["−4 Hazy ½ bbl · sale removal · PA", "2.00 bbl"], ["−10 Pils cases · sale removal · PA", "0.47 bbl"], ["invoice number", "deferred to delivery"]])}
       {E.note("Shipping on delivery isn’t available yet — invoice timing can’t be saved. Choose Invoice now to ship today.")}
       {E.sp()}
       {E.btn("Ship order", "irr disabled")}
@@ -656,7 +656,7 @@ export const SCREENS: Screen[] = [
       {E.fld("From → to", "Warehouse → Taproom")}
       {E.row("Pils · 16 oz case", "move / picked", "4 / 4", "ok")}
       {E.row("Hazy IPA · ½ bbl keg", "move / picked", "2 / 2", "ok")}
-      {E.tape([["−4 Pils cases · taproom_transfer · Warehouse", "0.19 bbl"], ["+4 Pils cases · taproom_transfer · Taproom", "0.19 bbl"], ["−2 / +2 Hazy ½ bbl · taproom_transfer", "1.00 bbl"]])}
+      {E.tape([["−4 Pils cases · taproom transfer · Warehouse", "0.19 bbl"], ["+4 Pils cases · taproom transfer · Taproom", "0.19 bbl"], ["−2 / +2 Hazy ½ bbl · taproom transfer", "1.00 bbl"]])}
       {E.info("No invoice: this is an internal move.")}
       {E.sp()}
       {E.btn("Complete transfer", "irr")}
@@ -759,7 +759,7 @@ export const SCREENS: Screen[] = [
       {E.chips(["damaged", "wrong item", "unsold"])}
       {E.fld("Return to", "Warehouse · original fulfillment source")}
       {E.row("Deposit refund", "½ bbl pool · 1", "−$30.00")}
-      {E.tape([["+1 Hazy ½ bbl · return_in", "Warehouse"], ["credit memo number · on commit", "−$180.00"]])}
+      {E.tape([["+1 Hazy ½ bbl · return in", "Warehouse"], ["credit memo number · on commit", "−$180.00"]])}
       {E.note("Empty-keg asset returns are a different Keg fleet command.")}
       {E.sp()}
       {E.btn("Return shipment", "irr")}
@@ -1119,10 +1119,10 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.fld("Occupancy", "FV2 · B-0416 · Hazy IPA")}
       {E.fld("Material", "Citra · hop")}
-      {E.chips(["dry_hop", "fermentation", "other"], 0)}
+      {E.chips(["dry hop", "fermentation", "other"], 0)}
       {E.num("18", "lb · lot L-0790 · 262 on hand")}
       {E.chips(["lb", "oz", "kg"])}
-      {E.info("Preview: −18 lb Citra · L-0790 · consumption · dry_hop · B-0416")}
+      {E.info("Preview: −18 lb Citra · L-0790 · consumption · dry hop · B-0416")}
       {E.pad()}
       {E.btn("Record addition", "irr")}
     </>),
@@ -1191,7 +1191,7 @@ export const SCREENS: Screen[] = [
       {E.fld("Packaged", "118 cases")}
       {E.fld("Lot", "L-240905-HZ")}
       {E.fld("Finished goods destination", "Warehouse · selected")}
-      {E.tape([["FV3 · occupancy/B-0416", "source revalidated"], ["+118 cases · production_in", "Warehouse · new lot"], ["−2,832 cans + ends · consumption", "FIFO"], ["Labels returned / damaged", "24 / 6"], ["Beer loss · 0.30 bbl", "yield 97.9%"]])}
+      {E.tape([["FV3 · occupancy/B-0416", "source revalidated"], ["+118 cases · production in", "Warehouse · new lot"], ["−2,832 cans + ends · consumption", "FIFO"], ["Labels returned / damaged", "24 / 6"], ["Beer loss · 0.30 bbl", "yield 97.9%"]])}
       {E.btns([["Print labels · lot / keg collar", "g"], ["Close packaging run", "irr"]])}
     </>),
   },
@@ -1289,7 +1289,7 @@ export const SCREENS: Screen[] = [
       {E.chips(["per bbl", "15 bbl", "30 bbl"], 1)}
       {E.row("2-row", "mash · 44 lb / bbl", "660 lb")}
       {E.row("Citra", "boil · 10 min · 0.4 lb / bbl", "6 lb")}
-      {E.row("Citra", "dry_hop · day 4 · 1.2 lb / bbl", "18 lb")}
+      {E.row("Citra", "dry hop · day 4 · 1.2 lb / bbl", "18 lb")}
       {E.row("+ add ingredient", "material · stage · timing", "")}
       {E.fld("Mash temp", "152 °F")}
       {E.fld("Brewhouse efficiency", "72 %")}
@@ -1359,7 +1359,7 @@ export const SCREENS: Screen[] = [
       {E.nav("Square Events", "new · 42 held sales since Aug 12", "w")}
       {E.btn("Save location mapping")}
       {E.row("“Hazy 16 oz draft”", "exact SKU/package", E.act("Hazy IPA · ½ bbl keg"))}
-      {E.fld("qty_per_sale", "1/124 keg per 16 oz")}
+      {E.fld("Qty per sale", "1/124 keg per 16 oz")}
       {E.fld("Channel override", "none · inherits Taproom")}
       {E.btn("Save item mapping")}
       {E.row("7 sales · Hazy 16 oz", "depletion", "−0.0282 bbl")}
@@ -1406,11 +1406,11 @@ export const SCREENS: Screen[] = [
       {E.hd("Back · Beer", "Tap board")}
       {E.ttl("On tap")}
       {E.chips(["Taproom", "Warehouse"], 0)}
-      {E.tiles([["1", "Pils · &frac12; bbl", "on Mon", 0, 71], ["2", "Hazy IPA · &frac12; bbl", "on Mon", 0, 62], ["3", "Stout · &frac16; bbl", "on Tue · filled 60%", 0, 34], ["4", "Amber · &frac12; bbl", "on Sat", 0, 88], ["5", "Helles · &frac12; bbl", "on Wed · nearly out", 1, 9], ["6", "Saison · &frac12; bbl", "on Thu", 0, 54], ["8", "Porter · &frac16; bbl", "on Fri", 0, 46], ["9", "Hazy IPA · &frac12; bbl", "on Thu · second keg", 1, 93], ["10", "Kolsch · &frac12; bbl", "on Tue", 0, 27], ["11", "Barrel Dark · &frac16; bbl", "on Sun", 0, 80], ["—", "Wild Ale · &frac16; bbl", "on Thu · no number", 0, 66]])}
+      {E.tiles([["1", "Pils · ½ bbl", "on Mon", 0, 71], ["2", "Hazy IPA · ½ bbl", "on Mon", 0, 62], ["3", "Stout · ⅙ bbl", "on Tue · filled 60%", 0, 34], ["4", "Amber · ½ bbl", "on Sat", 0, 88], ["5", "Helles · ½ bbl", "on Wed · nearly out", 1, 9], ["6", "Saison · ½ bbl", "on Thu", 0, 54], ["8", "Porter · ⅙ bbl", "on Fri", 0, 46], ["9", "Hazy IPA · ½ bbl", "on Thu · second keg", 1, 93], ["10", "Kolsch · ½ bbl", "on Tue", 0, 27], ["11", "Barrel Dark · ⅙ bbl", "on Sun", 0, 80], ["—", "Wild Ale · ⅙ bbl", "on Thu · no number", 0, 66]])}
       {E.row("7 · Guest cider · keg", "tapped here by Dana · not our stock, no depletion", E.act("Kick"), "w")}
       {E.ttl("Open, not on a tap")}
-      {E.row("Amber · &frac12; bbl", "packaged short · filled 60% · 0.30 bbl", E.act("Tap"), "w")}
-      {E.row("Stout · &frac16; bbl", "pulled off tap 9 Sun · ~40% left", E.act("Tap"), "w")}
+      {E.row("Amber · ½ bbl", "packaged short · filled 60% · 0.30 bbl", E.act("Tap"), "w")}
+      {E.row("Stout · ⅙ bbl", "pulled off tap 9 Sun · ~40% left", E.act("Tap"), "w")}
       {E.info("A keg that was never filled to nominal enters stock open, not sealed. It counts as beer, not as a keg, and it is meant to be used next.")}
       {E.info("Ten taps numbered 1–11 with no 7 — numbers are yours, sparse is normal, and MGR neither generates nor renumbers them. Unnumbered kegs sort last.")}
       {E.btns(["Swap keg", "Kicked"])}
@@ -1433,13 +1433,13 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.row("Already swapped", "Helles was swapped out at 7:42pm by Ali", E.act("Reload"), "w")}
       {E.ttl("Coming off")}
-      {E.fld("Tap 5", "Helles · &frac12; bbl · on since Wed")}
-      {E.chips(["empty", "about &frac14; left", "about &frac12; left"], 0)}
+      {E.fld("Tap 5", "Helles · ½ bbl · on since Wed")}
+      {E.chips(["empty", "about ¼ left", "about ½ left"], 0)}
       {E.ttl("Going on")}
-      {E.nav("Helles · &frac12; bbl", "taproom stock · 4 available · same brand")}
+      {E.nav("Helles · ½ bbl", "taproom stock · 4 available · same brand")}
       {E.row("Not our stock", "guest or event keg · no depletion, no variance", E.act("Off"))}
       {E.inp("Name · Guest cider")}
-      {E.chips(["&frac12; bbl", "&frac16; bbl", "50 L"], 0)}
+      {E.chips(["½ bbl", "⅙ bbl", "50 L"], 0)}
       {E.fld("Tap number", "5 · optional")}
       {E.info("Remaining is a rough call, not a measurement — it only feeds the yield report and never the ledger.")}
       {E.btn("Swap · one record", "irr")}
@@ -1666,7 +1666,7 @@ export const SCREENS: Screen[] = [
       {E.nav("DTC", "taxable · 34 movements")}
       {E.nav("Export", "export · 6 movements")}
       {E.fld("Channel name", "Export")}
-      {E.chips(["taxable", "export", "vessel_supplies", "research", "transfer_in_bond"], 1)}
+      {E.chips(["taxable", "export", "vessel supplies", "research", "transfer in bond"], 1)}
       {E.info("Customers may override this. A taproom depletion has no customer and takes the channel default.")}
       {E.note("A channel with movements cannot be deleted.")}
       {E.gated("Save channel", "isn’t available yet — channels are still a fixed list")}
@@ -1692,7 +1692,7 @@ export const SCREENS: Screen[] = [
       {E.row("four-pack", "qty 6", E.act("Remove"))}
       {E.row("+ add component", "child format · qty", "")}
       {E.ttl("Packaging BOM")}
-      {E.tbl(["Material", "Qty", "On break"], [["Case tray", "1", "return_to_stock"], ["PakTech", "0", "consumed"]])}
+      {E.tbl(["Material", "Qty", "On break"], [["Case tray", "1", "return to stock"], ["PakTech", "0", "consumed"]])}
       {E.info("One level only: a case breaks into four-packs, never straight into cans.")}
       {E.gated("Save format", "isn’t available yet — package facts still live on each SKU")}
     </>),
@@ -1759,7 +1759,7 @@ export const SCREENS: Screen[] = [
       {E.fld("Location · bin", "Warehouse · Walk-in")}
       {E.num("1", "case · amounts are entered positive")}
       {E.pad()}
-      {E.tape([["−1 case · repack", "0.09677419 bbl"], ["+6 four-pack · repack", "derived from the case total"], ["Case tray ×1", "return_to_stock"], ["PakTech ×6", "consumed"]])}
+      {E.tape([["−1 case · repack", "0.09677419 bbl"], ["+6 four-pack · repack", "derived from the case total"], ["Case tray ×1", "return to stock"], ["PakTech ×6", "consumed"]])}
       {E.info("Preview: conserves 0.09677419 bbl · same location and bin · not a TTB removal")}
       {E.fld("Damaged on break", "0 four-pack · records as loss")}
       {E.gated("Record repack", "isn’t available yet — breaking a case has nowhere correct to land")}
