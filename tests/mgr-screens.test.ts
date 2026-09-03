@@ -150,6 +150,10 @@ describe("SCREENS", () => {
     const tierText = renderToStaticMarkup(createElement("div", null, tier.body)).replace(/<[^>]*>/g, " ");
     expect(tierText).toContain("$150.00");
     expect(tierText).not.toContain("$185.00");
+    const history = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Invoice history")!.body));
+    expect(history.match(/INV-1042/g)).toHaveLength(1);
+    expect(history).not.toContain("INV-0198");
+    expect(history).toContain("Pay");
   });
 
   it("marks pickable fields and never pins Required on a filled one", () => {
@@ -282,6 +286,8 @@ describe("SCREENS", () => {
     expect(pickSheet).toMatch(/Thu/);
     const pick = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Pick")!.body));
     expect(pick).toMatch(/Print/);
+    const deliveryStatus = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Confirm delivery")!.body));
+    expect(deliveryStatus).not.toContain(">›<");
     const receive = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Receive PO")!.body));
     expect(receive).not.toMatch(/Send PO/);
     const close = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Close packaging run")!.body));

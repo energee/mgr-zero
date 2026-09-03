@@ -1642,8 +1642,7 @@ export const SCREENS: Screen[] = [
     states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
     body: (<>
       {E.hd("Invoices", "Ridgeline")}
-      {E.row(INV.no, `due ${INV.dueShort}`, INV.total, "w")}
-      {E.row("INV-0198", "overdue · due 9/18", E.act("Pay"), "w")}
+      {E.row(INV.no, `overdue · due ${INV.dueShort} · ${INV.total}`, E.act("Pay"), "w")}
       {E.row("INV-0190", "paid 8/29", "$980", "ok")}
     </>),
   },
@@ -2641,7 +2640,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Driver route", "Route A · Stop 1 of 3")}
       {E.ttl("Ridgeline Tap Room")}
-      {E.pick("Invoice timing", "On delivery · saved")}
+      {E.fld("Invoice timing", "On delivery · saved")}
       {E.row("Hazy IPA · ½ bbl keg", "", "4")}
       {E.row("Pils · 16 oz case", "", "6")}
       {E.chips(["Dana", "Chris"], -1)}
