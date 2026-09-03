@@ -2,7 +2,7 @@
 // logs in, adds a sku to the cart, submits an order, and sees it on the
 // orders list. Seeds its own brewery/customer via the admin client (same
 // pattern as tests/commands-portal.test.ts); not part of the vitest suite
-// or CI — run with `npm run test:e2e` against a running `npx supabase
+// or CI — run with `bun run test:e2e` against a running `bunx supabase
 // start` + `.env.local`.
 //
 // Drives the browser with `agent-browser` (Vercel's browser automation
@@ -15,7 +15,7 @@
 // status: `.ecc/benchmarks/e2e-engines-2026-08-31.json`.
 //
 // The engine list is still a loop, so re-testing a newer lightpanda nightly
-// is `E2E_ENGINES=lightpanda,chrome npm run test:e2e`: each engine gets a
+// is `E2E_ENGINES=lightpanda,chrome bun run test:e2e`: each engine gets a
 // fresh seed and the full flow, on ANY failure (connect error, crash, page
 // error, or failed assertion) it moves to the next, and the name of the
 // engine that satisfied every assertion is printed.
@@ -45,7 +45,7 @@ function ab(session: string, args: string[], engine?: Engine): unknown {
   const argv = ["agent-browser", "--session", session, ...engineArgs, ...args, "--json"];
   let out: string;
   try {
-    out = execFileSync("npx", argv, { encoding: "utf8", timeout: 35000, stdio: ["ignore", "pipe", "pipe"] });
+    out = execFileSync("bunx", argv, { encoding: "utf8", timeout: 35000, stdio: ["ignore", "pipe", "pipe"] });
   } catch (err) {
     // execFileSync throws on non-zero exit; agent-browser still writes its
     // JSON error envelope to stdout in that case, so surface it if we can.
@@ -56,7 +56,7 @@ function ab(session: string, args: string[], engine?: Engine): unknown {
         const parsed = JSON.parse(stdout) as AbResult;
         if (parsed.error) message = parsed.error;
       } catch {
-        // stdout wasn't JSON (e.g. the npx/spawn error itself); keep the raw message
+        // stdout wasn't JSON (e.g. the bunx/spawn error itself); keep the raw message
       }
     }
     throw new Error(`agent-browser ${args.join(" ")} failed: ${message}`);
@@ -75,7 +75,7 @@ function ab(session: string, args: string[], engine?: Engine): unknown {
 
 function closeSession(session: string) {
   try {
-    execFileSync("npx", ["agent-browser", "--session", session, "close", "--json"], {
+    execFileSync("bunx", ["agent-browser", "--session", session, "close", "--json"], {
       encoding: "utf8",
       timeout: 15000,
       stdio: ["ignore", "pipe", "pipe"],
@@ -192,9 +192,9 @@ async function waitForServer(timeoutMs = 60000) {
 }
 
 function startDevServer(): ChildProcess {
-  // detached so the process group (npm + the `next` it spawns) can be
+  // detached so the process group (bun + the `next` it spawns) can be
   // killed together via a negative pid, instead of leaking `next`'s child.
-  const child = spawn("npm", ["run", "dev", "--", "-p", String(PORT)], {
+  const child = spawn("bun", ["run", "dev", "--", "-p", String(PORT)], {
     stdio: ["ignore", "pipe", "pipe"],
     detached: true,
   });

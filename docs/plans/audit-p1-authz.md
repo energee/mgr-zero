@@ -83,4 +83,4 @@
 
 **Review:** Run database and security reviewers over the SQL, grants, direct Data API paths, token boundary, and portal RPCs; resolve every legitimate finding.
 
-**Acceptance:** Focused tests pass, then `npx vitest run && npx tsc --noEmit && npm run lint`; Supabase advisors are recorded without chasing out-of-scope index findings; branch/status are rechecked before logical commits; nothing is pushed.
+**Acceptance:** Focused tests pass, then `bun run test && bunx tsc --noEmit && bun run lint`; Supabase advisors are recorded without chasing out-of-scope index findings; branch/status are rechecked before logical commits; nothing is pushed.

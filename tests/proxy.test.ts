@@ -38,8 +38,13 @@ beforeEach(() => {
 });
 
 describe("Supabase proxy refresh", () => {
-  it("does not refresh sessions for the customer guides", () => {
-    expect(new RegExp(`^${config.matcher[0]}$`).test("/docs/staff-guide")).toBe(false);
+  it("does not refresh sessions for the customer guides or their search", () => {
+    const matches = (path: string) => new RegExp(`^${config.matcher[0]}$`).test(path);
+    // /docs is the master chooser - the primary public entry point, not just a prefix.
+    expect(matches("/docs")).toBe(false);
+    expect(matches("/docs/staff-guide")).toBe(false);
+    expect(matches("/api/search")).toBe(false);
+    expect(matches("/inventory")).toBe(true);
   });
 
   it("forwards refreshed cookies through one current request override", async () => {

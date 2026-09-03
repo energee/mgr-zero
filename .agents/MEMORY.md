@@ -8,6 +8,7 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
 - Setup, ports, dev login: `README.md`. Ownership + iron rules: `.agents/ARCHITECTURE.md`.
 
 ## Decisions
+- **2026-09-02 — Bun is the package manager.** Installs and scripts go through Bun (`bun install`, `bun run`, `bunx`); Node 22 remains the Next.js runtime. The committed lockfile is `bun.lock` only.
 - **2026-09-02 — `components/mgr/screens.tsx` is the source of truth for MGR screens.** The HTML wireframe seeded the records once and is retired for MGR-venue frames (kept for Slack/QuickBooks/Square venue drawings). Design review happens at `/design`; edit the typed records directly, never regenerate.
 - One baseline migration covering all ten slices (58 tables) instead of accumulating migrations. Pre-deploy, the baseline is edited in place. Details: `.agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md`.
 - Product spec: `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md`.
@@ -78,7 +79,7 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
 - `Unregistered API key` / `Invalid API key` with no Postgres error code means the key was rejected before PostgREST: URL and key are from different Supabase instances. Check `NEXT_PUBLIC_SUPABASE_URL` first; `curl -sD- -H "apikey: $KEY" "$URL/rest/v1/"` gives the real answer.
 - `security definer` functions get PUBLIC execute by default; revoke from `public, anon` or the RLS helpers are callable unauthenticated (gated by `tests/schema-rules.test.ts`).
 - One local Supabase stack serves every worktree. A `supabase db reset` in another session silently swaps the loaded baseline; the tell is a burst of "relation does not exist" / undefined-column failures across suites. Reset from your own worktree and run the suite immediately; if it flips mid-run, check `docker ps` for a freshly restarted `supabase_db_mgr`.
-- Worktrees don't inherit `.env.local` (gitignored, per-checkout) — `npm test`/`npm run dev`/`npm run test:e2e` in a fresh worktree fail silently with `supabaseKey is required` until it's copied in from the main checkout.
+- Worktrees don't inherit `.env.local` (gitignored, per-checkout) — `bun run test`/`bun run dev`/`bun run test:e2e` in a fresh worktree fail silently with `supabaseKey is required` until it's copied in from the main checkout.
 - `claude-code-action` rejects non-human workflow actors unless `allowed_bots` is set. Scheduled/manual dreaming runs as `github-actions[bot]`; its generated `dreaming/main` PR and the `documentation/user-guide` PR skip `claude-review` so the bot never reviews its own maintenance output.
 - A push authenticated with `github.token` (the default `GITHUB_TOKEN`) does not trigger other workflow runs — `ci.yml` silently never fires on a PR opened that way, and it can reach a human unchecked. Any job whose push must trigger CI (dreaming, the documentation agent) mints the MGR GitHub App token instead and takes its git identity from the app slug (PR #49; same pattern dreaming already used for its own push).
 - `git diff --name-only` never reports a file an agent created rather than edited, so a job that gates on that diff being empty will silently discard untracked output as "no changes". Stage first (`git add -A`) and diff the index instead (PR #49, documentation-agent.yml).

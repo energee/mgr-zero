@@ -33,8 +33,10 @@ jobs:
             exit 1
           fi
       - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: npm }
-      - run: npm ci
+        with: { node-version: 22 }
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version-file: ".bun-version" }
+      - run: bun install --frozen-lockfile
       - uses: supabase/setup-cli@v1
         with: { version: 2.116.0 }
       # Only the services the tests touch: Postgres, Auth, PostgREST, Kong,
@@ -49,7 +51,7 @@ jobs:
         run: |
           supabase status -o env | node scripts/supabase-env.mjs >> "$GITHUB_ENV"
           echo "COMMAND_RATE_LIMIT_HMAC_SECRET=ci-command-rate-limit-hmac-secret-that-is-long-enough" >> "$GITHUB_ENV"
-      - run: npx vitest run
-      - run: npm run lint
-      - run: npx tsc --noEmit
-      - run: npm run build
+      - run: bun run test
+      - run: bun run lint
+      - run: bunx tsc --noEmit
+      - run: bun run build

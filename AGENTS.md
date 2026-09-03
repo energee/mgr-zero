@@ -25,7 +25,7 @@ below just in time — don't preload everything.
 | Brewing/TTB domain rules (units, loss, removals) | `.agents/superpowers/specs/brewing-domain.md` |
 | Why v1 (`~/Repos/mgr`) was left behind | `.agents/superpowers/specs/2026-08-31-mgr-v1-review.md` |
 | Product intent, what a slice is | `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md` |
-| UI layout, navigation, input model (chat + forms) | `.agents/superpowers/specs/2026-08-31-mgr-ui-layout-plan.md`; screens: `components/mgr/screens.tsx` is the source of truth, viewed at `/design` (`npm run dev`); `2026-08-31-mgr-wireframes.html` is retired for MGR frames and kept only for the Slack/QuickBooks/Square venue drawings |
+| UI layout, navigation, input model (chat + forms) | `.agents/superpowers/specs/2026-08-31-mgr-ui-layout-plan.md`; screens: `components/mgr/screens.tsx` is the source of truth, viewed at `/design` (`bun run dev`); `2026-08-31-mgr-wireframes.html` is retired for MGR frames and kept only for the Slack/QuickBooks/Square venue drawings |
 | Chat notifications (Slack today, provider-neutral design) | `.agents/superpowers/specs/2026-09-01-mgr-chat-notifications-design.md`; plan: `.agents/superpowers/plans/2026-09-01-chat-notifications.md` |
 | What's done / next | `.agents/PROGRESS.md` |
 | Past decisions and lessons | `.agents/MEMORY.md` |
@@ -36,15 +36,15 @@ below just in time — don't preload everything.
 
 ## Operating loop
 
-1. `npx supabase start` must be running; tests hit the real database.
+1. `bunx supabase start` must be running; tests hit the real database.
 2. Find the owner of the concept in `.agents/ARCHITECTURE.md` and change it there.
 3. TDD: new behavior starts with a failing vitest — write it, watch it fail,
    then implement; the commit contains the test. Applies to every harness
    (Claude Code, pi, Codex, or other). Exception: UI rendering — TDD the
    logic below the component boundary; step 4 covers the eyeball check.
-4. Prove it: `npx vitest run && npx tsc --noEmit && npm run lint`. For UI, look
+4. Prove it: `bun run test && bunx tsc --noEmit && bun run lint`. For UI, look
    at the rendered page — tests don't cover rendering. Use the `browse` skill
-   (`.agents/skills/browse/SKILL.md`): `npx agent-browser --session <name> open
+   (`.agents/skills/browse/SKILL.md`): `bunx agent-browser --session <name> open
    http://localhost:3000/...` then `snapshot` / `get text` / `screenshot`, and
    `close` the same session when done. `<name>` is the branch with `/` → `-`;
    the skill has the exact incantation and why the session matters.

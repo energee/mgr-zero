@@ -22,14 +22,15 @@ and what enforces each one. Agents start at `AGENTS.md`.
 
 ## Local development
 
-Requires Node.js 22.x. The repository pins the major in `.node-version` and
-`package.json`; use that runtime for installs, tests, builds, and deployment.
+Requires Node.js 22.x and Bun 1.3.x. The repository pins Node in `.node-version`
+and `package.json`, and Bun in `.bun-version` / `packageManager`; use Bun for
+installs and scripts, and Node 22 as the Next.js runtime.
 
 Local Supabase runs on non-default ports (54341/54342/54343) configured
 in the committed `supabase/config.toml`. These ports are used by every
 developer and in CI — they were chosen to avoid colliding with a
 default-port Supabase project running alongside locally. Verify the live
-values with `npx supabase status`:
+values with `bunx supabase status`:
 
 ```
 API URL:  http://127.0.0.1:54341
@@ -38,15 +39,15 @@ Studio:   http://127.0.0.1:54343
 ```
 
 CI (`.github/workflows/ci.yml`) derives env vars from
-`npx supabase status -o env` rather than hardcoding them, so the setup
+`bunx supabase status -o env` rather than hardcoding them, so the setup
 automatically adapts to the values in `config.toml`.
 
 ### Setup
 
 ```bash
-npm install
-npx supabase start        # starts the local Postgres/Auth/Studio stack
-npx supabase status -o env | node scripts/supabase-env.mjs > .env.local
+bun install
+bunx supabase start        # starts the local Postgres/Auth/Studio stack
+bunx supabase status -o env | node scripts/supabase-env.mjs > .env.local
 ```
 
 The mapper converts the Supabase CLI's local key labels into the application's
@@ -60,8 +61,8 @@ COMMAND_RATE_LIMIT_HMAC_SECRET=<random secret of at least 32 characters>
 Apply migrations and seed a dev user/brewery:
 
 ```bash
-npx supabase db reset             # applies supabase/migrations/*.sql
-npx tsx --env-file=.env.local scripts/seed-dev.ts   # idempotent; creates "Demo Brewing" + dev@mgr.local
+bunx supabase db reset             # applies supabase/migrations/*.sql
+bun --env-file=.env.local scripts/seed-dev.ts   # idempotent; creates "Demo Brewing" + dev@mgr.local
 ```
 
 Seeded dev login: `dev@mgr.local` / `dev-password-1` (dev-only credential —
@@ -71,25 +72,25 @@ of `/` after login — that's the wholesale customer portal, not a bug.
 
 Working in a worktree (`.agents/worktrees/<branch>`): `.env.local` is
 gitignored and **not** inherited from the main checkout — copy it in
-(`cp ../../../.env.local .env.local` or similar) before running `npm test`
-or `npm run dev` there, or Supabase calls fail with `supabaseKey is
+(`cp ../../../.env.local .env.local` or similar) before running `bun run test`
+or `bun run dev` there, or Supabase calls fail with `supabaseKey is
 required`.
 
 ```bash
-npm run dev   # http://localhost:3000
+bun run dev   # http://localhost:3000
 ```
 
 ## Tests
 
 ```bash
-npm test          # vitest run — real local Supabase, not mocks
-npm run lint       # eslint, incl. the admin-client import guard
-npx tsc --noEmit   # typecheck
-npm run build      # production build
-npm run test:e2e   # agent-browser smoke — local only, not run in CI
+bun run test       # vitest run — real local Supabase, not mocks
+bun run lint       # eslint, incl. the admin-client import guard
+bunx tsc --noEmit  # typecheck
+bun run build      # production build
+bun run test:e2e   # agent-browser smoke — local only, not run in CI
 ```
 
-`npm run test:e2e` drives the browser with `agent-browser` (Vercel's browser
+`bun run test:e2e` drives the browser with `agent-browser` (Vercel's browser
 automation CLI) instead of Playwright. It runs agent-browser's bundled Chrome
 by default; `E2E_ENGINES=lightpanda,chrome` re-enables the engine-fallback
 chain (each engine gets freshly seeded data; the script prints which engine
@@ -99,7 +100,7 @@ engine/adapter gaps — benchmark + status in
 `brew upgrade lightpanda` or an agent-browser release. The script starts its own `next dev` on port
 3100 (not 3000, so it never collides with another worktree's dev server on
 the same repo), reusing one already running there, and stops what it
-started on both success and failure. It needs `npx supabase start` and a
+started on both success and failure. It needs `bunx supabase start` and a
 `.env.local` in place, same as the vitest suite. See `tests-e2e/portal-smoke.ts`.
 
 Test files: `tests/api-command.test.ts` (Bearer auth on `/api/command`),
@@ -112,7 +113,7 @@ isolation, ledger immutability, CHECK constraints, ATP math),
 table, `security_invoker` views, `search_path` on functions, no anon-executable
 definer functions), `tests/schema-conventions.test.ts` (composite FKs, lot
 trigger, append-only ledgers), `tests/write-atomicity.test.ts` (iron rule 5). Tests run against the real local Supabase stack (not a
-mock) — `npx supabase start` must be running first.
+mock) — `bunx supabase start` must be running first.
 
 ## HTTP API
 
@@ -269,7 +270,7 @@ orders are wholesale orders shipped from the brewery's warehouse.
 for this repo yet. When that is set up, create the hosted Supabase and Vercel
 projects and configure `NEXT_PUBLIC_SUPABASE_URL`,
 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, and
-`COMMAND_RATE_LIMIT_HMAC_SECRET` in Vercel. Then run `npx supabase db push` against
+`COMMAND_RATE_LIMIT_HMAC_SECRET` in Vercel. Then run `bunx supabase db push` against
 the hosted project, deploy, and verify login → catalog → inventory on the
 preview URL.
 
@@ -281,7 +282,7 @@ deps, starts a local Supabase stack with only the services the tests use
 invites to — `supabase start -x …` excludes the rest),
 which applies migrations on the fresh stack, runs the full vitest suite
 against it, then
-`npm run lint`, `tsc --noEmit` and `npm run build`. This is the merge gate — RLS and
+`bun run lint`, `tsc --noEmit` and `bun run build`. This is the merge gate — RLS and
 command-registry correctness are enforced here, not just locally.
 
 After a pull request merges—or when manually dispatched on `main`—
