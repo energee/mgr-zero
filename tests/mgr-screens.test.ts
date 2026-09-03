@@ -37,7 +37,7 @@ describe("SCREENS", () => {
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands; .agents/PROGRESS.md narrates
     // what the number is made of — 96 MGR frames plus the 17 venue frames.
-    expect(SCREENS).toHaveLength(113);
+    expect(SCREENS).toHaveLength(117);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
 
@@ -86,6 +86,21 @@ describe("SCREENS", () => {
     const transfer = SCREENS.find((x) => x.name === "Cellar transfer")!;
     const transferHtml = renderToStaticMarkup(createElement("div", null, transfer.body));
     expect(transferHtml).not.toMatch(/border-l-2/);
+  });
+
+  it("gives every MGR screen states, and keeps engineering phrases off the glass", () => {
+    // Issue 79: missing empty/offline/permission/already-done/error states, and
+    // policy copy (RPC, occupancy/B-0416, source of truth, callback) on the device.
+    const banned = /source of truth|Last callback|Retry eligible|occupancy\/B-|One RPC |\bpersisted\b/;
+    for (const s of SCREENS) {
+      if (s.venue) continue;
+      expect(s.states?.length, s.name).toBeGreaterThan(0);
+      const body = renderToStaticMarkup(createElement("div", null, s.hd, s.body));
+      expect(body, s.name).not.toMatch(banned);
+    }
+    for (const name of ["Shipment done", "Run closed", "Receipt", "Movement recorded"]) {
+      expect(SCREENS.some((s) => s.name === name), name).toBe(true);
+    }
   });
 
   it("gives the portal an Account tab, entry, Me, order detail and invoice follow-ups", () => {
