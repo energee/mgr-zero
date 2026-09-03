@@ -584,8 +584,8 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Pick", "ORD-0231 · short line")}
       {E.fld("Order · source", "Ridgeline · Warehouse")}
-      {E.row("Pils · 16 oz case", "picked / ordered", "7 / 10", "w")}
-      {E.chips(["damaged", "not found", "count error", "customer cut"], 1)}
+      {E.row("Pils · 16 oz case", "ordered 10", E.stq(7), "w")}
+      {E.nav("Reason", "required", "w")}
       {E.ttl("Resolve the missing 3")}
       {E.chips(["Adjust order to 7", "Keep 3 owed · staged"], 0)}
       {E.info("Preview: order line 10 → 7 · allocation −3 · ATP −6 → −3 · customer sees “adjusted”.")}
@@ -606,9 +606,9 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("ORD-0231", "Pick · Warehouse")}
       {E.info("From Warehouse · lines start at ordered; touch only exceptions.")}
-      {E.row("Hazy IPA · ½ bbl keg", "picked / ordered", "4 / 4", "ok")}
-      {E.row("Pils · 16 oz case", "", "10 / 10", "ok")}
-      {E.row("Stout · ⅙ bbl keg", "", "2 / 2", "ok")}
+      {E.row("Hazy IPA · ½ bbl keg", "ordered 4", E.stq(4), "ok")}
+      {E.row("Pils · 16 oz case", "ordered 10", E.stq(10), "ok")}
+      {E.row("Stout · ⅙ bbl keg", "ordered 2", E.stq(2), "ok")}
       {E.sp()}
       {E.btn("Done picking")}
     </>),
@@ -626,9 +626,9 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("ORD-0231", "Ship")}
       {E.row("Fulfillment source", "Warehouse", E.act("Required"))}
-      {E.row("Hazy IPA · ½ bbl keg", "ship / picked", "4 / 4", "ok")}
-      {E.row("Pils · 16 oz case", "ship / picked", "9 / 10", "w")}
-      {E.chips(["damaged", "not found", "customer cut"], 0)}
+      {E.row("Hazy IPA · ½ bbl keg", "picked 4", E.stq(4), "ok")}
+      {E.row("Pils · 16 oz case", "picked 10", E.stq(9), "w")}
+      {E.nav("Reason", "required", "w")}
       {E.fld("Carrier · tracking", "optional")}
       {E.chips(["Invoice now", "On delivery"], 0)}
       {E.tape([["−4 Hazy ½ bbl · sale removal · PA", "2.00 bbl"], ["−9 Pils cases · sale removal · PA", "0.42 bbl"], ["1 Pils case released · restock", ""], ["invoice number", "assigned on commit"]])}
@@ -710,9 +710,9 @@ export const SCREENS: Screen[] = [
       {E.back("Beer", "Taproom")}
       {E.ttl("Weekly count / sales depletion")}
       {E.note("This count posts the depletion. POS sales are the expected number beside it; the gap is what the taproom lost to pours, comps, staff drinks and line cleaning.")}
-      {E.row("Pils · 16 oz case", "expected 4 · counted", "4")}
-      {E.row("Hazy · ½ bbl keg", "expected 3 · counted", "2", "w")}
-      {E.row("Stout · ⅙ bbl keg", "expected 2 · counted", "2")}
+      {E.row("Pils · 16 oz case", "expected 4", E.stq(4))}
+      {E.row("Hazy · ½ bbl keg", "expected 3", E.stq(2), "w")}
+      {E.row("Stout · ⅙ bbl keg", "expected 2", E.stq(2))}
       {E.info("Variance −1 Hazy · 0.5 bbl unaccounted. Recording posts 4 Pils + 4 Hazy + 2 Stout depletion; the variance is reported, never posted.")}
       {E.nav("Variance by brand", "four weeks · where the gap keeps showing up")}
       {E.gated("Record count")}
@@ -772,7 +772,7 @@ export const SCREENS: Screen[] = [
     writes: "return_shipment [design; one RPC: return_in movements at explicit destination + credit memo + owned-fleet keg_events linked to shipment when slice 9 is enabled]",
     body: (<>
       {E.back("ORD-0231", "Beer return")}
-      {E.row("Hazy IPA · ½ bbl keg", "shipped 4 · returning", "1")}
+      {E.row("Hazy IPA · ½ bbl keg", "shipped 4 · returning", E.stq(1))}
       {E.chips(["damaged", "wrong item", "unsold"])}
       {E.fld("Return to", "Warehouse · original fulfillment source")}
       {E.row("Deposit refund", "½ bbl pool · 1", "−$30.00")}
@@ -798,8 +798,8 @@ export const SCREENS: Screen[] = [
       {E.fld("Ship-to", "Main · Phoenixville, PA")}
       {E.fld("Customer PO", "optional · 4471")}
       {E.fld("Requested ship", "Thu 9/3")}
-      {E.row("Hazy IPA · ½ bbl keg", "ATP 11 at Warehouse", "4")}
-      {E.row("Pils · 16 oz case", "ATP −6 at Warehouse", "10", "w")}
+      {E.row("Hazy IPA · ½ bbl keg", "ATP 11 at Warehouse", E.stq(4))}
+      {E.row("Pils · 16 oz case", "ATP −6 at Warehouse", E.stq(10), "w")}
       {E.btn("Add line", "g")}
       {E.info("Order number is assigned on commit.")}
       {E.sp()}
@@ -1291,8 +1291,8 @@ export const SCREENS: Screen[] = [
       {E.ttl("Source")}
       {E.nav("FV3 · Hazy IPA", "B-0416 · 42.0 bbl · gravity 2.1 · ready")}
       {E.ttl("Planned outputs")}
-      {E.fld("Hazy · cans (case of 24)", "118 cases · 39.6 bbl")}
-      {E.fld("Hazy · ½ bbl keg", "4 kegs · 2.0 bbl")}
+      {E.row("Hazy · cans (case of 24)", "39.6 bbl", E.stq(118))}
+      {E.row("Hazy · ½ bbl keg", "2.0 bbl", E.stq(4))}
       {E.fld("Left in FV3", "0.4 bbl · loss at close unless held")}
       {E.ttl("Materials")}
       {E.tbl(["need", "have", "short"], [["cans 2,832", "3,100", "0"], ["ends 2,832", "2,400", <><span className="text-warning-foreground">432</span></>], ["labels 2,832", "5,000", "0"], ["trays 118", "140", "0"]])}
@@ -1331,9 +1331,9 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Work", "PO-0142 · Country Malt")}
       {E.row("Status", "sent Mon · expected Thu", E.act("Send PO"))}
-      {E.row("2-row · 55 lb bags", "expected 40 · counted", "42", "w")}
-      {E.row("Citra · 44 lb boxes", "expected 4 · counted", "3", "w")}
-      {E.row("Rice hulls · 50 lb", "expected 6 · counted", "6", "ok")}
+      {E.row("2-row · 55 lb bags", "expected 40", E.stq(42), "w")}
+      {E.row("Citra · 44 lb boxes", "expected 4", E.stq(3), "w")}
+      {E.row("Rice hulls · 50 lb", "expected 6", E.stq(6), "ok")}
       {E.fld("Citra lot · best by", "2026-CIT-77 · 2027-08-31")}
       {E.tape([["+2,310 lb 2-row · receipt", "over 2 bags"], ["+132 lb Citra · receipt", "lot 2026-CIT-77 · short 1"]])}
       {E.info("2-row is over by 2 bags and Citra short 1; the PO becomes partially received.")}
