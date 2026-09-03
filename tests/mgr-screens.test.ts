@@ -242,6 +242,20 @@ describe("SCREENS", () => {
     expect(transferHtml).not.toMatch(/border-l-2/);
   });
 
+  it("uses one verb and buyer copy on the named landings", () => {
+    // Issue 85: Brewer Start vs Brew day, Sales ATP jargon, Driver after-as-button.
+    const brewer = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Brewer")!.body));
+    expect(brewer).toMatch(/Start/);
+    expect(brewer).not.toMatch(/>Brew day</);
+    const sales = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Sales")!.body));
+    expect(sales).toMatch(/Not enough Pils/);
+    expect(sales).not.toMatch(/ATP/);
+    const driver = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Driver")!.body));
+    expect(driver).not.toMatch(/>after</);
+    const me = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Me")!.body));
+    expect(me).toMatch(/Switch/);
+  });
+
   it("draws locked-out landings and the composer question", () => {
     // Issue 83: no-membership, expired invite/reset, session expiry with the
     // outbox kept, and the composer question (chips, no Commit).
