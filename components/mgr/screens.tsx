@@ -71,6 +71,9 @@ const INV = {
   fee: "$9.48",
 } as const;
 
+// The Work list chips, in the order every Work list draws them.
+const WORK_CHIPS = ["all", "orders", "batches", "runs", "POs", "routes"];
+
 // The states every screen can reach; a record with designed states lists its own instead.
 const DEFAULT_STATES: NonNullable<Screen["states"]> = [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]];
 
@@ -143,7 +146,7 @@ export const SCREENS: Screen[] = [
     body: today(<>
       {E.btn("Swap keg")}
       {E.row("Tap 5 · Pils", "nearly out · ~9% left", E.act("Swap"), "w", BeerIcon)}
-      {E.gated("Weekly count", "isn’t available yet; the count cannot be saved yet")}
+      {E.gated("Weekly count")}
       {E.row("Guest cider", "rung in Square · not mapped, blocks reconcile", "unmapped", "w", Tag01Icon)}
       {E.row("Variance · last week", "−0.5 bbl Hazy unaccounted", E.act("Review"), "", TaskDone01Icon)}
       {E.note("No picks, orders or invoices: the taproom role sees the taproom.")}
@@ -172,7 +175,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Work", "warehouse default")}
       {E.btn("New order", "g")}
-      {E.chips(["all", "orders", "batches", "runs", "POs", "routes"], 1)}
+      {E.chips(WORK_CHIPS, 1)}
       {E.row("ORD-0231 · Ridgeline", "submitted · ships today", E.act("Confirm"), "", Package01Icon)}
       {E.row("ORD-0229 · Al’s Bar", "picked · restock 3 Pils staged", E.act("Put back"), "w", Package01Icon)}
       {E.row("PO-0142 · Country Malt", "due today", E.act("Receive"), "", DeliveryTruck01Icon)}
@@ -518,7 +521,7 @@ export const SCREENS: Screen[] = [
     reads: "list_team_members",
     writes: "update_staff_role [design; single row] · revoke_staff [design; single membership row ends] · invite_staff [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI] · the taproom role [SCHEMA-GATE: revision 2 §16.13/§16.16 q4: staff_role gains taproom, but P-staff is role-agnostic, so the narrow per-role policies are undesigned]",
     states: [["last admin", "role change refused · keep one admin", 1], ["pending", "invite sent · not yet accepted"], ["permission", "admin only", 1]],
-    spec: "From Settings. Role chips change the member's role in one write; Remove is copper and ends the membership (Auth user untouched; re-invite is the compensation). The invite stays disabled with the same human copy as first run until its gate closes.",
+    spec: "From Settings. A member row opens the Team member sheet, where the role changes in one write and Remove ends the membership (Auth user untouched; re-invite is the compensation). The invite stays disabled with the same human copy as first run until its gate closes.",
     body: (<>
       {E.back("Settings", "Team")}
       {E.nav("Maria Alvarez", "maria@ · warehouse")}
@@ -805,12 +808,12 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Work", "sales default")}
       {E.btn("New order")}
-      {E.chips(["all", "orders", "batches", "runs", "POs", "routes"], 1)}
+      {E.chips(WORK_CHIPS, 1)}
       {E.chips(["all states", "draft", "submitted", "confirmed", "picked", "shipped"], 0)}
       {E.row("ORD-0231 · Ridgeline", "submitted · ships Thu", E.act("Confirm"))}
       {E.row("ORD-0229 · Al’s Bar", "picked · restock 3 Pils staged", E.act("Put back"), "w")}
       {E.row("ORD-0234 · Teresa’s", "confirmed · ships Fri", E.act("Pick"))}
-      {E.row("ORD-0235 · Teresa’s", "draft · ships Fri", E.act("Finish"))}
+      {E.row("ORD-0237 · Teresa’s", "draft · ships Fri", E.act("Finish"))}
     </>),
   },
   {
@@ -1084,7 +1087,7 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     spec: "There is no ranking command or priority column; every change is a named quantity edit.",
     body: (<>
-      {E.back("Beer", "Pils · 16 oz case")}
+      {E.back("Finished goods", "Pils · 16 oz case")}
       {E.num("−6 cases · −0.58 bbl", "ATP · 22 cases on hand · 28 allocated")}
       {E.row("ORD-0231 · Ridgeline", "10 cases · 0.97 bbl", E.act("Adjust"))}
       {E.row("ORD-0234 · Teresa’s", "12 cases · 1.16 bbl", E.act("Release"))}
@@ -1125,7 +1128,7 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     spec: "Source is required and becomes the order's from-location; the app never guesses “Warehouse.” Save draft lands on the Order screen, where Submit lives.",
     body: (<>
-      {E.back("Work", "New order")}
+      {E.back("Orders", "New order")}
       {E.pick("Customer", "Ridgeline Tap Room")}
       {E.pick("Source location", "Warehouse")}
       {E.pick("Ship-to", "Main · Phoenixville, PA")}
@@ -1645,7 +1648,7 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     body: (<>
       {E.hd("Invoices", "Ridgeline")}
-      {E.row(INV.no, `overdue · due ${INV.dueShort} · ${INV.total}`, E.act("Pay"), "w")}
+      {E.row(INV.no, `due ${INV.dueShort} · ${INV.total}`, E.act("Pay"))}
       {E.row("INV-0190", "paid 8/29", "$980", "ok")}
     </>),
   },
@@ -1695,10 +1698,10 @@ export const SCREENS: Screen[] = [
     reads: "get_cellar_map [design]",
     writes: "create_vessel · update_vessel [design; mutable single rows] · complete_batch [SCHEMA-GATE: close/reconciliation identity + classifications; one RPC: batch close + occupancy close + automatic reconciliation]",
     states: DEFAULT_STATES,
-    spec: "Complete batch stays disabled until close/reconciliation identity exists: the batch’s closing time, the occupancy close and the typed automatic reconciliation must commit atomically. Tile fill derives from occupancy vs vessel capacity, never from a status column. Reading is the one primary; Transfer and Brew day are outline. A tile opens the Vessel sheet to edit facts.",
+    spec: "Complete batch stays disabled until close/reconciliation identity exists: the batch’s closing time, the occupancy close and the typed automatic reconciliation must commit atomically. Tile fill derives from occupancy vs vessel capacity, never from a status column. Reading is the one primary; Transfer and Brew day are outline. A tile opens Vessel detail.",
     body: (<>
       {E.back("Beer", "Cellar")}
-      {E.tiles([["FV1", "Pils · 12.8 / 15 bbl", "1.9 °P · read 4 h", 0, 85, 1], ["FV2", "Hazy · 9.0 / 15 bbl", "7.5 °P · read 8 h", 0, 60, 1], ["FV3", "Stout · 13.5 / 15 bbl", "5.2 °P · overdue 31 h", 1, 90, 1], ["BT1", "Pils · 7.0 / 10 bbl", "carbing", 0, 70, 1], ["BT2", "Empty · 0 / 10 bbl", "available", 0, 0, 1], ["FB1", "Saison · 0.4 / 1 bbl", "aging · read 1 d", 0, 40, 1]], 2)}
+      {E.tiles([["FV1", "Pils · 12.8 / 15 bbl", "1.9 °P · read 4 h", 0, 85], ["FV2", "Hazy · 9.0 / 15 bbl", "7.5 °P · read 8 h", 0, 60], ["FV3", "Stout · 13.5 / 15 bbl", "5.2 °P · overdue 31 h", 1, 90], ["BT1", "Pils · 7.0 / 10 bbl", "carbing", 0, 70], ["BT2", "Empty · 0 / 10 bbl", "available", 0, 0], ["FB1", "Saison · 0.4 / 1 bbl", "aging · read 1 d", 0, 40]], "c2")}
       {E.btns([["Reading", "p"], ["Transfer", "g"], ["Brew day", "g"]], "c3")}
       {E.nav("FV3 · fermenter · 15 bbl", "occupancy, readings and vessel facts")}
       {E.btn("Add vessel", "g")}
@@ -1792,12 +1795,12 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Work", "brewer default")}
       {E.btn("New batch")}
-      {E.chips(["all", "orders", "batches", "runs", "POs", "routes"], 2)}
+      {E.chips(WORK_CHIPS, 2)}
       {E.ttl("Planned")}
       {E.row("B-0416 · Hazy IPA v4", "Fri 9/4 · 15 bbl", E.act("Start"))}
       {E.ttl("Active")}
       {E.row("B-0409 · Pils", "FV1 · 1.9 °P · read 4 h ago", E.act("Reading"))}
-      {E.row("B-0412 · Stout", "FV3 · reading overdue 31 h", E.act("Reading"), "w")}
+      {E.row("B-0413 · Stout", "FV3 · reading overdue 31 h", E.act("Reading"), "w")}
     </>),
   },
   {
@@ -1916,7 +1919,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Work", "brewer default")}
       {E.btn("Schedule run")}
-      {E.chips(["all", "orders", "batches", "runs", "POs", "routes"], 3)}
+      {E.chips(WORK_CHIPS, 3)}
       {E.ttl("Upcoming")}
       {E.row("RUN-0031 · Hazy cans", "Fri 9/5 · FV3 · 118 cases planned · 480 ends short", E.act("Resolve"), "w")}
       {E.row("RUN-0032 · Pils ½ bbl", "Tue 9/9 · FV1 · 40 kegs planned", E.act("Start"))}
@@ -1988,7 +1991,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Work", "warehouse default")}
       {E.btn("New PO")}
-      {E.chips(["all", "orders", "batches", "runs", "POs", "routes"], 4)}
+      {E.chips(WORK_CHIPS, 4)}
       {E.row("PO-0142 · Country Malt", "sent · due Thu", E.act("Receive"))}
       {E.row("PO-0141 · YCH", "partially received · 1 Citra box due", E.act("Receive"), "w")}
       {E.row("PO-0143 · CanSource", "draft · 4 pallets", E.act("Send"))}
@@ -2491,7 +2494,7 @@ export const SCREENS: Screen[] = [
       {E.back("Beer", "Tap board")}
       {E.ttl("On tap")}
       {E.chips(["Taproom", "Warehouse"], 0)}
-      {E.tiles([["1", "Pils · ½ bbl", "on Mon", 0, 71, 1], ["2", "Hazy IPA · ½ bbl", "on Mon", 0, 62, 1], ["3", "Stout · ⅙ bbl", "on Tue · filled 60%", 0, 34, 1], ["4", "Amber · ½ bbl", "on Sat", 0, 88, 1], ["5", "Helles · ½ bbl", "on Wed · nearly out", 1, 9, 1], ["6", "Saison · ½ bbl", "on Thu", 0, 54, 1], ["8", "Porter · ⅙ bbl", "on Fri", 0, 46, 1], ["9", "Hazy IPA · ½ bbl", "on Thu · second keg", 1, 93, 1], ["10", "Kolsch · ½ bbl", "on Tue", 0, 27, 1], ["11", "Barrel Dark · ⅙ bbl", "on Sun", 0, 80, 1], ["unnumbered", "Wild Ale · ⅙ bbl", "on Thu · sorts last", 0, 66, 1]])}
+      {E.tiles([["1", "Pils · ½ bbl", "on Mon", 0, 71], ["2", "Hazy IPA · ½ bbl", "on Mon", 0, 62], ["3", "Stout · ⅙ bbl", "on Tue · filled 60%", 0, 34], ["4", "Amber · ½ bbl", "on Sat", 0, 88], ["5", "Helles · ½ bbl", "on Wed · nearly out", 1, 9], ["6", "Saison · ½ bbl", "on Thu", 0, 54], ["8", "Porter · ⅙ bbl", "on Fri", 0, 46], ["9", "Hazy IPA · ½ bbl", "on Thu · second keg", 1, 93], ["10", "Kolsch · ½ bbl", "on Tue", 0, 27], ["11", "Barrel Dark · ⅙ bbl", "on Sun", 0, 80], ["unnumbered", "Wild Ale · ⅙ bbl", "on Thu · sorts last", 0, 66]])}
       {E.row("7 · Guest cider · keg", "tapped here by Dana · not our stock, no depletion", E.act("Kick"), "w")}
       {E.ttl("Open, not on a tap")}
       {E.row("Amber · ½ bbl", "packaged short · filled 60% · 0.30 bbl", E.act("Tap"), "w")}
@@ -2564,7 +2567,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Work", "driver default")}
       {E.btn("New route")}
-      {E.chips(["all", "orders", "batches", "runs", "POs", "routes"], 5)}
+      {E.chips(WORK_CHIPS, 5)}
       {E.row("Route A · Thu", "3 stops · Maria · departed 8:10", E.act("Resume"))}
       {E.row("Route B · Fri", "2 stops · driver not assigned", E.act("Assign"), "w")}
       {E.row("ORD-0236 · Dock", "shipped · no route", E.act("Add to route"), "w")}
@@ -2584,8 +2587,8 @@ export const SCREENS: Screen[] = [
       {E.back("Routes", "Route A · Thu")}
       {E.fld("Driver · vehicle", "Maria · Box truck 2")}
       {E.row("Stop 1 · Ridgeline", "4 Hazy halves · 6 Pils cases", "next")}
-      {E.row("Stop 2 · Al’s Bar", "2 Stout sixths", "after")}
-      {E.row("Stop 3 · Teresa’s", "8 Hazy halves · 12 Pils cases", "after", "w")}
+      {E.row("Stop 2 · Al’s Bar", "2 Stout sixths · later")}
+      {E.row("Stop 3 · Teresa’s", "8 Hazy halves · 12 Pils cases · later", "", "w")}
       {E.row("Unassigned · ORD-0236 · Dock", "3 Hazy halves · shipped, no route", E.act("Add stop"), "w")}
       {E.btns([["Save route plan", "g"], ["Depart route", "p"]])}
     </>),
@@ -2601,7 +2604,7 @@ export const SCREENS: Screen[] = [
     states: [["planned", "Depart lives on Route"], ["departed", "Return is the one verb"], ["complete", "already returned"]],
     spec: "The departed state of a route. Planned routes Depart on Route; this screen is only Return.",
     body: (<>
-      {E.back("Work", "Route A · Thu")}
+      {E.back("Routes", "Route A · Thu")}
       {E.fld("Driver · vehicle", "Maria · Box truck 2")}
       {E.row("Stop 1 · Ridgeline", "delivered 8:42", "done", "ok")}
       {E.row("Stop 2 · Al’s Bar", "delivered 9:15", "done", "ok")}
@@ -2624,8 +2627,8 @@ export const SCREENS: Screen[] = [
       {E.back("Today", "Route A · Thu")}
       {E.fld("Load", "14 Hazy halves · 18 Pils cases · 2 Stout sixths")}
       {E.row("Stop 1 · Ridgeline Tap Room", "4 Hazy halves · 6 Pils cases", E.act("Resume"), "w")}
-      {E.row("Stop 2 · Al’s Bar", "2 Stout sixths", "after")}
-      {E.row("Stop 3 · Teresa’s", "8 Hazy halves · 12 Pils cases", "after")}
+      {E.row("Stop 2 · Al’s Bar", "2 Stout sixths · later")}
+      {E.row("Stop 3 · Teresa’s", "8 Hazy halves · 12 Pils cases · later")}
       {E.sp()}
       {E.btn("Return route")}
     </>),
