@@ -25,7 +25,7 @@ below just in time — don't preload everything.
 | Brewing/TTB domain rules (units, loss, removals) | `.agents/superpowers/specs/brewing-domain.md` |
 | Why v1 (`~/Repos/mgr`) was left behind | `.agents/superpowers/specs/2026-08-31-mgr-v1-review.md` |
 | Product intent, what a slice is | `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md` |
-| UI layout, navigation, input model (chat + forms) | `.agents/superpowers/specs/2026-08-31-mgr-ui-layout-plan.md`; screens: `2026-08-31-mgr-wireframes.html` (edit the `SCREENS` array; keep in step with the plan) |
+| UI layout, navigation, input model (chat + forms) | `.agents/superpowers/specs/2026-08-31-mgr-ui-layout-plan.md`; screens: `components/mgr/screens.tsx` is the source of truth, viewed at `/design` (`npm run dev`); `2026-08-31-mgr-wireframes.html` is retired for MGR frames and kept only for the Slack/QuickBooks/Square venue drawings |
 | What's done / next | `.agents/PROGRESS.md` |
 | Past decisions and lessons | `.agents/MEMORY.md` |
 | Multi-model planning, implementation, or review | `.agents/orchestration/README.md`; invoke `.agents/orchestration/bin/workflow` rather than provider CLIs directly |

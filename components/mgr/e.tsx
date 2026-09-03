@@ -46,13 +46,11 @@ export const E = {
         <ItemTitle>{t}</ItemTitle>
         {s ? <ItemDescription>{s}</ItemDescription> : null}
       </ItemContent>
-      {n ? (
-        <ItemActions>
-          {typeof n === "string" && /^[A-Z]/.test(n) ? <Button variant="ghost" size="sm">{n}</Button> : <span className="text-sm text-muted-foreground">{n}</span>}
-        </ItemActions>
-      ) : null}
+      {n ? <ItemActions>{typeof n === "string" ? <span className="text-sm text-muted-foreground">{n}</span> : n}</ItemActions> : null}
     </Item>
   ),
+  /** A row's trailing action verb (Pick, Confirm, Resume) as a real target. */
+  act: (t: React.ReactNode) => <Button variant="ghost" size="sm">{t}</Button>,
   btn: (t: React.ReactNode, k: BtnKind = "p") => {
     const [kind, disabled] = k.split(" ") as [BtnBase, string?];
     return (
