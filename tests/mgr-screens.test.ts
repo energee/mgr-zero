@@ -391,6 +391,25 @@ describe("SCREENS", () => {
     }
   });
 
+  it("keeps one copy of each commit verb on the role landings and the order (#97)", () => {
+    // Issue 97: the row verb is the action; a top button row repeats it.
+    const html = (name: string) =>
+      renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === name)!.body));
+    for (const name of ["Today", "Sales", "Brewer", "Taproom"]) {
+      const buttons = html(name).match(/<button\b[^>]*>/g) ?? [];
+      expect(buttons.every((b) => /data-row-action/.test(b)), name).toBe(true);
+    }
+    expect(html("Sales")).toMatch(/New order/);
+    const order = html("Order");
+    expect(order).not.toMatch(/Adjust line/);
+    expect(order).toMatch(/Add line/);
+    expect((order.match(/>Adjust</g) ?? []).length).toBe(3);
+    expect(order).not.toMatch(/>adjust</);
+    const confirm = html("Confirm order");
+    expect(confirm).not.toMatch(/Next: confirm/);
+    expect(confirm).toMatch(/Confirm order/);
+  });
+
   it("gives the named screens one filled primary each", () => {
     // Issue 71: two filled verbs on one body fight for the commit. Outline,
     // ghost, disabled and steppers are not the primary. A tile or

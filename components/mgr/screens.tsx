@@ -83,10 +83,9 @@ export const SCREENS: Screen[] = [
     step: 1, slice: "all", tab: "Today", name: "Today",
     job: "Role-filtered work that opens ready to finish · full-size exemplar at ship scale",
     reads: "get_today [design; delivery rows require assigned warehouse member or admin]", writes: "none",
-    states: [["empty", "Nothing waiting · record below"], ["loading", "row-shaped skeletons"], ["error", "Today did not load · Retry", 1], ["offline", "cached rows · writes queue"], ["role hidden", "only relevant permitted work · no blank gaps"]],
+    states: [["empty", "Nothing waiting · Record movement"], ["loading", "row-shaped skeletons"], ["error", "Today did not load · Retry", 1], ["offline", "cached rows · writes queue"], ["role hidden", "only relevant permitted work · no blank gaps"]],
     spec: "Drawn as the warehouse persona at honest 16px density. Rows are role-filtered per plan §3. Pick is the one primary, labelled with the ready count; Receive is outline. The restock row appears while the order's restock flag is set and opens the order. Weekly count is gated: disabled with human copy, never a gate name.",
     body: today(<>
-      {E.btns([["Pick · 3 ready", "p"], ["Receive", "g"]], "c2")}
       {E.row("3 orders ready", "quantities default to ordered", E.act("Pick"), "w", Package01Icon)}
       {E.row("Staged · ORD-0229", "restock 3 Pils cases to Warehouse", E.act("Put back"), "w", Package01Icon)}
       {E.row("PO-0142 · Country Malt", "arrives Thu", E.act("Receive"), "", DeliveryTruck01Icon)}
@@ -98,25 +97,24 @@ export const SCREENS: Screen[] = [
     step: 1, slice: "all", tab: "Today", name: "Sales",
     job: "Sales landing: submitted orders to confirm and beer that is short",
     reads: "get_today [design; sales role filter] · get_shortfalls [design]", writes: "none",
-    states: [["empty", "Nothing to confirm · new order below"], ["role hidden", "no Pick/Receive; no blank gaps"]],
+    states: [["empty", "Nothing to confirm · New order"], ["role hidden", "no Pick/Receive; no blank gaps"]],
     spec: "The same Today read as the exemplar, filtered for sales. Confirm opens Order · confirm (2 taps); shortfall rows open Shortfall, pars and standing allocation.",
     body: today(<>
-      {E.btns(["Confirm", "New order"], "c2")}
       {E.row("ORD-0231 · Ridgeline", "submitted · ships Thu", E.act("Confirm"), "w", Package01Icon)}
       {E.row("ORD-0235 · Teresa’s", "submitted · ships Fri", E.act("Confirm"), "", Package01Icon)}
       {E.row("Pils · 16 oz case", "Not enough Pils for 2 orders", E.act("Choose who gets it"), "w")}
       {E.row("Hazy IPA · ½ bbl", "11 ready · fine", "")}
       {E.row("Al’s Bar · OH", "Al’s Bar can’t receive Stout in OH", E.act("Fix registration"), "w")}
+      {E.nav("New order")}
     </>),
   },
   {
     step: 1, slice: "all", tab: "Today", name: "Brewer",
     job: "Brewer landing: readings due, brew day due, packaging to close",
     reads: "get_today [design; brewer role filter]", writes: "none",
-    states: [["empty", "Nothing due · record a reading below"], ["role hidden", "no picks or receipts"]],
+    states: [["empty", "Nothing due · Reading"], ["role hidden", "no picks or receipts"]],
     spec: "Reading opens the Fermentation reading sheet defaulted to the overdue vessel. Brew day and packaging rows open their Work frames. Warehouse picks never appear here.",
     body: today(<>
-      {E.btns(["Reading", "Start"], "c2")}
       {E.row("FV3 · Stout", "reading overdue 31 h", E.act("Reading"), "w", ThermometerIcon)}
       {E.row("B-0416 · Hazy IPA v4", "brew day Fri 9/4 · 15 bbl", E.act("Start"), "", BeerIcon)}
       {E.row("RUN-0031 · Hazy cans", "packaged today · close due", E.act("Close"), "w", Package01Icon)}
@@ -141,10 +139,9 @@ export const SCREENS: Screen[] = [
     step: 1, slice: "all", tab: "Today", name: "Taproom",
     job: "Bartender landing: what needs swapping, counting or mapping",
     reads: "get_today [design; taproom role filter]", writes: "none",
-    states: [["empty", "Nothing due · swap a keg below"], ["role hidden", "no picks, no orders, no invoices", 1], ["narrow surface", "tap board and POS reconcile, nothing else"]],
+    states: [["empty", "Nothing due · Swap"], ["role hidden", "no picks, no orders, no invoices", 1], ["narrow surface", "tap board and POS reconcile, nothing else"]],
     spec: "The taproom role maps to a shift rather than a function: a bartender needs the tap board and POS reconciliation and nothing else. The unmapped-item row is here because it silently blocks reconcile.",
     body: today(<>
-      {E.btn("Swap keg")}
       {E.row("Tap 5 · Pils", "nearly out · ~9% left", E.act("Swap"), "w", BeerIcon)}
       {E.gated("Weekly count")}
       {E.row("Guest cider", "rung in Square · not mapped, blocks reconcile", "unmapped", "w", Tag01Icon)}
@@ -828,7 +825,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Orders", "ORD-0231")}
       {E.ttl("Ridgeline Tap Room")}
-      {E.row("Current state", "Submitted · ships Thu", E.status("Next: confirm"))}
+      {E.fld("State", "Submitted · ships Thu")}
       {E.pick("Fulfillment source", "Warehouse", ["Warehouse", "Taproom"])}
       {E.info("Lifecycle: submitted → confirmed → picked → shipped. Only the valid next action is active.")}
       {E.row("Hazy IPA · ½ bbl keg", "", "4 · ATP 11")}
@@ -856,10 +853,10 @@ export const SCREENS: Screen[] = [
       {E.fld("Fulfillment source", "Warehouse")}
       {E.fld("Customer PO", "4471")}
       {E.note("Put back 3 Pils cases to Warehouse. They stayed staged after the line was adjusted.")}
-      {E.row("Hazy IPA · ½ bbl keg", "ordered 4 · picked 4", "ATP 11", "ok")}
-      {E.row("Pils · 16 oz case", "ordered 7 · picked 10", "adjust", "w")}
-      {E.row("Stout · ⅙ bbl keg", "ordered 2 · picked 2", "ATP 7", "ok")}
-      {E.btns([["Adjust line", "g"], ["Add line", "g"]])}
+      {E.row("Hazy IPA · ½ bbl keg", "ordered 4 · picked 4 · 11 available", E.act("Adjust"), "ok")}
+      {E.row("Pils · 16 oz case", "ordered 7 · picked 10", E.act("Adjust"), "w")}
+      {E.row("Stout · ⅙ bbl keg", "ordered 2 · picked 2 · 7 available", E.act("Adjust"), "ok")}
+      {E.btn("Add line", "g")}
       {E.note("Stout isn’t registered for Ohio. Check the Compliance registry ›")}
       {E.tape([["created · Ted", "Mon 9:02"], ["submitted · Ted", "Mon 9:05"], ["confirmed · Maria", "Mon 14:10"], ["picked · Dave · 4 / 10 / 2", "Tue 8:40"], ["line adjusted · Pils 10 → 7 · customer cut", "Tue 9:15"]])}
       {E.btns([["Ship", "p"], ["Cancel order", "ghost"]])}
