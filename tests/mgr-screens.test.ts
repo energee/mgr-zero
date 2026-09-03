@@ -178,6 +178,22 @@ describe("SCREENS", () => {
     expect(renderToStaticMarkup(VenueFrame({ venue: slack.venue!, children: slack.body }))).toContain('class="slk modal"');
   });
 
+  it("keeps external venue facts in the host product's vocabulary", () => {
+    const venueHtml = (name: string) => {
+      const screen = SCREENS.find((s) => s.name === name)!;
+      return renderToStaticMarkup(VenueFrame({ venue: screen.venue!, children: screen.body }));
+    };
+    expect(venueHtml("Pushed invoice")).toMatch(/Keg deposit[\s\S]*NON/);
+    expect(venueHtml("Push rejected")).not.toContain("qa-ft");
+    expect(venueHtml("Square sales receipt")).toMatch(/Sales receipt[\s\S]*Square customer/);
+    expect(venueHtml("Taproom sale")).not.toMatch(/<b>Channel<\/b>/);
+    expect(venueHtml("Refund").indexOf("10:51 pm")).toBeLessThan(venueHtml("Refund").indexOf("10:32 pm"));
+    expect(venueHtml("Published item")).not.toContain("• Pint");
+    expect(venueHtml("Published item")).not.toContain("SQ-8841");
+    expect(venueHtml("Notification preferences")).toContain('role="switch"');
+    expect(venueHtml("Notification preferences")).toContain("<select");
+  });
+
   it("gives sheets no separate header; their title is the record name", () => {
     expect(SCREENS.filter((s) => s.surface === "sheet" && s.hd)).toEqual([]);
   });
