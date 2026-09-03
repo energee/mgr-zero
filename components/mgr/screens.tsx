@@ -1189,13 +1189,11 @@ export const SCREENS: Screen[] = [
     job: "Plan a run separately, then create lot and movements on close",
     reads: "get_packaging_run [design; revalidate selected source occupancy] · list_locations",
     writes: "schedule_packaging_run [design; one RPC: run with explicit source occupancy + planned outputs] · close_packaging_run [design; one RPC: revalidate source + close + lot + outputs + material movements at explicit locations]",
-    spec: "One frame, two modes: plan (green; date, source occupancy, planned outputs) and close (copper review; revalidated source, actual outputs, lot, explicit FG destination, material consumption/return/damage, yield/loss). Print labels is presentation after commit: measured thermal keg-collar/lot labels per plan §3. No packaging-day-actuals screen.",
+    spec: "The close half of the packaging frame; planning and editing the plan live in the Schedule packaging run sheet, reached from the Plan row until the run starts. Close is a copper review ( revalidated source, actual outputs, lot, explicit FG destination, material consumption/return/damage, yield/loss). Print labels is presentation after commit: measured thermal keg-collar/lot labels per plan §3. No packaging-day-actuals screen.",
     body: (<>
       {E.hd("Back · Work", "RUN-0031 · Hazy cans")}
       {E.fld("Packaging source", "FV3 · occupancy/B-0416")}
-      {E.fld("Plan", "Hazy · cans · Fri 9/5")}
-      {E.fld("Planned outputs", "118 cases")}
-      {E.btn("Save run plan")}
+      {E.nav("Plan", "Hazy · cans · Fri 9/5 · 118 cases · edit until start")}
       {E.tbl(["need", "have", "short"], [["cans 2,880", "3,100", "0"], ["ends 2,880", "2,400", <><span className="text-warning-foreground">480</span></>], ["labels 2,880", "5,000", "0"]])}
       {E.note("480 ends short · resolve or explicitly override before starting.")}
       {E.fld("Packaged", "118 cases")}
@@ -1203,6 +1201,57 @@ export const SCREENS: Screen[] = [
       {E.fld("Finished goods destination", "Warehouse · selected")}
       {E.tape([["FV3 · occupancy/B-0416", "source revalidated"], ["+118 cases · production in", "Warehouse · new lot"], ["−2,832 cans + ends · consumption", "FIFO"], ["Labels returned / damaged", "24 / 6"], ["Beer loss · 0.30 bbl", "yield 97.9%"]])}
       {E.btns([["Print labels · lot / keg collar", "g"], ["Close packaging run", "irr"]])}
+    </>),
+  },
+  {
+    step: 8,
+    slice: 5,
+    tab: "Work",
+    name: "Packaging runs",
+    job: "See what is planned, what is due and what closed, and schedule the next run",
+    reads: "list_packaging_runs [design; planned and recent closed, by planned date] · get_material_shortfalls [design; per planned run]",
+    writes: "none [scheduling and closing happen on their own surfaces]",
+    states: [["short", "a planned run whose materials fall short says so on the row and its next action is Resolve, not Start"], ["due today", "the same row also appears in Today for the brewer"], ["closed", "recent runs stay for a few weeks with lot, output and yield; after that they are history under Search and Lot trace"], ["empty", "no runs planned: the button is the only thing on the page"]],
+    spec: "The Work list with the runs chip active, which is the packaging list: Work is where everything in motion lives, so runs get no rail entry of their own. Upcoming sorts by planned date and every row names its next action. Recent breaks Work's in-motion rule on purpose, because a brewer plans the next run against the last one's yield; it is kept short and the full history stays in Search. Schedule run opens the sheet; a row opens the run, where closing happens.",
+    body: (<>
+      {E.hd("Work", "brewer default")}
+      {E.btn("Schedule run")}
+      {E.chips(["all", "orders", "batches", "runs", "POs", "routes"], 3)}
+      {E.ttl("Upcoming")}
+      {E.row("RUN-0031 · Hazy cans", "Fri 9/5 · FV3 · 118 cases planned · 480 ends short", E.act("Resolve"), "w")}
+      {E.row("RUN-0032 · Pils ½ bbl", "Tue 9/9 · FV1 · 40 kegs planned", E.act("Start"))}
+      {E.row("RUN-0033 · Stout cans", "Thu 9/11 · no source yet", E.act("Pick source"))}
+      {E.ttl("Recent")}
+      {E.row("RUN-0030 · Pils cans", "closed Tue 9/2 · L-240902-PL · 96 cases · 97% yield", "", "ok")}
+      {E.row("RUN-0029 · Hazy ½ bbl", "closed Fri 8/29 · L-240829-HZ · 38 kegs · 95% yield", "", "ok")}
+      {E.row("RUN-0028 · Helles cans", "closed Wed 8/27 · L-240827-HL · 110 cases · 92% yield · 2 bbl loss", "", "w")}
+      {E.info("Recent keeps the last few weeks. Older runs are under Search and Lot trace.")}
+    </>),
+  },
+  {
+    step: 8,
+    slice: 5,
+    tab: "Work",
+    surface: "sheet",
+    name: "Schedule packaging run",
+    job: "Plan a run against one source occupancy and see shortages before the day",
+    reads: "list_occupancies [design; open, with volume and contents] · list_formats [design; for the brand in the source] · get_material_shortfalls [design; preview for the planned outputs]",
+    writes: "schedule_packaging_run [design; one RPC: run with explicit source occupancy + planned outputs] · update_packaging_run [design; same sheet reopens a planned run until it starts]",
+    states: [["source chosen", "the brand comes from what is in the vessel, so only that brand's formats are offered"], ["short", "the materials table shows the shortage now, not on the day; Save still works, Start will not"], ["editing", "a planned run reopens here with its values filled; a started run cannot be rescheduled, only closed"], ["no open occupancy", "nothing to package: the source picker says so and links to Cellar"]],
+    spec: "The plan half of the packaging frame, pulled out so a run can be scheduled before it exists and edited until it starts. One source occupancy, chosen exactly, is the rule that lets close revalidate it later. Planned outputs are counts per format; the sheet converts to barrels and shows what is left in the vessel so a plan cannot exceed the source. Materials are previewed from the format BOM so a shortage is a planning fact, not a surprise at the line. Saving writes the run and its planned outputs in one RPC and lands on the run; nothing moves in the ledger until close.",
+    body: (<>
+      {E.fld("Planned date", "Fri 9/5")}
+      {E.ttl("Source")}
+      {E.nav("FV3 · Hazy IPA", "B-0416 · 42.0 bbl · gravity 2.1 · ready")}
+      {E.ttl("Planned outputs")}
+      {E.fld("Hazy · cans (case of 24)", "118 cases · 39.6 bbl")}
+      {E.fld("Hazy · ½ bbl keg", "4 kegs · 2.0 bbl")}
+      {E.fld("Left in FV3", "0.4 bbl · loss at close unless held")}
+      {E.ttl("Materials")}
+      {E.tbl(["need", "have", "short"], [["cans 2,832", "3,100", "0"], ["ends 2,832", "2,400", <><span className="text-warning-foreground">432</span></>], ["labels 2,832", "5,000", "0"], ["trays 118", "140", "0"]])}
+      {E.note("432 ends short. Save the plan now; Start stays disabled until the shortage is resolved or overridden on the run.")}
+      {E.btn("Save run plan")}
+      {E.info("Nothing moves until the run closes. Saving writes the run and its planned outputs together.")}
     </>),
   },
   {

@@ -36,8 +36,8 @@ describe("SCREENS", () => {
     // A tripwire against a frame dropped by hand from a 1700-line array — the
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands; .agents/PROGRESS.md narrates
-    // what the number is made of — 83 MGR frames plus the 17 venue frames.
-    expect(SCREENS).toHaveLength(100);
+    // what the number is made of — 85 MGR frames plus the 17 venue frames.
+    expect(SCREENS).toHaveLength(102);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
 
