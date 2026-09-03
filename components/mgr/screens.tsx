@@ -370,7 +370,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.ttl("New brewery")}
       {E.inp("Brewery name")}
-      {E.inp("Timezone")}
+      {E.pick("Timezone", "America/New_York")}
       {E.inp("TTB registry number · optional")}
       {E.btn("Create brewery")}
     </>),
@@ -465,10 +465,10 @@ export const SCREENS: Screen[] = [
     spec: "The server derives sign and 0.50000000 bbl; the client never supplies either. Drawn with festival removal selected: sample and festival removal leave the premises and require a destination state (the schema enforces it); destruction, loss and depletion never carry one. Channel stays.",
     body: (<>
       {E.chips(["add finished goods", "depletion", "loss", "sample", "festival removal", "destruction", "adjustment"], 4)}
-      {E.fld("SKU / package", "Hazy IPA · ½ bbl keg")}
-      {E.fld("Location", "Warehouse")}
-      {E.fld("Channel", "taproom")}
-      {E.fld("Destination state", "PA · where the beer is poured")}
+      {E.pick("SKU / package", "Hazy IPA · ½ bbl keg")}
+      {E.pick("Location", "Warehouse")}
+      {E.pick("Channel", "taproom")}
+      {E.pick("Destination state", "PA · where the beer is poured")}
       {E.num("1", "keg · amounts are entered positive")}
       {E.info("Preview: −1 keg · 0.50 bbl · festival removal · PA")}
       {E.chips(["keg", "case", "bbl"])}
@@ -511,9 +511,9 @@ export const SCREENS: Screen[] = [
       {E.hd("Composer", "proposal")}
       {E.row("“Blew a half of Hazy at the taproom”")}
       {E.num("−1 × Hazy IPA · ½ bbl keg", "Taproom · depletion · −0.5 bbl")}
-      {E.fld("SKU / package", "Hazy IPA · ½ bbl keg")}
-      {E.fld("Location", "Taproom")}
-      {E.fld("Type", "Depletion")}
+      {E.pick("SKU / package", "Hazy IPA · ½ bbl keg")}
+      {E.pick("Location", "Taproom")}
+      {E.pick("Type", "Depletion")}
       {E.info("Document numbers are assigned on commit.")}
       {E.sp()}
       {E.btns([["Open as form", "g"], ["Commit movement", "irr"]])}
@@ -592,7 +592,7 @@ export const SCREENS: Screen[] = [
       {E.back("Orders", "ORD-0231")}
       {E.ttl("Ridgeline Tap Room")}
       {E.row("Current state", "Submitted · ships Thu", E.act("Next: confirm"))}
-      {E.row("Fulfillment source", "Warehouse", E.act("Required"))}
+      {E.pick("Fulfillment source", "Warehouse")}
       {E.info("Lifecycle: submitted → confirmed → picked → shipped. Only the valid next action is active.")}
       {E.row("Hazy IPA · ½ bbl keg", "", "4 · ATP 11")}
       {E.row("Pils · 16 oz case", "", "10 · ATP −6", "w")}
@@ -681,11 +681,11 @@ export const SCREENS: Screen[] = [
     spec: <>Ship qty prefills from picked and is editable per line; a shortage reason appears only when qty &lt; picked. Carrier/tracking never block the commit. The preview names the destination state from the ship-to and says the invoice number is assigned on commit. On-delivery timing lives on Ship · confirmation; taproom transfers use Complete transfer.</>,
     body: (<>
       {E.back("ORD-0231", "Ship")}
-      {E.row("Fulfillment source", "Warehouse", E.act("Required"))}
+      {E.pick("Fulfillment source", "Warehouse")}
       {E.row("Hazy IPA · ½ bbl keg", "ship / picked", "4 / 4", "ok")}
       {E.row("Pils · 16 oz case", "ship / picked", "9 / 10", "w")}
       {E.chips(["damaged", "not found", "customer cut"], 0)}
-      {E.fld("Carrier · tracking", "optional")}
+      {E.inp("Carrier · tracking · optional")}
       {E.chips(["Invoice now", "On delivery"], 0)}
       {E.tape([["−4 Hazy ½ bbl · sale removal · PA", "2.00 bbl"], ["−9 Pils cases · sale removal · PA", "0.42 bbl"], ["1 Pils case released · restock", ""], ["invoice number", "assigned on commit"]])}
       {E.sp()}
@@ -704,7 +704,7 @@ export const SCREENS: Screen[] = [
     spec: "Never infer invoice timing from carrier or a future route; the reviewed choice must persist on the shipment before routing and delivery confirmation may use it. Until then this body is disabled with human copy while Ship · invoice now stays enabled.",
     body: (<>
       {E.back("ORD-0231", "Ship")}
-      {E.row("Fulfillment source", "Warehouse", E.act("Required"))}
+      {E.pick("Fulfillment source", "Warehouse")}
       {E.row("Hazy IPA · ½ bbl keg", "ship / picked", "4 / 4", "ok")}
       {E.row("Pils · 16 oz case", "ship / picked", "10 / 10", "ok")}
       {E.chips(["Invoice now", "On delivery"], 1)}
@@ -830,7 +830,7 @@ export const SCREENS: Screen[] = [
       {E.back("ORD-0231", "Beer return")}
       {E.row("Hazy IPA · ½ bbl keg", "shipped 4 · returning", "1")}
       {E.chips(["damaged", "wrong item", "unsold"])}
-      {E.fld("Return to", "Warehouse · original fulfillment source")}
+      {E.pick("Return to", "Warehouse · original fulfillment source")}
       {E.row("Deposit refund", "½ bbl pool · 1", "−$30.00")}
       {E.tape([["+1 Hazy ½ bbl · return in", "Warehouse"], ["credit memo number · on commit", "−$180.00"]])}
       {E.note("Empty-keg asset returns are a different Keg fleet command.")}
@@ -849,11 +849,11 @@ export const SCREENS: Screen[] = [
     spec: "Source is required and becomes the order's from-location; the app never guesses “Warehouse.” Save draft lands on the Order screen, where Submit lives.",
     body: (<>
       {E.back("Work", "New order")}
-      {E.fld("Customer", "Ridgeline Tap Room")}
-      {E.fld("Source location", "Warehouse")}
-      {E.fld("Ship-to", "Main · Phoenixville, PA")}
-      {E.fld("Customer PO", "optional · 4471")}
-      {E.fld("Requested ship", "Thu 9/3")}
+      {E.pick("Customer", "Ridgeline Tap Room")}
+      {E.pick("Source location", "Warehouse")}
+      {E.pick("Ship-to", "Main · Phoenixville, PA")}
+      {E.inp("Customer PO · optional · 4471")}
+      {E.pick("Requested ship", "Thu 9/3")}
       {E.row("Hazy IPA · ½ bbl keg", "ATP 11 at Warehouse", "4")}
       {E.row("Pils · 16 oz case", "ATP −6 at Warehouse", "10", "w")}
       {E.btn("Add line", "g")}
@@ -1193,8 +1193,8 @@ export const SCREENS: Screen[] = [
     states: [["no lot", "Choose a lot · Citra is lot-tracked", 1], ["recipe hint", "planned dry hop 1.2 lb/bbl · 18 lb"], ["offline", "queue with requestId"], ["stale", "occupancy closed · choose another", 1]],
     spec: "Not Record movement (that is finished goods) and not Brew day (that is knockout). The consumption movement carries the lot; the addition row carries stage and occupancy so loss accounting stays anchored to the batch.",
     body: (<>
-      {E.fld("Occupancy", "FV2 · B-0416 · Hazy IPA")}
-      {E.fld("Material", "Citra · hop")}
+      {E.pick("Occupancy", "FV2 · B-0416 · Hazy IPA")}
+      {E.pick("Material", "Citra · hop")}
       {E.chips(["dry hop", "fermentation", "other"], 0)}
       {E.num("18", "lb · lot L-0790 · 262 on hand")}
       {E.chips(["lb", "oz", "kg"])}
@@ -1235,11 +1235,11 @@ export const SCREENS: Screen[] = [
     spec: "Two modes: planned (recipe · date · planned bbl) and brew day (actual lots · knockout vessel). Save schedule is green and independent; Record brew day posts immutable material consumption for mash/boil/whirlpool stages only; the 18 lb Citra dry hop is posted later from Cellar addition. Yeast is consumed as a material lot, not a culture generation (plan §8).",
     body: (<>
       {E.back("Batches", "B-0416 · Hazy")}
-      {E.fld("Recipe / date", "Hazy IPA v4 · 9/4 · 15 bbl")}
+      {E.pick("Recipe / date", "Hazy IPA v4 · 9/4 · 15 bbl")}
       {E.btn("Save schedule")}
-      {E.row("2-row", "lot L-0821", "660 lb")}
-      {E.row("Citra · boil", "lot L-0790", "6 lb")}
-      {E.row("Yeast", "WLP066 · lot Y-0312", "1 brink")}
+      {E.nav("2-row", "lot L-0821 · 660 lb")}
+      {E.nav("Citra · boil", "lot L-0790 · 6 lb")}
+      {E.nav("Yeast", "WLP066 · lot Y-0312 · 1 brink")}
       {E.fld("Knockout baseline", "14.6 bbl → FV2")}
       {E.tape([["Start B-0416 · Hazy IPA v4", ""], ["Consume additions", "named material lots"], ["Knockout 14.6 bbl → FV2", "loss baseline"]])}
       {E.sp()}
@@ -1257,8 +1257,8 @@ export const SCREENS: Screen[] = [
     writes: "record_cellar_transfer [design; one RPC: create target occupancy(initial_bbl=0) when empty + append transfer(loss_bbl) + close source occupancy iff fully emptied]",
     spec: "Drawn as a blend into an occupied brite: BT1 keeps its occupancy and B-0412 keeps its identity: the schema has one batch per occupancy, and blends are transfers into the surviving one (renaming a blend as a new batch is a plan §8 schema gap). An empty target (BT2) gets a new occupancy starting at zero bbl in the same RPC; the transfer row stays immutable; a fully emptied source closes its occupancy. A partial transfer never implies loss: the person explicitly holds the remainder or records loss. No vessel status.",
     body: (<>
-      {E.fld("From", "FV1 · Pils · B-0409 · 12.8 bbl")}
-      {E.fld("To", "BT1 · Pils · B-0412 · 7.0 / 10 bbl")}
+      {E.pick("From", "FV1 · Pils · B-0409 · 12.8 bbl")}
+      {E.pick("To", "BT1 · Pils · B-0412 · 7.0 / 10 bbl")}
       {E.num("3.0", "bbl moving")}
       {E.info("Blend preview: BT1 7.0 + 3.0 = 10.0 bbl (full) · stays B-0412 · Pils. FV1 keeps 9.8 bbl.")}
       {E.fld("Remainder in FV1", "9.8 bbl")}
@@ -1284,8 +1284,8 @@ export const SCREENS: Screen[] = [
       {E.tbl(["need", "have", "short"], [["cans 2,880", "3,100", "0"], ["ends 2,880", "2,400", <><span className="text-warning-foreground">480</span></>], ["labels 2,880", "5,000", "0"]])}
       {E.note("480 ends short · resolve or explicitly override before starting.")}
       {E.fld("Packaged", "118 cases")}
-      {E.fld("Lot", "L-240905-HZ")}
-      {E.fld("Finished goods destination", "Warehouse · selected")}
+      {E.pick("Lot", "L-240905-HZ")}
+      {E.pick("Finished goods destination", "Warehouse · selected")}
       {E.tape([["FV3 · occupancy/B-0416", "source revalidated"], ["+118 cases · production in", "Warehouse · new lot"], ["−2,832 cans + ends · consumption", "FIFO"], ["Labels returned / damaged", "24 / 6"], ["Beer loss · 0.30 bbl", "yield 97.9%"]])}
       {E.btns([["Print labels · lot / keg collar", "g"], ["Close packaging run", "irr"]])}
     </>),
@@ -1327,7 +1327,7 @@ export const SCREENS: Screen[] = [
     states: [["source chosen", "the brand comes from what is in the vessel, so only that brand's formats are offered"], ["short", "the materials table shows the shortage now, not on the day; Save still works, Start will not"], ["editing", "a planned run reopens here with its values filled; a started run cannot be rescheduled, only closed"], ["no open occupancy", "nothing to package: the source picker says so and links to Cellar"]],
     spec: "The plan half of the packaging frame, pulled out so a run can be scheduled before it exists and edited until it starts. One source occupancy, chosen exactly, is the rule that lets close revalidate it later. Planned outputs are counts per format; the sheet converts to barrels and shows what is left in the vessel so a plan cannot exceed the source. Materials are previewed from the format BOM so a shortage is a planning fact, not a surprise at the line. Saving writes the run and its planned outputs in one RPC and lands on the run; nothing moves in the ledger until close.",
     body: (<>
-      {E.fld("Planned date", "Fri 9/5")}
+      {E.pick("Planned date", "Fri 9/5")}
       {E.ttl("Source")}
       {E.nav("FV3 · Hazy IPA", "B-0416 · 42.0 bbl · gravity 2.1 · ready")}
       {E.ttl("Planned outputs")}
@@ -1429,7 +1429,7 @@ export const SCREENS: Screen[] = [
     reads: "get_material_on_hand [design]",
     writes: "record_material_count [design; one RPC: count + lines + adjustment movements]",
     body: (<>
-      {E.fld("Material", "Cans · 16 oz")}
+      {E.pick("Material", "Cans · 16 oz")}
       {E.num("3,050", "system 3,100 · variance −50 each")}
       {E.chips(["each", "case"])}
       {E.pad()}
@@ -1703,7 +1703,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Route A", "Stop 1 of 3")}
       {E.ttl("Ridgeline Tap Room")}
-      {E.row("Invoice timing", "On delivery · persisted", E.act("Required"))}
+      {E.pick("Invoice timing", "On delivery · persisted")}
       {E.row("Hazy IPA · ½ bbl keg", "", "4")}
       {E.row("Pils · 16 oz case", "", "6")}
       {E.chips(["Maria", "Dave", "Type name"], -1)}
@@ -1760,9 +1760,9 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Settings", "Chat")}
       {E.row("Slack · Demo Brewing", "Connected · scopes healthy", E.act("Active"), "ok", SlackMark)}
-      {E.fld("Operations channel", "#mgr-operations · private")}
-      {E.fld("Quiet hours", "9:00 PM–6:00 AM · brewery time")}
-      {E.fld("Reading overdue after", "24 hours · Today + chat")}
+      {E.pick("Operations channel", "#mgr-operations · private")}
+      {E.pick("Quiet hours", "9:00 PM–6:00 AM · brewery time")}
+      {E.pick("Reading overdue after", "24 hours · Today + chat")}
       {E.chips(["App Home", "Personal DM", "Team digest", "Preferences"], 0)}
       {E.row("Preview · App Home", "4 current work reasons · fixture data", E.act("Open"))}
       {E.btn("Disable", "g")}

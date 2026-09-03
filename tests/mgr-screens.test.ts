@@ -81,6 +81,22 @@ describe("SCREENS", () => {
     expect(tierText).not.toContain("$185.00");
   });
 
+  it("marks pickable fields and never pins Required on a filled one", () => {
+    const chevrons = new Map([
+      ["Create brewery", 1], ["Record movement", 4], ["Composer proposal", 3],
+      ["Return and credit", 1], ["New order", 4], ["Cellar addition", 2],
+      ["Brew day", 4], ["Cellar transfer", 2], ["Close packaging run", 3],
+      ["Schedule packaging run", 2], ["Cycle count", 1], ["Chat settings", 3],
+    ]);
+    for (const s of SCREENS.filter((s) => !s.venue)) {
+      const html = renderToStaticMarkup(createElement("div", null, s.body));
+      expect.soft(html, `${s.name}: Required pill`).not.toMatch(/<button[^>]*>Required<\/button>/);
+      if (chevrons.has(s.name)) {
+        expect.soft(html.match(/>›</g)?.length ?? 0, `${s.name}: picker affordances`).toBeGreaterThanOrEqual(chevrons.get(s.name)!);
+      }
+    }
+  });
+
   it("draws customer copy, not markup escapes, machine identifiers or em dashes", () => {
     // Bodies are what a brewer reads on the glass; job, states and spec are
     // what a reader sees on /docs/screens. A literal "&frac12;" is a string
