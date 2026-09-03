@@ -46,8 +46,14 @@
 .sk-b.dan{color:var(--sk-red)}
 .sk-b.dis{opacity:.45}
 .sk-f{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px 16px;font-size:13px}
+.slk.modal .sk-f{grid-template-columns:1fr}
 .sk-f div{min-width:0;overflow-wrap:anywhere}
 .sk-f b{display:block;font-weight:700}
+.sk-control{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px}
+.sk-control b{font-weight:700}
+.sk-control button[role="switch"]{width:34px;height:20px;border:0;border-radius:999px;background:var(--sk-green);padding:2px;display:flex;justify-content:flex-end}
+.sk-control button[role="switch"] i{width:16px;height:16px;border-radius:50%;background:#fff}
+.sk-control select{min-width:180px;border:1px solid var(--sk-line);border-radius:4px;background:#fff;padding:6px 28px 6px 8px;color:var(--sk-ink)}
 .sk-gate{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
 .bar{flex-direction:column;align-items:stretch;gap:6px}
 .barrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;min-width:0}

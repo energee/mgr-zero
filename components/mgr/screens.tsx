@@ -2572,7 +2572,7 @@ export const SCREENS: Screen[] = [
       {X.when("Due date", INV.due)}
       {X.sec(INV.customer, <>{X.sub("Billing address", ["114 Bridge St.", "Phoenixville, PA  19460"])}{X.link("ap@ridgeline.example")}</>)}
       {X.sec("Invoice activity", X.life(["Opened", "Sent", "Viewed", "Paid"], 1))}
-      {X.more("Products and services")}
+      {X.sec("Products and services", X.rows([["Hazy IPA · ½ bbl · TAX", INV.hazyAmount], ["Pils · 16 oz case · TAX", INV.pilsAmount], ["Keg deposit · NON", INV.depositAmount], ["Total", INV.total]]))}
     </>),
   },
   {
@@ -2611,7 +2611,7 @@ export const SCREENS: Screen[] = [
     </>),
   },
   {
-    step: 5, slice: 1, group: "QuickBooks Online", venue: { name: "QuickBooks Online", title: "Invoice · not created", actions: "Edit" },
+    step: 5, slice: 1, group: "QuickBooks Online", venue: { name: "QuickBooks Online", title: "Invoice · not created" },
     name: "Push rejected",
     job: "What QuickBooks refuses when a SKU carries no usable item reference",
     reads: "none",
@@ -2620,12 +2620,12 @@ export const SCREENS: Screen[] = [
     spec: "Drawn because the failure is external and the recovery is not. MGR stores the raw provider reason as the invoice's sync error and leaves its sync status failed; the row stays in AR. Re-pushing reuses the same requestid, so a fixed mapping cannot produce a second invoice. Two causes share this one message (the SKU was never mapped, or the QuickBooks item has since gone inactive) and the recovery differs, so the error copy must not assume the first. Nothing appears in the list behind this panel, which is the point.",
     body: (<>
       {X.err("Invalid reference", "Invalid Reference Id : Item element id 0 not found.")}
-      {X.sec("Request", X.rows([["Invoice", "ORD-0241"], ["Failed line", "Stout · ⅙ bbl"], ["Created in QuickBooks", "Nothing"]]))}
+      {X.sec("Request", X.rows([["Order", "ORD-0241"], ["Failed line", "Stout · ⅙ bbl"], ["Created in QuickBooks", "Nothing"]]))}
       {X.note("Either the SKU has no QuickBooks item reference, or the item it points at is archived in QuickBooks. Map it here or reactivate it there, then re-push the same request.")}
     </>),
   },
   {
-    step: 7, slice: 7, venue: { name: "QuickBooks Online", title: "Sales receipt", actions: "Edit" },
+    step: 7, slice: 7, venue: { name: "QuickBooks Online", title: "Sales receipt", actions: "Edit", selected: "receipt" },
     name: "Square sales receipt",
     job: "Proof that Square's own QuickBooks sync books a daily receipt MGR must not double-count",
     reads: "none [Square's QuickBooks integration wrote it]",
@@ -2649,12 +2649,12 @@ export const SCREENS: Screen[] = [
     venue: {
       name: "Square", nav: "pay", on: "Transactions",
       panel: (<>
-        {X.h("$16.96 Payment", "Sep 1, 2026 10:32 pm")}
-        {X.meta([["", "Point of Sale"], ["Collected at", "Taproom"], ["Device", "Square Register 0305"], ["Order Source", "Register"], ["Channel", "Taproom · from mapped location"]])}
+        {X.h("$14.84 Payment", "Sep 1, 2026 10:32 pm")}
+        {X.meta([["", "Point of Sale"], ["Collected at", "Taproom"], ["Device", "Square Register 0305"], ["Order Source", "Register"]])}
         {X.sect("For here")}
-        {X.li([["Hazy IPA (Full Pour)", "$20.00", "$10.00 × 2"], ["Industry Discount", "($4.00)", ""]])}
-        {X.tot([["Subtotal", "16.00"], ["Sales Tax Zelienople", "0.96"], ["Total", "16.96", 1], ["Tendered", "28.00"], ["Change", "(11.04)"], ["Cash", "16.96"]])}
-        {X.note("MGR reads this. A line it cannot map to a package SKU and a variation blocks reconciliation rather than guessing a quantity.")}
+        {X.li([["Hazy IPA (Pint)", "$14.00", "$7.00 × 2"]])}
+        {X.tot([["Subtotal", "14.00"], ["Sales Tax Zelienople", "0.84"], ["Total", "14.84", 1], ["Cash", "14.84"]])}
+        {X.note("MGR mapping: the Square Taproom location uses the Taproom sales channel. An unmapped variation blocks reconciliation rather than guessing a quantity.")}
       </>),
     },
     name: "Taproom sale",
@@ -2666,7 +2666,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {sqTxnHead()}
       {X.day("Tuesday, September 1, 2026", "$1,564.63")}
-      {X.txns([["CASH", "10:32 pm", "Hazy IPA (Full Pour) × 2", "$16.96", "Taproom", 1], ["⋯", "9:59 pm", "No Sale", "$0.00", "Warehouse"], ["CASH", "9:44 pm", "Hazy IPA (Full Pour), Pils (Full Pour), Stout (Full Pour)", "$33.02", "Warehouse"], ["VISA", "9:16 pm", "Pils (Full Pour) × 3", "$26.67", "Warehouse"], ["VISA", "9:12 pm", "Pils (Can) × 2, Hazy IPA (Can) × 2, Stout (Can) × 2, Pils (Half) × 2, Hazy IPA To Go (Single) × 2, Saison…", "$141.23", "Warehouse"], ["AMEX", "8:52 pm", "Stout (Half Pour)", "$7.62", "Warehouse"], ["CASH", "8:43 pm", "Hazy IPA To Go (4 Pack)", "$28.89", "Warehouse"]])}
+      {X.txns([["CASH", "10:32 pm", "Hazy IPA (Pint) × 2", "$14.84", "Taproom", 1], ["⋯", "9:59 pm", "No Sale", "$0.00", "Warehouse"], ["CASH", "9:44 pm", "Hazy IPA (Pint), Pils (Pint), Stout (Pint)", "$33.02", "Warehouse"], ["VISA", "9:16 pm", "Pils (Pint) × 3", "$26.67", "Warehouse"], ["VISA", "9:12 pm", "Pils (Can) × 2, Hazy IPA (Can) × 2, Stout (Can) × 2, Pils (Half) × 2, Hazy IPA To Go (Single) × 2, Saison…", "$141.23", "Warehouse"], ["AMEX", "8:52 pm", "Stout (Taster)", "$7.62", "Warehouse"], ["CASH", "8:43 pm", "Hazy IPA To Go (4 Pack)", "$28.89", "Warehouse"]])}
     </>),
   },
   {
@@ -2692,7 +2692,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {sqTxnHead()}
       {X.day("Tuesday, September 1, 2026", "$1,564.63")}
-      {X.txns([["CASH", "10:32 pm", "Hazy IPA (Full Pour) × 2", "$16.96", "Taproom"], ["VISA", "10:51 pm", "Refund · Pils (Crowler)", "−$12.72", "Taproom", 1], ["VISA", "9:16 pm", "Pils (Full Pour) × 3", "$26.67", "Warehouse"], ["AMEX", "8:52 pm", "Stout (Half Pour)", "$7.62", "Warehouse"]])}
+      {X.txns([["VISA", "10:51 pm", "Refund · Pils (Crowler)", "−$12.72", "Taproom", 1], ["CASH", "10:32 pm", "Hazy IPA (Pint) × 2", "$14.84", "Taproom"], ["VISA", "9:16 pm", "Pils (Pint) × 3", "$26.67", "Warehouse"], ["AMEX", "8:52 pm", "Stout (Taster)", "$7.62", "Warehouse"]])}
     </>),
   },
   {
@@ -2719,8 +2719,8 @@ export const SCREENS: Screen[] = [
     spec: "DISCOVERED from a live library, and it breaks a modelling assumption: a Square item does not carry a price. Variations do. That is why the Price column reads as a range: it is the spread across a pint, a crowler and whatever else hangs off the item, and Variable means the spread is open. So the item id alone is not sufficient: sales report at the variation level, and the per-sale conversion MGR depletes against belongs to the variation, not the item. Publishing must store an id per serving, or a pint and a crowler collapse into one number.",
     body: (<>
       {sqItemFilters()}
-      {X.items([[1, "Hazy IPA", "On-Prem Draft", "Taproom", "ea", "Available", "$6.00 - $9.00/ea", "mgr"], [0, "• Pint · SQ-8841-V1", "", "", "ea", "Available", "$7.00/ea", "mgr var"], [0, "• Crowler · SQ-8841-V2", "", "", "ea", "Available", "$9.00/ea", "mgr var"], [0, "• Taster · SQ-8841-V3", "", "", "ea", "Available", "$6.00/ea", "mgr var"], [1, "Hazy IPA To Go", "Off-Prem Package", "2 locations", "ea", "Available", "$6.50 - $24.00/ea", "mgr"]])}
-      {X.note("One item, three variations, three ids. The conversion differs per variation: a pint is 0.0078125 bbl, a crowler is not.")}
+      {X.items([[1, "Hazy IPA", "On-Prem Draft", "Taproom", "ea", "Available", "$6.00 - $9.00/ea", "mgr"], [1, "Hazy IPA To Go", "Off-Prem Package", "2 locations", "ea", "Available", "$6.50 - $24.00/ea", "mgr"]])}
+      {X.note("MGR mapping: item FQ7K2N4M contains Pint 3YJ6Q8TX at $7.00, Crowler C4PV9K2D at $9.00, and Taster W8N3R6LA at $6.00. Square keeps these variations inside the item; MGR stores each opaque id because conversion differs by variation.")}
     </>),
   },
   {
@@ -2810,7 +2810,11 @@ export const SCREENS: Screen[] = [
     states: [["saved", "update App Home and close"], ["invalid hours", "name the correction", 1], ["unsupported provider", "open authenticated MGR fallback", 1]],
     spec: "Snooze and mute affect personal delivery only. App Home and MGR Today still show current work.",
     body: (<>
-      {S.f([["Submitted orders", "On"], ["Picks due", "On"], ["Assigned deliveries", "On"], ["Fermentation readings", "On"], ["Quiet hours", "9:00 PM–6:00 AM"]])}
+      {S.toggle("Submitted orders")}
+      {S.toggle("Picks due")}
+      {S.toggle("Assigned deliveries")}
+      {S.toggle("Fermentation readings")}
+      {S.select("Quiet hours", "9:00 PM–6:00 AM")}
       {S.ctx("Snooze and mute affect personal delivery only. MGR still shows the work as due.")}
     </>),
   },
