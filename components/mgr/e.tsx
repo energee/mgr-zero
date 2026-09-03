@@ -171,7 +171,7 @@ export const E = {
     </ItemGroup>
   ),
   tbl: (hd: React.ReactNode[], rows: React.ReactNode[][]) => (
-    <Table>
+    <Table className="min-w-max">
       <TableHeader>
         <TableRow>
           {hd.map((h, i) => (
