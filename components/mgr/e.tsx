@@ -5,6 +5,7 @@
 // Target sizing under a coarse pointer lives in app/globals.css, so nothing
 // here sets heights. Screen authors use only these and never components/ui.
 import * as React from "react";
+import { Children, Fragment, isValidElement, type ReactNode } from "react";
 import { Alert02Icon, ArrowLeft01Icon, InformationCircleIcon, SquareLock01Icon } from "@hugeicons/core-free-icons";
 import { Icon, type IconSvgElement } from "@/components/mgr/icon";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -102,10 +103,16 @@ export const E = {
     </ToggleGroup>
   ),
   pad: () => (
-    <div className="mt-auto grid grid-cols-3 gap-2">
+    <div className="grid grid-cols-3 gap-2">
       {"1 2 3 4 5 6 7 8 9 . 0 ⌫".split(" ").map((k) => (
         <Button key={k} variant="outline" size="lg">{k}</Button>
       ))}
+    </div>
+  ),
+  /** Pad + commit; CommandForm lifts this out of the scroll region so the verb stays on the phone. */
+  pin: (t: React.ReactNode) => (
+    <div data-pin className="flex flex-col gap-2">
+      {t}
     </div>
   ),
   tape: (arr: [React.ReactNode, React.ReactNode?][]) => (
@@ -216,3 +223,18 @@ export const E = {
     </InputGroup>
   ),
 };
+
+function isPin(n: ReactNode) {
+  return isValidElement(n) && Boolean((n.props as { "data-pin"?: unknown })["data-pin"]);
+}
+
+/** Lift `E.pin` out of a fragment body so CommandForm can keep it on screen. */
+export function splitPinned(body: ReactNode) {
+  const raw = isValidElement(body) && body.type === Fragment
+    ? (body.props as { children?: ReactNode }).children
+    : body;
+  const rest: ReactNode[] = [];
+  const pin: ReactNode[] = [];
+  for (const n of Children.toArray(raw)) (isPin(n) ? pin : rest).push(n);
+  return { rest, pin };
+}

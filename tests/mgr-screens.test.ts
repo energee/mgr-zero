@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { describe, expect, it } from "vitest";
 import { SCREENS, type Screen } from "../components/mgr/screens";
-import { E } from "../components/mgr/e";
+import { E, splitPinned } from "../components/mgr/e";
 import { VenueFrame } from "../components/mgr/venue";
 
 describe("SCREENS", () => {
@@ -37,8 +37,8 @@ describe("SCREENS", () => {
     // A tripwire against a frame dropped by hand from a 1700-line array — the
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands; .agents/PROGRESS.md narrates
-    // what the number is made of — 135 MGR frames plus the 17 venue frames.
-    expect(SCREENS).toHaveLength(152);
+    // what the number is made of — 153 MGR frames plus the 17 venue frames.
+    expect(SCREENS).toHaveLength(170);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
 
@@ -156,7 +156,7 @@ describe("SCREENS", () => {
     const chevrons = new Map([
       ["Create brewery", 1], ["Record movement", 4], ["Composer proposal", 3],
       ["Return and credit", 1], ["New order", 4], ["Cellar addition", 2],
-      ["Brew day", 3], ["Schedule batch", 2], ["Cellar transfer", 2], ["Close packaging run", 3],
+      ["Brew day", 3], ["Schedule batch", 2], ["Cellar transfer", 2], ["Close packaging run", 2],
       ["Schedule packaging run", 2], ["Cycle count", 1], ["Chat settings", 3],
     ]);
     for (const s of SCREENS.filter((s) => !s.venue)) {
@@ -215,6 +215,122 @@ describe("SCREENS", () => {
 
   it("gives sheets no separate header; their title is the record name", () => {
     expect(SCREENS.filter((s) => s.surface === "sheet" && s.hd)).toEqual([]);
+  });
+
+  it("pins the keypad commit so the pad does not push it off the phone", () => {
+    // Issue 73: on a 390×900 sheet the pad sat above the verb, so Record
+    // landed below the fold. The pin is a data-pin footer; CommandForm lifts
+    // it out of the scroll region.
+    const named = [
+      "Record movement", "Fermentation reading", "Cellar addition",
+      "Cellar transfer", "Cycle count", "Repack",
+    ];
+    for (const name of named) {
+      const s = SCREENS.find((x) => x.name === name);
+      expect(s, name).toBeTruthy();
+      const html = renderToStaticMarkup(createElement("div", null, s!.body));
+      const pinAt = html.indexOf("data-pin");
+      expect(pinAt, name).toBeGreaterThan(-1);
+      expect(html.indexOf("⌫", pinAt), `${name}: pad inside pin`).toBeGreaterThan(pinAt);
+      expect(splitPinned(s!.body).pin.length, `${name}: pin lifted`).toBe(1);
+    }
+    const reading = SCREENS.find((x) => x.name === "Fermentation reading")!;
+    const readingHtml = renderToStaticMarkup(createElement("div", null, reading.body));
+    expect(readingHtml).toMatch(/Gravity[\s\S]*on pad/);
+    const transfer = SCREENS.find((x) => x.name === "Cellar transfer")!;
+    const transferHtml = renderToStaticMarkup(createElement("div", null, transfer.body));
+    expect(transferHtml).not.toMatch(/border-l-2/);
+  });
+
+  it("draws locked-out landings and the composer question", () => {
+    // Issue 83: no-membership, expired invite/reset, session expiry with the
+    // outbox kept, and the composer question (chips, no Commit).
+    for (const name of ["No membership", "Expired invite", "Expired reset", "Session expired", "Composer question"]) {
+      expect(SCREENS.some((s) => s.name === name), name).toBe(true);
+    }
+    const q = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Composer question")!.body));
+    expect(q).not.toMatch(/Commit/);
+    const accept = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Accept invite")!.body));
+    expect(accept).toMatch(/name|Name/i);
+    const search = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Search")!.body));
+    expect(search).toMatch(/SKU/);
+  });
+
+  it("draws the driver route, put back, and ship-on-delivery work screens", () => {
+    // Issue 81: Put back was a Today verb with no screen; the driver route
+    // was only the planner; Confirm shipment was a second Ship title.
+    for (const name of ["Driver route", "Put back", "Ship on delivery"]) {
+      expect(SCREENS.some((s) => s.name === name), name).toBe(true);
+    }
+    expect(SCREENS.some((s) => s.name === "Confirm shipment")).toBe(false);
+    const pickSheet = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Pick sheet")!.body));
+    expect(pickSheet).toMatch(/›/);
+    expect(pickSheet).toMatch(/Thu/);
+    const pick = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Pick")!.body));
+    expect(pick).toMatch(/Print/);
+    const receive = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Receive PO")!.body));
+    expect(receive).not.toMatch(/Send PO/);
+    const close = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Close packaging run")!.body));
+    expect(close).not.toMatch(/Print labels/);
+    expect(close).toMatch(/started/);
+    const delivery = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Confirm delivery")!.body));
+    expect(delivery).toMatch(/Route A/);
+    expect(delivery).not.toMatch(/Type name/);
+  });
+
+  it("gives every MGR screen states, and keeps engineering phrases off the glass", () => {
+    // Issue 79: missing empty/offline/permission/already-done/error states, and
+    // policy copy (RPC, occupancy/B-0416, source of truth, callback) on the device.
+    const banned = /source of truth|Last callback|Retry eligible|occupancy\/B-|One RPC |\bpersisted\b/;
+    for (const s of SCREENS) {
+      if (s.venue) continue;
+      expect(s.states?.length, s.name).toBeGreaterThan(0);
+      const body = renderToStaticMarkup(createElement("div", null, s.hd, s.body));
+      expect(body, s.name).not.toMatch(banned);
+    }
+    for (const name of ["Shipment done", "Run closed", "Receipt", "Movement recorded"]) {
+      expect(SCREENS.some((s) => s.name === name), name).toBe(true);
+    }
+  });
+
+  it("gives the portal an Account tab, entry, Me, order detail and invoice follow-ups", () => {
+    // Issue 77: Account was drawn but unreachable; buyer entry, Me, order
+    // detail, dispute, paid invoice and disabled-primary reasons were missing.
+    const names = [
+      "Portal sign in", "Portal forgot password", "Portal set password", "Portal Me",
+      "Order detail", "Question invoice", "Paid invoice",
+    ];
+    for (const name of names) expect(SCREENS.some((s) => s.name === name), name).toBe(true);
+    const shop = SCREENS.find((s) => s.name === "Shop")!;
+    const shopHtml = renderToStaticMarkup(createElement("div", null, shop.body));
+    expect(shopHtml).toMatch(/p disabled|disabled/);
+    expect(shopHtml).toMatch(/ship from/i);
+    const history = SCREENS.find((s) => s.name === "Order history")!;
+    const historyHtml = renderToStaticMarkup(createElement("div", null, history.body));
+    expect(historyHtml).toMatch(/Reorder/);
+  });
+
+  it("puts a stepper on quantity rows and leaves reason unchosen", () => {
+    // Issue 75: quantities were static text. Pick had no way to change a
+    // count. Short pick and Ship and invoice preselected a reason.
+    const qty = [
+      "Pick", "Receive PO", "Return and credit", "New order",
+      "Weekly count", "Schedule packaging run",
+    ];
+    for (const name of qty) {
+      const s = SCREENS.find((x) => x.name === name);
+      expect(s, name).toBeTruthy();
+      const html = renderToStaticMarkup(createElement("div", null, s!.body));
+      expect(html, name).toMatch(/aria-label="Decrease"/);
+    }
+    for (const name of ["Short pick", "Ship and invoice"]) {
+      const s = SCREENS.find((x) => x.name === name);
+      expect(s, name).toBeTruthy();
+      const html = renderToStaticMarkup(createElement("div", null, s!.body));
+      expect(html, name).toMatch(/Reason/);
+      expect(html, name).toMatch(/required/);
+      expect(html, `${name}: no reason chips`).not.toMatch(/>damaged</);
+    }
   });
 
   it("gives the named screens one filled primary each", () => {
