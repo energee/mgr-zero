@@ -22,12 +22,22 @@ jobs:
       changed: ${{ steps.validate.outputs.changed }}
       head: ${{ steps.window.outputs.head }}
       open_pr: ${{ steps.prepare.outputs.open_pr }}
+      dream_sha: ${{ steps.prepare.outputs.dream_sha }}
+      rebuilt: ${{ steps.prepare.outputs.rebuilt }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Mint MGR GitHub App identity
+        id: mgr-app
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.MGR_APP_ID }}
+          private-key: ${{ secrets.MGR_APP_PRIVATE_KEY }}
+          permission-metadata: read
 
       - name: Find the accepted and checked windows
         id: window
@@ -58,16 +68,35 @@ jobs:
         id: prepare
         env:
           GH_TOKEN: ${{ github.token }}
+          APP_SLUG: ${{ steps.mgr-app.outputs.app-slug }}
         run: |
+          # The model runs on a checked-out dreaming/main, so its deny list is taken from main.
+          git show origin/main:.github/claude-ci-settings.json > "$RUNNER_TEMP/claude-ci-settings.json"
           open_pr=$(gh pr list --base main --head dreaming/main --state open --json number --jq '.[0].number // empty')
-          echo "open_pr=$open_pr" >> "$GITHUB_OUTPUT"
+          # The dreaming/main head this run builds on; publish's push lease is pinned to it.
+          dream_sha=$(git rev-parse -q --verify origin/dreaming/main || true)
+          rebuilt=false
+          # Merge and dream commits alike are the MGR GitHub App, so nothing needs re-authoring later.
+          login="${APP_SLUG}[bot]"
+          git config user.name "$login"
+          id="$(gh api "users/${login}" --jq .id)"
+          git config user.email "${id}+${login}@users.noreply.github.com"
           if [ -n "$open_pr" ]; then
             git checkout -B dreaming/main origin/dreaming/main
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            # A conflicting dream branch is abandoned; publish force-pushes a fresh one.
-            git merge --no-edit origin/main || { git merge --abort; git checkout -B dreaming/main origin/main; }
+            if ! git merge --no-edit origin/main; then
+              # A conflicting dream branch is abandoned: this run dreams on main, and the
+              # next publish force-pushes that as the new dreaming/main and says so in the PR.
+              echo "::warning::dreaming/main no longer merges with main; dreaming on main instead. The next publish rebuilds dreaming/main from it and drops the open dream PR's unmerged edits."
+              git merge --abort || true
+              git checkout -B dreaming/main origin/main
+              rebuilt=true
+            fi
           fi
+          {
+            echo "open_pr=$open_pr"
+            echo "dream_sha=$dream_sha"
+            echo "rebuilt=$rebuilt"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Run dream
         if: steps.window.outputs.new == 'true'
@@ -79,49 +108,7 @@ jobs:
           github_token: '${{ github.token }}'
           allowed_bots: 'github-actions'
           show_full_output: false
-          settings: |
-            {
-              "permissions": {
-                "deny": [
-                  "Read(/proc/**)",
-                  "Read(/etc/**)",
-                  "Read(/home/runner/.*/**)",
-                  "Read(/home/runner/.config/**)",
-                  "Read(/home/runner/.cache/**)",
-                  "Read(/home/runner/.ssh/**)",
-                  "Read(/home/runner/.gitconfig)",
-                  "Read(/home/runner/.npmrc)",
-                  "Read(/home/runner/.netrc)",
-                  "Read(/home/runner/work/_temp/**)",
-                  "Read(/github/home/**)",
-                  "Read(**/.env*)",
-                  "Read(**/*token*)",
-                  "Grep(/proc/**)",
-                  "Grep(/etc/**)",
-                  "Grep(/home/runner/.*/**)",
-                  "Grep(/home/runner/.config/**)",
-                  "Grep(/home/runner/.cache/**)",
-                  "Grep(/home/runner/.ssh/**)",
-                  "Grep(/home/runner/.gitconfig)",
-                  "Grep(/home/runner/.npmrc)",
-                  "Grep(/home/runner/.netrc)",
-                  "Grep(/home/runner/work/_temp/**)",
-                  "Grep(/github/home/**)",
-                  "Grep(**/.env*)",
-                  "Grep(**/*token*)",
-                  "Glob(/proc/**)",
-                  "Glob(/etc/**)",
-                  "Glob(/home/runner/.*/**)",
-                  "Glob(/home/runner/.config/**)",
-                  "Glob(/home/runner/.cache/**)",
-                  "Glob(/home/runner/.ssh/**)",
-                  "Glob(/home/runner/work/_temp/**)",
-                  "Glob(/github/home/**)",
-                  "Glob(**/.env*)",
-                  "Glob(**/*token*)"
-                ]
-              }
-            }
+          settings: ${{ runner.temp }}/claude-ci-settings.json
           prompt: >-
             You are running inside GitHub Actions (GITHUB_ACTIONS=true); the CI-only guard is satisfied.
             The last accepted dream on main is ${{ steps.window.outputs.base }} and current main HEAD is
@@ -131,6 +118,8 @@ jobs:
       - name: Validate dream changes
         if: steps.window.outputs.new == 'true'
         id: validate
+        env:
+          DREAM_SHA: ${{ steps.prepare.outputs.dream_sha }}
         run: |
           git add -A
           changed=$(git diff --cached --name-only)
@@ -146,18 +135,22 @@ jobs:
           done <<EOF
           $changed
           EOF
-          # A patch, not file snapshots: publish applies it 3-way onto whatever main
-          # is by then, so edits that landed during the model run are kept.
-          git diff --cached --binary > dream.patch
+          git commit -q -m "dream: agent doc maintenance"
+          # A bundle of the validated commit, not a patch: publish pushes exactly this
+          # tree, so it never re-merges main or needs preimage blobs for a 3-way apply.
+          # Edits that land on main during the model run leave the PR one merge behind,
+          # which GitHub shows as usual and the next dream's merge absorbs. Only commits
+          # publish cannot already reach (main, the observed dreaming/main) are packed.
+          git bundle create dream.bundle HEAD ^origin/main ${DREAM_SHA:+^$DREAM_SHA}
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
-      - name: Save dream patch
+      - name: Save dream bundle
         if: steps.validate.outputs.changed == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: dream-patch
+          name: dream-bundle
           if-no-files-found: error
-          path: dream.patch
+          path: dream.bundle
 
   publish:
     needs: maintain
@@ -184,70 +177,36 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.mgr-app.outputs.token }}
 
-      - name: Prepare publication branch
-        env:
-          GH_TOKEN: ${{ steps.mgr-app.outputs.token }}
-          EXPECTED_PR: ${{ needs.maintain.outputs.open_pr }}
-          APP_SLUG: ${{ steps.mgr-app.outputs.app-slug }}
-        run: |
-          current_pr=$(gh pr list --base main --head dreaming/main --state open --json number --jq '.[0].number // empty')
-          if [ "$current_pr" != "$EXPECTED_PR" ]; then
-            echo "Dream PR changed during curation; retry without advancing the marker."
-            exit 1
-          fi
-          login="${APP_SLUG}[bot]"
-          git config user.name "$login"
-          id="$(gh api "users/${login}" --jq .id)"
-          git config user.email "${id}+${login}@users.noreply.github.com"
-          if [ "${{ needs.maintain.outputs.changed }}" = "true" ]; then
-            if [ -n "$EXPECTED_PR" ]; then
-              git checkout -B dreaming/main origin/dreaming/main
-              git merge --no-edit origin/main || { git merge --abort; git checkout -B dreaming/main origin/main; }
-            else
-              git checkout -B dreaming/main origin/main
-            fi
-          fi
-
-      - name: Restore dream patch
+      - name: Restore dream bundle
         if: needs.maintain.outputs.changed == 'true'
         uses: actions/download-artifact@v4
         with:
-          name: dream-patch
+          name: dream-bundle
           path: ${{ runner.temp }}
-
-      - name: Apply dream patch
-        if: needs.maintain.outputs.changed == 'true'
-        run: git apply --3way --index "$RUNNER_TEMP/dream.patch"
 
       - name: Publish dream pull request
         if: needs.maintain.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ steps.mgr-app.outputs.token }}
           EXPECTED_PR: ${{ needs.maintain.outputs.open_pr }}
+          EXPECTED_SHA: ${{ needs.maintain.outputs.dream_sha }}
+          REBUILT: ${{ needs.maintain.outputs.rebuilt }}
         run: |
-          git add -A
-          changed=$(git diff --cached --name-only)
-          if [ -z "$changed" ]; then
-            echo "Nothing to dream about"
-            exit 0
-          fi
-          while IFS= read -r path; do
-            case "$path" in
-              .agents/MEMORY.md|.agents/PROGRESS.md|.agents/ARCHITECTURE.md|.agents/DRIFT.md|.agents/agents/*.md|AGENTS.md) ;;
-              *) echo "Dream changed forbidden path: $path"; exit 1 ;;
-            esac
-          done <<EOF
-          $changed
-          EOF
-          git commit -m "dream: agent doc maintenance"
+          current_pr=$(gh pr list --base main --head dreaming/main --state open --json number --jq '.[0].number // empty')
+          [ "$current_pr" = "$EXPECTED_PR" ] || { echo "Dream PR changed during curation; retry without advancing the marker."; exit 1; }
+          git fetch "$RUNNER_TEMP/dream.bundle" HEAD
+          git checkout -B dreaming/main FETCH_HEAD
           body="Curates the living agent documents from merged evidence. Outstanding read-only drift is tracked in .agents/DRIFT.md; the diff is the authoritative change summary."
+          if [ "$REBUILT" = "true" ]; then
+            body=$(printf '%s\n\n%s' "$body" "dreaming/main no longer merged with main, so it was rebuilt from main. Edits from the previous dream PR that main had not merged were dropped.")
+          fi
+          # The lease is the dreaming/main head maintain built on (empty: branch absent),
+          # so a commit pushed during the model run rejects the push instead of vanishing.
+          git push --force-with-lease="refs/heads/dreaming/main:${EXPECTED_SHA}" origin dreaming/main
           if [ -n "$EXPECTED_PR" ]; then
-            [ "$(gh pr view "$EXPECTED_PR" --json state --jq .state)" = "OPEN" ] || exit 1
-            git push -f origin dreaming/main
             [ "$(gh pr view "$EXPECTED_PR" --json state --jq .state)" = "OPEN" ] || exit 1
             gh pr edit "$EXPECTED_PR" --title "dream: agent doc maintenance" --body "$body"
           else
-            git push -f origin dreaming/main
             gh pr create --base main --head dreaming/main --title "dream: agent doc maintenance" --body "$body"
           fi
 
