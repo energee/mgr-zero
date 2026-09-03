@@ -1,7 +1,9 @@
 // tests/documentation-agent.test.ts — keeps the guide suite and its post-merge maintainer comprehensive, scoped, and reviewable.
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { listTools } from "@/lib/commands/registry";
+import "@/lib/commands/all";
 
 const root = resolve(__dirname, "..");
 const read = (path: string) => readFileSync(resolve(root, path), "utf8");
@@ -60,11 +62,11 @@ describe("HTTP API documentation", () => {
   it("has one catalog containing every registered operation", () => {
     const readme = read("README.md");
     expect(readme.match(/^## HTTP API$/gm)).toHaveLength(1);
+    const api = readme.match(/^## HTTP API[\s\S]*?(?=^## )/m)?.[0];
+    expect(api).toBeDefined();
 
-    for (const file of readdirSync(resolve(root, "lib/commands")).filter((name) => name.endsWith(".ts"))) {
-      for (const [, name] of read(`lib/commands/${file}`).matchAll(/define(?:Command|Query)\(\{\s*name:\s*"([^"]+)"/g)) {
-        expect(readme, `${name} is missing from README.md`).toContain(`\`${name}\``);
-      }
+    for (const { name } of listTools()) {
+      expect(api, `${name} is missing from README.md HTTP API`).toContain(`\`${name}\``);
     }
   });
 });

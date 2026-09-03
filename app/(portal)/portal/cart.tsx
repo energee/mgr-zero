@@ -37,7 +37,7 @@ const BADGE_STYLE: Record<CatalogItem["badge"], string> = {
 
 export function submissionFailureMessage(message: string, draftId: string | null) {
   return draftId
-    ? `Order saved as a draft (${message}). Retry Submit order here, or contact the brewery.`
+    ? `Order saved, but submission could not be confirmed (${message}). View the order status before retrying, or contact the brewery.`
     : message;
 }
 
@@ -100,9 +100,8 @@ export function Cart({ items, shipTos }: { items: CatalogItem[]; shipTos: ShipTo
       await command(breweryId, "portal_submit_order", { orderId: savedId });
       router.push(`/portal/orders/${savedId}`);
     } catch (err) {
-      // If ensureDraft succeeded but portal_submit_order failed, the draft
-      // exists and is kept in state (not discarded) — surface it as saved,
-      // with a link, rather than a bare failure the customer can't act on.
+      // A transport failure does not prove whether portal_submit_order
+      // committed. The saved order id is still available for status recovery.
       const message = err instanceof Error ? err.message : "order submission failed";
       setError(submissionFailureMessage(message, savedId));
     } finally {
@@ -188,7 +187,7 @@ export function Cart({ items, shipTos }: { items: CatalogItem[]; shipTos: ShipTo
               <>
                 {" "}
                 <Link href={`/portal/orders/${draftId}`} className="underline">
-                  View draft order
+                  View order status
                 </Link>
               </>
             )}
