@@ -16,12 +16,14 @@ export type NavItem = {
 
 export const STAFF_NAV: readonly NavItem[] = [
   { label: "Today", href: "/" },
-  { label: "Beer", href: "/inventory", children: [{ label: "Inventory", href: "/inventory" }] },
+  // Inventory and Orders reads exclude brewer today (lib/commands/*.ts readRoles); the
+  // brewer's Cellar/Brew day/Packaging areas arrive with their slices.
+  { label: "Beer", href: "/inventory", children: [{ label: "Inventory", href: "/inventory", roles: ["sales", "warehouse"] }] },
   {
     label: "Work",
     href: "/orders",
     children: [
-      { label: "Orders", href: "/orders" },
+      { label: "Orders", href: "/orders", roles: ["sales", "warehouse"] },
       { label: "Pick", href: "/pick", roles: ["warehouse"] },
       { label: "Replenishment", href: "/replenishment", roles: ["warehouse"] },
     ],
@@ -47,20 +49,29 @@ export const PORTAL_NAV: readonly NavItem[] = [
 
 const allowed = (item: NavItem, role: StaffRole) => role === "admin" || !item.roles || item.roles.includes(role);
 
-/** Drop entries the role may not see. Tabs stay; only their children thin out. */
+/**
+ * Drop entries the role may not see. Children thin out; a group whose
+ * children all fall away is dropped too, since its href is one of the routes
+ * just hidden (a warehouse user must not get a bare "More" tab that opens
+ * Invoices).
+ */
 export function navFor(items: readonly NavItem[], role: StaffRole): NavItem[] {
   return items
     .filter((i) => allowed(i, role))
-    .map((i) => (i.children ? { ...i, children: i.children.filter((c) => allowed(c, role)) } : i));
+    .map((i) => (i.children ? { ...i, children: i.children.filter((c) => allowed(c, role)) } : i))
+    .filter((i) => !i.children || i.children.length > 0);
 }
+
+/** True when `pathname` is `href` or a route beneath it ("/" only matches itself). */
+export const isUnder = (pathname: string, href: string) =>
+  pathname === href || (href !== "/" && pathname.startsWith(href + "/"));
 
 /** The tab whose href (or a child's) is the longest prefix of the path. */
 export function activeTab(items: readonly NavItem[], pathname: string): NavItem | undefined {
-  const matches = (href: string) => pathname === href || (href !== "/" && pathname.startsWith(href + "/"));
   let best: { tab: NavItem; len: number } | undefined;
   for (const tab of items) {
     for (const href of [tab.href, ...(tab.children ?? []).map((c) => c.href)]) {
-      if (matches(href) && (!best || href.length > best.len)) best = { tab, len: href.length };
+      if (isUnder(pathname, href) && (!best || href.length > best.len)) best = { tab, len: href.length };
     }
   }
   return best?.tab;

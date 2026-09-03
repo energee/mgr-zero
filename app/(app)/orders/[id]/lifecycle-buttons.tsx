@@ -4,7 +4,7 @@
 // Record pick (confirmed/picked, via pick-form.tsx), Ship (picked, via
 // ship-form.tsx), Cancel with reason (any pre-ship status). Calls commands
 // directly rather than through useCommandForm since these aren't
-// single-field dialog forms.
+// single-field command forms.
 "use client";
 
 import { useState } from "react";

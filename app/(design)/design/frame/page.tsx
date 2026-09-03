@@ -1,19 +1,19 @@
 // app/(design)/design/frame/page.tsx — one screen record rendered full-
 // viewport inside the real shell; the gallery (../page.tsx) embeds this in
 // iframes so viewport-driven parts (sidebar, sheets, safe area) behave exactly
-// as shipped. Sheet screens open the real CommandForm; entry screens (no
-// shell exists for them yet) get a bare centered card. Dev-only.
+// as shipped. Sheet screens open the real CommandForm pinned open; entry
+// screens (no shell exists for them yet) get a bare centered card. Dev-only
+// (../../layout.tsx gates the route group).
 import { notFound } from "next/navigation";
 import { AppShell, PortalShell } from "@/components/mgr/app-shell";
+import { CommandForm } from "@/components/mgr/command-form";
 import { E } from "@/components/mgr/e";
 import { MeSheet } from "@/components/mgr/me-sheet";
 import { SCREENS } from "@/components/mgr/screens";
 import { Button } from "@/components/ui/button";
 import { navFor, STAFF_NAV } from "@/lib/mgr/nav";
-import { OpenCommandForm } from "./open-form";
 
 export default async function DesignFrame({ searchParams }: { searchParams: Promise<{ s?: string }> }) {
-  if (process.env.NODE_ENV !== "development") notFound();
   const s = SCREENS[Number((await searchParams).s)];
   if (!s) notFound();
   if (s.surface === "entry") {
@@ -28,9 +28,9 @@ export default async function DesignFrame({ searchParams }: { searchParams: Prom
   }
   const body =
     s.surface === "sheet" ? (
-      <OpenCommandForm title={s.name}>
+      <CommandForm open title={s.name}>
         <div className="flex flex-col gap-2">{s.body}</div>
-      </OpenCommandForm>
+      </CommandForm>
     ) : (
       s.body
     );

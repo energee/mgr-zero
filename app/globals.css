@@ -169,10 +169,13 @@
   }
 }
 
-/* Print the pick sheet (and any other page) without the shell chrome. */
+/* Print the pick sheet (and any other page) without the shell chrome: the
+   header, the phone tab bar, and the desktop rail (shadcn's Sidebar renders
+   divs, so it is addressed by its data-slot; that hides its gap column too). */
 @media print {
   header,
-  nav {
+  nav,
+  [data-slot="sidebar"] {
     display: none;
   }
 }

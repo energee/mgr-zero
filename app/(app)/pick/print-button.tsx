@@ -1,5 +1,6 @@
 // app/(app)/pick/print-button.tsx — triggers the browser print dialog. The
-// @media print rule in app/globals.css hides the nav sidebar for output.
+// @media print rule in app/globals.css hides the shell chrome (header, tab
+// bar, rail) for output.
 "use client";
 
 import { Button } from "@/components/ui/button";

@@ -14,7 +14,7 @@ import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInset,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { activeTab, PORTAL_NAV, type NavItem } from "@/lib/mgr/nav";
+import { activeTab, isUnder, PORTAL_NAV, type NavItem } from "@/lib/mgr/nav";
 import { cn } from "@/lib/utils";
 
 export type AppShellProps = {
@@ -26,7 +26,7 @@ export type AppShellProps = {
   composer?: React.ReactNode;
   /** Force the active tab (the gallery renders screens off their real route). */
   active?: string;
-  /** Initial rail state; layouts read it from the sidebar_state cookie. */
+  /** Initial rail state; layouts read it with lib/mgr/sidebar-state.ts. */
   sidebarOpen?: boolean;
   children: React.ReactNode;
 };
@@ -58,7 +58,7 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
                 <SidebarMenu>
                   {(leaf ? [tab] : tab.children!).map((c) => (
                     <SidebarMenuItem key={c.href}>
-                      <SidebarMenuButton asChild isActive={tab.label === current && (leaf || pathname === c.href)}>
+                      <SidebarMenuButton asChild isActive={tab.label === current && (leaf || isUnder(pathname, c.href))}>
                         <Link href={c.href}>{c.label}</Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -78,7 +78,8 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
           </span>
           {headerRight && <span className="flex shrink-0 items-center gap-1">{headerRight}</span>}
         </header>
-        <main className="flex min-w-0 flex-1 flex-col gap-3 p-4 md:max-w-2xl md:px-8 md:py-6">{children}</main>
+        {/* SidebarInset is already the <main> landmark; this is the content column. */}
+        <div className="flex min-w-0 flex-1 flex-col gap-3 p-4 md:max-w-2xl md:px-8 md:py-6">{children}</div>
         {composer && <div className="border-t px-3 py-2">{composer}</div>}
         <TabBar items={items} active={current} className="md:hidden" />
       </SidebarInset>

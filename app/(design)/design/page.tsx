@@ -2,15 +2,13 @@
 // record in components/mgr/screens.tsx is embedded from ./frame as a real
 // viewport, so viewport-driven parts (sidebar, sheets, safe area) behave as
 // shipped; gallery.tsx owns the phone/desk width switch and lazy frames. The
-// record's states, spec and reads/writes caption the frame. 404 outside
-// development.
-import { notFound } from "next/navigation";
+// record's states, spec and reads/writes caption the frame. Dev-only
+// (../layout.tsx gates the route group).
 import { E } from "@/components/mgr/e";
 import { SCREENS } from "@/components/mgr/screens";
 import { Gallery } from "./gallery";
 
 export default function DesignGallery() {
-  if (process.env.NODE_ENV !== "development") notFound();
   const frames = SCREENS.map((s) => ({
     name: s.name,
     caption: (
