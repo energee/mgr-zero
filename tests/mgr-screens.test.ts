@@ -13,8 +13,8 @@ describe("SCREENS", () => {
   it("ports the step-1 frames with names, jobs and IO", () => {
     const step1 = SCREENS.filter((s) => s.step === 1);
     expect(step1.map((s) => s.name)).toEqual([
-      "Today", "Today · sales", "Today · brewer", "Today · driver", "Today · taproom",
-      "Beer", "Work", "More", "Global search", "Me", "Settings", "Permission denied",
+      "Today", "Sales", "Brewer", "Driver", "Taproom",
+      "Beer", "Work", "More", "Search", "Me", "Settings", "Permission denied",
     ]);
     for (const s of SCREENS) {
       expect(s.job).toBeTruthy();
