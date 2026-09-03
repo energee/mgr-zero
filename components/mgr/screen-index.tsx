@@ -12,7 +12,11 @@ import { VenueFrame } from "@/components/mgr/venue";
 import { ScreenWidth } from "@/components/mgr/screen-width";
 
 const area = (s: Screen) => s.group ?? (s.portal ? "Portal" : (s.tab ?? "Other"));
-const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+// Areas and screens share names — a "Today" area holds a "Today" screen — so
+// screen anchors are prefixed; without it both headings claim #today and the
+// sub-index sends every screen link to its area.
+const screenSlug = (name: string) => `screen-${slug(name)}`;
 
 // Order areas by where they appear in the inventory, so the page reads in the
 // same build order the gallery does rather than alphabetically.
@@ -29,11 +33,10 @@ function byArea() {
 /** The page's own table of contents: Fumadocs builds one from an MDX file's
  * headings, and these headings come from this component instead, so the docs
  * route hands this list to DocsPage for the right-hand sub-index. */
-export const SCREEN_TOC = byArea().map(([name, screens]) => ({
-  title: `${name} · ${screens.length}`,
-  url: `#${slug(name)}`,
-  depth: 2,
-}));
+export const SCREEN_TOC = byArea().flatMap(([name, screens]) => [
+  { title: name, url: `#${slug(name)}`, depth: 2 },
+  ...screens.map((s) => ({ title: s.name, url: `#${screenSlug(s.name)}`, depth: 3 })),
+]);
 
 export function ScreenIndex() {
   return (
@@ -45,7 +48,7 @@ export function ScreenIndex() {
           </h2>
           {screens.map((s) => (
             <article key={s.name}>
-              <h3 className="text-base font-medium">{s.name}</h3>
+              <h3 id={screenSlug(s.name)} className="scroll-m-20 text-base font-medium">{s.name}</h3>
               <p className="mt-1 text-sm text-fd-muted-foreground">{s.job}</p>
               <dl className="mt-3 grid gap-1 font-mono text-xs text-fd-muted-foreground">
                 <div><dt className="inline font-semibold">reads </dt><dd className="inline">{s.reads}</dd></div>
