@@ -26,7 +26,7 @@ substitutes repo-visible signals (see Signal).
 | Write path | Claude only edits the bounded documents. A separate deterministic job validates, commits, pushes, and creates/updates the `dreaming/main` PR; it refuses to publish or advance the marker if PR state changed during curation |
 | Editable | The living agent docs plus `.agents/DRIFT.md`; the authoritative list lives in `.agents/agents/dreaming.md` |
 | Read-only (flag drift only) | Everything else — unresolved drift is persisted in `.agents/DRIFT.md` |
-| Signal | Git history + merged PR diffs/comments since last dream, plus committed `.remember/` digests |
+| Signal | Git history + merged PR diffs/comments since last dream, plus any committed `.remember/today-*.md` digests (optional; the remember plugin retires them locally, so they are often absent) |
 
 ## Components
 
@@ -39,8 +39,9 @@ substitutes repo-visible signals (see Signal).
 3. `.agents/DRIFT.md` — durable unresolved findings in artifacts the model may
    inspect but not edit.
 4. `.gitignore` change — un-ignore `.remember/today-*.md` digests so dated
-   session summaries ride along with normal commits and become dream input
-   (rolling scratch like `now.md` stays local).
+   session summaries can ride along with normal commits as extra dream input
+   (rolling scratch like `now.md` stays local; the plugin renames a digest to
+   `.done.md` after rollover, so a committed one shows as deleted locally).
 
 ## Dream prompt contract
 
@@ -50,8 +51,12 @@ normal review. Two rationale points that belong to the design, not the
 contract:
 
 - Transcript signal doesn't exist in CI, so the inputs are repo-visible
-  substitutes: the git/PR window since the last dream plus committed
+  substitutes: the git/PR window since the last dream plus any committed
   `.remember/today-*.md` digests.
+- The model job hands publish a `git diff` patch, not file snapshots, applied
+  `--3way` onto current main so edits that land during the run survive. A
+  `dreaming/main` that no longer merges cleanly is abandoned and rebuilt from
+  main rather than failing every scheduled run.
 - The editable set includes `dreaming.md` itself, but the workflow still
   enforces the file boundary and owns publication.
 

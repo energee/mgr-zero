@@ -76,4 +76,5 @@ production data (there is none yet — keep it that way by asking).
 - `.agents/agents/dreaming.md` — prompt for the dreaming workflow
   (`.github/workflows/dreaming.yml`) that curates the agent docs via a
   `dreaming/main` PR authored by the MGR GitHub App (`mgr[bot]`);
-  committed `.remember/today-*.md` digests are its input.
+  merged PRs are its input; committed `.remember/today-*.md` digests, when
+  present, are extra evidence.
