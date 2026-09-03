@@ -206,7 +206,7 @@ describe("production-readiness workflow contract", () => {
     expect(dreaming).not.toContain("bot_name:");
     expect(dreaming).toContain('git config user.name "$login"');
     expect(dreaming).toContain(
-      'git config user.email "$(gh api "users/${login}" --jq .id)+${login}@users.noreply.github.com"'
+      'git config user.email "${id}+${login}@users.noreply.github.com"'
     );
     expect(dreaming).not.toContain("dreaming-bot");
     expect(dreaming).toContain(
