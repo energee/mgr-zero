@@ -21,6 +21,10 @@ never copy it into a second place.
 | `proxy.ts`, `app/(auth)/` | Session refresh and login. Customer-only accounts (a `customer_users` row, no `brewery_users` row) land on `/portal` instead of `/`. |
 | `app/(app)/<area>/` | Staff pages and forms. Thin: read via queries, mutate via commands. |
 | `app/(portal)/` | Wholesale customer portal route group (own layout, `/portal` shop + cart, `/portal/orders`, `/portal/invoices`) — reads/writes only through the `portal.ts` customer-role commands above. |
+| `lib/chat/` | Provider-neutral chat notification contracts and validation, Chat SDK state, Slack adapter/transport/renderer, OAuth installation and staff linking, job authentication, preview fixtures, and `jobs.ts`, the rule-4 service-role owner. |
+| `lib/commands/chat.ts`, `lib/commands/today.ts` | Staff chat linking and notification settings; the role-filtered Today projection. |
+| `app/api/chat/`, `app/api/webhooks/slack/` | Thin Slack OAuth, scheduled-job, and events/App Home routes that delegate to `lib/chat/`. |
+| `app/(app)/settings/chat/` | Staff chat notification settings and Slack account linking. |
 | `components/ui/` | shadcn primitives. Don't hand-edit; re-add with the shadcn CLI. |
 | `components/mgr/` | Product composites over `components/ui`: `app-shell.tsx` (the one staff/portal shell: Sidebar rail at md+, phone tab bar, `PortalShell`), `command-form.tsx` (every mutation form's surface: Sheet on phone, Dialog on desk), `me-sheet.tsx`, `theme-toggle.tsx`, `e.tsx` (the wireframe `E.*` vocabulary screens compose), `screens.tsx` (the typed screen inventory — the source of truth for what each MGR screen shows; edit it directly). Screen authors never touch `components/ui` directly. |
 | `lib/mgr/nav.ts`, `lib/mgr/sidebar-state.ts` | Navigation manifests (staff tabs + rail children, portal tabs), role filtering, active-tab resolution; the rail's persisted open state. |
@@ -32,7 +36,7 @@ never copy it into a second place.
 | `.agents/superpowers/specs/` | Product and schema design decisions (why). |
 | `.agents/agents/documentation-maintainer.md`, `.github/workflows/documentation-agent.yml` | Post-merge and manual customer-documentation contract and automation. Claude may edit only the three guide HTML files in a read-only GitHub job; a separate deterministic job validates that bounded diff and maintains the reviewable `documentation/user-guide` pull request. |
 | `app/icon.svg`, `lib/mgr-icon.ts`, `components/mgr-icon.tsx` | Canonical MGR mark. The SVG is the Next.js favicon; the module owns the path; the component is the in-app reuse. `docs/brand/mgr-github-app-icon.png` is a 1024px raster of the same path for the MGR GitHub App avatar. |
-| `.agents/agents/dreaming.md`, `.github/workflows/dreaming.yml` | Post-merge agent-doc curation. Dream PRs are authored by the MGR GitHub App (`mgr[bot]`) using `vars.MGR_APP_ID` + `secrets.MGR_APP_PRIVATE_KEY`. |
+| `.agents/agents/dreaming.md`, `.agents/DRIFT.md`, `.github/workflows/dreaming.yml` | Daily/manual agent-doc curation and its unresolved read-only drift ledger. Claude edits documents with read-only GitHub access; the workflow validates and publishes through the MGR GitHub App (`mgr[bot]`). |
 | `.agents/skills/` | Project-local, harness-compatible agent workflows loaded on demand. |
 | `.pi/prompts/` | Thin Pi slash-command aliases; workflow instructions remain owned by the corresponding skill. |
 | `.agents/` | This file, agent memory and progress; worktrees live under `.agents/worktrees/`. |

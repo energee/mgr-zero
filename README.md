@@ -332,6 +332,18 @@ creation. Mutations return `{ order_id }` unless noted.
 | `invite_customer_user` | admin, sales | Not available in this release: validates then fails closed with a `CommandError` |
 | `list_team_members` | admin, sales, warehouse | Staff memberships (user id + role) |
 
+### Chat notifications & Today
+
+| Command | Roles | Purpose |
+| --- | --- | --- |
+| `set_notification_preference` | all staff | Enable or mute one notification reason for yourself; optionally override personal quiet hours |
+| `set_brewery_quiet_hours` | admin | Set or clear brewery-wide quiet hours for one chat installation |
+| `set_notification_destination` | admin | Choose the private operations channel for morning and midday digests |
+| `consume_chat_link_proof` | all staff | Complete a Slack-to-MGR account link with a single-use proof |
+| `unlink_chat_user` | all staff | Remove your Slack link; admins may remove any staff link |
+| `get_chat_link_status` | all staff | Report whether you have an active link for an installation |
+| `get_today` | all staff | Role-filtered work assigned, due, or overdue now; optional ISO-8601 `now` |
+
 ### Customer portal
 
 Callers with the `customer` role (portal users) see only their own
