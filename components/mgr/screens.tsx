@@ -78,9 +78,9 @@ export const SCREENS: Screen[] = [
     job: "Role-filtered work that opens ready to finish · full-size exemplar at ship scale",
     reads: "get_today [design; delivery rows require assigned warehouse member or admin]", writes: "none",
     states: [["empty", "Nothing waiting · record below"], ["loading", "row-shaped skeletons"], ["error", "Today did not load · Retry", 1], ["offline", "cached rows · writes queue"], ["role hidden", "only relevant permitted work · no blank gaps"]],
-    spec: "Drawn as the warehouse persona at honest 16px density. Rows are role-filtered per plan §3. The restock row appears while the order's restock flag is set and opens the order. Weekly count is gated: disabled with human copy, never a gate name.",
+    spec: "Drawn as the warehouse persona at honest 16px density. Rows are role-filtered per plan §3. Pick is the one primary, labelled with the ready count; Receive is outline. The restock row appears while the order's restock flag is set and opens the order. Weekly count is gated: disabled with human copy, never a gate name.",
     body: today(<>
-      {E.btns(["Pick", "Receive"], "c2")}
+      {E.btns([["Pick · 3 ready", "p"], ["Receive", "g"]], "c2")}
       {E.row("3 orders ready", "quantities default to ordered", E.act("Pick"), "w", Package01Icon)}
       {E.row("Staged · ORD-0229", "restock 3 Pils cases to Warehouse", E.act("Put back"), "w", Package01Icon)}
       {E.row("PO-0142 · Country Malt", "arrives Thu", E.act("Receive"), "", DeliveryTruck01Icon)}
@@ -138,7 +138,7 @@ export const SCREENS: Screen[] = [
     states: [["empty", "Nothing due · swap a keg below"], ["role hidden", "no picks, no orders, no invoices", 1], ["narrow surface", "tap board and POS reconcile, nothing else"]],
     spec: "The taproom role maps to a shift rather than a function: a bartender needs the tap board and POS reconciliation and nothing else. The unmapped-item row is here because it silently blocks reconcile.",
     body: today(<>
-      {E.btns(["Swap keg", "Weekly count"], "c2")}
+      {E.btns([["Swap keg", "p"], ["Weekly count", "g"]], "c2")}
       {E.row("Tap 5 · Pils", "nearly out · ~9% left", E.act("Swap"), "w", BeerIcon)}
       {E.row("Weekly count", "due Thu · last counted 7 days ago", E.act("Count"), "", TaskDone01Icon)}
       {E.row("Guest cider", "rung in Square · not mapped, blocks reconcile", E.act("Map"), "w", Tag01Icon)}
@@ -226,7 +226,7 @@ export const SCREENS: Screen[] = [
       {E.fld("Deployment", "dedicated · read-only")}
       {E.btn("Save brewery")}
       {E.fld("Selected location", "Warehouse · warehouse")}
-      {E.btns([["Add location", "g"], ["Save location", "p"]])}
+      {E.btns([["Add location", "g"], ["Save location", "g"]])}
       {E.nav("Team", "3 members · 1 pending invite")}
       {E.nav("Accounting", "QuickBooks · connection and push defaults", "", QuickBooksMark)}
       {E.nav("Point of sale", "Square · catalog and sales", "", SquareMark)}
@@ -611,7 +611,7 @@ export const SCREENS: Screen[] = [
     reads: "get_order · get_atp",
     writes: "submit_order [design; draft → submitted] · adjust_order_line [design; one RPC: line + allocation; sets needs_restock on a picked order] · confirm_order [design; one RPC] · cancel_order [design; one RPC: terminal status + allocation release]",
     states: [["draft", "Submit is the one active verb"], ["confirmed / picked", "lines adjust; restock rows appear when picked qty exceeds ordered"], ["shipped", "read-only tape · Return shipment is the correction"], ["stale", "another user changed a line · refresh", 1], ["permission", "sales or admin to adjust; warehouse reads", 1]],
-    spec: "Drawn as picked after a line was adjusted down: staged 3 Pils cases must go back to Warehouse; there is no restock write; re-picking or shipping clears the restock flag on the order. Every transition appends an order event row in the same RPC. Confirm still has its own two-tap Today frame.",
+    spec: "Drawn as picked after a line was adjusted down: staged 3 Pils cases must go back to Warehouse; there is no restock write; re-picking or shipping clears the restock flag on the order. Ship opens Ship and invoice rather than committing here. Cancel is ghost and asks for confirm. Every transition appends an order event row in the same RPC. Confirm still has its own two-tap Today frame.",
     body: (<>
       {E.back("Orders", "ORD-0229")}
       {E.ttl("Al’s Bar · Columbus, OH")}
@@ -624,7 +624,8 @@ export const SCREENS: Screen[] = [
       {E.btns([["Adjust line", "g"], ["Add line", "g"]])}
       {E.note("Stout isn’t registered for Ohio. Check the Compliance registry ›")}
       {E.tape([["created · Ted", "Mon 9:02"], ["submitted · Ted", "Mon 9:05"], ["confirmed · Maria", "Mon 14:10"], ["picked · Dave · 4 / 10 / 2", "Tue 8:40"], ["line adjusted · Pils 10 → 7 · customer cut", "Tue 9:15"]])}
-      {E.btns([["Ship order", "irr"], ["Cancel order", "irr"]])}
+      {E.btns([["Ship", "p"], ["Cancel order", "ghost"]])}
+      {E.info("Cancel asks you to confirm. Allocations release.")}
     </>),
   },
   {
@@ -776,7 +777,7 @@ export const SCREENS: Screen[] = [
       {E.note("Below par: transfer 4 Pils + 2 Hazy.")}
       {E.fld("Transfer from", "Warehouse · selected")}
       {E.row("Transfer to", "Taproom", E.act("Fixed"))}
-      {E.btn("Create transfer order")}
+      {E.btn("Create transfer order", "g")}
     </>),
   },
   {
@@ -990,7 +991,7 @@ export const SCREENS: Screen[] = [
       {E.fld("Brand name", "Hazy IPA")}
       {E.fld("Style · ABV", "IPA · 6.8 %")}
       {E.chips(["beer"], 0)}
-      {E.btn("Save brand")}
+      {E.btn("Save brand", "g")}
       {E.ttl("SKU · ½ bbl keg")}
       {E.fld("SKU name", "½ bbl keg")}
       {E.chips(["keg", "can", "bottle"], 0)}
@@ -1149,15 +1150,33 @@ export const SCREENS: Screen[] = [
     job: "Occupancy is the subject: fill, gravity and overdue lead every tile",
     reads: "get_cellar_map [design]",
     writes: "create_vessel · update_vessel [design; mutable single rows] · complete_batch [SCHEMA-GATE: close/reconciliation identity + classifications; one RPC: batch close + occupancy close + automatic reconciliation]",
-    spec: "Complete batch stays disabled until close/reconciliation identity exists: the batch’s closing time, the occupancy close and the typed automatic reconciliation must commit atomically. Tile fill derives from occupancy vs vessel capacity, never from a status column.",
+    spec: "Complete batch stays disabled until close/reconciliation identity exists: the batch’s closing time, the occupancy close and the typed automatic reconciliation must commit atomically. Tile fill derives from occupancy vs vessel capacity, never from a status column. Reading is the one primary; Transfer and Brew day are outline. A tile opens the Vessel sheet to edit facts.",
     body: (<>
       {E.back("Beer", "Cellar")}
       {E.tiles([["FV1", "Pils · 12.8 / 15 bbl", "1.9 °P · read 4 h", 0, 85], ["FV2", "Hazy · 9.0 / 15 bbl", "7.5 °P · read 8 h", 0, 60], ["FV3", "Stout · 13.5 / 15 bbl", "5.2 °P · overdue 31 h", 1, 90], ["BT1", "Pils · 7.0 / 10 bbl", "carbing", 0, 70], ["BT2", "Empty · 0 / 10 bbl", "available", 0, 0], ["FB1", "Saison · 0.4 / 1 bbl", "aging · read 1 d", 0, 40]])}
-      {E.btns(["Reading", "Transfer", "Brew day"], "c3")}
-      {E.fld("Selected vessel", "FV3 · 15 bbl · fermenter")}
-      {E.btns([["Add vessel", "g"], ["Save vessel", "g"]])}
+      {E.btns([["Reading", "p"], ["Transfer", "g"], ["Brew day", "g"]], "c3")}
+      {E.nav("FV3 · fermenter · 15 bbl", "edit vessel facts")}
+      {E.btn("Add vessel", "g")}
       {E.gated("Complete batch")}
       {E.sp()}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 4,
+    tab: "Beer",
+    surface: "sheet",
+    name: "Vessel",
+    job: "Edit one vessel’s name, kind and capacity",
+    reads: "get_cellar_map [design]",
+    writes: "create_vessel · update_vessel [design; mutable single rows]",
+    spec: "Opened from a Cellar map tile. Occupancy and reading history stay on the map until a fuller vessel detail lands.",
+    body: (<>
+      {E.fld("Name", "FV3")}
+      {E.fld("Kind", "fermenter")}
+      {E.fld("Capacity", "15 bbl")}
+      {E.sp()}
+      {E.btn("Save vessel")}
     </>),
   },
   {
@@ -1210,9 +1229,9 @@ export const SCREENS: Screen[] = [
     name: "Batches",
     job: "See planned and active batches with the next brew or cellar action",
     reads: "list_batches [design]",
-    writes: "none [batch creation and brew-day recording happen on Brew day]",
+    writes: "none [scheduling happens on Schedule batch; recording on Brew day]",
     states: [["planned", "Start is the next action"], ["active", "the row names the next reading or transfer"], ["empty", "no batches yet: New batch is the only action"]],
-    spec: "The Work list with the batches chip active. Planned batches sort before active batches due for attention; every row names its next action. New batch opens Brew day in planned mode, and Brew day returns here.",
+    spec: "The Work list with the batches chip active. Planned batches sort before active batches due for attention; every row names its next action. New batch opens Schedule batch, and Schedule batch and Brew day return here.",
     body: (<>
       {E.hd("Work", "brewer default")}
       {E.btn("New batch")}
@@ -1228,15 +1247,31 @@ export const SCREENS: Screen[] = [
     step: 7,
     slice: 4,
     tab: "Work",
-    name: "Brew day",
-    job: "Schedule first; later consume actual lots and set knockout baseline",
+    name: "Schedule batch",
+    job: "Set recipe, date and planned barrels before brew day",
     reads: "get_brew_day [design]",
-    writes: "schedule_batch [design; single planned-batch row] · record_brew_day [design; one RPC: additions + material movements + occupancy]",
-    spec: "Two modes: planned (recipe · date · planned bbl) and brew day (actual lots · knockout vessel). Save schedule is green and independent; Record brew day posts immutable material consumption for mash/boil/whirlpool stages only; the 18 lb Citra dry hop is posted later from Cellar addition. Yeast is consumed as a material lot, not a culture generation (plan §8).",
+    writes: "schedule_batch [design; single planned-batch row]",
+    states: [["planned", "Save schedule is the one verb"], ["brew day", "Record brew day is its own screen"]],
+    spec: "The planned mode of brew day: recipe, date and planned barrels. Record brew day is a separate screen so this page has one primary.",
     body: (<>
       {E.back("Batches", "B-0416 · Hazy")}
-      {E.pick("Recipe / date", "Hazy IPA v4 · 9/4 · 15 bbl")}
+      {E.pick("Recipe", "Hazy IPA v4")}
+      {E.pick("Date · planned", "Fri 9/4 · 15 bbl")}
+      {E.sp()}
       {E.btn("Save schedule")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 4,
+    tab: "Work",
+    name: "Brew day",
+    job: "Consume actual lots and set knockout baseline",
+    reads: "get_brew_day [design]",
+    writes: "record_brew_day [design; one RPC: additions + material movements + occupancy]",
+    spec: "Brew-day mode: actual lots and knockout vessel. Planned recipe/date/barrels live on Schedule batch so this page has one primary. Record brew day posts immutable material consumption for mash/boil/whirlpool stages only; the 18 lb Citra dry hop is posted later from Cellar addition. Yeast is consumed as a material lot, not a culture generation (plan §8).",
+    body: (<>
+      {E.back("Batches", "B-0416 · Hazy")}
       {E.nav("2-row", "lot L-0821 · 660 lb")}
       {E.nav("Citra · boil", "lot L-0790 · 6 lb")}
       {E.nav("Yeast", "WLP066 · lot Y-0312 · 1 brink")}
@@ -1454,7 +1489,7 @@ export const SCREENS: Screen[] = [
       {E.fld("Vendor lead time", "10 days")}
       {E.btn("Save vendor")}
       {E.fld("Contract quantity", "400 lb")}
-      {E.btn("Save contract")}
+      {E.btn("Save contract", "g")}
       {E.btn("Create draft purchase order", "g")}
     </>),
   },
@@ -1553,17 +1588,16 @@ export const SCREENS: Screen[] = [
     spec: "Locations are never typed: ListLocations returns them at connect and they land in MGR’s list of POS locations, so the left of each row is Square’s truth and only the right is a choice. Both choices open the shared entity picker rather than a mapping page of their own: three rows do not earn a screen, and lifting them out would hide the gate from the reconcile that is blocked by it. MGR holds one Square location to one MGR location: a second claim on the same MGR location is refused, or two registers would deplete one shelf without either knowing. ListLocations runs on every sync, not only at connect: a location opened next year has to surface on its own, or its sales disappear with nothing on screen to explain it. It appears unmapped rather than defaulting to anything. Its held sales are the reason the row counts them: raw rows never delete, so mapping makes a backlog reconcilable rather than forgiving it, and each depletion posts at its own sale date. Posting a month of pours on the mapping date would balance the ledger and falsify every variance report built on it. Nothing else is asked for: once mapped, availability derives from that location’s stock and prices inherit their format defaults, so the menu fills itself. A location closed in Square keeps its mapping and its history and simply stops producing sales. External fetch/retry reuses requestId; raw sale rows never delete; no durable cursor is claimed. Reconcile posts immutable rows only after both mapping fields validate. A former SCHEMA-GATE is closed here: the sale channel is no longer a fixed four-value list pinned to Taproom but a per-brewery table of channels, so on-premise and off-premise report separately without a movement-model change. Each depletion carries a sale channel resolved as the item’s channel override, falling back to the location’s channel: never inferred, and never the old Taproom literal, so two Square locations can post under different channels. Refund lines are in the same list and the same RPC/requestId: a refund previews as a positive adjustment (inventory credit); sales-only reconcile is how v1 lost units. INVERTED (was drawn the other way round): the physical count is the source of truth and posts the depletion; POS sales post nothing and supply expected consumption. The gap between them is the product (bad pours, theft, staff drinks, comps, line cleaning), and it exists only because both halves are kept. Reconcile therefore records the expected figure and the sale links, never a movement.",
     body: (<>
       {E.back("Settings", "Square")}
-      {E.btn("Connect Square", "irr")}
-      {E.btn("Sync Square sales", "irr")}
+      {E.btn("Sync Square sales", "g")}
       {E.info("Locations come from Square. Choose what each one feeds and which channel its sales post under.")}
       {E.nav("Square Taproom", "MGR Taproom · channel Taproom", "ok")}
       {E.nav("Square Warehouse", "MGR Warehouse · channel DTC", "ok")}
       {E.nav("Square Events", "new · 42 held sales since Aug 12", "w")}
-      {E.btn("Save location mapping")}
+      {E.btn("Save location mapping", "g")}
       {E.row("“Hazy 16 oz draft”", "exact SKU/package", E.act("Hazy IPA · ½ bbl keg"))}
       {E.fld("Qty per sale", "1/124 keg per 16 oz")}
       {E.fld("Channel override", "none · inherits Taproom")}
-      {E.btn("Save item mapping")}
+      {E.btn("Save item mapping", "g")}
       {E.row("7 sales · Hazy 16 oz", "depletion", "−0.0282 bbl")}
       {E.row("1 refund · Hazy 16 oz", "inventory credit · adjustment", "+0.0040 bbl", "w")}
       {E.note("The weekly count posts the depletion. These sales are the expected number the count is measured against.")}
@@ -1601,10 +1635,10 @@ export const SCREENS: Screen[] = [
     name: "Tap board",
     job: "What is on, since when, and roughly how much is left",
     reads: "list_open_taps [design; Realtime on this page only, 30s poll is an adequate fallback]",
-    writes: "tap_keg · swap_keg [design; closes A and opens B in one RPC] · kick_keg [design; compare-and-swap on the open interval id]",
+    writes: "tap_keg · swap_keg [design; closes A and opens B in one RPC] · kick_keg [design; compare-and-swap on the open interval id; Kick keg sheet]",
     states: [["swap", "one act, one record · never kick-then-tap"], ["already swapped", "second attempt fails · Helles was already swapped out at 7:42pm", 1], ["not in taproom stock", "put on by a person · never discovered from Square", 1], ["guest or event keg", "yield from nominal size · excluded from variance", 1], ["two kegs, one brand", "taps 2 and 9 · sales split proportionally, yield labelled split", 1], ["no number", "sorts last · a number is never required"], ["duplicate number", "shown as entered · nothing downstream reads it"], ["kicked", "interval closed with a reason · the tap goes empty"], ["packaged short", "enters stock open · filled volume is measured, not guessed", 1], ["open, off tap", "still open stock · counted by volume, not as a whole keg", 1]],
     redrawn: true,
-    spec: <>The decided schema (16.13) chose differently from the first drawing: the primitive is the <b>swap</b>, not tap-then-blow. A bartender changing a keg performs one act, and a kick-then-tap model asks for two records; the gap between them is where data goes missing, worst exactly when it matters, on a follow keg of the same beer where nothing looks wrong afterwards. The swap command closes A and opens B in one RPC, the same discipline as the keg-return RPC, so an interval can never be left open by a half-finished swap. That is also why lines were the wrong model: the ambiguity was never about where a keg is plugged in. Numbers here are the brewery’s own, optional and sparse (1, 3, 5 with nothing at 2 or 4). They sort this board and nothing else reads them, so MGR neither generates nor enforces them and two kegs numbered alike is a thing to look at, not a save error. Unnumbered kegs sort last. A keg that is not ours reaches this board one way only: somebody tapped it here. Nothing arrives from Square: an item the taproom created there is <i>ignored</i> under 16.14, never queued and never mapped, so the guest cider in the register and the guest cider on this line are two unrelated facts that happen to share a name. It is recorded because the board is what the website reads, and a board that silently omits a pouring tap lies to customers, and because the keg still earns a yield from its nominal size. Nothing here touches the ledger: the count posts depletion (16.15), which is what makes two writers safe and why a keg tapped outside taproom stock needs no special rule: it is flagged as not in inventory, still earns a yield from its nominal size, and is excluded from variance. A keg packaged short enters stock <b>open</b> rather than as sealed inventory, which is the decision that makes it obvious it should be used next and, more quietly, keeps a weekly count honest: counted as one keg it would overstate the shelf, counted by its volume it does not. That also means the opening fill for such a keg is <i>known</i>, measured at the packaging run and already in the ledger as that run’s output, rather than the eyeball the spec assumes; a yield derived from it is measured, not estimated. Remaining percent is estimated from POS sales against nominal volume, and it is the reason this screen is worth opening: a board that only takes data from people gets ignored. Two kegs of one brand open at once splits sales proportionally and any per-keg yield is labelled <i>split</i>, never presented as measured. The duplicate-swap risk is uncertainty, not simultaneity: the command carries the open interval id and requires that the interval is still open, so the second attempt fails with copy a human can act on rather than opening a phantom interval; the recent list below is the correction path, not a guard.</>,
+    spec: <>A tile opens Swap keg for that tap; Kick on a row opens Kick keg. No second filled button on this board. The decided schema (16.13) chose differently from the first drawing: the primitive is the <b>swap</b>, not tap-then-blow. A bartender changing a keg performs one act, and a kick-then-tap model asks for two records; the gap between them is where data goes missing, worst exactly when it matters, on a follow keg of the same beer where nothing looks wrong afterwards. The swap command closes A and opens B in one RPC, the same discipline as the keg-return RPC, so an interval can never be left open by a half-finished swap. That is also why lines were the wrong model: the ambiguity was never about where a keg is plugged in. Numbers here are the brewery’s own, optional and sparse (1, 3, 5 with nothing at 2 or 4). They sort this board and nothing else reads them, so MGR neither generates nor enforces them and two kegs numbered alike is a thing to look at, not a save error. Unnumbered kegs sort last. A keg that is not ours reaches this board one way only: somebody tapped it here. Nothing arrives from Square: an item the taproom created there is <i>ignored</i> under 16.14, never queued and never mapped, so the guest cider in the register and the guest cider on this line are two unrelated facts that happen to share a name. It is recorded because the board is what the website reads, and a board that silently omits a pouring tap lies to customers, and because the keg still earns a yield from its nominal size. Nothing here touches the ledger: the count posts depletion (16.15), which is what makes two writers safe and why a keg tapped outside taproom stock needs no special rule: it is flagged as not in inventory, still earns a yield from its nominal size, and is excluded from variance. A keg packaged short enters stock <b>open</b> rather than as sealed inventory, which is the decision that makes it obvious it should be used next and, more quietly, keeps a weekly count honest: counted as one keg it would overstate the shelf, counted by its volume it does not. That also means the opening fill for such a keg is <i>known</i>, measured at the packaging run and already in the ledger as that run’s output, rather than the eyeball the spec assumes; a yield derived from it is measured, not estimated. Remaining percent is estimated from POS sales against nominal volume, and it is the reason this screen is worth opening: a board that only takes data from people gets ignored. Two kegs of one brand open at once splits sales proportionally and any per-keg yield is labelled <i>split</i>, never presented as measured. The duplicate-swap risk is uncertainty, not simultaneity: the command carries the open interval id and requires that the interval is still open, so the second attempt fails with copy a human can act on rather than opening a phantom interval; the recent list below is the correction path, not a guard.</>,
     body: (<>
       {E.back("Beer", "Tap board")}
       {E.ttl("On tap")}
@@ -1616,7 +1650,6 @@ export const SCREENS: Screen[] = [
       {E.row("Stout · ⅙ bbl", "pulled off tap 9 Sun · ~40% left", E.act("Tap"), "w")}
       {E.info("A keg that was never filled to nominal enters stock open, not sealed. It counts as beer, not as a keg, and it is meant to be used next.")}
       {E.info("Ten taps numbered 1–11 with no 7: numbers are yours, sparse is normal, and MGR neither generates nor renumbers them. Unnumbered kegs sort last.")}
-      {E.btns(["Swap keg", "Kicked"])}
       {E.row("Recent · Kolsch tapped", "Dana · Tue 4:10pm")}
       {E.row("Recent · Saison swapped in", "Ali · Thu 11:20am")}
       {E.note("Remaining is estimated from POS sales against nominal volume. Nothing on this board posts to the ledger; the weekly count does that.")}
@@ -1630,7 +1663,7 @@ export const SCREENS: Screen[] = [
     name: "Swap keg",
     job: "Close one keg and open the next in a single record",
     reads: "list_open_taps · get_taproom_sellable [design]",
-    writes: "swap_keg [design; closes A and opens B in one RPC, carries the open interval id and requires closed_at null] · kick_keg [design]",
+    writes: "swap_keg [design; closes A and opens B in one RPC, carries the open interval id and requires closed_at null]",
     states: [["same brand", "the follow keg is the default · one tap, not two records"], ["guest keg", "name and nominal size are typed · nothing comes from Square", 1], ["already swapped", "Helles was swapped out at 7:42pm by Ali · nothing opens", 1], ["no number", "left blank · the keg sorts last on the board"], ["close fill", "three chips · never a typed number", 1], ["kicked instead", "closes with a reason · the tap goes empty"]],
     spec: <>The surface every other tap decision assumed and none of them showed. One sheet, because the swap is one act: what comes off and what goes on are decided together and written by one RPC, so an interval can never be left open by a half-finished swap. Going on defaults to the same brand, which is the common case (a follow keg of the flagship) and is exactly the case a kick-then-tap model loses, because afterwards nothing looks wrong. Coming off asks for a rough remaining, never a number: yield is poured ÷ (nominal × (opening fill − closing fill)), and the honest input is three chips rather than a text field implying precision nobody has. Empty is the default because it is nearly always true. <b>Not our stock</b> is the toggle that answers where a guest keg comes from: nothing is discovered from Square, where such an item is <i>ignored</i> under 16.14 and never maps. A person puts it on and types it, which is why name and nominal size become inputs here: there is no brand to read them from, and yield needs the size. SCHEMA-GATE: 16.13 says an interval flagged as not in inventory earns a yield from its nominal size but never says what identifies the beer when no brand exists behind it; the interval needs its own label and size columns. The tap number is typed and optional, here as everywhere: MGR has no concept of a physical line, so this field is the only place a number can enter the system. The conflict row is the compare-and-swap guard made visible: the command carries the open interval id and requires that the interval is still open, so the realistic failure (the website posted a swap, the bartender did not see it land and swaps again a minute later) fails with copy naming the beer, who and when instead of opening a phantom interval.</>,
     body: (<>
@@ -1646,8 +1679,28 @@ export const SCREENS: Screen[] = [
       {E.fld("Tap number", "5 · optional")}
       {E.info("Remaining is a rough call, not a measurement; it only feeds the yield report and never the ledger.")}
       {E.btn("Swap · one record", "irr")}
-      {E.btn("Kicked · leave the tap empty", "g")}
       {E.note("One RPC closes the old interval and opens the new one. A half-finished swap is not a state this can reach.")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 7,
+    tab: "Beer",
+    surface: "sheet",
+    name: "Kick keg",
+    job: "Close a tap with a reason and leave it empty",
+    reads: "list_open_taps [design]",
+    writes: "kick_keg [design; compare-and-swap on the open interval id]",
+    states: [["empty", "the usual case"], ["beer left", "rough remaining feeds yield, never the ledger"], ["already swapped", "the interval is already closed · nothing kicks"]],
+    spec: "A small sheet of its own so Swap keg has one verb. Reason is required. Remaining is the same three chips as a swap, because yield still needs a closing fill. The tap goes empty; putting beer on is a later swap.",
+    body: (<>
+      {E.fld("Tap 5", "Helles · ½ bbl · on since Wed")}
+      {E.ttl("Reason")}
+      {E.chips(["empty", "bad keg", "event over"], 0)}
+      {E.ttl("Remaining")}
+      {E.chips(["empty", "about ¼ left", "about ½ left"], 0)}
+      {E.sp()}
+      {E.btn("Kick keg", "irr")}
     </>),
   },
   {
@@ -1678,7 +1731,7 @@ export const SCREENS: Screen[] = [
     reads: "get_route_load · get_route_builder [design; require persisted shipment invoice timing]",
     writes: "save_route [design; one RPC: route + stop assignments] · depart_route · return_route [design]",
     states: [["post-route", "All stops complete · no return time yet"]],
-    spec: "Load derives only from shipments with a persisted invoice mode; the checklist is presentation only, with no loaded status or mark-loaded command. Unassigned shipments become stops with driver, vehicle and stop order in the same route-save RPC. A refused delivery has no screen: leave the stop open and assign it to a later route. Resume opens the next incomplete stop for the assigned driver.",
+    spec: "Planned state: Depart is the one primary; Save route plan is outline. Return lives on Return route once the route has departed. Load derives only from shipments with a persisted invoice mode; the checklist is presentation only, with no loaded status or mark-loaded command. Unassigned shipments become stops with driver, vehicle and stop order in the same route-save RPC. A refused delivery has no screen: leave the stop open and assign it to a later route. Resume opens the next incomplete stop for the assigned driver.",
     body: (<>
       {E.back("Routes", "Route A · Thu")}
       {E.fld("Driver · vehicle", "Maria · Box truck 2")}
@@ -1687,6 +1740,25 @@ export const SCREENS: Screen[] = [
       {E.row("Stop 3 · Teresa’s", "8 Hazy halves · 12 Pils cases", "after", "w")}
       {E.row("Unassigned · ORD-0236 · Dock", "3 Hazy halves · shipped, no route", E.act("Add stop"), "w")}
       {E.btns([["Save route plan", "g"], ["Depart route", "p"]])}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 10,
+    tab: "Work",
+    name: "Return route",
+    job: "Stamp the return once every stop is done",
+    reads: "get_route_load [design]",
+    writes: "return_route [design]",
+    states: [["planned", "Depart lives on Route"], ["departed", "Return is the one verb"], ["complete", "already returned"]],
+    spec: "The departed state of a route. Planned routes Depart on Route; this screen is only Return.",
+    body: (<>
+      {E.back("Work", "Route A · Thu")}
+      {E.fld("Driver · vehicle", "Maria · Box truck 2")}
+      {E.row("Stop 1 · Ridgeline", "delivered 8:42", "done", "ok")}
+      {E.row("Stop 2 · Al’s Bar", "delivered 9:15", "done", "ok")}
+      {E.row("Stop 3 · Teresa’s", "delivered 10:03", "done", "ok")}
+      {E.sp()}
       {E.btn("Return route")}
     </>),
   },

@@ -25,8 +25,8 @@ type RowClass = "" | "w" | "ok" | "dis";
 const dotColor: Partial<Record<RowClass, string>> = { w: "bg-warning-foreground", ok: "bg-primary" };
 const Dot = ({ cls }: { cls: RowClass }) => (dotColor[cls] ? <span className={cn("size-2 rounded-full", dotColor[cls])} /> : null);
 
-/** Button kinds: p = primary, g = secondary/outline, irr = irreversible (teal); " disabled" suffix draws a gated action. */
-type BtnBase = "p" | "g" | "irr";
+/** Button kinds: p = primary, g = secondary/outline, ghost = quiet, irr = irreversible (teal); " disabled" suffix draws a gated action. */
+type BtnBase = "p" | "g" | "ghost" | "irr";
 type BtnKind = BtnBase | `${BtnBase} disabled`;
 
 export const E = {
@@ -66,7 +66,7 @@ export const E = {
     const [kind, disabled] = k.split(" ") as [BtnBase, string?];
     return (
       <Button
-        variant={kind === "g" ? "outline" : "default"}
+        variant={kind === "g" ? "outline" : kind === "ghost" ? "ghost" : "default"}
         disabled={Boolean(disabled)}
         className={cn(kind === "irr" && "bg-irreversible text-irreversible-foreground hover:bg-irreversible/90")}
         {...(kind === "irr" ? { "data-variant": "irreversible" } : {})}
