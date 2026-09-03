@@ -1,15 +1,37 @@
-// components/mgr/screen-width.tsx — the published inventory's viewport control.
-// The /design gallery switches iframe width (app/(design)/design/gallery.tsx);
-// this page renders frames inline, so the same choice is a data attribute and
-// the widths land in app/(docs)/docs/docs.css. Sticky, so the control stays
-// reachable a hundred frames down. The theme button is the app's own toggle —
+// components/mgr/screen-width.tsx — the published inventory's viewport control
+// and the frame embed it drives. Frames are iframes for the same reason the
+// /design gallery uses them: the shell's phone/desktop split comes from viewport
+// breakpoints, so a frame rendered inline in a narrow box would still lay out as
+// desktop. Changing the width changes the iframe attribute without reloading.
+// Sticky, so the control stays reachable a hundred frames down. The theme button is the app's own toggle —
 // Fumadocs' switch is disabled in the docs layout because app/layout.tsx's boot
 // script owns the `.dark` class, and two owners would fight over it.
 "use client";
 
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
 import { ThemeToggle } from "@/components/mgr/theme-toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+
+const WIDTHS = { phone: 390, desk: 1280 } as const;
+const WidthContext = createContext<number>(WIDTHS.phone);
+
+/** One frame, embedded at a real viewport width — see app/(frames)/screens/frame. */
+export function ScreenEmbed({ index, title }: { index: number; title: string }) {
+  const width = useContext(WidthContext);
+  return (
+    <iframe
+      src={`/screens/frame?s=${index}`}
+      title={`${title} at ${width}px`}
+      width={width}
+      height={780}
+      loading="lazy"
+      // No max-width: clamping the iframe to the docs column would shrink its
+      // viewport back below the shell's md breakpoint, so Desk would still draw the
+      // phone layout. The wrapper scrolls instead.
+      className="rounded-lg border bg-background"
+    />
+  );
+}
 
 export function ScreenWidth({ children }: { children: React.ReactNode }) {
   const [mode, setMode] = useState<"phone" | "desk">("phone");
@@ -22,7 +44,7 @@ export function ScreenWidth({ children }: { children: React.ReactNode }) {
         </ToggleGroup>
         <div className="w-40"><ThemeToggle /></div>
       </div>
-      {children}
+      <WidthContext.Provider value={WIDTHS[mode]}>{children}</WidthContext.Provider>
     </div>
   );
 }

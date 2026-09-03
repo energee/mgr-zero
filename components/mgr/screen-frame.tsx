@@ -1,0 +1,74 @@
+// components/mgr/screen-frame.tsx — one screen record inside the surface it
+// actually ships in: the app or portal shell, a pinned-open CommandForm for a
+// sheet, a bare card for an entry screen, or the vendor's own chrome for a
+// venue frame. Both the /design gallery route and the published inventory
+// (components/mgr/screen-index.tsx) render through this, so a frame cannot look
+// like two different things in the two places it is shown.
+import { AppShell, PortalShell } from "@/components/mgr/app-shell";
+import { CommandForm } from "@/components/mgr/command-form";
+import { E } from "@/components/mgr/e";
+import { MeSheet } from "@/components/mgr/me-sheet";
+import type { Screen } from "@/components/mgr/screens";
+import { VenueFrame } from "@/components/mgr/venue";
+import { Button } from "@/components/ui/button";
+import { navFor, STAFF_NAV } from "@/lib/mgr/nav";
+
+export function ScreenFrame({ screen: s, embedded }: { screen: Screen; embedded?: boolean }) {
+  // A sheet is a real Dialog: it portals to <body> and covers the viewport, which
+  // is right in the gallery (one frame per iframe) and wrong on a page holding a
+  // hundred frames, where every open dialog would stack over the document. When
+  // embedded, the sheet is drawn as the titled card it presents as, in place.
+  if (embedded && s.surface === "sheet") {
+    return (
+      <div className="bg-background p-4">
+        <div className="mx-auto flex w-full max-w-md flex-col gap-2 rounded-xl border bg-card p-4">
+          <div className="text-sm font-medium">{s.name}</div>
+          {s.body}
+        </div>
+      </div>
+    );
+  }
+  // A venue frame is not an MGR screen: it brings its own product's chrome and
+  // never the app shell (components/mgr/venue.tsx).
+  if (s.venue) {
+    return (
+      <div className="flex flex-col justify-center bg-background p-4">
+        <VenueFrame venue={s.venue}>{s.body}</VenueFrame>
+      </div>
+    );
+  }
+  if (s.surface === "entry") {
+    return (
+      <div className="flex flex-col justify-end bg-background p-4 @md:items-center @md:justify-center">
+        <div className="flex w-full flex-col gap-2 rounded-xl border bg-card p-6 @md:max-w-sm">
+          {s.hd}
+          {s.body}
+        </div>
+      </div>
+    );
+  }
+  const body =
+    s.surface === "sheet" ? (
+      <CommandForm open title={s.name}>
+        <div className="flex flex-col gap-2">{s.body}</div>
+      </CommandForm>
+    ) : (
+      s.body
+    );
+  const me = <MeSheet fields={[["Brewery", "Demo Brewing"], ["Role", "admin"]]} />;
+  return s.portal ? (
+    <PortalShell brand="Demo Brewing wholesale" headerRight={me} composer={E.comp(true)} active={s.portal}>
+      {body}
+    </PortalShell>
+  ) : (
+    <AppShell
+      brand="Demo Brewing"
+      items={navFor(STAFF_NAV, "admin")}
+      headerRight={<><Button variant="ghost" size="sm">Search</Button>{me}</>}
+      composer={E.comp()}
+      active={s.tab}
+    >
+      {body}
+    </AppShell>
+  );
+}

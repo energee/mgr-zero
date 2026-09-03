@@ -5,11 +5,3 @@
 @import "tailwindcss";
 @import "fumadocs-ui/css/shadcn.css";
 @import "fumadocs-ui/css/preset.css";
-
-/* The screen inventory (content/docs/screens.mdx) renders real frames inline.
-   components/mgr/screen-width.tsx sets the data attribute; the widths live here
-   so the frames re-lay-out through the shell's container queries exactly as the
-   /design gallery's iframes do. A venue frame keeps its own product width. */
-[data-screen-width="phone"] .screen-frame > :not(.xf):not(.slk) { max-width: 390px; }
-[data-screen-width="desk"] .screen-frame > :not(.xf):not(.slk) { max-width: 1280px; }
-.screen-frame > * { container-type: inline-size; }

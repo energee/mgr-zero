@@ -5,11 +5,13 @@
 // carries what a reader needs without a running server: the drawing itself,
 // what each screen is for, what it reads and writes, and which states it must
 // handle. Bodies render inline rather than in the gallery's iframes — the
-// gallery embeds the real shell to prove viewport behavior, which a docs page
-// neither needs nor can have in production, where /design 404s.
+// frames are embedded from app/(frames)/screens/frame, which ships (unlike the
+// dev-only /design), so each renders in the real shell at a real viewport width:
+// the desktop rail and the phone tab bar switch on viewport breakpoints, and an
+// inline render in a narrow box would show the desktop layout at every size.
 import { SCREENS, type Screen } from "@/components/mgr/screens";
-import { VenueFrame } from "@/components/mgr/venue";
-import { ScreenWidth } from "@/components/mgr/screen-width";
+import { ScreenEmbed, ScreenWidth } from "@/components/mgr/screen-width";
+
 
 const area = (s: Screen) => s.group ?? (s.portal ? "Portal" : (s.tab ?? "Other"));
 const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -63,10 +65,8 @@ export function ScreenIndex() {
                 </ul>
               )}
               {s.spec && <p className="mt-3 text-sm">{s.spec}</p>}
-              <div className="screen-frame mt-4 overflow-x-auto">
-                {s.venue
-                  ? <VenueFrame venue={s.venue}>{s.body}</VenueFrame>
-                  : <div className="flex flex-col gap-2">{s.hd}{s.body}</div>}
+              <div className="mt-4 overflow-x-auto">
+                <ScreenEmbed index={SCREENS.indexOf(s)} title={s.name} />
               </div>
             </article>
           ))}
