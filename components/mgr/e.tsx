@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupTextarea } from "@/components/ui/input-group";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -112,6 +113,13 @@ export const E = {
       <InputGroupInput type="number" inputMode="decimal" step="any" defaultValue={value} aria-label={label} className="text-2xl font-semibold" />
       {unit ? <InputGroupAddon align="inline-end">{unit}</InputGroupAddon> : null}
     </InputGroup>
+  ),
+  /** A view switcher: the body below is the active panel, so there are no
+   *  TabsContent panels here. Filters and single-choice fields stay chips. */
+  tabs: (names: string[], on = 0) => (
+    <Tabs value={names[on]}>
+      <TabsList>{names.map((n) => <TabsTrigger key={n} value={n}>{n}</TabsTrigger>)}</TabsList>
+    </Tabs>
   ),
   chips: (arr: string[], on = 0) => (
     <ToggleGroup type="single" value={arr[on]} variant="outline" size="sm" className="flex-wrap justify-start">
