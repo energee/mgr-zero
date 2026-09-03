@@ -13,7 +13,7 @@ invoice-linked credit memos, taproom replenishment (pars → internal transfer
 orders) with standing taproom allocations, customer/ship-to/price-list CRUD,
 customer portal (order entry to `submitted`, history, invoices, availability
 hints), order change tracking (`order_events`), vitest data-layer coverage,
-one Playwright portal smoke.
+one agent-browser portal smoke.
 
 **Out (deferred):** keg deposit invoice lines and `keg_events` (keg slice),
 the shortfall/competing-demand view (ATP may still go negative — it just isn't
@@ -105,5 +105,5 @@ pick → ship → movements + invoice, remainder cancelled), adjust-after-pick �
 `needs_restock` + re-allocation, cancel → allocations released, credit memo →
 negative invoice + `return_in`, replenishment order creation,
 `order_events` written for every transition, RLS (tenant isolation; customer
-users see only their own orders/invoices/events; no staff data). Playwright:
+users see only their own orders/invoices/events; no staff data). Agent-browser:
 one portal ordering smoke (login → catalog → cart → submit). CI unchanged.

@@ -1,5 +1,10 @@
 # Customizable sale channels
 
+> **Revise before execution.** Schema revision 2 later added channel/customer
+> tax treatment and requires the related baseline changes to land in one pass.
+> Keep this plan's channel identity and assignment decisions, but reconcile its
+> tasks with `.agents/superpowers/specs/2026-08-31-mgr-schema-design.md` §16.3–16.4 first.
+
 Replace the `sale_channel` Postgres enum with a per-brewery table so breweries
 create and assign channels on their own plans. Seeded with the four current
 values; a channel is deletable while nothing references it.

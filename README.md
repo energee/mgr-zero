@@ -79,108 +79,6 @@ required`.
 npm run dev   # http://localhost:3000
 ```
 
-## HTTP API
-
-One endpoint: `POST /api/command`. Registered operations are either queries
-(side-effect-free reads) or commands (writes). You authenticate as a brewery
-user, name the operation, and pass its input. Data is always scoped to
-`breweryId` — you only see that brewery, and only if you are a member.
-
-### Auth
-
-Send a user access token:
-
-```
-Authorization: Bearer <access_token>
-```
-
-Exchange email/password for a token at the project's Auth URL (`/auth/v1/token?grant_type=password`, header `apikey` = the project's anon key). Tokens expire; use the `refresh_token` from the same response when you need a new one. A logged-in browser session (cookies) also works.
-
-```bash
-TOKEN=$(curl -sS "$NEXT_PUBLIC_SUPABASE_URL/auth/v1/token?grant_type=password" \
-  -H "apikey: $NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
-  -H "content-type: application/json" \
-  -d '{"email":"you@brewery.example","password":"..."}' \
-  | jq -r .access_token)
-
-curl -sS http://localhost:3000/api/command \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "content-type: application/json" \
-  -d '{"breweryId":"<brewery uuid>","name":"list_products","input":{}}'
-```
-
-Staff roles: `admin`, `sales`, `warehouse`, `brewer`. Each command lists who may call it. Customer-portal users are `customer` and currently have no commands.
-
-### Request / response
-
-Every request has `breweryId`, `name`, and `input`. A query may omit
-`requestId`; a command **must** include a client-generated RFC 9562/4122 UUID
-as `requestId` before its handler runs.
-
-```json
-{ "breweryId": "<uuid>", "name": "list_products", "input": {} }
-```
-
-```json
-{ "breweryId": "<uuid>", "name": "create_product", "input": {}, "requestId": "<uuid>" }
-```
-
-Every response includes a server-generated `correlationId`. A successful query
-returns `{ "ok": true, "data": ..., "correlationId": "<uuid>" }`; a successful
-command additionally returns its submitted `requestId`. Failures use the
-structured public envelope `{ "ok": false, "error": { "code": "...", "message":
-"..." }, "correlationId": "<uuid>" }` and include a submitted `requestId` when
-one was supplied.
-
-| HTTP | Meaning |
-| --- | --- |
-| 400 | Non-JSON body, invalid request, missing/malformed command `requestId`, invalid `input`, or a data rule rejected the write |
-| 401 | Missing, malformed, expired, or revoked token |
-| 403 | Authenticated, but not a member of `breweryId`, or your role cannot run this command |
-| 409 | A `requestId` was reused with a different payload, command, or brewery (`conflict`) |
-| 404 | Unknown operation |
-| 500 | Server error (message is generic) |
-
-### Catalog
-
-| Command | Roles | `input` |
-| --- | --- | --- |
-| `list_products` | admin, sales, warehouse | `{}` — products with nested SKUs, A–Z |
-| `list_skus` | admin, sales, warehouse | `{}` — `{ id, name, products: { name } }` |
-| `list_locations` | admin, sales, warehouse | `{}` — `{ id, name, kind }` |
-| `create_product` | admin, sales | `{ name, style?, abv? }` |
-| `create_sku` | admin, sales | `{ productId, name, packageType, bblPerUnit, unitsPerCase? }` — `packageType` is `keg`, `can`, or `bottle`; `bblPerUnit` is a numeric string (`"0.5"`) |
-| `create_location` | admin | `{ name, kind }` — `kind` is `warehouse` or `taproom` |
-
-### Inventory
-
-On-hand is the sum of an append-only movement ledger. You never send `bbl`; it is computed from `qty × sku.bbl_per_unit`. Corrections are new movements, not edits.
-
-| Command | Roles | `input` |
-| --- | --- | --- |
-| `get_on_hand` | admin, sales, warehouse | `{ skuId? }` — qty per SKU/location |
-| `get_atp` | admin, sales, warehouse | `{ skuId? }` — on-hand minus open allocations |
-| `list_movements` | admin, sales, warehouse | `{ skuId?, limit? }` — newest first; `limit` default 50, max 200 |
-| `record_movement` | admin, warehouse | `{ skuId, locationId, qty, type, channel?, destState?, note? }` — `qty` ≠ 0; `destState` is a 2-letter code |
-| `set_taproom_par` | admin, sales | `{ locationId, skuId, parQty }` |
-| `set_portal_fulfillment_source` | admin | `{ locationId }` |
-
-`record_movement` `type`: `opening_balance`, `production_in`, `adjustment`, `sale_removal`, `taproom_transfer`, `depletion`, `return_in`, `destruction`, `loss`, `sample`, `festival_removal`.
-
-`channel` (when the movement is a removal): `wholesale`, `taproom`, `dtc`, `export`.
-
-### Import
-
-`import_csv` (admin) is registered but **not available in this release**: it validates `{ kind, rows }` (kinds `customers`, `ship_tos`, `products_skus`, `price_list_items`, `opening_balances`; at most 5000 rows) and then rejects with `CSV import is not available in this release`. No rows are written.
-
-### Team
-
-| Command | Roles | `input` |
-| --- | --- | --- |
-| `list_team_members` | admin, sales, warehouse | `{}` — `{ user_id, role }` (no emails) |
-| `invite_staff` | admin | `{ email, role }` — **not available in this release**; validates, then rejects with `Invitations are not available in this release` |
-| `invite_customer_user` | admin, sales | `{ email, customerId }` — **not available in this release**; same rejection |
-
 ## Tests
 
 ```bash
@@ -232,8 +130,8 @@ Content-Type: application/json
 command must submit a client-generated RFC 9562/4122 UUID `requestId` before
 the handler can run.
 
-Authentication is the Supabase cookie session of the logged-in user
-(established by the app's login flow). The caller must be a member of the
+Authentication is either the Supabase cookie session established by the app's
+login flow or `Authorization: Bearer <supabase access_token>`. The caller must be a member of the
 brewery named by `breweryId`: either staff (a `brewery_users` row with role
 `admin`, `sales`, `warehouse`, or `brewer`) or a portal user (a
 `customer_users` row linked to one of the brewery's customers, which gives
@@ -275,9 +173,11 @@ are `YYYY-MM-DD` strings. `limit` parameters default to 50 (max 200).
 | --- | --- | --- |
 | `record_movement` | admin, warehouse | Append an inventory movement (`skuId`, `locationId`, non-zero `qty`, `type`, optional `channel`, `destState`, `note`). The ledger is immutable — corrections are new opposite movements, not edits. `bbl` is computed server-side; don't send it |
 | `set_taproom_par` | admin, sales | Set the par level for a SKU at a taproom |
+| `set_standing_allocation` | admin, sales | Set or release a standing taproom allocation (`locationId`, `skuId`, nonnegative `qty`; zero releases it) |
 | `get_on_hand` | admin, sales, warehouse | On-hand quantity per SKU/location (optional `skuId` filter) |
 | `get_atp` | admin, sales, warehouse | Available-to-promise (on-hand minus open allocations) per SKU |
 | `list_movements` | admin, sales, warehouse | Recent movements, newest first (optional `skuId`, `limit`) |
+| `list_standing_allocations` | admin, sales, warehouse | Open standing taproom allocations, optionally filtered by `locationId` |
 
 ### Customers & pricing
 
@@ -336,13 +236,16 @@ creation. Mutations return `{ order_id }` unless noted.
 
 | Command | Roles | Purpose |
 | --- | --- | --- |
-| `set_notification_preference` | all staff | Enable or mute one notification reason for yourself; optionally override personal quiet hours |
-| `set_brewery_quiet_hours` | admin | Set or clear brewery-wide quiet hours for one chat installation |
-| `set_notification_destination` | admin | Choose the private operations channel for morning and midday digests |
-| `consume_chat_link_proof` | all staff | Complete a Slack-to-MGR account link with a single-use proof |
-| `unlink_chat_user` | all staff | Remove your Slack link; admins may remove any staff link |
-| `get_chat_link_status` | all staff | Report whether you have an active link for an installation |
-| `get_today` | all staff | Role-filtered work assigned, due, or overdue now; optional ISO-8601 `now` |
+| `get_today` | admin, sales, warehouse, brewer | Role-filtered work due now (`{ now? }`, an offset-aware ISO timestamp) |
+| `set_notification_preference` | admin, sales, warehouse, brewer | Enable or mute one notification reason (`{ reason, enabled, quietHours? }`); quiet hours use `HH:MM` start/end and an optional timezone |
+| `set_brewery_quiet_hours` | admin | Set or clear brewery-wide quiet hours (`{ installationId, start, end }`; times are `HH:MM` or both null) |
+| `set_notification_destination` | admin | Choose the private operations destination for scheduled digests (`{ installationId, externalDestinationId }`) |
+| `consume_chat_link_proof` | admin, sales, warehouse, brewer | Link the current staff account using `{ proof }` from a single-use link |
+| `unlink_chat_user` | admin, sales, warehouse, brewer | Unlink a chat user by `linkId` |
+| `get_chat_link_status` | admin, sales, warehouse, brewer | Return the current user's link status for an `installationId` |
+
+Notification `reason` is `submitted_order`, `pick_due`, `delivery_next`,
+`fermentation_reading_overdue`, or `operations_digest`.
 
 ### Customer portal
 
