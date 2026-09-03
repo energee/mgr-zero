@@ -49,8 +49,11 @@ below just in time — don't preload everything.
    `close` the same session when done. `<name>` is the branch with `/` → `-`;
    the skill has the exact incantation and why the session matters.
 5. `git diff` before committing (a stray NUL byte once made a file binary).
-6. Update `.agents/PROGRESS.md`; update `.agents/MEMORY.md` only if a durable
-   decision changed.
+6. Do not edit `.agents/PROGRESS.md`, `.agents/MEMORY.md`, or `.agents/DRIFT.md`
+   in a feature PR — every PR inserting at the top of the same log conflicts
+   with every other. Put the one-line progress note (and any durable decision)
+   in the PR description; the dreaming workflow reads merged PRs and writes the
+   logs serially on its own `dreaming/main` PR.
 
 CI (`.github/workflows/ci.yml`) runs the same checks plus `next build` on every
 push; it is the merge gate.
@@ -66,8 +69,8 @@ production data (there is none yet — keep it that way by asking).
 
 ## Working files
 
-- `.agents/MEMORY.md` — durable facts and decisions. Update when a decision changes.
-- `.agents/PROGRESS.md` — done / in flight / next. Update at the end of each session.
+- `.agents/MEMORY.md` — durable facts and decisions. Written by the dreaming PR from merged PR descriptions; edit directly only in a dedicated docs PR.
+- `.agents/PROGRESS.md` — done / in flight / next. Same rule: state the change in the PR description, the dreaming PR writes it here.
 - `.agents/DRIFT.md` — unresolved contradictions in artifacts the dreaming agent cannot edit.
 - `.agents/superpowers/{specs,plans}` — design specs and plans; `docs/superpowers` is a symlink to it (the superpowers skills write there).
 - `.agents/agents/` — subagent definitions; `.claude/agents` is a symlink to it (Claude Code only reads `.claude/agents`).
