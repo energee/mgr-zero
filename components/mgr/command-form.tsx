@@ -30,7 +30,6 @@ export function CommandForm({
   footer?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const foot = footer ? <div className="shrink-0 border-t px-4 pt-2">{footer}</div> : null;
   if (useIsMobile()) {
     return (
       <Sheet open={open} onOpenChange={onOpenChange}>
@@ -39,8 +38,8 @@ export function CommandForm({
           <SheetHeader className="shrink-0 pb-0">
             <SheetTitle>{title}</SheetTitle>
           </SheetHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto px-4">{children}</div>
-          {foot}
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-1">{children}</div>
+          {footer && <div className="shrink-0 border-t px-4 pt-2">{footer}</div>}
         </SheetContent>
       </Sheet>
     );
@@ -52,8 +51,8 @@ export function CommandForm({
         <DialogHeader className="shrink-0">
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
-        {foot}
+        <div className="-mx-4 min-h-0 flex-1 overflow-y-auto px-4 py-1">{children}</div>
+        {footer && <div className="-mx-4 shrink-0 border-t px-4 pt-2">{footer}</div>}
       </DialogContent>
     </Dialog>
   );
