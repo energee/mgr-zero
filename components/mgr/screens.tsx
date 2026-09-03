@@ -10,7 +10,7 @@ import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-ic
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
 import {
-  BeerIcon, DeliveryTruck01Icon, Invoice01Icon, Package01Icon, Route01Icon, Tag01Icon, TaskDone01Icon, ThermometerIcon, WifiDisconnected01Icon,
+  BeerIcon, DeliveryTruck01Icon, Package01Icon, Route01Icon, Tag01Icon, TaskDone01Icon, ThermometerIcon, WifiDisconnected01Icon,
 } from "@hugeicons/core-free-icons";
 
 export type Tab = "Today" | "Beer" | "Work" | "More";
@@ -306,6 +306,67 @@ export const SCREENS: Screen[] = [
       {E.sp()}
       {E.ttl("Set new password")}
       {E.fld("Account", "maria@demobrewing.com")}
+      {E.inp("Choose a password")}
+      {E.btn("Save password")}
+      {E.sp()}
+    </>),
+  },
+  {
+    step: 6,
+    slice: 1,
+    group: "Entry",
+    surface: "entry",
+    name: "Portal sign in",
+    job: "A wholesale buyer enters through the same Auth boundary",
+    reads: "none",
+    writes: "supabase_auth_sign_in_with_password [platform]",
+    spec: "Customer-only accounts land on Order. Forgot password is a text link, not a second primary.",
+    hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
+    body: (<>
+      {E.sp()}
+      {E.ttl("Sign in to your account")}
+      {E.inp("email")}
+      {E.inp("password")}
+      {E.btn("Sign in")}
+      {E.row("Forgot password?")}
+      {E.sp()}
+    </>),
+  },
+  {
+    step: 6,
+    slice: 1,
+    group: "Entry",
+    surface: "entry",
+    name: "Portal forgot password",
+    job: "Recover a buyer login without saying whether the email exists",
+    reads: "none",
+    writes: "supabase_auth_reset_password_for_email [platform]",
+    spec: "The sent state is this same screen with the info. Enumeration is never confirmed.",
+    hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
+    body: (<>
+      {E.sp()}
+      {E.ttl("Reset password")}
+      {E.inp("email")}
+      {E.btn("Send reset link")}
+      {E.info("If that email is on an account, a reset link is on its way.")}
+      {E.sp()}
+    </>),
+  },
+  {
+    step: 6,
+    slice: 1,
+    group: "Entry",
+    surface: "entry",
+    name: "Portal set password",
+    job: "Recovery-token landing for a buyer; lands in the portal",
+    reads: "supabase_auth_get_session [platform; recovery token]",
+    writes: "supabase_auth_update_user [platform]",
+    spec: "After Save, a customer membership opens Order, not Today.",
+    hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
+    body: (<>
+      {E.sp()}
+      {E.ttl("Set new password")}
+      {E.fld("Account", "buyer@ridgeline.example")}
       {E.inp("Choose a password")}
       {E.btn("Save password")}
       {E.sp()}
@@ -963,6 +1024,7 @@ export const SCREENS: Screen[] = [
       {E.row("Ship-to · requested date", "Main · Wed 9/9", E.act("Change"))}
       {E.sp()}
       {E.btn("Review order · $828.00", "p disabled")}
+      {E.info("Review is unavailable until the brewery sets where your orders ship from.")}
     </>),
   },
   {
@@ -986,6 +1048,7 @@ export const SCREENS: Screen[] = [
       {E.info("Order number is assigned when you place the order.")}
       {E.sp()}
       {E.btn("Place order · $828.00", "p disabled")}
+      {E.info("Placing an order isn’t available until the brewery sets where yours ship from.")}
     </>),
   },
   {
@@ -997,15 +1060,33 @@ export const SCREENS: Screen[] = [
     reads: "list_portal_orders [design]",
     writes: "none",
     states: [["expanded row", "lines with ordered vs shipped and plain adjusted copy"], ["no orders", "Start one from Order"]],
-    spec: "Each row expands in place into its lines; adjusted quantities are stated in buyer copy. No change request and no cancel: the portal is read-only after submit, and the row says whom to call.",
+    spec: "A row opens Order detail. Shipped rows offer Reorder. Adjusted quantities are stated in buyer copy. No cancel: the portal is read-only after submit, and the row says whom to call.",
     body: (<>
       {E.hd("Orders", "Ridgeline")}
-      {E.row("ORD-0231", "confirmed · ships Thu", "$1,240")}
-      {E.row("ORD-0225", "shipped 8/27", "$980")}
-      {E.row("ORD-0221", "adjusted · 2 cases short", "$528", "w")}
-      {E.row("Hazy IPA · ½ bbl keg", "ordered 2 · shipped 2", "$300.00")}
-      {E.row("Pils · 16 oz case", "ordered 8 · shipped 6 · 2 not available", "$228.00", "w")}
+      {E.nav("ORD-0231", "confirmed · ships Thu · $1,240")}
+      {E.row("ORD-0225", "shipped 8/27 · $980", E.act("Reorder"))}
+      {E.nav("ORD-0221", "adjusted · 2 cases short · $528", "w")}
       {E.info("Need a change? Call Demo Brewing. Orders can’t be edited here after they’re placed.")}
+    </>),
+  },
+  {
+    step: 6,
+    slice: 1,
+    portal: "Orders",
+    name: "Order detail",
+    job: "One order’s status, lines and the invoice when it exists",
+    reads: "portal_order [existing] · portal_invoices [existing]",
+    writes: "none",
+    states: [["confirmed", "ships date · no invoice yet"], ["adjusted", "lines show ordered vs shipped"], ["shipped", "invoice link · Reorder"], ["delivered", "invoice link · Reorder"]],
+    spec: "Opened from Order history. Status is the buyer-facing state. Reorder is on shipped and delivered. The invoice link is absent until the brewery has billed.",
+    body: (<>
+      {E.back("Orders", "ORD-0225")}
+      {E.fld("Status", "Shipped 8/27")}
+      {E.fld("Ship-to", "Main · Phoenixville, PA")}
+      {E.row("Hazy IPA · ½ bbl keg", "ordered 2 · shipped 2", "$300.00")}
+      {E.row("Pils · 16 oz case", "ordered 6 · shipped 6", "$228.00")}
+      {E.nav("INV-0190", "paid 8/29 · $980")}
+      {E.btn("Reorder", "g")}
     </>),
   },
   {
@@ -1026,6 +1107,8 @@ export const SCREENS: Screen[] = [
       {E.tbl(["Item", "Qty", "Amount"], [["Hazy IPA · 1/2 bbl", "4", "740.00"], ["Pils · 16 oz case", "6", "252.00"]])}
       {E.info("Pay by card or bank transfer through QuickBooks. You will not need an account.")}
       {E.btn("Pay invoice")}
+      {E.btn("Download PDF", "g")}
+      {E.nav("Question this invoice", "sends a note to Demo Brewing")}
       {E.note("Opens QuickBooks in a new tab. This link keeps working; it is re-checked each time you open it.")}
     </>),
   },
@@ -1047,6 +1130,40 @@ export const SCREENS: Screen[] = [
       {E.tbl(["Item", "Qty", "Amount"], [["Hazy IPA · 1/2 bbl", "4", "740.00"], ["Pils · 16 oz case", "6", "252.00"]])}
       {E.note("Contact Demo Brewing to arrange payment. The invoice above is unchanged and still due.")}
       {E.row("Demo Brewing", "(610) 555-0142", "›")}
+      {E.nav("Question this invoice", "sends a note to Demo Brewing")}
+    </>),
+  },
+  {
+    step: 6,
+    slice: 1,
+    portal: "Invoices",
+    surface: "sheet",
+    name: "Question invoice",
+    job: "Ask the brewery about a line, a total or a payment",
+    reads: "get_portal_invoice [design]",
+    writes: "none [email or chat to the brewery; no portal write]",
+    spec: "Off Pay invoice and Payment unavailable. The buyer writes a note; the brewery gets it. Nothing on the invoice changes.",
+    body: (<>
+      {E.fld("Invoice", "INV-0198 · $1,240.00")}
+      {E.inp("What’s wrong with this invoice?")}
+      {E.btn("Send to Demo Brewing")}
+    </>),
+  },
+  {
+    step: 6,
+    slice: 1,
+    portal: "Invoices",
+    name: "Paid invoice",
+    job: "A paid invoice has no Pay; the date and PDF remain",
+    reads: "get_portal_invoice [design]",
+    writes: "none",
+    spec: "The paid date arrived from QuickBooks. Pay is gone. Download PDF is the one action.",
+    body: (<>
+      {E.back("Invoices", "INV-0190")}
+      {E.ttl("$980.00")}
+      {E.row("Paid", "8/29/2026", "", "ok")}
+      {E.tbl(["Item", "Qty", "Amount"], [["Hazy IPA · ½ bbl", "2", "300.00"], ["Pils · 16 oz case", "6", "228.00"]])}
+      {E.btn("Download PDF", "g")}
     </>),
   },
   {
@@ -1059,9 +1176,8 @@ export const SCREENS: Screen[] = [
     writes: "none",
     body: (<>
       {E.hd("Invoices", "Ridgeline")}
-      {E.row("INV-0198", "due 9/18", "$1,240", "w")}
+      {E.row("INV-0198", "overdue · due 9/18", E.act("Pay"), "w")}
       {E.row("INV-0190", "paid 8/29", "$980", "ok")}
-      {E.blank("No invoices yet. They appear after shipment or delivery.", Invoice01Icon)}
     </>),
   },
   {
@@ -1080,6 +1196,23 @@ export const SCREENS: Screen[] = [
       {E.row("You · buyer", "signed-in membership", "active")}
       {E.row("Keg deposits held", "38 × ½ bbl", "$1,140")}
       {E.info("Contact the brewery to change account details.")}
+    </>),
+  },
+  {
+    step: 6,
+    slice: 1,
+    portal: "Account",
+    surface: "sheet",
+    name: "Portal Me",
+    job: "Who I am on this customer account, leave, change password",
+    reads: "supabase_auth_get_session [platform]",
+    writes: "supabase_auth_sign_out [platform]",
+    spec: "Opened from the portal header Me control. No brewery switcher. Change password opens Portal set password. Sign out is outline here; the irreversible accent is a staff Me follow-up.",
+    body: (<>
+      {E.fld("Signed in as", "buyer@ridgeline.example")}
+      {E.fld("Account", "Ridgeline Tap Room")}
+      {E.btn("Change password", "g")}
+      {E.btn("Sign out", "g")}
     </>),
   },
   {

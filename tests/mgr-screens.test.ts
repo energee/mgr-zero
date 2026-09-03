@@ -36,8 +36,8 @@ describe("SCREENS", () => {
     // A tripwire against a frame dropped by hand from a 1700-line array — the
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands; .agents/PROGRESS.md narrates
-    // what the number is made of — 89 MGR frames plus the 17 venue frames.
-    expect(SCREENS).toHaveLength(106);
+    // what the number is made of — 96 MGR frames plus the 17 venue frames.
+    expect(SCREENS).toHaveLength(113);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
 
@@ -86,6 +86,23 @@ describe("SCREENS", () => {
     const transfer = SCREENS.find((x) => x.name === "Cellar transfer")!;
     const transferHtml = renderToStaticMarkup(createElement("div", null, transfer.body));
     expect(transferHtml).not.toMatch(/border-l-2/);
+  });
+
+  it("gives the portal an Account tab, entry, Me, order detail and invoice follow-ups", () => {
+    // Issue 77: Account was drawn but unreachable; buyer entry, Me, order
+    // detail, dispute, paid invoice and disabled-primary reasons were missing.
+    const names = [
+      "Portal sign in", "Portal forgot password", "Portal set password", "Portal Me",
+      "Order detail", "Question invoice", "Paid invoice",
+    ];
+    for (const name of names) expect(SCREENS.some((s) => s.name === name), name).toBe(true);
+    const shop = SCREENS.find((s) => s.name === "Shop")!;
+    const shopHtml = renderToStaticMarkup(createElement("div", null, shop.body));
+    expect(shopHtml).toMatch(/p disabled|disabled/);
+    expect(shopHtml).toMatch(/ship from/i);
+    const history = SCREENS.find((s) => s.name === "Order history")!;
+    const historyHtml = renderToStaticMarkup(createElement("div", null, history.body));
+    expect(historyHtml).toMatch(/Reorder/);
   });
 
   it("puts a stepper on quantity rows and leaves reason unchosen", () => {

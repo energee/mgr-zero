@@ -1,6 +1,6 @@
 // app/(portal)/layout.tsx — chrome for the customer portal: the same
 // AppShell as staff, fed the buyer-facing portal manifest (Order · Orders ·
-// Invoices) and the customer's account name. Resolves the caller's customer
+// Invoices · Account) and the customer's account name. Resolves the caller's customer
 // account instead of a brewery membership and provides breweryId via the same
 // BreweryProvider so lib/commands/client.ts's command() works unmodified. The
 // rail's collapsed state round-trips through the sidebar_state cookie exactly
