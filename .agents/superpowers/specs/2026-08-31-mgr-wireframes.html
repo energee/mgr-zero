@@ -2,7 +2,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MGR rev-4 wireframes</title>
 <!--
-  MGR rev-4 screen inventory. SCREENS is the source of truth for the frame inventory; TABS,
+  MGR rev-4 screen inventory. RETIRED for MGR-venue frames on 2026-09-02: the source of
+  truth is now components/mgr/screens.tsx, rendered at /design. This file is kept for the
+  Slack, QuickBooks and Square venue drawings (S.* / X.* frames) only. Historically: TABS,
   RAIL and STEPS mirror the UI plan. The phone/desk toggle re-renders every frame from
   the same body: desk adds the rail (or portal top nav), turns sheets/entry into
   centered dialogs, and drops control heights to cursor density.
@@ -12,9 +14,9 @@
 -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
-:root{--bg:#EEF0EE;--sf:#FFFFFF;--ink:#16201B;--ink2:#536159;--line:#9EA8A1;--line2:#DCE2DE;--acc:#1F4D3A;--on-acc:#FFFFFF;--warn:#C99A2E;--warn-text:#7A5600;--warn-bg:#FFF5D8;--irr:#9A4E20;--on-irr:#FFFFFF;--deskw:880px}
+:root{--bg:#FAFAF7;--sf:#FFFFFF;--ink:#1E1F1A;--ink2:#6C6D64;--line:#C9C9C0;--line2:#E3E3DC;--acc:#6F4FD6;--on-acc:#FFFFFF;--warn:#E0891F;--warn-text:#8A4A00;--warn-bg:#FDECD2;--irr:#0F6B78;--on-irr:#FFFFFF;--deskw:880px}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#101713;--sf:#18211C;--ink:#F2F5F2;--ink2:#B6C0BA;--line:#5C6B62;--line2:#35413A;--acc:#8AC5A6;--on-acc:#0E241A;--warn:#F0C766;--warn-text:#F0C766;--warn-bg:#30260E;--irr:#E2A06F;--on-irr:#2B1205}}
-:root[data-theme="dark"]{--bg:#101713;--sf:#18211C;--ink:#F2F5F2;--ink2:#B6C0BA;--line:#5C6B62;--line2:#35413A;--acc:#8AC5A6;--on-acc:#0E241A;--warn:#F0C766;--warn-text:#F0C766;--warn-bg:#30260E;--irr:#E2A06F;--on-irr:#2B1205}
+:root[data-theme="dark"]{--bg:#1B1C18;--sf:#22231F;--ink:#EDEDE6;--ink2:#A0A196;--line:#454640;--line2:#33342E;--acc:#AE81FF;--on-acc:#1A1030;--warn:#FDB44B;--warn-text:#FDB44B;--warn-bg:#3B2A12;--irr:#0F6B78;--on-irr:#E6FAFC}
 *{box-sizing:border-box}
 html,body{max-width:100%;overflow-x:hidden}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 "Instrument Sans",system-ui,sans-serif}

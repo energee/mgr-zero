@@ -1,33 +1,29 @@
+// app/(app)/layout.tsx — staff chrome: the shared AppShell fed the
+// role-filtered staff manifest (lib/mgr/nav.ts) and a Me sheet with the
+// brewery, role and sign-out; the rail's collapsed state round-trips through
+// the sidebar_state cookie shadcn's Sidebar writes (lib/mgr/sidebar-state.ts).
+// Pages render inside the shell's main column.
 import { getActiveBrewery } from "@/lib/brewery";
+import { sidebarOpenFromCookie } from "@/lib/mgr/sidebar-state";
 import { BreweryProvider } from "./brewery-provider";
-import { MgrIcon } from "@/components/mgr-icon";
-import Link from "next/link";
+import { AppShell } from "@/components/mgr/app-shell";
+import { MeSheet } from "@/components/mgr/me-sheet";
+import { navFor, STAFF_NAV } from "@/lib/mgr/nav";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const brewery = await getActiveBrewery();
+  const [brewery, sidebarOpen] = await Promise.all([getActiveBrewery(), sidebarOpenFromCookie()]);
   return (
     <BreweryProvider id={brewery.id}>
-      <div className="flex min-h-screen">
-        <aside className="w-52 border-r p-4">
-          <div className="mb-6 flex items-center gap-2 font-semibold">
-            <MgrIcon size={20} className="shrink-0" />
-            {brewery.name}
-          </div>
-          <nav className="flex flex-col gap-2 text-sm">
-            <Link href="/">Dashboard</Link>
-            <Link href="/inventory">Inventory</Link>
-            <Link href="/catalog">Catalog</Link>
-            <Link href="/customers">Customers</Link>
-            <Link href="/pricing">Pricing</Link>
-            <Link href="/orders">Orders</Link>
-            <Link href="/pick">Pick</Link>
-            <Link href="/invoices">Invoices</Link>
-            <Link href="/replenishment">Replenishment</Link>
-            <Link href="/settings/team">Team</Link>
-          </nav>
-        </aside>
-        <main className="flex-1 p-6">{children}</main>
-      </div>
+      <AppShell
+        brand={brewery.name}
+        items={navFor(STAFF_NAV, brewery.role)}
+        sidebarOpen={sidebarOpen}
+        headerRight={
+          <MeSheet fields={[["Brewery", brewery.name], ["Role", brewery.role]]} />
+        }
+      >
+        {children}
+      </AppShell>
     </BreweryProvider>
   );
 }

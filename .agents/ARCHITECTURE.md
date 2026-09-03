@@ -26,6 +26,10 @@ never copy it into a second place.
 | `app/api/chat/`, `app/api/webhooks/slack/` | Thin Slack OAuth, scheduled-job, and events/App Home routes that delegate to `lib/chat/`. |
 | `app/(app)/settings/chat/` | Staff chat notification settings and Slack account linking. |
 | `components/ui/` | shadcn primitives. Don't hand-edit; re-add with the shadcn CLI. |
+| `components/mgr/` | Product composites over `components/ui`: `app-shell.tsx` (the one staff/portal shell: Sidebar rail at md+, phone tab bar, `PortalShell`), `command-form.tsx` (every mutation form's surface: Sheet on phone, Dialog on desk), `me-sheet.tsx`, `theme-toggle.tsx`, `e.tsx` (the wireframe `E.*` vocabulary screens compose), `screens.tsx` (the typed screen inventory — the source of truth for what each MGR screen shows; edit it directly). Screen authors never touch `components/ui` directly. |
+| `lib/mgr/nav.ts`, `lib/mgr/sidebar-state.ts` | Navigation manifests (staff tabs + rail children, portal tabs), role filtering, active-tab resolution; the rail's persisted open state. |
+| `app/globals.css`, `app/layout.tsx` | Design tokens (light `:root` / `.dark`), fonts, coarse-pointer target sizes, and the inline theme boot script. |
+| `app/(design)/` | Dev-only component gallery (`/design`, per-screen `/design/frame`); its layout 404s outside development. |
 | `tests/` | Proof. Runs against the real local Supabase stack, never mocks. |
 | `scripts/seed-dev.ts` | Idempotent dev seed. |
 | `public/docs/{user,staff,portal}-guide.html` | Self-contained customer documentation served at `/docs/*.html`: `user-guide.html` is the master audience chooser; staff and portal guides separately cover every available screen and action for their users. Uses customer language only and never exposes implementation phases or internals. |

@@ -1,4 +1,4 @@
-// app/(app)/orders/[id]/adjust-lines-form.tsx — dialog form for the
+// app/(app)/orders/[id]/adjust-lines-form.tsx — CommandForm (bottom sheet on phone, dialog on desk) for the
 // adjust_order_lines command. Pre-fills the current order lines (edit qty,
 // remove, or add a new sku row) and requires a reason; the command replaces
 // the full line set and re-syncs allocations server-side.
@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -52,16 +52,9 @@ export function AdjustLinesForm({
   }
 
   return (
-    <Dialog open={form.open} onOpenChange={form.setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" variant="outline">
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Adjust lines" trigger={<Button size="sm" variant="outline">
           Adjust lines
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Adjust lines</DialogTitle>
-        </DialogHeader>
+        </Button>}>
         <form onSubmit={form.submit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label>Lines</Label>
@@ -101,14 +94,13 @@ export function AdjustLinesForm({
             <Label htmlFor="adjust-reason">Reason</Label>
             <Input id="adjust-reason" value={reason} onChange={(e) => setReason(e.target.value)} required />
           </div>
-          {form.error && <p className="text-sm text-red-600">{form.error}</p>}
-          <DialogFooter>
+          {form.error && <p className="text-sm text-destructive">{form.error}</p>}
+          <CommandFormFooter>
             <Button type="submit" disabled={form.submitting}>
               {form.submitting ? "Saving…" : "Save"}
             </Button>
-          </DialogFooter>
+          </CommandFormFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </CommandForm>
   );
 }
