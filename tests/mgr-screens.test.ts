@@ -37,7 +37,7 @@ describe("SCREENS", () => {
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands; .agents/PROGRESS.md narrates
     // what the number is made of — 96 MGR frames plus the 17 venue frames.
-    expect(SCREENS).toHaveLength(117);
+    expect(SCREENS).toHaveLength(119);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
 
@@ -86,6 +86,28 @@ describe("SCREENS", () => {
     const transfer = SCREENS.find((x) => x.name === "Cellar transfer")!;
     const transferHtml = renderToStaticMarkup(createElement("div", null, transfer.body));
     expect(transferHtml).not.toMatch(/border-l-2/);
+  });
+
+  it("draws the driver route, put back, and ship-on-delivery work screens", () => {
+    // Issue 81: Put back was a Today verb with no screen; the driver route
+    // was only the planner; Confirm shipment was a second Ship title.
+    for (const name of ["Driver route", "Put back", "Ship on delivery"]) {
+      expect(SCREENS.some((s) => s.name === name), name).toBe(true);
+    }
+    expect(SCREENS.some((s) => s.name === "Confirm shipment")).toBe(false);
+    const pickSheet = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Pick sheet")!.body));
+    expect(pickSheet).toMatch(/›/);
+    expect(pickSheet).toMatch(/Thu/);
+    const pick = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Pick")!.body));
+    expect(pick).toMatch(/Print/);
+    const receive = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Receive PO")!.body));
+    expect(receive).not.toMatch(/Send PO/);
+    const close = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Close packaging run")!.body));
+    expect(close).not.toMatch(/Print labels/);
+    expect(close).toMatch(/started/);
+    const delivery = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Confirm delivery")!.body));
+    expect(delivery).toMatch(/Route A/);
+    expect(delivery).not.toMatch(/Type name/);
   });
 
   it("gives every MGR screen states, and keeps engineering phrases off the glass", () => {

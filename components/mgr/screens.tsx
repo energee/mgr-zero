@@ -102,13 +102,13 @@ export const SCREENS: Screen[] = [
     job: "Driver landing: the next stop and nothing else",
     reads: "get_today [design; delivery rows require route.driver_user_id = caller or admin]", writes: "none",
     states: [["empty", "No route today"], ["offline", "stop list cached · Delivered waits", 1], ["permission", "warehouse membership + assigned route", 1]],
-    spec: "Resume opens Driver · confirm delivery for the next incomplete stop. No Pick/Receive rows. The route itself is Work → Route and loading.",
+    spec: "Resume opens Confirm delivery for the next incomplete stop. Route A opens Driver route (all stops, the load, Return). No Pick/Receive rows.",
     body: today(<>
       {E.btn("Resume · Stop 1 of 3")}
       {E.row("Stop 1 · Ridgeline Tap Room", "4 Hazy halves · 6 Pils cases", E.act("Resume"), "w")}
       {E.row("Stop 2 · Al’s Bar", "2 Stout sixths", "after")}
       {E.row("Stop 3 · Teresa’s", "8 Hazy halves · 12 Pils cases", "after")}
-      {E.row("Route A", "departed 8:10 · return open", "")}
+      {E.nav("Route A", "departed 8:10 · return open")}
     </>),
   },
   {
@@ -700,8 +700,27 @@ export const SCREENS: Screen[] = [
       {E.row("Hazy IPA · ½ bbl keg", "ordered 4", E.stq(4), "ok")}
       {E.row("Pils · 16 oz case", "ordered 10", E.stq(10), "ok")}
       {E.row("Stout · ⅙ bbl keg", "ordered 2", E.stq(2), "ok")}
+      {E.btn("Print pick sheet", "g")}
       {E.sp()}
       {E.btn("Done picking")}
+    </>),
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "Work",
+    name: "Put back",
+    job: "Confirm staged quantities were re-shelved after a restock",
+    reads: "get_order [design; restock flag and staged qtys]",
+    writes: "none [re-picking or shipping clears the restock flag; there is no restock write]",
+    states: [["pending", "Today Put back is the standing row"], ["done", "flag cleared · row leaves Today"]],
+    spec: "Today’s Put back row opens this. Staged 3 Pils cases after ORD-0229 was adjusted down. Confirming they are back on the shelf is the verb; inventory already sits in Warehouse as staged.",
+    body: (<>
+      {E.back("Today", "ORD-0229 · put back")}
+      {E.note("3 Pils cases stayed staged after the line was adjusted. Put them back on the Warehouse shelf.")}
+      {E.row("Pils · 16 oz case", "staged after pick", "3", "w")}
+      {E.sp()}
+      {E.btn("Put back 3 cases")}
     </>),
   },
   {
@@ -748,17 +767,17 @@ export const SCREENS: Screen[] = [
     step: 5,
     slice: 1,
     tab: "Work",
-    name: "Confirm shipment",
-    job: "On-delivery / self-delivery ship: reviewed timing must persist first",
+    name: "Ship on delivery",
+    job: "The On delivery state of Ship and invoice",
     reads: "get_order",
     writes: "ship_order [SCHEMA-GATE: persist explicit on-delivery invoice timing on the shipment; then the same one RPC without the invoice; confirm_delivery invoices later]",
     states: [["stale", "picked qty changed · preview", 1], ["offline", "wait for live recheck", 1], ["permission", "warehouse or admin required", 1], ["schema gate", "deferred mode cannot persist yet", 1]],
-    spec: "Never infer invoice timing from carrier or a future route; the reviewed choice must persist on the shipment before routing and delivery confirmation may use it. Until then this body is disabled with human copy while Ship · invoice now stays enabled.",
+    spec: "Folded into Ship and invoice as the On delivery chip. Same fields as Invoice now; the commit stays disabled until invoice timing can be saved. Two screens both titled Ship was confusing.",
     body: (<>
       {E.back("ORD-0231", "Ship")}
       {E.row("Fulfillment source", "Warehouse", E.act("Required"))}
-      {E.row("Hazy IPA · ½ bbl keg", "ship / picked", "4 / 4", "ok")}
-      {E.row("Pils · 16 oz case", "ship / picked", "10 / 10", "ok")}
+      {E.row("Hazy IPA · ½ bbl keg", "picked 4", E.stq(4), "ok")}
+      {E.row("Pils · 16 oz case", "picked 10", E.stq(10), "ok")}
       {E.chips(["Invoice now", "On delivery"], 1)}
       {E.tape([["−4 Hazy ½ bbl · sale removal · PA", "2.00 bbl"], ["−10 Pils cases · sale removal · PA", "0.47 bbl"], ["invoice number", "deferred to delivery"]])}
       {E.note("Shipping on delivery isn’t available yet; invoice timing can’t be saved. Choose Invoice now to ship today.")}
@@ -797,13 +816,12 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
     body: (<>
-      {E.back("Work", "Thu pick sheet")}
-      {E.row("Ridgeline", "ORD-0231", "3 lines")}
-      {E.row("Al’s Bar", "ORD-0232", "1 line")}
-      {E.row("Teresa’s", "ORD-0234", "5 lines")}
+      {E.back("Work", "Pick sheet")}
+      {E.chips(["Wed 9/2", "Thu 9/3", "Fri 9/4"], 1)}
+      {E.nav("Ridgeline · ORD-0231", "3 lines")}
+      {E.nav("Al’s Bar · ORD-0232", "1 line")}
+      {E.nav("Teresa’s · ORD-0234", "5 lines")}
       {E.nav("Totals", "Hazy halves 9 · Pils cases 22")}
-      {E.sp()}
-      {E.btn("Print pick sheet", "g")}
     </>),
   },
   {
@@ -1436,16 +1454,15 @@ export const SCREENS: Screen[] = [
     states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
     spec: "The close half of the packaging frame; planning and editing the plan live in the Schedule packaging run sheet, reached from the Plan row until the run starts. Close is a copper review ( revalidated source, actual outputs, lot, explicit FG destination, material consumption/return/damage, yield/loss). Print labels is presentation after commit: measured thermal keg-collar/lot labels per plan §3. No packaging-day-actuals screen.",
     body: (<>
-      {E.back("Work", "RUN-0031 · Hazy cans")}
+      {E.back("Work", "RUN-0031 · started")}
       {E.fld("Packaging source", "FV3 · B-0416")}
-      {E.nav("Plan", "Hazy · cans · Fri 9/5 · 118 cases · edit until start")}
       {E.tbl(["need", "have", "short"], [["cans 2,880", "3,100", "0"], ["ends 2,880", "2,400", <><span className="text-warning-foreground">480</span></>], ["labels 2,880", "5,000", "0"]])}
       {E.note("480 ends short · resolve or explicitly override before starting.")}
       {E.fld("Packaged", "118 cases")}
       {E.fld("Lot", "L-240905-HZ")}
       {E.fld("Finished goods destination", "Warehouse · selected")}
       {E.tape([["FV3 · B-0416", "source checked"], ["+118 cases · production in", "Warehouse · new lot"], ["−2,832 cans + ends · consumption", "FIFO"], ["Labels returned / damaged", "24 / 6"], ["Beer loss · 0.30 bbl", "yield 97.9%"]])}
-      {E.btns([["Print labels · lot / keg collar", "g"], ["Close packaging run", "irr"]])}
+      {E.btn("Close packaging run", "irr")}
     </>),
   },
   {
@@ -1547,7 +1564,7 @@ export const SCREENS: Screen[] = [
     spec: "Send PO (green) shows while the PO is draft; receiving needs a sent PO. Only counted quantity posts; over and short are both visible and both allowed, and the keypad never clamps an over-count as the only guard. PO status is trigger-derived; never write a loaded/status flag.",
     body: (<>
       {E.back("Work", "PO-0142 · Country Malt")}
-      {E.row("Status", "sent Mon · expected Thu", E.act("Send PO"))}
+      {E.fld("Status", "sent Mon · expected Thu")}
       {E.row("2-row · 55 lb bags", "expected 40", E.stq(42), "w")}
       {E.row("Citra · 44 lb boxes", "expected 4", E.stq(3), "w")}
       {E.row("Rice hulls · 50 lb", "expected 6", E.stq(6), "ok")}
@@ -1857,19 +1874,39 @@ export const SCREENS: Screen[] = [
     step: 7,
     slice: 10,
     tab: "Work",
+    name: "Driver route",
+    job: "The route as the driver sees it: every stop, the load, Return",
+    reads: "get_route_load [design]",
+    writes: "return_route [design]",
+    states: [["departed", "Return is the one verb"], ["next stop", "Resume opens Confirm delivery"]],
+    spec: "Off Driver Today’s Route A row. Planner Route is for building; this is for running. Load is derived from the shipments on the stops.",
+    body: (<>
+      {E.back("Today", "Route A · Thu")}
+      {E.fld("Load", "14 Hazy halves · 18 Pils cases · 2 Stout sixths")}
+      {E.row("Stop 1 · Ridgeline Tap Room", "4 Hazy halves · 6 Pils cases", E.act("Resume"), "w")}
+      {E.row("Stop 2 · Al’s Bar", "2 Stout sixths", "after")}
+      {E.row("Stop 3 · Teresa’s", "8 Hazy halves · 12 Pils cases", "after")}
+      {E.sp()}
+      {E.btn("Return route")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 10,
+    tab: "Work",
     name: "Confirm delivery",
     job: "Name receiving contact, then commit delivery and invoice",
     reads: "get_delivery_stop [design; require persisted on-delivery invoice timing]",
     writes: "confirm_delivery [design; one RPC: delivered_at + signed_by + invoice only when persisted mode is on-delivery; never ships]",
     states: [["offline", "keep stop open; commit waits", 1], ["response lost", "same requestId returns result"], ["permission", "warehouse membership and being the route’s assigned driver, or admin", 1], ["success", "INV number after commit"]],
-    spec: "2 taps: receiving-contact chip → Delivered. The receiving name is stored as text; the UI never implies a signature image is retained.",
+    spec: "2 taps: receiving-contact chip from the ship-to → Delivered. Back goes to Driver route. The receiving name is stored as text; the UI never implies a signature image is retained.",
     body: (<>
-      {E.hd("Route A", "Stop 1 of 3")}
+      {E.back("Route A", "Stop 1 of 3")}
       {E.ttl("Ridgeline Tap Room")}
       {E.row("Invoice timing", "On delivery · saved", E.act("Required"))}
       {E.row("Hazy IPA · ½ bbl keg", "", "4")}
       {E.row("Pils · 16 oz case", "", "6")}
-      {E.chips(["Maria", "Dave", "Type name"], -1)}
+      {E.chips(["Dana", "Chris"], -1)}
       {E.sp()}
       {E.btn("Delivered", "irr")}
     </>),
