@@ -1,11 +1,11 @@
-// app/(app)/orders/[id]/pick-form.tsx — dialog form for the record_pick
+// app/(app)/orders/[id]/pick-form.tsx — CommandForm (bottom sheet on phone, dialog on desk) for the record_pick
 // command. Pre-fills each line's picked qty with its current qty_picked (or
 // qty_ordered if not yet picked); submitting sets the order to "picked".
 "use client";
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCommandForm } from "@/lib/commands/use-command-form";
@@ -28,14 +28,7 @@ export function PickForm({ orderId, lines }: { orderId: string; lines: PickLine[
   });
 
   return (
-    <Dialog open={form.open} onOpenChange={form.setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm">Record pick</Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Record pick</DialogTitle>
-        </DialogHeader>
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Record pick" trigger={<Button size="sm">Record pick</Button>}>
         <form onSubmit={form.submit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             {lines.map((l) => (
@@ -54,14 +47,13 @@ export function PickForm({ orderId, lines }: { orderId: string; lines: PickLine[
               </div>
             ))}
           </div>
-          {form.error && <p className="text-sm text-red-600">{form.error}</p>}
-          <DialogFooter>
+          {form.error && <p className="text-sm text-destructive">{form.error}</p>}
+          <CommandFormFooter>
             <Button type="submit" disabled={form.submitting}>
               {form.submitting ? "Saving…" : "Save"}
             </Button>
-          </DialogFooter>
+          </CommandFormFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </CommandForm>
   );
 }

@@ -1,5 +1,5 @@
-// lib/commands/use-command-form.ts — the dialog-form lifecycle every mutation
-// dialog shares: open/close, one command action (with its serialized request
+// lib/commands/use-command-form.ts — the form lifecycle every mutation form
+// (rendered in components/mgr/command-form.tsx) shares: open/close, one command action (with its serialized request
 // ID), inline error, and refresh on success. Forms own only their fields and
 // how to build the command input.
 "use client";
