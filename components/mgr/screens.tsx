@@ -899,14 +899,69 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Settings", "Accounting")}
       {E.ttl("QuickBooks")}
-      {E.row("Demo Brewing LLC", "connected · company 9341", E.act("Active"), "ok")}
-      {E.fld("Token", "healthy · refreshed today")}
+      {E.row("Demo Brewing LLC", "authorization expired · company 9341", E.act("Disconnect"), "w")}
+      {E.note("QuickBooks authorization expired. Push, payment links and paid-date sync are paused.")}
+      {E.btn("Reconnect QuickBooks")}
       {E.row("QuickBooks Payments", "active · card and bank", "", "ok", QuickBooksMark)}
       {E.ttl("Push defaults")}
       {E.info("Every invoice is pushed ready to pay. Turning both off means customers cannot pay online at all.")}
       {E.row("Bank transfer (ACH)", "on · lowest fee", E.act("On"), "ok")}
       {E.row("Card", "on · percentage fee applies", E.act("On"), "ok")}
       {E.row("Customers missing an email", "2 · cannot be pushed", E.act("Review"), "w")}
+    </>),
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "More",
+    group: "QuickBooks Online",
+    name: "Connect QuickBooks",
+    job: "Authorize one QuickBooks company and explain the data exchange before OAuth",
+    reads: "none [OAuth returns the selected company]",
+    writes: "connect_qbo [design]",
+    states: [["cancelled", "return to Accounting unchanged"], ["already connected", "show Mapping conflict", 1]],
+    spec: "The disconnected Accounting state. OAuth is an external write, so the button is copper and the page says what MGR will exchange before leaving.",
+    body: (<>
+      {E.back("Settings", "Connect QuickBooks")}
+      {E.info("MGR reads customers, items, invoice status and payments. It creates wholesale invoices and credit memos.")}
+      {E.note("QuickBooks remains the accounting record. Connecting does not push existing invoices.")}
+      {E.btn("Connect QuickBooks", "irr")}
+    </>),
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "More",
+    group: "QuickBooks Online",
+    surface: "sheet",
+    name: "Mapping conflict",
+    job: "Resolve an ambiguous QuickBooks customer or item without guessing",
+    reads: "get_qbo_mapping_candidates [design]",
+    writes: "set_qbo_customer_mapping · set_qbo_item_mapping [design]",
+    states: [["customer", "two candidates match"], ["item", "two candidates match"], ["company claimed", "this company is connected to another brewery", 1]],
+    spec: "A candidate is chosen explicitly. A company already claimed by another brewery cannot be overridden here.",
+    body: (<>
+      {E.note("Two QuickBooks customers match Ridgeline Tap Room. Choose the account this brewery invoices.")}
+      {E.row("Ridgeline Tap Room", "Phoenixville · active · customer 184", E.act("Use"))}
+      {E.row("Ridgeline Holdings", "Phoenixville · active · customer 227", E.act("Use"))}
+      {E.info("If this QuickBooks company belongs to another MGR brewery, disconnect it there first.")}
+    </>),
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "More",
+    group: "QuickBooks Online",
+    surface: "sheet",
+    name: "Disconnect QuickBooks",
+    job: "Confirm the external effects of disconnecting QuickBooks",
+    reads: "get_qbo_connection [design]",
+    writes: "disconnect_qbo [design]",
+    states: [["confirmed", "connection disabled and tokens purged"]],
+    spec: "The confirmation names what stops and what remains so reconnecting can resume without remapping.",
+    body: (<>
+      {E.note("Stops: invoice push, payment links and paid-date sync.")}
+      {E.info("Stays: MGR invoices, QuickBooks ids and customer/item mappings.")}
       {E.btn("Disconnect QuickBooks", "irr")}
     </>),
   },
@@ -918,16 +973,16 @@ export const SCREENS: Screen[] = [
     name: "Invoice drift",
     job: "What the AR list shows when someone edits, voids or deletes an invoice over there",
     reads: "list_invoices [design; qbo_sync_token + qbo_remote_state]",
-    writes: "none [MGR does not correct QuickBooks]",
+    writes: "push_invoice_to_qbo [same requestId] · write_off_invoice [design; MGR status only, never touches QuickBooks]",
     states: [["edited there", "SyncToken changed since MGR pushed", 1], ["voided", "amounts zeroed; this is not payment", 1], ["deleted", "the id points at nothing; sync gets a 404", 1], ["not sent", "pushed but never delivered; only a fault if MGR is not the channel"], ["live", "the ordinary case; no badge at all"]],
     spec: <>QuickBooks has no read-only invoice. Once pushed, the accountant can edit, void or delete it from the Sales transactions sidebar and no API setting prevents that, so MGR detects rather than prevents. QuickBooks hands us the detector free: SyncToken increments on every modification and already rides the response the sync job reads for balance, so drift costs one column and no extra call. The rule this frame protects: <b>a voided invoice is not a paid invoice.</b> Voiding zeroes the amounts, so any logic inferring paid from a QuickBooks balance of zero books cancelled revenue as collected; the database refuses to record a paid date unless the remote state is live, rather than trusting the job to remember. MGR surfaces drift and stops: no re-push that overwrites an accountant’s correction, no field-level merge UI. ASSUMPTION: a drifted invoice stays in AR at QuickBooks’ numbers, because QuickBooks owns the invoice after push.</>,
     body: (<>
       {E.back("More", "Invoices")}
-      {E.row(`${INV.no} · Ridgeline`, `due ${INV.dueShort} · pushed`, INV.total)}
-      {E.row("INV-1041 · Al’s Bar", "edited in QuickBooks · $980 → $1,040", "$1,040", "w")}
-      {E.row("INV-1040 · Teresa’s", "voided in QuickBooks · not paid", "$0.00", "w")}
-      {E.row("INV-1039 · Al’s Bar", "deleted in QuickBooks · re-push or write off", "", "w")}
-      {E.row("INV-1038 · Al’s Bar", "pushed · not sent from QuickBooks", "$540")}
+      {E.row(`${INV.no} · Ridgeline`, `due ${INV.dueShort} · ${INV.total} · pushed`, E.act("Open in QuickBooks"))}
+      {E.row("INV-1041 · Al’s Bar", "edited in QuickBooks · $980 → $1,040", E.act("Open in QuickBooks"), "w")}
+      {E.row("INV-1040 · Teresa’s", "voided in QuickBooks · not paid", E.act("Write off"), "w")}
+      {E.row("INV-1039 · Al’s Bar", "deleted in QuickBooks", <>{E.act("Re-push")}{E.act("Write off")}</>, "w")}
+      {E.row("INV-1038 · Al’s Bar", "pushed · not sent from QuickBooks", E.act("Open in QuickBooks"))}
       {E.row("INV-1037 · Ridgeline", "paid 8/29 from QuickBooks Online", "$980", "ok")}
       {E.info("MGR shows what changed over there. Corrections belong in QuickBooks, or as a credit memo here.")}
     </>),
@@ -1759,13 +1814,70 @@ export const SCREENS: Screen[] = [
     spec: "Preview picker renders the same provider-neutral fixtures consumed by renderer contract tests. It never queries live customer data or sends a message. Reading cadence is MGR-owned and controls both Today and chat.",
     body: (<>
       {E.back("Settings", "Chat")}
-      {E.row("Slack · Demo Brewing", "Connected · scopes healthy", E.act("Active"), "ok", SlackMark)}
+      {E.row("Slack · Demo Brewing", "Connected · scopes healthy", E.act("Disconnect"), "ok", SlackMark)}
       {E.pick("Operations channel", "#mgr-operations · private")}
       {E.pick("Quiet hours", "9:00 PM–6:00 AM · brewery time")}
       {E.pick("Reading overdue after", "24 hours · Today + chat")}
+      {E.nav("Health", "last message from Slack today · 8:42 AM")}
+      {E.nav("Linked people", "3 linked")}
       {E.chips(["App Home", "Personal DM", "Team digest", "Preferences"], 0)}
       {E.row("Preview · App Home", "4 current work reasons · fixture data", E.act("Open"))}
       {E.btn("Disable", "g")}
+    </>),
+  },
+  {
+    step: 8,
+    slice: "chat",
+    tab: "More",
+    group: "Chat",
+    name: "Linked people",
+    job: "See which MGR users linked Slack and remove a stale link",
+    reads: "list_chat_user_links [design]",
+    writes: "unlink_chat_user [design]",
+    states: [["linked", "three people"], ["unlinked", "personal messages stop for that person", 1]],
+    spec: "A brewery admin can remove a stale identity link without disconnecting Slack for everyone.",
+    body: (<>
+      {E.back("Chat", "Linked people")}
+      {E.row("Avery Stone", "Admin · linked 8/29/2026", E.act("Unlink"))}
+      {E.row("Casey Lin", "Brewer · linked 8/30/2026", E.act("Unlink"))}
+      {E.row("Morgan Reed", "Driver · linked 9/02/2026", E.act("Unlink"))}
+      {E.btn("Link your Slack", "g")}
+    </>),
+  },
+  {
+    step: 8,
+    slice: "chat",
+    tab: "More",
+    group: "Chat",
+    surface: "entry",
+    name: "Link your Slack",
+    job: "Link the signed-in Slack identity to the signed-in MGR user",
+    reads: "get_chat_link_intent [design]",
+    writes: "consume_chat_link_proof [design; single-use]",
+    states: [["ready", "both identities named"], ["expired", "return to MGR and request a new link", 1]],
+    spec: "The entry page names both identities and the brewery before consuming the single-use proof.",
+    body: (<>
+      {E.ttl("Link your Slack")}
+      {E.info("Slack user Avery Stone will be linked to Avery Stone in Demo Brewing.")}
+      {E.note("This enables personal reminders and App Home. It does not change your MGR permissions.")}
+      {E.btn("Link accounts", "irr")}
+    </>),
+  },
+  {
+    step: 8,
+    slice: "chat",
+    tab: "More",
+    group: "Chat",
+    surface: "sheet",
+    name: "Disconnect Slack",
+    job: "Confirm the external effects of disconnecting Slack",
+    reads: "get_chat_integration_health [design]",
+    writes: "disconnect_chat_installation [design]",
+    states: [["confirmed", "installation and identity links removed"]],
+    spec: "The confirmation distinguishes stopped delivery from MGR work that remains.",
+    body: (<>
+      {E.note("Stops: App Home, personal reminders, team digests and Slack actions.")}
+      {E.info("Stays: MGR work, assignments, notification preferences and history.")}
       {E.btn("Disconnect Slack", "irr")}
     </>),
   },
@@ -1805,14 +1917,90 @@ export const SCREENS: Screen[] = [
       {E.back("Settings", "Point of sale")}
       {E.ttl("Point of sale")}
       {E.info("Publish what the taproom can sell, and read its sales back. One provider is connected at a time.")}
-      {E.row("Square · Demo Brewing LLC", "catalog published · sales syncing", E.act("Active"), "ok", SquareMark)}
+      {E.row("Square · Demo Brewing LLC", "catalog published · sales syncing", E.act("Disconnect"), "ok", SquareMark)}
       {E.row("Square → QuickBooks connector", "detected · Square posts taproom sales to QuickBooks Online itself", E.act("Review"), "w", SquareMark)}
-      {E.row("Taproom", "MGR Taproom · channel Taproom", "5 published")}
-      {E.row("Warehouse", "MGR Warehouse · channel DTC", "3 published")}
-      {E.gated("Third location", "not mapped · sales would have nowhere to deplete")}
+      {E.nav("Square locations", "2 mapped · 1 needs mapping")}
       {E.fld("Last sales sync", "Today · 6:58 PM")}
       {E.nav("Menu", "one catalog · Square, the website, per-location price")}
       {E.btn("Disable", "g")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 7,
+    tab: "More",
+    group: "POS",
+    name: "Connect Square",
+    job: "Authorize one Square seller and explain the data exchange before OAuth",
+    reads: "none [OAuth returns the selected seller]",
+    writes: "begin_pos_installation [design]",
+    states: [["cancelled", "return to Point of sale unchanged"], ["connected", "continue to Square locations"]],
+    spec: "The page explains both catalog writes and sales reads before leaving MGR.",
+    body: (<>
+      {E.back("Settings", "Connect Square")}
+      {E.info("MGR publishes catalog items and availability to Square. It reads completed sales to deplete taproom stock.")}
+      {E.note("Connecting does not publish a menu or import old sales.")}
+      {E.btn("Connect Square", "irr")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 7,
+    tab: "More",
+    group: "POS",
+    surface: "sheet",
+    name: "Square locations",
+    job: "Map each Square location to one MGR location and sales channel",
+    reads: "list_pos_locations · list_locations · list_sales_channels [design]",
+    writes: "set_pos_location_mapping [design]",
+    states: [["mapped", "two locations ready"], ["unmapped", "sales cannot reconcile", 1], ["claimed", "an MGR location cannot be claimed twice", 1]],
+    spec: "Each provider location needs both owners before its sales can change inventory.",
+    body: (<>
+      {E.ttl("Taproom")}
+      {E.pick("MGR location", "Taproom")}
+      {E.pick("Sales channel", "Taproom")}
+      {E.ttl("Warehouse")}
+      {E.pick("MGR location", "Warehouse")}
+      {E.pick("Sales channel", "DTC")}
+      {E.ttl("Third location · needs mapping")}
+      {E.pick("MGR location", "Select location")}
+      {E.pick("Sales channel", "Select channel")}
+      {E.btn("Save mappings")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 7,
+    tab: "More",
+    group: "POS",
+    surface: "sheet",
+    name: "Square → QuickBooks connector",
+    job: "Acknowledge that Square already posts taproom revenue to QuickBooks",
+    reads: "get_pos_integration_health [design]",
+    writes: "acknowledge_pos_accounting_connector [design; no external write]",
+    states: [["detected", "acknowledgement required", 1], ["acknowledged", "health warning dismissed"]],
+    spec: "Acknowledging records awareness only. MGR does not configure or disable Square's connector.",
+    body: (<>
+      {E.note("Square already posts taproom sales to QuickBooks Online as sales receipts.")}
+      {E.info("MGR pushes wholesale invoices only. Confirm with your accountant that the two revenue streams stay separate.")}
+      {E.btn("Understood", "g")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 7,
+    tab: "More",
+    group: "POS",
+    surface: "sheet",
+    name: "Disconnect Square",
+    job: "Confirm the external effects of disconnecting Square",
+    reads: "get_pos_integration_health [design]",
+    writes: "disconnect_pos_installation [design]",
+    states: [["confirmed", "installation disabled and token purged"]],
+    spec: "The confirmation names what stops and what remains so reconnecting can reuse mappings.",
+    body: (<>
+      {E.note("Stops: menu publishing, availability updates and sales sync.")}
+      {E.info("Stays: MGR stock, location mappings, sales history and published item ids.")}
       {E.btn("Disconnect Square", "irr")}
     </>),
   },

@@ -12,6 +12,7 @@ Running log of what's done, in flight, and next. Newest at top. Keep entries to 
 - [ ] Customizable sale channels: plan only (`docs/plans/sale-channels-customizable.md`, PR #42) — channel identity/assignment decisions stand, but its 12 tasks need reconciliation with schema revision 2's tax treatment and one-pass baseline before implementation.
 
 ## Done
+- 2026-09-03 — Design issue #78: QuickBooks, Square, and Slack now have explicit connect, recovery, mapping, linked-person, and disconnect-confirmation surfaces; chat settings links Health and Linked people, and invoice drift exposes its safe next actions. 103 MGR frames + 17 venue frames = 120.
 - 2026-09-03 — Design issue #76: shared `E.pick` chevrons now distinguish filled chooser values from plain fields across movement, orders, brewing, packaging, counts, chat, and delivery; typed PO/carrier fields use inputs, and filled values no longer carry misleading Required buttons.
 - 2026-09-03 — Design issue #74: one `INV-1042` fixture now agrees across AR, portal, and QuickBooks frames: Ridgeline, $150 Hazy halves, $38 Pils cases, $120 keg deposit, $948 total, 9/03 invoice, 10/03 due, $948 payment with $9.48 fee, and $106 credit memo.
 - 2026-09-03 — Design issue #70: eight promised lists drawn (**Finished goods**, **Materials on hand**, **Orders**, **Batches**, **Purchase orders**, **Routes**, **Recipes**, **Price lists**) with create actions, next-action rows, and resolved detail back links. 93 MGR frames + 17 venue frames = 110.
