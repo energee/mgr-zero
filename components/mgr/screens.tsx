@@ -6,6 +6,7 @@
 // and kept only for the Slack/QuickBooks/Square venue drawings.
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
+import { S, SQ_ITEM_COLS, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
 
 export type Tab = "Today" | "Beer" | "Work" | "More";
@@ -25,6 +26,9 @@ export type Screen = {
   writes: ReactNode;
   states?: [string, string, (0 | 1)?][];
   spec?: ReactNode;
+  /** Drawn inside another product (QuickBooks, Square, Slack) in that product's
+   * own chrome; the body then speaks `X`/`S`, not `E`. See ./venue.tsx. */
+  venue?: Venue;
   /** Entry-screen header (mark + product name); sheets take their title from `name`. */
   hd?: ReactNode;
   body: ReactNode;
@@ -1763,6 +1767,297 @@ export const SCREENS: Screen[] = [
       {E.info("Preview: conserves 0.09677419 bbl · same location and bin · not a TTB removal")}
       {E.fld("Damaged on break", "0 four-pack · records as loss")}
       {E.gated("Record repack", "isn’t available yet — breaking a case has nowhere correct to land")}
+    </>),
+  },
+  // ---- The external venues. Not MGR screens: what QuickBooks, Square and Slack
+  // show when MGR writes into them, drawn in each product's own design language
+  // (components/mgr/venue.tsx) so an integration contract stays legible. Ported
+  // from the wireframes file, which is now retired for these too.
+
+  // QuickBooks — what MGR's push produces, rendered by Intuit. Slice 1, step 5.
+  {
+    step: 5, slice: 1, group: "QBO", venue: { name: "QuickBooks", title: "Invoice INV-1042", actions: "Edit invoice" },
+    name: "Invoice · as MGR pushed it",
+    job: "What the accountant opens after one shipment invoices — and the two steps the push does not perform",
+    reads: "— [QuickBooks renders; MGR wrote it]",
+    writes: "push_invoice [design; requestid, online-only, AllowOnlineACHPayment + AllowOnlineCreditCardPayment]",
+    states: [["not sent", "created by MGR; QuickBooks has emailed nobody", 1], ["accepted", "qbo_invoice_id stored on the MGR invoice"], ["rejected", "qbo_sync_error shown in MGR; nothing created here", 1], ["response lost", "the same requestid returns the first invoice, never a second"], ["tax intent missing", "AST does not engage and the invoice books at 0.00 tax", 1], ["no customer email", "push refuses — an invoice without one can never be paid online", 1], ["viewed", "the customer opened it — a signal MGR has no column for", 1]],
+    spec: "Drawn as QuickBooks actually presents it: the Sales transactions list with a right sidebar, because QuickBooks has no separate full-page record. Every Product/Service line resolves through skus.qbo_item_id and the bill-to through customers.qbo_customer_id. MGR sends tax intent, never tax amounts — Intuit requires TxnTaxDetail.TxnTaxCodeRef to opt the transaction into Automated Sales Tax, and an unmarked line is treated as TAX, so a keg deposit must carry TaxCodeRef NON explicitly or it books as taxable revenue. The header carries the second finding: a pushed invoice reads Not sent. Creating and delivering are different acts and push_invoice performs only the first.",
+    body: (<>
+      {X.stat("Due in 9 days (Not sent)", 1)}
+      {X.amt("Total due", "1,051", "52")}
+      {X.when("Invoice date", "9/03/2026")}
+      {X.when("Due date", "10/03/2026")}
+      {X.sec("Ridgeline Tap Room", <>{X.sub("Billing address", ["114 Bridge St.", "Phoenixville, PA  19460"])}{X.link("ap@ridgeline.example")}</>)}
+      {X.sec("Invoice activity", X.life(["Opened", "Sent", "Viewed", "Paid"], 1))}
+      {X.more("Products and services")}
+    </>),
+  },
+  {
+    step: 5, slice: 1, group: "QBO", venue: { name: "QuickBooks", title: "Payment", actions: "Edit" },
+    name: "Payment · flows back",
+    job: "The accountant records payment here; MGR never offers a Mark paid verb",
+    reads: "qbo sync job [design; writes invoices.paid_at]",
+    writes: "— [no MGR user action]",
+    states: [["paid", "invoices.paid_at set on the next sync"], ["fee deducted", "the deposit is smaller than the payment", 1], ["partial", "balance drops; the AR row stays due", 1], ["sync lagging", "MGR AR shows the last synced balance", 1]],
+    spec: "This frame justifies an absence: there is deliberately no Mark paid button anywhere in MGR. paid_at and qbo_balance_cents arrive from the sync job only, which is why the AR list stops showing an invoice as due without anyone in the brewery doing anything. It also carries a number MGR does not model — QuickBooks Payments deducts a processing fee before deposit, so the bank deposit never equals the invoice. MGR reconciles against qbo_balance_cents, not the deposit, and must not read the gap as a short payment.",
+    body: (<>
+      {X.stat("Paid")}
+      {X.amt("Amount paid", "1,051", "52")}
+      {X.when("Payment date", "9/28/2026")}
+      {X.sec("Ridgeline Tap Room", <>{X.sub("Billing address", ["114 Bridge St.", "Phoenixville, PA  19460"])}{X.rows([["Phone", "(610) 933-7181"]])}</>)}
+      {X.sec("Transaction Details", <>{X.sub("Payment Details", ["QuickBooks Payments-Bank *8837 | Fee: $10.52", "$1,051.52"])}{X.sub("Deposit Details", ["JPMORGAN CHASE BANK, NA | *0753"])}</>)}
+      {X.more("More info")}
+    </>),
+  },
+  {
+    step: 5, slice: 1, group: "QBO", venue: { name: "QuickBooks", title: "Credit memo CM-0068", actions: "Edit" },
+    name: "Credit memo · as pushed",
+    job: "A return or keg deposit refund as it lands against the customer",
+    reads: "—",
+    writes: "create_credit_memo [design; kind=credit_memo, own requestid]",
+    states: [["applied", "reduces the customer balance here"], ["unapplied", "sits as available credit"], ["rejected", "qbo_sync_error on the MGR credit row", 1], ["deposit line untaxed", "TaxCodeRef NON, or it refunds phantom tax", 1]],
+    spec: "Created by Return shipment or a keg return, never free-form — the plan lists free-form credit memos as deliberately deferred. Returning an empty keg posts the deposit refund and the keg event in one RPC, so the credit and the fleet balance cannot disagree. The deposit line carries TaxCodeRef NON: an unmarked line defaults to TAX and would refund tax that was never charged.",
+    body: (<>
+      {X.stat("Applied")}
+      {X.amt("Total credit", "114", "00")}
+      {X.when("Credit date", "9/12/2026")}
+      {X.when("Applied to", "Invoice INV-1042")}
+      {X.sec("Ridgeline Tap Room", X.sub("Billing address", ["114 Bridge St.", "Phoenixville, PA  19460"]))}
+      {X.sec("Products and services", X.rows([["Pils · 16 oz case · TAX", "$84.00"], ["Keg deposit refund · NON", "$30.00"]]))}
+      {X.more("More info")}
+    </>),
+  },
+  {
+    step: 5, slice: 1, group: "QBO", venue: { name: "QuickBooks", title: "Invoice · not created", actions: "Edit" },
+    name: "Push rejected · unmapped item",
+    job: "What QuickBooks refuses when a SKU carries no usable item reference",
+    reads: "—",
+    writes: "push_invoice [design; rejected — no partial invoice]",
+    states: [["failed", "MGR AR row reads push failed", 1], ["unmapped", "the SKU carries no qbo_item_id"], ["archived in QBO", "mapped, but the item went inactive — same error, different fix", 1], ["never partial", "no half invoice is left behind here"]],
+    spec: "Drawn because the failure is external and the recovery is not. MGR stores the raw provider reason in invoices.qbo_sync_error and leaves qbo_sync_status failed; the row stays in AR. Re-pushing reuses the same requestid, so a fixed mapping cannot produce a second invoice. Two causes share this one message — the SKU was never mapped, or the QuickBooks item has since gone inactive — and the recovery differs, so the error copy must not assume the first. Nothing appears in the list behind this panel, which is the point.",
+    body: (<>
+      {X.err("Invalid reference", "Invalid Reference Id : Item element id 0 not found.")}
+      {X.sec("Request", X.rows([["Invoice", "ORD-0241"], ["Failed line", "Stout · ⅙ bbl"], ["Created in QuickBooks", "Nothing"]]))}
+      {X.note("Either the SKU has no QuickBooks item reference, or the item it points at is archived in QuickBooks. Map it here or reactivate it there, then re-push the same request.")}
+    </>),
+  },
+  {
+    step: 7, slice: 7, group: "POS", venue: { name: "QuickBooks", title: "Sales receipt", actions: "Edit" },
+    name: "Square sales receipt · sidebar",
+    job: "Proof that Square's own QuickBooks sync books a daily receipt MGR must not double-count",
+    reads: "— [Square's QuickBooks integration wrote it]",
+    writes: "— [MGR never pushes taproom sales]",
+    states: [["daily total", "one receipt per location per day, not one per sale"], ["tips item", "Square posts a tips line MGR has no concept of", 1], ["double count", "MGR pushing taproom revenue here would book it twice", 1]],
+    spec: "Drawn to mark a boundary MGR must not cross. Square's own QuickBooks connection already books taproom revenue as a daily sales receipt, so MGR ingesting Square sales is for inventory only — it must never push that revenue to QuickBooks as well. The tips item is the tell: it is Square's line, not MGR's, and MGR has no concept that would produce it.",
+    body: (<>
+      {X.stat("Paid")}
+      {X.amt("Amount", "59", "73")}
+      {X.when("Receipt date", "09/03/2026")}
+      {X.sec("Square customer")}
+      {X.sec("Sales receipt activity", X.sub("Paid", ["Credit Card"]))}
+      {X.sec("Products and services", <>{X.rows([["4-Pack Beer To Go", "$19.00"], ["Draft Sales", "$30.00"], ["Square sale tips item", "$7.79"]])}{X.link("More details")}</>)}
+      {X.more("More info")}
+    </>),
+  },
+
+  // Square — records MGR reads, not writes. Slice 7, step 7.
+  {
+    step: 7, slice: 7, group: "POS",
+    venue: {
+      name: "Square", nav: "pay", on: "Transactions",
+      panel: (<>
+        {X.h("$16.96 Payment", "Sep 1, 2026 10:32 pm")}
+        {X.meta([["", "Point of Sale"], ["Collected at", "Taproom"], ["Device", "Square Register 0305"], ["Order Source", "Register"], ["Channel", "Taproom · from mapped location"]])}
+        {X.sect("For here")}
+        {X.li([["Hazy IPA (Full Pour)", "$20.00", "$10.00 × 2"], ["Industry Discount", "($4.00)", ""]])}
+        {X.tot([["Subtotal", "16.00"], ["Sales Tax Zelienople", "0.96"], ["Total", "16.96", 1], ["Tendered", "28.00"], ["Change", "(11.04)"], ["Cash", "16.96"]])}
+        {X.note("MGR reads this. A line it cannot map to a package SKU and a variation blocks reconciliation rather than guessing a quantity.")}
+      </>),
+    },
+    name: "Taproom sale · Square POS",
+    job: "The sale MGR ingests — and the truth the weekly count is checked against",
+    reads: "sync_pos_sales [design; slice 7, idempotent per sale id]",
+    writes: "— [Square owns the sale]",
+    states: [["synced", "depletion posted once per sale id"], ["unmapped item", "reconciliation stays disabled until mapped", 1], ["refund", "arrives as its own line, credited back"], ["disconnected", "no expected number · the count still posts depletion"], ["tips line", "Square posts a tips item MGR has no concept of", 1]],
+    spec: "Note the direction: ingesting a sale posts nothing to the ledger — it is the expected number the weekly count is measured against, and the count is what removes the beer. Drawn in the real container: a transaction is a right panel over Transactions, not a free-standing receipt. Read the list, not just the panel — a row summarises as an item name and a count, no SKU and no unit, so the list can never be the reconciliation source. Only the panel carries the lines, and even there the serving is a variation.",
+    body: (<>
+      {sqTxnHead()}
+      {X.day("Tuesday, September 1, 2026", "$1,564.63")}
+      {X.txns([["CASH", "10:32 pm", "Hazy IPA (Full Pour) × 2", "$16.96", "Taproom", 1], ["⋯", "9:59 pm", "No Sale", "$0.00", "Warehouse"], ["CASH", "9:44 pm", "Hazy IPA (Full Pour), Pils (Full Pour), Stout (Full Pour)", "$33.02", "Warehouse"], ["VISA", "9:16 pm", "Pils (Full Pour) × 3", "$26.67", "Warehouse"], ["VISA", "9:12 pm", "Pils (Can) × 2, Hazy IPA (Can) × 2, Stout (Can) × 2, Pils (Half) × 2, Hazy IPA To Go (Single) × 2, Saison…", "$141.23", "Warehouse"], ["AMEX", "8:52 pm", "Stout (Half Pour)", "$7.62", "Warehouse"], ["CASH", "8:43 pm", "Hazy IPA To Go (4 Pack)", "$28.89", "Warehouse"]])}
+    </>),
+  },
+  {
+    step: 7, slice: 7, group: "POS",
+    venue: {
+      name: "Square", nav: "pay", on: "Transactions",
+      panel: (<>
+        {X.h("$12.72 Refund", "Sep 1, 2026 10:51 pm")}
+        {X.pill("Refunded", 1)}
+        {X.meta([["", "Point of Sale"], ["Collected at", "Taproom"], ["Device", "Square Register 0305"], ["Original sale", "#5g4P"]])}
+        {X.sect("Refunded items")}
+        {X.li([["Pils · crowler", "−12.00", "$12.00 × 1"]])}
+        {X.tot([["Sales Tax Zelienople", "−0.72"], ["Total refunded", "−12.72", 1]])}
+        {X.note("Reaches MGR through the same reconcile RPC as the sale.")}
+      </>),
+    },
+    name: "Refund · Square POS",
+    job: "The refund line that becomes a positive inventory adjustment in MGR",
+    reads: "sync_pos_sales [design; refund lines included]",
+    writes: "— [Square owns the refund]",
+    states: [["previewed", "MGR shows a positive adjustment, not a negative sale"], ["partial refund", "only the refunded units credit back"], ["unmapped", "same block as the sale it reverses", 1], ["same list", "a refund is a row in Transactions like any payment"]],
+    spec: "The reconcile list includes refund lines and previews the inventory credit as a positive adjustment. Drawing it as a negative sale would invite a signed-quantity bug of exactly the kind the movement vocabulary exists to prevent. A refund is not a separate surface in Square — it is another row in the same Transactions list, opening the same panel, which is why MGR ingests both through one call rather than two.",
+    body: (<>
+      {sqTxnHead()}
+      {X.day("Tuesday, September 1, 2026", "$1,564.63")}
+      {X.txns([["CASH", "10:32 pm", "Hazy IPA (Full Pour) × 2", "$16.96", "Taproom"], ["VISA", "10:51 pm", "Refund · Pils (Crowler)", "−$12.72", "Taproom", 1], ["VISA", "9:16 pm", "Pils (Full Pour) × 3", "$26.67", "Warehouse"], ["AMEX", "8:52 pm", "Stout (Half Pour)", "$7.62", "Warehouse"]])}
+    </>),
+  },
+  {
+    step: 7, slice: 7, group: "POS", venue: { name: "Square" },
+    name: "Item library · ownership boundary",
+    job: "Which rows MGR maintains, and which it must never touch",
+    reads: "—",
+    writes: "— [mapping is written in MGR, not here]",
+    states: [["MGR-owned", "published, updated and retired by MGR"], ["taproom-owned", "left alone; sales still ingest if mapped"], ["unmapped taproom item", "reconcile disabled for that item only", 1], ["renamed in Square", "id holds; ownership survives"], ["ownership is invisible here", "Square has no owner column — MGR infers it from the stored item id", 1]],
+    spec: "Drawn to fix a boundary before publishing can cross it: a taproom rings food, merch and guest taps MGR knows nothing about. MGR maintains only the rows it published and leaves every other one alone — retire must never walk the whole catalog. Items predating the integration are adopted by mapping once, then maintained like the rest. The shading here is ours, not Square's: the real library has no ownership column, so MGR can only tell its rows apart by holding the item id.",
+    body: (<>
+      {sqItemFilters()}
+      {X.items(SQ_ITEM_COLS, [[1, "Hazy IPA", "On-Prem Draft", "Taproom", "ea", "Available", "$6.00 - $9.00/ea", "mgr"], [1, "Hazy IPA To Go", "Off-Prem Package", "2 locations", "ea", "Available", "$6.50 - $24.00/ea", "mgr"], [1, "Pils", "On-Prem Draft", "Taproom", "ea", "Available", "$6.00 - $9.00/ea", "mgr"], [0, "Pretzel", "Events etc.", "Warehouse", "ea", "Available", "$7.00/ea", ""], [0, "Guest cider", "", "Taproom", "ea", "Available", "Variable", ""], [0, "Logo tee", "", "2 locations", "ea", "Available", "$25.00/ea", ""]])}
+      {X.note("Shaded rows carry an item id MGR wrote. Everything else is the taproom’s and is never renamed, hidden or deleted by MGR.")}
+    </>),
+  },
+  {
+    step: 7, slice: 7, group: "POS", venue: { name: "Square" },
+    name: "Item published by MGR · and its variations",
+    job: "A brand becomes a Square item, its formats become variations — and price lives on the format",
+    reads: "get_taproom_sellable [design]",
+    writes: "publish_pos_item [design; upsert by MGR key, writes back skus.square_item_id + variation ids]",
+    states: [["created", "item id and variation ids stored on the SKU"], ["variation added", "a new serving is a new variation, not a new item", 1], ["renamed in MGR", "same item updated, ids hold"], ["collision", "existing Square item adopted, never duplicated", 1], ["tax assignment", "merged, never replaced — a republish must not retax", 1], ["off-premise twin", "its own item and id; same source SKU"]],
+    spec: "DISCOVERED from a live library, and it breaks a modelling assumption: a Square item does not carry a price. Variations do. That is why the Price column reads as a range — it is the spread across a pint, a crowler and whatever else hangs off the item, and Variable means the spread is open. So the item id alone is not sufficient: sales report at the variation level, and the per-sale conversion MGR depletes against belongs to the variation, not the item. Publishing must store an id per serving, or a pint and a crowler collapse into one number.",
+    body: (<>
+      {sqItemFilters()}
+      {X.items(SQ_ITEM_COLS, [[1, "Hazy IPA", "On-Prem Draft", "Taproom", "ea", "Available", "$6.00 - $9.00/ea", "mgr"], [0, "• Pint · SQ-8841-V1", "", "", "ea", "Available", "$7.00/ea", "mgr var"], [0, "• Crowler · SQ-8841-V2", "", "", "ea", "Available", "$9.00/ea", "mgr var"], [0, "• Taster · SQ-8841-V3", "", "", "ea", "Available", "$6.00/ea", "mgr var"], [1, "Hazy IPA To Go", "Off-Prem Package", "2 locations", "ea", "Available", "$6.50 - $24.00/ea", "mgr"]])}
+      {X.note("One item, three variations, three ids. The conversion differs per variation — a pint is 0.0078125 bbl, a crowler is not.")}
+    </>),
+  },
+  {
+    step: 7, slice: 7, group: "POS", venue: { name: "Square" },
+    name: "Item retired · hidden, not deleted",
+    job: "Beer that stopped being available leaves the register without losing its history",
+    reads: "get_taproom_sellable [design]",
+    writes: "retire_pos_item [design; clears present_at_location_ids — never a delete]",
+    states: [["retired", "off the register; past sales still resolve"], ["back in stock", "re-published under the same id, no churn"], ["sold while retiring", "the sale still ingests; the id never went away"], ["delete", "not offered — it would break prior orders", 1], ["variation retired", "one serving can go while the item stays", 1]],
+    spec: "The removal half of maintenance, and deliberately not a delete. Deleting a catalog object breaks the orders that reference it and destroys the id the sales ingest maps through, so last month stops reconciling. Clearing the location takes it off the register just as completely, which is why Locations reads none and Status flips rather than the row disappearing. Because price and serving live on variations, retirement has two levels: a blown keg retires the pint while the crowler keeps selling.",
+    body: (<>
+      {sqItemFilters("All")}
+      {X.items(SQ_ITEM_COLS, [[1, "Stout", "On-Prem Draft", "— none", "ea", "Not available", "$6.00 - $9.00/ea", "mgr"], [0, "• Pint · SQ-8790-V1", "", "— none", "ea", "Not available", "$7.00/ea", "mgr var"], [0, "• Crowler · SQ-8790-V2", "", "Taproom", "ea", "Available", "$9.00/ea", "mgr var"], [1, "Hazy IPA", "On-Prem Draft", "Taproom", "ea", "Available", "$6.00 - $9.00/ea", "mgr"]])}
+      {X.note("Catalog object kept, prior orders still resolve, reconciliation unaffected. The crowler is still pouring while the pint is retired.")}
+    </>),
+  },
+
+  // Slack — the three places MGR appears inside Slack. Chat slice, step 8.
+  {
+    step: 8, slice: "chat", group: "Chat", surface: "entry", venue: { name: "Slack", shell: "home", ctx: "App Home" },
+    name: "Slack App Home · link identity",
+    job: "Link one Slack user to one current brewery staff membership",
+    reads: "get_chat_link_status [design]",
+    writes: "issue_chat_link_proof · consume_chat_link_proof [design; single-use, authenticated MGR completion]",
+    states: [["expired", "link expired · create a new one", 1], ["not staff", "customer and removed membership rejected", 1], ["linked", "show personal queue"]],
+    spec: "Slack profile email and display name are never identity. The deep link requires normal MGR authentication.",
+    body: (<>
+      {S.h("Your MGR work")}
+      {S.s("Link your account to see only work your current brewery role permits.")}
+      {S.acts([["Link MGR account", "pri"]])}
+      {S.ctx("No customer contacts, prices or notes are posted here.")}
+    </>),
+  },
+  {
+    step: 8, slice: "chat", group: "Chat", surface: "entry", venue: { name: "Slack", shell: "home", ctx: "App Home · Refresh" },
+    name: "Slack App Home · personal queue",
+    job: "Show the current role-filtered Today projection privately",
+    reads: "get_today [design; linked user + current membership] · get_chat_link_status",
+    writes: "—",
+    states: [["empty", "You’re caught up"], ["loading", "row-shaped skeletons"], ["stale", "refresh removes resolved work"], ["unlinked", "return to link screen", 1]],
+    spec: "Rows are rebuilt from owning MGR queries. App Home remains current during quiet hours and is optional for future providers.",
+    body: (<>
+      {S.h("Today · 4 waiting")}
+      {S.sa("*ORD-0231 · Review submitted order*\nrequested Thu · sales", "Open")}
+      {S.sa("*ORD-0235 · Pick due*\nships Fri · warehouse", "Open")}
+      {S.sa("*Route A · next stop*\nassigned to you · 9:30 AM", "Open")}
+      {S.sa("*FV2 · reading overdue*\nlast reading 26 h ago · brewer", "Open")}
+      {S.acts([["Open Today in MGR", "pri"]])}
+    </>),
+  },
+  {
+    step: 8, slice: "chat", group: "Chat", surface: "entry", venue: { name: "Slack", shell: "msg", ctx: "MGR", who: "Direct message", at: "8:43 AM" },
+    name: "Slack personal DM · state change",
+    job: "Notify once when linked work becomes assigned, due or overdue",
+    reads: "get_notification_occurrence [design] · owning Today query revalidation",
+    writes: "snooze_notification · set_notification_preference [integration state only]",
+    states: [["quiet hours", "queued until personal window opens"], ["resolved", "same message updates to Resolved"], ["retry", "same semantic delivery; no second message"], ["unauthorized", "suppress and unlink if membership ended", 1]],
+    spec: "The provider message is a projection. Deleting it does not change MGR. Deep links contain no trusted actor or tenant claims.",
+    body: (<>
+      {S.h("ORD-0235")}
+      {S.s("*Pick due*\nassigned to you")}
+      {S.ctx("Pick due · needs attention")}
+      {S.acts([["Open pick in MGR", "pri"], ["Snooze"], ["Mute picks"]])}
+    </>),
+  },
+  {
+    step: 8, slice: "chat", group: "Chat", surface: "entry", venue: { name: "Slack", shell: "msg", ctx: "# mgr-operations", who: "private · 6 members", at: "7:00 AM" },
+    name: "Slack team digest · private operations",
+    job: "Summarize unresolved work without leaking personal or customer detail",
+    reads: "get_chat_operations_digest [design; current unresolved counts]",
+    writes: "—",
+    states: [["morning", "one message for the local morning window"], ["midday", "the same window message updates"], ["channel invalid", "shared delivery disabled; personal delivery continues", 1]],
+    spec: "The destination must stay private, bot-member and non-external. Counts and safe operational labels only; details remain personal.",
+    body: (<>
+      {S.h("Morning operations · 6 waiting")}
+      {S.s("*Submitted orders:* 2 · need sales review\n*Picks due:* 2 · warehouse queue\n*Assigned deliveries:* 1 · next stops ready\n*Fermentation readings:* 1 · overdue")}
+      {S.ctx("Details and actions are available in each person’s private MGR App Home.")}
+      {S.acts([["Open my MGR work", "pri"]])}
+    </>),
+  },
+  {
+    step: 8, slice: "chat", group: "Chat", surface: "sheet", venue: { name: "Slack", shell: "modal", ctx: "Notification preferences", foot: [["Save preferences", "pri"]] },
+    name: "Slack notification preferences",
+    job: "Let a linked user control delivery without changing MGR due state",
+    reads: "get_notification_preferences [design]",
+    writes: "set_notification_preference · snooze_notification [design; integration state only]",
+    states: [["saved", "update App Home and close"], ["invalid hours", "name the correction", 1], ["unsupported provider", "open authenticated MGR fallback", 1]],
+    spec: "Snooze and mute affect personal delivery only. App Home and MGR Today still show current work.",
+    body: (<>
+      {S.f([["Submitted orders", "On"], ["Picks due", "On"], ["Assigned deliveries", "On"], ["Fermentation readings", "On"], ["Quiet hours", "9:00 PM–6:00 AM"]])}
+      {S.ctx("Snooze and mute affect personal delivery only. MGR still shows the work as due.")}
+    </>),
+  },
+  {
+    step: 8, slice: "chat", group: "Chat", surface: "sheet", venue: { name: "Slack", shell: "modal", ctx: "Record fermentation reading", foot: [["Open in MGR"]] },
+    name: "Slack form · fermentation reading",
+    job: "Preview the first eligible operational modal without enabling it early",
+    reads: "get_fermentation_reading_preview [gated; current occupancy/version]",
+    writes: "record_fermentation_reading [gated; request replay + version + correction contract]",
+    states: [["not yet eligible", "open the MGR reading flow instead", 1], ["stale", "occupancy changed · refresh", 1], ["response lost", "the same request returns the first result"]],
+    spec: "Future phase only. Personal destination, canonical preview and explicit Record reading confirmation. A new reading corrects history; prior rows never edit.",
+    body: (<>
+      {S.ctx("Future phase only")}
+      {S.f([["Vessel", "FV2 · Hazy IPA"], ["Last reading", "26 h ago"], ["Reading", "4.2 °Plato · 68 °F"]])}
+      {S.dis("Record reading", "Open this reading in MGR for now")}
+    </>),
+  },
+  {
+    step: 8, slice: "chat", group: "Chat", surface: "sheet", venue: { name: "Slack", shell: "modal", ctx: "Review order", foot: [["Open order in MGR"]] },
+    name: "Slack form · clean order confirmation",
+    job: "Show why warning-free order confirmation remains conditional",
+    reads: "get_order_confirmation_preview [gated; canonical current preview]",
+    writes: "confirm_order [gated; atomic allocation + request replay + expected version]",
+    states: [["warning", "ATP, registration, price or source warning routes to MGR", 1], ["stale", "order changed · refresh", 1], ["eligible", "only a warning-free preview can confirm"]],
+    spec: "Future phase only. This fixture intentionally carries an ATP warning, so Slack cannot confirm it.",
+    body: (<>
+      {S.ctx("Future phase only")}
+      {S.f([["Order", "ORD-0231 · 3 lines · requested Thu · Submitted"], ["Warning", "Hazy IPA · 16 oz case is 8 units short. Review allocations and restock in MGR."]])}
+      {S.dis("Confirm order", "This order needs the full MGR review")}
     </>),
   },
 ];

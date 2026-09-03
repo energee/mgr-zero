@@ -2,9 +2,13 @@
 // Renders components/mgr/screens.tsx (the source of truth) as prose, so the
 // published page cannot drift from the gallery and nothing here is maintained
 // by hand. The frames themselves stay at /design, which is dev-only; this page
-// carries what a reader needs without a running server: what each screen is
-// for, what it reads and writes, and which states it must handle.
+// carries what a reader needs without a running server: the drawing itself,
+// what each screen is for, what it reads and writes, and which states it must
+// handle. Bodies render inline rather than in the gallery's iframes — the
+// gallery embeds the real shell to prove viewport behavior, which a docs page
+// neither needs nor can have in production, where /design 404s.
 import { SCREENS, type Screen } from "@/components/mgr/screens";
+import { VenueFrame } from "@/components/mgr/venue";
 
 const area = (s: Screen) => s.group ?? (s.portal ? "Portal" : (s.tab ?? "Other"));
 
@@ -45,6 +49,11 @@ export function ScreenIndex() {
                 </ul>
               )}
               {s.spec && <p className="mt-3 text-sm">{s.spec}</p>}
+              <div className="mt-4 overflow-x-auto rounded-md border bg-fd-background p-3">
+                {s.venue
+                  ? <VenueFrame venue={s.venue}>{s.body}</VenueFrame>
+                  : <div className="mx-auto flex max-w-sm flex-col gap-2">{s.hd}{s.body}</div>}
+              </div>
             </article>
           ))}
         </section>
