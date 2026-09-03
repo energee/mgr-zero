@@ -2936,7 +2936,7 @@ export const SCREENS: Screen[] = [
       {E.fld("Format price", "$7.00")}
       {E.fld("Price override", "$6.50")}
       {E.btn("Reset to format price", "g")}
-      {E.fld("Availability", "sells while taproom stock remains")}
+      {E.row("Sell while taproom stock remains", "retires itself when it runs out", E.sw(true, "Sell while taproom stock remains"))}
       {E.info("Leave the override empty and this row follows the format. A price set here applies to this location only.")}
       {E.btn("Save override")}
     </>),
