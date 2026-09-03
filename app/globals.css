@@ -31,6 +31,7 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -53,7 +54,9 @@
 }
 
 /* Product tokens — Linear-quiet neutrals with one violet accent, teal reserved
-   for irreversible actions (append-only, external, sign-out), amber for
+   for irreversible actions that still write a record (append-only, external,
+   sign-out), red for the ones that take something away (end a membership,
+   cancel an order, break an integration, discard queued work), amber for
    attention. All pairs pass WCAG AA. */
 :root {
   --background: #FAFAF7;
@@ -71,6 +74,7 @@
   --accent: #EBEBE4;
   --accent-foreground: #1E1F1A;
   --destructive: #C24A45;
+  --destructive-foreground: #FFFFFF; /* 4.82:1 */
   --border: #E3E3DC;
   --input: #E3E3DC;
   --ring: #6F4FD6;
@@ -88,7 +92,9 @@
   --chart-3: #E0891F;
   --chart-4: #D4457A;
   --chart-5: #7D7E74;
-  --warning: #FDECD2;
+  /* A warm card, not a filled panel: lifts 1.06 off the page, matching the
+     1.05 that bg-card gives a plain Alert. Amber ink on it is 6.22:1. */
+  --warning: #FDF3DC;
   --warning-foreground: #8A4A00;
   --irreversible: #0F6B78;
   --irreversible-foreground: #FFFFFF;
@@ -110,6 +116,8 @@
   --accent: #32332D;
   --accent-foreground: #EDEDE6;
   --destructive: #E06661;
+  /* Ink, not white: white on this red is 3.36:1 and fails AA. Dark is 4.93:1. */
+  --destructive-foreground: #1E1F1A;
   --border: #33342E;
   --input: #33342E;
   --ring: #AE81FF;
@@ -126,7 +134,8 @@
   --chart-3: #FD971F;
   --chart-4: #F26A9A;
   --chart-5: #8B8C82;
-  --warning: #3B2A12;
+  /* Lifts 1.09 off the page against bg-card's 1.08; amber ink on it is 8.83:1. */
+  --warning: #26231A;
   --warning-foreground: #FDB44B;
   --irreversible: #0F6B78;
   --irreversible-foreground: #E6FAFC;
@@ -164,7 +173,8 @@
     min-width: 48px;
   }
   [data-slot="button"][data-variant="default"],
-  [data-slot="button"][data-variant="irreversible"] {
+  [data-slot="button"][data-variant="irreversible"],
+  [data-slot="button"][data-variant="destructive"] {
     min-height: 56px;
   }
 }

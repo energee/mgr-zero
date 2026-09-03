@@ -5,6 +5,7 @@
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
+import { formatVolume } from "@/lib/volume";
 import "@/lib/commands/all";
 import { ProductForm } from "./product-form";
 import { SkuForm } from "./sku-form";
@@ -44,7 +45,7 @@ export default async function CatalogPage() {
                     <tr className="text-left text-muted-foreground">
                       <th className="py-1 font-normal">SKU</th>
                       <th className="py-1 font-normal">Package</th>
-                      <th className="py-1 font-normal">BBL / unit</th>
+                      <th className="py-1 font-normal">Volume</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -52,7 +53,7 @@ export default async function CatalogPage() {
                       <tr key={sku.id} className="border-t">
                         <td className="py-1">{sku.name}</td>
                         <td className="py-1">{sku.package_type}</td>
-                        <td className="py-1">{sku.bbl_per_unit}</td>
+                        <td className="py-1">{formatVolume(sku.bbl_per_unit)}</td>
                       </tr>
                     ))}
                   </tbody>

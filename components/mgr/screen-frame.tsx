@@ -8,6 +8,7 @@ import { AppShell, PortalShell } from "@/components/mgr/app-shell";
 import { CommandForm } from "@/components/mgr/command-form";
 import { E, splitPinned } from "@/components/mgr/e";
 import { MeSheet } from "@/components/mgr/me-sheet";
+import { MARIA } from "@/components/mgr/user-avatar";
 import type { Screen } from "@/components/mgr/screens";
 import { VenueFrame } from "@/components/mgr/venue";
 import "@/components/mgr/venue.css";
@@ -45,9 +46,11 @@ export function ScreenFrame({ screen: s }: { screen: Screen }) {
     ) : (
       s.body
     );
-  const me = <MeSheet fields={[["Brewery", "Demo Brewing"], ["Role", "admin"]]} />;
+  // The staff user is the fixture face (Maria); the portal user is the customer's
+  // buyer, a different person, so that header keeps the icon.
+  const me = <MeSheet avatar={{ src: MARIA, name: "Maria Alvarez" }} fields={[["Brewery", "Demo Brewing"], ["Role", "admin"]]} />;
   return s.portal ? (
-    <PortalShell brand="Demo Brewing wholesale" headerRight={me} composer={E.comp(true)} active={s.portal}>
+    <PortalShell brand="Demo Brewing wholesale" headerRight={<MeSheet fields={[["Account", "Ridgeline Tap Room"]]} />} composer={E.comp(true)} active={s.portal}>
       {body}
     </PortalShell>
   ) : (

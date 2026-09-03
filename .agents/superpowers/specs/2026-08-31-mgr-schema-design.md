@@ -693,10 +693,17 @@ formats (
 
 New enum: `format_basis as enum ('packaged','poured')`.
 
-`skus` gains `format_id` and stops carrying its own `bbl_per_unit`; the trigger
+`skus` becomes the unique `(brand_id, format_id)` association. Its display name derives
+from the brand and format; it retains its stable ID, active state, UPC and provider
+mappings, but stops carrying its own package facts or `bbl_per_unit`. The trigger
 `enforce_bbl_integrity()` reads it through the format. **Safe for history** —
 `inventory_movements.bbl` is frozen at write time, so correcting a format later
 cannot move past movements.
+
+Atomic-format volume entry accepts a per-instance subset of `oz`, `gal`, `bbl`, `mL`
+and `L`; the command converts the entered value to canonical bbl before writing.
+Composed-format volume is derived and read-only. There is no SKU volume override: a
+different physical volume is a different format.
 
 ### 16.2a `format_components` — composition (decided 2026-09-02)
 
@@ -738,9 +745,8 @@ cans in inventory is YAGNI; packaging runs already produce composed formats with
 their own BOM. Partial material recovery (a tray damaged on break) is likewise
 left out; the cycle count handles it.
 
-**OPEN:** is a format fully sized (`case · 24×16oz`) or shape-only (`case`)?
-Fully sized keeps `bbl_per_unit` on the format and is the assumption above; it
-means more format rows and no "case" abstraction above them.
+**DECIDED:** a format is fully sized (`case · 24×16oz`), not shape-only (`case`).
+Different volume or packaging means a different format.
 
 ### 16.3 `sale_channels` — see `docs/plans/sale-channels-customizable.md` (#42, merged)
 
@@ -1000,12 +1006,10 @@ format_bom (format_id, material_id, qty_per_unit,   -- was sku_bom (sku_id, ...)
 New enum: `format_material_disposition as enum ('consumed','return_to_stock')` —
 what happens to the material when a composed unit is broken open (§16.10).
 
-**Consequence to watch:** brand-specific print — labels, printed cans, keg
-collars — is materially brand-dependent, and a format-level BOM cannot express
-it. Two ways that resolves, and this does not need deciding now: treat print as
-a generic material line on the format and let cost roll up at the material
-level, or add a narrow per-SKU override table later for print only. The second
-is a strictly additive change, so starting format-only is safe.
+**Brand-specific print:** labels, printed cans and keg collars that change the BOM
+make a distinct format. There is no SKU BOM override. This creates more format rows,
+but keeps one format equal to one physical package definition and prevents hidden
+exceptions from changing material consumption.
 
 `packaging_run_consumptions` already records what was actually consumed, so
 history is unaffected either way — the BOM is a plan, not a fact of record.
@@ -1052,7 +1056,7 @@ role-agnostic — `staff_all for all using (is_staff_of(brewery_id))` — so a
 `taproom` user added today inherits full staff read *and write* on customers,
 price lists, invoices, production and compliance. Narrowing that surface needs
 per-role policies which are **not designed yet** and are not in §16.17's build
-order. Do not ship the role without them; see §16.16 item 4.
+order. Do not ship the role without them; see §16.16 item 3.
 
 **Tapping a keg that is not in taproom stock is allowed.** The interval is
 flagged `not_in_inventory`. No special ledger rule is needed — tapping posts
@@ -1189,16 +1193,14 @@ to the read side instead of a CHECK (§16.11).
 
 Still open:
 
-1. Formats fully sized, or shape-only? (§16.2) — note §16.2a makes this narrower:
-   only *atomic* formats carry a size at all.
-2. Tiers priced by format with SKU override, or the reverse? (§16.4)
-3. Does a poured format bind to one packaged format, or to a brand? Binding to a
+1. Tiers priced by format with SKU override, or the reverse? (§16.4)
+2. Does a poured format bind to one packaged format, or to a brand? Binding to a
    format makes bin-derived availability exact. (§16.2)
-4. What RLS does `taproom` get? The role itself is decided (§16.13), but §0's
+3. What RLS does `taproom` get? The role itself is decided (§16.13), but §0's
    `P-staff` is role-agnostic, so adding the enum value grants full staff
    read/write. The per-role policies that make the surface narrow are undesigned
    and unscheduled — this blocks shipping the role. (§16.13)
-5. Quarters or eighths for fill — and do you weigh kegs? Tare weights are known
+4. Quarters or eighths for fill — and do you weigh kegs? Tare weights are known
    per keg size, so weighing turns an estimate into a measurement. (§16.8)
 
 ### 16.17 Build order when this is migrated
@@ -1206,7 +1208,7 @@ Still open:
 `brands` rename → `formats` + `skus.format_id` + `format_bom` → `bins` → `sale_channels`
 (per #42's plan, plus tax treatment — needs movement tests green) → price tiers → `pos_menus` →
 `keg_taps` → `repack` → invoice drift. The `taproom` role ships only once its
-per-role RLS policies exist (§16.16 item 4) — it is not a step in this order
+per-role RLS policies exist (§16.16 item 3) — it is not a step in this order
 until they are designed.
 
 `AGENTS.md` authorises editing the baseline in place, so this lands as one

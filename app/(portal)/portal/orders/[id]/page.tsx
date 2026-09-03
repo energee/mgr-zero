@@ -4,6 +4,7 @@
 // edits after confirmation, so they're framed from the customer's point of
 // view ("The brewery adjusted this order") rather than reusing the staff
 // wording in app/(app)/orders/[id]/page.tsx.
+import { DirectionIcon } from "@/components/mgr/icon";
 import { getActiveCustomer } from "@/lib/portal";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
@@ -58,7 +59,7 @@ function EventLine({ event, skuNames }: { event: OrderEvent; skuNames: Map<strin
       <li>
         {time} — The brewery adjusted this order
         <div className="text-muted-foreground">
-          {before} → {after}
+          {before} <DirectionIcon /> {after}
           {reason ? ` (${reason})` : ""}
         </div>
       </li>
