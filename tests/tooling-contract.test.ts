@@ -47,6 +47,10 @@ describe("production tooling contract", () => {
       { cwd: root, encoding: "utf8" }
     );
 
+    // git grep exits 1 when it finds nothing; anything else (or a spawn failure)
+    // would leave stdout empty and pass the assertion without checking anything.
+    expect(result.error).toBeUndefined();
+    expect([0, 1]).toContain(result.status);
     expect(result.stdout).toBe("");
   });
 

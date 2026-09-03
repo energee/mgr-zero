@@ -40,6 +40,18 @@ describe("customer guides (MDX)", () => {
       expect(portal).toContain(`[#${section}]`);
     }
   });
+
+  it("points every in-page link at an anchor the guide actually declares", () => {
+    const broken = GUIDES.flatMap((guide) => {
+      const mdx = read(`content/docs/${guide}.mdx`);
+      // Headings declare their anchor inline as `## Title [#slug]`.
+      const declared = new Set([...mdx.matchAll(/\[#([a-z0-9-]+)\]/g)].map((m) => m[1]));
+      return [...mdx.matchAll(/\]\(#([a-z0-9-]+)\)/g)]
+        .filter((m) => !declared.has(m[1]))
+        .map((m) => `${guide}.mdx -> #${m[1]}`);
+    });
+    expect(broken).toEqual([]);
+  });
 });
 
 describe("guide URLs", () => {
