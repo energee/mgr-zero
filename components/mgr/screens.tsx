@@ -173,9 +173,10 @@ export const SCREENS: Screen[] = [
   {
     step: 1, slice: "all", group: "Global", surface: "sheet", name: "Search", job: "Search every permitted entity kind",
     reads: "search_entities [design]", writes: "none",
-    states: [["empty", "No matches · change the term"], ["permission", "Results honor row access"]],
+    states: [["empty", "No matches · change the term"], ["loading", "row-shaped skeletons"], ["offline", "cached matches only", 1], ["permission", "Results honor row access"]],
     body: (<>
-      {E.inp("Search SKU, customer, order, lot, vessel or material")}
+      {E.inp("Search")}
+      {E.chips(["all", "SKU", "order", "lot"], 0)}
       {E.nav("Hazy IPA · ½ bbl", "SKU · ATP 11", "", BeerIcon)}
       {E.nav("ORD-0231 · Ridgeline", "order · 4 × Hazy", "", Package01Icon)}
       {E.nav("L-240831-HZ", "lot · packaged 8/31", "", TaskDone01Icon)}
@@ -233,6 +234,65 @@ export const SCREENS: Screen[] = [
       {E.sp()}
     </>),
   },
+  {
+    step: 2, slice: 1, group: "Entry", surface: "entry", name: "No membership",
+    job: "Signed in, but this account is not on any brewery or customer",
+    reads: "none", writes: "none",
+    states: [["no brewery", "ask an admin for an invite"], ["no customer", "the brewery invites portal buyers"]],
+    spec: "After sign-in with no brewery and no customer account. The queue is empty because nothing was writable.",
+    hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
+    body: (<>
+      {E.sp()}
+      {E.ttl("No brewery yet")}
+      {E.note("This login is not on a brewery or a customer account.")}
+      {E.info("Ask an admin to send an invite.")}
+      {E.btn("Sign out", "g")}
+      {E.sp()}
+    </>),
+  },
+  {
+    step: 2, slice: 1, group: "Entry", surface: "entry", name: "Expired invite",
+    job: "The invite link is no longer valid",
+    reads: "none", writes: "none",
+    states: [["expired", "ask for a new invite"], ["wrong audience", "a customer link used on staff, or the reverse", 1], ["already a member", "sign in instead"]],
+    spec: "Plan §5b. A used or timed-out token never opens Accept invite.",
+    hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
+    body: (<>
+      {E.sp()}
+      {E.ttl("Invite expired")}
+      {E.note("This invite is no longer valid.")}
+      {E.info("Ask an admin to send a new one.")}
+      {E.btn("Back to sign in")}
+      {E.sp()}
+    </>),
+  },
+  {
+    step: 2, slice: 1, group: "Entry", surface: "entry", name: "Expired reset",
+    job: "The password reset link is no longer valid",
+    reads: "none", writes: "none",
+    states: [["expired", "request a new reset link"]],
+    spec: "A timed-out recovery token never opens Set new password.",
+    hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
+    body: (<>
+      {E.sp()}
+      {E.ttl("Reset link expired")}
+      {E.note("This reset link is no longer valid.")}
+      {E.btn("Request a new link")}
+      {E.sp()}
+    </>),
+  },
+  {
+    step: 4, slice: 1, group: "Global", surface: "sheet", name: "Session expired",
+    job: "Sign in again; queued writes stay in the outbox",
+    reads: "local_outbox [client state]", writes: "none",
+    states: [["queue kept", "3 writes waiting"], ["signed in", "Retry 1 waiting on the outbox"]],
+    spec: "Mid-write expiry does not drop the outbox. Sign in, then Offline outbox still has the queued envelopes.",
+    body: (<>
+      {E.note("Your session ended. The 3 queued writes are still here.")}
+      {E.row("Record movement · Hazy", "waiting", "queued", "", WifiDisconnected01Icon)}
+      {E.btn("Sign in to retry")}
+    </>),
+  },
   // steps 2–8
   {
     step: 2,
@@ -252,7 +312,7 @@ export const SCREENS: Screen[] = [
       {E.inp("password")}
       {E.btn("Sign in")}
       {E.btn("Email me a link", "g")}
-      {E.row("Forgot password?")}
+      {E.act("Forgot password?")}
       {E.sp()}
     </>),
   },
@@ -266,12 +326,13 @@ export const SCREENS: Screen[] = [
     reads: "supabase_auth_get_session [platform]",
     writes: "supabase_auth_update_user [platform; membership already exists]",
     states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
-    spec: "Staff lands on Today; a customer lands on portal Order. The token decides; the person never chooses a shell.",
+    spec: "Staff lands on Today; a customer lands on portal Order. The token decides; the person never chooses a shell. Name is collected here. Expired, wrong-audience and already-a-member are their own landings.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
     body: (<>
       {E.sp()}
       {E.ttl("Join Demo Brewing")}
       {E.row("Role", "", "warehouse")}
+      {E.inp("Your name")}
       {E.inp("Choose a password")}
       {E.btn("Join Demo Brewing")}
       {E.sp()}
@@ -286,14 +347,13 @@ export const SCREENS: Screen[] = [
     job: "Recover access without account enumeration",
     reads: "none",
     writes: "supabase_auth_reset_password_for_email [platform]",
-    states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
+    states: [["sent", "Check your email"], ["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["error", "Did not load · Retry", 1]],
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
     body: (<>
       {E.sp()}
       {E.ttl("Reset password")}
       {E.inp("email")}
       {E.btn("Send reset link")}
-      {E.info("Sent state: Check your email.")}
       {E.sp()}
     </>),
   },
@@ -422,7 +482,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.ttl("New brewery")}
       {E.inp("Brewery name")}
-      {E.inp("Timezone")}
+      {E.nav("Timezone", "America/New_York")}
       {E.inp("TTB registry number · optional")}
       {E.btn("Create brewery")}
     </>),
@@ -579,6 +639,25 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Today",
     group: "Global",
+    name: "Composer question",
+    job: "One question, chips, no Commit until the SKU is chosen",
+    reads: "preview_command [design; internal query, not an AI tool]",
+    writes: "none",
+    states: [["ambiguous", "choice chips · no Commit"], ["resolved", "opens Composer proposal"]],
+    spec: "Named in Composer proposal states and never drawn until now. “Blew a half of Hazy” must pick the package before a Commit exists.",
+    body: (<>
+      {E.hd("Composer", "question")}
+      {E.row("“Blew a half of Hazy at the taproom”")}
+      {E.ttl("Which half?")}
+      {E.chips(["½ bbl keg", "half the remaining ⅙"], -1)}
+      {E.info("The verb stays off until this is answered.")}
+    </>),
+  },
+  {
+    step: 4,
+    slice: 1,
+    tab: "Today",
+    group: "Global",
     name: "Composer answer",
     job: "Questions use named registered queries",
     reads: "get_atp · get_shortfalls [design]",
@@ -608,7 +687,7 @@ export const SCREENS: Screen[] = [
       {E.row("Record fermentation reading · FV3", "response lost", E.act("Check"), "", WifiDisconnected01Icon)}
       {E.row("Record cellar transfer · FV2", "validation failed", E.act("Fix"), "w", WifiDisconnected01Icon)}
       {E.btn("Retry 1 waiting")}
-      {E.note("Discarding deletes these 3 unsent writes.")}
+      {E.note("Discard asks you to confirm. These 3 unsent writes are deleted.")}
       {E.btn("Discard 3 queued writes", "irr")}
     </>),
   },
@@ -1546,9 +1625,12 @@ export const SCREENS: Screen[] = [
     states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
     body: (<>
       {E.back("Search", "L-240831-HZ")}
-      {E.row("Hazy IPA · 16 oz case", "RUN-0028 · packaged 8/31", "118")}
+      {E.row("Hazy IPA · 16 oz case", "RUN-0028 · packaged 8/31", "118 cases")}
       {E.tape([["−40 · ORD-0225 · Ridgeline", "8/27"], ["−24 · ORD-0229 · Teresa’s", "8/29"], ["−6 · taproom transfer", "8/30"], ["−2 · sample", "8/30"]])}
       {E.nav("Materials in", "2-row L-0821 · Citra L-0790")}
+      {E.ttl("Recall contacts")}
+      {E.row("Ridgeline Tap Room", "Dana · 610-555-0140")}
+      {E.row("Teresa’s", "Teresa · 215-555-0199")}
       {E.btn("Print trace", "g")}
     </>),
   },
