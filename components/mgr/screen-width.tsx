@@ -13,6 +13,11 @@ import { ThemeToggle } from "@/components/mgr/theme-toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 type Mode = "phone" | "desk";
+
+function syncFrames() {
+  const dark = document.documentElement.classList.contains("dark");
+  for (const f of document.querySelectorAll("iframe")) f.contentDocument?.documentElement.classList.toggle("dark", dark);
+}
 const WidthContext = createContext<Mode>("phone");
 
 /** One frame, embedded at a real viewport width — see app/(frames)/screens/frame. */
@@ -24,7 +29,7 @@ export function ScreenEmbed({ index, title }: { index: number; title: string }) 
   // the column is wide enough to clear the breakpoint.
   return (
     <iframe
-      src={`/screens/frame?s=${index}`}
+      src={`/screens/frame/${index}`}
       title={`${title} · ${mode}`}
       height={780}
       loading="lazy"
@@ -40,7 +45,7 @@ export function ScreenEmbed({ index, title }: { index: number; title: string }) 
 export function ScreenWidth({ children, deskOnly = false }: { children: React.ReactNode; deskOnly?: boolean }) {
   const [mode, setMode] = useState<Mode>(deskOnly ? "desk" : "phone");
   return (
-    <div className="flex flex-col gap-8" data-screen-width={mode}>
+    <div className="flex flex-col gap-8">
       <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 bg-fd-background/95 py-2 backdrop-blur">
         {!deskOnly && (
           <ToggleGroup type="single" variant="outline" size="sm" value={mode} onValueChange={(v) => v && setMode(v as Mode)}>
@@ -48,7 +53,11 @@ export function ScreenWidth({ children, deskOnly = false }: { children: React.Re
             <ToggleGroupItem value="desk">Desktop</ToggleGroupItem>
           </ToggleGroup>
         )}
-        <div className="w-40"><ThemeToggle /></div>
+        {/* Each frame is its own document, so the toggle's class change does not
+            reach them. They are same-origin, so copy the choice across after it
+            lands; a frame that has not loaded yet reads localStorage in its own
+            boot script and comes up correct on its own. */}
+        <div className="w-40" onClick={() => queueMicrotask(syncFrames)}><ThemeToggle /></div>
       </div>
       <WidthContext.Provider value={mode}>{children}</WidthContext.Provider>
     </div>

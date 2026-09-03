@@ -32,5 +32,5 @@ export async function proxy(req: NextRequest) {
 // from /public doesn't need one, and neither do the public customer guides at /docs
 // (the chooser itself included) or the search endpoint that backs their ⌘K dialog.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|docs(?:/|$)|api/search|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|txt|html)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|docs(?:/|$)|screens/frame/|api/search|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|txt|html)$).*)"],
 };

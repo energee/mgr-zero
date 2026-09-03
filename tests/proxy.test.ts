@@ -44,6 +44,8 @@ describe("Supabase proxy refresh", () => {
     expect(matches("/docs")).toBe(false);
     expect(matches("/docs/staff-guide")).toBe(false);
     expect(matches("/api/search")).toBe(false);
+    // The screen frames the docs embed are public like the docs themselves.
+    expect(matches("/screens/frame/0")).toBe(false);
     expect(matches("/inventory")).toBe(true);
   });
 

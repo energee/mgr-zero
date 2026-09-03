@@ -30,26 +30,19 @@ type BtnBase = "p" | "g" | "irr";
 type BtnKind = BtnBase | `${BtnBase} disabled`;
 
 export const E = {
-  /** `hd("Back · Work", "Pick")` draws a back link to Work above the title
-   * Pick: an arrow says "back" faster than the word, and the destination is
-   * the only text a reader needs. Any other `t` is the title itself. */
-  hd: (t: React.ReactNode, r: React.ReactNode = "") => {
-    const back = typeof t === "string" && t.startsWith("Back · ") ? t.slice(7) : null;
-    if (back !== null) {
-      return (
-        <div className="flex flex-col gap-1">
-          <a href="#" className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Icon icon={ArrowLeft01Icon} />{back}</a>
-          <h1 className="text-lg font-semibold">{r}</h1>
-        </div>
-      );
-    }
-    return (
-      <div className="flex items-baseline justify-between gap-2">
-        <h1 className="text-lg font-semibold">{t}</h1>
-        <span className="text-xs text-muted-foreground">{r}</span>
-      </div>
-    );
-  },
+  hd: (t: React.ReactNode, r: React.ReactNode = "") => (
+    <div className="flex items-baseline justify-between gap-2">
+      <h1 className="text-lg font-semibold">{t}</h1>
+      <span className="text-xs text-muted-foreground">{r}</span>
+    </div>
+  ),
+  /** A detail screen's header: an arrow link to the parent area above the title. */
+  back: (to: React.ReactNode, title: React.ReactNode) => (
+    <div className="flex flex-col gap-1">
+      <a href="#" className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Icon icon={ArrowLeft01Icon} />{to}</a>
+      <h1 className="text-lg font-semibold">{title}</h1>
+    </div>
+  ),
   ttl: (t: React.ReactNode) => <h2 className="mt-2 text-sm font-medium text-muted-foreground">{t}</h2>,
   /** `icon` says which kind of thing a row is — only in lists that mix kinds
    * (Today, search); a homogeneous list gets none (docs/plans/hugeicons.md §3). */

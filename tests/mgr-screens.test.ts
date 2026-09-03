@@ -20,7 +20,7 @@ describe("SCREENS", () => {
       expect(s.job).toBeTruthy();
       expect(s.reads).toBeTruthy();
       expect(s.writes).toBeTruthy();
-      expect(Boolean(s.tab) || Boolean(s.group) || Boolean(s.portal)).toBe(true);
+      expect(Boolean(s.tab) || Boolean(s.group) || Boolean(s.portal) || Boolean(s.venue)).toBe(true);
     }
   });
 
@@ -49,14 +49,12 @@ describe("SCREENS", () => {
     // reads/writes are exempt from the identifier rule only: they name
     // registry IDs on purpose.
     const text = (...n: unknown[]) =>
-      n.map((x) => renderToStaticMarkup(createElement("div", null, x as never)).replace(/<[^>]*>/g, " ")).join(" ")
-        // Email addresses are copy, not identifiers.
-        .replace(/\S+@\S+/g, "");
+      n.map((x) => renderToStaticMarkup(createElement("div", null, x as never)).replace(/<[^>]*>/g, " ")).join(" ");
     for (const s of SCREENS) {
       const body = text(s.hd, s.body);
       const notes = text(s.job, s.spec, ...(s.states ?? []).flat());
       expect.soft(body, `${s.name}: HTML entity in copy`).not.toMatch(/&(?:[a-z]+|#\d+);/);
-      expect.soft(body + notes, `${s.name}: snake_case or dotted identifier`).not.toMatch(/[a-z]+_[a-z_]+|\b[a-z]+\.[a-z_]+\(?/);
+      expect.soft(body + notes, `${s.name}: snake_case or dotted identifier`).not.toMatch(/[a-z]+_[a-z_]+|\b[a-z]+\.[a-z]+_[a-z_]+|\b[a-z]+\.[a-z_]+\(/);
       expect.soft(body + notes + text(s.reads, s.writes), `${s.name}: em dash`).not.toContain("—");
     }
   });

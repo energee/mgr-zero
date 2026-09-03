@@ -6,7 +6,8 @@
 import {
   ArrowDataTransferHorizontalIcon, Factory01Icon, Layers01Icon, Store01Icon,
 } from "@hugeicons/core-free-icons";
-import type { IconSvgElement } from "@/components/mgr/icon";
+import { createElement } from "react";
+import { Icon, type IconSvgElement } from "@/components/mgr/icon";
 
 export const DOC_ICONS = {
   staff: Factory01Icon,
@@ -16,3 +17,7 @@ export const DOC_ICONS = {
 } as const satisfies Record<string, IconSvgElement>;
 
 export type DocIconName = keyof typeof DOC_ICONS;
+
+/** The `<Icon />` for a docs icon name, or nothing for an unknown one. */
+export const docIcon = (name: string | undefined, size?: 16 | 20) =>
+  name && name in DOC_ICONS ? createElement(Icon, { icon: DOC_ICONS[name as DocIconName], size }) : undefined;

@@ -9,7 +9,6 @@
 // record vocabulary for the two record venues. Screen bodies use these instead
 // of `E`; nothing here is MGR's own UI.
 import type { ReactNode } from "react";
-import "./venue.css";
 
 /** Wireframe markup shorthand: *bold* and newlines, the only two the fixtures use. */
 const mrk = (t: string): ReactNode =>
@@ -55,6 +54,8 @@ export const S = {
 };
 
 /** Shared primitives for the record-shaped venues (QuickBooks, Square). */
+const SQ_ITEM_COLS = ["Item", "Reporting category", "Locations", "Sold by", "Status", "Price"];
+
 export const X = {
   h: (t: ReactNode, sub: ReactNode = "") => (
     <div className="x-h">{t}{sub ? <span>{sub}</span> : null}</div>
@@ -108,13 +109,13 @@ export const X = {
       {actions.map(([t, k], i) => <span key={i} className={`sd-b ${k ?? ""}`}>{t}{k ? "" : " ▾"}</span>)}
     </div>
   ),
-  items: (hd: string[], rows: [0 | 1, string, string, string, string, string, string, string][]) => (
+  items: (rows: [0 | 1, string, string, string, string, string, string, string][]) => (
     <div className="x-scroll">
       <table className="sd-t">
         <tbody>
           <tr>
             <th className="sd-x" /><th className="sd-ck"><b /></th><th className="sd-im" />
-            {hd.map((h) => <th key={h}>{h}</th>)}
+            {SQ_ITEM_COLS.map((h) => <th key={h}>{h}</th>)}
             <th className="sd-plus">+</th>
           </tr>
           {rows.map(([exp, name, cat, loc, sold, st, price, own], i) => (
@@ -167,7 +168,6 @@ export const X = {
 };
 
 // Chrome shared across Square frames, named so it cannot drift frame to frame.
-export const SQ_ITEM_COLS = ["Item", "Reporting category", "Locations", "Sold by", "Status", "Price"];
 export const sqItemFilters = (st = "Active") =>
   X.filt(["Category", ["Locations", "All"], ["Status", st], "≡ All filters"], [["Actions"], ["Create item", "p"]]);
 const sqTxnFilters = () =>
@@ -183,14 +183,14 @@ export const sqTxnHead = () => (
 
 // One nav vocabulary for both record venues: [label, depth, expandable]. The two
 // products draw the same hierarchical list; only the chrome around it differs.
-type NavItem = [string, number, (0 | 1)?];
-const navList = (items: NavItem[], active: string) =>
+type VenueNavItem = [string, number, (0 | 1)?];
+const navList = (items: VenueNavItem[], active: string) =>
   items.map(([t, d, x], i) => (
     <div key={i} className={`nv l${d}${t === active ? " on" : ""}`}>{t}{x ? <i>▾</i> : null}</div>
   ));
 
 const QBO_RAIL: [string, string][] = [["Create", "+"], ["Bookmarks", "☆"], ["Home", "⌂"], ["Reports", "⎁"], ["All apps", "▦"]];
-const QBO_APPS: NavItem[] = [["Accounting", 1, 1], ["Expenses & Bills", 1, 1], ["Sales & Get Paid", 1, 1], ["Overview", 2],
+const QBO_APPS: VenueNavItem[] = [["Accounting", 1, 1], ["Expenses & Bills", 1, 1], ["Sales & Get Paid", 1, 1], ["Overview", 2],
   ["Sales transactions", 2], ["Invoices", 2], ["Payment links", 2], ["Recurring payments", 2], ["Sales orders", 2],
   ["Sales channels", 2], ["QuickBooks payouts", 2], ["Products & services", 2], ["Customer Hub", 1, 1],
   ["Inventory", 1, 1], ["Sales Tax", 1, 1]];
@@ -241,11 +241,11 @@ function QboFrame({ title, actions, children }: { title: string; actions?: strin
   );
 }
 
-const SQ_PAY_NAV: NavItem[] = [["Home", 1], ["Items & services", 1, 1], ["Payments & invoices", 1, 1], ["Transactions", 2],
+const SQ_PAY_NAV: VenueNavItem[] = [["Home", 1], ["Items & services", 1, 1], ["Payments & invoices", 1, 1], ["Transactions", 2],
   ["Orders", 2, 1], ["Invoices", 2, 1], ["Bill Pay", 2, 1], ["Virtual Terminal", 2, 1], ["Payment links", 2, 1],
   ["Subscriptions", 2], ["Disputes", 2], ["Risk Manager", 2, 1], ["Customers", 1], ["Reports", 1], ["Staff", 1],
   ["Banking", 1], ["What’s new", 1], ["Settings", 1], ["Add more", 1], ["Channels", 1], ["Online ordering", 1], ["Square Online", 1]];
-const SQ_NAV: NavItem[] = [["Items & services", 1, 1], ["Items", 2, 1], ["Item library", 3], ["Channel listings", 3],
+const SQ_NAV: VenueNavItem[] = [["Items & services", 1, 1], ["Items", 2, 1], ["Item library", 3], ["Channel listings", 3],
   ["Service library", 3], ["Image library", 3], ["Resources", 3], ["Modifiers", 3], ["Categories", 3], ["Discounts", 3],
   ["Options", 3], ["Units", 3], ["Custom attributes", 3], ["Settings", 3, 1], ["Menus", 2], ["Inventory management", 2, 1],
   ["Order guide", 2], ["Gift Cards", 2, 1], ["Subscription plans", 2], ["Payments & invoices", 1, 1], ["Customers", 1],

@@ -10,26 +10,13 @@ import { E } from "@/components/mgr/e";
 import { MeSheet } from "@/components/mgr/me-sheet";
 import type { Screen } from "@/components/mgr/screens";
 import { VenueFrame } from "@/components/mgr/venue";
+import "@/components/mgr/venue.css";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/mgr/icon";
 import { Search01Icon } from "@hugeicons/core-free-icons";
 import { navFor, STAFF_NAV } from "@/lib/mgr/nav";
 
-export function ScreenFrame({ screen: s, embedded }: { screen: Screen; embedded?: boolean }) {
-  // A sheet is a real Dialog: it portals to <body> and covers the viewport, which
-  // is right in the gallery (one frame per iframe) and wrong on a page holding a
-  // hundred frames, where every open dialog would stack over the document. When
-  // embedded, the sheet is drawn as the titled card it presents as, in place.
-  if (embedded && s.surface === "sheet") {
-    return (
-      <div className="bg-background p-4">
-        <div className="mx-auto flex w-full max-w-md flex-col gap-2 rounded-xl border bg-card p-4">
-          <div className="text-sm font-medium">{s.name}</div>
-          {s.body}
-        </div>
-      </div>
-    );
-  }
+export function ScreenFrame({ screen: s }: { screen: Screen }) {
   // A venue frame is not an MGR screen: it brings its own product's chrome and
   // never the app shell (components/mgr/venue.tsx).
   if (s.venue) {

@@ -10,6 +10,9 @@ import { cn } from "@/lib/utils";
 
 export type { IconSvgElement };
 
-export function Icon({ icon, size = 16, className }: { icon: IconSvgElement; size?: 16 | 20 | 24; className?: string }) {
-  return <HugeiconsIcon icon={icon} size={size} strokeWidth={1.5} aria-hidden className={cn("shrink-0", className)} />;
+export function Icon({ icon, size = 16, className }: { icon: IconSvgElement; size?: 16 | 20; className?: string }) {
+  // Hugeicons puts its stroke on every element after the element's own
+  // attributes, so a filled mark (brand-icons.tsx) gets no stroke at all.
+  const filled = icon[0]?.[1].fill !== undefined;
+  return <HugeiconsIcon icon={icon} size={size} strokeWidth={filled ? undefined : 1.5} aria-hidden className={cn("shrink-0", className)} />;
 }
