@@ -13,9 +13,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Empty, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
+import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupTextarea } from "@/components/ui/input-group";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -140,8 +142,27 @@ export const E = {
       <span className="text-right">{v}</span>
     </div>
   ),
-  /** A filled value the user can change. */
-  pick: (k: React.ReactNode, v: React.ReactNode) => E.fld(k, <>{v}<span className="ml-2 text-muted-foreground">›</span></>),
+  /** A typed value. type is the native input type: text, email, date, number. */
+  edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[]) => {
+    const listId = suggestions?.length ? `${label.replace(/\s+/g, "-").toLowerCase()}-list` : undefined;
+    return (
+      <Field orientation="horizontal">
+        <FieldLabel>{label}</FieldLabel>
+        <Input type={type} defaultValue={value} aria-label={label} list={listId} />
+        {listId ? <datalist id={listId}>{suggestions!.map((o) => <option key={o} value={o} />)}</datalist> : null}
+      </Field>
+    );
+  },
+  /** A picked value: a Select for short fixed lists; long lists (SKU, customer) keep opening Entity picker. */
+  pick: (label: string, value: string, options: string[]) => (
+    <Field orientation="horizontal">
+      <FieldLabel>{label}</FieldLabel>
+      <Select defaultValue={value}>
+        <SelectTrigger aria-label={label}><SelectValue /></SelectTrigger>
+        <SelectContent>{options.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+      </Select>
+    </Field>
+  ),
   // The amber box and the quiet box differed only by tint; the glyph is the
   // second channel, so the difference survives a dim screen or a colorblind eye.
   note: (t: React.ReactNode) => (
