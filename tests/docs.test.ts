@@ -1,29 +1,51 @@
-// tests/docs.test.ts — the customer guides are body fragments under public/docs
-// rendered by app/(docs)/docs/[guide]; lib/docs.ts is the loader.
+// tests/docs.test.ts — the customer guides are Fumadocs MDX pages in
+// content/docs (lib/source.ts, app/(docs)/docs). Guards the shape the
+// documentation maintainer must keep, and the legacy URL redirects.
+import { readFileSync, readdirSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { GUIDES, readGuide } from "@/lib/docs";
 
-describe("guide loader", () => {
-  it("lists the three guides and reads each as a styled fragment", () => {
-    expect(GUIDES).toEqual(["user-guide", "staff-guide", "portal-guide"]);
+const root = resolve(__dirname, "..");
+const read = (path: string) => readFileSync(resolve(root, path), "utf8");
+const GUIDES = ["index", "staff-guide", "portal-guide"];
+
+describe("customer guides (MDX)", () => {
+  it("has exactly the three guides, each with frontmatter and no code", () => {
+    const files = readdirSync(resolve(root, "content/docs")).filter((f) => f.endsWith(".mdx")).sort();
+    expect(files).toEqual(GUIDES.map((g) => `${g}.mdx`).sort());
     for (const guide of GUIDES) {
-      const { html, title } = readGuide(guide);
-      expect(title).toBeTruthy();
-      expect(html).toContain("<main");
-      // Fragments inherit app/globals.css; a self-styled page would fork the design.
-      expect(html).not.toMatch(/<(?:!doctype|html|head|body|style|script|link)\b/i);
+      const mdx = read(`content/docs/${guide}.mdx`);
+      expect(mdx).toMatch(/^---\ntitle: .+\ndescription: .+\n---\n/);
+      // Prose only: no imports/exports, scripts, raw HTML or styling hooks.
+      expect(mdx).not.toMatch(/^(import|export)\s/m);
+      expect(mdx).not.toMatch(/<(?:script|style|link|iframe|img|div|span|p|a)\b/i);
+      expect(mdx).not.toMatch(/\b(?:RLS|schema|command ID|slice \d|implementation gate)\b/i);
     }
+    expect(JSON.parse(read("content/docs/meta.json")).pages).toEqual(GUIDES);
   });
 
-  it("rejects an unknown guide", () => {
-    expect(() => readGuide("nope")).toThrow();
+  it("keeps the master chooser linked to both audiences and the audiences apart", () => {
+    const master = read("content/docs/index.mdx");
+    const staff = read("content/docs/staff-guide.mdx");
+    const portal = read("content/docs/portal-guide.mdx");
+    expect(master).toContain('href="/docs/staff-guide"');
+    expect(master).toContain('href="/docs/portal-guide"');
+    expect(staff).not.toContain("[#customer-portal]");
+    expect(portal).not.toContain("Record Movement");
+    for (const section of ["sign-in", "roles", "navigation", "catalog", "inventory", "customers", "pricing", "orders", "pick-sheet", "invoices", "replenishment", "team", "slack", "errors-corrections", "unavailable"]) {
+      expect(staff).toContain(`[#${section}]`);
+    }
+    for (const section of ["access", "shop", "statuses", "orders", "invoices", "help"]) {
+      expect(portal).toContain(`[#${section}]`);
+    }
   });
 });
 
 describe("guide URLs", () => {
-  it("redirects the raw public/docs .html path to the styled route", async () => {
+  it("redirects the pre-Fumadocs paths to the docs routes", async () => {
     const config = (await import("@/next.config")).default;
     const redirects = await config.redirects!();
+    expect(redirects).toContainEqual({ source: "/docs/user-guide.html", destination: "/docs", permanent: true });
     expect(redirects).toContainEqual({ source: "/docs/:guide.html", destination: "/docs/:guide", permanent: true });
   });
 });
