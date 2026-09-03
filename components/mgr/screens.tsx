@@ -434,8 +434,10 @@ export const SCREENS: Screen[] = [
       {E.num("1", "keg · amounts are entered positive")}
       {E.info("Preview: −1 keg · 0.50 bbl · festival removal · PA")}
       {E.chips(["keg", "case", "bbl"])}
-      {E.pad()}
-      {E.btn("Record movement", "irr")}
+      {E.pin(<>
+        {E.pad()}
+        {E.btn("Record movement", "irr")}
+      </>)}
     </>),
   },
   {
@@ -1126,16 +1128,18 @@ export const SCREENS: Screen[] = [
     job: "Record any values taken; SG converts to stored Plato",
     reads: "get_cellar_map [design; occupancy + last reading]",
     writes: "record_fermentation_reading [design; mutable reading row]",
-    spec: "One reading may contain gravity, temperature, pH, or any combination. Blank values remain absent; prior values are reference only, never silently copied.",
+    spec: "One reading may contain gravity, temperature, pH, or any combination. Blank values remain absent; prior values are reference only, never silently copied. The pad fills the highlighted field; Gravity is the default.",
     body: (<>
-      {E.fld("Gravity", "1.019 SG · prior 1.021")}
+      {E.row("Gravity", "1.019 SG · prior 1.021", "on pad", "w")}
       {E.fld("Temperature", "68.2 °F · prior 67.8")}
       {E.fld("pH", "blank · prior 4.21")}
       {E.chips(["SG", "°P"], 0)}
       {E.info("Enter only values taken now; blanks are not rewritten.")}
       {E.inp("Note · optional")}
-      {E.pad()}
-      {E.btn("Record reading")}
+      {E.pin(<>
+        {E.pad()}
+        {E.btn("Record reading")}
+      </>)}
     </>),
   },
   {
@@ -1156,8 +1160,10 @@ export const SCREENS: Screen[] = [
       {E.num("18", "lb · lot L-0790 · 262 on hand")}
       {E.chips(["lb", "oz", "kg"])}
       {E.info("Preview: −18 lb Citra · L-0790 · consumption · dry hop · B-0416")}
-      {E.pad()}
-      {E.btn("Record addition", "irr")}
+      {E.pin(<>
+        {E.pad()}
+        {E.btn("Record addition", "irr")}
+      </>)}
     </>),
   },
   {
@@ -1216,9 +1222,10 @@ export const SCREENS: Screen[] = [
       {E.info("Blend preview: BT1 7.0 + 3.0 = 10.0 bbl (full) · stays B-0412 · Pils. FV1 keeps 9.8 bbl.")}
       {E.fld("Remainder in FV1", "9.8 bbl")}
       {E.chips(["Leave in FV1", "Record as loss"], 0)}
-      {E.tape([["3.0 bbl FV1 → BT1 · blend", "loss 0.0 bbl"]])}
-      {E.pad()}
-      {E.btn("Record transfer", "irr")}
+      {E.pin(<>
+        {E.pad()}
+        {E.btn("Record transfer", "irr")}
+      </>)}
     </>),
   },
   {
@@ -1347,8 +1354,10 @@ export const SCREENS: Screen[] = [
       {E.fld("Material", "Cans · 16 oz")}
       {E.num("3,050", "system 3,100 · variance −50 each")}
       {E.chips(["each", "case"])}
-      {E.pad()}
-      {E.btn("Record count", "irr")}
+      {E.pin(<>
+        {E.pad()}
+        {E.btn("Record count", "irr")}
+      </>)}
     </>),
   },
   {
@@ -1899,11 +1908,13 @@ export const SCREENS: Screen[] = [
       {E.fld("Break", "Hazy IPA · case · 24×16oz")}
       {E.fld("Location · bin", "Warehouse · Walk-in")}
       {E.num("1", "case · amounts are entered positive")}
-      {E.pad()}
       {E.tape([["−1 case · repack", "0.09677419 bbl"], ["+6 four-pack · repack", "derived from the case total"], ["Case tray ×1", "return to stock"], ["PakTech ×6", "consumed"]])}
       {E.info("Preview: conserves 0.09677419 bbl · same location and bin · not a TTB removal")}
       {E.fld("Damaged on break", "0 four-pack · records as loss")}
-      {E.gated("Record repack", "isn’t available yet: breaking a case has nowhere correct to land")}
+      {E.pin(<>
+        {E.pad()}
+        {E.gated("Record repack", "isn’t available yet: breaking a case has nowhere correct to land")}
+      </>)}
     </>),
   },
   // ---- The external venues. Not MGR screens: what QuickBooks, Square and Slack

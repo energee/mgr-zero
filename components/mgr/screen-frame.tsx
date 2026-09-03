@@ -6,7 +6,7 @@
 // like two different things in the two places it is shown.
 import { AppShell, PortalShell } from "@/components/mgr/app-shell";
 import { CommandForm } from "@/components/mgr/command-form";
-import { E } from "@/components/mgr/e";
+import { E, splitPinned } from "@/components/mgr/e";
 import { MeSheet } from "@/components/mgr/me-sheet";
 import type { Screen } from "@/components/mgr/screens";
 import { VenueFrame } from "@/components/mgr/venue";
@@ -36,10 +36,11 @@ export function ScreenFrame({ screen: s }: { screen: Screen }) {
       </div>
     );
   }
+  const { rest, pin } = splitPinned(s.body);
   const body =
     s.surface === "sheet" ? (
-      <CommandForm open title={s.name}>
-        <div className="flex flex-col gap-2">{s.body}</div>
+      <CommandForm open title={s.name} footer={pin.length ? pin : undefined}>
+        <div className="flex flex-col gap-2">{rest}</div>
       </CommandForm>
     ) : (
       s.body

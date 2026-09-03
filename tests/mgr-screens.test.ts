@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
-import { E } from "../components/mgr/e";
+import { E, splitPinned } from "../components/mgr/e";
 
 describe("SCREENS", () => {
   it("ports the step-1 frames with names, jobs and IO", () => {
@@ -61,6 +61,31 @@ describe("SCREENS", () => {
 
   it("gives sheets no separate header; their title is the record name", () => {
     expect(SCREENS.filter((s) => s.surface === "sheet" && s.hd)).toEqual([]);
+  });
+
+  it("pins the keypad commit so the pad does not push it off the phone", () => {
+    // Issue 73: on a 390×900 sheet the pad sat above the verb, so Record
+    // landed below the fold. The pin is a data-pin footer; CommandForm lifts
+    // it out of the scroll region.
+    const named = [
+      "Record movement", "Fermentation reading", "Cellar addition",
+      "Cellar transfer", "Cycle count", "Repack",
+    ];
+    for (const name of named) {
+      const s = SCREENS.find((x) => x.name === name);
+      expect(s, name).toBeTruthy();
+      const html = renderToStaticMarkup(createElement("div", null, s!.body));
+      const pinAt = html.indexOf("data-pin");
+      expect(pinAt, name).toBeGreaterThan(-1);
+      expect(html.indexOf("⌫", pinAt), `${name}: pad inside pin`).toBeGreaterThan(pinAt);
+      expect(splitPinned(s!.body).pin.length, `${name}: pin lifted`).toBe(1);
+    }
+    const reading = SCREENS.find((x) => x.name === "Fermentation reading")!;
+    const readingHtml = renderToStaticMarkup(createElement("div", null, reading.body));
+    expect(readingHtml).toMatch(/Gravity[\s\S]*on pad/);
+    const transfer = SCREENS.find((x) => x.name === "Cellar transfer")!;
+    const transferHtml = renderToStaticMarkup(createElement("div", null, transfer.body));
+    expect(transferHtml).not.toMatch(/border-l-2/);
   });
 
   it("gives the named screens one filled primary each", () => {
