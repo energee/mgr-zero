@@ -37,8 +37,8 @@ describe("SCREENS", () => {
     // A tripwire against a frame dropped by hand from a 1700-line array — the
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands; .agents/PROGRESS.md narrates
-    // what the number is made of — 109 MGR frames plus the 17 venue frames.
-    expect(SCREENS).toHaveLength(126);
+    // what the number is made of — 121 MGR frames plus the 17 venue frames.
+    expect(SCREENS).toHaveLength(138);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
 
@@ -71,6 +71,27 @@ describe("SCREENS", () => {
       const html = renderToStaticMarkup(createElement("div", null, screen.body));
       expect.soft(html.match(/<button/g)?.length ?? 0, `${name}: actionable tiles`).toBeGreaterThanOrEqual(count);
     }
+  });
+
+  it("draws the missing More and Settings destinations", () => {
+    const expected = new Map<string, Screen["surface"]>([
+      ["Customer detail", undefined], ["Ship-to form", "sheet"], ["Compliance months", undefined],
+      ["Locations", undefined], ["Location detail", undefined], ["Materials", undefined],
+      ["Material", "sheet"], ["Vendor", "sheet"], ["Contracts", undefined],
+      ["Contract", "sheet"], ["SKU list", undefined], ["Team member", "sheet"],
+    ]);
+    for (const [name, surface] of expected) {
+      const screen = SCREENS.find((s) => s.name === name);
+      expect.soft(screen, name).toBeTruthy();
+      expect.soft(screen?.surface, name).toBe(surface);
+    }
+    const bodyText = (name: string) => renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === name)!.body));
+    for (const destination of ["Vendors", "Sale channels", "Formats", "Price tiers", "Bins", "Chat"]) {
+      expect.soft(bodyText("More"), destination).toContain(destination);
+    }
+    expect(bodyText("Team")).not.toContain("Remove selected member");
+    expect(bodyText("Import")).toContain("Settings");
+    expect(bodyText("Planning")).toContain("More");
   });
 
   it("resolves detail back links to a screen or shell destination", () => {
@@ -144,6 +165,17 @@ describe("SCREENS", () => {
       expect.soft(body + notes, `${s.name}: snake_case or dotted identifier`).not.toMatch(/[a-z]+_[a-z_]+|\b[a-z]+\.[a-z]+_[a-z_]+|\b[a-z]+\.[a-z_]+\(/);
       expect.soft(body + notes + text(s.reads, s.writes), `${s.name}: em dash`).not.toContain("—");
     }
+  });
+
+  it("keeps phone tables contained and avoids duplicate page titles", () => {
+    const menu = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Menu")!.body));
+    const pos = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Point of sale")!.body));
+    const formats = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Formats")!.body));
+    expect(menu.match(/<h[12][^>]*>[^<]*(?:POS )?menu/gi)).toHaveLength(1);
+    expect(pos.match(/<h[12][^>]*>Point of sale/gi)).toHaveLength(1);
+    expect(menu + formats).toContain("min-w-max");
+    const slack = SCREENS.find((s) => s.name === "Notification preferences")!;
+    expect(renderToStaticMarkup(VenueFrame({ venue: slack.venue!, children: slack.body }))).toContain('class="slk modal"');
   });
 
   it("gives sheets no separate header; their title is the record name", () => {

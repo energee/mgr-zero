@@ -290,7 +290,7 @@ function SlackFrame({ shell, ctx, who, at, foot, children }: {
   }
   if (shell === "modal") {
     return (
-      <div className="slk">
+      <div className="slk modal">
         <div className="slk-modtop"><span>{ctx}</span><i>✕</i></div>
         <div className="slk-body">{children}</div>
         <div className="slk-modft">{(foot ?? []).map(([l, k], i) => <span key={i} className={`sk-b ${k ?? ""}`}>{l}</span>)}</div>

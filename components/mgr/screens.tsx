@@ -181,11 +181,19 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("More")}
       {E.nav("Invoices", "QuickBooks Online mapping and push", "", QuickBooksMark)}
-      {E.nav("Catalog · price lists")}
-      {E.nav("Customers · ship-tos")}
-      {E.nav("Recipes · compliance")}
+      {E.nav("Catalog", "brands and SKUs")}
+      {E.nav("Price tiers", "customer price lists")}
+      {E.nav("Customers", "accounts and ship-tos")}
+      {E.nav("Recipes", "formulas and versions")}
+      {E.nav("Compliance months", "reports and filing status")}
+      {E.nav("Vendors", "suppliers")}
+      {E.nav("Sale channels", "tax treatment")}
+      {E.nav("Formats", "package composition")}
       {E.nav("Planning")}
-      {E.nav("Settings", "team · locations · import · integrations")}
+      {E.nav("Settings", "brewery and integrations")}
+      {E.nav("Locations", "warehouses, taprooms and bins")}
+      {E.nav("Bins", "physical subdivisions by location")}
+      {E.nav("Chat", "Slack and notifications")}
     </>),
   },
   {
@@ -226,12 +234,47 @@ export const SCREENS: Screen[] = [
       {E.fld("PA license", "G-1234")}
       {E.fld("Deployment", "dedicated · read-only")}
       {E.btn("Save brewery")}
-      {E.fld("Selected location", "Warehouse · warehouse")}
-      {E.btns([["Add location", "g"], ["Save location", "p"]])}
+      {E.nav("Locations", "Warehouse · Taproom")}
       {E.nav("Team", "3 members · 1 pending invite")}
       {E.nav("Accounting", "QuickBooks · connection and push defaults", "", QuickBooksMark)}
       {E.nav("Point of sale", "Square · catalog and sales", "", SquareMark)}
       {E.nav("Import", "CSV wizard")}
+    </>),
+  },
+  {
+    step: 8,
+    slice: "all",
+    tab: "More",
+    name: "Locations",
+    job: "List brewery locations and create the next one",
+    reads: "list_locations",
+    writes: "create_location [design]",
+    states: [["active", "inventory and work may use it"], ["empty", "Add location is the only action"]],
+    spec: "Settings links here instead of editing whichever location happened to be selected.",
+    body: (<>
+      {E.back("Settings", "Locations")}
+      {E.btn("Add location")}
+      {E.row("Warehouse", "warehouse · 186 inventory units", E.act("Edit"))}
+      {E.row("Taproom", "taproom · 11 taps · 2 bins", E.act("Edit"))}
+    </>),
+  },
+  {
+    step: 8,
+    slice: "all",
+    tab: "More",
+    name: "Location detail",
+    job: "Edit one location and open its physical bins",
+    reads: "list_locations",
+    writes: "update_location [design]",
+    states: [["warehouse", "fulfillment source"], ["taproom", "POS and taps may map here"], ["in use", "type changes preserve history"]],
+    spec: "Location facts stay separate from bins, which are their own list.",
+    body: (<>
+      {E.back("Locations", "Taproom")}
+      {E.inp("Location name · Taproom")}
+      {E.pick("Type", "Taproom")}
+      {E.fld("Timezone", "Brewery default · America/New_York")}
+      {E.nav("Location bins", "Default · Walk-in · To-go fridge")}
+      {E.btn("Save location")}
     </>),
   },
   {
@@ -344,17 +387,31 @@ export const SCREENS: Screen[] = [
     spec: "From Settings. Role chips change the member's role in one write; Remove is copper and ends the membership (Auth user untouched; re-invite is the compensation). The invite stays disabled with the same human copy as first run until its gate closes.",
     body: (<>
       {E.back("Settings", "Team")}
-      {E.row("Maria Alvarez", "maria@ · warehouse", E.act("Change role"))}
-      {E.row("Dave Chen", "dave@ · brewer", E.act("Change role"))}
+      {E.nav("Maria Alvarez", "maria@ · warehouse")}
+      {E.nav("Dave Chen", "dave@ · brewer")}
       {E.row("Ted", "ted@ · admin", "you")}
       {E.row("sam@demobrewing.com", "invited Tue · pending", "", "w")}
-      {E.btn("Remove selected member", "irr")}
-      {E.ttl("Invite")}
-      {E.fld("Email · role", "name@brewery.com · sales")}
-      {E.chips(["admin", "sales", "warehouse", "brewer"], 1)}
-      {E.gated("taproom", "isn’t available yet; what a taproom lead may see is still being drawn")}
-      {E.note("Sending an invite emails the recipient and cannot be recalled.")}
-      {E.gated("Send staff invite", "isn’t available yet; invitations are being made retry-safe")}
+      {E.gated("Invite staff", "isn’t available yet; invitations are being made retry-safe")}
+    </>),
+  },
+  {
+    step: 2,
+    slice: 1,
+    tab: "More",
+    surface: "sheet",
+    name: "Team member",
+    job: "Change one member's role or remove that membership",
+    reads: "list_team_members",
+    writes: "update_staff_role · revoke_staff [design]",
+    states: [["member", "role can change"], ["last admin", "remove and role change refused", 1], ["self", "remove refused", 1]],
+    spec: "The destructive action belongs to the named member, so there is no ambiguous selected-member state.",
+    body: (<>
+      {E.ttl("Maria Alvarez")}
+      {E.fld("Email", "maria@demobrewing.com")}
+      {E.pick("Role", "Warehouse")}
+      {E.btn("Save role")}
+      {E.note("Removing Maria ends this brewery membership. Her sign-in account remains.")}
+      {E.btn("Remove Maria", "irr")}
     </>),
   },
   {
@@ -410,6 +467,7 @@ export const SCREENS: Screen[] = [
     states: [["all invalid", "Commit disabled · fix mapping", 1], ["mixed", "2 ready · 1 blocked"], ["rerun target", "After gate, same requestId returns result"], ["permission", "Import requires admin", 1]],
     spec: "Commit controls stay disabled until dependent rows are atomic and opening balances cannot duplicate on rerun. Ship colors: customer/catalog rows green; append-only opening balances copper.",
     body: (<>
+      {E.back("Settings", "Import")}
       {E.stp(["upload", "map", "preview", "commit"], 2)}
       {E.chips(["customers", "catalog", "opening balances"], 0)}
       {E.tbl(["row", "record", "match", "state"], [["1", "Ridgeline + Main", "new", "ready"], ["2", "Al’s Bar", "ship-to missing", <><span className="text-warning-foreground">blocked</span></>], ["3", "Teresa’s", "existing", "skip"]])}
@@ -874,17 +932,63 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("More", "Customers")}
       {E.inp("Search customers")}
-      {E.nav("Ridgeline Tap Room", "retailer · PA · 2 portal users")}
-      {E.nav("Al’s Bar", "retailer · OH · brewery remits", "w")}
+      {E.row("Ridgeline Tap Room", "retailer · PA · 2 portal users", E.act("Open"))}
+      {E.row("Al’s Bar", "retailer · OH · brewery remits", E.act("Open"), "w")}
       {E.chips(["distributor", "retailer", "brewery", "other"], 1)}
       {E.fld("License no. · terms", "PA R-55821 · net30")}
       {E.row("Price list", "", E.act("Wholesale"))}
       {E.btn("Save customer")}
-      {E.nav("Ship-tos", "Main · Dock")}
+      {E.row("Ship-tos", "Main · Dock", E.act("Add"))}
+      {E.row("Main", "114 Bridge St · Phoenixville, PA", E.act("Edit"))}
       {E.nav("Customer keg balance", "38 out · $1,140 deposits held")}
       {E.btn("Add ship-to", "g")}
       {E.note("Sending an invite emails the recipient and cannot be recalled.")}
       {E.btn("Invite portal user", "irr")}
+    </>),
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "More",
+    name: "Customer detail",
+    job: "Edit one customer and reach its ship-tos, prices, orders and keg balance",
+    reads: "get_customer [design]",
+    writes: "update_customer",
+    states: [["active", "may place orders"], ["inactive", "history remains"], ["license warning", "renewal needs review", 1]],
+    spec: "The list opens a named account; related operational records remain links rather than inline editors.",
+    body: (<>
+      {E.back("Customers", "Ridgeline Tap Room")}
+      {E.inp("Customer name · Ridgeline Tap Room")}
+      {E.pick("Type", "Retailer")}
+      {E.inp("License number · PA R-55821")}
+      {E.pick("Terms", "Net 30")}
+      {E.pick("Price list", "Wholesale · standard")}
+      {E.nav("Ship-tos", "Main · Dock")}
+      {E.nav("Customer keg balance", "38 out · $1,140 deposits held")}
+      {E.nav("Orders", "3 open · 42 total")}
+      {E.btn("Save customer")}
+    </>),
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "More",
+    surface: "sheet",
+    name: "Ship-to form",
+    job: "Create or edit one delivery address for a customer",
+    reads: "get_customer [design]",
+    writes: "create_ship_to · update_ship_to",
+    states: [["new", "address required"], ["existing", "orders keep their frozen destination"], ["default", "new orders select it first"]],
+    spec: "Editing an address never rewrites the destination recorded on an existing order.",
+    body: (<>
+      {E.ttl("Main ship-to")}
+      {E.inp("Label · Main")}
+      {E.inp("Address · 114 Bridge St")}
+      {E.inp("City · Phoenixville")}
+      {E.inp("State · PA")}
+      {E.inp("Postal code · 19460")}
+      {E.row("Default ship-to", "selected first on new orders", E.act("On"), "ok")}
+      {E.btn("Save ship-to")}
     </>),
   },
   {
@@ -1048,12 +1152,25 @@ export const SCREENS: Screen[] = [
       {E.fld("Style · ABV", "IPA · 6.8 %")}
       {E.chips(["beer"], 0)}
       {E.btn("Save brand")}
-      {E.ttl("SKU · ½ bbl keg")}
-      {E.fld("SKU name", "½ bbl keg")}
-      {E.chips(["keg", "can", "bottle"], 0)}
-      {E.fld("Units per case", "none · kegs are single units")}
-      {E.fld("bbl per unit", "1/2 · 0.50000000")}
-      {E.btns([["Add SKU", "g"], ["Save SKU", "p"]])}
+      {E.nav("SKU list", "3 active packages")}
+    </>),
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "More",
+    name: "SKU list",
+    job: "See every package sold under one brand and open its facts",
+    reads: "list_skus",
+    writes: "none [creation and editing happen on SKU detail]",
+    states: [["active", "available to price and sell"], ["inactive", "history remains", 1], ["empty", "Add SKU is the only action"]],
+    spec: "Product links here instead of showing an arbitrary one of three SKUs inline.",
+    body: (<>
+      {E.back("Product", "Hazy IPA · SKUs")}
+      {E.btn("Add SKU")}
+      {E.row("½ bbl keg", "0.50000000 bbl · active", E.act("Edit"))}
+      {E.row("⅙ bbl keg", "0.16666667 bbl · active", E.act("Edit"))}
+      {E.row("case · 24×16 oz", "0.09677419 bbl · active", E.act("Edit"))}
     </>),
   },
   {
@@ -1523,21 +1640,112 @@ export const SCREENS: Screen[] = [
     slice: 2,
     tab: "More",
     name: "Vendors",
-    job: "Manage materials, suppliers, contracts and a manual purchase draft",
-    reads: "list_materials · get_material_on_hand · list_vendors_and_contracts [design]",
-    writes: "create_material · update_material · upsert_vendor · upsert_material_contract · create_purchase_order [design; draft PO + lines uses one RPC]",
-    spec: "Draft only here; Send PO lives on the PO/receive frame, and there is no send wizard.",
+    job: "List suppliers and open one supplier's terms",
+    reads: "list_vendors_and_contracts [design]",
+    writes: "none [creation and editing happen on Vendor]",
+    states: [["active", "available for purchase orders"], ["contract", "committed quantity summarized"], ["empty", "Add vendor is the only action"]],
+    spec: "Materials, vendors and contracts are separate lists so each row has one predictable destination.",
     body: (<>
-      {E.back("More", "Materials + vendors")}
-      {E.fld("Material", "Citra · hop · lb")}
-      {E.btns([["Add material", "g"], ["Save material", "g"]])}
-      {E.row("Citra 2026 · YCH", "committed 400 lb", "262 received")}
-      {E.row("2-row 2026 · Country Malt", "committed 20,000 lb", "8,800 received")}
-      {E.fld("Vendor lead time", "10 days")}
+      {E.back("More", "Vendors")}
+      {E.btn("Add vendor")}
+      {E.row("YCH", "hops · 10-day lead · 1 active contract", E.act("Edit"))}
+      {E.row("Country Malt", "grain · 14-day lead · 1 active contract", E.act("Edit"))}
+      {E.row("CanSource", "packaging · 21-day lead", E.act("Edit"))}
+      {E.nav("Materials", "12 materials")}
+      {E.nav("Contracts", "2 active commitments")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 2,
+    tab: "More",
+    name: "Materials",
+    job: "List material definitions separately from on-hand lots",
+    reads: "list_materials",
+    writes: "none [creation and editing happen on Material]",
+    states: [["active", "available to recipes and purchase orders"], ["inactive", "history remains", 1], ["empty", "Add material is the only action"]],
+    spec: "This list owns material facts; Materials on hand remains the inventory view.",
+    body: (<>
+      {E.back("Vendors", "Materials")}
+      {E.btn("Add material")}
+      {E.row("Citra", "hop · lb · 262 lb on hand", E.act("Edit"))}
+      {E.row("2-row", "grain · lb · 8,800 lb on hand", E.act("Edit"))}
+      {E.row("Cans · 16 oz", "packaging · each · 3,100 on hand", E.act("Edit"))}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 2,
+    tab: "More",
+    surface: "sheet",
+    name: "Material",
+    job: "Create or edit one material definition",
+    reads: "list_materials",
+    writes: "create_material · update_material",
+    states: [["new", "name, kind and unit required"], ["in use", "unit change refused", 1]],
+    spec: "Inventory quantities and lots are not edited on the definition.",
+    body: (<>
+      {E.inp("Material name · Citra")}
+      {E.pick("Kind", "Hop")}
+      {E.pick("Unit", "lb")}
+      {E.row("Active", "available to recipes and purchase orders", E.act("On"), "ok")}
+      {E.btn("Save material")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 2,
+    tab: "More",
+    surface: "sheet",
+    name: "Vendor",
+    job: "Create or edit one supplier and its purchase terms",
+    reads: "list_vendors_and_contracts [design]",
+    writes: "upsert_vendor [design]",
+    states: [["new", "name required"], ["active", "available for purchase orders"]],
+    spec: "Contracts remain separate records because a vendor may supply many materials.",
+    body: (<>
+      {E.inp("Vendor name · YCH")}
+      {E.inp("Email · orders@ych.example")}
+      {E.inp("Lead time · 10 days")}
+      {E.pick("Terms", "Net 30")}
       {E.btn("Save vendor")}
-      {E.fld("Contract quantity", "400 lb")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 2,
+    tab: "More",
+    name: "Contracts",
+    job: "List material commitments and remaining quantities",
+    reads: "list_vendors_and_contracts [design]",
+    writes: "none [creation and editing happen on Contract]",
+    states: [["active", "remaining quantity shown"], ["fulfilled", "history remains"], ["empty", "Add contract is the only action"]],
+    spec: "Each commitment is one vendor and one material.",
+    body: (<>
+      {E.back("Vendors", "Contracts")}
+      {E.btn("Add contract")}
+      {E.row("YCH · Citra 2026", "400 lb committed · 138 lb remaining", E.act("Edit"))}
+      {E.row("Country Malt · 2-row 2026", "20,000 lb committed · 11,200 lb remaining", E.act("Edit"))}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 2,
+    tab: "More",
+    surface: "sheet",
+    name: "Contract",
+    job: "Create or edit one material purchasing commitment",
+    reads: "list_materials · list_vendors_and_contracts [design]",
+    writes: "upsert_material_contract [design]",
+    states: [["new", "vendor, material and quantity required"], ["received", "received quantity is read-only"]],
+    spec: "Receipts update progress; this sheet only owns the commitment.",
+    body: (<>
+      {E.pick("Vendor", "YCH")}
+      {E.pick("Material", "Citra 2026")}
+      {E.inp("Committed quantity · 400 lb")}
+      {E.fld("Received", "262 lb · read-only")}
+      {E.pick("Delivery window", "September 2026")}
       {E.btn("Save contract")}
-      {E.btn("Create draft purchase order", "g")}
     </>),
   },
   {
@@ -1588,13 +1796,32 @@ export const SCREENS: Screen[] = [
     step: 7,
     slice: 6,
     tab: "More",
+    name: "Compliance months",
+    job: "Choose a reporting month and see whether its snapshot was filed",
+    reads: "list_compliance_reports [design]",
+    writes: "none",
+    states: [["current", "ready for review"], ["filed", "immutable snapshot saved"], ["blocked", "report does not balance", 1]],
+    spec: "This is the shared destination for the registry back link and the report month picker.",
+    body: (<>
+      {E.back("More", "Compliance")}
+      {E.nav("September 2026", "current · ready to review", "w")}
+      {E.nav("August 2026", "filed 9/02/2026 · $1,508 excise", "ok")}
+      {E.nav("July 2026", "filed 8/04/2026 · $1,442 excise", "ok")}
+      {E.nav("Compliance registry", "brands, states and licenses")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 6,
+    tab: "More",
     name: "Monthly compliance",
     job: "Generate from ledgers, review, then record the external filing",
     reads: "generate_compliance_report · get_loss_review [design; SCHEMA-GATE for typed completion-loss identity]",
     writes: "file_compliance_report [design; immutable snapshot] · reattribute_loss [SCHEMA-GATE; requires typed origin/classification + atomic compensation]",
     spec: "Reattribution waits for schema that identifies completion rows and cellar removal class; correction must be atomic append-only compensation, never free-text note matching. The identity checks are v1 lessons drawn in user copy: balance per class, cellar as in-process, 0.00 never blank, no transmission.",
     body: (<>
-      {E.back("More", "August 2026")}
+      {E.back("Compliance months", "August 2026")}
+      {E.pick("Month", "August 2026")}
       {E.row("1 · Review auto-reconciled losses", "review isn’t available yet", "3", "w")}
       {E.row("2 · Review generated figures", "", E.act("Current"))}
       {E.tbl(["class", "begin", "+", "−", "end"], [["cellar · in-process", "120.40", "62.00", "58.10", "124.30"], ["kegs", "41.00", "30.50", "33.20", "38.30"], ["cans", "12.60", "18.00", "14.90", "15.70"], ["bottles", "0.00", "0.00", "0.00", "0.00"]])}
@@ -1615,7 +1842,7 @@ export const SCREENS: Screen[] = [
     writes: "upsert_brand_approval · upsert_state_registration · upsert_brewery_state_license [design]",
     spec: "Unregistered destination/brand combinations warn during order confirm and link here.",
     body: (<>
-      {E.back("Compliance", "Registry")}
+      {E.back("Compliance months", "Registry")}
       {E.chips(["brands", "states", "licenses"])}
       {E.row("Hazy IPA", "COLA approved · formula n/a", E.act("PA · OH"))}
       {E.row("Stout", "COLA pending", E.act("PA"), "w")}
@@ -1903,8 +2130,9 @@ export const SCREENS: Screen[] = [
     reads: "get_planning_shortfalls [design]",
     writes: "draft_purchase_order_from_requirements [design; one RPC: draft PO + lines]",
     body: (<>
+      {E.back("More", "Planning")}
       {E.tbl(["week", "demand", "supply", "gap"], [["9/7", "48 bbl", "40 bbl", <><span className="text-warning-foreground">−8</span></>], ["9/14", "52 bbl", "60 bbl", "+8"]])}
-      {E.row("Sept 12 packaging", "short 480 ends · lead 10 days", E.act("Draft PO"), "w")}
+      {E.row("Sept 12 packaging", "short 480 ends · lead 10 days", E.act("Review"), "w")}
       {E.row("Hazy ATP negative 9/9", "open named shortfall", E.act("Review"))}
       {E.btn("Draft purchase order")}
     </>),
@@ -2043,7 +2271,6 @@ export const SCREENS: Screen[] = [
     spec: "Provider-neutral by construction, mirroring the chat integration that already solved this: portable contracts, one adapter per provider, and a conformance test every adapter must pass (see the chat contracts module and its adapter conformance test). Square is the only adapter today and the only value this screen can offer; nothing in the copy, the commands or the schema names it. The integration tokens table already records which provider each token belongs to (QuickBooks or Square), so the seam exists below this screen. DISCOVERED from a live Square library: a taproom may already run Square’s own QuickBooks connector, which posts taproom sales into QuickBooks as Sales receipts without MGR. That is a different revenue stream from the wholesale invoices MGR pushes, so today it does not double-count, but only by luck, and a brewery running both without knowing is the failure mode. This screen detects it and says so rather than letting the accountant find two sources of taproom revenue at month end.",
     body: (<>
       {E.back("Settings", "Point of sale")}
-      {E.ttl("Point of sale")}
       {E.info("Publish what the taproom can sell, and read its sales back. One provider is connected at a time.")}
       {E.row("Square · Demo Brewing LLC", "catalog published · sales syncing", E.act("Disconnect"), "ok", SquareMark)}
       {E.row("Square → QuickBooks connector", "detected · Square posts taproom sales to QuickBooks Online itself", E.act("Review"), "w", SquareMark)}
@@ -2146,7 +2373,6 @@ export const SCREENS: Screen[] = [
     spec: <>This was an authoring surface and is now a read-out. Brand, format and availability are all derived (brand from what is in the bin, formats from the brand, availability from taproom stock), so publishing is zero-touch and a new brand reaches the register the moment stock lands. Retail resolves as the location’s own price override, falling back to the format’s default retail price, which is why the table shows the inherited number and names its Source: an exception has to be legible, or a stale price from last summer becomes silently authoritative. The override column stays empty unless someone sets it, so a format-wide price change actually propagates; writing the default into every row on publish would freeze each one at its first price, which is the failure mode this drawing exists to prevent. Publish changes survives because MGR still owns when the provider copy is refreshed. Location is a scope rather than a column: Square publishes one item with per-location presence on the variation, so MGR maintains one catalog and varies where each row appears; two parallel menus would fight that model and double every retire. Everything under the switcher is read for one location: stock, availability, and the price override that is keyed by POS location. A column would only serve a cross-location comparison nobody performs, while every action here is taken against one register. Renamed from POS menu: the register is no longer the only destination. The website is the third consumer of this catalog after Square and QuickBooks, not an integration of its own: a bespoke web feed would produce a third answer to what are we selling right now, and would leak unannounced beer, which is the same ownership boundary the Square item library taught. So the website is a read client keeping no copy, and the sync logic it runs today exists only because it keeps one. Its existing beers are adopted exactly as pre-integration Square items are: matched to a brand once, then maintained from here, so nothing vanishes from a public page the day MGR connects. Transport is deliberately not drawn: a menu changes a handful of times a day, so a cached read of the published rows is as fresh as a socket per visitor without opening an anonymous realtime path. Destination-native rows sit <i>below</i> that button rather than in the table: position is what says they are outside the publishable set, which no label reliably does. They appear at all because an unmapped taproom item is the reason a sale fails to reconcile, and Map is the only action MGR ever offers against a row it does not own.</>,
     body: (<>
       {E.back("More", "Menu")}
-      {E.ttl("POS menu")}
       {E.chips(["Taproom", "Warehouse"], 0)}
       {E.info("One catalog, scoped to a location. Price and availability are read for the location above.")}
       {E.tbl(["Brand · format", "Retail", "Source", "Publishes to"], [["Hazy IPA · pint", "$7.00", "format", "Square · Website"], ["Hazy IPA · crowler", "$9.00", "format", "Square"], ["Pils · pint", "$6.50", "override", "Square · Website"], ["Pils · crowler", "$12.00", "format", "Square"]])}
