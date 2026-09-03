@@ -71,6 +71,9 @@ const INV = {
   fee: "$9.48",
 } as const;
 
+// The movement kinds, in the order Record movement offers them.
+const MOVEMENT_KINDS = ["add finished goods", "depletion", "loss", "sample", "festival removal", "destruction", "adjustment"];
+
 // The Work list chips, in the order every Work list draws them.
 const WORK_CHIPS = ["all", "orders", "batches", "runs", "POs", "routes"];
 
@@ -390,7 +393,7 @@ export const SCREENS: Screen[] = [
       {E.inp("password")}
       {E.btn("Sign in")}
       {E.btn("Email me a link", "g")}
-      {E.act("Forgot password?")}
+      <a href="#" data-to="Reset password" className="text-sm text-muted-foreground underline">Forgot password?</a>
       {E.sp()}
     </>),
   },
@@ -474,7 +477,7 @@ export const SCREENS: Screen[] = [
       {E.inp("email")}
       {E.inp("password")}
       {E.btn("Sign in")}
-      {E.act("Forgot password?")}
+      <a href="#" data-to="Portal forgot password" className="text-sm text-muted-foreground underline">Forgot password?</a>
       {E.sp()}
     </>),
   },
@@ -673,7 +676,8 @@ export const SCREENS: Screen[] = [
     states: [["offline", "Queue with requestId"], ["stale", "ATP changed · preview again", 1], ["permission", "Role cannot record here", 1], ["echo", "Committed row · correction waits for schema gate"]],
     spec: "The server derives sign and 0.50000000 bbl; the client never supplies either. Drawn with festival removal selected: sample and festival removal leave the premises and require a destination state (the schema enforces it); destruction, loss and depletion never carry one. Channel stays.",
     body: (<>
-      {E.chips(["add finished goods", "depletion", "loss", "sample", "festival removal", "destruction", "adjustment"], 4)}
+      <div className="md:hidden">{E.pick("Kind", "festival removal", MOVEMENT_KINDS)}</div>
+      <div className="hidden md:block">{E.chips(MOVEMENT_KINDS, 4)}</div>
       {E.nav("SKU / package", "Hazy IPA · ½ bbl keg")}
       {E.pick("Location", "Warehouse", ["Warehouse", "Taproom"])}
       {E.pick("Channel", "taproom", ["taproom", "wholesale", "dtc", "export"])}
@@ -1076,7 +1080,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Beer", "Variance")}
       {E.ttl("Variance by brand")}
-      {E.chips(["4 weeks", "12 weeks"], 0)}
+      {E.tabs(["4 weeks", "12 weeks"])}
       {E.tbl(["Brand", "Expected", "Counted", "Variance"], [["Hazy IPA", "11.5 bbl", "11.0 bbl", "−0.5"], ["Pils", "8.0 bbl", "7.9 bbl", "−0.1"], ["Stout", "3.0 bbl", "3.0 bbl", "0.0"]])}
       {E.nav("Hazy IPA", "short 4 weeks running · 1.8 bbl total · −4%")}
       {E.info("A brand short every week points at one line or one shift. A single short week is noise.")}
@@ -1429,14 +1433,13 @@ export const SCREENS: Screen[] = [
     job: "Sellable facts without ledger writes, including the TTB fields",
     reads: "list_brands · list_skus",
     writes: "create_brand* · update_brand · create_sku* · update_sku",
-    states: [["new brand", "name + style + ABV + tax class"], ["inactive SKU", "hidden from portal; history keeps it"], ["keg SKU", "keg size chip; container source waits for slice 5"]],
+    states: [["new brand", "name + style + ABV + tax class"], ["inactive SKU", "hidden from portal; history keeps it"], ["keg SKU", "keg size chip; container source waits for slice 5"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"]],
     spec: "Barrels per unit is the basis of all TTB math, so it shows as the exact fraction and the decimal the ledger will freeze. The TTB tax class defaults to beer; other classes appear when the brewery sells one. No UPC scan, no container source editor here.",
     body: (<>
       {E.back("Catalog", "Hazy IPA")}
       {E.edit("Brand name", "Hazy IPA")}
       {E.edit("Style", "IPA")}
       {E.edit("ABV", "6.8")}
-      {E.chips(["beer"], 0)}
       {E.btn("Save brand")}
       {E.nav("SKU list", "3 active packages")}
     </>),
@@ -2018,7 +2021,7 @@ export const SCREENS: Screen[] = [
       {E.row("Citra · 44 lb boxes", "expected 4", E.stq(3), "w")}
       {E.row("Rice hulls · 50 lb", "expected 6", E.stq(6), "ok")}
       {E.fld("Citra lot", "2026-CIT-77")}
-      {E.fld("Best by", "2027-08-31")}
+      {E.edit("Best by", "2027-08-31", "date")}
       {E.tape([["+2,310 lb 2-row · receipt", "over 2 bags"], ["+132 lb Citra · receipt", "lot 2026-CIT-77 · short 1"]])}
       {E.info("2-row is over by 2 bags and Citra short 1; the PO becomes partially received.")}
       {E.sp()}
@@ -2291,7 +2294,7 @@ export const SCREENS: Screen[] = [
     spec: "Unregistered destination/brand combinations warn during order confirm and link here.",
     body: (<>
       {E.back("Compliance months", "Registry")}
-      {E.chips(["brands", "states", "licenses"])}
+      {E.tabs(["brands", "states", "licenses"])}
       {E.row("Hazy IPA", "COLA approved · formula n/a", E.act("Edit"))}
       {E.row("Stout", "COLA pending", E.act("Edit"), "w")}
       {E.row("Ohio", "supplier registered · expires 12/31", E.act("Edit"))}
@@ -2497,7 +2500,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Beer", "Tap board")}
       {E.ttl("On tap")}
-      {E.chips(["Taproom", "Warehouse"], 0)}
+      {E.tabs(["Taproom", "Warehouse"])}
       {E.tiles([["1", "Pils · ½ bbl", "on Mon", 0, 71], ["2", "Hazy IPA · ½ bbl", "on Mon", 0, 62], ["3", "Stout · ⅙ bbl", "on Tue · filled 60%", 0, 34], ["4", "Amber · ½ bbl", "on Sat", 0, 88], ["5", "Helles · ½ bbl", "on Wed · nearly out", 1, 9], ["6", "Saison · ½ bbl", "on Thu", 0, 54], ["8", "Porter · ⅙ bbl", "on Fri", 0, 46], ["9", "Hazy IPA · ½ bbl", "on Thu · second keg", 1, 93], ["10", "Kolsch · ½ bbl", "on Tue", 0, 27], ["11", "Barrel Dark · ⅙ bbl", "on Sun", 0, 80], ["unnumbered", "Wild Ale · ⅙ bbl", "on Thu · sorts last", 0, 66]])}
       {E.row("7 · Guest cider · keg", "tapped here by Dana · not our stock, no depletion", E.act("Kick"), "w")}
       {E.ttl("Open, not on a tap")}
@@ -2716,7 +2719,7 @@ export const SCREENS: Screen[] = [
       {E.edit("Reading overdue after", "24", "number")}
       {E.nav("Health", "last message from Slack today · 8:42 AM")}
       {E.nav("Linked people", "3 linked")}
-      {E.chips(["App Home", "Personal DM", "Team digest", "Preferences"], 0)}
+      {E.tabs(["App Home", "Personal DM", "Team digest", "Preferences"])}
       {E.row("Preview · App Home", "4 current work reasons · fixture data", E.act("Open"))}
       {E.row("Delivery enabled", "turn off all Slack sends", E.sw(true, "Slack delivery"), "ok")}
     </>),
@@ -2913,7 +2916,7 @@ export const SCREENS: Screen[] = [
     spec: <>This was an authoring surface and is now a read-out. Brand, format and availability are all derived (brand from what is in the bin, formats from the brand, availability from taproom stock), so publishing is zero-touch and a new brand reaches the register the moment stock lands. Retail resolves as the location’s own price override, falling back to the format’s default retail price, which is why the table shows the inherited number and names its Source: an exception has to be legible, or a stale price from last summer becomes silently authoritative. The override column stays empty unless someone sets it, so a format-wide price change actually propagates; writing the default into every row on publish would freeze each one at its first price, which is the failure mode this drawing exists to prevent. Publish changes survives because MGR still owns when the provider copy is refreshed. Location is a scope rather than a column: Square publishes one item with per-location presence on the variation, so MGR maintains one catalog and varies where each row appears; two parallel menus would fight that model and double every retire. Everything under the switcher is read for one location: stock, availability, and the price override that is keyed by POS location. A column would only serve a cross-location comparison nobody performs, while every action here is taken against one register. Renamed from POS menu: the register is no longer the only destination. The website is the third consumer of this catalog after Square and QuickBooks, not an integration of its own: a bespoke web feed would produce a third answer to what are we selling right now, and would leak unannounced beer, which is the same ownership boundary the Square item library taught. So the website is a read client keeping no copy, and the sync logic it runs today exists only because it keeps one. Its existing beers are adopted exactly as pre-integration Square items are: matched to a brand once, then maintained from here, so nothing vanishes from a public page the day MGR connects. Transport is deliberately not drawn: a menu changes a handful of times a day, so a cached read of the published rows is as fresh as a socket per visitor without opening an anonymous realtime path. Destination-native rows sit <i>below</i> that button rather than in the table: position is what says they are outside the publishable set, which no label reliably does. They appear at all because an unmapped taproom item is the reason a sale fails to reconcile, and Map is the only action MGR ever offers against a row it does not own.</>,
     body: (<>
       {E.back("More", "Menu")}
-      {E.chips(["Taproom", "Warehouse"], 0)}
+      {E.tabs(["Taproom", "Warehouse"])}
       {E.info("One catalog, scoped to a location. Price and availability are read for the location above.")}
       {E.tbl(["Brand · format", "Retail", "Source", "Publishes to"], [["Hazy IPA · pint", "$7.00", "format", "Square · Website"], ["Hazy IPA · crowler", "$9.00", "format", "Square"], ["Pils · pint", "$6.50", "override", "Square · Website"], ["Pils · crowler", "$12.00", "format", "Square"]])}
       {E.row("Stout · pint", "no taproom stock · off the register", E.status("Retired", "w"), "w")}

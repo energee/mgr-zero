@@ -146,8 +146,10 @@ describe("SCREENS", () => {
     const screenNames = new Set(SCREENS.map((s) => s.name));
     for (const s of SCREENS) {
       const html = renderToStaticMarkup(createElement("div", null, s.body));
-      for (const [, link] of html.matchAll(/<a [^>]*>(.*?)<\/a>/g)) {
-        const target = link.replace(/<[^>]*>/g, "");
+      // A link whose customer copy is not the screen's name declares its
+      // destination with data-to (Sign in's "Forgot password?" → Reset password).
+      for (const [, tag, link] of html.matchAll(/(<a [^>]*>)(.*?)<\/a>/g)) {
+        const target = tag.match(/data-to="([^"]*)"/)?.[1] ?? link.replace(/<[^>]*>/g, "");
         expect.soft(
           screenNames.has(target) || shellDestinations.has(target) || /^[A-Z]{2,3}-\d+$/.test(target),
           `${s.name}: unresolved back target ${target}`,
@@ -429,6 +431,40 @@ describe("SCREENS", () => {
     expect(btns).not.toContain("md:grid-cols-3");
     const tiles = renderToStaticMarkup(E.tiles([["FV1", "Pils"], ["FV2", "Hazy"]]));
     expect(tiles).toContain("auto-fill");
+  });
+
+  it("uses the control that does the job on view switchers and roles (#99)", () => {
+    // Issue 99: filter chips were standing in for view switchers, a
+    // one-option chip group, a link and a role editor.
+    const html = (name: string) =>
+      renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === name)!.body));
+    for (const name of ["Compliance registry", "Chat settings", "Menu", "Tap board", "Variance by brand"]) {
+      expect(html(name), name).toContain("tablist");
+    }
+    // Record movement: seven kinds are a Select on the phone, chips from md up.
+    const move = html("Record movement");
+    expect(move).toContain("md:hidden");
+    expect(move).toContain("hidden md:block");
+    // Team: no selection-less bulk remove; the role Select lives on the
+    // Team member sheet since #72 split editors out of list pages.
+    expect(html("Team")).not.toMatch(/Remove selected member/);
+    expect(html("Team member")).toContain("data-slot=\"select-trigger\"");
+    // Sign in: a link, not a card row.
+    expect(html("Sign in")).toMatch(/<a [^>]*>Forgot password\?<\/a>/);
+    // Product: no one-option chip group.
+    const product = SCREENS.find((s) => s.name === "Product")!;
+    expect(renderToStaticMarkup(createElement("div", null, product.body))).not.toContain("tax class");
+    expect(JSON.stringify(product.states)).toMatch(/tax class/);
+    // Dates are native date inputs.
+    expect(html("New order")).toMatch(/type="date"/);
+    expect(html("Receive PO")).toMatch(/type="date"/);
+    // No ToggleGroup is left with a single option.
+    for (const s of SCREENS) {
+      const groups = renderToStaticMarkup(createElement("div", null, s.body)).match(/data-slot="toggle-group"[\s\S]*?(?=data-slot="toggle-group"|$)/g) ?? [];
+      for (const g of groups) {
+        expect((g.match(/data-slot="toggle-group-item"/g) ?? []).length, s.name).not.toBe(1);
+      }
+    }
   });
 
   it("gives the named screens one filled primary each", () => {
