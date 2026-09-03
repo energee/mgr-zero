@@ -17,7 +17,7 @@ describe("customer guides (MDX)", () => {
     expect(files).toEqual(GUIDES.map((g) => `${g}.mdx`).sort());
     for (const guide of GUIDES) {
       const mdx = read(`content/docs/${guide}.mdx`);
-      expect(mdx).toMatch(/^---\ntitle: .+\ndescription: .+\n---\n/);
+      expect(mdx).toMatch(/^---\n(?:\w+: .+\n)*title: .+\ndescription: .+\n(?:\w+: .+\n)*---\n/);
       // Prose only: no imports/exports, scripts, raw HTML or styling hooks.
       expect(mdx).not.toMatch(/^(import|export)\s/m);
       expect(mdx).not.toMatch(/<(?:script|style|link|iframe|img|div|span|p|a)\b/i);

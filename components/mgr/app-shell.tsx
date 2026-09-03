@@ -10,6 +10,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MgrIcon } from "@/components/mgr-icon";
+import { Icon } from "@/components/mgr/icon";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInset,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger,
@@ -51,7 +52,7 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
             <SidebarGroup key={tab.label}>
               {!leaf && (
                 <SidebarGroupLabel asChild>
-                  <Link href={tab.href}>{tab.label}</Link>
+                  <Link href={tab.href} className="gap-2">{tab.icon && <Icon icon={tab.icon} />}{tab.label}</Link>
                 </SidebarGroupLabel>
               )}
               <SidebarGroupContent>
@@ -59,7 +60,7 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
                   {(leaf ? [tab] : tab.children!).map((c) => (
                     <SidebarMenuItem key={c.href}>
                       <SidebarMenuButton asChild isActive={tab.label === current && (leaf || isUnder(pathname, c.href))}>
-                        <Link href={c.href}>{c.label}</Link>
+                        <Link href={c.href}>{leaf && tab.icon && <Icon icon={tab.icon} />}{c.label}</Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
@@ -100,8 +101,9 @@ export function TabBar({ items, active, className }: { items: readonly NavItem[]
           key={t.label}
           href={t.href}
           aria-current={t.label === active ? "page" : undefined}
-          className={cn("flex min-h-12 items-center justify-center", t.label === active ? "font-medium text-foreground" : "text-muted-foreground")}
+          className={cn("flex min-h-12 flex-col items-center justify-center gap-0.5", t.label === active ? "font-medium text-foreground" : "text-muted-foreground")}
         >
+          {t.icon && <Icon icon={t.icon} size={20} />}
           {t.label}
         </Link>
       ))}

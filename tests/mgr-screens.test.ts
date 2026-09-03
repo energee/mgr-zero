@@ -10,17 +10,17 @@ import { SCREENS } from "../components/mgr/screens";
 import { E } from "../components/mgr/e";
 
 describe("SCREENS", () => {
-  it("ports the eleven step-1 frames with names, jobs and IO", () => {
+  it("ports the step-1 frames with names, jobs and IO", () => {
     const step1 = SCREENS.filter((s) => s.step === 1);
     expect(step1.map((s) => s.name)).toEqual([
-      "Today", "Today · sales", "Today · brewer", "Today · driver", "Today · taproom",
-      "Beer", "Work", "More", "Global search", "Me", "Settings",
+      "Today", "Sales", "Brewer", "Driver", "Taproom",
+      "Beer", "Work", "More", "Search", "Me", "Settings", "Permission denied",
     ]);
     for (const s of SCREENS) {
       expect(s.job).toBeTruthy();
       expect(s.reads).toBeTruthy();
       expect(s.writes).toBeTruthy();
-      expect(Boolean(s.tab) || Boolean(s.group) || Boolean(s.portal)).toBe(true);
+      expect(Boolean(s.tab) || Boolean(s.group) || Boolean(s.portal) || Boolean(s.venue)).toBe(true);
     }
   });
 
@@ -32,9 +32,31 @@ describe("SCREENS", () => {
     }
   });
 
-  it("carries every MGR-venue wireframe frame (94 minus the 17 Slack/QuickBooks/Square ones) with unique names", () => {
-    expect(SCREENS).toHaveLength(77);
+  it("carries every MGR-venue frame with unique names", () => {
+    // A tripwire against a frame dropped by hand from a 1700-line array — the
+    // uniqueness check below catches duplicates, nothing else catches a loss.
+    // Bump it deliberately when a frame lands; .agents/PROGRESS.md narrates
+    // what the number is made of — 85 MGR frames plus the 17 venue frames.
+    expect(SCREENS).toHaveLength(102);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
+  });
+
+  it("draws customer copy, not markup escapes, machine identifiers or em dashes", () => {
+    // Bodies are what a brewer reads on the glass; job, states and spec are
+    // what a reader sees on /docs/screens. A literal "&frac12;" is a string
+    // React never decodes, "record_movement" is the wire name of a command, not
+    // its label, and an em dash is a tell that a sentence was never finished.
+    // reads/writes are exempt from the identifier rule only: they name
+    // registry IDs on purpose.
+    const text = (...n: unknown[]) =>
+      n.map((x) => renderToStaticMarkup(createElement("div", null, x as never)).replace(/<[^>]*>/g, " ")).join(" ");
+    for (const s of SCREENS) {
+      const body = text(s.hd, s.body);
+      const notes = text(s.job, s.spec, ...(s.states ?? []).flat());
+      expect.soft(body, `${s.name}: HTML entity in copy`).not.toMatch(/&(?:[a-z]+|#\d+);/);
+      expect.soft(body + notes, `${s.name}: snake_case or dotted identifier`).not.toMatch(/[a-z]+_[a-z_]+|\b[a-z]+\.[a-z]+_[a-z_]+|\b[a-z]+\.[a-z_]+\(/);
+      expect.soft(body + notes + text(s.reads, s.writes), `${s.name}: em dash`).not.toContain("—");
+    }
   });
 
   it("gives sheets no separate header; their title is the record name", () => {

@@ -1,0 +1,240 @@
+/* components/mgr/venue.css — the external venues' own design language, ported
+   verbatim from the wireframes file (.agents/superpowers/specs/2026-08-31-mgr-
+   wireframes.html) so QuickBooks, Square and Slack keep looking like their own
+   products rather than MGR frames. Tokens are scoped to the venue roots and
+   deliberately do NOT follow the app theme: these surfaces are light because
+   the real products are light, and a venue that inherited MGR's dark mode
+   would stop being evidence of what the integration actually looks like.
+   Everything below is vendor chrome; MGR's own screens never use these rules. */
+.xf, .slk {
+  --line: #cfcac2;
+  --ink2: #6b6660;
+}
+
+/* ---- Slack surfaces: Slack's own design language, not MGR's. Greyscale plus
+   Slack aubergine in the chrome only, so these read as wireframes and never as
+   screenshots. Tokens are scoped to .slk and deliberately do not follow the page
+   theme — Slack's light surface is the thing being drawn. */
+.slk{--sk-bg:#FFFFFF;--sk-ink:#1D1C1D;--sk-ink2:#616061;--sk-line:#DDDDDD;--sk-aub:#3F0E40;--sk-btn:#BBBABB;--sk-green:#007A5A;--sk-red:#E01E5A;
+  background:var(--sk-bg);color:var(--sk-ink);border:1.5px solid var(--line);border-radius:8px;overflow:hidden;
+  display:flex;flex-direction:column;min-width:0;max-width:100%;font:13px/1.46 "Instrument Sans",system-ui,sans-serif}
+.slk-top{background:var(--sk-aub);color:#fff;padding:9px 12px;font-weight:600;font-size:12px;display:flex;justify-content:space-between;gap:8px}
+.slk-top i{font-style:normal;opacity:.75;font:10px "JetBrains Mono",monospace;display:flex;align-items:center}
+.slk-tabs{display:flex;gap:18px;padding:0 12px;border-bottom:1px solid var(--sk-line);font-size:12.5px;color:var(--sk-ink2)}
+.slk-tabs div{padding:9px 0}
+.slk-tabs div.on{color:var(--sk-ink);font-weight:700;box-shadow:inset 0 -2px 0 var(--sk-ink)}
+.slk-body{padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.slk-msg{display:flex;gap:8px;padding:12px;min-width:0}
+.slk-av{width:36px;height:36px;border-radius:4px;background:var(--sk-aub);color:#fff;display:grid;place-items:center;font:700 13px "Familjen Grotesk",sans-serif;flex:none}
+.slk-mb{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.slk-mh{display:flex;align-items:baseline;gap:6px;font-size:11px;color:var(--sk-ink2);flex-wrap:wrap}
+.slk-mh b{color:var(--sk-ink);font-size:13px;font-weight:700}
+.slk-badge{background:#E8E8E8;color:#616061;border-radius:2px;padding:0 4px;font:700 9.5px "JetBrains Mono",monospace}
+.slk-modtop{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:13px 14px;border-bottom:1px solid var(--sk-line);font:700 15px "Familjen Grotesk",sans-serif}
+.slk-modtop i{font-style:normal;color:var(--sk-ink2);font-size:15px}
+.slk-modft{display:flex;justify-content:flex-end;gap:8px;padding:12px 14px;border-top:1px solid var(--sk-line)}
+/* Block Kit blocks — one class per block type emitted by lib/chat/slack-renderer.ts */
+.sk-h{font:700 18px/1.25 "Familjen Grotesk",sans-serif;margin:0}
+.sk-s{font-size:13px;overflow-wrap:anywhere}
+.sk-ctx{font-size:11.5px;color:var(--sk-ink2);overflow-wrap:anywhere}
+.sk-sa{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.sk-sa .sk-s{flex:1;min-width:0}
+.sk-acts{display:flex;gap:8px;flex-wrap:wrap}
+.sk-b{border:1px solid var(--sk-btn);border-radius:4px;background:#fff;color:var(--sk-ink);padding:7px 12px;font-size:12.5px;font-weight:700;white-space:nowrap}
+.sk-b.pri{background:var(--sk-green);border-color:var(--sk-green);color:#fff}
+.sk-b.dan{color:var(--sk-red)}
+.sk-b.dis{opacity:.45}
+.sk-f{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px 16px;font-size:13px}
+.sk-f div{min-width:0;overflow-wrap:anywhere}
+.sk-f b{display:block;font-weight:700}
+.sk-gate{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+.bar{flex-direction:column;align-items:stretch;gap:6px}
+.barrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;min-width:0}
+.barrow>b{font:600 9.5px "JetBrains Mono",monospace;text-transform:uppercase;letter-spacing:.06em;color:var(--ink2);width:46px;flex:none}
+.barrow.dim,.barrow button.dim{opacity:.32;pointer-events:none}
+#home-sec.hide,.vsec.hide{display:none}
+.noshell{border:1.5px dashed var(--line);border-radius:8px;padding:18px;color:var(--ink2);font-size:12px}
+/* QuickBooks and Square shells. Same discipline as .slk: each owns its tokens,
+   stays light, and spends its brand colour only on chrome so the frame reads as a
+   wireframe. X.* primitives below are shared and resolve against --x-*. */
+.xf{background:#fff;border:1.5px solid var(--line);border-radius:8px;overflow:hidden;display:flex;flex-direction:column;min-width:0;max-width:100%;color:var(--x-ink);font:13px/1.45 "Instrument Sans",system-ui,sans-serif}
+.qbo{--x-ink:#393A3D;--x-ink2:#6B6C72;--x-line:#D4D7DC;--x-acc:#2CA01C;--x-bad:#B3261E}
+.sq{--x-ink:#1B1B1B;--x-ink2:#6A6A6A;--x-line:#E0E0E0;--x-acc:#006AFF;--x-bad:#B3261E}
+.xf-top{display:flex;justify-content:space-between;gap:8px;padding:9px 12px;color:#fff;font-weight:700;font-size:12px}
+.qbo .xf-top{background:#fff;color:var(--x-ink);border-bottom:1px solid var(--x-line);align-items:center}
+.qb-search{flex:1;max-width:420px;border:1px solid var(--x-line);border-radius:20px;padding:4px 11px;
+  color:var(--x-ink2);font:11px "Instrument Sans",sans-serif!important;opacity:1!important;overflow:hidden;
+  white-space:nowrap;text-overflow:ellipsis}
+.qb-rail{width:58px;flex:none;border-right:1px solid var(--x-line);padding:8px 4px;display:flex;
+  flex-direction:column;gap:9px;align-items:center;text-align:center;font-size:8px;color:var(--x-ink2)}
+.qb-rail div i{display:block;font-style:normal;font-size:14px;color:var(--x-ink);margin-bottom:1px}
+.qb-logo{width:22px;height:22px;border-radius:50%;background:var(--x-acc);color:#fff;
+  display:grid;place-items:center;font:700 10px "Familjen Grotesk",sans-serif;margin-bottom:4px}
+/* Shared left-nav, used by both record venues. Each supplies its own width and the
+   chrome above and below; the list itself is one implementation. */
+.nv-col{flex:none;border-right:1px solid var(--x-line);padding:8px 6px;font-size:11px;color:var(--x-ink);
+  display:flex;flex-direction:column;gap:1px;background:#fff}
+.nv-h{font:700 8.5px "JetBrains Mono",monospace;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--x-ink2);padding:0 6px 6px}
+.nv{display:flex;justify-content:space-between;gap:6px;padding:4px 6px;border-radius:6px}
+.nv i{font-style:normal;color:var(--x-ink2);font-size:9px}
+.nv.l2{padding-left:16px;color:var(--x-ink2)}
+.nv.l3{padding-left:26px;color:var(--x-ink2)}
+.nv.on{background:#EDEEF0;color:var(--x-ink);font-weight:600}
+.qb-apps{width:158px}
+.sq .xf-top{background:#1B1B1B}
+.xf-top span{display:flex;align-items:center;gap:7px}
+.xf-mark{width:15px;height:15px;flex:none;fill:currentColor}
+.xf-top i{font-style:normal;font:10px "JetBrains Mono",monospace;opacity:.85;display:flex;align-items:center;font-weight:400}
+.xf-main{display:flex;min-width:0}
+.xf-nav{width:96px;flex:none;border-right:1px solid var(--x-line);padding:8px;color:var(--x-ink2);font-size:11px;display:flex;flex-direction:column;gap:5px}
+.xf-nav b{color:var(--x-ink);font-weight:700}
+.xf-body{flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:10px}
+.x-h{font:700 17px/1.2 "Familjen Grotesk",sans-serif}
+.x-h span{display:block;font:400 12px "Instrument Sans",sans-serif;color:var(--x-ink2);margin-top:2px}
+.x-pill{align-self:flex-start;border:1px solid var(--x-acc);color:var(--x-acc);border-radius:20px;padding:1px 9px;font:700 10.5px "JetBrains Mono",monospace}
+.x-pill.bad{border-color:var(--x-bad);color:var(--x-bad)}
+.x-tot{display:flex;flex-direction:column;gap:3px;font-size:12px;align-self:flex-end;min-width:180px}
+.x-tot div{display:flex;justify-content:space-between;gap:20px}
+.x-tot div.s{font-weight:700;border-top:1px solid var(--x-line);padding-top:4px;font-size:13px}
+.qbopanel .xf-main{min-height:520px}
+/* The list the panel opened over — dimmed, because it is context, not the subject. */
+.qp-back{flex:1;min-width:0;padding:12px;opacity:.45;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.qp-bh{font:700 15px "Familjen Grotesk",sans-serif}
+.qp-kpi{display:flex;gap:22px;margin:4px 0 2px}
+.qp-kpi b{display:block;font:600 17px "Familjen Grotesk",sans-serif}
+.qp-kpi span{font-size:10.5px;color:var(--x-ink2)}
+.qp-filt{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 2px}
+.qp-filt span{border:1px solid var(--x-line);border-radius:4px;padding:3px 8px;font-size:10.5px;color:var(--x-ink2)}
+.qp-br{display:grid;grid-template-columns:58px 66px 108px 1fr;gap:10px;font-size:11.5px;padding:6px 7px;
+  border-bottom:1px solid var(--x-line)}
+.qp-br.hd{font:700 9px "JetBrains Mono",monospace;text-transform:uppercase;color:var(--x-ink2)}
+.qp-br.on{background:#EDEEF0;border-radius:3px}
+/* A detail panel overlays the list, it does not push it aside — in both products the
+   table runs on underneath and is simply covered. Docking it as a flex sibling made
+   the list narrower, which is not what either product does. */
+.qbopanel .xf-main,.sqdash .xf-main{position:relative}
+.qa-panel,.sd-panel{position:absolute;top:0;right:0;bottom:0;z-index:2;
+  box-shadow:-8px 0 22px rgba(0,0,0,.10)}
+.qa-panel{width:372px;border-left:1px solid var(--x-line);background:#fff;
+  display:flex;flex-direction:column}
+.qa-top{display:flex;align-items:center;justify-content:center;position:relative;padding:11px 12px;
+  border-bottom:1px solid var(--x-line);font-weight:600;font-size:13.5px}
+.qa-top i{position:absolute;right:9px;top:7px;font-style:normal;font-size:12px;color:var(--x-ink2);
+  border:1.5px solid transparent;border-radius:4px;padding:2px 5px}
+.qa-body{display:flex;flex-direction:column;min-width:0;flex:1}
+.qa-stat{display:flex;align-items:center;gap:6px;color:var(--x-acc);font-weight:600;font-size:12.5px;padding:12px 14px 0}
+.qa-stat.plain{color:var(--x-ink)}
+.qa-amt{padding:6px 14px 0}
+.qa-amt b{display:block;font-size:12.5px;font-weight:600;margin-bottom:1px}
+.qa-amt span{font-size:15px;font-weight:500}
+.qa-amt em{font-style:normal;font-size:31px;font-weight:500;letter-spacing:-.5px}
+.qa-amt sup{font-size:15px;vertical-align:super;font-weight:500}
+.qa-when{padding:10px 14px 14px;font-size:12.5px}
+.qa-when b{display:block;font-weight:600;margin-bottom:1px}
+.qa-sec{border-top:1px solid var(--x-line);padding:13px 14px}
+.qa-sh{display:flex;justify-content:space-between;align-items:center;gap:10px;font:600 13.5px "Familjen Grotesk",sans-serif}
+.qa-sh i{font-style:normal;color:var(--x-ink2);font-size:12px}
+.qa-rows{display:flex;flex-direction:column;gap:7px;margin-top:11px;font-size:12.5px}
+.qa-rows div{display:flex;justify-content:space-between;gap:14px}
+.qa-rows span:last-child{white-space:nowrap;font-variant-numeric:tabular-nums}
+.qa-sub{margin-top:11px;font-size:12.5px;display:flex;flex-direction:column;gap:3px}
+.qa-sub b{font:600 13px "Familjen Grotesk",sans-serif}
+.qa-link{margin-top:6px;font-size:12.5px;color:#0077C5}
+.qa-life{margin-top:11px;display:flex;flex-direction:column}
+.qa-life>div{display:flex;gap:9px;align-items:flex-start;padding-bottom:13px;position:relative}
+.qa-life>div:not(:last-child)::after{content:"";position:absolute;left:5px;top:14px;bottom:0;width:1px;background:var(--x-line)}
+.qa-life b{width:11px;height:11px;border-radius:50%;border:1.5px solid var(--x-line);background:#fff;
+  flex:none;margin-top:2px;z-index:1}
+.qa-life .on b{background:#2CA01C;border-color:#2CA01C}
+.qa-life span{font-size:12.5px;color:var(--x-ink2)}
+.qa-life .on span{color:var(--x-ink);font-weight:600}
+.qa-ft{display:flex;justify-content:flex-end;gap:8px;padding:10px 12px;border-top:1px solid var(--x-line);background:#FAFAFA}
+.qa-b{border:1.5px solid var(--x-acc);color:var(--x-acc);border-radius:4px;padding:6px 11px;font-size:12px;font-weight:600}
+.qa-b.p{background:#0D5B23;border-color:#0D5B23;color:#fff}
+.sqdash{--x-ink:#1B1B1B;--x-ink2:#6A6A6A;--x-line:#E6E6E6;--x-acc:#006AFF;--x-bad:#B3261E}
+.sqdash .xf-main{min-height:470px}
+.sd-nav{width:180px;padding:10px 8px}
+.sd-brand{display:flex;flex-wrap:wrap;align-items:center;gap:5px;padding:0 6px 8px}
+.sd-brand .xf-mark{width:17px;height:17px;fill:var(--x-ink)}
+.sd-logo{width:22px;height:22px;border-radius:50%;background:#1B4D2E;color:#fff;display:grid;place-items:center;
+  font:700 11px "Familjen Grotesk",sans-serif;flex:none}
+.sd-brand>span{font:600 12px "Familjen Grotesk",sans-serif;display:flex;flex-direction:column;line-height:1.25}
+.sd-brand>span i{font-style:normal;font-weight:400;color:var(--x-ink2);font-size:10px}
+.sd-search{border:1px solid var(--x-line);border-radius:6px;padding:4px 8px;color:var(--x-ink2);
+  font-size:10.5px;margin:0 0 8px}
+.sd-main{flex:1;min-width:0;padding:12px;display:flex;flex-direction:column;gap:10px;overflow:hidden}
+.sd-filt{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:10.5px}
+.sd-filt span{border:1px solid var(--x-line);border-radius:20px;padding:4px 10px;color:var(--x-ink)}
+.sd-q{flex:1;min-width:90px;color:var(--x-ink2)!important}
+.sd-sp{flex:1;border:0!important;padding:0!important}
+.sd-b{border-radius:20px}
+.sd-b.p{background:var(--x-ink);border-color:var(--x-ink)!important;color:#fff;font-weight:600}
+.sd-t{width:100%;border-collapse:collapse;font-size:11px}
+.sd-t th{text-align:left;font:700 8.5px "JetBrains Mono",monospace;text-transform:uppercase;letter-spacing:.04em;
+  color:var(--x-ink2);border-bottom:1px solid var(--x-line);padding:4px 6px 5px 0;white-space:nowrap}
+.sd-t td{padding:6px 6px 6px 0;border-bottom:1px solid var(--x-line);vertical-align:middle}
+.sd-t .sd-x{width:12px;color:var(--x-ink2);padding-right:2px}
+.sd-t .sd-pr{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.sd-t .sd-ck{width:13px;padding-right:3px}
+.sd-t .sd-ck b{display:block;width:11px;height:11px;border:1px solid #B9B9B9;border-radius:3px}
+.sd-t .sd-im{width:20px;padding-right:5px}
+.sd-t .sd-im i{display:block;width:17px;height:17px;border-radius:3px;background:#EFEFEF}
+.sd-t .sd-plus{width:14px;text-align:right;color:var(--x-ink2);font-size:11px}
+.sd-t tr.mgr td{background:#F2F7FF}
+.sd-t tr.var td:nth-child(4){padding-left:16px;color:var(--x-ink2)}
+.sd-take{margin-top:10px;border:1px solid var(--x-line);border-radius:8px;padding:6px;text-align:center;
+  font-size:11px;font-weight:600}
+.sd-hd{font:600 17px "Familjen Grotesk",sans-serif}
+.sd-hd span{display:block;font:400 10.5px "Instrument Sans",sans-serif;color:var(--x-ink2);margin-top:1px}
+.sd-kpi{display:flex;gap:30px;margin:2px 0 4px}
+.sd-kpi b{display:block;font:600 19px "Familjen Grotesk",sans-serif}
+.sd-kpi span{font:700 8.5px "JetBrains Mono",monospace;text-transform:uppercase;letter-spacing:.05em;color:var(--x-ink2)}
+.sd-day{background:#F5F5F5;padding:6px 9px;font-size:11px;color:var(--x-ink2);border-radius:4px;
+  display:flex;justify-content:space-between;gap:12px}
+.sd-day span{font-variant-numeric:tabular-nums}
+.sd-kpi>div:last-child{margin-left:auto;text-align:right}
+.sd-tx>div{display:flex;align-items:center;gap:9px;padding:6px 8px;border-bottom:1px solid var(--x-line);font-size:11px}
+.sd-tx>div.on{background:#EFEFEF}
+.sd-tx i{font-style:normal;font:700 7px "JetBrains Mono",monospace;border:1px solid var(--x-line);border-radius:3px;
+  padding:2px 3px;width:26px;text-align:center;flex:none;color:var(--x-ink2)}
+.sd-tx span{width:52px;flex:none;color:var(--x-ink2)}
+.sd-tx b{font-weight:400;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sd-tx u{text-decoration:none;margin-left:auto;flex:none;font-variant-numeric:tabular-nums;padding-left:12px}
+.sd-tx em{font-style:normal;color:var(--x-ink2);flex:none;white-space:nowrap}
+.sd-panel{width:390px;background:#F7F7F7;border-left:1px solid var(--x-line);padding:10px;
+  display:flex;flex-direction:column;gap:9px}
+.sd-pact{display:flex;gap:7px}
+.sd-b.w{flex:1;text-align:center;background:#EFEFEF;border-radius:8px;padding:8px;font-weight:600}
+.sd-card{background:#fff;border:1px solid var(--x-line);border-radius:8px;padding:12px;flex:1;
+  display:flex;flex-direction:column;gap:9px;overflow:hidden}
+.sd-pft{display:flex;justify-content:flex-end}
+.sd-panel .sd-b{border:1px solid var(--x-line);border-radius:20px;padding:6px 12px;font-size:11px;background:#fff}
+.sd-panel .sd-b.p{background:var(--x-ink);border-color:var(--x-ink);color:#fff;font-weight:600;border-radius:20px;padding:7px 18px}
+.sd-pill{background:#D6F5DE;color:#0B5B22;border-radius:20px;padding:2px 9px;font-size:10px;font-weight:600;
+  display:inline-block;white-space:nowrap}
+.sd-pill.off{background:#EFEFEF;color:var(--x-ink2)}
+.x-meta{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--x-ink2)}
+.x-meta b{font-weight:400;color:var(--x-ink2)}
+.x-meta b::after{content:": "}
+.x-sect{font:700 10px "JetBrains Mono",monospace;text-transform:uppercase;letter-spacing:.06em;color:var(--x-ink2);border-top:1px solid var(--x-line);padding-top:9px}
+.x-li{display:flex;flex-direction:column;gap:3px;font-size:12.5px}
+.x-lr{display:flex;justify-content:space-between;gap:16px;font-weight:600}
+.x-lr span:last-child{white-space:nowrap;font-variant-numeric:tabular-nums}
+.x-ls{color:var(--x-ink2);font-size:11.5px;margin-bottom:4px}
+.x-note{font-size:11.5px;color:var(--x-ink2);border-top:1px solid var(--x-line);padding-top:7px;overflow-wrap:anywhere}
+.x-err{border:1px solid var(--x-bad);border-left-width:3px;border-radius:3px;padding:8px 10px;font-size:12px;color:var(--x-bad)}
+.x-err b{display:block;font:700 10px "JetBrains Mono",monospace;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px}
+.vsec>h2.grp{margin-bottom:8px}
+.vsec>.grid{grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr))}
+/* The two record venues are not the same shape. A QuickBooks invoice is a wide
+   browser record — 4-column line table, right-aligned totals — and clips in a
+   phone-width column. A Square transaction is a narrow receipt column in the
+   Square Dashboard, so it stays near its real width. */
+.vsec[data-v="QuickBooks"]>.grid{grid-template-columns:repeat(auto-fill,minmax(min(560px,100%),1fr))}
+/* Square Dashboard is a desktop product end to end — list, panel and library all
+   live in the same full-width chrome, so its frames get the whole row. The 460px
+   receipt cap is gone with the receipt shell it belonged to. */
+.vsec[data-v="Square"]>.grid{grid-template-columns:minmax(0,1fr)}
+.x-scroll{overflow-x:auto;max-width:100%}
+.slknote{font-size:12px;margin-bottom:16px}

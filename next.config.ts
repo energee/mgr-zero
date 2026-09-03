@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 import { createMDX } from "fumadocs-mdx/next";
 
 const nextConfig: NextConfig = {
+  // The icon set is one 6,000-line barrel; this keeps dev compiles from parsing it whole.
+  experimental: { optimizePackageImports: ["@hugeicons/core-free-icons"] },
   // The customer guides in content/docs are rendered at /docs/<name>. The
   // pre-Fumadocs URLs redirect there: the master guide was renamed to index,
   // so /docs/user-guide{,.html} needs its own destination. Names are matched

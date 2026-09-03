@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from "fumadocs-ui/layouts/docs/page";
 import { getMDXComponents } from "@/components/mdx";
+import { SCREEN_TOC, VENUE_TOC } from "@/components/mgr/screen-index";
 import { source } from "@/lib/source";
 
 type Props = { params: Promise<{ slug?: string[] }> };
@@ -13,8 +14,23 @@ export default async function Page({ params }: Props) {
   const page = source.getPage((await params).slug);
   if (!page) notFound();
   const MDX = page.data.body;
+  // Fumadocs builds a page's sub-index from its own MDX headings. These two
+  // pages' headings come from <ScreenIndex /> instead, so their sections are
+  // appended here — without this each has a table of contents with nothing in
+  // it below the intro.
+  const generated = { screens: SCREEN_TOC, integrations: VENUE_TOC }[page.slugs.join("/")];
+  const toc = generated ? [...page.data.toc, ...generated] : page.data.toc;
+  // The generated pages embed frames at desktop width, so they take the full
+  // column. `full` alone would also drop the table of contents (it only
+  // defaults it off), so the TOC is re-enabled explicitly; the article's own
+  // 1168px cap is lifted the same way, and the layout width in ../layout.tsx.
   return (
-    <DocsPage toc={page.data.toc} full={page.data.full}>
+    <DocsPage
+      toc={toc}
+      full={Boolean(generated) || page.data.full}
+      tableOfContent={{ enabled: true }}
+      className={generated ? "max-w-none" : undefined}
+    >
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>
       <DocsBody>
