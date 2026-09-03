@@ -23,7 +23,7 @@ If the credentials are wrong, MGR shows **Incorrect email or password**. If the 
 | **Admin** | All current staff screens and actions. |
 | **Sales** | Catalog creation; customers and pricing; order creation, submission, confirmation, adjustment, cancellation, and credits; inventory viewing; invoices. Sales does not currently have a way to reach Replenishment. |
 | **Warehouse** | Inventory viewing and movements; order and pick-sheet viewing, picking, and shipping; replenishment suggestions; the invoice created when it ships a wholesale order, from a link shown right after shipping — it cannot open the Catalog, the Invoices list, or Team. |
-| **Brewer** | Today (the only navigation tab shown) and account linking from Slack. The other current staff pages may return a permission error. |
+| **Brewer** | Today and account linking from Slack. Brewer's Beer, Work, and More tabs are also visible, but every link under them currently returns a permission error — see [Navigate MGR](#navigation). |
 
 <Callout type="info">
 If an action reports a permission error, stop and ask an administrator. Repeated submission will not change your access.
@@ -31,7 +31,15 @@ If an action reports a permission error, stop and ask an administrator. Repeated
 
 ## Navigate MGR [#navigation]
 
-The brewery name at the top of the header identifies the brewery whose records are displayed. Navigation has up to four sections — **Today, Beer, Work**, and **More** — shown as tabs along the bottom on a phone and as a left rail on wider screens. Beer holds **Inventory**; Work holds **Orders, Pick**, and **Replenishment**; More holds **Invoices, Catalog, Customers, Price lists**, and **Settings** (the team roster). Links your role cannot use are simply not shown, and Warehouse currently has no links under More, so that tab does not appear for Warehouse. The **Me** control in the header shows your brewery and role, switches between light and dark mode, and offers **Sign out**. Forms open as a panel from the bottom of the screen on a phone and as a centered dialog on wider screens.
+The brewery name at the top of the header identifies the brewery whose records are displayed. Navigation has up to four sections — **Today, Beer, Work**, and **More** — shown as tabs along the bottom on a phone and as a left rail on wider screens; on a phone, the tab itself opens the group's primary page. Beer holds **Inventory**, plus **Taproom, Taps, Cellar, Materials**, and **Kegs**; Work holds **Orders, Pick, Replenishment, Batches, Packaging, POs**, and **Deliveries**; More holds **Invoices, Catalog, Customers, Price lists, Recipes, Compliance, Planning, Import**, and **Settings** (the team roster). Links your role cannot use are simply not shown.
+
+None of Taproom, Taps, Cellar, Materials, Kegs, Batches, Packaging, POs, Deliveries, Recipes, Compliance, or Planning has its own screen yet — each currently opens the same page as Inventory, Orders, Catalog, or Invoices. Import has no interface at all (see [Actions not yet available](#unavailable)).
+
+<Callout type="warn">
+**Brewer navigation:** Brewer now sees Beer, Work, and More tabs in addition to Today, but selecting **Cellar, Materials, Batches, Packaging, Recipes**, or **Planning** returns a permission error. Today and Slack account linking are the only staff features Brewer can currently use.
+</Callout>
+
+The **Me** control in the header shows your brewery and role, switches between light and dark mode, and offers **Sign out**. Forms open as a panel from the bottom of the screen on a phone and as a centered dialog on wider screens.
 
 <Cards>
   <Card title="Today">The tab you land on after signing in. It currently shows only a placeholder heading, **Dashboard**, with no metrics or actions.</Card>
