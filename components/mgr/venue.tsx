@@ -44,6 +44,12 @@ export const S = {
       ))}
     </div>
   ),
+  toggle: (label: string, on = true) => (
+    <div className="sk-control"><b>{label}</b><button type="button" role="switch" aria-checked={on}><i /></button></div>
+  ),
+  select: (label: string, value: string) => (
+    <label className="sk-control"><b>{label}</b><select defaultValue={value}><option>{value}</option></select></label>
+  ),
   /** A Slack action MGR will not enable yet: disabled button plus the reason. */
   dis: (label: ReactNode, why: ReactNode) => (
     <div className="sk-gate">
@@ -195,12 +201,15 @@ const QBO_APPS: VenueNavItem[] = [["Accounting", 1, 1], ["Expenses & Bills", 1, 
   ["Sales channels", 2], ["QuickBooks payouts", 2], ["Products & services", 2], ["Customer Hub", 1, 1],
   ["Inventory", 1, 1], ["Sales Tax", 1, 1]];
 
-const QBO_BACKDROP_ROWS = [["9/11/26", "Invoice", "INV-1042", "Ridgeline Tap Room"], ["9/10/26", "Invoice", "INV-1041", "Al’s Bar"],
+const QBO_BACKDROP_ROWS = [["9/3/26", "Invoice", "INV-1042", "Ridgeline Tap Room"], ["9/10/26", "Invoice", "INV-1041", "Al’s Bar"],
   ["9/10/26", "Invoice", "INV-1040", "Teresa’s"], ["9/3/26", "Invoice", "INV-1039", "Al’s Bar"],
   ["9/1/26", "Payment", "", "Ridgeline Tap Room"]];
 
 /** QuickBooks: the Sales transactions list with a record open in the right panel — the only record shape it has. */
-function QboFrame({ title, actions, children }: { title: string; actions?: string; children: ReactNode }) {
+function QboFrame({ title, actions, selected, children }: { title: string; actions?: string; selected?: "receipt"; children: ReactNode }) {
+  const backdropRows = selected === "receipt"
+    ? [["9/3/26", "Sales receipt", "SR-1428", "Square customer"], ...QBO_BACKDROP_ROWS]
+    : QBO_BACKDROP_ROWS;
   return (
     <div className="xf qbo qbopanel">
       <div className="xf-top">
@@ -227,7 +236,7 @@ function QboFrame({ title, actions, children }: { title: string; actions?: strin
               .map((c) => <span key={c}>{c}</span>)}
           </div>
           <div className="qp-br hd"><span>Date</span><span>Type</span><span>No.</span><span>Customer</span></div>
-          {QBO_BACKDROP_ROWS.map((r, i) => (
+          {backdropRows.map((r, i) => (
             <div key={i} className={`qp-br${i === 0 ? " on" : ""}`}>{r.map((c, j) => <span key={j}>{c}</span>)}</div>
           ))}
         </div>
@@ -290,7 +299,7 @@ function SlackFrame({ shell, ctx, who, at, foot, children }: {
   }
   if (shell === "modal") {
     return (
-      <div className="slk">
+      <div className="slk modal">
         <div className="slk-modtop"><span>{ctx}</span><i>✕</i></div>
         <div className="slk-body">{children}</div>
         <div className="slk-modft">{(foot ?? []).map(([l, k], i) => <span key={i} className={`sk-b ${k ?? ""}`}>{l}</span>)}</div>
@@ -313,13 +322,13 @@ function SlackFrame({ shell, ctx, who, at, foot, children }: {
 
 /** Which product a frame is drawn inside, and the chrome that product needs. */
 export type Venue =
-  | { name: "QuickBooks Online"; title: string; actions?: string }
+  | { name: "QuickBooks Online"; title: string; actions?: string; selected?: "receipt" }
   | { name: "Square"; nav?: "pay"; on?: string; panel?: ReactNode }
   | { name: "Slack"; shell: "home" | "msg" | "modal"; ctx?: string; who?: string; at?: string; foot?: [string, string?][] };
 
 /** Renders one venue frame in its own product's chrome. */
 export function VenueFrame({ venue, children }: { venue: Venue; children: ReactNode }) {
-  if (venue.name === "QuickBooks Online") return <QboFrame title={venue.title} actions={venue.actions}>{children}</QboFrame>;
+  if (venue.name === "QuickBooks Online") return <QboFrame title={venue.title} actions={venue.actions} selected={venue.selected}>{children}</QboFrame>;
   if (venue.name === "Square") return <SqDashFrame nav={venue.nav} on={venue.on} panel={venue.panel}>{children}</SqDashFrame>;
   return <SlackFrame shell={venue.shell} ctx={venue.ctx} who={venue.who} at={venue.at} foot={venue.foot}>{children}</SlackFrame>;
 }

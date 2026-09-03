@@ -25,6 +25,12 @@ import { cn } from "@/lib/utils";
 type RowClass = "" | "w" | "ok" | "dis";
 const dotColor: Partial<Record<RowClass, string>> = { w: "bg-warning-foreground", ok: "bg-primary" };
 const Dot = ({ cls }: { cls: RowClass }) => (dotColor[cls] ? <span className={cn("size-2 rounded-full", dotColor[cls])} /> : null);
+const TileContent = ({ n, s, g, w, f }: { n: React.ReactNode; s: React.ReactNode; g?: React.ReactNode; w?: 0 | 1; f?: number }) => (<>
+  <span className="flex items-center gap-1.5 font-medium text-sm leading-none">{w ? <Dot cls="w" /> : null}{n}</span>
+  <span className="text-muted-foreground text-sm leading-normal">{s}</span>
+  {g ? <span className="text-muted-foreground text-sm leading-normal">{g}</span> : null}
+  {f != null && <span className="mt-1 block h-1 w-full overflow-hidden rounded-full bg-muted"><i className="block h-full bg-primary" style={{ width: `${f}%` }} /></span>}
+</>);
 
 /** Button kinds: p = primary, g = secondary/outline, ghost = quiet, irr = irreversible (teal); " disabled" suffix draws a gated action. */
 type BtnBase = "p" | "g" | "ghost" | "irr";
@@ -125,6 +131,8 @@ export const E = {
       <span className="text-right">{v}</span>
     </div>
   ),
+  /** A filled value the user can change. */
+  pick: (k: React.ReactNode, v: React.ReactNode) => E.fld(k, <>{v}<span className="ml-2 text-muted-foreground">›</span></>),
   // The amber box and the quiet box differed only by tint; the glyph is the
   // second channel, so the difference survives a dim screen or a colorblind eye.
   note: (t: React.ReactNode) => (
@@ -160,27 +168,17 @@ export const E = {
       ))}
     </div>
   ),
-  tiles: (arr: [React.ReactNode, React.ReactNode, React.ReactNode?, (0 | 1)?, number?][]) => (
+  tiles: (arr: [React.ReactNode, React.ReactNode, React.ReactNode?, (0 | 1)?, number?, (0 | 1)?][]) => (
     <ItemGroup className="grid grid-cols-3 gap-2">
-      {arr.map(([n, s, g, w, f], i) => (
-        <Item key={i} variant="outline" size="sm" className="flex-col items-start gap-0.5">
-          <ItemTitle className="flex items-center gap-1.5">
-            {w ? <Dot cls="w" /> : null}
-            {n}
-          </ItemTitle>
-          <ItemDescription>{s}</ItemDescription>
-          {g ? <ItemDescription>{g}</ItemDescription> : null}
-          {f != null && (
-            <span className="mt-1 block h-1 w-full overflow-hidden rounded-full bg-muted">
-              <i className="block h-full bg-primary" style={{ width: `${f}%` }} />
-            </span>
-          )}
+      {arr.map(([n, s, g, w, f, actionable], i) => (
+        <Item key={i} variant="outline" size="sm" className="flex-col items-start gap-0.5" asChild={Boolean(actionable)}>
+          {actionable ? <button type="button"><TileContent {...{ n, s, g, w, f }} /></button> : <div><TileContent {...{ n, s, g, w, f }} /></div>}
         </Item>
       ))}
     </ItemGroup>
   ),
   tbl: (hd: React.ReactNode[], rows: React.ReactNode[][]) => (
-    <Table>
+    <Table className="min-w-max">
       <TableHeader>
         <TableRow>
           {hd.map((h, i) => (
@@ -206,11 +204,11 @@ export const E = {
     </Empty>
   ),
   inp: (t: string) => <Input placeholder={t} aria-label={t} />,
-  stq: (v: React.ReactNode) => (
+  stq: (v: number, label = "Quantity") => (
     <ButtonGroup>
       <Button variant="outline" size="icon" aria-label="Decrease">−</Button>
+      <Input type="number" inputMode="numeric" min={0} defaultValue={v} aria-label={label} className="w-14 text-center" />
       <Button variant="outline" size="icon" aria-label="Increase">+</Button>
-      <span className="flex items-center px-2 text-sm">{v}</span>
     </ButtonGroup>
   ),
   gated: (t: React.ReactNode, why: React.ReactNode = "isn’t available yet") => E.row(t, why, "", "dis", SquareLock01Icon),
