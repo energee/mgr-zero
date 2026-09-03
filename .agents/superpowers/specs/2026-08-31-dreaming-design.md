@@ -53,10 +53,20 @@ contract:
 - Transcript signal doesn't exist in CI, so the inputs are repo-visible
   substitutes: the git/PR window since the last dream plus any committed
   `.remember/today-*.md` digests.
-- The model job hands publish a `git diff` patch, not file snapshots, applied
-  `--3way` onto current main so edits that land during the run survive. A
-  `dreaming/main` that no longer merges cleanly is abandoned and rebuilt from
-  main rather than failing every scheduled run.
+- The model job validates and commits the dream itself and hands publish a
+  `git bundle` of that commit. Publish pushes exactly that tree: it never
+  re-merges main (the two jobs could otherwise disagree about whether
+  `dreaming/main` still merges) and never needs the preimage blobs a `--3way`
+  patch apply would (a merge-product blob exists in no pushed ref). Edits that
+  land on main during the run leave the PR one merge behind, which the next
+  dream's merge absorbs. A `dreaming/main` that no longer merges cleanly is
+  abandoned and rebuilt from main rather than failing every scheduled run; the
+  run logs a warning and the PR body says so.
+- The publish push is `--force-with-lease` on the `dreaming/main` head the
+  model job built on, so a commit a reviewer pushes to the branch mid-run
+  rejects the push (the run retries without advancing the marker) instead of
+  being overwritten.
+- Both Claude workflows read one deny list, `.github/claude-ci-settings.json`.
 - The editable set includes `dreaming.md` itself, but the workflow still
   enforces the file boundary and owns publication.
 

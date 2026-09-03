@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(/proc/**)",
+      "Read(/etc/**)",
+      "Read(/home/runner/.*/**)",
+      "Read(/home/runner/.config/**)",
+      "Read(/home/runner/.cache/**)",
+      "Read(/home/runner/.ssh/**)",
+      "Read(/home/runner/.gitconfig)",
+      "Read(/home/runner/.npmrc)",
+      "Read(/home/runner/.netrc)",
+      "Read(/home/runner/work/_temp/**)",
+      "Read(/github/home/**)",
+      "Read(**/.env*)",
+      "Read(**/*token*)",
+      "Grep(/proc/**)",
+      "Grep(/etc/**)",
+      "Grep(/home/runner/.*/**)",
+      "Grep(/home/runner/.config/**)",
+      "Grep(/home/runner/.cache/**)",
+      "Grep(/home/runner/.ssh/**)",
+      "Grep(/home/runner/.gitconfig)",
+      "Grep(/home/runner/.npmrc)",
+      "Grep(/home/runner/.netrc)",
+      "Grep(/home/runner/work/_temp/**)",
+      "Grep(/github/home/**)",
+      "Grep(**/.env*)",
+      "Grep(**/*token*)",
+      "Glob(/proc/**)",
+      "Glob(/etc/**)",
+      "Glob(/home/runner/.*/**)",
+      "Glob(/home/runner/.config/**)",
+      "Glob(/home/runner/.cache/**)",
+      "Glob(/home/runner/.ssh/**)",
+      "Glob(/home/runner/work/_temp/**)",
+      "Glob(/github/home/**)",
+      "Glob(**/.env*)",
+      "Glob(**/*token*)"
+    ]
+  }
+}
