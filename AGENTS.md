@@ -36,6 +36,8 @@ below just in time — don't preload everything.
 
 ## Operating loop
 
+0. Orient first: follow `.agents/skills/orient/SKILL.md` (`/orient` in Claude
+   Code) — report worktree, branch, status, PR base, then wait for confirmation.
 1. `bunx supabase start` must be running; tests hit the real database.
 2. Find the owner of the concept in `.agents/ARCHITECTURE.md` and change it there.
 3. TDD: new behavior starts with a failing vitest — write it, watch it fail,
@@ -66,6 +68,10 @@ reseed, create worktrees under `.agents/worktrees/<branch>`.
 Ask first: provisioning hosted Supabase or Vercel, any deploy, adding a
 dependency, adding a second migration file, anything that would `DELETE`
 production data (there is none yet — keep it that way by asking).
+
+Do not move, rename, or delete files outside the explicit scope of the
+request. If a restructure seems necessary, list the proposed moves and wait for
+approval before touching anything.
 
 ## Working files
 
