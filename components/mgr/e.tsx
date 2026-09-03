@@ -31,8 +31,8 @@ const TileContent = ({ n, s, g, w, f }: { n: React.ReactNode; s: React.ReactNode
   {f != null && <span className="mt-1 block h-1 w-full overflow-hidden rounded-full bg-muted"><i className="block h-full bg-primary" style={{ width: `${f}%` }} /></span>}
 </>);
 
-/** Button kinds: p = primary, g = secondary/outline, irr = irreversible (teal); " disabled" suffix draws a gated action. */
-type BtnBase = "p" | "g" | "irr";
+/** Button kinds: p = primary, g = secondary/outline, ghost = quiet, irr = irreversible (teal); " disabled" suffix draws a gated action. */
+type BtnBase = "p" | "g" | "ghost" | "irr";
 type BtnKind = BtnBase | `${BtnBase} disabled`;
 
 export const E = {
@@ -72,7 +72,7 @@ export const E = {
     const [kind, disabled] = k.split(" ") as [BtnBase, string?];
     return (
       <Button
-        variant={kind === "g" ? "outline" : "default"}
+        variant={kind === "g" ? "outline" : kind === "ghost" ? "ghost" : "default"}
         disabled={Boolean(disabled)}
         className={cn(kind === "irr" && "bg-irreversible text-irreversible-foreground hover:bg-irreversible/90")}
         {...(kind === "irr" ? { "data-variant": "irreversible" } : {})}
