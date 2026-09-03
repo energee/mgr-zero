@@ -118,16 +118,19 @@ jobs:
           fi
           git diff --cached --check
           for guide in public/docs/user-guide.html public/docs/staff-guide.html public/docs/portal-guide.html; do
-            grep -qi '^<!doctype html>' "$guide"
+            if grep -Eqi '<(!doctype|html|head|body|style)\b' "$guide"; then
+              echo "$guide is a body fragment styled by app/globals.css; it must not carry its own document or styles."
+              exit 1
+            fi
             grep -q '<main' "$guide"
             grep -q '<nav' "$guide"
             if grep -Eqi '<(script|base|link|iframe|object|embed|img|form|video|audio|source)\b|http-equiv|@import|url[[:space:]]*\(|[[:space:]]on[a-z]+[[:space:]]*=' "$guide"; then
-              echo "$guide must remain self-contained and inert."
+              echo "$guide must remain script- and asset-free."
               exit 1
             fi
           done
-          grep -q 'staff-guide.html' public/docs/user-guide.html
-          grep -q 'portal-guide.html' public/docs/user-guide.html
+          grep -q '/docs/staff-guide' public/docs/user-guide.html
+          grep -q '/docs/portal-guide' public/docs/user-guide.html
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
       - name: Save the updated guide

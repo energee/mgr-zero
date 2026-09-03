@@ -68,12 +68,16 @@ see. Prefer short steps, compact tables, and direct recovery instructions. Be
 concise but never omit a field, condition, side effect, or safe correction merely
 to shorten the guide.
 
-Keep each guide a valid, self-contained HTML document with semantic headings,
-landmark elements, working anchor navigation, minimal responsive inline CSS,
-visible keyboard focus, and print styles. Use no scripts, external styles, fonts,
-images, or assets. Keep the presentation neutral and close to browser defaults;
-do not invent a documentation design system before MGR adopts one shared with
-the application and API documentation.
+Each guide is an HTML body fragment, not a document: no doctype, `<html>`,
+`<head>`, `<body>`, or `<style>`. The application renders it at
+`/docs/<name>` inside its own layout, and `app/globals.css` (the `.guide`
+rules) styles the semantic markup, so the guides share the product's fonts,
+colors, dark mode, and print rules by inheritance. Use semantic headings,
+landmark elements, working anchor navigation, and only the existing classes
+(`eyebrow`, `lede`, `summary`, `steps`, `facts`/`fact`, `note`,
+`warning note`, `table-wrap`, `status`, `stamp`, `flow`). Cross-link guides
+as `/docs/staff-guide` and `/docs/portal-guide`. Use no scripts, styles,
+fonts, images, or assets.
 
 Never expose source paths, command/query names, database terminology, access
 policy terminology, development phases, future plans, or implementation gates.

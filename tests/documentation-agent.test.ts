@@ -15,7 +15,7 @@ describe("customer documentation", () => {
     const portal = read("public/docs/portal-guide.html");
 
     for (const guide of [master, staff, portal]) {
-      expect(guide).toMatch(/^<!doctype html>/i);
+      expect(guide).not.toMatch(/<(?:!doctype|html|head|body|style)\b/i);
       expect(guide).toContain("<main");
       expect(guide).toContain("<nav");
       expect(guide).not.toMatch(/<(?:script|link)\b/i);
@@ -26,10 +26,8 @@ describe("customer documentation", () => {
       expect(guide).not.toMatch(/\b(?:RLS|schema|command ID|slice \d|implementation gate)\b/i);
     }
 
-    expect(master).toContain("staff-guide.html");
-    expect(master).toContain("portal-guide.html");
-    expect(staff).toContain("@media print");
-    expect(portal).toContain("@media print");
+    expect(master).toContain("/docs/staff-guide");
+    expect(master).toContain("/docs/portal-guide");
     expect(staff).not.toContain('id="customer-portal"');
     expect(portal).not.toContain("Record Movement");
 

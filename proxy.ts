@@ -29,7 +29,7 @@ export async function proxy(req: NextRequest) {
 }
 
 // Skip static assets: a session refresh is a Supabase round-trip, and an SVG
-// from /public doesn't need one.
+// from /public doesn't need one, and neither do the public customer guides at /docs/*.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|txt|html)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|docs/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|txt|html)$).*)"],
 };

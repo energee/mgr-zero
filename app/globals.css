@@ -179,3 +179,74 @@
     display: none;
   }
 }
+/* Customer guides (public/docs, rendered by app/(docs)/docs/[guide]). The
+   fragments carry no styles of their own; everything below is the app's
+   tokens applied to their semantic markup so docs and product read as one. */
+.guide {
+  display: grid;
+  grid-template-columns: 14rem minmax(0, 46rem);
+  gap: 3rem;
+  max-width: 68rem;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+  line-height: 1.6;
+}
+.guide > main:only-child { grid-column: 1 / -1; max-width: 46rem; }
+.guide aside { position: sticky; top: 1.5rem; align-self: start; font-size: 0.875rem; }
+.guide .brand { font-family: var(--font-heading); font-weight: 600; color: var(--primary); text-decoration: none; }
+.guide .nav-label, .guide .eyebrow {
+  font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--muted-foreground); margin: 0 0 0.25rem;
+}
+.guide aside ul { list-style: none; margin: 0; padding: 0; border-left: 1px solid var(--border); }
+.guide aside nav a { display: block; padding: 0.25rem 0.75rem; color: var(--muted-foreground); text-decoration: none; border-left: 2px solid transparent; margin-left: -1px; }
+.guide aside nav a:hover { color: var(--foreground); border-left-color: var(--primary); }
+.guide main { min-width: 0; }
+.guide p, .guide ol, .guide ul, .guide .table-wrap, .guide .facts, .guide .flow { margin: 0 0 0.875rem; }
+.guide header p { margin-bottom: 0.5rem; }
+.guide section { scroll-margin-top: 1.5rem; }
+.guide header, .guide section, .guide footer { margin-bottom: 3rem; }
+.guide h1 { font-size: 2rem; line-height: 1.15; margin: 0 0 0.5rem; letter-spacing: -0.01em; }
+.guide h2 { font-size: 1.375rem; margin: 0 0 0.5rem; }
+.guide h3 { font-size: 1rem; margin: 1.5rem 0 0.5rem; }
+.guide .lede { font-size: 1.125rem; color: var(--muted-foreground); margin-top: 0; }
+.guide .summary { color: var(--muted-foreground); }
+.guide a { color: var(--primary); }
+.guide .stamp, .guide .status {
+  display: inline-block; font-family: var(--font-mono); font-size: 0.75rem; padding: 0.125rem 0.5rem;
+  border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--muted);
+}
+.guide main ol { list-style: decimal; padding-left: 1.5rem; }
+.guide main ul:not(nav ul) { list-style: disc; padding-left: 1.5rem; }
+.guide .steps li { margin-bottom: 0.375rem; }
+.guide .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.guide .fact { padding: 1rem; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); font-size: 0.875rem; }
+.guide .fact strong { display: block; font-family: var(--font-heading); margin-bottom: 0.25rem; }
+.guide .note { padding: 0.75rem 1rem; border-left: 3px solid var(--primary); background: var(--muted); border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+.guide .warning.note { border-left-color: var(--warning-foreground); background: var(--warning); color: var(--warning-foreground); }
+.guide .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.guide table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.guide th, .guide td { padding: 0.5rem 0.75rem; text-align: left; vertical-align: top; border-top: 1px solid var(--border); }
+.guide thead th { border-top: 0; background: var(--muted); font-family: var(--font-mono); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted-foreground); }
+.guide code { font-family: var(--font-mono); font-size: 0.875em; padding: 0.0625rem 0.3rem; background: var(--muted); border-radius: var(--radius-sm); }
+.guide .flow { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.guide footer { font-size: 0.875rem; color: var(--muted-foreground); border-top: 1px solid var(--border); padding-top: 1rem; }
+.guide a:focus-visible, .guide summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.guide main nav ul { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 1rem; }
+.guide main nav li { padding: 1.25rem; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.guide main nav li:has(a:hover) { border-color: var(--primary); }
+.guide main nav h2 { margin: 0 0 0.375rem; }
+.guide main nav h2 a { text-decoration: none; }
+.guide main nav h2 a::after { content: ""; position: absolute; inset: 0; }
+.guide main nav li { position: relative; }
+.guide main nav p { margin: 0; color: var(--muted-foreground); font-size: 0.9375rem; }
+@media (max-width: 760px) {
+  .guide { display: block; padding: 1.25rem 1rem 3rem; }
+  .guide aside { position: static; margin-bottom: 2rem; }
+  .guide .facts { grid-template-columns: 1fr; }
+}
+@media print {
+  .guide { display: block; max-width: none; }
+  .guide aside { display: none; }
+  .guide section { break-inside: avoid; }
+}

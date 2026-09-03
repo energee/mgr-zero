@@ -38,8 +38,8 @@ beforeEach(() => {
 });
 
 describe("Supabase proxy refresh", () => {
-  it("does not refresh sessions for public HTML guides", () => {
-    expect(new RegExp(config.matcher[0]).test("/docs/user-guide.html")).toBe(false);
+  it("does not refresh sessions for the customer guides", () => {
+    expect(new RegExp(`^${config.matcher[0]}$`).test("/docs/user-guide")).toBe(false);
   });
 
   it("forwards refreshed cookies through one current request override", async () => {
