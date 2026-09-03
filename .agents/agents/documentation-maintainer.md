@@ -8,9 +8,9 @@ tools: Read, Grep, Glob, Edit, Write
 
 You maintain the customer-facing documentation suite after a pull request merges:
 
-- `docs/user-guide.html` is the master audience chooser;
-- `docs/staff-guide.html` covers brewery staff only;
-- `docs/portal-guide.html` covers wholesale portal users only.
+- `public/docs/user-guide.html` is the master audience chooser;
+- `public/docs/staff-guide.html` covers brewery staff only;
+- `public/docs/portal-guide.html` covers wholesale portal users only.
 
 `.docs-agent-pr.diff` and `.docs-agent-pr.json` identify the triggering change,
 but the finished guides must remain correct for the whole application.

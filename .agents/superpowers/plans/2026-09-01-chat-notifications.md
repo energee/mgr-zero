@@ -59,7 +59,7 @@ The slice-4 cellar and slice-10 delivery plans own those MGR pages/commands. Thi
 - `.agents/superpowers/specs/2026-08-31-mgr-ui-layout-plan.md` — Settings preview gallery and Slack surface ownership.
 - `.agents/superpowers/specs/2026-08-31-mgr-wireframes.html` — 73-frame catalog with 10 Chat frames.
 - `.agents/ARCHITECTURE.md` — chat owners, narrow internal-job exception, and provider contract.
-- `docs/user-guide.html` — customer-facing setup, linking, delivery, quiet hours, privacy, and recovery.
+- `public/docs/user-guide.html` — customer-facing setup, linking, delivery, quiet hours, privacy, and recovery.
 - `README.md` — local Slack app, environment, callback, job, and sandbox setup.
 - `.agents/PROGRESS.md` — completed scope and remaining gated forms.
 
@@ -1269,7 +1269,7 @@ git commit -m "test: verify Slack chat surfaces"
 - Modify: `.agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md`
 - Modify: `.agents/superpowers/specs/2026-08-31-mgr-ui-layout-plan.md`
 - Modify: `.agents/superpowers/specs/2026-09-01-mgr-chat-notifications-design.md`
-- Modify: `docs/user-guide.html`
+- Modify: `public/docs/user-guide.html`
 - Modify: `README.md`
 - Modify: `.agents/PROGRESS.md`
 
@@ -1335,7 +1335,7 @@ Expected: branch `plan/chat-notifications`, no unrelated files, no whitespace er
 - [ ] **Step 6: Commit documentation**
 
 ```bash
-git add .agents/ARCHITECTURE.md .agents/PROGRESS.md .agents/superpowers/specs docs/user-guide.html README.md
+git add .agents/ARCHITECTURE.md .agents/PROGRESS.md .agents/superpowers/specs public/docs/user-guide.html README.md
 git commit -m "docs: explain Slack chat notifications"
 ```
 
