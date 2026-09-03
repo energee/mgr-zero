@@ -75,16 +75,12 @@ jobs:
             exit 1
           fi
           git diff --cached --check
-          for guide in content/docs/index.mdx content/docs/staff-guide.mdx content/docs/portal-guide.mdx; do
-            head -1 "$guide" | grep -q '^---$'
-            grep -q '^title: ' "$guide"
-            if grep -Eq '^(import|export)[[:space:]]|<(script|style|link|iframe|img|div|span)\b|url[[:space:]]*\(|[[:space:]]on[a-z]+[[:space:]]*=' "$guide"; then
-              echo "$guide must stay prose MDX: no imports, raw HTML, scripts, or assets."
-              exit 1
-            fi
-          done
-          grep -q 'href="/docs/staff-guide"' content/docs/index.mdx
-          grep -q 'href="/docs/portal-guide"' content/docs/index.mdx
+          # Guide *shape* (frontmatter, prose-only MDX, anchors, the chooser's
+          # links) is specified once, in tests/docs.test.ts. The publish job
+          # pushes with the App token so ci.yml runs vitest on the generated
+          # PR - the merge gate - and a second copy of those rules in shell
+          # would only drift. This step owns what vitest cannot see: which
+          # files the agent touched.
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
       - name: Save the updated guide
@@ -92,10 +88,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: customer-guide
-          path: |
-            content/docs/index.mdx
-            content/docs/staff-guide.mdx
-            content/docs/portal-guide.mdx
+          path: content/docs
           if-no-files-found: error
 
   publish:
@@ -139,7 +132,7 @@ jobs:
           git config user.name "$login"
           git config user.email "$(gh api "users/${login}" --jq .id)+${login}@users.noreply.github.com"
           git checkout -B documentation/user-guide
-          git add content/docs/index.mdx content/docs/staff-guide.mdx content/docs/portal-guide.mdx
+          git add content/docs
           if [ "$EVENT_NAME" = "pull_request" ]; then
             doc_source="PR #$PR_NUMBER"
           else

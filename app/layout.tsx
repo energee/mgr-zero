@@ -7,11 +7,9 @@
 // beforeInteractive runs from the client bundle, i.e. after paint, so it is
 // not used). React then hydrates <html> against a class list the script
 // already changed, hence suppressHydrationWarning. components/mgr/theme-toggle.tsx
-// flips the class and writes the preference. Fumadocs' RootProvider (docs
-// shell, search) is mounted here with its own theme handling disabled.
+// flips the class and writes the preference.
 import type { Metadata, Viewport } from "next";
 import { Familjen_Grotesk, Instrument_Sans, JetBrains_Mono } from "next/font/google";
-import { RootProvider } from "fumadocs-ui/provider/next";
 import "./globals.css";
 
 const instrumentSans = Instrument_Sans({ variable: "--font-instrument-sans", subsets: ["latin"] });
@@ -39,10 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
       </head>
-      <body className="min-h-full flex flex-col">
-        {/* theme disabled: THEME_BOOT and components/mgr/theme-toggle.tsx own the .dark class */}
-        <RootProvider theme={{ enabled: false }}>{children}</RootProvider>
-      </body>
+      <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
 }

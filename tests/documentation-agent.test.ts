@@ -45,8 +45,12 @@ describe("post-merge documentation maintainer", () => {
     expect(workflow).toContain("manual documentation audit");
     expect(workflow).toContain("contents: write");
     expect(workflow).toContain("pull-requests: write");
-    expect(workflow).toContain("Edit(content/docs/staff-guide.mdx)");
-    expect(workflow).toContain("Write(content/docs/portal-guide.mdx)");
+    // The agent may write only the guides, and only vitest specifies their
+    // shape: a second copy of those rules in shell would drift (see the
+    // workflow's validate step).
+    expect(workflow).toContain("content/docs/(index|staff-guide|portal-guide)");
+    expect(workflow).toMatch(/Edit\(content\/docs\/[a-z-]+\.mdx\)/);
+    expect(workflow).not.toMatch(/grep[^\n]*\$guide/);
     expect(workflow).toContain("documentation/user-guide");
     // Staged, not working-tree: git diff never sees a guide the agent creates
     // rather than edits, so the run reported no changes and binned the work.
@@ -57,9 +61,7 @@ describe("post-merge documentation maintainer", () => {
     expect(workflow).toContain("actions/create-github-app-token");
     expect(workflow).toContain("GH_TOKEN: ${{ steps.mgr-app.outputs.token }}");
     expect(workflow).toContain("token: ${{ steps.mgr-app.outputs.token }}");
-    expect(workflow).toContain("content/docs/index.mdx content/docs/staff-guide.mdx content/docs/portal-guide.mdx");
     expect(workflow).toContain("gh pr create");
-    expect(workflow).toContain("<(script|style|link|iframe");
     expect(workflow).not.toContain("issues: read");
     expect(workflow).not.toContain("issues: write");
     expect(workflow).not.toContain("--json-schema");

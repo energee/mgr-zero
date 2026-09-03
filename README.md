@@ -288,7 +288,7 @@ After a pull request merges—or when manually dispatched on `main`—
 `.github/workflows/documentation-agent.yml` audits every current user-facing
 route, not only the triggering change, and updates the
 staff and portal field manuals linked from `content/docs/index.mdx` when behavior has drifted. The
-Claude job has read-only GitHub permissions and may edit only those three HTML files. A separate
+Claude job has read-only GitHub permissions and may edit only those three MDX files. A separate
 deterministic job rejects wider or active-content changes, then maintains one
 reviewable `documentation/user-guide` pull request; the bot never commits directly
 to `main`.

@@ -7,7 +7,9 @@ import { describe, expect, it } from "vitest";
 
 const root = resolve(__dirname, "..");
 const read = (path: string) => readFileSync(resolve(root, path), "utf8");
-const GUIDES = ["index", "staff-guide", "portal-guide"];
+// content/docs/meta.json is the one list of guides: it orders the sidebar, so
+// a guide missing from it is invisible. Everything else here derives from it.
+const GUIDES: string[] = JSON.parse(read("content/docs/meta.json")).pages;
 
 describe("customer guides (MDX)", () => {
   it("has exactly the three guides, each with frontmatter and no code", () => {
@@ -21,7 +23,6 @@ describe("customer guides (MDX)", () => {
       expect(mdx).not.toMatch(/<(?:script|style|link|iframe|img|div|span|p|a)\b/i);
       expect(mdx).not.toMatch(/\b(?:RLS|schema|command ID|slice \d|implementation gate)\b/i);
     }
-    expect(JSON.parse(read("content/docs/meta.json")).pages).toEqual(GUIDES);
   });
 
   it("keeps the master chooser linked to both audiences and the audiences apart", () => {
@@ -45,7 +46,11 @@ describe("guide URLs", () => {
   it("redirects the pre-Fumadocs paths to the docs routes", async () => {
     const config = (await import("@/next.config")).default;
     const redirects = await config.redirects!();
-    expect(redirects).toContainEqual({ source: "/docs/user-guide.html", destination: "/docs", permanent: true });
-    expect(redirects).toContainEqual({ source: "/docs/:guide.html", destination: "/docs/:guide", permanent: true });
+    expect(redirects).toContainEqual({ source: "/docs/user-guide{.html}?", destination: "/docs", permanent: true });
+    expect(redirects).toContainEqual({
+      source: "/docs/:guide(staff-guide|portal-guide).html",
+      destination: "/docs/:guide",
+      permanent: true,
+    });
   });
 });

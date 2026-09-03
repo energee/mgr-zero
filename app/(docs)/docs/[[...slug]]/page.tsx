@@ -24,6 +24,8 @@ export default async function Page({ params }: Props) {
   );
 }
 
+export const dynamicParams = false;
+
 export function generateStaticParams() {
   return source.generateParams();
 }
