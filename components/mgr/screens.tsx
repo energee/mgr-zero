@@ -50,7 +50,7 @@ export const SCREENS: Screen[] = [
       {E.row("3 orders ready", "quantities default to ordered", E.act("Pick"), "w")}
       {E.row("Staged · ORD-0229", "restock 3 Pils cases to Warehouse", E.act("Put back"), "w")}
       {E.row("PO-0142 · Country Malt", "arrives Thu", E.act("Receive"))}
-      {E.row("Next delivery · Sly Fox", "your route · stop 1 of 3", E.act("Resume"))}
+      {E.row("Next delivery · Ridgeline", "your route · stop 1 of 3", E.act("Resume"))}
       {E.gated("Weekly count")}
     </>),
   },
@@ -62,7 +62,7 @@ export const SCREENS: Screen[] = [
     spec: "Same get_today read as the exemplar, filtered for sales. Confirm opens Order · confirm (2 taps); shortfall rows open Shortfall, pars and standing allocation.",
     body: today(<>
       {E.btns(["Confirm", "New order"], "c2")}
-      {E.row("ORD-0231 · Sly Fox", "submitted · ships Thu", E.act("Confirm"), "w")}
+      {E.row("ORD-0231 · Ridgeline", "submitted · ships Thu", E.act("Confirm"), "w")}
       {E.row("ORD-0235 · Teresa’s", "submitted · ships Fri", E.act("Confirm"))}
       {E.row("Pils · 16 oz case", "ATP −6 · 2 orders compete", E.act("Review"), "w")}
       {E.row("Hazy IPA · ½ bbl", "ATP 11 · fine", "")}
@@ -91,7 +91,7 @@ export const SCREENS: Screen[] = [
     spec: "Resume opens Driver · confirm delivery for the next incomplete stop. No Pick/Receive rows. The route itself is Work → Route and loading.",
     body: today(<>
       {E.btn("Resume · Stop 1 of 3")}
-      {E.row("Stop 1 · Sly Fox Tap Room", "4 Hazy halves · 6 Pils cases", E.act("Resume"), "w")}
+      {E.row("Stop 1 · Ridgeline Tap Room", "4 Hazy halves · 6 Pils cases", E.act("Resume"), "w")}
       {E.row("Stop 2 · Al’s Bar", "2 Stout sixths", "after")}
       {E.row("Stop 3 · Teresa’s", "8 Hazy halves · 12 Pils cases", "after")}
       {E.row("Route A", "departed 8:10 · return open", "")}
@@ -133,7 +133,7 @@ export const SCREENS: Screen[] = [
       {E.hd("Work", "warehouse default")}
       {E.btn("New order", "g")}
       {E.chips(["all", "orders", "batches", "runs", "POs", "routes"], 1)}
-      {E.row("ORD-0231 · Sly Fox", "submitted · ships today", E.act("Confirm"))}
+      {E.row("ORD-0231 · Ridgeline", "submitted · ships today", E.act("Confirm"))}
       {E.row("ORD-0229 · Al’s Bar", "picked · restock 3 Pils staged", E.act("Put back"), "w")}
       {E.row("PO-0142 · Country Malt", "due today", E.act("Receive"))}
       {E.row("Route A", "3 stops · Thu", E.act("Resume"))}
@@ -160,7 +160,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.inp("Search SKU, customer, order, lot, vessel or material")}
       {E.nav("Hazy IPA · ½ bbl", "SKU · ATP 11")}
-      {E.nav("ORD-0231 · Sly Fox", "order · 4 × Hazy")}
+      {E.nav("ORD-0231 · Ridgeline", "order · 4 × Hazy")}
       {E.nav("L-240831-HZ", "lot · packaged 8/31")}
     </>),
   },
@@ -174,7 +174,7 @@ export const SCREENS: Screen[] = [
       {E.fld("Role", "warehouse")}
       {E.ttl("Brewery")}
       {E.row("Demo Brewing", "current", "✓", "ok")}
-      {E.row("Sly Fox Contract Brewing", "switch", "")}
+      {E.row("Ridgeline Contract Brewing", "switch", "")}
       {E.sp()}
       {E.btn("Sign out", "g")}
     </>),
@@ -377,7 +377,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.stp(["upload", "map", "preview", "commit"], 2)}
       {E.chips(["customers", "catalog", "opening balances"], 0)}
-      {E.tbl(["row", "record", "match", "state"], [["1", "Sly Fox + Main", "new", "ready"], ["2", "Al’s Bar", "ship-to missing", <><span className="text-warning-foreground">blocked</span></>], ["3", "Teresa’s", "existing", "skip"]])}
+      {E.tbl(["row", "record", "match", "state"], [["1", "Ridgeline + Main", "new", "ready"], ["2", "Al’s Bar", "ship-to missing", <><span className="text-warning-foreground">blocked</span></>], ["3", "Teresa’s", "existing", "skip"]])}
       {E.btns([["Import 2 customer rows", "p disabled"], ["Post opening balances", "irr disabled"]])}
     </>),
   },
@@ -517,7 +517,7 @@ export const SCREENS: Screen[] = [
     spec: "2 taps from Today: Confirm → Confirm order, only when no blocking review exists. The registration warning is the same one Order · detail shows; it links to the Compliance registry and never blocks.",
     body: (<>
       {E.hd("Back · Work", "ORD-0231")}
-      {E.ttl("Sly Fox Tap Room")}
+      {E.ttl("Ridgeline Tap Room")}
       {E.row("Current state", "Submitted · ships Thu", E.act("Next: confirm"))}
       {E.row("Fulfillment source", "Warehouse", E.act("Required"))}
       {E.info("Lifecycle: submitted → confirmed → picked → shipped. Only the valid next action is active.")}
@@ -566,7 +566,7 @@ export const SCREENS: Screen[] = [
     spec: "Opens from a Pick line whose count is below ordered. Reason is required; exactly one resolution is chosen and the verb names it: adjusting the order is green (mutable order edit); keeping the remainder staged is also green. The restock implication is copy in the preview, never a status column. Done picking completes afterward on the Pick frame.",
     body: (<>
       {E.hd("Back · Pick", "ORD-0231 · short line")}
-      {E.fld("Order · source", "Sly Fox · Warehouse")}
+      {E.fld("Order · source", "Ridgeline · Warehouse")}
       {E.row("Pils · 16 oz case", "picked / ordered", "7 / 10", "w")}
       {E.chips(["damaged", "not found", "count error", "customer cut"], 1)}
       {E.ttl("Resolve the missing 3")}
@@ -672,7 +672,7 @@ export const SCREENS: Screen[] = [
     writes: "—",
     body: (<>
       {E.hd("Back · Work", "Thu pick sheet")}
-      {E.row("Sly Fox", "ORD-0231", "3 lines")}
+      {E.row("Ridgeline", "ORD-0231", "3 lines")}
       {E.row("Al’s Bar", "ORD-0232", "1 line")}
       {E.row("Teresa’s", "ORD-0234", "5 lines")}
       {E.nav("Totals", "Hazy halves 9 · Pils cases 22")}
@@ -738,7 +738,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Back · Beer", "Pils · 16 oz case")}
       {E.num("−6", "ATP · 22 on hand · 28 allocated")}
-      {E.row("ORD-0231 · Sly Fox", "adjust line", "10")}
+      {E.row("ORD-0231 · Ridgeline", "adjust line", "10")}
       {E.row("ORD-0234 · Teresa’s", "release allocation", "12")}
       {E.row("Taproom standing", "edit protected qty", "6")}
       {E.row("Taproom par", "edit replenishment target", "8")}
@@ -776,7 +776,7 @@ export const SCREENS: Screen[] = [
     spec: "Source writes required from_location_id; the app never guesses “Warehouse.” Save draft lands on Order · detail, where Submit lives.",
     body: (<>
       {E.hd("Back · Work", "New order")}
-      {E.fld("Customer", "Sly Fox Tap Room")}
+      {E.fld("Customer", "Ridgeline Tap Room")}
       {E.fld("Source location", "Warehouse")}
       {E.fld("Ship-to", "Main · Phoenixville, PA")}
       {E.fld("Customer PO", "optional · 4471")}
@@ -800,7 +800,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Back · More", "Customers")}
       {E.inp("Search customers")}
-      {E.nav("Sly Fox Tap Room", "retailer · PA · 2 portal users")}
+      {E.nav("Ridgeline Tap Room", "retailer · PA · 2 portal users")}
       {E.nav("Al’s Bar", "retailer · OH · brewery remits", "w")}
       {E.chips(["distributor", "retailer", "brewery", "other"], 1)}
       {E.fld("License no. · terms", "PA R-55821 · net30")}
@@ -850,12 +850,12 @@ export const SCREENS: Screen[] = [
     spec: <>QuickBooks has no read-only invoice. Once pushed, the accountant can edit, void or delete it from the Sales transactions sidebar and no API setting prevents that — so MGR detects rather than prevents. QuickBooks hands us the detector free: SyncToken increments on every modification and already rides the response the sync job reads for balance, so drift costs one column and no extra call. The rule this frame protects: <b>a voided invoice is not a paid invoice.</b> Voiding zeroes the amounts, so any logic inferring paid from qbo_balance_cents = 0 books cancelled revenue as collected — the database refuses paid_at unless the remote state is live rather than trusting the job to remember. MGR surfaces drift and stops: no re-push that overwrites an accountant’s correction, no field-level merge UI. ASSUMPTION: a drifted invoice stays in AR at QuickBooks’ numbers, because QuickBooks owns the invoice after push.</>,
     body: (<>
       {E.hd("Back · More", "Invoices")}
-      {E.row("INV-1042 · Sly Fox", "due 10/03 · pushed", "$1,051.52")}
+      {E.row("INV-1042 · Ridgeline", "due 10/03 · pushed", "$1,051.52")}
       {E.row("INV-1041 · Al’s Bar", "edited in QuickBooks · $980 → $1,040", "$1,040", "w")}
       {E.row("INV-1040 · Teresa’s", "voided in QuickBooks · not paid", "$0.00", "w")}
-      {E.row("INV-1039 · Sly Fox", "deleted in QuickBooks · re-push or write off", "—", "w")}
+      {E.row("INV-1039 · Ridgeline", "deleted in QuickBooks · re-push or write off", "—", "w")}
       {E.row("INV-1038 · Al’s Bar", "pushed · not sent from QuickBooks", "$540")}
-      {E.row("INV-1037 · Sly Fox", "paid 8/29 from QBO", "$980", "ok")}
+      {E.row("INV-1037 · Ridgeline", "paid 8/29 from QBO", "$980", "ok")}
       {E.info("MGR shows what changed over there. Corrections belong in QuickBooks, or as a credit memo here.")}
     </>),
   },
@@ -872,9 +872,9 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Back · More", "Invoices")}
       {E.row("QuickBooks", "connected · company 9341", "healthy", "ok")}
-      {E.row("INV-0198 · Sly Fox", "due 9/18 · pushed", "$1,240")}
+      {E.row("INV-0198 · Ridgeline", "due 9/18 · pushed", "$1,240")}
       {E.row("INV-0197 · Al’s Bar", "push failed · item unmapped", "$540", "w")}
-      {E.row("INV-0190 · Sly Fox", "paid 8/29 from QBO", "$980", "ok")}
+      {E.row("INV-0190 · Ridgeline", "paid 8/29 from QBO", "$980", "ok")}
       {E.row("CM-0012 · Teresa’s", "credit memo · pushed", "−$180")}
       {E.ttl("INV-0197 · fix and push")}
       {E.row("SKU · Pils case", "QBO candidate: Pils 16 oz", E.act("Select"))}
@@ -937,7 +937,7 @@ export const SCREENS: Screen[] = [
     states: [["empty catalog", "call brewery; nothing orderable"], ["missing price", "item cannot enter cart", 1], ["no ship-to", "contact brewery; choose an existing ship-to", 1], ["repeat recheck", "SKU, price, ship-to and source revalidate", 1], ["receipt", "ORD number after commit"]],
     spec: "Target 2 taps: Same as last week → Place order (the repeat proposal opens Review prefilled). Review stays disabled until the schema/RLS contract supplies and validates a customer-allowed source — never silently choose Warehouse. Stepper − and + each ship as 48×48 targets. No staff vocabulary (ATP, gates, fulfillment engineering) anywhere in the portal. No persistent cart: leaving the page keeps nothing.",
     body: (<>
-      {E.hd("Order", "Sly Fox")}
+      {E.hd("Order", "Ridgeline")}
       {E.btn("Same as last week", "g")}
       {E.row("Hazy IPA · ½ bbl keg", "$150.00", E.stq(4))}
       {E.row("Pils · 16 oz case", "$38.00", E.stq(6))}
@@ -982,7 +982,7 @@ export const SCREENS: Screen[] = [
     states: [["expanded row", "lines with ordered vs shipped and plain adjusted copy"], ["no orders", "Start one from Order"]],
     spec: "Each row expands in place into its lines; adjusted quantities are stated in buyer copy. No change-request, no cancel — the portal is read-only after submit; the row says whom to call.",
     body: (<>
-      {E.hd("Orders", "Sly Fox")}
+      {E.hd("Orders", "Ridgeline")}
       {E.row("ORD-0231", "confirmed · ships Thu", "$1,240")}
       {E.row("ORD-0225", "shipped 8/27", "$980")}
       {E.row("ORD-0221", "adjusted · 2 cases short", "$528", "w")}
@@ -1041,7 +1041,7 @@ export const SCREENS: Screen[] = [
     reads: "list_portal_invoices [design]",
     writes: "—",
     body: (<>
-      {E.hd("Invoices", "Sly Fox")}
+      {E.hd("Invoices", "Ridgeline")}
       {E.row("INV-0198", "due 9/18", "$1,240", "w")}
       {E.row("INV-0190", "paid 8/29", "$980", "ok")}
       {E.blank("No invoices yet. They appear after shipment or delivery.")}
@@ -1057,7 +1057,7 @@ export const SCREENS: Screen[] = [
     writes: "—",
     spec: "Peer portal users are not listed; the composer exposes only account-safe reads and order commands.",
     body: (<>
-      {E.hd("Account", "Sly Fox")}
+      {E.hd("Account", "Ridgeline")}
       {E.nav("Main ship-to", "Phoenixville, PA")}
       {E.nav("Dock ship-to", "Royersford, PA")}
       {E.row("You · buyer", "signed-in membership", "active")}
@@ -1207,7 +1207,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Back · Search", "L-240831-HZ")}
       {E.row("Hazy IPA · 16 oz case", "RUN-0028 · packaged 8/31", "118")}
-      {E.tape([["−40 · ORD-0225 · Sly Fox", "8/27"], ["−24 · ORD-0229 · Teresa’s", "8/29"], ["−6 · taproom transfer", "8/30"], ["−2 · sample", "8/30"]])}
+      {E.tape([["−40 · ORD-0225 · Ridgeline", "8/27"], ["−24 · ORD-0229 · Teresa’s", "8/29"], ["−6 · taproom transfer", "8/30"], ["−2 · sample", "8/30"]])}
       {E.nav("Materials in", "2-row L-0821 · Citra L-0790")}
       {E.btn("Print trace", "g")}
     </>),
@@ -1383,11 +1383,11 @@ export const SCREENS: Screen[] = [
       {E.fld("Selected pool", "Owned ½ bbl · 203 kegs · $30 deposit")}
       {E.btns([["Add keg pool", "g"], ["Save keg pool", "g"]])}
       {E.row("Owned ½ bbl", "142 out · 61 in", "203")}
-      {E.row("Sly Fox", "38 out", "$1,140")}
+      {E.row("Ridgeline", "38 out", "$1,140")}
       {E.row("Unreturned over 90 days", "", "9", "w")}
       {E.chips(["acquire", "return empty", "lost / found", "retire"], 1)}
-      {E.fld("Customer · qty", "Sly Fox · 4 × ½ bbl")}
-      {E.info("Preview: +4 returned · Sly Fox 38 → 34 out · credit memo −$120.00 deposit refund")}
+      {E.fld("Customer · qty", "Ridgeline · 4 × ½ bbl")}
+      {E.info("Preview: +4 returned · Ridgeline 38 → 34 out · credit memo −$120.00 deposit refund")}
       {E.note("Empty kegs only; beer return/credit is Return shipment.")}
       {E.btn("Record keg return · refund $120", "irr")}
     </>),
@@ -1460,7 +1460,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Back · Work", "Route A · Thu")}
       {E.fld("Driver · vehicle", "Maria · Box truck 2")}
-      {E.row("Stop 1 · Sly Fox", "4 Hazy halves · 6 Pils cases", "next")}
+      {E.row("Stop 1 · Ridgeline", "4 Hazy halves · 6 Pils cases", "next")}
       {E.row("Stop 2 · Al’s Bar", "2 Stout sixths", "after")}
       {E.row("Stop 3 · Teresa’s", "8 Hazy halves · 12 Pils cases", "after", "w")}
       {E.row("Unassigned · ORD-0236 · Dock", "3 Hazy halves · shipped, no route", E.act("Add stop"), "w")}
@@ -1480,7 +1480,7 @@ export const SCREENS: Screen[] = [
     spec: "2 taps: receiving-contact chip → Delivered. signed_by is stored text; the UI never implies a signature image is retained.",
     body: (<>
       {E.hd("Route A", "Stop 1 of 3")}
-      {E.ttl("Sly Fox Tap Room")}
+      {E.ttl("Ridgeline Tap Room")}
       {E.row("Invoice timing", "On delivery · persisted", E.act("Required"))}
       {E.row("Hazy IPA · ½ bbl keg", "", "4")}
       {E.row("Pils · 16 oz case", "", "6")}
