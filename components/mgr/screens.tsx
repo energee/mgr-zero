@@ -1454,8 +1454,9 @@ export const SCREENS: Screen[] = [
     states: [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]],
     spec: "The close half of the packaging frame; planning and editing the plan live in the Schedule packaging run sheet, reached from the Plan row until the run starts. Close is a copper review ( revalidated source, actual outputs, lot, explicit FG destination, material consumption/return/damage, yield/loss). Print labels is presentation after commit: measured thermal keg-collar/lot labels per plan §3. No packaging-day-actuals screen.",
     body: (<>
-      {E.back("Work", "RUN-0031 · started")}
+      {E.back("Work", "RUN-0031 · Hazy cans")}
       {E.fld("Packaging source", "FV3 · B-0416")}
+      {E.nav("Plan", "Hazy · cans · Fri 9/5 · 118 cases · edit until start")}
       {E.tbl(["need", "have", "short"], [["cans 2,880", "3,100", "0"], ["ends 2,880", "2,400", <><span className="text-warning-foreground">480</span></>], ["labels 2,880", "5,000", "0"]])}
       {E.note("480 ends short · resolve or explicitly override before starting.")}
       {E.fld("Packaged", "118 cases")}
@@ -1463,6 +1464,24 @@ export const SCREENS: Screen[] = [
       {E.fld("Finished goods destination", "Warehouse · selected")}
       {E.tape([["FV3 · B-0416", "source checked"], ["+118 cases · production in", "Warehouse · new lot"], ["−2,832 cans + ends · consumption", "FIFO"], ["Labels returned / damaged", "24 / 6"], ["Beer loss · 0.30 bbl", "yield 97.9%"]])}
       {E.btn("Close packaging run", "irr")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 5,
+    tab: "Work",
+    name: "Run closed",
+    job: "Lot and labels after close; Print is the post-commit action",
+    reads: "get_packaging_run [design]",
+    writes: "none",
+    states: [["closed", "lot assigned · labels ready"], ["print", "keg collar and lot labels"]],
+    spec: "Post-commit of Close packaging run. Print labels moves here; the close verb is gone.",
+    body: (<>
+      {E.back("Work", "RUN-0031 · closed")}
+      {E.fld("Lot", "L-240905-HZ")}
+      {E.fld("Output", "118 cases · Warehouse")}
+      {E.fld("Yield", "97.9% · 0.30 bbl loss")}
+      {E.btn("Print labels")}
     </>),
   },
   {
@@ -1564,7 +1583,7 @@ export const SCREENS: Screen[] = [
     spec: "Send PO (green) shows while the PO is draft; receiving needs a sent PO. Only counted quantity posts; over and short are both visible and both allowed, and the keypad never clamps an over-count as the only guard. PO status is trigger-derived; never write a loaded/status flag.",
     body: (<>
       {E.back("Work", "PO-0142 · Country Malt")}
-      {E.fld("Status", "sent Mon · expected Thu")}
+      {E.row("Status", "sent Mon · expected Thu", E.act("Send PO"))}
       {E.row("2-row · 55 lb bags", "expected 40", E.stq(42), "w")}
       {E.row("Citra · 44 lb boxes", "expected 4", E.stq(3), "w")}
       {E.row("Rice hulls · 50 lb", "expected 6", E.stq(6), "ok")}
