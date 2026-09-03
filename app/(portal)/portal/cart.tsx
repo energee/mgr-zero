@@ -35,6 +35,12 @@ const BADGE_STYLE: Record<CatalogItem["badge"], string> = {
   out: "bg-neutral-100 text-neutral-500",
 };
 
+export function submissionFailureMessage(message: string, draftId: string | null) {
+  return draftId
+    ? `Order saved, but submission could not be confirmed (${message}). View the order status before retrying, or contact the brewery.`
+    : message;
+}
+
 export function Cart({ items, shipTos }: { items: CatalogItem[]; shipTos: ShipToOption[] }) {
   const breweryId = useBrewery();
   const router = useRouter();
@@ -88,16 +94,16 @@ export function Cart({ items, shipTos }: { items: CatalogItem[]; shipTos: ShipTo
   async function submit() {
     setBusy("submit");
     setError(null);
+    let savedId = draftId;
     try {
-      const id = await ensureDraft();
-      await command(breweryId, "portal_submit_order", { orderId: id });
-      router.push(`/portal/orders/${id}`);
+      savedId = await ensureDraft();
+      await command(breweryId, "portal_submit_order", { orderId: savedId });
+      router.push(`/portal/orders/${savedId}`);
     } catch (err) {
-      // If ensureDraft succeeded but portal_submit_order failed, the draft
-      // exists and is kept in state (not discarded) — surface it as saved,
-      // with a link, rather than a bare failure the customer can't act on.
+      // A transport failure does not prove whether portal_submit_order
+      // committed. The saved order id is still available for status recovery.
       const message = err instanceof Error ? err.message : "order submission failed";
-      setError(draftId ? `Order saved as a draft (${message}). You can submit it from the order page.` : message);
+      setError(submissionFailureMessage(message, savedId));
     } finally {
       setBusy(null);
     }
@@ -181,7 +187,7 @@ export function Cart({ items, shipTos }: { items: CatalogItem[]; shipTos: ShipTo
               <>
                 {" "}
                 <Link href={`/portal/orders/${draftId}`} className="underline">
-                  View draft order
+                  View order status
                 </Link>
               </>
             )}

@@ -121,8 +121,8 @@ jobs:
             grep -qi '^<!doctype html>' "$guide"
             grep -q '<main' "$guide"
             grep -q '<nav' "$guide"
-            if grep -Eqi '<(script|link|iframe|object|embed|img|form|video|audio|source)\b|url[[:space:]]*\(|[[:space:]]on[a-z]+[[:space:]]*=' "$guide"; then
-              echo "$guide must remain self-contained and script-free."
+            if grep -Eqi '<(script|base|link|iframe|object|embed|img|form|video|audio|source)\b|http-equiv|@import|url[[:space:]]*\(|[[:space:]]on[a-z]+[[:space:]]*=' "$guide"; then
+              echo "$guide must remain self-contained and inert."
               exit 1
             fi
           done
@@ -148,7 +148,6 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-      issues: read
     steps:
       # A GITHUB_TOKEN push does not trigger workflows, so the docs PR never ran
       # ci.yml - the stated merge gate - and reached a human unchecked. An App
