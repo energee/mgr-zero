@@ -195,7 +195,7 @@ const QBO_APPS: VenueNavItem[] = [["Accounting", 1, 1], ["Expenses & Bills", 1, 
   ["Sales channels", 2], ["QuickBooks payouts", 2], ["Products & services", 2], ["Customer Hub", 1, 1],
   ["Inventory", 1, 1], ["Sales Tax", 1, 1]];
 
-const QBO_BACKDROP_ROWS = [["9/11/26", "Invoice", "INV-1042", "Ridgeline Tap Room"], ["9/10/26", "Invoice", "INV-1041", "Al’s Bar"],
+const QBO_BACKDROP_ROWS = [["9/3/26", "Invoice", "INV-1042", "Ridgeline Tap Room"], ["9/10/26", "Invoice", "INV-1041", "Al’s Bar"],
   ["9/10/26", "Invoice", "INV-1040", "Teresa’s"], ["9/3/26", "Invoice", "INV-1039", "Al’s Bar"],
   ["9/1/26", "Payment", "", "Ridgeline Tap Room"]];
 

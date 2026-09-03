@@ -8,6 +8,7 @@ import { createElement } from "react";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { E } from "../components/mgr/e";
+import { VenueFrame } from "../components/mgr/venue";
 
 describe("SCREENS", () => {
   it("ports the step-1 frames with names, jobs and IO", () => {
@@ -36,9 +37,64 @@ describe("SCREENS", () => {
     // A tripwire against a frame dropped by hand from a 1700-line array — the
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands; .agents/PROGRESS.md narrates
-    // what the number is made of — 89 MGR frames plus the 17 venue frames.
-    expect(SCREENS).toHaveLength(106);
+    // what the number is made of — 97 MGR frames plus the 17 venue frames.
+    expect(SCREENS).toHaveLength(114);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
+  });
+
+  it("resolves detail back links to a screen or shell destination", () => {
+    const shellDestinations = new Set([
+      "Search", "Today", "Work", "More", "Beer", "Settings", "Catalog",
+      "Compliance", "Chat", "Invoices", "Pick",
+    ]);
+    const screenNames = new Set(SCREENS.map((s) => s.name));
+    for (const s of SCREENS) {
+      const html = renderToStaticMarkup(createElement("div", null, s.body));
+      for (const [, link] of html.matchAll(/<a [^>]*>(.*?)<\/a>/g)) {
+        const target = link.replace(/<[^>]*>/g, "");
+        expect.soft(
+          screenNames.has(target) || shellDestinations.has(target) || /^[A-Z]{2,3}-\d+$/.test(target),
+          `${s.name}: unresolved back target ${target}`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("threads one invoice through the AR, portal and venue frames", () => {
+    const names = [
+      "Invoice drift", "Invoices", "Review order", "Order history",
+      "Pay invoice", "Payment unavailable", "Invoice history",
+      "Pushed invoice", "Payment", "Credit memo",
+    ];
+    for (const s of SCREENS.filter((s) => names.includes(s.name))) {
+      const text = renderToStaticMarkup(createElement("div", null, s.body)).replace(/<[^>]*>/g, " ");
+      expect.soft(text, s.name).toContain("948");
+      expect.soft(text, s.name).not.toMatch(/1,051|1,240|\b185\.00|\b740\.00|\b252\.00|\b114\.00/);
+    }
+    const pushed = SCREENS.find((s) => s.name === "Pushed invoice")!;
+    const venue = renderToStaticMarkup(VenueFrame({ venue: pushed.venue!, children: pushed.body }));
+    expect(venue).toContain("9/3/26");
+    expect(venue).not.toContain("9/11/26");
+    const tier = SCREENS.find((s) => s.name === "Price tiers")!;
+    const tierText = renderToStaticMarkup(createElement("div", null, tier.body)).replace(/<[^>]*>/g, " ");
+    expect(tierText).toContain("$150.00");
+    expect(tierText).not.toContain("$185.00");
+  });
+
+  it("marks pickable fields and never pins Required on a filled one", () => {
+    const chevrons = new Map([
+      ["Create brewery", 1], ["Record movement", 4], ["Composer proposal", 3],
+      ["Return and credit", 1], ["New order", 4], ["Cellar addition", 2],
+      ["Brew day", 3], ["Schedule batch", 2], ["Cellar transfer", 2], ["Close packaging run", 3],
+      ["Schedule packaging run", 2], ["Cycle count", 1], ["Chat settings", 3],
+    ]);
+    for (const s of SCREENS.filter((s) => !s.venue)) {
+      const html = renderToStaticMarkup(createElement("div", null, s.body));
+      expect.soft(html, `${s.name}: Required pill`).not.toMatch(/<button[^>]*>Required<\/button>/);
+      if (chevrons.has(s.name)) {
+        expect.soft(html.match(/>›</g)?.length ?? 0, `${s.name}: picker affordances`).toBeGreaterThanOrEqual(chevrons.get(s.name)!);
+      }
+    }
   });
 
   it("draws customer copy, not markup escapes, machine identifiers or em dashes", () => {
