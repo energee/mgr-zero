@@ -114,7 +114,7 @@ rather than re-hardcoding a literal.
 ## Tasks
 
 TDD throughout: each task writes its named test first, watches it fail, then
-implements. Tests hit the real database (`npx supabase start`).
+implements. Tests hit the real database (`bunx supabase start`).
 
 **Sequential spine: 1 → 2 → 3 → 4 → 6 → 7 → 6b. Tasks 5, 8, 9 parallel after 4.**
 
@@ -123,7 +123,7 @@ implements. Tests hit the real database (`npx supabase start`).
    brewery B's channels; `unique (brewery_id, name)` rejects a duplicate.
    Files: `supabase/migrations/00001_baseline.sql` (table beside `locations`;
    add `'sale_channels'` to the `staff_read` foreach array at :2507).
-   Accept: `npx vitest run tests/sale-channels.test.ts`.
+   Accept: `bunx vitest run tests/sale-channels.test.ts`.
 
 2. **Seed trigger on brewery insert.**
    Test: `tests/sale-channels.test.ts` — a new brewery has exactly
@@ -213,7 +213,7 @@ implements. Tests hit the real database (`npx supabase start`).
 
 ## Final validation
 
-`npx vitest run && npx tsc --noEmit && npm run lint`, plus `next build` in CI.
+`bun run test && bunx tsc --noEmit && bun run lint`, plus `next build` in CI.
 `supabase db reset` before the suite, since the baseline changed.
 
 ## Not in scope

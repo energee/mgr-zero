@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Gitignored local checkouts and remember-plugin scratch — not app source.
+    ".agents/worktrees/**",
+    ".remember/**",
   ]),
   {
     // Iron rule 4 (.agents/ARCHITECTURE.md): the service-role client bypasses RLS and

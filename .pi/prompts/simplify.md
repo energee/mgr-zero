@@ -12,4 +12,4 @@ redundant comments, and dead code the change exposed. Preserve APIs, behavior,
 error semantics, security checks, domain terms, and comments that explain why.
 Do not touch schemas, dependencies, or generated files. Ask before any change
 that needs a design or behavior decision. Then run
-`npx vitest run && npx tsc --noEmit && npm run lint`.
+`bun run test && bunx tsc --noEmit && bun run lint`.

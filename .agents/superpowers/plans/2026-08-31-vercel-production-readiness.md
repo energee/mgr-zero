@@ -128,7 +128,7 @@ A file may have only one active owner. Sequential tasks may transfer ownership a
 | Coordinator | this plan, task integration, conflict resolution, final traceability, and shared truth docs: `README.md`, `public/docs/user-guide.html`, `.agents/ARCHITECTURE.md`, `.agents/MEMORY.md`, `.agents/PROGRESS.md` |
 | Database boundary owner | `supabase/migrations/00001_baseline.sql`, database exploit/invariant tests, and the mutation command modules named in Tasks 3–5 |
 | Auth/session owner | environment modules, Supabase clients, `proxy.ts`, auth routes/actions/pages, brewery/customer request context, invitation UI |
-| Framework owner | `package.json`, `package-lock.json`, `.node-version`, Vitest config, bundle evidence |
+| Framework owner | `package.json`, `bun.lock`, `.node-version`, `.bun-version`, Vitest config, bundle evidence |
 | Automation owner | `.github/workflows/*`, `.github/scripts/*`, `.agents/agents/dreaming.md`, `.github/agents/dreaming.md`, `.agents/DRIFT.md` |
 | Command/API owner | registry, command route/client/form hook, public errors, rate policy, observability, health route |
 | Import owner | import command application layer and import UI after Task 5 transfers those files |
@@ -289,13 +289,13 @@ graph TD
 - **Test/reproduction first:** capture the existing Vitest CommonJS warning and the pre-change `next experimental-analyze` route/module report. Extend `tests/tooling-contract.test.ts` to assert the Node engine, exact framework versions, and ESM Vitest config path.
 - **Create:** `.node-version`, `tests/tooling-contract.test.ts`, `docs/operations/performance-baseline.md`.
 - **Rename:** `vitest.config.ts` to `vitest.config.mts` using language-server file rename if references exist.
-- **Modify:** `package.json`, `package-lock.json`, `next.config.ts` only if the installed Next documentation requires a patch-compatible option change.
+- **Modify:** `package.json`, `bun.lock`, `next.config.ts` only if the installed Next documentation requires a patch-compatible option change.
 - **Runtime contract:** Node `22.x`; Next.js and `eslint-config-next` exactly `16.3.4`; preserve React versions unless the official Next 16.3.4 peer contract requires an aligned patch. No dependency is added.
 - **Measurement rule:** use the installed Next 16 analyzer before touching imports. If `lib/commands/all.ts` is absent from client chunks and `radix-ui` tree-shakes to used primitives, record the evidence and make no code change. If the entire Radix barrel is present, change only measured client components to supported `radix-ui/<primitive>` exports and browser-check them. If command registration enters a client chunk, move only the server side-effect import to the server entry. A dependency change requires approval.
 - **Acceptance:** `npx vitest run tests/tooling-contract.test.ts` emits no Vite CJS warning; `npx tsc --noEmit`; `npm run lint`; `npm run build`; analyzer evidence names the inspected routes/modules and the no-change/change decision.
 - **Depends on:** Task 1. May run beside database and auth foundation lanes.
 - **Commit boundary:** `chore(runtime): pin Node and Next production baseline`.
-- **Rollback:** revert package/config/evidence together and run `npm install`; do not hand-edit the lockfile.
+- **Rollback:** revert package/config/evidence together and run `bun install`; do not hand-edit the lockfile.
 
 ### Task 9 — Harden CI inputs, action/plugin provenance, and build parity
 

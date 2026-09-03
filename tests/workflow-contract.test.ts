@@ -109,10 +109,23 @@ jobs:
 
 describe("production-readiness workflow contract", () => {
   it("runs the full Vitest suite and includes invitation tests", () => {
-    expect(ci).toMatch(/^ {6}- run: npx vitest run(?:\s+#.*)?\s*$/m);
+    expect(ci).toMatch(/^ {6}- run: bun run test(?:\s+#.*)?\s*$/m);
     expect(vitestConfig).toMatch(/include:\s*\[\s*"tests\/\*\*\/\*\.test\.ts"/);
     expect(matchesGlob(INVITE_TEST, "tests/**/*.test.ts")).toBe(true);
     expect(configDefaults.exclude.some((pattern) => matchesGlob(INVITE_TEST, pattern))).toBe(false);
+  });
+
+  it("installs and runs with bun, not npm", () => {
+    expect(ci).toMatch(/^ {6}- uses: oven-sh\/setup-bun@v2(?:\s+#.*)?\s*$/m);
+    expect(ci).toContain('bun-version-file: ".bun-version"');
+    expect(ci).toMatch(/^ {6}- run: bun install --frozen-lockfile(?:\s+#.*)?\s*$/m);
+    expect(ci).toMatch(/^ {6}- run: bun run lint(?:\s+#.*)?\s*$/m);
+    expect(ci).toMatch(/^ {6}- run: bunx tsc --noEmit(?:\s+#.*)?\s*$/m);
+    expect(ci).toMatch(/^ {6}- run: bun run build(?:\s+#.*)?\s*$/m);
+    expect(ci).not.toMatch(/\bnpm ci\b/);
+    expect(ci).not.toMatch(/\bnpx /);
+    expect(ci).not.toMatch(/\bpnpm\b/);
+    expect(ci).not.toMatch(/cache: npm/);
   });
 
   it("maps Supabase CLI keys into the modern application environment contract", () => {

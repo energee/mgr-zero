@@ -8,7 +8,7 @@
 This is a focused bundle-composition baseline, not a Core Web Vitals measurement. Before changing any imports, the installed Next.js analyzer was run with:
 
 ```sh
-npx next experimental-analyze --output
+bunx next experimental-analyze --output
 ```
 
 The pre-change run used Next.js 16.3.3, completed its analysis in 2.6 seconds, and wrote the interactive report to `.next/diagnostics/analyze`. The report was inspected by route with the environment filter set to **Client**, then `/api/command` was inspected with the filter set to **Server**. The analyzer reports estimated compressed module totals; they are not equivalent to transferred page weight or field CWV data.

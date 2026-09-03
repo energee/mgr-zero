@@ -50,7 +50,7 @@ The slice-4 cellar and slice-10 delivery plans own those MGR pages/commands. Thi
 
 ### Existing files modified
 
-- `package.json`, `package-lock.json` — Chat SDK and Postgres dependencies plus chat browser-smoke script.
+- `package.json`, `bun.lock` — Chat SDK and Postgres dependencies plus chat browser-smoke script.
 - `supabase/migrations/00001_baseline.sql` — cadence field, private adapter schema, provider-neutral tables, RLS, RPCs, occurrence scan, leasing, and atomic submitted-order occurrence.
 - `lib/commands/all.ts` — register chat, Today, and brewery-setting definitions.
 - `app/(app)/layout.tsx` — add Chat integration settings navigation.
@@ -137,7 +137,7 @@ After Task 3, Tasks 4 and 7 can run in parallel. Task 5 can run in parallel with
 **Files:**
 - Test: `tests/chat-state-adapter.test.ts`
 - Modify: `package.json`
-- Modify: `package-lock.json`
+- Modify: `bun.lock`
 - Modify: `supabase/migrations/00001_baseline.sql` under a new private Chat SDK state section
 
 **Interfaces:**
@@ -149,7 +149,7 @@ After Task 3, Tasks 4 and 7 can run in parallel. Task 5 can run in parallel with
 Run:
 
 ```bash
-npm install chat@^4.39.0 @chat-adapter/slack@^4.39.0 @chat-adapter/state-pg@^4.39.0 pg@^8.20.0 && npm install -D @types/pg@^8.18.0
+bun add chat@^4.39.0 @chat-adapter/slack@^4.39.0 @chat-adapter/state-pg@^4.39.0 pg@^8.20.0 && bun add -d @types/pg@^8.18.0
 ```
 
 Expected: `package.json` records the four runtime packages and one type-only dev package; no other package changes.
@@ -325,7 +325,7 @@ Expected: PASS. If the adapter reads or creates outside `chat_sdk`, can access `
 - [x] **Step 6: Commit the passed compatibility spike**
 
 ```bash
-git add package.json package-lock.json supabase/migrations/00001_baseline.sql tests/chat-state-adapter.test.ts
+git add package.json bun.lock supabase/migrations/00001_baseline.sql tests/chat-state-adapter.test.ts
 git commit -m "test: prove isolated Chat SDK Postgres state"
 ```
 
@@ -1254,7 +1254,7 @@ Record message timestamps and redacted delivery IDs; save no tokens or customer 
 - [ ] **Step 5: Commit manifest and browser smoke**
 
 ```bash
-git add slack-app-manifest.template.yml scripts/render-slack-manifest.ts .gitignore tests-e2e/chat-previews.ts package.json package-lock.json
+git add slack-app-manifest.template.yml scripts/render-slack-manifest.ts .gitignore tests-e2e/chat-previews.ts package.json bun.lock
 git commit -m "test: verify Slack chat surfaces"
 ```
 
