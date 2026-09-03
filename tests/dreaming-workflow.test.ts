@@ -1,10 +1,19 @@
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 
 import { describe, expect, it } from "vitest";
 
 const read = (path: string) => readFileSync(path, "utf8");
+// ponytail: js-yaml is already installed transitively (eslint); a real parser without a new dependency.
+const { load } = createRequire(import.meta.url)("js-yaml") as { load: (source: string) => unknown };
 
 describe("dreaming workflow", () => {
+  it("is valid YAML (a column-0 line inside a `run: |` block once broke the file)", () => {
+    for (const file of [".github/workflows/dreaming.yml", ".github/workflows/documentation-agent.yml"]) {
+      expect(() => load(read(file))).not.toThrow();
+    }
+  });
+
   it("batches curation and leaves publication to a deterministic job", () => {
     const workflow = read(".github/workflows/dreaming.yml");
     const prompt = read(".agents/agents/dreaming.md");
@@ -33,10 +42,9 @@ describe("dreaming workflow", () => {
   it("ships the validated dream commit as a bundle so publish never re-merges or 3-way applies", () => {
     const workflow = read(".github/workflows/dreaming.yml");
 
-    expect(workflow).toContain("git bundle create dream.bundle origin/main..HEAD");
+    expect(workflow).toContain('git bundle create dream.bundle HEAD ^origin/main ${DREAM_SHA:+^$DREAM_SHA}');
     expect(workflow).toContain('git fetch "$RUNNER_TEMP/dream.bundle" HEAD');
     expect(workflow).toContain("git checkout -B dreaming/main FETCH_HEAD");
-    expect(workflow).toContain("git commit --amend --no-edit --reset-author");
     expect(workflow).not.toContain("git apply");
     expect(workflow).not.toContain("dream.patch");
     // One merge decision, made in maintain; publish does not re-derive it.
@@ -75,8 +83,11 @@ describe("dreaming workflow", () => {
       permissions: { deny: string[] };
     };
 
+    expect(docsAgent).toContain("settings: .github/claude-ci-settings.json");
+    // The dream runs on a checked-out dreaming/main, so its deny list must come from main.
+    expect(workflow).toContain('git show origin/main:.github/claude-ci-settings.json > "$RUNNER_TEMP/claude-ci-settings.json"');
+    expect(workflow).toContain("settings: ${{ runner.temp }}/claude-ci-settings.json");
     for (const file of [workflow, docsAgent]) {
-      expect(file).toContain("settings: .github/claude-ci-settings.json");
       expect(file).not.toContain('"deny"');
     }
     expect(settings.permissions.deny).toContain("Read(/home/runner/.ssh/**)");
@@ -96,6 +107,15 @@ describe("dreaming workflow", () => {
     expect(workflow).toContain('id="$(gh api "users/${login}" --jq .id)"');
   });
 
+  it("commits every dream commit, merges included, as the MGR GitHub App", () => {
+    const workflow = read(".github/workflows/dreaming.yml");
+
+    expect(workflow.split("uses: actions/create-github-app-token@v2")).toHaveLength(3);
+    expect(workflow).toContain("permission-metadata: read");
+    expect(workflow).not.toContain("github-actions[bot]");
+    expect(workflow).not.toContain("--reset-author");
+  });
+
   it("persists drift in a structured file the agent may prune", () => {
     const prompt = read(".agents/agents/dreaming.md");
     const architecture = read(".agents/ARCHITECTURE.md");
@@ -109,7 +129,7 @@ describe("dreaming workflow", () => {
     expect(architecture).toContain("| `lib/chat/` |");
     expect(readme).toContain("`get_today`");
     expect(drift).not.toContain("`get_today`");
-    for (const line of drift.split("\n").filter((l) => l.startsWith("- "))) {
+    for (const line of drift.split("\n").filter((l) => l.startsWith("-"))) {
       expect(line).toMatch(/^- \[ \] /);
     }
   });
