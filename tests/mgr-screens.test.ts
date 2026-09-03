@@ -6,7 +6,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { describe, expect, it } from "vitest";
-import { SCREENS } from "../components/mgr/screens";
+import { SCREENS, type Screen } from "../components/mgr/screens";
 import { E } from "../components/mgr/e";
 import { VenueFrame } from "../components/mgr/venue";
 
@@ -37,9 +37,22 @@ describe("SCREENS", () => {
     // A tripwire against a frame dropped by hand from a 1700-line array — the
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands; .agents/PROGRESS.md narrates
-    // what the number is made of — 93 MGR frames plus the 17 venue frames.
-    expect(SCREENS).toHaveLength(110);
+    // what the number is made of — 103 MGR frames plus the 17 venue frames.
+    expect(SCREENS).toHaveLength(120);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
+  });
+
+  it("draws connection recovery and confirmation surfaces", () => {
+    const expected = new Map<string, Screen["surface"]>([
+      ["Connect QuickBooks", undefined], ["Mapping conflict", "sheet"], ["Disconnect QuickBooks", "sheet"],
+      ["Connect Square", undefined], ["Square locations", "sheet"], ["Square → QuickBooks connector", "sheet"], ["Disconnect Square", "sheet"],
+      ["Linked people", undefined], ["Link your Slack", "entry"], ["Disconnect Slack", "sheet"],
+    ]);
+    for (const [name, surface] of expected) {
+      const screen = SCREENS.find((s) => s.name === name);
+      expect.soft(screen, name).toBeTruthy();
+      expect.soft(screen?.surface, name).toBe(surface);
+    }
   });
 
   it("resolves detail back links to a screen or shell destination", () => {
