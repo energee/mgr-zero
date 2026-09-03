@@ -36,7 +36,7 @@ describe("customer guides (MDX)", () => {
     for (const section of ["sign-in", "roles", "navigation", "catalog", "inventory", "customers", "pricing", "orders", "pick-sheet", "invoices", "replenishment", "team", "slack", "errors-corrections", "unavailable"]) {
       expect(staff).toContain(`[#${section}]`);
     }
-    for (const section of ["access", "shop", "statuses", "orders", "invoices", "help"]) {
+    for (const section of ["access", "shop", "statuses", "orders", "invoices", "account", "help"]) {
       expect(portal).toContain(`[#${section}]`);
     }
   });

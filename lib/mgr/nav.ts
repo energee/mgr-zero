@@ -4,7 +4,7 @@
 // leaves no gap) and active-tab resolution. Only routes that exist today are
 // listed; the plan's fuller rail grows here as pages ship.
 import {
-  BeerIcon, Home01Icon, Invoice01Icon, Package01Icon, Settings01Icon, ShoppingCart01Icon,
+  BeerIcon, Home01Icon, Invoice01Icon, Package01Icon, Settings01Icon, ShoppingCart01Icon, UserCircleIcon,
 } from "@hugeicons/core-free-icons";
 import type { IconSvgElement } from "@/components/mgr/icon";
 import type { StaffRole } from "@/lib/commands/registry";
@@ -54,6 +54,7 @@ export const PORTAL_NAV: readonly NavItem[] = [
   { label: "Order", href: "/portal", icon: ShoppingCart01Icon },
   { label: "Orders", href: "/portal/orders", icon: Package01Icon },
   { label: "Invoices", href: "/portal/invoices", icon: Invoice01Icon },
+  { label: "Account", href: "/portal/account", icon: UserCircleIcon },
 ];
 
 const allowed = (item: NavItem, role: StaffRole) => role === "admin" || !item.roles || item.roles.includes(role);
