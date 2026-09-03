@@ -56,3 +56,6 @@ next-env.d.ts
 # (see .agents/agents/dreaming.md); rolling scratch like now.md stays local
 /.remember/*
 !/.remember/today-*.md
+
+# fumadocs-mdx generated collection index
+/.source/

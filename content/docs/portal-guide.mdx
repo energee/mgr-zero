@@ -1,0 +1,77 @@
+---
+title: "Your MGR portal guide"
+description: "Shop your brewery’s priced catalog, place orders, and follow fulfillment without seeing another customer’s records."
+---
+
+## Sign in and navigate [#access]
+
+Your account is created by invitation; there is no public sign-up or password-reset control. Enter the invited email address and password, then select **Sign in**. Customer-only accounts open **Shop**.
+
+The header shows your customer account name; navigation offers **Order, Orders**, and **Invoices** as tabs along the bottom on a phone and a left rail on wider screens (Order is the shop). Open **Me** in the header to switch light or dark mode or select **Sign out** when finished. If MGR says the credentials are incorrect or the account has no membership, contact the brewery.
+
+## Shop [#shop]
+
+*You see only active SKUs priced on your assigned price list. The brewery must also have configured the warehouse used to fulfill portal orders.*
+
+1. Review each product, package, unit price, and **in stock**, **low stock**, or **out of stock** badge. These badges are coarse; exact inventory is not shown.
+2. Enter positive whole-unit quantities. Out-of-stock items are disabled.
+3. Choose **Ship to**; the first address is selected by default.
+4. Optionally enter **PO number** and **Note**, then review the subtotal.
+5. Select **Submit order** to save the order and send it to the brewery, or **Save draft** to save it without submitting.
+
+Both buttons stay disabled without a ship-to, without a positive line, or while saving. With no priced products, Shop says **No products available yet**.
+
+<Callout type="warn">
+**Before ordering:** if the brewery has not configured its portal fulfillment warehouse, saving fails with **portal fulfillment source is not configured**. Ask brewery staff to configure it.
+</Callout>
+
+<Callout type="warn">
+**Draft limitation:** after **Save draft**, MGR opens a read-only order page. You cannot edit or submit that saved draft from the order page. Ask brewery staff to finish or cancel it. If MGR cannot confirm submission, use **View order status** before retrying: the order may already be submitted. Contact the brewery if its status remains unclear.
+</Callout>
+
+## Order statuses [#statuses]
+
+| Status | Meaning |
+| --- | --- |
+| `draft` | Saved but not sent to the brewery for fulfillment. |
+| `submitted` | Sent to the brewery and waiting for review. |
+| `confirmed` | Accepted by the brewery; inventory is reserved. |
+| `picked` | The warehouse recorded quantities prepared for shipment. |
+| `shipped` | The brewery recorded shipment and created an invoice for positive shipped quantities. |
+| `cancelled` | The brewery stopped the order; its reason appears in the timeline. |
+
+**staged — needs restocking** means the brewery changed an order after it had been picked and warehouse staff still need to reconcile the staged stock.
+
+## Orders [#orders]
+
+**Orders** lists your newest orders first with status, requested date, and any restocking badge. Select an order number to see ship-to, PO, note, ordered/picked/shipped quantities, captured unit prices, and the event timeline.
+
+Brewery line adjustments show the quantities before and after and the reason. Cancellation reasons also appear. The page is read-only: portal users cannot edit, submit, or cancel an order from it. With no orders, the page says **No orders yet**; a new draft with no events says **No events yet**.
+
+## Invoices and credits [#invoices]
+
+**Invoices** lists invoice or credit-memo number, kind, total, and paid date. A credit memo is a separate negative billing record created by the brewery for a correction or return. With no billing records, the page says **No invoices yet**.
+
+The portal currently has no invoice-detail or payment action. Contact the brewery for line-level invoice questions or payment corrections.
+
+## Errors and current limits [#help]
+
+An action reports an error
+
+Read the message and correct the visible fields. Your entries remain on Shop until the action succeeds or you leave the page. If the error concerns prices, ship-tos, access, or fulfillment configuration, contact the brewery.
+
+A page fails to load
+
+Select
+
+Try again
+
+once. If it still fails, give the brewery your customer name, page, approximate time, and action attempted.
+
+A product, order, or invoice seems missing
+
+Confirm the customer account name shown in navigation. Shop includes only active products priced for that account; Orders and Invoices include only that account’s records.
+
+There are currently no portal controls for public sign-up, password reset, adding ship-tos, changing account information, editing saved drafts or submitting them after leaving Shop, cancelling orders, opening invoice detail, or recording payment.
+
+If the application and this guide disagree, report the page, action, and exact message to your brewery contact.

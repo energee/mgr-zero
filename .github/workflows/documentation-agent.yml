@@ -53,7 +53,7 @@ jobs:
           display_report: false
           show_full_output: false
           settings: .github/claude-ci-settings.json
-          claude_args: '--allowedTools "Read,Grep,Glob,Edit(public/docs/user-guide.html),Write(public/docs/user-guide.html),Edit(public/docs/staff-guide.html),Write(public/docs/staff-guide.html),Edit(public/docs/portal-guide.html),Write(public/docs/portal-guide.html)"'
+          claude_args: '--allowedTools "Read,Grep,Glob,Edit(content/docs/index.mdx),Write(content/docs/index.mdx),Edit(content/docs/staff-guide.mdx),Write(content/docs/staff-guide.mdx),Edit(content/docs/portal-guide.mdx),Write(content/docs/portal-guide.mdx)"'
 
       - name: Validate the generated guide
         id: validate
@@ -68,27 +68,19 @@ jobs:
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          unexpected=$(printf '%s\n' "$changed" | grep -Ev '^public/docs/(user|staff|portal)-guide\.html$' || true)
+          unexpected=$(printf '%s\n' "$changed" | grep -Ev '^content/docs/(index|staff-guide|portal-guide)\.mdx$' || true)
           if [ -n "$unexpected" ]; then
             echo "Documentation agent changed files outside the guide suite:"
             echo "$changed"
             exit 1
           fi
           git diff --cached --check
-          for guide in public/docs/user-guide.html public/docs/staff-guide.html public/docs/portal-guide.html; do
-            if grep -Eqi '<(!doctype|html|head|body|style)\b' "$guide"; then
-              echo "$guide is a body fragment styled by app/globals.css; it must not carry its own document or styles."
-              exit 1
-            fi
-            grep -q '<main' "$guide"
-            grep -q '<nav' "$guide"
-            if grep -Eqi '<(script|base|link|iframe|object|embed|img|form|video|audio|source)\b|http-equiv|@import|url[[:space:]]*\(|[[:space:]]on[a-z]+[[:space:]]*=' "$guide"; then
-              echo "$guide must remain script- and asset-free."
-              exit 1
-            fi
-          done
-          grep -q '/docs/staff-guide' public/docs/user-guide.html
-          grep -q '/docs/portal-guide' public/docs/user-guide.html
+          # Guide *shape* (frontmatter, prose-only MDX, anchors, the chooser's
+          # links) is specified once, in tests/docs.test.ts. The publish job
+          # pushes with the App token so ci.yml runs vitest on the generated
+          # PR - the merge gate - and a second copy of those rules in shell
+          # would only drift. This step owns what vitest cannot see: which
+          # files the agent touched.
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
       - name: Save the updated guide
@@ -96,10 +88,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: customer-guide
-          path: |
-            public/docs/user-guide.html
-            public/docs/staff-guide.html
-            public/docs/portal-guide.html
+          path: content/docs
           if-no-files-found: error
 
   publish:
@@ -130,7 +119,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: customer-guide
-          path: public/docs
+          path: content/docs
 
       - name: Publish documentation pull request
         env:
@@ -143,7 +132,7 @@ jobs:
           git config user.name "$login"
           git config user.email "$(gh api "users/${login}" --jq .id)+${login}@users.noreply.github.com"
           git checkout -B documentation/user-guide
-          git add public/docs/user-guide.html public/docs/staff-guide.html public/docs/portal-guide.html
+          git add content/docs
           if [ "$EVENT_NAME" = "pull_request" ]; then
             doc_source="PR #$PR_NUMBER"
           else

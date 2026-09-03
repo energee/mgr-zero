@@ -8,54 +8,6 @@ import "@/lib/commands/all";
 const root = resolve(__dirname, "..");
 const read = (path: string) => readFileSync(resolve(root, path), "utf8");
 
-describe("customer documentation", () => {
-  it("separates staff and portal documentation behind one master guide", () => {
-    const master = read("public/docs/user-guide.html");
-    const staff = read("public/docs/staff-guide.html");
-    const portal = read("public/docs/portal-guide.html");
-
-    for (const guide of [master, staff, portal]) {
-      expect(guide).not.toMatch(/<(?:!doctype|html|head|body|style)\b/i);
-      expect(guide).toContain("<main");
-      expect(guide).toContain("<nav");
-      expect(guide).not.toMatch(/<(?:script|link)\b/i);
-      const ids = new Set([...guide.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]));
-      for (const match of guide.matchAll(/href="#([^"]+)"/g)) {
-        expect(ids.has(match[1]), `missing anchor target #${match[1]}`).toBe(true);
-      }
-      expect(guide).not.toMatch(/\b(?:RLS|schema|command ID|slice \d|implementation gate)\b/i);
-    }
-
-    expect(master).toContain("/docs/staff-guide");
-    expect(master).toContain("/docs/portal-guide");
-    expect(staff).not.toContain('id="customer-portal"');
-    expect(portal).not.toContain("Record Movement");
-
-    for (const section of [
-      "sign-in",
-      "roles",
-      "navigation",
-      "catalog",
-      "inventory",
-      "customers",
-      "pricing",
-      "orders",
-      "pick-sheet",
-      "invoices",
-      "replenishment",
-      "team",
-      "slack",
-      "errors-corrections",
-      "unavailable",
-    ]) {
-      expect(staff).toContain(`id="${section}"`);
-    }
-    for (const section of ["access", "shop", "statuses", "orders", "invoices", "help"]) {
-      expect(portal).toContain(`id="${section}"`);
-    }
-  });
-});
-
 describe("HTTP API documentation", () => {
   it("has one catalog containing every registered operation", () => {
     const readme = read("README.md");
@@ -70,15 +22,15 @@ describe("HTTP API documentation", () => {
 });
 
 describe("post-merge documentation maintainer", () => {
-  it("audits the complete live UI and may edit only the HTML guide suite", () => {
+  it("audits the complete live UI and may edit only the MDX guide suite", () => {
     const prompt = read(".agents/agents/documentation-maintainer.md");
 
-    expect(prompt).toContain("public/docs/user-guide.html");
-    expect(prompt).toContain("public/docs/staff-guide.html");
-    expect(prompt).toContain("public/docs/portal-guide.html");
+    expect(prompt).toContain("content/docs/index.mdx");
+    expect(prompt).toContain("content/docs/staff-guide.mdx");
+    expect(prompt).toContain("content/docs/portal-guide.mdx");
     expect(prompt).toContain("every current user-facing route");
     expect(prompt).toContain("Do not limit the review to the merged diff");
-    expect(prompt).toContain("Edit only those three HTML files");
+    expect(prompt).toContain("Edit only those three MDX files");
     expect(prompt).toContain("fields, choices, defaults, units, and limits");
     expect(prompt).toContain("success, empty, validation, permission, and failure states");
   });
@@ -93,8 +45,12 @@ describe("post-merge documentation maintainer", () => {
     expect(workflow).toContain("manual documentation audit");
     expect(workflow).toContain("contents: write");
     expect(workflow).toContain("pull-requests: write");
-    expect(workflow).toContain("Edit(public/docs/staff-guide.html)");
-    expect(workflow).toContain("Write(public/docs/portal-guide.html)");
+    // The agent may write only the guides, and only vitest specifies their
+    // shape: a second copy of those rules in shell would drift (see the
+    // workflow's validate step).
+    expect(workflow).toContain("content/docs/(index|staff-guide|portal-guide)");
+    expect(workflow).toMatch(/Edit\(content\/docs\/[a-z-]+\.mdx\)/);
+    expect(workflow).not.toMatch(/grep[^\n]*\$guide/);
     expect(workflow).toContain("documentation/user-guide");
     // Staged, not working-tree: git diff never sees a guide the agent creates
     // rather than edits, so the run reported no changes and binned the work.
@@ -105,11 +61,7 @@ describe("post-merge documentation maintainer", () => {
     expect(workflow).toContain("actions/create-github-app-token");
     expect(workflow).toContain("GH_TOKEN: ${{ steps.mgr-app.outputs.token }}");
     expect(workflow).toContain("token: ${{ steps.mgr-app.outputs.token }}");
-    expect(workflow).toContain("public/docs/user-guide.html public/docs/staff-guide.html public/docs/portal-guide.html");
     expect(workflow).toContain("gh pr create");
-    expect(workflow).toContain("<(script|base|link|iframe");
-    expect(workflow).toContain("http-equiv");
-    expect(workflow).toContain("@import");
     expect(workflow).not.toContain("issues: read");
     expect(workflow).not.toContain("issues: write");
     expect(workflow).not.toContain("--json-schema");
