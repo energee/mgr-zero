@@ -20,8 +20,8 @@ If the credentials are wrong, MGR shows **Incorrect email or password**. If the 
 | Role | Current access |
 | --- | --- |
 | **Admin** | All current staff screens and actions. |
-| **Sales** | Catalog creation; customers and pricing; order creation, submission, confirmation, adjustment, cancellation, and credits; inventory viewing; replenishment; invoices; team roster. |
-| **Warehouse** | Catalog and inventory viewing; inventory movements; order, pick-sheet, and invoice viewing; picking and shipping; replenishment suggestions; team roster. |
+| **Sales** | Catalog creation; customers and pricing; order creation, submission, confirmation, adjustment, cancellation, and credits; inventory viewing; invoices. Sales does not currently have a way to reach Replenishment. |
+| **Warehouse** | Inventory viewing and movements; order and pick-sheet viewing, picking, and shipping; replenishment suggestions; the invoice created when it ships a wholesale order, from a link shown right after shipping — it cannot open the Catalog, the Invoices list, or Team. |
 | **Brewer** | Today (the only navigation tab shown) and account linking from Slack. The other current staff pages may return a permission error. |
 
 <Callout type="info">
@@ -30,7 +30,7 @@ If an action reports a permission error, stop and ask an administrator. Repeated
 
 ## Navigate MGR [#navigation]
 
-The brewery name at the top of the header identifies the brewery whose records are displayed. Navigation is four sections — **Today, Beer, Work**, and **More** — shown as tabs along the bottom on a phone and as a left rail on wider screens. Beer holds **Inventory**; Work holds **Orders, Pick**, and **Replenishment**; More holds **Invoices, Catalog, Customers, Price lists**, and **Settings** (the team roster). Links your role cannot use are simply not shown. The **Me** control in the header shows your brewery and role, switches between light and dark mode, and offers **Sign out**. Forms open as a panel from the bottom of the screen on a phone and as a centered dialog on wider screens.
+The brewery name at the top of the header identifies the brewery whose records are displayed. Navigation has up to four sections — **Today, Beer, Work**, and **More** — shown as tabs along the bottom on a phone and as a left rail on wider screens. Beer holds **Inventory**; Work holds **Orders, Pick**, and **Replenishment**; More holds **Invoices, Catalog, Customers, Price lists**, and **Settings** (the team roster). Links your role cannot use are simply not shown, and Warehouse currently has no links under More, so that tab does not appear for Warehouse. The **Me** control in the header shows your brewery and role, switches between light and dark mode, and offers **Sign out**. Forms open as a panel from the bottom of the screen on a phone and as a centered dialog on wider screens.
 
 <Cards>
   <Card title="Today">The tab you land on after signing in. It currently shows only a placeholder heading, **Dashboard**, with no metrics or actions.</Card>
@@ -40,7 +40,7 @@ The brewery name at the top of the header identifies the brewery whose records a
 
 ## Catalog: products and SKUs [#catalog]
 
-*A product is the beer, such as Hazy IPA. A SKU is one sellable package of that beer, such as a half-barrel keg or a case of cans. Admin and Sales can create both; Warehouse can view them.*
+*A product is the beer, such as Hazy IPA. A SKU is one sellable package of that beer, such as a half-barrel keg or a case of cans. Admin and Sales can create and view both; Catalog is not reachable by Warehouse or Brewer.*
 
 ### Create a product
 
@@ -161,12 +161,14 @@ A wholesale order fails if the customer has no price list or an ordered SKU has 
 | **Confirm** | Submitted | Status becomes confirmed and stock is reserved. Negative ATP appears as a warning but does not block confirmation. |
 | **Adjust lines** | Confirmed or picked | Replace the full line set and give a required reason. Reservations are updated. Changing a picked order adds a **staged — needs restocking** badge until it is picked again. |
 | **Record pick** | Confirmed or picked | Enter a nonnegative picked amount per line; values default to the current picked amount or ordered amount. Short picks and zero are allowed. Status becomes picked and the restocking badge clears. |
-| **Ship** | Picked | Quantities default to picked amounts; use zero for held-back lines. Carrier and tracking are optional. Stock leaves the source. A transfer adds the same stock to its destination; a wholesale shipment with any positive quantity creates an invoice. |
+| **Ship** | Picked | Quantities default to picked amounts; use zero for held-back lines. Carrier and tracking are optional. Stock leaves the source. A transfer adds the same stock to its destination; a wholesale shipment with any positive quantity creates an invoice, and the confirmation shows a link to view it. |
 | **Cancel** | Any unshipped order | Give a required reason. Reservations are released. Cancelling after picking leaves the restocking badge as a physical reminder. |
 
 The order detail shows customer and ship-to for wholesale orders, PO, requested date, ordered/picked/shipped quantity, captured price, current ATP, and a time-stamped event history. The current detail page does not display a taproom transfer’s destination. An empty order list says **No orders yet**; an empty timeline says **No events yet**. A shipped or cancelled order has no further action controls.
 
 ## Pick sheet [#pick-sheet]
+
+*Admin and Warehouse can open Pick; Sales does not currently have a way to reach this page.*
 
 Open **Pick** to see confirmed and picked orders grouped by requested ship date; orders without a date appear under **Unscheduled**. Each card shows ordered and previously picked amounts and links to the order detail, where picking is recorded.
 
@@ -174,7 +176,7 @@ Select **Print** to open the browser print dialog. MGR hides the staff navigatio
 
 ## Invoices and credit memos [#invoices]
 
-*Admin, Sales, and Warehouse can view invoices. Admin and Sales can create a credit memo.*
+*Admin and Sales can open the Invoices list. Admin and Sales can create a credit memo. Warehouse cannot open the Invoices list, but sees the invoice created by a wholesale shipment it records, from a link shown right after shipping.*
 
 The Invoices list shows number, kind, customer, total, and paid date. Open an invoice number to see issue date, line quantities, captured unit prices, amounts, and total. An empty list says **No invoices yet**. Payment is display-only; there is no record-payment action.
 
@@ -189,7 +191,7 @@ MGR creates a separate credit memo at the original prices, adds the credited qua
 
 ## Taproom replenishment [#replenishment]
 
-*Admin and Sales can create replenishment orders. Warehouse can view the suggestions.*
+*Admin and Warehouse can open Replenishment; Sales does not currently have a way to reach this page. The Create replenishment order button is shown to Warehouse, but only Admin can complete it — Warehouse submitting it returns a permission error.*
 
 1. Open **Replenishment** and choose a taproom. The first taproom is selected by default.
 2. Review each SKU’s par, on-hand amount, and suggested quantity. Suggested quantity is the par shortfall, never less than zero.
@@ -201,7 +203,7 @@ The page says **No taprooms configured** when none exist, or **No pars set for t
 
 ## Team [#team]
 
-Admin, Sales, and Warehouse can open **Team** to see current staff memberships. Each row shows a user ID and role; email addresses are not displayed. The page is read-only, so it has no invitation, role-change, or removal controls. An empty roster shows **No staff members yet**.
+Admin can open **Team** to see current staff memberships; Sales and Warehouse do not currently have a way to reach this page. Each row shows a user ID and role; email addresses are not displayed. The page is read-only, so it has no invitation, role-change, or removal controls. An empty roster shows **No staff members yet**.
 
 ## Link your Slack account [#slack]
 
