@@ -10,6 +10,8 @@
 // the desktop rail and the phone tab bar switch on viewport breakpoints, and an
 // inline render in a narrow box would show the desktop layout at every size.
 import { SCREENS, type Screen } from "@/components/mgr/screens";
+import { SlackIcon } from "@hugeicons/core-free-icons";
+import { Icon } from "@/components/mgr/icon";
 import { ScreenEmbed, ScreenWidth } from "@/components/mgr/screen-width";
 
 
@@ -48,10 +50,12 @@ export const VENUE_TOC = tocFor("venues");
 
 export function ScreenIndex({ kind = "mgr" }: { kind?: "mgr" | "venues" }) {
   return (
-    <ScreenWidth>
+    <ScreenWidth deskOnly={kind === "venues"}>
       {sections(kind).map(([name, screens]) => (
         <section key={name} className="flex flex-col gap-8">
-          <h2 id={slug(name)} className="scroll-m-20 border-b pb-2 text-xl font-semibold">
+          <h2 id={slug(name)} className="flex items-center gap-2 scroll-m-20 border-b pb-2 text-xl font-semibold">
+            {/* Slack has a mark in Hugeicons; QuickBooks and Square do not, and a stand-in shape would fake a brand. */}
+            {name === "Slack" && <Icon icon={SlackIcon} size={20} />}
             {name} <span className="text-sm font-normal text-fd-muted-foreground">· {screens.length} screens</span>
           </h2>
           {screens.map((s) => (

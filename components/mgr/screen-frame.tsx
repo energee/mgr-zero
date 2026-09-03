@@ -11,6 +11,8 @@ import { MeSheet } from "@/components/mgr/me-sheet";
 import type { Screen } from "@/components/mgr/screens";
 import { VenueFrame } from "@/components/mgr/venue";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/mgr/icon";
+import { Search01Icon } from "@hugeicons/core-free-icons";
 import { navFor, STAFF_NAV } from "@/lib/mgr/nav";
 
 export function ScreenFrame({ screen: s, embedded }: { screen: Screen; embedded?: boolean }) {
@@ -64,7 +66,7 @@ export function ScreenFrame({ screen: s, embedded }: { screen: Screen; embedded?
     <AppShell
       brand="Demo Brewing"
       items={navFor(STAFF_NAV, "admin")}
-      headerRight={<><Button variant="ghost" size="sm">Search</Button>{me}</>}
+      headerRight={<><Button variant="ghost" size="sm"><Icon icon={Search01Icon} />Search</Button>{me}</>}
       composer={E.comp()}
       active={s.tab}
     >

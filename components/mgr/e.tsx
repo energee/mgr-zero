@@ -5,11 +5,13 @@
 // Target sizing under a coarse pointer lives in app/globals.css, so nothing
 // here sets heights. Screen authors use only these and never components/ui.
 import * as React from "react";
+import { Alert02Icon, InformationCircleIcon, SquareLock01Icon } from "@hugeicons/core-free-icons";
+import { Icon, type IconSvgElement } from "@/components/mgr/icon";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
-import { Empty, EmptyDescription } from "@/components/ui/empty";
+import { Empty, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupTextarea } from "@/components/ui/input-group";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
@@ -35,15 +37,17 @@ export const E = {
     </div>
   ),
   ttl: (t: React.ReactNode) => <h2 className="mt-2 text-sm font-medium text-muted-foreground">{t}</h2>,
-  row: (t: React.ReactNode, s: React.ReactNode = "", n: React.ReactNode = "", cls: RowClass = "") => (
+  /** `icon` says which kind of thing a row is — only in lists that mix kinds
+   * (Today, search); a homogeneous list gets none (docs/plans/hugeicons.md §3). */
+  row: (t: React.ReactNode, s: React.ReactNode = "", n: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement) => (
     <Item variant="outline" className={cn(cls === "dis" && "opacity-50")}>
-      {dotColor[cls] && (
+      {(icon || dotColor[cls]) && (
         <ItemMedia>
-          <Dot cls={cls} />
+          {icon ? <Icon icon={icon} /> : <Dot cls={cls} />}
         </ItemMedia>
       )}
       <ItemContent>
-        <ItemTitle>{t}</ItemTitle>
+        <ItemTitle>{icon && dotColor[cls] ? <><Dot cls={cls} />{t}</> : t}</ItemTitle>
         {s ? <ItemDescription>{s}</ItemDescription> : null}
       </ItemContent>
       {n ? <ItemActions>{typeof n === "string" ? <span className="text-sm text-muted-foreground">{n}</span> : n}</ItemActions> : null}
@@ -107,13 +111,17 @@ export const E = {
       <span className="text-right">{v}</span>
     </div>
   ),
+  // The amber box and the quiet box differed only by tint; the glyph is the
+  // second channel, so the difference survives a dim screen or a colorblind eye.
   note: (t: React.ReactNode) => (
     <Alert className="bg-warning text-warning-foreground">
+      <Icon icon={Alert02Icon} />
       <AlertDescription className="text-warning-foreground">{t}</AlertDescription>
     </Alert>
   ),
   info: (t: React.ReactNode) => (
     <Alert>
+      <Icon icon={InformationCircleIcon} />
       <AlertDescription>{t}</AlertDescription>
     </Alert>
   ),
@@ -177,8 +185,9 @@ export const E = {
       </TableBody>
     </Table>
   ),
-  blank: (t: React.ReactNode) => (
+  blank: (t: React.ReactNode, icon?: IconSvgElement) => (
     <Empty className="flex-1">
+      {icon && <EmptyMedia variant="icon"><Icon icon={icon} size={20} /></EmptyMedia>}
       <EmptyDescription>{t}</EmptyDescription>
     </Empty>
   ),
@@ -190,8 +199,8 @@ export const E = {
       <span className="flex items-center px-2 text-sm">{v}</span>
     </ButtonGroup>
   ),
-  gated: (t: React.ReactNode, why: React.ReactNode = "isn’t available yet") => E.row(t, why, "", "dis"),
-  nav: (t: React.ReactNode, s: React.ReactNode = "", cls: RowClass = "") => E.row(t, s, "›", cls),
+  gated: (t: React.ReactNode, why: React.ReactNode = "isn’t available yet") => E.row(t, why, "", "dis", SquareLock01Icon),
+  nav: (t: React.ReactNode, s: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement) => E.row(t, s, "›", cls, icon),
   sp: () => <div className="flex-1" />,
   comp: (portal = false) => (
     <InputGroup>

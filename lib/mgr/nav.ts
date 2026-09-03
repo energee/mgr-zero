@@ -3,6 +3,10 @@
 // and the two pure helpers AppShell needs — role filtering (a hidden entry
 // leaves no gap) and active-tab resolution. Only routes that exist today are
 // listed; the plan's fuller rail grows here as pages ship.
+import {
+  BeerIcon, Home01Icon, Invoice01Icon, Package01Icon, Settings01Icon, ShoppingCart01Icon,
+} from "@hugeicons/core-free-icons";
+import type { IconSvgElement } from "@/components/mgr/icon";
 import type { StaffRole } from "@/lib/commands/registry";
 
 export type NavItem = {
@@ -12,16 +16,20 @@ export type NavItem = {
   roles?: readonly StaffRole[];
   /** Desktop rail sub-entries; the tab itself is the phone target. */
   children?: readonly NavItem[];
+  /** Tab glyph — phone tab bar and rail group head only, never a child
+   * (docs/plans/hugeicons.md §1). */
+  icon?: IconSvgElement;
 };
 
 export const STAFF_NAV: readonly NavItem[] = [
-  { label: "Today", href: "/" },
+  { label: "Today", href: "/", icon: Home01Icon },
   // Inventory and Orders reads exclude brewer today (lib/commands/*.ts readRoles); the
   // brewer's Cellar/Brew day/Packaging areas arrive with their slices.
-  { label: "Beer", href: "/inventory", children: [{ label: "Inventory", href: "/inventory", roles: ["sales", "warehouse"] }] },
+  { label: "Beer", href: "/inventory", icon: BeerIcon, children: [{ label: "Inventory", href: "/inventory", roles: ["sales", "warehouse"] }] },
   {
     label: "Work",
     href: "/orders",
+    icon: Package01Icon,
     children: [
       { label: "Orders", href: "/orders", roles: ["sales", "warehouse"] },
       { label: "Pick", href: "/pick", roles: ["warehouse"] },
@@ -31,6 +39,7 @@ export const STAFF_NAV: readonly NavItem[] = [
   {
     label: "More",
     href: "/invoices",
+    icon: Settings01Icon,
     children: [
       { label: "Invoices", href: "/invoices", roles: ["sales"] },
       { label: "Catalog", href: "/catalog", roles: ["sales"] },
@@ -42,9 +51,9 @@ export const STAFF_NAV: readonly NavItem[] = [
 ];
 
 export const PORTAL_NAV: readonly NavItem[] = [
-  { label: "Order", href: "/portal" },
-  { label: "Orders", href: "/portal/orders" },
-  { label: "Invoices", href: "/portal/invoices" },
+  { label: "Order", href: "/portal", icon: ShoppingCart01Icon },
+  { label: "Orders", href: "/portal/orders", icon: Package01Icon },
+  { label: "Invoices", href: "/portal/invoices", icon: Invoice01Icon },
 ];
 
 const allowed = (item: NavItem, role: StaffRole) => role === "admin" || !item.roles || item.roles.includes(role);

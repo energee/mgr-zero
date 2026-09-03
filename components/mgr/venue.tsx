@@ -313,13 +313,13 @@ function SlackFrame({ shell, ctx, who, at, foot, children }: {
 
 /** Which product a frame is drawn inside, and the chrome that product needs. */
 export type Venue =
-  | { name: "QuickBooks"; title: string; actions?: string }
+  | { name: "QuickBooks Online"; title: string; actions?: string }
   | { name: "Square"; nav?: "pay"; on?: string; panel?: ReactNode }
   | { name: "Slack"; shell: "home" | "msg" | "modal"; ctx?: string; who?: string; at?: string; foot?: [string, string?][] };
 
 /** Renders one venue frame in its own product's chrome. */
 export function VenueFrame({ venue, children }: { venue: Venue; children: ReactNode }) {
-  if (venue.name === "QuickBooks") return <QboFrame title={venue.title} actions={venue.actions}>{children}</QboFrame>;
+  if (venue.name === "QuickBooks Online") return <QboFrame title={venue.title} actions={venue.actions}>{children}</QboFrame>;
   if (venue.name === "Square") return <SqDashFrame nav={venue.nav} on={venue.on} panel={venue.panel}>{children}</SqDashFrame>;
   return <SlackFrame shell={venue.shell} ctx={venue.ctx} who={venue.who} at={venue.at} foot={venue.foot}>{children}</SlackFrame>;
 }

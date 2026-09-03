@@ -21,7 +21,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     // theme disabled: app/layout.tsx's boot script and components/mgr/theme-toggle.tsx own the .dark class
     <RootProvider theme={{ enabled: false }} search={{ preload: false }}>
-      <DocsLayout tree={source.getPageTree()} nav={{ title: brand }} themeSwitch={{ enabled: false }}>
+      {/* Fumadocs caps the whole layout at 1400px; the screen pages embed
+          desktop frames, so the grid may use the viewport. Prose pages keep
+          their own 900px article cap, so they do not stretch. */}
+      <DocsLayout
+        tree={source.getPageTree()}
+        nav={{ title: brand }}
+        themeSwitch={{ enabled: false }}
+        containerProps={{ style: { "--fd-layout-width": "100vw" } as React.CSSProperties }}
+      >
         {children}
       </DocsLayout>
     </RootProvider>

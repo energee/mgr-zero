@@ -8,6 +8,9 @@ import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { S, SQ_ITEM_COLS, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
+import {
+  BeerIcon, DeliveryTruck01Icon, Invoice01Icon, Package01Icon, Route01Icon, Tag01Icon, TaskDone01Icon, ThermometerIcon, WifiDisconnected01Icon,
+} from "@hugeicons/core-free-icons";
 
 export type Tab = "Today" | "Beer" | "Work" | "More";
 export type Screen = {
@@ -15,7 +18,7 @@ export type Screen = {
   slice: "all" | "chat" | number;
   /** Staff tab the frame lives under; a Global sheet sets `group` instead. */
   tab?: Tab;
-  group?: "Global" | "Entry" | "Portal" | "Desk" | "Chat" | "POS" | "QBO";
+  group?: "Global" | "Entry" | "Portal" | "Desk" | "Chat" | "POS" | "QuickBooks Online";
   /** Portal tab, for PortalShell frames. */
   portal?: "Order" | "Orders" | "Invoices" | "Account";
   /** Default page; `sheet` and `entry` frames render as a panel over the shell. */
@@ -51,10 +54,10 @@ export const SCREENS: Screen[] = [
     spec: "Drawn as the warehouse persona at honest 16px density. Rows are role-filtered per plan §3. The restock row appears while orders.needs_restock is set and opens Order · detail. Weekly count is gated: disabled with human copy, never a gate name.",
     body: today(<>
       {E.btns(["Pick", "Receive"], "c2")}
-      {E.row("3 orders ready", "quantities default to ordered", E.act("Pick"), "w")}
-      {E.row("Staged · ORD-0229", "restock 3 Pils cases to Warehouse", E.act("Put back"), "w")}
-      {E.row("PO-0142 · Country Malt", "arrives Thu", E.act("Receive"))}
-      {E.row("Next delivery · Ridgeline", "your route · stop 1 of 3", E.act("Resume"))}
+      {E.row("3 orders ready", "quantities default to ordered", E.act("Pick"), "w", Package01Icon)}
+      {E.row("Staged · ORD-0229", "restock 3 Pils cases to Warehouse", E.act("Put back"), "w", Package01Icon)}
+      {E.row("PO-0142 · Country Malt", "arrives Thu", E.act("Receive"), "", DeliveryTruck01Icon)}
+      {E.row("Next delivery · Ridgeline", "your route · stop 1 of 3", E.act("Resume"), "", Route01Icon)}
       {E.gated("Weekly count")}
     </>),
   },
@@ -66,8 +69,8 @@ export const SCREENS: Screen[] = [
     spec: "Same get_today read as the exemplar, filtered for sales. Confirm opens Order · confirm (2 taps); shortfall rows open Shortfall, pars and standing allocation.",
     body: today(<>
       {E.btns(["Confirm", "New order"], "c2")}
-      {E.row("ORD-0231 · Ridgeline", "submitted · ships Thu", E.act("Confirm"), "w")}
-      {E.row("ORD-0235 · Teresa’s", "submitted · ships Fri", E.act("Confirm"))}
+      {E.row("ORD-0231 · Ridgeline", "submitted · ships Thu", E.act("Confirm"), "w", Package01Icon)}
+      {E.row("ORD-0235 · Teresa’s", "submitted · ships Fri", E.act("Confirm"), "", Package01Icon)}
       {E.row("Pils · 16 oz case", "ATP −6 · 2 orders compete", E.act("Review"), "w")}
       {E.row("Hazy IPA · ½ bbl", "ATP 11 · fine", "")}
       {E.row("Al’s Bar · OH", "destination not registered for Stout", E.act("Review"), "w")}
@@ -81,10 +84,10 @@ export const SCREENS: Screen[] = [
     spec: "Reading opens the Fermentation reading sheet defaulted to the overdue vessel. Brew day and packaging rows open their Work frames. Warehouse picks never appear here.",
     body: today(<>
       {E.btns(["Reading", "Brew day"], "c2")}
-      {E.row("FV3 · Stout", "reading overdue 31 h", E.act("Reading"), "w")}
-      {E.row("B-0416 · Hazy IPA v4", "brew day Fri 9/4 · 15 bbl", E.act("Start"))}
-      {E.row("RUN-0031 · Hazy cans", "packaged today · close due", E.act("Close"), "w")}
-      {E.row("FV1 · Pils", "1.9 °P · read 4 h ago", "")}
+      {E.row("FV3 · Stout", "reading overdue 31 h", E.act("Reading"), "w", ThermometerIcon)}
+      {E.row("B-0416 · Hazy IPA v4", "brew day Fri 9/4 · 15 bbl", E.act("Start"), "", BeerIcon)}
+      {E.row("RUN-0031 · Hazy cans", "packaged today · close due", E.act("Close"), "w", Package01Icon)}
+      {E.row("FV1 · Pils", "1.9 °P · read 4 h ago", "", "", ThermometerIcon)}
     </>),
   },
   {
@@ -109,10 +112,10 @@ export const SCREENS: Screen[] = [
     spec: "The taproom role maps to a shift rather than a function: a bartender needs the tap board and POS reconciliation and nothing else. The unmapped-item row is here because it silently blocks reconcile.",
     body: today(<>
       {E.btns(["Swap keg", "Weekly count"], "c2")}
-      {E.row("Tap 5 · Pils", "nearly out · ~9% left", E.act("Swap"), "w")}
-      {E.row("Weekly count", "due Thu · last counted 7 days ago", E.act("Count"))}
-      {E.row("Guest cider", "rung in Square · not mapped, blocks reconcile", E.act("Map"), "w")}
-      {E.row("Variance · last week", "−0.5 bbl Hazy unaccounted", E.act("Review"))}
+      {E.row("Tap 5 · Pils", "nearly out · ~9% left", E.act("Swap"), "w", BeerIcon)}
+      {E.row("Weekly count", "due Thu · last counted 7 days ago", E.act("Count"), "", TaskDone01Icon)}
+      {E.row("Guest cider", "rung in Square · not mapped, blocks reconcile", E.act("Map"), "w", Tag01Icon)}
+      {E.row("Variance · last week", "−0.5 bbl Hazy unaccounted", E.act("Review"), "", TaskDone01Icon)}
       {E.note("No picks, orders or invoices — the taproom role sees the taproom.")}
     </>),
   },
@@ -137,10 +140,10 @@ export const SCREENS: Screen[] = [
       {E.hd("Work", "warehouse default")}
       {E.btn("New order", "g")}
       {E.chips(["all", "orders", "batches", "runs", "POs", "routes"], 1)}
-      {E.row("ORD-0231 · Ridgeline", "submitted · ships today", E.act("Confirm"))}
-      {E.row("ORD-0229 · Al’s Bar", "picked · restock 3 Pils staged", E.act("Put back"), "w")}
-      {E.row("PO-0142 · Country Malt", "due today", E.act("Receive"))}
-      {E.row("Route A", "3 stops · Thu", E.act("Resume"))}
+      {E.row("ORD-0231 · Ridgeline", "submitted · ships today", E.act("Confirm"), "", Package01Icon)}
+      {E.row("ORD-0229 · Al’s Bar", "picked · restock 3 Pils staged", E.act("Put back"), "w", Package01Icon)}
+      {E.row("PO-0142 · Country Malt", "due today", E.act("Receive"), "", DeliveryTruck01Icon)}
+      {E.row("Route A", "3 stops · Thu", E.act("Resume"), "", Route01Icon)}
     </>),
   },
   {
@@ -149,7 +152,7 @@ export const SCREENS: Screen[] = [
     spec: "Role-filtered; hidden entries leave no gaps. Standing work remains in Today, Beer or Work.",
     body: (<>
       {E.hd("More")}
-      {E.nav("Invoices", "QBO mapping and push")}
+      {E.nav("Invoices", "QuickBooks Online mapping and push")}
       {E.nav("Catalog · price lists")}
       {E.nav("Customers · ship-tos")}
       {E.nav("Recipes · compliance")}
@@ -163,9 +166,9 @@ export const SCREENS: Screen[] = [
     states: [["empty", "No matches · change the term"], ["permission", "Results honor row access"]],
     body: (<>
       {E.inp("Search SKU, customer, order, lot, vessel or material")}
-      {E.nav("Hazy IPA · ½ bbl", "SKU · ATP 11")}
-      {E.nav("ORD-0231 · Ridgeline", "order · 4 × Hazy")}
-      {E.nav("L-240831-HZ", "lot · packaged 8/31")}
+      {E.nav("Hazy IPA · ½ bbl", "SKU · ATP 11", "", BeerIcon)}
+      {E.nav("ORD-0231 · Ridgeline", "order · 4 × Hazy", "", Package01Icon)}
+      {E.nav("L-240831-HZ", "lot · packaged 8/31", "", TaskDone01Icon)}
     </>),
   },
   {
@@ -501,9 +504,9 @@ export const SCREENS: Screen[] = [
     states: [["response lost", "Server dedupe returns prior result"], ["permanent", "Open form; preserve fields", 1], ["session expired", "Sign in; keep queue"], ["permission changed", "Do not replay; explain", 1]],
     spec: "The discard confirmation names every queued write; response loss resolves by requestId and shows the prior result.",
     body: (<>
-      {E.row("Record movement · Hazy", "waiting for wifi", E.act("Retry"))}
-      {E.row("Record fermentation reading · FV3", "response lost", E.act("Check"))}
-      {E.row("Record cellar transfer · FV2", "validation failed", E.act("Fix"), "w")}
+      {E.row("Record movement · Hazy", "waiting for wifi", E.act("Retry"), "", WifiDisconnected01Icon)}
+      {E.row("Record fermentation reading · FV3", "response lost", E.act("Check"), "", WifiDisconnected01Icon)}
+      {E.row("Record cellar transfer · FV2", "validation failed", E.act("Fix"), "w", WifiDisconnected01Icon)}
       {E.btn("Retry eligible")}
       {E.note("Discarding deletes these 3 unsent writes.")}
       {E.btn("Discard 3 queued writes", "irr")}
@@ -820,7 +823,7 @@ export const SCREENS: Screen[] = [
     step: 5,
     slice: 1,
     tab: "More",
-    group: "QBO",
+    group: "QuickBooks Online",
     name: "Settings · Accounting",
     job: "One page for the QuickBooks connection, and for the three things a pay link needs",
     reads: "get_qbo_connection [design; adds payments_enabled + push defaults]",
@@ -845,7 +848,7 @@ export const SCREENS: Screen[] = [
     step: 5,
     slice: 1,
     tab: "More",
-    group: "QBO",
+    group: "QuickBooks Online",
     name: "Invoices · drift from QuickBooks",
     job: "What the AR list shows when someone edits, voids or deletes an invoice over there",
     reads: "list_invoices [design; qbo_sync_token + qbo_remote_state]",
@@ -859,7 +862,7 @@ export const SCREENS: Screen[] = [
       {E.row("INV-1040 · Teresa’s", "voided in QuickBooks · not paid", "$0.00", "w")}
       {E.row("INV-1039 · Ridgeline", "deleted in QuickBooks · re-push or write off", "—", "w")}
       {E.row("INV-1038 · Al’s Bar", "pushed · not sent from QuickBooks", "$540")}
-      {E.row("INV-1037 · Ridgeline", "paid 8/29 from QBO", "$980", "ok")}
+      {E.row("INV-1037 · Ridgeline", "paid 8/29 from QuickBooks Online", "$980", "ok")}
       {E.info("MGR shows what changed over there. Corrections belong in QuickBooks, or as a credit memo here.")}
     </>),
   },
@@ -867,23 +870,23 @@ export const SCREENS: Screen[] = [
     step: 5,
     slice: 1,
     tab: "More",
-    name: "Invoices and QBO",
+    name: "Invoices and QuickBooks Online",
     job: "An AR list first; connect, map and push are the drill-in for one invoice",
     reads: "list_invoices · get_qbo_connection · get_qbo_mapping_candidates [design]",
     writes: "connect_qbo · set_qbo_customer_mapping · set_qbo_item_mapping · push_invoice_to_qbo [design]",
-    states: [["connection health", "QuickBooks · token healthy · company 9341"], ["expired", "Reconnect before mapping or push", 1], ["paid", "paid_at arrives from the QBO sync · no user verb"], ["drill-in", "one invoice: mapping candidates + Push"]],
+    states: [["connection health", "QuickBooks · token healthy · company 9341"], ["expired", "Reconnect before mapping or push", 1], ["paid", "paid_at arrives from the QuickBooks Online sync · no user verb"], ["drill-in", "one invoice: mapping candidates + Push"]],
     spec: "List rows carry due / push_failed / paid_at and credit-memo QBO status; payments come back through the sync job and are read-only here. Tapping a failed row opens the drill-in drawn below the list: connection, each mapping and push are four independent commands; push is online-only copper and persists exact payload + deterministic requestId before the remote POST. Creating a credit memo stays Return shipment.",
     body: (<>
       {E.hd("Back · More", "Invoices")}
       {E.row("QuickBooks", "connected · company 9341", "healthy", "ok")}
       {E.row("INV-0198 · Ridgeline", "due 9/18 · pushed", "$1,240")}
       {E.row("INV-0197 · Al’s Bar", "push failed · item unmapped", "$540", "w")}
-      {E.row("INV-0190 · Ridgeline", "paid 8/29 from QBO", "$980", "ok")}
+      {E.row("INV-0190 · Ridgeline", "paid 8/29 from QuickBooks Online", "$980", "ok")}
       {E.row("CM-0012 · Teresa’s", "credit memo · pushed", "−$180")}
       {E.ttl("INV-0197 · fix and push")}
-      {E.row("SKU · Pils case", "QBO candidate: Pils 16 oz", E.act("Select"))}
+      {E.row("SKU · Pils case", "QuickBooks Online candidate: Pils 16 oz", E.act("Select"))}
       {E.btn("Save item mapping")}
-      {E.btn("Push invoice to QBO", "irr")}
+      {E.btn("Push invoice to QuickBooks Online", "irr")}
     </>),
   },
   {
@@ -1048,7 +1051,7 @@ export const SCREENS: Screen[] = [
       {E.hd("Invoices", "Ridgeline")}
       {E.row("INV-0198", "due 9/18", "$1,240", "w")}
       {E.row("INV-0190", "paid 8/29", "$980", "ok")}
-      {E.blank("No invoices yet. They appear after shipment or delivery.")}
+      {E.blank("No invoices yet. They appear after shipment or delivery.", Invoice01Icon)}
     </>),
   },
   {
@@ -1586,7 +1589,7 @@ export const SCREENS: Screen[] = [
       {E.ttl("Point of sale")}
       {E.info("Publish what the taproom can sell, and read its sales back. One provider is connected at a time.")}
       {E.row("Square · Demo Brewing LLC", "catalog published · sales syncing", E.act("Active"), "ok")}
-      {E.row("Square → QuickBooks connector", "detected · Square posts taproom sales to QBO itself", E.act("Review"), "w")}
+      {E.row("Square → QuickBooks connector", "detected · Square posts taproom sales to QuickBooks Online itself", E.act("Review"), "w")}
       {E.row("Taproom", "MGR Taproom · channel Taproom", "5 published")}
       {E.row("Warehouse", "MGR Warehouse · channel DTC", "3 published")}
       {E.gated("Third location", "not mapped · sales would have nowhere to deplete")}
@@ -1776,7 +1779,7 @@ export const SCREENS: Screen[] = [
 
   // QuickBooks — what MGR's push produces, rendered by Intuit. Slice 1, step 5.
   {
-    step: 5, slice: 1, group: "QBO", venue: { name: "QuickBooks", title: "Invoice INV-1042", actions: "Edit invoice" },
+    step: 5, slice: 1, group: "QuickBooks Online", venue: { name: "QuickBooks Online", title: "Invoice INV-1042", actions: "Edit invoice" },
     name: "Invoice · as MGR pushed it",
     job: "What the accountant opens after one shipment invoices — and the two steps the push does not perform",
     reads: "— [QuickBooks renders; MGR wrote it]",
@@ -1794,7 +1797,7 @@ export const SCREENS: Screen[] = [
     </>),
   },
   {
-    step: 5, slice: 1, group: "QBO", venue: { name: "QuickBooks", title: "Payment", actions: "Edit" },
+    step: 5, slice: 1, group: "QuickBooks Online", venue: { name: "QuickBooks Online", title: "Payment", actions: "Edit" },
     name: "Payment · flows back",
     job: "The accountant records payment here; MGR never offers a Mark paid verb",
     reads: "qbo sync job [design; writes invoices.paid_at]",
@@ -1811,7 +1814,7 @@ export const SCREENS: Screen[] = [
     </>),
   },
   {
-    step: 5, slice: 1, group: "QBO", venue: { name: "QuickBooks", title: "Credit memo CM-0068", actions: "Edit" },
+    step: 5, slice: 1, group: "QuickBooks Online", venue: { name: "QuickBooks Online", title: "Credit memo CM-0068", actions: "Edit" },
     name: "Credit memo · as pushed",
     job: "A return or keg deposit refund as it lands against the customer",
     reads: "—",
@@ -1829,12 +1832,12 @@ export const SCREENS: Screen[] = [
     </>),
   },
   {
-    step: 5, slice: 1, group: "QBO", venue: { name: "QuickBooks", title: "Invoice · not created", actions: "Edit" },
+    step: 5, slice: 1, group: "QuickBooks Online", venue: { name: "QuickBooks Online", title: "Invoice · not created", actions: "Edit" },
     name: "Push rejected · unmapped item",
     job: "What QuickBooks refuses when a SKU carries no usable item reference",
     reads: "—",
     writes: "push_invoice [design; rejected — no partial invoice]",
-    states: [["failed", "MGR AR row reads push failed", 1], ["unmapped", "the SKU carries no qbo_item_id"], ["archived in QBO", "mapped, but the item went inactive — same error, different fix", 1], ["never partial", "no half invoice is left behind here"]],
+    states: [["failed", "MGR AR row reads push failed", 1], ["unmapped", "the SKU carries no qbo_item_id"], ["archived in QuickBooks Online", "mapped, but the item went inactive — same error, different fix", 1], ["never partial", "no half invoice is left behind here"]],
     spec: "Drawn because the failure is external and the recovery is not. MGR stores the raw provider reason in invoices.qbo_sync_error and leaves qbo_sync_status failed; the row stays in AR. Re-pushing reuses the same requestid, so a fixed mapping cannot produce a second invoice. Two causes share this one message — the SKU was never mapped, or the QuickBooks item has since gone inactive — and the recovery differs, so the error copy must not assume the first. Nothing appears in the list behind this panel, which is the point.",
     body: (<>
       {X.err("Invalid reference", "Invalid Reference Id : Item element id 0 not found.")}
@@ -1843,7 +1846,7 @@ export const SCREENS: Screen[] = [
     </>),
   },
   {
-    step: 7, slice: 7, group: "POS", venue: { name: "QuickBooks", title: "Sales receipt", actions: "Edit" },
+    step: 7, slice: 7, group: "POS", venue: { name: "QuickBooks Online", title: "Sales receipt", actions: "Edit" },
     name: "Square sales receipt · sidebar",
     job: "Proof that Square's own QuickBooks sync books a daily receipt MGR must not double-count",
     reads: "— [Square's QuickBooks integration wrote it]",

@@ -12,39 +12,45 @@ import { createContext, useContext, useState } from "react";
 import { ThemeToggle } from "@/components/mgr/theme-toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-const WIDTHS = { phone: 390, desk: 1280 } as const;
-const WidthContext = createContext<number>(WIDTHS.phone);
+type Mode = "phone" | "desk";
+const WidthContext = createContext<Mode>("phone");
 
 /** One frame, embedded at a real viewport width — see app/(frames)/screens/frame. */
 export function ScreenEmbed({ index, title }: { index: number; title: string }) {
-  const width = useContext(WidthContext);
+  const mode = useContext(WidthContext);
+  // Phone is a real 390px viewport. Desk fills the column: the shell draws its
+  // rail at any width from 768 up, and a fixed 1280 only guaranteed a
+  // horizontal scroll on most screens. The page lifts Fumadocs' width caps so
+  // the column is wide enough to clear the breakpoint.
   return (
     <iframe
       src={`/screens/frame?s=${index}`}
-      title={`${title} at ${width}px`}
-      width={width}
+      title={`${title} · ${mode}`}
       height={780}
       loading="lazy"
-      // No max-width: clamping the iframe to the docs column would shrink its
-      // viewport back below the shell's md breakpoint, so Desk would still draw the
-      // phone layout. The wrapper scrolls instead.
-      className="rounded-lg border bg-background"
+      style={{ width: mode === "phone" ? 390 : "100%" }}
+      className="max-w-full rounded-lg border bg-background"
     />
   );
 }
 
-export function ScreenWidth({ children }: { children: React.ReactNode }) {
-  const [mode, setMode] = useState<"phone" | "desk">("phone");
+/** `deskOnly` pins the width and hides the switch — the external venues are
+ * desktop products (QuickBooks and Square Dashboard have no phone layout to
+ * show), so offering Phone there would only draw them broken. */
+export function ScreenWidth({ children, deskOnly = false }: { children: React.ReactNode; deskOnly?: boolean }) {
+  const [mode, setMode] = useState<Mode>(deskOnly ? "desk" : "phone");
   return (
     <div className="flex flex-col gap-8" data-screen-width={mode}>
       <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 bg-fd-background/95 py-2 backdrop-blur">
-        <ToggleGroup type="single" variant="outline" size="sm" value={mode} onValueChange={(v) => v && setMode(v as "phone" | "desk")}>
-          <ToggleGroupItem value="phone">Phone · 390</ToggleGroupItem>
-          <ToggleGroupItem value="desk">Desk · 1280</ToggleGroupItem>
-        </ToggleGroup>
+        {!deskOnly && (
+          <ToggleGroup type="single" variant="outline" size="sm" value={mode} onValueChange={(v) => v && setMode(v as Mode)}>
+            <ToggleGroupItem value="phone">Phone · 390</ToggleGroupItem>
+            <ToggleGroupItem value="desk">Desk</ToggleGroupItem>
+          </ToggleGroup>
+        )}
         <div className="w-40"><ThemeToggle /></div>
       </div>
-      <WidthContext.Provider value={WIDTHS[mode]}>{children}</WidthContext.Provider>
+      <WidthContext.Provider value={mode}>{children}</WidthContext.Provider>
     </div>
   );
 }

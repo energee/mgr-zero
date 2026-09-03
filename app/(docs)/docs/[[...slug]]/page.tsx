@@ -20,8 +20,17 @@ export default async function Page({ params }: Props) {
   // it below the intro.
   const generated = { screens: SCREEN_TOC, integrations: VENUE_TOC }[page.slugs.join("/")];
   const toc = generated ? [...page.data.toc, ...generated] : page.data.toc;
+  // The generated pages embed frames at desktop width, so they take the full
+  // column. `full` alone would also drop the table of contents (it only
+  // defaults it off), so the TOC is re-enabled explicitly; the article's own
+  // 1168px cap is lifted the same way, and the layout width in ../layout.tsx.
   return (
-    <DocsPage toc={toc} full={page.data.full}>
+    <DocsPage
+      toc={toc}
+      full={Boolean(generated) || page.data.full}
+      tableOfContent={{ enabled: true }}
+      className={generated ? "max-w-none" : undefined}
+    >
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>
       <DocsBody>

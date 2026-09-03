@@ -6,7 +6,9 @@
 import { logout } from "@/app/(auth)/actions";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Icon } from "@/components/mgr/icon";
 import { ThemeToggle } from "@/components/mgr/theme-toggle";
+import { UserCircleIcon } from "@hugeicons/core-free-icons";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export function MeSheet({ fields }: { fields: [string, string][] }) {
@@ -14,7 +16,7 @@ export function MeSheet({ fields }: { fields: [string, string][] }) {
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="sm">Me</Button>
+        <Button variant="ghost" size="sm"><Icon icon={UserCircleIcon} />Me</Button>
       </SheetTrigger>
       <SheetContent side={mobile ? "bottom" : "right"} className="pb-[max(1rem,env(safe-area-inset-bottom))]">
         <SheetHeader><SheetTitle>Me</SheetTitle></SheetHeader>
