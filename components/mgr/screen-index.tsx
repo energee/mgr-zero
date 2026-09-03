@@ -20,30 +20,36 @@ const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").re
 // sub-index sends every screen link to its area.
 const screenSlug = (name: string) => `screen-${slug(name)}`;
 
-// Order areas by where they appear in the inventory, so the page reads in the
-// same build order the gallery does rather than alphabetically.
-function byArea() {
+// Order sections by where they appear in the inventory, so a page reads in the
+// same build order the gallery does rather than alphabetically. MGR screens
+// group by the area that owns them; venue frames group by the product they are
+// drawn inside, which is the only grouping that means anything for them.
+function sections(kind: "mgr" | "venues") {
   const groups = new Map<string, Screen[]>();
   for (const s of SCREENS) {
-    const key = area(s);
+    if (kind === "venues" ? !s.venue : Boolean(s.venue)) continue;
+    const key = s.venue ? s.venue.name : area(s);
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key)!.push(s);
   }
   return [...groups];
 }
 
-/** The page's own table of contents: Fumadocs builds one from an MDX file's
+/** A page's own table of contents: Fumadocs builds one from an MDX file's
  * headings, and these headings come from this component instead, so the docs
- * route hands this list to DocsPage for the right-hand sub-index. */
-export const SCREEN_TOC = byArea().flatMap(([name, screens]) => [
-  { title: name, url: `#${slug(name)}`, depth: 2 },
-  ...screens.map((s) => ({ title: s.name, url: `#${screenSlug(s.name)}`, depth: 3 })),
-]);
+ * route hands the matching list to DocsPage for the right-hand sub-index. */
+const tocFor = (kind: "mgr" | "venues") =>
+  sections(kind).flatMap(([name, screens]) => [
+    { title: name, url: `#${slug(name)}`, depth: 2 },
+    ...screens.map((s) => ({ title: s.name, url: `#${screenSlug(s.name)}`, depth: 3 })),
+  ]);
+export const SCREEN_TOC = tocFor("mgr");
+export const VENUE_TOC = tocFor("venues");
 
-export function ScreenIndex() {
+export function ScreenIndex({ kind = "mgr" }: { kind?: "mgr" | "venues" }) {
   return (
     <ScreenWidth>
-      {byArea().map(([name, screens]) => (
+      {sections(kind).map(([name, screens]) => (
         <section key={name} className="flex flex-col gap-8">
           <h2 id={slug(name)} className="scroll-m-20 border-b pb-2 text-xl font-semibold">
             {name} <span className="text-sm font-normal text-fd-muted-foreground">· {screens.length} screens</span>

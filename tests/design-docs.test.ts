@@ -10,16 +10,23 @@ import { ScreenIndex } from "../components/mgr/screen-index";
 import { SCREENS } from "../components/mgr/screens";
 
 describe("design docs", () => {
-  it("publishes every screen in the Fumadocs tree", () => {
+  it("publishes both pages in the Fumadocs tree", () => {
     const meta = JSON.parse(readFileSync("content/docs/meta.json", "utf8"));
-    expect(meta.pages).toContain("screens");
+    expect(meta.pages).toEqual(expect.arrayContaining(["screens", "integrations"]));
     expect(readFileSync("content/docs/screens.mdx", "utf8")).toContain("<ScreenIndex />");
+    expect(readFileSync("content/docs/integrations.mdx", "utf8")).toContain('<ScreenIndex kind="venues" />');
   });
 
-  it("renders every screen's name and job from the inventory itself", () => {
-    const html = renderToStaticMarkup(createElement(ScreenIndex));
-    for (const s of SCREENS) expect(html).toContain(s.name);
-    expect(html).toContain("Repack · sheet");
+  it("splits MGR screens from the external venues, losing none", () => {
+    const mgr = renderToStaticMarkup(createElement(ScreenIndex));
+    const venues = renderToStaticMarkup(createElement(ScreenIndex, { kind: "venues" as const }));
+    for (const s of SCREENS) {
+      const [inPage, other] = s.venue ? [venues, mgr] : [mgr, venues];
+      expect(inPage, `${s.name} is missing from its page`).toContain(s.name);
+      expect(other, `${s.name} appears on both pages`).not.toContain(`>${s.name}<`);
+    }
+    // Venues group by product, not by the tab a record happens to carry.
+    for (const product of ["QuickBooks", "Square", "Slack"]) expect(venues).toContain(product);
   });
 
   it("stays out of the documentation agent's reach", () => {

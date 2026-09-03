@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from "fumadocs-ui/layouts/docs/page";
 import { getMDXComponents } from "@/components/mdx";
-import { SCREEN_TOC } from "@/components/mgr/screen-index";
+import { SCREEN_TOC, VENUE_TOC } from "@/components/mgr/screen-index";
 import { source } from "@/lib/source";
 
 type Props = { params: Promise<{ slug?: string[] }> };
@@ -14,11 +14,12 @@ export default async function Page({ params }: Props) {
   const page = source.getPage((await params).slug);
   if (!page) notFound();
   const MDX = page.data.body;
-  // Fumadocs builds a page's sub-index from its own MDX headings. The screen
-  // inventory's headings come from <ScreenIndex /> instead, so its areas are
-  // appended here — without this the page has a table of contents with nothing
-  // in it below the intro.
-  const toc = page.slugs.join("/") === "screens" ? [...page.data.toc, ...SCREEN_TOC] : page.data.toc;
+  // Fumadocs builds a page's sub-index from its own MDX headings. These two
+  // pages' headings come from <ScreenIndex /> instead, so their sections are
+  // appended here — without this each has a table of contents with nothing in
+  // it below the intro.
+  const generated = { screens: SCREEN_TOC, integrations: VENUE_TOC }[page.slugs.join("/")];
+  const toc = generated ? [...page.data.toc, ...generated] : page.data.toc;
   return (
     <DocsPage toc={toc} full={page.data.full}>
       <DocsTitle>{page.data.title}</DocsTitle>
