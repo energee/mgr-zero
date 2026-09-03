@@ -236,12 +236,12 @@ creation. Mutations return `{ order_id }` unless noted.
 
 | Command | Roles | Purpose |
 | --- | --- | --- |
-| `get_today` | admin, sales, warehouse, brewer | Role-filtered work due now (`{ now? }`, an offset-aware ISO timestamp) |
+| `get_today` | admin, sales, warehouse, brewer | Role-filtered work assigned, due, or overdue now (`{ now? }`, an offset-aware ISO timestamp) |
 | `set_notification_preference` | admin, sales, warehouse, brewer | Enable or mute one notification reason (`{ reason, enabled, quietHours? }`); quiet hours use `HH:MM` start/end and an optional timezone |
 | `set_brewery_quiet_hours` | admin | Set or clear brewery-wide quiet hours (`{ installationId, start, end }`; times are `HH:MM` or both null) |
 | `set_notification_destination` | admin | Choose the private operations destination for scheduled digests (`{ installationId, externalDestinationId }`) |
 | `consume_chat_link_proof` | admin, sales, warehouse, brewer | Link the current staff account using `{ proof }` from a single-use link |
-| `unlink_chat_user` | admin, sales, warehouse, brewer | Unlink a chat user by `linkId` |
+| `unlink_chat_user` | admin, sales, warehouse, brewer | Unlink your own Slack account by `linkId`; admins may unlink any staff account |
 | `get_chat_link_status` | admin, sales, warehouse, brewer | Return the current user's link status for an `installationId` |
 
 Notification `reason` is `submitted_order`, `pick_due`, `delivery_next`,
