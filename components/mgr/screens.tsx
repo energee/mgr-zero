@@ -701,9 +701,9 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.inp("Search")}
       {E.row("Recent")}
-      {E.row("Hazy IPA · ½ bbl keg", "", E.act("ATP 11"))}
-      {E.row("Pils · 16 oz case", "", E.act("ATP −6"), "w")}
-      {E.row("Stout · ⅙ bbl keg", "", E.act("ATP 7"))}
+      {E.row("Hazy IPA · ½ bbl keg", "", "ATP 11")}
+      {E.row("Pils · 16 oz case", "", "ATP −6", "w")}
+      {E.row("Stout · ⅙ bbl keg", "", "ATP 7")}
       {E.row("All SKUs")}
       {E.blank("All SKUs · A–Z")}
     </>),
@@ -822,7 +822,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Orders", "ORD-0231")}
       {E.ttl("Ridgeline Tap Room")}
-      {E.row("Current state", "Submitted · ships Thu", E.act("Next: confirm"))}
+      {E.row("Current state", "Submitted · ships Thu", E.status("Next: confirm"))}
       {E.pick("Fulfillment source", "Warehouse")}
       {E.info("Lifecycle: submitted → confirmed → picked → shipped. Only the valid next action is active.")}
       {E.row("Hazy IPA · ½ bbl keg", "", "4 · ATP 11")}
@@ -846,12 +846,12 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Orders", "ORD-0229")}
       {E.ttl("Al’s Bar · Columbus, OH")}
-      {E.row("Current state", "Picked · restock pending", E.act("Next: ship"))}
+      {E.row("Current state", "Picked · restock pending", E.status("Next: ship"))}
       {E.fld("Fulfillment source · customer PO", "Warehouse · PO 4471")}
       {E.note("Put back 3 Pils cases to Warehouse. They stayed staged after the line was adjusted.")}
-      {E.row("Hazy IPA · ½ bbl keg", "ordered 4 · picked 4", E.act("ATP 11"), "ok")}
+      {E.row("Hazy IPA · ½ bbl keg", "ordered 4 · picked 4", "ATP 11", "ok")}
       {E.row("Pils · 16 oz case", "ordered 7 · picked 10", "adjust", "w")}
-      {E.row("Stout · ⅙ bbl keg", "ordered 2 · picked 2", E.act("ATP 7"), "ok")}
+      {E.row("Stout · ⅙ bbl keg", "ordered 2 · picked 2", "ATP 7", "ok")}
       {E.btns([["Adjust line", "g"], ["Add line", "g"]])}
       {E.note("Stout isn’t registered for Ohio. Check the Compliance registry ›")}
       {E.tape([["created · Ted", "Mon 9:02"], ["submitted · Ted", "Mon 9:05"], ["confirmed · Maria", "Mon 14:10"], ["picked · Dave · 4 / 10 / 2", "Tue 8:40"], ["line adjusted · Pils 10 → 7 · customer cut", "Tue 9:15"]])}
@@ -1044,7 +1044,7 @@ export const SCREENS: Screen[] = [
       {E.ttl("Needs replenishment")}
       {E.note("Below par: transfer 4 Pils + 2 Hazy.")}
       {E.fld("Transfer from", "Warehouse · selected")}
-      {E.row("Transfer to", "Taproom", E.act("Fixed"))}
+      {E.row("Transfer to", "Taproom", E.status("Fixed"))}
       {E.btn("Create transfer order", "g")}
     </>),
   },
@@ -1210,7 +1210,7 @@ export const SCREENS: Screen[] = [
       {E.inp("City · Phoenixville")}
       {E.inp("State · PA")}
       {E.inp("Postal code · 19460")}
-      {E.row("Default ship-to", "selected first on new orders", E.act("On"), "ok")}
+      {E.row("Default ship-to", "selected first on new orders", E.sw(true, "Default ship-to"), "ok")}
       {E.btn("Save ship-to")}
     </>),
   },
@@ -1234,8 +1234,8 @@ export const SCREENS: Screen[] = [
       {E.row("QuickBooks Payments", "active · card and bank", "", "ok", QuickBooksMark)}
       {E.ttl("Push defaults")}
       {E.info("Every invoice is pushed ready to pay. Turning both off means customers cannot pay online at all.")}
-      {E.row("Bank transfer (ACH)", "on · lowest fee", E.act("On"), "ok")}
-      {E.row("Card", "on · percentage fee applies", E.act("On"), "ok")}
+      {E.row("Bank transfer (ACH)", "on · lowest fee", E.sw(true, "Bank transfer payments"), "ok")}
+      {E.row("Card", "on · percentage fee applies", E.sw(true, "Card payments"), "ok")}
       {E.row("Customers missing an email", "2 · cannot be pushed", E.act("Review"), "w")}
     </>),
   },
@@ -2122,7 +2122,7 @@ export const SCREENS: Screen[] = [
       {E.inp("Material name · Citra")}
       {E.pick("Kind", "Hop")}
       {E.pick("Unit", "lb")}
-      {E.row("Active", "available to recipes and purchase orders", E.act("On"), "ok")}
+      {E.row("Active", "available to recipes and purchase orders", E.sw(true, "Material active"), "ok")}
       {E.btn("Save material")}
     </>),
   },
@@ -2259,7 +2259,7 @@ export const SCREENS: Screen[] = [
       {E.back("Compliance months", "August 2026")}
       {E.pick("Month", "August 2026")}
       {E.row("1 · Review auto-reconciled losses", "review isn’t available yet", "3", "w")}
-      {E.row("2 · Review generated figures", "", E.act("Current"))}
+      {E.row("2 · Review generated figures", "", E.status("Current", "ok"))}
       {E.tbl(["class", "begin", "+", "−", "end"], [["cellar · in-process", "120.40", "62.00", "58.10", "124.30"], ["kegs", "41.00", "30.50", "33.20", "38.30"], ["cans", "12.60", "18.00", "14.90", "15.70"], ["bottles", "0.00", "0.00", "0.00", "0.00"]])}
       {E.info("Every class balances: begin + in − out = end. Cellar leaves by packaging, not as a removal. Zeros print 0.00.")}
       {E.row("PA / OH excise", "generated", "$1,508")}
@@ -2357,7 +2357,7 @@ export const SCREENS: Screen[] = [
       {E.nav("Square Warehouse", "MGR Warehouse · channel DTC", "ok")}
       {E.nav("Square Events", "new · 42 held sales since Aug 12", "w")}
       {E.btn("Save location mapping", "g")}
-      {E.row("“Hazy 16 oz draft”", "exact SKU/package", E.act("Hazy IPA · ½ bbl keg"))}
+      {E.pick("“Hazy 16 oz draft”", "Hazy IPA · ½ bbl keg")}
       {E.fld("Qty per sale", "1/124 keg per 16 oz")}
       {E.fld("Channel override", "none · inherits Taproom")}
       {E.btn("Save item mapping", "g")}
@@ -2537,7 +2537,7 @@ export const SCREENS: Screen[] = [
       {E.chips(["empty", "about ¼ left", "about ½ left"], 0)}
       {E.ttl("Going on")}
       {E.nav("Helles · ½ bbl", "taproom stock · 4 available · same brand")}
-      {E.row("Not our stock", "guest or event keg · no depletion, no variance", E.act("Off"))}
+      {E.row("Not our stock", "guest or event keg · no depletion, no variance", E.sw(false, "Not our stock"))}
       {E.inp("Name · Guest cider")}
       {E.chips(["½ bbl", "⅙ bbl", "50 L"], 0)}
       {E.fld("Tap number", "5 · optional")}
@@ -2704,7 +2704,7 @@ export const SCREENS: Screen[] = [
       {E.nav("Linked people", "3 linked")}
       {E.chips(["App Home", "Personal DM", "Team digest", "Preferences"], 0)}
       {E.row("Preview · App Home", "4 current work reasons · fixture data", E.act("Open"))}
-      {E.btn("Disable", "g")}
+      {E.row("Delivery enabled", "turn off all Slack sends", E.sw(true, "Slack delivery"), "ok")}
     </>),
   },
   {
@@ -2777,9 +2777,9 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Chat", "Health")}
       {E.note("Slack authorization expired. No messages are being sent.")}
-      {E.row("Last message from Slack", "Today · 8:42 AM", E.act("Succeeded"))}
-      {E.row("Last delivery", "Today · 8:43 AM", E.act("Succeeded"))}
-      {E.row("Queued", "3 deliveries", E.act("Paused"), "w")}
+      {E.row("Last message from Slack", "Today · 8:42 AM", E.status("Succeeded", "ok"))}
+      {E.row("Last delivery", "Today · 8:43 AM", E.status("Succeeded", "ok"))}
+      {E.row("Queued", "3 deliveries", E.status("Paused", "w"), "w")}
       {E.btn("Reauthorize Slack")}
       {E.btn("Disable integration", "irr")}
     </>),
@@ -2902,7 +2902,7 @@ export const SCREENS: Screen[] = [
       {E.chips(["Taproom", "Warehouse"], 0)}
       {E.info("One catalog, scoped to a location. Price and availability are read for the location above.")}
       {E.tbl(["Brand · format", "Retail", "Source", "Publishes to"], [["Hazy IPA · pint", "$7.00", "format", "Square · Website"], ["Hazy IPA · crowler", "$9.00", "format", "Square"], ["Pils · pint", "$6.50", "override", "Square · Website"], ["Pils · crowler", "$12.00", "format", "Square"]])}
-      {E.row("Stout · pint", "no taproom stock · off the register", E.act("Retired"), "w")}
+      {E.row("Stout · pint", "no taproom stock · off the register", E.status("Retired", "w"), "w")}
       {E.note("Pils · pint is the only override: $6.50 against a format default of $7.00. Every other row follows its format.")}
       {E.btn("Publish changes")}
       {E.ttl("Also on these destinations")}
@@ -2934,7 +2934,7 @@ export const SCREENS: Screen[] = [
       {E.fld("Format price", "$7.00")}
       {E.inp("Price override · $6.50")}
       {E.btn("Reset to format price", "g")}
-      {E.row("Sell while taproom stock remains", "retires itself when it runs out", E.act("On"))}
+      {E.row("Sell while taproom stock remains", "retires itself when it runs out", E.sw(true, "Sell while taproom stock remains"))}
       {E.info("Leave the override empty and this row follows the format. A price set here applies to this location only.")}
       {E.btn("Save override")}
     </>),
