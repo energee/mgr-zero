@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupTextarea } from "@/components/ui/input-group";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
@@ -68,7 +69,15 @@ export const E = {
     </Item>
   ),
   /** A row's trailing action verb (Pick, Confirm, Resume) as a real target. */
-  act: (t: React.ReactNode) => <Button variant="ghost" size="sm">{t}</Button>,
+  act: (t: React.ReactNode) => <Button variant="ghost" size="sm" data-row-action>{t}</Button>,
+  /** A status word. Never clickable. */
+  status: (t: React.ReactNode, tone: "ok" | "w" | "" = "") => (
+    <Badge variant={tone === "w" ? "secondary" : "outline"} className="gap-1.5">
+      {tone === "ok" ? <Dot cls="ok" /> : null}{t}
+    </Badge>
+  ),
+  /** An on/off setting. */
+  sw: (on: boolean, label: string) => <Switch defaultChecked={on} aria-label={label} />,
   btn: (t: React.ReactNode, k: BtnKind = "p") => {
     const [kind, disabled] = k.split(" ") as [BtnBase, string?];
     return (

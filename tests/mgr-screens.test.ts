@@ -113,6 +113,30 @@ describe("SCREENS", () => {
     expect(html("Review order").match(/<input[^>]*type="number"/g)).toHaveLength(2);
   });
 
+  it("renders status and setting values as non-action controls", () => {
+    const render = (node: ReturnType<typeof E.row>) => renderToStaticMarkup(createElement("div", null, node));
+    expect(render(E.status("Active", "ok"))).not.toContain("<button");
+    expect(render(E.status("Required", "w"))).toContain("Required");
+    expect(render(E.sw(true, "Card payments"))).toContain('role="switch"');
+    expect(render(E.sw(true, "Card payments"))).toContain('aria-checked="true"');
+  });
+
+  it("keeps row actions to verbs", () => {
+    const verbs = new Set([
+      "Add", "Add stop", "Add to route", "Adjust", "Assign", "Change", "Check", "Choose who gets it", "Close", "Confirm", "Connect", "Count", "Create",
+      "Disconnect", "Edit", "Edit prices", "Finish", "Fix", "Invite", "Kick", "Map", "Open", "Open balance", "Open batch", "Open count",
+      "Open in QuickBooks", "Open mapping", "Pay", "Pick", "Pick source", "Put back", "Reading", "Receive", "Record opening count", "Release", "Reload", "Remove", "Reorder", "Re-push",
+      "Resolve", "Resume", "Retry", "Review", "Review history", "Review sales", "Select", "Send", "Send PO", "Shortfall", "Skip", "Start", "Swap", "Switch", "Tap",
+      "Unlink", "Use", "Write off", "Fix registration", "Forgot password?", "Import CSV",
+    ]);
+    for (const screen of SCREENS) {
+      const html = renderToStaticMarkup(createElement("div", null, screen.body));
+      for (const [, label] of html.matchAll(/<button[^>]*data-row-action="true"[^>]*>([^<]+)<\/button>/g)) {
+        expect.soft(verbs.has(label), `${screen.name}: ${label}`).toBe(true);
+      }
+    }
+  });
+
   it("resolves detail back links to a screen or shell destination", () => {
     const shellDestinations = new Set([
       "Search", "Today", "Work", "More", "Beer", "Settings", "Catalog",
