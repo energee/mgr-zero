@@ -1,0 +1,7 @@
+/* app/(docs)/docs/docs.css — Fumadocs' stylesheet, imported by the docs layout
+   so it loads under /docs only; app/globals.css stays the app's own sheet.
+   shadcn.css aliases every --color-fd-* onto the app tokens defined there, so
+   the guides inherit the product palette instead of restating it. */
+@import "tailwindcss";
+@import "fumadocs-ui/css/shadcn.css";
+@import "fumadocs-ui/css/preset.css";
