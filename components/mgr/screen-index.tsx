@@ -9,8 +9,10 @@
 // neither needs nor can have in production, where /design 404s.
 import { SCREENS, type Screen } from "@/components/mgr/screens";
 import { VenueFrame } from "@/components/mgr/venue";
+import { ScreenWidth } from "@/components/mgr/screen-width";
 
 const area = (s: Screen) => s.group ?? (s.portal ? "Portal" : (s.tab ?? "Other"));
+const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
 // Order areas by where they appear in the inventory, so the page reads in the
 // same build order the gallery does rather than alphabetically.
@@ -24,16 +26,25 @@ function byArea() {
   return [...groups];
 }
 
+/** The page's own table of contents: Fumadocs builds one from an MDX file's
+ * headings, and these headings come from this component instead, so the docs
+ * route hands this list to DocsPage for the right-hand sub-index. */
+export const SCREEN_TOC = byArea().map(([name, screens]) => ({
+  title: `${name} · ${screens.length}`,
+  url: `#${slug(name)}`,
+  depth: 2,
+}));
+
 export function ScreenIndex() {
   return (
-    <div className="flex flex-col gap-8">
+    <ScreenWidth>
       {byArea().map(([name, screens]) => (
-        <section key={name} className="flex flex-col gap-4">
-          <h2 id={name.toLowerCase()} className="scroll-m-20 text-xl font-semibold">
+        <section key={name} className="flex flex-col gap-8">
+          <h2 id={slug(name)} className="scroll-m-20 border-b pb-2 text-xl font-semibold">
             {name} <span className="text-sm font-normal text-fd-muted-foreground">· {screens.length} screens</span>
           </h2>
           {screens.map((s) => (
-            <article key={s.name} className="rounded-lg border p-4">
+            <article key={s.name}>
               <h3 className="text-base font-medium">{s.name}</h3>
               <p className="mt-1 text-sm text-fd-muted-foreground">{s.job}</p>
               <dl className="mt-3 grid gap-1 font-mono text-xs text-fd-muted-foreground">
@@ -49,15 +60,15 @@ export function ScreenIndex() {
                 </ul>
               )}
               {s.spec && <p className="mt-3 text-sm">{s.spec}</p>}
-              <div className="mt-4 overflow-x-auto rounded-md border bg-fd-background p-3">
+              <div className="screen-frame mt-4 overflow-x-auto">
                 {s.venue
                   ? <VenueFrame venue={s.venue}>{s.body}</VenueFrame>
-                  : <div className="mx-auto flex max-w-sm flex-col gap-2">{s.hd}{s.body}</div>}
+                  : <div className="flex flex-col gap-2">{s.hd}{s.body}</div>}
               </div>
             </article>
           ))}
         </section>
       ))}
-    </div>
+    </ScreenWidth>
   );
 }
