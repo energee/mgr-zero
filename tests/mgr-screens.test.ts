@@ -33,9 +33,10 @@ describe("SCREENS", () => {
   });
 
   it("carries every MGR-venue frame with unique names", () => {
-    // 77 ported from the wireframes (94 minus the 17 Slack/QuickBooks/Square
-    // venue drawings) + Permission denied (plan §3) + the five revision-2
-    // frames (schema §16), which are drawn gated until §16 is migrated.
+    // A tripwire against a frame dropped by hand from a 1700-line array — the
+    // uniqueness check below catches duplicates, nothing else catches a loss.
+    // Bump it deliberately when a frame lands; .agents/PROGRESS.md narrates
+    // what the number is made of.
     expect(SCREENS).toHaveLength(83);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
