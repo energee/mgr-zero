@@ -1,7 +1,7 @@
 // app/(app)/pick/page.tsx — daily pick sheet: confirmed/picked orders from
 // daily_pick_sheet, grouped by requested_ship_date with lines shown inline;
 // print via print-button.tsx (see the @media print rule in app/globals.css
-// that hides the nav sidebar). Recording actual picks happens on the order
+// that hides the shell chrome). Recording actual picks happens on the order
 // detail page (pick-form.tsx), linked from here.
 import Link from "next/link";
 import { getActiveBrewery } from "@/lib/brewery";

@@ -1,17 +1,24 @@
 // app/layout.tsx — root document: plan §5 fonts (Instrument Sans body, Familjen
 // Grotesk display, JetBrains Mono data) exposed as CSS variables that
 // app/globals.css maps onto --font-sans/--font-heading/--font-mono, plus
-// viewport-fit=cover so the shells can pad for the safe area. public/theme-boot.js
-// (next/script beforeInteractive) applies the `.dark` class before paint;
-// components/mgr/theme-toggle.tsx flips it.
+// viewport-fit=cover so the shells can pad for the safe area. THEME_BOOT is an
+// inline, parser-blocking <head> script that applies the `.dark` class from
+// localStorage.theme or the OS preference before first paint (next/script's
+// beforeInteractive runs from the client bundle, i.e. after paint, so it is
+// not used). React then hydrates <html> against a class list the script
+// already changed, hence suppressHydrationWarning. components/mgr/theme-toggle.tsx
+// flips the class and writes the preference.
 import type { Metadata, Viewport } from "next";
 import { Familjen_Grotesk, Instrument_Sans, JetBrains_Mono } from "next/font/google";
-import Script from "next/script";
 import "./globals.css";
 
 const instrumentSans = Instrument_Sans({ variable: "--font-instrument-sans", subsets: ["latin"] });
 const familjenGrotesk = Familjen_Grotesk({ variable: "--font-familjen-grotesk", subsets: ["latin"], preload: false });
 const jetbrainsMono = JetBrains_Mono({ variable: "--font-jetbrains-mono", subsets: ["latin"], preload: false });
+
+// ponytail: static boot script; a theme provider dependency would be more code for the same result
+const THEME_BOOT =
+  "(function(){try{var t=localStorage.theme;if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}})()";
 
 export const metadata: Metadata = {
   title: "MGR",
@@ -25,12 +32,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html
       lang="en"
       className={`${instrumentSans.variable} ${familjenGrotesk.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">
-        {children}
-        {/* ponytail: 10-line static boot script; a theme provider dependency would be more code for the same result */}
-        <Script src="/theme-boot.js" strategy="beforeInteractive" />
-      </body>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
+      </head>
+      <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
 }

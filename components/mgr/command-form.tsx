@@ -20,7 +20,8 @@ export function CommandForm({
   children,
 }: {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  /** Omit to pin the form open (the design gallery); dismiss gestures then do nothing. */
+  onOpenChange?: (open: boolean) => void;
   /** Omit when the caller controls `open` itself (the design gallery). */
   trigger?: React.ReactNode;
   title: React.ReactNode;

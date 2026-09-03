@@ -2,9 +2,9 @@
 
 Date: 2026-08-31
 Status: Draft for Ted; rev 4 incorporates the fresh-eyes product, architecture, schema,
-navigation, state, build-order, wet-phone, and Slack-first chat-preview review. Nothing in this plan is built yet;
-the current shell (`app/(app)/layout.tsx`, a 208px left rail with five links and Geist) is
-the placeholder it replaces.
+navigation, state, build-order, wet-phone, and Slack-first chat-preview review. Build status lives in `.agents/PROGRESS.md`;
+the shell, tokens, `E` composites, screen records and `/design` gallery from §5–§7 step 1 are
+built on the `ui-components` branch (`components/mgr/`, `lib/mgr/`, `app/(design)/`).
 Wireframes: `2026-08-31-mgr-wireframes.html` — the frame inventory (product destinations plus
 separately identified sheets, overlays, flow states, and provider previews) tagged with
 tab/group, slice, build step, registered reads, and registered writes; the phone/desk
