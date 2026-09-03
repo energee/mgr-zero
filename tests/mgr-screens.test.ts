@@ -37,8 +37,8 @@ describe("SCREENS", () => {
     // A tripwire against a frame dropped by hand from a 1700-line array — the
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands; .agents/PROGRESS.md narrates
-    // what the number is made of — 121 MGR frames plus the 17 venue frames.
-    expect(SCREENS).toHaveLength(138);
+    // what the number is made of — 133 MGR frames plus the 17 venue frames.
+    expect(SCREENS).toHaveLength(150);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
 
@@ -92,6 +92,18 @@ describe("SCREENS", () => {
     expect(bodyText("Team")).not.toContain("Remove selected member");
     expect(bodyText("Import")).toContain("Settings");
     expect(bodyText("Planning")).toContain("More");
+  });
+
+  it("splits list pages from their row editors", () => {
+    const sheets = ["Invite portal user", "Fix mapping", "Package BOM", "SKU", "Brand approval", "State registration", "License", "Channel", "Format", "Override", "Bin"];
+    for (const name of sheets) expect.soft(SCREENS.find((s) => s.name === name)?.surface, name).toBe("sheet");
+    expect(SCREENS.find((s) => s.name === "Invoice")?.surface).toBeUndefined();
+    for (const name of ["Customers", "Invoices", "Catalog", "Vendors", "Compliance registry", "Sale channels", "Formats", "Price tiers", "Location bins"]) {
+      const html = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === name)!.body));
+      expect.soft(html, `${name}: inline save`).not.toMatch(/>Save[^<]*<\/button>/);
+    }
+    const product = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Product")!.body));
+    expect(product).not.toContain("Save SKU");
   });
 
   it("resolves detail back links to a screen or shell destination", () => {
