@@ -36,8 +36,8 @@ describe("SCREENS", () => {
     // A tripwire against a frame dropped by hand from a 1700-line array — the
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands; .agents/PROGRESS.md narrates
-    // what the number is made of — 85 MGR frames plus the 17 venue frames.
-    expect(SCREENS).toHaveLength(102);
+    // what the number is made of — 89 MGR frames plus the 17 venue frames.
+    expect(SCREENS).toHaveLength(106);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
 
@@ -61,5 +61,28 @@ describe("SCREENS", () => {
 
   it("gives sheets no separate header; their title is the record name", () => {
     expect(SCREENS.filter((s) => s.surface === "sheet" && s.hd)).toEqual([]);
+  });
+
+  it("gives the named screens one filled primary each", () => {
+    // Issue 71: two filled verbs on one body fight for the commit. Outline,
+    // ghost, disabled, pad keys and steppers are not the primary. A tile or
+    // row act can still open the next screen.
+    const named = [
+      "Today", "Taproom", "Order", "Cellar map", "Tap board", "Swap keg",
+      "Weekly count", "Brew day", "Route", "Settings", "Product", "Vendors",
+      "POS mapping", "Planning", "Schedule batch", "Vessel", "Kick keg", "Return route",
+    ];
+    const filled = (html: string) =>
+      (html.match(/<button\b[^>]*>/g) ?? []).filter((b) =>
+        /data-variant="(?:default|irreversible)"/.test(b)
+        && !/\sdisabled(?:=["'][^"']*["'])?(?=[\s>])/.test(b)
+        && !/data-size="icon"/.test(b),
+      );
+    for (const name of named) {
+      const s = SCREENS.find((x) => x.name === name);
+      expect(s, name).toBeTruthy();
+      const html = renderToStaticMarkup(createElement("div", null, s!.hd, s!.body));
+      expect(filled(html).length, name).toBeLessThanOrEqual(1);
+    }
   });
 });
