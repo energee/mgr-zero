@@ -1,4 +1,4 @@
-// tests/docs.test.ts — the customer guides are body fragments under content/docs
+// tests/docs.test.ts — the customer guides are body fragments under public/docs
 // rendered by app/(docs)/docs/[guide]; lib/docs.ts is the loader.
 import { describe, expect, it } from "vitest";
 import { GUIDES, readGuide } from "@/lib/docs";
@@ -17,5 +17,13 @@ describe("guide loader", () => {
 
   it("rejects an unknown guide", () => {
     expect(() => readGuide("nope")).toThrow();
+  });
+});
+
+describe("guide URLs", () => {
+  it("redirects the raw public/docs .html path to the styled route", async () => {
+    const config = (await import("@/next.config")).default;
+    const redirects = await config.redirects!();
+    expect(redirects).toContainEqual({ source: "/docs/:guide.html", destination: "/docs/:guide", permanent: true });
   });
 });

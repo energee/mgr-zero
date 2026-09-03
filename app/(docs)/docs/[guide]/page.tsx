@@ -1,5 +1,5 @@
 // app/(docs)/docs/[guide]/page.tsx — renders one customer guide from
-// content/docs inside the app's root layout, so the guides share the app's
+// public/docs inside the app's root layout, so the guides share the app's
 // design language by inheritance rather than by copying it. The `.guide`
 // rules in app/globals.css style the fragment's semantic markup. Static:
 // the three guides are enumerated at build time and anything else 404s.
