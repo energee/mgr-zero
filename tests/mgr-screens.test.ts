@@ -10,11 +10,11 @@ import { SCREENS } from "../components/mgr/screens";
 import { E } from "../components/mgr/e";
 
 describe("SCREENS", () => {
-  it("ports the eleven step-1 frames with names, jobs and IO", () => {
+  it("ports the step-1 frames with names, jobs and IO", () => {
     const step1 = SCREENS.filter((s) => s.step === 1);
     expect(step1.map((s) => s.name)).toEqual([
       "Today", "Today · sales", "Today · brewer", "Today · driver", "Today · taproom",
-      "Beer", "Work", "More", "Global search", "Me", "Settings",
+      "Beer", "Work", "More", "Global search", "Me", "Settings", "Permission denied",
     ]);
     for (const s of SCREENS) {
       expect(s.job).toBeTruthy();
@@ -32,8 +32,11 @@ describe("SCREENS", () => {
     }
   });
 
-  it("carries every MGR-venue wireframe frame (94 minus the 17 Slack/QuickBooks/Square ones) with unique names", () => {
-    expect(SCREENS).toHaveLength(77);
+  it("carries every MGR-venue frame with unique names", () => {
+    // 77 ported from the wireframes (94 minus the 17 Slack/QuickBooks/Square
+    // venue drawings) + Permission denied (plan §3) + the five revision-2
+    // frames (schema §16), which are drawn gated until §16 is migrated.
+    expect(SCREENS).toHaveLength(83);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
 

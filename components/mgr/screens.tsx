@@ -199,6 +199,22 @@ export const SCREENS: Screen[] = [
       {E.nav("Import", "CSV wizard")}
     </>),
   },
+  {
+    step: 1, slice: "all", group: "Global", name: "Permission denied",
+    job: "A forbidden route says what was refused and offers one way back",
+    reads: "— [the denied query never runs]", writes: "—",
+    states: [["role hidden", "navigation never drew the link"], ["bookmarked", "direct URL · denied, not empty rows", 1], ["revoked mid-session", "the next command is refused; the shell stays usable", 1]],
+    spec: "Plan §3: navigation and Today hide inapplicable actions while the registry and RLS still deny direct URLs and commands — so this frame exists for the URL, not for a link. It names the refusal and the role that would satisfy it, never a blank table, a spinner, or the shape of data the caller may not read.",
+    body: (<>
+      {E.hd("Back · Today", "No access")}
+      {E.note("You do not have access to Invoices.")}
+      {E.fld("Signed in as", "dave@ · brewer")}
+      {E.fld("Needs", "admin or sales")}
+      {E.info("An admin can change your role in Settings › Team.")}
+      {E.btns([["Back to Today", "p"], ["Go to Beer", "g"]])}
+      {E.sp()}
+    </>),
+  },
   // steps 2–8
   {
     step: 2,
@@ -300,7 +316,8 @@ export const SCREENS: Screen[] = [
       {E.btn("Remove selected member", "irr")}
       {E.ttl("Invite")}
       {E.fld("Email · role", "name@brewery.com · sales")}
-      {E.chips(["admin", "sales", "warehouse", "brewer"], 1)}
+      {E.chips(["admin", "sales", "warehouse", "brewer", "taproom"], 1)}
+      {E.gated("taproom", "waits on its own RLS · §16.16 open question 4")}
       {E.note("Sending an invite emails the recipient and cannot be recalled.")}
       {E.gated("Send staff invite", "isn’t available yet — invitations are being made retry-safe")}
     </>),
@@ -1626,6 +1643,125 @@ export const SCREENS: Screen[] = [
       {E.row("Sell while taproom stock remains", "retires itself when it runs out", E.act("On"))}
       {E.info("Leave the override empty and this row follows the format. A price set here applies to this location only.")}
       {E.btn("Save override")}
+    </>),
+  },
+  // Revision 2 (schema §16, designed 2026-09-02, not migrated). Every commit
+  // here is drawn gated: the frames exist so the interface can settle before
+  // the one-pass migration, per §16's own build order.
+  {
+    step: 8,
+    slice: 1,
+    tab: "More",
+    name: "Sale channels and tax treatment",
+    job: "Name the channels this brewery sells through and what each one is taxed as",
+    reads: "list_sale_channels [design; §16.3 + PR #42]",
+    writes: "create_sale_channel · update_sale_channel · delete_sale_channel [SCHEMA-GATE: revision 2 §16.3 — sale_channels replaces the sale_channel enum; not migrated]",
+    states: [["in use", "delete refused by on delete restrict · human copy, not a 23503", 1], ["seeded", "four defaults arrive with the brewery"], ["inherit", "a customer with no override takes the channel default"]],
+    spec: "The channel carries a name and a default tax treatment and nothing else: removal classification stays on movement_type, which is why #42 rejected is_removal and requires_dest_state. Resolution order is customer override → channel default, and the resolved value is frozen onto the movement at write time so editing a customer in March never restates January.",
+    body: (<>
+      {E.hd("Back · Settings", "Sale channels")}
+      {E.row("Wholesale", "taxable · 118 movements", E.act("Edit"))}
+      {E.row("Taproom", "taxable · 402 movements", E.act("Edit"))}
+      {E.row("DTC", "taxable · 34 movements", E.act("Edit"))}
+      {E.row("Export", "export · 6 movements", E.act("Edit"))}
+      {E.fld("Channel name", "Export")}
+      {E.chips(["taxable", "export", "vessel_supplies", "research", "transfer_in_bond"], 1)}
+      {E.info("Customers may override this. A taproom depletion has no customer and takes the channel default.")}
+      {E.note("A channel with movements cannot be deleted.")}
+      {E.gated("Save channel", "waits on revision 2 · sale_channels is not migrated")}
+    </>),
+  },
+  {
+    step: 8,
+    slice: 1,
+    tab: "More",
+    name: "Formats and composition",
+    job: "Type bbl_per_unit once, on the atomic format, and derive every shape above it",
+    reads: "list_formats [design; §16.2] · get_format_components [design; §16.2a]",
+    writes: "create_format · update_format · replace_format_components [design; one RPC replaces the child set] · replace_format_bom [SCHEMA-GATE: revision 2 §16.2/16.2a/16.12 — formats, format_components and format_bom supersede skus.bbl_per_unit and sku_bom; not migrated]",
+    states: [["atomic", "carries a typed bbl_per_unit"], ["composed", "volume derived from children · the field is read-only"], ["children missing", "a composed format cannot be created before its children", 1], ["poured", "never holds stock · a ratio back to the keg"], ["in use", "editing a format never moves frozen movement bbl"]],
+    spec: "bbl_per_unit is the basis of all TTB math, so exactly one row types it. Only atomic formats carry a volume; composed ones compute it from format_components, which is also what makes repack (§16.10) validated rather than asserted. basis says only whether the shape holds stock — a pour is a component row with a fractional qty, not a different kind of thing. Each BOM line's on_break disposition is what the repack sheet reads. OPEN (§16.16 q1): fully sized formats, drawn here, or shape-only.",
+    body: (<>
+      {E.hd("Back · Settings", "Formats")}
+      {E.tbl(["Format", "Basis", "bbl / unit", "From"], [["16 oz can", "packaged", "0.00403226", "typed"], ["four-pack", "packaged", "0.01612903", "4 × can"], ["case · 24×16oz", "packaged", "0.09677419", "6 × four-pack"], ["½ bbl keg", "packaged", "0.50000000", "typed"], ["pint", "poured", "0.00806452", "1/124 × ½ bbl"]])}
+      {E.fld("Format name", "case · 24×16oz")}
+      {E.chips(["packaged", "poured"], 0)}
+      {E.fld("Volume", "0.09677419 bbl · derived · read-only")}
+      {E.ttl("Composition")}
+      {E.row("four-pack", "qty 6", E.act("Remove"))}
+      {E.row("+ add component", "child format · qty", "")}
+      {E.ttl("Packaging BOM")}
+      {E.tbl(["Material", "Qty", "On break"], [["Case tray", "1", "return_to_stock"], ["PakTech", "0", "consumed"]])}
+      {E.info("One level only: a case breaks into four-packs, never straight into cans.")}
+      {E.gated("Save format", "waits on revision 2 · formats are not migrated")}
+    </>),
+  },
+  {
+    step: 8,
+    slice: 1,
+    tab: "More",
+    name: "Price tiers by channel",
+    job: "Price a format once per tier and override only the exceptions",
+    reads: "list_price_lists [design; + channel_id §16.4] · get_price_list [design; formats and SKU overrides]",
+    writes: "create_price_list · update_price_list · set_price_list_format · set_price_list_item · clear_price_list_item [SCHEMA-GATE: revision 2 §16.4 — price_lists.channel_id and price_list_formats; not migrated]",
+    states: [["inherited", "the format price is what the customer sees"], ["overridden", "one brand × format priced away from the tier", 1], ["poured", "a pour is priceable here and is not a SKU"], ["no price", "neither a format default nor an override · the line cannot be sold", 1]],
+    spec: "price_lists are already tiers and customers.price_list_id already assigns them; revision 2 adds the channel and makes a format priceable, so a taproom pour — which is not a SKU — can be priced at all. Drawn format-default with a per-SKU override, matching Menu and POS item, which already read “format default” and offer Reset to format price. §16.16 q2 leaves the direction open; drawing it the other way would make those two shipped frames inconsistent.",
+    body: (<>
+      {E.hd("Back · Catalog", "Wholesale tier")}
+      {E.fld("Tier name", "Wholesale · standard")}
+      {E.fld("Channel", "Wholesale")}
+      {E.ttl("Format defaults")}
+      {E.tbl(["Format", "Price", "Source"], [["½ bbl keg", "$185.00", "tier default"], ["sixtel", "$95.00", "tier default"], ["case · 24×16oz", "$38.00", "tier default"]])}
+      {E.ttl("Brand × format overrides")}
+      {E.row("Barrel-aged Stout · ½ bbl keg", "$240.00 · against a $185.00 default", E.act("Clear"), "w")}
+      {E.row("+ add override", "brand · format · price", "")}
+      {E.info("All halves are $185, except the barrel-aged one. Clear an override and the row rejoins the tier.")}
+      {E.gated("Save tier", "waits on revision 2 · price_list_formats is not migrated")}
+    </>),
+  },
+  {
+    step: 8,
+    slice: 1,
+    tab: "More",
+    name: "Location bins",
+    job: "Subdivide a location without making every query carry an or-null",
+    reads: "list_locations · list_bins [design; §16.6]",
+    writes: "create_bin · update_bin · delete_bin [SCHEMA-GATE: revision 2 §16.6 — bins, inventory_movements.bin_id not null, taproom_pars re-keyed on bin; not migrated]",
+    states: [["default bin", "created with the location and named for it · cannot be deleted", 1], ["never subdivided", "one bin the brewery can ignore"], ["in use", "a bin holding stock cannot be deleted", 1], ["par on a bin", "keep 4 cases in the to-go fridge"]],
+    spec: "Every location gets a default bin created with it, so bin_id is NOT NULL everywhere it appears — movements, pars, menus — and no on-hand or availability query carries a nullable branch. One setup artifact bought against a whole class of null handling. Bins are physical subdivisions a menu can read; they are explicitly not tap lines (§16.8), which are hand-maintained state nothing downstream validates.",
+    body: (<>
+      {E.hd("Back · Settings", "Taproom · bins")}
+      {E.row("Taproom", "default bin · created with the location", "", "dis")}
+      {E.row("Walk-in", "38 cases · 12 kegs", E.act("Edit"))}
+      {E.row("To-go fridge", "22 cases · par 4 cases", E.act("Edit"))}
+      {E.row("+ add bin", "name · kind", "")}
+      {E.fld("Bin name", "To-go fridge")}
+      {E.fld("Par", "4 cases · Hazy IPA")}
+      {E.info("A brewery that never subdivides sees one bin and ignores it.")}
+      {E.note("Tap lines are not bins — the tap board owns those.")}
+      {E.gated("Save bin", "waits on revision 2 · bins are not migrated")}
+    </>),
+  },
+  {
+    step: 8,
+    slice: 1,
+    group: "Global",
+    surface: "sheet",
+    name: "Repack · sheet",
+    job: "Break bulk as a paired, bbl-conserving pair of legs — never a loss and a gain",
+    reads: "get_format_components [design; §16.2a] · get_material_on_hand",
+    writes: "record_repack [SCHEMA-GATE: revision 2 §16.10 — repack movement type, shared ref, abs(sum(bbl)) < 0.000001 over the ref; not migrated]",
+    states: [["offered", "composition knows a case yields six four-packs · nobody types both halves"], ["breakage", "−1 case · +5 four-packs · +1 loss keeps the invariant absolute", 1], ["materials", "case tray returns to stock, PakTech is consumed · per-repack override"], ["one level", "case → four-packs, never case → cans", 1], ["never TTB", "nothing left the brewery · same location and bin"]],
+    spec: "adjustment cannot express a break: it has no way to pair the two halves, so the break reads as an unexplained loss beside an unexplained gain. The outbound leg's bbl is derived from the inbound leg's frozen total rather than recomputed from bbl_per_unit — rounding each leg independently leaves −0.00000001 on a 24×16oz case — and the constraint carries a tolerance to catch a hand-entered repack without rejecting a legitimate one. Build-direction repack is out of scope; the whole repack is one RPC sharing one ref so beer and materials cannot disagree.",
+    body: (<>
+      {E.fld("Break", "Hazy IPA · case · 24×16oz")}
+      {E.fld("Location · bin", "Warehouse · Walk-in")}
+      {E.num("1", "case · amounts are entered positive")}
+      {E.pad()}
+      {E.tape([["−1 case · repack", "0.09677419 bbl"], ["+6 four-pack · repack", "derived from the case total"], ["Case tray ×1", "return_to_stock"], ["PakTech ×6", "consumed"]])}
+      {E.info("Preview: conserves 0.09677419 bbl · same location and bin · not a TTB removal")}
+      {E.fld("Damaged on break", "0 four-pack · records as loss")}
+      {E.gated("Record repack", "waits on revision 2 · the repack movement type is not migrated")}
     </>),
   },
 ];
