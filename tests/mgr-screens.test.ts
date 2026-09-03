@@ -245,26 +245,28 @@ describe("SCREENS", () => {
     expect(SCREENS.filter((s) => s.surface === "sheet" && s.hd)).toEqual([]);
   });
 
-  it("pins the keypad commit so the pad does not push it off the phone", () => {
-    // Issue 73: on a 390×900 sheet the pad sat above the verb, so Record
-    // landed below the fold. The pin is a data-pin footer; CommandForm lifts
-    // it out of the scroll region.
+  it("types quantities in a native decimal input instead of a number pad", () => {
+    // Issue 93: the OS keyboard is the keypad. #73's pin stays around the
+    // commit so the verb remains on the phone after the pad is gone.
     const named = [
       "Record movement", "Fermentation reading", "Cellar addition",
       "Cellar transfer", "Cycle count", "Repack",
     ];
+    for (const screen of SCREENS) {
+      const html = renderToStaticMarkup(createElement("div", null, screen.body));
+      for (const [, label] of html.matchAll(/<button[^>]*>([^<]*)<\/button>/g)) {
+        expect.soft(label, `${screen.name}: pad key ${label}`).not.toMatch(/^(?:\d|⌫)$/);
+      }
+    }
     for (const name of named) {
       const s = SCREENS.find((x) => x.name === name);
       expect(s, name).toBeTruthy();
       const { pin } = splitPinned(s!.body);
       expect(pin.length, `${name}: pin lifted`).toBe(1);
+      expect.soft(renderToStaticMarkup(createElement("div", null, s!.body)), `${name}: number input`).toMatch(/<input[^>]*type="number"/);
       const pinHtml = renderToStaticMarkup(createElement("div", null, pin));
-      expect(pinHtml, `${name}: pad inside pin`).toContain("⌫");
       expect(pinHtml, `${name}: commit verb inside pin`).toMatch(/Record (movement|reading|addition|transfer|count|repack)/);
     }
-    const reading = SCREENS.find((x) => x.name === "Fermentation reading")!;
-    const readingHtml = renderToStaticMarkup(createElement("div", null, reading.body));
-    expect(readingHtml).toMatch(/Gravity[\s\S]*on pad/);
     const transfer = SCREENS.find((x) => x.name === "Cellar transfer")!;
     const transferHtml = renderToStaticMarkup(createElement("div", null, transfer.body));
     expect(transferHtml).not.toMatch(/border-l-2/);
@@ -379,7 +381,7 @@ describe("SCREENS", () => {
 
   it("gives the named screens one filled primary each", () => {
     // Issue 71: two filled verbs on one body fight for the commit. Outline,
-    // ghost, disabled, pad keys and steppers are not the primary. A tile or
+    // ghost, disabled and steppers are not the primary. A tile or
     // row act can still open the next screen.
     const named = [
       "Today", "Taproom", "Order", "Cellar map", "Tap board", "Swap keg",
