@@ -1,5 +1,5 @@
 // tests/documentation-agent.test.ts — keeps the guide suite and its post-merge maintainer comprehensive, scoped, and reviewable.
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -56,6 +56,19 @@ describe("customer documentation", () => {
   });
 });
 
+describe("HTTP API documentation", () => {
+  it("has one catalog containing every registered operation", () => {
+    const readme = read("README.md");
+    expect(readme.match(/^## HTTP API$/gm)).toHaveLength(1);
+
+    for (const file of readdirSync(resolve(root, "lib/commands")).filter((name) => name.endsWith(".ts"))) {
+      for (const [, name] of read(`lib/commands/${file}`).matchAll(/define(?:Command|Query)\(\{\s*name:\s*"([^"]+)"/g)) {
+        expect(readme, `${name} is missing from README.md`).toContain(`\`${name}\``);
+      }
+    }
+  });
+});
+
 describe("post-merge documentation maintainer", () => {
   it("audits the complete live UI and may edit only the HTML guide suite", () => {
     const prompt = read(".agents/agents/documentation-maintainer.md");
@@ -94,6 +107,10 @@ describe("post-merge documentation maintainer", () => {
     expect(workflow).toContain("token: ${{ steps.mgr-app.outputs.token }}");
     expect(workflow).toContain("docs/user-guide.html docs/staff-guide.html docs/portal-guide.html");
     expect(workflow).toContain("gh pr create");
+    expect(workflow).toContain("<(script|base|link|iframe");
+    expect(workflow).toContain("http-equiv");
+    expect(workflow).toContain("@import");
+    expect(workflow).not.toContain("issues: read");
     expect(workflow).not.toContain("issues: write");
     expect(workflow).not.toContain("--json-schema");
   });

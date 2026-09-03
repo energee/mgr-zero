@@ -1,19 +1,18 @@
 # Slice 1C — QBO Integration + AI Chat Composer Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> Follow the TDD operating loop in `AGENTS.md` once this plan is unblocked.
+> Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Pattern update (2026-09-01 merge of PR #27 into PR #29):** the SQL
-> examples below still show the `security invoker` + `require_authorized_staff_rpc`
-> + `request.path` policy pattern, which no longer exists in the baseline. New
-> writers follow `.agents/ARCHITECTURE.md` iron rule 5 instead: a `security
-> definer` RPC taking `p_request_id`, opening with `private.assert_staff(...)`
-> and `private.claim_command_request(...)`, closing with
-> `private.complete_command_request(...)`, granted explicitly to `authenticated`.
-> The token boundary (`lib/supabase/integration-tokens.ts`) is unchanged.
+> **Blocked — revise before execution.** Tasks 1–7 still encode the removed
+> `security invoker` / request-path authorization model and a multi-write
+> external-call flow that does not satisfy `.agents/ARCHITECTURE.md` iron rule 5.
+> Do not implement this plan until the QBO track is redesigned around the current
+> definer/request-ledger boundary and durable external-write recovery. The token
+> boundary (`lib/supabase/integration-tokens.ts`) remains valid.
 
 **Goal:** QuickBooks Online invoices-out / payments-back, and the AI chat composer that turns typed intent into a previewed, explicitly-confirmed registry command.
 
-**Architecture:** QBO is a thin `lib/qbo.ts` fetch wrapper (plain OAuth2, no Intuit SDK) plus registry commands. OAuth tokens never touch a public table: they are written and read only through `lib/supabase/integration-tokens.ts` (`storeIntegrationTokens` / `readIntegrationTokens`), which authorizes the caller with the RLS-bound client before calling the service-only `store_integration_tokens` / `read_integration_tokens` RPCs over `private.integration_tokens`. Every push persists its exact payload + the invoice's `qbo_idempotency_key` in an append-only `qbo_pushes` log before POSTing. All new SQL writers follow the audit-p1-authz pattern: `security invoker set search_path = ''`, first line `perform public.require_authorized_staff_rpc(brewery, '<rpc name>', roles)`, RLS insert/update policies keyed on `is_authorized_staff_rpc`, and explicit grants (the Data API exposes nothing by default). The composer is a registry query (`compose_command`) that gives the LLM only `aiExposed` command schemas; the server canonicalizes candidates through `preview_command`; the UI commits only on an explicit verb click.
+**Architecture:** QBO is a thin `lib/qbo.ts` fetch wrapper (plain OAuth2, no Intuit SDK) plus registry commands. OAuth tokens never touch a public table: they are written and read only through `lib/supabase/integration-tokens.ts` (`storeIntegrationTokens` / `readIntegrationTokens`), which authorizes the caller with the RLS-bound client before calling the service-only `store_integration_tokens` / `read_integration_tokens` RPCs over `private.integration_tokens`. Every push must persist its exact payload + the invoice's `qbo_idempotency_key` before POSTing, with durable recovery for the later external result; the blocked tasks below do not yet meet that contract. The composer is a registry query (`compose_command`) that gives the LLM only `aiExposed` command schemas; the server canonicalizes candidates through `preview_command`; the UI commits only on an explicit verb click.
 
 **Tech Stack:** Next.js App Router, Supabase (Postgres/RLS), Zod, `@anthropic-ai/sdk` (**new dependency — approving this plan approves adding it**; QBO uses plain `fetch`, no new dep).
 
@@ -21,10 +20,11 @@
 
 ## Audit corrections folded into this revision (audit-p1-authz)
 
-Each item below changed a task relative to the 2026-08-31 draft; the task text is already corrected.
+These corrections describe an intermediate revision and are retained as history;
+the blocked QBO tasks below are not current implementation instructions.
 
 1. **Tokens are private.** `qbo_connections` has no `access_token`/`refresh_token` columns; `pos_connections` likewise. Task 2/3 persist tokens only via `storeIntegrationTokens(ctx, …)` and read them only via `readIntegrationTokens(ctx, "qbo")`. Nothing else may import `@/lib/supabase/admin` (eslint `no-restricted-imports`).
-2. **No definer RPCs with in-body `staff_role` checks.** Task 1/6 SQL is `security invoker set search_path = ''` + `require_authorized_staff_rpc` + RLS policies that only admit writes inside that RPC path — the same shape as `create_order`/`set_price`.
+2. **Superseded writer model.** The intermediate `security invoker` + request-path design was replaced by the definer/request-ledger boundary in `.agents/ARCHITECTURE.md` iron rule 5.
 3. **Explicit exposure.** `auto_expose_new_tables = false`: every new table/function needs migration-owned `grant`s, and `tests/schema-rules.test.ts` (relation ACL matrix + function execute-by-signature pins) must be extended in the same commit or it goes red.
 4. **No direct `.from().update()` writes.** Customers/SKUs updates are RLS-denied outside their RPCs, so Task 4's mappings are two new invoker RPCs, not client updates.
 5. **Connection metadata is written by an RPC.** Authenticated users have no write policy on `qbo_connections`; Task 3 adds `upsert_qbo_connection` (admin, RPC-path gated). The token purge triggers already erase `private.integration_tokens` when a connection row is deleted or its `realm_id`/identity changes, so a reconnect is: RPC upsert → `storeIntegrationTokens`.
@@ -40,7 +40,7 @@ Each item below changed a task relative to the 2026-08-31 draft; the task text i
 - Composer contract (UI plan §2): server (`preview_command`), not the model, canonicalizes; previews never invent document numbers ("assigned on commit"); every AI write waits for an explicit click on its verb; no auto-commit setting; composer history is device-local.
 - `push_invoice_to_qbo` (UI plan): persist exact payload + stable request ID **before** POST; uncertain response reconciles by the same ID before retry; online only.
 - `connect_qbo`: durable OAuth after admin permission check; `get_qbo_connection` returns health only, **never tokens**. Token material crosses exactly one boundary: `lib/supabase/integration-tokens.ts`.
-- Every new SQL writer: `security invoker set search_path = ''`, `require_authorized_staff_rpc` first, RLS policies keyed on `is_authorized_staff_rpc`, explicit `grant execute … to authenticated`, and the signature added to `tests/schema-rules.test.ts`.
+- Every new SQL writer follows `.agents/ARCHITECTURE.md` iron rule 5 and is pinned by the boundary/schema tests named there.
 - Mappings are explicit single-row remaps: `qbo_customer_id` on `customers`, `qbo_item_id` on `skus`.
 - Prove everything: `npx vitest run && npx tsc --noEmit && npm run lint`; tests hit real local Supabase, never mocks of the DB (external QBO/Anthropic HTTP is faked at the process boundary).
 - New env vars (add to `.env.example` + README in the task that introduces each): `QBO_CLIENT_ID`, `QBO_CLIENT_SECRET`, `QBO_REDIRECT_URI`, `QBO_AUTH_BASE`, `QBO_API_BASE`, `ANTHROPIC_API_KEY`.
@@ -217,7 +217,7 @@ Handler order (the ordering is the spec's durability requirement — payload per
 **Files:**
 - Create: `app/(app)/settings/integrations/page.tsx`, `app/(app)/settings/integrations/qbo-panel.tsx`
 - Modify: `app/(app)/page.tsx` (Today: "QBO failures" row)
-- Test: rendered-page check (manual, per operating loop step 3) — tests don't cover rendering.
+- Test: rendered-page check (manual, per operating loop step 4) — tests don't cover rendering.
 
 **Interfaces:**
 - Consumes: `get_qbo_connection`, `connect_qbo`, `get_qbo_mapping_candidates`, `set_qbo_customer_mapping`, `set_qbo_item_mapping`, `push_invoice_to_qbo` via the existing client command caller (`lib/commands/client.ts`; follow `app/(app)/settings/team` as the pattern).
@@ -226,7 +226,7 @@ Handler order (the ordering is the spec's durability requirement — payload per
 - [ ] **Step 2:** Today row: count of `push_failed` invoices linking to the integrations screen, admin/sales roles only.
 - [ ] **Step 3:** Look at the rendered pages against local Supabase with a seeded failed push; fix what's broken. `npx tsc --noEmit && npm run lint`.
 - [ ] **Step 4: Commit** `feat(1c): QBO integrations screen + Today failure row`
-- [ ] **Step 5:** Add the same **Push to QuickBooks** button (with the confirmation dialog) to `app/(app)/invoices/[id]/page.tsx`; update `docs/user-guide.html` (Integrations screen, push action, failure row, corrections) in the same commit.
+- [ ] **Step 5:** Add the same **Push to QuickBooks** button (with the confirmation dialog) to `app/(app)/invoices/[id]/page.tsx`; update `docs/staff-guide.html` (Integrations screen, push action, failure row, corrections) in the same commit.
 
 ### Task 8: Registry — `aiExposed` flag + `preview_command`
 
@@ -278,7 +278,7 @@ Flow (UI plan §2 verbatim requirements): text → `compose_command`; if candida
 ### Task 11: Docs + final validation
 
 **Files:**
-- Modify: `.agents/ARCHITECTURE.md` (ownership rows for `lib/qbo.ts`, `lib/commands/{qbo,preview,compose}.ts`, `app/api/qbo/callback`; note the compose→preview→commit contract is now implemented and that `lib/supabase/integration-tokens.ts` stays the only token boundary), `README.md` (env table + § HTTP API rows for every new command — run `/http-api`), `docs/user-guide.html`, `.agents/PROGRESS.md`; `2026-08-31-mgr-wireframes.html` only if the built Integrations/composer screens diverged from their frames (wireframes stay in step with the plan).
+- Modify: `.agents/ARCHITECTURE.md` (ownership rows for `lib/qbo.ts`, `lib/commands/{qbo,preview,compose}.ts`, `app/api/qbo/callback`; note the compose→preview→commit contract is now implemented and that `lib/supabase/integration-tokens.ts` stays the only token boundary), `README.md` (env table + § HTTP API rows for every new command — run `/http-api`), the applicable `docs/{staff,portal}-guide.html` files, `.agents/PROGRESS.md`; `2026-08-31-mgr-wireframes.html` only if the built Integrations/composer screens diverged from their frames (wireframes stay in step with the plan).
 
 - [ ] **Step 1:** Full gate: `npx vitest run && npx tsc --noEmit && npm run lint`; `git diff` review (NUL-byte check); one from-scratch `npx supabase db reset` to prove the baseline replays.
 - [ ] **Step 2:** Update the docs above; verify every new file carries its module-level comment.

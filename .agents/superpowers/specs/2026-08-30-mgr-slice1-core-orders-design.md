@@ -246,7 +246,7 @@ QBO is the book of record for money; MGR for inventory/orders. Direction: invoic
 
 - Ledger integrity at DB level: no UPDATE/DELETE grants on `inventory_movements`; CHECK constraints on type/channel/dest_state combinations; FKs everywhere.
 - RLS tests are first-class CI: per table, assert tenant A cannot read/write tenant B; customer users cannot see staff data.
-- vitest against local Supabase for data-layer flows (order lifecycle → movements → invoice); QBO client against recorded fixtures; one Playwright smoke for portal ordering.
+- vitest against local Supabase for data-layer flows (order lifecycle → movements → invoice); QBO client against recorded fixtures; one agent-browser smoke for portal ordering.
 - Currency in integer cents; volume math in numeric (no floats).
 
 ## Out of scope for slice 1
