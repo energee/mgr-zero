@@ -1,9 +1,11 @@
 // tests/mgr-icon.test.ts — the v1 MGR mark is the single source for favicon,
-// in-app chrome, and the GitHub App avatar raster.
+// in-app chrome, the wireframes document, and the GitHub App avatar raster.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { MgrIcon } from "@/components/mgr-icon";
 import { MGR_ICON_PATH, MGR_ICON_VIEWBOX } from "../lib/mgr-icon";
 
 const root = resolve(__dirname, "..");
@@ -29,13 +31,33 @@ describe("MGR mark", () => {
     expect(svg).toContain('aria-label="MGR"');
   });
 
-  it("renders decorative by default and labelled only on request", async () => {
+  it("keeps the wireframes document on the same path", () => {
+    // The wireframes are a standalone HTML document and cannot import, so the
+    // mark is hand-copied there. This is the only copy with no other guard.
+    const doc = readFileSync(
+      resolve(root, ".agents/superpowers/specs/2026-08-31-mgr-wireframes.html"),
+      "utf8",
+    );
+    const match = doc.match(/const MGR='<svg[^']*\sd="([^"]+)"/);
+    if (!match) {
+      throw new Error("the wireframes document is missing the MGR mark path");
+    }
+    expect(match[1]).toBe(MGR_ICON_PATH);
+  });
+
+  it("keeps a favicon.ico fallback for clients without SVG icon support", () => {
+    // app/icon.svg alone leaves the conventional /favicon.ico a 404, which
+    // crawlers and link unfurlers still request. Raster, so only presence and
+    // the ICO magic number are checked - the geometry guard is the SVG above.
+    const ico = readFileSync(resolve(root, "app/favicon.ico"));
+    expect(ico.subarray(0, 4)).toEqual(Buffer.from([0, 0, 1, 0]));
+    expect(ico.byteLength).toBeGreaterThan(0);
+  });
+
+  it("renders decorative by default and labelled only on request", () => {
     // Both shells and the login form put the mark beside the name it stands
     // for, so labelling it made a screen reader announce MGR twice. Decorative
     // is the default; a label is for where the mark stands alone.
-    const { renderToStaticMarkup } = await import("react-dom/server");
-    const { MgrIcon } = await import("../components/mgr-icon");
-
     const bare = renderToStaticMarkup(createElement(MgrIcon));
     expect(bare).toContain('aria-hidden="true"');
     expect(bare).not.toContain("aria-label");

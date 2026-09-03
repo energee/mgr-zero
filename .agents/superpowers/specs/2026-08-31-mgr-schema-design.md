@@ -1,9 +1,13 @@
 # MGR — Baseline Schema Design (all ten slices)
 
 Date: 2026-08-31
-Status: Approved 2026-08-31 (with `brewer` added); implemented as
+Status: §1–§15 approved 2026-08-31 (with `brewer` added); implemented as
 `supabase/migrations/00001_baseline.sql`. Newly discovered blockers are marked
 **SCHEMA-GATE** and are not implemented.
+**§16 is revision 2 — designed 2026-09-02, NOT migrated.** Nothing in §16 exists
+in the database. It is written here rather than as migrations deliberately: the
+interface is still moving, and a schema spec is cheaper to change than a
+migration chain. Sections above that §16 supersedes say so inline.
 Phase-2 deltas from the reviewed draft are marked **(impl)**.
 Inputs: `2026-08-31-mgr-schema-decisions.md` (decisions + conventions),
 `2026-08-30-mgr-slice1-core-orders-design.md` (product), `brewing-domain.md` (units), and the
@@ -74,7 +78,7 @@ money cents.
 
 | Enum | Values | Notes |
 |---|---|---|
-| `staff_role` | `admin, sales, warehouse, brewer` | `brewer` added at review |
+| `staff_role` | `admin, sales, warehouse, brewer` | `brewer` added at review **· `taproom` added by §16.13** |
 | `customer_type` | `distributor, retailer, brewery, other` | unchanged |
 | `package_type` | `keg, can, bottle` | unchanged |
 | `keg_size` | `half_bbl, quarter_bbl, sixth_bbl, fifty_l, thirty_l, twenty_l` | physical set; safe as enum |
@@ -129,11 +133,11 @@ RLS enabled, no policies for `authenticated` — only touched through `next_no()
 
 ## 3. Catalog
 
-### `products` — unchanged
+### `products` — unchanged **· superseded by §16.1 (`brands`)**
 `name, style, abv numeric(4,2), ttb_tax_class text default 'beer'`. unique `(brewery_id,
 name)` (decisions doc lists it; the current index is non-unique — tightening is intended).
 
-### `skus` — carried forward + keg/UPC fields
+### `skus` — carried forward + keg/UPC fields **· revised by §16.2 (`format_id`)**
 Existing: `product_id → products, name, package_type, units_per_case, bbl_per_unit
 numeric(12,8) > 0, qbo_item_id, active`. New:
 - `upc text` — barcode; unique `(brewery_id, upc)` where not null.
@@ -146,10 +150,10 @@ numeric(12,8) > 0, qbo_item_id, active`. New:
 RLS: `staff_all`; `customer_read` select `active and brewery_id in (customer's brewery)`.
 
 ### `price_lists` — + `unique (brewery_id, name)`
-### `price_list_items` — + `srp_cents int check (>= 0)` (suggested retail, nullable)
+### `price_list_items` — + `srp_cents int check (>= 0)` (suggested retail, nullable) **· revised by §16.4**
 pk `(price_list_id, sku_id)`, both composite. RLS: `staff_all`, `customer_own_prices`.
 
-### `sku_bom` — new (slice 5 packaging BOM)
+### `sku_bom` — new (slice 5 packaging BOM) **· superseded by §16.12 (`format_bom`)**
 `sku_id → skus, material_id → materials, qty_per_unit numeric check (> 0)` (in the
 material's `base_uom`, per single SKU unit). pk `(sku_id, material_id)`. idx `(material_id)`.
 
@@ -309,7 +313,7 @@ token statement; the RLS-checking server boundary is their only application call
 `connection_id → pos_connections, external_location_id text, location_id → locations`.
 pk `(connection_id, external_location_id)`.
 
-### `pos_item_mappings`
+### `pos_item_mappings` **· revised by §16.5 (variation-level)**
 `connection_id → pos_connections, external_item_id text, external_item_name text, sku_id
 → skus, qty_per_sale numeric > 0` (SKU units depleted per one sold — a pint from a
 half-bbl keg is `1/124`). pk `(connection_id, external_item_id)`. Unmapped = no row.
@@ -631,3 +635,586 @@ shipment's order.
 Core 6 · Catalog 5 · FG 5 · Orders 5 · Integrations 5 · Materials 11 · Recipes 3 ·
 Production 7 · Packaging 3 · Compliance 4 · Kegs 2 · Deliveries 2 = **58 tables**,
 ~18 views, 5 append-only ledgers, 2 immutable definition tables.
+
+## 16. Revision 2 — brands, formats, bins, channels (designed 2026-09-02, not migrated)
+
+**Nothing in this section exists in the database.** It is deliberately held as a
+spec rather than a migration chain: the interface is still being drawn (see
+`2026-08-31-mgr-wireframes.html`, vocabulary note at the top of that file), and
+every table below would otherwise be migrated two or three times before the
+first screen ships. Build it in one pass when the interface settles.
+
+Conventions of §0 apply unchanged: composite `(id, brewery_id)` parents, RLS on
+every table, `security_invoker` views, pinned `search_path`.
+
+### 16.1 `products` → `brands`
+
+A **brand** is the sellable identity — "Lupula", "Waves". A **batch** is a
+production instance — "Lupula 3". They were conflated because a batch usually
+becomes one brand, but a blend of two batches may ship as a third brand, and a
+batch's identity is not knowable at brew time.
+
+Rename `products` → `brands` and every `product_id` → `brand_id` (`skus`,
+`lots`, recipes, compliance). No column semantics change for those. Do it as a
+rename, not an alias — two names for one table is how drift starts.
+
+**`batches` is the one exception.** Its column becomes `intended_brand_id` and
+loses `NOT NULL`, because the semantics genuinely change — see §16.9.
+
+`brand` is preferred over `product` because TTB label approval is granted
+against a brand, it is what gets renamed when batches blend, and it does not
+collide with `sku` in conversation. `label` was rejected: it collides with
+packaging materials (`material_category = 'packaging'`).
+
+### 16.2 `formats` — new
+
+The sellable shape: glass, four-pack, case, sixtel, half. Today these facts are
+restated on every SKU row (`package_type`, `keg_size`, `units_per_case`,
+`bbl_per_unit`), so 20 brands × 5 formats is 100 rows each re-typing
+`bbl_per_unit` — which §0 calls the basis of all TTB math. One typo is one
+brand's excise numbers wrong.
+
+```
+formats (
+  id, brewery_id, name,
+  basis format_basis not null,              -- 'packaged' | 'poured': does it hold stock
+  package_type package_type,                -- container; null for poured
+  keg_size keg_size,
+  units_per_case int,
+  bbl_per_unit numeric(12,8)                -- atomic formats only; composed ones derive it (§16.2a)
+)
+```
+
+- **packaged** — its own inventory unit. What `packaging_runs` output, what a
+  bin holds, what a SKU is.
+- **poured** — never held. A glass is not stock; it is a ratio back to the keg
+  it is drawn from. This is exactly what a Square *variation* is, which is why
+  `skus.square_item_id` alone cannot map a sale (see §16.5).
+
+New enum: `format_basis as enum ('packaged','poured')`.
+
+`skus` gains `format_id` and stops carrying its own `bbl_per_unit`; the trigger
+`enforce_bbl_integrity()` reads it through the format. **Safe for history** —
+`inventory_movements.bbl` is frozen at write time, so correcting a format later
+cannot move past movements.
+
+### 16.2a `format_components` — composition (decided 2026-09-02)
+
+Formats compose. A four-pack is four cans plus a PakTech; a 16oz case is six
+four-packs plus a case tray. And a 16oz pour is 1/124 of a half bbl — **the same
+relation with a fractional quantity**: a pour is a `format_components` row
+with a fractional `qty`, and `basis` means only "does this hold stock".
+
+```
+format_components (parent_format_id, child_format_id, qty numeric(12,6))
+```
+
+The packaging BOM (`format_bom`, with its `on_break` disposition) is in §16.12.
+
+**`bbl_per_unit` is strictly derived.** Only *atomic* formats — a 16oz can, a
+half bbl keg — carry a typed volume; anything composed computes it from its
+children. This removes a whole class of typo from the number the design doc
+calls the basis of all TTB math, and it is stronger than merely moving
+`bbl_per_unit` off the SKU (§16.2). A composed format cannot be created before
+its children exist, which is the intended constraint.
+
+**Repack (§16.10) becomes validated rather than asserted.** Composition already
+knows that breaking one case yields exactly six four-packs, so the app offers
+the repack instead of asking someone to enter both halves and hoping they
+balance. **One level only** — case → four-packs, never case → cans in a step.
+That keeps material accounting honest: breaking a case releases the case tray
+and nothing else, because PakTechs are only released when a four-pack is broken.
+
+**Materials on break.** Each BOM line carries `on_break`, so a PakTech defaults
+to `consumed` and a case tray to `return_to_stock`; the repack sheet shows the
+default and allows a per-repack override. A question asked once, not every time
+— a brewery breaking twenty cases a week would click through a mandatory prompt
+without reading it. `material_movement_type` already has both `consumption` and
+`return_to_stock`, so no enum change is needed. The whole repack is one RPC
+sharing one `ref`, so beer and materials cannot disagree.
+
+**Build-direction repack is out of scope** — assembling four-packs from loose
+cans in inventory is YAGNI; packaging runs already produce composed formats with
+their own BOM. Partial material recovery (a tray damaged on break) is likewise
+left out; the cycle count handles it.
+
+**OPEN:** is a format fully sized (`case · 24×16oz`) or shape-only (`case`)?
+Fully sized keeps `bbl_per_unit` on the format and is the assumption above; it
+means more format rows and no "case" abstraction above them.
+
+### 16.3 `sale_channels` — see `docs/plans/sale-channels-customizable.md` (#42, merged)
+
+**Superseded by #42, which is merged and is the authority.** This section
+originally proposed `sale_channels (… is_removal, ttb_category)`, moving removal
+classification from the `removal_shape` CHECK onto the channel row. That was
+wrong and #42 is right: `brewing-domain.md` classifies removals by *type* —
+"samples, donations, festival pours, destructions and losses are distinct
+removal types with distinct tax treatment; classify at the ledger" — so channel
+columns would have duplicated what `movement_type` already carries, and
+duplicated classification is how two sources drift apart. #42 had already
+rejected a `requires_dest_state` column for the same underlying reason.
+
+Take #42's shape as given: brewery-scoped table modelled on `locations`, the
+`channel = 'taproom'` literal dropped from the depletion CHECK,
+`on delete restrict` so "removable only if unused" is enforced by Postgres, and
+a trigger on `breweries` insert seeding the four defaults.
+
+Two things #42 leaves to slice 7, which belong here:
+
+**POS channel assignment.** `pos_locations.sale_channel_id` with an optional
+per-item override, per #42's own table of where a movement gets its channel.
+
+**Tax treatment (decided 2026-09-02).** With four fixed channels, `export`
+implicitly meant an untaxpaid removal. Once a brewery names its own channels,
+nothing distinguishes an export channel from a taxpaid one — `movement_type` is
+`sale_removal` for both. So the channel carries a **default tax treatment**
+(`taxable`), and a customer may override or inherit it:
+
+```
+sale_channels + tax_treatment      not null default 'taxable'
+customers     + tax_treatment      null = inherit from the channel
+inventory_movements + tax_treatment  resolved and frozen at write time
+```
+
+**The resolved value is stored on the movement, never looked up at report
+time.** `brewing-domain.md` requires that a filed month is never rewritten by a
+later change; a live lookup would mean editing a customer in March silently
+restates January's excise. This is the same discipline the schema already
+applies to `bbl`, frozen by trigger on insert. Resolution order is customer
+override → channel default; a movement with no customer (a taproom depletion)
+takes the channel default.
+
+**Value set (decided 2026-09-02): the full TTB vocabulary** of removals without
+payment of tax — `taxable`, `export`, `vessel_supplies`, `research`,
+`transfer_in_bond` — rather than starting with `export` alone.
+
+### 16.4 Price tiers scoped to a channel; formats priced
+
+`price_lists` are already tiers and `customers.price_list_id` already assigns
+them. Two gaps: a tier has no channel, and `price_list_items` is keyed
+`(price_list_id, sku_id)` so a taproom pour — which is not a SKU — cannot be
+priced at all.
+
+```
+price_lists    + channel_id
+price_list_formats (price_list_id, format_id, unit_price_cents)     -- tier default
+price_list_items   (price_list_id, sku_id,  unit_price_cents, srp_cents)  -- brand × format override
+```
+
+Format-level price with a per-SKU override collapses most data entry — "all
+halves are $185, except the barrel-aged one" — and matches how a wholesale sheet
+reads.
+
+**OPEN:** whether format-level pricing is the default and SKU the override, or
+the reverse.
+
+### 16.5 `pos_item_mappings` — variation level
+
+`pos_item_mappings (connection_id, external_item_id) → sku_id + qty_per_sale`
+maps an *item*. A live Square library shows items carry no price and no
+quantity; **variations** do. A pint and a crowler off one keg are two variations
+of one item, so the current key collapses them into one depletion number.
+
+Add `external_variation_id` to the key and let `qty_per_sale` derive from the
+poured format rather than being hand-entered.
+
+### 16.6 `bins` — new, one per location minimum (decided 2026-09-02)
+
+**Every location gets a default bin**, created with it and named for it. `bin_id`
+is therefore `NOT NULL` everywhere it appears — movements, pars, menus — and
+there is no nullable branch anywhere downstream. A brewery that never subdivides
+sees one bin it can ignore; one that does adds bins beside the default.
+
+This supersedes the earlier "nullable, required once a location has bins"
+proposal. That version was correct but bought a permanent "or null" in every
+on-hand, availability and par query to avoid one setup artifact. Trading a bin
+nobody asked for against deleting a class of null-handling is worth it.
+
+`taproom_pars` re-keys on bin for the same reason: "keep 4 cases in the to-go
+fridge" becomes expressible, and a brewery that does not care sets it on the
+default bin.
+
+Physical subdivisions of a location: cooler, walk-in, to-go fridge. Menus read
+them, so availability is derived from stock rather than hand-flipped.
+
+```
+bins (id, brewery_id, location_id, name, kind, unique (location_id, name))
+inventory_movements + bin_id not null
+```
+
+`movements_onhand_idx` extends to `(brewery_id, sku_id, location_id, bin_id)`
+so bin on-hand is an index prefix, not a filter over the location; no second
+index.
+
+**Not tap lines.** Tap assignment is hand-maintained state that nothing
+downstream validates and that a bartender changes for optics; modelling it as a
+bin would create twelve setup rows per bar and a foreign key that silently goes
+stale. See §16.8.
+
+### 16.7 `pos_menus` — new
+
+A menu is a binding, not a price list: `bin × location × channel × destination`.
+Its lines are the formats available from what is physically in that bin, priced
+through the channel's tier. The menu authors nothing.
+
+```
+pos_menus (id, brewery_id, connection_id, location_id, bin_id, channel_id, price_list_id)
+```
+
+**Destinations are plural.** Square is one; QuickBooks is another; the brewery's
+own website is a third. Building a bespoke web feed instead would produce three
+different answers to "what are we selling right now". A published menu is also
+the ownership boundary: MGR's catalog holds test batches and unannounced beer,
+so a public site must consume a menu, never the catalog.
+
+### 16.8 `keg_taps` — new, optional
+
+Two events bracketing an interval. **Neither posts a movement** — tapping opens
+an interval, kicking closes it, and nothing reaches the ledger either way
+(§16.15). Depletion comes from the physical count.
+
+```
+keg_taps (
+  id, brewery_id, sku_id, lot_id, bin_id,
+  opened_at, closed_at, close_reason,        -- 'blown' | 'dumped' | 'returned'
+  open_fill  numeric(3,2) default 1.00,      -- coarse: 1, .75, .5, .25, heel
+  close_fill numeric(3,2) default 0.00,
+  tap_label text                             -- free text, unvalidated, never an FK
+)
+-- sku_id, lot_id, bin_id are §0 composite (x_id, brewery_id) FKs.
+-- keg_taps_open_idx (brewery_id) where closed_at is null — the board, the
+-- compare-and-swap guard and the realtime filter all select on it
+-- (same shape as occupancies_open_idx / allocations_open_idx).
+```
+
+Yield = poured bbl ÷ (`formats.bbl_per_unit` × (`open_fill` − `close_fill`)). A half bbl
+is 124 × 16oz on paper and 112–120 in life; a keg reading 95 has a problem.
+
+**Fill levels are estimates for a report, never ledger quantities.** They must
+never reach `inventory_movements`, because `bbl` feeds excise math and a rough
+eyeball has no business in a federal filing. A yield derived from a non-default
+fill renders as *estimated*.
+
+Fill fractions and serving sizes are never ledger quantities: only the count
+posts (§16.15), and `format_components.qty` is `numeric(12,6)` so pours sum
+without rounding in a view.
+
+Attribution when two kegs of one SKU are open: split proportionally, and label
+the number as split. `tap_label` does not improve attribution — Square has no
+concept of a line — it enables *diagnosis*, by grouping yields across many kegs
+to find a bad line.
+
+### 16.9 `batches.product_id` → `intended_brand_id`, nullable
+
+Identity is optional at brew and required at packaging. The gate already exists:
+`lots.brand_id` is `NOT NULL`, so packaging cannot produce a finished good
+without an identity. `batches.product_id NOT NULL` was enforcing nothing the lot
+did not already enforce — it only forced the decision earlier than the business
+makes it.
+
+Referenced by exactly one index and no function, view or TypeScript. Keep it as
+*intent* rather than dropping it: planning wants "this is meant to be Lupula",
+and the gap between intent and outcome becomes queryable.
+
+Batches then need their own `code`, because "Lupula 3" is today derived from the
+brand and that derivation breaks the moment a batch ships as something else.
+
+### 16.10 `repack` — new movement type
+
+Breaking bulk is a real conversion: a sealed case and six loose four-packs are
+different things to a picker. `adjustment` cannot express it — it has no way to
+pair the two halves, so a break reads as an unexplained loss and an unexplained
+gain.
+
+A repack is a paired, **bbl-conserving** movement: `−1 case`, `+6 four-packs`,
+same location and bin, sharing a `ref`. TTB never sees a repack; nothing left
+the brewery.
+
+**Conservation is by construction, not by coincidence.** Rounding each leg
+independently does not cancel: a 24×16oz case is 3/31 bbl → `0.09677419` at
+`numeric(12,8)`, a four-pack is 1/62 → `0.01612903`, and −1×case + 6×four-pack
+leaves `−0.00000001`. So the outbound leg's `bbl` is derived from the inbound
+leg's frozen total — §16.2a composition already gives the ratio — rather than
+recomputed from `bbl_per_unit`. The constraint then carries a tolerance,
+`abs(sum(bbl)) < 0.000001` over a `ref`, to catch a hand-entered repack without
+rejecting a legitimate one.
+
+Breakage stays named: `−1 case, +5 four-packs, +1 loss`, so the repack invariant
+stays absolute.
+
+**Superseded in part by §16.2a:** composition now derives the other side of a
+repack, so this is validated rather than asserted, and it is one level only.
+Materials released or consumed on a break follow each BOM line's `on_break`.
+
+Line cleaning likewise wants a named `loss` reason, or it lands in yield
+variance and makes every keg look slightly bad.
+
+### 16.11 Invoice drift — `qbo_sync_token`, `qbo_remote_state`
+
+QuickBooks has no read-only invoice. Once pushed, an accountant can edit, void
+or delete it and no API setting prevents that, so MGR detects rather than
+prevents. `SyncToken` increments on every modification and already rides the
+response the sync job reads for balance — drift costs one column and no extra
+call.
+
+```
+invoices + qbo_sync_token text
+         + qbo_remote_state  ('live' | 'voided' | 'deleted')  default 'live'
+```
+
+**A voided invoice is not a paid invoice.** Voiding zeroes the amounts, so any
+logic inferring paid from `qbo_balance_cents = 0` books cancelled revenue as
+collected.
+
+**The guarantee lives on the read side, not in a CHECK (decided 2026-09-02).** An
+earlier draft proposed `check (paid_at is null or qbo_remote_state = 'live')`.
+That constraint prevents the very drift it exists to detect: push → paid → an
+accountant voids it in QuickBooks, and the sync job's `set qbo_remote_state =
+'voided'` now violates the check unless it first nulls `paid_at` — exactly the
+rule the constraint claimed to abolish, and a contradiction of
+`2026-08-31-mgr-schema-decisions.md`'s *detect drift, do not prevent it*.
+Paid-then-voided is real history and must stay representable. Instead, nothing
+infers paid from balance: collected revenue reads
+`qbo_remote_state = 'live' and qbo_balance_cents = 0`, expressed once in the
+reporting view so no call site can forget it.
+
+A failing test is drafted at `tests/invoice-remote-state.test.ts`; it lands with
+§16.11's implementation, since it cannot go green before these columns exist.
+
+Also rename `qbo_idempotency_key` in spirit: Intuit's mechanism is a `requestid`
+query parameter, not a body field. The column name is MGR-side and may stay, but
+the docs should stop calling it an idempotency key.
+
+### 16.12 `sku_bom` → `format_bom` (decided 2026-09-02)
+
+**The packaging BOM belongs to the format, not the SKU.** A case box, a divider,
+a can end and a keg cap are properties of the shape, identical across every
+brand packaged in it. Keying the BOM per SKU means re-entering the same bill for
+every brand, which is the same duplication `formats` exists to remove.
+
+```
+format_bom (format_id, material_id, qty_per_unit,   -- was sku_bom (sku_id, ...)
+            on_break format_material_disposition not null)
+```
+
+New enum: `format_material_disposition as enum ('consumed','return_to_stock')` —
+what happens to the material when a composed unit is broken open (§16.10).
+
+**Consequence to watch:** brand-specific print — labels, printed cans, keg
+collars — is materially brand-dependent, and a format-level BOM cannot express
+it. Two ways that resolves, and this does not need deciding now: treat print as
+a generic material line on the format and let cost roll up at the material
+level, or add a narrow per-SKU override table later for print only. The second
+is a strictly additive change, so starting format-only is safe.
+
+`packaging_run_consumptions` already records what was actually consumed, so
+history is unaffected either way — the BOM is a plan, not a fact of record.
+
+### 16.13 Tap events: swap is the primitive (decided 2026-09-02)
+
+A bartender changing a keg performs **one** act, but a kick-then-tap model asks
+for two records. The gap between them is where data goes missing, and it is
+worst exactly when it matters — a follow keg of the same beer, where nothing
+looks wrong afterwards.
+
+So the primitive is the swap:
+
+| Command | Effect |
+| --- | --- |
+| `tap_keg` | opens an interval |
+| `swap_keg` | closes A and opens B **in one RPC**, defaulting to the same SKU |
+| `kick_keg` | closes A with a reason; tap goes empty |
+
+`swap_keg` being one transaction is the same discipline as the keg-return RPC:
+an interval can never be left open by a half-finished swap.
+
+**This is also why tap lines were the wrong model.** The follow-keg ambiguity is
+not about where a keg is plugged in — it is about whether the handoff was
+recorded atomically. Model the swap and the ambiguity disappears with zero
+knowledge of physical lines.
+
+Two kegs of one SKU open at once still happens (two taps of the flagship).
+Sales split proportionally across open intervals, and any per-keg yield derived
+from an overlap is labelled *split*, never presented as measured.
+
+**Two writers, one truth.** MGR stores tap state; the brewery website drives it
+through `tap_keg` / `swap_keg` / `kick_keg` and reads `list_open_taps`. The
+website is a client, not a second store, so nothing can diverge — unlike
+`tap_label` (§16.8), where two systems would each keep their own copy. MGR's own
+tap board issues the same commands.
+
+**`taproom` role — new.** `staff_role` gains `taproom`. It is the first role that
+maps to a shift rather than a function: a bartender needs the tap board and POS
+reconciliation and nothing else.
+
+**The enum value alone does not narrow anything.** §0's `P-staff` template is
+role-agnostic — `staff_all for all using (is_staff_of(brewery_id))` — so a
+`taproom` user added today inherits full staff read *and write* on customers,
+price lists, invoices, production and compliance. Narrowing that surface needs
+per-role policies which are **not designed yet** and are not in §16.17's build
+order. Do not ship the role without them; see §16.16 item 4.
+
+**Tapping a keg that is not in taproom stock is allowed.** The interval is
+flagged `not_in_inventory`. No special ledger rule is needed — tapping posts
+nothing either way (§16.15) — so the flag exists solely to exclude the keg from
+variance, since it was never counted into taproom stock. An event keg or one
+carried over still gets a yield number from its nominal size.
+
+**Concurrency.** The realistic failure is not two simultaneous clicks; it is a
+duplicate action from uncertainty — the website posts a swap, the bartender does
+not see it land, and swaps again on the board a minute later, producing two
+intervals or a phantom keg. Two guards:
+
+1. **Compare-and-swap.** The command carries the open interval's id and the RPC
+   requires `closed_at is null`. The second call fails with copy a human can act
+   on: *"Hazy IPA was already swapped out at 7:42pm."* No infrastructure, and it
+   makes the duplicate impossible rather than merely visible.
+2. **Recent tap events on the board** — last few actions with who and when. This
+   does not prevent anything; it is the correction path.
+
+**Live updates.** Subscribe to `keg_taps` filtered by brewery via Supabase
+Realtime, on the tap board page only, unsubscribed on navigate away. RLS applies
+to the subscription. One socket per open page in one taproom is single-digit
+connections. A 30-second poll of `list_open_taps` is an adequate fallback — the
+data changes a handful of times a day. Realtime is a nicety here; guard 1 is what
+prevents the bug, so if Realtime ever becomes a burden it can be deleted with
+nothing else breaking. Do not build a general realtime layer for it.
+
+**Tap board.** One row per open keg, showing what is on, since when, and an
+estimated remaining percentage derived from POS sales against nominal volume,
+with `Swap` and `Kicked` actions. The estimate is what makes the screen worth
+opening — a screen that only takes data from people gets ignored; one that says
+what is about to run out gets used. Frame drawn in the wireframes.
+
+### 16.14 POS reconciliation: partial contribution, archived in Square (decided 2026-09-02)
+
+**What an unmapped item actually costs.** Under §16.15 POS never posts to the
+ledger, so an unmapped item is not an inventory error — the count already caught
+the beer leaving. It is a *measurement* error: fifteen pints sold under an item
+MGR cannot translate leave expected consumption fifteen pints short, and the
+variance report shows fifteen pints of loss that never happened. A mapping gap
+and theft look identical. Keeping the variance number honest is the only reason
+this list exists.
+
+That also gives the discriminator: an item matters **if and only if it draws
+from a keg**. A pretzel sold two hundred times moves no beer and cannot affect
+variance at any volume.
+
+**A mapped line contributes its expected consumption even if another line on the
+same sale is unmapped.** Three pints and an unmapped pretzel: the pints count
+toward expected, the pretzel does not hold the sale. Partial contribution keeps
+the variance figure as good as the mapping allows instead of discarding a whole
+sale.
+
+**Nothing is auto-ignored by provenance.** Classifying by *where an item came
+from* re-creates the failure it is meant to solve: a beer typed straight into
+Square by a bartender is “created in Square” and would be filed away unread,
+which is the genuinely-unmapped beer hiding in the list all over again. Two
+human-driven escape hatches instead, neither of which can hide a beer by
+accident:
+
+1. **Archive it in Square (decided 2026-09-02).** For an item that should no
+   longer sell at all — a guest tap that is gone, a one-off, a retired beer —
+   retire it where it lives, through the same Square Catalog write MGR already
+   uses to hide a SKU that has come out of inventory. MGR reads Square's archive
+   state and never lists an archived item, so Square stays the source of truth
+   for its own catalog and no MGR-side mirror can drift. The unmapped list
+   offers the action directly; a taproom archiving in Square by hand gets the
+   same result with no MGR involvement.
+2. **Ignore, set by a person.** For an item that is legitimately sold forever
+   and is simply not beer — food, merch — one click, permanent. `ignored` is
+   therefore a statement that *someone looked at it*, never an inference.
+
+The list is sorted by sales volume, so the item costing the most variance is at
+the top and the forty pretzels are cleared once at connect.
+
+`pos_unmapped_items` keys on variation and means *needs attention*, not
+*everything Square sells that is not ours*.
+
+**Open:** confirm the Square Catalog field for archive/hide against the live API
+before building — the same call §16.7's publish path needs.
+
+### 16.15 The count posts depletion; POS is the variance check (decided 2026-09-02)
+
+**This inverts a rule drawn in the wireframes** — the POS frames say "when Square
+is connected the weekly count posts no depletion, it is a variance check against
+POS". The opposite is correct and those frames need amending.
+
+| | Source | Posts to the ledger |
+| --- | --- | --- |
+| **Actual** | physical count | yes — `depletion`, channel `taproom` |
+| **Expected** | POS sales × serving size | no |
+| **Variance** | expected − actual | nothing; it is a report |
+
+**POS is not the source of truth for inventory.** It is the tool for seeing
+expected consumption against actual, and the gap is the product: bad pours,
+theft, staff drinks, comps, line cleaning. That number only exists because both
+halves are kept, and it is what a taproom manager will act on.
+
+**A keg moving warehouse → taproom is not a removal.** It stays on the books as
+taproom stock until a count says it is gone. `taproom_transfer` keeps
+`channel null`, unchanged. This keeps taproom on-hand a real number, which bins
+and menu availability need anyway, and a month-end count yields the month's
+removal cleanly — satisfying the domain rule that a removal belongs to the month
+the beer left.
+
+Three consequences worth stating:
+
+1. **`inventory_movements.qty` does not need widening.** The `numeric(12,2)`
+   rounding problem only existed if fractional pours became movements. Counts
+   are in kegs and cases. Earlier text in §16.8 arguing for whole-keg depletion
+   to dodge the rounding still holds for its own reason, but the rounding itself
+   is now moot.
+2. **Tap and kick have no ledger effect whatsoever.** They open and close an
+   interval and nothing else, so a mis-tap corrupts nothing and both the website
+   and MGR can write them freely. This is the property that makes two writers
+   safe (§16.13).
+3. **A keg tapped that is not in taproom stock** needs no special ledger rule —
+   depletion never came from tapping in the first place. The
+   `not_in_inventory` flag remains useful only for excluding it from variance.
+
+**Yield (§16.8) is unaffected**: it was always a report over POS data against
+nominal volume, never a ledger write.
+
+### 16.16 Open questions
+
+**Resolved 2026-09-02:** BOM belongs to the format (§16.12); every location has
+a default bin and `bin_id` is `NOT NULL` (§16.6); a COLA attaches to a **brand**,
+so `product_approvals` becomes `brand_approvals` keyed by `brand_id` — a blend
+shipping as a new brand needs its own approval, which is correct because it is a
+different label; swap is the tap primitive and `staff_role` gains `taproom`
+(§16.13); partial contribution, and unmapped items archived in Square or ignored
+by a person rather than by provenance (§16.14); the paid/voided guarantee moves
+to the read side instead of a CHECK (§16.11).
+
+Still open:
+
+1. Formats fully sized, or shape-only? (§16.2) — note §16.2a makes this narrower:
+   only *atomic* formats carry a size at all.
+2. Tiers priced by format with SKU override, or the reverse? (§16.4)
+3. Does a poured format bind to one packaged format, or to a brand? Binding to a
+   format makes bin-derived availability exact. (§16.2)
+4. What RLS does `taproom` get? The role itself is decided (§16.13), but §0's
+   `P-staff` is role-agnostic, so adding the enum value grants full staff
+   read/write. The per-role policies that make the surface narrow are undesigned
+   and unscheduled — this blocks shipping the role. (§16.13)
+5. Quarters or eighths for fill — and do you weigh kegs? Tare weights are known
+   per keg size, so weighing turns an estimate into a measurement. (§16.8)
+
+### 16.17 Build order when this is migrated
+
+`brands` rename → `formats` + `skus.format_id` + `format_bom` → `bins` → `sale_channels`
+(per #42's plan, plus tax treatment — needs movement tests green) → price tiers → `pos_menus` →
+`keg_taps` → `repack` → invoice drift. The `taproom` role ships only once its
+per-role RLS policies exist (§16.16 item 4) — it is not a step in this order
+until they are designed.
+
+`AGENTS.md` authorises editing the baseline in place, so this lands as one
+revised `00001_baseline.sql` rather than a migration chain.
+
+**Verification note:** at the time of writing, `npx supabase start` fails
+locally on `staff_role already exists` and the test suite dies at import from
+`.env.local` key drift (`ANON_KEY`/`SERVICE_ROLE_KEY` vs the
+`PUBLISHABLE_KEY`/`SECRET_KEY` the code now reads). CI is green on the same
+commit, so both are local. None of §16 should be migrated until the database
+runs locally and `npx vitest run` passes.

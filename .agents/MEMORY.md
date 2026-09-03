@@ -10,9 +10,12 @@ Durable facts and decisions for agents working on mgr. Update when a decision is
 ## Decisions
 - One baseline migration covering all ten slices (58 tables) instead of accumulating migrations. Pre-deploy, the baseline is edited in place. Details: `.agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md`.
 - Product spec: `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md`.
+- Schema revision 2 (2026-09-02, §16 of the design doc — held as a spec, not migrated): `products` → `brands`, and a batch's identity becomes `intended_brand_id`, nullable, because identity is optional at brew and already enforced at packaging by `lots.brand_id NOT NULL`. `formats` own `bbl_per_unit`; SKUs stop carrying it.
+- Taproom inventory: **the physical count posts depletion; POS is the variance check** (2026-09-02, §16.15). This inverts the rule drawn in the POS wireframes, which need amending. Tapping and kicking a keg have no ledger effect at all — POS yields *expected* consumption, the count yields *actual*, and the gap is the report a taproom manager acts on.
 - Schema conventions live in `.agents/ARCHITECTURE.md`; the quote behind "no status columns" is Ted's: "if it won't be accurate I don't want it".
-- UI source of truth is UI plan rev 4 plus the exactly 73-frame
-  `2026-08-31-mgr-wireframes.html`; change navigation/flows and the `SCREENS`
+- UI source of truth is UI plan rev 4 plus `2026-08-31-mgr-wireframes.html`,
+  whose `SCREENS` array is the frame inventory (its own `EXPECTED` constant
+  asserts the count; do not restate the number here); change navigation/flows and the `SCREENS`
   array together (the count is not sacred — a real operator job gets a real
   body, never an annotation chip). Staff uses Today/Beer/Work/More; the wholesale portal has its
   own Order/Orders/Invoices/Account shell. Frames draw only user-visible UI —
