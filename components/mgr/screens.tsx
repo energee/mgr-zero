@@ -12,6 +12,14 @@
 // composer strip is shell chrome — screen-frame.tsx passes E.comp() to both
 // shells — so it is present under every staff and portal frame without any
 // body naming it.
+//
+// Option casing follows the word, never the control that draws it. A proper
+// noun or a named record (Warehouse, Taproom, Wholesale, Admin, Citra) is
+// Title case in a chip, a tab and a picker alike; a generic domain term
+// (depletion, dry hop, taxable, packaged) stays lowercase, as do units (lb,
+// oz, bbl); an option that is a phrase rather than a term takes sentence case
+// (Empty, About ¼ left, Customer remits). A lowercase list here is the rule,
+// not an oversight.
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-icons";
@@ -62,8 +70,7 @@ const today = (rows: ReactNode) => (
 
 // One invoice threaded through the AR list, the portal and the QuickBooks
 // venue frames, plus its named siblings. Every invoice number in this file
-// comes from here: two series were in use, so ORD-0231 carried two invoice
-// numbers and one paid invoice carried two more.
+// comes from here, so one order cannot end up with two of them.
 const INV = {
   no: "INV-1042",
   order: "ORD-0231",
@@ -96,6 +103,17 @@ const INV = {
 // "add finished goods" was a second, unreconciled path to the same stock.
 const MOVEMENT_KINDS = ["opening balance", "depletion", "loss", "sample", "festival removal", "destruction", "adjustment"];
 
+// The sale channels, in the order every picker offers them.
+const CHANNELS = ["Wholesale", "Taproom", "DTC", "Export"];
+
+// A rough remaining fill, wherever a keg comes off a tap.
+const FILL_CHIPS = ["Empty", "About ¼ left", "About ½ left"];
+
+// Gate copy shared by the frames naming one gate. Two frames drifting apart is
+// the failure this prevents: the copy is the promise, so it lives once.
+const INVITE_GATE = "isn’t available yet; invitations are being made retry-safe. Until it closes a brewery is whoever created it, alone";
+const REVERSAL_GATE = "isn’t available yet: a reversal needs an auditable link and TTB semantics. Until it closes no movement anywhere in MGR can be corrected, and a mistyped removal reaches the report";
+
 // The Work list chips, in the order every Work list draws them.
 const WORK_CHIPS = ["all", "orders", "batches", "runs", "POs", "routes"];
 const ORDER_STATES = ["all states", "draft", "submitted", "confirmed", "picked", "shipped"];
@@ -110,7 +128,7 @@ export const SCREENS: Screen[] = [
     job: "Role-filtered work that opens ready to finish · full-size exemplar at ship scale",
     reads: "get_today [design; delivery rows require assigned warehouse member or admin]", writes: "none",
     states: [["empty", "one button: the role's first verb"], ["loading", "row-shaped skeletons"], ["error", "Today did not load · Retry", 1], ["offline", "cached rows · writes queue"], ["role hidden", "only relevant permitted work · no blank gaps"]],
-    spec: "Drawn as the warehouse persona at honest 16px density. Rows are role-filtered per plan §3; the row verb is the action. A row standing for one order opens that order's Pick; this row stands for three, and issue 97 fixed the verb as the action rather than a destination label, so Pick here lands on the day's Pick sheet and each order opens its own Pick from there. The verb never becomes a noun to explain itself. The restock row appears while the order's restock flag is set and opens the order. Weekly count is gated: disabled with human copy, never a gate name.",
+    spec: "Drawn as the warehouse persona at honest 16px density. Rows are role-filtered per plan §3; the row verb is the action. A row standing for one order opens that order's Pick. This row stands for three, so Pick lands on the day's Pick sheet and each order opens its own Pick from there; the verb never becomes a noun to explain itself. The restock row appears while the order's restock flag is set and opens the order. Weekly count is gated: disabled with human copy, never a gate name.",
     body: today(<>
       {E.row("3 orders ready", "quantities default to ordered", E.act("Pick"), "w", Package01Icon)}
       {E.row("Staged · ORD-0229", "restock 3 Pils cases to Warehouse", E.act("Put back"), "w", Package01Icon)}
@@ -142,7 +160,7 @@ export const SCREENS: Screen[] = [
       {E.row("Pils · 16 oz case", "Not enough Pils for 2 orders", E.act("Choose who gets it"), "w")}
       {E.row("Hazy IPA · ½ bbl", "11 ready · fine", "")}
       {E.row("Al’s Bar · OH", "Al’s Bar can’t receive Stout in OH", E.act("Fix registration"), "w")}
-      {E.row(`${INV.no} · Ridgeline`, "buyer asked about this invoice", E.act("Read"), "w")}
+      {E.row(`${INV.no} · Ridgeline`, "buyer asked about this invoice", E.act("Open"), "w")}
       {E.nav("New order")}
     </>),
   },
@@ -566,7 +584,7 @@ export const SCREENS: Screen[] = [
       {E.nav("Dave Chen", "@dave · brewer", "", E.face({ src: "/mock/dave.jpg" }))}
       {E.nav("Ted", "@ted · sales", "", E.face({ src: "/mock/ted.jpg" }))}
       {E.row("sam@demobrewing.com", "invited Tue · pending", "", "w", E.face({ name: "sam@demobrewing.com" }))}
-      {E.gated("Invite staff", "isn’t available yet; invitations are being made retry-safe. Until it closes a brewery is whoever created it, alone")}
+      {E.gated("Invite staff", INVITE_GATE)}
     </>),
   },
   {
@@ -630,7 +648,7 @@ export const SCREENS: Screen[] = [
       {E.edit("Email", "", "email")}
       {E.chips(["Warehouse", "Sales", "Brewer", "Admin"])}
       {E.note("Sending an invite emails the recipient and cannot be recalled.")}
-      {E.gated("Send staff invite", "isn’t available yet; invitations are being made retry-safe. Until it closes a brewery is whoever created it, alone")}
+      {E.gated("Send staff invite", INVITE_GATE)}
       {E.row("5 · Opening inventory", "count what’s on hand today", E.act("Record opening count"))}
     </>),
   },
@@ -687,7 +705,7 @@ export const SCREENS: Screen[] = [
       {E.row("Taproom", "", "3")}
       {E.tape([["+8 production in · Warehouse", "Mon"], ["−4 taproom transfer", "Tue"], ["−1 depletion · Taproom", "Wed"]])}
       {E.btn("Record movement")}
-      {E.gated("Reverse a movement", "isn’t available yet: a reversal needs an auditable link and TTB semantics. Until it closes no movement anywhere in MGR can be corrected, and a mistyped removal reaches the report")}
+      {E.gated("Reverse a movement", REVERSAL_GATE)}
     </>),
   },
   {
@@ -700,13 +718,13 @@ export const SCREENS: Screen[] = [
     reads: "list_skus · list_locations · get_atp",
     writes: "record_movement [existing; one append-only inventory movement]",
     states: [["offline", "Queue with requestId"], ["stale", "ATP changed · preview again", 1], ["permission", "Role cannot record here", 1], ["echo", "Committed row · correction waits for schema gate"], ["unregistered destination", "Stout to OH warns and links to the registry · never blocks", 1]],
-    spec: "The server derives sign and 0.50000000 bbl; the client never supplies either. Drawn with festival removal selected: sample and festival removal leave the premises and require a destination state (the schema enforces it); destruction, loss and depletion never carry one. An unregistered brand and destination warn here with the same copy the order screens use and link to the Compliance registry, because a festival removal leaves the premises exactly as a shipment does and was the one path that crossed a state line without saying so. The warning never blocks, and it is a state rather than a drawn note: this frame carries Hazy IPA into PA, which is registered, so drawing the warning here would be the false positive the rule exists to avoid. Channel stays.",
+    spec: "The server derives sign and 0.50000000 bbl; the client never supplies either. Drawn with festival removal selected: sample and festival removal leave the premises and require a destination state (the schema enforces it); destruction, loss and depletion never carry one. An unregistered brand and destination warn here with the same copy the order screens use, because a festival removal leaves the premises exactly as a shipment does and was the one path that crossed a state line without saying so. This frame carries Hazy IPA into PA, which is registered, so the warning is a state rather than drawn copy. Channel stays.",
     body: (<>
       <div className="md:hidden">{E.pick("Kind", "festival removal", MOVEMENT_KINDS)}</div>
       <div className="hidden md:block">{E.chips(MOVEMENT_KINDS, 4)}</div>
       {E.nav("SKU / package", "Hazy IPA · ½ bbl keg")}
       {E.pick("Location", "Warehouse", ["Warehouse", "Taproom"])}
-      {E.pick("Channel", "Taproom", ["Wholesale", "Taproom", "DTC", "Export"])}
+      {E.pick("Channel", "Taproom", CHANNELS)}
       {E.pick("Destination state", "PA · where the beer is poured", ["PA · where the beer is poured", "OH · where the beer is poured"])}
       {E.qty("1", E.chips(["keg", "case", "bbl"]))}
       {E.info("Preview: −1 keg · ½ bbl · festival removal · PA · amounts are entered positive")}
@@ -728,7 +746,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Beer", "Hazy IPA · ½ bbl")}
       {E.tape([["−1 keg · festival removal · PA", "½ bbl · just now"]])}
-      {E.gated("Record inventory correction", "isn’t available yet: a reversal needs an auditable link and TTB semantics. Until it closes no movement anywhere in MGR can be corrected, and a mistyped removal reaches the report")}
+      {E.gated("Record inventory correction", REVERSAL_GATE)}
     </>),
   },
   {
@@ -889,7 +907,7 @@ export const SCREENS: Screen[] = [
     reads: "get_order · get_atp",
     writes: "submit_order [design; draft → submitted] · adjust_order_line [design; one RPC: line + allocation; sets needs_restock on a picked order] · confirm_order [design; one RPC] · cancel_order [design; one RPC: terminal status + allocation release + needs_restock while quantities are staged]",
     states: [["draft", "Submit is the one active verb"], ["confirmed / picked", "lines adjust; restock rows appear when picked qty exceeds ordered"], ["shipped", "read-only tape · Return shipment is the correction"], ["delivered", "the route stamped it · read-only, Return shipment still corrects"], ["stale", "another user changed a line · refresh", 1], ["permission", "sales or admin to adjust; warehouse reads", 1]],
-    spec: "Drawn as picked after a line was adjusted down: staged 3 Pils cases must go back to Warehouse. Adjusting down, shipping short and cancelling all set the restock flag; Put back is what clears it, since a cancelled order can never be re-picked. Delivered is the last lifecycle state and arrives from Confirm delivery on the route, not from a verb here. Ship opens Ship and invoice rather than committing here. Cancel is ghost and asks for confirm. Every transition appends an order event row in the same RPC. Confirm still has its own two-tap Today frame.",
+    spec: "Drawn as picked after a line was adjusted down: staged 3 Pils cases must go back to Warehouse. Adjusting down, shipping short and cancelling all set the restock flag; Put back is what clears it. Delivered is the last lifecycle state and arrives from Confirm delivery on the route, not from a verb here. Ship opens Ship and invoice rather than committing here. Cancel is ghost and asks for confirm. Every transition appends an order event row in the same RPC. Confirm still has its own two-tap Today frame.",
     body: (<>
       {E.back("Orders", "ORD-0229")}
       {E.ttl("Al’s Bar · Columbus, OH")}
@@ -938,7 +956,7 @@ export const SCREENS: Screen[] = [
     reads: "get_order",
     writes: "record_pick [design; one RPC: every qty_picked + picked status] · resolve_short_pick [design; one RPC]",
     states: [["short pick", "a line below ordered opens the Short pick frame", 1], ["partly picked", "reopened after a kept-owed line · counted lines start at what was picked"], ["concurrent", "another picker changed qty"], ["cancelled", "staged · restock now", 1], ["offline", "queue whole pick set once"]],
-    spec: "2 taps from Today: Pick → Done picking (all-as-ordered only). Shortage is not a chip here: entering a count below ordered opens Short pick. An order whose short line kept its remainder owed comes back here rather than finishing, and lines start at the count they already carry.",
+    spec: "2 taps from Today: Pick → Done picking (all-as-ordered only). Shortage is not a chip here: entering a count below ordered opens Short pick.",
     body: (<>
       {E.back("ORD-0231", "Pick · Warehouse")}
       {E.info("From Warehouse · lines start at ordered; touch only exceptions.")}
@@ -958,7 +976,7 @@ export const SCREENS: Screen[] = [
     job: "Confirm staged quantities were re-shelved after a restock",
     reads: "get_order [design; restock flag and staged qtys]",
     writes: "confirm_restock [design; one RPC: clears needs_restock + order_events row]",
-    states: [["pending", "Today Put back is the standing row"], ["done", "flag cleared · row leaves Today"], ["cancelled order", "the only way its staged beer ever comes back"], ["stale", "someone re-picked · the flag is already clear", 1]],
+    states: [["pending", "Today Put back is the standing row"], ["done", "flag cleared · row leaves Today"], ["cancelled order", "the flag survives cancel · this is the only way back"], ["stale", "someone re-picked · the flag is already clear", 1]],
     spec: "Today’s Put back row opens this. Staged 3 Pils cases after ORD-0229 was adjusted down. The verb writes: it clears the restock flag and appends the order event, because a cancelled order can never be re-picked or shipped and would otherwise leave its row standing on Today forever. Inventory already sits in Warehouse as staged, so nothing moves in the ledger.",
     body: (<>
       {E.back("Today", "ORD-0229 · put back")}
@@ -1126,7 +1144,7 @@ export const SCREENS: Screen[] = [
     reads: "get_shortfalls · get_standing_allocations [design]",
     writes: "adjust_order_line [design; one RPC: line + allocation] · release_allocation · set_taproom_par · set_taproom_standing_allocation [design]",
     states: DEFAULT_STATES,
-    spec: "There is no ranking command or priority column; every change is a named quantity edit. Taproom par edits the bin's par (§16.6 keys pars on bins), the same row the Bin sheet shows: two screens reach one number, and neither owns a second copy of it.",
+    spec: "There is no ranking command or priority column; every change is a named quantity edit. Taproom par edits the bin's par (§16.6 keys pars on bins), the same row the Bin sheet shows.",
     body: (<>
       {E.back("Finished goods", "Pils · 16 oz case")}
       {E.num("−6 cases · −0.58 bbl", "ATP · 22 cases on hand · 28 allocated")}
@@ -1355,7 +1373,7 @@ export const SCREENS: Screen[] = [
     reads: "list_invoices [design; qbo_sync_token + qbo_remote_state] · get_qbo_connection · get_qbo_mapping_candidates [design]",
     writes: "connect_qbo · set_qbo_customer_mapping · set_qbo_item_mapping [design] · push_invoice_to_qbo [same requestId, except a deleted remote invoice, which pushes under a new one] · write_off_invoice [design; MGR status only, never touches QuickBooks]",
     states: [["connection health", "QuickBooks · token healthy · company 9341"], ["expired", "Reconnect before mapping or push", 1], ["live", "the ordinary case; no badge at all"], ["edited there", "SyncToken changed since MGR pushed", 1], ["voided", "amounts zeroed; this is not payment", 1], ["deleted", "the id points at nothing; sync gets a 404", 1], ["not sent", "pushed but never delivered; only a fault if MGR is not the channel"], ["paid", "the paid date arrives from the QuickBooks Online sync · no user verb"], ["push failed", "the drill-in resolves each mapping", 1]],
-    spec: <>QuickBooks has no read-only invoice. Once pushed, the accountant can edit, void or delete it from the Sales transactions sidebar and no API setting prevents that, so MGR detects rather than prevents. QuickBooks hands us the detector free: SyncToken increments on every modification and already rides the response the sync job reads for balance, so drift costs one column and no extra call. The rule this frame protects: <b>a voided invoice is not a paid invoice.</b> Voiding zeroes the amounts, so any logic inferring paid from a QuickBooks balance of zero books cancelled revenue as collected; the database refuses to record a paid date unless the remote state is live, rather than trusting the job to remember. MGR surfaces drift and stops: no re-push that overwrites an accountant’s correction, no field-level merge UI. The one exception is the deleted invoice, where the remote id points at nothing: dedupe on the original requestId would return the first result and create nothing, so that push carries a new requestId and produces a second QuickBooks invoice under the same MGR number. Ordinary retries keep the old requestId and stay protected. ASSUMPTION: a drifted invoice stays in AR at QuickBooks’ numbers, because QuickBooks owns the invoice after push. This was drawn as two screens, an AR list and a drift list, both titled Invoices and both reached from More: drift is not a place, it is what some of these rows are doing, so the states carry it and the list is one. Rows also carry the due date, push failure and credit-memo status; payments come back through the sync job and are read-only. A failed row opens the drill-in, where connection, each mapping and push are four independent commands, and push persists its exact payload and deterministic requestId before the remote POST. Creating a credit memo stays Return shipment.</>,
+    spec: <>QuickBooks has no read-only invoice. Once pushed, the accountant can edit, void or delete it from the Sales transactions sidebar and no API setting prevents that, so MGR detects rather than prevents. QuickBooks hands us the detector free: SyncToken increments on every modification and already rides the response the sync job reads for balance, so drift costs one column and no extra call. The rule this frame protects: <b>a voided invoice is not a paid invoice.</b> Voiding zeroes the amounts, so any logic inferring paid from a QuickBooks balance of zero books cancelled revenue as collected; the database refuses to record a paid date unless the remote state is live, rather than trusting the job to remember. MGR surfaces drift and stops: no re-push that overwrites an accountant’s correction, no field-level merge UI. The one exception is the deleted invoice, where the remote id points at nothing: dedupe on the original requestId would return the first result and create nothing, so that push carries a new requestId and produces a second QuickBooks invoice under the same MGR number. Ordinary retries keep the old requestId and stay protected. ASSUMPTION: a drifted invoice stays in AR at QuickBooks’ numbers, because QuickBooks owns the invoice after push. Drift is not a place, it is what some of these rows are doing, which is why it lives in the states of one list rather than a second one. Rows also carry the due date, push failure and credit-memo status; payments come back through the sync job and are read-only. A failed row opens the drill-in, where connection, each mapping and push are four independent commands, and push persists its exact payload and deterministic requestId before the remote POST. Creating a credit memo stays Return shipment.</>,
     body: (<>
       {E.back("More", "Invoices")}
       {E.row("QuickBooks", "connected · company 9341", "healthy", "ok", QuickBooksMark)}
@@ -2392,7 +2410,7 @@ export const SCREENS: Screen[] = [
       {E.btn("Save location mapping", "g")}
       {E.nav("“Hazy 16 oz draft”", "Hazy IPA · ½ bbl keg")}
       {E.fld("Qty per sale", "1/124 keg per 16 oz")}
-      {E.pick("Channel override", "Taproom", ["Wholesale", "Taproom", "DTC", "Export"])}
+      {E.pick("Channel override", "Taproom", CHANNELS)}
       {E.btn("Save item mapping", "g")}
       {E.row("7 sales · Hazy 16 oz", "depletion", "−112 oz")}
       {E.row("1 refund · Hazy 16 oz", "inventory credit · adjustment", "+16 oz", "w")}
@@ -2513,7 +2531,7 @@ export const SCREENS: Screen[] = [
     job: "What is on, since when, and roughly how much is left",
     reads: "list_open_taps [design; Realtime on this page only, 30s poll is an adequate fallback]",
     writes: "tap_keg · swap_keg [design; closes A and opens B in one RPC] · kick_keg [design; compare-and-swap on the open interval id; Kick keg sheet]",
-    states: [["swap", "one act, one record · never kick-then-tap"], ["already swapped", "second attempt fails · Helles was already swapped out at 7:42pm", 1], ["not in taproom stock", "put on by a person · never discovered from Square", 1], ["guest or event keg", "yield from nominal size · excluded from variance", 1], ["two kegs, one brand", "taps 2 and 9 · sales split proportionally, yield labelled split", 1], ["no number", "sorts last · a number is never required"], ["duplicate number", "shown as entered · nothing downstream reads it"], ["kicked", "interval closed with a reason · the tap goes empty"], ["packaged short", "enters stock open · filled volume is measured, not guessed", 1], ["open, off tap", "still open stock · counted by volume, not as a whole keg", 1], ["no POS", "no sales to estimate against · the tile drops the bar and reads on since, nothing else", 1]],
+    states: [["swap", "one act, one record · never kick-then-tap"], ["already swapped", "second attempt fails · Helles was already swapped out at 7:42pm", 1], ["not in taproom stock", "put on by a person · never discovered from Square", 1], ["guest or event keg", "yield from nominal size · excluded from variance", 1], ["two kegs, one brand", "taps 2 and 9 · sales split proportionally, yield labelled split", 1], ["no number", "sorts last · a number is never required"], ["duplicate number", "shown as entered · nothing downstream reads it"], ["kicked", "interval closed with a reason · the tap goes empty"], ["packaged short", "enters stock open · filled volume is measured, not guessed", 1], ["open, off tap", "still open stock · counted by volume, not as a whole keg", 1], ["no POS", "no sales to estimate against · no bar, see the note", 1]],
     redrawn: true,
     spec: <>A tile opens Swap keg for that tap; Kick on a row opens Kick keg. No second filled button on this board. The decided schema (16.13) chose differently from the first drawing: the primitive is the <b>swap</b>, not tap-then-blow. A bartender changing a keg performs one act, and a kick-then-tap model asks for two records; the gap between them is where data goes missing, worst exactly when it matters, on a follow keg of the same beer where nothing looks wrong afterwards. The swap command closes A and opens B in one RPC, the same discipline as the keg-return RPC, so an interval can never be left open by a half-finished swap. That is also why lines were the wrong model: the ambiguity was never about where a keg is plugged in. Numbers here are the brewery’s own, optional and sparse (1, 3, 5 with nothing at 2 or 4). They sort this board and nothing else reads them, so MGR neither generates nor enforces them and two kegs numbered alike is a thing to look at, not a save error. Unnumbered kegs sort last. A keg that is not ours reaches this board one way only: somebody tapped it here. Nothing arrives from Square: an item the taproom created there is <i>ignored</i> under 16.14, never queued and never mapped, so the guest cider in the register and the guest cider on this line are two unrelated facts that happen to share a name. It is recorded because the board is what the website reads, and a board that silently omits a pouring tap lies to customers, and because the keg still earns a yield from its nominal size. Nothing here touches the ledger: the count posts depletion (16.15), which is what makes two writers safe and why a keg tapped outside taproom stock needs no special rule: it is flagged as not in inventory, still earns a yield from its nominal size, and is excluded from variance. A keg packaged short enters stock <b>open</b> rather than as sealed inventory, which is the decision that makes it obvious it should be used next and, more quietly, keeps a weekly count honest: counted as one keg it would overstate the shelf, counted by its volume it does not. That also means the opening fill for such a keg is <i>known</i>, measured at the packaging run and already in the ledger as that run’s output, rather than the eyeball the spec assumes; a yield derived from it is measured, not estimated. Remaining percent is estimated from POS sales against nominal volume, and it is the reason this screen is worth opening: a board that only takes data from people gets ignored. Two kegs of one brand open at once splits sales proportionally and any per-keg yield is labelled <i>split</i>, never presented as measured. The duplicate-swap risk is uncertainty, not simultaneity: the command carries the open interval id and requires that the interval is still open, so the second attempt fails with copy a human can act on rather than opening a phantom interval; the recent list below is the correction path, not a guard.</>,
     body: (<>
@@ -2549,7 +2567,7 @@ export const SCREENS: Screen[] = [
       {E.fld("Coming off", "Helles · ½ bbl · on since Wed")}
       {E.pick("Reason", "Kicked empty", ["Kicked empty", "Flavor change", "Quality hold"])}
       {E.ttl("Remaining")}
-      {E.chips(["Empty", "About ¼ left", "About ½ left"], 0)}
+      {E.chips(FILL_CHIPS, 0)}
       {E.info("Beer left in the keg remains open taproom stock and can be tapped again.")}
       {E.btn("Kick keg", "del")}
     </>),
@@ -2564,12 +2582,12 @@ export const SCREENS: Screen[] = [
     reads: "list_open_taps · get_taproom_sellable [design]",
     writes: "swap_keg [design; closes A and opens B in one RPC, carries the open interval id and requires closed_at null]",
     states: [["same brand", "the follow keg is the default · one tap, not two records"], ["guest keg", "gated · name and nominal size would be typed, and have nowhere to persist", 1], ["already swapped", "Helles was swapped out at 7:42pm by Ali · nothing opens", 1], ["no number", "left blank · the keg sorts last on the board"], ["close fill", "three chips · never a typed number", 1], ["kicked instead", "closes with a reason · the tap goes empty"]],
-    spec: <>The surface every other tap decision assumed and none of them showed. One sheet, because the swap is one act: what comes off and what goes on are decided together and written by one RPC, so an interval can never be left open by a half-finished swap. Going on defaults to the same brand, which is the common case (a follow keg of the flagship) and is exactly the case a kick-then-tap model loses, because afterwards nothing looks wrong. Coming off asks for a rough remaining, never a number: yield is poured ÷ (nominal × (opening fill − closing fill)), and the honest input is three chips rather than a text field implying precision nobody has. Empty is the default because it is nearly always true. <b>Not our stock</b> is the toggle that answers where a guest keg comes from: nothing is discovered from Square, where such an item is <i>ignored</i> under 16.14 and never maps. A person puts it on and types it, which is why name and nominal size would be inputs here: there is no brand to read them from, and yield needs the size. They are not drawn, because the toggle is gated until the interval can hold them; a guest keg already on the tap board predates the gate and is read, never created. SCHEMA-GATE: 16.13 says an interval flagged as not in inventory earns a yield from its nominal size but never says what identifies the beer when no brand exists behind it; the interval needs its own label and size columns, so that toggle is drawn gated while the swap itself ships. Gating the whole verb would take the ordinary same-brand swap down with it, which is the case this sheet exists for. The tap number is typed and optional, here as everywhere: MGR has no concept of a physical line, so this field is the only place a number can enter the system. The conflict row is the compare-and-swap guard made visible: the command carries the open interval id and requires that the interval is still open, so the realistic failure (the website posted a swap, the bartender did not see it land and swaps again a minute later) fails with copy naming the beer, who and when instead of opening a phantom interval.</>,
+    spec: <>The surface every other tap decision assumed and none of them showed. One sheet, because the swap is one act: what comes off and what goes on are decided together and written by one RPC, so an interval can never be left open by a half-finished swap. Going on defaults to the same brand, which is the common case (a follow keg of the flagship) and is exactly the case a kick-then-tap model loses, because afterwards nothing looks wrong. Coming off asks for a rough remaining, never a number: yield is poured ÷ (nominal × (opening fill − closing fill)), and the honest input is three chips rather than a text field implying precision nobody has. Empty is the default because it is nearly always true. <b>Not our stock</b> is the toggle that answers where a guest keg comes from: nothing is discovered from Square, where such an item is <i>ignored</i> under 16.14 and never maps. A person puts it on and types it, which is why name and nominal size would be inputs here: there is no brand to read them from, and yield needs the size. They are not drawn, because the toggle is gated until the interval can hold them; a guest keg already on the tap board predates the gate and is read, never created. Gating the whole verb would take the ordinary same-brand swap down with it. SCHEMA-GATE: 16.13 says an interval flagged as not in inventory earns a yield from its nominal size but never says what identifies the beer when no brand exists behind it; the interval needs its own label and size columns. The tap number is typed and optional, here as everywhere: MGR has no concept of a physical line, so this field is the only place a number can enter the system. The conflict row is the compare-and-swap guard made visible: the command carries the open interval id and requires that the interval is still open, so the realistic failure (the website posted a swap, the bartender did not see it land and swaps again a minute later) fails with copy naming the beer, who and when instead of opening a phantom interval.</>,
     body: (<>
       {E.row("Already swapped", "Helles was swapped out at 7:42pm by Ali", E.act("Reload"), "w")}
       {E.ttl("Coming off")}
       {E.fld("Tap 5", "Helles · ½ bbl · on since Wed")}
-      {E.chips(["Empty", "About ¼ left", "About ½ left"], 0)}
+      {E.chips(FILL_CHIPS, 0)}
       {E.ttl("Going on")}
       {E.nav("Helles · ½ bbl", "taproom stock · 4 available · same brand")}
       {E.gated("Not our stock", "guest and event kegs aren’t available yet: the interval has nowhere to keep a name and a size")}
@@ -2874,13 +2892,13 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.ttl("Taproom")}
       {E.pick("MGR location", "Taproom", ["Taproom", "Warehouse", "Select location"])}
-      {E.pick("Sales channel", "Taproom", ["Wholesale", "Taproom", "DTC", "Export", "Select channel"])}
+      {E.pick("Sales channel", "Taproom", [...CHANNELS, "Select channel"])}
       {E.ttl("Warehouse")}
       {E.pick("MGR location", "Warehouse", ["Taproom", "Warehouse", "Select location"])}
-      {E.pick("Sales channel", "DTC", ["Wholesale", "Taproom", "DTC", "Export", "Select channel"])}
+      {E.pick("Sales channel", "DTC", [...CHANNELS, "Select channel"])}
       {E.ttl("Third location · needs mapping")}
       {E.pick("MGR location", "Select location", ["Taproom", "Warehouse", "Select location"])}
-      {E.pick("Sales channel", "Select channel", ["Wholesale", "Taproom", "DTC", "Export", "Select channel"])}
+      {E.pick("Sales channel", "Select channel", [...CHANNELS, "Select channel"])}
       {E.btn("Save mappings")}
     </>),
   },
@@ -3084,7 +3102,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Price lists", "Wholesale tier")}
       {E.edit("Tier name", "Wholesale · standard")}
-      {E.pick("Channel", "Wholesale", ["Wholesale", "Taproom", "DTC", "Export"])}
+      {E.pick("Channel", "Wholesale", CHANNELS)}
       {E.ttl("Format defaults")}
       {E.tbl(["Format", "Price", "Source"], [["½ bbl keg", INV.hazyPrice, "tier default"], ["sixtel", "$95.00", "tier default"], ["case · 24×16oz", INV.pilsPrice, "tier default"]])}
       {E.ttl("Brand × format overrides")}
