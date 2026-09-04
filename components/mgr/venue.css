@@ -1,6 +1,6 @@
 /* components/mgr/venue.css — the external venues' own design language, ported
-   verbatim from the wireframes file (.agents/superpowers/specs/2026-08-31-mgr-
-   wireframes.html) so QuickBooks, Square and Slack keep looking like their own
+   verbatim from the wireframes file (.agents/superpowers/specs/2026-08-31-mgr-wireframes.html,
+   deleted in #133 once ported) so QuickBooks, Square and Slack keep looking like their own
    products rather than MGR frames. Tokens are scoped to the venue roots and
    deliberately do NOT follow the app theme: these surfaces are light because
    the real products are light, and a venue that inherited MGR's dark mode

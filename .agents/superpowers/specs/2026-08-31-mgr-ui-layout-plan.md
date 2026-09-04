@@ -3,15 +3,17 @@
 Date: 2026-08-31
 Status: Draft for Ted; rev 4 incorporates the fresh-eyes product, architecture, schema,
 navigation, state, build-order, wet-phone, and Slack-first chat-preview review. Build status lives in `.agents/PROGRESS.md`;
-the shell, tokens, `E` composites, screen records and `/design` gallery from §5–§7 step 1 are
-built on the `ui-components` branch (`components/mgr/`, `lib/mgr/`, `app/(design)/`).
+the shell, tokens, `E` composites and screen records from §5–§7 step 1 are
+built on the `ui-components` branch (`components/mgr/`, `lib/mgr/`); the frames publish at
+`/docs/screens` and `/docs/integrations` (the `/design` gallery they were first reviewed in was
+retired in #133).
 Frames: `components/mgr/screens.tsx`, published at `/docs/screens` — the frame inventory (product destinations plus
 separately identified sheets, overlays, flow states, and provider previews) tagged with
 tab/group, slice, build step, registered reads, and registered writes; the phone/desk
 toggle re-renders every frame from the same body (desk = rail/top-nav shell, dialog
 sheets, 32 px cursor-density controls). Update it in the same commit as any change
-to §3 or §4. The repository HTML is the canonical rev-4 artifact; republish that exact
-source before sharing an external artifact URL.
+to §3 or §4. The typed records are the canonical artifact; the rev-4 HTML document they
+were seeded from was deleted in #133 and is recoverable only from git history.
 The wireframe catalog is drawn compressed to fit 73-up; implementers build from the §5
 tokens (16px phone body), not the artifact's pixels — the warehouse Today frame is the
 full-size exemplar. Frames draw only what a user sees; state variants, tap audits, gate
@@ -362,7 +364,7 @@ Portal frames are **Portal · Order** (steppers + Same as last week), **Portal �
 (quantities, ship-to, "Ships from Warehouse", **Place order** — buyer copy only, disabled
 until the source contract exists; no persistent cart), **Portal · Orders** (rows expand
 into lines and adjusted-quantity copy; no staff verbs; read-only after submit), **Portal ·
-Invoices**, and **Portal · Account**. Account is read-only under current RLS. The count lives in the wireframes document alone (`EXPECTED`), because it moves
+Invoices**, and **Portal · Account**. Account is read-only under current RLS. The count lives in `components/mgr/screens.tsx` alone (`SCREENS.length`), because it moves
 every time a screen is drawn; taps, the POS redraw and the foreign venues have
 all since raised it.
 
