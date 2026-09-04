@@ -47,7 +47,7 @@ export function ScreenIframe({ index, title, mode }: { index: number; title: str
         height={height}
         loading="lazy"
         style={desk ? { width: DESK, transform: `scale(${scale})`, transformOrigin: "top left" } : { width: 390 }}
-        className="max-w-none rounded-lg border bg-background"
+        className={desk ? "max-w-none rounded-lg border bg-background" : "max-w-full rounded-lg border bg-background"}
       />
     </div>
   );
