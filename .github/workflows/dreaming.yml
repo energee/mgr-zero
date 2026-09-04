@@ -96,6 +96,8 @@ jobs:
             echo "open_pr=$open_pr"
             echo "dream_sha=$dream_sha"
             echo "rebuilt=$rebuilt"
+            echo "login=$login"
+            echo "email=${id}+${login}@users.noreply.github.com"
           } >> "$GITHUB_OUTPUT"
 
       - name: Run dream
@@ -120,6 +122,11 @@ jobs:
         id: validate
         env:
           DREAM_SHA: ${{ steps.prepare.outputs.dream_sha }}
+          # The model run rewrites this repo's git identity to claude[bot], so the
+          # dream commit names its author explicitly instead of trusting the config
+          # set before it.
+          DREAM_LOGIN: ${{ steps.prepare.outputs.login }}
+          DREAM_EMAIL: ${{ steps.prepare.outputs.email }}
         run: |
           git add -A
           changed=$(git diff --cached --name-only)
@@ -135,7 +142,8 @@ jobs:
           done <<EOF
           $changed
           EOF
-          git commit -q -m "dream: agent doc maintenance"
+          git -c "user.name=$DREAM_LOGIN" -c "user.email=$DREAM_EMAIL" \
+            commit -q -m "dream: agent doc maintenance"
           # A bundle of the validated commit, not a patch: publish pushes exactly this
           # tree, so it never re-merges main or needs preimage blobs for a 3-way apply.
           # Edits that land on main during the model run leave the PR one merge behind,
