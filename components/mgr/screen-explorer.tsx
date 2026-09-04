@@ -19,7 +19,7 @@ import { asPersona } from "@/components/mgr/demo-screens";
 import type { StaffRole } from "@/lib/commands/registry";
 import { BACK, resolveTap } from "@/lib/mgr/screen-links";
 import { ScreenFrame, ScreenSheet } from "@/components/mgr/screen-frame";
-import { SCREENS } from "@/components/mgr/screens";
+import { SCREENS, WORK_TABS } from "@/components/mgr/screens";
 import { ThemeToggle } from "@/components/mgr/theme-toggle";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -84,13 +84,14 @@ export function ScreenExplorer() {
   };
   // One handler for every tap in the drawing: the nearest link, button or row
   // gives the label (a row's title, not its whole text); a resolved name opens
-  // that screen. Tabs and chips only ever switch in place. Capture phase, and
+  // that screen. Tabs and chips switch in place unless the tab names a screen
+  // of its own (data-to, the Work chips). Capture phase, and
   // propagation stops on a hit, so the shell's Next.js links never navigate
   // the docs page and the Me control's own sheet never opens outside the box.
   const onTap = (e: React.MouseEvent) => {
     if (!current) return;
     const el = (e.target as HTMLElement).closest<HTMLElement>("a, button, [data-slot=item]");
-    if (!el || el.matches("[role=tab], [data-slot=toggle-group-item]")) return;
+    if (!el || (el.matches("[role=tab], [data-slot=toggle-group-item]") && !el.dataset.to)) return;
     const link = el.closest("a");
     const label = el.getAttribute("aria-label") ?? (el.matches("[data-slot=item]") ? el.querySelector("[data-slot=item-title]")?.textContent : el.textContent) ?? "";
     const name = resolveTap(current[1], label, link?.getAttribute("href"), el.getAttribute("data-to"));
@@ -104,6 +105,8 @@ export function ScreenExplorer() {
     const hit = screenByName(denied ? "Permission denied" : home);
     if (hit) pick(hit[0]);
   };
+  // Tabs that open a screen this persona may not: hidden, as the app would.
+  const hidden = Object.values(WORK_TABS).filter((n) => deniedFor(persona.role, n)).map((n) => `.screen-box [data-to="${n}"]{display:none}`).join("");
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
     e.preventDefault();
@@ -164,7 +167,8 @@ export function ScreenExplorer() {
                   sidebar. ponytail: the shell still reads the window for its
                   phone/desktop split; container queries in AppShell would let a
                   narrow box draw the phone layout. */}
-              <div ref={setBox} onClickCapture={onTap} className="relative h-[80svh] overflow-auto rounded-lg border [transform:translateZ(0)]">
+              <div ref={setBox} onClickCapture={onTap} className="screen-box relative h-[80svh] overflow-auto rounded-lg border [transform:translateZ(0)]">
+                {hidden && <style>{hidden}</style>}
                 {s.surface === "sheet" ? (
                   <>
                     <ScreenFrame screen={SCREENS[under ?? pageUnder([], current[0])]} persona={persona} />

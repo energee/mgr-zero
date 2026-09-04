@@ -120,6 +120,8 @@ const REVERSAL_GATE = "isn’t available yet: a reversal needs an auditable link
 
 // The Work list chips, in the order every Work list draws them.
 const WORK_CHIPS = ["all", "orders", "batches", "runs", "POs", "routes"];
+/** The screen each Work chip opens: the chips are one bar drawn on six screens. */
+export const WORK_TABS: Record<string, string> = { all: "Work", orders: "Orders", batches: "Batches", runs: "Packaging runs", POs: "Purchase orders", routes: "Routes" };
 const ORDER_STATES = ["all states", "draft", "submitted", "confirmed", "picked", "shipped"];
 
 // The states every screen can reach; a record with designed states lists its own instead.
@@ -237,7 +239,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Work", "warehouse default")}
       {E.btn("New order", "g")}
-      {E.tabs(WORK_CHIPS, 1)}
+      {E.tabs(WORK_CHIPS, 1, "w-full", WORK_TABS)}
       {E.row("ORD-0231 · Ridgeline", "submitted · ships today", E.act("Confirm"), "", Package01Icon)}
       {E.row("ORD-0229 · Al’s Bar", "picked · restock 3 Pils staged", E.act("Put back"), "w", Package01Icon)}
       {E.row("PO-0142 · Country Malt", "due today", E.act("Receive"), "", DeliveryTruck01Icon)}
@@ -884,7 +886,7 @@ export const SCREENS: Screen[] = [
       {E.hd("Work", "sales default")}
       {E.btn("New order")}
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        {E.tabs(WORK_CHIPS, 1, "w-full md:w-fit")}
+        {E.tabs(WORK_CHIPS, 1, "w-full md:w-fit", WORK_TABS)}
         {E.tabs(ORDER_STATES, 0, "w-full justify-start overflow-x-auto md:w-fit")}
       </div>
       {E.row("ORD-0231 · Ridgeline", "submitted · ships Thu", E.act("Confirm"))}
@@ -1872,7 +1874,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Work", "brewer default")}
       {E.btn("New batch")}
-      {E.tabs(WORK_CHIPS, 2)}
+      {E.tabs(WORK_CHIPS, 2, "w-full", WORK_TABS)}
       {E.ttl("Planned")}
       {E.row("B-0416 · Hazy IPA v4", "Fri 9/4 · 15 bbl", E.act("Start"))}
       {E.ttl("Active")}
@@ -1997,7 +1999,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Work", "brewer default")}
       {E.btn("Schedule run")}
-      {E.tabs(WORK_CHIPS, 3)}
+      {E.tabs(WORK_CHIPS, 3, "w-full", WORK_TABS)}
       {E.ttl("Upcoming")}
       {E.row("RUN-0031 · Hazy cans", "Fri 9/5 · FV3 · 118 cases planned · 480 ends short", E.act("Resolve"), "w")}
       {E.row("RUN-0032 · Pils ½ bbl", "Tue 9/9 · FV1 · 40 kegs planned", E.act("Start"))}
@@ -2071,7 +2073,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Work", "warehouse default")}
       {E.btn("New PO")}
-      {E.tabs(WORK_CHIPS, 4)}
+      {E.tabs(WORK_CHIPS, 4, "w-full", WORK_TABS)}
       {E.row("PO-0142 · Country Malt", "sent · due Thu", E.act("Receive"))}
       {E.row("PO-0141 · YCH", "partially received · 1 Citra box due", E.act("Receive"), "w")}
       {E.row("PO-0143 · CanSource", "draft · 4 pallets", E.act("Send"))}
@@ -2658,7 +2660,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Work", "driver default")}
       {E.btn("New route")}
-      {E.tabs(WORK_CHIPS, 5)}
+      {E.tabs(WORK_CHIPS, 5, "w-full", WORK_TABS)}
       {E.row("Route A · Thu", "3 stops · Maria · departed 8:10", E.act("Resume"))}
       {E.row("Route B · Fri", "2 stops · driver not assigned", E.act("Assign"), "w")}
       {E.row("ORD-0236 · Dock", "shipped · no route", E.act("Add to route"), "w")}

@@ -145,11 +145,14 @@ export const E = {
    *  an order's states) is a tab bar too; single-choice fields stay chips.
    *  Spans the column by default; pass width classes to hug ("w-fit", an input
    *  addon) or to scroll a bar too long for the phone ("overflow-x-auto"). */
-  tabs: (names: string[], on = 0, cls = "w-full") => (
+  tabs: (names: string[], on = 0, cls = "w-full", to?: Record<string, string>) => (
     // Uncontrolled, like chips: a controlled value with no onValueChange makes
     // every trigger inert, and these bars are meant to be clickable in the inventory.
+    // `to` names the screen a tab opens (data-to) where each tab is a screen of
+    // its own, like the Work chips; the explorer walks there and hides tabs the
+    // persona may not open.
     <Tabs defaultValue={names[on]}>
-      <TabsList variant="solid" className={cls}>{names.map((n) => <TabsTrigger key={n} value={n}>{n}</TabsTrigger>)}</TabsList>
+      <TabsList variant="solid" className={cls}>{names.map((n) => <TabsTrigger key={n} value={n} data-to={to?.[n]}>{n}</TabsTrigger>)}</TabsList>
     </Tabs>
   ),
   chips: (arr: string[], on = 0, bright = false) => (

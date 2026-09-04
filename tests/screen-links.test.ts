@@ -61,3 +61,18 @@ describe("resolveTap", () => {
     expect(walk("Finished goods", "Hazy IPA · ½ bbl keg", "Record movement")).toBe("Record movement");
   });
 });
+
+// The Work chips are screens of their own: a chip carries the screen it opens
+// so the explorer walks there, and a persona who may not open it never sees it.
+describe("Work chips", () => {
+  it("name the screen each chip opens", async () => {
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { createElement } = await import("react");
+    const { WORK_TABS } = await import("../components/mgr/screens");
+    for (const name of Object.values(WORK_TABS)) expect(by(name), name).toBeDefined();
+    for (const name of ["Work", "Orders", "Batches", "Packaging runs", "Purchase orders", "Routes"]) {
+      const html = renderToStaticMarkup(createElement("div", null, by(name).body));
+      for (const to of Object.values(WORK_TABS)) expect(html, `${name} → ${to}`).toContain(`data-to="${to}"`);
+    }
+  });
+});
