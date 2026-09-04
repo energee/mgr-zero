@@ -140,7 +140,7 @@ describe("SCREENS", () => {
     const verbs = new Set([
       "Add", "Add stop", "Add to route", "Adjust", "Assign", "Change", "Check", "Choose who gets it", "Close", "Confirm", "Connect", "Count", "Create",
       "Disconnect", "Edit", "Edit prices", "Finish", "Fix", "Invite", "Kick", "Map", "Open", "Open balance", "Open batch", "Open count",
-      "Open in QuickBooks", "Open mapping", "Pay", "Pick", "Pick source", "Put back", "Reading", "Receive", "Record opening count", "Release", "Reload", "Remove", "Reorder", "Re-push",
+      "Open in QuickBooks", "Open mapping", "Pay", "Pick", "Pick source", "Put back", "Read", "Reading", "Receive", "Record opening count", "Release", "Reload", "Remove", "Reorder", "Re-push",
       "Resolve", "Resume", "Retry", "Review", "Review history", "Review sales", "Select", "Send", "Send PO", "Shortfall", "Skip", "Start", "Swap", "Switch", "Tap",
       "Unlink", "Use", "Write off", "Fix registration", "Forgot password?", "Import CSV",
     ]);
