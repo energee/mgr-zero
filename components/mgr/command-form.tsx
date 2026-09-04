@@ -21,9 +21,9 @@ export function CommandForm({
   children,
 }: {
   open: boolean;
-  /** Omit to pin the form open (the design gallery); dismiss gestures then do nothing. */
+  /** Omit to pin the form open (the screen inventory's frames); dismiss gestures then do nothing. */
   onOpenChange?: (open: boolean) => void;
-  /** Omit when the caller controls `open` itself (the design gallery). */
+  /** Omit when the caller controls `open` itself (the screen inventory's frames). */
   trigger?: React.ReactNode;
   title: React.ReactNode;
   /** Stays on screen; the body scrolls. Quantity sheets put the commit verb here. */

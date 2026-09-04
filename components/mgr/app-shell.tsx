@@ -3,7 +3,7 @@
 // is the left rail (tabs as group labels, children as menu items, ⌘B
 // collapses it); below md the sidebar is hidden and a bottom tab bar with
 // 48px targets and safe-area padding takes over. Breakpoints are viewport
-// media queries, which is why the design gallery renders each frame in an
+// media queries, which is why the screen inventory renders each frame in an
 // iframe. (pointer: coarse) sizing comes from app/globals.css.
 "use client";
 
@@ -25,7 +25,7 @@ export type AppShellProps = {
   headerRight?: React.ReactNode;
   /** Composer strip above the tab bar; omitted until the composer ships. */
   composer?: React.ReactNode;
-  /** Force the active tab (the gallery renders screens off their real route). */
+  /** Force the active tab (the inventory renders screens off their real route). */
   active?: string;
   /** Initial rail state; layouts read it with lib/mgr/sidebar-state.ts. */
   sidebarOpen?: boolean;

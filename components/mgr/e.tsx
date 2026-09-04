@@ -1,6 +1,6 @@
 // components/mgr/e.tsx — the screen vocabulary, ported name-for-name from the
-// wireframe file's `E` helper (.agents/superpowers/specs/2026-08-31-mgr-
-// wireframes.html) but styled as shadcn defaults: quiet surfaces, one accent,
+// wireframe file's `E` helper (.agents/superpowers/specs/2026-08-31-mgr-wireframes.html,
+// deleted in #133 once ported) but styled as shadcn defaults: quiet surfaces, one accent,
 // color only where it carries meaning (a status dot, not a filled row).
 // Target sizing under a coarse pointer lives in app/globals.css, so nothing
 // here sets heights. Screen authors use only these and never components/ui.
