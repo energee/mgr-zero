@@ -60,9 +60,19 @@ const today = (rows: ReactNode) => (
   </>
 );
 
+// One invoice threaded through the AR list, the portal and the QuickBooks
+// venue frames, plus its named siblings. Every invoice number in this file
+// comes from here: two series were in use, so ORD-0231 carried two invoice
+// numbers and one paid invoice carried two more.
 const INV = {
   no: "INV-1042",
   order: "ORD-0231",
+  paid: "INV-1037",
+  failed: "INV-1039",
+  edited: "INV-1041",
+  voided: "INV-1040",
+  unsent: "INV-1038",
+  memo: "CM-0012",
   customer: "Ridgeline Tap Room",
   invoiceDate: "9/03/2026",
   due: "10/03/2026",
@@ -606,20 +616,21 @@ export const SCREENS: Screen[] = [
     reads: "get_first_run_state [design]",
     writes: "create_location · invite_staff [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI]",
     states: DEFAULT_STATES,
-    spec: "Replaces Today until complete; app and portal shells already exist. Each step is one command: add a location, import a CSV, add a brand, invite staff, record a movement. The invite is drawn disabled with the same human copy as the Team frame until the invite workflow gate closes; the step can be skipped.",
+    spec: "Replaces Today until complete; app and portal shells already exist. Each step is one command and all five are drawn: add a location, import a CSV, add a brand, invite staff, record a movement. The brand step was named here and never drawn, which stranded anyone not importing: a brewery with locations and no brand has nothing to record a movement against. The invite is drawn disabled with the same human copy as the Team frame until the invite workflow gate closes; the step can be skipped.",
     body: (<>
-      {E.hd("Set up Demo Brewing", "4 steps")}
+      {E.hd("Set up Demo Brewing", "5 steps")}
       {E.row("1 · Add locations", "inline form expanded", "in progress", "ok")}
       {E.fld("Location name", "Warehouse")}
       {E.chips(["Warehouse", "Taproom"])}
       {E.btn("Add location")}
-      {E.row("2 · Import CSV", "or add a brand one at a time", E.act("Import CSV"))}
-      {E.row("3 · Invite the team", "email and role", E.act("Skip"))}
+      {E.row("2 · Import CSV", "customers, catalog and opening balances at once", E.act("Import CSV"))}
+      {E.row("3 · Add a brand", "or let the import create them", E.act("Add"))}
+      {E.row("4 · Invite the team", "email and role", E.act("Skip"))}
       {E.edit("Email", "", "email")}
       {E.chips(["Warehouse", "Sales", "Brewer", "Admin"])}
       {E.note("Sending an invite emails the recipient and cannot be recalled.")}
       {E.gated("Send staff invite", "isn’t available yet; invitations are being made retry-safe. Until it closes a brewery is one person, and no customer can reach the portal")}
-      {E.row("4 · Opening inventory", "count what’s on hand today", E.act("Record opening count"))}
+      {E.row("5 · Opening inventory", "count what’s on hand today", E.act("Record opening count"))}
     </>),
   },
   {
@@ -810,15 +821,16 @@ export const SCREENS: Screen[] = [
     job: "Retry safely; separate response loss from permanent rejection",
     reads: "local_outbox [client state]",
     writes: "none [client replays envelope’s exact registered command with same requestId; confirmed discard is local]",
-    states: [["response lost", "Server dedupe returns prior result"], ["permanent", "Open form; preserve fields", 1], ["session expired", "Sign in; keep queue"], ["permission changed", "Do not replay; explain", 1]],
-    spec: "The discard confirmation names every queued write; response loss resolves by requestId and shows the prior result.",
+    states: [["response lost", "Server dedupe returns prior result"], ["permanent", "Open form; preserve fields", 1], ["session expired", "Sign in; keep queue"], ["permission changed", "the row says why and offers only Discard", 1], ["one row", "discarding one leaves the others queued"]],
+    spec: "The discard confirmation names every queued write; response loss resolves by requestId and shows the prior result. Discard is per row as well as bulk: a write that can never succeed (a role that changed under it, a validation the server will refuse again) otherwise forces someone to bin the two retryable writes beside it to clear the one that is stuck. A row whose permission changed is never replayed, so it carries no Retry at all; the copy names the role it was written under, because the person holding the phone is usually not the person who changed it.",
     body: (<>
-      {E.row("Record movement · Hazy", "waiting for wifi", E.act("Retry"), "", WifiDisconnected01Icon)}
-      {E.row("Record fermentation reading · FV3", "response lost", E.act("Check"), "", WifiDisconnected01Icon)}
-      {E.row("Record cellar transfer · FV2", "validation failed", E.act("Fix"), "w", WifiDisconnected01Icon)}
+      {E.row("Record movement · Hazy", "waiting for wifi", <>{E.act("Retry")}{E.act("Discard")}</>, "", WifiDisconnected01Icon)}
+      {E.row("Record fermentation reading · FV3", "response lost", <>{E.act("Check")}{E.act("Discard")}</>, "", WifiDisconnected01Icon)}
+      {E.row("Record cellar transfer · FV2", "validation failed", <>{E.act("Fix")}{E.act("Discard")}</>, "w", WifiDisconnected01Icon)}
+      {E.row("Record pick · ORD-0229", "your role changed · this will not be sent", E.act("Discard"), "w", WifiDisconnected01Icon)}
       {E.btn("Retry 1 waiting")}
-      {E.note("Discard asks you to confirm. These 3 unsent writes are deleted.")}
-      {E.btn("Discard 3 queued writes", "del")}
+      {E.note("Discard asks you to confirm. These 4 unsent writes are deleted.")}
+      {E.btn("Discard 4 queued writes", "del")}
     </>),
   },
   {
@@ -991,8 +1003,8 @@ export const SCREENS: Screen[] = [
     spec: "Post-commit of Ship and invoice. A tape means recorded. Return shipment is the correction.",
     body: (<>
       {E.back("ORD-0231", "Shipped")}
-      {E.fld("Invoice", "INV-0241 · assigned")}
-      {E.tape([["−4 Hazy ½ bbl · sale removal · PA", "2.00 bbl"], ["−9 Pils cases · sale removal · PA", "0.42 bbl"], ["INV-0241", "invoiced now"]])}
+      {E.fld("Invoice", `${INV.no} · assigned`)}
+      {E.tape([["−4 Hazy ½ bbl · sale removal · PA", "2.00 bbl"], ["−9 Pils cases · sale removal · PA", "0.42 bbl"], [INV.no, "invoiced now"]])}
       {E.info("To correct this shipment, Return shipment.")}
     </>),
   },
@@ -1141,7 +1153,7 @@ export const SCREENS: Screen[] = [
       {E.chips(["damaged", "wrong item", "unsold"])}
       {E.pick("Return to", "Warehouse · original fulfillment source", ["Warehouse · original fulfillment source", "Taproom"])}
       {E.row("Deposit refund", "½ bbl pool · 1 · as deposited", "−$30.00")}
-      {E.info("Credited at the price on INV-0241, not today’s price list.")}
+      {E.info(`Credited at the price on ${INV.no}, not today’s price list.`)}
       {E.tape([["+1 Hazy ½ bbl · return in", "Warehouse"], ["credit memo number · on commit", "−$180.00"]])}
       {E.note("Empty-keg asset returns are a different Keg fleet command.")}
       {E.sp()}
@@ -1339,40 +1351,23 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     group: "QuickBooks Online",
-    name: "Invoice drift",
-    job: "What the AR list shows when someone edits, voids or deletes an invoice over there",
-    reads: "list_invoices [design; qbo_sync_token + qbo_remote_state]",
-    writes: "push_invoice_to_qbo [same requestId, except a deleted remote invoice, which pushes under a new one] · write_off_invoice [design; MGR status only, never touches QuickBooks]",
-    states: [["edited there", "SyncToken changed since MGR pushed", 1], ["voided", "amounts zeroed; this is not payment", 1], ["deleted", "the id points at nothing; sync gets a 404", 1], ["not sent", "pushed but never delivered; only a fault if MGR is not the channel"], ["live", "the ordinary case; no badge at all"]],
-    spec: <>QuickBooks has no read-only invoice. Once pushed, the accountant can edit, void or delete it from the Sales transactions sidebar and no API setting prevents that, so MGR detects rather than prevents. QuickBooks hands us the detector free: SyncToken increments on every modification and already rides the response the sync job reads for balance, so drift costs one column and no extra call. The rule this frame protects: <b>a voided invoice is not a paid invoice.</b> Voiding zeroes the amounts, so any logic inferring paid from a QuickBooks balance of zero books cancelled revenue as collected; the database refuses to record a paid date unless the remote state is live, rather than trusting the job to remember. MGR surfaces drift and stops: no re-push that overwrites an accountant’s correction, no field-level merge UI. The one exception is the deleted invoice, where the remote id points at nothing: dedupe on the original requestId would return the first result and create nothing, so that push carries a new requestId and produces a second QuickBooks invoice under the same MGR number. Ordinary retries keep the old requestId and stay protected. ASSUMPTION: a drifted invoice stays in AR at QuickBooks’ numbers, because QuickBooks owns the invoice after push.</>,
-    body: (<>
-      {E.back("More", "Invoices")}
-      {E.row(`${INV.no} · Ridgeline`, `due ${INV.dueShort} · ${INV.total} · pushed`, E.act("Open in QuickBooks"))}
-      {E.row("INV-1041 · Al’s Bar", <>edited in QuickBooks · $980 {E.arrow()} $1,040</>, E.act("Open in QuickBooks"), "w")}
-      {E.row("INV-1040 · Teresa’s", "voided in QuickBooks · not paid", E.act("Write off"), "w")}
-      {E.row("INV-1039 · Al’s Bar", "deleted in QuickBooks", <>{E.act("Re-push")}{E.act("Write off")}</>, "w")}
-      {E.row("INV-1038 · Al’s Bar", "pushed · not emailed yet", E.act("Open in QuickBooks"))}
-      {E.row("INV-1037 · Ridgeline", "paid 8/29 from QuickBooks Online", "$980", "ok")}
-      {E.info("MGR shows what changed over there. Corrections belong in QuickBooks, or as a credit memo here.")}
-    </>),
-  },
-  {
-    step: 5,
-    slice: 1,
-    tab: "More",
     name: "Invoices",
-    job: "An AR list first; connect, map and push are the drill-in for one invoice",
-    reads: "list_invoices · get_qbo_connection · get_qbo_mapping_candidates [design]",
-    writes: "connect_qbo · set_qbo_customer_mapping · set_qbo_item_mapping · push_invoice_to_qbo [design]",
-    states: [["connection health", "QuickBooks · token healthy · company 9341"], ["expired", "Reconnect before mapping or push", 1], ["paid", "the paid date arrives from the QuickBooks Online sync · no user verb"], ["drill-in", "one invoice: mapping candidates + Push"]],
-    spec: "List rows carry the due date, push failure and paid date, plus credit-memo QuickBooks status; payments come back through the sync job and are read-only here. Tapping a failed row opens the drill-in drawn below the list: connection, each mapping and push are four independent commands; push is online-only copper and persists exact payload + deterministic requestId before the remote POST. Creating a credit memo stays Return shipment.",
+    job: "The AR list: what is due, what QuickBooks changed underneath it, and the drill-in for one invoice",
+    reads: "list_invoices [design; qbo_sync_token + qbo_remote_state] · get_qbo_connection · get_qbo_mapping_candidates [design]",
+    writes: "connect_qbo · set_qbo_customer_mapping · set_qbo_item_mapping [design] · push_invoice_to_qbo [same requestId, except a deleted remote invoice, which pushes under a new one] · write_off_invoice [design; MGR status only, never touches QuickBooks]",
+    states: [["connection health", "QuickBooks · token healthy · company 9341"], ["expired", "Reconnect before mapping or push", 1], ["live", "the ordinary case; no badge at all"], ["edited there", "SyncToken changed since MGR pushed", 1], ["voided", "amounts zeroed; this is not payment", 1], ["deleted", "the id points at nothing; sync gets a 404", 1], ["not sent", "pushed but never delivered; only a fault if MGR is not the channel"], ["paid", "the paid date arrives from the QuickBooks Online sync · no user verb"], ["push failed", "the drill-in resolves each mapping", 1]],
+    spec: <>QuickBooks has no read-only invoice. Once pushed, the accountant can edit, void or delete it from the Sales transactions sidebar and no API setting prevents that, so MGR detects rather than prevents. QuickBooks hands us the detector free: SyncToken increments on every modification and already rides the response the sync job reads for balance, so drift costs one column and no extra call. The rule this frame protects: <b>a voided invoice is not a paid invoice.</b> Voiding zeroes the amounts, so any logic inferring paid from a QuickBooks balance of zero books cancelled revenue as collected; the database refuses to record a paid date unless the remote state is live, rather than trusting the job to remember. MGR surfaces drift and stops: no re-push that overwrites an accountant’s correction, no field-level merge UI. The one exception is the deleted invoice, where the remote id points at nothing: dedupe on the original requestId would return the first result and create nothing, so that push carries a new requestId and produces a second QuickBooks invoice under the same MGR number. Ordinary retries keep the old requestId and stay protected. ASSUMPTION: a drifted invoice stays in AR at QuickBooks’ numbers, because QuickBooks owns the invoice after push. This was drawn as two screens, an AR list and a drift list, both titled Invoices and both reached from More: drift is not a place, it is what some of these rows are doing, so the states carry it and the list is one. Rows also carry the due date, push failure and credit-memo status; payments come back through the sync job and are read-only. A failed row opens the drill-in, where connection, each mapping and push are four independent commands, and push persists its exact payload and deterministic requestId before the remote POST. Creating a credit memo stays Return shipment.</>,
     body: (<>
       {E.back("More", "Invoices")}
       {E.row("QuickBooks", "connected · company 9341", "healthy", "ok", QuickBooksMark)}
-      {E.row(`${INV.no} · Ridgeline`, `due ${INV.dueShort} · pushed · ${INV.total}`, E.act("Open"))}
-      {E.row("INV-0197 · Al’s Bar", "push failed · item unmapped · $540", E.act("Review"), "w")}
-      {E.row("INV-0190 · Ridgeline", "paid 8/29 from QuickBooks Online · $980", E.act("Open"), "ok")}
-      {E.row("CM-0012 · Teresa’s", "credit memo · pushed · −$180", E.act("Open"))}
+      {E.row(`${INV.no} · Ridgeline`, `due ${INV.dueShort} · ${INV.total} · pushed`, E.act("Open"))}
+      {E.row(`${INV.edited} · Al’s Bar`, <>edited in QuickBooks · $980 {E.arrow()} $1,040</>, E.act("Open in QuickBooks"), "w")}
+      {E.row(`${INV.voided} · Teresa’s`, "voided in QuickBooks · not paid", E.act("Write off"), "w")}
+      {E.row(`${INV.failed} · Al’s Bar`, "push failed · item unmapped · $540", <>{E.act("Review")}{E.act("Write off")}</>, "w")}
+      {E.row(`${INV.unsent} · Al’s Bar`, "pushed · not emailed yet", E.act("Open in QuickBooks"))}
+      {E.row(`${INV.paid} · Ridgeline`, "paid 8/29 from QuickBooks Online", "$980", "ok")}
+      {E.row(`${INV.memo} · Teresa’s`, "credit memo · pushed · −$180", E.act("Open"))}
+      {E.info("MGR shows what changed over there. Corrections belong in QuickBooks, or as a credit memo here.")}
     </>),
   },
   {
@@ -1385,7 +1380,7 @@ export const SCREENS: Screen[] = [
     writes: "push_invoice_to_qbo [design]",
     states: [["unmapped", "push stays unavailable", 1], ["ready", "every customer and item is mapped"], ["pushed", "QuickBooks owns later accounting edits"]],
     body: (<>
-      {E.back("Invoices", "INV-0197")}
+      {E.back("Invoices", INV.failed)}
       {E.row("Al’s Bar", "due 10/03 · 3 lines", "$540")}
       {E.row("Customer mapping", "Al’s Bar · customer 227", E.act("Fix"), "ok")}
       {E.row("Pils · case", "QuickBooks item is missing", E.act("Fix"), "w")}
@@ -1585,7 +1580,7 @@ export const SCREENS: Screen[] = [
       {E.fld("Ship-to", "Main · Phoenixville, PA")}
       {E.row("Hazy IPA · ½ bbl keg", "ordered 2 · shipped 2", "$300.00")}
       {E.row("Pils · 16 oz case", "ordered 6 · shipped 6", "$228.00")}
-      {E.nav("INV-0190", "paid 8/29 · $980")}
+      {E.nav(INV.paid, "paid 8/29 · $980")}
       {E.btn("Reorder", "g")}
     </>),
   },
@@ -1661,7 +1656,7 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     spec: "The paid date arrived from QuickBooks. Pay is gone. Download PDF is the one action.",
     body: (<>
-      {E.back("Invoices", "INV-0190")}
+      {E.back("Invoices", INV.paid)}
       {E.ttl("$980.00")}
       {E.row("Paid", "8/29/2026", "", "ok")}
       {E.tbl(["Item", "Qty", "Amount"], [["Hazy IPA · ½ bbl", "2", "300.00"], ["Pils · 16 oz case", "6", "228.00"]])}
@@ -1680,7 +1675,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Invoices", "Ridgeline")}
       {E.row(INV.no, `due ${INV.dueShort} · ${INV.total}`, E.act("Pay"))}
-      {E.row("INV-0190", "paid 8/29", "$980", "ok")}
+      {E.row(INV.paid, "paid 8/29", "$980", "ok")}
     </>),
   },
   {
