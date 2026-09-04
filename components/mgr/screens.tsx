@@ -99,7 +99,7 @@ export const SCREENS: Screen[] = [
     job: "Role-filtered work that opens ready to finish · full-size exemplar at ship scale",
     reads: "get_today [design; delivery rows require assigned warehouse member or admin]", writes: "none",
     states: [["empty", "one button: the role's first verb"], ["loading", "row-shaped skeletons"], ["error", "Today did not load · Retry", 1], ["offline", "cached rows · writes queue"], ["role hidden", "only relevant permitted work · no blank gaps"]],
-    spec: "Drawn as the warehouse persona at honest 16px density. Rows are role-filtered per plan §3; the row verb is the action. The restock row appears while the order's restock flag is set and opens the order. Weekly count is gated: disabled with human copy, never a gate name.",
+    spec: "Drawn as the warehouse persona at honest 16px density. Rows are role-filtered per plan §3; the row verb is the action. A row standing for one order opens that order's Pick; this row stands for three, and issue 97 fixed the verb as the action rather than a destination label, so Pick here lands on the day's Pick sheet and each order opens its own Pick from there. The verb never becomes a noun to explain itself. The restock row appears while the order's restock flag is set and opens the order. Weekly count is gated: disabled with human copy, never a gate name.",
     body: today(<>
       {E.row("3 orders ready", "quantities default to ordered", E.act("Pick"), "w", Package01Icon)}
       {E.row("Staged · ORD-0229", "restock 3 Pils cases to Warehouse", E.act("Put back"), "w", Package01Icon)}
@@ -232,7 +232,8 @@ export const SCREENS: Screen[] = [
   {
     step: 1, slice: "all", group: "Global", surface: "sheet", name: "Search", job: "Search every permitted entity kind",
     reads: "search_entities [design]", writes: "none",
-    states: [["empty", "No matches · change the term"], ["loading", "row-shaped skeletons"], ["offline", "cached matches only", 1], ["permission", "Results honor row access"]],
+    states: [["empty", "No matches · change the term"], ["loading", "row-shaped skeletons"], ["offline", "cached matches only", 1], ["permission", "Results honor row access"], ["document number", "ORD-0231 matches exactly and sorts first"]],
+    spec: "One registered search across the entity kinds the caller's role can read; the chips narrow what is already permitted and never widen it, and RLS decides the rows either way, so a term matching a customer the caller cannot see returns nothing rather than a redacted row. A document number (ORD-0231, INV-1042, L-240831-HZ) matches exactly and sorts above name matches, because someone typing one is holding it in their hand; names match on prefix. This is also where history lives: a run closed months ago leaves the Work list and is found here.",
     body: (<>
       {E.inp("Search")}
       {E.chips(["all", "SKU", "order", "lot"], 0)}
@@ -687,7 +688,7 @@ export const SCREENS: Screen[] = [
     reads: "list_skus · list_locations · get_atp",
     writes: "record_movement [existing; one append-only inventory movement]",
     states: [["offline", "Queue with requestId"], ["stale", "ATP changed · preview again", 1], ["permission", "Role cannot record here", 1], ["echo", "Committed row · correction waits for schema gate"]],
-    spec: "The server derives sign and 0.50000000 bbl; the client never supplies either. Drawn with festival removal selected: sample and festival removal leave the premises and require a destination state (the schema enforces it); destruction, loss and depletion never carry one. Channel stays.",
+    spec: "The server derives sign and 0.50000000 bbl; the client never supplies either. Drawn with festival removal selected: sample and festival removal leave the premises and require a destination state (the schema enforces it); destruction, loss and depletion never carry one. An unregistered brand and destination warn here with the same copy the order screens use and link to the Compliance registry, because a festival removal leaves the premises exactly as a shipment does and was the one path that crossed a state line without saying so. The warning never blocks. Channel stays.",
     body: (<>
       <div className="md:hidden">{E.pick("Kind", "festival removal", MOVEMENT_KINDS)}</div>
       <div className="hidden md:block">{E.chips(MOVEMENT_KINDS, 4)}</div>
@@ -695,6 +696,7 @@ export const SCREENS: Screen[] = [
       {E.pick("Location", "Warehouse", ["Warehouse", "Taproom"])}
       {E.pick("Channel", "Taproom", ["Wholesale", "Taproom", "DTC", "Export"])}
       {E.pick("Destination state", "PA · where the beer is poured", ["PA · where the beer is poured", "OH · where the beer is poured"])}
+      {E.note("Hazy IPA isn’t registered in Ohio. Check the Compliance registry.")}
       {E.qty("1", E.chips(["keg", "case", "bbl"]))}
       {E.info("Preview: −1 keg · ½ bbl · festival removal · PA · amounts are entered positive")}
       {E.pin(<>
@@ -1043,9 +1045,10 @@ export const SCREENS: Screen[] = [
     tab: "Work",
     name: "Pick sheet",
     job: "Group confirmed demand by ship date",
-    reads: "get_daily_pick_sheet [design]",
+    reads: "get_daily_pick_sheet [design; confirmed orders by requested ship date, one fulfillment source]",
     writes: "none",
-    states: DEFAULT_STATES,
+    states: [["day chosen", "confirmed orders requesting that ship date"], ["totals", "read-only · what to bring to the floor in one trip"], ["empty", "nothing confirmed for that day"], ["mixed sources", "one source at a time · a Taproom order is not on the Warehouse sheet", 1]],
+    spec: "A staging aid, not a command surface: nothing here writes, and a row opens that order's Pick, which is where counting happens. Totals sum the day so a picker carries one load out instead of walking back per order; they are read-only because a total spans orders and picking is per-order. Scoped to one fulfillment source, since a sheet mixing Warehouse and Taproom lines would send someone to the wrong room.",
     body: (<>
       {E.back("Work", "Pick sheet")}
       {E.chips(["Wed 9/2", "Thu 9/3", "Fri 9/4"], 1)}
@@ -1111,7 +1114,7 @@ export const SCREENS: Screen[] = [
     reads: "get_shortfalls · get_standing_allocations [design]",
     writes: "adjust_order_line [design; one RPC: line + allocation] · release_allocation · set_taproom_par · set_taproom_standing_allocation [design]",
     states: DEFAULT_STATES,
-    spec: "There is no ranking command or priority column; every change is a named quantity edit.",
+    spec: "There is no ranking command or priority column; every change is a named quantity edit. Taproom par edits the bin's par (§16.6 keys pars on bins), the same row the Bin sheet shows: two screens reach one number, and neither owns a second copy of it.",
     body: (<>
       {E.back("Finished goods", "Pils · 16 oz case")}
       {E.num("−6 cases · −0.58 bbl", "ATP · 22 cases on hand · 28 allocated")}
@@ -1129,14 +1132,16 @@ export const SCREENS: Screen[] = [
     name: "Return and credit",
     job: "Return beer and correct money atomically",
     reads: "get_order",
-    writes: "return_shipment [design; one RPC: return_in movements at explicit destination + credit memo + owned-fleet keg_events linked to shipment when slice 9 is enabled]",
-    states: DEFAULT_STATES,
+    writes: "return_shipment [design; one RPC: return_in movements at explicit destination + loss movement for a damaged return + credit memo at the invoiced price + owned-fleet keg_events linked to shipment when slice 9 is enabled]",
+    states: [["unsold", "returns as sellable stock at the chosen destination"], ["damaged", "returns, then posts loss in the same RPC · never re-sold", 1], ["wrong item", "sellable · the mis-picked SKU goes back on the shelf"], ["invoice paid", "the credit memo sits unapplied as available credit", 1], ["partial", "only the returned units credit back"]],
+    spec: "Reason decides the beer, never the money. Unsold and wrong item return as sellable stock at the destination; damaged returns and is written to loss in the same RPC, because beer that came back broken is not inventory and pretending otherwise puts it back on a pick list. The credit is the price frozen on the original invoice line and the deposit is the one recorded on the original shipment, never today's price list, on the same principle that freezes a channel onto a movement at write time. A paid invoice can still be returned: the credit memo lands unapplied and sits as available credit, which is the state the QuickBooks credit-memo frame already draws.",
     body: (<>
       {E.back("ORD-0231", "Beer return")}
       {E.row("Hazy IPA · ½ bbl keg", "shipped 4 · returning", E.stq(1))}
       {E.chips(["damaged", "wrong item", "unsold"])}
       {E.pick("Return to", "Warehouse · original fulfillment source", ["Warehouse · original fulfillment source", "Taproom"])}
-      {E.row("Deposit refund", "½ bbl pool · 1", "−$30.00")}
+      {E.row("Deposit refund", "½ bbl pool · 1 · as deposited", "−$30.00")}
+      {E.info("Credited at the price on INV-0241, not today’s price list.")}
       {E.tape([["+1 Hazy ½ bbl · return in", "Warehouse"], ["credit memo number · on commit", "−$180.00"]])}
       {E.note("Empty-keg asset returns are a different Keg fleet command.")}
       {E.sp()}
@@ -1988,7 +1993,8 @@ export const SCREENS: Screen[] = [
     job: "Trace a lot globally from material to customer",
     reads: "trace_lot [design]",
     writes: "none",
-    states: DEFAULT_STATES,
+    states: [["shipped out", "every customer that received the lot, with its contact"], ["taproom", "transfers follow to the count that depleted them"], ["no contact", "the ship-to carries none · the customer record is the fallback", 1], ["still on hand", "unsold units are the part a recall can actually stop"]],
+    spec: "A recall contact is the person on the ship-to that received the lot, falling back to the customer record when that address carries none: the account's billing contact is rarely who is standing next to the keg. The trace follows a taproom transfer to the count that depleted it and stops there. It does not descend into POS sale lines, because a sale posts nothing to the ledger and would imply a per-pint traceability MGR does not have. Print trace is the packet handed to a regulator or a customer, which is why contacts and materials sit on the same page as the movements.",
     body: (<>
       {E.back("Search", "L-240831-HZ")}
       {E.row("Hazy IPA · 16 oz case", "RUN-0028 · packaged 8/31", "118 cases")}
@@ -2087,12 +2093,13 @@ export const SCREENS: Screen[] = [
     name: "Cycle count",
     job: "Post only variance as an append-only movement",
     reads: "get_material_on_hand [design]",
-    writes: "record_material_count [design; one RPC: count + lines + adjustment movements]",
-    states: DEFAULT_STATES,
+    writes: "record_material_count [design; one RPC: count + lines + adjustment movements against named lots]",
+    states: [["one lot", "the variance lands on it · nothing to choose"], ["several lots", "a shortage consumes earliest best-by first; an overage lands on the newest lot"], ["no best-by", "lots with none fall to receipt order behind those that have one"], ["split", "a shortage crossing two lots names both in the preview", 1]],
+    spec: "A count is one number and a material may hold several lots, so the RPC has to decide which lot moves. A shortage consumes earliest best-by first, not earliest receipt: best-by is what a recall and an expiry sweep read, and consuming the freshest lot first would leave the oldest to expire on the shelf. An overage lands on the newest lot, since unrecorded stock is far likelier to be the delivery just counted in than one from six months ago. The chosen lot is always named in the preview: a variance that silently splits across two lots is the one thing this sheet must not do quietly.",
     body: (<>
       {E.nav("Material", "Cans · 16 oz")}
       {E.qty("3050", E.chips(["each", "case"]))}
-      {E.info("system 3,100 · variance −50")}
+      {E.info("system 3,100 · variance −50 · from lot L-0774, best by 3/15/27")}
       {E.pin(<>
         {E.btn("Record count", "irr")}
       </>)}
@@ -2681,9 +2688,10 @@ export const SCREENS: Screen[] = [
     group: "Desk",
     name: "Planning",
     job: "See demand gaps and draft a PO without priority state",
-    reads: "get_planning_shortfalls [design]",
+    reads: "get_planning_shortfalls [design; demand, supply and gap by week]",
     writes: "draft_purchase_order_from_requirements [design; one RPC: draft PO + lines]",
-    states: DEFAULT_STATES,
+    states: [["gap", "demand exceeds supply in that week · the only actionable row"], ["covered", "supply meets demand · shown so the horizon reads continuously"], ["no vendor", "no contract and no lead time on file · the row cannot draft a PO", 1], ["empty", "nothing planned and nothing ordered"]],
+    spec: "The three columns are defined so the gap is arithmetic rather than judgement. Demand is confirmed and submitted order lines by requested ship week, plus taproom pars; supply is on-hand ATP plus the planned outputs of packaging runs already scheduled into that week. The horizon runs as far ahead as the longest material lead time can still be acted on, which is why it is drawn two weeks and not a quarter: a gap nobody can still buy for is a report, not a plan. A drafted PO goes to the vendor holding an active contract for that material, and failing that the shortest lead time; the quantity is the gap rounded up to the vendor's purchase unit. Nothing here ranks or prioritises, in keeping with Pars and allocation: every change stays a named quantity.",
     body: (<>
       {E.back("More", "Planning")}
       {E.tbl(["week", "demand", "supply", "gap"], [["9/7", "48 bbl", "40 bbl", <><span className="text-warning-foreground">−8</span></>], ["9/14", "52 bbl", "60 bbl", "+8"]])}
@@ -3137,6 +3145,7 @@ export const SCREENS: Screen[] = [
       {E.edit("Bin name", "To-go fridge")}
       {E.pick("Kind", "Packaged storage", ["Packaged storage", "Cold storage", "Dry storage"])}
       {E.edit("Par", "4", "number")}
+      {E.info("This is the same par Pars and allocation edits. A par belongs to a bin; there is only ever one number.")}
       {E.info("A brewery that never subdivides sees one bin and ignores it.")}
       {E.note("Tap lines are not bins. The tap board owns those.")}
       {E.gated("Save bin", "isn’t available yet: a location is still one undivided space")}
