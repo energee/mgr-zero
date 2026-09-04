@@ -531,6 +531,17 @@ describe("SCREENS", () => {
     }
   });
 
+  it("edits a whole number with the same stepper Weekly count uses", () => {
+    // A contract quantity or an overdue threshold is counted, not typed: the
+    // −/+ stepper (E.stq) is the one number control, as on Weekly count.
+    for (const name of ["Contract", "Chat settings"]) {
+      expect(body(name), `${name}: no stepper`).toContain('aria-label="Decrease"');
+    }
+    for (const [name, label] of [["Contract", "Contract quantity"], ["Chat settings", "Reading overdue after"]]) {
+      expect(body(name), `${name}: the stepper is not the labelled field`).toMatch(new RegExp(`aria-label="Decrease"[^§]*aria-label="${label}"`));
+    }
+  });
+
   it("uses the desktop width instead of a centred phone column (#98)", () => {
     // Issue 98: the shell was capped at a phone column, buttons kept a fixed
     // grid and tiles were locked to three, so desktop drew wide gutters.

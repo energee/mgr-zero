@@ -3,6 +3,7 @@
 // query, an area and a surface. Kept out of the component so it is testable
 // without a DOM. Venue frames are never listed: they belong to /docs/integrations.
 import { area, SCREENS, type Screen } from "@/components/mgr/screens";
+import type { StaffRole } from "@/lib/commands/registry";
 
 export type Surface = NonNullable<Screen["surface"]>;
 export type Filter = { q?: string; area?: string; surface?: Surface };
@@ -27,6 +28,13 @@ export function filterScreens({ q = "", area: a, surface }: Filter): Indexed[] {
 }
 
 export const screenByName = (name: string) => MGR.find(([, s]) => s.name === name);
+
+/** The staff roles the explorer can draw the shell as. */
+export const PERSONAS: StaffRole[] = ["admin", "sales", "warehouse", "brewer"];
+
+/** The role's landing: its own Today where one is drawn (lib/mgr/nav.ts
+ * filters the rail; the drawing itself is the role-filtered Today). */
+export const homeFor = (role: StaffRole) => ({ sales: "Sales", brewer: "Brewer" } as Partial<Record<StaffRole, string>>)[role] ?? "Today";
 
 const isPage = (i: number) => SCREENS[i].surface === undefined;
 

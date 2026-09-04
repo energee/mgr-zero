@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/mgr/icon";
 import { Search01Icon } from "@hugeicons/core-free-icons";
 import { navFor, STAFF_NAV } from "@/lib/mgr/nav";
+import type { StaffRole } from "@/lib/commands/registry";
 
 /** A sheet record as the command form it ships in. Pinned open unless `onClose`
  * is given (the explorer passes it, and `container` to keep the portal in its box). */
@@ -28,7 +29,9 @@ export function ScreenSheet({ screen: s, container, onClose }: { screen: Screen;
   );
 }
 
-export function ScreenFrame({ screen: s }: { screen: Screen }) {
+/** `role` is the persona the shell is drawn for (the explorer's switch):
+ * it filters the rail and names the role in the Me sheet. */
+export function ScreenFrame({ screen: s, role = "admin" }: { screen: Screen; role?: StaffRole }) {
   // A venue frame is not an MGR screen: it brings its own product's chrome and
   // never the app shell (components/mgr/venue.tsx).
   if (s.venue) {
@@ -51,7 +54,7 @@ export function ScreenFrame({ screen: s }: { screen: Screen }) {
   const body = s.surface === "sheet" ? <ScreenSheet screen={s} /> : s.body;
   // The staff user is the fixture face (Maria); the portal user is the customer's
   // buyer, a different person, so that header keeps the icon.
-  const me = <MeSheet avatar={{ src: MARIA, name: "Maria Alvarez" }} fields={[["Brewery", "Demo Brewing"], ["Role", "admin"]]} />;
+  const me = <MeSheet avatar={{ src: MARIA, name: "Maria Alvarez" }} fields={[["Brewery", "Demo Brewing"], ["Role", role]]} />;
   return s.portal ? (
     <PortalShell brand="Demo Brewing wholesale" headerRight={<MeSheet fields={[["Account", "Ridgeline Tap Room"]]} />} composer={E.comp(true)} active={s.portal}>
       {body}
@@ -59,7 +62,7 @@ export function ScreenFrame({ screen: s }: { screen: Screen }) {
   ) : (
     <AppShell
       brand="Demo Brewing"
-      items={navFor(STAFF_NAV, "admin")}
+      items={navFor(STAFF_NAV, role)}
       headerRight={<><Button variant="ghost" size="sm"><Icon icon={Search01Icon} />Search</Button>{me}</>}
       composer={E.comp()}
       active={s.tab}

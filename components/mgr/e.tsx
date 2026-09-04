@@ -194,6 +194,16 @@ export const E = {
   /** An editable field. type is the native input type; "date" pops the calendar (DatePicker). */
   edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[]) => {
     if (type === "date") return <DatePicker label={label} defaultValue={value} />;
+    // A whole number (a contract quantity, an overdue threshold) is counted,
+    // not typed: the same −/+ stepper Weekly count uses.
+    if (type === "number") {
+      return (
+        <Field orientation="horizontal">
+          <FieldLabel>{label}</FieldLabel>
+          {E.stq(Number(value), label)}
+        </Field>
+      );
+    }
     const listId = suggestions?.length ? `${label.replace(/\s+/g, "-").toLowerCase()}-list` : undefined;
     return (
       <Field orientation="horizontal">
