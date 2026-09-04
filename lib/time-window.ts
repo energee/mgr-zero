@@ -1,7 +1,8 @@
-// lib/time-window.ts — the one place that turns a stored `hh:mm` time of day
-// into the string a brewer reads, and that measures a window which may wrap
-// midnight. Storage stays 24-hour `hh:mm`, matching set_brewery_quiet_hours
-// (lib/commands/chat.ts) and the personal quiet-hours override beside it.
+// lib/time-window.ts — turns a stored `hh:mm` time of day into the string a
+// brewer reads, and measures a window which may wrap midnight. Storage stays
+// 24-hour `hh:mm`, matching set_brewery_quiet_hours (lib/commands/chat.ts) and
+// the personal quiet-hours override beside it. The Slack previews in
+// lib/chat/preview-fixtures.ts still spell their own window out by hand.
 export const MINUTES_PER_DAY = 1440;
 const NOON = MINUTES_PER_DAY / 2;
 
@@ -17,20 +18,20 @@ export function parseClock(value: string) {
   return h * 60 + m;
 }
 
-/** Minutes since midnight as a 12-hour clock reading: 1260 → "9:00 PM". */
+/** Minutes since midnight as a 12-hour clock reading: 1260 → "9:00 PM".
+ *  Date rolls minutes over on its own, so an out-of-range figure still reads as a clock. */
 export function formatClock(minutes: number) {
-  return clock.format(new Date(2000, 0, 1, 0, ((minutes % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY));
+  return clock.format(new Date(2000, 0, 1, 0, minutes));
 }
 
-/** Distance along a track that starts at noon. A night window crosses midnight,
- *  so on a midnight-anchored track it runs backwards; from noon it is one span. */
+/** Position on a track anchored at noon, and back again. A slider track is
+ *  monotonic, so a window that crosses midnight only draws as one span from noon. */
 export const toNoonOffset = (minutes: number) => (minutes - NOON + MINUTES_PER_DAY) % MINUTES_PER_DAY;
-/** The inverse. A full turn (1440) lands back on noon rather than falling off the end. */
 export const fromNoonOffset = (offset: number) => (offset + NOON) % MINUTES_PER_DAY;
 
 /** How long the window lasts, counting forward from start. Start == end is a
- *  whole day: quiet hours covering nothing would be "off", which is its own control. */
-export function windowMinutes(start: number, end: number) {
+ *  whole day: a window covering nothing would be "off", which is its own control. */
+function windowMinutes(start: number, end: number) {
   const span = (end - start + MINUTES_PER_DAY) % MINUTES_PER_DAY;
   return span === 0 ? MINUTES_PER_DAY : span;
 }
