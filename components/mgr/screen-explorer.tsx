@@ -158,18 +158,7 @@ export function ScreenExplorer() {
               <div>
                 <div className="font-mono text-xs text-fd-muted-foreground">{area(s)} · {s.surface ?? "page"} · slice {s.slice} · step {s.step}</div>
                 <h2 className="text-xl font-semibold">{s.name}</h2>
-                <p className="text-sm text-fd-muted-foreground">{s.job}</p>
               </div>
-              <dl className="grid gap-1 font-mono text-xs">
-                <div><dt className="inline font-semibold">reads </dt><dd className="inline">{s.reads}</dd></div>
-                <div><dt className="inline font-semibold">writes </dt><dd className="inline">{s.writes}</dd></div>
-              </dl>
-              {s.states && (
-                <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                  {s.states.map(([state, note], n) => <li key={n}><b className="font-medium">{state}</b>: {note}</li>)}
-                </ul>
-              )}
-              {s.spec && <p className="text-sm">{s.spec}</p>}
               {/* The transform makes this box the containing block for the shell's
                   fixed-position rail, so it draws here and not over the docs
                   sidebar. ponytail: the shell still reads the window for its
@@ -185,6 +174,17 @@ export function ScreenExplorer() {
                   <ScreenFrame screen={s} persona={persona} />
                 )}
               </div>
+              <p className="text-sm text-fd-muted-foreground">{s.job}</p>
+              <dl className="grid gap-1 font-mono text-xs">
+                <div><dt className="inline font-semibold">reads </dt><dd className="inline">{s.reads}</dd></div>
+                <div><dt className="inline font-semibold">writes </dt><dd className="inline">{s.writes}</dd></div>
+              </dl>
+              {s.states && (
+                <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                  {s.states.map(([state, note], n) => <li key={n}><b className="font-medium">{state}</b>: {note}</li>)}
+                </ul>
+              )}
+              {s.spec && <p className="text-sm">{s.spec}</p>}
             </article>
           );
         })()}
