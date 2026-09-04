@@ -4,7 +4,7 @@
 // main flows must chain end to end so the explorer is a walkable prototype.
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
-import { BACK, resolveTap, TAPS, ROUTES } from "../lib/mgr/screen-links";
+import { BACK, PORTAL, resolveTap, TAPS, ROUTES } from "../lib/mgr/screen-links";
 
 const by = (name: string) => SCREENS.find((s) => s.name === name)!;
 const names = new Set(SCREENS.map((s) => s.name));
@@ -36,7 +36,7 @@ describe("resolveTap", () => {
   it("only ever names screens the inventory has", () => {
     for (const s of SCREENS) for (const t of Object.values(s.to ?? {})) expect(names, `${s.name}.to → ${t}`).toContain(t);
     for (const [, t] of TAPS) if (t !== BACK) expect(names, `TAPS → ${t}`).toContain(t);
-    for (const t of Object.values(ROUTES)) expect(names, `ROUTES → ${t}`).toContain(t);
+    for (const t of [...Object.values(ROUTES), ...Object.values(PORTAL)]) expect(names, `ROUTES/PORTAL → ${t}`).toContain(t);
   });
 
   it("walks the main flows end to end", () => {
@@ -50,6 +50,12 @@ describe("resolveTap", () => {
     expect(walk("Orders", "Confirm", "Confirm order")).toBe("Order");
     expect(walk("Orders", "New order", "Save draft")).toBe("Order");
     expect(walk("Customers", "Ridgeline Tap Room", "Invite")).toBe("Invite portal user");
+    // The portal is its own world: its entry screens never land on staff pages.
+    expect(walk("Portal sign in", "Sign in")).toBe("Shop");
+    expect(walk("Portal Me", "Sign out")).toBe("Portal sign in");
+    expect(walk("Shop", "Me", "Sign out")).toBe("Portal sign in");
+    expect(walk("Today", "Me")).toBe("Me");
+    expect(walk("Order history", "ORD-0225")).toBe("Order detail");
     expect(walk("Shop", "Review order · $828.00", "Place order · $948.00")).toBe("Order detail");
     expect(resolveTap(by("Sign in"), "Forgot password?", null, "Reset password")).toBe("Reset password");
     expect(walk("Finished goods", "Hazy IPA · ½ bbl keg", "Record movement")).toBe("Record movement");
