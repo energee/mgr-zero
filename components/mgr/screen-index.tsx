@@ -1,12 +1,12 @@
 // components/mgr/screen-index.tsx — the screen inventory as documentation.
 // Renders components/mgr/screens.tsx (the source of truth) as prose, so the
 // published page cannot drift from the gallery and nothing here is maintained
-// by hand. The frames themselves stay at /design, which is dev-only; this page
-// carries what a reader needs without a running server: the drawing itself,
+// by hand. This page carries what a reader needs without a running server:
+// the drawing itself,
 // what each screen is for, what it reads and writes, and which states it must
 // handle. Bodies render inline rather than in the gallery's iframes — the
-// frames are embedded from app/(frames)/screens/frame, which ships (unlike the
-// dev-only /design), so each renders in the real shell at a real viewport width:
+// frames are embedded from app/(frames)/screens/frame, so each renders in the
+// real shell at a real viewport width:
 // the desktop rail and the phone tab bar switch on viewport breakpoints, and an
 // inline render in a narrow box would show the desktop layout at every size.
 import type { TOCItemType } from "fumadocs-core/toc";

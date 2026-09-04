@@ -1,8 +1,7 @@
 // components/mgr/user-avatar.tsx — a person's photo, for the design inventory
 // only. There is no avatar column in the schema (see
 // .agents/superpowers/specs/2026-08-31-mgr-schema-design.md), so the real app
-// header keeps the UserCircle icon; the /design gallery and the published
-// inventory pass this in so a screen shows a face where a face will go.
+// header keeps the UserCircle icon; the published inventory passes this in so a screen shows a face where a face will go.
 // public/mock/*.jpg are fixtures named for the person, not product assets:
 // a new face is a file plus a `src`, never another component.
 //

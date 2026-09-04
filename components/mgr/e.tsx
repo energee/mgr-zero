@@ -147,7 +147,7 @@ export const E = {
    *  addon) or to scroll a bar too long for the phone ("overflow-x-auto"). */
   tabs: (names: string[], on = 0, cls = "w-full") => (
     // Uncontrolled, like chips: a controlled value with no onValueChange makes
-    // every trigger inert, and these bars are meant to be clickable in /design.
+    // every trigger inert, and these bars are meant to be clickable in the inventory.
     <Tabs defaultValue={names[on]}>
       <TabsList variant="solid" className={cls}>{names.map((n) => <TabsTrigger key={n} value={n}>{n}</TabsTrigger>)}</TabsList>
     </Tabs>

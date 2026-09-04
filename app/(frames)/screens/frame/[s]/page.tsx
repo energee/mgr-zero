@@ -1,6 +1,6 @@
 // app/(frames)/screens/frame/[s]/page.tsx — one screen record, by inventory
-// index, rendered full-viewport outside any shell so the /design gallery and
-// the published inventory (content/docs/screens.mdx) can embed it in an iframe
+// index, rendered full-viewport outside any shell so the published inventory
+// (content/docs/screens.mdx, content/docs/integrations.mdx) can embed it in an iframe
 // at a real viewport width: the shell's phone/desktop split comes from viewport
 // breakpoints, so a frame rendered inline in a 390px box would still lay out as
 // desktop. Static: every index is built once; anything else 404s.

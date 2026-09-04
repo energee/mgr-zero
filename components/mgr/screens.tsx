@@ -1,5 +1,5 @@
 // components/mgr/screens.tsx — the screen inventory and the source of truth
-// for what each MGR screen shows (plan §4, §7); /design renders it. Every
+// for what each MGR screen shows (plan §4, §7); /docs/screens renders it. Every
 // record is typed; `states` is annotation the gallery captions under the
 // frame, never markup inside it. Bodies use only the E vocabulary. Edit the
 // records here directly — the HTML wireframe is retired for MGR-venue frames

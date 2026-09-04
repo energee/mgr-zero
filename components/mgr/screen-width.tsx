@@ -1,6 +1,6 @@
 // components/mgr/screen-width.tsx — the published inventory's viewport control
-// and the frame embed it drives. Frames are iframes for the same reason the
-// /design gallery uses them: the shell's phone/desktop split comes from viewport
+// and the frame embed it drives. Frames are iframes because the shell's
+// phone/desktop split comes from viewport
 // breakpoints, so a frame rendered inline in a narrow box would still lay out as
 // desktop. Changing the width changes the iframe attribute without reloading.
 // Sticky, so the control stays reachable a hundred frames down. The theme button is the app's own toggle —
