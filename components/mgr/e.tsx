@@ -10,6 +10,7 @@ import { Alert02Icon, ArrowLeft01Icon, InformationCircleIcon, SquareLock01Icon }
 import { DatePicker } from "@/components/mgr/date-picker";
 import { DirectionIcon, Icon, type IconSvgElement } from "@/components/mgr/icon";
 import { TimeWindowField } from "@/components/mgr/time-window-field";
+import { VolumeField } from "@/components/mgr/volume-field";
 import { MARIA, UserAvatar } from "@/components/mgr/user-avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -159,13 +160,7 @@ export const E = {
     </ToggleGroup>
   ),
   /** An atomic format's volume: a qty whose unit addon is the per-instance unit choice. */
-  volume: (value: string, units: VolumeUnit[], on = 0) => (
-    <Field>
-      {/* htmlFor, so the visible label focuses the input and names it once. */}
-      <FieldLabel htmlFor="format-volume">Volume</FieldLabel>
-      {E.qty(value, E.tabs(units, on, "w-fit"), "Volume", "format-volume")}
-    </Field>
-  ),
+  volume: (value: string, units: VolumeUnit[], on = 0) => <VolumeField value={value} units={units} on={on} />,
   /** Commit; CommandForm lifts this out of the scroll region so the verb stays on the phone. */
   pin: (t: React.ReactNode) => (
     <div data-pin className="flex flex-col gap-2">
