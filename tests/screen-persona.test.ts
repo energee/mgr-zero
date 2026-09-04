@@ -9,7 +9,8 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
 import { SCREENS } from "../components/mgr/screens";
 import { ScreenFrame } from "../components/mgr/screen-frame";
-import { deniedFor, homeFor, needsFor, PERSONAS, personaFor } from "../lib/mgr/demo-personas";
+import { deniedFor, homeFor, LANDINGS, needsFor, PERSONAS, personaFor, roleGaps } from "../lib/mgr/demo-personas";
+import { writeFileSync } from "node:fs";
 import { asPersona } from "../components/mgr/demo-screens";
 import { initialsOf } from "../components/mgr/user-avatar";
 
@@ -50,10 +51,29 @@ describe("persona", () => {
     expect(deniedFor("sales", "Pick sheet")).toBe(true);
     expect(deniedFor("brewer", "Cellar map")).toBe(false);
     expect(deniedFor("admin", "Customers")).toBe(false);
-    // A screen with no route of its own (a sheet, a detail) is never refused here.
+    // A screen with no route and no permission state is never refused here.
     expect(deniedFor("brewer", "Record movement")).toBe(false);
     expect(needsFor("Pick sheet")).toEqual(["admin", "warehouse"]);
     expect(needsFor("Customers")).toEqual(["admin", "sales"]);
+  });
+
+  it("refuses commands whose record says who may run them (the permission state)", () => {
+    expect(needsFor("Confirm order")).toEqual(["admin", "sales"]);
+    expect(deniedFor("brewer", "Confirm order")).toBe(true);
+    expect(deniedFor("sales", "Ship and invoice")).toBe(true);
+    expect(deniedFor("warehouse", "Order")).toBe(false); // "warehouse reads"
+    expect(deniedFor("brewer", "Order")).toBe(true);
+    expect(deniedFor("sales", "Team")).toBe(true);
+    expect(deniedFor("admin", "Team")).toBe(false);
+  });
+
+  it("names the landings the persona switch swaps, and reports the role-dependent screens it cannot", () => {
+    expect(LANDINGS).toEqual(["Today", "Sales", "Brewer", "Driver", "Taproom"]);
+    const gaps = roleGaps();
+    // These say their rows vary by role but have one drawing: not wirable, only drawable.
+    for (const name of ["Work", "More"]) expect(gaps.map((g) => g.name)).toContain(name);
+    for (const g of gaps) expect(g.why).toBeTruthy();
+    if (process.env.ROLE_REPORT) writeFileSync(process.env.ROLE_REPORT, gaps.map((g) => `- ${g.name}: ${g.why}`).join("\n"));
   });
 
   it("redraws Me and Permission denied for the person, leaving every other screen alone", () => {

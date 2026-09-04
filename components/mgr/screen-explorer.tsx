@@ -14,7 +14,7 @@
 import { useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { area } from "@/components/mgr/screens";
 import { AREAS, filterScreens, pageUnder, screenByName, type Surface } from "@/lib/mgr/screen-explorer";
-import { deniedFor, homeFor, PERSONAS, personaFor } from "@/lib/mgr/demo-personas";
+import { deniedFor, homeFor, LANDINGS, PERSONAS, personaFor } from "@/lib/mgr/demo-personas";
 import { asPersona } from "@/components/mgr/demo-screens";
 import type { StaffRole } from "@/lib/commands/registry";
 import { BACK, resolveTap } from "@/lib/mgr/screen-links";
@@ -67,6 +67,15 @@ export function ScreenExplorer() {
     window.dispatchEvent(new HashChangeEvent("hashchange"));
   };
   const pick = (i: number) => go(i, true);
+  // A new persona lands on their own Today when a landing is on view.
+  const choose = (role: StaffRole) => {
+    const p = personaFor(role);
+    setPersona(p);
+    if (current && LANDINGS.includes(current[1].name)) {
+      const home = screenByName(homeFor(p.role));
+      if (home) go(home[0], true);
+    }
+  };
   const back = () => {
     trail.current.pop();
     const prev = trail.current.pop();
@@ -119,7 +128,7 @@ export function ScreenExplorer() {
           {SURFACES.map((s) => <ToggleGroupItem key={s} value={s} className="capitalize">{s}</ToggleGroupItem>)}
         </ToggleGroup>
         <span className="text-sm text-fd-muted-foreground">{hits.length} screens</span>
-        <Select value={persona.role} onValueChange={(v) => setPersona(personaFor(v as StaffRole))}>
+        <Select value={persona.role} onValueChange={(v) => choose(v as StaffRole)}>
           <SelectTrigger className="w-48" aria-label="Persona"><SelectValue /></SelectTrigger>
           <SelectContent>
             {PERSONAS.map((p) => <SelectItem key={p.role} value={p.role}>{p.name} · {p.role}</SelectItem>)}
