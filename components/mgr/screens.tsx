@@ -72,6 +72,7 @@ const INV = {
   edited: "INV-1041",
   voided: "INV-1040",
   unsent: "INV-1038",
+  deleted: "INV-1036",
   memo: "CM-0012",
   customer: "Ridgeline Tap Room",
   invoiceDate: "9/03/2026",
@@ -1154,7 +1155,7 @@ export const SCREENS: Screen[] = [
       {E.pick("Return to", "Warehouse · original fulfillment source", ["Warehouse · original fulfillment source", "Taproom"])}
       {E.row("Deposit refund", "½ bbl pool · 1 · as deposited", "−$30.00")}
       {E.info(`Credited at the price on ${INV.no}, not today’s price list.`)}
-      {E.tape([["+1 Hazy ½ bbl · return in", "Warehouse"], ["credit memo number · on commit", "−$180.00"]])}
+      {E.tape([["+1 Hazy ½ bbl · return in", "Warehouse"], ["−1 Hazy ½ bbl · loss · damaged", "not sellable"], ["credit memo number · on commit", "−$180.00"]])}
       {E.note("Empty-keg asset returns are a different Keg fleet command.")}
       {E.sp()}
       {E.btn("Return shipment", "irr")}
@@ -1363,7 +1364,8 @@ export const SCREENS: Screen[] = [
       {E.row(`${INV.no} · Ridgeline`, `due ${INV.dueShort} · ${INV.total} · pushed`, E.act("Open"))}
       {E.row(`${INV.edited} · Al’s Bar`, <>edited in QuickBooks · $980 {E.arrow()} $1,040</>, E.act("Open in QuickBooks"), "w")}
       {E.row(`${INV.voided} · Teresa’s`, "voided in QuickBooks · not paid", E.act("Write off"), "w")}
-      {E.row(`${INV.failed} · Al’s Bar`, "push failed · item unmapped · $540", <>{E.act("Review")}{E.act("Write off")}</>, "w")}
+      {E.row(`${INV.failed} · Al’s Bar`, "push failed · item unmapped · $540", E.act("Review"), "w")}
+      {E.row(`${INV.deleted} · Teresa’s`, "deleted in QuickBooks", <>{E.act("Re-push")}{E.act("Write off")}</>, "w")}
       {E.row(`${INV.unsent} · Al’s Bar`, "pushed · not emailed yet", E.act("Open in QuickBooks"))}
       {E.row(`${INV.paid} · Ridgeline`, "paid 8/29 from QuickBooks Online", "$980", "ok")}
       {E.row(`${INV.memo} · Teresa’s`, "credit memo · pushed · −$180", E.act("Open"))}
