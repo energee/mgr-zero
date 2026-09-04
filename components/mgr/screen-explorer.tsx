@@ -13,7 +13,9 @@
 
 import { useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { area } from "@/components/mgr/screens";
-import { AREAS, filterScreens, homeFor, pageUnder, PERSONAS, screenByName, type Surface } from "@/lib/mgr/screen-explorer";
+import { AREAS, filterScreens, pageUnder, screenByName, type Surface } from "@/lib/mgr/screen-explorer";
+import { deniedFor, homeFor, PERSONAS, personaFor } from "@/lib/mgr/demo-personas";
+import { asPersona } from "@/components/mgr/demo-screens";
 import type { StaffRole } from "@/lib/commands/registry";
 import { BACK, resolveTap } from "@/lib/mgr/screen-links";
 import { ScreenFrame, ScreenSheet } from "@/components/mgr/screen-frame";
@@ -37,9 +39,12 @@ export function ScreenExplorer() {
   const [q, setQ] = useState("");
   const [areaPick, setArea] = useState(ALL);
   const [surface, setSurface] = useState(ALL);
-  // The persona the shell is drawn as. Chosen outside the app, like a test
-  // account: it filters the rail and swaps Today for the role's own landing.
-  const [role, setRole] = useState<StaffRole>("admin");
+  // The demo user the shell is drawn as (lib/mgr/demo-personas.ts). Chosen
+  // outside the app, like signing in as a test account: their face and role's
+  // rail, their own Today, and a refusal where their role may not go.
+  const [persona, setPersona] = useState(PERSONAS[0]);
+  // The screen the persona was last refused, for Permission denied's copy.
+  const [refused, setRefused] = useState<string>();
   const hits = useMemo(
     () => filterScreens({ q, area: areaPick === ALL ? undefined : areaPick, surface: surface === ALL ? undefined : (surface as Surface) }),
     [q, areaPick, surface],
@@ -84,7 +89,10 @@ export function ScreenExplorer() {
     if (!name) return;
     e.stopPropagation();
     if (name === BACK) return back();
-    const hit = screenByName(name === "Today" ? homeFor(role) : name);
+    const home = name === "Today" ? homeFor(persona.role) : name;
+    const denied = deniedFor(persona.role, home);
+    if (denied) setRefused(home);
+    const hit = screenByName(denied ? "Permission denied" : home);
     if (hit) pick(hit[0]);
   };
   const onKey = (e: React.KeyboardEvent) => {
@@ -111,10 +119,10 @@ export function ScreenExplorer() {
           {SURFACES.map((s) => <ToggleGroupItem key={s} value={s} className="capitalize">{s}</ToggleGroupItem>)}
         </ToggleGroup>
         <span className="text-sm text-fd-muted-foreground">{hits.length} screens</span>
-        <Select value={role} onValueChange={(v) => setRole(v as StaffRole)}>
-          <SelectTrigger className="w-36 capitalize" aria-label="Persona"><SelectValue /></SelectTrigger>
+        <Select value={persona.role} onValueChange={(v) => setPersona(personaFor(v as StaffRole))}>
+          <SelectTrigger className="w-48" aria-label="Persona"><SelectValue /></SelectTrigger>
           <SelectContent>
-            {PERSONAS.map((r) => <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>)}
+            {PERSONAS.map((p) => <SelectItem key={p.role} value={p.role}>{p.name} · {p.role}</SelectItem>)}
           </SelectContent>
         </Select>
         <span className="ml-auto w-40"><ThemeToggle /></span>
@@ -135,7 +143,7 @@ export function ScreenExplorer() {
           {hits.length === 0 && <li className="p-3 text-fd-muted-foreground">No screen matches.</li>}
         </ul>
         {current && (() => {
-          const [, s] = current;
+          const s = asPersona(current[1], persona, refused);
           return (
             <article className="flex min-w-0 flex-col gap-3">
               <div>
@@ -161,11 +169,11 @@ export function ScreenExplorer() {
               <div ref={setBox} onClickCapture={onTap} className="relative h-[80svh] overflow-auto rounded-lg border [transform:translateZ(0)]">
                 {s.surface === "sheet" ? (
                   <>
-                    <ScreenFrame screen={SCREENS[under ?? pageUnder([], current[0])]} role={role} />
+                    <ScreenFrame screen={SCREENS[under ?? pageUnder([], current[0])]} persona={persona} />
                     {box && <ScreenSheet screen={s} container={box} onClose={back} />}
                   </>
                 ) : (
-                  <ScreenFrame screen={s} role={role} />
+                  <ScreenFrame screen={s} persona={persona} />
                 )}
               </div>
             </article>
