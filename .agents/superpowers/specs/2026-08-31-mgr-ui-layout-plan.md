@@ -5,7 +5,7 @@ Status: Draft for Ted; rev 4 incorporates the fresh-eyes product, architecture, 
 navigation, state, build-order, wet-phone, and Slack-first chat-preview review. Build status lives in `.agents/PROGRESS.md`;
 the shell, tokens, `E` composites, screen records and `/design` gallery from §5–§7 step 1 are
 built on the `ui-components` branch (`components/mgr/`, `lib/mgr/`, `app/(design)/`).
-Wireframes: `2026-08-31-mgr-wireframes.html` — the frame inventory (product destinations plus
+Frames: `components/mgr/screens.tsx`, published at `/docs/screens` — the frame inventory (product destinations plus
 separately identified sheets, overlays, flow states, and provider previews) tagged with
 tab/group, slice, build step, registered reads, and registered writes; the phone/desk
 toggle re-renders every frame from the same body (desk = rail/top-nav shell, dialog

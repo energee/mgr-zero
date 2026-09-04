@@ -1308,7 +1308,7 @@ defineQuery({
 
 **Files:**
 - Modify: `.agents/ARCHITECTURE.md` (ownership: orders/customers/portal command files, portal route group, `order_events`), `.agents/PROGRESS.md` (1B done, 1C next), `README.md` (portal login note, `test:e2e` script), `.agents/MEMORY.md` (only if a durable decision changed during implementation)
-- Verify: wireframes (`.agents/superpowers/specs/2026-08-31-mgr-wireframes.html`) still match what was built; if any screen deviated during Tasks 7–10, update the `SCREENS` array in the same commit (standing rule: wireframes move with the plan).
+- Verify: the screen inventory (`components/mgr/screens.tsx`) still matches what was built; if any screen deviated during Tasks 7–10, update the `SCREENS` array in the same commit (standing rule: the frames move with the plan).
 
 - [ ] **Step 1: Update the docs; `git diff` review; commit** — `git commit -am "docs: slice 1B shipped — architecture map, progress, portal notes"`
 - [ ] **Step 2: Full gate: `npx vitest run && npx tsc --noEmit && npm run lint && npm run build`.**

@@ -75,7 +75,7 @@ for the pre-baseline shape; the baseline preserved their semantics so the slice-
 ## Revision 2 decisions (2026-09-02) — why, for the tables in §16 of the design doc
 
 These came out of drawing the QuickBooks and Square surfaces accurately
-(`2026-08-31-mgr-wireframes.html`). Drawing someone else's product honestly is
+(`components/mgr/venue.tsx`, published at `/docs/integrations`). Drawing someone else's product honestly is
 what exposed what was wrong in ours — each decision below traces to a specific
 live screenshot, not to a preference.
 

@@ -57,7 +57,7 @@ The slice-4 cellar and slice-10 delivery plans own those MGR pages/commands. Thi
 - `.agents/superpowers/specs/2026-08-31-mgr-schema-design.md` — exact new tables/functions.
 - `.agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md` — provider portability, state isolation, dedupe, cadence, and projection-only rationale.
 - `.agents/superpowers/specs/2026-08-31-mgr-ui-layout-plan.md` — Settings preview gallery and Slack surface ownership.
-- `.agents/superpowers/specs/2026-08-31-mgr-wireframes.html` — 73-frame catalog with 10 Chat frames.
+- `components/mgr/screens.tsx` — the screen inventory, including the Chat frames.
 - `.agents/ARCHITECTURE.md` — chat owners, narrow internal-job exception, and provider contract.
 - `public/docs/user-guide.html` — customer-facing setup, linking, delivery, quiet hours, privacy, and recovery.
 - `README.md` — local Slack app, environment, callback, job, and sandbox setup.
@@ -585,7 +585,7 @@ git commit -m "feat: define portable chat presentation contracts"
 - Test: `tests/chat-preview.test.ts`
 - Create: `lib/chat/preview-web.tsx`
 - Create: `app/(app)/settings/chat/chat-settings-client.tsx`
-- Reference: `.agents/superpowers/specs/2026-08-31-mgr-wireframes.html`
+- Reference: `components/mgr/screens.tsx`
 
 **Interfaces:**
 - Consumes: `CHAT_PREVIEW_FIXTURES`, `ChatPreviewId`, `PortableNotification`.

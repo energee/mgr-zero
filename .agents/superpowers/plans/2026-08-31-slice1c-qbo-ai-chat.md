@@ -278,7 +278,7 @@ Flow (UI plan §2 verbatim requirements): text → `compose_command`; if candida
 ### Task 11: Docs + final validation
 
 **Files:**
-- Modify: `.agents/ARCHITECTURE.md` (ownership rows for `lib/qbo.ts`, `lib/commands/{qbo,preview,compose}.ts`, `app/api/qbo/callback`; note the compose→preview→commit contract is now implemented and that `lib/supabase/integration-tokens.ts` stays the only token boundary), `README.md` (env table + § HTTP API rows for every new command — run `/http-api`), the applicable `public/docs/{staff,portal}-guide.html` files, `.agents/PROGRESS.md`; `2026-08-31-mgr-wireframes.html` only if the built Integrations/composer screens diverged from their frames (wireframes stay in step with the plan).
+- Modify: `.agents/ARCHITECTURE.md` (ownership rows for `lib/qbo.ts`, `lib/commands/{qbo,preview,compose}.ts`, `app/api/qbo/callback`; note the compose→preview→commit contract is now implemented and that `lib/supabase/integration-tokens.ts` stays the only token boundary), `README.md` (env table + § HTTP API rows for every new command — run `/http-api`), the applicable `public/docs/{staff,portal}-guide.html` files, `.agents/PROGRESS.md`; `components/mgr/screens.tsx` only if the built Integrations/composer screens diverged from their frames (the frames stay in step with the plan).
 
 - [ ] **Step 1:** Full gate: `npx vitest run && npx tsc --noEmit && npm run lint`; `git diff` review (NUL-byte check); one from-scratch `npx supabase db reset` to prove the baseline replays.
 - [ ] **Step 2:** Update the docs above; verify every new file carries its module-level comment.

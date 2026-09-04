@@ -25,7 +25,7 @@ below just in time — don't preload everything.
 | Brewing/TTB domain rules (units, loss, removals) | `.agents/superpowers/specs/brewing-domain.md` |
 | Why v1 (`~/Repos/mgr`) was left behind | `.agents/superpowers/specs/2026-08-31-mgr-v1-review.md` |
 | Product intent, what a slice is | `.agents/superpowers/specs/2026-08-30-mgr-slice1-core-orders-design.md` |
-| UI layout, navigation, input model (chat + forms) | `.agents/superpowers/specs/2026-08-31-mgr-ui-layout-plan.md`; screens: `components/mgr/screens.tsx` is the source of truth, viewed at `/docs/screens` (`bun run dev`); the old `/design` gallery is gone and the HTML wireframe is retired (kept only because `tests/mgr-icon.test.ts` guards the mark path hand-copied into it) — the Slack/QuickBooks/Square venue frames are ported too (`components/mgr/venue.tsx`); the inventory publishes at `/docs/screens`, the venue frames at `/docs/integrations` |
+| UI layout, navigation, input model (chat + forms) | `.agents/superpowers/specs/2026-08-31-mgr-ui-layout-plan.md`; screens: `components/mgr/screens.tsx` is the source of truth, viewed at `/docs/screens` (`bun run dev`); the old `/design` gallery and the HTML wireframe are both deleted — the Slack/QuickBooks/Square venue frames are ported too (`components/mgr/venue.tsx`); the inventory publishes at `/docs/screens`, the venue frames at `/docs/integrations` |
 | Chat notifications (Slack today, provider-neutral design) | `.agents/superpowers/specs/2026-09-01-mgr-chat-notifications-design.md`; plan: `.agents/superpowers/plans/2026-09-01-chat-notifications.md` |
 | What's done / next | `.agents/PROGRESS.md` |
 | Past decisions and lessons | `.agents/MEMORY.md` |

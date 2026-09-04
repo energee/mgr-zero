@@ -1,5 +1,5 @@
 // tests/mgr-icon.test.ts — the v1 MGR mark is the single source for favicon,
-// in-app chrome, the wireframes document, and the GitHub App avatar raster.
+// in-app chrome, and the GitHub App avatar raster.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createElement } from "react";
@@ -29,20 +29,6 @@ describe("MGR mark", () => {
       svgPath: MGR_ICON_PATH,
     });
     expect(svg).toContain('aria-label="MGR"');
-  });
-
-  it("keeps the wireframes document on the same path", () => {
-    // The wireframes are a standalone HTML document and cannot import, so the
-    // mark is hand-copied there. This is the only copy with no other guard.
-    const doc = readFileSync(
-      resolve(root, ".agents/superpowers/specs/2026-08-31-mgr-wireframes.html"),
-      "utf8",
-    );
-    const match = doc.match(/const MGR='<svg[^']*\sd="([^"]+)"/);
-    if (!match) {
-      throw new Error("the wireframes document is missing the MGR mark path");
-    }
-    expect(match[1]).toBe(MGR_ICON_PATH);
   });
 
   it("keeps a favicon.ico fallback for clients without SVG icon support", () => {

@@ -113,7 +113,7 @@ MGR Settings → Integrations → Chat includes a preview gallery before and aft
 
 Previews use a committed provider-neutral fixture catalog. They never query live brewery/customer data, send provider messages, or imply that a gated action is available. Provider render-contract tests consume the same fixtures; an accessible web renderer displays them inside Settings. Sharing fixture inputs prevents product copy and data-minimization rules from drifting while allowing Slack Block Kit and web markup to remain platform-correct.
 
-The canonical low-fidelity frames live in `.agents/superpowers/specs/2026-08-31-mgr-wireframes.html` under build step 8 and the **Chat** filter.
+The canonical frames live in `components/mgr/screens.tsx` (build step 8, the **Chat** area), published at `/docs/screens`.
 
 ## 5. Initial notification reasons
 
