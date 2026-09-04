@@ -6,6 +6,8 @@ description: "Every screen and action currently available to brewery staff in MG
 
 ## Sign in and sign out [#sign-in]
 
+<Screen name="Sign in" />
+
 *Staff accounts are created by invitation; there is no public sign-up or password-reset control.*
 
 1. Enter the email address and password associated with your invitation.
@@ -31,6 +33,8 @@ If an action reports a permission error, stop and ask an administrator. Repeated
 
 ## Navigate MGR [#navigation]
 
+<Screen name="Today" />
+
 The brewery name at the top of the header identifies the brewery whose records are displayed. Navigation has up to four sections — **Today, Beer, Work**, and **More** — shown as tabs along the bottom on a phone and as a left rail on wider screens; on a phone, the tab itself opens the group's primary page. Beer holds **Inventory**, plus **Taproom, Taps, Cellar, Materials**, and **Kegs**; Work holds **Orders, Pick, Replenishment, Batches, Packaging, POs**, and **Deliveries**; More holds **Invoices, Catalog, Customers, Price lists, Recipes, Compliance, Planning, Import**, and **Settings** (the team roster). Links your role cannot use are simply not shown.
 
 None of Taproom, Taps, Cellar, Materials, Kegs, Batches, Packaging, POs, Deliveries, Recipes, Compliance, or Planning has its own screen yet — each currently opens the same page as Inventory, Orders, Catalog, or Invoices. Import has no interface at all (see [Actions not yet available](#unavailable)).
@@ -53,11 +57,15 @@ The **Me** control in the header shows your brewery and role, switches between l
 
 ### Create a product
 
+<Screen name="Product" />
+
 1. Open **Catalog** and select **New Product**.
 2. Enter **Name** (required), **Style** (optional), and **ABV** (optional percentage; enter 6.5 for 6.5%).
 3. Select **Create**. Product names must be unique within the brewery. The product appears alphabetically and initially shows **No SKUs yet**.
 
 ### Create a SKU
+
+<Screen name="SKU" />
 
 1. Find the product and select **New SKU**.
 2. Enter **Name**; choose **Package type** (`keg`, `can`, or `bottle`; default `keg`).
@@ -72,6 +80,8 @@ If there are no products, Catalog shows **No products yet**.
 
 ## Inventory and movement history [#inventory]
 
+<Screen name="Finished goods" />
+
 *Admin, Sales, and Warehouse can view inventory. Admin and Warehouse can record movements.*
 
 <Cards>
@@ -81,6 +91,8 @@ If there are no products, Catalog shows **No products yet**.
 </Cards>
 
 ### Record a movement
+
+<Screen name="Record movement" />
 
 1. Open **Inventory** and select **Record Movement**.
 2. Choose a **SKU** and **Location**.
@@ -117,6 +129,8 @@ Empty sections show **No inventory recorded yet** or **No movements recorded yet
 
 ### Create or edit a customer
 
+<Screen name="Customer detail" />
+
 1. Open **Customers**. Select **New Customer**, or select **Edit** beside an existing customer.
 2. Enter **Name** (required).
 3. Choose **Type**: distributor, retailer (default), brewery, or other.
@@ -127,11 +141,15 @@ Empty sections show **No inventory recorded yet** or **No movements recorded yet
 
 ### Create or edit a ship-to
 
+<Screen name="Ship-to form" />
+
 Select the customer name, then **New Ship-To** or **Edit**. Enter required **Label, Address 1, City, State** (two letters, changed to uppercase), and **Zip**; **Address 2** is optional. Ship-to state determines the destination used when a wholesale shipment leaves inventory.
 
 Empty lists show **No customers yet** or **No ship-tos yet**. Customer deletion and portal-user invitations are not available.
 
 ## Price lists [#pricing]
+
+<Screen name="Price lists" />
 
 *Admin and Sales can create or rename lists and set a per-SKU price. A customer sees only the prices from its assigned list.*
 
@@ -144,6 +162,8 @@ A list without entries shows **No prices set yet**; an empty Pricing screen show
 
 ## Staff orders [#orders]
 
+<Screen name="Orders" />
+
 *Admin and Sales create and manage orders. Admin and Warehouse record picks and shipments. Admin, Sales, and Warehouse can view the order list and detail.*
 
 → `draft` → `submitted` → `confirmed` → `picked` → `shipped` →
@@ -151,6 +171,8 @@ A list without entries shows **No prices set yet**; an empty Pricing screen show
 An order may instead become `cancelled` any time before shipping. The Orders screen lists newest first and can filter by any status.
 
 ### Create an order
+
+<Screen name="New order" />
 
 1. Open **Orders** and select **New Order**.
 2. Choose **Kind**: **Wholesale** (default) or **Taproom transfer**.
@@ -166,6 +188,8 @@ A wholesale order fails if the customer has no price list or an ordered SKU has 
 
 ### Move an order through fulfillment
 
+<Screen name="Order" />
+
 | Action | When shown | What happens |
 | --- | --- | --- |
 | **Submit** | Draft | Status becomes submitted and the event timeline records it. |
@@ -179,6 +203,8 @@ The order detail shows customer and ship-to for wholesale orders, PO, requested 
 
 ## Pick sheet [#pick-sheet]
 
+<Screen name="Pick sheet" />
+
 *Admin and Warehouse can open Pick; Sales does not currently have a way to reach this page.*
 
 Open **Pick** to see confirmed and picked orders grouped by requested ship date; orders without a date appear under **Unscheduled**. Each card shows ordered and previously picked amounts and links to the order detail, where picking is recorded.
@@ -187,11 +213,15 @@ Select **Print** to open the browser print dialog. MGR hides the staff navigatio
 
 ## Invoices and credit memos [#invoices]
 
+<Screen name="Invoices" />
+
 *Admin and Sales can open the Invoices list. Admin and Sales can create a credit memo. Warehouse cannot open the Invoices list, but sees the invoice created by a wholesale shipment it records, from a link shown right after shipping.*
 
 The Invoices list shows number, kind, customer, total, and paid date. Open an invoice number to see issue date, line quantities, captured unit prices, amounts, and total. An empty list says **No invoices yet**. Payment is display-only; there is no record-payment action.
 
 ### Correct a shipped invoice
+
+<Screen name="Invoice" />
 
 1. Open an invoice and select **Credit memo**.
 2. Enter the positive quantity to credit for each applicable line. Leave unrelated lines at zero. A credit cannot exceed the remaining uncredited quantity.
@@ -201,6 +231,8 @@ The Invoices list shows number, kind, customer, total, and paid date. Open an in
 MGR creates a separate credit memo at the original prices, adds the credited quantity back to the selected location, and records the correction on the originating order’s timeline. Credit memos cannot themselves be credited.
 
 ## Taproom replenishment [#replenishment]
+
+<Screen name="Pars and allocation" />
 
 *Admin and Warehouse can open Replenishment; Sales does not currently have a way to reach this page. The Create replenishment order button is shown to Warehouse, but only Admin can complete it — Warehouse submitting it returns a permission error.*
 
@@ -214,9 +246,13 @@ The page says **No taprooms configured** when none exist, or **No pars set for t
 
 ## Team [#team]
 
+<Screen name="Team" />
+
 Admin can open **Team** to see current staff memberships; Sales and Warehouse do not currently have a way to reach this page. Each row shows a user ID and role; email addresses are not displayed. The page is read-only, so it has no invitation, role-change, or removal controls. An empty roster shows **No staff members yet**.
 
 ## Link your Slack account [#slack]
+
+<Screen name="Link your Slack" />
 
 When your brewery’s Slack connection is available, open its MGR App Home and choose **Link MGR account**. Sign in to MGR if asked. A valid link confirms that Slack is linked.
 

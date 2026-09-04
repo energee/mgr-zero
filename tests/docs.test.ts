@@ -54,6 +54,25 @@ describe("customer guides (MDX)", () => {
   });
 });
 
+// A guide section that describes a screen embeds it: <Screen name="…" /> draws
+// the inventory frame (components/mgr/screen-embed.tsx) under the prose.
+describe("guide screen embeds", () => {
+  it("names only screens the inventory has, and covers the main sections", async () => {
+    const { SCREENS } = await import("../components/mgr/screens");
+    const names = new Set(SCREENS.filter((s) => !s.venue).map((s) => s.name));
+    const embeds = (guide: string) => [...read(`content/docs/${guide}.mdx`).matchAll(/<Screen name="([^"]+)" \/>/g)].map((m) => m[1]);
+    for (const guide of ["staff-guide", "portal-guide"]) {
+      const found = embeds(guide);
+      expect(found.length, `${guide} has no embeds`).toBeGreaterThan(0);
+      expect(found.filter((n) => !names.has(n)), `${guide} names unknown screens`).toEqual([]);
+    }
+    expect(embeds("staff-guide")).toEqual(expect.arrayContaining(["Sign in", "Today", "Orders", "Pick sheet", "Invoices", "Team"]));
+    expect(embeds("portal-guide")).toEqual(expect.arrayContaining(["Portal sign in", "Shop", "Order history", "Account"]));
+    // The maintainer must know the component exists, or it will strip them.
+    expect(read(".agents/agents/documentation-maintainer.md")).toContain("<Screen name=");
+  });
+});
+
 describe("guide URLs", () => {
   it("redirects the pre-Fumadocs paths to the docs routes", async () => {
     const config = (await import("@/next.config")).default;

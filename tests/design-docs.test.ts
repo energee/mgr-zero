@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { describe, expect, it } from "vitest";
 import { ScreenIndex } from "../components/mgr/screen-index";
-import { SCREENS } from "../components/mgr/screens";
+import { area, SCREENS } from "../components/mgr/screens";
 
 describe("design docs", () => {
   it("publishes both pages in the Fumadocs tree", () => {
@@ -34,5 +34,32 @@ describe("design docs", () => {
     // fails the run on any other path; a generated page must not be editable.
     const wf = readFileSync(".github/workflows/documentation-agent.yml", "utf8");
     expect(wf).not.toContain("screens.mdx");
+  });
+});
+
+// The explorer (content/docs/screens-explore.mdx) is the same inventory as a
+// browse-and-filter page; the filter is a pure function so it is tested here.
+describe("screen explorer", () => {
+  it("publishes the explore page beside the inventory", () => {
+    const meta = JSON.parse(readFileSync("content/docs/meta.json", "utf8"));
+    expect(meta.pages.indexOf("screens-explore")).toBe(meta.pages.indexOf("screens") + 1);
+    expect(readFileSync("content/docs/screens-explore.mdx", "utf8")).toContain("<ScreenExplorer />");
+  });
+
+  it("filters MGR screens by text, area and surface, never venues", async () => {
+    const { filterScreens, screenByName } = await import("../lib/mgr/screen-explorer");
+    const all = filterScreens({});
+    expect(all.length).toBe(SCREENS.filter((s) => !s.venue).length);
+    expect(all.every(([, s]) => !s.venue)).toBe(true);
+    // Text matches the name, case-insensitive; the index is the frame route key.
+    const orders = filterScreens({ q: "orders" });
+    expect(orders.map(([, s]) => s.name)).toContain("Orders");
+    for (const [i, s] of orders) expect(SCREENS[i]).toBe(s);
+    expect(filterScreens({ area: "Work" }).every(([, s]) => area(s) === "Work")).toBe(true);
+    expect(filterScreens({ surface: "sheet" }).every(([, s]) => s.surface === "sheet")).toBe(true);
+    expect(filterScreens({ surface: "page" }).every(([, s]) => !s.surface)).toBe(true);
+    expect(filterScreens({ q: "no such screen" })).toEqual([]);
+    expect(screenByName("Orders")?.[1].name).toBe("Orders");
+    expect(screenByName("Nope")).toBeUndefined();
   });
 });

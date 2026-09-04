@@ -4,7 +4,7 @@
 // map, so a page and its card cannot disagree, and a typo fails typecheck at
 // the map rather than rendering nothing.
 import {
-  ArrowDataTransferHorizontalIcon, Factory01Icon, Layers01Icon, Store01Icon,
+  ArrowDataTransferHorizontalIcon, Factory01Icon, Layers01Icon, Search01Icon, Store01Icon,
 } from "@hugeicons/core-free-icons";
 import { createElement } from "react";
 import { Icon, type IconSvgElement } from "@/components/mgr/icon";
@@ -13,6 +13,7 @@ export const DOC_ICONS = {
   staff: Factory01Icon,
   portal: Store01Icon,
   screens: Layers01Icon,
+  explore: Search01Icon,
   integrations: ArrowDataTransferHorizontalIcon,
 } as const satisfies Record<string, IconSvgElement>;
 
