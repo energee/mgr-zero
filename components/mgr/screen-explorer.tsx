@@ -61,6 +61,9 @@ export function ScreenExplorer() {
   // The selection follows the filter: an unlisted selection moves to the first hit.
   const current = hits.find(([i]) => i === hashIndex) ?? hits[0];
   const go = (i: number, push: boolean) => {
+    // A deep-linked screen was never walked to; it is the ground of the first
+    // tap and where dismissing that tap's sheet goes back to.
+    if (!trail.current.length && current) trail.current.push(current[0]);
     setUnder(pageUnder(trail.current, i));
     trail.current.push(i);
     history[push ? "pushState" : "replaceState"](null, "", `#s${i}`);

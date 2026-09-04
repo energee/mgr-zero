@@ -67,12 +67,17 @@ describe("screen explorer", () => {
     const { pageUnder, screenByName } = await import("../lib/mgr/screen-explorer");
     const orders = screenByName("Orders")![0];
     const movement = screenByName("Record movement")![0];
+    const run = screenByName("Schedule packaging run")![0];
     const today = screenByName("Today")![0];
     expect(pageUnder([today, orders, movement], movement)).toBe(orders);
     // No trail: the first page in the sheet's own area.
-    expect(SCREENS[pageUnder([], movement)].surface).toBeUndefined();
-    expect(area(SCREENS[pageUnder([], movement)])).toBe(area(SCREENS[movement]));
+    expect(SCREENS[pageUnder([], run)].surface).toBeUndefined();
+    expect(area(SCREENS[pageUnder([], run)])).toBe(area(SCREENS[run]));
     // A page is its own ground.
     expect(pageUnder([today], orders)).toBe(orders);
+    // Global is anywhere: its sheets open over Today, never over the refusal
+    // page that happens to lead the area.
+    expect(pageUnder([], screenByName("Search")![0])).toBe(today);
+    expect(pageUnder([], movement)).toBe(today);
   });
 });

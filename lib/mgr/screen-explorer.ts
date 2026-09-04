@@ -31,10 +31,14 @@ export const screenByName = (name: string) => MGR.find(([, s]) => s.name === nam
 const isPage = (i: number) => SCREENS[i].surface === undefined;
 
 /** The page a sheet (or entry) at `index` draws over: the last page in the
- * visited `trail`, else the first page in its own area. A page is its own ground. */
+ * visited `trail`, else the first page in its own area. A page is its own
+ * ground. Global is anywhere, not a place: its sheets (Search, Me, Record
+ * movement) open over Today, never over the refusal or composer pages filed
+ * beside them. */
 export function pageUnder(trail: number[], index: number): number {
   if (isPage(index)) return index;
   for (let n = trail.length - 1; n >= 0; n--) if (isPage(trail[n])) return trail[n];
   const own = area(SCREENS[index]);
+  if (own === "Global") return MGR[0][0];
   return MGR.find(([i, s]) => isPage(i) && area(s) === own)?.[0] ?? MGR[0][0];
 }
