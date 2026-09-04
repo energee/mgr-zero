@@ -11,11 +11,13 @@ import { ROUTES } from "@/lib/mgr/screen-links";
 
 export type Persona = { role: StaffRole; name: string; handle: string; avatar?: string };
 
+// The people on the Team screen (components/mgr/screens.tsx), one per role,
+// with the faces in public/mock; tests/screen-persona.test.ts holds them to it.
 export const PERSONAS: Persona[] = [
   { role: "admin", name: "Maria Alvarez", handle: "@maria", avatar: MARIA },
-  { role: "sales", name: "Sam Ortiz", handle: "@sam" },
-  { role: "warehouse", name: "Wes Kim", handle: "@wes" },
-  { role: "brewer", name: "Dave Nguyen", handle: "@dave" },
+  { role: "sales", name: "Ted", handle: "@ted", avatar: "/mock/ted.jpg" },
+  { role: "warehouse", name: "Sam Ortiz", handle: "@sam", avatar: "/mock/sam.jpg" },
+  { role: "brewer", name: "Dave Chen", handle: "@dave", avatar: "/mock/dave.jpg" },
 ];
 
 export const personaFor = (role: StaffRole) => PERSONAS.find((p) => p.role === role) ?? PERSONAS[0];

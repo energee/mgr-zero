@@ -16,10 +16,14 @@ import { initialsOf } from "../components/mgr/user-avatar";
 const by = (name: string) => SCREENS.find((s) => s.name === name)!;
 
 describe("persona", () => {
-  it("is one demo user per staff role", () => {
+  it("is one demo user per staff role, each on the Team screen with that role", () => {
     expect(PERSONAS.map((p) => p.role)).toEqual(["admin", "sales", "warehouse", "brewer"]);
-    for (const p of PERSONAS) expect(p.name).toMatch(/\w+ \w+/);
-    expect(personaFor("brewer").handle).toBe("@dave");
+    const team = renderToStaticMarkup(createElement("div", null, by("Team").body));
+    for (const p of PERSONAS) {
+      expect(team, `${p.name} is not on Team`).toContain(p.name);
+      expect(team, `${p.name} has another role on Team`).toContain(`${p.handle} · ${p.role}`);
+      if (p.avatar) expect(team, `${p.name}'s face differs on Team`).toContain(p.avatar);
+    }
   });
 
   it("draws the shell as that person with their role's rail", () => {
@@ -55,12 +59,12 @@ describe("persona", () => {
   it("redraws Me and Permission denied for the person, leaving every other screen alone", () => {
     const html = (name: string, refused?: string) =>
       renderToStaticMarkup(createElement("div", null, asPersona(by(name), personaFor("sales"), refused).body));
-    expect(html("Me")).toContain("Sam Ortiz");
-    expect(html("Me")).toContain("sam@demobrewing.com");
+    expect(html("Me")).toContain("Ted");
+    expect(html("Me")).toContain("ted@demobrewing.com");
     expect(html("Me")).not.toContain("Maria");
     const denied = html("Permission denied", "Pick sheet");
     expect(denied).toContain("You do not have access to Pick sheet.");
-    expect(denied).toContain("@sam · sales");
+    expect(denied).toContain("@ted · sales");
     expect(denied).toContain("admin or warehouse");
     expect(asPersona(by("Orders"), personaFor("sales"))).toBe(by("Orders"));
   });

@@ -597,7 +597,8 @@ export const SCREENS: Screen[] = [
       {E.row("Maria Alvarez", "@maria · admin", "you", "", E.face())}
       {E.nav("Dave Chen", "@dave · brewer", "", E.face({ src: "/mock/dave.jpg" }))}
       {E.nav("Ted", "@ted · sales", "", E.face({ src: "/mock/ted.jpg" }))}
-      {E.row("sam@demobrewing.com", "invited Tue · pending", "", "w", E.face({ name: "sam@demobrewing.com" }))}
+      {E.nav("Sam Ortiz", "@sam · warehouse", "", E.face({ src: "/mock/sam.jpg" }))}
+      {E.row("wes@demobrewing.com", "invited Tue · pending", "", "w", E.face({ name: "wes@demobrewing.com" }))}
       {E.gated("Invite staff", INVITE_GATE)}
     </>),
   },
