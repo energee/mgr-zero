@@ -395,7 +395,7 @@ export const SCREENS: Screen[] = [
       {E.inp("password")}
       {E.btn("Sign in")}
       {E.btn("Email me a link", "g")}
-      <a href="#" data-to="Reset password" className="text-sm text-muted-foreground underline">Forgot password?</a>
+      {E.link("Forgot password?", "Reset password")}
       {E.sp()}
     </>),
   },
@@ -479,7 +479,7 @@ export const SCREENS: Screen[] = [
       {E.inp("email")}
       {E.inp("password")}
       {E.btn("Sign in")}
-      <a href="#" data-to="Portal forgot password" className="text-sm text-muted-foreground underline">Forgot password?</a>
+      {E.link("Forgot password?", "Portal forgot password")}
       {E.sp()}
     </>),
   },

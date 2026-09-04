@@ -177,11 +177,19 @@ export const E = {
       ))}
     </ol>
   ),
+  /** A read-only pair, as a definition list: the label names the value for a
+   *  screen reader, which a pair of spans does not. Not Item — that is a row
+   *  with its own border and inset, and these sit flush inside one. */
   fld: (k: React.ReactNode, v: React.ReactNode) => (
-    <div className="flex items-center justify-between gap-4 py-2 text-sm">
-      <span className="text-muted-foreground">{k}</span>
-      <span className="text-right">{v}</span>
-    </div>
+    <dl className="flex items-center justify-between gap-4 py-2 text-sm">
+      <dt className="text-muted-foreground">{k}</dt>
+      <dd className="text-right">{v}</dd>
+    </dl>
+  ),
+  /** A text link. `to` names the destination screen when the copy does not
+   *  (tests/mgr-screens.test.ts resolves every link to a screen or shell area). */
+  link: (t: React.ReactNode, to?: string) => (
+    <a href="#" data-to={to} className="text-sm text-muted-foreground underline">{t}</a>
   ),
   /** An editable field. type is the native input type; "date" pops the calendar (DatePicker). */
   edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[]) => {
