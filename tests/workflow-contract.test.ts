@@ -221,6 +221,9 @@ describe("production-readiness workflow contract", () => {
     expect(dreaming).toContain(
       'git config user.email "${id}+${login}@users.noreply.github.com"'
     );
+    expect(dreaming).toContain(
+      'git -c "user.name=$DREAM_LOGIN" -c "user.email=$DREAM_EMAIL"'
+    );
     expect(dreaming).not.toContain("dreaming-bot");
     expect(dreaming).toContain(
       "token: ${{ steps.mgr-app.outputs.token }}"
