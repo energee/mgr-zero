@@ -78,7 +78,7 @@ export function ScreenExplorer() {
   };
   const back = () => {
     trail.current.pop();
-    const prev = trail.current.pop();
+    const prev = trail.current.at(-1);
     if (prev !== undefined) history.back();
     else if (current) go(pageUnder([], current[0]), true);
   };
