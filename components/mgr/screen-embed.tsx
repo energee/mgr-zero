@@ -8,7 +8,7 @@
 
 import { useState } from "react";
 import { screenByName } from "@/lib/mgr/screen-explorer";
-import { ScreenFrame, type Mode } from "@/components/mgr/screen-width";
+import { ScreenIframe, type Mode } from "@/components/mgr/screen-width";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export function Screen({ name }: { name: string }) {
@@ -22,7 +22,7 @@ export function Screen({ name }: { name: string }) {
         <ToggleGroupItem value="phone">Mobile</ToggleGroupItem>
         <ToggleGroupItem value="desk">Desktop</ToggleGroupItem>
       </ToggleGroup>
-      <ScreenFrame index={index} title={name} mode={mode} />
+      <ScreenIframe index={index} title={name} mode={mode} />
     </figure>
   );
 }

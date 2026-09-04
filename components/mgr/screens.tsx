@@ -52,6 +52,10 @@ export type Screen = {
   /** Drawn inside another product (QuickBooks, Square, Slack) in that product's
    * own chrome; the body then speaks `X`/`S`, not `E`. See ./venue.tsx. */
   venue?: Venue;
+  /** Where a tap goes when its label means something else on this screen
+   * (`Adjust` on Order opens Short pick); the global rules in
+   * lib/mgr/screen-links.ts cover labels that always mean the same screen. */
+  to?: Record<string, string>;
   /** Entry-screen header (mark + product name); sheets take their title from `name`. */
   hd?: ReactNode;
   body: ReactNode;
@@ -125,6 +129,7 @@ export const SCREENS: Screen[] = [
   // step 1 — foundations and both authenticated shells
   {
     step: 1, slice: "all", tab: "Today", name: "Today",
+    to: { Pick: "Pick sheet", "Put back": "Put back", "3 orders ready": "Pick sheet", "Staged · ORD-0229": "Order" },
     job: "Role-filtered work that opens ready to finish · full-size exemplar at ship scale",
     reads: "get_today [design; delivery rows require assigned warehouse member or admin]", writes: "none",
     states: [["empty", "one button: the role's first verb"], ["loading", "row-shaped skeletons"], ["error", "Today did not load · Retry", 1], ["offline", "cached rows · writes queue"], ["role hidden", "only relevant permitted work · no blank gaps"]],
@@ -856,6 +861,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Work",
     name: "Orders",
+    to: { "Put back": "Put back" },
     job: "Find every order by state and take its next valid action",
     reads: "list_orders",
     writes: "none [creation and state changes happen on their own surfaces]",
@@ -903,6 +909,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Work",
     name: "Order",
+    to: { Adjust: "Short pick", "Add line": "New order", Cancel: "Orders" },
     job: "The staff home for one order: state, next action, lines, events, restock",
     reads: "get_order · get_atp",
     writes: "submit_order [design; draft → submitted] · adjust_order_line [design; one RPC: line + allocation; sets needs_restock on a picked order] · confirm_order [design; one RPC] · cancel_order [design; one RPC: terminal status + allocation release + needs_restock while quantities are staged]",

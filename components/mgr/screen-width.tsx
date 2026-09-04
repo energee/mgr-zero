@@ -27,7 +27,7 @@ const WidthContext = createContext<Mode>("phone");
 const DESK = 1024;
 
 /** One frame, embedded at a real viewport width — see app/(frames)/screens/frame. */
-export function ScreenFrame({ index, title, mode }: { index: number; title: string; mode: Mode }) {
+export function ScreenIframe({ index, title, mode }: { index: number; title: string; mode: Mode }) {
   const box = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   useEffect(() => {
@@ -55,7 +55,7 @@ export function ScreenFrame({ index, title, mode }: { index: number; title: stri
 
 /** A frame at the width the surrounding <ScreenWidth> chose. */
 export function ScreenEmbed(props: { index: number; title: string }) {
-  return <ScreenFrame {...props} mode={useContext(WidthContext)} />;
+  return <ScreenIframe {...props} mode={useContext(WidthContext)} />;
 }
 
 /** `deskOnly` pins the width and hides the switch — the external venues are

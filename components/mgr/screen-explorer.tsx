@@ -1,15 +1,19 @@
 // components/mgr/screen-explorer.tsx — the interactive screen inventory
 // (content/docs/screens-explore.mdx). A filterable list of every MGR screen on
-// the left, the selected screen's frame and record on the right. The
-// selection lives in the URL hash so a link opens straight to a screen. The
-// reference page (content/docs/screens.mdx) stays the long, linkable scroll;
-// this is for browsing. Filtering is lib/mgr/screen-explorer.ts.
+// the left, the selected screen drawn inline in its real shell on the right,
+// and taps inside it walk to the next screen (lib/mgr/screen-links.ts decides
+// where a label goes). The selection lives in the URL hash so a link opens
+// straight to a screen. No iframe: the shell answers to the window width, so
+// resize the window for the phone layout. The reference page
+// (content/docs/screens.mdx) stays the long, linkable scroll; this is for
+// browsing. Filtering is lib/mgr/screen-explorer.ts.
 "use client";
 
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { area } from "@/components/mgr/screens";
-import { AREAS, filterScreens, type Surface } from "@/lib/mgr/screen-explorer";
-import { ScreenFrame, type Mode } from "@/components/mgr/screen-width";
+import { AREAS, filterScreens, screenByName, type Surface } from "@/lib/mgr/screen-explorer";
+import { resolveTap } from "@/lib/mgr/screen-links";
+import { ScreenFrame } from "@/components/mgr/screen-frame";
 import { ThemeToggle } from "@/components/mgr/theme-toggle";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -29,7 +33,6 @@ export function ScreenExplorer() {
   const [q, setQ] = useState("");
   const [areaPick, setArea] = useState(ALL);
   const [surface, setSurface] = useState(ALL);
-  const [mode, setMode] = useState<Mode>("phone");
   const hits = useMemo(
     () => filterScreens({ q, area: areaPick === ALL ? undefined : areaPick, surface: surface === ALL ? undefined : (surface as Surface) }),
     [q, areaPick, surface],
@@ -41,6 +44,21 @@ export function ScreenExplorer() {
   const pick = (i: number) => {
     setSelected(i);
     history.replaceState(null, "", `#s${i}`);
+  };
+  // One handler for every tap in the drawing: the nearest link, button or row
+  // gives the label (a row's title, not its whole text); a resolved name opens
+  // that screen. Capture phase, so the shell's Next.js links never navigate
+  // the docs page, and "#" anchors never jump it.
+  const onTap = (e: React.MouseEvent) => {
+    if (!current) return;
+    const el = (e.target as HTMLElement).closest<HTMLElement>("a, button, [data-slot=item]");
+    if (!el) return;
+    const link = el.closest("a");
+    const label = (el.matches("[data-slot=item]") ? el.querySelector("[data-slot=item-title]")?.textContent : el.textContent) ?? "";
+    const name = resolveTap(current[1], label, link?.getAttribute("href"), el.getAttribute("data-to"));
+    if (link || name) e.preventDefault();
+    const hit = name ? screenByName(name) : undefined;
+    if (hit) pick(hit[0]);
   };
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
@@ -66,17 +84,10 @@ export function ScreenExplorer() {
           {SURFACES.map((s) => <ToggleGroupItem key={s} value={s} className="capitalize">{s}</ToggleGroupItem>)}
         </ToggleGroup>
         <span className="text-sm text-fd-muted-foreground">{hits.length} screens</span>
-        <span className="ml-auto flex items-center gap-2">
-          <ToggleGroup type="single" variant="outline" size="sm" value={mode} onValueChange={(v) => v && setMode(v as Mode)} aria-label="Width">
-            <ToggleGroupItem value="phone">Mobile</ToggleGroupItem>
-            <ToggleGroupItem value="desk">Desktop</ToggleGroupItem>
-          </ToggleGroup>
-          <span className="w-40"><ThemeToggle /></span>
-        </span>
+        <span className="ml-auto w-40"><ThemeToggle /></span>
       </div>
-      {/* Desktop frames need the whole column, so the list moves above them. */}
-      <div className={`grid gap-6 ${mode === "desk" ? "" : "md:grid-cols-[14rem_1fr]"}`}>
-        <ul role="listbox" aria-label="Screens" tabIndex={0} onKeyDown={onKey} className={`overflow-y-auto rounded-lg border text-sm ${mode === "desk" ? "max-h-[30vh]" : "max-h-[80vh] md:sticky md:top-4"}`}>
+      <div className="grid gap-6 md:grid-cols-[14rem_1fr]">
+        <ul role="listbox" aria-label="Screens" tabIndex={0} onKeyDown={onKey} className="max-h-[80vh] overflow-y-auto rounded-lg border text-sm md:sticky md:top-4">
           {hits.map(([i, s], n) => {
             const head = n === 0 || area(hits[n - 1][1]) !== area(s);
             return (
@@ -91,7 +102,7 @@ export function ScreenExplorer() {
           {hits.length === 0 && <li className="p-3 text-fd-muted-foreground">No screen matches.</li>}
         </ul>
         {current && (() => {
-          const [i, s] = current;
+          const [, s] = current;
           return (
             <article className="flex min-w-0 flex-col gap-3">
               <div>
@@ -109,7 +120,14 @@ export function ScreenExplorer() {
                 </ul>
               )}
               {s.spec && <p className="text-sm">{s.spec}</p>}
-              <div className="overflow-x-auto"><ScreenFrame index={i} title={s.name} mode={mode} /></div>
+              {/* The transform makes this box the containing block for the shell's
+                  fixed-position rail, so it draws here and not over the docs
+                  sidebar. ponytail: the shell still reads the window for its
+                  phone/desktop split; container queries in AppShell would let a
+                  narrow box draw the phone layout. */}
+              <div onClickCapture={onTap} className="relative h-[80svh] overflow-auto rounded-lg border [transform:translateZ(0)]">
+                <ScreenFrame screen={s} />
+              </div>
             </article>
           );
         })()}
