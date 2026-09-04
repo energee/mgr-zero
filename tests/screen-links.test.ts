@@ -4,7 +4,7 @@
 // main flows must chain end to end so the explorer is a walkable prototype.
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
-import { resolveTap, TAPS, ROUTES } from "../lib/mgr/screen-links";
+import { BACK, resolveTap, TAPS, ROUTES } from "../lib/mgr/screen-links";
 
 const by = (name: string) => SCREENS.find((s) => s.name === name)!;
 const names = new Set(SCREENS.map((s) => s.name));
@@ -20,6 +20,12 @@ describe("resolveTap", () => {
     expect(resolveTap(by("Today"), "Nothing like this")).toBeUndefined();
   });
 
+  it("sends dismiss verbs back, never to a screen", () => {
+    expect(resolveTap(by("New order"), "Cancel")).toBe(BACK);
+    expect(resolveTap(by("Record movement"), "Discard")).toBe(BACK);
+    expect(resolveTap(by("Order"), "Cancel order")).not.toBe(BACK);
+  });
+
   it("maps shell links by route", () => {
     expect(resolveTap(by("Today"), "Work", "/orders")).toBe("Orders");
     expect(resolveTap(by("Today"), "Pick", "/pick")).toBe("Pick sheet");
@@ -29,7 +35,7 @@ describe("resolveTap", () => {
 
   it("only ever names screens the inventory has", () => {
     for (const s of SCREENS) for (const t of Object.values(s.to ?? {})) expect(names, `${s.name}.to → ${t}`).toContain(t);
-    for (const [, t] of TAPS) expect(names, `TAPS → ${t}`).toContain(t);
+    for (const [, t] of TAPS) if (t !== BACK) expect(names, `TAPS → ${t}`).toContain(t);
     for (const t of Object.values(ROUTES)) expect(names, `ROUTES → ${t}`).toContain(t);
   });
 

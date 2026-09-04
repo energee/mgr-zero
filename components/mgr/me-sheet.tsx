@@ -20,7 +20,7 @@ export function MeSheet({ fields, avatar }: { fields: [string, string][]; avatar
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="sm">{avatar ? <UserAvatar {...avatar} className="size-5 text-[0.6rem]" /> : <Icon icon={UserCircleIcon} />}Me</Button>
+        <Button variant="ghost" size="sm" aria-label="Me">{avatar ? <UserAvatar {...avatar} className="size-5 text-[0.6rem]" /> : <Icon icon={UserCircleIcon} />}Me</Button>
       </SheetTrigger>
       <SheetContent side={mobile ? "bottom" : "right"} className="pb-[max(1rem,env(safe-area-inset-bottom))]">
         <SheetHeader className="flex-row items-center gap-3">

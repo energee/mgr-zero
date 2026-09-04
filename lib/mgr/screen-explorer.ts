@@ -27,3 +27,14 @@ export function filterScreens({ q = "", area: a, surface }: Filter): Indexed[] {
 }
 
 export const screenByName = (name: string) => MGR.find(([, s]) => s.name === name);
+
+const isPage = (i: number) => SCREENS[i].surface === undefined;
+
+/** The page a sheet (or entry) at `index` draws over: the last page in the
+ * visited `trail`, else the first page in its own area. A page is its own ground. */
+export function pageUnder(trail: number[], index: number): number {
+  if (isPage(index)) return index;
+  for (let n = trail.length - 1; n >= 0; n--) if (isPage(trail[n])) return trail[n];
+  const own = area(SCREENS[index]);
+  return MGR.find(([i, s]) => isPage(i) && area(s) === own)?.[0] ?? MGR[0][0];
+}

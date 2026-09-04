@@ -7,8 +7,17 @@
 // walk the main flows without a DOM.
 import { SCREENS, type Screen } from "@/components/mgr/screens";
 
+/** The resolver's answer for a dismiss verb: leave this screen for the one before. */
+export const BACK = "\u2190";
+
 /** Labels (or label patterns) that mean one screen wherever they appear. */
 export const TAPS: [string | RegExp, string][] = [
+  ["Cancel", BACK],
+  ["Close", BACK],
+  ["Discard", BACK],
+  ["Not now", BACK],
+  ["Back", BACK],
+  ["Keep", BACK],
   [/^ORD-\d+/, "Order"],
   [/^INV-\d+/, "Invoice"],
   [/^PO-\d+/, "Receive PO"],

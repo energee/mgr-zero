@@ -62,4 +62,17 @@ describe("screen explorer", () => {
     expect(screenByName("Orders")?.[1].name).toBe("Orders");
     expect(screenByName("Nope")).toBeUndefined();
   });
+
+  it("finds the page a sheet opens over: the last page visited, else its area's first page", async () => {
+    const { pageUnder, screenByName } = await import("../lib/mgr/screen-explorer");
+    const orders = screenByName("Orders")![0];
+    const movement = screenByName("Record movement")![0];
+    const today = screenByName("Today")![0];
+    expect(pageUnder([today, orders, movement], movement)).toBe(orders);
+    // No trail: the first page in the sheet's own area.
+    expect(SCREENS[pageUnder([], movement)].surface).toBeUndefined();
+    expect(area(SCREENS[pageUnder([], movement)])).toBe(area(SCREENS[movement]));
+    // A page is its own ground.
+    expect(pageUnder([today], orders)).toBe(orders);
+  });
 });

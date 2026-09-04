@@ -17,6 +17,17 @@ import { Icon } from "@/components/mgr/icon";
 import { Search01Icon } from "@hugeicons/core-free-icons";
 import { navFor, STAFF_NAV } from "@/lib/mgr/nav";
 
+/** A sheet record as the command form it ships in. Pinned open unless `onClose`
+ * is given (the explorer passes it, and `container` to keep the portal in its box). */
+export function ScreenSheet({ screen: s, container, onClose }: { screen: Screen; container?: HTMLElement | null; onClose?: () => void }) {
+  const { rest, pin } = splitPinned(s.body);
+  return (
+    <CommandForm open onOpenChange={onClose && ((open) => !open && onClose())} container={container} title={s.name} footer={pin.length ? pin : undefined}>
+      <div className="flex flex-col gap-2">{rest}</div>
+    </CommandForm>
+  );
+}
+
 export function ScreenFrame({ screen: s }: { screen: Screen }) {
   // A venue frame is not an MGR screen: it brings its own product's chrome and
   // never the app shell (components/mgr/venue.tsx).
@@ -37,15 +48,7 @@ export function ScreenFrame({ screen: s }: { screen: Screen }) {
       </div>
     );
   }
-  const { rest, pin } = splitPinned(s.body);
-  const body =
-    s.surface === "sheet" ? (
-      <CommandForm open title={s.name} footer={pin.length ? pin : undefined}>
-        <div className="flex flex-col gap-2">{rest}</div>
-      </CommandForm>
-    ) : (
-      s.body
-    );
+  const body = s.surface === "sheet" ? <ScreenSheet screen={s} /> : s.body;
   // The staff user is the fixture face (Maria); the portal user is the customer's
   // buyer, a different person, so that header keeps the icon.
   const me = <MeSheet avatar={{ src: MARIA, name: "Maria Alvarez" }} fields={[["Brewery", "Demo Brewing"], ["Role", "admin"]]} />;

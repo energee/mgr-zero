@@ -18,9 +18,12 @@ export function CommandForm({
   trigger,
   title,
   footer,
+  container,
   children,
 }: {
   open: boolean;
+  /** Where the sheet or dialog portals to; the screen explorer keeps it inside its box. */
+  container?: HTMLElement | null;
   /** Omit to pin the form open (the screen inventory's frames); dismiss gestures then do nothing. */
   onOpenChange?: (open: boolean) => void;
   /** Omit when the caller controls `open` itself (the screen inventory's frames). */
@@ -37,7 +40,7 @@ export function CommandForm({
     return (
       <Sheet open={open} onOpenChange={onOpenChange}>
         {trigger && <SheetTrigger asChild>{trigger}</SheetTrigger>}
-        <SheetContent side="bottom" className="flex max-h-[90svh] flex-col overflow-hidden rounded-t-xl pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <SheetContent container={container} side="bottom" className="flex max-h-[90svh] flex-col overflow-hidden rounded-t-xl pb-[max(1rem,env(safe-area-inset-bottom))]">
           <SheetHeader className="shrink-0 pb-0">
             <SheetTitle>{title}</SheetTitle>
           </SheetHeader>
@@ -50,7 +53,7 @@ export function CommandForm({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-      <DialogContent className="flex max-h-[90svh] flex-col overflow-hidden sm:max-w-md">
+      <DialogContent container={container} className="flex max-h-[90svh] flex-col overflow-hidden sm:max-w-md">
         <DialogHeader className="shrink-0">
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>

@@ -2,18 +2,21 @@
 // (content/docs/screens-explore.mdx). A filterable list of every MGR screen on
 // the left, the selected screen drawn inline in its real shell on the right,
 // and taps inside it walk to the next screen (lib/mgr/screen-links.ts decides
-// where a label goes). The selection lives in the URL hash so a link opens
-// straight to a screen. No iframe: the shell answers to the window width, so
+// where a label goes). A sheet opens over the page it was reached from, inside
+// this box; dismissing it goes back. The selection is the URL hash, pushed on
+// every tap, so a link opens straight to a screen and the browser's back button
+// retraces the walk. No iframe: the shell answers to the window width, so
 // resize the window for the phone layout. The reference page
 // (content/docs/screens.mdx) stays the long, linkable scroll; this is for
 // browsing. Filtering is lib/mgr/screen-explorer.ts.
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { area } from "@/components/mgr/screens";
-import { AREAS, filterScreens, screenByName, type Surface } from "@/lib/mgr/screen-explorer";
-import { resolveTap } from "@/lib/mgr/screen-links";
-import { ScreenFrame } from "@/components/mgr/screen-frame";
+import { AREAS, filterScreens, pageUnder, screenByName, type Surface } from "@/lib/mgr/screen-explorer";
+import { BACK, resolveTap } from "@/lib/mgr/screen-links";
+import { ScreenFrame, ScreenSheet } from "@/components/mgr/screen-frame";
+import { SCREENS } from "@/components/mgr/screens";
 import { ThemeToggle } from "@/components/mgr/theme-toggle";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -38,26 +41,46 @@ export function ScreenExplorer() {
     [q, areaPick, surface],
   );
   const hashIndex = useHashIndex();
-  const [selected, setSelected] = useState<number | null>(null);
+  // The walk so far (inventory indexes), for the page a sheet opens over and
+  // for going back when the browser history has nothing of ours to pop.
+  const trail = useRef<number[]>([]);
+  // The page under the current sheet, fixed at navigation time (a ref cannot
+  // be read during render); a hash the browser restores falls back to the
+  // sheet's own area.
+  const [under, setUnder] = useState<number | null>(null);
+  const [box, setBox] = useState<HTMLDivElement | null>(null);
   // The selection follows the filter: an unlisted selection moves to the first hit.
-  const current = hits.find(([i]) => i === (selected ?? hashIndex)) ?? hits[0];
-  const pick = (i: number) => {
-    setSelected(i);
-    history.replaceState(null, "", `#s${i}`);
+  const current = hits.find(([i]) => i === hashIndex) ?? hits[0];
+  const go = (i: number, push: boolean) => {
+    setUnder(pageUnder(trail.current, i));
+    trail.current.push(i);
+    history[push ? "pushState" : "replaceState"](null, "", `#s${i}`);
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+  };
+  const pick = (i: number) => go(i, true);
+  const back = () => {
+    trail.current.pop();
+    const prev = trail.current.pop();
+    if (prev !== undefined) history.back();
+    else if (current) go(pageUnder([], current[0]), true);
   };
   // One handler for every tap in the drawing: the nearest link, button or row
   // gives the label (a row's title, not its whole text); a resolved name opens
-  // that screen. Capture phase, so the shell's Next.js links never navigate
-  // the docs page, and "#" anchors never jump it.
+  // that screen. Tabs and chips only ever switch in place. Capture phase, and
+  // propagation stops on a hit, so the shell's Next.js links never navigate
+  // the docs page and the Me control's own sheet never opens outside the box.
   const onTap = (e: React.MouseEvent) => {
     if (!current) return;
     const el = (e.target as HTMLElement).closest<HTMLElement>("a, button, [data-slot=item]");
-    if (!el) return;
+    if (!el || el.matches("[role=tab], [data-slot=toggle-group-item]")) return;
     const link = el.closest("a");
-    const label = (el.matches("[data-slot=item]") ? el.querySelector("[data-slot=item-title]")?.textContent : el.textContent) ?? "";
+    const label = el.getAttribute("aria-label") ?? (el.matches("[data-slot=item]") ? el.querySelector("[data-slot=item-title]")?.textContent : el.textContent) ?? "";
     const name = resolveTap(current[1], label, link?.getAttribute("href"), el.getAttribute("data-to"));
     if (link || name) e.preventDefault();
-    const hit = name ? screenByName(name) : undefined;
+    if (!name) return;
+    e.stopPropagation();
+    if (name === BACK) return back();
+    const hit = screenByName(name);
     if (hit) pick(hit[0]);
   };
   const onKey = (e: React.KeyboardEvent) => {
@@ -125,8 +148,15 @@ export function ScreenExplorer() {
                   sidebar. ponytail: the shell still reads the window for its
                   phone/desktop split; container queries in AppShell would let a
                   narrow box draw the phone layout. */}
-              <div onClickCapture={onTap} className="relative h-[80svh] overflow-auto rounded-lg border [transform:translateZ(0)]">
-                <ScreenFrame screen={s} />
+              <div ref={setBox} onClickCapture={onTap} className="relative h-[80svh] overflow-auto rounded-lg border [transform:translateZ(0)]">
+                {s.surface === "sheet" ? (
+                  <>
+                    <ScreenFrame screen={SCREENS[under ?? pageUnder([], current[0])]} />
+                    {box && <ScreenSheet screen={s} container={box} onClose={back} />}
+                  </>
+                ) : (
+                  <ScreenFrame screen={s} />
+                )}
               </div>
             </article>
           );
