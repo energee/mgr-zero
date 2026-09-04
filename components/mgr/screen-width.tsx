@@ -57,7 +57,7 @@ export function ScreenWidth({ children, deskOnly = false }: { children: React.Re
             reach them. They are same-origin, so copy the choice across after it
             lands; a frame that has not loaded yet reads localStorage in its own
             boot script and comes up correct on its own. */}
-        <div className="w-40" onClick={() => queueMicrotask(syncFrames)}><ThemeToggle /></div>
+        <div onClick={() => queueMicrotask(syncFrames)}><ThemeToggle compact /></div>
       </div>
       <WidthContext.Provider value={mode}>{children}</WidthContext.Provider>
     </div>

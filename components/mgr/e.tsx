@@ -7,7 +7,11 @@
 import * as React from "react";
 import { Children, Fragment, isValidElement, type ReactNode } from "react";
 import { Alert02Icon, ArrowLeft01Icon, InformationCircleIcon, SquareLock01Icon } from "@hugeicons/core-free-icons";
-import { Icon, type IconSvgElement } from "@/components/mgr/icon";
+import { DatePicker } from "@/components/mgr/date-picker";
+import { DirectionIcon, Icon, type IconSvgElement } from "@/components/mgr/icon";
+import { TimeWindowField } from "@/components/mgr/time-window-field";
+import { VolumeField } from "@/components/mgr/volume-field";
+import { MARIA, UserAvatar } from "@/components/mgr/user-avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,9 +40,16 @@ const TileContent = ({ n, s, g, w, f }: { n: React.ReactNode; s: React.ReactNode
   {f != null && <span className="mt-1 block h-1 w-full overflow-hidden rounded-full bg-muted"><i className="block h-full bg-primary" style={{ width: `${f}%` }} /></span>}
 </>);
 
-/** Button kinds: p = primary, g = secondary/outline, ghost = quiet, irr = irreversible (teal); " disabled" suffix draws a gated action. */
-type BtnBase = "p" | "g" | "ghost" | "irr";
+/** ItemMedia rides with the title line whenever a row has a description, which is
+ *  right for a 16px icon and wrong for a face: the tallest thing in the row centres. */
+const FACE_MEDIA = "group-has-data-[slot=item-description]/item:translate-y-0 group-has-data-[slot=item-description]/item:self-center";
+/** Button kinds: p = primary, g = secondary/outline, ghost = quiet, irr = irreversible
+ *  but still a record (teal), del = takes something away (red); " disabled" suffix draws a gated action.
+ *  Teal is for a write you meant to make; red is for a loss: ending a membership,
+ *  cancelling an order, breaking an integration, discarding queued work, kicking a keg. */
+type BtnBase = "p" | "g" | "ghost" | "irr" | "del";
 type BtnKind = BtnBase | `${BtnBase} disabled`;
+type VolumeUnit = "oz" | "gal" | "bbl" | "mL" | "L";
 
 export const E = {
   hd: (t: React.ReactNode, r: React.ReactNode = "") => (
@@ -57,11 +68,12 @@ export const E = {
   ttl: (t: React.ReactNode) => <h2 className="mt-2 text-sm font-medium text-muted-foreground">{t}</h2>,
   /** `icon` says which kind of thing a row is — only in lists that mix kinds
    * (Today, search); a homogeneous list gets none (docs/plans/hugeicons.md §3). */
-  row: (t: React.ReactNode, s: React.ReactNode = "", n: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement) => (
+  row: (t: React.ReactNode, s: React.ReactNode = "", n: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement) => (
     <Item variant="outline" className={cn(cls === "dis" && "opacity-50")}>
       {(icon || dotColor[cls]) && (
-        <ItemMedia>
-          {icon ? <Icon icon={icon} /> : <Dot cls={cls} />}
+        <ItemMedia className={cn(isValidElement(icon) && FACE_MEDIA)}>
+          {/* A Hugeicons icon is an array; an element is already media (E.face). */}
+          {icon ? (isValidElement(icon) ? icon : <Icon icon={icon} />) : <Dot cls={cls} />}
         </ItemMedia>
       )}
       <ItemContent>
@@ -85,9 +97,14 @@ export const E = {
     const [kind, disabled] = k.split(" ") as [BtnBase, string?];
     return (
       <Button
-        variant={kind === "g" ? "outline" : kind === "ghost" ? "ghost" : "default"}
+        variant={kind === "g" ? "outline" : kind === "ghost" ? "ghost" : kind === "del" ? "destructive" : "default"}
         disabled={Boolean(disabled)}
-        className={cn(kind === "irr" && "bg-irreversible text-irreversible-foreground hover:bg-irreversible/90")}
+        className={cn(
+          kind === "irr" && "bg-irreversible text-irreversible-foreground hover:bg-irreversible/90",
+          // Solid, not shadcn's tint (whose dark:bg-destructive/20 would otherwise
+          // win): a loss should carry the same weight as the teal commit beside it.
+          kind === "del" && "bg-destructive text-destructive-foreground hover:bg-destructive/90 dark:bg-destructive dark:hover:bg-destructive/90",
+        )}
         {...(kind === "irr" ? { "data-variant": "irreversible" } : {})}
       >
         {t}
@@ -107,27 +124,43 @@ export const E = {
       <div className="text-xs text-muted-foreground">{s}</div>
     </div>
   ),
+  /** A person's photo, for a row's media slot: E.row(name, sub, "", "", E.face()).
+   *  Defaults to Maria; a fixture is anyone else (E.face({ src: "/mock/dave.jpg" })),
+   *  and a name with no fixture draws initials (E.face({ name: "Sam Ruiz" })). */
+  face: ({ src, name, className }: { src?: string; name?: string; className?: string } = {}) => (
+    // A name with no fixture draws initials; neither one is the signed-in user.
+    <UserAvatar src={src ?? (name ? undefined : MARIA)} name={name} className={className} />
+  ),
+  /** A forward arrow read as "to"; null draws it decorative (aria-hidden). */
+  arrow: (label: string | null = "to") => <DirectionIcon label={label} />,
   /** A typed quantity: the OS keyboard is the keypad. unit renders as a trailing addon. */
-  qty: (value: string, unit?: React.ReactNode, label = "Quantity") => (
+  qty: (value: string, unit?: React.ReactNode, label = "Quantity", id?: string) => (
     <InputGroup>
-      <InputGroupInput type="number" inputMode="decimal" step="any" defaultValue={value} aria-label={label} className="text-2xl font-semibold" />
+      <InputGroupInput id={id} type="number" inputMode="decimal" step="any" defaultValue={value} aria-label={label} className="text-2xl font-semibold" />
       {unit ? <InputGroupAddon align="inline-end">{unit}</InputGroupAddon> : null}
     </InputGroup>
   ),
   /** A view switcher: the body below is the active panel, so there are no
-   *  TabsContent panels here. Filters and single-choice fields stay chips. */
-  tabs: (names: string[], on = 0) => (
-    <Tabs value={names[on]}>
-      <TabsList>{names.map((n) => <TabsTrigger key={n} value={n}>{n}</TabsTrigger>)}</TabsList>
+   *  TabsContent panels here. A filter that swaps the whole list (Work's kinds,
+   *  an order's states) is a tab bar too; single-choice fields stay chips.
+   *  Spans the column by default; pass width classes to hug ("w-fit", an input
+   *  addon) or to scroll a bar too long for the phone ("overflow-x-auto"). */
+  tabs: (names: string[], on = 0, cls = "w-full") => (
+    // Uncontrolled, like chips: a controlled value with no onValueChange makes
+    // every trigger inert, and these bars are meant to be clickable in /design.
+    <Tabs defaultValue={names[on]}>
+      <TabsList variant="solid" className={cls}>{names.map((n) => <TabsTrigger key={n} value={n}>{n}</TabsTrigger>)}</TabsList>
     </Tabs>
   ),
-  chips: (arr: string[], on = 0) => (
-    <ToggleGroup type="single" value={arr[on]} variant="outline" size="sm" className="flex-wrap justify-start">
+  chips: (arr: string[], on = 0, bright = false) => (
+    <ToggleGroup type="single" defaultValue={arr[on]} variant="outline" size="sm" className="flex-wrap justify-start">
       {arr.map((c) => (
-        <ToggleGroupItem key={c} value={c}>{c}</ToggleGroupItem>
+        <ToggleGroupItem key={c} value={c} className={cn(bright && "data-[state=on]:bg-primary data-[state=on]:text-primary-foreground")}>{c}</ToggleGroupItem>
       ))}
     </ToggleGroup>
   ),
+  /** An atomic format's volume: a qty whose unit addon is the per-instance unit choice. */
+  volume: (value: string, units: VolumeUnit[], on = 0) => <VolumeField value={value} units={units} on={on} />,
   /** Commit; CommandForm lifts this out of the scroll region so the verb stays on the phone. */
   pin: (t: React.ReactNode) => (
     <div data-pin className="flex flex-col gap-2">
@@ -144,14 +177,23 @@ export const E = {
       ))}
     </ol>
   ),
+  /** A read-only pair, as a definition list: the label names the value for a
+   *  screen reader, which a pair of spans does not. Not Item — that is a row
+   *  with its own border and inset, and these sit flush inside one. */
   fld: (k: React.ReactNode, v: React.ReactNode) => (
-    <div className="flex items-center justify-between gap-4 py-2 text-sm">
-      <span className="text-muted-foreground">{k}</span>
-      <span className="text-right">{v}</span>
-    </div>
+    <dl className="flex items-center justify-between gap-4 py-2 text-sm">
+      <dt className="text-muted-foreground">{k}</dt>
+      <dd className="text-right">{v}</dd>
+    </dl>
   ),
-  /** A typed value. type is the native input type: text, email, date, number. */
+  /** A text link. `to` names the destination screen when the copy does not
+   *  (tests/mgr-screens.test.ts resolves every link to a screen or shell area). */
+  link: (t: React.ReactNode, to?: string) => (
+    <a href="#" data-to={to} className="text-sm text-muted-foreground underline">{t}</a>
+  ),
+  /** An editable field. type is the native input type; "date" pops the calendar (DatePicker). */
   edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[]) => {
+    if (type === "date") return <DatePicker label={label} defaultValue={value} />;
     const listId = suggestions?.length ? `${label.replace(/\s+/g, "-").toLowerCase()}-list` : undefined;
     return (
       <Field orientation="horizontal">
@@ -161,6 +203,8 @@ export const E = {
       </Field>
     );
   },
+  /** A time-of-day window as one two-thumb range: start and end are 24-hour "hh:mm". */
+  window: (label: string, start: string, end: string) => <TimeWindowField label={label} start={start} end={end} />,
   /** A picked value: a Select for short fixed lists; long lists (SKU, customer) keep opening Entity picker. */
   pick: (label: string, value: string, options: string[]) => (
     <Field orientation="horizontal">
@@ -174,15 +218,20 @@ export const E = {
   // The amber box and the quiet box differed only by tint; the glyph is the
   // second channel, so the difference survives a dim screen or a colorblind eye.
   note: (t: React.ReactNode) => (
-    <Alert className="bg-warning text-warning-foreground">
+    // A warm card, sitting at the same lift off the page as a plain Alert's
+    // bg-card, so attention is carried by the amber ink and rule rather than by
+    // a filled panel competing with the row beside it.
+    <Alert className="border-warning-foreground/40 bg-warning text-warning-foreground">
       <Icon icon={Alert02Icon} />
-      <AlertDescription className="text-warning-foreground">{t}</AlertDescription>
+      {/* text-pretty, not shadcn's text-balance: balancing shortens every line to
+          even them up, so a two-line note reads as a narrow block in a wide card. */}
+      <AlertDescription className="text-pretty text-warning-foreground">{t}</AlertDescription>
     </Alert>
   ),
   info: (t: React.ReactNode) => (
     <Alert>
       <Icon icon={InformationCircleIcon} />
-      <AlertDescription>{t}</AlertDescription>
+      <AlertDescription className="text-pretty">{t}</AlertDescription>
     </Alert>
   ),
   /** Annotation chips; the gallery renders this under the frame, never inside it. */
@@ -245,12 +294,12 @@ export const E = {
   stq: (v: number, label = "Quantity") => (
     <ButtonGroup>
       <Button variant="outline" size="icon" aria-label="Decrease">−</Button>
-      <Input type="number" inputMode="numeric" min={0} defaultValue={v} aria-label={label} className="w-14 text-center" />
+      <Input type="number" inputMode="numeric" min={0} defaultValue={v} aria-label={label} className="w-14 appearance-none text-center [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
       <Button variant="outline" size="icon" aria-label="Increase">+</Button>
     </ButtonGroup>
   ),
   gated: (t: React.ReactNode, why: React.ReactNode = "isn’t available yet") => E.row(t, why, "", "dis", SquareLock01Icon),
-  nav: (t: React.ReactNode, s: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement) => E.row(t, s, "›", cls, icon),
+  nav: (t: React.ReactNode, s: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement) => E.row(t, s, <DirectionIcon label="Open" />, cls, icon),
   sp: () => <div className="flex-1" />,
   comp: (portal = false) => (
     <InputGroup>

@@ -9,6 +9,7 @@ import { E } from "@/components/mgr/e";
 import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-icons";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
+import { formatVolume } from "@/lib/volume";
 import {
   BeerIcon, DeliveryTruck01Icon, Package01Icon, Route01Icon, Tag01Icon, TaskDone01Icon, ThermometerIcon, WifiDisconnected01Icon,
 } from "@hugeicons/core-free-icons";
@@ -76,6 +77,7 @@ const MOVEMENT_KINDS = ["add finished goods", "depletion", "loss", "sample", "fe
 
 // The Work list chips, in the order every Work list draws them.
 const WORK_CHIPS = ["all", "orders", "batches", "runs", "POs", "routes"];
+const ORDER_STATES = ["all states", "draft", "submitted", "confirmed", "picked", "shipped"];
 
 // The states every screen can reach; a record with designed states lists its own instead.
 const DEFAULT_STATES: NonNullable<Screen["states"]> = [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]];
@@ -159,7 +161,7 @@ export const SCREENS: Screen[] = [
       {E.row("Tap 5 · Pils", "nearly out · ~9% left", E.act("Swap"), "w", BeerIcon)}
       {E.gated("Weekly count")}
       {E.row("Guest cider", "rung in Square · not mapped, blocks reconcile", "unmapped", "w", Tag01Icon)}
-      {E.row("Variance · last week", "−0.5 bbl Hazy unaccounted", E.act("Review"), "", TaskDone01Icon)}
+      {E.row("Variance · last week", "−½ bbl Hazy unaccounted", E.act("Review"), "", TaskDone01Icon)}
       {E.note("No picks, orders or invoices: the taproom role sees the taproom.")}
     </>),
   },
@@ -186,7 +188,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Work", "warehouse default")}
       {E.btn("New order", "g")}
-      {E.chips(WORK_CHIPS, 1)}
+      {E.tabs(WORK_CHIPS, 1)}
       {E.row("ORD-0231 · Ridgeline", "submitted · ships today", E.act("Confirm"), "", Package01Icon)}
       {E.row("ORD-0229 · Al’s Bar", "picked · restock 3 Pils staged", E.act("Put back"), "w", Package01Icon)}
       {E.row("PO-0142 · Country Malt", "due today", E.act("Receive"), "", DeliveryTruck01Icon)}
@@ -234,8 +236,8 @@ export const SCREENS: Screen[] = [
     states: [["dedicated mode", "switcher hidden · one brewery"], ["single membership", "switcher hidden"]],
     spec: "Opened from the header Me control. Brewery switcher renders only in SaaS mode with more than one membership. No notification history, no settings; those live under More.",
     body: (<>
+      {E.row("Maria Alvarez", "admin", "", "", E.face({ className: "size-10" }))}
       {E.fld("Signed in as", "maria@demobrewing.com")}
-      {E.fld("Role", "warehouse")}
       {E.ttl("Brewery")}
       {E.row("Demo Brewing", "current", "✓", "ok")}
       {E.row("Ridgeline Contract Brewing", "", E.act("Switch"))}
@@ -308,9 +310,9 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Today", "No access")}
       {E.note("You do not have access to Invoices.")}
-      {E.fld("Signed in as", "dave@ · brewer")}
+      {E.fld("Signed in as", "@dave · brewer")}
       {E.fld("Needs", "admin or sales")}
-      {E.info("An admin can change your role in Settings › Team.")}
+      {E.info("An admin can change your role in Settings, then Team.")}
       {E.btns([["Back to Today", "p"], ["Go to Beer", "g"]])}
       {E.sp()}
     </>),
@@ -393,7 +395,7 @@ export const SCREENS: Screen[] = [
       {E.inp("password")}
       {E.btn("Sign in")}
       {E.btn("Email me a link", "g")}
-      <a href="#" data-to="Reset password" className="text-sm text-muted-foreground underline">Forgot password?</a>
+      {E.link("Forgot password?", "Reset password")}
       {E.sp()}
     </>),
   },
@@ -477,7 +479,7 @@ export const SCREENS: Screen[] = [
       {E.inp("email")}
       {E.inp("password")}
       {E.btn("Sign in")}
-      <a href="#" data-to="Portal forgot password" className="text-sm text-muted-foreground underline">Forgot password?</a>
+      {E.link("Forgot password?", "Portal forgot password")}
       {E.sp()}
     </>),
   },
@@ -530,15 +532,15 @@ export const SCREENS: Screen[] = [
     name: "Team",
     job: "Roster, roles, pending invites and revocation",
     reads: "list_team_members",
-    writes: "update_staff_role [design; single row] · revoke_staff [design; single membership row ends] · invite_staff [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI] · the taproom role [SCHEMA-GATE: revision 2 §16.13/§16.16 q4: staff_role gains taproom, but P-staff is role-agnostic, so the narrow per-role policies are undesigned]",
+    writes: "update_staff_role [design; single row] · revoke_staff [design; single membership row ends] · invite_staff [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI] · the taproom role [SCHEMA-GATE: revision 2 §16.13/§16.16 q3: staff_role gains taproom, but P-staff is role-agnostic, so the narrow per-role policies are undesigned]",
     states: [["last admin", "role change refused · keep one admin", 1], ["pending", "invite sent · not yet accepted"], ["permission", "admin only", 1]],
-    spec: "From Settings. A member row opens the Team member sheet, where the role changes in one write and Remove ends the membership (Auth user untouched; re-invite is the compensation). The invite stays disabled with the same human copy as first run until its gate closes.",
+    spec: "A person shows as @handle, the local part of their email; it is derived, not a stored column. A pending invite has no account yet, so it shows the full address it was sent to. From Settings. A member row opens the Team member sheet, where the role changes in one write and Remove ends the membership (Auth user untouched; re-invite is the compensation). The invite stays disabled with the same human copy as first run until its gate closes.",
     body: (<>
       {E.back("Settings", "Team")}
-      {E.nav("Maria Alvarez", "maria@ · warehouse")}
-      {E.nav("Dave Chen", "dave@ · brewer")}
-      {E.row("Ted", "ted@ · admin", "you")}
-      {E.row("sam@demobrewing.com", "invited Tue · pending", "", "w")}
+      {E.row("Maria Alvarez", "@maria · admin", "you", "", E.face())}
+      {E.nav("Dave Chen", "@dave · brewer", "", E.face({ src: "/mock/dave.jpg" }))}
+      {E.nav("Ted", "@ted · sales", "", E.face({ src: "/mock/ted.jpg" }))}
+      {E.row("sam@demobrewing.com", "invited Tue · pending", "", "w", E.face({ name: "sam@demobrewing.com" }))}
       {E.gated("Invite staff", "isn’t available yet; invitations are being made retry-safe")}
     </>),
   },
@@ -552,14 +554,13 @@ export const SCREENS: Screen[] = [
     reads: "list_team_members",
     writes: "update_staff_role · revoke_staff [design]",
     states: [["member", "role can change"], ["last admin", "remove and role change refused", 1], ["self", "remove refused", 1]],
-    spec: "The destructive action belongs to the named member, so there is no ambiguous selected-member state.",
+    spec: "The destructive action belongs to the named member, so there is no ambiguous selected-member state. Drawn for another member, never the signed-in one: opening your own row is the self state, where Remove is refused.",
     body: (<>
-      {E.ttl("Maria Alvarez")}
-      {E.fld("Email", "maria@demobrewing.com")}
-      {E.pick("Role", "Warehouse", ["Admin", "Sales", "Warehouse", "Brewer", "Taproom"])}
+      {E.row("Dave Chen", "dave@demobrewing.com", "", "", E.face({ className: "size-10", src: "/mock/dave.jpg" }))}
+      {E.pick("Role", "Brewer", ["Admin", "Sales", "Warehouse", "Brewer", "Taproom"])}
       {E.btn("Save role")}
-      {E.note("Removing Maria ends this brewery membership. Her sign-in account remains.")}
-      {E.btn("Remove Maria", "irr")}
+      {E.note("Removing Dave ends this brewery membership. Their sign-in account remains.")}
+      {E.btn("Remove Dave", "del")}
     </>),
   },
   {
@@ -598,7 +599,6 @@ export const SCREENS: Screen[] = [
       {E.fld("Location name", "Warehouse")}
       {E.chips(["warehouse", "taproom"])}
       {E.btn("Add location")}
-      {E.btn("Add another location", "g")}
       {E.row("2 · Import CSV", "or add a brand one at a time", E.act("Import CSV"))}
       {E.row("3 · Invite the team", "email and role", E.act("Skip"))}
       {E.edit("Email", "", "email")}
@@ -683,7 +683,7 @@ export const SCREENS: Screen[] = [
       {E.pick("Channel", "taproom", ["taproom", "wholesale", "dtc", "export"])}
       {E.pick("Destination state", "PA · where the beer is poured", ["PA · where the beer is poured", "OH · where the beer is poured"])}
       {E.qty("1", E.chips(["keg", "case", "bbl"]))}
-      {E.info("Preview: −1 keg · 0.50 bbl · festival removal · PA · amounts are entered positive")}
+      {E.info("Preview: −1 keg · ½ bbl · festival removal · PA · amounts are entered positive")}
       {E.pin(<>
         {E.btn("Record movement", "irr")}
       </>)}
@@ -701,7 +701,7 @@ export const SCREENS: Screen[] = [
     spec: "Post-commit of Record movement. A tape means recorded. The named correction is Record inventory correction, not Undo.",
     body: (<>
       {E.back("Beer", "Hazy IPA · ½ bbl")}
-      {E.tape([["−1 keg · festival removal · PA", "0.50 bbl · just now"]])}
+      {E.tape([["−1 keg · festival removal · PA", "½ bbl · just now"]])}
       {E.gated("Record inventory correction")}
     </>),
   },
@@ -740,7 +740,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.hd("Composer", "proposal")}
       {E.row("“Blew a half of Hazy at the taproom”")}
-      {E.num("−1 × Hazy IPA · ½ bbl keg", "Taproom · depletion · −0.5 bbl")}
+      {E.num("−1 × Hazy IPA · ½ bbl keg", "Taproom · depletion · −½ bbl")}
       {E.nav("SKU / package", "Hazy IPA · ½ bbl keg")}
       {E.pick("Location", "Taproom", ["Warehouse", "Taproom"])}
       {E.pick("Type", "Depletion", ["Depletion", "Loss", "Adjustment"])}
@@ -803,7 +803,7 @@ export const SCREENS: Screen[] = [
       {E.row("Record cellar transfer · FV2", "validation failed", E.act("Fix"), "w", WifiDisconnected01Icon)}
       {E.btn("Retry 1 waiting")}
       {E.note("Discard asks you to confirm. These 3 unsent writes are deleted.")}
-      {E.btn("Discard 3 queued writes", "irr")}
+      {E.btn("Discard 3 queued writes", "del")}
     </>),
   },
   {
@@ -815,12 +815,14 @@ export const SCREENS: Screen[] = [
     reads: "list_orders",
     writes: "none [creation and state changes happen on their own surfaces]",
     states: [["filtered", "one state chip selected"], ["empty", "no orders in this state: New order stays available"]],
-    spec: "The Work list with the orders chip active. Rows cover the active order states and name the next valid action; New order opens the order-entry sheet. Order and Confirm order return here.",
+    spec: "The Work list with the Orders tab active. Rows cover the active order states and name the next valid action; New order opens the order-entry sheet. Order and Confirm order return here.",
     body: (<>
       {E.hd("Work", "sales default")}
       {E.btn("New order")}
-      {E.chips(WORK_CHIPS, 1)}
-      {E.chips(["all states", "draft", "submitted", "confirmed", "picked", "shipped"], 0)}
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        {E.tabs(WORK_CHIPS, 1, "w-full md:w-fit")}
+        {E.tabs(ORDER_STATES, 0, "w-full justify-start overflow-x-auto md:w-fit")}
+      </div>
       {E.row("ORD-0231 · Ridgeline", "submitted · ships Thu", E.act("Confirm"))}
       {E.row("ORD-0229 · Al’s Bar", "picked · restock 3 Pils staged", E.act("Put back"), "w")}
       {E.row("ORD-0234 · Teresa’s", "confirmed · ships Fri", E.act("Pick"))}
@@ -842,13 +844,13 @@ export const SCREENS: Screen[] = [
       {E.ttl("Ridgeline Tap Room")}
       {E.fld("State", "Submitted · ships Thu")}
       {E.pick("Fulfillment source", "Warehouse", ["Warehouse", "Taproom"])}
-      {E.info("Lifecycle: submitted → confirmed → picked → shipped. Only the valid next action is active.")}
+      {E.info(<>Lifecycle: submitted {E.arrow()} confirmed {E.arrow()} picked {E.arrow()} shipped. Only the valid next action is active.</>)}
       {E.row("Hazy IPA · ½ bbl keg", "", "4 · ATP 11")}
       {E.row("Pils · 16 oz case", "", "10 · ATP −6", "w")}
       {E.note("ATP is −6. Confirming oversells; that stays your call.")}
-      {E.note("Stout isn’t registered for Ohio. Check the Compliance registry ›")}
+      {E.note("Stout isn’t registered for Ohio. Check the Compliance registry.")}
       {E.sp()}
-      {E.btns([["Confirm order", "p"], ["Cancel order", "irr"]])}
+      {E.btns([["Confirm order", "p"], ["Cancel order", "del"]])}
     </>),
   },
   {
@@ -872,8 +874,8 @@ export const SCREENS: Screen[] = [
       {E.row("Pils · 16 oz case", "ordered 7 · picked 10", E.act("Adjust"), "w")}
       {E.row("Stout · ⅙ bbl keg", "ordered 2 · picked 2 · ATP 7", E.act("Adjust"), "ok")}
       {E.btn("Add line", "g")}
-      {E.note("Stout isn’t registered for Ohio. Check the Compliance registry ›")}
-      {E.tape([["created · Ted", "Mon 9:02"], ["submitted · Ted", "Mon 9:05"], ["confirmed · Maria", "Mon 14:10"], ["picked · Dave · 4 / 10 / 2", "Tue 8:40"], ["line adjusted · Pils 10 → 7 · customer cut", "Tue 9:15"]])}
+      {E.note("Stout isn’t registered for Ohio. Check the Compliance registry.")}
+      {E.tape([["created · Ted", "Mon 9:02"], ["submitted · Ted", "Mon 9:05"], ["confirmed · Maria", "Mon 14:10"], ["picked · Dave · 4 / 10 / 2", "Tue 8:40"], [<>line adjusted · Pils 10 {E.arrow()} 7 · customer cut</>, "Tue 9:15"]])}
       {E.btns([["Ship", "p"], ["Cancel order", "ghost"]])}
       {E.info("Cancel asks you to confirm. Allocations release.")}
     </>),
@@ -895,7 +897,7 @@ export const SCREENS: Screen[] = [
       {E.nav("Reason", "required", "w")}
       {E.ttl("Resolve the missing 3")}
       {E.chips(["Adjust order to 7", "Keep 3 owed · staged"], 0)}
-      {E.info("Preview: order line 10 → 7. Customer sees “adjusted”.")}
+      {E.info(<>Preview: order line 10 {E.arrow()} 7. Customer sees “adjusted”.</>)}
       {E.sp()}
       {E.btn("Adjust order to 7 cases")}
     </>),
@@ -1013,10 +1015,10 @@ export const SCREENS: Screen[] = [
     spec: "No invoice-timing chip and no destination state: beer moves between the brewery’s own locations. Copper because the paired movements are append-only. Requested from Taproom · Needs replenishment.",
     body: (<>
       {E.back("TRF-0088", "Complete transfer")}
-      {E.fld("From → to", "Warehouse → Taproom")}
+      {E.fld(<>From {E.arrow(null)} to</>, <>Warehouse {E.arrow()} Taproom</>)}
       {E.row("Pils · 16 oz case", "move / picked", "4 / 4", "ok")}
       {E.row("Hazy IPA · ½ bbl keg", "move / picked", "2 / 2", "ok")}
-      {E.tape([["−4 Pils cases · taproom transfer · Warehouse", "0.19 bbl"], ["+4 Pils cases · taproom transfer · Taproom", "0.19 bbl"], ["−2 / +2 Hazy ½ bbl · taproom transfer", "1.00 bbl"]])}
+      {E.tape([["−4 Pils cases · taproom transfer · Warehouse", formatVolume("0.19")], ["+4 Pils cases · taproom transfer · Taproom", formatVolume("0.19")], ["−2 / +2 Hazy ½ bbl · taproom transfer", formatVolume("1.00")]])}
       {E.info("No invoice: this is an internal move.")}
       {E.sp()}
       {E.btn("Complete transfer", "irr")}
@@ -1057,7 +1059,7 @@ export const SCREENS: Screen[] = [
       {E.row("Pils · 16 oz case", "expected 4", E.stq(4))}
       {E.row("Hazy · ½ bbl keg", "expected 3", E.stq(2), "w")}
       {E.row("Stout · ⅙ bbl keg", "expected 2", E.stq(2))}
-      {E.info("Variance −1 Hazy · 0.5 bbl unaccounted. Recording posts 4 Pils + 4 Hazy + 2 Stout depletion; the variance is reported, never posted.")}
+      {E.info("Variance −1 Hazy · ½ bbl unaccounted. Recording posts 4 Pils + 4 Hazy + 2 Stout depletion; the variance is reported, never posted.")}
       {E.nav("Variance by brand", "four weeks · where the gap keeps showing up")}
       {E.gated("Record count")}
       {E.ttl("Needs replenishment")}
@@ -1311,7 +1313,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.note("Stops: invoice push, payment links and paid-date sync.")}
       {E.info("Stays: MGR invoices, QuickBooks ids and customer/item mappings.")}
-      {E.btn("Disconnect QuickBooks", "irr")}
+      {E.btn("Disconnect QuickBooks", "del")}
     </>),
   },
   {
@@ -1328,7 +1330,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("More", "Invoices")}
       {E.row(`${INV.no} · Ridgeline`, `due ${INV.dueShort} · ${INV.total} · pushed`, E.act("Open in QuickBooks"))}
-      {E.row("INV-1041 · Al’s Bar", "edited in QuickBooks · $980 → $1,040", E.act("Open in QuickBooks"), "w")}
+      {E.row("INV-1041 · Al’s Bar", <>edited in QuickBooks · $980 {E.arrow()} $1,040</>, E.act("Open in QuickBooks"), "w")}
       {E.row("INV-1040 · Teresa’s", "voided in QuickBooks · not paid", E.act("Write off"), "w")}
       {E.row("INV-1039 · Al’s Bar", "deleted in QuickBooks", <>{E.act("Re-push")}{E.act("Write off")}</>, "w")}
       {E.row("INV-1038 · Al’s Bar", "pushed · not emailed yet", E.act("Open in QuickBooks"))}
@@ -1393,11 +1395,11 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Catalog",
-    job: "Define brands, SKUs, package BOMs and prices without ledger writes",
+    job: "Define brands, their sellable formats and prices without ledger writes",
     reads: "list_brands · list_skus",
-    writes: "create_brand · update_brand · create_sku · update_sku · replace_sku_bom [design; one RPC replaces selected SKU full BOM] · create_price_list · update_price_list · set_price_list_item [existing/design]",
+    writes: "create_brand · update_brand · create_sku · update_sku · create_price_list · update_price_list · set_price_list_item [existing/design]",
     states: DEFAULT_STATES,
-    spec: "BOM replacement is one RPC, never a client row loop. Brand and SKU facts (ABV, tax class, package, barrels per unit) edit on the Brand / SKU frame; this page stays list + BOM + a simple list × SKU price item, never the v1 price matrix.",
+    spec: "Brand facts (ABV and tax class) edit on Brand; SKU associates the brand with a Format. Volume and packaging stay on the Format. This page remains a list with simple pricing, never the v1 price matrix.",
     body: (<>
       {E.back("More", "Catalog")}
       {E.nav("Hazy IPA", "IPA · 6.8% · 3 SKUs")}
@@ -1413,12 +1415,13 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "Package BOM",
-    job: "Replace the packaging materials consumed by one SKU",
-    reads: "get_sku · list_materials [design]",
-    writes: "replace_sku_bom [design; one RPC replaces the selected SKU full BOM]",
-    states: [["complete", "every material has a quantity"], ["empty", "the SKU consumes no tracked packaging"]],
+    job: "Replace the packaging materials consumed by one format",
+    reads: "get_format · list_materials [design]",
+    writes: "replace_format_bom [SCHEMA-GATE: revision 2 §16.12; one RPC replaces the selected Format BOM]",
+    states: [["complete", "every material has a quantity"], ["empty", "the Format consumes no tracked packaging"]],
+    spec: "The BOM belongs entirely to the Format. A different material list requires another Format; SKUs never override it.",
     body: (<>
-      {E.nav("SKU", "Hazy IPA · case · 24×16 oz")}
+      {E.nav("Format", "case · 24×16 oz")}
       {E.row("16 oz can", "quantity 24", E.act("Edit"))}
       {E.row("Can end", "quantity 24", E.act("Edit"))}
       {E.row("Case tray", "quantity 1", E.act("Edit"))}
@@ -1433,8 +1436,8 @@ export const SCREENS: Screen[] = [
     job: "Sellable facts without ledger writes, including the TTB fields",
     reads: "list_brands · list_skus",
     writes: "create_brand* · update_brand · create_sku* · update_sku",
-    states: [["new brand", "name + style + ABV + tax class"], ["inactive SKU", "hidden from portal; history keeps it"], ["keg SKU", "keg size chip; container source waits for slice 5"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"]],
-    spec: "Barrels per unit is the basis of all TTB math, so it shows as the exact fraction and the decimal the ledger will freeze. The TTB tax class defaults to beer; other classes appear when the brewery sells one. No UPC scan, no container source editor here.",
+    states: [["new brand", "name + style + ABV + tax class"], ["new SKU", "choose one existing Format"], ["inactive SKU", "hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"]],
+    spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Package facts live on Formats, while the SKU is the stable brand × format identity used by inventory, orders, pricing and provider mappings. No UPC scan or container source editor here.",
     body: (<>
       {E.back("Catalog", "Hazy IPA")}
       {E.edit("Brand name", "Hazy IPA")}
@@ -1450,16 +1453,15 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "SKU",
-    job: "Create or edit one sellable package under a brand",
-    reads: "get_sku",
-    writes: "create_sku · update_sku",
-    states: [["active", "available to price and sell"], ["inactive", "history remains", 1]],
+    job: "Associate one shared package format with a brand",
+    reads: "get_sku · list_formats [design; §16.2]",
+    writes: "create_sku · update_sku [SCHEMA-GATE: revision 2 §16.2, SKU becomes brand × format]",
+    states: [["active", "available to price and sell"], ["inactive", "history remains", 1], ["in use", "format cannot change; create another SKU", 1]],
+    spec: "A SKU owns the stable sellable identity, active state, UPC/provider mappings and any price exception. Its name, volume and packaging derive from the selected Format. There are no SKU packaging overrides: a different volume or BOM is a different Format.",
     body: (<>
-      {E.edit("SKU name", "½ bbl keg")}
-      {E.chips(["keg", "case", "each"])}
-      {E.edit("Units per case", "1", "number")}
-      {E.edit("bbl per unit", "0.50000000", "number")}
-      {E.row("Package BOM", "Keg shell · quantity 1", E.act("Edit"))}
+      {E.pick("Format", "½ bbl keg", ["½ bbl keg", "⅙ bbl keg", "case · 24×16 oz"])}
+      {E.row("Active", "available to price and sell", E.sw(true, "Active"))}
+      {E.info("Volume and packaging come from the Format. Create another Format when either differs.")}
       {E.btn("Save SKU")}
     </>),
   },
@@ -1476,9 +1478,9 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Product", "Hazy IPA · SKUs")}
       {E.btn("Add SKU")}
-      {E.row("½ bbl keg", "0.50000000 bbl · active", E.act("Edit"))}
-      {E.row("⅙ bbl keg", "0.16666667 bbl · active", E.act("Edit"))}
-      {E.row("case · 24×16 oz", "0.09677419 bbl · active", E.act("Edit"))}
+      {E.row("½ bbl keg", `${formatVolume("0.50000000")} · active`, E.act("Edit"))}
+      {E.row("⅙ bbl keg", `${formatVolume("0.16666667")} · active`, E.act("Edit"))}
+      {E.row("case · 24×16 oz", `${formatVolume("0.09677419")} · active`, E.act("Edit"))}
     </>),
   },
   {
@@ -1609,7 +1611,7 @@ export const SCREENS: Screen[] = [
       {E.row("Due", INV.due)}
       {E.tbl(["Item", "Qty", "Amount"], [["Hazy IPA · ½ bbl", "4", INV.hazyAmount], ["Pils · 16 oz case", "6", INV.pilsAmount], ["Keg deposit · NON", "4", INV.depositAmount]])}
       {E.note("Contact Demo Brewing to arrange payment. The invoice above is unchanged and still due.")}
-      {E.row("Demo Brewing", "(610) 555-0142", "›")}
+      {E.nav("Demo Brewing", "(610) 555-0142")}
       {E.nav("Question this invoice", "sends a note to Demo Brewing")}
     </>),
   },
@@ -1799,11 +1801,11 @@ export const SCREENS: Screen[] = [
     reads: "list_batches [design]",
     writes: "none [scheduling happens on Schedule batch; recording on Brew day]",
     states: [["planned", "Start is the next action"], ["active", "the row names the next reading or transfer"], ["empty", "no batches yet: New batch is the only action"]],
-    spec: "The Work list with the batches chip active. Planned batches sort before active batches due for attention; every row names its next action. New batch opens Schedule batch, and Schedule batch and Brew day return here.",
+    spec: "The Work list with the Batches tab active. Planned batches sort before active batches due for attention; every row names its next action. New batch opens Schedule batch, and Schedule batch and Brew day return here.",
     body: (<>
       {E.hd("Work", "brewer default")}
       {E.btn("New batch")}
-      {E.chips(WORK_CHIPS, 2)}
+      {E.tabs(WORK_CHIPS, 2)}
       {E.ttl("Planned")}
       {E.row("B-0416 · Hazy IPA v4", "Fri 9/4 · 15 bbl", E.act("Start"))}
       {E.ttl("Active")}
@@ -1844,8 +1846,8 @@ export const SCREENS: Screen[] = [
       {E.nav("2-row", "lot L-0821 · 660 lb")}
       {E.nav("Citra · boil", "lot L-0790 · 6 lb")}
       {E.nav("Yeast", "WLP066 · lot Y-0312 · 1 brink")}
-      {E.fld("Knockout baseline", "14.6 bbl → FV2")}
-      {E.tape([["Start B-0416 · Hazy IPA v4", ""], ["Consume additions", "named material lots"], ["Knockout 14.6 bbl → FV2", "loss baseline"]])}
+      {E.fld("Knockout baseline", <>14.6 bbl {E.arrow()} FV2</>)}
+      {E.tape([["Start B-0416 · Hazy IPA v4", ""], ["Consume additions", "named material lots"], [<>Knockout 14.6 bbl {E.arrow()} FV2</>, "loss baseline"]])}
       {E.sp()}
       {E.btn("Record brew day", "irr")}
     </>),
@@ -1922,11 +1924,11 @@ export const SCREENS: Screen[] = [
     reads: "list_packaging_runs [design; planned and recent closed, by planned date] · get_material_shortfalls [design; per planned run]",
     writes: "none [scheduling and closing happen on their own surfaces]",
     states: [["short", "a planned run whose materials fall short says so on the row and its next action is Resolve, not Start"], ["due today", "the same row also appears in Today for the brewer"], ["closed", "recent runs stay for a few weeks with lot, output and yield; after that they are history under Search and Lot trace"], ["empty", "no runs planned: the button is the only thing on the page"]],
-    spec: "The Work list with the runs chip active, which is the packaging list: Work is where everything in motion lives, so runs get no rail entry of their own. Upcoming sorts by planned date and every row names its next action. Recent breaks Work's in-motion rule on purpose, because a brewer plans the next run against the last one's yield; it is kept short and the full history stays in Search. Schedule run opens the sheet; a row opens the run, where closing happens.",
+    spec: "The Work list with the Runs tab active, which is the packaging list: Work is where everything in motion lives, so runs get no rail entry of their own. Upcoming sorts by planned date and every row names its next action. Recent breaks Work's in-motion rule on purpose, because a brewer plans the next run against the last one's yield; it is kept short and the full history stays in Search. Schedule run opens the sheet; a row opens the run, where closing happens.",
     body: (<>
       {E.hd("Work", "brewer default")}
       {E.btn("Schedule run")}
-      {E.chips(WORK_CHIPS, 3)}
+      {E.tabs(WORK_CHIPS, 3)}
       {E.ttl("Upcoming")}
       {E.row("RUN-0031 · Hazy cans", "Fri 9/5 · FV3 · 118 cases planned · 480 ends short", E.act("Resolve"), "w")}
       {E.row("RUN-0032 · Pils ½ bbl", "Tue 9/9 · FV1 · 40 kegs planned", E.act("Start"))}
@@ -1994,11 +1996,11 @@ export const SCREENS: Screen[] = [
     reads: "list_purchase_orders [design]",
     writes: "none [creation and receiving happen on their own surfaces]",
     states: [["draft", "Send is the next action"], ["partial", "Receive stays available for the remainder"], ["empty", "no open purchase orders: New PO is the only action"]],
-    spec: "The Work list with the POs chip active. Each row names the next action; New PO opens the existing vendor purchase draft, and Receive PO returns here.",
+    spec: "The Work list with the POs tab active. Each row names the next action; New PO opens the existing vendor purchase draft, and Receive PO returns here.",
     body: (<>
       {E.hd("Work", "warehouse default")}
       {E.btn("New PO")}
-      {E.chips(WORK_CHIPS, 4)}
+      {E.tabs(WORK_CHIPS, 4)}
       {E.row("PO-0142 · Country Malt", "sent · due Thu", E.act("Receive"))}
       {E.row("PO-0141 · YCH", "partially received · 1 Citra box due", E.act("Receive"), "w")}
       {E.row("PO-0143 · CanSource", "draft · 4 pallets", E.act("Send"))}
@@ -2375,8 +2377,8 @@ export const SCREENS: Screen[] = [
       {E.fld("Qty per sale", "1/124 keg per 16 oz")}
       {E.pick("Channel override", "Taproom", ["Taproom", "DTC", "Wholesale"])}
       {E.btn("Save item mapping", "g")}
-      {E.row("7 sales · Hazy 16 oz", "depletion", "−0.0282 bbl")}
-      {E.row("1 refund · Hazy 16 oz", "inventory credit · adjustment", "+0.0040 bbl", "w")}
+      {E.row("7 sales · Hazy 16 oz", "depletion", "−112 oz")}
+      {E.row("1 refund · Hazy 16 oz", "inventory credit · adjustment", "+16 oz", "w")}
       {E.note("The weekly count posts the depletion. These sales are the expected number the count is measured against.")}
       {E.btn("Reconcile 7 sales + 1 refund", "irr")}
     </>),
@@ -2396,7 +2398,7 @@ export const SCREENS: Screen[] = [
       {E.back("POS mapping", "Square sale SQ-88421")}
       {E.row("Square Taproom · 9/02 8:14 PM", "$7.00 · completed", "SQ-88421", "ok", SquareMark)}
       {E.row("Hazy 16 oz draft × 1", "mapped to Hazy IPA · ½ bbl keg", E.act("Open mapping"))}
-      {E.fld("Expected consumption", "1/124 keg · 0.0040 bbl")}
+      {E.fld("Expected consumption", "1/124 keg · 16 oz")}
       {E.fld("Sales channel", "Taproom · inherited from location")}
       {E.row("Weekly count · 9/03", "included in expected total · count posted depletion", E.act("Open count"), "ok")}
       {E.info("Square supplied the expected amount. No inventory movement was posted by this sale.")}
@@ -2423,7 +2425,7 @@ export const SCREENS: Screen[] = [
       {E.chips(["acquire", "return empty", "lost / found", "retire"], 1)}
       {E.pick("Customer", "Ridgeline Tap Room", ["Ridgeline Tap Room", "Al’s Bar"])}
       {E.stq(4, "Kegs")}
-      {E.info("Preview: +4 returned · Ridgeline 38 → 34 out · credit memo −$120.00 deposit refund")}
+      {E.info(<>Preview: +4 returned · Ridgeline 38 {E.arrow()} 34 out · credit memo −$120.00 deposit refund</>)}
       {E.note("Empty kegs only; beer return/credit is Return shipment.")}
       {E.btn("Record keg return · refund $120", "irr")}
     </>),
@@ -2531,7 +2533,7 @@ export const SCREENS: Screen[] = [
       {E.ttl("Remaining")}
       {E.chips(["empty", "about ¼ left", "about ½ left"], 0)}
       {E.info("Beer left in the keg remains open taproom stock and can be tapped again.")}
-      {E.btn("Kick keg", "irr")}
+      {E.btn("Kick keg", "del")}
     </>),
   },
   {
@@ -2570,11 +2572,11 @@ export const SCREENS: Screen[] = [
     reads: "list_routes [design]",
     writes: "none [route planning happens on Route]",
     states: [["unassigned", "shipped orders waiting for a route are called out"], ["empty", "no routes yet: New route is the only action"]],
-    spec: "The Work list with the routes chip active. Every row names its next action; New route opens Route in builder mode, and Route returns here.",
+    spec: "The Work list with the Routes tab active. Every row names its next action; New route opens Route in builder mode, and Route returns here.",
     body: (<>
       {E.hd("Work", "driver default")}
       {E.btn("New route")}
-      {E.chips(WORK_CHIPS, 5)}
+      {E.tabs(WORK_CHIPS, 5)}
       {E.row("Route A · Thu", "3 stops · Maria · departed 8:10", E.act("Resume"))}
       {E.row("Route B · Fri", "2 stops · driver not assigned", E.act("Assign"), "w")}
       {E.row("ORD-0236 · Dock", "shipped · no route", E.act("Add to route"), "w")}
@@ -2714,8 +2716,7 @@ export const SCREENS: Screen[] = [
       {E.back("Settings", "Chat")}
       {E.row("Slack · Demo Brewing", "Connected · scopes healthy", E.act("Disconnect"), "ok", SlackMark)}
       {E.pick("Operations channel", "#mgr-operations · private", ["#mgr-operations · private", "#general"])}
-      {E.edit("Quiet hours start", "21:00", "time")}
-      {E.edit("Quiet hours end", "06:00", "time")}
+      {E.window("Quiet hours", "21:00", "06:00")}
       {E.edit("Reading overdue after", "24", "number")}
       {E.nav("Health", "last message from Slack today · 8:42 AM")}
       {E.nav("Linked people", "3 linked")}
@@ -2777,7 +2778,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.note("Stops: App Home, personal reminders, team digests and Slack actions.")}
       {E.info("Stays: MGR work, assignments, notification preferences and history.")}
-      {E.btn("Disconnect Slack", "irr")}
+      {E.btn("Disconnect Slack", "del")}
     </>),
   },
   {
@@ -2816,7 +2817,7 @@ export const SCREENS: Screen[] = [
       {E.back("Settings", "Point of sale")}
       {E.info("Publish what the taproom can sell, and read its sales back. One provider is connected at a time.")}
       {E.row("Square · Demo Brewing LLC", "catalog published · sales syncing", E.act("Disconnect"), "ok", SquareMark)}
-      {E.row("Square → QuickBooks connector", "detected · Square posts taproom sales to QuickBooks Online itself", E.act("Review"), "w", SquareMark)}
+      {E.row(<>Square {E.arrow()} QuickBooks connector</>, "detected · Square posts taproom sales to QuickBooks Online itself", E.act("Review"), "w", SquareMark)}
       {E.nav("Square locations", "2 mapped · 1 needs mapping")}
       {E.fld("Last sales sync", "Today · 6:58 PM")}
       {E.nav("Menu", "one catalog · Square, the website, per-location price")}
@@ -2899,7 +2900,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.note("Stops: menu publishing, availability updates and sales sync.")}
       {E.info("Stays: MGR stock, location mappings, sales history and published item ids.")}
-      {E.btn("Disconnect Square", "irr")}
+      {E.btn("Disconnect Square", "del")}
     </>),
   },
   {
@@ -2945,7 +2946,7 @@ export const SCREENS: Screen[] = [
       {E.fld("Brand", "Hazy IPA")}
       {E.fld("Format", "pint · poured")}
       {E.fld("Pours from", "½ bbl keg · Taproom")}
-      {E.fld("Serving", "1/124 of a ½ bbl · 0.004032 · from the format")}
+      {E.fld("Serving", "1/124 of a ½ bbl · 16 oz · from the format")}
       {E.fld("Premise", "On-premise · from the format")}
       {E.fld("Tax", "On-premise rate · held by the provider")}
       {E.fld("Format price", "$7.00")}
@@ -3002,14 +3003,14 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Formats",
-    job: "Type barrels per unit once, on the atomic format, and derive every shape above it",
+    job: "Enter volume once on an atomic format and derive every shape above it",
     reads: "list_formats [design; §16.2] · get_format_components [design; §16.2a]",
     writes: "create_format · update_format · replace_format_components [design; one RPC replaces the child set] · replace_format_bom [SCHEMA-GATE: revision 2 §16.2/16.2a/16.12: formats, format_components and format_bom supersede skus.bbl_per_unit and sku_bom]",
-    states: [["atomic", "carries a typed barrels per unit"], ["children missing", "a composed format cannot be created before its children", 1], ["poured", "never holds stock · a ratio back to the keg"], ["in use", "editing a format never moves frozen movement bbl"]],
-    spec: "Barrels per unit is the basis of all TTB math, so exactly one row types it. Only atomic formats carry a volume; composed ones compute it from their component formats, which is also what makes repack (§16.10) validated rather than asserted. The basis says only whether the shape holds stock: a pour is a component row with a fractional quantity, not a different kind of thing. Each BOM line's on-break disposition is what the repack sheet reads. OPEN (§16.16 q1): fully sized formats, drawn here, or shape-only.",
+    states: [["atomic", "owns one volume entered in an allowed unit"], ["children missing", "a composed format cannot be created before its children", 1], ["poured", "never holds stock · a ratio back to the keg"], ["in use", "editing a format never moves frozen movement bbl"]],
+    spec: "Volume is the basis of all TTB math, so exactly one atomic Format owns it. The input receives its allowed units per instance: US beer packages offer oz, gal and bbl; metric formats may offer mL and L. The server converts the entry to canonical bbl. Composed formats compute volume from their children, which is also what makes repack (§16.10) validated rather than asserted. The basis says only whether the shape holds stock. Each BOM line's on-break disposition is what the repack sheet reads.",
     body: (<>
       {E.back("Settings", "Formats")}
-      {E.tbl(["Format", "Basis", "bbl / unit", "From"], [["16 oz can", "packaged", "0.00403226", "typed"], ["four-pack", "packaged", "0.01612903", "4 × can"], ["case · 24×16oz", "packaged", "0.09677419", "6 × four-pack"], ["½ bbl keg", "packaged", "0.50000000", "typed"], ["pint", "poured", "0.00403226", "1/124 × ½ bbl"]])}
+      {E.tbl(["Format", "Basis", "Volume", "From"], [["16 oz can", "packaged", formatVolume("0.00403226"), "unit"], ["four-pack", "packaged", formatVolume("0.01612903"), "4 × can"], ["case · 24×16oz", "packaged", formatVolume("0.09677419"), "6 × four-pack"], ["½ bbl keg", "packaged", formatVolume("0.50000000"), "unit"], ["pint", "poured", formatVolume("0.00403226"), "1/124 × ½ bbl"]])}
       {E.gated("Add format", "isn’t available yet: package facts still live on each SKU")}
     </>),
   },
@@ -3022,17 +3023,16 @@ export const SCREENS: Screen[] = [
     job: "Create or edit one atomic or composed package format",
     reads: "get_format [design; §16.2] · get_format_components [design; §16.2a]",
     writes: "create_format · update_format · replace_format_components · replace_format_bom [SCHEMA-GATE: revision 2 §16.2/16.2a/16.12]",
-    states: [["atomic", "barrels per unit is typed"], ["composed", "volume derives from child formats"]],
+    states: [["atomic", "volume unit choices are set by this input"], ["composed", "volume derives from child formats"]],
     body: (<>
-      {E.edit("Format name", "case · 24×16oz")}
-      {E.chips(["packaged", "poured"])}
-      {E.fld("Volume", "0.09677419 bbl · derived · read-only")}
-      {E.ttl("Composition")}
-      {E.row("four-pack", "quantity 6", E.act("Remove"))}
-      {E.row("Add component", "child format · quantity", E.act("Add"))}
+      {E.edit("Format name", "16 oz can")}
+      {E.chips(["packaged", "poured"], 0, true)}
+      {E.pick("Package", "can", ["can", "bottle", "keg"])}
+      {E.volume("16", ["oz", "gal", "bbl"])}
+      {E.info("Composed formats show a derived, read-only Volume instead.")}
       {E.ttl("Packaging BOM")}
-      {E.tbl(["Material", "Qty", "On break"], [["Case tray", "1", "return to stock"], ["PakTech", "0", "consumed"]])}
-      {E.info("One level only: a case breaks into four-packs, never straight into cans.")}
+      {E.tbl(["Material", "Qty", "On break"], [["Can body", "1", "consumed"], ["Can end", "1", "consumed"]])}
+      {E.info("If the volume or BOM differs, create another Format.")}
       {E.gated("Save format", "isn’t available yet: package facts still live on each SKU")}
     </>),
   },
@@ -3063,7 +3063,7 @@ export const SCREENS: Screen[] = [
     reads: "list_price_lists [design; + channel_id §16.4] · get_price_list [design; formats and SKU overrides]",
     writes: "create_price_list · update_price_list · set_price_list_format · set_price_list_item · clear_price_list_item [SCHEMA-GATE: revision 2 §16.4: price_lists.channel_id and price_list_formats]",
     states: [["inherited", "the format price is what the customer sees"], ["overridden", "one brand × format priced away from the tier", 1], ["poured", "a pour is priceable here and is not a SKU"], ["no price", "neither a format default nor an override · the line cannot be sold", 1]],
-    spec: "Price lists are already tiers and the customer's assigned price list already assigns them; revision 2 adds the channel and makes a format priceable, so a taproom pour (which is not a SKU) can be priced at all. Drawn format-default with a per-SKU override, matching Menu and POS item, which already read “format default” and offer Reset to format price. §16.16 q2 leaves the direction open; drawing it the other way would make those two shipped frames inconsistent.",
+    spec: "Price lists are already tiers and the customer's assigned price list already assigns them; revision 2 adds the channel and makes a format priceable, so a taproom pour (which is not a SKU) can be priced at all. Drawn format-default with a per-SKU override, matching Menu and POS item, which already read “format default” and offer Reset to format price. §16.16 q1 leaves the direction open; drawing it the other way would make those two shipped frames inconsistent.",
     body: (<>
       {E.back("Price lists", "Wholesale tier")}
       {E.edit("Tier name", "Wholesale · standard")}
@@ -3146,8 +3146,8 @@ export const SCREENS: Screen[] = [
       {E.fld("Break", "Hazy IPA · case · 24×16oz")}
       {E.fld("Location · bin", "Warehouse · Walk-in")}
       {E.qty("1", "case")}
-      {E.tape([["−1 case · repack", "0.09677419 bbl"], ["+6 four-pack · repack", "derived from the case total"], ["Case tray ×1", "return to stock"], ["PakTech ×6", "consumed"]])}
-      {E.info("Preview: conserves 0.09677419 bbl · same location and bin · not a TTB removal")}
+      {E.tape([["−1 case · repack", formatVolume("0.09677419")], ["+6 four-pack · repack", "derived from the case total"], ["Case tray ×1", "return to stock"], ["PakTech ×6", "consumed"]])}
+      {E.info(`Preview: conserves ${formatVolume("0.09677419")} · same location and bin · not a TTB removal`)}
       {E.fld("Damaged on break", "0 four-pack · records as loss")}
       {E.pin(<>
         {E.gated("Record repack", "isn’t available yet: breaking a case has nowhere correct to land")}

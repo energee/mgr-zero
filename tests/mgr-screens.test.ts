@@ -3,6 +3,8 @@
 // every record carries its metadata, `states` is a caption (never rendered
 // into the body), and each body renders through the E vocabulary without
 // throwing. Rendering uses react-dom/server, so no DOM is needed.
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { describe, expect, it } from "vitest";
@@ -10,6 +12,18 @@ import { SCREENS, type Screen } from "../components/mgr/screens";
 import { E, splitPinned } from "../components/mgr/e";
 import { VenueFrame } from "../components/mgr/venue";
 import { AppShell } from "../components/mgr/app-shell";
+
+/** One screen's body as static markup, by name. Rendered once and kept: the
+ *  suite asks for the same handful of screens across a dozen assertions. */
+const rendered = new Map<string, string>();
+const body = (name: string) => {
+  let html = rendered.get(name);
+  if (html === undefined) {
+    html = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === name)!.body));
+    rendered.set(name, html);
+  }
+  return html;
+};
 
 describe("SCREENS", () => {
   it("ports the step-1 frames with names, jobs and IO", () => {
@@ -206,8 +220,9 @@ describe("SCREENS", () => {
       const html = renderToStaticMarkup(createElement("div", null, s.body));
       expect.soft(html, `${s.name}: Required pill`).not.toMatch(/<button[^>]*>Required<\/button>/);
       if (chevrons.has(s.name)) {
-        expect.soft(html.match(/>›</g)?.length ?? 0, `${s.name}: picker affordances`).toBeGreaterThanOrEqual(chevrons.get(s.name)!);
+        expect.soft(html.match(/data-direction="forward"/g)?.length ?? 0, `${s.name}: picker affordances`).toBeGreaterThanOrEqual(chevrons.get(s.name)!);
       }
+      expect.soft(html, `${s.name}: Unicode direction arrow`).not.toMatch(/[→›]/);
     }
   });
 
@@ -238,6 +253,104 @@ describe("SCREENS", () => {
     expect(menu + formats).toContain("min-w-max");
     const slack = SCREENS.find((s) => s.name === "Notification preferences")!;
     expect(renderToStaticMarkup(VenueFrame({ venue: slack.venue!, children: slack.body }))).toContain('class="slk modal"');
+  });
+
+  it("writes a person as @handle, never a domain-elided address", () => {
+    for (const s of SCREENS) {
+      const html = renderToStaticMarkup(createElement("div", null, s.body));
+      // "maria@ · warehouse" reads as truncated data; a handle is "@maria".
+      expect.soft(html, `${s.name}: elided address`).not.toMatch(/[a-z0-9]@(?![a-z0-9.])/i);
+    }
+    expect(body("Team")).toContain("@maria");
+    // An invite goes to an address, and its recipient has no account to have a handle.
+    expect(body("Team")).toContain("sam@demobrewing.com");
+  });
+
+  it("renders a date field with no value, and names it", () => {
+    // An empty or malformed value used to reach Intl.format as an Invalid Date,
+    // which throws and takes the whole screen down with it.
+    for (const value of ["", "not-a-date", "2027-08-31"]) {
+      const html = renderToStaticMarkup(createElement("div", null, E.edit("Best by", value, "date")));
+      expect.soft(html, value).toContain("aria-labelledby");
+      expect.soft(html, value).toContain("Best by");
+    }
+    expect(renderToStaticMarkup(createElement("div", null, E.edit("Best by", "", "date")))).toContain("Pick a date");
+  });
+
+  it("falls back to initials when a person has no fixture photo", () => {
+    const render = (node: ReturnType<typeof E.face>) => renderToStaticMarkup(createElement("div", null, node));
+    // Initials sit under the photo, so the markup a static export ships keeps
+    // the real src; a person with no fixture shows letters instead.
+    expect(render(E.face({ name: "Maria Alvarez" }))).toContain(">MA<");
+    expect(render(E.face({ name: "Ted" }))).toContain(">T<");
+    expect(render(E.face({ name: "sam@demobrewing.com" }))).toContain(">S<");
+    expect(render(E.face({ name: "Maria Alvarez" }))).not.toContain("<img");
+    // Every other call keeps its photo: no name and no path is the signed-in user.
+    expect(render(E.face())).toContain('src="/mock/maria.jpg"');
+    expect(render(E.face({ src: "/mock/dave.jpg" }))).toContain('src="/mock/dave.jpg"');
+    expect(render(E.face({ className: "size-10" }))).toMatch(/size-10[\s\S]*src="\/mock\/maria.jpg"/);
+  });
+
+  it("keeps one signed-in staff identity: Maria, admin, with the face", () => {
+    // The gallery shell signs in as admin (screen-frame.tsx) so every surface is
+    // reachable, so the person the screens name has to be that admin.
+    expect(body("Me")).toMatch(/Maria Alvarez[\s\S]*admin/);
+    expect(body("Team")).toMatch(/Maria Alvarez[\s\S]*@maria · admin[\s\S]*you/);
+    // Team member acts on someone else; removing yourself is the self state.
+    expect(body("Team member")).not.toMatch(/Maria|@maria/);
+
+    // Fixture files are named for the person; each src may only appear next to that name.
+    const faces: [string, RegExp][] = [
+      ["/mock/maria.jpg", /Maria|maria@/],
+      ["/mock/dave.jpg", /Dave/],
+      ["/mock/ted.jpg", /Ted/],
+      // No sam.jpg: a pending invite has no account yet, so the Team spec has it
+      // showing the address it was sent to, and the avatar falls back to initials.
+    ];
+    for (const [src] of faces) {
+      expect(existsSync(resolve("public", src.slice(1))), src).toBe(true);
+    }
+    const team = body("Team");
+    for (const [src] of faces) expect(team, src).toContain(`src="${src}"`);
+    expect(team, "the pending invite is initials, not a portrait").toContain(">S<");
+    expect(body("Me")).toContain('src="/mock/maria.jpg"');
+    expect(body("Me")).not.toContain("/mock/dave.jpg");
+    expect(body("Team member")).toContain('src="/mock/dave.jpg"');
+    expect(body("Team member")).not.toContain("/mock/maria.jpg");
+    for (const s of SCREENS) {
+      const html = renderToStaticMarkup(createElement("div", null, s.body));
+      if (!html.includes("data-mock-avatar")) continue;
+      expect.soft(s.portal, `${s.name}: the portal buyer is not the staff user`).toBeUndefined();
+      for (const [src, who] of faces) {
+        if (html.includes(src)) expect.soft(html, `${s.name}: ${src}`).toMatch(who);
+      }
+    }
+  });
+
+  it("shows format volume in familiar brewery units", () => {
+    const formats = body("Formats");
+    expect(formats).toContain(">Volume</th>");
+    for (const volume of ["16 oz", "64 oz", "3 gal", "½ bbl"]) expect.soft(formats, volume).toContain(volume);
+    expect(formats).not.toContain("bbl / format");
+  });
+
+  it("keeps volume on formats while SKUs choose a format", () => {
+    const sku = body("SKU");
+    expect(sku).toContain(">Format<");
+    expect(sku).not.toMatch(/bbl per unit|Units per case|Package BOM|Packaging overrides/);
+
+    const format = body("Format");
+    expect(format).toContain('aria-label="Volume"');
+    expect(format).toMatch(/data-slot="input-group"[\s\S]*aria-label="Volume"[\s\S]*role="tablist"/);
+    expect(format).toMatch(/role="radiogroup"[^>]*>[\s\S]*packaged[\s\S]*poured/);
+    expect(format).toMatch(/role="tablist"[^>]*>[\s\S]*oz[\s\S]*gal[\s\S]*bbl/);
+    for (const unit of ["oz", "gal", "bbl"]) expect.soft(format, unit).toContain(`>${unit}</button>`);
+    for (const unit of ["mL", "L"]) expect.soft(format, unit).not.toContain(`>${unit}</button>`);
+
+    const metric = renderToStaticMarkup(createElement("div", null, E.volume("500", ["mL", "L"])));
+    expect(metric).toContain(">mL</button>");
+    expect(metric).toContain(">L</button>");
+    expect(metric).not.toContain(">bbl</button>");
   });
 
   it("keeps external venue facts in the host product's vocabulary", () => {
@@ -346,12 +459,12 @@ describe("SCREENS", () => {
     }
     expect(SCREENS.some((s) => s.name === "Confirm shipment")).toBe(false);
     const pickSheet = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Pick sheet")!.body));
-    expect(pickSheet).toMatch(/›/);
+    expect(pickSheet).toContain('data-direction="forward"');
     expect(pickSheet).toMatch(/Thu/);
     const pick = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Pick")!.body));
     expect(pick).toMatch(/Print/);
     const deliveryStatus = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Confirm delivery")!.body));
-    expect(deliveryStatus).not.toContain(">›<");
+    expect(deliveryStatus).not.toContain('data-direction="forward"');
     const receive = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Receive PO")!.body));
     expect(receive).not.toMatch(/Send PO/);
     const close = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Close packaging run")!.body));
@@ -441,6 +554,10 @@ describe("SCREENS", () => {
     for (const name of ["Compliance registry", "Chat settings", "Menu", "Tap board", "Variance by brand"]) {
       expect(html(name), name).toContain("tablist");
     }
+    for (const name of ["Work", "Orders", "Batches", "Packaging runs", "Purchase orders", "Routes"]) {
+      expect(html(name), name).toContain("tablist");
+    }
+    expect(html("Packaging runs")).toContain("data-active:bg-primary");
     // Record movement: seven kinds are a Select on the phone, chips from md up.
     const move = html("Record movement");
     expect(move).toContain("md:hidden");
@@ -455,9 +572,11 @@ describe("SCREENS", () => {
     const product = SCREENS.find((s) => s.name === "Product")!;
     expect(renderToStaticMarkup(createElement("div", null, product.body))).not.toContain("tax class");
     expect(JSON.stringify(product.states)).toMatch(/tax class/);
-    // Dates are native date inputs.
-    expect(html("New order")).toMatch(/type="date"/);
-    expect(html("Receive PO")).toMatch(/type="date"/);
+    // Every date field is the calendar picker; no screen falls back to the OS date input.
+    for (const name of ["New order", "Schedule batch", "Schedule packaging run", "Receive PO"]) {
+      expect(html(name), name).toContain('data-slot="popover-trigger"');
+    }
+    for (const s of SCREENS) expect.soft(renderToStaticMarkup(createElement("div", null, s.body)), s.name).not.toMatch(/type="date"/);
     // No ToggleGroup is left with a single option.
     for (const s of SCREENS) {
       const groups = renderToStaticMarkup(createElement("div", null, s.body)).match(/data-slot="toggle-group"[\s\S]*?(?=data-slot="toggle-group"|$)/g) ?? [];

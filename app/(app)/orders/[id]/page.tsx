@@ -3,6 +3,7 @@
 // status-gated actions. Reads through the command registry (get_order,
 // list_skus) with a brewery-scoped Ctx. Failures throw to the (app) error
 // boundary.
+import { DirectionIcon } from "@/components/mgr/icon";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
@@ -65,7 +66,7 @@ function EventLine({ event, skuNames }: { event: OrderEvent; skuNames: Map<strin
       <li>
         {time} — lines adjusted — {actor}
         <div className="text-muted-foreground">
-          {before} → {after} ({reason})
+          {before} <DirectionIcon /> {after} ({reason})
         </div>
       </li>
     );
