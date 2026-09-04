@@ -4,7 +4,7 @@
 // the personal quiet-hours override beside it. The Slack previews in
 // lib/chat/preview-fixtures.ts still spell their own window out by hand.
 export const MINUTES_PER_DAY = 1440;
-const NOON = MINUTES_PER_DAY / 2;
+export const NOON = MINUTES_PER_DAY / 2;
 
 // Pinned, not the ambient locale: the server formats during SSR and the browser
 // on hydration, so an implicit locale renders two different strings and React
@@ -24,10 +24,21 @@ export function formatClock(minutes: number) {
   return clock.format(new Date(2000, 0, 1, 0, minutes));
 }
 
-/** Position on a track anchored at noon, and back again. A slider track is
- *  monotonic, so a window that crosses midnight only draws as one span from noon. */
-export const toNoonOffset = (minutes: number) => (minutes - NOON + MINUTES_PER_DAY) % MINUTES_PER_DAY;
-export const fromNoonOffset = (offset: number) => (offset + NOON) % MINUTES_PER_DAY;
+/** Position on a track anchored at `anchor` minutes, and back again. */
+export const toOffset = (minutes: number, anchor: number) => (minutes - anchor + MINUTES_PER_DAY) % MINUTES_PER_DAY;
+export const fromOffset = (offset: number, anchor: number) => (offset + anchor) % MINUTES_PER_DAY;
+
+/** The clock hour a track has to start at to draw this window as one forward span.
+ *  A slider track is monotonic, so it cannot draw a window that crosses its own
+ *  ends: quiet hours (21:00 → 06:00) cross midnight and so run noon to noon,
+ *  while taproom hours (11:00 → 22:00) cross noon and so run midnight to midnight.
+ *  Without this the two offsets come out descending and Radix draws the range
+ *  with a negative width, then swaps the ends on the first drag. */
+export const anchorFor = (start: number, end: number) => (start <= end ? 0 : NOON);
+
+/** The noon-anchored track, the case a window through midnight needs. */
+export const toNoonOffset = (minutes: number) => toOffset(minutes, NOON);
+export const fromNoonOffset = (offset: number) => fromOffset(offset, NOON);
 
 /** How long the window lasts, counting forward from start. Start == end is a
  *  whole day: a window covering nothing would be "off", which is its own control. */
