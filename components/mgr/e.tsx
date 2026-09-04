@@ -9,6 +9,7 @@ import { Children, Fragment, isValidElement, type ReactNode } from "react";
 import { Alert02Icon, ArrowLeft01Icon, InformationCircleIcon, SquareLock01Icon } from "@hugeicons/core-free-icons";
 import { DatePicker } from "@/components/mgr/date-picker";
 import { DirectionIcon, Icon, type IconSvgElement } from "@/components/mgr/icon";
+import { QuietHours } from "@/components/mgr/quiet-hours";
 import { MARIA, UserAvatar } from "@/components/mgr/user-avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -199,6 +200,8 @@ export const E = {
       </Field>
     );
   },
+  /** A time-of-day window as one two-thumb range: start and end are 24-hour "hh:mm". */
+  window: (label: string, start: string, end: string) => <QuietHours label={label} start={start} end={end} />,
   /** A picked value: a Select for short fixed lists; long lists (SKU, customer) keep opening Entity picker. */
   pick: (label: string, value: string, options: string[]) => (
     <Field orientation="horizontal">

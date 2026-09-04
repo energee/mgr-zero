@@ -2716,8 +2716,7 @@ export const SCREENS: Screen[] = [
       {E.back("Settings", "Chat")}
       {E.row("Slack · Demo Brewing", "Connected · scopes healthy", E.act("Disconnect"), "ok", SlackMark)}
       {E.pick("Operations channel", "#mgr-operations · private", ["#mgr-operations · private", "#general"])}
-      {E.edit("Quiet hours start", "21:00", "time")}
-      {E.edit("Quiet hours end", "06:00", "time")}
+      {E.window("Quiet hours", "21:00", "06:00")}
       {E.edit("Reading overdue after", "24", "number")}
       {E.nav("Health", "last message from Slack today · 8:42 AM")}
       {E.nav("Linked people", "3 linked")}
