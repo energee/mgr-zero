@@ -640,7 +640,7 @@ Production 7 · Packaging 3 · Compliance 4 · Kegs 2 · Deliveries 2 = **58 tab
 
 **Nothing in this section exists in the database.** It is deliberately held as a
 spec rather than a migration chain: the interface is still being drawn (see
-`2026-08-31-mgr-wireframes.html`, vocabulary note at the top of that file), and
+`components/mgr/screens.tsx`, published at `/docs/screens`), and
 every table below would otherwise be migrated two or three times before the
 first screen ships. Build it in one pass when the interface settles.
 

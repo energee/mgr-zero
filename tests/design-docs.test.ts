@@ -1,6 +1,6 @@
 // tests/design-docs.test.ts — the screen inventory is published as a Fumadocs
 // page that renders components/mgr/screens.tsx directly, so it cannot drift
-// from the gallery, and it stays outside the documentation agent's allowlist:
+// from the code, and it stays outside the documentation agent's allowlist:
 // the customer guides are agent-maintained, this page is generated from code.
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";

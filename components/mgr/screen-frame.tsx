@@ -1,9 +1,9 @@
 // components/mgr/screen-frame.tsx — one screen record inside the surface it
 // actually ships in: the app or portal shell, a pinned-open CommandForm for a
 // sheet, a bare card for an entry screen, or the vendor's own chrome for a
-// venue frame. Both the /design gallery route and the published inventory
-// (components/mgr/screen-index.tsx) render through this, so a frame cannot look
-// like two different things in the two places it is shown.
+// venue frame. The published inventory (components/mgr/screen-index.tsx)
+// renders through this, so a frame cannot look like two different things
+// wherever it is shown.
 import { AppShell, PortalShell } from "@/components/mgr/app-shell";
 import { CommandForm } from "@/components/mgr/command-form";
 import { E, splitPinned } from "@/components/mgr/e";

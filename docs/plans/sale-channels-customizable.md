@@ -218,7 +218,7 @@ implements. Tests hit the real database (`bunx supabase start`).
 
 ## Not in scope
 
-- **Wireframes.** `2026-08-31-mgr-wireframes.html` is being edited in another
+- **Frames.** `components/mgr/screens.tsx` is being edited in another
   session. The POS item frame's premise chip should become a sale-channel
   picker and its `SCHEMA-GATE` note should go — coordinate, do not edit here.
 - **An enum-parity test** for the remaining enums (`movement_type` is duplicated

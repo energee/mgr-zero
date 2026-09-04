@@ -1,7 +1,7 @@
 // components/mgr/theme-toggle.tsx — light/dark switch for the Me sheet. Stores
 // the choice in localStorage.theme and flips the `.dark` class; app/layout.tsx
 // applies the stored (or OS) choice before first paint. `compact` draws it as
-// an icon-only sm control for a toolbar (the /design and /docs/screens width bar).
+// an icon-only sm control for a toolbar (the /docs/screens width bar).
 "use client";
 
 import { useSyncExternalStore } from "react";

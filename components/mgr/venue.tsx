@@ -3,7 +3,7 @@
 // these frames are drawn as those products actually present them rather than as
 // MGR screens: Intuit's transaction sidebar, Square Dashboard's filter-and-table,
 // Slack's App Home / DM / modal. Ported name-for-name from the wireframes file
-// (.agents/superpowers/specs/2026-08-31-mgr-wireframes.html) with its chrome CSS
+// (the retired HTML wireframe, deleted once ported) with its chrome CSS
 // in ./venue.css — the vendor look is evidence about an integration contract, so
 // it is copied, not re-derived. `S` is the Slack vocabulary, `X` the shared
 // record vocabulary for the two record venues. Screen bodies use these instead
