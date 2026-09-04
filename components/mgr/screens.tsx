@@ -597,12 +597,12 @@ export const SCREENS: Screen[] = [
       {E.hd("Set up Demo Brewing", "4 steps")}
       {E.row("1 · Add locations", "inline form expanded", "in progress", "ok")}
       {E.fld("Location name", "Warehouse")}
-      {E.chips(["warehouse", "taproom"])}
+      {E.chips(["Warehouse", "Taproom"])}
       {E.btn("Add location")}
       {E.row("2 · Import CSV", "or add a brand one at a time", E.act("Import CSV"))}
       {E.row("3 · Invite the team", "email and role", E.act("Skip"))}
       {E.edit("Email", "", "email")}
-      {E.chips(["warehouse", "sales", "brewer", "admin"])}
+      {E.chips(["Warehouse", "Sales", "Brewer", "Admin"])}
       {E.note("Sending an invite emails the recipient and cannot be recalled.")}
       {E.gated("Send staff invite", "isn’t available yet; invitations are being made retry-safe")}
       {E.row("4 · Opening inventory", "count what’s on hand today", E.act("Record opening count"))}
@@ -680,7 +680,7 @@ export const SCREENS: Screen[] = [
       <div className="hidden md:block">{E.chips(MOVEMENT_KINDS, 4)}</div>
       {E.nav("SKU / package", "Hazy IPA · ½ bbl keg")}
       {E.pick("Location", "Warehouse", ["Warehouse", "Taproom"])}
-      {E.pick("Channel", "taproom", ["taproom", "wholesale", "dtc", "export"])}
+      {E.pick("Channel", "Taproom", ["Wholesale", "Taproom", "DTC", "Export"])}
       {E.pick("Destination state", "PA · where the beer is poured", ["PA · where the beer is poured", "OH · where the beer is poured"])}
       {E.qty("1", E.chips(["keg", "case", "bbl"]))}
       {E.info("Preview: −1 keg · ½ bbl · festival removal · PA · amounts are entered positive")}
@@ -764,7 +764,7 @@ export const SCREENS: Screen[] = [
       {E.hd("Composer", "question")}
       {E.row("“Blew a half of Hazy at the taproom”")}
       {E.ttl("Which half?")}
-      {E.chips(["½ bbl keg", "half the remaining ⅙"], -1)}
+      {E.chips(["½ bbl keg", "Half the remaining ⅙"], -1)}
       {E.info("The verb stays off until this is answered.")}
     </>),
   },
@@ -1189,7 +1189,7 @@ export const SCREENS: Screen[] = [
       {E.edit("License number", "PA R-55821")}
       {E.edit("Terms", "Net 30")}
       {E.pick("Price list", "Wholesale · standard", ["Wholesale · standard", "Wholesale · distributor", "Taproom"])}
-      {E.pick("Excise remittance", "customer remits", ["customer remits", "we remit"])}
+      {E.pick("Excise remittance", "Customer remits", ["Customer remits", "We remit"])}
       {E.nav("Ship-tos", "Main · Dock")}
       {E.row("Portal users", "2 active", E.act("Invite"))}
       {E.nav("Customer keg balance", "38 out · $1,140 deposits held")}
@@ -1209,7 +1209,7 @@ export const SCREENS: Screen[] = [
     states: [["ready", "email is valid"], ["sent", "recipient receives a sign-in link"], ["existing member", "show the existing access instead", 1]],
     body: (<>
       {E.edit("Email", "buyer@ridgeline.example", "email")}
-      {E.chips(["buyer", "account admin"])}
+      {E.chips(["Buyer", "Account admin"])}
       {E.note("Sending an invite emails the recipient and cannot be recalled.")}
       {E.gated("Send invite", "isn’t available yet: customer membership hardening comes first")}
     </>),
@@ -2375,7 +2375,7 @@ export const SCREENS: Screen[] = [
       {E.btn("Save location mapping", "g")}
       {E.nav("“Hazy 16 oz draft”", "Hazy IPA · ½ bbl keg")}
       {E.fld("Qty per sale", "1/124 keg per 16 oz")}
-      {E.pick("Channel override", "Taproom", ["Taproom", "DTC", "Wholesale"])}
+      {E.pick("Channel override", "Taproom", ["Wholesale", "Taproom", "DTC", "Export"])}
       {E.btn("Save item mapping", "g")}
       {E.row("7 sales · Hazy 16 oz", "depletion", "−112 oz")}
       {E.row("1 refund · Hazy 16 oz", "inventory credit · adjustment", "+16 oz", "w")}
@@ -2531,7 +2531,7 @@ export const SCREENS: Screen[] = [
       {E.fld("Coming off", "Helles · ½ bbl · on since Wed")}
       {E.pick("Reason", "Kicked empty", ["Kicked empty", "Flavor change", "Quality hold"])}
       {E.ttl("Remaining")}
-      {E.chips(["empty", "about ¼ left", "about ½ left"], 0)}
+      {E.chips(["Empty", "About ¼ left", "About ½ left"], 0)}
       {E.info("Beer left in the keg remains open taproom stock and can be tapped again.")}
       {E.btn("Kick keg", "del")}
     </>),
@@ -2551,7 +2551,7 @@ export const SCREENS: Screen[] = [
       {E.row("Already swapped", "Helles was swapped out at 7:42pm by Ali", E.act("Reload"), "w")}
       {E.ttl("Coming off")}
       {E.fld("Tap 5", "Helles · ½ bbl · on since Wed")}
-      {E.chips(["empty", "about ¼ left", "about ½ left"], 0)}
+      {E.chips(["Empty", "About ¼ left", "About ½ left"], 0)}
       {E.ttl("Going on")}
       {E.nav("Helles · ½ bbl", "taproom stock · 4 available · same brand")}
       {E.row("Not our stock", "guest or event keg · no depletion, no variance", E.sw(false, "Not our stock"))}
@@ -2857,13 +2857,13 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.ttl("Taproom")}
       {E.pick("MGR location", "Taproom", ["Taproom", "Warehouse", "Select location"])}
-      {E.pick("Sales channel", "Taproom", ["Taproom", "DTC", "Wholesale", "Select channel"])}
+      {E.pick("Sales channel", "Taproom", ["Wholesale", "Taproom", "DTC", "Export", "Select channel"])}
       {E.ttl("Warehouse")}
       {E.pick("MGR location", "Warehouse", ["Taproom", "Warehouse", "Select location"])}
-      {E.pick("Sales channel", "DTC", ["Taproom", "DTC", "Wholesale", "Select channel"])}
+      {E.pick("Sales channel", "DTC", ["Wholesale", "Taproom", "DTC", "Export", "Select channel"])}
       {E.ttl("Third location · needs mapping")}
       {E.pick("MGR location", "Select location", ["Taproom", "Warehouse", "Select location"])}
-      {E.pick("Sales channel", "Select channel", ["Taproom", "DTC", "Wholesale", "Select channel"])}
+      {E.pick("Sales channel", "Select channel", ["Wholesale", "Taproom", "DTC", "Export", "Select channel"])}
       {E.btn("Save mappings")}
     </>),
   },
