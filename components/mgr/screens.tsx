@@ -235,11 +235,11 @@ export const SCREENS: Screen[] = [
     step: 1, slice: "all", tab: "Work", name: "Work", job: "Everything currently in motion, ordered by next due action",
     reads: "list_work [design; role default + remembered explicit filter]", writes: "none",
     states: DEFAULT_STATES,
-    spec: "Warehouse default rows shown; the full chip set stays visible and an explicit chip choice is remembered. Rows sort by urgency/due time, not newest activity.",
+    spec: "Warehouse default rows shown; the chips are the kinds the role may open (a brewer has no POs or routes) and an explicit chip choice is remembered. Rows sort by urgency/due time, not newest activity.",
     body: (<>
       {E.hd("Work", "warehouse default")}
       {E.btn("New order", "g")}
-      {E.tabs(WORK_CHIPS, 1, "w-full", WORK_TABS)}
+      {E.tabs(WORK_CHIPS, 0, "w-full", WORK_TABS)}
       {E.row("ORD-0231 · Ridgeline", "submitted · ships today", E.act("Confirm"), "", Package01Icon)}
       {E.row("ORD-0229 · Al’s Bar", "picked · restock 3 Pils staged", E.act("Put back"), "w", Package01Icon)}
       {E.row("PO-0142 · Country Malt", "due today", E.act("Receive"), "", DeliveryTruck01Icon)}
