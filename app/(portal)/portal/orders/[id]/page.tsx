@@ -8,6 +8,7 @@ import { DirectionIcon } from "@/components/mgr/icon";
 import { getActiveCustomer } from "@/lib/portal";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
+import { orNotFound } from "@/lib/mgr/not-found";
 import "@/lib/commands/all";
 
 type OrderStatus = "draft" | "submitted" | "confirmed" | "picked" | "shipped" | "cancelled";
@@ -84,7 +85,8 @@ export default async function PortalOrderDetailPage({ params }: { params: Promis
   const { id } = await params;
   const customer = await getActiveCustomer();
   const ctx = await buildContext(customer.breweryId);
-  const { order, lines, events } = (await runCommand("portal_order", { orderId: id }, ctx)) as {
+  // Unknown or malformed id → app/(portal)/not-found.tsx, same as staff detail pages.
+  const { order, lines, events } = (await orNotFound(runCommand("portal_order", { orderId: id }, ctx))) as {
     order: Order;
     lines: OrderLine[];
     events: OrderEvent[];

@@ -4,7 +4,7 @@
 // bearer context's handling of membership-query failures.
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { makeBrewery, makeStaffCtx } from "./helpers";
+import { admin, asUser, makeBrewery, makeCustomerUser, makeStaffCtx } from "./helpers";
 import { runCommand, CommandError } from "@/lib/commands/registry";
 import { ctxForBearer } from "@/lib/commands/context";
 import { isMissingRecord } from "@/lib/mgr/not-found";
@@ -26,6 +26,23 @@ describe("get_* commands with an unknown or malformed id", () => {
       await expect(runCommand(name, { [key]: "abc" }, ctx)).rejects.toMatchObject({ status: 400, code: "invalid_input" });
     });
   }
+});
+
+describe("portal_order with an unknown or malformed id (review on #144)", () => {
+  let cust: { db: Awaited<ReturnType<typeof asUser>>; userId: string; breweryId: string; role: "customer"; customerId: string };
+  beforeAll(async () => {
+    const b = await makeBrewery();
+    const { data: pl } = await admin.from("price_lists").insert({ brewery_id: b.id, name: "std" }).select().single();
+    const { data: c } = await admin.from("customers").insert({ brewery_id: b.id, name: "Bar", type: "retailer", state: "PA", price_list_id: pl!.id }).select().single();
+    const user = await makeCustomerUser(c!.id);
+    cust = { db: await asUser(user.email), userId: user.id, breweryId: b.id, role: "customer", customerId: c!.id };
+  });
+  it("unknown uuid → 404 not_found", async () => {
+    await expect(runCommand("portal_order", { orderId: NIL }, cust)).rejects.toMatchObject({ status: 404, code: "not_found" });
+  });
+  it("non-uuid → 400 invalid_input", async () => {
+    await expect(runCommand("portal_order", { orderId: "abc" }, cust)).rejects.toMatchObject({ status: 400, code: "invalid_input" });
+  });
 });
 
 describe("isMissingRecord (detail pages → notFound())", () => {
