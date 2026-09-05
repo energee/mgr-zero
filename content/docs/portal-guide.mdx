@@ -25,14 +25,14 @@ The header shows your customer account name; navigation offers **Order, Orders, 
 4. Optionally enter **PO number** and **Note**, then review the subtotal.
 5. Select **Submit order** to save the order and send it to the brewery, or **Save draft** to save it without submitting.
 
-Both buttons stay disabled without a ship-to, without a positive line, or while saving. With no priced products, Shop says **No products available yet**.
+Both buttons stay disabled without a ship-to, without a positive line, or while saving; this holds even after a draft has been saved from this cart. With no priced products, Shop says **No products available yet**.
 
 <Callout type="warn">
 **Before ordering:** if the brewery has not configured its portal fulfillment warehouse, saving fails with **portal fulfillment source is not configured**. Ask brewery staff to configure it.
 </Callout>
 
 <Callout type="warn">
-**Draft limitation:** after **Save draft**, MGR opens a read-only order page. You cannot edit or submit that saved draft from the order page. Ask brewery staff to finish or cancel it. If MGR cannot confirm submission, use **View order status** before retrying: the order may already be submitted. Contact the brewery if its status remains unclear.
+**Draft limitation:** after **Save draft**, MGR opens a read-only order page. You cannot edit or submit that saved draft from the order page. Ask brewery staff to finish or cancel it. If you stay on Shop after saving (or after a submission MGR could not confirm), further edits to quantities, ship-to, PO number, or note replace the saved draft's contents the next time you select **Save draft** or **Submit order**; the same order is reused, so no duplicate draft is created. If MGR cannot confirm submission, use **View order status** before retrying: the order may already be submitted. Contact the brewery if its status remains unclear.
 </Callout>
 
 ## Order statuses [#statuses]
