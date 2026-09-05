@@ -51,15 +51,12 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
-  container,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
-  /** Portal target; default is the document body. The screen explorer passes its own box. */
-  container?: HTMLElement | null
 }) {
   return (
-    <DialogPortal container={container}>
+    <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"

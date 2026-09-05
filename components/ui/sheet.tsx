@@ -50,16 +50,13 @@ function SheetContent({
   children,
   side = "right",
   showCloseButton = true,
-  container,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
-  /** Portal target; default is the document body. The screen explorer passes its own box. */
-  container?: HTMLElement | null
 }) {
   return (
-    <SheetPortal container={container}>
+    <SheetPortal>
       <SheetOverlay />
       <SheetPrimitive.Content
         data-slot="sheet-content"

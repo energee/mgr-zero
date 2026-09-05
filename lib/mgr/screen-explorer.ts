@@ -77,3 +77,11 @@ export function pageUnder(trail: number[], index: number): number {
   if (own === "Global") return MGR[0][0];
   return MGR.find(([i, s]) => isPage(i) && area(s) === own)?.[0] ?? MGR[0][0];
 }
+
+
+/** A history entry owns its walk; revisiting a screen cuts the loop. */
+export function advanceWalk(walk: number[], current: number | undefined, next: number, fresh = false): number[] {
+  const trail = fresh ? [] : walk.length ? walk : current === undefined ? [] : [current];
+  const seen = trail.indexOf(next);
+  return [...(seen < 0 ? trail : trail.slice(0, seen)), next];
+}

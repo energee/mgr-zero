@@ -102,3 +102,17 @@ describe("explorer search and link state", () => {
     expect(parseHash("#s=3&p=brewer")).toEqual({ s: 3, p: "brewer" });
   });
 });
+
+
+it("restores each browser history entry's walk and sheet parent", async () => {
+  const { advanceWalk, pageUnder, screenByName } = await import("../lib/mgr/screen-explorer");
+  const a = screenByName("Orders")![0], sheet = screenByName("Me")![0], b = screenByName("Settings")![0];
+  const first = advanceWalk([], a, sheet);
+  const second = advanceWalk(first, sheet, b);
+  expect(first).toEqual([a, sheet]);
+  expect(second).toEqual([a, sheet, b]);
+  // Restoring Back's saved walk must restore A, even after B was visited.
+  expect(pageUnder(first, sheet)).toBe(a);
+  expect(advanceWalk(first, sheet, a)).toEqual([a]);
+  expect(advanceWalk(second, b, sheet, true)).toEqual([sheet]);
+});

@@ -15,7 +15,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { area } from "@/components/mgr/screens";
-import { AREAS, buildHash, filterScreens, pageUnder, parseHash, screenByName, type HashState, type Indexed, type Surface } from "@/lib/mgr/screen-explorer";
+import { AREAS, advanceWalk, buildHash, filterScreens, pageUnder, parseHash, screenByName, type HashState, type Indexed, type Surface } from "@/lib/mgr/screen-explorer";
 import { deniedFor, homeFor, PERSONAS, personaFor } from "@/lib/mgr/demo-personas";
 import { asPersona } from "@/components/mgr/demo-screens";
 import type { StaffRole } from "@/lib/commands/registry";
@@ -40,17 +40,29 @@ const HOMES = ["Today", "Sales", "Brewer"];
 // the client reads the hash on hydration, and every control writes it back.
 const onHash = (cb: () => void) => {
   window.addEventListener("hashchange", cb);
-  return () => window.removeEventListener("hashchange", cb);
+  window.addEventListener("popstate", cb);
+  return () => {
+    window.removeEventListener("hashchange", cb);
+    window.removeEventListener("popstate", cb);
+  };
 };
-const useHash = () => useSyncExternalStore(onHash, () => window.location.hash, () => "");
-const write = (state: HashState, push: boolean) => {
-  history[push ? "pushState" : "replaceState"](null, "", buildHash(state));
+// Keep the walk on its browser history entry, so Back and Forward restore it
+// along with the URL. A pasted hash starts a fresh walk.
+const snapshot = () => JSON.stringify({
+  hash: window.location.hash,
+  walk: history.state?.mgrExplorer?.hash === window.location.hash ? history.state.mgrExplorer.walk : [],
+});
+const useNavigation = () => JSON.parse(useSyncExternalStore(onHash, snapshot, () => '{"hash":"","walk":[]}')) as { hash: string; walk: number[] };
+const write = (state: HashState, push: boolean, walk: number[]) => {
+  const hash = buildHash(state);
+  history[push ? "pushState" : "replaceState"]({ ...history.state, mgrExplorer: { hash, walk } }, "", hash);
   window.dispatchEvent(new HashChangeEvent("hashchange"));
 };
 const byIndex = (i?: number): Indexed | undefined => (i !== undefined && SCREENS[i] && !SCREENS[i].venue ? [i, SCREENS[i]] : undefined);
 
 export function ScreenExplorer() {
-  const view = parseHash(useHash());
+  const { hash, walk } = useNavigation();
+  const view = parseHash(hash);
   const q = view.q ?? "";
   const areaPick = view.a ?? ALL;
   const surface = view.f ?? ALL;
@@ -65,15 +77,6 @@ export function ScreenExplorer() {
   // its rows once.
   const hits = filterScreens({ q, area: areaPick === ALL ? undefined : areaPick, surface: surface === ALL ? undefined : (surface as Surface) })
     .sort((a, b) => AREAS.indexOf(area(a[1])) - AREAS.indexOf(area(b[1])));
-  // The walk so far (inventory indexes), for the page a sheet opens over, for
-  // Back, and drawn as the trail above the frame. The ref is read
-  // synchronously in handlers; the state copy is what renders.
-  const trail = useRef<number[]>([]);
-  const [walk, setWalk] = useState<number[]>([]);
-  // The page under the current sheet, fixed at navigation time (a ref cannot
-  // be read during render); a hash the browser restores falls back to the
-  // sheet's own area.
-  const [under, setUnder] = useState<number | null>(null);
   const [box, setBox] = useState<HTMLDivElement | null>(null);
   const list = useRef<HTMLUListElement>(null);
   // The link's screen is the one drawn even when the filter no longer lists
@@ -81,18 +84,9 @@ export function ScreenExplorer() {
   const current = byIndex(view.s) ?? hits[0];
   const listed = current && hits.some(([i]) => i === current[0]);
   // Filters write themselves and keep the reader's pick.
-  const set = (patch: HashState) => write({ ...view, ...patch }, false);
+  const set = (patch: HashState) => write({ ...view, ...patch }, false, walk);
   const go = (i: number, push: boolean, patch: HashState = {}, fresh = false) => {
-    // A deep-linked screen was never walked to; it is the ground of the first
-    // tap and where dismissing that tap's sheet goes back to.
-    if (fresh) trail.current = [];
-    else if (!trail.current.length && current) trail.current.push(current[0]);
-    setUnder(pageUnder(trail.current, i));
-    const seen = trail.current.indexOf(i);
-    if (seen >= 0) trail.current.length = seen;
-    trail.current.push(i);
-    setWalk([...trail.current]);
-    write({ ...view, ...patch, s: i }, push);
+    write({ ...view, ...patch, s: i }, push, advanceWalk(walk, current?.[0], i, fresh));
   };
   // From the list: a new start, focus stays where it was. From a tap in the
   // frame: one more step, and Tab continues into the drawing.
@@ -117,8 +111,7 @@ export function ScreenExplorer() {
     set({ p: role });
   };
   const back = () => {
-    trail.current.pop();
-    const prev = trail.current.at(-1);
+    const prev = walk.at(-2);
     if (prev !== undefined) go(prev, true);
     else if (current) go(pageUnder([], current[0]), false, {}, true);
     box?.focus({ preventScroll: true });
@@ -145,7 +138,7 @@ export function ScreenExplorer() {
     if (link || name) e.preventDefault();
     // Nowhere to go, or a verb named like the sheet it sits in ("Record
     // movement" on Record movement): it acts here.
-    if (!name || name === current[1].name) return actInPlace(el, label, back, trail.current.length > 1);
+    if (!name || name === current[1].name) return actInPlace(el, label, back, walk.length > 1);
     e.stopPropagation();
     if (name === BACK) return back();
     const home = name === "Today" ? homeFor(persona.role) : name;
@@ -164,15 +157,6 @@ export function ScreenExplorer() {
   };
   // Tabs that open a screen this persona may not: hidden, as the app would.
   const hidden = Object.values(WORK_TABS).filter((n) => deniedFor(persona.role, n)).map((n) => `.screen-box [data-to="${n}"]{display:none}`).join("");
-  // The browser's back and forward move the hash without us: the trail is cut
-  // back to that screen when it is on it, else starts over there.
-  useEffect(() => {
-    const s = view.s;
-    if (s === undefined || trail.current.at(-1) === s) return;
-    const at = trail.current.indexOf(s);
-    trail.current = at >= 0 ? trail.current.slice(0, at + 1) : [s];
-    setWalk([...trail.current]);
-  }, [view.s]);
   // The selected row stays in view when a tap or a link lands far down the list.
   useEffect(() => {
     list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
@@ -264,7 +248,7 @@ export function ScreenExplorer() {
                   {hidden && <style>{hidden}</style>}
                   {s.surface === "sheet" ? (
                     <>
-                      <ScreenFrame screen={SCREENS[under ?? pageUnder([], current[0])]} persona={persona} />
+                      <ScreenFrame screen={SCREENS[pageUnder(walk, current[0])]} persona={persona} />
                       {box && <ScreenSheet screen={s} container={box} onClose={back} />}
                     </>
                   ) : (
