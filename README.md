@@ -51,12 +51,8 @@ bunx supabase status -o env | node scripts/supabase-env.mjs > .env.local
 ```
 
 The mapper converts the Supabase CLI's local key labels into the application's
-modern environment contract. Add a separate random HMAC secret of at least 32
-characters to `.env.local`:
-
-```dotenv
-COMMAND_RATE_LIMIT_HMAC_SECRET=<random secret of at least 32 characters>
-```
+modern environment contract; nothing else is needed in `.env.local`. Rate
+limiting on `/api/command`: not yet implemented (authz audit A1).
 
 `VERCEL_ENV` is optional; when set it must be `production`, `preview`, or
 `development` (`lib/env/server-parser.ts`). Vercel sets it on deploys; locally
@@ -265,8 +261,8 @@ orders are wholesale orders shipped from the brewery's warehouse.
 **Not yet provisioned.** No hosted Supabase project or Vercel project exists
 for this repo yet. When that is set up, create the hosted Supabase and Vercel
 projects and configure `NEXT_PUBLIC_SUPABASE_URL`,
-`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, and
-`COMMAND_RATE_LIMIT_HMAC_SECRET` in Vercel. Then run `bunx supabase db push` against
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY` in Vercel.
+Then run `bunx supabase db push` against
 the hosted project, deploy, and verify login → catalog → inventory on the
 preview URL.
 

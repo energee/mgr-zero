@@ -13,7 +13,6 @@ const validPublic = {
 const validServer = {
   ...validPublic,
   SUPABASE_SECRET_KEY: "service-role-key",
-  COMMAND_RATE_LIMIT_HMAC_SECRET: "a-command-rate-limit-secret-that-is-long-enough",
 };
 
 describe("environment validation", () => {
@@ -26,17 +25,22 @@ describe("environment validation", () => {
     );
   });
 
-  it("fails fast when server-only configuration is missing, invalid, or too short", () => {
+  it("fails fast when server-only configuration is missing or invalid", () => {
     expect(() => readServerEnv(validPublic)).toThrow("SUPABASE_SECRET_KEY");
     expect(() =>
       readServerEnv({ ...validServer, VERCEL_ENV: "staging" })
     ).toThrow("VERCEL_ENV");
-    expect(() =>
-      readServerEnv({ ...validServer, COMMAND_RATE_LIMIT_HMAC_SECRET: "a".repeat(31) })
-    ).toThrow("COMMAND_RATE_LIMIT_HMAC_SECRET");
-    expect(readServerEnv({ ...validServer, COMMAND_RATE_LIMIT_HMAC_SECRET: "a".repeat(32) })).toMatchObject({
-      commandRateLimitHmacSecret: "a".repeat(32),
-    });
+  });
+
+  it("needs only the Supabase secret key on the server; no rate-limit secret exists (audit 2026-09-05 A1)", () => {
+    // COMMAND_RATE_LIMIT_HMAC_SECRET was required but never consumed. Nothing
+    // may demand it or expose a value for it.
+    const server = readServerEnv(validServer);
+    expect(server).toMatchObject({ supabaseSecretKey: "service-role-key" });
+    expect(server).not.toHaveProperty("commandRateLimitHmacSecret");
+    expect(readFileSync(resolve(__dirname, "..", "lib", "env", "server-parser.ts"), "utf8")).not.toContain(
+      "COMMAND_RATE_LIMIT"
+    );
   });
 
   it("uses direct static public environment references for browser inlining", () => {
@@ -59,7 +63,6 @@ describe("environment validation", () => {
     const browserClient = readFileSync(resolve(__dirname, "..", "lib", "supabase", "client.ts"), "utf8");
 
     expect(publicEnv).not.toContain("SUPABASE_SECRET_KEY");
-    expect(publicEnv).not.toContain("COMMAND_RATE_LIMIT_HMAC_SECRET");
     expect(browserClient).not.toContain("@/lib/env/server");
     expect(browserClient).not.toContain("SUPABASE_SECRET_KEY");
     expect(serverEnv).toContain('import "server-only"');

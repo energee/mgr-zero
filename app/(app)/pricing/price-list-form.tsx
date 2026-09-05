@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
+import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCommandForm } from "@/lib/commands/use-command-form";
@@ -30,7 +30,7 @@ export function PriceListForm({ priceList }: { priceList?: PriceListEditData }) 
             <Label htmlFor="price-list-name">Name</Label>
             <Input id="price-list-name" value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
-          {form.error && <p className="text-sm text-destructive">{form.error}</p>}
+          <CommandFormMessage error={form.error} />
           <CommandFormFooter>
             <Button type="submit" disabled={form.submitting}>
               {form.submitting ? (isEdit ? "Saving…" : "Creating…") : isEdit ? "Save" : "Create"}

@@ -5,7 +5,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
+import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -51,7 +51,7 @@ export function PriceForm({
             <Label htmlFor="price-dollars">Unit price (USD)</Label>
             <Input id="price-dollars" type="number" step="0.01" min="0" value={dollars} onChange={(e) => setDollars(e.target.value)} required />
           </div>
-          {form.error && <p className="text-sm text-destructive">{form.error}</p>}
+          <CommandFormMessage error={form.error} />
           <CommandFormFooter>
             <Button type="submit" disabled={form.submitting || !skuId}>
               {form.submitting ? "Saving…" : "Save"}

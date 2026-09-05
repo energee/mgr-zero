@@ -1,6 +1,7 @@
 // lib/commands/use-command-form.ts — the form lifecycle every mutation form
 // (rendered in components/mgr/command-form.tsx) shares: open/close, one command action (with its serialized request
-// ID), inline error, and refresh on success. Forms own only their fields and
+// ID), inline error (rendered by CommandFormMessage as role="alert"), and
+// refresh on success. Forms own only their fields and
 // how to build the command input.
 "use client";
 
