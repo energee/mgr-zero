@@ -58,6 +58,10 @@ characters to `.env.local`:
 COMMAND_RATE_LIMIT_HMAC_SECRET=<random secret of at least 32 characters>
 ```
 
+`VERCEL_ENV` is optional; when set it must be `production`, `preview`, or
+`development` (`lib/env/server-parser.ts`). Vercel sets it on deploys; locally
+it is normally absent.
+
 Apply migrations and seed a dev user/brewery:
 
 ```bash
@@ -103,17 +107,22 @@ the same repo), reusing one already running there, and stops what it
 started on both success and failure. It needs `bunx supabase start` and a
 `.env.local` in place, same as the vitest suite. See `tests-e2e/portal-smoke.ts`.
 
-Test files: `tests/api-command.test.ts` (Bearer auth on `/api/command`),
-`tests/rls-tenancy.test.ts`, `tests/rls-ledger.test.ts` (RLS
-isolation, ledger immutability, CHECK constraints, ATP math),
-`tests/registry.test.ts` (command registry validation/permissions),
-`tests/commands-inventory.test.ts` (catalog/inventory commands),
-`tests/commands-import.test.ts` (CSV import blocked), `tests/commands-invites.test.ts` (invitations blocked)
-(invitations), `tests/schema-rules.test.ts` (pg_catalog gates: RLS on every
-table, `security_invoker` views, `search_path` on functions, no anon-executable
-definer functions), `tests/schema-conventions.test.ts` (composite FKs, lot
-trigger, append-only ledgers), `tests/write-atomicity.test.ts` (iron rule 5). Tests run against the real local Supabase stack (not a
-mock) — `bunx supabase start` must be running first.
+Test files, by suite (`ls tests/`):
+
+- `api-command`, `request-auth`, `proxy` — Bearer auth on `/api/command`; request authentication kept distinct from membership resolution; refresh cookies preserving no-cache headers.
+- `registry`, `command-idempotency`, `write-atomicity`, `data-api-boundary` — command registry validation and permissions, durable request replay, iron rule 5, and narrow RPCs instead of table DML.
+- `commands-catalog`, `commands-inventory`, `commands-customers`, `commands-orders`, `commands-portal`, `commands-today` — the domain commands per area.
+- `commands-import`, `commands-invites` — CSV import and invitations are registered but blocked.
+- `orders-lifecycle`, `orders-fulfillment` — order state machine, allocations, pick/ship, invoices, credit memos.
+- `portal-cart` — the portal cart's submission-failure messages.
+- `rls-tenancy`, `rls-orders`, `rls-ledger`, `rls-command-boundary`, `rls-integration-secrets` — RLS isolation, ledger immutability, CHECK constraints, ATP math, staff writes only through role-scoped RPCs, and integration tokens never reaching browser clients.
+- `schema-rules`, `schema-conventions` — pg_catalog gates (RLS on every table, `security_invoker` views, `search_path` on functions, no anon-executable definer functions) and conventions (composite FKs, lot trigger, append-only ledgers).
+- `chat-*` — chat notification contracts, adapter conformance, delivery policy, pacing, occurrences, jobs, linking, OAuth, webhook, Slack renderer, state adapter, preview fixtures, and schema.
+- `env`, `time-window`, `volume` — environment parsing and the display helpers.
+- `mgr-nav`, `mgr-screens`, `mgr-icon`, `screen-links`, `screen-persona`, `tap-coverage` — navigation manifests, the screen inventory, the mark, and the explorer's link/persona contracts.
+- `docs`, `design-docs`, `documentation-agent`, `documentation-agent-workflow`, `dreaming-workflow`, `workflow-contract`, `tooling-contract` — the guide MDX shape, the generated design pages, README ↔ command sync, the CI/agent workflow contracts, and the pinned runtime/framework/Vitest tooling.
+
+Tests run against the real local Supabase stack (not a mock) — `bunx supabase start` must be running first.
 
 ## HTTP API
 

@@ -24,7 +24,7 @@ If the credentials are wrong, MGR shows **Incorrect email or password**. If the 
 | --- | --- |
 | **Admin** | All current staff screens and actions. |
 | **Sales** | Catalog creation; customers and pricing; order creation, submission, confirmation, adjustment, cancellation, and credits; inventory viewing; invoices; replenishment suggestions and order creation. |
-| **Warehouse** | Inventory viewing and movements; order and pick-sheet viewing, picking, and shipping; replenishment suggestions (the Create replenishment order button appears but returns a permission error); viewing Catalog read-only from **Menu** in the More tab; the invoice created when it ships a wholesale order, from a link shown right after shipping — it cannot open the Invoices list or Team. |
+| **Warehouse** | Inventory viewing and movements; order and pick-sheet viewing, picking, and shipping; replenishment suggestions (the Create replenishment order button appears but returns a permission error); viewing Catalog read-only from **Menu** in the More tab; opening the Invoices list from the **More** tab (it is the tab's landing page) and the invoice created when it ships a wholesale order. Team opens if the address is entered directly but is not linked in navigation. |
 | **Brewer** | Today and account linking from Slack. Brewer's Beer, Work, and More tabs are also visible, but every link under them currently returns a permission error — see [Navigate MGR](#navigation). |
 
 <Callout type="info">
@@ -176,8 +176,8 @@ An order may instead become `cancelled` any time before shipping. The Orders scr
 
 1. Open **Orders** and select **New Order**.
 2. Choose **Kind**: **Wholesale** (default) or **Taproom transfer**.
-3. For wholesale, choose the **Customer** and one of that customer’s **Ship-tos**. For a transfer, choose the destination taproom.
-4. Choose the source in **From location**. Use a warehouse source.
+3. For wholesale, choose the **Customer** and one of that customer’s **Ship-tos**. For a transfer, choose the destination in **To location**.
+4. Choose the source in **From location**. Both location selects list every location of the brewery, not just taprooms or warehouses, so pick a warehouse source and a taproom destination yourself.
 5. Optionally choose **Requested ship date** and enter **PO number**.
 6. Add one or more lines. Each needs a SKU and quantity greater than zero. **Add line** adds a row; **Remove** removes one, but at least one row remains.
 7. Select **Create**. The result is a draft. Wholesale line prices are captured from the customer’s current price list; later price-list changes do not alter those lines.
@@ -199,13 +199,13 @@ A wholesale order fails if the customer has no price list or an ordered SKU has 
 | **Ship** | Picked | Quantities default to picked amounts; use zero for held-back lines. Carrier and tracking are optional. Stock leaves the source. A transfer adds the same stock to its destination; a wholesale shipment with any positive quantity creates an invoice, and the confirmation shows a link to view it. |
 | **Cancel** | Any unshipped order | Give a required reason. Reservations are released. Cancelling after picking leaves the restocking badge as a physical reminder. |
 
-The order detail shows customer and ship-to for wholesale orders, PO, requested date, ordered/picked/shipped quantity, captured price, current ATP, and a time-stamped event history. The current detail page does not display a taproom transfer’s destination. An empty order list says **No orders yet**; an empty timeline says **No events yet**. A shipped or cancelled order has no further action controls.
+The order detail shows customer and ship-to for wholesale orders, PO, requested date, ordered/picked/shipped quantity, captured price, current ATP, and a time-stamped event history. The current detail page does not display a taproom transfer’s destination, and it does not show the order note — a note entered by a portal customer is visible only in the portal’s own order detail. An empty order list says **No orders yet**; an empty timeline says **No events yet**. A shipped or cancelled order has no further action controls.
 
 ## Pick sheet [#pick-sheet]
 
 <Screen name="Pick sheet" />
 
-*Admin and Warehouse can open Pick; Sales does not currently have a way to reach this page.*
+*Admin and Warehouse can open Pick from the Work tab. The page also opens for Sales when the address is entered directly, but it is not linked in Sales navigation.*
 
 Open **Pick** to see confirmed and picked orders grouped by requested ship date; orders without a date appear under **Unscheduled**. Each card shows ordered and previously picked amounts and links to the order detail, where picking is recorded.
 
@@ -215,7 +215,7 @@ Select **Print** to open the browser print dialog. MGR hides the staff navigatio
 
 <Screen name="Invoices" />
 
-*Admin and Sales can open the Invoices list. Admin and Sales can create a credit memo. Warehouse cannot open the Invoices list, but sees the invoice created by a wholesale shipment it records, from a link shown right after shipping.*
+*Admin and Sales can open the Invoices list from the **Invoices** link. Warehouse can also open it — the **More** tab lands on Invoices, though the link itself is not shown — and sees the invoice created by a wholesale shipment it records from a link shown right after shipping. Only Admin and Sales can create a credit memo.*
 
 The Invoices list shows number, kind, customer, total, and paid date. Open an invoice number to see issue date, line quantities, captured unit prices, amounts, and total. An empty list says **No invoices yet**. Payment is display-only; there is no record-payment action.
 
@@ -248,7 +248,7 @@ The page says **No taprooms configured** when none exist, or **No pars set for t
 
 <Screen name="Team" />
 
-Admin can open **Team** to see current staff memberships; Sales and Warehouse do not currently have a way to reach this page. Each row shows a user ID and role; email addresses are not displayed. The page is read-only, so it has no invitation, role-change, or removal controls. An empty roster shows **No staff members yet**.
+Admin can open **Team** from **Settings** to see current staff memberships. The page also opens for Sales and Warehouse when the address is entered directly, but it is not linked in their navigation. Each row shows a user ID and role; email addresses are not displayed. The page is read-only, so it has no invitation, role-change, or removal controls. An empty roster shows **No staff members yet**.
 
 ## Link your Slack account [#slack]
 
@@ -264,29 +264,15 @@ If the link is missing, expired, already used, or belongs to another account, re
 
 ## Errors and corrections [#errors-corrections]
 
-A form reports an error
+**A form reports an error.** Read the message, correct the visible fields, and submit again. Your entries remain until the form succeeds or you close it. Permission errors require an administrator.
 
-Read the message, correct the visible fields, and submit again. Your entries remain until the form succeeds or you close it. Permission errors require an administrator.
+**A page fails to load.** Select **Try again** once. If it still fails, give your administrator the brewery or customer name, page, approximate time, and action attempted.
 
-A page fails to load
+**A record seems missing.** Confirm the brewery or customer account shown in the navigation, clear any order-status filter, and verify the exact product, SKU, customer, or location name.
 
-Select
+**Inventory is wrong.** Do a physical count and identify what happened. Record an adjustment only for a verified count difference. Never disguise a sale, sample, loss, destruction, festival removal, return, or transfer as another type. Add a note that explains the correction.
 
-Try again
-
-once. If it still fails, give your administrator the brewery or customer name, page, approximate time, and action attempted.
-
-A record seems missing
-
-Confirm the brewery or customer account shown in the navigation, clear any order-status filter, and verify the exact product, SKU, customer, or location name.
-
-Inventory is wrong
-
-Do a physical count and identify what happened. Record an adjustment only for a verified count difference. Never disguise a sale, sample, loss, destruction, festival removal, return, or transfer as another type. Add a note that explains the correction.
-
-A shipped order or invoice is wrong
-
-Do not add an unrelated inventory movement. Create a credit memo from the invoice so the financial correction and returned stock stay linked to the shipment history.
+**A shipped order or invoice is wrong.** Do not add an unrelated inventory movement. Create a credit memo from the invoice so the financial correction and returned stock stay linked to the shipment history.
 
 ## Actions not yet available [#unavailable]
 
