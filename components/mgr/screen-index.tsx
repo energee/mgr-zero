@@ -20,7 +20,7 @@ const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").re
 // Areas and screens share names — a "Today" area holds a "Today" screen — so
 // screen anchors are prefixed; without it both headings claim #today and the
 // sub-index sends every screen link to its area.
-const screenSlug = (name: string) => `screen-${slug(name)}`;
+export const screenSlug = (name: string) => `screen-${slug(name)}`;
 
 // Order sections by where they appear in the inventory, so a page reads in the
 // same build order the gallery does rather than alphabetically. MGR screens

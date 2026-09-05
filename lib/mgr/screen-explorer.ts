@@ -15,6 +15,11 @@ const MGR: Indexed[] = SCREENS.map((s, i): Indexed => [i, s]).filter(([, s]) => 
 /** The areas MGR screens file under, in inventory order. */
 export const AREAS = [...new Set(MGR.map(([, s]) => area(s)))];
 
+// What the search box reads: the name, then the job line, spec and state
+// notes where they are plain strings (a JSX job is only findable by name).
+const haystack = (s: Screen) =>
+  [s.name, s.job, s.spec, ...(s.states ?? []).flat()].filter((x) => typeof x === "string").join(" ").toLowerCase();
+
 export function filterScreens({ q = "", area: a, surface }: Filter): Indexed[] {
   const needle = q.trim().toLowerCase();
   return MGR.filter(
@@ -22,8 +27,30 @@ export function filterScreens({ q = "", area: a, surface }: Filter): Indexed[] {
       (!a || area(s) === a) &&
       // A page has no `surface`; the chip reads better than "undefined".
       (!surface || (s.surface ?? "page") === surface) &&
-      (!needle || s.name.toLowerCase().includes(needle)),
+      (!needle || haystack(s).includes(needle)),
   );
+}
+
+/** Everything the explorer keeps in the URL hash so a link reopens the same
+ * view: `s` the inventory index, `p` the persona role, `q`/`a`/`f` the
+ * search, area and surface filters. `#s<index>` is the form the first links used. */
+export type HashState = { s?: number; p?: string; q?: string; a?: string; f?: string };
+
+export function parseHash(hash: string): HashState {
+  const legacy = /^#s(\d+)$/.exec(hash);
+  if (legacy) return { s: Number(legacy[1]) };
+  const params = new URLSearchParams(hash.replace(/^#/, ""));
+  const out: HashState = {};
+  if (params.has("s")) out.s = Number(params.get("s"));
+  for (const k of ["p", "q", "a", "f"] as const) if (params.get(k)) out[k] = params.get(k)!;
+  return out;
+}
+
+export function buildHash(state: HashState): string {
+  const params = new URLSearchParams();
+  if (state.s !== undefined) params.set("s", String(state.s));
+  for (const k of ["p", "q", "a", "f"] as const) if (state[k]) params.set(k, state[k]!);
+  return `#${params}`;
 }
 
 export const screenByName = (name: string) => MGR.find(([, s]) => s.name === name);

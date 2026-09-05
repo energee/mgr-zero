@@ -81,3 +81,24 @@ describe("screen explorer", () => {
     expect(pageUnder([], movement)).toBe(today);
   });
 });
+
+describe("explorer search and link state", () => {
+  it("matches a screen by its job, spec and state notes, not only its name", async () => {
+    const { filterScreens } = await import("../lib/mgr/screen-explorer");
+    const names = (q: string) => filterScreens({ q }).map(([, s]) => s.name);
+    expect(names("credit")).toContain("Return and credit");
+    expect(names("blocking review")).toContain("Confirm order"); // spec text
+    expect(names("skeleton")).toContain("Confirm order"); // a state note
+    expect(names("zzzz-nothing")).toEqual([]);
+  });
+
+  it("round-trips the explorer state through the hash and reads the old #s<index> form", async () => {
+    const { parseHash, buildHash } = await import("../lib/mgr/screen-explorer");
+    expect(parseHash("#s7")).toEqual({ s: 7 });
+    expect(parseHash("")).toEqual({});
+    const state = { s: 12, p: "sales", q: "keg", a: "Work", f: "sheet" };
+    expect(parseHash(buildHash(state))).toEqual(state);
+    expect(buildHash({ s: 3 })).toBe("#s=3");
+    expect(parseHash("#s=3&p=brewer")).toEqual({ s: 3, p: "brewer" });
+  });
+});

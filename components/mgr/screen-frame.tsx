@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/mgr/icon";
 import { Search01Icon } from "@hugeicons/core-free-icons";
 import { navFor, STAFF_NAV } from "@/lib/mgr/nav";
-import { PERSONAS, type Persona } from "@/lib/mgr/demo-personas";
+import { PERSONAS, type Persona, PORTAL_BUYER } from "@/lib/mgr/demo-personas";
 
 /** A sheet record as the command form it ships in. Pinned open unless `onClose`
  * is given (the explorer passes it, and `container` to keep the portal in its box). */
@@ -52,11 +52,11 @@ export function ScreenFrame({ screen: s, persona = PERSONAS[0] }: { screen: Scre
     );
   }
   const body = s.surface === "sheet" ? <ScreenSheet screen={s} /> : s.body;
-  // The staff user is the fixture face (Maria); the portal user is the customer's
-  // buyer, a different person, so that header keeps the icon.
+  // The staff user is the chosen persona's face; the portal user is the
+  // customer's buyer (PORTAL_BUYER), a different person, shown by initials.
   const me = <MeSheet avatar={{ src: persona.avatar, name: persona.name }} fields={[["Name", persona.name], ["Brewery", "Demo Brewing"], ["Role", `${persona.handle} · ${persona.role}`]]} />;
   return s.portal ? (
-    <PortalShell brand="Demo Brewing wholesale" headerRight={<MeSheet fields={[["Account", "Ridgeline Tap Room"]]} />} composer={E.comp(true)} active={s.portal}>
+    <PortalShell brand="Demo Brewing wholesale" headerRight={<MeSheet avatar={{ name: PORTAL_BUYER.name }} fields={[["Name", PORTAL_BUYER.name], ["Account", PORTAL_BUYER.account], ["Signed in as", PORTAL_BUYER.email]]} />} composer={E.comp(true)} active={s.portal}>
       {body}
     </PortalShell>
   ) : (

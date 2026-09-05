@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
 import { SCREENS } from "../components/mgr/screens";
 import { ScreenFrame } from "../components/mgr/screen-frame";
-import { deniedFor, homeFor, LANDINGS, needsFor, PERSONAS, personaFor, roleGaps } from "../lib/mgr/demo-personas";
+import { deniedFor, homeFor, LANDINGS, needsFor, PERSONAS, personaFor, PORTAL_BUYER, roleGaps } from "../lib/mgr/demo-personas";
 import { writeFileSync } from "node:fs";
 import { asPersona } from "../components/mgr/demo-screens";
 import { initialsOf } from "../components/mgr/user-avatar";
@@ -87,5 +87,18 @@ describe("persona", () => {
     expect(denied).toContain("@ted · sales");
     expect(denied).toContain("admin or warehouse");
     expect(asPersona(by("Orders"), personaFor("sales"))).toBe(by("Orders"));
+  });
+  it("signs the portal frames in as the demo buyer, never a staff person", () => {
+    const portal = SCREENS.find((s) => s.portal && !s.surface)!;
+    const html = renderToStaticMarkup(createElement(ScreenFrame, { screen: portal, persona: personaFor("sales") }));
+    // The Me sheet is closed in static markup; the header avatar carries the buyer's initials.
+    expect(html).toContain(initialsOf(PORTAL_BUYER.name));
+    expect(html).not.toContain("ted.jpg");
+  });
+
+  it("does not let a parent tab's landing route grant its children: More lands on Invoices, warehouse may not open it", () => {
+    expect(deniedFor("warehouse", "Invoices")).toBe(true);
+    expect(deniedFor("sales", "Invoices")).toBe(false);
+    expect(deniedFor("brewer", "Orders")).toBe(true);
   });
 });

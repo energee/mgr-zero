@@ -23,10 +23,17 @@ export const PERSONAS: Persona[] = [
 
 export const personaFor = (role: StaffRole) => PERSONAS.find((p) => p.role === role) ?? PERSONAS[0];
 
+/** The customer the portal frames are signed in as: the buyer at the account
+ * the staff screens ship to. One person, no roles — the portal has none. */
+export const PORTAL_BUYER = { name: "Jordan Lee", account: "Ridgeline Tap Room", email: "jordan@ridgelinetap.com" };
+
 /** The role's landing: its own Today where one is drawn (Sales, Brewer). */
 export const homeFor = (role: StaffRole) => ({ sales: "Sales", brewer: "Brewer" } as Partial<Record<StaffRole, string>>)[role] ?? "Today";
 
-const routesOf = (role: StaffRole) => new Set(navFor(STAFF_NAV, role).flatMap((t) => [t.href, ...(t.children ?? []).map((c) => c.href)]));
+// A tab with children lands on its first child; that href is a landing, not a
+// permission, so only leaf tabs and children count (More's /invoices does not
+// let a warehouse member open Invoices).
+const routesOf = (role: StaffRole) => new Set(navFor(STAFF_NAV, role).flatMap((t) => (t.children?.length ? t.children.map((c) => c.href) : [t.href])));
 
 /** Every drawn landing; the persona switch swaps one for the new role's. */
 export const LANDINGS = ["Today", "Sales", "Brewer", "Driver", "Taproom"];
