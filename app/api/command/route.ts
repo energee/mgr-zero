@@ -1,6 +1,7 @@
 // app/api/command/route.ts — the typed HTTP command/query endpoint.
 // Commands require client-provided UUID request IDs; queries only receive a
-// server-generated correlation ID. Task 12 will sanitize unexpected errors.
+// server-generated correlation ID. Unexpected errors are logged and returned
+// as a generic 500; database errors are sanitized in registry.ts (unwrap).
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { buildContextFromBearer, buildRouteContext } from "@/lib/commands/context";

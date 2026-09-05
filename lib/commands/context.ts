@@ -7,24 +7,27 @@ import {
   type RequestAuthContext,
 } from "@/lib/auth/request-context";
 import { publicEnv } from "@/lib/env/public";
-import { CommandError } from "./registry";
+import { CommandError, unwrap } from "./registry";
 import type { Ctx } from "./registry";
 
-async function ctxForBearer(db: SupabaseClient, userId: string, breweryId: string): Promise<Ctx> {
-  const { data: staff } = await db
+// Exported for tests; production callers go through buildContextFromBearer.
+// Both membership reads go through unwrap so a database failure is a 500
+// db_error rather than being mistaken for "not a member" (403).
+export async function ctxForBearer(db: SupabaseClient, userId: string, breweryId: string): Promise<Ctx> {
+  const staff = await unwrap(db
     .from("brewery_users")
     .select("role")
     .eq("brewery_id", breweryId)
     .eq("user_id", userId)
-    .maybeSingle();
+    .maybeSingle());
   if (staff) return { db, userId, breweryId, role: staff.role };
 
-  const { data: customer } = await db
+  const customer = await unwrap(db
     .from("customer_users")
     .select("customer_id, customers!inner(brewery_id)")
     .eq("user_id", userId)
     .eq("customers.brewery_id", breweryId)
-    .limit(1);
+    .limit(1));
   if (customer?.length) {
     return { db, userId, breweryId, role: "customer", customerId: customer[0].customer_id };
   }
