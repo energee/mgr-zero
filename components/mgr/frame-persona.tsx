@@ -10,12 +10,13 @@ import { asPersona } from "@/components/mgr/demo-screens";
 import { personaFor } from "@/lib/mgr/demo-personas";
 import type { StaffRole } from "@/lib/commands/registry";
 import { SCREENS } from "@/components/mgr/screens";
+import { parseHash } from "@/lib/mgr/screen-explorer";
 
 const onHash = (cb: () => void) => {
   window.addEventListener("hashchange", cb);
   return () => window.removeEventListener("hashchange", cb);
 };
-const role = () => /p=(\w+)/.exec(window.location.hash)?.[1] ?? "";
+const role = () => parseHash(window.location.hash).p ?? "";
 
 export function FramePersona({ index }: { index: number }) {
   const persona = personaFor(useSyncExternalStore(onHash, role, () => "") as StaffRole);
