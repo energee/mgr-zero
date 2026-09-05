@@ -1,10 +1,13 @@
 // app/(app)/customers/[id]/page.tsx — single customer: profile and ship-tos
-// (portal-user invites are not available in this release). Reads through the command registry (get_customer) with
-// a brewery-scoped Ctx. Failures throw to the (app) error boundary.
+// (portal-user invites are not available in this release). Reads through the
+// command registry (get_customer) with a brewery-scoped Ctx. An unknown or
+// malformed id renders not-found.tsx; other failures throw to the (app) error
+// boundary.
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
+import { orNotFound } from "@/lib/mgr/not-found";
 import { CustomerForm } from "../customer-form";
 import { ShipToForm } from "../ship-to-form";
 
@@ -35,7 +38,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const [{ customer, shipTos }, priceLists] = (await Promise.all([
-    runCommand("get_customer", { customerId: id }, ctx),
+    orNotFound(runCommand("get_customer", { customerId: id }, ctx)),
     runCommand("list_price_lists", {}, ctx),
   ])) as [{ customer: Customer; shipTos: ShipTo[] }, PriceList[]];
 

@@ -147,8 +147,8 @@ envelope `{ "ok": false, "error": { "code": "...", "message": "..." },
 | 401 | Unauthenticated |
 | 403 | Not a member of the brewery or permission denied |
 | 409 | `requestId` reused with a different payload (`conflict`) |
-| 404 | Unknown operation |
-| 500 | Unexpected failure |
+| 404 | Unknown operation (`unknown_command`), or a `get_*` id that matches no record the caller may see (`not_found`) |
+| 500 | Unexpected failure; database errors surface as `db_error` with a generic message and are logged server-side |
 
 Input fields are camelCase; ids are UUIDs; money is integer cents; dates
 are `YYYY-MM-DD` strings. `limit` parameters default to 50 (max 200).
