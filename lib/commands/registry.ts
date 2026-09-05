@@ -58,16 +58,12 @@ export async function unwrap<T>(query: PromiseLike<{ data: T; error: { message: 
   return data;
 }
 
-// Maps a Supabase/PostgREST error to the public CommandError envelope:
-// - 42501: the definer RPCs signal authorization failures → 403.
-// - MG409: application SQLSTATE for request-id reuse → 409.
-// - PGRST116: PostgREST found zero (or many) rows for .single() → 404 not_found;
-//   detail pages turn this into the not-found route (lib/mgr/not-found.ts).
-// - P0001: `raise exception` without an errcode — the domain rules our own RPCs
-//   raise ("order is shipped", "ship-to not found") — keep their message, 400.
-// Anything else (constraint violations, connection faults, PostgREST parse
-// errors) is logged here and surfaces as a generic 500 so raw Postgres text
-// never reaches a client (security audit A2).
+// Maps a Supabase/PostgREST error to the public CommandError envelope. P0001 is
+// `raise exception` without an errcode, i.e. the domain rules our own RPCs
+// raise, so its message is the user-facing one. Anything unlisted is logged
+// here and surfaces as a generic 500 so raw Postgres text never reaches a
+// client (security audit A2); detail pages turn not_found into the not-found
+// route (lib/mgr/not-found.ts).
 function rpcError(error: { message: string; code?: string }): CommandError {
   switch (error.code) {
     case "42501": return new CommandError(error.message, 403, "permission_denied");

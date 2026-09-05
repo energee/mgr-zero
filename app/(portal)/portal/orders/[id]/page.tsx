@@ -85,7 +85,6 @@ export default async function PortalOrderDetailPage({ params }: { params: Promis
   const { id } = await params;
   const customer = await getActiveCustomer();
   const ctx = await buildContext(customer.breweryId);
-  // Unknown or malformed id → app/(portal)/not-found.tsx, same as staff detail pages.
   const { order, lines, events } = (await orNotFound(runCommand("portal_order", { orderId: id }, ctx))) as {
     order: Order;
     lines: OrderLine[];

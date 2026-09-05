@@ -6,16 +6,12 @@
 import { notFound } from "next/navigation";
 import { CommandError } from "@/lib/commands/registry";
 
-export function isMissingRecord(e: unknown): boolean {
-  return e instanceof CommandError && (e.code === "not_found" || e.code === "invalid_input");
-}
-
 // Awaits a registry read; a missing record calls notFound(), anything else rethrows.
 export async function orNotFound<T>(read: Promise<T>): Promise<T> {
   try {
     return await read;
   } catch (e) {
-    if (isMissingRecord(e)) notFound();
+    if (e instanceof CommandError && (e.code === "not_found" || e.code === "invalid_input")) notFound();
     throw e;
   }
 }

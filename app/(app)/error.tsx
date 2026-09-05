@@ -9,7 +9,7 @@
 export default function AppError({ reset }: { reset: () => void }) {
   return (
     <div className="flex flex-col gap-2 text-sm">
-      <p className="text-red-600">Something went wrong loading this page.</p>
+      <p role="alert" className="text-destructive">Something went wrong loading this page.</p>
       <button onClick={reset} className="w-fit underline">Try again</button>
     </div>
   );

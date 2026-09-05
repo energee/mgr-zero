@@ -11,13 +11,17 @@ import { publicEnv } from "@/lib/env/public";
 import { CommandError, unwrap } from "./registry";
 import type { Ctx } from "./registry";
 
+const uuid = z.uuid();
+/** True for a canonical UUID string; shared by the command route and the bearer context. */
+export const isUuid = (value: string | undefined): value is string => value !== undefined && uuid.safeParse(value).success;
+
 // Exported for tests; production callers go through buildContextFromBearer.
 // Both membership reads go through unwrap so a database failure is a 500
 // db_error rather than being mistaken for "not a member" (403). A malformed
-// breweryId is rejected up front so Postgres never sees it (a 22P02 would
-// otherwise surface as db_error) and the caller still gets not_member.
+// breweryId is rejected up front (Postgres would raise 22P02 → db_error) and
+// still reads as not_member, the contract tests/api-command.test.ts pins.
 export async function ctxForBearer(db: SupabaseClient, userId: string, breweryId: string): Promise<Ctx> {
-  if (!z.uuid().safeParse(breweryId).success) {
+  if (!isUuid(breweryId)) {
     throw new CommandError("not a member of this brewery", 403, "not_member");
   }
   const staff = await unwrap(db

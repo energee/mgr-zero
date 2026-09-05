@@ -3,8 +3,7 @@
 // server-generated correlation ID. Unexpected errors are logged and returned
 // as a generic 500; database errors are sanitized in registry.ts (unwrap).
 import { NextResponse } from "next/server";
-import { z } from "zod";
-import { buildContextFromBearer, buildRouteContext } from "@/lib/commands/context";
+import { buildContextFromBearer, buildRouteContext, isUuid } from "@/lib/commands/context";
 import {
   type CommandExecution,
   type CommandFailure,
@@ -35,12 +34,6 @@ function isCommandRequest(body: unknown): body is CommandRequest {
     && "name" in body
     && typeof body.name === "string"
     && "input" in body;
-}
-
-const requestIdSchema = z.uuid();
-
-function isUuid(value: string | undefined): value is string {
-  return value !== undefined && requestIdSchema.safeParse(value).success;
 }
 
 
