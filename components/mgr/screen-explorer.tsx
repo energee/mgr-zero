@@ -72,18 +72,26 @@ export function ScreenExplorer() {
   // The selection follows the filter: an unlisted selection moves to the first hit.
   const current = hits.find(([i]) => i === view.s) ?? hits[0];
   const set = (patch: HashState) => write({ ...view, s: current?.[0], ...patch }, false);
-  const go = (i: number, push: boolean, patch: HashState = {}) => {
+  // The trail is the walk from where the reader started: a list pick (or a
+  // persona switch) starts over at that screen, a tap inside the frame extends
+  // it, and a tap back to a screen already on it cuts the loop off there.
+  const go = (i: number, push: boolean, patch: HashState = {}, fresh = false) => {
     // A deep-linked screen was never walked to; it is the ground of the first
     // tap and where dismissing that tap's sheet goes back to.
-    if (!trail.current.length && current) trail.current.push(current[0]);
+    if (fresh) trail.current = [];
+    else if (!trail.current.length && current) trail.current.push(current[0]);
     setUnder(pageUnder(trail.current, i));
+    const seen = trail.current.indexOf(i);
+    if (seen >= 0) trail.current.length = seen;
     trail.current.push(i);
     setWalk([...trail.current]);
     write({ ...view, ...patch, s: i }, push);
     // Keyboard reach: Tab now continues into the drawing, not back to the list.
     box?.focus({ preventScroll: true });
   };
-  const pick = (i: number) => go(i, true);
+  // From the list: a new start. From a tap in the frame: one more step.
+  const pick = (i: number) => go(i, true, {}, true);
+  const step = (i: number) => go(i, true);
   // A new persona: refused where they are if their role may not open it, else
   // their own Today when a landing is on view, else the same screen as them.
   const choose = (role: StaffRole) => {
@@ -92,10 +100,10 @@ export function ScreenExplorer() {
     if (name && deniedFor(role, name)) {
       setRefused(name);
       const denied = screenByName("Permission denied");
-      if (denied) return go(denied[0], true, { p: role });
+      if (denied) return go(denied[0], true, { p: role }, true);
     } else if (name && LANDINGS.includes(name)) {
       const home = screenByName(homeFor(p.role));
-      if (home) return go(home[0], true, { p: role });
+      if (home) return go(home[0], true, { p: role }, true);
     }
     set({ p: role });
   };
@@ -132,7 +140,7 @@ export function ScreenExplorer() {
     const denied = deniedFor(persona.role, home);
     if (denied) setRefused(home);
     const hit = screenByName(denied ? "Permission denied" : home);
-    if (hit) pick(hit[0]);
+    if (hit) step(hit[0]);
   };
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
