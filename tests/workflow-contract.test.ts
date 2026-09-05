@@ -132,7 +132,7 @@ describe("production-readiness workflow contract", () => {
     expect(ci).toContain("node scripts/supabase-env.mjs");
     expect(supabaseEnvMapper).toContain("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
     expect(supabaseEnvMapper).toContain("SUPABASE_SECRET_KEY");
-    expect(ci).toContain("COMMAND_RATE_LIMIT_HMAC_SECRET");
+    expect(ci).not.toContain("COMMAND_RATE_LIMIT_HMAC_SECRET");
     expect(supabaseEnvMapper).not.toContain("NEXT_PUBLIC_SUPABASE_ANON_KEY");
     expect(supabaseEnvMapper).not.toContain("SUPABASE_SERVICE_ROLE_KEY");
   });
