@@ -2498,6 +2498,39 @@ begin
   if v_replay is not null then return v_replay; end if;
   v_result := private.create_replenishment_order_impl(p_from,p_to,p_lines); return private.complete_command_request(p_request_id,v_result);
 end $$;
+-- ---------------------------------------------------------------- RLS support indexes
+-- Every staff_read / customer policy below filters on brewery_id. Tables whose
+-- unique constraints or query indexes already lead with brewery_id are covered;
+-- these tables were not (docs/audits/2026-09-05/security.md), so each RLS check
+-- was a sequential scan. tests/schema-rls-indexes.test.ts keeps the set complete.
+create index batch_additions_brewery_idx on batch_additions (brewery_id);
+create index deliveries_brewery_idx on deliveries (brewery_id);
+create index fermentation_readings_brewery_idx on fermentation_readings (brewery_id);
+create index invoice_lines_brewery_idx on invoice_lines (brewery_id);
+create index material_contracts_brewery_idx on material_contracts (brewery_id);
+create index material_count_lines_brewery_idx on material_count_lines (brewery_id);
+create index material_counts_brewery_idx on material_counts (brewery_id);
+create index material_lots_brewery_idx on material_lots (brewery_id);
+create index order_events_brewery_idx on order_events (brewery_id);
+create index order_lines_brewery_idx on order_lines (brewery_id);
+create index packaging_run_consumptions_brewery_idx on packaging_run_consumptions (brewery_id);
+create index packaging_run_outputs_brewery_idx on packaging_run_outputs (brewery_id);
+create index pos_item_mappings_brewery_idx on pos_item_mappings (brewery_id);
+create index pos_locations_brewery_idx on pos_locations (brewery_id);
+create index price_list_items_brewery_idx on price_list_items (brewery_id);
+create index product_approvals_brewery_idx on product_approvals (brewery_id);
+create index purchase_order_lines_brewery_idx on purchase_order_lines (brewery_id);
+create index receipt_lines_brewery_idx on receipt_lines (brewery_id);
+create index receipts_brewery_idx on receipts (brewery_id);
+create index recipe_ingredients_brewery_idx on recipe_ingredients (brewery_id);
+create index recipe_versions_brewery_idx on recipe_versions (brewery_id);
+create index ship_tos_brewery_idx on ship_tos (brewery_id);
+create index shipments_brewery_idx on shipments (brewery_id);
+create index sku_bom_brewery_idx on sku_bom (brewery_id);
+create index state_registrations_brewery_idx on state_registrations (brewery_id);
+create index taproom_pars_brewery_idx on taproom_pars (brewery_id);
+create index transfers_brewery_idx on transfers (brewery_id);
+create index volume_adjustments_brewery_idx on volume_adjustments (brewery_id);
 -- ---------------------------------------------------------------- RLS
 do $$
 declare t text;
@@ -2544,8 +2577,9 @@ alter table customer_users enable row level security;
 alter table brewery_counters enable row level security;   -- no policies: only via next_no()
 
 create policy staff_read on breweries for select using (is_staff_of(id));
-create policy member_read on brewery_users for select using (user_id = auth.uid() or is_staff_of(brewery_id));
-create policy self_read on customer_users for select using (user_id = auth.uid());
+-- (select auth.uid()) is evaluated once per statement, not once per row.
+create policy member_read on brewery_users for select using (user_id = (select auth.uid()) or is_staff_of(brewery_id));
+create policy self_read on customer_users for select using (user_id = (select auth.uid()));
 
 -- Portal customers
 create policy customer_read_own on customers for select using (id in (select my_customer_ids()));
