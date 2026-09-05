@@ -1,9 +1,11 @@
 // lib/env/server-parser.ts — parses server configuration for server code, scripts, and tests.
+// Server-only contract: SUPABASE_SECRET_KEY plus the public values, and an
+// optional VERCEL_ENV. Rate limiting on /api/command is not yet implemented
+// (see docs/audits/2026-09-01-authz-audit.md A1), so no HMAC secret lives here.
 import { readPublicEnv, type PublicEnv } from "./public";
 
 export interface ServerEnv extends PublicEnv {
   supabaseSecretKey: string;
-  commandRateLimitHmacSecret: string;
   vercelEnv?: "production" | "preview" | "development";
 }
 
@@ -22,15 +24,10 @@ export function readServerEnv(env: Environment = process.env): ServerEnv {
   }
 
   const supabaseSecretKey = required(env, "SUPABASE_SECRET_KEY");
-  const commandRateLimitHmacSecret = required(env, "COMMAND_RATE_LIMIT_HMAC_SECRET");
-  if (commandRateLimitHmacSecret.length < 32) {
-    throw new Error("Invalid environment variable: COMMAND_RATE_LIMIT_HMAC_SECRET must be at least 32 characters");
-  }
 
   return {
     ...readPublicEnv(env),
     supabaseSecretKey,
-    commandRateLimitHmacSecret,
     vercelEnv: vercelEnv as ServerEnv["vercelEnv"],
   };
 }
