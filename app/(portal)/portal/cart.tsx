@@ -4,10 +4,13 @@
 // along the way is an implementation detail, never shown to the customer, as
 // long as both calls succeed. If portal_create_order succeeds but
 // portal_submit_order fails, the created order id is kept in `draftId` so a
-// retry (Save draft or Submit) reuses it and calls portal_submit_order again
-// rather than calling portal_create_order a second time — that would leave
-// an orphan duplicate draft behind. The error shown in that case links to
-// the saved draft so the customer isn't left wondering if anything happened.
+// retry (Save draft or Submit) reuses it rather than calling
+// portal_create_order a second time — that would leave an orphan duplicate
+// draft behind. Once `draftId` exists every save goes through
+// portal_update_draft_order with the cart's current lines/ship-to/PO/note, so
+// edits made after Save draft or a failed submit are never lost to a stale
+// draft (decision in lib/portal-cart.ts). The error shown in that case links
+// to the saved draft so the customer isn't left wondering if anything happened.
 "use client";
 
 import { useState } from "react";
@@ -19,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useBrewery } from "@/app/(app)/brewery-provider";
 import { command } from "@/lib/commands/client";
+import { cartActionsDisabled, planDraftSync } from "@/lib/portal-cart";
 
 export type CatalogItem = {
   skuId: string;
@@ -62,18 +66,22 @@ export function Cart({ items, shipTos }: { items: CatalogItem[]; shipTos: ShipTo
     return sum + (item ? item.unitPriceCents * l.qty : 0);
   }, 0);
 
-  // Reuses `draftId` if a previous attempt already created the order, so a
-  // retry never calls portal_create_order twice for the same cart.
-  async function ensureDraft(): Promise<string> {
-    if (draftId) return draftId;
+  // Writes the cart's current state to the database and returns the order id.
+  // Reuses `draftId` if a previous attempt already created the order — a
+  // retry never calls portal_create_order twice for the same cart — but still
+  // pushes the current lines/fields so the saved draft matches what's on screen.
+  async function syncDraft(): Promise<string> {
+    const plan = planDraftSync(draftId);
+    if (plan.command === "portal_update_draft_order") {
+      // Send PO/note verbatim: update_draft_order treats null as "leave
+      // alone", so an emptied field must arrive as "" to actually clear it.
+      await command(breweryId, plan.command, { orderId: plan.orderId, shipToId, poNumber, note, lines });
+      return plan.orderId;
+    }
+    const fields = { shipToId, poNumber: poNumber || undefined, note: note || undefined, lines };
     // create_order (the underlying plpgsql fn) returns jsonb keyed
     // order_id, not id — see lib/commands/portal.ts's portal_create_order.
-    const order = (await command(breweryId, "portal_create_order", {
-      shipToId,
-      poNumber: poNumber || undefined,
-      note: note || undefined,
-      lines,
-    })) as { order_id: string };
+    const order = (await command(breweryId, plan.command, fields)) as { order_id: string };
     setDraftId(order.order_id);
     return order.order_id;
   }
@@ -82,7 +90,7 @@ export function Cart({ items, shipTos }: { items: CatalogItem[]; shipTos: ShipTo
     setBusy("draft");
     setError(null);
     try {
-      const id = await ensureDraft();
+      const id = await syncDraft();
       router.push(`/portal/orders/${id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "portal_create_order failed");
@@ -94,9 +102,16 @@ export function Cart({ items, shipTos }: { items: CatalogItem[]; shipTos: ShipTo
   async function submit() {
     setBusy("submit");
     setError(null);
-    let savedId = draftId;
+    let savedId: string;
     try {
-      savedId = await ensureDraft();
+      savedId = await syncDraft();
+    } catch (err) {
+      // The sync is a plain write; nothing was submitted, so say only that.
+      setError(err instanceof Error ? err.message : "saving the order failed");
+      setBusy(null);
+      return;
+    }
+    try {
       await command(breweryId, "portal_submit_order", { orderId: savedId });
       router.push(`/portal/orders/${savedId}`);
     } catch (err) {
@@ -109,7 +124,7 @@ export function Cart({ items, shipTos }: { items: CatalogItem[]; shipTos: ShipTo
     }
   }
 
-  const disabled = !shipToId || (lines.length === 0 && !draftId) || busy !== null;
+  const disabled = cartActionsDisabled({ shipToId, lineCount: lines.length, busy: busy !== null });
 
   return (
     <div className="flex flex-col gap-6">
