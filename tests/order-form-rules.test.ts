@@ -35,7 +35,7 @@ describe("orderFormReadiness", () => {
   it("an empty catalog yields a hint naming what to create first", () => {
     const empty = { kind: "wholesale" as const, customerId: "", shipToId: "", fromLocationId: "", toLocationId: "", lines: [{ skuId: "", qty: "" }] };
     expect(orderFormReadiness({ ...empty, catalog: { customers: 0, locations: 0, skus: 0 } }).hint)
-      .toBe("Before creating an order, add a customer, a location and a SKU.");
+      .toBe("Before creating an order, add a customer, a location, and a SKU.");
     expect(orderFormReadiness({ ...empty, catalog: { customers: 0, locations: 1, skus: 1 } }).hint)
       .toBe("Before creating an order, add a customer.");
     expect(orderFormReadiness({ ...empty, catalog: { customers: 1, locations: 0, skus: 0 } }).hint)

@@ -1,11 +1,7 @@
 // lib/order-form-rules.ts — the pure "is this New Order form submittable" rule
-// behind app/(app)/orders/order-form.tsx (audit 2026-09-05, rendered-ux-perf
-// #3). Mirrors the create_order input schema in lib/commands/orders.ts and the
-// orders check constraint: wholesale needs customer + ship-to, a taproom
-// transfer needs a to-location, both need a from-location and at least one
-// line with a SKU and a positive quantity. On an empty brewery it also yields
-// the hint that tells staff what to create first, so the Create button is
-// never the first place they learn the catalog is empty.
+// behind app/(app)/orders/order-form.tsx. Mirrors the create_order input schema
+// in lib/commands/orders.ts and the orders check constraint; on an empty
+// brewery it also yields the hint naming what to create first.
 
 export type OrderFormReadinessInput = {
   kind: "wholesale" | "taproom_transfer";
@@ -24,21 +20,21 @@ export type OrderFormReadiness = {
   hint: string | null;
 };
 
+/** A line the form both counts toward readiness and sends to create_order. */
+export const isCompleteLine = (l: { skuId: string; qty: string }) => Boolean(l.skuId) && Number(l.qty) > 0;
+
+const conjunction = new Intl.ListFormat("en", { type: "conjunction" });
+
 export function orderFormReadiness(i: OrderFormReadinessInput): OrderFormReadiness {
   const party = i.kind === "wholesale" ? Boolean(i.customerId && i.shipToId) : Boolean(i.toLocationId);
-  const hasLine = i.lines.some((l) => l.skuId && Number(l.qty) > 0);
+  const hasLine = i.lines.some(isCompleteLine);
   const submittable = party && Boolean(i.fromLocationId) && hasLine;
 
   const missing: string[] = [];
   if (i.kind === "wholesale" && i.catalog.customers === 0) missing.push("a customer");
   if (i.catalog.locations === 0) missing.push("a location");
   if (i.catalog.skus === 0) missing.push("a SKU");
-  const hint = missing.length === 0 ? null : `Before creating an order, add ${list(missing)}.`;
+  const hint = missing.length === 0 ? null : `Before creating an order, add ${conjunction.format(missing)}.`;
 
   return { submittable, hint };
-}
-
-function list(items: string[]): string {
-  if (items.length <= 1) return items.join("");
-  return `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
 }

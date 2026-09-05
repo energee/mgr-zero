@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { orderFormReadiness } from "@/lib/order-form-rules";
+import { isCompleteLine, orderFormReadiness } from "@/lib/order-form-rules";
 
 type OrderKind = "wholesale" | "taproom_transfer";
 
@@ -76,7 +76,7 @@ export function OrderForm({
       requestedShipDate: requestedShipDate || undefined,
       poNumber: poNumber || undefined,
       lines: lines
-        .filter((l) => l.skuId && l.qty)
+        .filter(isCompleteLine)
         .map((l) => ({ skuId: l.skuId, qty: Number(l.qty) })),
     }),
     reset,
