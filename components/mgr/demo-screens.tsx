@@ -8,7 +8,7 @@ import type { Screen } from "@/components/mgr/screens";
 import { UserAvatar } from "@/components/mgr/user-avatar";
 import { needsFor, type Persona } from "@/lib/mgr/demo-personas";
 
-const list = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} or ${xs[xs.length - 1]}` : xs[0] ?? "admin");
+const list = (xs: string[]) => (xs.length ? new Intl.ListFormat("en", { type: "disjunction" }).format(xs) : "admin");
 
 /** `screen` as `persona` would see it; any other screen comes back untouched. */
 export function asPersona(screen: Screen, persona: Persona, refused?: string): Screen {

@@ -10,13 +10,13 @@ import { createElement } from "react";
 import { expect, it, vi } from "vitest";
 vi.mock("next/navigation", () => ({ usePathname: () => "/" }));
 import { area, SCREENS, type Screen } from "../components/mgr/screens";
-import { INERT, resolveTap } from "../lib/mgr/screen-links";
+import { INERT, matches, resolveTap } from "../lib/mgr/screen-links";
 import { ScreenFrame } from "../components/mgr/screen-frame";
 
 const text = (h: string) => h.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
 const INERT_ATTR = /role="tab"|role="switch"|toggle-group-item|sidebar-trigger|select-trigger|sidebar-menu-button|data-gated/;
 const INERT_LABEL = /^[−+]$|^History$/;
-const inert = (l: string) => INERT_LABEL.test(l) || INERT.some((k) => (typeof k === "string" ? k === l : k.test(l)));
+const inert = (l: string) => INERT_LABEL.test(l) || INERT.some((k) => matches(k, l));
 
 /** Every tap on a screen: [label, href, data-to]. */
 function taps(html: string): [string, string | null, string | null][] {

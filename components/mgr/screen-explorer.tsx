@@ -15,11 +15,11 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { area } from "@/components/mgr/screens";
-import { AREAS, advanceWalk, buildHash, filterScreens, pageUnder, parseHash, screenByName, type HashState, type Indexed, type Surface } from "@/lib/mgr/screen-explorer";
+import { AREAS, advanceWalk, buildHash, filterScreens, pageUnder, parseHash, screenByIndex, screenByName, type HashState, type Surface } from "@/lib/mgr/screen-explorer";
 import { deniedFor, homeFor, PERSONAS, personaFor } from "@/lib/mgr/demo-personas";
 import { asPersona } from "@/components/mgr/demo-screens";
 import type { StaffRole } from "@/lib/commands/registry";
-import { BACK, resolveTap } from "@/lib/mgr/screen-links";
+import { BACK, resolveTap, isInert } from "@/lib/mgr/screen-links";
 import { ScreenFrame, ScreenSheet } from "@/components/mgr/screen-frame";
 import { screenSlug } from "@/components/mgr/screen-index";
 import { ScreenIframe, syncFrames } from "@/components/mgr/screen-width";
@@ -35,7 +35,7 @@ const SURFACES: Surface[] = ["page", "sheet", "entry"];
 const DENIED = "Permission denied";
 // The landings the persona switch swaps for the new role's own; Driver and
 // Taproom stay put for a role that may open them.
-const HOMES = ["Today", "Sales", "Brewer"];
+const HOMES = [...new Set(PERSONAS.map((p) => homeFor(p.role)))];
 // The hash as an external store: the static page renders with no selection,
 // the client reads the hash on hydration, and every control writes it back.
 const onHash = (cb: () => void) => {
@@ -58,7 +58,6 @@ const write = (state: HashState, push: boolean, walk: number[]) => {
   history[push ? "pushState" : "replaceState"]({ ...history.state, mgrExplorer: { hash, walk } }, "", hash);
   window.dispatchEvent(new HashChangeEvent("hashchange"));
 };
-const byIndex = (i?: number): Indexed | undefined => (i !== undefined && SCREENS[i] && !SCREENS[i].venue ? [i, SCREENS[i]] : undefined);
 
 export function ScreenExplorer() {
   const { hash, walk } = useNavigation();
@@ -81,7 +80,7 @@ export function ScreenExplorer() {
   const list = useRef<HTMLUListElement>(null);
   // The link's screen is the one drawn even when the filter no longer lists
   // it (a walk can leave the filtered set); with no link, the first hit.
-  const current = byIndex(view.s) ?? hits[0];
+  const current = screenByIndex(view.s) ?? hits[0];
   const listed = current && hits.some(([i]) => i === current[0]);
   // Filters write themselves and keep the reader's pick.
   const set = (patch: HashState) => write({ ...view, ...patch }, false, walk);
@@ -131,7 +130,7 @@ export function ScreenExplorer() {
     if (el.closest("[data-gated]")) return e.preventDefault();
     const link = el.closest("a");
     const label = el.getAttribute("aria-label") ?? (el.matches("[data-slot=item]") ? el.querySelector("[data-slot=item-title]")?.textContent : null) ?? el.textContent ?? "";
-    if (label.trim() === "Pay invoice") return e.preventDefault();
+    if (isInert(label)) return e.preventDefault();
     const group = el.closest("[data-slot=sidebar-group-label]") && screenByName(label.trim());
     const name = group ? label.trim() : resolveTap(current[1], label, link?.getAttribute("href"), el.getAttribute("data-to"));
     if (el.matches("[role=tab]") && (!name || name === current[1].name)) return filterRows(el);

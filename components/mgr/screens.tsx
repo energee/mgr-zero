@@ -128,6 +128,8 @@ const ORDER_STATES = ["all states", "draft", "submitted", "confirmed", "picked",
 
 // The states every screen can reach; a record with designed states lists its own instead.
 const DEFAULT_STATES: NonNullable<Screen["states"]> = [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]];
+/** DEFAULT_STATES with the permission note swapped for who may open the screen. */
+const permitted = (who: string): NonNullable<Screen["states"]> => [["permission", who, 1], ...DEFAULT_STATES.filter(([st]) => st !== "permission")];
 
 export const SCREENS: Screen[] = [
   // step 1 — foundations and both authenticated shells
@@ -306,7 +308,7 @@ export const SCREENS: Screen[] = [
   {
     step: 1, slice: "all", tab: "More", name: "Settings", job: "Edit brewery/location basics and route to rare setup",
     reads: "list_locations · list_team_members", writes: "update_brewery · update_location [design; mutable single rows]",
-    states: [["permission", "admin only", 1], ...DEFAULT_STATES.filter(([s]) => s !== "permission")],
+    states: permitted("admin only"),
     spec: "Invoices remains a first-class More and desk-rail destination. TTB registry number and PA license are brewery columns and feed the compliance report header. The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. Deployment mode is read-only. Team opens the Team frame.",
     body: (<>
       {E.back("More", "Settings")}
@@ -661,7 +663,7 @@ export const SCREENS: Screen[] = [
     job: "Turn an empty brewery into usable truth",
     reads: "get_first_run_state [design]",
     writes: "create_location · invite_staff [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI]",
-    states: [["permission", "admin only", 1], ...DEFAULT_STATES.filter(([s]) => s !== "permission")],
+    states: permitted("admin only"),
     spec: "Replaces Today until complete; app and portal shells already exist. Each step is one command and all five are drawn: add a location, import a CSV, add a brand, invite staff, record a movement. The brand step was named here and never drawn, which stranded anyone not importing: a brewery with locations and no brand has nothing to record a movement against. The invite is drawn disabled with the same human copy as the Team frame until the invite workflow gate closes; the step can be skipped.",
     body: (<>
       {E.hd("Set up Demo Brewing", "5 steps")}
@@ -724,7 +726,7 @@ export const SCREENS: Screen[] = [
     job: "See on-hand, ATP and immutable tape together",
     reads: "get_on_hand · get_atp · list_movements",
     writes: "reverse_inventory_movement [SCHEMA-GATE: auditable link + valid sign and TTB semantics]",
-    states: [["permission", "sales or warehouse required", 1], ...DEFAULT_STATES.filter(([s]) => s !== "permission")],
+    states: permitted("sales or warehouse required"),
     spec: "Correction is not actionable yet: opposite-sign rows fail movement CHECKs; enable only after a structured reversal link and reporting semantics exist.",
     body: (<>
       {E.back("Finished goods", "Hazy IPA · ½ bbl")}
@@ -1136,7 +1138,7 @@ export const SCREENS: Screen[] = [
     job: "Target-state count plus active suggested transfer",
     reads: "get_taproom_count_snapshot [SCHEMA-GATE] · get_taproom_replenishment [design] · list_locations",
     writes: "record_taproom_count [SCHEMA-GATE: durable count + lines + optional movements in one RPC] · create_taproom_transfer [design; one RPC: order with explicit source + destination + lines + allocations]",
-    states: [["permission", "warehouse or admin required", 1], ...DEFAULT_STATES.filter(([s]) => s !== "permission")],
+    states: permitted("warehouse or admin required"),
     spec: "Count is target-state only and disabled until durable count persistence lands; the taproom lead uses the warehouse permission bundle. INVERTED (this frame was drawn the other way round): the physical count is the source of truth and posts the depletion, connected or not. POS supplies expected consumption and posts nothing, so disconnecting removes the expected column and changes nothing about what the count writes. That is also why a keg moving warehouse → taproom stays on the books as taproom stock: a taproom transfer carries no channel, and the beer leaves only when a count says it is gone, which makes a month-end count yield the month’s removal cleanly. Variance is drawn twice on purpose: inline while someone can still recount, and as a report where a pattern across weeks (one line, one shift) is the only place it becomes legible. Counts are in kegs and cases, so qty never needs fractional widening.",
     body: (<>
       {E.back("Beer", "Taproom")}
@@ -1230,7 +1232,7 @@ export const SCREENS: Screen[] = [
     job: "Complete customer, source, ship-to and line entry for staff",
     reads: "list_customers · list_locations · list_skus · get_atp",
     writes: "create_order [design; one RPC: draft order + all lines]",
-    states: [["permission", "sales or admin required", 1], ...DEFAULT_STATES.filter(([s]) => s !== "permission")],
+    states: permitted("sales or admin required"),
     spec: "Source is required and becomes the order's from-location; the app never guesses “Warehouse.” Save draft lands on the Order screen, where Submit lives.",
     body: (<>
       {E.back("Orders", "New order")}
@@ -1855,7 +1857,7 @@ export const SCREENS: Screen[] = [
     job: "Record any values taken; SG converts to stored Plato",
     reads: "get_cellar_map [design; occupancy + last reading]",
     writes: "record_fermentation_reading [design; mutable reading row]",
-    states: [["permission", "brewer or admin required", 1], ...DEFAULT_STATES.filter(([s]) => s !== "permission")],
+    states: permitted("brewer or admin required"),
     spec: "One reading may contain gravity, temperature, pH, or any combination. Blank values remain absent; prior values are reference only, never silently copied. Each value is typed; Gravity is the default.",
     body: (<>
       {E.qty("1.019", "SG · prior 1.021", "Gravity")}
@@ -1941,7 +1943,7 @@ export const SCREENS: Screen[] = [
     job: "Consume actual lots and set knockout baseline",
     reads: "get_brew_day [design]",
     writes: "record_brew_day [design; one RPC: additions + material movements + occupancy]",
-    states: [["permission", "brewer or admin required", 1], ...DEFAULT_STATES.filter(([s]) => s !== "permission")],
+    states: permitted("brewer or admin required"),
     spec: "Brew-day mode: actual lots and knockout vessel. Planned recipe/date/barrels live on Schedule batch so this page has one primary. Record brew day posts immutable material consumption for mash/boil/whirlpool stages only; the 18 lb Citra dry hop is posted later from Cellar addition. Yeast is consumed as a material lot, not a culture generation (plan §8).",
     body: (<>
       {E.back("Batches", "B-0416 · Hazy")}
@@ -1964,7 +1966,7 @@ export const SCREENS: Screen[] = [
     job: "Write one transfer row that carries its own loss volume",
     reads: "get_cellar_map [design; occupancy volumes]",
     writes: "record_cellar_transfer [design; one RPC: create target occupancy(initial_bbl=0) when empty + append transfer(loss_bbl) + close source occupancy iff fully emptied]",
-    states: [["permission", "brewer or admin required", 1], ...DEFAULT_STATES.filter(([s]) => s !== "permission")],
+    states: permitted("brewer or admin required"),
     spec: "Drawn as a blend into an occupied brite: BT1 keeps its occupancy and B-0412 keeps its identity: the schema has one batch per occupancy, and blends are transfers into the surviving one (renaming a blend as a new batch is a plan §8 schema gap). An empty target (BT2) gets a new occupancy starting at zero bbl in the same RPC; the transfer row stays immutable; a fully emptied source closes its occupancy. A partial transfer never implies loss: the person explicitly holds the remainder or records loss. No vessel status.",
     body: (<>
       {E.pick("From", "FV1 · Pils · B-0409 · 12.8 bbl", ["FV1 · Pils · B-0409 · 12.8 bbl", "FV2 · Hazy IPA · B-0416 · 14.6 bbl"])}
@@ -1987,7 +1989,7 @@ export const SCREENS: Screen[] = [
     job: "Plan a run separately, then create lot and movements on close",
     reads: "get_packaging_run [design; revalidate selected source occupancy] · list_locations",
     writes: "schedule_packaging_run [design; one RPC: run with explicit source occupancy + planned outputs] · close_packaging_run [design; one RPC: revalidate source + close + lot + outputs + material movements at explicit locations]",
-    states: [["permission", "brewer or warehouse required", 1], ...DEFAULT_STATES.filter(([s]) => s !== "permission")],
+    states: permitted("brewer or warehouse required"),
     spec: "The close half of the packaging frame; planning and editing the plan live in the Schedule packaging run sheet until the run starts. Close is a copper review ( revalidated source, actual outputs, lot, explicit FG destination, material consumption/return/damage, yield/loss). Print labels is presentation after commit: measured thermal keg-collar/lot labels per plan §3. No packaging-day-actuals screen.",
     body: (<>
       {E.back("Work", "RUN-0031 · started")}
@@ -2345,7 +2347,7 @@ export const SCREENS: Screen[] = [
     job: "Author immutable versions from assumptions; actuals keep predictions honest",
     reads: "list_recipes · get_recipe [design] · get_recipe_outcomes [design; per-batch actual OG/FG/ABV + realized efficiency/attenuation, derived from fermentation readings, never stored]",
     writes: "create_recipe [design; mutable parent row] · create_recipe_version [design; one RPC: immutable version + ingredients; SCHEMA-GATE: assumption columns on recipe_versions + per-ingredient extract snapshot + extract potential on materials; typed target_og/fg/abv columns drop]",
-    states: [["permission", "brewer or admin required", 1], ...DEFAULT_STATES.filter(([s]) => s !== "permission")],
+    states: permitted("brewer or admin required"),
     spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. Versioning is disabled behind its schema gate. A new parent takes name and style only; versions append, and history is never edited. Costing lives on desk.",
     body: (<>
       {E.back("Recipes", "Hazy IPA v4")}
@@ -2391,7 +2393,7 @@ export const SCREENS: Screen[] = [
     job: "Generate from ledgers, review, then record the external filing",
     reads: "generate_compliance_report · get_loss_review [design; SCHEMA-GATE for typed completion-loss identity]",
     writes: "file_compliance_report [design; immutable snapshot] · reattribute_loss [SCHEMA-GATE; requires typed origin/classification + atomic compensation]",
-    states: [["permission", "sales or admin required", 1], ...DEFAULT_STATES.filter(([s]) => s !== "permission")],
+    states: permitted("sales or admin required"),
     spec: "Reattribution waits for schema that identifies completion rows and cellar removal class; correction must be atomic append-only compensation, never free-text note matching. The identity checks are v1 lessons drawn in user copy: balance per class, cellar as in-process, 0.00 never blank, no transmission.",
     body: (<>
       {E.back("Compliance months", "August 2026")}
@@ -2415,7 +2417,7 @@ export const SCREENS: Screen[] = [
     job: "Maintain brand and state permissions used by order warnings",
     reads: "get_compliance_registry [design]",
     writes: "upsert_brand_approval · upsert_state_registration · upsert_brewery_state_license [design]",
-    states: [["permission", "sales or admin required", 1], ...DEFAULT_STATES.filter(([s]) => s !== "permission")],
+    states: permitted("sales or admin required"),
     spec: "Unregistered destination/brand combinations warn during order confirm and link here.",
     body: (<>
       {E.back("Compliance months", "Registry")}

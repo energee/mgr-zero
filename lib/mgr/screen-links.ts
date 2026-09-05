@@ -5,7 +5,8 @@
 // match — which already covers every back arrow, tab and "New order" style
 // verb. Unresolved taps do nothing. Pure, so tests/screen-links.test.ts can
 // walk the main flows without a DOM.
-import { SCREENS, type Screen } from "@/components/mgr/screens";
+import { type Screen } from "@/components/mgr/screens";
+import { screenByName } from "@/lib/mgr/screen-explorer";
 
 /** The resolver's answer for a dismiss verb: leave this screen for the one before. */
 export const BACK = "\u2190";
@@ -31,7 +32,6 @@ export const TAPS: [string | RegExp, string][] = [
   ["Save customer", "Customer detail"],
   ["Save ship-to", "Customer detail"],
   ["Ship", "Ship and invoice"],
-  ["Pick", "Pick sheet"],
   ["Receive", "Receive PO"],
   ["Invite", "Invite portal user"],
   ["Resume", "Driver route"],
@@ -43,19 +43,14 @@ export const TAPS: [string | RegExp, string][] = [
   ["Send reset link", "Set new password"],
   ["Save password", "Today"],
   ["Change password", "Set new password"],
-  ["Return shipment", "Return and credit"],
-  ["Complete", "Complete transfer"],
   ["Understood", BACK],
   ["Use", BACK],
   [/^L-\d{6}-[A-Z]{2}$/, "Lot trace"],
-  ["Search", "Search"],
-  ["Me", "Me"],
   ["Ridgeline Tap Room", "Customer detail"],
   [/^(FV|BT|FB)\d/, "Vessel detail"],
   // Rules below were written from the coverage report (tests/tap-coverage.test.ts).
   [/^B-\d+/, "Brew day"],
   [/^RUN-\d+/, "Close packaging run"],
-  [/^(FV|BT|FB)\d+\b/, "Vessel detail"],
   ["Reading", "Fermentation reading"],
   ["Start", "Brew day"],
   ["Transfer", "Cellar transfer"],
@@ -84,7 +79,6 @@ export const TAPS: [string | RegExp, string][] = [
   [/^Route [A-Z]( · |$)/, "Route"],
   [/^TRF-\d+/, "Order"],
   [/^(Ridgeline|Al’s Bar|Teresa’s) · ORD-\d+/, "Pick"],
-  [/^Stop \d+ · /, "Confirm delivery"],
   [/^Unassigned · ORD-\d+/, "Order"],
   ["Cancel order", "Orders"],
   ["Done picking", "Order"],
@@ -103,7 +97,6 @@ export const TAPS: [string | RegExp, string][] = [
   ["Teresa\u2019s", "Customer detail"],
   ["Add customer", "Customer detail"],
   ["Add location", "Location detail"],
-  ["Warehouse", "Location detail"],
   ["Maria Alvarez", "Team member"],
   ["Dave Chen", "Team member"],
   ["Ted", "Team member"],
@@ -152,14 +145,12 @@ export const TAPS: [string | RegExp, string][] = [
   ["Open as form", "Record movement"],
   ["Commit movement", "Movement recorded"],
   ["SKU / package", "Entity picker"],
-  ["Shortfall detail", "SKU detail"],
   ["Materials in", "Materials on hand"],
   ["Back to sign in", "Sign in"],
   ["Request a new link", "Reset password"],
   ["Join Demo Brewing", "Today"],
   ["Draft purchase order", "Purchase orders"],
   ["Sept 12 packaging", "Packaging runs"],
-  ["Hazy ATP negative 9/9", "SKU detail"],
   ["Reconnect QuickBooks", "Connect QuickBooks"],
   ["Customers missing an email", "Customers"],
   ["Question this invoice", "Question invoice"],
@@ -203,9 +194,7 @@ export const INERT: (string | RegExp)[] = [
   "August 31, 2027",
   "Avery Stone",
   "Bank transfer (ACH)",
-  "Bank transfer payments",
   "Buyer asked about this invoice",
-  "Card payments",
   "Card",
   "Casey Lin",
   "Change",
@@ -269,7 +258,6 @@ export const INERT: (string | RegExp)[] = [
   "Ships from",
   "Skip",
   "Slack \u00b7 Demo Brewing",
-  "Slack delivery",
   "Slack",
   "Square Taproom \u00b7 9/02 8:14 PM",
   "Square \u00b7 Demo Brewing LLC",
@@ -283,7 +271,6 @@ export const INERT: (string | RegExp)[] = [
   "Email me a link",
   "Default ship-to",
   "Active",
-  "Material active",
   "Sell while taproom stock remains",
   /^(January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2}, \d{4}$/,
   "Reset to format price",
@@ -302,7 +289,6 @@ export const INERT: (string | RegExp)[] = [
   "Case tray",
   "Edit",
   "Replace BOM",
-  /^(oz|gal|bbl|mL|L)$/,
   "\u201cHow much Hazy can I promise Friday?\u201d",
 ];
 
@@ -341,9 +327,11 @@ export const ROUTES: Record<string, string> = {
   "/portal/account": "Account",
 };
 
-const NAMES = new Set(SCREENS.filter((s) => !s.venue).map((s) => s.name));
+/** A TAPS or INERT key against a label: exact for a string, a test for a pattern. */
+export const matches = (k: string | RegExp, label: string) => (typeof k === "string" ? k === label : k.test(label));
+export const isInert = (label: string) => INERT.some((k) => matches(k, label.trim()));
 const isPortalSide = (name: string) => {
-  const s = SCREENS.find((x) => x.name === name);
+  const s = screenByName(name)?.[1];
   return Boolean(s && (s.portal || s.surface === "entry"));
 };
 
@@ -357,6 +345,6 @@ export function resolveTap(screen: Screen, label: string, href?: string | null, 
   if (screen.portal && PORTAL[l]) return PORTAL[l];
   const guard = (name: string | undefined) => (screen.portal && name && name !== BACK && !isPortalSide(name) ? undefined : name);
   if (href && ROUTES[href]) return guard(ROUTES[href]);
-  for (const [k, name] of TAPS) if (typeof k === "string" ? k === l : k.test(l)) return guard(name);
-  return NAMES.has(l) ? guard(l) : undefined;
+  for (const [k, name] of TAPS) if (matches(k, l)) return guard(name);
+  return screenByName(l) ? guard(l) : undefined;
 }
