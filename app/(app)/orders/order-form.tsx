@@ -3,16 +3,21 @@
 // the server page, no extra round trip); kind toggles wholesale (customer +
 // ship-to) vs taproom transfer (to-location only), per the orders check
 // constraint in 00001_baseline.sql. Line editor is a simple add/remove list
-// of sku + qty rows.
+// of sku + qty rows. Create stays disabled until lib/order-form-rules.ts says
+// the input is submittable (audit 2026-09-05, rendered-ux-perf #3); on an
+// empty brewery the same rule renders a hint linking to /customers and
+// /catalog instead of letting the server reject an empty order.
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
+import { orderFormReadiness } from "@/lib/order-form-rules";
 
 type OrderKind = "wholesale" | "taproom_transfer";
 
@@ -45,6 +50,10 @@ export function OrderForm({
   const [lines, setLines] = useState<LineRow[]>([{ skuId: "", qty: "" }]);
 
   const shipTos = customers.find((c) => c.id === customerId)?.shipTos ?? [];
+  const readiness = orderFormReadiness({
+    kind, customerId, shipToId, fromLocationId, toLocationId, lines,
+    catalog: { customers: customers.length, locations: locations.length, skus: skus.length },
+  });
 
   function reset() {
     setKind("wholesale");
@@ -85,7 +94,7 @@ export function OrderForm({
 
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="New Order" trigger={<Button>New Order</Button>}>
-        <form onSubmit={form.submit} className="flex flex-col gap-4">
+        <form onSubmit={form.submit} className="flex flex-col gap-4" aria-describedby={readiness.hint ? "order-form-hint" : undefined}>
           <div className="flex flex-col gap-2">
             <Label htmlFor="order-kind">Kind</Label>
             <Select value={kind} onValueChange={(v) => setKind(v as OrderKind)}>
@@ -233,9 +242,15 @@ export function OrderForm({
             </Button>
           </div>
 
+          {readiness.hint && (
+            <p id="order-form-hint" className="text-sm text-muted-foreground">
+              {readiness.hint} Go to <Link href="/customers" className="underline">Customers</Link> or{" "}
+              <Link href="/catalog" className="underline">Catalog</Link>.
+            </p>
+          )}
           {form.error && <p className="text-sm text-destructive">{form.error}</p>}
           <CommandFormFooter>
-            <Button type="submit" disabled={form.submitting}>
+            <Button type="submit" disabled={form.submitting || !readiness.submittable}>
               {form.submitting ? "Creating…" : "Create"}
             </Button>
           </CommandFormFooter>

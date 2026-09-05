@@ -180,7 +180,11 @@ An order may instead become `cancelled` any time before shipping. The Orders scr
 4. Choose the source in **From location**. Use a warehouse source.
 5. Optionally choose **Requested ship date** and enter **PO number**.
 6. Add one or more lines. Each needs a SKU and quantity greater than zero. **Add line** adds a row; **Remove** removes one, but at least one row remains.
-7. Select **Create**. The result is a draft. Wholesale line prices are captured from the customer’s current price list; later price-list changes do not alter those lines.
+7. Select **Create**. The button stays disabled until the required fields are chosen: for wholesale, a customer, a ship-to, a from location and at least one line with a SKU and a quantity above zero; for a transfer, a destination instead of the customer and ship-to. The result is a draft. Wholesale line prices are captured from the customer’s current price list; later price-list changes do not alter those lines.
+
+<Callout type="info">
+On a new brewery with nothing to choose yet, the form shows a note such as “Before creating an order, add a customer, a location and a SKU.” with links to **Customers** and **Catalog**, and **Create** stays disabled until those exist.
+</Callout>
 
 <Callout type="warn">
 A wholesale order fails if the customer has no price list or an ordered SKU has no price on that list.

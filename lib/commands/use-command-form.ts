@@ -1,13 +1,15 @@
 // lib/commands/use-command-form.ts — the form lifecycle every mutation form
 // (rendered in components/mgr/command-form.tsx) shares: open/close, one command action (with its serialized request
-// ID), inline error, and refresh on success. Forms own only their fields and
-// how to build the command input.
+// ID), inline error (server validation failures are rewritten to per-field
+// sentences by format-command-error.ts), and refresh on success. Forms own
+// only their fields and how to build the command input.
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useBrewery } from "@/app/(app)/brewery-provider";
 import { command } from "./client";
+import { formatCommandError } from "./format-command-error";
 
 export function useCommandForm(name: string, opts: { build: () => unknown; reset: () => void }) {
   const breweryId = useBrewery();
@@ -30,7 +32,7 @@ export function useCommandForm(name: string, opts: { build: () => unknown; reset
       setOpen(false);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : `${name} failed`);
+      setError(err instanceof Error ? formatCommandError(err.message) : `${name} failed`);
     } finally {
       setSubmitting(false);
     }
