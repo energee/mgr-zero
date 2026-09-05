@@ -164,3 +164,10 @@ a gap to close, not a convention to trust.
 Append-only ledgers over mutable counters; triggers for derived values;
 no status columns that won't be kept accurate. Full rationale:
 `.agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md`.
+
+RLS predicates are index-backed: every table whose policy filters on
+`brewery_id` has an index whose first column is `brewery_id` (a unique
+constraint or query index leading with it counts). Policies call
+`(select auth.uid())`, never bare `auth.uid()`, so the lookup runs once per
+statement instead of once per row. *Enforced by:*
+`tests/schema-rls-indexes.test.ts` (from `docs/audits/2026-09-05/security.md`).
