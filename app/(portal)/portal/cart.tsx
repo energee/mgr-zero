@@ -71,12 +71,14 @@ export function Cart({ items, shipTos }: { items: CatalogItem[]; shipTos: ShipTo
   // retry never calls portal_create_order twice for the same cart — but still
   // pushes the current lines/fields so the saved draft matches what's on screen.
   async function syncDraft(): Promise<string> {
-    const fields = { shipToId, poNumber: poNumber || undefined, note: note || undefined, lines };
     const plan = planDraftSync(draftId);
     if (plan.command === "portal_update_draft_order") {
-      await command(breweryId, plan.command, { orderId: plan.orderId, ...fields });
+      // Send PO/note verbatim: update_draft_order treats null as "leave
+      // alone", so an emptied field must arrive as "" to actually clear it.
+      await command(breweryId, plan.command, { orderId: plan.orderId, shipToId, poNumber, note, lines });
       return plan.orderId;
     }
+    const fields = { shipToId, poNumber: poNumber || undefined, note: note || undefined, lines };
     // create_order (the underlying plpgsql fn) returns jsonb keyed
     // order_id, not id — see lib/commands/portal.ts's portal_create_order.
     const order = (await command(breweryId, plan.command, fields)) as { order_id: string };
@@ -100,9 +102,16 @@ export function Cart({ items, shipTos }: { items: CatalogItem[]; shipTos: ShipTo
   async function submit() {
     setBusy("submit");
     setError(null);
-    let savedId = draftId;
+    let savedId: string;
     try {
       savedId = await syncDraft();
+    } catch (err) {
+      // The sync is a plain write; nothing was submitted, so say only that.
+      setError(err instanceof Error ? err.message : "saving the order failed");
+      setBusy(null);
+      return;
+    }
+    try {
       await command(breweryId, "portal_submit_order", { orderId: savedId });
       router.push(`/portal/orders/${savedId}`);
     } catch (err) {

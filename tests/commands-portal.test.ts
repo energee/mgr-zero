@@ -61,10 +61,14 @@ describe("portal commands", () => {
     const { data: updated } = await admin.from("orders").select("po_number, note, status").eq("id", created.order_id).single();
     expect(updated).toEqual({ po_number: "PO-2", note: "revised", status: "draft" });
 
-    // Omitted fields are left alone; only what the caller sends changes.
+    // Omitted PO/note leave the saved values alone; an empty string clears them
+    // (the cart sends the fields verbatim on update for exactly this reason).
     await runCommand("portal_update_draft_order", { orderId: created.order_id, lines: [{ skuId, qty: 5 }] }, custCtx);
     const { data: kept } = await admin.from("orders").select("po_number, note").eq("id", created.order_id).single();
     expect(kept).toEqual({ po_number: "PO-2", note: "revised" });
+    await runCommand("portal_update_draft_order", { orderId: created.order_id, poNumber: "", note: "", lines: [{ skuId, qty: 5 }] }, custCtx);
+    const { data: cleared } = await admin.from("orders").select("po_number, note").eq("id", created.order_id).single();
+    expect(cleared).toEqual({ po_number: "", note: "" });
 
     // The cart's Submit path (app/(portal)/portal/cart.tsx) pushes the current
     // lines through portal_update_draft_order before submitting, so the
