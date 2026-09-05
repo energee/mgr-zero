@@ -24,7 +24,7 @@ If the credentials are wrong, MGR shows **Incorrect email or password**. If the 
 | --- | --- |
 | **Admin** | All current staff screens and actions. |
 | **Sales** | Catalog creation; customers and pricing; order creation, submission, confirmation, adjustment, cancellation, and credits; inventory viewing; invoices; replenishment suggestions and order creation. |
-| **Warehouse** | Inventory viewing and movements; order and pick-sheet viewing, picking, and shipping; replenishment suggestions (the Create replenishment order button appears but returns a permission error); viewing Catalog read-only from **Menu** in the More tab; the invoice created when it ships a wholesale order, from a link shown right after shipping — it cannot open the Invoices list or Team. |
+| **Warehouse** | Inventory viewing and movements; order and pick-sheet viewing, picking, and shipping; replenishment suggestions (the Create replenishment order button appears but returns a permission error); viewing Catalog read-only by opening its page directly (the More tab has no link to it yet); the invoice created when it ships a wholesale order, from a link shown right after shipping — it cannot open the Invoices list or Team. |
 | **Brewer** | Today and account linking from Slack. No Beer, Work, or More tab is shown, because every Brewer area is still planned — see [Navigate MGR](#navigation). |
 
 <Callout type="info">
@@ -57,15 +57,11 @@ The **Me** control in the header shows your brewery and role, switches between l
 
 ### Create a product
 
-<Screen name="Product" />
-
 1. Open **Catalog** and select **New Product**.
 2. Enter **Name** (required), **Style** (optional), and **ABV** (optional percentage; enter 6.5 for 6.5%).
 3. Select **Create**. Product names must be unique within the brewery. The product appears alphabetically and initially shows **No SKUs yet**.
 
 ### Create a SKU
-
-<Screen name="SKU" />
 
 1. Find the product and select **New SKU**.
 2. Enter **Name**; choose **Package type** (`keg`, `can`, or `bottle`; default `keg`).
