@@ -1,16 +1,9 @@
 // tests/schema-rules.test.ts — schema-wide rules read straight from pg_catalog,
-// so .agents/ARCHITECTURE.md conventions are gates, not prose. Uses `psql` (present on
-// dev machines via libpq and on ubuntu-latest CI); DATABASE_URL overrides the
-// local Supabase default. Lifted from MGR v1's check-* scripts, each of which
+// so .agents/ARCHITECTURE.md conventions are gates, not prose (psql via
+// tests/helpers.ts). Lifted from MGR v1's check-* scripts, each of which
 // was written after a Supabase advisor finding or a real bug.
 import { describe, it, expect } from "vitest";
-import { execFileSync } from "node:child_process";
-
-const DB = process.env.DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:54342/postgres";
-function sql(q: string, quiet = false): string[] {
-  const args = quiet ? [DB, "-Atq", "-c", q] : [DB, "-Atc", q];
-  return execFileSync("psql", args, { encoding: "utf8" }).trim().split("\n").filter(Boolean);
-}
+import { sql } from "./helpers";
 
 describe("schema rules", () => {
   it("every public table has RLS enabled", () => {

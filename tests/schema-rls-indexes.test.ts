@@ -1,17 +1,12 @@
 // tests/schema-rls-indexes.test.ts — RLS performance rules read straight from
-// pg_catalog on the live local database (same psql approach as
-// tests/schema-rules.test.ts). Written after docs/audits/2026-09-05/security.md:
+// pg_catalog on the live local database (psql via tests/helpers.ts). Written
+// after docs/audits/2026-09-05/security.md:
 // (a) every table whose policy predicate filters on brewery_id must have an index
 // whose first column is brewery_id, otherwise each RLS check is a sequential scan;
 // (b) auth.uid() inside a policy must be wrapped as (select auth.uid()) so Postgres
 // evaluates it once per statement (initPlan) instead of once per row.
 import { describe, it, expect } from "vitest";
-import { execFileSync } from "node:child_process";
-
-const DB = process.env.DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:54342/postgres";
-function sql(q: string): string[] {
-  return execFileSync("psql", [DB, "-Atc", q], { encoding: "utf8" }).trim().split("\n").filter(Boolean);
-}
+import { sql } from "./helpers";
 
 // Every public policy expression (qual and with_check) labelled by table.policy.
 const POLICY_EXPRS = `
