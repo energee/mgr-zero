@@ -5,6 +5,8 @@
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { BACK, PORTAL, resolveTap, TAPS, ROUTES } from "../lib/mgr/screen-links";
+import { deniedFor, needsFor, PERSONAS } from "../lib/mgr/demo-personas";
+import { pageUnder } from "../lib/mgr/screen-explorer";
 
 const by = (name: string) => SCREENS.find((s) => s.name === name)!;
 const names = new Set(SCREENS.map((s) => s.name));
@@ -104,8 +106,7 @@ describe("reported explorer flows", () => {
     expect(resolveTap(by(screen), tap)).toBe(target);
   });
 
-  it("keeps every portal screen accessible to every demo persona", async () => {
-    const { deniedFor, needsFor, PERSONAS } = await import("../lib/mgr/demo-personas");
+  it("keeps every portal screen accessible to every demo persona", () => {
     for (const screen of SCREENS.filter(s => s.portal)) {
       expect(needsFor(screen.name)).toEqual([]);
       for (const persona of PERSONAS) expect(deniedFor(persona.role, screen.name)).toBe(false);
@@ -114,8 +115,7 @@ describe("reported explorer flows", () => {
       for (const role of ["sales", "warehouse"] as const) expect(deniedFor(role, screen), screen).toBe(true);
   });
 
-  it("keeps deep-linked sheets over their owning pages", async () => {
-    const { pageUnder } = await import("../lib/mgr/screen-explorer");
+  it("keeps deep-linked sheets over their owning pages", () => {
     for (const [sheet, page] of [["Question invoice", "Pay invoice"], ["Square locations", "Point of sale"], ["Square → QuickBooks connector", "Point of sale"], ["Disconnect Square", "Point of sale"], ["POS item", "Menu"], ["Disconnect Slack", "Chat settings"]]) {
       expect(SCREENS[pageUnder([], SCREENS.indexOf(by(sheet)))].name).toBe(page);
     }

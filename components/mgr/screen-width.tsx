@@ -28,8 +28,8 @@ const WidthContext = createContext<Mode>("phone");
 // "fill the column" drew the phone layout under a Desktop label.
 const DESK = 1024;
 
-/** One frame, embedded at a real viewport width — see app/(frames)/screens/frame. */
-/** `persona` rides in the frame's hash (app/(frames)/screens/frame reads it);
+/** One frame, embedded at a real viewport width — see app/(frames)/screens/frame.
+ *  `persona` rides in the frame's hash (app/(frames)/screens/frame reads it);
  *  `preview` makes the frame inert — the explorer's phone view is a look, not a walk. */
 export function ScreenIframe({ index, title, mode, persona, preview }: { index: number; title: string; mode: Mode; persona?: string; preview?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
