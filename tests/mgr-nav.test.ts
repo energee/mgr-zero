@@ -14,14 +14,14 @@ describe("navFor", () => {
   it("hides role-restricted children without leaving an empty entry", () => {
     const sales = navFor(STAFF_NAV, "sales");
     const work = sales.find((t) => t.label === "Work")!;
-    expect(work.children!.map((c) => c.label)).toEqual(["Orders"]);
+    expect(work.children!.map((c) => c.label)).toEqual(["Orders", "Replenishment"]);
     expect(sales.map((t) => t.label)).toEqual(["Today", "Beer", "Work", "More"]);
     expect(navFor(STAFF_NAV, "sales").flatMap((t) => t.children ?? []).some((c) => c.label === "Settings")).toBe(false);
   });
   it("keeps only groups with a permitted child", () => {
     const warehouse = navFor(STAFF_NAV, "warehouse");
     expect(warehouse.map((t) => t.label)).toEqual(["Today", "Beer", "Work", "More"]);
-    expect(warehouse.find((t) => t.label === "More")!.children!.map((c) => c.label)).toEqual(["Planning"]);
+    expect(warehouse.find((t) => t.label === "More")!.children!.map((c) => c.label)).toEqual(["Menu", "Planning"]);
   });
 });
 

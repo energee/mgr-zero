@@ -25,7 +25,7 @@ export const personaFor = (role: StaffRole) => PERSONAS.find((p) => p.role === r
 
 /** The customer the portal frames are signed in as: the buyer at the account
  * the staff screens ship to. One person, no roles — the portal has none. */
-export const PORTAL_BUYER = { name: "Jordan Lee", account: "Ridgeline Tap Room", email: "jordan@ridgelinetap.com" };
+export { PORTAL_BUYER } from "@/components/mgr/screens";
 
 /** The role's landing: its own Today where one is drawn (Sales, Brewer). */
 export const homeFor = (role: StaffRole) => ({ sales: "Sales", brewer: "Brewer" } as Partial<Record<StaffRole, string>>)[role] ?? "Today";
@@ -57,10 +57,12 @@ const routesTo = (screen: string) => Object.entries(ROUTES).filter(([, name]) =>
  * rail entries that route to it (admin always may). Empty for a screen with
  * neither. */
 export function needsFor(screen: string): StaffRole[] {
+  if (byName(screen)?.portal) return [];
   const own = permittedBy(byName(screen));
   if (own.length) return own;
   const routes = routesTo(screen);
-  const items = STAFF_NAV.flatMap((t) => [t, ...(t.children ?? [])]).filter((i) => routes.includes(i.href));
+  // Leaf tabs and children only: a parent tab's href is a landing, not a permission.
+  const items = STAFF_NAV.flatMap((t) => (t.children?.length ? t.children : [t])).filter((i) => routes.includes(i.href));
   if (!items.length) return [];
   const roles = new Set<StaffRole>(["admin"]);
   for (const i of items) for (const r of i.roles ?? ["sales", "warehouse", "brewer"]) roles.add(r);
@@ -72,6 +74,8 @@ export function needsFor(screen: string): StaffRole[] {
  * role's rail. A screen with neither is reached through its parent, which was
  * already checked. */
 export function deniedFor(role: StaffRole, screen: string): boolean {
+  // The portal is the buyer's: no staff role is refused there.
+  if (byName(screen)?.portal) return false;
   const own = permittedBy(byName(screen));
   if (own.length) return !own.includes(role);
   const routes = routesTo(screen);

@@ -8,13 +8,15 @@
 // script owns the `.dark` class, and two owners would fight over it.
 "use client";
 
+import { cn } from "@/lib/utils";
+
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { ThemeToggle } from "@/components/mgr/theme-toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export type Mode = "phone" | "desk";
 
-function syncFrames() {
+export function syncFrames() {
   const dark = document.documentElement.classList.contains("dark");
   for (const f of document.querySelectorAll("iframe")) f.contentDocument?.documentElement.classList.toggle("dark", dark);
 }
@@ -27,7 +29,9 @@ const WidthContext = createContext<Mode>("phone");
 const DESK = 1024;
 
 /** One frame, embedded at a real viewport width — see app/(frames)/screens/frame. */
-export function ScreenIframe({ index, title, mode }: { index: number; title: string; mode: Mode }) {
+/** `persona` rides in the frame's hash (app/(frames)/screens/frame reads it);
+ *  `preview` makes the frame inert — the explorer's phone view is a look, not a walk. */
+export function ScreenIframe({ index, title, mode, persona, preview }: { index: number; title: string; mode: Mode; persona?: string; preview?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   useEffect(() => {
@@ -40,9 +44,9 @@ export function ScreenIframe({ index, title, mode }: { index: number; title: str
   const desk = mode === "desk";
   const height = 780;
   return (
-    <div ref={box} style={{ height: desk ? height * scale : height }} className="max-w-full overflow-hidden">
+    <div ref={box} style={{ height: desk ? height * scale : height }} className={cn("max-w-full overflow-hidden", preview && "pointer-events-none select-none")}>
       <iframe
-        src={`/screens/frame/${index}`}
+        src={`/screens/frame/${index}${persona ? `#p=${persona}` : ""}`}
         title={`${title} · ${mode}`}
         height={height}
         loading="lazy"

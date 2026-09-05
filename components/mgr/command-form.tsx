@@ -38,9 +38,9 @@ export function CommandForm({
   const foot = (bleed: string) => footer && <div className={cn("shrink-0 border-t px-4 pt-2", bleed)}>{footer}</div>;
   if (useIsMobile()) {
     return (
-      <Sheet open={open} onOpenChange={onOpenChange}>
+      <Sheet open={open} onOpenChange={onOpenChange} modal={!container}>
         {trigger && <SheetTrigger asChild>{trigger}</SheetTrigger>}
-        <SheetContent container={container} side="bottom" className="flex max-h-[90svh] flex-col overflow-hidden rounded-t-xl pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <SheetContent container={container} side="bottom" onOpenAutoFocus={container ? (e) => e.preventDefault() : undefined} className={cn("flex flex-col overflow-hidden rounded-t-xl pb-[max(1rem,env(safe-area-inset-bottom))]", container ? "max-h-[calc(100%-1rem)]" : "max-h-[90svh]")}>
           <SheetHeader className="shrink-0 pb-0">
             <SheetTitle>{title}</SheetTitle>
           </SheetHeader>
@@ -51,9 +51,11 @@ export function CommandForm({
     );
   }
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    // Portaled into a container (the screen explorer's box) the form is a
+    // drawing, not a modal: the page around it stays live and it fits the box.
+    <Dialog open={open} onOpenChange={onOpenChange} modal={!container}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-      <DialogContent container={container} className="flex max-h-[90svh] flex-col overflow-hidden sm:max-w-md">
+      <DialogContent container={container} onOpenAutoFocus={container ? (e) => e.preventDefault() : undefined} className={cn("flex flex-col overflow-hidden sm:max-w-md", container ? "max-h-[calc(100%-2rem)]" : "max-h-[90svh]")}>
         <DialogHeader className="shrink-0">
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>

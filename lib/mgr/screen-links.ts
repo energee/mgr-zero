@@ -30,22 +30,24 @@ export const TAPS: [string | RegExp, string][] = [
   ["Save draft", "Order"],
   ["Save customer", "Customer detail"],
   ["Save ship-to", "Customer detail"],
-  ["Save SKU", "SKU detail"],
-  ["Ship order", "Ship and invoice"],
   ["Ship", "Ship and invoice"],
   ["Pick", "Pick sheet"],
-  ["Finish", "Ship and invoice"],
   ["Receive", "Receive PO"],
   ["Invite", "Invite portal user"],
   ["Resume", "Driver route"],
   ["Review", "SKU detail"],
   ["Reorder", "Shop"],
-  ["Edit prices", "Price lists"],
+  ["Edit prices", "Price tiers"],
   ["Sign out", "Sign in"],
   ["Sign in", "Today"],
-  ["Email me a link", "Reset password"],
   ["Send reset link", "Set new password"],
-  ["Save password", "Sign in"],
+  ["Save password", "Today"],
+  ["Change password", "Set new password"],
+  ["Return shipment", "Return and credit"],
+  ["Complete", "Complete transfer"],
+  ["Understood", BACK],
+  ["Use", BACK],
+  [/^L-\d{6}-[A-Z]{2}$/, "Lot trace"],
   ["Search", "Search"],
   ["Me", "Me"],
   ["Ridgeline Tap Room", "Customer detail"],
@@ -113,7 +115,6 @@ export const TAPS: [string | RegExp, string][] = [
   ["Re-push", "Invoice"],
   ["QuickBooks", "Accounting"],
   ["Fix", "Fix mapping"],
-  ["Customer mapping", "Fix mapping"],
   ["Add brand", "Product"],
   ["Save brand", "Catalog"],
   ["\u00bd bbl keg", "SKU"],
@@ -147,7 +148,7 @@ export const TAPS: [string | RegExp, string][] = [
   ["Walk-in", "Bin"],
   ["To-go fridge", "Bin"],
   ["Back to Today", "Today"],
-  ["Go to Beer", "Finished goods"],
+  ["Go to Beer", "Beer"],
   ["Open as form", "Record movement"],
   ["Commit movement", "Movement recorded"],
   ["SKU / package", "Entity picker"],
@@ -180,7 +181,6 @@ export const TAPS: [string | RegExp, string][] = [
  * to another product, add-a-row buttons — so the coverage test does not count
  * them as gaps. The explorer simply leaves them alone. */
 export const INERT: (string | RegExp)[] = [
-  "Hazy IPA",
   "Reconcile 7 sales + 1 refund",
   "Main ship-to",
   "Dock ship-to",
@@ -198,10 +198,7 @@ export const INERT: (string | RegExp)[] = [
   "Add bin",
   "Add channel",
   "Add keg pool",
-  "Add line",
-  "Add location",
   "Add stop",
-  "Add vessel",
   "Adjust selected",
   "August 31, 2027",
   "Avery Stone",
@@ -242,7 +239,7 @@ export const INERT: (string | RegExp)[] = [
   "PA / OH excise",
   "Paid",
   "Post opening balances",
-  "Preview \u00b7 App Home",
+  /^Preview · (App Home|Personal DM|Team digest|Preferences)$/,
   "Print labels",
   "Print pick sheet",
   "Print trace",
@@ -253,7 +250,6 @@ export const INERT: (string | RegExp)[] = [
   "Reason",
   "Recent \u00b7 Kolsch tapped",
   "Recent \u00b7 Saison swapped in",
-  "Record count",
   "Record inventory correction",
   "Release",
   "Retired",
@@ -283,12 +279,35 @@ export const INERT: (string | RegExp)[] = [
   "Totals",
   "Transfer to",
   "Unlink",
-  "Warehouse",
+  "Pay invoice",
+  "Email me a link",
+  "Default ship-to",
+  "Active",
+  "Material active",
+  "Sell while taproom stock remains",
+  /^(January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2}, \d{4}$/,
+  "Reset to format price",
+  "Switch",
+  "Reload",
+  "Already swapped",
+  "Check",
+  "Retry",
+  "Retry 1 waiting",
+  "Discard 4 queued writes",
+  "Ridgeline Contract Brewing",
+  "Keg deposit",
+  "Hazy · cans (case of 24)",
+  "16 oz can",
+  "Can end",
+  "Case tray",
+  "Edit",
+  "Replace BOM",
+  /^(oz|gal|bbl|mL|L)$/,
   "\u201cHow much Hazy can I promise Friday?\u201d",
 ];
 
 /** Inside the portal shell the same chrome means the buyer's screens. */
-export const PORTAL: Record<string, string> = { Me: "Portal Me", "Sign out": "Portal sign in", Invoices: "Invoice history" };
+export const PORTAL: Record<string, string> = { Me: "Portal Me", "Sign out": "Portal sign in", Invoices: "Invoice history", Orders: "Order history", Order: "Shop", Account: "Account" };
 
 /** Shell links by route (lib/mgr/nav.ts): the tab bar, the rail and its children. */
 export const ROUTES: Record<string, string> = {
@@ -308,13 +327,14 @@ export const ROUTES: Record<string, string> = {
   "/orders#deliveries": "Routes",
   "/invoices": "Invoices",
   "/catalog": "Catalog",
+  "/catalog#menu": "Menu",
   "/customers": "Customers",
   "/pricing": "Price lists",
   "/catalog#recipes": "Recipes",
   "/invoices#compliance": "Compliance months",
   "/orders#planning": "Planning",
   "/settings/team#import": "Import",
-  "/settings/team": "Team",
+  "/settings/team": "Settings",
   "/portal": "Shop",
   "/portal/orders": "Order history",
   "/portal/invoices": "Invoice history",
@@ -322,14 +342,21 @@ export const ROUTES: Record<string, string> = {
 };
 
 const NAMES = new Set(SCREENS.filter((s) => !s.venue).map((s) => s.name));
+const isPortalSide = (name: string) => {
+  const s = SCREENS.find((x) => x.name === name);
+  return Boolean(s && (s.portal || s.surface === "entry"));
+};
 
-/** `to` is an explicit target on the element (E.link's data-to) and wins outright. */
+/** `to` is an explicit target on the element (E.link's data-to) and wins outright.
+ * Inside the portal a rule that lands on a staff screen is no rule: the buyer
+ * has no staff vocabulary, so the tap acts in place instead. */
 export function resolveTap(screen: Screen, label: string, href?: string | null, to?: string | null): string | undefined {
   if (to) return to;
   const l = label.trim();
   if (screen.to?.[l]) return screen.to[l];
   if (screen.portal && PORTAL[l]) return PORTAL[l];
-  if (href && ROUTES[href]) return ROUTES[href];
-  for (const [k, name] of TAPS) if (typeof k === "string" ? k === l : k.test(l)) return name;
-  return NAMES.has(l) ? l : undefined;
+  const guard = (name: string | undefined) => (screen.portal && name && name !== BACK && !isPortalSide(name) ? undefined : name);
+  if (href && ROUTES[href]) return guard(ROUTES[href]);
+  for (const [k, name] of TAPS) if (typeof k === "string" ? k === l : k.test(l)) return guard(name);
+  return NAMES.has(l) ? guard(l) : undefined;
 }

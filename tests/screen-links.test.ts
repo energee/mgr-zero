@@ -76,3 +76,48 @@ describe("Work chips", () => {
     }
   });
 });
+
+
+describe("reported explorer flows", () => {
+  it.each([
+    ["Portal set password", "Save password", "Shop"],
+    ["Menu", "Warehouse", "Menu"],
+    ["Order history", "ORD-0231", "Order detail"],
+    ["Order detail", "Orders", "Order history"],
+    ["Order detail", "INV-1037", "Paid invoice"],
+    ["Invoice history", "INV-1042", "Pay invoice"],
+    ["Invoice history", "INV-1037", "Paid invoice"],
+    ["Portal Me", "Change password", "Portal set password"],
+    ["Set new password", "Save password", "Today"],
+    ["Create brewery", "Create brewery", "First-run checklist"],
+    ["Accounting", "Review", "Customers"],
+    ["Mapping conflict", "Use", BACK],
+    ["Mapping conflict", "Ridgeline Tap Room", "Mapping conflict"],
+    ["Disconnect QuickBooks", "Disconnect QuickBooks", "Connect QuickBooks"],
+    ["Disconnect Slack", "Disconnect Slack", "Chat disconnected"],
+    ["Disconnect Square", "Disconnect Square", "Connect Square"],
+    ["Connect QuickBooks", "Connect QuickBooks", "Accounting"],
+    ["Connect Square", "Connect Square", "Square locations"],
+    ["Point of sale", "Review", "Square → QuickBooks connector"],
+    ["Square → QuickBooks connector", "Understood", BACK],
+  ])("%s: %s → %s", (screen, tap, target) => {
+    expect(resolveTap(by(screen), tap)).toBe(target);
+  });
+
+  it("keeps every portal screen accessible to every demo persona", async () => {
+    const { deniedFor, needsFor, PERSONAS } = await import("../lib/mgr/demo-personas");
+    for (const screen of SCREENS.filter(s => s.portal)) {
+      expect(needsFor(screen.name)).toEqual([]);
+      for (const persona of PERSONAS) expect(deniedFor(persona.role, screen.name)).toBe(false);
+    }
+    for (const screen of ["Settings", "Accounting", "Point of sale", "Chat settings", "Chat disconnected"])
+      for (const role of ["sales", "warehouse"] as const) expect(deniedFor(role, screen), screen).toBe(true);
+  });
+
+  it("keeps deep-linked sheets over their owning pages", async () => {
+    const { pageUnder } = await import("../lib/mgr/screen-explorer");
+    for (const [sheet, page] of [["Question invoice", "Pay invoice"], ["Square locations", "Point of sale"], ["Square → QuickBooks connector", "Point of sale"], ["Disconnect Square", "Point of sale"], ["POS item", "Menu"], ["Disconnect Slack", "Chat settings"]]) {
+      expect(SCREENS[pageUnder([], SCREENS.indexOf(by(sheet)))].name).toBe(page);
+    }
+  });
+});

@@ -5,15 +5,16 @@
 // breakpoints, so a frame rendered inline in a 390px box would still lay out as
 // desktop. Static: every index is built once; anything else 404s.
 import { notFound } from "next/navigation";
-import { ScreenFrame } from "@/components/mgr/screen-frame";
+import { FramePersona } from "@/components/mgr/frame-persona";
 import { SCREENS } from "@/components/mgr/screens";
 
 export default async function ScreenFramePage({ params }: { params: Promise<{ s: string }> }) {
-  const s = SCREENS[Number((await params).s)];
-  if (!s) notFound();
+  const index = Number((await params).s);
+  if (!SCREENS[index]) notFound();
+  // The persona rides in the hash (#p=<role>); components/mgr/frame-persona.tsx reads it.
   return (
     <div className="min-h-svh bg-background">
-      <ScreenFrame screen={s} />
+      <FramePersona index={index} />
     </div>
   );
 }

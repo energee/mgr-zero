@@ -44,7 +44,7 @@ export const STAFF_NAV: readonly NavItem[] = [
     children: [
       { label: "Orders", href: "/orders", roles: ["sales", "warehouse"] },
       { label: "Pick", href: "/pick", roles: ["warehouse"] },
-      { label: "Replenishment", href: "/replenishment", roles: ["warehouse"] },
+      { label: "Replenishment", href: "/replenishment", roles: ["sales", "warehouse"] },
       { label: "Batches", href: "/orders#batches", roles: ["brewer"] },
       { label: "Packaging", href: "/orders#packaging", roles: ["brewer", "warehouse"] },
       { label: "POs", href: "/orders#purchase-orders", roles: ["warehouse"] },
@@ -58,6 +58,7 @@ export const STAFF_NAV: readonly NavItem[] = [
     children: [
       { label: "Invoices", href: "/invoices", roles: ["sales"] },
       { label: "Catalog", href: "/catalog", roles: ["sales"] },
+      { label: "Menu", href: "/catalog#menu", roles: ["warehouse"] },
       { label: "Customers", href: "/customers", roles: ["sales"] },
       { label: "Price lists", href: "/pricing", roles: ["sales"] },
       { label: "Recipes", href: "/catalog#recipes", roles: ["brewer"] },

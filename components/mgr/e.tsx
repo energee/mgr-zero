@@ -69,7 +69,7 @@ export const E = {
   /** `icon` says which kind of thing a row is — only in lists that mix kinds
    * (Today, search); a homogeneous list gets none (docs/plans/hugeicons.md §3). */
   row: (t: React.ReactNode, s: React.ReactNode = "", n: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement) => (
-    <Item variant="outline" className={cn(cls === "dis" && "opacity-50")}>
+    <Item variant="outline" data-gated={cls === "dis" || undefined} className={cn(cls === "dis" && "opacity-50")}>
       {(icon || dotColor[cls]) && (
         <ItemMedia className={cn(isValidElement(icon) && FACE_MEDIA)}>
           {/* A Hugeicons icon is an array; an element is already media (E.face). */}
@@ -151,7 +151,7 @@ export const E = {
     // `to` names the screen a tab opens (data-to) where each tab is a screen of
     // its own, like the Work chips; the explorer walks there and hides tabs the
     // persona may not open.
-    <Tabs defaultValue={names[on]}>
+    <Tabs defaultValue={names[on]} className="min-w-0">
       <TabsList variant="solid" className={cls}>{names.map((n) => <TabsTrigger key={n} value={n} data-to={to?.[n]}>{n}</TabsTrigger>)}</TabsList>
     </Tabs>
   ),
