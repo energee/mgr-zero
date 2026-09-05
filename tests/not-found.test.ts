@@ -44,7 +44,7 @@ describe("ctxForBearer", () => {
     const chain = { select: () => chain, eq: () => chain, limit: () => Promise.resolve(failure), maybeSingle: () => Promise.resolve(failure) };
     const db = { from: () => chain } as unknown as SupabaseClient;
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
-    await expect(ctxForBearer(db, "user", "brewery")).rejects.toMatchObject({ status: 500, code: "db_error" });
+    await expect(ctxForBearer(db, "user", "00000000-0000-0000-0000-000000000000")).rejects.toMatchObject({ status: 500, code: "db_error" });
     log.mockRestore();
   });
 });

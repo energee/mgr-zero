@@ -6,14 +6,20 @@ import {
   getRequestAuthContext,
   type RequestAuthContext,
 } from "@/lib/auth/request-context";
+import { z } from "zod";
 import { publicEnv } from "@/lib/env/public";
 import { CommandError, unwrap } from "./registry";
 import type { Ctx } from "./registry";
 
 // Exported for tests; production callers go through buildContextFromBearer.
 // Both membership reads go through unwrap so a database failure is a 500
-// db_error rather than being mistaken for "not a member" (403).
+// db_error rather than being mistaken for "not a member" (403). A malformed
+// breweryId is rejected up front so Postgres never sees it (a 22P02 would
+// otherwise surface as db_error) and the caller still gets not_member.
 export async function ctxForBearer(db: SupabaseClient, userId: string, breweryId: string): Promise<Ctx> {
+  if (!z.uuid().safeParse(breweryId).success) {
+    throw new CommandError("not a member of this brewery", 403, "not_member");
+  }
   const staff = await unwrap(db
     .from("brewery_users")
     .select("role")
