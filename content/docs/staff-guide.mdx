@@ -23,8 +23,8 @@ If the credentials are wrong, MGR shows **Incorrect email or password**. If the 
 | Role | Current access |
 | --- | --- |
 | **Admin** | All current staff screens and actions. |
-| **Sales** | Catalog creation; customers and pricing; order creation, submission, confirmation, adjustment, cancellation, and credits; inventory viewing; invoices; replenishment viewing and creating a replenishment order. |
-| **Warehouse** | Inventory viewing and movements; order and pick-sheet viewing, picking, and shipping; replenishment suggestions; the invoice created when it ships a wholesale order, from a link shown right after shipping; **Menu** opens the Catalog page to view products and SKUs, but creating either there returns a permission error — it cannot open the Invoices list or Team. |
+| **Sales** | Catalog creation; customers and pricing; order creation, submission, confirmation, adjustment, cancellation, and credits; inventory viewing; invoices; replenishment suggestions and order creation. |
+| **Warehouse** | Inventory viewing and movements; order and pick-sheet viewing, picking, and shipping; replenishment suggestions (the Create replenishment order button appears but returns a permission error); viewing Catalog read-only from **Menu** in the More tab; the invoice created when it ships a wholesale order, from a link shown right after shipping — it cannot open the Invoices list or Team. |
 | **Brewer** | Today and account linking from Slack. Brewer's Beer, Work, and More tabs are also visible, but every link under them currently returns a permission error — see [Navigate MGR](#navigation). |
 
 <Callout type="info">
@@ -37,7 +37,7 @@ If an action reports a permission error, stop and ask an administrator. Repeated
 
 The brewery name at the top of the header identifies the brewery whose records are displayed. Navigation has up to four sections — **Today, Beer, Work**, and **More** — shown as tabs along the bottom on a phone and as a left rail on wider screens; on a phone, the tab itself opens the group's primary page. Beer holds **Inventory**, plus **Taproom, Taps, Cellar, Materials**, and **Kegs**; Work holds **Orders, Pick, Replenishment, Batches, Packaging, POs**, and **Deliveries**; More holds **Invoices, Catalog, Menu, Customers, Price lists, Recipes, Compliance, Planning, Import**, and **Settings** (the team roster). Links your role cannot use are simply not shown.
 
-None of Taproom, Taps, Cellar, Materials, Kegs, Batches, Packaging, POs, Deliveries, Recipes, Compliance, Planning, Import, or Menu has its own screen yet — each currently opens the same page as Inventory, Orders, Catalog, Invoices, or Settings. Import specifically opens the Team roster with no CSV-upload control anywhere on it (see [Actions not yet available](#unavailable)).
+None of Taproom, Taps, Cellar, Materials, Kegs, Batches, Packaging, POs, Deliveries, Menu, Recipes, Compliance, Planning, or Import has its own screen yet — each currently opens the same page as Inventory, Orders, Catalog, Invoices, or Settings. Import specifically opens the Team roster with no CSV-upload control anywhere on it (see [Actions not yet available](#unavailable)).
 
 <Callout type="warn">
 **Brewer navigation:** Brewer now sees Beer, Work, and More tabs in addition to Today, but selecting **Cellar, Materials, Batches, Packaging, Recipes**, or **Planning** returns a permission error. Today and Slack account linking are the only staff features Brewer can currently use.
@@ -53,7 +53,7 @@ The **Me** control in the header shows your brewery and role, switches between l
 
 ## Catalog: products and SKUs [#catalog]
 
-*A product is the beer, such as Hazy IPA. A SKU is one sellable package of that beer, such as a half-barrel keg or a case of cans. Admin and Sales can create and view both. Warehouse can open Catalog from the **Menu** link to view products and SKUs, but creating either there returns a permission error. Catalog is not reachable by Brewer.*
+*A product is the beer, such as Hazy IPA. A SKU is one sellable package of that beer, such as a half-barrel keg or a case of cans. Admin and Sales can create products and SKUs. Warehouse can view this same page read-only from **Menu** in the More tab — the New Product and New SKU buttons still appear, but submitting either returns a permission error. Catalog is not reachable by Brewer.*
 
 ### Create a product
 
@@ -234,7 +234,7 @@ MGR creates a separate credit memo at the original prices, adds the credited qua
 
 <Screen name="Pars and allocation" />
 
-*Admin, Sales, and Warehouse can open Replenishment. The Create replenishment order button is shown to Warehouse, but only Admin and Sales can complete it — Warehouse submitting it returns a permission error.*
+*Admin, Sales, and Warehouse can open Replenishment. Admin and Sales can create a replenishment order; the Create replenishment order button also appears for Warehouse, but submitting it returns a permission error.*
 
 1. Open **Replenishment** and choose a taproom. The first taproom is selected by default.
 2. Review each SKU’s par, on-hand amount, and suggested quantity. Suggested quantity is the par shortfall, never less than zero.
