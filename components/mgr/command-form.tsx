@@ -3,8 +3,10 @@
 // switched on hooks/use-mobile.ts exactly as shadcn's Sidebar does. Pairs
 // with lib/commands/use-command-form.ts (open/setOpen/submit/error) but is
 // presentational, so forms with bespoke state use it the same way. Always
-// titled. Content is closed on first paint, so the SSR "not mobile" snapshot
-// never renders the wrong primitive.
+// titled. Submit feedback goes through CommandFormMessage below so every form
+// announces errors and warnings to assistive tech the same way. Content is
+// closed on first paint, so the SSR "not mobile" snapshot never renders the
+// wrong primitive.
 "use client";
 
 import { Dialog as DialogPrimitive } from "radix-ui";
@@ -89,4 +91,32 @@ export function CommandForm({
 /** Action row at the bottom of a CommandForm body: stacked on phone, right-aligned on desk. */
 export function CommandFormFooter({ className, ...props }: React.ComponentProps<"div">) {
   return <div className={cn("flex flex-col gap-2 pt-2 md:flex-row md:justify-end", className)} {...props} />;
+}
+
+/**
+ * Submit feedback under a CommandForm body. Errors (`error`, or `tone="error"`
+ * children) render as `role="alert"` so screen readers interrupt with the
+ * failure; soft warnings (`tone="warning"`, e.g. confirm_order's ATP list)
+ * render as a polite `role="status"` region. Renders nothing when empty.
+ * Login's inline error (components/login-form.tsx) is the same pattern.
+ */
+export function CommandFormMessage({
+  error,
+  tone = "error",
+  className,
+  children,
+}: {
+  error?: string | null;
+  tone?: "error" | "warning";
+  className?: string;
+  children?: React.ReactNode;
+}) {
+  const content = children ?? error;
+  if (!content) return null;
+  const live = tone === "error" ? { role: "alert" as const } : { role: "status" as const, "aria-live": "polite" as const };
+  return (
+    <p {...live} className={cn("text-sm", tone === "error" ? "text-destructive" : "text-warning-foreground", className)}>
+      {content}
+    </p>
+  );
 }

@@ -8,7 +8,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
+import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -233,7 +233,7 @@ export function OrderForm({
             </Button>
           </div>
 
-          {form.error && <p className="text-sm text-destructive">{form.error}</p>}
+          <CommandFormMessage error={form.error} />
           <CommandFormFooter>
             <Button type="submit" disabled={form.submitting}>
               {form.submitting ? "Creating…" : "Create"}
