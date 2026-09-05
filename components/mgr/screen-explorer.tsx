@@ -125,15 +125,16 @@ export function ScreenExplorer() {
     if (!current) return;
     const el = (e.target as HTMLElement).closest<HTMLElement>("a, button, [data-slot=item]");
     if (!el || el.matches("[data-slot=toggle-group-item]")) return;
-    if (el.matches("[role=tab]") && !el.dataset.to) return filterRows(el);
     const link = el.closest("a");
     const label = el.getAttribute("aria-label") ?? (el.matches("[data-slot=item]") ? el.querySelector("[data-slot=item-title]")?.textContent : el.textContent) ?? "";
     const name = resolveTap(current[1], label, link?.getAttribute("href"), el.getAttribute("data-to"));
+    // A tab is a screen of its own when its label names one (Tap board's
+    // Warehouse is Location detail); otherwise it filters the rows under it.
+    if (el.matches("[role=tab]") && (!name || name === current[1].name)) return filterRows(el);
     if (link || name) e.preventDefault();
-    if (!name) {
-      if (process.env.NODE_ENV !== "production") console.debug(`[screen-explorer] no screen for "${label}" on ${current[1].name}`);
-      return;
-    }
+    // Nowhere to go, or a verb named like the sheet it sits in ("Record
+    // movement" on Record movement): it acts here.
+    if (!name || name === current[1].name) return actInPlace(el, label, () => back(), trail.current.length > 1);
     e.stopPropagation();
     if (name === BACK) return back();
     const home = name === "Today" ? homeFor(persona.role) : name;
@@ -279,4 +280,39 @@ function filterRows(tab: HTMLElement) {
   const rows = [...(scope?.querySelectorAll<HTMLElement>("[data-slot=item]") ?? [])];
   const keep = label.startsWith("all") ? rows : rows.filter((r) => (r.textContent ?? "").toLowerCase().includes(label));
   for (const r of rows) r.hidden = keep.length > 0 && !keep.includes(r);
+}
+
+// A tap the resolver leaves alone still has to do something a reader can see.
+// An add-a-line verb ("+ add ingredient", "Add stop") grows the list by one
+// unsaved line; a commit verb in a sheet's footer closes the sheet, and one on
+// a page returns to where the reader came from, as the command would; with no
+// trail to return along it flashes done. Selects, switches, steppers and links
+// out are left to their own behavior. ponytail: the screens have no state, so
+// this is theatre; a drawn "after" state per command would replace it.
+function actInPlace(el: HTMLElement, label: string, back: () => void, canReturn: boolean) {
+  if (el.matches("a, [role], [data-slot=select-trigger], [data-slot=popover-trigger], [data-slot=input-group-addon] *") || /^[−+]$/.test(label.trim())) return;
+  const add = /^\+?\s*add\s+(.+)$/i.exec(label.trim());
+  if (add) {
+    const row = el.closest<HTMLElement>("[data-slot=item]") ?? el.parentElement?.querySelector<HTMLElement>("[data-slot=item]");
+    const line = row ? (row.cloneNode(true) as HTMLElement) : document.createElement("div");
+    if (!row) line.className = "rounded-lg border px-3 py-2 text-sm";
+    const title = line.querySelector("[data-slot=item-title]");
+    const desc = line.querySelector("[data-slot=item-description]");
+    if (title) title.textContent = `New ${add[1].replace(/\s*\(.*$/, "").toLowerCase()}`;
+    else line.textContent = `New ${add[1].toLowerCase()}`;
+    if (desc) desc.textContent = "unsaved";
+    line.querySelector("[data-slot=item-actions]")?.remove();
+    line.removeAttribute("hidden");
+    (row ?? el).before(line);
+    return;
+  }
+  if (!el.matches("button") || el.matches("[data-variant=ghost], [data-variant=outline], [data-row-action]")) return;
+  const inSheet = Boolean(el.closest("[data-slot=dialog-content], [data-slot=sheet-content]") && el.closest(".border-t"));
+  if (inSheet || canReturn) return back();
+  {
+    const was = el.textContent;
+    el.textContent = "Done ✓";
+    el.setAttribute("aria-disabled", "true");
+    setTimeout(() => { el.textContent = was; el.removeAttribute("aria-disabled"); }, 1200);
+  }
 }
