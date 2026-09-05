@@ -6,6 +6,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -97,7 +98,7 @@ export function ReplenishForm({
         <p className="text-sm text-muted-foreground">No pars set for this taproom.</p>
       )}
 
-      {form.error && <p className="text-sm text-red-600">{form.error}</p>}
+      <CommandFormMessage error={form.error} />
       <div>
         <Button type="submit" disabled={form.submitting || !fromLocationId || suggestions.length === 0}>
           {form.submitting ? "Creating…" : "Create replenishment order"}
