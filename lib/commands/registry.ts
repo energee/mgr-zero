@@ -1,6 +1,6 @@
 // lib/commands/registry.ts — single source of truth for every operation.
 // UI calls these via /api/command; AI chat (plan 1C) exposes the same registry as tools.
-import { ZodType } from "zod";
+import { z, ZodType } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type StaffRole = "admin" | "sales" | "warehouse" | "brewer";
@@ -156,7 +156,10 @@ export async function runCommand(name: string, rawInput: unknown, ctx: Ctx, exec
   const allowed = def.roles === "any" || (def.roles === "customer" ? ctx.role === "customer" : def.roles.includes(ctx.role as StaffRole));
   if (!allowed) throw new CommandError(`permission denied: ${name} requires ${JSON.stringify(def.roles)}`, 403, "permission_denied");
   const parsed = def.input.safeParse(rawInput);
-  if (!parsed.success) throw new CommandError(`validation failed: ${parsed.error.message}`, 400, "invalid_input");
+  // prettifyError gives one readable line per issue ("✖ Invalid UUID → at
+  // customerId") for forms, the portal cart and HTTP API callers alike, instead
+  // of the serialized issue array zod puts in error.message.
+  if (!parsed.success) throw new CommandError(`validation failed: ${z.prettifyError(parsed.error)}`, 400, "invalid_input");
   try {
     return await def.execute(ctx, parsed.data, def.kind === "command" ? execution ?? createExecution() : undefined);
   } catch (e: unknown) {
