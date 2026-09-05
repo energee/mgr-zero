@@ -12,7 +12,7 @@ const read = (path: string) => readFileSync(resolve(root, path), "utf8");
 const GUIDES: string[] = JSON.parse(read("content/docs/meta.json")).pages;
 
 describe("customer guides (MDX)", () => {
-  it("has exactly the three guides, each with frontmatter and no code", () => {
+  it("has exactly the pages meta.json lists, each with frontmatter and no code", () => {
     const files = readdirSync(resolve(root, "content/docs")).filter((f) => f.endsWith(".mdx")).sort();
     expect(files).toEqual(GUIDES.map((g) => `${g}.mdx`).sort());
     for (const guide of GUIDES) {
