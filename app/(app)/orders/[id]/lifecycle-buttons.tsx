@@ -10,7 +10,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
+import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useBrewery } from "../../brewery-provider";
@@ -104,7 +104,7 @@ export function LifecycleButtons({
                   <Label htmlFor="cancel-reason">Reason</Label>
                   <Input id="cancel-reason" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} required />
                 </div>
-                {error && <p className="text-sm text-destructive">{error}</p>}
+                <CommandFormMessage error={error} />
                 <CommandFormFooter>
                   <Button type="submit" disabled={busy}>
                     {busy ? "Cancelling…" : "Cancel order"}
@@ -114,13 +114,13 @@ export function LifecycleButtons({
             </CommandForm>
         )}
       </div>
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      <CommandFormMessage error={error} />
       {warnings.length > 0 && (
         <div className="flex flex-col gap-1">
           {warnings.map((w) => (
-            <p key={w.sku_id} className="text-sm text-warning-foreground">
+            <CommandFormMessage key={w.sku_id} tone="warning">
               ATP negative for {skuNames.get(w.sku_id) ?? w.sku_id}
-            </p>
+            </CommandFormMessage>
           ))}
         </div>
       )}

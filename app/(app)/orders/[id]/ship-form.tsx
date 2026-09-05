@@ -7,11 +7,11 @@
 // the invoice_id back out of the response.
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
+import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useBrewery } from "../../brewery-provider";
@@ -28,6 +28,8 @@ export function ShipForm({ orderId, lines }: { orderId: string; lines: ShipLine[
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [qtys, setQtys] = useState<Record<string, string>>(() => initialQtys(lines));
+  // Per-line qty inputs need real ids so each Label is programmatically linked (audit 2026-09-05, a11y #5).
+  const idBase = useId();
   const [carrier, setCarrier] = useState("");
   const [tracking, setTracking] = useState("");
   const [busy, setBusy] = useState(false);
@@ -86,10 +88,11 @@ export function ShipForm({ orderId, lines }: { orderId: string; lines: ShipLine[
             <div className="flex flex-col gap-2">
               {lines.map((l) => (
                 <div key={l.id} className="flex items-center gap-2">
-                  <Label className="flex-1 font-normal">
+                  <Label htmlFor={`${idBase}-${l.id}`} className="flex-1 font-normal">
                     {l.skuName} (picked {l.qtyPicked ?? 0})
                   </Label>
                   <Input
+                    id={`${idBase}-${l.id}`}
                     type="number"
                     min="0"
                     step="any"
@@ -110,7 +113,7 @@ export function ShipForm({ orderId, lines }: { orderId: string; lines: ShipLine[
                 <Input id="ship-tracking" value={tracking} onChange={(e) => setTracking(e.target.value)} />
               </div>
             </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            <CommandFormMessage error={error} />
             <CommandFormFooter>
               <Button type="submit" disabled={busy}>
                 {busy ? "Shipping…" : "Ship"}
