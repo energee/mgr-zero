@@ -27,7 +27,7 @@ import { SCREENS, WORK_TABS } from "@/components/mgr/screens";
 import { ThemeToggle } from "@/components/mgr/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const ALL = "all";
@@ -181,8 +181,10 @@ export function ScreenExplorer() {
         <Select value={areaPick} onValueChange={(v) => set({ a: v === ALL ? undefined : v })}>
           <SelectTrigger className="w-44" aria-label="Area"><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value={ALL}>All areas</SelectItem>
-            {AREAS.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+            <SelectGroup>
+              <SelectItem value={ALL}>All areas</SelectItem>
+              {AREAS.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+            </SelectGroup>
           </SelectContent>
         </Select>
         <ToggleGroup type="single" variant="outline" size="sm" value={surface} onValueChange={(v) => v && set({ f: v === ALL ? undefined : v })} aria-label="Surface">
@@ -193,7 +195,9 @@ export function ScreenExplorer() {
         <Select value={persona.role} onValueChange={(v) => choose(v as StaffRole)}>
           <SelectTrigger className="w-48" aria-label="Persona"><SelectValue /></SelectTrigger>
           <SelectContent>
-            {PERSONAS.map((p) => <SelectItem key={p.role} value={p.role}>{p.name} · {p.role}</SelectItem>)}
+            <SelectGroup>
+              {PERSONAS.map((p) => <SelectItem key={p.role} value={p.role}>{p.name} · {p.role}</SelectItem>)}
+            </SelectGroup>
           </SelectContent>
         </Select>
         <ToggleGroup type="single" variant="outline" size="sm" value={phone ? "phone" : "desk"} onValueChange={(v) => v && set({ w: v === "phone" ? "phone" : undefined })} aria-label="Width">
