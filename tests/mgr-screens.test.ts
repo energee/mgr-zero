@@ -264,7 +264,7 @@ describe("SCREENS", () => {
     }
     expect(body("Team")).toContain("@maria");
     // An invite goes to an address, and its recipient has no account to have a handle.
-    expect(body("Team")).toContain("sam@demobrewing.com");
+    expect(body("Team")).toContain("wes@demobrewing.com");
   });
 
   it("renders a date field with no value, and names it", () => {
@@ -284,7 +284,7 @@ describe("SCREENS", () => {
     // the real src; a person with no fixture shows letters instead.
     expect(render(E.face({ name: "Maria Alvarez" }))).toContain(">MA<");
     expect(render(E.face({ name: "Ted" }))).toContain(">T<");
-    expect(render(E.face({ name: "sam@demobrewing.com" }))).toContain(">S<");
+    expect(render(E.face({ name: "wes@demobrewing.com" }))).toContain(">W<");
     expect(render(E.face({ name: "Maria Alvarez" }))).not.toContain("<img");
     // Every other call keeps its photo: no name and no path is the signed-in user.
     expect(render(E.face())).toContain('src="/mock/maria.jpg"');
@@ -305,7 +305,8 @@ describe("SCREENS", () => {
       ["/mock/maria.jpg", /Maria|maria@/],
       ["/mock/dave.jpg", /Dave/],
       ["/mock/ted.jpg", /Ted/],
-      // No sam.jpg: a pending invite has no account yet, so the Team spec has it
+      ["/mock/sam.jpg", /Sam/],
+      // No wes.jpg: a pending invite has no account yet, so the Team spec has it
       // showing the address it was sent to, and the avatar falls back to initials.
     ];
     for (const [src] of faces) {
@@ -313,7 +314,7 @@ describe("SCREENS", () => {
     }
     const team = body("Team");
     for (const [src] of faces) expect(team, src).toContain(`src="${src}"`);
-    expect(team, "the pending invite is initials, not a portrait").toContain(">S<");
+    expect(team, "the pending invite is initials, not a portrait").toContain(">W<");
     expect(body("Me")).toContain('src="/mock/maria.jpg"');
     expect(body("Me")).not.toContain("/mock/dave.jpg");
     expect(body("Team member")).toContain('src="/mock/dave.jpg"');
@@ -528,6 +529,17 @@ describe("SCREENS", () => {
       expect(html, name).toMatch(/Reason/);
       expect(html, name).toMatch(/required/);
       expect(html, `${name}: no reason chips`).not.toMatch(/>damaged</);
+    }
+  });
+
+  it("edits a whole number with the same stepper Weekly count uses", () => {
+    // A contract quantity or an overdue threshold is counted, not typed: the
+    // −/+ stepper (E.stq) is the one number control, as on Weekly count.
+    for (const name of ["Contract", "Chat settings"]) {
+      expect(body(name), `${name}: no stepper`).toContain('aria-label="Decrease"');
+    }
+    for (const [name, label] of [["Contract", "Contract quantity"], ["Chat settings", "Reading overdue after"]]) {
+      expect(body(name), `${name}: the stepper is not the labelled field`).toMatch(new RegExp(`aria-label="Decrease"[^§]*aria-label="${label}"`));
     }
   });
 

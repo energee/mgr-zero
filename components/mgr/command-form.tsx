@@ -7,6 +7,8 @@
 // never renders the wrong primitive.
 "use client";
 
+import { Dialog as DialogPrimitive } from "radix-ui";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -18,9 +20,12 @@ export function CommandForm({
   trigger,
   title,
   footer,
+  container,
   children,
 }: {
   open: boolean;
+  /** Where the sheet or dialog portals to; the screen explorer keeps it inside its box. */
+  container?: HTMLElement | null;
   /** Omit to pin the form open (the screen inventory's frames); dismiss gestures then do nothing. */
   onOpenChange?: (open: boolean) => void;
   /** Omit when the caller controls `open` itself (the screen inventory's frames). */
@@ -33,7 +38,27 @@ export function CommandForm({
   // bleed: the dialog body and footer pull out to DialogContent's own padding so a focus ring and the divider reach the edge; the sheet has none to undo.
   const body = (bleed: string) => <div className={cn("min-h-0 flex-1 overflow-y-auto px-4 py-1", bleed)}>{children}</div>;
   const foot = (bleed: string) => footer && <div className={cn("shrink-0 border-t px-4 pt-2", bleed)}>{footer}</div>;
-  if (useIsMobile()) {
+  const mobile = useIsMobile();
+  // Explorer-only portal plumbing belongs here, not in generated shadcn files.
+  if (container) return (
+    <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
+      <DialogPrimitive.Portal container={container}>
+        <DialogPrimitive.Content
+          data-slot="dialog-content"
+          aria-describedby={undefined}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+          className={cn("fixed z-50 flex flex-col gap-4 overflow-hidden rounded-xl bg-popover p-4 text-sm text-popover-foreground shadow-lg ring-1 ring-foreground/10", mobile ? "inset-x-0 bottom-0 max-h-[calc(100%-1rem)]" : "top-1/2 left-1/2 max-h-[calc(100%-2rem)] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2")}
+        >
+          <DialogHeader className="shrink-0"><DialogTitle>{title}</DialogTitle></DialogHeader>
+          {body("-mx-4")}
+          {foot("-mx-4")}
+          <DialogPrimitive.Close asChild><Button variant="ghost" size="sm" className="self-end">Close</Button></DialogPrimitive.Close>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </Dialog>
+  );
+  if (mobile) {
     return (
       <Sheet open={open} onOpenChange={onOpenChange}>
         {trigger && <SheetTrigger asChild>{trigger}</SheetTrigger>}

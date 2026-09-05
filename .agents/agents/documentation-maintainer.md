@@ -75,7 +75,11 @@ the headings, so write no HTML, CSS, imports, exports, or scripts. Use `##`
 sections with stable anchors (`## Orders [#orders]`), `###` for tasks, numbered
 steps, Markdown tables, `**Label**` for on-screen labels, backticks for literal
 values, and the built-in components `<Callout type="info|warn">`, `<Cards>` and
-`<Card title="…" href="…">`. Cross-link guides as `/docs/staff-guide` and
+`<Card title="…" href="…">`. A section that describes a screen shows it: put
+`<Screen name="Orders" />` on its own line right under the heading, where the
+name is the screen's exact name in `components/mgr/screens.tsx` (an unknown
+name fails the build). Keep existing embeds, move them with their section, and
+add one when a new section describes a screen the inventory draws. Cross-link guides as `/docs/staff-guide` and
 `/docs/portal-guide`; `content/docs/meta.json` fixes the sidebar order.
 
 Never expose source paths, command/query names, database terminology, access

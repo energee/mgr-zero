@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
 type OrderKind = "wholesale" | "taproom_transfer";
@@ -93,8 +93,10 @@ export function OrderForm({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="wholesale">Wholesale</SelectItem>
-                <SelectItem value="taproom_transfer">Taproom transfer</SelectItem>
+                <SelectGroup>
+                  <SelectItem value="wholesale">Wholesale</SelectItem>
+                  <SelectItem value="taproom_transfer">Taproom transfer</SelectItem>
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>
@@ -114,11 +116,13 @@ export function OrderForm({
                     <SelectValue placeholder="Select customer" />
                   </SelectTrigger>
                   <SelectContent>
-                    {customers.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
+                    <SelectGroup>
+                      {customers.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>
@@ -129,11 +133,13 @@ export function OrderForm({
                     <SelectValue placeholder={customerId ? "Select ship-to" : "Select a customer first"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {shipTos.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.label}
-                      </SelectItem>
-                    ))}
+                    <SelectGroup>
+                      {shipTos.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
               </div>
@@ -146,11 +152,13 @@ export function OrderForm({
                   <SelectValue placeholder="Select location" />
                 </SelectTrigger>
                 <SelectContent>
-                  {locations.map((l) => (
-                    <SelectItem key={l.id} value={l.id}>
-                      {l.name}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    {locations.map((l) => (
+                      <SelectItem key={l.id} value={l.id}>
+                        {l.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
@@ -163,11 +171,13 @@ export function OrderForm({
                 <SelectValue placeholder="Select location" />
               </SelectTrigger>
               <SelectContent>
-                {locations.map((l) => (
-                  <SelectItem key={l.id} value={l.id}>
-                    {l.name}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  {locations.map((l) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>
@@ -195,11 +205,13 @@ export function OrderForm({
                     <SelectValue placeholder="Select SKU" />
                   </SelectTrigger>
                   <SelectContent>
-                    {skus.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.label}
-                      </SelectItem>
-                    ))}
+                    <SelectGroup>
+                      {skus.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   </SelectContent>
                 </Select>
                 <Input

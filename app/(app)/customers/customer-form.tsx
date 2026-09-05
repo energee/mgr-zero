@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
 const CUSTOMER_TYPES = ["distributor", "retailer", "brewery", "other"] as const;
@@ -76,11 +76,13 @@ export function CustomerForm({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {CUSTOMER_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  {CUSTOMER_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>
@@ -102,12 +104,14 @@ export function CustomerForm({
                 <SelectValue placeholder="None" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={NONE_PRICE_LIST}>None</SelectItem>
-                {priceLists.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  <SelectItem value={NONE_PRICE_LIST}>None</SelectItem>
+                  {priceLists.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>

@@ -19,6 +19,11 @@ export default async function Page({ params }: Props) {
   // appended here — without this each has a table of contents with nothing in
   // it below the intro.
   const generated = { screens: SCREEN_TOC, integrations: VENUE_TOC }[page.slugs.join("/")];
+  // The explorer has no headings but embeds desktop frames too, so it is full
+  // width, and with nothing to list its table of contents is off: the empty
+  // column would squeeze the frame to its rail on a laptop.
+  const explorer = page.slugs.join("/") === "screens-explore";
+  const wide = Boolean(generated) || explorer;
   const toc = generated ? [...page.data.toc, ...generated] : page.data.toc;
   // The generated pages embed frames at desktop width, so they take the full
   // column. `full` alone would also drop the table of contents (it only
@@ -27,9 +32,9 @@ export default async function Page({ params }: Props) {
   return (
     <DocsPage
       toc={toc}
-      full={Boolean(generated) || page.data.full}
-      tableOfContent={{ enabled: true }}
-      className={generated ? "max-w-none" : undefined}
+      full={wide || page.data.full}
+      tableOfContent={{ enabled: !explorer }}
+      className={wide ? "max-w-none" : undefined}
     >
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>

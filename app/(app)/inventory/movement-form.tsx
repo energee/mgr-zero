@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
 // Staff-facing movement types; sale_removal/taproom_transfer are produced by
@@ -56,11 +56,13 @@ export function MovementForm({
                 <SelectValue placeholder="Select a SKU" />
               </SelectTrigger>
               <SelectContent>
-                {skus.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.label}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  {skus.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>
@@ -71,11 +73,13 @@ export function MovementForm({
                 <SelectValue placeholder="Select a location" />
               </SelectTrigger>
               <SelectContent>
-                {locations.map((l) => (
-                  <SelectItem key={l.id} value={l.id}>
-                    {l.name}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  {locations.map((l) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>
@@ -86,11 +90,13 @@ export function MovementForm({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {MOVEMENT_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  {MOVEMENT_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>
@@ -102,11 +108,13 @@ export function MovementForm({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {CHANNELS.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    {CHANNELS.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>

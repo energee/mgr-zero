@@ -16,7 +16,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useBrewery } from "@/app/(app)/brewery-provider";
 import { command } from "@/lib/commands/client";
 
@@ -161,11 +161,13 @@ export function Cart({ items, shipTos }: { items: CatalogItem[]; shipTos: ShipTo
               <SelectValue placeholder="Select a ship-to" />
             </SelectTrigger>
             <SelectContent>
-              {shipTos.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.label}
-                </SelectItem>
-              ))}
+              <SelectGroup>
+                {shipTos.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
             </SelectContent>
           </Select>
         </div>

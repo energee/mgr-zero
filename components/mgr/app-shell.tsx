@@ -71,7 +71,7 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
           })}
         </SidebarContent>
       </Sidebar>
-      <SidebarInset className="min-h-svh">
+      <SidebarInset className="min-h-svh min-w-0">
         <header className="flex h-12 items-center justify-between gap-2 border-b px-2">
           <span className="flex min-w-0 items-center gap-1 text-sm font-medium">
             <SidebarTrigger className="hidden md:inline-flex" />

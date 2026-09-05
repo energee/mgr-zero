@@ -21,7 +21,7 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupTextarea } from "@/components/ui/input-group";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -69,7 +69,7 @@ export const E = {
   /** `icon` says which kind of thing a row is — only in lists that mix kinds
    * (Today, search); a homogeneous list gets none (docs/plans/hugeicons.md §3). */
   row: (t: React.ReactNode, s: React.ReactNode = "", n: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement) => (
-    <Item variant="outline" className={cn(cls === "dis" && "opacity-50")}>
+    <Item variant="outline" data-gated={cls === "dis" || undefined} className={cn(cls === "dis" && "opacity-50")}>
       {(icon || dotColor[cls]) && (
         <ItemMedia className={cn(isValidElement(icon) && FACE_MEDIA)}>
           {/* A Hugeicons icon is an array; an element is already media (E.face). */}
@@ -145,11 +145,14 @@ export const E = {
    *  an order's states) is a tab bar too; single-choice fields stay chips.
    *  Spans the column by default; pass width classes to hug ("w-fit", an input
    *  addon) or to scroll a bar too long for the phone ("overflow-x-auto"). */
-  tabs: (names: string[], on = 0, cls = "w-full") => (
+  tabs: (names: string[], on = 0, cls = "w-full", to?: Record<string, string>) => (
     // Uncontrolled, like chips: a controlled value with no onValueChange makes
     // every trigger inert, and these bars are meant to be clickable in the inventory.
-    <Tabs defaultValue={names[on]}>
-      <TabsList variant="solid" className={cls}>{names.map((n) => <TabsTrigger key={n} value={n}>{n}</TabsTrigger>)}</TabsList>
+    // `to` names the screen a tab opens (data-to) where each tab is a screen of
+    // its own, like the Work chips; the explorer walks there and hides tabs the
+    // persona may not open.
+    <Tabs defaultValue={names[on]} className="min-w-0">
+      <TabsList variant="solid" className={cls}>{names.map((n) => <TabsTrigger key={n} value={n} data-to={to?.[n]}>{n}</TabsTrigger>)}</TabsList>
     </Tabs>
   ),
   chips: (arr: string[], on = 0, bright = false) => (
@@ -194,6 +197,16 @@ export const E = {
   /** An editable field. type is the native input type; "date" pops the calendar (DatePicker). */
   edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[]) => {
     if (type === "date") return <DatePicker label={label} defaultValue={value} />;
+    // A whole number (a contract quantity, an overdue threshold) is counted,
+    // not typed: the same −/+ stepper Weekly count uses.
+    if (type === "number") {
+      return (
+        <Field orientation="horizontal">
+          <FieldLabel>{label}</FieldLabel>
+          {E.stq(Number(value), label)}
+        </Field>
+      );
+    }
     const listId = suggestions?.length ? `${label.replace(/\s+/g, "-").toLowerCase()}-list` : undefined;
     return (
       <Field orientation="horizontal">
@@ -211,7 +224,7 @@ export const E = {
       <FieldLabel>{label}</FieldLabel>
       <Select defaultValue={value}>
         <SelectTrigger aria-label={label}><SelectValue /></SelectTrigger>
-        <SelectContent>{options.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+        <SelectContent><SelectGroup>{options.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectGroup></SelectContent>
       </Select>
     </Field>
   ),

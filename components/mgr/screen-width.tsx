@@ -8,35 +8,58 @@
 // script owns the `.dark` class, and two owners would fight over it.
 "use client";
 
-import { createContext, useContext, useState } from "react";
+import { cn } from "@/lib/utils";
+
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { ThemeToggle } from "@/components/mgr/theme-toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-type Mode = "phone" | "desk";
+export type Mode = "phone" | "desk";
 
-function syncFrames() {
+export function syncFrames() {
   const dark = document.documentElement.classList.contains("dark");
   for (const f of document.querySelectorAll("iframe")) f.contentDocument?.documentElement.classList.toggle("dark", dark);
 }
 const WidthContext = createContext<Mode>("phone");
 
+// Desktop frames lay out at a fixed 1024px viewport and are scaled to fit the
+// column: the shell's rail needs a 768px-wide viewport, and a docs column beside
+// a sidebar and table of contents is narrower than that on most laptops, so
+// "fill the column" drew the phone layout under a Desktop label.
+const DESK = 1024;
+
 /** One frame, embedded at a real viewport width — see app/(frames)/screens/frame. */
-export function ScreenEmbed({ index, title }: { index: number; title: string }) {
-  const mode = useContext(WidthContext);
-  // Mobile is a real 390px viewport. Desktop fills the column: the shell draws its
-  // rail at any width from 768 up, and a fixed 1280 only guaranteed a
-  // horizontal scroll on most screens. The page lifts Fumadocs' width caps so
-  // the column is wide enough to clear the breakpoint.
+/** `persona` rides in the frame's hash (app/(frames)/screens/frame reads it);
+ *  `preview` makes the frame inert — the explorer's phone view is a look, not a walk. */
+export function ScreenIframe({ index, title, mode, persona, preview }: { index: number; title: string; mode: Mode; persona?: string; preview?: boolean }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const el = box.current;
+    if (!el || mode !== "desk") return;
+    const ro = new ResizeObserver(([e]) => setScale(Math.min(1, e.contentRect.width / DESK)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [mode]);
+  const desk = mode === "desk";
+  const height = 780;
   return (
-    <iframe
-      src={`/screens/frame/${index}`}
-      title={`${title} · ${mode}`}
-      height={780}
-      loading="lazy"
-      style={{ width: mode === "phone" ? 390 : "100%" }}
-      className="max-w-full rounded-lg border bg-background"
-    />
+    <div ref={box} style={{ height: desk ? height * scale : height }} className={cn("max-w-full overflow-hidden", preview && "pointer-events-none select-none")}>
+      <iframe
+        src={`/screens/frame/${index}${persona ? `#p=${persona}` : ""}`}
+        title={`${title} · ${mode}`}
+        height={height}
+        loading="lazy"
+        style={desk ? { width: DESK, transform: `scale(${scale})`, transformOrigin: "top left" } : { width: 390 }}
+        className={desk ? "max-w-none rounded-lg border bg-background" : "max-w-full rounded-lg border bg-background"}
+      />
+    </div>
   );
+}
+
+/** A frame at the width the surrounding <ScreenWidth> chose. */
+export function ScreenEmbed(props: { index: number; title: string }) {
+  return <ScreenIframe {...props} mode={useContext(WidthContext)} />;
 }
 
 /** `deskOnly` pins the width and hides the switch — the external venues are
