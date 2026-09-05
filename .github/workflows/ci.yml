@@ -48,9 +48,7 @@ jobs:
       - name: Env from local stack
         # The app accepts modern Supabase names only. The mapping script keeps
         # local CLI output compatible without reintroducing runtime fallbacks.
-        run: |
-          supabase status -o env | node scripts/supabase-env.mjs >> "$GITHUB_ENV"
-          echo "COMMAND_RATE_LIMIT_HMAC_SECRET=ci-command-rate-limit-hmac-secret-that-is-long-enough" >> "$GITHUB_ENV"
+        run: supabase status -o env | node scripts/supabase-env.mjs >> "$GITHUB_ENV"
       - run: bun run test
       - run: bun run lint
       - run: bunx tsc --noEmit
