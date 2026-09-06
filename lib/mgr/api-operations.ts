@@ -54,8 +54,11 @@ const INTEGRATION = /(qbo|square|pos_|chat_installation|chat_integration|chat_re
 // [SCHEMA-GATE: …]"); a real name always carries an underscore. A screen also
 // names what the client and the platform do — `local_outbox [client state]`,
 // `supabase_auth_sign_out [platform]` — and neither is an API operation.
+// `[view]` is the third: a query composed for one screen (`get_cellar_map
+// [view]`). It will exist, but its shape follows the screen, so publishing it
+// as integration surface would promise a contract nobody asked for.
 const isOperationName = (name: string) => name.includes("_") && !name.startsWith("supabase_");
-const NOT_AN_OPERATION = /\[(client state|platform)/;
+const NOT_AN_OPERATION = /\[(client state|platform|view)/;
 
 /** Every operation named by a screen, with the screens that name it. */
 function screenOperations() {

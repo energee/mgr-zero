@@ -6,6 +6,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { SCREENS } from "@/components/mgr/screens";
 import { API_AREAS, apiOperations, areaOf, operationsInArea } from "@/lib/mgr/api-operations";
 import { BACKLOG_PATH, opsEnd, opsStart, renderArea, renderBacklog } from "@/lib/mgr/api-reference";
 import { API_ERRORS } from "@/lib/mgr/api-errors";
@@ -203,5 +204,56 @@ describe("HTTP API reference", () => {
     for (const [alias, use] of Object.entries(retired)) {
       expect(named.has(alias), `${alias} duplicates ${use}`).toBe(false);
     }
+  });
+  // A query shaped for exactly one screen is not integration surface: its
+  // response changes whenever the screen does, so publishing it would promise
+  // a shape nobody asked for. Screens mark those `[view]` and the derivation
+  // drops them, the same way it already drops `[client state]` and
+  // `[platform]` (YAGNI pass, 2026-09-06).
+  it("keeps view-annotated reads out of the reference", () => {
+    const named = new Set(apiOperations().map((o) => o.name));
+    const annotated = SCREENS.flatMap((screen) =>
+      [screen.reads, screen.writes]
+        .filter((d): d is string => typeof d === "string")
+        .flatMap((d) => d.split("\u00b7"))
+        .filter((part) => /\[view/.test(part))
+        .map((part) => part.trim().match(/^([a-z_]+)/)?.[1])
+        .filter((name): name is string => Boolean(name)),
+    );
+    expect(annotated.length, "no screen annotates a read [view]").toBeGreaterThan(0);
+    for (const name of annotated) {
+      expect(named.has(name), `${name} is annotated [view] but still published`).toBe(false);
+    }
+  });
+  // Catalog entities settled on upsert + list (upsert_customer, upsert_ship_to,
+  // upsert_price_list are registered and work); these five spelled out full
+  // CRUD instead. A separate create and update double the idempotency surface
+  // a caller has to get right for one entity (YAGNI pass, 2026-09-06).
+  it("designs catalog entities as upsert + list, not spelled-out CRUD", () => {
+    const collapsed: Record<string, string> = {
+      create_sale_channel: "upsert_sale_channel",
+      update_sale_channel: "upsert_sale_channel",
+      get_sale_channel: "list_sale_channels",
+      create_format: "upsert_format",
+      update_format: "upsert_format",
+      get_format: "list_formats",
+      create_brand: "upsert_brand",
+      update_brand: "upsert_brand",
+      create_material: "upsert_material",
+      update_material: "upsert_material",
+      create_vessel: "upsert_vessel",
+      update_vessel: "upsert_vessel",
+      get_vessel: "list_vessels",
+    };
+    const named = new Set(apiOperations().map((o) => o.name));
+    for (const [spelled, use] of Object.entries(collapsed)) {
+      expect(named.has(spelled), `${spelled} is spelled-out CRUD; use ${use}`).toBe(false);
+      expect(named.has(use), `${use} is what replaces it`).toBe(true);
+    }
+    // delete_sale_channel stays: both channel frames draw the refusal ("A
+    // channel with movements cannot be deleted"), so the verb is a capability
+    // the screen describes, not CRUD boilerplate. Retiring it behind a flag is
+    // a design change, not a rename.
+    expect(named.has("delete_sale_channel")).toBe(true);
   });
 });

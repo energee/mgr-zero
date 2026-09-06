@@ -490,21 +490,17 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* today-designed */}
 
-6 of the 17 operations in this area are available today; the 11 below are not.
+6 of the 13 operations in this area are available today; the 7 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
-| `get_beer_overview` | query | Beer |
 | `get_chat_link_intent` | query | Link your Slack |
 | `get_notification_occurrence` | query | Personal DM |
 | `get_notification_preferences` | query | Chat settings, Notification preferences |
-| `get_planning_shortfalls` | query | Planning |
 | `get_shortfalls` | query | Sales, Composer answer, Pars and allocation |
 | `issue_chat_link_proof` | command | Link identity |
-| `list_work` | query | Work |
-| `preview_command` | query | Composer proposal, Composer question |
 | `search_entities` | query | Search, Entity picker |
 | `snooze_notification` | command | Personal DM, Notification preferences |
 
@@ -833,14 +829,13 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* orders-designed */}
 
-16 of the 24 operations in this area are available today; the 8 below are not.
+16 of the 23 operations in this area are available today; the 7 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
 | `confirm_restock` | command | Put back |
-| `get_order_confirmation_preview` | query | Order confirmation form |
 | `list_invoice_questions` | query | Sales |
 | `raise_invoice_question` | command | Question invoice |
 | `release_allocation` | command | Pars and allocation |
@@ -1129,26 +1124,23 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* catalog-designed */}
 
-7 of the 21 operations in this area are available today; the 14 below are not.
+7 of the 18 operations in this area are available today; the 11 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
 | `clear_price_list_item` | command | Price tiers, Override |
-| `create_brand` | command | Catalog, Product |
-| `create_sale_channel` | command | Sale channels, Channel |
 | `delete_sale_channel` | command | Sale channels, Channel |
 | `get_price_list` | query | Price tiers, Override |
-| `get_sale_channel` | query | Channel |
 | `get_sku` | query | SKU |
 | `list_brands` | query | Catalog, Product |
-| `list_sale_channels` | query | Square locations, Sale channels |
+| `list_sale_channels` | query | Square locations, Sale channels, Channel |
 | `set_price_list_format` | command | Price tiers |
 | `set_price_list_item` | command | Catalog, Price tiers, Override |
-| `update_brand` | command | Catalog, Product |
-| `update_sale_channel` | command | Sale channels, Channel |
 | `update_sku` | command | Catalog, Product, SKU |
+| `upsert_brand` | command | Catalog, Product |
+| `upsert_sale_channel` | command | Sale channels, Channel |
 
 {/* end ops:catalog */}
 
@@ -1353,7 +1345,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* taproom-designed */}
 
-3 of the 21 operations in this area are available today; the 18 below are not.
+3 of the 15 operations in this area are available today; the 12 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
 
@@ -1362,12 +1354,6 @@ The screens need them and the backend has not built them, so calling one returns
 | `create_keg_pool` | command | Keg fleet |
 | `create_taproom_transfer` | command | Weekly count |
 | `get_customer_keg_balance` | query | Customer keg balance |
-| `get_keg_fleet` | query | Keg fleet |
-| `get_keg_report` | query | Keg report |
-| `get_taproom_count_snapshot` | query | Weekly count |
-| `get_taproom_replenishment` | query | Weekly count |
-| `get_taproom_sellable` | query | Swap keg, Published item, Retired item |
-| `get_taproom_variance` | query | Variance by brand |
 | `kick_keg` | command | Tap board, Kick keg |
 | `list_keg_events` | query | Keg event history |
 | `list_open_taps` | query | Tap board, Kick keg, Swap keg |
@@ -1397,18 +1383,16 @@ unreceived PO never inflates what a packaging run believes it has.
 
 **Designed, not yet available** {/* purchasing-designed */}
 
-None of the 16 operations in this area are available yet.
+None of the 14 operations in this area are available yet.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
-| `create_material` | command | Material |
 | `create_purchase_order` | command | New PO |
 | `draft_purchase_order_from_requirements` | command | Planning |
 | `get_material_on_hand` | query | Materials on hand, Cycle count, Repack |
 | `get_material_requirements` | query | New PO |
-| `get_material_shortfalls` | query | Packaging runs, Schedule packaging run |
 | `get_purchase_order` | query | Receive PO, Receipt |
 | `list_materials` | query | Package BOM, New PO, Materials, Material, Contract |
 | `list_purchase_orders` | query | Purchase orders |
@@ -1416,7 +1400,7 @@ The screens need them and the backend has not built them, so calling one returns
 | `receive_purchase_order` | command | Receive PO |
 | `record_material_count` | command | Cycle count |
 | `send_purchase_order` | command | Receive PO |
-| `update_material` | command | Material |
+| `upsert_material` | command | Material |
 | `upsert_material_contract` | command | Contract |
 | `upsert_vendor` | command | Vendor |
 
@@ -1437,7 +1421,7 @@ reading notification is measured against.
 
 **Designed, not yet available** {/* production-designed */}
 
-None of the 19 operations in this area are available yet.
+None of the 16 operations in this area are available yet.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
 
@@ -1446,22 +1430,19 @@ The screens need them and the backend has not built them, so calling one returns
 | `complete_batch` | command | Cellar map |
 | `create_recipe` | command | Recipe |
 | `create_recipe_version` | command | Recipe |
-| `create_vessel` | command | Cellar map |
 | `get_brew_day` | query | Schedule batch, Brew day |
-| `get_cellar_map` | query | Cellar map, Fermentation reading, Cellar addition, Cellar transfer |
-| `get_fermentation_reading_preview` | query | Fermentation reading form |
 | `get_recipe` | query | Cellar addition, Recipe |
 | `get_recipe_outcomes` | query | Recipe |
-| `get_vessel` | query | Vessel detail |
 | `list_batches` | query | Batches |
 | `list_fermentation_readings` | query | Vessel detail |
 | `list_recipes` | query | Recipes, Recipe |
+| `list_vessels` | query | Vessel detail |
 | `record_batch_addition` | command | Cellar addition |
 | `record_brew_day` | command | Brew day |
 | `record_cellar_transfer` | command | Cellar transfer |
 | `record_fermentation_reading` | command | Fermentation reading, Fermentation reading form |
 | `schedule_batch` | command | Schedule batch |
-| `update_vessel` | command | Cellar map, Vessel detail |
+| `upsert_vessel` | command | Cellar map, Vessel detail |
 
 {/* end ops:production */}
 
@@ -1482,26 +1463,24 @@ before it is scheduled rather than after.
 
 **Designed, not yet available** {/* packaging-designed */}
 
-None of the 14 operations in this area are available yet.
+None of the 12 operations in this area are available yet.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
 | `close_packaging_run` | command | Close packaging run |
-| `create_format` | command | Formats, Format |
-| `get_format` | query | Package BOM, Format |
 | `get_format_components` | query | Formats, Format, Repack |
 | `get_packaging_run` | query | Close packaging run, Run closed |
-| `list_formats` | query | SKU, Schedule packaging run, Formats |
+| `list_formats` | query | Package BOM, SKU, Schedule packaging run, Formats, Format |
 | `list_occupancies` | query | Schedule packaging run |
 | `list_packaging_runs` | query | Packaging runs |
 | `record_repack` | command | Repack |
 | `replace_format_bom` | command | Package BOM, Formats, Format |
 | `replace_format_components` | command | Formats, Format |
 | `schedule_packaging_run` | command | Close packaging run, Schedule packaging run |
-| `update_format` | command | Formats, Format |
 | `update_packaging_run` | command | Schedule packaging run |
+| `upsert_format` | command | Formats, Format |
 
 {/* end ops:packaging */}
 
@@ -1519,7 +1498,7 @@ before the route can close.
 
 **Designed, not yet available** {/* delivery-designed */}
 
-None of the 9 operations in this area are available yet.
+None of the 7 operations in this area are available yet.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
 
@@ -1528,8 +1507,6 @@ The screens need them and the backend has not built them, so calling one returns
 | `confirm_delivery` | command | Confirm delivery |
 | `depart_route` | command | Route |
 | `get_delivery_stop` | query | Confirm delivery |
-| `get_route_builder` | query | Route |
-| `get_route_load` | query | Route, Return route, Driver route |
 | `list_routes` | query | Routes |
 | `return_route` | command | Route, Return route, Driver route |
 | `return_shipment` | command | Return and credit |
@@ -1553,7 +1530,7 @@ changes the underlying records.
 
 **Designed, not yet available** {/* compliance-designed */}
 
-None of the 10 operations in this area are available yet.
+None of the 9 operations in this area are available yet.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
 
@@ -1562,7 +1539,6 @@ The screens need them and the backend has not built them, so calling one returns
 | `file_compliance_report` | command | Monthly compliance |
 | `generate_compliance_report` | query | Monthly compliance |
 | `get_compliance_registry` | query | Compliance registry, Brand approval, State registration, License |
-| `get_loss_review` | query | Monthly compliance |
 | `list_compliance_reports` | query | Compliance months |
 | `reattribute_loss` | command | Monthly compliance |
 | `trace_lot` | query | Lot trace |
@@ -1658,14 +1634,13 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* team-designed */}
 
-4 of the 11 operations in this area are available today; the 7 below are not.
+4 of the 10 operations in this area are available today; the 6 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
 | `get_brewery_operating_defaults` | query | Chat settings |
-| `get_first_run_state` | query | Me, First-run checklist |
 | `provision_brewery` | command | Create brewery |
 | `revoke_staff` | command | Team, Team member |
 | `set_brewery_operating_defaults` | command | Chat settings |
