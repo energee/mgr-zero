@@ -713,6 +713,10 @@ create table purchase_order_lines (
   qty_ordered numeric(14,4) not null check (qty_ordered > 0),     -- purchase uom
   unit_cost_cents int check (unit_cost_cents >= 0),
   contract_id uuid,
+  -- The lot the vendor named at order time (a contracted hop lot, a crop year).
+  -- Advisory: it creates no material_lots row. Receiving prefills from it, and
+  -- what the receiver reads off the package is what creates the lot.
+  expected_lot_code text,
   unique (id, brewery_id),
   foreign key (po_id, brewery_id) references purchase_orders (id, brewery_id),
   foreign key (material_id, brewery_id) references materials (id, brewery_id),
