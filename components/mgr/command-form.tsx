@@ -10,11 +10,27 @@
 "use client";
 
 import { Dialog as DialogPrimitive } from "radix-ui";
+import { XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+
+// Every CommandForm holds unsubmitted edits, so its close is a discard: styled
+// destructive like the offline queue's Discard rather than the shadcn default
+// ghost X, and overridden here (not in components/ui) so a harmless Sheet like
+// MeSheet keeps its neutral close.
+function FormClose({ as: Close, className }: { as: typeof SheetClose | typeof DialogClose; className: string }) {
+  return (
+    <Close asChild>
+      <Button variant="destructive" size="icon-sm" className={className}>
+        <XIcon />
+        <span className="sr-only">Close</span>
+      </Button>
+    </Close>
+  );
+}
 
 export function CommandForm({
   open,
@@ -55,7 +71,7 @@ export function CommandForm({
           <DialogHeader className="shrink-0"><DialogTitle>{title}</DialogTitle></DialogHeader>
           {body("-mx-4")}
           {foot("-mx-4")}
-          <DialogPrimitive.Close asChild><Button variant="ghost" size="sm" className="self-end">Close</Button></DialogPrimitive.Close>
+          <DialogPrimitive.Close asChild><Button variant="destructive" size="sm" className="self-end">Close</Button></DialogPrimitive.Close>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </Dialog>
@@ -64,12 +80,13 @@ export function CommandForm({
     return (
       <Sheet open={open} onOpenChange={onOpenChange}>
         {trigger && <SheetTrigger asChild>{trigger}</SheetTrigger>}
-        <SheetContent side="bottom" className="flex max-h-[90svh] flex-col overflow-hidden rounded-t-xl pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <SheetContent showCloseButton={false} side="bottom" className="flex max-h-[90svh] flex-col overflow-hidden rounded-t-xl pb-[max(1rem,env(safe-area-inset-bottom))]">
           <SheetHeader className="shrink-0 pb-0">
             <SheetTitle>{title}</SheetTitle>
           </SheetHeader>
           {body("")}
           {foot("")}
+          <FormClose as={SheetClose} className="absolute top-3 right-3" />
         </SheetContent>
       </Sheet>
     );
@@ -77,12 +94,13 @@ export function CommandForm({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-      <DialogContent className="flex max-h-[90svh] flex-col overflow-hidden sm:max-w-md">
+      <DialogContent showCloseButton={false} className="flex max-h-[90svh] flex-col overflow-hidden sm:max-w-md">
         <DialogHeader className="shrink-0">
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         {body("-mx-4")}
         {foot("-mx-4")}
+        <FormClose as={DialogClose} className="absolute top-2 right-2" />
       </DialogContent>
     </Dialog>
   );
