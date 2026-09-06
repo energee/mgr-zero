@@ -833,17 +833,14 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* orders-designed */}
 
-16 of the 27 operations in this area are available today; the 11 below are not.
+16 of the 24 operations in this area are available today; the 8 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
-| `adjust_order_line` | command | Order, Pars and allocation |
 | `confirm_restock` | command | Put back |
-| `get_daily_pick_sheet` | query | Pick sheet |
 | `get_order_confirmation_preview` | query | Order confirmation form |
-| `get_standing_allocations` | query | Pars and allocation |
 | `list_invoice_questions` | query | Sales |
 | `raise_invoice_question` | command | Question invoice |
 | `release_allocation` | command | Pars and allocation |
@@ -1132,7 +1129,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* catalog-designed */}
 
-7 of the 24 operations in this area are available today; the 17 below are not.
+7 of the 21 operations in this area are available today; the 14 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
 
@@ -1140,19 +1137,16 @@ The screens need them and the backend has not built them, so calling one returns
 | --- | --- | --- |
 | `clear_price_list_item` | command | Price tiers, Override |
 | `create_brand` | command | Catalog, Product |
-| `create_price_list` | command | Catalog, Price tiers |
 | `create_sale_channel` | command | Sale channels, Channel |
 | `delete_sale_channel` | command | Sale channels, Channel |
 | `get_price_list` | query | Price tiers, Override |
 | `get_sale_channel` | query | Channel |
 | `get_sku` | query | SKU |
 | `list_brands` | query | Catalog, Product |
-| `list_sale_channels` | query | Sale channels |
-| `list_sales_channels` | query | Square locations |
+| `list_sale_channels` | query | Square locations, Sale channels |
 | `set_price_list_format` | command | Price tiers |
 | `set_price_list_item` | command | Catalog, Price tiers, Override |
 | `update_brand` | command | Catalog, Product |
-| `update_price_list` | command | Catalog, Price tiers |
 | `update_sale_channel` | command | Sale channels, Channel |
 | `update_sku` | command | Catalog, Product, SKU |
 
@@ -1284,21 +1278,6 @@ curl -X POST "$MGR_URL/api/command" \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_ship_to", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "customerId": "00000000-0000-0000-0000-000000000000", "label": "string", "address1": "string", "city": "string", "state": "string", "zip": "string" } }'
 ```
-
----
-
-**Designed, not yet available** {/* customers-designed */}
-
-6 of the 10 operations in this area are available today; the 4 below are not.
-
-The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
-
-| Operation | Kind | Needed by |
-| --- | --- | --- |
-| `create_customer` | command | Customers |
-| `create_ship_to` | command | Customers, Ship-to form |
-| `update_customer` | command | Customers, Customer detail |
-| `update_ship_to` | command | Customers, Ship-to form |
 
 {/* end ops:customers */}
 
@@ -1832,16 +1811,13 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* portal-designed */}
 
-7 of the 12 operations in this area are available today; the 5 below are not.
+7 of the 9 operations in this area are available today; the 2 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
 | `get_portal_account` | query | Account |
-| `get_portal_catalog` | query | Shop, Review order |
-| `get_portal_invoice` | query | Pay invoice, Payment unavailable, Question invoice, Paid invoice |
-| `list_portal_invoices` | query | Invoice history |
-| `list_portal_orders` | query | Order history |
+| `portal_invoice` | query | Pay invoice, Payment unavailable, Question invoice, Paid invoice |
 
 {/* end ops:portal */}

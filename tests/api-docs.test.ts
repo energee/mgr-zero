@@ -179,4 +179,29 @@ describe("HTTP API reference", () => {
     for (const code of ["400", "401", "403", "404", "409", "500"]) expect(errors).toContain(code);
     expect(page.slice(page.indexOf("## Operations"))).not.toContain("POST /api/command");
   });
+  // A screen must not invent a second name for an operation the registry
+  // already answers: the reference would then list the same capability twice,
+  // once available and once designed. Each retired alias below was a screen
+  // spelling of the registered name beside it (YAGNI pass, 2026-09-06).
+  it("never designs an alias of an operation the registry already answers", () => {
+    const retired: Record<string, string> = {
+      create_customer: "upsert_customer",
+      update_customer: "upsert_customer",
+      create_ship_to: "upsert_ship_to",
+      update_ship_to: "upsert_ship_to",
+      create_price_list: "upsert_price_list",
+      update_price_list: "upsert_price_list",
+      adjust_order_line: "adjust_order_lines",
+      get_daily_pick_sheet: "daily_pick_sheet",
+      get_portal_catalog: "portal_catalog",
+      list_portal_orders: "portal_orders",
+      list_portal_invoices: "portal_invoices",
+      get_standing_allocations: "list_standing_allocations",
+      list_sales_channels: "list_sale_channels",
+    };
+    const named = new Set(apiOperations().map((o) => o.name));
+    for (const [alias, use] of Object.entries(retired)) {
+      expect(named.has(alias), `${alias} duplicates ${use}`).toBe(false);
+    }
+  });
 });

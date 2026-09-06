@@ -4,21 +4,18 @@
 
 # API operations backlog
 
-148 operations the screens declare they need that the command registry does not yet answer, against 55 that it does.
+135 operations the screens declare they need that the command registry does not yet answer, against 55 that it does.
 
 This is the backend push, scoped. Each row names the operation a screen asked for and the screens waiting on it, so an area can be built and shipped whole rather than a command at a time. `/docs/api` publishes the same list per area, marked designed, so an integrator sees the roadmap without being told a date.
 
 Nothing here is a schema decision. An operation appears because a screen named it in its `reads` or `writes`; what it takes and returns is settled when it is built.
 
-## Customer portal — 5 to build, 7 built
+## Customer portal — 2 to build, 7 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
 | `get_portal_account` | query | Account |
-| `get_portal_catalog` | query | Shop, Review order |
-| `get_portal_invoice` | query | Pay invoice, Payment unavailable, Question invoice, Paid invoice |
-| `list_portal_invoices` | query | Invoice history |
-| `list_portal_orders` | query | Order history |
+| `portal_invoice` | query | Pay invoice, Payment unavailable, Question invoice, Paid invoice |
 ## Compliance — 10 to build, 0 built
 
 | Operation | Kind | Needed by |
@@ -76,25 +73,22 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `record_fermentation_reading` | command | Fermentation reading, Fermentation reading form |
 | `schedule_batch` | command | Schedule batch |
 | `update_vessel` | command | Cellar map, Vessel detail |
-## Catalog & pricing — 17 to build, 7 built
+## Catalog & pricing — 14 to build, 7 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
 | `clear_price_list_item` | command | Price tiers, Override |
 | `create_brand` | command | Catalog, Product |
-| `create_price_list` | command | Catalog, Price tiers |
 | `create_sale_channel` | command | Sale channels, Channel |
 | `delete_sale_channel` | command | Sale channels, Channel |
 | `get_price_list` | query | Price tiers, Override |
 | `get_sale_channel` | query | Channel |
 | `get_sku` | query | SKU |
 | `list_brands` | query | Catalog, Product |
-| `list_sale_channels` | query | Sale channels |
-| `list_sales_channels` | query | Square locations |
+| `list_sale_channels` | query | Square locations, Sale channels |
 | `set_price_list_format` | command | Price tiers |
 | `set_price_list_item` | command | Catalog, Price tiers, Override |
 | `update_brand` | command | Catalog, Product |
-| `update_price_list` | command | Catalog, Price tiers |
 | `update_sale_channel` | command | Sale channels, Channel |
 | `update_sku` | command | Catalog, Product, SKU |
 ## Packaging — 14 to build, 0 built
@@ -150,15 +144,12 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `return_route` | command | Route, Return route, Driver route |
 | `return_shipment` | command | Return and credit |
 | `save_route` | command | Route |
-## Orders & invoicing — 11 to build, 16 built
+## Orders & invoicing — 8 to build, 16 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
-| `adjust_order_line` | command | Order, Pars and allocation |
 | `confirm_restock` | command | Put back |
-| `get_daily_pick_sheet` | query | Pick sheet |
 | `get_order_confirmation_preview` | query | Order confirmation form |
-| `get_standing_allocations` | query | Pars and allocation |
 | `list_invoice_questions` | query | Sales |
 | `raise_invoice_question` | command | Question invoice |
 | `release_allocation` | command | Pars and allocation |
@@ -176,14 +167,6 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `reverse_inventory_movement` | command | SKU detail |
 | `update_bin` | command | Location bins, Bin |
 | `update_location` | command | Settings, Location detail |
-## Customers — 4 to build, 6 built
-
-| Operation | Kind | Needed by |
-| --- | --- | --- |
-| `create_customer` | command | Customers |
-| `create_ship_to` | command | Customers, Ship-to form |
-| `update_customer` | command | Customers, Customer detail |
-| `update_ship_to` | command | Customers, Ship-to form |
 ## Team & brewery settings — 7 to build, 4 built
 
 | Operation | Kind | Needed by |
