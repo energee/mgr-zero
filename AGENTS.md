@@ -14,6 +14,28 @@ Multi-tenant brewery operations SaaS: Next.js App Router + Supabase (Postgres,
 Auth, RLS). Nothing is deployed yet. Read this file, then follow the routes
 below just in time — don't preload everything.
 
+## Current focus: screens
+
+Decided 2026-09-06. `components/mgr/screens.tsx` and the pages that render it
+are the work. Schema, migrations, RPCs, and the database-backed test suites
+wait for the backend push; when that starts, tests get their own throwaway
+database (as CI already has) and stop touching the dev one.
+
+- Don't start database work, test-database isolation, or migrations
+  unprompted. If a screen change seems to need one, say so in a line and
+  draw the screen gated (`SCHEMA-GATE` in `writes`), as the inventory already does.
+- Proof for screen work is `bunx tsc --noEmit && bun run lint`, the pure
+  vitest files (`bunx vitest run tests/mgr-screens.test.ts tests/tap-coverage.test.ts
+  tests/screen-links.test.ts tests/theme-contrast.test.ts tests/screen-persona.test.ts
+  tests/design-docs.test.ts tests/docs.test.ts` covers the inventory),
+  and looking at the rendered page (step 4). Leave the database-backed suites
+  to CI, which runs them on a fresh database.
+- If `tests/chat-jobs.test.ts` times out locally, that is the shared dev
+  database, not your change: its `runChatScan` walks every brewery with an
+  active `chat_installations` row, and every past run left a fake one behind.
+  `update chat_installations set state = 'disconnected' where state = 'active'`
+  clears it (no seed creates installations, so every active row is a leftover).
+
 ## Where to look
 
 | Task | Read first |
@@ -38,14 +60,18 @@ below just in time — don't preload everything.
 
 0. Orient first: follow `.agents/skills/orient/SKILL.md` (`/orient` in Claude
    Code) — report worktree, branch, status, PR base, then wait for confirmation.
-1. `bunx supabase start` must be running; tests hit the real database.
+1. `bunx supabase start` must be running for the database-backed suites and
+   the dev server; those suites hit the real local database. Screen work
+   under the current focus needs only the pure files listed above.
 2. Find the owner of the concept in `.agents/ARCHITECTURE.md` and change it there.
 3. TDD: new behavior starts with a failing vitest — write it, watch it fail,
    then implement; the commit contains the test. Applies to every harness
    (Claude Code, pi, Codex, or other). Exception: UI rendering — TDD the
    logic below the component boundary; step 4 covers the eyeball check.
-4. Prove it: `bun run test && bunx tsc --noEmit && bun run lint`. For UI, look
-   at the rendered page — tests don't cover rendering. Use the `browse` skill
+4. Prove it: `bun run test && bunx tsc --noEmit && bun run lint` (under the
+   current focus, the pure vitest files stand in for `bun run test` locally;
+   CI runs the full suite). For UI, look at the rendered page — tests don't
+   cover rendering. Use the `browse` skill
    (`.agents/skills/browse/SKILL.md`): `bunx agent-browser --session <name> open
    http://localhost:3000/...` then `snapshot` / `get text` / `screenshot`, and
    `close` the same session when done. `<name>` is the branch with `/` → `-`;
