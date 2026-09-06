@@ -1,6 +1,6 @@
 // components/mgr/icon.tsx — the one way an icon enters MGR's own UI. Wraps
-// Hugeicons so every placement shares a treatment: 16px in rows and alerts,
-// 20px in the tab bar, stroke 1.5, currentColor, and aria-hidden — the text
+// Hugeicons so every placement shares a treatment: 24px in list rows, 16px in
+// alerts and inline text, 20px in the tab bar, stroke 1.5, currentColor, and aria-hidden — the text
 // beside an icon is its label, so the glyph is never announced twice. Icons
 // never take a color of their own; attention stays with the row's dot. Where
 // icons may appear at all is decided in docs/plans/hugeicons.md, not here.
@@ -13,7 +13,7 @@ export type { IconSvgElement };
 
 // `data-icon` is spread through rather than named in the markup: Button and
 // TabsTrigger pad themselves off it (has-data-[icon=inline-start]).
-export function Icon({ icon, size = 16, className, ...rest }: { icon: IconSvgElement; size?: 16 | 20; className?: string; "data-icon"?: "inline-start" | "inline-end" }) {
+export function Icon({ icon, size = 16, className, ...rest }: { icon: IconSvgElement; size?: 16 | 20 | 24; className?: string; "data-icon"?: "inline-start" | "inline-end" }) {
   // Hugeicons puts its stroke on every element after the element's own
   // attributes, so a filled mark (brand-icons.tsx) gets no stroke at all.
   const filled = icon[0]?.[1].fill !== undefined;

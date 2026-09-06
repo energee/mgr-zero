@@ -5,6 +5,8 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  --color-dot-warning: var(--dot-warning);
+  --color-dot-success: var(--dot-success);
   --color-accent1: var(--accent1);
   --color-accent2: var(--accent2);
   --color-accent3: var(--accent3);
@@ -118,6 +120,11 @@
   --accent4: #269d69;
   --accent5: #1c8ca8;
   --accent6: #7058be;
+  /* Status dots. A 10px mark is not a surface, so it takes the ramp rather than
+     the tinted-surface inks (--warning-foreground and friends), which are tuned
+     to sit as text on their own tint. Named so a retheme moves the dot too. */
+  --dot-warning: var(--accent3);
+  --dot-success: var(--accent4);
   --irreversible: #0F6B78;
   --irreversible-foreground: #FFFFFF;
 }

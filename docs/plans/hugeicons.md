@@ -46,7 +46,7 @@ language). Lucide stays inside `components/ui/*` for shadcn chrome.
 
 ## Treatment
 
-`components/mgr/icon.tsx` pins 16px in rows and alerts, 20px in the tab bar,
+`components/mgr/icon.tsx` pins 24px in list rows, 16px in alerts and inline text, 20px in the tab bar,
 stroke 1.5, `currentColor`, `aria-hidden` (adjacent text is the label). Icons
 never take a color of their own.
 

@@ -160,8 +160,12 @@ export function ScreenExplorer() {
     const next = hits[at + (e.key === "ArrowDown" ? 1 : -1)];
     if (next) pick(next[0]);
   };
-  // Tabs that open a screen this persona may not: hidden, as the app would.
-  const hidden = Object.values(WORK_TABS).filter((n) => deniedFor(persona.role, n)).map((n) => `.screen-box [data-to="${n}"]{display:none}`).join("");
+  // Everything a preview box rewrites about the shell it draws, in one place:
+  // the rail is sized to the box (its own h-svh is the docs viewport, taller
+  // than 80svh), and tabs that open a screen this persona may not are hidden,
+  // as the app would hide them.
+  const boxCss = ".screen-box [data-slot=sidebar-container]{height:100%}"
+    + Object.values(WORK_TABS).filter((n) => deniedFor(persona.role, n)).map((n) => `.screen-box [data-to="${n}"]{display:none}`).join("");
   // The selected row stays in view when a tap or a link lands far down the list.
   useEffect(() => {
     list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
@@ -251,18 +255,22 @@ export function ScreenExplorer() {
               ) : (
                 /* The transform makes this box the containing block for the shell's
                    fixed-position rail, so it draws here and not over the docs
-                   sidebar. Keyed by screen: a drawing never inherits another's
+                   sidebar — but a fixed child of a transformed ancestor scrolls
+                   with it, so the scrolling is an inner box and this one holds
+                   still. Keyed by screen: a drawing never inherits another's
                    filtered rows or added lines. */
-                <div key={current[0]} ref={setBox} tabIndex={-1} onClickCapture={onTap} className="screen-box relative h-[80svh] overflow-auto rounded-lg border outline-none [transform:translateZ(0)]">
-                  {hidden && <style>{hidden}</style>}
-                  {s.surface === "sheet" ? (
-                    <>
-                      <ScreenFrame screen={SCREENS[pageUnder(walk, current[0])]} persona={persona} />
-                      {box && <ScreenSheet screen={s} container={box} onClose={back} />}
-                    </>
-                  ) : (
-                    <ScreenFrame screen={s} persona={persona} />
-                  )}
+                <div key={current[0]} ref={setBox} tabIndex={-1} onClickCapture={onTap} className="screen-box relative h-[80svh] overflow-hidden rounded-lg border outline-none [transform:translateZ(0)]">
+                  <style>{boxCss}</style>
+                  <div className="h-full overflow-auto">
+                    {s.surface === "sheet" ? (
+                      <>
+                        <ScreenFrame screen={SCREENS[pageUnder(walk, current[0])]} persona={persona} />
+                        {box && <ScreenSheet screen={s} container={box} onClose={back} />}
+                      </>
+                    ) : (
+                      <ScreenFrame screen={s} persona={persona} />
+                    )}
+                  </div>
                 </div>
               )}
               <p className="text-sm text-fd-muted-foreground">{s.job}</p>

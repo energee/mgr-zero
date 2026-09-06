@@ -1,6 +1,7 @@
 // components/mgr/app-shell.tsx — the one navigation shell for staff and
 // portal (plan §3, §6), built on shadcn's Sidebar. At md and up the sidebar
-// is the left rail (tabs as group labels, children as menu items, ⌘B
+// is the left rail (every tab a menu item with its icon, children indented
+// under it as sub-items, ⌘B
 // collapses it); below md the sidebar is hidden and a bottom tab bar with
 // 48px targets and safe-area padding takes over. Breakpoints are viewport
 // media queries, which is why the screen inventory renders each frame in an
@@ -12,8 +13,9 @@ import { usePathname } from "next/navigation";
 import { MgrIcon } from "@/components/mgr-icon";
 import { Icon } from "@/components/mgr/icon";
 import {
-  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInset,
-  SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger,
+  Sidebar, SidebarContent, SidebarGroup, SidebarHeader, SidebarInset,
+  SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem,
+  SidebarProvider, SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { activeTab, isUnder, PORTAL_NAV, type NavItem } from "@/lib/mgr/nav";
 import { cn } from "@/lib/utils";
@@ -46,29 +48,35 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
       <Sidebar collapsible="offcanvas">
         <SidebarHeader className="h-12 justify-center px-4 text-sm font-medium">{brandMark}</SidebarHeader>
         <SidebarContent>
-          {items.map((tab) => {
-            const leaf = !tab.children?.length;
-            return (
-            <SidebarGroup key={tab.label}>
-              {!leaf && (
-                <SidebarGroupLabel asChild>
-                  <Link href={tab.href} className="gap-2">{tab.icon && <Icon icon={tab.icon} />}{tab.label}</Link>
-                </SidebarGroupLabel>
-              )}
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {(leaf ? [tab] : tab.children!).map((c) => (
-                    <SidebarMenuItem key={c.href}>
-                      <SidebarMenuButton asChild isActive={tab.label === current && (leaf || isUnder(pathname, c.href))}>
-                        <Link href={c.href}>{leaf && tab.icon && <Icon icon={tab.icon} />}{c.label}</Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-            );
-          })}
+          {/* Every tab is drawn the same way — icon, label, one menu button —
+              whether or not it has children; a parent used to be a quiet group
+              label, so Today and Beer read as different kinds of thing. Children
+              are sub-items indented under their tab. */}
+          <SidebarGroup>
+            <SidebarMenu>
+              {items.map((tab) => {
+                const leaf = !tab.children?.length;
+                return (
+                  <SidebarMenuItem key={tab.label}>
+                    <SidebarMenuButton asChild isActive={tab.label === current && (leaf || isUnder(pathname, tab.href))}>
+                      <Link href={tab.href}>{tab.icon && <Icon icon={tab.icon} />}{tab.label}</Link>
+                    </SidebarMenuButton>
+                    {!leaf && (
+                      <SidebarMenuSub>
+                        {tab.children!.map((c) => (
+                          <SidebarMenuSubItem key={c.href}>
+                            <SidebarMenuSubButton asChild isActive={tab.label === current && isUnder(pathname, c.href)}>
+                              <Link href={c.href}>{c.label}</Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    )}
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroup>
         </SidebarContent>
       </Sidebar>
       <SidebarInset className="min-h-svh min-w-0">
