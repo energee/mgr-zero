@@ -252,9 +252,16 @@ export function ScreenExplorer() {
                 /* The transform makes this box the containing block for the shell's
                    fixed-position rail, so it draws here and not over the docs
                    sidebar. Keyed by screen: a drawing never inherits another's
-                   filtered rows or added lines. */
-                <div key={current[0]} ref={setBox} tabIndex={-1} onClickCapture={onTap} className="screen-box relative h-[80svh] overflow-auto rounded-lg border outline-none [transform:translateZ(0)]">
+                   filtered rows or added lines.
+                   Two boxes, not one: the transformed outer box is the containing
+                   block and never scrolls, so the rail stays put and is sized to
+                   the box (h-svh would be the docs viewport, taller than 80svh);
+                   the inner box does the scrolling. One box scrolled the rail
+                   out of frame, because a fixed child of a transformed ancestor
+                   scrolls with it. */
+                <div key={current[0]} ref={setBox} tabIndex={-1} onClickCapture={onTap} className="screen-box relative h-[80svh] overflow-hidden rounded-lg border outline-none [transform:translateZ(0)] [&_[data-slot=sidebar-container]]:h-full">
                   {hidden && <style>{hidden}</style>}
+                  <div className="h-full overflow-auto">
                   {s.surface === "sheet" ? (
                     <>
                       <ScreenFrame screen={SCREENS[pageUnder(walk, current[0])]} persona={persona} />
@@ -263,6 +270,7 @@ export function ScreenExplorer() {
                   ) : (
                     <ScreenFrame screen={s} persona={persona} />
                   )}
+                  </div>
                 </div>
               )}
               <p className="text-sm text-fd-muted-foreground">{s.job}</p>
