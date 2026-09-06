@@ -119,14 +119,19 @@ export function ScreenExplorer() {
   // gives the label (a row's title, else its text: a tile has no title); a
   // resolved name opens that screen. A rail group label names its landing. A
   // tab that names a screen of its own (data-to, the Work chips) opens it; any
-  // other tab filters the rows under it in place. Chips and gated rows only
-  // ever act in place. Capture phase, and propagation stops on a hit, so the
-  // shell's Next.js links never navigate the docs page and the Me control's
-  // own sheet never opens outside the box.
+  // other tab filters the rows under it in place. Chips, a unit switcher inside
+  // a field, and gated rows only ever act in place. Capture phase, and
+  // propagation stops on a hit, so the shell's Next.js links never navigate the
+  // docs page and the Me control's own sheet never opens outside the box.
   const onTap = (e: React.MouseEvent) => {
     if (!current) return;
     const el = (e.target as HTMLElement).closest<HTMLElement>("a, button, [data-slot=item]");
     if (!el || el.matches("[data-slot=toggle-group-item]")) return;
+    // A unit switcher (E.qty's addon) is a tab bar by markup only: it chooses
+    // the unit of one number, so it must never filter the rows below it the way
+    // a view switcher does. Harmless today only because every screen using one
+    // happens to put its rows above the field; this keeps it that way.
+    if (el.closest("[data-slot=input-group-addon]")) return;
     if (el.closest("[data-gated]")) return e.preventDefault();
     const link = el.closest("a");
     const label = el.getAttribute("aria-label") ?? (el.matches("[data-slot=item]") ? el.querySelector("[data-slot=item-title]")?.textContent : null) ?? el.textContent ?? "";

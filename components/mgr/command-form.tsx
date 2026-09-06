@@ -12,23 +12,24 @@
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 // Every CommandForm holds unsubmitted edits, so its close is a discard: styled
 // destructive like the offline queue's Discard rather than the shadcn default
 // ghost X, and overridden here (not in components/ui) so a harmless Sheet like
-// MeSheet keeps its neutral close.
-function FormClose({ as: Close, className }: { as: typeof SheetClose | typeof DialogClose; className: string }) {
+// MeSheet keeps its neutral close. Sheet is Radix Dialog under an alias, so one
+// primitive closes both branches; only the corner inset differs.
+function FormClose({ className }: { className: string }) {
   return (
-    <Close asChild>
+    <DialogPrimitive.Close asChild>
       <Button variant="destructive" size="icon-sm" className={className}>
         <XIcon />
         <span className="sr-only">Close</span>
       </Button>
-    </Close>
+    </DialogPrimitive.Close>
   );
 }
 
@@ -86,7 +87,7 @@ export function CommandForm({
           </SheetHeader>
           {body("")}
           {foot("")}
-          <FormClose as={SheetClose} className="absolute top-3 right-3" />
+          <FormClose className="absolute top-3 right-3" />
         </SheetContent>
       </Sheet>
     );
@@ -100,7 +101,7 @@ export function CommandForm({
         </DialogHeader>
         {body("-mx-4")}
         {foot("-mx-4")}
-        <FormClose as={DialogClose} className="absolute top-2 right-2" />
+        <FormClose className="absolute top-2 right-2" />
       </DialogContent>
     </Dialog>
   );

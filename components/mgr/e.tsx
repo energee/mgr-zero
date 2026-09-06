@@ -11,6 +11,7 @@ import { DatePicker } from "@/components/mgr/date-picker";
 import { DirectionIcon, Icon, type IconSvgElement } from "@/components/mgr/icon";
 import { TimeWindowField } from "@/components/mgr/time-window-field";
 import { VolumeField } from "@/components/mgr/volume-field";
+import { Qty, TabBar } from "@/components/mgr/qty";
 import { MARIA, UserAvatar } from "@/components/mgr/user-avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -19,10 +20,9 @@ import { ButtonGroup } from "@/components/ui/button-group";
 import { Empty, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupTextarea } from "@/components/ui/input-group";
+import { InputGroup, InputGroupAddon, InputGroupTextarea } from "@/components/ui/input-group";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -142,19 +142,11 @@ export const E = {
   /** A forward arrow read as "to"; null draws it decorative (aria-hidden). */
   arrow: (label: string | null = "to") => <DirectionIcon label={label} />,
   /** A typed quantity: the OS keyboard is the keypad. unit renders as a trailing
-   *  addon — often chips or tabs (a segmented unit choice), which are flex
-   *  items with a content-based min-width and won't shrink on a narrow field;
-   *  overflow-hidden clips to the field's own border instead of spilling
-   *  past it, same as components/mgr/volume-field.tsx. */
+   *  addon — plain text ("bbl"), chips, or a segmented unit choice (`E.tabs`
+   *  hugged with "w-fit"). The field's clipping and addon padding live in
+   *  components/mgr/qty.tsx, shared with `volume`. */
   qty: (value: string, unit?: React.ReactNode, label = "Quantity", id?: string) => (
-    <InputGroup className="overflow-hidden">
-      <InputGroupInput id={id} type="number" inputMode="decimal" step="any" defaultValue={value} aria-label={label} className="text-2xl font-semibold" />
-      {/* pr-0 for a unit switcher: a TabsList insets itself (p-[3px]), so the
-          addon's default inline-end pr-2 would only double up as dead space past
-          the last unit. A plain-text unit ("bbl", "SG · prior 1.021") has no
-          inset of its own and keeps the padding. */}
-      {unit ? <InputGroupAddon align="inline-end" className="has-[>[data-slot=tabs]]:pr-0">{unit}</InputGroupAddon> : null}
-    </InputGroup>
+    <Qty value={value} unit={unit} label={label} id={id} />
   ),
   /** A view switcher: the body below is the active panel, so there are no
    *  TabsContent panels here. A filter that swaps the whole list (Work's kinds,
@@ -162,16 +154,11 @@ export const E = {
    *  except the unit a quantity is entered in, which is a switcher on the number
    *  itself and rides inside the field as `E.qty`'s addon (see `volume`).
    *  Spans the column by default; pass width classes to hug ("w-fit", an input
-   *  addon) or to scroll a bar too long for the phone ("overflow-x-auto"). */
+   *  addon) or to scroll a bar too long for the phone ("overflow-x-auto").
+   *  `to` names the screen a tab opens; the explorer walks there and hides tabs
+   *  the persona may not open. See components/mgr/qty.tsx for the a11y caveat. */
   tabs: (names: string[], on = 0, cls = "w-full", to?: Record<string, string>) => (
-    // Uncontrolled, like chips: a controlled value with no onValueChange makes
-    // every trigger inert, and these bars are meant to be clickable in the inventory.
-    // `to` names the screen a tab opens (data-to) where each tab is a screen of
-    // its own, like the Work chips; the explorer walks there and hides tabs the
-    // persona may not open.
-    <Tabs defaultValue={names[on]} className="min-w-0">
-      <TabsList variant="solid" className={cls}>{names.map((n) => <TabsTrigger key={n} value={n} data-to={to?.[n]}>{n}</TabsTrigger>)}</TabsList>
-    </Tabs>
+    <TabBar names={names} on={on} cls={cls} to={to} />
   ),
   chips: (arr: string[], on = 0, bright = false) => (
     <ToggleGroup type="single" defaultValue={arr[on]} variant="outline" size="sm" className="flex-wrap justify-start">
