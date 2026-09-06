@@ -87,8 +87,10 @@ enforced in `delete_bin` under a row lock on the location:
 - **a location keeps a minimum of one bin** — deleting the last one is refused. There is no
   special "default" row; whichever bin remains is the one, and it can be renamed like any
   other;
-- **a bin holding stock cannot be deleted** — refused when any of the three ledgers sums to
-  non-zero for that bin. Move the stock first.
+- **a bin that has ever recorded stock cannot be deleted** — refused when any of the three
+  ledgers has a row for that bin. The ledgers are append-only and reference the bin, so
+  moving the stock out does not make it deletable (a net-zero balance still leaves the
+  rows behind). Rename it instead; only a never-used bin can be removed.
 
 The minimum-of-one rule is a count, so it lives in the RPC rather than a constraint; the
 row lock is what stops two concurrent deletes from emptying a location between them.
@@ -114,8 +116,9 @@ at `:553`. Nothing new to learn.
 `bins` deliberately has no capacity, no dimensions, and no pick-sequence ordering. A bin is
 a name for a place. Add more when something needs it.
 
-Commands: `list_bins`, `create_bin`, `update_bin` (rename), `delete_bin`; admin and
-warehouse, the roles the Location bins screen already names.
+Commands: `list_bins`, `create_bin`, `update_bin` (rename), `delete_bin`. The three
+mutations are admin and warehouse, the roles the Location bins screen already names;
+`list_bins` also grants sales, like `list_locations`, since order screens pick a bin.
 
 ## Decision 2 — location on all three ledgers
 
@@ -329,12 +332,14 @@ Two smaller notes:
 
 Each phase is a PR, checkpointed before the next begins.
 
-**Phase 1 — where things are.** `bins` table with the default-bin rule, bin commands,
-`location_kind = 'storage'`, `location_id` and `bin_id` on `material_movements` and
-`keg_events`, `bin_id` on `inventory_movements`, index changes. On-hand views gain
-`location_id` / `bin_id`, and the affected screens (Locations, Location bins, Bin, Keg
-fleet, Materials on hand, Record movement) lose their gates. Tests updated to carry
-locations and bins. No transfers, no deliveries.
+**Phase 1 — where things are.** `bins` table with the seeded trio and minimum-of-one
+rule (Decision 1), bin commands, `location_kind = 'storage'`, `location_id` and `bin_id`
+on `material_movements` and `keg_events`, `bin_id` on `inventory_movements`, index
+changes. Existing on-hand views keep their columns and grain; three bin-grain views
+(`bin_on_hand`, `material_bin_on_hand`, `keg_bin_totals`) are added beside them. The
+affected screens (Locations, Location detail, Location bins, Bin, Keg fleet, Record
+movement) lose their gates. Tests updated to carry locations and bins. No transfers, no
+deliveries.
 
 **Phase 2 — moving things.** `stock_transfers`, `stock_transfer_lines`,
 `receive_stock_transfer`, `move_stock_bin`, the enum additions, `brewery_counters` key

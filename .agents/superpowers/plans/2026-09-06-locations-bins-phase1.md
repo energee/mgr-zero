@@ -72,8 +72,8 @@ describe("bins", () => {
 
   it("create_location seeds Walk-in, Cold and Dry, and accepts the storage kind", async () => {
     const loc = (await runCommand("create_location", { name: "Overflow", kind: "storage" }, ctx)) as Row;
-    const { data } = await admin.from("bins").select("name").eq("location_id", loc.id).order("created_at");
-    expect(data!.map((b) => b.name)).toEqual(["Walk-in", "Cold", "Dry"]);
+    const { data } = await admin.from("bins").select("name").eq("location_id", loc.id).order("name");
+    expect(data!.map((b) => b.name)).toEqual(["Cold", "Dry", "Walk-in"]);
   });
 
   it("bin names are unique per location, not per brewery", async () => {
@@ -185,8 +185,8 @@ tests/bins.test.ts"
 
 **Interfaces:**
 - Consumes: `public.bins` from Task 1.
-- Produces: RPCs `create_bin(p_brewery uuid, p_location uuid, p_name text, p_request_id uuid)`, `update_bin(p_brewery uuid, p_bin uuid, p_name text, p_request_id uuid)`, `delete_bin(p_brewery uuid, p_bin uuid, p_request_id uuid)` — all `returns jsonb`; commands `list_bins {locationId?}`, `create_bin {locationId, name}`, `update_bin {binId, name}`, `delete_bin {binId}`. Roles `admin`, `warehouse`.
-- Note for Task 3: `delete_bin`'s stock guard reads the three ledgers. In this task the ledgers have no `bin_id` yet, so the guard is stubbed as `v_stock := 0;` and **Task 3 finishes it**. The test for the stock guard is therefore written in Task 3.
+- Produces: RPCs `create_bin(p_brewery uuid, p_location uuid, p_name text, p_request_id uuid)`, `update_bin(p_brewery uuid, p_bin uuid, p_name text, p_request_id uuid)`, `delete_bin(p_brewery uuid, p_bin uuid, p_request_id uuid)` — all `returns jsonb`; commands `list_bins {locationId?}`, `create_bin {locationId, name}`, `update_bin {binId, name}`, `delete_bin {binId}`. Roles `admin`, `warehouse` for the three mutations; `list_bins` also grants `sales`, matching `list_locations`.
+- Note for Task 3: `delete_bin`'s stock guard reads the three ledgers. In this task the ledgers have no `bin_id` yet, so the guard is stubbed as `v_used := false;` and **Task 3 finishes it**. The test for the stock guard is therefore written in Task 3.
 
 - [ ] **Step 1: Write the failing tests** (append to `tests/bins.test.ts`, inside the `describe`)
 
@@ -196,6 +196,8 @@ tests/bins.test.ts"
     const loc = (await runCommand("create_location", { name: "List WH", kind: "warehouse" }, ctx)) as Row;
     const bins = (await runCommand("list_bins", { locationId: loc.id }, wh)) as Row[];
     expect(bins.map((b) => b.name)).toEqual(["Cold", "Dry", "Walk-in"]);
+    const sales = await makeStaffCtx(ctx.breweryId, "sales");
+    expect(((await runCommand("list_bins", { locationId: loc.id }, sales)) as Row[]).length).toBe(3);
   });
 
   it("create_bin and update_bin are warehouse-or-admin and idempotent by request", async () => {
@@ -269,11 +271,13 @@ end $$;
 
 -- Two guards, both under a row lock on the location so concurrent deletes
 -- cannot empty it between them: a location keeps at least one bin, and a bin
--- holding stock is never removed (move the stock first).
+-- that has ever recorded stock is never removed. The ledgers are append-only
+-- and reference the bin, so "move the stock out first" cannot make it
+-- deletable — a net-zero balance still leaves rows behind. Rename it instead.
 create function delete_bin(
   p_brewery uuid, p_bin uuid, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_replay jsonb; v_row public.bins; v_stock numeric;
+declare v_replay jsonb; v_row public.bins; v_used boolean;
 begin
   perform private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'delete_bin', p_request_id,
@@ -285,9 +289,9 @@ begin
   if (select count(*) from public.bins where location_id = v_row.location_id) <= 1 then
     raise exception 'a location keeps at least one bin; rename it instead';
   end if;
-  v_stock := 0;  -- Task 3 replaces this with the three-ledger sum once bin_id exists
-  if v_stock <> 0 then
-    raise exception 'bin still holds stock (% units); move it first', v_stock;
+  v_used := false;  -- Task 3 replaces this with the three-ledger exists check once bin_id exists
+  if v_used then
+    raise exception 'bin has recorded stock and cannot be removed; rename it instead';
   end if;
   delete from public.bins where id = p_bin;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
@@ -309,7 +313,7 @@ In the `grant execute on function` list at `:3571`, after `create_location(uuid,
 ```ts
 // Bins subdivide a location (spec 2026-09-06 Decision 1). Reads go through
 // RLS; the three writes are the idempotent RPCs. A location never drops below
-// one bin and a bin holding stock is not deleted — delete_bin raises both.
+// one bin and a bin that ever recorded stock is not deleted — delete_bin raises both.
 defineQuery({
   name: "list_bins", description: "Bins of one location (or all), alphabetical",
   input: z.object({ locationId: z.string().uuid().optional() }), roles: ["admin", "sales", "warehouse"],
@@ -374,7 +378,7 @@ defineCommand({
 | `list_bins` | admin, sales, warehouse | Bins of a location (optional `locationId`), alphabetical |
 | `create_bin` | admin, warehouse | Add a bin to a location (`locationId`, `name`) |
 | `update_bin` | admin, warehouse | Rename a bin (`binId`, `name`) |
-| `delete_bin` | admin, warehouse | Remove an empty bin (`binId`); a location always keeps at least one |
+| `delete_bin` | admin, warehouse | Remove a never-used bin (`binId`); a location always keeps at least one, and a bin that ever recorded stock is renamed, not removed |
 ```
 
 Replace the existing `create_location` row rather than duplicating it. Also change `list_locations`'s purpose to "Warehouses, taprooms and storage, alphabetical".
@@ -411,7 +415,7 @@ This is the invasive task. Read the spec's "Why `not null` on all of them" befor
 - Produces: columns `inventory_movements.bin_id uuid not null`, `material_movements.location_id uuid not null`, `material_movements.bin_id uuid not null`, `keg_events.location_id uuid not null`, `keg_events.bin_id uuid not null`; `private.first_bin(p_location uuid) returns uuid`; RPC `record_inventory_movement(uuid,uuid,uuid,uuid,numeric,public.movement_type,public.sale_channel,text,text,uuid)` — `p_bin` is the **fourth** parameter, after `p_location`; command `record_movement` input gains required `binId`; views `bin_on_hand (brewery_id, sku_id, location_id, bin_id, qty)`, `material_bin_on_hand (brewery_id, material_id, location_id, bin_id, qty)`, `keg_bin_totals (brewery_id, pool_id, keg_size, location_id, bin_id, qty)`; query `get_bin_on_hand {skuId?, locationId?}`.
 - Existing views `on_hand`, `lot_on_hand`, `atp`, `taproom_replenishment`, `material_on_hand`, `material_lot_on_hand`, `keg_fleet_totals` keep their columns and grain **unchanged** — bin grain is additive.
 
-**Assumption, stated here because the spec leaves it open:** order-driven movements (`ship_order`, taproom transfers, credit-memo returns) have no bin on the order, so they post to `private.first_bin(location)` — the location's oldest bin, which for a fresh location is `Walk-in`. Orders gain bins in a later phase if anyone needs them; until then the brewery renames its first bin to whatever it wants order stock to land in.
+**Assumption, stated here because the spec leaves it open:** order-driven movements (`ship_order`, taproom transfers, credit-memo returns) have no bin on the order, so they post to `private.first_bin(location)` — the location's alphabetically first bin, which for a fresh location is `Cold`. (Not "oldest": the trio is seeded in one transaction, so all three share one `created_at` — `now()` is transaction-constant in Postgres.) Orders gain bins in a later phase if anyone needs them; until then the brewery names the bin it wants order stock to land in so it sorts first.
 
 - [ ] **Step 1: Write the failing tests** (append to `tests/bins.test.ts`)
 
@@ -488,14 +492,20 @@ This is the invasive task. Read the spec's "Why `not null` on all of them" befor
     expect(Number(perLoc[0].qty)).toBe(15);
   });
 
-  it("delete_bin refuses a bin that holds stock", async () => {
+  it("delete_bin refuses a bin that ever recorded stock, even at net zero", async () => {
     const loc = (await runCommand("create_location", { name: "Stock WH", kind: "warehouse" }, ctx)) as Row;
     const [bin] = (await runCommand("list_bins", { locationId: loc.id }, ctx)) as Row[];
     const p = (await runCommand("create_product", { name: "Stock Pils" }, ctx)) as Row;
     const s = (await runCommand("create_sku", { productId: p.id, name: "case", packageType: "can", bblPerUnit: "0.0645" }, ctx)) as Row;
     await runCommand("record_movement", { skuId: s.id, locationId: loc.id, binId: bin.id, qty: 2, type: "opening_balance" }, ctx);
     await expect(runCommand("delete_bin", { binId: bin.id }, ctx))
-      .rejects.toMatchObject({ message: expect.stringMatching(/holds stock/i) });
+      .rejects.toMatchObject({ message: expect.stringMatching(/recorded stock/i) });
+    // Moving it all back out does not lift the refusal: the ledger rows still
+    // reference the bin, and the ledgers are append-only. The guard must say so
+    // rather than letting the delete fall through to a raw FK violation.
+    await runCommand("record_movement", { skuId: s.id, locationId: loc.id, binId: bin.id, qty: -2, type: "adjustment" }, ctx);
+    await expect(runCommand("delete_bin", { binId: bin.id }, ctx))
+      .rejects.toMatchObject({ message: expect.stringMatching(/recorded stock/i) });
   });
 ```
 
@@ -575,11 +585,13 @@ Before `private.create_order_impl` (`:1472`) add:
 
 ```sql
 -- Order-driven movements have no bin on the order (a later phase may add one),
--- so they post to the location's oldest bin. Deterministic, and the brewery can
--- rename that bin to whatever it wants order stock to land in.
+-- so they post to the location's alphabetically first bin ('Cold' for a fresh
+-- location). Name, not created_at: the seeded trio shares one transaction
+-- timestamp. Deterministic, and the brewery names the bin it wants order
+-- stock to land in so it sorts first.
 create function private.first_bin(p_location uuid) returns uuid
 language sql stable set search_path = '' as $$
-  select id from public.bins where location_id = p_location order by created_at, name limit 1
+  select id from public.bins where location_id = p_location order by name limit 1
 $$;
 ```
 
@@ -638,18 +650,15 @@ Update the grant-execute signature at `:3578`:
   record_inventory_movement(uuid,uuid,uuid,uuid,numeric,public.movement_type,public.sale_channel,text,text,uuid),
 ```
 
-- [ ] **Step 8: Baseline — finish `delete_bin`'s stock guard** (replace Task 2's `v_stock := 0;` line)
+- [ ] **Step 8: Baseline — finish `delete_bin`'s stock guard** (replace Task 2's `v_used := false;` line)
 
 ```sql
-  select coalesce((select sum(qty) from public.inventory_movements where bin_id = p_bin), 0)
-       + coalesce((select sum(qty) from public.material_movements  where bin_id = p_bin), 0)
-       + coalesce((select sum(case reason when 'acquired' then qty when 'found' then qty
-                                          when 'retired' then -qty when 'lost' then -qty else 0 end)
-                   from public.keg_events where bin_id = p_bin), 0)
-    into v_stock;
+  v_used := exists (select 1 from public.inventory_movements where bin_id = p_bin)
+         or exists (select 1 from public.material_movements  where bin_id = p_bin)
+         or exists (select 1 from public.keg_events          where bin_id = p_bin);
 ```
 
-The keg expression is the same one `keg_fleet_totals` uses; kegs `shipped`/`returned` change the customer balance, not the bin's stock.
+An existence check, not a net balance: the three ledgers are append-only and their `bin_id` FKs have no `on delete` clause, so a bin with any history can never be deleted — a net-zero sum would pass the guard and then fail on the FK. The guard names the real rule ("rename it instead") so the client never sees a raw constraint error.
 
 - [ ] **Step 9: Baseline — three additive views**
 
@@ -827,10 +836,10 @@ git commit -m "feat(inventory): pick a bin when recording a movement; on hand pe
   - Location detail: `E.pick("Type", "Taproom", ["Warehouse", "Taproom", "Storage"])`; `E.nav("Location bins", "Walk-in · Cold · Dry")`.
 
 - [ ] **Step 2: Location bins and Bin**
-  - Location bins: `reads: "list_locations · list_bins"`, `writes: "create_bin · update_bin · delete_bin"`; drop the SCHEMA-GATE text. States: replace `["default bin", "created with the location · cannot be deleted", 1]` with `["last bin", "a location keeps at least one · rename it instead", 1]`. Spec string: "Every location starts with Walk-in, Cold and Dry. Rename or remove what doesn't match the building, but a location always keeps one bin, so no on-hand or availability query carries a nullable branch. Bins are physical subdivisions a menu can read; they are explicitly not tap lines (§16.8)." Body: replace `E.gated("Taproom", …)` with `E.nav("Walk-in", "38 cases · 12 kegs")`, keep the other two navs, replace `E.gated("Add bin", …)` with `E.btn("Add bin", "g")`, and set `to: { "Walk-in": "Bin", "To-go fridge": "Bin", "Cold": "Bin", "Add bin": "Bin" }` — adjust the nav labels so the `to:` keys match exactly what is drawn.
-  - Bin: `writes: "create_bin · update_bin · delete_bin"`; remove the `Kind` pick and the `Par` edit and the par `E.info` (Kind deferred to §16.7, Par to the pars phase); keep the "Tap lines are not bins" note; replace `E.gated("Save bin", …)` with `E.btn("Save bin")`; replace the "A brewery that never subdivides…" info with `E.info("A location keeps at least one bin. Rename the last one rather than removing it.")`. States: replace `["default", "cannot be removed", 1]` with `["last bin", "rename it instead of removing it", 1]`; keep `["in use", "delete is refused", 1]`.
+  - Location bins: `reads: "list_locations · list_bins"`, `writes: "create_bin · update_bin · delete_bin"`; drop the SCHEMA-GATE text. States: replace `["default bin", "created with the location · cannot be deleted", 1]` with `["last bin", "a location keeps at least one · rename it instead", 1]`. Spec string: "Every location starts with Walk-in, Cold and Dry. Rename or remove what doesn't match the building, but a location always keeps one bin, so no on-hand or availability query carries a nullable branch. Bins are physical subdivisions a menu can read; they are explicitly not tap lines (§16.8)." Body: replace the three current rows (`E.gated("Taproom", …)`, `E.nav("Walk-in", …)`, `E.nav("To-go fridge", …)`) with exactly the seeded trio — `E.nav("Walk-in", "38 cases · 12 kegs")`, `E.nav("Cold", "22 cases")`, `E.nav("Dry", "6 cases")` — replace `E.gated("Add bin", …)` with `E.btn("Add bin", "g")`, and set `to: { "Walk-in": "Bin", "Cold": "Bin", "Dry": "Bin", "Add bin": "Bin" }`. `To-go fridge` goes away: it is not one of the three bins `create_location` seeds.
+  - Bin: `writes: "create_bin · update_bin · delete_bin"`; remove the `Kind` pick and the `Par` edit and the par `E.info` (Kind deferred to §16.7, Par to the pars phase); keep the "Tap lines are not bins" note; replace `E.gated("Save bin", …)` with `E.btn("Save bin")`; replace the "A brewery that never subdivides…" info with `E.info("A location keeps at least one bin. Rename the last one rather than removing it.")`. States: replace `["default", "cannot be removed", 1]` with `["last bin", "rename it instead of removing it", 1]`; replace `["in use", "delete is refused", 1]` with `["has history", "a bin that ever recorded stock is renamed, not removed", 1]`.
 
-- [ ] **Step 3: Record movement** — after the Location pick add `E.pick("Bin", "Walk-in", ["Walk-in", "Cold", "Dry"])`; `reads:` gains `list_bins`.
+- [ ] **Step 3: Record movement** — after the Location pick add `E.pick("Bin", "Cold", ["Cold", "Dry", "Walk-in"])` (alphabetical, matching `list_bins`; the first is preselected); `reads:` gains `list_bins`.
 
 - [ ] **Step 4: Keg fleet** — replace `E.row("Owned ½ bbl", "142 out · 61 in", "203")` with two rows showing the per-location split the spec opens with:
   ```tsx
@@ -865,8 +874,8 @@ git commit -m "screens: bins are real; storage locations; bin on Record movement
 
 - [ ] **Step 1: Staff guide**
   - Card `:86`: "On hand" → "The sum of recorded movements for one SKU in one bin at one location."
-  - Step 2 `:96`: "Choose a **SKU**, **Location** and **Bin**. Every location starts with three bins — Walk-in, Cold, Dry — and the first is preselected."
-  - Add a short "Bins" paragraph under the Inventory cards: a bin is a named place inside a location; every location keeps at least one; a bin holding stock cannot be removed — move the stock first.
+  - Step 2 `:96`: "Choose a **SKU**, **Location** and **Bin**. Every location starts with three bins — Cold, Dry, Walk-in — listed alphabetically, and the first is preselected."
+  - Add a short "Bins" paragraph under the Inventory cards: a bin is a named place inside a location; every location keeps at least one; a bin that has ever recorded stock cannot be removed — rename it instead.
   - `:289`: the "not in the interface" bullet still says creating locations is missing (true — no settings page exists yet); add "adding, renaming or removing bins" to that same bullet so the guide does not overclaim.
 
 - [ ] **Step 2: Schema design doc amendments** — each is one or two lines:
@@ -898,4 +907,4 @@ git commit -m "docs: bins and storage locations in the staff guide, schema desig
 - [ ] `bunx supabase db reset && bun run test && bunx tsc --noEmit && bun run lint` — all green.
 - [ ] `bunx next build` — CI runs it; run it once locally.
 - [ ] `git diff main --stat` and skim `git diff main -- supabase/migrations/00001_baseline.sql` for a stray NUL byte (AGENTS.md step 5).
-- [ ] PR description carries the progress note: "Phase 1 of locations/bins: bins table seeded per location, bin_id not null on all three ledgers, bin-grain views, bin commands, inventory page bin picker. Phases 2 (stock_transfers) and 3 (deliveries) next." And the durable decision: "Order-driven movements post to `private.first_bin(location)` until orders carry a bin."
+- [ ] PR description carries the progress note: "Phase 1 of locations/bins: bins table seeded per location, bin_id not null on all three ledgers, bin-grain views, bin commands, inventory page bin picker. Phases 2 (stock_transfers) and 3 (deliveries) next." And the durable decision: "Order-driven movements post to `private.first_bin(location)` (alphabetically first bin) until orders carry a bin. A bin that ever recorded stock is never deleted — the ledgers are append-only — so `delete_bin` refuses on history, not on net balance."
