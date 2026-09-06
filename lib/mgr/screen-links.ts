@@ -86,6 +86,7 @@ export const TAPS: [string | RegExp, string][] = [
   ["Record brew day", "Batches"],
   ["Schedule run", "Schedule packaging run"],
   ["Receive purchase order", "Receipt"],
+  ["Send purchase order", "Purchase orders"],
   ["New route", "Route"],
   ["Save route plan", "Routes"],
   ["Depart route", "Return route"],
@@ -172,7 +173,8 @@ export const TAPS: [string | RegExp, string][] = [
  * to another product, add-a-row buttons — so the coverage test does not count
  * them as gaps. The explorer simply leaves them alone. */
 export const INERT: (string | RegExp)[] = [
-  "Reconcile 7 sales + 1 refund",
+  "Record 7 sales + 1 refund as expected",
+  "Lot-tracked",
   "Main ship-to",
   "Dock ship-to",
   "+ add ingredient",
