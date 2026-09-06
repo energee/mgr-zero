@@ -31,8 +31,17 @@ import { cn } from "@/lib/utils";
 
 /** Row modifiers from the wireframe: w = needs attention, ok = current, dis = gated. */
 type RowClass = "" | "w" | "ok" | "dis";
-const dotColor: Partial<Record<RowClass, string>> = { w: "bg-warning-foreground", ok: "bg-success-foreground" };
-const Dot = ({ cls }: { cls: RowClass }) => (dotColor[cls] ? <span className={cn("size-2 rounded-full", dotColor[cls])} /> : null);
+/** Status dots take the accent ramp, not the tinted-surface inks: at 10px a dot is
+ *  a mark, not a surface, and it needs the saturation. Dark mode is unchanged —
+ *  accent3/4 are already what --warning-foreground/--success-foreground resolve to there. */
+const dotColor: Partial<Record<RowClass, string>> = { w: "bg-accent3", ok: "bg-accent4" };
+/** What the dot means, said out loud: colour alone is not a status (WCAG 1.4.1). */
+const dotLabel: Partial<Record<RowClass, string>> = { w: "Needs attention", ok: "Current" };
+/** 10px with a background-coloured ring, so the dot still reads as a dot when it
+ *  sits on a tinted row or beside a 20px icon. */
+const Dot = ({ cls }: { cls: RowClass }) => (dotColor[cls] ? (
+  <span className={cn("size-2.5 shrink-0 rounded-full ring-2 ring-background", dotColor[cls])} role="img" aria-label={dotLabel[cls]} />
+) : null);
 const TileContent = ({ n, s, g, w, f }: { n: React.ReactNode; s: React.ReactNode; g?: React.ReactNode; w?: 0 | 1; f?: number }) => (<>
   <span className="flex items-center gap-1.5 font-medium text-sm leading-none">{w ? <Dot cls="w" /> : null}{n}</span>
   <span className="text-muted-foreground text-sm leading-normal">{s}</span>
@@ -40,9 +49,10 @@ const TileContent = ({ n, s, g, w, f }: { n: React.ReactNode; s: React.ReactNode
   {f != null && <span className="mt-1 block h-1 w-full overflow-hidden rounded-full bg-muted"><i className="block h-full bg-primary" style={{ width: `${f}%` }} /></span>}
 </>);
 
-/** ItemMedia rides with the title line whenever a row has a description, which is
- *  right for a 16px icon and wrong for a face: the tallest thing in the row centres. */
-const FACE_MEDIA = "group-has-data-[slot=item-description]/item:translate-y-0 group-has-data-[slot=item-description]/item:self-center";
+/** shadcn pins ItemMedia to the title line whenever a row has a description. That
+ *  read top-heavy once row icons went to 24px (and always did for a face), so media
+ *  centres against the whole row instead. */
+const CENTER_MEDIA = "group-has-data-[slot=item-description]/item:translate-y-0 group-has-data-[slot=item-description]/item:self-center";
 /** Button kinds: p = primary, g = secondary/outline, ghost = quiet, irr = irreversible
  *  but still a record (teal), del = takes something away (red); " disabled" suffix draws a gated action.
  *  Teal is for a write you meant to make; red is for a loss: ending a membership,
@@ -76,13 +86,20 @@ export const E = {
   row: (t: React.ReactNode, s: React.ReactNode = "", n: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement, foot?: React.ReactNode) => (
     <Item variant="outline" data-gated={cls === "dis" || undefined} className={cn(cls === "dis" && "opacity-50")}>
       {(icon || dotColor[cls]) && (
-        <ItemMedia className={cn(isValidElement(icon) && FACE_MEDIA)}>
-          {/* A Hugeicons icon is an array; an element is already media (E.face). */}
-          {icon ? (isValidElement(icon) ? icon : <Icon icon={icon} />) : <Dot cls={cls} />}
+        <ItemMedia className={CENTER_MEDIA}>
+          {/* A Hugeicons icon is an array; an element is already media (E.face).
+           *  With an icon the status rides its corner rather than the title line:
+           *  a dot before the title indents the title away from its description. */}
+          {icon ? (
+            <span className="relative">
+              {isValidElement(icon) ? icon : <Icon icon={icon} size={24} />}
+              <span className="absolute -right-1 -top-1"><Dot cls={cls} /></span>
+            </span>
+          ) : <Dot cls={cls} />}
         </ItemMedia>
       )}
       <ItemContent>
-        <ItemTitle>{icon && dotColor[cls] ? <><Dot cls={cls} />{t}</> : t}</ItemTitle>
+        <ItemTitle>{t}</ItemTitle>
         {s ? <ItemDescription>{s}</ItemDescription> : null}
       </ItemContent>
       {n ? <ItemActions>{typeof n === "string" ? <span className="text-sm text-muted-foreground">{n}</span> : n}</ItemActions> : null}
@@ -315,7 +332,7 @@ export const E = {
   ),
   blank: (t: React.ReactNode, icon?: IconSvgElement) => (
     <Empty className="flex-1">
-      {icon && <EmptyMedia variant="icon"><Icon icon={icon} size={20} /></EmptyMedia>}
+      {icon && <EmptyMedia variant="icon"><Icon icon={icon} size={24} /></EmptyMedia>}
       <EmptyDescription>{t}</EmptyDescription>
     </Empty>
   ),
