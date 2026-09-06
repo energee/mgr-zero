@@ -1,4 +1,5 @@
 // tests/helpers.ts — creates tenants/users via admin credentials; returns RLS-bound clients per user.
+import { execFileSync } from "node:child_process";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { publicEnv } from "@/lib/env/public";
 import { readServerEnv } from "@/lib/env/server-parser";
@@ -49,4 +50,13 @@ export async function makeStaffCtx(breweryId: string, role: "admin" | "sales" | 
   const staff = await makeStaff(breweryId, role);
   const db = await asUser(staff.email);
   return { db, userId: staff.id, breweryId, role };
+}
+
+// psql against the local database for pg_catalog assertions (schema-* tests):
+// present on dev machines via libpq and on ubuntu-latest CI; DATABASE_URL
+// overrides the local Supabase default. `quiet` drops psql's own chatter.
+const DB = process.env.DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:54342/postgres";
+export function sql(q: string, quiet = false): string[] {
+  const args = quiet ? [DB, "-Atq", "-c", q] : [DB, "-Atc", q];
+  return execFileSync("psql", args, { encoding: "utf8" }).trim().split("\n").filter(Boolean);
 }

@@ -3,10 +3,13 @@
 // for why list_invoices/get_invoice split totals this way). For an invoice
 // (not a credit memo — the create_credit_memo fn rejects crediting a credit
 // memo), offers a dialog to create a credit memo against a subset of lines.
+// An unknown or malformed id renders not-found.tsx; other failures throw to
+// the (app) error boundary.
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
+import { orNotFound } from "@/lib/mgr/not-found";
 import { CreditMemoForm } from "./credit-memo-form";
 
 type Invoice = {
@@ -32,7 +35,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const [{ invoice, lines }, locationRows] = (await Promise.all([
-    runCommand("get_invoice", { invoiceId: id }, ctx),
+    orNotFound(runCommand("get_invoice", { invoiceId: id }, ctx)),
     runCommand("list_locations", {}, ctx),
   ])) as [{ invoice: Invoice; lines: InvoiceLine[] }, LocationRow[]];
 

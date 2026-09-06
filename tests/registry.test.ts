@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { z } from "zod";
 import { defineCommand, defineQuery, runCommand, unwrap, _clearRegistry, CommandError, getCommandDefinition, type CommandExecution, type Ctx } from "@/lib/commands/registry";
 
@@ -106,7 +106,16 @@ describe("unwrap maps RPC SQLSTATEs to command errors", () => {
   it("MG409 (request-id reuse) → 409 conflict", async () => {
     await expect(unwrap(failing("MG409"))).rejects.toMatchObject({ status: 409, code: "conflict" });
   });
-  it("anything else stays 400 bad_request", async () => {
-    await expect(unwrap(failing("23514"))).rejects.toMatchObject({ status: 400, code: "bad_request" });
+  it("P0001 (a domain rule raised by our own RPCs) → 400 bad_request with its message", async () => {
+    await expect(unwrap(failing("P0001"))).rejects.toMatchObject({ status: 400, code: "bad_request", message: "boom" });
+  });
+  it("PGRST116 (PostgREST: zero or many rows for .single()) → 404 not_found without the raw message", async () => {
+    await expect(unwrap(failing("PGRST116"))).rejects.toMatchObject({ status: 404, code: "not_found", message: "record not found" });
+  });
+  it("any other database error → 500 db_error with a generic message; the original is logged", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(unwrap(failing("23514"))).rejects.toMatchObject({ status: 500, code: "db_error", message: "database error" });
+    expect(log).toHaveBeenCalledWith("database error 23514:", "boom");
+    log.mockRestore();
   });
 });

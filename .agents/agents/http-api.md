@@ -26,8 +26,7 @@ command, run this before calling the work done.
 
 1. **Inventory shipped commands.** Read `lib/commands/all.ts` for the module
    list, then every `defineCommand` / `defineQuery` in those modules (not
-   `registry.ts`, `client.ts`, `context.ts`, `use-command-form.ts`,
-   `import-limits.ts`). For each, record `name`, `roles`, and the Zod `input`
+   `registry.ts`, `client.ts`, `context.ts`, `use-command-form.ts`). For each, record `name`, `roles`, and the Zod `input`
    shape (field names, required vs optional, enums, defaults, maxes). Caller-
    visible handler behavior only: computed fields the client must not send,
    append-only rules, per-row error envelopes, name-resolution. Ignore

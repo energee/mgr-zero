@@ -141,10 +141,10 @@ export const SCREENS: Screen[] = [
     states: [["empty", "one button: the role's first verb"], ["loading", "row-shaped skeletons"], ["error", "Today did not load · Retry", 1], ["offline", "cached rows · writes queue"], ["role hidden", "only relevant permitted work · no blank gaps"]],
     spec: "Drawn as the warehouse persona at honest 16px density. Rows are role-filtered per plan §3; the row verb is the action. A row standing for one order opens that order's Pick. This row stands for three, so Pick lands on the day's Pick sheet and each order opens its own Pick from there; the verb never becomes a noun to explain itself. The restock row appears while the order's restock flag is set and opens the order. Weekly count is gated: disabled with human copy, never a gate name.",
     body: today(<>
-      {E.row("3 orders ready", "quantities default to ordered", E.act("Pick"), "w", Package01Icon)}
-      {E.row("Staged · ORD-0229", "restock 3 Pils cases to Warehouse", E.act("Put back"), "w", Package01Icon)}
-      {E.row("PO-0142 · Country Malt", "arrives Thu", E.act("Receive"), "", DeliveryTruck01Icon)}
-      {E.row("Next delivery · Ridgeline", "your route · stop 1 of 3", E.act("Resume"), "", Route01Icon)}
+      {E.row("3 orders ready", "quantities default to ordered", E.act("Pick", "info"), "w", Package01Icon)}
+      {E.row("Staged · ORD-0229", "restock 3 Pils cases to Warehouse", E.act("Put back", "attention"), "w", Package01Icon)}
+      {E.row("PO-0142 · Country Malt", "arrives Thu", E.act("Receive", "info"), "", DeliveryTruck01Icon)}
+      {E.row("Next delivery · Ridgeline", "your route · stop 1 of 3", E.act("Resume", "info"), "", Route01Icon)}
       {E.gated("Weekly count")}
     </>),
   },
@@ -167,11 +167,11 @@ export const SCREENS: Screen[] = [
     states: [["empty", "one button: the role's first verb"], ["role hidden", "no Pick/Receive; no blank gaps"], ["buyer question", "a portal question lands here, because nothing else in MGR would show it"]],
     spec: "The same Today read as the exemplar, filtered for sales. Confirm is the row verb (2 taps); shortfall rows open Shortfall, pars and standing allocation. A question raised from the portal's Question invoice sheet appears as a row here and opens that invoice, where Mark answered clears it: the note has a destination a person opens and a way to leave the list again. New order is the last row because the top button is gone.",
     body: today(<>
-      {E.row("ORD-0231 · Ridgeline", "submitted · ships Thu", E.act("Confirm"), "w", Package01Icon)}
-      {E.row("ORD-0235 · Teresa’s", "submitted · ships Fri", E.act("Confirm"), "", Package01Icon)}
-      {E.row("Pils · 16 oz case", "Not enough Pils for 2 orders", E.act("Choose who gets it"), "w")}
+      {E.row("ORD-0231 · Ridgeline", "submitted · ships Thu", E.act("Confirm", "success"), "w", Package01Icon)}
+      {E.row("ORD-0235 · Teresa’s", "submitted · ships Fri", E.act("Confirm", "success"), "", Package01Icon)}
+      {E.row("Pils · 16 oz case", "Not enough Pils for 2 orders", E.act("Choose who gets it", "attention"), "w")}
       {E.row("Hazy IPA · ½ bbl", "11 ready · fine", "")}
-      {E.row("Al’s Bar · OH", "Al’s Bar can’t receive Stout in OH", E.act("Fix registration"), "w")}
+      {E.row("Al’s Bar · OH", "Al’s Bar can’t receive Stout in OH", E.act("Fix registration", "attention"), "w")}
       {E.row(`${INV.no} · Ridgeline`, "buyer asked about this invoice", E.act("Open"), "w")}
       {E.nav("New order")}
     </>),
@@ -184,9 +184,9 @@ export const SCREENS: Screen[] = [
     states: [["empty", "one button: the role's first verb"], ["role hidden", "no picks or receipts"]],
     spec: "Reading opens the Fermentation reading sheet defaulted to the overdue vessel. Brew day and packaging rows open their Work frames. Warehouse picks never appear here. The row verb is the action.",
     body: today(<>
-      {E.row("FV3 · Stout", "reading overdue 31 h", E.act("Reading"), "w", ThermometerIcon)}
-      {E.row("B-0416 · Hazy IPA v4", "brew day Fri 9/4 · 15 bbl", E.act("Start"), "", BeerIcon)}
-      {E.row("RUN-0031 · Hazy cans", "packaged today · close due", E.act("Close"), "w", Package01Icon)}
+      {E.row("FV3 · Stout", "reading overdue 31 h", E.act("Reading", "info"), "w", ThermometerIcon)}
+      {E.row("B-0416 · Hazy IPA v4", "brew day Fri 9/4 · 15 bbl", E.act("Start", "info"), "", BeerIcon)}
+      {E.row("RUN-0031 · Hazy cans", "packaged today · close due", E.act("Close", "info"), "w", Package01Icon)}
       {E.row("FV1 · Pils", "1.9 °P · read 4 h ago", "", "", ThermometerIcon)}
     </>),
   },
@@ -213,7 +213,7 @@ export const SCREENS: Screen[] = [
     states: [["empty", "one button: the role's first verb"], ["role hidden", "no picks, no orders, no invoices", 1], ["narrow surface", "tap board and POS reconcile, nothing else"]],
     spec: "The taproom role maps to a shift rather than a function: a bartender needs the tap board and POS reconciliation and nothing else. The unmapped-item row is here because it silently blocks reconcile. The row verb is the action.",
     body: today(<>
-      {E.row("Tap 5 · Pils", "nearly out · ~9% left", E.act("Swap"), "w", BeerIcon)}
+      {E.row("Tap 5 · Pils", "nearly out · ~9% left", E.act("Swap", "info"), "w", BeerIcon)}
       {E.gated("Weekly count")}
       {E.row("Guest cider", "rung in Square · not mapped, blocks reconcile", "unmapped", "w", Tag01Icon)}
       {E.row("Variance · last week", "−½ bbl Hazy unaccounted", E.act("Review"), "", TaskDone01Icon)}
@@ -245,10 +245,10 @@ export const SCREENS: Screen[] = [
       {E.hd("Work", "warehouse default")}
       {E.btn("New order", "g")}
       {E.tabs(WORK_CHIPS, 0, "w-full", WORK_TABS)}
-      {E.row("ORD-0231 · Ridgeline", "submitted · ships today", E.act("Confirm"), "", Package01Icon)}
-      {E.row("ORD-0229 · Al’s Bar", "picked · restock 3 Pils staged", E.act("Put back"), "w", Package01Icon)}
-      {E.row("PO-0142 · Country Malt", "due today", E.act("Receive"), "", DeliveryTruck01Icon)}
-      {E.row("Route A", "3 stops · Thu", E.act("Resume"), "", Route01Icon)}
+      {E.row("ORD-0231 · Ridgeline", "submitted · ships today", E.act("Confirm", "success"), "", Package01Icon)}
+      {E.row("ORD-0229 · Al’s Bar", "picked · restock 3 Pils staged", E.act("Put back", "attention"), "w", Package01Icon)}
+      {E.row("PO-0142 · Country Malt", "due today", E.act("Receive", "info"), "", DeliveryTruck01Icon)}
+      {E.row("Route A", "3 stops · Thu", E.act("Resume", "info"), "", Route01Icon)}
     </>),
   },
   {
@@ -302,7 +302,7 @@ export const SCREENS: Screen[] = [
       {E.row("Ridgeline Contract Brewing", "", E.act("Switch"))}
       {E.sp()}
       {E.btn("Change password", "g")}
-      {E.btn("Sign out", "irr")}
+      {E.btn("Sign out", "del")}
     </>),
   },
   {
@@ -678,7 +678,7 @@ export const SCREENS: Screen[] = [
       {E.chips(["Warehouse", "Sales", "Brewer", "Admin"])}
       {E.note("Sending an invite emails the recipient and cannot be recalled.")}
       {E.gated("Send staff invite", INVITE_GATE)}
-      {E.row("5 · Opening inventory", "count what’s on hand today", E.act("Record opening count"))}
+      {E.row("5 · Opening inventory", "count what’s on hand today", E.act("Record opening count", "info"))}
     </>),
   },
   {
@@ -713,7 +713,7 @@ export const SCREENS: Screen[] = [
       {E.back("Beer", "Finished goods")}
       {E.btn("Add SKU")}
       {E.row("Hazy IPA · ½ bbl keg", "15 on hand · 4 allocated · ATP 11", E.act("Review"))}
-      {E.row("Pils · 16 oz case", "18 on hand · 24 allocated · ATP −6", E.act("Shortfall"), "w")}
+      {E.row("Pils · 16 oz case", "18 on hand · 24 allocated · ATP −6", E.act("Shortfall", "attention"), "w")}
       {E.row("Stout · ⅙ bbl keg", "9 on hand · 2 allocated · ATP 7", E.act("Review"))}
     </>),
   },
@@ -877,10 +877,10 @@ export const SCREENS: Screen[] = [
     states: [["response lost", "Server dedupe returns prior result"], ["permanent", "Open form; preserve fields", 1], ["session expired", "Sign in; keep queue"], ["permission changed", "the row says why and offers only Discard", 1], ["one row", "discarding one leaves the others queued"]],
     spec: "The discard confirmation names every queued write; response loss resolves by requestId and shows the prior result. Discard is per row as well as bulk: a write that can never succeed (a role that changed under it, a validation the server will refuse again) otherwise forces someone to bin the two retryable writes beside it to clear the one that is stuck. A row whose permission changed is never replayed, so it carries no Retry at all; the copy names the role it was written under, because the person holding the phone is usually not the person who changed it.",
     body: (<>
-      {E.row("Record movement · Hazy", "waiting for wifi", <>{E.act("Retry")}{E.act("Discard")}</>, "", WifiDisconnected01Icon)}
-      {E.row("Record fermentation reading · FV3", "response lost", <>{E.act("Check")}{E.act("Discard")}</>, "", WifiDisconnected01Icon)}
-      {E.row("Record cellar transfer · FV2", "validation failed", <>{E.act("Fix")}{E.act("Discard")}</>, "w", WifiDisconnected01Icon)}
-      {E.row("Record pick · ORD-0229", "your role changed · this will not be sent", E.act("Discard"), "w", WifiDisconnected01Icon)}
+      {E.row("Record movement · Hazy", "waiting for wifi", <>{E.act("Retry", "attention")}{E.act("Discard", "destructive")}</>, "", WifiDisconnected01Icon)}
+      {E.row("Record fermentation reading · FV3", "response lost", <>{E.act("Check")}{E.act("Discard", "destructive")}</>, "", WifiDisconnected01Icon)}
+      {E.row("Record cellar transfer · FV2", "validation failed", <>{E.act("Fix", "attention")}{E.act("Discard", "destructive")}</>, "w", WifiDisconnected01Icon)}
+      {E.row("Record pick · ORD-0229", "your role changed · this will not be sent", E.act("Discard", "destructive"), "w", WifiDisconnected01Icon)}
       {E.btn("Retry 1 waiting")}
       {E.note("Discard asks you to confirm. These 4 unsent writes are deleted.")}
       {E.btn("Discard 4 queued writes", "del")}
@@ -904,10 +904,10 @@ export const SCREENS: Screen[] = [
         {E.tabs(WORK_CHIPS, 1, "w-full md:w-fit", WORK_TABS)}
         {E.tabs(ORDER_STATES, 0, "w-full justify-start overflow-x-auto md:w-fit")}
       </div>
-      {E.row("ORD-0231 · Ridgeline", "submitted · ships Thu", E.act("Confirm"))}
-      {E.row("ORD-0229 · Al’s Bar", "picked · restock 3 Pils staged", E.act("Put back"), "w")}
-      {E.row("ORD-0234 · Teresa’s", "confirmed · ships Fri", E.act("Pick"))}
-      {E.row("ORD-0237 · Teresa’s", "draft · ships Fri", E.act("Finish"))}
+      {E.row("ORD-0231 · Ridgeline", "submitted · ships Thu", E.act("Confirm", "success"))}
+      {E.row("ORD-0229 · Al’s Bar", "picked · restock 3 Pils staged", E.act("Put back", "attention"), "w")}
+      {E.row("ORD-0234 · Teresa’s", "confirmed · ships Fri", E.act("Pick", "info"))}
+      {E.row("ORD-0237 · Teresa’s", "draft · ships Fri", E.act("Finish", "primary"))}
     </>),
   },
   {
@@ -952,9 +952,9 @@ export const SCREENS: Screen[] = [
       {E.fld("Fulfillment source", "Warehouse")}
       {E.fld("Customer PO", "4471")}
       {E.note("Put back 3 Pils cases to Warehouse. They stayed staged after the line was adjusted.")}
-      {E.row("Hazy IPA · ½ bbl keg", "ordered 4 · picked 4 · ATP 11", E.act("Adjust"), "ok")}
-      {E.row("Pils · 16 oz case", "ordered 7 · picked 10", E.act("Adjust"), "w")}
-      {E.row("Stout · ⅙ bbl keg", "ordered 2 · picked 2 · ATP 7", E.act("Adjust"), "ok")}
+      {E.row("Hazy IPA · ½ bbl keg", "ordered 4 · picked 4 · ATP 11", E.act("Adjust", "attention"), "ok")}
+      {E.row("Pils · 16 oz case", "ordered 7 · picked 10", E.act("Adjust", "attention"), "w")}
+      {E.row("Stout · ⅙ bbl keg", "ordered 2 · picked 2 · ATP 7", E.act("Adjust", "attention"), "ok")}
       {E.btn("Add line", "g")}
       {E.note("Stout isn’t registered for Ohio. Check the Compliance registry.")}
       {E.tape([["created · Ted", "Mon 9:02"], ["submitted · Ted", "Mon 9:05"], ["confirmed · Maria", "Mon 14:10"], ["picked · Dave · 4 / 10 / 2", "Tue 8:40"], [<>line adjusted · Pils 10 {E.arrow()} 7 · customer cut</>, "Tue 9:15"], ["restock pending · 3 Pils staged", "Tue 9:15"]])}
@@ -1183,7 +1183,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Beer",
     name: "Pars and allocation",
-    to: { Release: "Order", "Taproom standing": "Bin", Adjust: "Order", "Edit par": "Bin", "Taproom par": "Bin" , "Edit": "Bin" },
+    to: { Release: "Order", Adjust: "Order", "Edit par": "Bin", "Taproom par": "Bin" },
     job: "Change named quantities; never invent priority",
     reads: "get_shortfalls · get_standing_allocations [design]",
     writes: "adjust_order_line [design; one RPC: line + allocation] · release_allocation · set_taproom_par · set_taproom_standing_allocation [design]",
@@ -1192,10 +1192,10 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Finished goods", "Pils · 16 oz case")}
       {E.num("−6 cases · −0.58 bbl", "ATP · 22 cases on hand · 28 allocated")}
-      {E.row("ORD-0231 · Ridgeline", "10 cases · 0.97 bbl", E.act("Adjust"))}
-      {E.row("ORD-0234 · Teresa’s", "12 cases · 1.16 bbl", E.act("Release"))}
+      {E.row("ORD-0231 · Ridgeline", "10 cases · 0.97 bbl", E.act("Adjust", "attention"))}
+      {E.row("ORD-0234 · Teresa’s", "12 cases · 1.16 bbl", E.act("Release", "destructive"))}
       {E.row("Taproom standing", "6 cases · 0.58 bbl", E.act("Edit"))}
-      {E.row("Taproom par", "8 cases · 0.77 bbl", E.act("Edit"))}
+      {E.row("Taproom par", "8 cases · 0.77 bbl", E.act("Edit par"))}
       {E.btns([["Adjust selected", "p"], ["Edit par", "g"]])}
     </>),
   },
@@ -1347,7 +1347,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Settings", "Accounting")}
       {E.ttl("QuickBooks")}
-      {E.row("Demo Brewing LLC", "authorization expired · company 9341", E.act("Disconnect"), "w")}
+      {E.row("Demo Brewing LLC", "authorization expired · company 9341", E.act("Disconnect", "destructive"), "w")}
       {E.note("QuickBooks authorization expired. Push, payment links and paid-date sync are paused.")}
       {E.btn("Reconnect QuickBooks")}
       {E.row("QuickBooks Payments", "active · card and bank", "", "ok", QuickBooksMark)}
@@ -1432,9 +1432,9 @@ export const SCREENS: Screen[] = [
       {E.row("QuickBooks", "connected · company 9341", "healthy", "ok", QuickBooksMark)}
       {E.row(`${INV.no} · Ridgeline`, `due ${INV.dueShort} · ${INV.total} · pushed`, E.act("Open"))}
       {E.row(`${INV.edited} · Al’s Bar`, <>edited in QuickBooks · $980 {E.arrow()} $1,040</>, E.act("Open in QuickBooks"), "w")}
-      {E.row(`${INV.voided} · Teresa’s`, "voided in QuickBooks · not paid", E.act("Write off"), "w")}
+      {E.row(`${INV.voided} · Teresa’s`, "voided in QuickBooks · not paid", E.act("Write off", "destructive"), "w")}
       {E.row(`${INV.failed} · Al’s Bar`, "push failed · item unmapped · $540", E.act("Review"), "w")}
-      {E.row(`${INV.deleted} · Teresa’s`, "deleted in QuickBooks", <>{E.act("Re-push")}{E.act("Write off")}</>, "w")}
+      {E.row(`${INV.deleted} · Teresa’s`, "deleted in QuickBooks", <>{E.act("Re-push", "attention")}{E.act("Write off", "destructive")}</>, "w")}
       {E.row(`${INV.unsent} · Al’s Bar`, "pushed · not emailed yet", E.act("Open in QuickBooks"))}
       {E.row(`${INV.paid} · Ridgeline`, "paid 8/29 from QuickBooks Online", "$980", "ok")}
       {E.row(`${INV.memo} · Ridgeline`, `credit memo · pushed · against ${INV.no} · −$180`, E.act("Open"))}
@@ -1455,10 +1455,10 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Invoices", INV.failed)}
       {E.row("Al’s Bar", "due 10/03 · 3 lines", "$540")}
-      {E.row("Customer mapping", "Al’s Bar · customer 227", E.act("Fix"), "ok")}
-      {E.row("Pils · case", "QuickBooks item is missing", E.act("Fix"), "w")}
+      {E.row("Customer mapping", "Al’s Bar · customer 227", E.act("Fix", "attention"), "ok")}
+      {E.row("Pils · case", "QuickBooks item is missing", E.act("Fix", "attention"), "w")}
       {E.info("Push becomes available after every customer and item has a QuickBooks match.")}
-      {E.row("Buyer asked about this invoice", "“The Pils count looks short.” · Dana, Tue", E.act("Mark answered"), "w")}
+      {E.row("Buyer asked about this invoice", "“The Pils count looks short.” · Dana, Tue", E.act("Mark answered", "success"), "w")}
       {E.btn("Push invoice to QuickBooks Online", "irr disabled")}
     </>),
   },
@@ -1758,7 +1758,7 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     body: (<>
       {E.hd("Invoices", "Ridgeline")}
-      {E.row(INV.no, `due ${INV.dueShort} · ${INV.total}`, E.act("Pay"))}
+      {E.row(INV.no, `due ${INV.dueShort} · ${INV.total}`, E.act("Pay", "info"))}
       {E.row(INV.paid, "paid 8/29", "$980", "ok")}
     </>),
   },
@@ -1792,7 +1792,7 @@ export const SCREENS: Screen[] = [
     reads: "supabase_auth_get_session [platform]",
     writes: "supabase_auth_sign_out [platform]",
     states: DEFAULT_STATES,
-    spec: "Opened from the portal header Me control. No brewery switcher. Change password opens Portal set password. Sign out is outline here; the irreversible accent is a staff Me follow-up.",
+    spec: "Opened from the portal header Me control. No brewery switcher. Change password opens Portal set password. Sign out is outline here; the destructive accent is a staff Me follow-up.",
     body: (<>
       {E.fld("Signed in as", PORTAL_BUYER.email)}
       {E.fld("Account", PORTAL_BUYER.account)}
@@ -1910,10 +1910,10 @@ export const SCREENS: Screen[] = [
       {E.btn("New batch")}
       {E.tabs(WORK_CHIPS, 2, "w-full", WORK_TABS)}
       {E.ttl("Planned")}
-      {E.row("B-0416 · Hazy IPA v4", "Fri 9/4 · 15 bbl", E.act("Start"))}
+      {E.row("B-0416 · Hazy IPA v4", "Fri 9/4 · 15 bbl", E.act("Start", "info"))}
       {E.ttl("Active")}
-      {E.row("B-0409 · Pils", "FV1 · 1.9 °P · read 4 h ago", E.act("Reading"))}
-      {E.row("B-0413 · Stout", "FV3 · reading overdue 31 h", E.act("Reading"), "w")}
+      {E.row("B-0409 · Pils", "FV1 · 1.9 °P · read 4 h ago", E.act("Reading", "info"))}
+      {E.row("B-0413 · Stout", "FV3 · reading overdue 31 h", E.act("Reading", "info"), "w")}
     </>),
   },
   {
@@ -2038,8 +2038,8 @@ export const SCREENS: Screen[] = [
       {E.btn("Schedule run")}
       {E.tabs(WORK_CHIPS, 3, "w-full", WORK_TABS)}
       {E.ttl("Upcoming")}
-      {E.row("RUN-0031 · Hazy cans", "Fri 9/5 · FV3 · 118 cases planned · 480 ends short", E.act("Resolve"), "w")}
-      {E.row("RUN-0032 · Pils ½ bbl", "Tue 9/9 · FV1 · 40 kegs planned", E.act("Start"))}
+      {E.row("RUN-0031 · Hazy cans", "Fri 9/5 · FV3 · 118 cases planned · 480 ends short", E.act("Resolve", "attention"), "w")}
+      {E.row("RUN-0032 · Pils ½ bbl", "Tue 9/9 · FV1 · 40 kegs planned", E.act("Start", "info"))}
       {E.row("RUN-0033 · Stout cans", "Thu 9/11 · no source yet", E.act("Pick source"))}
       {E.ttl("Recent")}
       {E.row("RUN-0030 · Pils cans", "closed Tue 9/2 · L-240902-PL · 96 cases · 97% yield", "", "ok")}
@@ -2112,9 +2112,9 @@ export const SCREENS: Screen[] = [
       {E.hd("Work", "warehouse default")}
       {E.btn("New PO")}
       {E.tabs(WORK_CHIPS, 4, "w-full", WORK_TABS)}
-      {E.row("PO-0142 · Country Malt", "sent · due Thu", E.act("Receive"))}
-      {E.row("PO-0141 · YCH", "partially received · 1 Citra box due", E.act("Receive"), "w")}
-      {E.row("PO-0143 · CanSource", "draft · 4 pallets", E.act("Send"))}
+      {E.row("PO-0142 · Country Malt", "sent · due Thu", E.act("Receive", "info"))}
+      {E.row("PO-0141 · YCH", "partially received · 1 Citra box due", E.act("Receive", "info"), "w")}
+      {E.row("PO-0143 · CanSource", "draft · 4 pallets", E.act("Send", "info"))}
     </>),
   },
   {
@@ -2173,10 +2173,10 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Beer", "Materials on hand")}
       {E.btn("Add material")}
-      {E.row("Cans · 16 oz", "3,100 each · 2 lots · best by none", E.act("Count"))}
-      {E.row("Citra 2026 · YCH", "262 lb · 1 lot · best by 8/31/27", E.act("Count"))}
-      {E.row("2-row 2026 · Country Malt", "8,800 lb · 3 lots · best by 3/15/27", E.act("Count"))}
-      {E.row("Yeast · WLP066", "2 brinks · 2 lots · best by 9/8/26", E.act("Count"), "w")}
+      {E.row("Cans · 16 oz", "3,100 each · 2 lots · best by none", E.act("Count", "info"))}
+      {E.row("Citra 2026 · YCH", "262 lb · 1 lot · best by 8/31/27", E.act("Count", "info"))}
+      {E.row("2-row 2026 · Country Malt", "8,800 lb · 3 lots · best by 3/15/27", E.act("Count", "info"))}
+      {E.row("Yeast · WLP066", "2 brinks · 2 lots · best by 9/8/26", E.act("Count", "info"), "w")}
     </>),
   },
   {
@@ -2335,7 +2335,7 @@ export const SCREENS: Screen[] = [
       {E.btn("Create recipe")}
       {E.row("Hazy IPA v4", "IPA · 15 bbl · updated Aug 28", E.act("Review"))}
       {E.row("Pils v3", "German pils · 15 bbl · updated Aug 21", E.act("Review"))}
-      {E.row("Stout v2", "Stout · draft version", E.act("Finish"), "w")}
+      {E.row("Stout v2", "Stout · draft version", E.act("Finish", "primary"), "w")}
     </>),
   },
   {
@@ -2403,7 +2403,7 @@ export const SCREENS: Screen[] = [
       {E.tbl(["class", "begin", "+", "−", "end"], [["cellar · in-process", "120.40", "62.00", "58.10", "124.30"], ["kegs", "41.00", "30.50", "33.20", "38.30"], ["cans", "12.60", "18.00", "14.90", "15.70"], ["bottles", "0.00", "0.00", "0.00", "0.00"]])}
       {E.info("Every class balances: begin + in − out = end. Cellar leaves by packaging, not as a removal. Zeros print 0.00.")}
       {E.row("PA / OH excise", "generated", "$1,508")}
-      {E.row("3 · Confirm filed outside MGR", "", E.act("Confirm"))}
+      {E.row("3 · Confirm filed outside MGR", "", E.act("Confirm", "success"))}
       {E.info("MGR saves the immutable snapshot; it does not transmit the filing. Save stays off until the report balances.")}
       {E.btn("Save filed snapshot", "irr")}
     </>),
@@ -2637,11 +2637,11 @@ export const SCREENS: Screen[] = [
       {E.ttl("On tap")}
       {E.tabs(["Taproom", "Warehouse"])}
       {E.tiles([["1", "Pils · ½ bbl", "on Mon", 0, 71], ["2", "Hazy IPA · ½ bbl", "on Mon", 0, 62], ["3", "Stout · ⅙ bbl", "on Tue · filled 60%", 0, 34], ["4", "Amber · ½ bbl", "on Sat", 0, 88], ["5", "Helles · ½ bbl", "on Wed · nearly out", 1, 9], ["6", "Saison · ½ bbl", "on Thu", 0, 54], ["8", "Porter · ⅙ bbl", "on Fri", 0, 46], ["9", "Hazy IPA · ½ bbl", "on Thu · second keg", 1, 93], ["10", "Kolsch · ½ bbl", "on Tue", 0, 27], ["11", "Barrel Dark · ⅙ bbl", "on Sun", 0, 80], ["unnumbered", "Wild Ale · ⅙ bbl", "on Thu · sorts last", 0, 66]])}
-      {E.row("7 · Guest cider · keg", "tapped here by Dana · not our stock, no depletion", E.act("Kick"), "w")}
+      {E.row("7 · Guest cider · keg", "tapped here by Dana · not our stock, no depletion", E.act("Kick", "destructive"), "w")}
       {E.note("Putting a new guest keg on isn’t available yet: the swap can’t save its name and size. This one is read and can still be kicked.")}
       {E.ttl("Open, not on a tap")}
-      {E.row("Amber · ½ bbl", "packaged short · filled 60% · 0.30 bbl", E.act("Tap"), "w")}
-      {E.row("Stout · ⅙ bbl", "pulled off tap 9 Sun · ~40% left", E.act("Tap"), "w")}
+      {E.row("Amber · ½ bbl", "packaged short · filled 60% · 0.30 bbl", E.act("Tap", "info"), "w")}
+      {E.row("Stout · ⅙ bbl", "pulled off tap 9 Sun · ~40% left", E.act("Tap", "info"), "w")}
       {E.info("A keg that was never filled to nominal enters stock open, not sealed. It counts as beer, not as a keg, and it is meant to be used next.")}
       {E.info("Tap 7 is empty. Unnumbered kegs sort last.")}
       {E.row("Recent · Kolsch tapped", "Dana · Tue 4:10pm")}
@@ -2712,9 +2712,9 @@ export const SCREENS: Screen[] = [
       {E.hd("Work", "driver default")}
       {E.btn("New route")}
       {E.tabs(WORK_CHIPS, 5, "w-full", WORK_TABS)}
-      {E.row("Route A · Thu", "3 stops · Maria · departed 8:10", E.act("Resume"))}
-      {E.row("Route B · Fri", "2 stops · driver not assigned", E.act("Assign"), "w")}
-      {E.row("ORD-0236 · Dock", "shipped · no route", E.act("Add to route"), "w")}
+      {E.row("Route A · Thu", "3 stops · Maria · departed 8:10", E.act("Resume", "info"))}
+      {E.row("Route B · Fri", "2 stops · driver not assigned", E.act("Assign", "attention"), "w")}
+      {E.row("ORD-0236 · Dock", "shipped · no route", E.act("Add to route", "attention"), "w")}
     </>),
   },
   {
@@ -2734,7 +2734,7 @@ export const SCREENS: Screen[] = [
       {E.row("Stop 1 · Ridgeline", "4 Hazy halves · 6 Pils cases", "next")}
       {E.row("Stop 2 · Al’s Bar", "2 Stout sixths · later")}
       {E.row("Stop 3 · Teresa’s", "8 Hazy halves · 12 Pils cases · later", "", "w")}
-      {E.row("Unassigned · ORD-0236 · Dock", "3 Hazy halves · shipped, no route", E.act("Add stop"), "w")}
+      {E.row("Unassigned · ORD-0236 · Dock", "3 Hazy halves · shipped, no route", E.act("Add stop", "attention"), "w")}
       {E.btns([["Save route plan", "g"], ["Depart route", "p"]])}
     </>),
   },
@@ -2773,7 +2773,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Today", "Route A · Thu")}
       {E.fld("Load", "14 Hazy halves · 18 Pils cases · 2 Stout sixths")}
-      {E.row("Stop 1 · Ridgeline Tap Room", "4 Hazy halves · 6 Pils cases", E.act("Resume"), "w")}
+      {E.row("Stop 1 · Ridgeline Tap Room", "4 Hazy halves · 6 Pils cases", E.act("Resume", "info"), "w")}
       {E.row("Stop 2 · Al’s Bar", "2 Stout sixths · later")}
       {E.row("Stop 3 · Teresa’s", "8 Hazy halves · 12 Pils cases · later")}
       {E.sp()}
@@ -2854,7 +2854,7 @@ export const SCREENS: Screen[] = [
     spec: "Preview picker renders the same provider-neutral fixtures consumed by renderer contract tests. It never queries live customer data or sends a message. Reading cadence is MGR-owned and controls both Today and chat.",
     body: (<>
       {E.back("Settings", "Chat")}
-      {E.row("Slack · Demo Brewing", "Connected · scopes healthy", E.act("Disconnect"), "ok", SlackMark)}
+      {E.row("Slack · Demo Brewing", "Connected · scopes healthy", E.act("Disconnect", "destructive"), "ok", SlackMark)}
       {E.pick("Operations channel", "#mgr-operations · private", ["#mgr-operations · private", "#general"])}
       {E.window("Quiet hours", "21:00", "06:00")}
       {E.edit("Reading overdue after", "24", "number")}
@@ -2882,9 +2882,9 @@ export const SCREENS: Screen[] = [
     spec: "A brewery admin can remove a stale identity link without disconnecting Slack for everyone.",
     body: (<>
       {E.back("Chat", "Linked people")}
-      {E.row("Avery Stone", "Admin · linked 8/29/2026", E.act("Unlink"))}
-      {E.row("Casey Lin", "Brewer · linked 8/30/2026", E.act("Unlink"))}
-      {E.row("Morgan Reed", "Driver · linked 9/02/2026", E.act("Unlink"))}
+      {E.row("Avery Stone", "Admin · linked 8/29/2026", E.act("Unlink", "destructive"))}
+      {E.row("Casey Lin", "Brewer · linked 8/30/2026", E.act("Unlink", "destructive"))}
+      {E.row("Morgan Reed", "Driver · linked 9/02/2026", E.act("Unlink", "destructive"))}
       {E.btn("Link your Slack", "g")}
     </>),
   },
@@ -2963,7 +2963,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Settings", "Point of sale")}
       {E.info("Publish what the taproom can sell, and read its sales back. One provider is connected at a time.")}
-      {E.row("Square · Demo Brewing LLC", "catalog published · sales syncing", E.act("Disconnect"), "ok", SquareMark)}
+      {E.row("Square · Demo Brewing LLC", "catalog published · sales syncing", E.act("Disconnect", "destructive"), "ok", SquareMark)}
       {E.row(<>Square {E.arrow()} QuickBooks connector</>, "detected · Square posts taproom sales to QuickBooks Online itself", E.act("Review"), "w", SquareMark)}
       {E.nav("Square locations", "2 mapped · 1 needs mapping")}
       {E.fld("Last sales sync", "Today · 6:58 PM")}

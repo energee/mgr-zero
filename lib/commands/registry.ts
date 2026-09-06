@@ -1,6 +1,6 @@
 // lib/commands/registry.ts — single source of truth for every operation.
 // UI calls these via /api/command; AI chat (plan 1C) exposes the same registry as tools.
-import { ZodType } from "zod";
+import { z, ZodType } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type StaffRole = "admin" | "sales" | "warehouse" | "brewer";
@@ -51,20 +51,28 @@ export class CommandError extends Error {
 
 // Awaits a Supabase query and turns its { data, error } into data-or-throw,
 // so handlers don't each repeat `if (error) throw new CommandError(...)`.
-// Raw Postgres errors remain user-facing until Task 12 centralizes sanitization.
+// This is the one place database errors become public: see rpcError.
 export async function unwrap<T>(query: PromiseLike<{ data: T; error: { message: string; code?: string } | null }>): Promise<T> {
   const { data, error } = await query;
   if (error) throw rpcError(error);
   return data;
 }
 
-// The definer RPCs signal authorization failures as 42501 and request-id
-// reuse as the application SQLSTATE MG409; keep those distinguishable from 400s.
+// Maps a Supabase/PostgREST error to the public CommandError envelope. P0001 is
+// `raise exception` without an errcode, i.e. the domain rules our own RPCs
+// raise, so its message is the user-facing one. Anything unlisted is logged
+// here and surfaces as a generic 500 so raw Postgres text never reaches a
+// client (security audit A2); detail pages turn not_found into the not-found
+// route (lib/mgr/not-found.ts).
 function rpcError(error: { message: string; code?: string }): CommandError {
   switch (error.code) {
     case "42501": return new CommandError(error.message, 403, "permission_denied");
     case "MG409": return new CommandError(error.message, 409, "conflict");
-    default: return new CommandError(error.message);
+    case "PGRST116": return new CommandError("record not found", 404, "not_found");
+    case "P0001": return new CommandError(error.message);
+    default:
+      console.error(`database error ${error.code ?? "unknown"}:`, error.message);
+      return new CommandError("database error", 500, "db_error");
   }
 }
 
@@ -156,7 +164,10 @@ export async function runCommand(name: string, rawInput: unknown, ctx: Ctx, exec
   const allowed = def.roles === "any" || (def.roles === "customer" ? ctx.role === "customer" : def.roles.includes(ctx.role as StaffRole));
   if (!allowed) throw new CommandError(`permission denied: ${name} requires ${JSON.stringify(def.roles)}`, 403, "permission_denied");
   const parsed = def.input.safeParse(rawInput);
-  if (!parsed.success) throw new CommandError(`validation failed: ${parsed.error.message}`, 400, "invalid_input");
+  // prettifyError gives one readable line per issue ("✖ Invalid UUID → at
+  // customerId") for forms, the portal cart and HTTP API callers alike, instead
+  // of the serialized issue array zod puts in error.message.
+  if (!parsed.success) throw new CommandError(`validation failed: ${z.prettifyError(parsed.error)}`, 400, "invalid_input");
   try {
     return await def.execute(ctx, parsed.data, def.kind === "command" ? execution ?? createExecution() : undefined);
   } catch (e: unknown) {

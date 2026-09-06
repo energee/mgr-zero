@@ -15,7 +15,7 @@ Enums stay conservative: adding a value later is one line; a wrong one is foreve
 | Area | Decision | Consequence for schema |
 |---|---|---|
 | Batches | A batch can split across vessels and blend with other batches | `batches` → `vessel_occupancies` (volume) → `transfers` between occupancies carry volume; blends are traceable |
-| FG lots | Packaging run = lot; one run draws from exactly one vessel occupancy | `packaging_runs.occupancy_id`; `lots` 1:1 with runs; `inventory_movements.lot_id` |
+| FG lots | Packaging run = lot; one run draws from exactly one vessel occupancy — required to *start* a run, not to plan one (amended by `2026-09-05-mgr-packaging-source-planning.md`) | `packaging_runs.occupancy_id`; `lots` 1:1 with runs; `inventory_movements.lot_id` |
 | Kegs | Counts per customer, not serials. Pools by ownership: owned / leased / pay-per-fill. One-way kegs are materials | `keg_pools` (kind, vendor, contract terms), `keg_events` append-only count ledger (pool, size, delta, counterparty, reason); deposits reference pool |
 | Readings | Manual entry only | `fermentation_readings` (occupancy, at, temp, ph, gravity, note, by); no devices table |
 | Premises | One per brewery | TTB registry no. stays on `breweries` |

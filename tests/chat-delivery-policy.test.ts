@@ -37,7 +37,9 @@ const scan = async (now: string) => {
 const release = async (now: string, start: string | null, end: string | null, tz = "America/New_York") =>
   (await admin.rpc("chat_quiet_release", { p_now: now, p_start: start, p_end: end, p_tz: tz })).data as string;
 const iso = (v: string) => new Date(v).toISOString();
-const lease = async (limit = 10, seconds = 60, now = "2026-09-05T14:00:00Z") => {
+// Leasing clock sits a decade ahead: submittedOrder() queues deliveries at the
+// real now(), and lease_chat_deliveries only returns rows due at or before p_now.
+const lease = async (limit = 10, seconds = 60, now = "2036-09-05T14:00:00Z") => {
   const { data, error } = await admin.rpc("lease_chat_deliveries", { p_limit: limit, p_lease_seconds: seconds, p_now: now });
   if (error) throw error;
   return data as { id: string; occurrence_id: string; destination_id: string; installation_id: string; provider: string; lease_expires_at: string; attempt_count: number }[];
@@ -138,23 +140,23 @@ describe("delivery leasing", () => {
     expect(sent).toMatchObject({ state: "sent", provider_conversation_id: "D1", provider_message_id: "m1", lease_expires_at: null });
     expect(sent.sent_at).not.toBeNull();
 
-    const retry = await admin.rpc("retry_chat_delivery", { p_delivery: c[0].id, p_lease: c[0].lease_expires_at, p_next_attempt_at: "2026-09-05T14:05:00Z", p_error_code: "rate_limited" });
+    const retry = await admin.rpc("retry_chat_delivery", { p_delivery: c[0].id, p_lease: c[0].lease_expires_at, p_next_attempt_at: "2036-09-05T14:05:00Z", p_error_code: "rate_limited" });
     expect(retry.error).toBeNull();
     expect((await admin.from("notification_deliveries").select().eq("id", c[0].id).single()).data).toMatchObject({ state: "retrying", last_error_code: "rate_limited", lease_expires_at: null });
-    expect(await lease(10, 60, "2026-09-05T14:04:00Z")).toEqual([]);
-    const [again] = await lease(10, 60, "2026-09-05T14:06:00Z");
+    expect(await lease(10, 60, "2036-09-05T14:04:00Z")).toEqual([]);
+    const [again] = await lease(10, 60, "2036-09-05T14:06:00Z");
     expect(again.id).toBe(c[0].id);
     expect(again.attempt_count).toBe(2);
 
     // Crash: the lease expires and the next call recovers the row.
-    const [recovered] = await lease(10, 60, "2026-09-05T14:10:00Z");
+    const [recovered] = await lease(10, 60, "2036-09-05T14:10:00Z");
     expect(recovered.id).toBe(c[0].id);
     expect(recovered.attempt_count).toBe(3);
     const stop = await admin.rpc("suppress_chat_delivery", { p_delivery: recovered.id, p_lease: recovered.lease_expires_at, p_state: "terminal", p_error_code: "invalid_auth" });
     expect(stop.error).toBeNull();
     expect((await admin.from("notification_deliveries").select("state, last_error_code").eq("id", recovered.id).single()).data).toEqual({ state: "terminal", last_error_code: "invalid_auth" });
 
-    const denied = await adminCtx.db.rpc("lease_chat_deliveries", { p_limit: 1, p_lease_seconds: 60, p_now: "2026-09-05T14:00:00Z" });
+    const denied = await adminCtx.db.rpc("lease_chat_deliveries", { p_limit: 1, p_lease_seconds: 60, p_now: "2036-09-05T14:00:00Z" });
     expect(denied.error?.message).toMatch(/permission denied|not find the function/i);
   });
 });

@@ -47,7 +47,7 @@ export default async function PortalOrdersPage() {
                 <td className="py-1">{o.requested_ship_date ?? "—"}</td>
                 <td className="py-1 text-right">
                   {o.needs_restock && (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
+                    <span className="rounded-full bg-attention px-2 py-0.5 text-xs text-attention-foreground">
                       staged — needs restocking
                     </span>
                   )}

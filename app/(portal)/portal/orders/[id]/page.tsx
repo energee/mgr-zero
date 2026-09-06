@@ -8,6 +8,7 @@ import { DirectionIcon } from "@/components/mgr/icon";
 import { getActiveCustomer } from "@/lib/portal";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
+import { orNotFound } from "@/lib/mgr/not-found";
 import "@/lib/commands/all";
 
 type OrderStatus = "draft" | "submitted" | "confirmed" | "picked" | "shipped" | "cancelled";
@@ -84,7 +85,7 @@ export default async function PortalOrderDetailPage({ params }: { params: Promis
   const { id } = await params;
   const customer = await getActiveCustomer();
   const ctx = await buildContext(customer.breweryId);
-  const { order, lines, events } = (await runCommand("portal_order", { orderId: id }, ctx)) as {
+  const { order, lines, events } = (await orNotFound(runCommand("portal_order", { orderId: id }, ctx))) as {
     order: Order;
     lines: OrderLine[];
     events: OrderEvent[];
@@ -98,7 +99,7 @@ export default async function PortalOrderDetailPage({ params }: { params: Promis
         <h1 className="text-xl font-semibold">
           Order {order.order_no ?? order.id.slice(0, 8)}
           {order.needs_restock && (
-            <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-normal text-amber-800 align-middle">
+            <span className="ml-2 rounded-full bg-attention px-2 py-0.5 text-xs font-normal text-attention-foreground align-middle">
               staged — needs restocking
             </span>
           )}

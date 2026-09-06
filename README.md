@@ -51,12 +51,12 @@ bunx supabase status -o env | node scripts/supabase-env.mjs > .env.local
 ```
 
 The mapper converts the Supabase CLI's local key labels into the application's
-modern environment contract. Add a separate random HMAC secret of at least 32
-characters to `.env.local`:
+modern environment contract; nothing else is needed in `.env.local`. Rate
+limiting on `/api/command`: not yet implemented (authz audit A1).
 
-```dotenv
-COMMAND_RATE_LIMIT_HMAC_SECRET=<random secret of at least 32 characters>
-```
+`VERCEL_ENV` is optional; when set it must be `production`, `preview`, or
+`development` (`lib/env/server-parser.ts`). Vercel sets it on deploys; locally
+it is normally absent.
 
 Apply migrations and seed a dev user/brewery:
 
@@ -103,17 +103,9 @@ the same repo), reusing one already running there, and stops what it
 started on both success and failure. It needs `bunx supabase start` and a
 `.env.local` in place, same as the vitest suite. See `tests-e2e/portal-smoke.ts`.
 
-Test files: `tests/api-command.test.ts` (Bearer auth on `/api/command`),
-`tests/rls-tenancy.test.ts`, `tests/rls-ledger.test.ts` (RLS
-isolation, ledger immutability, CHECK constraints, ATP math),
-`tests/registry.test.ts` (command registry validation/permissions),
-`tests/commands-inventory.test.ts` (catalog/inventory commands),
-`tests/commands-import.test.ts` (CSV import blocked), `tests/commands-invites.test.ts` (invitations blocked)
-(invitations), `tests/schema-rules.test.ts` (pg_catalog gates: RLS on every
-table, `security_invoker` views, `search_path` on functions, no anon-executable
-definer functions), `tests/schema-conventions.test.ts` (composite FKs, lot
-trigger, append-only ledgers), `tests/write-atomicity.test.ts` (iron rule 5). Tests run against the real local Supabase stack (not a
-mock) — `bunx supabase start` must be running first.
+Each `tests/*.test.ts` opens with a header comment stating what it gates; `ls tests/` is the index. The `rls-*` and `schema-*` suites read pg_catalog and are the schema's merge gate; `commands-import` and `commands-invites` prove those commands stay blocked.
+
+Tests run against the real local Supabase stack (not a mock) — `bunx supabase start` must be running first.
 
 ## HTTP API
 
@@ -151,8 +143,8 @@ envelope `{ "ok": false, "error": { "code": "...", "message": "..." },
 | 401 | Unauthenticated |
 | 403 | Not a member of the brewery or permission denied |
 | 409 | `requestId` reused with a different payload (`conflict`) |
-| 404 | Unknown operation |
-| 500 | Unexpected failure |
+| 404 | Unknown operation (`unknown_command`), or a `get_*` id that matches no record the caller may see (`not_found`) |
+| 500 | Unexpected failure; database errors surface as `db_error` with a generic message and are logged server-side |
 
 Input fields are camelCase; ids are UUIDs; money is integer cents; dates
 are `YYYY-MM-DD` strings. `limit` parameters default to 50 (max 200).
@@ -269,8 +261,8 @@ orders are wholesale orders shipped from the brewery's warehouse.
 **Not yet provisioned.** No hosted Supabase project or Vercel project exists
 for this repo yet. When that is set up, create the hosted Supabase and Vercel
 projects and configure `NEXT_PUBLIC_SUPABASE_URL`,
-`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, and
-`COMMAND_RATE_LIMIT_HMAC_SECRET` in Vercel. Then run `bunx supabase db push` against
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY` in Vercel.
+Then run `bunx supabase db push` against
 the hosted project, deploy, and verify login → catalog → inventory on the
 preview URL.
 

@@ -3,9 +3,9 @@
 // qty_ordered if not yet picked); submitting sets the order to "picked".
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { CommandForm, CommandFormFooter } from "@/components/mgr/command-form";
+import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCommandForm } from "@/lib/commands/use-command-form";
@@ -18,6 +18,8 @@ function initialQtys(lines: PickLine[]) {
 
 export function PickForm({ orderId, lines }: { orderId: string; lines: PickLine[] }) {
   const [qtys, setQtys] = useState<Record<string, string>>(() => initialQtys(lines));
+  // Per-line qty inputs need real ids so each Label is programmatically linked (audit 2026-09-05, a11y #5).
+  const idBase = useId();
 
   const form = useCommandForm("record_pick", {
     build: () => ({
@@ -33,10 +35,11 @@ export function PickForm({ orderId, lines }: { orderId: string; lines: PickLine[
           <div className="flex flex-col gap-2">
             {lines.map((l) => (
               <div key={l.id} className="flex items-center gap-2">
-                <Label className="flex-1 font-normal">
+                <Label htmlFor={`${idBase}-${l.id}`} className="flex-1 font-normal">
                   {l.skuName} (ordered {l.qtyOrdered})
                 </Label>
                 <Input
+                  id={`${idBase}-${l.id}`}
                   type="number"
                   min="0"
                   step="any"
@@ -47,7 +50,7 @@ export function PickForm({ orderId, lines }: { orderId: string; lines: PickLine[
               </div>
             ))}
           </div>
-          {form.error && <p className="text-sm text-destructive">{form.error}</p>}
+          <CommandFormMessage error={form.error} />
           <CommandFormFooter>
             <Button type="submit" disabled={form.submitting}>
               {form.submitting ? "Saving…" : "Save"}

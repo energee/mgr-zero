@@ -59,7 +59,10 @@ const deliveriesOf = async (orderId: string) => {
   const occ = (await admin.from("notification_occurrences").select("id").eq("subject_id", orderId).eq("reason", "submitted_order").single()).data!;
   return (await admin.from("notification_deliveries").select().eq("occurrence_id", occ.id).order("created_at").order("id")).data!;
 };
-const NOW = "2026-09-05T14:00:00Z";
+// Frozen worker clock. Deliveries are queued with next_attempt_at = the real
+// now(), so this must stay ahead of wall time or the lease finds nothing;
+// pinned a decade out (it bit at 14:00Z on 2026-09-05, the old value).
+const NOW = "2036-09-05T14:00:00Z";
 const deliver = (limit = 50, now = NOW) => runChatDeliveryBatch({ limit, now: new Date(now), transport, db: admin });
 const drain = () => admin.from("notification_deliveries").update({ state: "terminal" }).in("state", ["queued", "retrying", "leased"]);
 
@@ -166,15 +169,15 @@ describe("delivery batch", () => {
     expect(new Date(d.next_attempt_at).getTime() - new Date(NOW).getTime()).toBe(7000);
 
     failNext = Object.assign(new Error("boom"), { data: { error: "internal_error" } });
-    await deliver(1, "2026-09-05T14:00:10Z");
+    await deliver(1, "2036-09-05T14:00:10Z");
     [d] = await deliveriesOf(id);
     expect(d.state).toBe("retrying");
-    const delay = (new Date(d.next_attempt_at).getTime() - new Date("2026-09-05T14:00:10Z").getTime()) / 1000;
+    const delay = (new Date(d.next_attempt_at).getTime() - new Date("2036-09-05T14:00:10Z").getTime()) / 1000;
     expect(delay).toBeGreaterThanOrEqual(2 ** d.attempt_count);
     expect(delay).toBeLessThanOrEqual(2 ** d.attempt_count * 1.25);
 
     failNext = Object.assign(new Error("invalid_auth"), { data: { error: "invalid_auth" } });
-    await deliver(1, "2026-09-06T00:00:00Z");
+    await deliver(1, "2036-09-06T00:00:00Z");
     [d] = await deliveriesOf(id);
     expect(d).toMatchObject({ state: "terminal", last_error_code: "invalid_auth" });
     expect((await admin.from("chat_installations").select("state, last_failure_code").eq("id", inst.id).single()).data).toEqual({ state: "needs_reauthorization", last_failure_code: "invalid_auth" });
@@ -185,9 +188,9 @@ describe("delivery batch", () => {
     await drain(); calls.sends.length = 0;
     const channel = await runCommand("set_notification_destination", { installationId: inst.id, externalDestinationId: "C-ops" }, adminCtx) as { id: string };
     await submittedOrder();
-    await runChatScan({ now: new Date("2026-09-05T12:30:00Z"), db: admin });
+    await runChatScan({ now: new Date("2036-09-05T12:30:00Z"), db: admin });
     validation = { ok: false, reason: "not_private" };
-    await deliver(50, "2026-09-05T12:30:00Z");
+    await deliver(50, "2036-09-05T12:30:00Z");
     const blocked = (await admin.from("notification_destinations").select("state, blocked_reason").eq("id", channel.id).single()).data;
     expect(blocked).toEqual({ state: "blocked", blocked_reason: "not_private" });
     const digestDelivery = (await admin.from("notification_deliveries").select("state, last_error_code").eq("destination_id", channel.id).single()).data;
@@ -196,8 +199,8 @@ describe("delivery batch", () => {
 
     validation = { ok: true };
     const channel2 = await runCommand("set_notification_destination", { installationId: inst.id, externalDestinationId: "C-ops-2" }, adminCtx) as { id: string };
-    await runChatScan({ now: new Date("2026-09-06T12:30:00Z"), db: admin });
-    await deliver(50, "2026-09-06T12:30:00Z");
+    await runChatScan({ now: new Date("2036-09-06T12:30:00Z"), db: admin });
+    await deliver(50, "2036-09-06T12:30:00Z");
     const sentDigest = calls.sends.find((s) => s.destinationId === "C-ops-2")!;
     expect(sentDigest.notification.subject.safeLabel).toMatch(/Morning operations/);
     expect(sentDigest.notification.detail).toMatch(/Submitted orders: \d+/);
