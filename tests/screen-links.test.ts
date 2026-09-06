@@ -129,7 +129,6 @@ describe("reported explorer flows", () => {
 describe("isInertOn", () => {
   it("lets the screen's own map beat the global inert list", () => {
     expect(isInertOn(by("Pars and allocation"), "Release")).toBe(false);
-    expect(isInertOn(by("Pars and allocation"), "Edit")).toBe(false);
     expect(isInertOn(by("SKU list"), "Edit")).toBe(false);
     expect(isInertOn(by("Locations"), "Edit")).toBe(false);
   });
@@ -143,10 +142,24 @@ describe("isInertOn", () => {
     expect(isInertOn(by("Today"), "Paid", "Invoice")).toBe(false);
   });
 
-  it("suppresses no `to` mapping on any screen", () => {
-    const swallowed = SCREENS.flatMap((s) =>
-      Object.keys(s.to ?? {}).filter((label) => isInertOn(s, label)).map((label) => `${s.name}: ${label}`),
-    );
+  it("keeps the two Edit rows on Pars and allocation apart", () => {
+    // Both rows draw an act; only the par row has a screen to open. Bin is the
+    // par editor, so a bare "Edit" mapped screen-wide would send the standing
+    // allocation there too. The par row names its verb; standing acts in place.
+    const s = by("Pars and allocation");
+    expect(resolveTap(s, "Edit par")).toBe("Bin");
+    expect(isInertOn(s, "Edit par")).toBe(false);
+    expect(isInertOn(s, "Edit")).toBe(true);
+    expect(isInertOn(s, "Taproom standing")).toBe(true);
+  });
+
+  it("suppresses no author-written mapping on any screen", () => {
+    // Both tiers resolveTap honours above the global rules: the record's own
+    // map, and PORTAL on a portal screen. Neither may be swallowed by INERT.
+    const swallowed = SCREENS.flatMap((s) => [
+      ...Object.keys(s.to ?? {}),
+      ...(s.portal ? Object.keys(PORTAL) : []),
+    ].filter((label) => isInertOn(s, label)).map((label) => `${s.name}: ${label}`));
     expect(swallowed).toEqual([]);
   });
 });

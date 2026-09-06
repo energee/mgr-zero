@@ -335,8 +335,10 @@ export const isInert = (label: string) => INERT.some((k) => matches(k, label.tri
  * this screen (or the element itself) explicitly maps it: the record's own `to`
  * map is the resolver's first tier and wins outright, so the suppression list
  * must never outrank a mapping an author wrote on purpose. */
-export const isInertOn = (screen: Screen, label: string, to?: string | null) =>
-  !to && !screen.to?.[label.trim()] && isInert(label);
+export const isInertOn = (screen: Screen, label: string, to?: string | null) => {
+  const l = label.trim();
+  return !to && !screen.to?.[l] && !(screen.portal && PORTAL[l]) && isInert(l);
+};
 const isPortalSide = (name: string) => {
   const s = screenByName(name)?.[1];
   return Boolean(s && (s.portal || s.surface === "entry"));
