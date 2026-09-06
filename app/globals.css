@@ -5,12 +5,12 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --color-accent1: #ff6188;
-  --color-accent2: #fc9867;
-  --color-accent3: #ffd866;
-  --color-accent4: #a9dc76;
-  --color-accent5: #78dce8;
-  --color-accent6: #ab9df2;
+  --color-accent1: var(--accent1);
+  --color-accent2: var(--accent2);
+  --color-accent3: var(--accent3);
+  --color-accent4: var(--accent4);
+  --color-accent5: var(--accent5);
+  --color-accent6: var(--accent6);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
   --color-attention: var(--attention);
@@ -67,7 +67,8 @@
 
 /* Palette roles: violet = primary, rose = destructive/error, orange = review,
    yellow = warning, green = healthy, cyan = information/irreversible commit.
-   Exact accents above; darker light-mode inks keep small text readable.
+   accent1-6 are the palette ramp, defined per theme below (light inks are
+   darkened for contrast on the light ground; dark keeps the Monokai hues).
    Keep status labels and alert icons: color is never the only signal. */
 :root {
   --background: #FAFAF7;
@@ -111,6 +112,12 @@
   --info-foreground: #236773;
   --warning: #FDF3DC;
   --warning-foreground: #755800;
+  --accent1: #e14775;
+  --accent2: #e16032;
+  --accent3: #cc7a0a;
+  --accent4: #269d69;
+  --accent5: #1c8ca8;
+  --accent6: #7058be;
   --irreversible: #0F6B78;
   --irreversible-foreground: #FFFFFF;
 }
@@ -156,6 +163,12 @@
   --info-foreground: #78dce8;
   --warning: #26231A;
   --warning-foreground: #ffd866;
+  --accent1: #ff6188;
+  --accent2: #fc9867;
+  --accent3: #ffd866;
+  --accent4: #a9dc76;
+  --accent5: #78dce8;
+  --accent6: #ab9df2;
   --irreversible: #78dce8;
   --irreversible-foreground: #1E1F1A;
 }
