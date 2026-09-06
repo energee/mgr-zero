@@ -2125,18 +2125,20 @@ export const SCREENS: Screen[] = [
     job: "Count what arrived; trigger derives receipt status",
     reads: "get_purchase_order [design]",
     writes: "send_purchase_order [design; single row draft → sent] · receive_purchase_order [design; one RPC: receipt + lines (counted, over or short) + lots with best_by + material movements]",
-    states: [["loading", "PO-line skeleton"], ["stale", "receipt changed · recheck", 1], ["offline", "keep counts; commit waits"], ["permission", "warehouse or admin", 1], ["success", "partially received"]],
-    spec: "Send PO (green) shows while the PO is draft; receiving needs a sent PO. Only counted quantity posts; over and short are both visible and both allowed, and the keypad never clamps an over-count as the only guard. PO status is trigger-derived; never write a loaded/status flag.",
+    states: [["loading", "PO-line skeleton"], ["no lot", "Citra is lot-tracked · enter the lot off the box", 1], ["stale", "receipt changed · recheck", 1], ["offline", "keep counts; commit waits"], ["permission", "warehouse or admin", 1], ["success", "partially received"]],
+    spec: "Send PO (green) shows while the PO is draft; receiving needs a sent PO. Each lot-tracked line takes a lot code and best-by typed off the vendor packaging; the receive RPC creates the material lot, so nothing upstream carries the code. Untracked lines (rice hulls) ask for none. Only counted quantity posts; over and short are both visible and both allowed, and the keypad never clamps an over-count as the only guard. PO status is trigger-derived; never write a loaded/status flag.",
     body: (<>
       {E.back("Purchase orders", "PO-0142 · Country Malt")}
       {E.fld("Status", "sent Mon · expected Thu")}
       {E.row("2-row · 55 lb bags", "expected 40", E.stq(42), "w")}
       {E.row("Citra · 44 lb boxes", "expected 4", E.stq(3), "w")}
       {E.row("Rice hulls · 50 lb", "expected 6", E.stq(6), "ok")}
-      {E.fld("Citra lot", "2026-CIT-77")}
-      {E.edit("Best by", "2027-08-31", "date")}
-      {E.tape([["+2,310 lb 2-row · receipt", "over 2 bags"], ["+132 lb Citra · receipt", "lot 2026-CIT-77 · short 1"]])}
-      {E.info("2-row is over by 2 bags and Citra short 1; the PO becomes partially received.")}
+      {E.edit("2-row lot", "CM-26-4410")}
+      {E.edit("2-row best by", "2027-03-31", "date")}
+      {E.edit("Citra lot", "2026-CIT-77")}
+      {E.edit("Citra best by", "2027-08-31", "date")}
+      {E.tape([["+2,310 lb 2-row · receipt", "lot CM-26-4410 · over 2 bags"], ["+132 lb Citra · receipt", "lot 2026-CIT-77 · short 1"], ["+300 lb rice hulls · receipt", "not lot-tracked"]])}
+      {E.info("2-row is over by 2 bags and Citra short 1; the PO becomes partially received. Lot codes come off the vendor's bag or box.")}
       {E.sp()}
       {E.btn("Receive purchase order", "irr")}
     </>),
@@ -2155,7 +2157,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Work", "PO-0142 · received")}
       {E.fld("Status", "partially received")}
-      {E.tape([["+2,310 lb 2-row · receipt", "over 2 bags"], ["+132 lb Citra · receipt", "lot 2026-CIT-77 · short 1"]])}
+      {E.tape([["+2,310 lb 2-row · receipt", "lot CM-26-4410 · over 2 bags"], ["+132 lb Citra · receipt", "lot 2026-CIT-77 · short 1"], ["+300 lb rice hulls · receipt", "not lot-tracked"]])}
       {E.info("2-row is over by 2 bags and Citra short 1.")}
     </>),
   },
