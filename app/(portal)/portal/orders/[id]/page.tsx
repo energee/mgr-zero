@@ -98,7 +98,7 @@ export default async function PortalOrderDetailPage({ params }: { params: Promis
         <h1 className="text-xl font-semibold">
           Order {order.order_no ?? order.id.slice(0, 8)}
           {order.needs_restock && (
-            <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-normal text-amber-800 align-middle">
+            <span className="ml-2 rounded-full bg-attention px-2 py-0.5 text-xs font-normal text-attention-foreground align-middle">
               staged — needs restocking
             </span>
           )}

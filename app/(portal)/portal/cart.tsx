@@ -34,9 +34,9 @@ export type CatalogItem = {
 export type ShipToOption = { id: string; label: string };
 
 const BADGE_STYLE: Record<CatalogItem["badge"], string> = {
-  in: "bg-green-100 text-green-800",
-  low: "bg-amber-100 text-amber-800",
-  out: "bg-neutral-100 text-neutral-500",
+  in: "bg-success text-success-foreground",
+  low: "bg-warning text-warning-foreground",
+  out: "bg-muted text-muted-foreground",
 };
 
 export function submissionFailureMessage(message: string, draftId: string | null) {
