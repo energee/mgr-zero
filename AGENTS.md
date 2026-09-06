@@ -26,7 +26,8 @@ database (as CI already has) and stop touching the dev one.
   draw the screen gated (`SCHEMA-GATE` in `writes`), as the inventory already does.
 - Proof for screen work is `bunx tsc --noEmit && bun run lint`, the pure
   vitest files (`bunx vitest run tests/mgr-screens.test.ts tests/tap-coverage.test.ts
-  tests/screen-links.test.ts tests/theme-contrast.test.ts` covers the inventory),
+  tests/screen-links.test.ts tests/theme-contrast.test.ts tests/screen-persona.test.ts
+  tests/design-docs.test.ts tests/docs.test.ts` covers the inventory),
   and looking at the rendered page (step 4). Leave the database-backed suites
   to CI, which runs them on a fresh database.
 - If `tests/chat-jobs.test.ts` times out locally, that is the shared dev
