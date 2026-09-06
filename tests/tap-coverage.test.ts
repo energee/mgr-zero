@@ -30,7 +30,17 @@ function taps(s: Screen, html: string): [string, string | null, string | null][]
     if (!label || INERT_ATTR.test(attrs) || inert(s, label, to)) continue;
     out.push([label, /href="([^"]*)"/.exec(attrs)?.[1] ?? null, to]);
   }
-  for (const m of html.matchAll(/data-slot="item-title"[^>]*>([\s\S]*?)<\/div>/g)) if (!inert(s, text(m[1]))) out.push([text(m[1]), null, null]);
+  // A row whose control is a toggle acts in place, so its title is not a tap:
+  // the switch lives in a sibling slot, so the whole item is the unit to test.
+  // Matching item-by-item is what keeps every switch row out of the count
+  // without hand-listing each one in INERT.
+  for (const item of html.split(/data-slot="item"(?=[\s>])/).slice(1)) {
+    const t = /data-slot="item-title"[^>]*>([\s\S]*?)<\/div>/.exec(item);
+    // Every switch in the inventory sits in a row's action slot, so a chunk
+    // holding one is a toggle row: its title acts in place and is not a tap.
+    if (!t || /role="switch"/.test(item)) continue;
+    if (!inert(s, text(t[1]))) out.push([text(t[1]), null, null]);
+  }
   return out;
 }
 

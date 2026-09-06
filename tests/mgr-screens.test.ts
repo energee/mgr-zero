@@ -535,11 +535,12 @@ describe("SCREENS", () => {
   it("edits a whole number with the same stepper Weekly count uses", () => {
     // A contract quantity or an overdue threshold is counted, not typed: the
     // −/+ stepper (E.stq) is the one number control, as on Weekly count.
-    for (const name of ["Contract", "Settings"]) {
-      expect(body(name), `${name}: no stepper`).toContain('aria-label="Decrease"');
-    }
-    for (const [name, label] of [["Contract", "Contract quantity"], ["Settings", "Reading overdue after · hours"]]) {
-      expect(body(name), `${name}: the stepper is not the labelled field`).toMatch(new RegExp(`aria-label="Decrease"[^§]*aria-label="${label}"`));
+    // The pair table is the whole check: the regex fails if the stepper is
+    // missing as surely as if it is not the labelled field. Labels are escaped
+    // so a field may be named for a reader, parentheses and all.
+    for (const [name, label] of [["Contract", "Contract quantity"], ["Settings", "Reading overdue after (hours)"]]) {
+      const esc = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      expect(body(name), `${name}: the stepper is not the labelled field`).toMatch(new RegExp(`aria-label="Decrease"[^§]*aria-label="${esc}"`));
     }
   });
 

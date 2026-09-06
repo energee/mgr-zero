@@ -112,6 +112,15 @@ const MOVEMENT_KINDS = ["opening balance", "depletion", "loss", "sample", "festi
 // The sale channels, in the order every picker offers them.
 const CHANNELS = ["Wholesale", "Taproom", "DTC", "Export"];
 
+// The excise tax treatments a channel sets and a customer may override. One
+// list: the Channel chips and the Customer picker drifting apart is how a
+// treatment ends up settable in one place and unknown in the other.
+const TAX_TREATMENTS = ["taxable", "export", "vessel supplies", "research", "transfer in bond"];
+
+// Hours before a fermentation reading counts as overdue. Settings owns it;
+// Chat settings shows the same number back.
+const OVERDUE_HOURS = "24";
+
 // A rough remaining fill, wherever a keg comes off a tap.
 const FILL_CHIPS = ["Empty", "About ¼ left", "About ½ left"];
 
@@ -317,7 +326,7 @@ export const SCREENS: Screen[] = [
       {E.edit("TTB registry number", "BR-PA-12345")}
       {E.edit("PA license", "G-1234")}
       {E.edit("Customer-facing phone", "(610) 555-0142", "tel")}
-      {E.edit("Reading overdue after · hours", "24", "number")}
+      {E.edit("Reading overdue after (hours)", OVERDUE_HOURS, "number")}
       {E.fld("Deployment", "dedicated · read-only")}
       {E.btn("Save brewery")}
       {E.nav("Locations", "Warehouse · Taproom")}
@@ -1286,7 +1295,7 @@ export const SCREENS: Screen[] = [
       {E.edit("License number", "PA R-55821")}
       {E.edit("Terms", "Net 30")}
       {E.pick("Price list", "Wholesale · standard", ["Wholesale · standard", "Wholesale · distributor", "Taproom"])}
-      {E.pick("Tax treatment", "Inherit from channel", ["Inherit from channel", "Taxable", "Export", "Vessel supplies", "Research", "Transfer in bond"])}
+      {E.pick("Tax treatment", "Inherit from channel", ["Inherit from channel", ...TAX_TREATMENTS])}
       {E.nav("Ship-tos", "Main · Dock")}
       {E.row("Portal users", "2 active", E.act("Invite"))}
       {E.nav("Customer keg balance", "38 out · $1,140 deposits held")}
@@ -2142,7 +2151,7 @@ export const SCREENS: Screen[] = [
       {E.edit("Citra lot", "2026-CIT-77")}
       {E.edit("Citra best by", "2027-08-31", "date")}
       {E.tape([["+2,310 lb 2-row · receipt", "lot CM-26-4410 · over 2 bags"], ["+132 lb Citra · receipt", "lot 2026-CIT-77 · short 1"], ["+300 lb rice hulls · receipt", "not lot-tracked"]])}
-      {E.info("2-row is over by 2 bags and Citra short 1; the PO becomes partially received. Lot codes come off the vendor's bag or box.")}
+      {E.info("2-row is over by 2 bags and Citra short 1; the PO becomes partially received.")}
       {E.sp()}
       {E.btns([["Send purchase order", "g"], ["Receive purchase order", "irr"]])}
     </>),
@@ -2220,9 +2229,9 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("More", "Vendors")}
       {E.btn("Add vendor")}
-      {E.row("YCH", "hops · 10-day lead · 1 active contract", E.act("Edit"))}
-      {E.row("Country Malt", "grain · 14-day lead · 1 active contract", E.act("Edit"))}
-      {E.row("CanSource", "packaging · 21-day lead", E.act("Edit"))}
+      {E.row("YCH", "hops · 1 active contract", E.act("Edit"))}
+      {E.row("Country Malt", "grain · 1 active contract", E.act("Edit"))}
+      {E.row("CanSource", "packaging · 3 materials", E.act("Edit"))}
       {E.nav("Materials", "12 materials")}
       {E.nav("Contracts", "2 active commitments")}
     </>),
@@ -2326,7 +2335,7 @@ export const SCREENS: Screen[] = [
       {E.fld("Received", "262 lb · read-only")}
       {E.edit("Starts", "2026-09-01", "date")}
       {E.edit("Ends", "2026-10-31", "date")}
-      {E.edit("Unit cost", "9.40")}
+      {E.edit("Unit cost", "$9.40")}
       {E.btn("Save contract")}
     </>),
   },
@@ -2560,7 +2569,7 @@ export const SCREENS: Screen[] = [
       {E.fld("Selected pool", "Owned ½ bbl · 203 kegs · $30 deposit")}
       {E.pick("Kind", "Owned", ["Owned", "Leased", "Pay per fill"])}
       {E.nav("Vendor", "none · owned pools have no vendor")}
-      {E.edit("Per-fill cost", "0.00")}
+      {E.edit("Per-fill cost", "$0.00")}
       {E.btns([["Add keg pool", "g"], ["Save keg pool", "g"]])}
       {E.row("Owned ½ bbl", "142 out · 61 in", "203")}
       {E.nav("Customer keg balance", "Ridgeline · 38 out · $1,140")}
@@ -2825,8 +2834,8 @@ export const SCREENS: Screen[] = [
     job: "See demand gaps and draft a PO without priority state",
     reads: "get_planning_shortfalls [design; demand, supply and gap by week]",
     writes: "draft_purchase_order_from_requirements [design; one RPC: draft PO + lines]",
-    states: [["gap", "demand exceeds supply in that week · the only actionable row"], ["covered", "supply meets demand · shown so the horizon reads continuously"], ["no vendor", "no contract and no lead time on file · the row cannot draft a PO", 1], ["empty", "nothing planned and nothing ordered"]],
-    spec: "The three columns are defined so the gap is arithmetic rather than judgement. Demand is confirmed and submitted order lines by requested ship week, plus taproom pars; supply is on-hand ATP plus the planned outputs of packaging runs already scheduled into that week. The horizon runs as far ahead as the longest material lead time can still be acted on, which is why it is drawn two weeks and not a quarter: a gap nobody can still buy for is a report, not a plan. A drafted PO goes to the vendor holding an active contract for that material, and failing that the shortest lead time; the quantity is the gap rounded up to the vendor's purchase unit. Nothing here ranks or prioritises, in keeping with Pars and allocation: every change stays a named quantity.",
+    states: [["gap", "demand exceeds supply in that week · the only actionable row"], ["covered", "supply meets demand · shown so the horizon reads continuously"], ["no vendor", "no contract and no lead time on the material · the row cannot draft a PO", 1], ["empty", "nothing planned and nothing ordered"]],
+    spec: "The three columns are defined so the gap is arithmetic rather than judgement. Demand is confirmed and submitted order lines by requested ship week, plus taproom pars; supply is on-hand ATP plus the planned outputs of packaging runs already scheduled into that week. The horizon runs as far ahead as the longest material lead time can still be acted on, which is why it is drawn two weeks and not a quarter: a gap nobody can still buy for is a report, not a plan. A drafted PO goes to the vendor holding an active contract for that material, and failing that the shortest lead time on the material; the quantity is the gap rounded up to its purchase unit. Nothing here ranks or prioritises, in keeping with Pars and allocation: every change stays a named quantity.",
     body: (<>
       {E.back("More", "Planning")}
       {E.tbl(["week", "demand", "supply", "gap"], [["9/7", "48 bbl", "40 bbl", <><span className="text-warning-foreground">−8</span></>], ["9/14", "52 bbl", "60 bbl", "+8"]])}
@@ -2872,7 +2881,7 @@ export const SCREENS: Screen[] = [
       {E.row("Slack · Demo Brewing", "Connected · scopes healthy", E.act("Disconnect", "destructive"), "ok", SlackMark)}
       {E.pick("Operations channel", "#mgr-operations · private", ["#mgr-operations · private", "#general"])}
       {E.window("Quiet hours", "21:00", "06:00")}
-      {E.fld("Reading overdue after", "24 h · set on Settings")}
+      {E.fld("Reading overdue after", `${OVERDUE_HOURS} h · set on Settings`)}
       {E.nav("Health", "last message from Slack today · 8:42 AM")}
       {E.nav("Linked people", "3 linked")}
       <div>
@@ -3161,7 +3170,7 @@ export const SCREENS: Screen[] = [
     states: [["permission", "sales or admin required", 1], ["new", "name and tax treatment required"], ["in use", "delete is refused", 1]],
     body: (<>
       {E.edit("Channel name", "Export")}
-      {E.chips(["taxable", "export", "vessel supplies", "research", "transfer in bond"], 1)}
+      {E.chips(TAX_TREATMENTS, 1)}
       {E.info("Customers may override this. Sales without a customer take the channel default.")}
       {E.note("A channel with movements cannot be deleted.")}
       {E.gated("Save channel", "isn’t available yet: channels are still a fixed list")}

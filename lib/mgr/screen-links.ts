@@ -174,7 +174,6 @@ export const TAPS: [string | RegExp, string][] = [
  * them as gaps. The explorer simply leaves them alone. */
 export const INERT: (string | RegExp)[] = [
   "Record 7 sales + 1 refund as expected",
-  "Lot-tracked",
   "Main ship-to",
   "Dock ship-to",
   "+ add ingredient",
@@ -195,9 +194,7 @@ export const INERT: (string | RegExp)[] = [
   "Adjust selected",
   "August 31, 2027",
   "Avery Stone",
-  "Bank transfer (ACH)",
   "Buyer asked about this invoice",
-  "Card",
   "Casey Lin",
   "Change",
   "Citra \u00b7 44 lb boxes",
@@ -271,9 +268,6 @@ export const INERT: (string | RegExp)[] = [
   "Unlink",
   "Pay invoice",
   "Email me a link",
-  "Default ship-to",
-  "Active",
-  "Sell while taproom stock remains",
   /^(January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2}, \d{4}$/,
   "Reset to format price",
   "Switch",
