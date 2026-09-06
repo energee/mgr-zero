@@ -51,20 +51,28 @@ export class CommandError extends Error {
 
 // Awaits a Supabase query and turns its { data, error } into data-or-throw,
 // so handlers don't each repeat `if (error) throw new CommandError(...)`.
-// Raw Postgres errors remain user-facing until Task 12 centralizes sanitization.
+// This is the one place database errors become public: see rpcError.
 export async function unwrap<T>(query: PromiseLike<{ data: T; error: { message: string; code?: string } | null }>): Promise<T> {
   const { data, error } = await query;
   if (error) throw rpcError(error);
   return data;
 }
 
-// The definer RPCs signal authorization failures as 42501 and request-id
-// reuse as the application SQLSTATE MG409; keep those distinguishable from 400s.
+// Maps a Supabase/PostgREST error to the public CommandError envelope. P0001 is
+// `raise exception` without an errcode, i.e. the domain rules our own RPCs
+// raise, so its message is the user-facing one. Anything unlisted is logged
+// here and surfaces as a generic 500 so raw Postgres text never reaches a
+// client (security audit A2); detail pages turn not_found into the not-found
+// route (lib/mgr/not-found.ts).
 function rpcError(error: { message: string; code?: string }): CommandError {
   switch (error.code) {
     case "42501": return new CommandError(error.message, 403, "permission_denied");
     case "MG409": return new CommandError(error.message, 409, "conflict");
-    default: return new CommandError(error.message);
+    case "PGRST116": return new CommandError("record not found", 404, "not_found");
+    case "P0001": return new CommandError(error.message);
+    default:
+      console.error(`database error ${error.code ?? "unknown"}:`, error.message);
+      return new CommandError("database error", 500, "db_error");
   }
 }
 

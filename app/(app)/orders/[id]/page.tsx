@@ -1,13 +1,14 @@
 // app/(app)/orders/[id]/page.tsx — single order: header, line table with
 // per-sku ATP badges, event timeline, and lifecycle-buttons.tsx for the
 // status-gated actions. Reads through the command registry (get_order,
-// list_skus) with a brewery-scoped Ctx. Failures throw to the (app) error
-// boundary.
+// list_skus) with a brewery-scoped Ctx. An unknown or malformed id renders
+// not-found.tsx; other failures throw to the (app) error boundary.
 import { DirectionIcon } from "@/components/mgr/icon";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
+import { orNotFound } from "@/lib/mgr/not-found";
 import { LifecycleButtons } from "./lifecycle-buttons";
 
 type OrderStatus = "draft" | "submitted" | "confirmed" | "picked" | "shipped" | "cancelled";
@@ -91,7 +92,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const [{ order, lines, events, atp }, skuRows] = (await Promise.all([
-    runCommand("get_order", { orderId: id }, ctx),
+    orNotFound(runCommand("get_order", { orderId: id }, ctx)),
     runCommand("list_skus", {}, ctx),
   ])) as [{ order: Order; lines: OrderLine[]; events: OrderEvent[]; atp: Atp[] }, SkuRow[]];
 
