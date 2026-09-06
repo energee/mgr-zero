@@ -208,8 +208,11 @@ export const E = {
   link: (t: React.ReactNode, to?: string) => (
     <a href="#" data-to={to} className="text-sm text-muted-foreground underline">{t}</a>
   ),
-  /** An editable field. type is the native input type; "date" pops the calendar (DatePicker). */
-  edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[]) => {
+  /** An editable field. type is the native input type; "date" pops the calendar
+   *  (DatePicker). `scope` disambiguates the datalist when two fields on one
+   *  screen share a label: a card names its own material, so both lot fields
+   *  are labelled "Lot" and would otherwise collide on one id. */
+  edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[], scope?: string) => {
     if (type === "date") return <DatePicker label={label} defaultValue={value} />;
     // A whole number (a contract quantity, an overdue threshold) is counted,
     // not typed: the same −/+ stepper Weekly count uses.
@@ -221,7 +224,7 @@ export const E = {
         </Field>
       );
     }
-    const listId = suggestions?.length ? `${label.replace(/\s+/g, "-").toLowerCase()}-list` : undefined;
+    const listId = suggestions?.length ? `${[scope, label].filter(Boolean).join("-").replace(/\s+/g, "-").toLowerCase()}-list` : undefined;
     return (
       <Field orientation="horizontal">
         <FieldLabel>{label}</FieldLabel>

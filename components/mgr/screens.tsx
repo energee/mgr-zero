@@ -2170,17 +2170,17 @@ export const SCREENS: Screen[] = [
     job: "Count what arrived; trigger derives receipt status",
     reads: "get_purchase_order [design]",
     writes: "send_purchase_order [design; single row draft → sent] · receive_purchase_order [design; one RPC: receipt + lines (counted, over or short) + lots with best_by + material movements]",
-    states: [["loading", "PO-line skeleton"], ["draft", "Send purchase order is the one active verb · counts wait"], ["no lot", "Citra is lot-tracked · enter the lot off the box", 1], ["lot as ordered", "the box matches the PO · nothing to say"], ["lot substituted", "the vendor shipped another lot · recorded, never blocked", 1], ["stale", "receipt changed · recheck", 1], ["offline", "keep counts; commit waits"], ["permission", "warehouse or admin", 1], ["success", "partially received"]],
-    spec: "Send PO (green) shows while the PO is draft; receiving needs a sent PO. Each lot-tracked line takes a lot code and best-by typed off the vendor packaging, prefilled from the lot the PO named. The receive RPC creates the material lot from what is entered here, never from the PO: the package is the only writer of a lot code. A difference is a substitution, which is reported and never blocked. The two codes are compared case-folded with non-alphanumerics stripped, so punctuation alone never reads as a substitution. Untracked lines (rice hulls) ask for none. Only counted quantity posts; over and short are both visible and both allowed, and the keypad never clamps an over-count as the only guard. PO status is trigger-derived; never write a loaded/status flag.",
+    states: [["loading", "PO-line skeleton"], ["draft", "Send purchase order is the one active verb · counts wait"], ["no lot", "Citra is lot-tracked · enter the lot off the box", 1], ["prefilled", "the PO named a lot · the field opens on it"], ["lot as ordered", "the box matches the PO · nothing to say"], ["lot substituted", "the vendor shipped another lot · recorded, never blocked", 1], ["no lot on the PO", "the field opens empty · recent lots for that material are offered"], ["stale", "receipt changed · recheck", 1], ["offline", "keep counts; commit waits"], ["permission", "warehouse or admin", 1], ["success", "partially received"]],
+    spec: "Send PO (green) shows while the PO is draft; receiving needs a sent PO. Each lot-tracked line takes a lot code and best-by typed off the vendor packaging, prefilled from the lot the PO named so the ordinary receipt is a glance and no typing. When the PO named none the field opens empty and offers that material\u2019s recent lots, which is what keeps one vendor lot from becoming two records over a stray space. The receive RPC creates the material lot from what is entered here, never from the PO: the package is the only writer of a lot code. A difference is a substitution, which is reported and never blocked. The two codes are compared case-folded with non-alphanumerics stripped, so punctuation alone never reads as a substitution. Untracked lines (rice hulls) ask for none. Only counted quantity posts; over and short are both visible and both allowed, and the keypad never clamps an over-count as the only guard. PO status is trigger-derived; never write a loaded/status flag.",
     body: (<>
       {E.back("Purchase orders", "PO-0142 · Country Malt")}
       {E.fld("Status", "sent Mon · expected Thu")}
-      {E.row("2-row · 55 lb bags", "expected 40 · lot CM-26-4410 on the PO", E.stq(42), "w", undefined, <>
-        {E.edit("Lot", "CM-26-4410")}
+      {E.row("2-row · 55 lb bags", "expected 40 · lot from the PO", E.stq(42), "w", undefined, <>
+        {E.edit("Lot", "CM-26-4410", "text", ["CM-26-4410", "CM-26-4288", "CM-25-9910"], "2-row")}
         {E.edit("Best by", "2027-03-31", "date")}
       </>)}
-      {E.row("Citra · 44 lb boxes", "expected 4 · lot 2026-CIT-77 on the PO", E.stq(3), "w", undefined, <>
-        {E.edit("Lot", "2026-CIT-91")}
+      {E.row("Citra · 44 lb boxes", "expected 4 · lot from the PO", E.stq(3), "w", undefined, <>
+        {E.edit("Lot", "2026-CIT-91", "text", ["2026-CIT-77", "2026-CIT-91", "2025-CIT-40"], "Citra")}
         {E.edit("Best by", "2027-08-31", "date")}
         {E.note("Substituted: the PO named 2026-CIT-77. The box decides; the receipt records both.")}
       </>)}
