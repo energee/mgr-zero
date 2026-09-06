@@ -187,5 +187,7 @@ is required to plan — `:2058` job "Plan a run against one source occupancy"; `
 nothing to package"; `:2062` "shows what is left in the vessel so a plan cannot exceed the
 source". All four are wrong under product-level planning. AGENTS.md makes `screens.tsx` the
 source of truth and the customer guides embed those frames, so implementing this spec without
-redrawing the sheet leaves the inventory contradicting itself. The baseline migration is edited in place
-until first deploy, so no second migration file is implied.
+redrawing the sheet leaves the inventory contradicting itself.
+
+The baseline migration is edited in place until first deploy, so no second migration file is
+implied.
