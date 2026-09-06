@@ -31,17 +31,27 @@ import { cn } from "@/lib/utils";
 
 /** Row modifiers from the wireframe: w = needs attention, ok = current, dis = gated. */
 type RowClass = "" | "w" | "ok" | "dis";
-/** Status dots take the accent ramp, not the tinted-surface inks: at 10px a dot is
- *  a mark, not a surface, and it needs the saturation. Dark mode is unchanged —
- *  accent3/4 are already what --warning-foreground/--success-foreground resolve to there. */
-const dotColor: Partial<Record<RowClass, string>> = { w: "bg-accent3", ok: "bg-accent4" };
+/** --dot-warning / --dot-success in app/globals.css say why these are not the
+ *  warning/success inks. */
+const dotColor: Partial<Record<RowClass, string>> = { w: "bg-dot-warning", ok: "bg-dot-success" };
 /** What the dot means, said out loud: colour alone is not a status (WCAG 1.4.1). */
 const dotLabel: Partial<Record<RowClass, string>> = { w: "Needs attention", ok: "Current" };
-/** 10px with a background-coloured ring, so the dot still reads as a dot when it
- *  sits on a tinted row or beside a 20px icon. */
-const Dot = ({ cls }: { cls: RowClass }) => (dotColor[cls] ? (
-  <span className={cn("size-2.5 shrink-0 rounded-full ring-2 ring-background", dotColor[cls])} role="img" aria-label={dotLabel[cls]} />
+/** 10px with a background-coloured ring, so the dot still reads as a dot on a
+ *  tinted row or over the corner of a row icon. */
+const Dot = ({ cls, className }: { cls: RowClass; className?: string }) => (dotColor[cls] ? (
+  <span className={cn("size-2.5 shrink-0 rounded-full ring-2 ring-background", dotColor[cls], className)} role="img" aria-label={dotLabel[cls]} />
 ) : null);
+/** A row's leading mark. A Hugeicons icon is an array; an element is already
+ *  media (E.face). With an icon the status rides its corner rather than the
+ *  title line — a dot before the title indents the title away from its
+ *  description — and the positioning wrapper costs a node only when there is
+ *  a dot to hang. */
+const RowMedia = ({ icon, cls }: { icon: IconSvgElement | React.ReactElement; cls: RowClass }) => {
+  const glyph = isValidElement(icon) ? icon : <Icon icon={icon} size={24} />;
+  return dotColor[cls] ? (
+    <span className="relative">{glyph}<Dot cls={cls} className="-top-1 -right-1 absolute" /></span>
+  ) : glyph;
+};
 const TileContent = ({ n, s, g, w, f }: { n: React.ReactNode; s: React.ReactNode; g?: React.ReactNode; w?: 0 | 1; f?: number }) => (<>
   <span className="flex items-center gap-1.5 font-medium text-sm leading-none">{w ? <Dot cls="w" /> : null}{n}</span>
   <span className="text-muted-foreground text-sm leading-normal">{s}</span>
@@ -87,15 +97,7 @@ export const E = {
     <Item variant="outline" data-gated={cls === "dis" || undefined} className={cn(cls === "dis" && "opacity-50")}>
       {(icon || dotColor[cls]) && (
         <ItemMedia className={CENTER_MEDIA}>
-          {/* A Hugeicons icon is an array; an element is already media (E.face).
-           *  With an icon the status rides its corner rather than the title line:
-           *  a dot before the title indents the title away from its description. */}
-          {icon ? (
-            <span className="relative">
-              {isValidElement(icon) ? icon : <Icon icon={icon} size={24} />}
-              <span className="absolute -right-1 -top-1"><Dot cls={cls} /></span>
-            </span>
-          ) : <Dot cls={cls} />}
+          {icon ? <RowMedia icon={icon} cls={cls} /> : <Dot cls={cls} />}
         </ItemMedia>
       )}
       <ItemContent>
@@ -332,7 +334,7 @@ export const E = {
   ),
   blank: (t: React.ReactNode, icon?: IconSvgElement) => (
     <Empty className="flex-1">
-      {icon && <EmptyMedia variant="icon"><Icon icon={icon} size={24} /></EmptyMedia>}
+      {icon && <EmptyMedia variant="icon"><Icon icon={icon} size={20} /></EmptyMedia>}
       <EmptyDescription>{t}</EmptyDescription>
     </Empty>
   ),

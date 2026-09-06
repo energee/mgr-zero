@@ -13,7 +13,7 @@ import { usePathname } from "next/navigation";
 import { MgrIcon } from "@/components/mgr-icon";
 import { Icon } from "@/components/mgr/icon";
 import {
-  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarHeader, SidebarInset,
+  Sidebar, SidebarContent, SidebarGroup, SidebarHeader, SidebarInset,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem,
   SidebarProvider, SidebarTrigger,
 } from "@/components/ui/sidebar";
@@ -53,31 +53,29 @@ export function AppShell({ brand, items, headerRight, composer, active, sidebarO
               label, so Today and Beer read as different kinds of thing. Children
               are sub-items indented under their tab. */}
           <SidebarGroup>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {items.map((tab) => {
-                  const leaf = !tab.children?.length;
-                  return (
-                    <SidebarMenuItem key={tab.label}>
-                      <SidebarMenuButton asChild isActive={tab.label === current && (leaf || isUnder(pathname, tab.href))}>
-                        <Link href={tab.href}>{tab.icon && <Icon icon={tab.icon} />}{tab.label}</Link>
-                      </SidebarMenuButton>
-                      {!leaf && (
-                        <SidebarMenuSub>
-                          {tab.children!.map((c) => (
-                            <SidebarMenuSubItem key={c.href}>
-                              <SidebarMenuSubButton asChild isActive={tab.label === current && isUnder(pathname, c.href)}>
-                                <Link href={c.href}>{c.label}</Link>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          ))}
-                        </SidebarMenuSub>
-                      )}
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
+            <SidebarMenu>
+              {items.map((tab) => {
+                const leaf = !tab.children?.length;
+                return (
+                  <SidebarMenuItem key={tab.label}>
+                    <SidebarMenuButton asChild isActive={tab.label === current && (leaf || isUnder(pathname, tab.href))}>
+                      <Link href={tab.href}>{tab.icon && <Icon icon={tab.icon} />}{tab.label}</Link>
+                    </SidebarMenuButton>
+                    {!leaf && (
+                      <SidebarMenuSub>
+                        {tab.children!.map((c) => (
+                          <SidebarMenuSubItem key={c.href}>
+                            <SidebarMenuSubButton asChild isActive={tab.label === current && isUnder(pathname, c.href)}>
+                              <Link href={c.href}>{c.label}</Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    )}
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
           </SidebarGroup>
         </SidebarContent>
       </Sidebar>
