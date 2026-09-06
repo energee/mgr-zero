@@ -302,7 +302,7 @@ export const SCREENS: Screen[] = [
       {E.row("Ridgeline Contract Brewing", "", E.act("Switch"))}
       {E.sp()}
       {E.btn("Change password", "g")}
-      {E.btn("Sign out", "irr")}
+      {E.btn("Sign out", "del")}
     </>),
   },
   {
@@ -1792,7 +1792,7 @@ export const SCREENS: Screen[] = [
     reads: "supabase_auth_get_session [platform]",
     writes: "supabase_auth_sign_out [platform]",
     states: DEFAULT_STATES,
-    spec: "Opened from the portal header Me control. No brewery switcher. Change password opens Portal set password. Sign out is outline here; the irreversible accent is a staff Me follow-up.",
+    spec: "Opened from the portal header Me control. No brewery switcher. Change password opens Portal set password. Sign out is outline here; the destructive accent is a staff Me follow-up.",
     body: (<>
       {E.fld("Signed in as", PORTAL_BUYER.email)}
       {E.fld("Account", PORTAL_BUYER.account)}
