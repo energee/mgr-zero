@@ -247,7 +247,7 @@ polymorphism stays in the database rather than in a service layer.
 
 Bins on lines are `from_bin_id` / `to_bin_id` rather than one column, because a transfer
 moves stock out of a bin at the source and into a different bin at the destination. The UI
-defaults both to the location's default bin; the column is `not null` per §16.6.
+defaults both to the location's first bin; the column is `not null` per §16.6.
 
 ### Posting
 
