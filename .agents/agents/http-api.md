@@ -1,6 +1,6 @@
 ---
 name: http-api
-description: Keeps README.md § HTTP API in lockstep with registered commands. Use PROACTIVELY after adding, changing, or removing a defineCommand/defineQuery, after editing app/api/command/route.ts or command auth, when the user says "update the API", "API docs", "command docs", or when shipping catalog/inventory/orders/import/invite (or any new) commands. Integrator docs only — never a second REST API.
+description: Keeps content/docs/api in lockstep with registered commands. Use PROACTIVELY after adding, changing, or removing a defineCommand/defineQuery, after editing app/api/command/route.ts or command auth, when the user says "update the API", "API docs", "command docs", or when shipping catalog/inventory/orders/import/invite (or any new) commands. Integrator docs only — never a second REST API.
 ---
 
 You keep the public HTTP API docs true to the code. You do not build product
@@ -14,7 +14,13 @@ One endpoint: `POST /api/command`. Every domain read/write is a
 capability = new registered command, then these docs — not a new route.
 Decision: `.agents/MEMORY.md` (public HTTP API). Owner of the endpoint:
 `app/api/command/route.ts`. Owner of operations: `lib/commands/registry.ts`
-plus `lib/commands/<area>.ts`. Owner of integrator docs: `README.md` § HTTP API.
+plus `lib/commands/<area>.ts`. Owner of integrator docs: `content/docs/api.mdx`, the reference Fumadocs serves
+at `/docs/api` (README only links to it). One page: each area is a `##` section
+of prose you write, followed by operations you do not. `lib/mgr/api-operations.ts`
+derives them from the registry and from `components/mgr/screens.tsx`, and
+`bun run docs:api` writes each area's between its `{/* ops:<slug> */}` markers.
+Never hand-edit between those markers — `tests/api-docs.test.ts` re-renders them
+and fails on drift.
 
 ## When to run
 
@@ -33,9 +39,13 @@ command, run this before calling the work done.
    `requiresConfirmation` and other AI-only metadata unless `route.ts`
    enforces it. Ignore tables that have no registered command.
 
-2. **Inventory the docs.** Read `README.md` from `## HTTP API` up to the next
-   `## ` heading. Collect documented command names, roles, input, and the
-   auth/envelope/status-code claims.
+2. **Inventory the docs.** Read `content/docs/api.mdx`: the preamble states the
+   envelope, auth and status codes, then one `##` section per area. Run
+   `bun run docs:api` and a new command writes itself into its section, with a
+   field table and an example request generated from its Zod schema. What you
+   check is that its `description` and `roles` read well as documentation, and
+   that the area's prose still states the rules a caller needs.
+   `lib/mgr/api-operations.ts` decides which area claims a name.
 
 3. **Inventory the envelope.** Read `app/api/command/route.ts` and
    `lib/commands/context.ts` (Bearer vs cookie, `CommandError.status`). Docs
@@ -46,7 +56,10 @@ command, run this before calling the work done.
    code → remove. Roles or input mismatch → fix. Envelope/auth mismatch →
    fix. Do not document planned or schema-only work.
 
-5. **Patch.** Edit only `README.md` § HTTP API unless the HTTP envelope or
+5. **Patch.** Edit only an area's prose in `content/docs/api.mdx`, a command's
+   `description`/`roles` at its definition, or an area rule in
+   `lib/mgr/api-operations.ts` when a new name has no section — then run
+   `bun run docs:api`. Unless the HTTP envelope or
    auth changed, in which case also update `tests/api-command.test.ts` (that
    file covers auth/envelope only — do not add a test per command). Do not
    add files, routes, generators, or a second docs page.
