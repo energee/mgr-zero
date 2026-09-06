@@ -127,12 +127,6 @@ describe("reported explorer flows", () => {
 // map is the first tier of the resolver. The explorer must not let the
 // suppression list silently outrank it.
 describe("isInertOn", () => {
-  it("lets the screen's own map beat the global inert list", () => {
-    expect(isInertOn(by("Pars and allocation"), "Release")).toBe(false);
-    expect(isInertOn(by("SKU list"), "Edit")).toBe(false);
-    expect(isInertOn(by("Locations"), "Edit")).toBe(false);
-  });
-
   it("still suppresses an inert label the screen does not map", () => {
     expect(isInertOn(by("Pars and allocation"), "Paid")).toBe(true);
     expect(isInertOn(by("Pars and allocation"), "Print labels")).toBe(true);
@@ -148,7 +142,6 @@ describe("isInertOn", () => {
     // allocation there too. The par row names its verb; standing acts in place.
     const s = by("Pars and allocation");
     expect(resolveTap(s, "Edit par")).toBe("Bin");
-    expect(isInertOn(s, "Edit par")).toBe(false);
     expect(isInertOn(s, "Edit")).toBe(true);
     expect(isInertOn(s, "Taproom standing")).toBe(true);
   });

@@ -328,16 +328,20 @@ export const ROUTES: Record<string, string> = {
 };
 
 /** A TAPS or INERT key against a label: exact for a string, a test for a pattern. */
-export const matches = (k: string | RegExp, label: string) => (typeof k === "string" ? k === label : k.test(label));
-export const isInert = (label: string) => INERT.some((k) => matches(k, label.trim()));
+const matches = (k: string | RegExp, label: string) => (typeof k === "string" ? k === label : k.test(label));
+
+/** The tiers an author wrote by hand for this exact tap: the element's own
+ * target, the record's `to` map, PORTAL on a portal screen. They outrank every
+ * global rule below, so both the resolver and the suppression check read them
+ * from here — stated once, they cannot drift apart. */
+const authored = (screen: Screen, l: string, to?: string | null) =>
+  to || screen.to?.[l] || (screen.portal ? PORTAL[l] : undefined);
 
 /** Whether a tap acts in place. An INERT label does wherever it appears — unless
- * this screen (or the element itself) explicitly maps it: the record's own `to`
- * map is the resolver's first tier and wins outright, so the suppression list
- * must never outrank a mapping an author wrote on purpose. */
+ * an author named a target for it on this screen, which wins outright. */
 export const isInertOn = (screen: Screen, label: string, to?: string | null) => {
   const l = label.trim();
-  return !to && !screen.to?.[l] && !(screen.portal && PORTAL[l]) && isInert(l);
+  return !authored(screen, l, to) && INERT.some((k) => matches(k, l));
 };
 const isPortalSide = (name: string) => {
   const s = screenByName(name)?.[1];
@@ -348,10 +352,9 @@ const isPortalSide = (name: string) => {
  * Inside the portal a rule that lands on a staff screen is no rule: the buyer
  * has no staff vocabulary, so the tap acts in place instead. */
 export function resolveTap(screen: Screen, label: string, href?: string | null, to?: string | null): string | undefined {
-  if (to) return to;
   const l = label.trim();
-  if (screen.to?.[l]) return screen.to[l];
-  if (screen.portal && PORTAL[l]) return PORTAL[l];
+  const explicit = authored(screen, l, to);
+  if (explicit) return explicit;
   const guard = (name: string | undefined) => (screen.portal && name && name !== BACK && !isPortalSide(name) ? undefined : name);
   if (href && ROUTES[href]) return guard(ROUTES[href]);
   for (const [k, name] of TAPS) if (matches(k, l)) return guard(name);
