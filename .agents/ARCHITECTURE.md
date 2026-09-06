@@ -21,6 +21,9 @@ never copy it into a second place.
 | `proxy.ts`, `app/(auth)/` | Session refresh and login. Customer-only accounts (a `customer_users` row, no `brewery_users` row) land on `/portal` instead of `/`. |
 | `app/(app)/<area>/` | Staff pages and forms. Thin: read via queries, mutate via commands. |
 | `app/(portal)/` | Wholesale customer portal route group (own layout, `/portal` shop + cart, `/portal/orders`, `/portal/invoices`, `/portal/account`) — reads/writes only through the `portal.ts` customer-role commands above. |
+| `lib/order-form-rules.ts` | Pure "is the New Order form submittable" rule behind `app/(app)/orders/order-form.tsx` (customer + ship-to or to-location, from-location, one complete line), mirroring `create_order`'s input schema; also supplies the empty-catalog hint. |
+| `lib/portal-cart.ts` | Pure decisions behind the portal cart's Save draft/Submit buttons (`app/(portal)/portal/cart.tsx`): which command syncs the cart's current lines (`portal_create_order` vs `portal_update_draft_order`) and when the buttons are disabled. |
+| `lib/mgr/not-found.ts` | `orNotFound()`: wraps a detail page's registry read so an unknown or malformed id renders the app's `not-found.tsx` instead of the generic error boundary; shared by `(app)` and `(portal)` detail pages. |
 | `lib/chat/` | Provider-neutral chat notification contracts and validation, Chat SDK state, Slack adapter/transport/renderer, OAuth installation and staff linking, job authentication, preview fixtures, and `jobs.ts`, the rule-4 service-role owner. |
 | `lib/commands/chat.ts`, `lib/commands/today.ts` | Staff chat linking and notification settings; the role-filtered Today projection. |
 | `app/api/chat/`, `app/api/webhooks/slack/` | Thin Slack OAuth, scheduled-job, and events/App Home routes that delegate to `lib/chat/`. |
