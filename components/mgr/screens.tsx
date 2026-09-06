@@ -767,7 +767,7 @@ export const SCREENS: Screen[] = [
       {E.pick("Location", "Warehouse", ["Warehouse", "Taproom"])}
       {E.pick("Channel", "Taproom", CHANNELS)}
       {E.pick("Destination state", "PA · where the beer is poured", ["PA · where the beer is poured", "OH · where the beer is poured"])}
-      {E.qty("1", E.chips(["keg", "case", "bbl"]))}
+      {E.qty("1", E.tabs(["keg", "case", "bbl"], 0, "w-fit"))}
       {E.info("Preview: −1 keg · ½ bbl · festival removal · PA · amounts are entered positive")}
       {E.pin(<>
         {E.btn("Record movement", "irr")}
@@ -1899,7 +1899,7 @@ export const SCREENS: Screen[] = [
       {E.pick("Occupancy", "FV2 · B-0416 · Hazy IPA", ["FV2 · B-0416 · Hazy IPA", "FV1 · B-0409 · Pils"])}
       {E.nav("Material", "Citra · hop")}
       {E.chips(["dry hop", "fermentation", "other"], 0)}
-      {E.qty("18", E.chips(["lb", "oz", "kg"]))}
+      {E.qty("18", E.tabs(["lb", "oz", "kg"], 0, "w-fit"))}
       {E.info("Preview: −18 lb Citra · L-0790 · consumption · dry hop · B-0416")}
       {E.pin(<>
         {E.btn("Record addition", "irr")}
@@ -2242,7 +2242,7 @@ export const SCREENS: Screen[] = [
     spec: "A count is one number and a material may hold several lots, so the RPC has to decide which lot moves. A shortage consumes earliest best-by first, not earliest receipt: best-by is what a recall and an expiry sweep read, and consuming the freshest lot first would leave the oldest to expire on the shelf. An overage lands on the newest lot, since unrecorded stock is far likelier to be the delivery just counted in than one from six months ago. The chosen lot is always named in the preview: a variance that silently splits across two lots is the one thing this sheet must not do quietly.",
     body: (<>
       {E.nav("Material", "Cans · 16 oz")}
-      {E.qty("3050", E.chips(["each", "case"]))}
+      {E.qty("3050", E.tabs(["each", "case"], 0, "w-fit"))}
       {E.info("system 3,100 · variance −50 · from lot L-0774, best by 3/15/27")}
       {E.pin(<>
         {E.btn("Record count", "irr")}
