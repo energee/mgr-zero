@@ -3,7 +3,10 @@
 Date: 2026-09-06
 Status: Decided with Ted; not yet implemented. Three phases, each its own PR.
 Amends: `2026-08-31-mgr-schema-design.md` — `locations` is no longer a flat two-kind
-list, and `material_movements` / `keg_events` stop being location-blind.
+list, `material_movements` / `keg_events` stop being location-blind, and decision #6
+("materials have no locations") is reversed. Adopts §16.6 (bins, decided 2026-09-02)
+as written: default bin per location, `bin_id NOT NULL`. Defers §16.6's `taproom_pars`
+re-key to a later phase.
 
 ## Problem
 
@@ -50,8 +53,9 @@ is by definition cross-location, so it is always potentially deliverable, and a 
 cannot become one because it has no transfer document to hang a delivery on.
 
 **Location is a ledger dimension** — balances are per location, movements name a source and
-a destination. **Bin is detail carried alongside** — nullable everywhere, so a brewery that
-does not want bins never sees one.
+a destination. **Bin is the finer grain inside it** — required everywhere (§16.6), which a
+default bin per location makes free: a brewery that never subdivides sees one bin it can
+ignore, and no on-hand, availability or par query ever carries an `or null`.
 
 ## Decision 1 — `bins`, and the invariant that keeps them honest
 
@@ -64,16 +68,30 @@ create table bins (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
   location_id uuid not null,
-  code text not null,                      -- "D4", "Rack 3"
-  note text,
-  active boolean not null default true,
+  name text not null,                      -- "Walk-in", "To-go fridge", "Rack 3"
+  is_default boolean not null default false,
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
-  unique (location_id, code),
+  unique (location_id, name),
   unique (id, location_id, brewery_id),    -- target of the composite FK below
   foreign key (location_id, brewery_id) references locations (id, brewery_id)
 );
+create unique index bins_default_uidx on bins (location_id) where is_default;
+create index bins_brewery_idx on bins (brewery_id, location_id);
 ```
+
+**Every location is born with a default bin** named for it, created inside `create_location`
+in the same transaction. The two guards that make "remove" safe are structural:
+
+- the default bin cannot be deleted — `delete_bin` refuses `is_default`, and the partial
+  unique index guarantees exactly one per location;
+- a bin holding stock cannot be deleted — `delete_bin` refuses when any of the three
+  ledgers sums to non-zero for that bin. Move the stock first.
+
+Bins are brewery-configured — the brewery names them. There is deliberately **no `kind`**
+column yet: nothing in these phases reads one, and the Bin sheet's Kind picker (Packaged /
+Cold / Dry) stays gated until §16.7 menus actually consume it. An enum is trivial to add and
+painful to rename.
 
 The invariant that matters is **a ledger row's bin must belong to that row's location**.
 Filing a keg into bin D4 at the taproom, when D4 is a warehouse bin, must be impossible —
@@ -91,28 +109,37 @@ at `:553`. Nothing new to learn.
 `bins` deliberately has no capacity, no dimensions, and no pick-sequence ordering. A bin is
 a name for a place. Add more when something needs it.
 
+Commands: `list_bins`, `create_bin`, `update_bin` (rename), `delete_bin`; admin and
+warehouse, the roles the Location bins screen already names.
+
 ## Decision 2 — location on all three ledgers
 
 | Ledger | Line | Change |
 | --- | --- | --- |
-| `inventory_movements` | `:322` | add nullable `bin_id` (already has `location_id not null`) |
-| `material_movements` | `:540` | add `location_id not null`, nullable `bin_id` |
-| `keg_events` | `:950` | add `location_id not null`, nullable `bin_id` |
+| `inventory_movements` | `:322` | add `bin_id not null` (already has `location_id not null`) |
+| `material_movements` | `:540` | add `location_id not null`, `bin_id not null` |
+| `keg_events` | `:950` | add `location_id not null`, `bin_id not null` |
 
-On-hand indexes extend to match:
+On-hand indexes end in `bin_id` so per-bin on-hand is an index prefix, not a filter over
+the location (§16.6):
 
 ```sql
+-- movements_onhand_idx becomes:
+  on inventory_movements (brewery_id, sku_id, location_id, bin_id);
 create index material_movements_onhand_idx
-  on material_movements (brewery_id, material_id, location_id);
+  on material_movements (brewery_id, material_id, location_id, bin_id);
 -- keg_events_pool_idx becomes:
-  on keg_events (brewery_id, pool_id, keg_size, location_id);
+  on keg_events (brewery_id, pool_id, keg_size, location_id, bin_id);
 ```
+
+`record_inventory_movement` gains an optional `p_bin`; null resolves to the location's
+default bin inside the RPC, so every existing caller keeps working unchanged.
 
 The opening list then reads as balances per pool × size × location — `Microstar /
 sixth_bbl / Warehouse = 36` and `Microstar / sixth_bbl / Storage = 40`, two real rows
 summing to 76. The parenthetical stops being a note in someone's head.
 
-### Why `not null` on both
+### Why `not null` on all of them
 
 `inventory_movements.location_id` is already `not null` and the two new columns match it.
 A nullable location would mean "somewhere", which is the state being fixed; every on-hand
@@ -122,9 +149,9 @@ query would then need a coalesce and every count screen a "no location" bucket.
 `shipped` it is the location the kegs left from; for `returned`, the one they came back
 into. The existing per-reason check on `customer_id` (`:967`) is unchanged.
 
-This is the one genuinely invasive edit in the spec: every seed row and every test that
-writes a `material_movements` or `keg_events` row must now name a location. The work is
-mechanical, and it is the bulk of phase 1's churn.
+This is the one genuinely invasive edit in the spec: every test that writes a
+`material_movements`, `keg_events` or `inventory_movements` row directly must now name a
+location and a bin. The work is mechanical, and it is the bulk of phase 1's churn.
 
 ### Why this is cheap to do at all
 
@@ -195,8 +222,8 @@ create table stock_transfer_lines (
   keg_pool_id uuid,
   keg_size keg_size,
   qty numeric(14,4) not null check (qty > 0),
-  from_bin_id uuid,
-  to_bin_id uuid,
+  from_bin_id uuid not null,
+  to_bin_id uuid not null,
   note text,
   unique (id, brewery_id),
   foreign key (transfer_id, brewery_id) references stock_transfers (id, brewery_id),
@@ -212,7 +239,8 @@ create table stock_transfer_lines (
 polymorphism stays in the database rather than in a service layer.
 
 Bins on lines are `from_bin_id` / `to_bin_id` rather than one column, because a transfer
-moves stock out of a bin at the source and into a different bin at the destination.
+moves stock out of a bin at the source and into a different bin at the destination. The UI
+defaults both to the location's default bin; the column is `not null` per §16.6.
 
 ### Posting
 
@@ -265,14 +293,18 @@ The `check (to_location_id <> from_location_id)` on `stock_transfers` is what ma
 structural: a same-location move is not merely discouraged, it cannot be written as a
 transfer.
 
-## Consequence worth naming
+## Consequences worth naming
 
 Carrying `bin_id` on every ledger row yields per-bin balances for free. The stated need was
-*finding things* — "which corner do I walk to" — which a single bin label per item per
-location would have satisfied more cheaply. The ledger-row approach is strictly more
-capable and was chosen deliberately, but it buys a bin-level count-and-variance workflow
-that may never be run. If bin-level counting is still unused after phase 1 ships, that is
-evidence to leave it unbuilt, not a gap to fill.
+*finding things* — "which corner do I walk to". The ledger-row approach is strictly more
+capable, and §16.6 chose it for a different reason: a required column with a default row
+deletes a class of null handling. Bin-level *counting* is still a workflow nobody has asked
+for; the balances exist, the screens for them do not, and that is fine.
+
+**`taproom_pars` re-key on bin (§16.6) is deferred.** Pars keep `(location_id, sku_id)`
+through all three phases here; the Bin sheet's Par field stays gated. It is a mechanical
+change (`set_taproom_par` takes a bin, `taproom_replenishment` joins through it, the
+replenishment page picks a bin) that belongs with pars work, not with "where things are".
 
 Two smaller notes:
 
@@ -290,15 +322,17 @@ Two smaller notes:
 
 Each phase is a PR, checkpointed before the next begins.
 
-**Phase 1 — where things are.** `bins` table, `location_kind = 'storage'`, `location_id` and
-`bin_id` on `material_movements` and `keg_events`, `bin_id` on `inventory_movements`, index
-changes, `brewery_counters` key check. On-hand queries and the affected screens (Keg fleet,
-Materials on hand, Finished goods, Locations, Record movement). Seeds and tests updated to
-carry locations. No transfers, no deliveries.
+**Phase 1 — where things are.** `bins` table with the default-bin rule, bin commands,
+`location_kind = 'storage'`, `location_id` and `bin_id` on `material_movements` and
+`keg_events`, `bin_id` on `inventory_movements`, index changes. On-hand views gain
+`location_id` / `bin_id`, and the affected screens (Locations, Location bins, Bin, Keg
+fleet, Materials on hand, Record movement) lose their gates. Tests updated to carry
+locations and bins. No transfers, no deliveries.
 
 **Phase 2 — moving things.** `stock_transfers`, `stock_transfer_lines`,
-`receive_stock_transfer`, `move_stock_bin`, the enum additions. Moves work and post
-correctly; nothing rides a route yet. Includes the volume-neutrality test.
+`receive_stock_transfer`, `move_stock_bin`, the enum additions, `brewery_counters` key
+`'transfer'`. Moves work and post correctly; nothing rides a route yet. Includes the
+volume-neutrality test.
 
 **Phase 3 — driving things.** `deliveries` polymorphism, route and driver screens, the
 customer guides.
@@ -309,6 +343,9 @@ Per AGENTS.md, every behaviour starts with a failing vitest against the real dat
 
 - **Invariant:** a ledger row whose `bin_id` belongs to another location is rejected by the
   database, not by app code. One test per ledger.
+- **Default bin:** `create_location` yields exactly one `is_default` bin; deleting it is
+  refused; deleting a bin with non-zero stock is refused; deleting an empty non-default bin
+  succeeds.
 - **Balances:** two pools × two sizes × two locations produce four independent on-hand rows
   that sum correctly, and the `Microstar 36 / 40` case reads back as written.
 - **Volume neutrality:** a transfer of finished goods leaves total `bbl` unchanged and posts
