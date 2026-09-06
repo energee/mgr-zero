@@ -126,9 +126,13 @@ Two things the naive form of that gets wrong.
 (`:464`; its only other reader is `material_requirements` at `:1356`), and nothing couples it
 to `vessel_occupancies`. A batch knocked out into a tank whose `brewed_on` was never set
 counts twice — 42 bbl planned *and* 42 bbl in the tank — and the shortfall reads zero when the
-brewery in fact needs to brew. The planned leg must anti-join open occupancies, or
-`brewed_on` must be set when an occupancy opens. The anti-join is the cheaper of the two and
-needs no schema change.
+brewery in fact needs to brew. **Set `brewed_on` when an occupancy opens.** An anti-join on
+*open* occupancies looks cheaper but does not close the gap: once that occupancy ends
+(`ended_at` set) the in-tank leg stops counting the beer — `occupancy_volumes` filters
+`ended_at is null` — and the anti-join stops matching too, so `planned_bbl` counts as supply
+forever for beer already brewed and packaged. Same failure, deferred until the tank empties.
+An anti-join would have to exclude *every* occupancy ever opened for the batch; setting
+`brewed_on` is both correct and simpler.
 
 **The demand leg never expires.** It filters `closed_at is null` only, and `packaging_runs`
 has no cancelled or void column. Under the old schema that was safe because every run was
@@ -161,8 +165,9 @@ extends the forecasting horizon that is already built.
 - `packaging_run_outputs.sku_id` FKs only to `skus` (`:654`), not to a SKU *of this run's
   product*. With `product_id` authoritative and the new view aggregating by it, a Stout run
   carrying a Pils output attributes Pils barrels to Stout demand, and the lot written at close
-  carries the run's product while its movements carry the SKU's. The promotion trigger at
-  `:62` covers occupancy↔product; outputs↔product needs the same guard.
+  carries the run's product while its movements carry the SKU's. The promotion assertion
+  proposed under **Schema** above covers occupancy↔product only, and is itself not yet built;
+  outputs↔product needs the same guard.
 - No command owns the promotion. `update_packaging_run` is described at `screens.tsx:2060` as
   reopening a planned run until it starts — rescheduling, not binding a source. `Pick source`
   needs a home, and it is what calls the product-match assertion.
