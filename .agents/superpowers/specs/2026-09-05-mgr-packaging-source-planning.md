@@ -33,8 +33,9 @@ where it was enforced.
 
 ## Decision — two levels, not three
 
-A run names a **product** while it is being planned, and an **occupancy** when it is executed.
-There is no batch level; see "Why not a batch level" below.
+A run always names the **product** it is for, and gains an **occupancy** when it is executed.
+The levels accumulate rather than replace: planning needs only the product, execution adds
+the tank. There is no batch level; see "Why not a batch level" below.
 
 | Level | When | What is knowable |
 |---|---|---|
@@ -44,12 +45,21 @@ There is no batch level; see "Why not a batch level" below.
 ### Schema
 
     occupancy_id uuid,   -- was: not null
-    product_id   uuid,
-    check (num_nonnulls(occupancy_id, product_id) = 1),
+    product_id   uuid not null,
     check (started_at is null or occupancy_id is not null)
 
-Exactly one is set — the run's current commitment level. Composite FKs follow the existing
-`(id, brewery_id)` pattern.
+`product_id` is always set — it is what the run is *for*, and it stays set when an occupancy
+is picked. Composite FKs follow the existing `(id, brewery_id)` pattern.
+
+An earlier draft made the two mutually exclusive (`num_nonnulls(...) = 1`, nulling
+`product_id` on promotion). Rejected: it erases the planned product, so a run's planning
+history is unrecoverable before `lots` exists at close, and — worse — it leaves nothing to
+check the picked occupancy against. A Stout run could be bound to a Pils tank with no
+constraint violated. Keeping both lets a trigger assert on promotion that
+
+    vessel_occupancies.batch_id -> batches.product_id  =  packaging_runs.product_id
+
+which is the guarantee `close_packaging_run` needs anyway before it writes a lot.
 
 The second check preserves the close-revalidation rule intact: a run still cannot **start**
 without an exact occupancy. It just no longer needs one to be **planned**. The transition is
