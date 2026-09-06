@@ -18,7 +18,10 @@ export function VolumeField({ value, units, on }: { value: string; units: string
     <Field>
       {/* htmlFor, so the visible label focuses the input and names it once. */}
       <FieldLabel htmlFor={id}>Volume</FieldLabel>
-      <InputGroup>
+      {/* overflow-hidden: the unit tabs are a flex item with a content-based
+          min-width, so on a narrow field they won't shrink past "oz gal bbl"
+          — clip to the field's own border instead of spilling past it. */}
+      <InputGroup className="overflow-hidden">
         <InputGroupInput
           id={id}
           type="number"
@@ -28,7 +31,10 @@ export function VolumeField({ value, units, on }: { value: string; units: string
           aria-label="Volume"
           className="text-2xl font-semibold"
         />
-        <InputGroupAddon align="inline-end">
+        {/* pr-0: the tab list already insets itself (p-[3px] in tabsListVariants),
+            so the addon's default inline-end pr-2 only doubled up as dead space
+            past the last unit. */}
+        <InputGroupAddon align="inline-end" className="pr-0">
           <Tabs defaultValue={units[on]}>
             <TabsList variant="solid" className="w-fit">
               {units.map((u) => <TabsTrigger key={u} value={u}>{u}</TabsTrigger>)}

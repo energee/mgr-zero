@@ -141,16 +141,26 @@ export const E = {
   ),
   /** A forward arrow read as "to"; null draws it decorative (aria-hidden). */
   arrow: (label: string | null = "to") => <DirectionIcon label={label} />,
-  /** A typed quantity: the OS keyboard is the keypad. unit renders as a trailing addon. */
+  /** A typed quantity: the OS keyboard is the keypad. unit renders as a trailing
+   *  addon — often chips or tabs (a segmented unit choice), which are flex
+   *  items with a content-based min-width and won't shrink on a narrow field;
+   *  overflow-hidden clips to the field's own border instead of spilling
+   *  past it, same as components/mgr/volume-field.tsx. */
   qty: (value: string, unit?: React.ReactNode, label = "Quantity", id?: string) => (
-    <InputGroup>
+    <InputGroup className="overflow-hidden">
       <InputGroupInput id={id} type="number" inputMode="decimal" step="any" defaultValue={value} aria-label={label} className="text-2xl font-semibold" />
-      {unit ? <InputGroupAddon align="inline-end">{unit}</InputGroupAddon> : null}
+      {/* pr-0 for a unit switcher: a TabsList insets itself (p-[3px]), so the
+          addon's default inline-end pr-2 would only double up as dead space past
+          the last unit. A plain-text unit ("bbl", "SG · prior 1.021") has no
+          inset of its own and keeps the padding. */}
+      {unit ? <InputGroupAddon align="inline-end" className="has-[>[data-slot=tabs]]:pr-0">{unit}</InputGroupAddon> : null}
     </InputGroup>
   ),
   /** A view switcher: the body below is the active panel, so there are no
    *  TabsContent panels here. A filter that swaps the whole list (Work's kinds,
-   *  an order's states) is a tab bar too; single-choice fields stay chips.
+   *  an order's states) is a tab bar too; single-choice fields stay chips —
+   *  except the unit a quantity is entered in, which is a switcher on the number
+   *  itself and rides inside the field as `E.qty`'s addon (see `volume`).
    *  Spans the column by default; pass width classes to hug ("w-fit", an input
    *  addon) or to scroll a bar too long for the phone ("overflow-x-auto"). */
   tabs: (names: string[], on = 0, cls = "w-full", to?: Record<string, string>) => (
