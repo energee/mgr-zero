@@ -330,6 +330,13 @@ export const ROUTES: Record<string, string> = {
 /** A TAPS or INERT key against a label: exact for a string, a test for a pattern. */
 export const matches = (k: string | RegExp, label: string) => (typeof k === "string" ? k === label : k.test(label));
 export const isInert = (label: string) => INERT.some((k) => matches(k, label.trim()));
+
+/** Whether a tap acts in place. An INERT label does wherever it appears — unless
+ * this screen (or the element itself) explicitly maps it: the record's own `to`
+ * map is the resolver's first tier and wins outright, so the suppression list
+ * must never outrank a mapping an author wrote on purpose. */
+export const isInertOn = (screen: Screen, label: string, to?: string | null) =>
+  !to && !screen.to?.[label.trim()] && isInert(label);
 const isPortalSide = (name: string) => {
   const s = screenByName(name)?.[1];
   return Boolean(s && (s.portal || s.surface === "entry"));

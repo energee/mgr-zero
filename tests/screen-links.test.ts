@@ -4,7 +4,7 @@
 // main flows must chain end to end so the explorer is a walkable prototype.
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
-import { BACK, PORTAL, resolveTap, TAPS, ROUTES } from "../lib/mgr/screen-links";
+import { BACK, isInertOn, PORTAL, resolveTap, TAPS, ROUTES } from "../lib/mgr/screen-links";
 import { deniedFor, needsFor, PERSONAS } from "../lib/mgr/demo-personas";
 import { pageUnder } from "../lib/mgr/screen-explorer";
 
@@ -119,5 +119,34 @@ describe("reported explorer flows", () => {
     for (const [sheet, page] of [["Question invoice", "Pay invoice"], ["Square locations", "Point of sale"], ["Square → QuickBooks connector", "Point of sale"], ["Disconnect Square", "Point of sale"], ["POS item", "Menu"], ["Disconnect Slack", "Chat settings"]]) {
       expect(SCREENS[pageUnder([], SCREENS.indexOf(by(sheet)))].name).toBe(page);
     }
+  });
+});
+
+// A label in the global INERT list acts in place wherever it appears — but a
+// screen that explicitly maps the label meant it, and the record's own `to`
+// map is the first tier of the resolver. The explorer must not let the
+// suppression list silently outrank it.
+describe("isInertOn", () => {
+  it("lets the screen's own map beat the global inert list", () => {
+    expect(isInertOn(by("Pars and allocation"), "Release")).toBe(false);
+    expect(isInertOn(by("Pars and allocation"), "Edit")).toBe(false);
+    expect(isInertOn(by("SKU list"), "Edit")).toBe(false);
+    expect(isInertOn(by("Locations"), "Edit")).toBe(false);
+  });
+
+  it("still suppresses an inert label the screen does not map", () => {
+    expect(isInertOn(by("Pars and allocation"), "Paid")).toBe(true);
+    expect(isInertOn(by("Pars and allocation"), "Print labels")).toBe(true);
+  });
+
+  it("honours an explicit data-to over the inert list", () => {
+    expect(isInertOn(by("Today"), "Paid", "Invoice")).toBe(false);
+  });
+
+  it("suppresses no `to` mapping on any screen", () => {
+    const swallowed = SCREENS.flatMap((s) =>
+      Object.keys(s.to ?? {}).filter((label) => isInertOn(s, label)).map((label) => `${s.name}: ${label}`),
+    );
+    expect(swallowed).toEqual([]);
   });
 });
