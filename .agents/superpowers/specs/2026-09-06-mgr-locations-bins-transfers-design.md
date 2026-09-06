@@ -5,8 +5,9 @@ Status: Decided with Ted; not yet implemented. Three phases, each its own PR.
 Amends: `2026-08-31-mgr-schema-design.md` — `locations` is no longer a flat two-kind
 list, `material_movements` / `keg_events` stop being location-blind, and decision #6
 ("materials have no locations") is reversed. Adopts §16.6 (bins, decided 2026-09-02)
-as written: default bin per location, `bin_id NOT NULL`. Defers §16.6's `taproom_pars`
-re-key to a later phase.
+in spirit — `bin_id NOT NULL`, every location always has at least one bin — but with a
+seeded trio and a minimum-of-one rule instead of one undeletable default. Defers §16.6's
+`taproom_pars` re-key to a later phase.
 
 ## Problem
 
@@ -54,8 +55,8 @@ cannot become one because it has no transfer document to hang a delivery on.
 
 **Location is a ledger dimension** — balances are per location, movements name a source and
 a destination. **Bin is the finer grain inside it** — required everywhere (§16.6), which a
-default bin per location makes free: a brewery that never subdivides sees one bin it can
-ignore, and no on-hand, availability or par query ever carries an `or null`.
+guaranteed minimum of one bin per location makes free: no on-hand, availability or par
+query ever carries an `or null`.
 
 ## Decision 1 — `bins`, and the invariant that keeps them honest
 
@@ -69,24 +70,28 @@ create table bins (
   brewery_id uuid not null references breweries(id),
   location_id uuid not null,
   name text not null,                      -- "Walk-in", "To-go fridge", "Rack 3"
-  is_default boolean not null default false,
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
   unique (location_id, name),
   unique (id, location_id, brewery_id),    -- target of the composite FK below
   foreign key (location_id, brewery_id) references locations (id, brewery_id)
 );
-create unique index bins_default_uidx on bins (location_id) where is_default;
 create index bins_brewery_idx on bins (brewery_id, location_id);
 ```
 
-**Every location is born with a default bin** named for it, created inside `create_location`
-in the same transaction. The two guards that make "remove" safe are structural:
+**Every location is born with a preset trio** — `Walk-in`, `Cold`, `Dry` — created inside
+`create_location` in the same transaction. They are ordinary bins: rename any of them,
+delete the ones that don't match the building. Two guards make "remove" safe, both
+enforced in `delete_bin` under a row lock on the location:
 
-- the default bin cannot be deleted — `delete_bin` refuses `is_default`, and the partial
-  unique index guarantees exactly one per location;
-- a bin holding stock cannot be deleted — `delete_bin` refuses when any of the three
-  ledgers sums to non-zero for that bin. Move the stock first.
+- **a location keeps a minimum of one bin** — deleting the last one is refused. There is no
+  special "default" row; whichever bin remains is the one, and it can be renamed like any
+  other;
+- **a bin holding stock cannot be deleted** — refused when any of the three ledgers sums to
+  non-zero for that bin. Move the stock first.
+
+The minimum-of-one rule is a count, so it lives in the RPC rather than a constraint; the
+row lock is what stops two concurrent deletes from emptying a location between them.
 
 Bins are brewery-configured — the brewery names them. There is deliberately **no `kind`**
 column yet: nothing in these phases reads one, and the Bin sheet's Kind picker (Packaged /
@@ -132,8 +137,10 @@ create index material_movements_onhand_idx
   on keg_events (brewery_id, pool_id, keg_size, location_id, bin_id);
 ```
 
-`record_inventory_movement` gains an optional `p_bin`; null resolves to the location's
-default bin inside the RPC, so every existing caller keeps working unchanged.
+`record_inventory_movement` gains a required `p_bin`, and `record_movement`'s input a
+required `binId`. There is no default to fall back to, so the column is required at the
+boundary too; the Record movement form preselects the location's first bin. The two
+existing tests that call `record_movement` name a bin.
 
 The opening list then reads as balances per pool × size × location — `Microstar /
 sixth_bbl / Warehouse = 36` and `Microstar / sixth_bbl / Storage = 40`, two real rows
@@ -343,9 +350,9 @@ Per AGENTS.md, every behaviour starts with a failing vitest against the real dat
 
 - **Invariant:** a ledger row whose `bin_id` belongs to another location is rejected by the
   database, not by app code. One test per ledger.
-- **Default bin:** `create_location` yields exactly one `is_default` bin; deleting it is
-  refused; deleting a bin with non-zero stock is refused; deleting an empty non-default bin
-  succeeds.
+- **Minimum of one:** `create_location` yields the trio; deleting down to one succeeds;
+  deleting the last bin is refused; deleting a bin with non-zero stock is refused; renaming
+  the last bin succeeds.
 - **Balances:** two pools × two sizes × two locations produce four independent on-hand rows
   that sum correctly, and the `Microstar 36 / 40` case reads back as written.
 - **Volume neutrality:** a transfer of finished goods leaves total `bbl` unchanged and posts
