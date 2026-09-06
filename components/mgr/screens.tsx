@@ -2169,7 +2169,7 @@ export const SCREENS: Screen[] = [
     job: "Count what arrived; trigger derives receipt status",
     reads: "get_purchase_order [design]",
     writes: "send_purchase_order [design; single row draft → sent] · receive_purchase_order [design; one RPC: receipt + lines (counted, over or short) + lots with best_by + material movements]",
-    states: [["loading", "PO-line skeleton"], ["draft", "Send purchase order is the one active verb · counts wait"], ["prefilled", "the PO named a lot · the field opens on it and the ordinary receipt changes nothing"], ["no lot on the PO", "the field opens empty · recent lots for that material are offered", 1], ["lot substituted", "the vendor shipped another lot · recorded, never blocked", 1], ["stale", "receipt changed · recheck", 1], ["offline", "keep counts; commit waits"], ["permission", "warehouse or admin", 1], ["success", "partially received"]],
+    states: [["loading", "PO-line skeleton"], ["draft", "Send purchase order is the one active verb · counts wait, and the receive verb is not drawn", 1], ["prefilled", "the PO named a lot · the field opens on it and the ordinary receipt changes nothing"], ["no lot on the PO", "the field opens empty · recent lots for that material are offered", 1], ["lot substituted", "the vendor shipped another lot · recorded, never blocked", 1], ["stale", "receipt changed · recheck", 1], ["offline", "keep counts; commit waits"], ["permission", "warehouse or admin", 1], ["success", "partially received"]],
     spec: "Send PO (green) shows while the PO is draft; receiving needs a sent PO. Each lot-tracked line takes a lot code and best-by typed off the vendor packaging, prefilled from the lot the PO named so the ordinary receipt is a glance and no typing. When the PO named none the field opens empty and offers that material\u2019s recent lots, which is what keeps one vendor lot from becoming two records over a stray space. The receive RPC creates the material lot from what is entered here, never from the PO: the package is the only writer of a lot code. A difference is a substitution, which is reported and never blocked. Punctuation or case alone never reads as one: the schema spec owns that comparison rule. Untracked lines (rice hulls) ask for none. Only counted quantity posts; over and short are both visible and both allowed, and the keypad never clamps an over-count as the only guard. PO status is trigger-derived; never write a loaded/status flag.",
     body: (<>
       {E.back("Purchase orders", "PO-0142 · Country Malt")}
@@ -2187,7 +2187,7 @@ export const SCREENS: Screen[] = [
       {E.tape([["+2,310 lb 2-row · receipt", "lot CM-26-4410 · over 2 bags"], ["+132 lb Citra · receipt", "lot 2026-CIT-91 · substituted · short 1"], ["+300 lb rice hulls · receipt", "not lot-tracked"]])}
       {E.info("2-row is over by 2 bags and Citra short 1 on a substituted lot; the PO becomes partially received.")}
       {E.sp()}
-      {E.btns([["Send purchase order", "g"], ["Receive purchase order", "irr"]])}
+      {E.btn("Receive purchase order", "irr")}
     </>),
   },
   {
@@ -2204,8 +2204,8 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Work", "PO-0142 · received")}
       {E.fld("Status", "partially received")}
-      {E.tape([["+2,310 lb 2-row · receipt", "lot CM-26-4410 · over 2 bags"], ["+132 lb Citra · receipt", "lot 2026-CIT-77 · short 1"], ["+300 lb rice hulls · receipt", "not lot-tracked"]])}
-      {E.info("2-row is over by 2 bags and Citra short 1.")}
+      {E.tape([["+2,310 lb 2-row · receipt", "lot CM-26-4410 · over 2 bags"], ["+132 lb Citra · receipt", "lot 2026-CIT-91 · substituted · short 1"], ["+300 lb rice hulls · receipt", "not lot-tracked"]])}
+      {E.info("2-row is over by 2 bags and Citra short 1 on a substituted lot.")}
     </>),
   },
   {
@@ -2305,8 +2305,9 @@ export const SCREENS: Screen[] = [
       {E.edit("Material name", "Citra")}
       {E.pick("Kind", "Hop", ["Malt", "Hop", "Yeast", "Adjunct", "Chemical", "Packaging", "Other"])}
       {E.pick("Unit", "lb", ["lb", "oz", "kg", "each"])}
-      {E.pick("Purchase unit", "box", ["box", "bag", "pallet", "lb", "kg", "each"])}
+      {E.pick("Purchase unit", "each", ["each", "lb", "kg", "oz", "g", "l", "gal", "ml"])}
       {E.edit("Base units per purchase unit", "44", "number")}
+      {E.info("A 44 lb box is purchase unit each with 44 base units, not a “box” unit: the schema has one unit vocabulary and packaging is the factor.")}
       {E.edit("Lead time (days)", "10", "number")}
       {E.row("Lot-tracked", "receipts name a lot · consumption picks one", E.sw(true, "Lot-tracked"), "ok")}
       {E.row("Active", "available to recipes and purchase orders", E.sw(true, "Material active"), "ok")}
@@ -2602,7 +2603,7 @@ export const SCREENS: Screen[] = [
       {E.back("Beer", "Keg fleet")}
       {E.fld("Selected pool", "Owned ½ bbl · 203 kegs · $30 deposit")}
       {E.pick("Kind", "Owned", ["Owned", "Leased", "Pay per fill"])}
-      {E.nav("Vendor", "none · owned pools have no vendor")}
+      {E.fld("Vendor", "none · owned pools have no vendor")}
       {E.edit("Per-fill cost", "$0.00")}
       {E.btns([["Add keg pool", "g"], ["Save keg pool", "g"]])}
       {E.row("Owned ½ bbl", "142 out · 61 in", "203")}

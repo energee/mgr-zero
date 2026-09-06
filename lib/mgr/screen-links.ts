@@ -86,7 +86,6 @@ export const TAPS: [string | RegExp, string][] = [
   ["Record brew day", "Batches"],
   ["Schedule run", "Schedule packaging run"],
   ["Receive purchase order", "Receipt"],
-  ["Send purchase order", "Purchase orders"],
   ["New route", "Route"],
   ["Save route plan", "Routes"],
   ["Depart route", "Return route"],
