@@ -19,7 +19,7 @@ import { AREAS, advanceWalk, buildHash, filterScreens, pageUnder, parseHash, scr
 import { deniedFor, homeFor, PERSONAS, personaFor } from "@/lib/mgr/demo-personas";
 import { asPersona } from "@/components/mgr/demo-screens";
 import type { StaffRole } from "@/lib/commands/registry";
-import { BACK, resolveTap, isInert } from "@/lib/mgr/screen-links";
+import { BACK, resolveTap, isInertOn } from "@/lib/mgr/screen-links";
 import { ScreenFrame, ScreenSheet } from "@/components/mgr/screen-frame";
 import { screenSlug } from "@/components/mgr/screen-index";
 import { ScreenIframe, syncFrames } from "@/components/mgr/screen-width";
@@ -130,9 +130,10 @@ export function ScreenExplorer() {
     if (el.closest("[data-gated]")) return e.preventDefault();
     const link = el.closest("a");
     const label = el.getAttribute("aria-label") ?? (el.matches("[data-slot=item]") ? el.querySelector("[data-slot=item-title]")?.textContent : null) ?? el.textContent ?? "";
-    if (isInert(label)) return e.preventDefault();
+    const to = el.getAttribute("data-to");
+    if (isInertOn(current[1], label, to)) return e.preventDefault();
     const group = el.closest("[data-slot=sidebar-group-label]") && screenByName(label.trim());
-    const name = group ? label.trim() : resolveTap(current[1], label, link?.getAttribute("href"), el.getAttribute("data-to"));
+    const name = group ? label.trim() : resolveTap(current[1], label, link?.getAttribute("href"), to);
     if (el.matches("[role=tab]") && (!name || name === current[1].name)) return filterRows(el);
     if (link || name) e.preventDefault();
     // Nowhere to go, or a verb named like the sheet it sits in ("Record

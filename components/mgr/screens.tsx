@@ -1183,7 +1183,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Beer",
     name: "Pars and allocation",
-    to: { Release: "Order", "Taproom standing": "Bin", Adjust: "Order", "Edit par": "Bin", "Taproom par": "Bin" , "Edit": "Bin" },
+    to: { Release: "Order", Adjust: "Order", "Edit par": "Bin", "Taproom par": "Bin" },
     job: "Change named quantities; never invent priority",
     reads: "get_shortfalls · get_standing_allocations [design]",
     writes: "adjust_order_line [design; one RPC: line + allocation] · release_allocation · set_taproom_par · set_taproom_standing_allocation [design]",
@@ -1195,7 +1195,7 @@ export const SCREENS: Screen[] = [
       {E.row("ORD-0231 · Ridgeline", "10 cases · 0.97 bbl", E.act("Adjust", "attention"))}
       {E.row("ORD-0234 · Teresa’s", "12 cases · 1.16 bbl", E.act("Release", "destructive"))}
       {E.row("Taproom standing", "6 cases · 0.58 bbl", E.act("Edit"))}
-      {E.row("Taproom par", "8 cases · 0.77 bbl", E.act("Edit"))}
+      {E.row("Taproom par", "8 cases · 0.77 bbl", E.act("Edit par"))}
       {E.btns([["Adjust selected", "p"], ["Edit par", "g"]])}
     </>),
   },
