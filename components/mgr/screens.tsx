@@ -2143,13 +2143,15 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Purchase orders", "PO-0142 · Country Malt")}
       {E.fld("Status", "sent Mon · expected Thu")}
-      {E.row("2-row · 55 lb bags", "expected 40", E.stq(42), "w")}
-      {E.row("Citra · 44 lb boxes", "expected 4", E.stq(3), "w")}
-      {E.row("Rice hulls · 50 lb", "expected 6", E.stq(6), "ok")}
-      {E.edit("2-row lot", "CM-26-4410")}
-      {E.edit("2-row best by", "2027-03-31", "date")}
-      {E.edit("Citra lot", "2026-CIT-77")}
-      {E.edit("Citra best by", "2027-08-31", "date")}
+      {E.row("2-row · 55 lb bags", "expected 40", E.stq(42), "w", undefined, <>
+        {E.edit("Lot", "CM-26-4410")}
+        {E.edit("Best by", "2027-03-31", "date")}
+      </>)}
+      {E.row("Citra · 44 lb boxes", "expected 4", E.stq(3), "w", undefined, <>
+        {E.edit("Lot", "2026-CIT-77")}
+        {E.edit("Best by", "2027-08-31", "date")}
+      </>)}
+      {E.row("Rice hulls · 50 lb", "expected 6 · not lot-tracked", E.stq(6), "ok")}
       {E.tape([["+2,310 lb 2-row · receipt", "lot CM-26-4410 · over 2 bags"], ["+132 lb Citra · receipt", "lot 2026-CIT-77 · short 1"], ["+300 lb rice hulls · receipt", "not lot-tracked"]])}
       {E.info("2-row is over by 2 bags and Citra short 1; the PO becomes partially received.")}
       {E.sp()}
