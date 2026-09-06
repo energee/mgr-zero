@@ -54,9 +54,9 @@
 }
 
 /* Product tokens — Linear-quiet neutrals with one violet accent, teal reserved
-   for irreversible actions that still write a record (append-only, external,
-   sign-out), red for the ones that take something away (end a membership,
-   cancel an order, break an integration, discard queued work), amber for
+   for irreversible actions that still write a record (append-only, external),
+   red for the ones that take something away (end a membership, cancel an
+   order, break an integration, discard queued work, sign out), amber for
    attention. All pairs pass WCAG AA. */
 :root {
   --background: #FAFAF7;

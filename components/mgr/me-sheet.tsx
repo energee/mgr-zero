@@ -39,7 +39,7 @@ export function MeSheet({ fields, avatar }: { fields: [string, string][]; avatar
         <div className="flex flex-col gap-2 px-4">
           <ThemeToggle />
           <form action={logout}>
-            <Button type="submit" variant="outline" className="w-full">Sign out</Button>
+            <Button type="submit" variant="destructive" className="w-full">Sign out</Button>
           </form>
         </div>
       </SheetContent>
