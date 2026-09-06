@@ -51,6 +51,10 @@ the tank. There is no batch level; see "Why not a batch level" below.
 `product_id` is always set — it is what the run is *for*, and it stays set when an occupancy
 is picked. Composite FKs follow the existing `(id, brewery_id)` pattern.
 
+The second check preserves the close-revalidation rule intact: a run still cannot **start**
+without an exact occupancy. It just no longer needs one to be **planned**. The transition is
+the `E.act("Pick source")` affordance already drawn at `screens.tsx:2043`.
+
 An earlier draft made the two mutually exclusive (`num_nonnulls(...) = 1`, nulling
 `product_id` on promotion). Rejected: it erases the planned product, so a run's planning
 history is unrecoverable before `lots` exists at close, and — worse — it leaves nothing to
@@ -60,10 +64,6 @@ constraint violated. Keeping both lets a trigger assert on promotion that
     vessel_occupancies.batch_id -> batches.product_id  =  packaging_runs.product_id
 
 which is the guarantee `close_packaging_run` needs anyway before it writes a lot.
-
-The second check preserves the close-revalidation rule intact: a run still cannot **start**
-without an exact occupancy. It just no longer needs one to be **planned**. The transition is
-the `E.act("Pick source")` affordance already drawn at `screens.tsx:2043`.
 
 ## Why not a batch level
 
@@ -129,8 +129,8 @@ extends the forecasting horizon that is already built.
 - Blends are still modelled as transfers into a surviving occupancy, not as multi-source runs.
 - `packaging_run_outputs.qty_planned` stays unvalidated against available volume at product
   level. Nothing moves in the ledger until close, so this is a plan, not a ledger entry.
-- A product-level run offers formats from `skus.product_id` directly; an occupancy-level run
-  resolves through `batch_id → product_id` first. Both end at the same filter.
+- The format picker always reads the run's own `product_id`, at either level — the two-hop
+  `occupancy → batch → product` resolution the old column forced is gone entirely.
 - Nothing models seasonal / limited-release products; `skus.active` (`:258`) remains the only
   retirement lever, and the SKU list grows monotonically for one-off-heavy breweries.
 
