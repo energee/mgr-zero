@@ -112,6 +112,15 @@ const MOVEMENT_KINDS = ["opening balance", "depletion", "loss", "sample", "festi
 // The sale channels, in the order every picker offers them.
 const CHANNELS = ["Wholesale", "Taproom", "DTC", "Export"];
 
+// The excise tax treatments a channel sets and a customer may override. One
+// list: the Channel chips and the Customer picker drifting apart is how a
+// treatment ends up settable in one place and unknown in the other.
+const TAX_TREATMENTS = ["taxable", "export", "vessel supplies", "research", "transfer in bond"];
+
+// Hours before a fermentation reading counts as overdue. Settings owns it;
+// Chat settings shows the same number back.
+const OVERDUE_HOURS = "24";
+
 // A rough remaining fill, wherever a keg comes off a tap.
 const FILL_CHIPS = ["Empty", "About ¼ left", "About ½ left"];
 
@@ -317,6 +326,7 @@ export const SCREENS: Screen[] = [
       {E.edit("TTB registry number", "BR-PA-12345")}
       {E.edit("PA license", "G-1234")}
       {E.edit("Customer-facing phone", "(610) 555-0142", "tel")}
+      {E.edit("Reading overdue after (hours)", OVERDUE_HOURS, "number")}
       {E.fld("Deployment", "dedicated · read-only")}
       {E.btn("Save brewery")}
       {E.nav("Locations", "Warehouse · Taproom")}
@@ -689,7 +699,7 @@ export const SCREENS: Screen[] = [
     job: "Upload, map, preview and independently commit valid rows",
     reads: "list_skus · list_locations · list_customers [design]",
     writes: "import_csv [existing ID; IMPLEMENTATION-GATE: one RPC per dependent logical row + durable requestId/result]",
-    states: [["all invalid", "Commit disabled · fix mapping", 1], ["mixed", "2 ready · 1 blocked"], ["rerun target", "After gate, same requestId returns result"], ["permission", "Import requires admin", 1]],
+    states: [["upload error", "the file did not parse · nothing staged", 1], ["all invalid", "Commit disabled · fix mapping", 1], ["mixed", "2 ready · 1 blocked"], ["handoff", "phone inspects; mapping continues at a desk"], ["rerun target", "After gate, same requestId returns result"], ["permission", "Import requires admin", 1]],
     spec: "Commit controls stay disabled until dependent rows are atomic and opening balances cannot duplicate on rerun. Ship colors: customer/catalog rows green; append-only opening balances copper.",
     body: (<>
       {E.back("Settings", "Import")}
@@ -944,7 +954,7 @@ export const SCREENS: Screen[] = [
     reads: "get_order · get_atp",
     writes: "submit_order [design; draft → submitted] · adjust_order_line [design; one RPC: line + allocation; sets needs_restock on a picked order] · confirm_order [design; one RPC] · cancel_order [design; one RPC: terminal status + allocation release + needs_restock while quantities are staged]",
     states: [["draft", "Submit is the one active verb"], ["confirmed / picked", "lines adjust; restock rows appear when picked qty exceeds ordered"], ["shipped", "read-only tape · Return shipment is the correction"], ["delivered", "the route stamped it · read-only, Return shipment still corrects"], ["stale", "another user changed a line · refresh", 1], ["permission", "sales or admin to adjust; warehouse reads", 1]],
-    spec: "Drawn as picked after a line was adjusted down: staged 3 Pils cases must go back to Warehouse. Adjusting down, shipping short and cancelling all set the restock flag; Put back is what clears it. Delivered is the last lifecycle state and arrives from Confirm delivery on the route, not from a verb here. Ship opens Ship and invoice rather than committing here. Cancel is ghost and asks for confirm. Every transition appends an order event row in the same RPC. Confirm still has its own two-tap Today frame.",
+    spec: "Drawn as picked after a line was adjusted down: staged 3 Pils cases must go back to Warehouse. Adjusting down, shipping short and cancelling all set the restock flag; Put back is what clears it. Delivered is the last lifecycle state and arrives from Confirm delivery on the route, not from a verb here. Ship opens Ship and invoice rather than committing here. Cancel is destructive and asks for confirm. Every transition appends an order event row in the same RPC. Confirm still has its own two-tap Today frame.",
     body: (<>
       {E.back("Orders", "ORD-0229")}
       {E.ttl("Al’s Bar · Columbus, OH")}
@@ -958,7 +968,7 @@ export const SCREENS: Screen[] = [
       {E.btn("Add line", "g")}
       {E.note("Stout isn’t registered for Ohio. Check the Compliance registry.")}
       {E.tape([["created · Ted", "Mon 9:02"], ["submitted · Ted", "Mon 9:05"], ["confirmed · Maria", "Mon 14:10"], ["picked · Dave · 4 / 10 / 2", "Tue 8:40"], [<>line adjusted · Pils 10 {E.arrow()} 7 · customer cut</>, "Tue 9:15"], ["restock pending · 3 Pils staged", "Tue 9:15"]])}
-      {E.btns([["Ship", "p"], ["Cancel order", "ghost"]])}
+      {E.btns([["Ship", "p"], ["Cancel order", "del"]])}
       {E.info("Cancel asks you to confirm. Allocations release.")}
     </>),
   },
@@ -972,7 +982,7 @@ export const SCREENS: Screen[] = [
     reads: "get_order",
     writes: "resolve_short_pick [design; one RPC: short_reason + chosen resolution (line qty + allocation) + order_events row]",
     states: [["permission", "warehouse or admin required", 1], ["adjust down", "ordered 10 → 7 · allocation shrinks · ATP recovers"], ["keep staged", "7 staged · 3 remain owed · the order keeps its Pick action"], ["resumed", "Pick reopens showing 7 already picked · only the owed 3 need counting"], ["stale", "another picker changed this line · recheck", 1], ["offline", "resolution waits for live ATP", 1]],
-    spec: "Opens from a Pick line whose count is below ordered. Reason is required; exactly one resolution is chosen and the verb names it: adjusting the order is green (mutable order edit); keeping the remainder staged is also green. Keeping the remainder owed does not finish the pick: the order stays picked-partial and keeps its Pick row in Work and Today until every line reaches its ordered quantity, and reopening Pick shows what is already counted. The restock implication is copy in the preview, never a status column. Done picking completes afterward on the Pick frame.",
+    spec: "Opens from a Pick line whose count is below ordered. Reason is required; exactly one resolution is chosen and the verb names it: adjusting the order is green (mutable order edit); keeping the remainder staged is also green. Keeping the remainder owed does not finish the pick: the order stays picked with a line below ordered and keeps its Pick row in Work and Today until every line reaches its ordered quantity, and reopening Pick shows what is already counted. The restock implication is copy in the preview, never a status column. Done picking completes afterward on the Pick frame.",
     body: (<>
       {E.back("Pick", "ORD-0231 · short line")}
       {E.fld("Order · source", "Ridgeline · Warehouse")}
@@ -1039,12 +1049,13 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("ORD-0231", "Ship")}
       {E.pick("Fulfillment source", "Warehouse", ["Warehouse", "Taproom"])}
-      {E.row("Hazy IPA · ½ bbl keg", "picked 4", E.stq(4), "ok")}
-      {E.row("Pils · 16 oz case", "picked 10", E.stq(9), "w")}
+      {E.row("Hazy IPA · ½ bbl keg", "ordered 4 · picked 4", E.stq(4), "ok")}
+      {E.row("Pils · 16 oz case", "ordered 10 · picked 10", E.stq(9), "w")}
       {E.nav("Reason", "required", "w")}
+      {E.info("Shipping 9 of 10 Pils: the remaining 1 is cancelled and its allocation released. There is no backorder.")}
       {E.inp("Carrier · tracking · optional")}
       {E.chips(["Invoice now", "On delivery"], 0)}
-      {E.tape([["−4 Hazy ½ bbl · sale removal · PA", "2.00 bbl"], ["−9 Pils cases · sale removal · PA", "0.42 bbl"], ["1 Pils case released · restock", ""], ["invoice number", "assigned on commit"]])}
+      {E.tape([["−4 Hazy ½ bbl · sale removal · PA", "2.00 bbl"], ["−9 Pils cases · sale removal · PA", "0.87 bbl"], ["1 Pils case released · restock", ""], ["invoice number", "assigned on commit"]])}
       {E.sp()}
       {E.btn("Ship order", "irr")}
     </>),
@@ -1062,7 +1073,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("ORD-0231", "Shipped")}
       {E.fld("Invoice", `${INV.no} · assigned`)}
-      {E.tape([["−4 Hazy ½ bbl · sale removal · PA", "2.00 bbl"], ["−9 Pils cases · sale removal · PA", "0.42 bbl"], [INV.no, "invoiced now"]])}
+      {E.tape([["−4 Hazy ½ bbl · sale removal · PA", "2.00 bbl"], ["−9 Pils cases · sale removal · PA", "0.87 bbl"], [INV.no, "invoiced now"]])}
       {E.info("To correct this shipment, Return shipment.")}
     </>),
   },
@@ -1083,7 +1094,7 @@ export const SCREENS: Screen[] = [
       {E.row("Hazy IPA · ½ bbl keg", "picked 4", E.stq(4), "ok")}
       {E.row("Pils · 16 oz case", "picked 10", E.stq(10), "ok")}
       {E.chips(["Invoice now", "On delivery"], 1)}
-      {E.tape([["−4 Hazy ½ bbl · sale removal · PA", "2.00 bbl"], ["−10 Pils cases · sale removal · PA", "0.47 bbl"], ["invoice number", "deferred to delivery"]])}
+      {E.tape([["−4 Hazy ½ bbl · sale removal · PA", "2.00 bbl"], ["−10 Pils cases · sale removal · PA", "0.97 bbl"], ["invoice number", "deferred to delivery"]])}
       {E.note("Shipping on delivery isn’t available yet; invoice timing can’t be saved. Choose Invoice now to ship today.")}
       {E.sp()}
       {E.btn("Ship order", "irr disabled")}
@@ -1104,7 +1115,7 @@ export const SCREENS: Screen[] = [
       {E.fld(<>From {E.arrow(null)} to</>, <>Warehouse {E.arrow()} Taproom</>)}
       {E.row("Pils · 16 oz case", "move / picked", "4 / 4", "ok")}
       {E.row("Hazy IPA · ½ bbl keg", "move / picked", "2 / 2", "ok")}
-      {E.tape([["−4 Pils cases · taproom transfer · Warehouse", formatVolume("0.19")], ["+4 Pils cases · taproom transfer · Taproom", formatVolume("0.19")], ["−2 / +2 Hazy ½ bbl · taproom transfer", formatVolume("1.00")]])}
+      {E.tape([["−4 Pils cases · taproom transfer · Warehouse", formatVolume("0.39")], ["+4 Pils cases · taproom transfer · Taproom", formatVolume("0.39")], ["−2 / +2 Hazy ½ bbl · taproom transfer", formatVolume("1.00")]])}
       {E.info("No invoice: this is an internal move.")}
       {E.sp()}
       {E.btn("Complete transfer", "irr")}
@@ -1147,7 +1158,7 @@ export const SCREENS: Screen[] = [
       {E.row("Pils · 16 oz case", "expected 4", E.stq(4))}
       {E.row("Hazy · ½ bbl keg", "expected 3", E.stq(2), "w")}
       {E.row("Stout · ⅙ bbl keg", "expected 2", E.stq(2))}
-      {E.info("Variance −1 Hazy · ½ bbl unaccounted. Recording posts 4 Pils + 4 Hazy + 2 Stout depletion; the variance is reported, never posted.")}
+      {E.info("Variance −1 Hazy · ½ bbl unaccounted. Recording posts 4 Pils + 2 Hazy + 2 Stout depletion; the variance is reported, never posted.")}
       {E.nav("Variance by brand", "four weeks · where the gap keeps showing up")}
       {E.gated("Record count", "isn’t available yet: counts have nowhere durable to land. The count is the only thing that posts taproom depletion, so until this closes taproom stock only ever grows")}
       {E.ttl("Needs replenishment")}
@@ -1284,7 +1295,7 @@ export const SCREENS: Screen[] = [
       {E.edit("License number", "PA R-55821")}
       {E.edit("Terms", "Net 30")}
       {E.pick("Price list", "Wholesale · standard", ["Wholesale · standard", "Wholesale · distributor", "Taproom"])}
-      {E.pick("Excise remittance", "Customer remits", ["Customer remits", "We remit"])}
+      {E.pick("Tax treatment", "Inherit from channel", ["Inherit from channel", ...TAX_TREATMENTS])}
       {E.nav("Ship-tos", "Main · Dock")}
       {E.row("Portal users", "2 active", E.act("Invite"))}
       {E.nav("Customer keg balance", "38 out · $1,140 deposits held")}
@@ -1426,7 +1437,7 @@ export const SCREENS: Screen[] = [
     reads: "list_invoices [design; qbo_sync_token + qbo_remote_state] · get_qbo_connection · get_qbo_mapping_candidates [design]",
     writes: "connect_qbo · set_qbo_customer_mapping · set_qbo_item_mapping [design] · push_invoice_to_qbo [same requestId, except a deleted remote invoice, which pushes under a new one] · write_off_invoice [design; MGR status only, never touches QuickBooks]",
     states: [["connection health", "QuickBooks · token healthy · company 9341"], ["expired", "Reconnect before mapping or push", 1], ["live", "the ordinary case; no badge at all"], ["edited there", "SyncToken changed since MGR pushed", 1], ["voided", "amounts zeroed; this is not payment", 1], ["deleted", "the id points at nothing; sync gets a 404", 1], ["not sent", "pushed but never delivered; only a fault if MGR is not the channel"], ["paid", "the paid date arrives from the QuickBooks Online sync · no user verb"], ["push failed", "the drill-in resolves each mapping", 1]],
-    spec: <>QuickBooks has no read-only invoice. Once pushed, the accountant can edit, void or delete it from the Sales transactions sidebar and no API setting prevents that, so MGR detects rather than prevents. QuickBooks hands us the detector free: SyncToken increments on every modification and already rides the response the sync job reads for balance, so drift costs one column and no extra call. The rule this frame protects: <b>a voided invoice is not a paid invoice.</b> Voiding zeroes the amounts, so any logic inferring paid from a QuickBooks balance of zero books cancelled revenue as collected; the database refuses to record a paid date unless the remote state is live, rather than trusting the job to remember. MGR surfaces drift and stops: no re-push that overwrites an accountant’s correction, no field-level merge UI. The one exception is the deleted invoice, where the remote id points at nothing: dedupe on the original requestId would return the first result and create nothing, so that push carries a new requestId and produces a second QuickBooks invoice under the same MGR number. Ordinary retries keep the old requestId and stay protected. ASSUMPTION: a drifted invoice stays in AR at QuickBooks’ numbers, because QuickBooks owns the invoice after push. Drift is not a place, it is what some of these rows are doing, which is why it lives in the states of one list rather than a second one. Rows also carry the due date, push failure and credit-memo status; payments come back through the sync job and are read-only. A failed row opens the drill-in, where connection, each mapping and push are four independent commands, and push persists its exact payload and deterministic requestId before the remote POST. Creating a credit memo stays Return shipment.</>,
+    spec: <>QuickBooks has no read-only invoice. Once pushed, the accountant can edit, void or delete it from the Sales transactions sidebar and no API setting prevents that, so MGR detects rather than prevents. QuickBooks hands us the detector free: SyncToken increments on every modification and already rides the response the sync job reads for balance, so drift costs one column and no extra call. The rule this frame protects: <b>a voided invoice is not a paid invoice.</b> Voiding zeroes the amounts, so any logic inferring paid from a QuickBooks balance of zero books cancelled revenue as collected; collected revenue is a read-side rule, remote state live and balance zero, expressed once in the reporting view; no CHECK refuses a paid date, because paid-then-voided is a real history the row must be able to hold. MGR surfaces drift and stops: no re-push that overwrites an accountant’s correction, no field-level merge UI. The one exception is the deleted invoice, where the remote id points at nothing: dedupe on the original requestId would return the first result and create nothing, so that push carries a new requestId and produces a second QuickBooks invoice under the same MGR number. Ordinary retries keep the old requestId and stay protected. ASSUMPTION: a drifted invoice stays in AR at QuickBooks’ numbers, because QuickBooks owns the invoice after push. Drift is not a place, it is what some of these rows are doing, which is why it lives in the states of one list rather than a second one. Rows also carry the due date, push failure and credit-memo status; payments come back through the sync job and are read-only. A failed row opens the drill-in, where connection, each mapping and push are four independent commands, and push persists its exact payload and deterministic requestId before the remote POST. Creating a credit memo stays Return shipment.</>,
     body: (<>
       {E.back("More", "Invoices")}
       {E.row("QuickBooks", "connected · company 9341", "healthy", "ok", QuickBooksMark)}
@@ -1594,6 +1605,7 @@ export const SCREENS: Screen[] = [
       {E.row("Ships from", "Warehouse")}
       {E.row("Ship-to · requested date", "Main · Wed 9/9", E.act("Change"))}
       {E.sp()}
+      {E.info("Kegs add a $30.00 refundable deposit each, shown on review.")}
       {E.btn("Review order · $828.00", "p disabled")}
       {E.info("Review is unavailable until the brewery sets where your orders ship from. Until then the portal shows your catalog, orders and invoices, and orders are placed by calling the brewery.")}
     </>),
@@ -1842,7 +1854,7 @@ export const SCREENS: Screen[] = [
       {E.row("8/31 · 6:58 AM", "8.6 °P · 67.5 °F", "Dana")}
       {E.ttl("Vessel facts")}
       {E.edit("Name", "FV3")}
-      {E.pick("Type", "Fermenter", ["Fermenter", "Brite", "Serving"])}
+      {E.pick("Type", "Fermenter", ["Fermenter", "Brite", "Barrel", "Kettle", "Other"])}
       {E.edit("Capacity", "15")}
       {E.btn("Save vessel")}
     </>),
@@ -1929,6 +1941,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Batches", "B-0416 · Hazy")}
       {E.pick("Recipe", "Hazy IPA v4", ["Hazy IPA v4", "Pils v3", "Stout v2"])}
+      {E.edit("Planned barrels", "15", "number")}
       {E.edit("Date", "2026-09-04", "date")}
       {E.sp()}
       {E.btn("Save schedule")}
@@ -2102,7 +2115,7 @@ export const SCREENS: Screen[] = [
     slice: 2,
     tab: "Work",
     name: "Purchase orders",
-    to: { "New PO": "Receive PO", Send: "Receive PO" },
+    to: { "New PO": "New PO", Send: "Receive PO" },
     job: "See draft, sent and partially received purchase orders",
     reads: "list_purchase_orders [design]",
     writes: "none [creation and receiving happen on their own surfaces]",
@@ -2121,22 +2134,58 @@ export const SCREENS: Screen[] = [
     step: 7,
     slice: 2,
     tab: "Work",
+    name: "New PO",
+    to: { Vendor: "Entity picker", "Add line": "New PO", "Save draft": "Purchase orders" },
+    job: "Draft a vendor order: lines, cost, and the lot the vendor named",
+    reads: "list_vendors_and_contracts [design] · list_materials · get_material_requirements [design]",
+    writes: "create_purchase_order [design; one RPC: draft PO + all lines]",
+    states: [["permission", "warehouse or admin required", 1], ["new", "vendor and one line required"], ["from requirements", "Planning drafts the lines; the shortfall is the quantity"], ["contracted lot", "the vendor named a lot on the contract · it prefills receiving"], ["no lot named", "the ordinary case · receiving captures it off the package"]],
+    spec: "Expected lot is what the vendor named when the order was placed, which for a hop contract is often a crop-year lot. It is advisory: it creates no lot record and posts nothing, and it is offered only on a lot-tracked material. Receiving prefills its lot from it, and what the receiver reads off the arriving package is what creates the lot. That is the same principle as counted quantity: the promise is compared and the count is what posts. Rice hulls is not lot-tracked, so it is never asked.",
+    body: (<>
+      {E.back("Purchase orders", "New PO")}
+      {E.nav("Vendor", "Country Malt")}
+      {E.edit("Expected", "2026-09-10", "date")}
+      {E.line("2-row · 55 lb bags", "lot-tracked", E.stq(40), "", <>
+        {E.edit("Unit cost", "$28.50")}
+        {E.edit("Expected lot", "CM-26-4410")}
+      </>)}
+      {E.line("Citra · 44 lb boxes", "lot-tracked", E.stq(4), "", <>
+        {E.edit("Unit cost", "$9.40")}
+        {E.edit("Expected lot", "2026-CIT-77")}
+      </>)}
+      {E.line("Rice hulls · 50 lb", "not lot-tracked", E.stq(6), "", <>
+        {E.edit("Unit cost", "$0.62")}
+      </>)}
+      {E.btn("Add line", "g")}
+      {E.sp()}
+      {E.btn("Save draft")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 2,
+    tab: "Work",
     name: "Receive PO",
     job: "Count what arrived; trigger derives receipt status",
     reads: "get_purchase_order [design]",
     writes: "send_purchase_order [design; single row draft → sent] · receive_purchase_order [design; one RPC: receipt + lines (counted, over or short) + lots with best_by + material movements]",
-    states: [["loading", "PO-line skeleton"], ["stale", "receipt changed · recheck", 1], ["offline", "keep counts; commit waits"], ["permission", "warehouse or admin", 1], ["success", "partially received"]],
-    spec: "Send PO (green) shows while the PO is draft; receiving needs a sent PO. Only counted quantity posts; over and short are both visible and both allowed, and the keypad never clamps an over-count as the only guard. PO status is trigger-derived; never write a loaded/status flag.",
+    states: [["loading", "PO-line skeleton"], ["draft", "Send purchase order is the one active verb · counts wait, and the receive verb is not drawn", 1], ["prefilled", "the PO named a lot · the field opens on it and the ordinary receipt changes nothing"], ["no lot on the PO", "the field opens empty · recent lots for that material are offered", 1], ["lot substituted", "the vendor shipped another lot · recorded, never blocked", 1], ["stale", "receipt changed · recheck", 1], ["offline", "keep counts; commit waits"], ["permission", "warehouse or admin", 1], ["success", "partially received"]],
+    spec: "Send PO (green) shows while the PO is draft; receiving needs a sent PO. Each lot-tracked line takes a lot code and best-by typed off the vendor packaging, prefilled from the lot the PO named so the ordinary receipt is a glance and no typing. When the PO named none the field opens empty and offers that material\u2019s recent lots, which is what keeps one vendor lot from becoming two records over a stray space. The receive RPC creates the material lot from what is entered here, never from the PO: the package is the only writer of a lot code. A difference is a substitution, which is reported and never blocked. Punctuation or case alone never reads as one: the schema spec owns that comparison rule. Untracked lines (rice hulls) ask for none. Only counted quantity posts; over and short are both visible and both allowed, and the keypad never clamps an over-count as the only guard. PO status is trigger-derived; never write a loaded/status flag.",
     body: (<>
       {E.back("Purchase orders", "PO-0142 · Country Malt")}
       {E.fld("Status", "sent Mon · expected Thu")}
-      {E.row("2-row · 55 lb bags", "expected 40", E.stq(42), "w")}
-      {E.row("Citra · 44 lb boxes", "expected 4", E.stq(3), "w")}
-      {E.row("Rice hulls · 50 lb", "expected 6", E.stq(6), "ok")}
-      {E.fld("Citra lot", "2026-CIT-77")}
-      {E.edit("Best by", "2027-08-31", "date")}
-      {E.tape([["+2,310 lb 2-row · receipt", "over 2 bags"], ["+132 lb Citra · receipt", "lot 2026-CIT-77 · short 1"]])}
-      {E.info("2-row is over by 2 bags and Citra short 1; the PO becomes partially received.")}
+      {E.line("2-row · 55 lb bags", "expected 40 · lot from the PO", E.stq(42), "w", <>
+        {E.edit("Lot", "CM-26-4410", "text", ["CM-26-4410", "CM-26-4288", "CM-25-9910"])}
+        {E.edit("Best by", "2027-03-31", "date")}
+      </>)}
+      {E.line("Citra · 44 lb boxes", "expected 4 · lot from the PO", E.stq(3), "w", <>
+        {E.edit("Lot", "2026-CIT-91", "text", ["2026-CIT-77", "2026-CIT-91", "2025-CIT-40"])}
+        {E.edit("Best by", "2027-08-31", "date")}
+        {E.note("Substituted: the PO named 2026-CIT-77. The box decides; the receipt records both.")}
+      </>)}
+      {E.row("Rice hulls · 50 lb", "expected 6 · not lot-tracked", E.stq(6), "ok")}
+      {E.tape([["+2,310 lb 2-row · receipt", "lot CM-26-4410 · over 2 bags"], ["+132 lb Citra · receipt", "lot 2026-CIT-91 · substituted · short 1"], ["+300 lb rice hulls · receipt", "not lot-tracked"]])}
+      {E.info("2-row is over by 2 bags and Citra short 1 on a substituted lot; the PO becomes partially received.")}
       {E.sp()}
       {E.btn("Receive purchase order", "irr")}
     </>),
@@ -2155,8 +2204,8 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Work", "PO-0142 · received")}
       {E.fld("Status", "partially received")}
-      {E.tape([["+2,310 lb 2-row · receipt", "over 2 bags"], ["+132 lb Citra · receipt", "lot 2026-CIT-77 · short 1"]])}
-      {E.info("2-row is over by 2 bags and Citra short 1.")}
+      {E.tape([["+2,310 lb 2-row · receipt", "lot CM-26-4410 · over 2 bags"], ["+132 lb Citra · receipt", "lot 2026-CIT-91 · substituted · short 1"], ["+300 lb rice hulls · receipt", "not lot-tracked"]])}
+      {E.info("2-row is over by 2 bags and Citra short 1 on a substituted lot.")}
     </>),
   },
   {
@@ -2214,9 +2263,9 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("More", "Vendors")}
       {E.btn("Add vendor")}
-      {E.row("YCH", "hops · 10-day lead · 1 active contract", E.act("Edit"))}
-      {E.row("Country Malt", "grain · 14-day lead · 1 active contract", E.act("Edit"))}
-      {E.row("CanSource", "packaging · 21-day lead", E.act("Edit"))}
+      {E.row("YCH", "hops · 1 active contract", E.act("Edit"))}
+      {E.row("Country Malt", "grain · 1 active contract", E.act("Edit"))}
+      {E.row("CanSource", "packaging · 3 materials", E.act("Edit"))}
       {E.nav("Materials", "12 materials")}
       {E.nav("Contracts", "2 active commitments")}
     </>),
@@ -2250,12 +2299,17 @@ export const SCREENS: Screen[] = [
     job: "Create or edit one material definition",
     reads: "list_materials",
     writes: "create_material · update_material",
-    states: [["permission", "warehouse or brewer required", 1], ["new", "name, kind and unit required"], ["in use", "unit change refused", 1]],
-    spec: "Inventory quantities and lots are not edited on the definition.",
+    states: [["permission", "warehouse or brewer required", 1], ["new", "name, kind and unit required"], ["in use", "unit change refused", 1], ["lot-tracked", "every receipt and consumption names a lot; off means none may"]],
+    spec: "Inventory quantities and lots are not edited on the definition. Lead time and the purchase-unit factor live here, not on the vendor: a hop box and a can pallet from one supplier are different numbers, and the factor is what turns counted bags into base units on Receive PO.",
     body: (<>
       {E.edit("Material name", "Citra")}
-      {E.pick("Kind", "Hop", ["Hop", "Grain", "Yeast", "Packaging"])}
+      {E.pick("Kind", "Hop", ["Malt", "Hop", "Yeast", "Adjunct", "Chemical", "Packaging", "Other"])}
       {E.pick("Unit", "lb", ["lb", "oz", "kg", "each"])}
+      {E.pick("Purchase unit", "each", ["each", "lb", "kg", "oz", "g", "l", "gal", "ml"])}
+      {E.edit("Base units per purchase unit", "44", "number")}
+      {E.info("A 44 lb box is purchase unit each with 44 base units, not a “box” unit: the schema has one unit vocabulary and packaging is the factor.")}
+      {E.edit("Lead time (days)", "10", "number")}
+      {E.row("Lot-tracked", "receipts name a lot · consumption picks one", E.sw(true, "Lot-tracked"), "ok")}
       {E.row("Active", "available to recipes and purchase orders", E.sw(true, "Material active"), "ok")}
       {E.btn("Save material")}
     </>),
@@ -2275,7 +2329,6 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.edit("Vendor name", "YCH")}
       {E.edit("Email", "orders@ych.example", "email")}
-      {E.edit("Lead time", "10", "number")}
       {E.pick("Terms", "Net 30", ["Due on receipt", "Net 15", "Net 30"])}
       {E.btn("Save vendor")}
     </>),
@@ -2315,7 +2368,9 @@ export const SCREENS: Screen[] = [
       {E.nav("Material", "Citra 2026")}
       {E.edit("Contract quantity", "400", "number")}
       {E.fld("Received", "262 lb · read-only")}
-      {E.pick("Delivery window", "September 2026", ["August 2026", "September 2026", "October 2026"])}
+      {E.edit("Starts", "2026-09-01", "date")}
+      {E.edit("Ends", "2026-10-31", "date")}
+      {E.edit("Unit cost", "$9.40")}
       {E.btn("Save contract")}
     </>),
   },
@@ -2505,10 +2560,10 @@ export const SCREENS: Screen[] = [
       {E.fld("Qty per sale", "1/124 keg per 16 oz")}
       {E.pick("Channel override", "Taproom", CHANNELS)}
       {E.btn("Save item mapping", "g")}
-      {E.row("7 sales · Hazy 16 oz", "depletion", "−112 oz")}
-      {E.row("1 refund · Hazy 16 oz", "inventory credit · adjustment", "+16 oz", "w")}
+      {E.row("7 sales · Hazy 16 oz", "expected consumption · not posted", "−112 oz")}
+      {E.row("1 refund · Hazy 16 oz", "expected credit · not posted", "+16 oz", "w")}
       {E.note("The weekly count posts the depletion. These sales are the expected number the count is measured against.")}
-      {E.btn("Reconcile 7 sales + 1 refund", "irr")}
+      {E.btn("Record 7 sales + 1 refund as expected", "irr")}
     </>),
   },
   {
@@ -2547,6 +2602,9 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Beer", "Keg fleet")}
       {E.fld("Selected pool", "Owned ½ bbl · 203 kegs · $30 deposit")}
+      {E.pick("Kind", "Owned", ["Owned", "Leased", "Pay per fill"])}
+      {E.fld("Vendor", "none · owned pools have no vendor")}
+      {E.edit("Per-fill cost", "$0.00")}
       {E.btns([["Add keg pool", "g"], ["Save keg pool", "g"]])}
       {E.row("Owned ½ bbl", "142 out · 61 in", "203")}
       {E.nav("Customer keg balance", "Ridgeline · 38 out · $1,140")}
@@ -2729,6 +2787,7 @@ export const SCREENS: Screen[] = [
     spec: "Planned state: Depart is the one primary; Save route plan is outline. Return lives on Return route once the route has departed. Load derives only from shipments with a persisted invoice mode; the checklist is presentation only, with no loaded status or mark-loaded command. Unassigned shipments become stops with driver, vehicle and stop order in the same route-save RPC. A refused delivery has no screen: leave the stop open and assign it to a later route. Resume opens the next incomplete stop for the assigned driver.",
     body: (<>
       {E.back("Routes", "Route A · Thu")}
+      {E.edit("Delivery date", "2026-09-10", "date")}
       {E.pick("Driver", "Maria", ["Maria", "Dave"])}
       {E.edit("Vehicle", "Box truck 2")}
       {E.row("Stop 1 · Ridgeline", "4 Hazy halves · 6 Pils cases", "next")}
@@ -2810,8 +2869,8 @@ export const SCREENS: Screen[] = [
     job: "See demand gaps and draft a PO without priority state",
     reads: "get_planning_shortfalls [design; demand, supply and gap by week]",
     writes: "draft_purchase_order_from_requirements [design; one RPC: draft PO + lines]",
-    states: [["gap", "demand exceeds supply in that week · the only actionable row"], ["covered", "supply meets demand · shown so the horizon reads continuously"], ["no vendor", "no contract and no lead time on file · the row cannot draft a PO", 1], ["empty", "nothing planned and nothing ordered"]],
-    spec: "The three columns are defined so the gap is arithmetic rather than judgement. Demand is confirmed and submitted order lines by requested ship week, plus taproom pars; supply is on-hand ATP plus the planned outputs of packaging runs already scheduled into that week. The horizon runs as far ahead as the longest material lead time can still be acted on, which is why it is drawn two weeks and not a quarter: a gap nobody can still buy for is a report, not a plan. A drafted PO goes to the vendor holding an active contract for that material, and failing that the shortest lead time; the quantity is the gap rounded up to the vendor's purchase unit. Nothing here ranks or prioritises, in keeping with Pars and allocation: every change stays a named quantity.",
+    states: [["gap", "demand exceeds supply in that week · the only actionable row"], ["covered", "supply meets demand · shown so the horizon reads continuously"], ["no vendor", "no contract and no lead time on the material · the row cannot draft a PO", 1], ["empty", "nothing planned and nothing ordered"]],
+    spec: "The three columns are defined so the gap is arithmetic rather than judgement. Demand is confirmed and submitted order lines by requested ship week, plus taproom pars; supply is on-hand ATP plus the planned outputs of packaging runs already scheduled into that week. The horizon runs as far ahead as the longest material lead time can still be acted on, which is why it is drawn two weeks and not a quarter: a gap nobody can still buy for is a report, not a plan. A drafted PO goes to the vendor holding an active contract for that material, and failing that the shortest lead time on the material; the quantity is the gap rounded up to its purchase unit. Nothing here ranks or prioritises, in keeping with Pars and allocation: every change stays a named quantity.",
     body: (<>
       {E.back("More", "Planning")}
       {E.tbl(["week", "demand", "supply", "gap"], [["9/7", "48 bbl", "40 bbl", <><span className="text-warning-foreground">−8</span></>], ["9/14", "52 bbl", "60 bbl", "+8"]])}
@@ -2857,7 +2916,7 @@ export const SCREENS: Screen[] = [
       {E.row("Slack · Demo Brewing", "Connected · scopes healthy", E.act("Disconnect", "destructive"), "ok", SlackMark)}
       {E.pick("Operations channel", "#mgr-operations · private", ["#mgr-operations · private", "#general"])}
       {E.window("Quiet hours", "21:00", "06:00")}
-      {E.edit("Reading overdue after", "24", "number")}
+      {E.fld("Reading overdue after", `${OVERDUE_HOURS} h · set on Settings`)}
       {E.nav("Health", "last message from Slack today · 8:42 AM")}
       {E.nav("Linked people", "3 linked")}
       <div>
@@ -3146,7 +3205,7 @@ export const SCREENS: Screen[] = [
     states: [["permission", "sales or admin required", 1], ["new", "name and tax treatment required"], ["in use", "delete is refused", 1]],
     body: (<>
       {E.edit("Channel name", "Export")}
-      {E.chips(["taxable", "export", "vessel supplies", "research", "transfer in bond"], 1)}
+      {E.chips(TAX_TREATMENTS, 1)}
       {E.info("Customers may override this. Sales without a customer take the channel default.")}
       {E.note("A channel with movements cannot be deleted.")}
       {E.gated("Save channel", "isn’t available yet: channels are still a fixed list")}

@@ -21,7 +21,7 @@ import { Empty, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupTextarea } from "@/components/ui/input-group";
-import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -68,7 +68,12 @@ export const E = {
   ttl: (t: React.ReactNode) => <h2 className="mt-2 text-sm font-medium text-muted-foreground">{t}</h2>,
   /** `icon` says which kind of thing a row is — only in lists that mix kinds
    * (Today, search); a homogeneous list gets none (docs/plans/hugeicons.md §3). */
-  row: (t: React.ReactNode, s: React.ReactNode = "", n: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement) => (
+  /** foot: fields that belong to this row, drawn inside its card on their own
+   *  line. A lot code and a best-by are facts about the line being received,
+   *  so they sit in it; listing them under the card made the reader match
+   *  "Citra lot" to a Citra row by name. Item is flex-wrap, so the footer
+   *  takes a full line without any layout of its own. */
+  row: (t: React.ReactNode, s: React.ReactNode = "", n: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement, foot?: React.ReactNode) => (
     <Item variant="outline" data-gated={cls === "dis" || undefined} className={cn(cls === "dis" && "opacity-50")}>
       {(icon || dotColor[cls]) && (
         <ItemMedia className={cn(isValidElement(icon) && FACE_MEDIA)}>
@@ -81,6 +86,7 @@ export const E = {
         {s ? <ItemDescription>{s}</ItemDescription> : null}
       </ItemContent>
       {n ? <ItemActions>{typeof n === "string" ? <span className="text-sm text-muted-foreground">{n}</span> : n}</ItemActions> : null}
+      {foot ? <ItemFooter className="mt-3 flex-col items-stretch gap-2 border-t pt-3">{foot}</ItemFooter> : null}
     </Item>
   ),
   /** Soft-filled workflow entry. Tone describes the action, independently of row status. */
@@ -199,7 +205,8 @@ export const E = {
   link: (t: React.ReactNode, to?: string) => (
     <a href="#" data-to={to} className="text-sm text-muted-foreground underline">{t}</a>
   ),
-  /** An editable field. type is the native input type; "date" pops the calendar (DatePicker). */
+  /** An editable field. type is the native input type; "date" pops the calendar
+   *  (DatePicker). */
   edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[]) => {
     if (type === "date") return <DatePicker label={label} defaultValue={value} />;
     // A whole number (a contract quantity, an overdue threshold) is counted,
@@ -212,7 +219,11 @@ export const E = {
         </Field>
       );
     }
-    const listId = suggestions?.length ? `${label.replace(/\s+/g, "-").toLowerCase()}-list` : undefined;
+    // The options are the datalist's identity, so the id derives from them: two
+    // fields sharing a label (a card names its own material, so both lot fields
+    // are just "Lot") never collide, and two offering the same options correctly
+    // share one list. A caller cannot forget to disambiguate.
+    const listId = suggestions?.length ? `list-${suggestions.join("-").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}` : undefined;
     return (
       <Field orientation="horizontal">
         <FieldLabel>{label}</FieldLabel>
@@ -318,6 +329,10 @@ export const E = {
   ),
   gated: (t: React.ReactNode, why: React.ReactNode = "isn’t available yet") => E.row(t, why, "", "dis", SquareLock01Icon),
   nav: (t: React.ReactNode, s: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement) => E.row(t, s, <DirectionIcon label="Open" />, cls, icon),
+  /** A document line: a material or SKU with its quantity and the fields that
+   *  belong to it. No line wants an icon, so this fills that slot rather than
+   *  every call site writing the hole. */
+  line: (t: React.ReactNode, s: React.ReactNode, n: React.ReactNode, cls: RowClass, fields: React.ReactNode) => E.row(t, s, n, cls, undefined, fields),
   sp: () => <div className="flex-1" />,
   comp: (portal = false) => (
     <InputGroup>
