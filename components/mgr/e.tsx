@@ -31,7 +31,7 @@ import { cn } from "@/lib/utils";
 
 /** Row modifiers from the wireframe: w = needs attention, ok = current, dis = gated. */
 type RowClass = "" | "w" | "ok" | "dis";
-const dotColor: Partial<Record<RowClass, string>> = { w: "bg-warning-foreground", ok: "bg-primary" };
+const dotColor: Partial<Record<RowClass, string>> = { w: "bg-warning-foreground", ok: "bg-success-foreground" };
 const Dot = ({ cls }: { cls: RowClass }) => (dotColor[cls] ? <span className={cn("size-2 rounded-full", dotColor[cls])} /> : null);
 const TileContent = ({ n, s, g, w, f }: { n: React.ReactNode; s: React.ReactNode; g?: React.ReactNode; w?: 0 | 1; f?: number }) => (<>
   <span className="flex items-center gap-1.5 font-medium text-sm leading-none">{w ? <Dot cls="w" /> : null}{n}</span>
@@ -83,8 +83,16 @@ export const E = {
       {n ? <ItemActions>{typeof n === "string" ? <span className="text-sm text-muted-foreground">{n}</span> : n}</ItemActions> : null}
     </Item>
   ),
-  /** A row's trailing action verb (Pick, Confirm, Resume) as a real target. */
-  act: (t: React.ReactNode) => <Button variant="ghost" size="sm" data-row-action>{t}</Button>,
+  /** Soft-filled workflow entry. Tone describes the action, independently of row status. */
+  act: (t: React.ReactNode, tone: "primary" | "success" | "attention" | "info" | "destructive" = "primary") => (
+    <Button variant="ghost" size="sm" data-row-action className={cn(
+      tone === "destructive" && "bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive",
+      tone === "primary" && "bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary",
+      tone === "success" && "bg-success text-success-foreground hover:bg-success/80 hover:text-success-foreground",
+      tone === "attention" && "bg-attention text-attention-foreground hover:bg-attention/80 hover:text-attention-foreground",
+      tone === "info" && "bg-info text-info-foreground hover:bg-info/80 hover:text-info-foreground",
+    )}>{t}</Button>
+  ),
   /** A status word. Never clickable. */
   status: (t: React.ReactNode, tone: "ok" | "w" | "" = "") => (
     <Badge variant={tone === "w" ? "secondary" : "outline"} className="gap-1.5">
@@ -242,9 +250,9 @@ export const E = {
     </Alert>
   ),
   info: (t: React.ReactNode) => (
-    <Alert>
+    <Alert className="border-info-foreground/40 bg-info text-info-foreground">
       <Icon icon={InformationCircleIcon} />
-      <AlertDescription className="text-pretty">{t}</AlertDescription>
+      <AlertDescription className="text-pretty text-info-foreground">{t}</AlertDescription>
     </Alert>
   ),
   /** Annotation chips; the gallery renders this under the frame, never inside it. */
