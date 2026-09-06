@@ -378,8 +378,14 @@ ordered_on date, expected_on date, note, created_by`. unique `(brewery_id, po_no
 
 ### `purchase_order_lines`
 `po_id → purchase_orders, material_id → materials, qty_ordered numeric > 0` (purchase
-uom), `unit_cost_cents int, contract_id → material_contracts` (drawdown). idx `(po_id)`,
-`(material_id)`, `(contract_id)`.
+uom), `unit_cost_cents int, contract_id → material_contracts` (drawdown),
+`expected_lot_code text`. idx `(po_id)`, `(material_id)`, `(contract_id)`.
+- `expected_lot_code` is the lot the vendor named when the order was placed — a
+  contracted hop lot or crop year — and is advisory only. It creates no
+  `material_lots` row and posts nothing. Receiving prefills its lot input from it,
+  but what the receiver reads off the arriving package is what creates the lot.
+  Null whenever the vendor did not name one, and meaningless on a material that is
+  not `lot_tracked`.
 
 ### `receipts`
 `po_id → purchase_orders, received_on date, received_by, note`. idx `(po_id)`.
@@ -391,6 +397,11 @@ lot_id → material_lots, movement_id → material_movements unique`. Only count
 posts: the receive command inserts the movement with `qty = qty_counted *
 purchase_uom_factor` and links it; `after insert` trigger updates PO status. Discrepancy
 view = `variance <> 0`. idx `(po_line_id)`.
+- Lot substitution is reported, never blocked: a receipt whose lot differs from the
+  line's `expected_lot_code` is still a valid receipt. Compare the two normalized —
+  case-folded with non-alphanumerics stripped — so `2026-cit-77` and `2026 CIT 77`
+  are the same lot and only a genuine substitution reads as one. Both codes are
+  stored as typed; normalization is for comparison, never for what is written.
 
 ### `material_counts` / `material_count_lines`
 Counts: `counted_on date, counted_by, note`. Lines: `count_id, material_id, lot_id

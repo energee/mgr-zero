@@ -2115,7 +2115,7 @@ export const SCREENS: Screen[] = [
     slice: 2,
     tab: "Work",
     name: "Purchase orders",
-    to: { "New PO": "Receive PO", Send: "Receive PO" },
+    to: { "New PO": "New PO", Send: "Receive PO" },
     job: "See draft, sent and partially received purchase orders",
     reads: "list_purchase_orders [design]",
     writes: "none [creation and receiving happen on their own surfaces]",
@@ -2134,26 +2134,59 @@ export const SCREENS: Screen[] = [
     step: 7,
     slice: 2,
     tab: "Work",
+    name: "New PO",
+    to: { Vendor: "Entity picker", "Add line": "New PO", "Save draft": "Purchase orders" },
+    job: "Draft a vendor order: lines, cost, and the lot the vendor named",
+    reads: "list_vendors_and_contracts [design] · list_materials · get_material_requirements [design]",
+    writes: "create_purchase_order [design; one RPC: draft PO + all lines]",
+    states: [["permission", "warehouse or admin required", 1], ["new", "vendor and one line required"], ["from requirements", "Planning drafts the lines; the shortfall is the quantity"], ["contracted lot", "the vendor named a lot on the contract · it prefills receiving"], ["no lot named", "the ordinary case · receiving captures it off the package"]],
+    spec: "Expected lot is what the vendor named when the order was placed, which for a hop contract is often a crop-year lot. It is advisory: it creates no lot record and posts nothing, and it is offered only on a lot-tracked material. Receiving prefills its lot from it, and what the receiver reads off the arriving package is what creates the lot. That is the same principle as counted quantity: the promise is compared and the count is what posts. Rice hulls is not lot-tracked, so it is never asked.",
+    body: (<>
+      {E.back("Purchase orders", "New PO")}
+      {E.nav("Vendor", "Country Malt")}
+      {E.edit("Expected", "2026-09-10", "date")}
+      {E.row("2-row · 55 lb bags", "lot-tracked", E.stq(40), "", undefined, <>
+        {E.edit("Unit cost", "$28.50")}
+        {E.edit("Expected lot", "CM-26-4410")}
+      </>)}
+      {E.row("Citra · 44 lb boxes", "lot-tracked · contract YCH-2026", E.stq(4), "", undefined, <>
+        {E.edit("Unit cost", "$9.40")}
+        {E.edit("Expected lot", "2026-CIT-77")}
+      </>)}
+      {E.row("Rice hulls · 50 lb", "not lot-tracked", E.stq(6), "", undefined, <>
+        {E.edit("Unit cost", "$0.62")}
+      </>)}
+      {E.btn("Add line", "g")}
+      {E.info("Expected lot is what the vendor named. Receiving prefills from it and the arriving package decides.")}
+      {E.sp()}
+      {E.btn("Save draft")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 2,
+    tab: "Work",
     name: "Receive PO",
     job: "Count what arrived; trigger derives receipt status",
     reads: "get_purchase_order [design]",
     writes: "send_purchase_order [design; single row draft → sent] · receive_purchase_order [design; one RPC: receipt + lines (counted, over or short) + lots with best_by + material movements]",
-    states: [["loading", "PO-line skeleton"], ["draft", "Send purchase order is the one active verb · counts wait"], ["no lot", "Citra is lot-tracked · enter the lot off the box", 1], ["stale", "receipt changed · recheck", 1], ["offline", "keep counts; commit waits"], ["permission", "warehouse or admin", 1], ["success", "partially received"]],
-    spec: "Send PO (green) shows while the PO is draft; receiving needs a sent PO. Each lot-tracked line takes a lot code and best-by typed off the vendor packaging; the receive RPC creates the material lot, so nothing upstream carries the code. Untracked lines (rice hulls) ask for none. Only counted quantity posts; over and short are both visible and both allowed, and the keypad never clamps an over-count as the only guard. PO status is trigger-derived; never write a loaded/status flag.",
+    states: [["loading", "PO-line skeleton"], ["draft", "Send purchase order is the one active verb · counts wait"], ["no lot", "Citra is lot-tracked · enter the lot off the box", 1], ["lot as ordered", "the box matches the PO · nothing to say"], ["lot substituted", "the vendor shipped another lot · recorded, never blocked", 1], ["stale", "receipt changed · recheck", 1], ["offline", "keep counts; commit waits"], ["permission", "warehouse or admin", 1], ["success", "partially received"]],
+    spec: "Send PO (green) shows while the PO is draft; receiving needs a sent PO. Each lot-tracked line takes a lot code and best-by typed off the vendor packaging, prefilled from the lot the PO named. The receive RPC creates the material lot from what is entered here, never from the PO: the package is the only writer of a lot code. A difference is a substitution, which is reported and never blocked. The two codes are compared case-folded with non-alphanumerics stripped, so punctuation alone never reads as a substitution. Untracked lines (rice hulls) ask for none. Only counted quantity posts; over and short are both visible and both allowed, and the keypad never clamps an over-count as the only guard. PO status is trigger-derived; never write a loaded/status flag.",
     body: (<>
       {E.back("Purchase orders", "PO-0142 · Country Malt")}
       {E.fld("Status", "sent Mon · expected Thu")}
-      {E.row("2-row · 55 lb bags", "expected 40", E.stq(42), "w", undefined, <>
+      {E.row("2-row · 55 lb bags", "expected 40 · lot CM-26-4410 on the PO", E.stq(42), "w", undefined, <>
         {E.edit("Lot", "CM-26-4410")}
         {E.edit("Best by", "2027-03-31", "date")}
       </>)}
-      {E.row("Citra · 44 lb boxes", "expected 4", E.stq(3), "w", undefined, <>
-        {E.edit("Lot", "2026-CIT-77")}
+      {E.row("Citra · 44 lb boxes", "expected 4 · lot 2026-CIT-77 on the PO", E.stq(3), "w", undefined, <>
+        {E.edit("Lot", "2026-CIT-91")}
         {E.edit("Best by", "2027-08-31", "date")}
+        {E.note("Substituted: the PO named 2026-CIT-77. The box decides; the receipt records both.")}
       </>)}
       {E.row("Rice hulls · 50 lb", "expected 6 · not lot-tracked", E.stq(6), "ok")}
-      {E.tape([["+2,310 lb 2-row · receipt", "lot CM-26-4410 · over 2 bags"], ["+132 lb Citra · receipt", "lot 2026-CIT-77 · short 1"], ["+300 lb rice hulls · receipt", "not lot-tracked"]])}
-      {E.info("2-row is over by 2 bags and Citra short 1; the PO becomes partially received.")}
+      {E.tape([["+2,310 lb 2-row · receipt", "lot CM-26-4410 · over 2 bags"], ["+132 lb Citra · receipt", "lot 2026-CIT-91 · substituted · short 1"], ["+300 lb rice hulls · receipt", "not lot-tracked"]])}
+      {E.info("2-row is over by 2 bags and Citra short 1 on a substituted lot; the PO becomes partially received.")}
       {E.sp()}
       {E.btns([["Send purchase order", "g"], ["Receive purchase order", "irr"]])}
     </>),
