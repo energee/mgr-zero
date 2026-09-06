@@ -4,7 +4,7 @@
 // main flows must chain end to end so the explorer is a walkable prototype.
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
-import { BACK, PORTAL, resolveTap, TAPS, ROUTES } from "../lib/mgr/screen-links";
+import { BACK, isInertOn, PORTAL, resolveTap, TAPS, ROUTES } from "../lib/mgr/screen-links";
 import { deniedFor, needsFor, PERSONAS } from "../lib/mgr/demo-personas";
 import { pageUnder } from "../lib/mgr/screen-explorer";
 
@@ -119,5 +119,40 @@ describe("reported explorer flows", () => {
     for (const [sheet, page] of [["Question invoice", "Pay invoice"], ["Square locations", "Point of sale"], ["Square → QuickBooks connector", "Point of sale"], ["Disconnect Square", "Point of sale"], ["POS item", "Menu"], ["Disconnect Slack", "Chat settings"]]) {
       expect(SCREENS[pageUnder([], SCREENS.indexOf(by(sheet)))].name).toBe(page);
     }
+  });
+});
+
+// A label in the global INERT list acts in place wherever it appears — but a
+// screen that explicitly maps the label meant it, and the record's own `to`
+// map is the first tier of the resolver. The explorer must not let the
+// suppression list silently outrank it.
+describe("isInertOn", () => {
+  it("still suppresses an inert label the screen does not map", () => {
+    expect(isInertOn(by("Pars and allocation"), "Paid")).toBe(true);
+    expect(isInertOn(by("Pars and allocation"), "Print labels")).toBe(true);
+  });
+
+  it("honours an explicit data-to over the inert list", () => {
+    expect(isInertOn(by("Today"), "Paid", "Invoice")).toBe(false);
+  });
+
+  it("keeps the two Edit rows on Pars and allocation apart", () => {
+    // Both rows draw an act; only the par row has a screen to open. Bin is the
+    // par editor, so a bare "Edit" mapped screen-wide would send the standing
+    // allocation there too. The par row names its verb; standing acts in place.
+    const s = by("Pars and allocation");
+    expect(resolveTap(s, "Edit par")).toBe("Bin");
+    expect(isInertOn(s, "Edit")).toBe(true);
+    expect(isInertOn(s, "Taproom standing")).toBe(true);
+  });
+
+  it("suppresses no author-written mapping on any screen", () => {
+    // Both tiers resolveTap honours above the global rules: the record's own
+    // map, and PORTAL on a portal screen. Neither may be swallowed by INERT.
+    const swallowed = SCREENS.flatMap((s) => [
+      ...Object.keys(s.to ?? {}),
+      ...(s.portal ? Object.keys(PORTAL) : []),
+    ].filter((label) => isInertOn(s, label)).map((label) => `${s.name}: ${label}`));
+    expect(swallowed).toEqual([]);
   });
 });

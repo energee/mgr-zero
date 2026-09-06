@@ -43,7 +43,7 @@ export default async function PortalInvoicesPage() {
                   <td className="py-1">
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs ${
-                        inv.kind === "credit_memo" ? "bg-amber-100 text-amber-800" : "bg-neutral-100 text-neutral-800"
+                        inv.kind === "credit_memo" ? "bg-info text-info-foreground" : "bg-muted text-muted-foreground"
                       }`}
                     >
                       {inv.kind === "credit_memo" ? "credit memo" : "invoice"}

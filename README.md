@@ -54,6 +54,10 @@ The mapper converts the Supabase CLI's local key labels into the application's
 modern environment contract; nothing else is needed in `.env.local`. Rate
 limiting on `/api/command`: not yet implemented (authz audit A1).
 
+`VERCEL_ENV` is optional; when set it must be `production`, `preview`, or
+`development` (`lib/env/server-parser.ts`). Vercel sets it on deploys; locally
+it is normally absent.
+
 Apply migrations and seed a dev user/brewery:
 
 ```bash
@@ -99,17 +103,9 @@ the same repo), reusing one already running there, and stops what it
 started on both success and failure. It needs `bunx supabase start` and a
 `.env.local` in place, same as the vitest suite. See `tests-e2e/portal-smoke.ts`.
 
-Test files: `tests/api-command.test.ts` (Bearer auth on `/api/command`),
-`tests/rls-tenancy.test.ts`, `tests/rls-ledger.test.ts` (RLS
-isolation, ledger immutability, CHECK constraints, ATP math),
-`tests/registry.test.ts` (command registry validation/permissions),
-`tests/commands-inventory.test.ts` (catalog/inventory commands),
-`tests/commands-import.test.ts` (CSV import blocked), `tests/commands-invites.test.ts` (invitations blocked)
-(invitations), `tests/schema-rules.test.ts` (pg_catalog gates: RLS on every
-table, `security_invoker` views, `search_path` on functions, no anon-executable
-definer functions), `tests/schema-conventions.test.ts` (composite FKs, lot
-trigger, append-only ledgers), `tests/write-atomicity.test.ts` (iron rule 5). Tests run against the real local Supabase stack (not a
-mock) — `bunx supabase start` must be running first.
+Each `tests/*.test.ts` opens with a header comment stating what it gates; `ls tests/` is the index. The `rls-*` and `schema-*` suites read pg_catalog and are the schema's merge gate; `commands-import` and `commands-invites` prove those commands stay blocked.
+
+Tests run against the real local Supabase stack (not a mock) — `bunx supabase start` must be running first.
 
 ## HTTP API
 
