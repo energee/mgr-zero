@@ -2145,19 +2145,18 @@ export const SCREENS: Screen[] = [
       {E.back("Purchase orders", "New PO")}
       {E.nav("Vendor", "Country Malt")}
       {E.edit("Expected", "2026-09-10", "date")}
-      {E.row("2-row · 55 lb bags", "lot-tracked", E.stq(40), "", undefined, <>
+      {E.line("2-row · 55 lb bags", "lot-tracked", E.stq(40), "", <>
         {E.edit("Unit cost", "$28.50")}
         {E.edit("Expected lot", "CM-26-4410")}
       </>)}
-      {E.row("Citra · 44 lb boxes", "lot-tracked · contract YCH-2026", E.stq(4), "", undefined, <>
+      {E.line("Citra · 44 lb boxes", "lot-tracked", E.stq(4), "", <>
         {E.edit("Unit cost", "$9.40")}
         {E.edit("Expected lot", "2026-CIT-77")}
       </>)}
-      {E.row("Rice hulls · 50 lb", "not lot-tracked", E.stq(6), "", undefined, <>
+      {E.line("Rice hulls · 50 lb", "not lot-tracked", E.stq(6), "", <>
         {E.edit("Unit cost", "$0.62")}
       </>)}
       {E.btn("Add line", "g")}
-      {E.info("Expected lot is what the vendor named. Receiving prefills from it and the arriving package decides.")}
       {E.sp()}
       {E.btn("Save draft")}
     </>),
@@ -2170,17 +2169,17 @@ export const SCREENS: Screen[] = [
     job: "Count what arrived; trigger derives receipt status",
     reads: "get_purchase_order [design]",
     writes: "send_purchase_order [design; single row draft → sent] · receive_purchase_order [design; one RPC: receipt + lines (counted, over or short) + lots with best_by + material movements]",
-    states: [["loading", "PO-line skeleton"], ["draft", "Send purchase order is the one active verb · counts wait"], ["no lot", "Citra is lot-tracked · enter the lot off the box", 1], ["prefilled", "the PO named a lot · the field opens on it"], ["lot as ordered", "the box matches the PO · nothing to say"], ["lot substituted", "the vendor shipped another lot · recorded, never blocked", 1], ["no lot on the PO", "the field opens empty · recent lots for that material are offered"], ["stale", "receipt changed · recheck", 1], ["offline", "keep counts; commit waits"], ["permission", "warehouse or admin", 1], ["success", "partially received"]],
-    spec: "Send PO (green) shows while the PO is draft; receiving needs a sent PO. Each lot-tracked line takes a lot code and best-by typed off the vendor packaging, prefilled from the lot the PO named so the ordinary receipt is a glance and no typing. When the PO named none the field opens empty and offers that material\u2019s recent lots, which is what keeps one vendor lot from becoming two records over a stray space. The receive RPC creates the material lot from what is entered here, never from the PO: the package is the only writer of a lot code. A difference is a substitution, which is reported and never blocked. The two codes are compared case-folded with non-alphanumerics stripped, so punctuation alone never reads as a substitution. Untracked lines (rice hulls) ask for none. Only counted quantity posts; over and short are both visible and both allowed, and the keypad never clamps an over-count as the only guard. PO status is trigger-derived; never write a loaded/status flag.",
+    states: [["loading", "PO-line skeleton"], ["draft", "Send purchase order is the one active verb · counts wait"], ["prefilled", "the PO named a lot · the field opens on it and the ordinary receipt changes nothing"], ["no lot on the PO", "the field opens empty · recent lots for that material are offered", 1], ["lot substituted", "the vendor shipped another lot · recorded, never blocked", 1], ["stale", "receipt changed · recheck", 1], ["offline", "keep counts; commit waits"], ["permission", "warehouse or admin", 1], ["success", "partially received"]],
+    spec: "Send PO (green) shows while the PO is draft; receiving needs a sent PO. Each lot-tracked line takes a lot code and best-by typed off the vendor packaging, prefilled from the lot the PO named so the ordinary receipt is a glance and no typing. When the PO named none the field opens empty and offers that material\u2019s recent lots, which is what keeps one vendor lot from becoming two records over a stray space. The receive RPC creates the material lot from what is entered here, never from the PO: the package is the only writer of a lot code. A difference is a substitution, which is reported and never blocked. Punctuation or case alone never reads as one: the schema spec owns that comparison rule. Untracked lines (rice hulls) ask for none. Only counted quantity posts; over and short are both visible and both allowed, and the keypad never clamps an over-count as the only guard. PO status is trigger-derived; never write a loaded/status flag.",
     body: (<>
       {E.back("Purchase orders", "PO-0142 · Country Malt")}
       {E.fld("Status", "sent Mon · expected Thu")}
-      {E.row("2-row · 55 lb bags", "expected 40 · lot from the PO", E.stq(42), "w", undefined, <>
-        {E.edit("Lot", "CM-26-4410", "text", ["CM-26-4410", "CM-26-4288", "CM-25-9910"], "2-row")}
+      {E.line("2-row · 55 lb bags", "expected 40 · lot from the PO", E.stq(42), "w", <>
+        {E.edit("Lot", "CM-26-4410", "text", ["CM-26-4410", "CM-26-4288", "CM-25-9910"])}
         {E.edit("Best by", "2027-03-31", "date")}
       </>)}
-      {E.row("Citra · 44 lb boxes", "expected 4 · lot from the PO", E.stq(3), "w", undefined, <>
-        {E.edit("Lot", "2026-CIT-91", "text", ["2026-CIT-77", "2026-CIT-91", "2025-CIT-40"], "Citra")}
+      {E.line("Citra · 44 lb boxes", "expected 4 · lot from the PO", E.stq(3), "w", <>
+        {E.edit("Lot", "2026-CIT-91", "text", ["2026-CIT-77", "2026-CIT-91", "2025-CIT-40"])}
         {E.edit("Best by", "2027-08-31", "date")}
         {E.note("Substituted: the PO named 2026-CIT-77. The box decides; the receipt records both.")}
       </>)}

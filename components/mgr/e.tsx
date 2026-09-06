@@ -148,9 +148,9 @@ export const E = {
   /** A forward arrow read as "to"; null draws it decorative (aria-hidden). */
   arrow: (label: string | null = "to") => <DirectionIcon label={label} />,
   /** A typed quantity: the OS keyboard is the keypad. unit renders as a trailing addon. */
-  qty: (value: string, unit?: React.ReactNode, label = "Quantity", id?: string) => (
+  qty: (value: string, unit?: React.ReactNode, label = "Quantity") => (
     <InputGroup>
-      <InputGroupInput id={id} type="number" inputMode="decimal" step="any" defaultValue={value} aria-label={label} className="text-2xl font-semibold" />
+      <InputGroupInput type="number" inputMode="decimal" step="any" defaultValue={value} aria-label={label} className="text-2xl font-semibold" />
       {unit ? <InputGroupAddon align="inline-end">{unit}</InputGroupAddon> : null}
     </InputGroup>
   ),
@@ -209,10 +209,8 @@ export const E = {
     <a href="#" data-to={to} className="text-sm text-muted-foreground underline">{t}</a>
   ),
   /** An editable field. type is the native input type; "date" pops the calendar
-   *  (DatePicker). `scope` disambiguates the datalist when two fields on one
-   *  screen share a label: a card names its own material, so both lot fields
-   *  are labelled "Lot" and would otherwise collide on one id. */
-  edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[], scope?: string) => {
+   *  (DatePicker). */
+  edit: (label: string, value: string, type: React.HTMLInputTypeAttribute = "text", suggestions?: string[]) => {
     if (type === "date") return <DatePicker label={label} defaultValue={value} />;
     // A whole number (a contract quantity, an overdue threshold) is counted,
     // not typed: the same −/+ stepper Weekly count uses.
@@ -224,7 +222,11 @@ export const E = {
         </Field>
       );
     }
-    const listId = suggestions?.length ? `${[scope, label].filter(Boolean).join("-").replace(/\s+/g, "-").toLowerCase()}-list` : undefined;
+    // The options are the datalist's identity, so the id derives from them: two
+    // fields sharing a label (a card names its own material, so both lot fields
+    // are just "Lot") never collide, and two offering the same options correctly
+    // share one list. A caller cannot forget to disambiguate.
+    const listId = suggestions?.length ? `list-${suggestions.join("-").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}` : undefined;
     return (
       <Field orientation="horizontal">
         <FieldLabel>{label}</FieldLabel>
@@ -330,6 +332,10 @@ export const E = {
   ),
   gated: (t: React.ReactNode, why: React.ReactNode = "isn’t available yet") => E.row(t, why, "", "dis", SquareLock01Icon),
   nav: (t: React.ReactNode, s: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement) => E.row(t, s, <DirectionIcon label="Open" />, cls, icon),
+  /** A document line: a material or SKU with its quantity and the fields that
+   *  belong to it. No line wants an icon, so this fills that slot rather than
+   *  every call site writing the hole. */
+  line: (t: React.ReactNode, s: React.ReactNode, n: React.ReactNode, cls: RowClass, fields: React.ReactNode) => E.row(t, s, n, cls, undefined, fields),
   sp: () => <div className="flex-1" />,
   comp: (portal = false) => (
     <InputGroup>

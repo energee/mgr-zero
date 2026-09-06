@@ -385,7 +385,10 @@ uom), `unit_cost_cents int, contract_id → material_contracts` (drawdown),
   `material_lots` row and posts nothing. Receiving prefills its lot input from it,
   but what the receiver reads off the arriving package is what creates the lot.
   Null whenever the vendor did not name one, and meaningless on a material that is
-  not `lot_tracked`.
+  not `lot_tracked`. The line is the only home for it: `material_contracts` carries
+  no lot code, because the ordinary order is placed against no contract at all, and
+  a vendor may name a lot without one. A contracted line is typed like any other,
+  so nothing has to reconcile a line against a lot held somewhere else.
 
 ### `receipts`
 `po_id → purchase_orders, received_on date, received_by, note`. idx `(po_id)`.
@@ -398,10 +401,15 @@ posts: the receive command inserts the movement with `qty = qty_counted *
 purchase_uom_factor` and links it; `after insert` trigger updates PO status. Discrepancy
 view = `variance <> 0`. idx `(po_line_id)`.
 - Lot substitution is reported, never blocked: a receipt whose lot differs from the
-  line's `expected_lot_code` is still a valid receipt. Compare the two normalized —
-  case-folded with non-alphanumerics stripped — so `2026-cit-77` and `2026 CIT 77`
-  are the same lot and only a genuine substitution reads as one. Both codes are
-  stored as typed; normalization is for comparison, never for what is written.
+  line's `expected_lot_code` is still a valid receipt. The two are compared
+  normalized (case-folded, non-alphanumerics stripped) so `2026-cit-77` and
+  `2026 CIT 77` are one lot and only a genuine substitution reads as one. That
+  normalization is one shared function called by the receive RPC and by every read
+  that reports a substitution, never re-derived in SQL or on a client: a second
+  copy written as `lower(trim(…))` puts punctuation back to reading as a
+  substitution, which is the whole failure this rule exists to prevent. Both codes
+  are stored exactly as typed; normalizing is for comparison, never for what is
+  written.
 
 ### `material_counts` / `material_count_lines`
 Counts: `counted_on date, counted_by, note`. Lines: `count_id, material_id, lot_id
