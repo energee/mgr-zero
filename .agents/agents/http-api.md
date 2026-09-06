@@ -15,12 +15,14 @@ capability = new registered command, then these docs — not a new route.
 Decision: `.agents/MEMORY.md` (public HTTP API). Owner of the endpoint:
 `app/api/command/route.ts`. Owner of operations: `lib/commands/registry.ts`
 plus `lib/commands/<area>.ts`. Owner of integrator docs: `content/docs/api.mdx`, the reference Fumadocs serves
-at `/docs/api` (README only links to it). One page: each area is a `##` section
-of prose you write, followed by operations you do not. `lib/mgr/api-operations.ts`
-derives them from the registry and from `components/mgr/screens.tsx`, and
-`bun run docs:api` writes each area's between its `{/* ops:<slug> */}` markers.
-Never hand-edit between those markers — `tests/api-docs.test.ts` re-renders them
-and fails on drift.
+at `/docs/api` (README only links to it). One page: the cross-cutting rules are
+`##` sections of prose you write, then a single `## Operations` holds each area
+as a `###` and each operation under it as a `####` you do not write.
+`lib/mgr/api-operations.ts` derives the operations from the registry and from
+`components/mgr/screens.tsx`, and `bun run docs:api` writes each area's block
+between its `ops:<slug>` and `end ops:<slug>` MDX comment markers. Never
+hand-edit between those markers — `tests/api-docs.test.ts` re-renders them and
+fails on drift.
 
 ## When to run
 
@@ -40,7 +42,8 @@ command, run this before calling the work done.
    enforces it. Ignore tables that have no registered command.
 
 2. **Inventory the docs.** Read `content/docs/api.mdx`: the preamble states the
-   envelope, auth and status codes, then one `##` section per area. Run
+   envelope, auth and status codes, then `## Operations` holds one `###` section
+   per area. Run
    `bun run docs:api` and a new command writes itself into its section, with a
    field table and an example request generated from its Zod schema. What you
    check is that its `description` and `roles` read well as documentation, and

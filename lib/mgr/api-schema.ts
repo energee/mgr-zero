@@ -13,7 +13,28 @@ export type ApiField = { name: string; type: string; required: boolean };
 const formats = (node: any): string[] =>
   (node.def.checks ?? []).map((c: any) => c._zod?.def?.format ?? c._zod?.def?.check).filter(Boolean);
 
-const unwrapOptional = (node: any) => (node.def.type === "optional" || node.def.type === "nullable" ? node.def.innerType : node);
+// Wrappers that change how a field may be omitted or emptied but not its shape.
+// They nest — `z.object({…}).nullable().optional()` is optional→nullable→object,
+// and `z.number().int().default(50)` is default→number — so both the label and
+// the required flag have to walk the whole chain. Stopping at one level printed
+// the wrapper's own name as the type ("default", "nullable") in the field table.
+const WRAPPERS = new Set(["optional", "nullable", "default", "prefault", "readonly", "catch"]);
+
+/** The schema node under every wrapper: the type a caller actually sends. */
+const unwrapOptional = (node: any) => {
+  let inner = node;
+  while (inner?.def && WRAPPERS.has(inner.def.type) && inner.def.innerType) inner = inner.def.innerType;
+  return inner;
+};
+
+/** True when the field may be left out: some wrapper omits it or supplies a value. */
+export function isOptional(node: any): boolean {
+  for (let n = node; n?.def && WRAPPERS.has(n.def.type); n = n.def.innerType) {
+    if (n.def.type === "optional" || n.def.type === "default" || n.def.type === "prefault") return true;
+    if (!n.def.innerType) break;
+  }
+  return false;
+}
 
 /** A human type label for one schema node, e.g. `uuid`, `integer`, `keg | can`. */
 export function typeLabel(node: any): string {
@@ -59,7 +80,7 @@ export function fieldsOf(schema: ZodType): ApiField[] {
   const shape = (schema as any).def?.shape;
   if (!shape) return [];
   return Object.entries<any>(shape)
-    .map(([name, node]) => ({ name, type: typeLabel(node), required: node.def.type !== "optional" && node.def.type !== "default" }))
+    .map(([name, node]) => ({ name, type: typeLabel(node), required: !isOptional(node) }))
     .sort((a, b) => (a.required === b.required ? 0 : a.required ? -1 : 1));
 }
 
@@ -69,7 +90,7 @@ export function sampleInput(schema: ZodType): Record<string, unknown> {
   if (!shape) return {};
   const sample: Record<string, unknown> = {};
   for (const [name, node] of Object.entries<any>(shape)) {
-    if (node.def.type === "optional" || node.def.type === "default") continue;
+    if (isOptional(node)) continue;
     sample[name] = sampleValue(node);
   }
   return sample;

@@ -301,6 +301,7 @@ one value that ties what your client saw to what the server recorded.
 | 404 | `unknown_command` | No operation is registered under that `name`. | Check the spelling. An operation marked designed is not registered yet and answers this. |
 | 409 | `conflict` | A `requestId` was reused with a different payload. | Reuse a requestId only to retry the identical write; generate a new one for a new write. |
 | 500 | `db_error` | The database refused the write for a reason not mapped to a public code. Logged server-side. | Retry once with the same `requestId`. If it persists, quote the `correlationId` from the response. |
+| 500 | `internal_error` | A handler threw something the endpoint could not map to a public code. A server fault, and the only code whose message carries no detail. | Retry once with the same `requestId`; a write may or may not have landed, so read the record back before retrying with a new one. Report it with the `correlationId`. |
 | 500 | `missing_execution` | A command reached its handler without execution metadata. A server fault. | Report it with the `correlationId`. |
 {/* end ops:errors */}
 
@@ -347,8 +348,10 @@ the brewery entered all the way to the tax form.
 ### Fields the server computes [#computed]
 
 Some values are derived and must not be sent. `bbl` on an inventory movement is
-computed from the SKU and the quantity; sending it is rejected rather than
-trusted, because two sources for one number is how ledgers drift.
+computed from the SKU and the quantity. A field an operation does not declare is
+dropped before the handler runs rather than trusted, so sending your own `bbl`
+does not fail — it is simply ignored, because two sources for one number is how
+ledgers drift. Read the computed value back rather than assuming yours was used.
 
 Prices on order lines are snapshotted at creation from the customer's price
 list. You do not send them, and changing a price list later does not rewrite an
@@ -460,7 +463,7 @@ Mute/unmute one notification reason for yourself and optionally override your qu
 | --- | --- | --- |
 | `reason` | submitted_order or pick_due or delivery_next or fermentation_reading_overdue or operations_digest | yes |
 | `enabled` | boolean | yes |
-| `quietHours` | nullable | no |
+| `quietHours` | object | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -685,7 +688,7 @@ Invoices and credit memos with subtotal (from invoice_totals), newest first
 | Field | Type | Required |
 | --- | --- | --- |
 | `customerId` | uuid | no |
-| `limit` | default | no |
+| `limit` | integer | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -703,7 +706,7 @@ Orders newest-first, optionally by status
 | Field | Type | Required |
 | --- | --- | --- |
 | `status` | draft or submitted or confirmed or picked or shipped or cancelled | no |
-| `limit` | default | no |
+| `limit` | integer | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -934,7 +937,7 @@ Recent inventory movements
 | Field | Type | Required |
 | --- | --- | --- |
 | `skuId` | uuid | no |
-| `limit` | default | no |
+| `limit` | integer | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

@@ -32,4 +32,6 @@ export const API_ERRORS: ApiError[] = [
     remedy: "Retry once with the same `requestId`. If it persists, quote the `correlationId` from the response." },
   { code: "missing_execution", status: 500, meaning: "A command reached its handler without execution metadata. A server fault.",
     remedy: "Report it with the `correlationId`." },
+  { code: "internal_error", status: 500, meaning: "A handler threw something the endpoint could not map to a public code. A server fault, and the only code whose message carries no detail.",
+    remedy: "Retry once with the same `requestId`; a write may or may not have landed, so read the record back before retrying with a new one. Report it with the `correlationId`." },
 ];

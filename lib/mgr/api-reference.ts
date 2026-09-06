@@ -103,8 +103,12 @@ export function renderRoleMatrix(): string {
   const rows = apiOperations()
     .filter((o) => o.status === "available")
     .map((o) => {
-      const roles = (o.roles ?? "").split(", ");
-      const cells = ROLES.map((r) => (roles.includes(r) ? "✓" : ""));
+      // `roles` is the registry's own value flattened to a string, and "any" is
+      // one of its three shapes (StaffRole[] | "customer" | "any"). Matching it
+      // by name alone would tick nothing and document an operation open to
+      // everyone as callable by nobody.
+      const roles = o.roles ?? "";
+      const cells = ROLES.map((r) => (roles === "any" || roles.split(", ").includes(r) ? "✓" : ""));
       const area = API_AREAS.find((a) => a.slug === areaOf(o.name));
       return `| \`${o.name}\` | ${area?.title ?? ""} | ${cells.join(" | ")} |`;
     });
@@ -132,8 +136,11 @@ export function renderBacklog(): string {
   const planned = operations.filter((o) => o.status === "designed");
 
   const areas = API_AREAS.map((area) => {
-    const rows = operationsInArea(area.slug).filter((o) => o.status === "designed");
-    const built = operationsInArea(area.slug).filter((o) => o.status === "available").length;
+    // One derivation per area: operationsInArea re-walks every screen and the
+    // whole registry, so asking it twice doubled the work for no new answer.
+    const inArea = operationsInArea(area.slug);
+    const rows = inArea.filter((o) => o.status === "designed");
+    const built = inArea.length - rows.length;
     if (rows.length === 0) return "";
     return [
       `## ${area.title} — ${rows.length} to build, ${built} built`,

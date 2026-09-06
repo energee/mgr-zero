@@ -21,7 +21,6 @@ const read = (path: string) => readFileSync(resolve(root, path), "utf8");
 // One page: the rail is its headings, so it tracks the scroll — the rules as
 // `##`, then `## Operations` with each area as `###` and its operations `####`.
 const PAGE = () => read("content/docs/api.mdx");
-const areaPage = (_slug: string) => PAGE();
 
 describe("HTTP API reference", () => {
   it("gives every registered operation an area and marks it available", () => {
@@ -58,7 +57,10 @@ describe("HTTP API reference", () => {
     expect(h3[0], "Today leads the operations").toBe("today");
     expect(h3.sort()).toEqual(API_AREAS.map((a) => a.slug).sort());
     for (const area of API_AREAS) {
-      const page = areaPage(area.slug);
+      // One derivation per area: operationsInArea re-walks every screen and the
+      // whole registry on each call.
+      const inArea = operationsInArea(area.slug);
+      expect(inArea.length, `${area.slug} has no operations`).toBeGreaterThan(0);
       // Fumadocs builds "On this page" from MDX headings at compile time, so
       // every operation is a real heading in the file rather than a
       // component's table row. `bun run docs:api` writes the block between
@@ -68,25 +70,24 @@ describe("HTTP API reference", () => {
       expect(block, `${area.slug} is stale — run \`bun run docs:api\``).toBe(renderArea(area.slug).trimEnd());
       // An available operation is documented in full; a designed one is a row
       // in the closing list, because there is no schema to document yet.
-      for (const operation of operationsInArea(area.slug)) {
+      for (const operation of inArea) {
         const entry = operation.status === "available"
           ? `#### ${operation.name} [#${operation.name}]`
           : `| \`${operation.name}\` |`;
         expect(page, `${area.slug} is missing ${operation.name}`).toContain(entry);
       }
       // Designed operations sit at the bottom, after everything callable.
-      const planned = operationsInArea(area.slug).filter((o) => o.status === "designed");
-      const live = operationsInArea(area.slug).filter((o) => o.status === "available");
+      const planned = inArea.filter((o) => o.status === "designed");
+      const live = inArea.filter((o) => o.status === "available");
       if (planned.length > 0 && live.length > 0) {
         expect(page.indexOf(`{/* ${area.slug}-designed */}`), `${area.slug} lists designed operations before available ones`)
           .toBeGreaterThan(page.lastIndexOf(`#### ${live[live.length - 1].name} `));
       }
       // A caller should never have to guess the request: an available
       // operation carries a runnable example naming itself.
-      for (const operation of operationsInArea(area.slug).filter((o) => o.status === "available")) {
+      for (const operation of live) {
         expect(page, `${operation.name} has no example request`).toContain(`"name": "${operation.name}"`);
       }
-      expect(operationsInArea(area.slug).length, `${area.slug} has no operations`).toBeGreaterThan(0);
     }
   });
 
@@ -113,7 +114,7 @@ describe("HTTP API reference", () => {
     for (const { name } of listTools()) {
       const schema = getCommandDefinition(name)?.input;
       if (!schema) continue;
-      const page = areaPage(areaOf(name)!);
+      const page = PAGE();
       for (const field of fieldsOf(schema)) {
         expect(page, `${name} does not document ${field.name}`).toContain(`| \`${field.name}\` |`);
       }
@@ -131,6 +132,17 @@ describe("HTTP API reference", () => {
     const anchors = [...PAGE().matchAll(/\[#([a-z0-9_-]+)\]/g)].map((m) => m[1]);
     const repeated = [...new Set(anchors.filter((a, i) => anchors.indexOf(a) !== i))];
     expect(repeated).toEqual([]);
+  });
+
+  // tests/docs.test.ts checks in-page links for the customer guides but skips
+  // this page, which carries more of them than any guide. Without this, a typo
+  // in one of the Cards' hrefs would ship as a link that scrolls nowhere.
+  it("points every in-page link at an anchor the reference declares", () => {
+    const page = PAGE();
+    const declared = new Set([...page.matchAll(/\[#([a-z0-9_-]+)\]/g)].map((m) => m[1]));
+    const links = [...page.matchAll(/href="#([a-z0-9_-]+)"|\]\(#([a-z0-9_-]+)\)/g)].map((m) => m[1] ?? m[2]);
+    expect(links.length, "the reference cross-links its own sections").toBeGreaterThan(0);
+    expect(links.filter((l) => !declared.has(l))).toEqual([]);
   });
 
   // The designed operations are the backend push. The reference publishes them
@@ -153,7 +165,12 @@ describe("HTTP API reference", () => {
     const sources = ["app/api/command/route.ts", "lib/commands/registry.ts", ...readdirSync(resolve(root, "lib/commands")).map((f) => `lib/commands/${f}`)]
       .filter((f) => f.endsWith(".ts"))
       .map(read).join("\n");
-    const raised = new Set([...sources.matchAll(/CommandError\([^;]*?,\s*\d{3},\s*"([a-z_]+)"/g)].map((m) => m[1]));
+    const raised = new Set([
+      ...[...sources.matchAll(/CommandError\([^;]*?,\s*\d{3},\s*"([a-z_]+)"/g)].map((m) => m[1]),
+      // route.ts's last-resort branch builds the failure envelope itself rather
+      // than throwing, so a CommandError-only grep missed `internal_error`.
+      ...[...sources.matchAll(/\bcode:\s*"([a-z_]+)"/g)].map((m) => m[1]),
+    ]);
     raised.add("bad_request"); // CommandError's default code, used without naming it.
     const documented = new Set(API_ERRORS.map((e) => e.code));
     expect([...raised].filter((c) => !documented.has(c)), "raised but undocumented").toEqual([]);
