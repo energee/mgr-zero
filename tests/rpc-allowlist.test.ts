@@ -9,6 +9,7 @@ const AUTHENTICATED_RPCS = [
   "adjust_order_lines(uuid,jsonb,text,uuid)",
   "upsert_vendor(uuid,uuid,text,text,text,integer,text,boolean,uuid)",
   "create_purchase_order(uuid,uuid,date,text,jsonb,uuid)",
+  "record_material_count(uuid,uuid,uuid,date,jsonb,uuid)",
   "draft_purchase_order_from_requirements(uuid,uuid[],uuid)",
   "send_purchase_order(uuid,uuid,text,uuid)",
   "receive_purchase_order(uuid,uuid,uuid,uuid,date,jsonb,uuid)",

@@ -424,10 +424,10 @@ view = `variance <> 0`. idx `(po_line_id)`.
   written.
 
 ### `material_counts` / `material_count_lines`
-Counts: `counted_on date, counted_by, note`. Lines: `count_id, material_id, lot_id
+Counts: `location_id, bin_id` (a count is taken at one bin; on hand is compared and adjusted there), `counted_on date, counted_by, note`. Lines: `count_id, material_id, lot_id
 (composite as above), qty_expected numeric` (snapshot at count), `qty_counted numeric >=
 0, movement_id → material_movements unique` (the `count_adjustment`, null when no
-variance). idx `(count_id)`, `(material_id)`.
+variance; a shortage split across lots is one line per lot). idx `(count_id)`, `(material_id)`.
 
 ### Views
 - `material_on_hand` — `sum(qty)` by `(brewery_id, material_id)`; `material_lot_on_hand`

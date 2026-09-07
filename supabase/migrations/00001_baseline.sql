@@ -1004,14 +1004,19 @@ end $$;
 create trigger receipt_lines_po_status after insert on receipt_lines
   for each row execute function update_po_status();
 
+-- A count is taken at one bin: on-hand is compared and adjusted there.
 create table material_counts (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
+  location_id uuid not null,
+  bin_id uuid not null,
   counted_on date not null default current_date,
   counted_by uuid not null references auth.users(id),
   note text,
   created_at timestamptz not null default now(),
-  unique (id, brewery_id)
+  unique (id, brewery_id),
+  foreign key (location_id, brewery_id) references locations (id, brewery_id),
+  foreign key (bin_id, location_id, brewery_id) references bins (id, location_id, brewery_id)
 );
 
 create table material_count_lines (
@@ -1020,9 +1025,9 @@ create table material_count_lines (
   count_id uuid not null,
   material_id uuid not null,
   lot_id uuid,
-  qty_expected numeric(14,4) not null,                 -- on-hand snapshot at count time
+  qty_expected numeric(14,4) not null,                 -- on-hand snapshot at count time (the lot's share when lot_id is set)
   qty_counted numeric(14,4) not null check (qty_counted >= 0),
-  movement_id uuid unique,                             -- count_adjustment; null when no variance
+  movement_id uuid unique,                             -- count_adjustment; null when no variance. A variance split across lots is one line per lot.
   foreign key (count_id, brewery_id) references material_counts (id, brewery_id),
   foreign key (material_id, brewery_id) references materials (id, brewery_id),
   foreign key (lot_id, material_id, brewery_id) references material_lots (id, material_id, brewery_id),
@@ -4181,6 +4186,85 @@ begin
   return private.complete_command_request(p_request_id, jsonb_build_object('purchaseOrderIds', v_pos, 'skipped', v_skipped));
 end $$;
 
+-- Cycle count at one bin (Cycle count sheet): one number per material, the
+-- header always written (a zero-variance count is a durable occurrence), and
+-- only the variance posts, as count_adjustment movements. A count is one
+-- number but a material may hold several lots, so this decides which lot
+-- moves: a shortage consumes earliest best-by first (lots with none fall to
+-- receipt order behind those that have one) and may split across lots, one
+-- count line per lot; an overage lands on the newest lot.
+create function record_material_count(
+  p_brewery uuid, p_location uuid, p_bin uuid, p_counted_on date, p_lines jsonb, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_actor uuid; v_replay jsonb; v_count public.material_counts; l jsonb; v_mat public.materials;
+  v_on_hand numeric; v_counted numeric; v_delta numeric; v_take numeric; v_movement uuid; lot record;
+  v_lines jsonb := '[]'; v_movements jsonb;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin','warehouse','brewer']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'record_material_count', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'location', p_location, 'bin', p_bin, 'counted_on', p_counted_on, 'lines', p_lines));
+  if v_replay is not null then return v_replay; end if;
+  if jsonb_array_length(p_lines) = 0 then raise exception 'a count needs at least one material'; end if;
+  insert into public.material_counts (brewery_id, location_id, bin_id, counted_on, counted_by)
+  values (p_brewery, p_location, p_bin, coalesce(p_counted_on, current_date), v_actor) returning * into v_count;
+  for l in select * from jsonb_array_elements(p_lines) loop
+    select * into v_mat from public.materials where id = (l->>'material_id')::uuid and brewery_id = p_brewery;
+    if v_mat.id is null then raise exception 'material not found'; end if;
+    v_counted := (l->>'qty')::numeric;
+    select coalesce(sum(qty), 0) into v_on_hand from public.material_movements
+      where material_id = v_mat.id and location_id = p_location and bin_id = p_bin;
+    v_delta := v_counted - v_on_hand;
+    v_movements := '[]';
+    if v_delta = 0 then
+      insert into public.material_count_lines (brewery_id, count_id, material_id, qty_expected, qty_counted)
+      values (p_brewery, v_count.id, v_mat.id, v_on_hand, v_counted);
+    elsif not v_mat.lot_tracked then
+      insert into public.material_movements (brewery_id, material_id, location_id, bin_id, qty, type, created_by)
+      values (p_brewery, v_mat.id, p_location, p_bin, v_delta, 'count_adjustment', v_actor) returning id into v_movement;
+      insert into public.material_count_lines (brewery_id, count_id, material_id, qty_expected, qty_counted, movement_id)
+      values (p_brewery, v_count.id, v_mat.id, v_on_hand, v_counted, v_movement);
+      v_movements := v_movements || to_jsonb(v_movement);
+    elsif v_delta > 0 then
+      -- Overage: the newest lot at this bin (unrecorded stock is likeliest the delivery just counted in).
+      select ml.id, coalesce(sum(mm.qty), 0) as qty into lot
+      from public.material_lots ml left join public.material_movements mm
+        on mm.lot_id = ml.id and mm.location_id = p_location and mm.bin_id = p_bin
+      where ml.material_id = v_mat.id group by ml.id, ml.received_on, ml.created_at
+      order by ml.received_on desc nulls last, ml.created_at desc limit 1;
+      if lot.id is null then raise exception '% is lot-tracked and has no lot to count against', v_mat.name; end if;
+      insert into public.material_movements (brewery_id, material_id, location_id, bin_id, lot_id, qty, type, created_by)
+      values (p_brewery, v_mat.id, p_location, p_bin, lot.id, v_delta, 'count_adjustment', v_actor) returning id into v_movement;
+      insert into public.material_count_lines (brewery_id, count_id, material_id, lot_id, qty_expected, qty_counted, movement_id)
+      values (p_brewery, v_count.id, v_mat.id, lot.id, lot.qty, lot.qty + v_delta, v_movement);
+      v_movements := v_movements || to_jsonb(v_movement);
+    else
+      -- Shortage: earliest best-by first, lots with none behind those that have one, then receipt order.
+      v_delta := -v_delta;
+      for lot in
+        select ml.id, sum(mm.qty) as qty
+        from public.material_lots ml join public.material_movements mm
+          on mm.lot_id = ml.id and mm.location_id = p_location and mm.bin_id = p_bin
+        where ml.material_id = v_mat.id group by ml.id, ml.best_by, ml.received_on, ml.created_at
+        having sum(mm.qty) > 0
+        order by ml.best_by asc nulls last, ml.received_on asc nulls last, ml.created_at
+      loop
+        exit when v_delta <= 0;
+        v_take := least(lot.qty, v_delta);
+        insert into public.material_movements (brewery_id, material_id, location_id, bin_id, lot_id, qty, type, created_by)
+        values (p_brewery, v_mat.id, p_location, p_bin, lot.id, -v_take, 'count_adjustment', v_actor) returning id into v_movement;
+        insert into public.material_count_lines (brewery_id, count_id, material_id, lot_id, qty_expected, qty_counted, movement_id)
+        values (p_brewery, v_count.id, v_mat.id, lot.id, lot.qty, lot.qty - v_take, v_movement);
+        v_movements := v_movements || to_jsonb(v_movement);
+        v_delta := v_delta - v_take;
+      end loop;
+      if v_delta > 0 then raise exception 'count of % is below zero for its lots at this bin', v_mat.name; end if;
+    end if;
+    v_lines := v_lines || jsonb_build_object('material_id', v_mat.id, 'qty_expected', v_on_hand, 'qty_counted', v_counted, 'movement_ids', v_movements);
+  end loop;
+  return private.complete_command_request(p_request_id, jsonb_build_object('id', v_count.id, 'counted_on', v_count.counted_on, 'lines', v_lines));
+end $$;
+
 -- ---------------------------------------------------------------- Stock transfers
 -- Internal moves of stuff between two locations (spec 2026-09-06 Decision 3).
 create function private.lock_transfer(p_transfer uuid, p_allowed public.stock_transfer_status[]) returns public.stock_transfers
@@ -5555,7 +5639,8 @@ grant execute on function
   create_purchase_order(uuid,uuid,date,text,jsonb,uuid),
   send_purchase_order(uuid,uuid,text,uuid),
   receive_purchase_order(uuid,uuid,uuid,uuid,date,jsonb,uuid),
-  draft_purchase_order_from_requirements(uuid,uuid[],uuid)
+  draft_purchase_order_from_requirements(uuid,uuid[],uuid),
+  record_material_count(uuid,uuid,uuid,date,jsonb,uuid)
   to authenticated;
 grant usage on schema private, extensions to service_role;
 -- service_role reaches `private` only for the UUID default its seed inserts

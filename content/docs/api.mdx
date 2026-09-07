@@ -243,6 +243,7 @@ omitted. They have no roles until they are built.
 | `record_brew_day` | Production | ✓ |  |  | ✓ |  |
 | `record_cellar_transfer` | Production | ✓ |  |  | ✓ |  |
 | `record_fermentation_reading` | Production | ✓ |  |  | ✓ |  |
+| `record_material_count` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |
 | `record_movement` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `record_pick` | Orders & invoicing | ✓ |  | ✓ |  |  |
 | `record_repack` | Packaging | ✓ |  | ✓ |  |  |
@@ -2038,6 +2039,26 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "receive_purchase_order", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "poId": "00000000-0000-0000-0000-000000000000", "locationId": "00000000-0000-0000-0000-000000000000", "binId": "00000000-0000-0000-0000-000000000000", "lines": [ { "poLineId": "00000000-0000-0000-0000-000000000000", "qtyCounted": 1 } ] } }'
 ```
 
+#### record_material_count [#record_material_count]
+
+`command` · admin, warehouse, brewer
+
+Cycle count at one bin: one number per material; the count is always recorded and only the variance posts as count_adjustment movements (a shortage from the earliest best-by lots, an overage onto the newest)
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+| `binId` | uuid | yes |
+| `lines` | array of object | yes |
+| `countedOn` | date (YYYY-MM-DD) | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_material_count", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "locationId": "00000000-0000-0000-0000-000000000000", "binId": "00000000-0000-0000-0000-000000000000", "lines": [ { "materialId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
+```
+
 #### send_purchase_order [#send_purchase_order]
 
 `command` · admin, warehouse
@@ -2128,18 +2149,6 @@ curl -X POST "$MGR_URL/api/command" \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_vendor", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string" } }'
 ```
-
----
-
-**Designed, not yet available** {/* purchasing-designed */}
-
-13 of the 14 operations in this area are available today; the 1 below are not.
-
-The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
-
-| Operation | Kind | Needed by |
-| --- | --- | --- |
-| `record_material_count` | command | Cycle count |
 
 {/* end ops:purchasing */}
 

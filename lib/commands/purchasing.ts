@@ -279,3 +279,17 @@ defineCommand({
     p_brewery: ctx.breweryId, p_materials: i.materialIds, p_request_id: execution.requestId,
   })),
 });
+
+defineCommand({
+  name: "record_material_count",
+  description: "Cycle count at one bin: one number per material; the count is always recorded and only the variance posts as count_adjustment movements (a shortage from the earliest best-by lots, an overage onto the newest)",
+  input: z.object({
+    locationId: z.string().uuid(), binId: z.string().uuid(), countedOn: isoDate.optional(),
+    lines: z.array(z.object({ materialId: z.string().uuid(), qty: z.number().nonnegative() })).min(1),
+  }),
+  roles: [...PURCHASING],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_material_count", {
+    p_brewery: ctx.breweryId, p_location: i.locationId, p_bin: i.binId, p_counted_on: i.countedOn ?? null,
+    p_lines: i.lines.map((l) => ({ material_id: l.materialId, qty: l.qty })), p_request_id: execution.requestId,
+  })),
+});

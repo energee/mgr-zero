@@ -191,3 +191,44 @@ describe("planning: draft purchase orders from material gaps", () => {
     expect(again.find((r) => r.material_id === pale.id)!.on_order).toBe(0);
   });
 });
+
+describe("material cycle count", () => {
+  it("equal count writes only the header; a shortage posts one negative count_adjustment", async () => {
+    const wh = await seedLocation(b.id, { name: "Packaging store" });
+    const cans = (await runCommand("upsert_material", { name: "Cans 16 oz", category: "packaging", baseUom: "each", purchaseUom: "each" }, ctx)) as { id: string };
+    await admin.from("material_movements").insert({ brewery_id: b.id, material_id: cans.id, location_id: wh.id, bin_id: wh.binId, qty: 3100, type: "opening_balance", created_by: ctx.userId });
+
+    const same = (await runCommand("record_material_count", { locationId: wh.id, binId: wh.binId, lines: [{ materialId: cans.id, qty: 3100 }] }, ctx)) as { id: string; lines: { material_id: string; qty_expected: number; qty_counted: number; movement_ids: string[] }[] };
+    expect(same.lines).toEqual([{ material_id: cans.id, qty_expected: 3100, qty_counted: 3100, movement_ids: [] }]);
+    expect((await admin.from("material_counts").select("id, location_id, bin_id").eq("id", same.id)).data).toEqual([{ id: same.id, location_id: wh.id, bin_id: wh.binId }]);
+
+    const short = (await runCommand("record_material_count", { locationId: wh.id, binId: wh.binId, lines: [{ materialId: cans.id, qty: 3050 }] }, ctx)) as { lines: { movement_ids: string[] }[] };
+    expect(short.lines[0].movement_ids).toHaveLength(1);
+    const moves = await admin.from("material_movements").select("qty, type, lot_id").eq("material_id", cans.id).eq("type", "count_adjustment");
+    expect(moves.data).toEqual([{ qty: -50, type: "count_adjustment", lot_id: null }]);
+  });
+
+  it("a shortage consumes earliest best-by first and may split across lots; an overage lands on the newest lot", async () => {
+    const wh = await seedLocation(b.id, { name: "Hop freezer" });
+    const hop = (await runCommand("upsert_material", { name: "Simcoe", category: "hop", baseUom: "lb", purchaseUom: "lb", lotTracked: true }, ctx)) as { id: string };
+    const lot = async (code: string, bestBy: string | null, receivedOn: string, qty: number) => {
+      const { data } = await admin.from("material_lots").insert({ brewery_id: b.id, material_id: hop.id, lot_code: code, best_by: bestBy, received_on: receivedOn }).select("id").single();
+      await admin.from("material_movements").insert({ brewery_id: b.id, material_id: hop.id, location_id: wh.id, bin_id: wh.binId, lot_id: data!.id, qty, type: "receipt", created_by: ctx.userId });
+      return data!.id as string;
+    };
+    const old = await lot("S-24", "2026-12-01", "2026-01-10", 10);   // expires first
+    const mid = await lot("S-25", "2027-06-01", "2026-06-10", 20);
+    const fresh = await lot("S-26", null, "2026-09-01", 30);        // no best-by: behind those that have one; newest receipt
+
+    // 60 on hand, counted 45: −10 from S-24 (all of it), −5 from S-25.
+    const short = (await runCommand("record_material_count", { locationId: wh.id, binId: wh.binId, lines: [{ materialId: hop.id, qty: 45 }] }, ctx)) as { lines: { movement_ids: string[] }[] };
+    expect(short.lines[0].movement_ids).toHaveLength(2);
+    const after = await admin.from("material_movements").select("lot_id, qty").eq("material_id", hop.id).eq("type", "count_adjustment").order("qty");
+    expect(after.data).toEqual([{ lot_id: old, qty: -10 }, { lot_id: mid, qty: -5 }]);
+
+    // 45 on hand, counted 50: +5 on the newest lot.
+    await runCommand("record_material_count", { locationId: wh.id, binId: wh.binId, lines: [{ materialId: hop.id, qty: 50 }] }, ctx);
+    const over = await admin.from("material_movements").select("lot_id, qty").eq("material_id", hop.id).eq("type", "count_adjustment").gt("qty", 0);
+    expect(over.data).toEqual([{ lot_id: fresh, qty: 5 }]);
+  });
+});
