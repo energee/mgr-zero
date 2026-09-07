@@ -22,8 +22,7 @@ export function asPersona(screen: Screen, persona: Persona, refused?: string): S
           {E.ttl("Brewery")}
           {E.row("Demo Brewing", "current", "✓", "ok")}
           {E.sp()}
-          {E.btn("Change password", "g")}
-          {E.btn("Sign out", "del")}
+          {E.btns([["Change password", "g"], ["Sign out", "del"]])}
         </>
       ),
     };
