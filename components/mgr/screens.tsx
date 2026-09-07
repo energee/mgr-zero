@@ -2357,8 +2357,10 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.edit("Vendor name", "YCH")}
       {E.edit("Email", "orders@ych.example", "email")}
-      {E.pick("Terms", "Net 30", ["Due on receipt", "Net 15", "Net 30"])}
-      {E.edit("Lead time (days)", "7", "number")}
+      {E.inline(
+        E.pick("Terms", "Net 30", ["Due on receipt", "Net 15", "Net 30"]),
+        E.edit("Lead time (days)", "7", "number"),
+      )}
       {E.info("The typed figure is what Planning dates a buy-by from. Received orders give an observed average that is read, never stored.")}
       {E.btn("Save vendor")}
     </>),

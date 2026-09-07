@@ -285,7 +285,7 @@ export const E = {
   /** Fields that read as one phrase (a quantity, its unit, and what it is per)
    *  stay on one line at every width; three at most, or the phone can’t. */
   inline: (...fields: React.ReactNode[]) => (
-    <div className="grid grid-cols-3 gap-2 [&>*]:min-w-0">{fields.map((f, i) => <Fragment key={i}>{f}</Fragment>)}</div>
+    <div className="grid gap-2 [&>*]:min-w-0" style={{ gridTemplateColumns: `repeat(${fields.length}, minmax(0, 1fr))` }}>{fields.map((f, i) => <Fragment key={i}>{f}</Fragment>)}</div>
   ),
   /** A time-of-day window as one two-thumb range: start and end are 24-hour "hh:mm". */
   window: (label: string, start: string, end: string) => <TimeWindowField label={label} start={start} end={end} />,
