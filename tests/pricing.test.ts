@@ -227,3 +227,13 @@ describe("order lines reprice from orders.sale_channel_id", () => {
     expect(lines.data!.find((l) => l.sku_id === bb.skuId)!.unit_price_cents).toBe(2500);
   });
 });
+
+describe("recipe default price group", () => {
+  it("a recipe parent may dangle a default group without pricing a version", async () => {
+    const { error, data } = await admin.from("recipes").insert({
+      brewery_id: b.id, name: "Hint IPA", default_price_group_id: group,
+    }).select("default_price_group_id").single();
+    expect(error).toBeNull();
+    expect(data!.default_price_group_id).toBe(group);
+  });
+});

@@ -1,6 +1,6 @@
 // app/(app)/locations/[id]/page.tsx — Location detail (screen record
 // Location detail): name and kind with Edit → update_location. Timezone is
-// the brewery's; bins stay gated until Program 2.
+// the brewery's; bins open /locations/[id]/bins.
 import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -20,12 +20,13 @@ export default async function LocationPage({ params }: { params: Promise<{ id: s
   const ctx = await buildContext(brewery.id);
   const location = ((await runCommand("list_locations", {}, ctx)) as LocationRow[]).find((l) => l.id === id);
   if (!location) notFound();
+  const bins = (await runCommand("list_bins", { locationId: id }, ctx)) as { name: string }[];
   return (
     <>
       {E.back("Locations", location.name, brewery.role === "admin" ? <LocationForm location={location} /> : undefined, "/locations")}
       {E.fld("Type", KIND_LABEL[location.kind])}
       {E.fld("Timezone", "Brewery default")}
-      {E.gated("Location bins")}
+      {E.row("Location bins", bins.map((b) => b.name).join(" · ") || "none", E.act("Open", "primary", `/locations/${id}/bins`))}
     </>
   );
 }

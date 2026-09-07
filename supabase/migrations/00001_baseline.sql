@@ -562,10 +562,14 @@ create table recipes (
   brand_id uuid,
   name text not null,
   note text,
+  -- Optional pre-fill for the brand a batch packages into (#189 D6). Never a
+  -- commitment: on delete set null so a group can go away without blocking.
+  default_price_group_id uuid,
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
   unique (brewery_id, name),
-  foreign key (brand_id, brewery_id) references brands (id, brewery_id)
+  foreign key (brand_id, brewery_id) references brands (id, brewery_id),
+  foreign key (default_price_group_id, brewery_id) references price_groups (id, brewery_id) on delete set null
 );
 
 create table recipe_versions (

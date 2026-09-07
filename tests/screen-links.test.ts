@@ -13,7 +13,7 @@ const names = new Set(SCREENS.map((s) => s.name));
 
 describe("resolveTap", () => {
   it("prefers the record's own map, then global rules, then the exact name", () => {
-    expect(resolveTap(by("Order"), "Adjust")).toBe("Short pick");
+    expect(resolveTap(by("Order"), "Adjust")).toBe("Adjust lines");
     expect(resolveTap(by("Orders"), "Confirm")).toBe("Confirm order");
     expect(resolveTap(by("Orders"), "New order")).toBe("New order");
     expect(resolveTap(by("Order"), "Orders")).toBe("Orders");
@@ -48,7 +48,8 @@ describe("resolveTap", () => {
         expect(next, `${at} → "${tap}"`).toBeDefined();
         return next!;
       }, from);
-    expect(walk("Today", "Pick", "Orders", "ORD-0231 · Ridgeline", "Adjust")).toBe("Short pick");
+    expect(walk("Today", "Pick", "Orders", "ORD-0231 · Ridgeline", "Adjust")).toBe("Adjust lines");
+    expect(walk("Short pick", "Pick")).toBe("Pick");
     expect(walk("Orders", "Confirm", "Confirm order")).toBe("Order");
     expect(walk("Orders", "New order", "Save draft")).toBe("Order");
     expect(walk("Customers", "Ridgeline Tap Room", "Invite")).toBe("Invite portal user");
@@ -72,7 +73,7 @@ describe("Work chips", () => {
     const { createElement } = await import("react");
     const { WORK_TABS } = await import("../components/mgr/screens");
     for (const name of Object.values(WORK_TABS)) expect(by(name), name).toBeDefined();
-    for (const name of ["Work", "Orders", "Batches", "Packaging runs", "Purchase orders", "Routes"]) {
+    for (const name of ["Work", "Orders", "Transfers", "Batches", "Packaging runs", "Purchase orders", "Routes"]) {
       const html = renderToStaticMarkup(createElement("div", null, by(name).body));
       for (const to of Object.values(WORK_TABS)) expect(html, `${name} → ${to}`).toContain(`data-to="${to}"`);
     }
