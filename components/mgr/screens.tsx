@@ -1933,14 +1933,15 @@ export const SCREENS: Screen[] = [
     slice: 4,
     tab: "Work",
     name: "Schedule batch",
-    job: "Set recipe, date and planned barrels before brew day",
-    reads: "get_brew_day [design]",
-    writes: "schedule_batch [design; single planned-batch row]",
-    states: [["permission", "brewer or admin required", 1], ["planned", "Save schedule is the one verb"], ["brew day", "Record brew day is its own screen"]],
-    spec: "The planned mode of brew day: recipe, date and planned barrels. Record brew day is a separate screen so this page has one primary.",
+    job: "Set date and planned barrels; recipe and brand are intent, not commitments",
+    reads: "get_brew_day [design] · list_recipes · list_brands [SCHEMA-GATE: revision 2 §16.1, products → brands]",
+    writes: "schedule_batch [design; single planned-batch row; the recipe version is already nullable, and SCHEMA-GATE: revision 2 §16.9 turns product_id into a nullable intended_brand_id]",
+    states: [["permission", "brewer or admin required", 1], ["planned", "Save schedule is the one verb"], ["no recipe yet", "date and barrels alone hold the slot"], ["no brand yet", "identity waits for packaging, which already requires one"], ["brew day", "Record brew day is its own screen"]],
+    spec: "The planned mode of brew day: date, planned barrels, and two optional statements of intent. Only date and barrels commit anything: they reserve the slot. The recipe version is already optional in the schema, and revision 2 makes the brand optional too, because identity is optional at brew and required at packaging, where every finished lot must already name a brand. Requiring either here enforces nothing the lot does not, and only forces the decision earlier than the business makes it. Keeping brand as intent is also what keeps the gap between what a batch was meant to be and what it shipped as worth querying, rather than rewriting history when a batch blends or turns into something else. Record brew day is a separate screen so this page has one primary.",
     body: (<>
       {E.back("Batches", "B-0416 · Hazy")}
-      {E.pick("Recipe", "Hazy IPA v4", ["Hazy IPA v4", "Pils v3", "Stout v2"])}
+      {E.pick("Recipe · optional", "Hazy IPA v4", ["Not decided", "Hazy IPA v4", "Pils v3", "Stout v2"])}
+      {E.pick("Brand · optional", "Hazy IPA", ["Not decided", "Hazy IPA", "Pils", "Stout"])}
       {E.edit("Planned barrels", "15", "number")}
       {E.edit("Date", "2026-09-04", "date")}
       {E.sp()}

@@ -59,7 +59,7 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `get_recipe_outcomes` | query | Recipe |
 | `list_batches` | query | Batches |
 | `list_fermentation_readings` | query | Vessel detail |
-| `list_recipes` | query | Recipes, Recipe |
+| `list_recipes` | query | Schedule batch, Recipes, Recipe |
 | `list_vessels` | query | Vessel detail |
 | `record_batch_addition` | command | Cellar addition |
 | `record_brew_day` | command | Brew day |
@@ -75,7 +75,7 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `delete_sale_channel` | command | Sale channels, Channel |
 | `get_price_list` | query | Price tiers, Override |
 | `get_sku` | query | SKU |
-| `list_brands` | query | Catalog, Product |
+| `list_brands` | query | Catalog, Product, Schedule batch |
 | `list_sale_channels` | query | Square locations, Sale channels, Channel |
 | `set_price_list_format` | command | Price tiers |
 | `set_price_list_item` | command | Catalog, Price tiers, Override |
