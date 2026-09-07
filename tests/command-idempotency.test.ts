@@ -8,6 +8,7 @@ let staffUserId: string;
 let staffDb: SupabaseClient;
 let skuId: string;
 let locationId: string;
+let binId: string;
 
 beforeAll(async () => {
   const brewery = await makeBrewery();
@@ -16,7 +17,7 @@ beforeAll(async () => {
   staffUserId = staff.id;
   staffDb = await asUser(staff.email);
   ({ skuId } = await seedCatalog(breweryId, { product: "Idempotency product", sku: "Idempotency SKU", packageType: "keg", bblPerUnit: 0.5 }));
-  locationId = (await seedLocation(breweryId, { name: "Idempotency warehouse" })).id;
+  ({ id: locationId, binId } = await seedLocation(breweryId, { name: "Idempotency warehouse" }));
 });
 
 describe("command request idempotency", () => {
@@ -88,6 +89,7 @@ describe("command request idempotency", () => {
       p_brewery: breweryId,
       p_sku: skuId,
       p_location: locationId,
+      p_bin: binId,
       p_qty: 2,
       p_type: "opening_balance",
       p_channel: null,
