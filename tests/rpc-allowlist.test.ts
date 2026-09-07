@@ -7,6 +7,9 @@ import { sql } from "./helpers";
 const AUTHENTICATED_RPCS = [
   "activate_chat_installation(uuid,text,text,text,text,text,text,jsonb)",
   "adjust_order_lines(uuid,jsonb,text,uuid)",
+  "upsert_vendor(uuid,uuid,text,text,text,integer,text,boolean,uuid)",
+  "upsert_material(uuid,uuid,text,material_category,uom,uom,numeric,boolean,uuid,numeric,boolean,uuid)",
+  "upsert_material_contract(uuid,uuid,uuid,uuid,numeric,integer,date,date,text,uuid)",
   "begin_chat_installation(uuid,text,text,text)",
   "begin_chat_reauthorization(uuid,text,text)",
   "cancel_order(uuid,text,uuid)",

@@ -1659,10 +1659,20 @@ create view material_last_cost with (security_invoker = true) as
   from material_movements where type = 'receipt' and unit_cost_cents is not null
   order by brewery_id, material_id, created_at desc;
 
+-- A contract is drawn down many times a year (spec 2026-09-07 §4): received is
+-- what accounting reconciles against, on order is what is placed but not yet
+-- arrived, and available (committed less both) is the only number a buyer
+-- decides against. Drafts and cancelled POs hold nothing. Purchase uom.
 create view contract_balances with (security_invoker = true) as
-  select c.id as contract_id, c.brewery_id, c.material_id, c.qty_committed,
-         c.qty_committed - coalesce(sum(l.qty_ordered), 0) as qty_remaining
-  from material_contracts c left join purchase_order_lines l on l.contract_id = c.id
+  select c.id as contract_id, c.brewery_id, c.vendor_id, c.material_id, c.qty_committed,
+         coalesce(sum(r.counted), 0) as qty_received,
+         coalesce(sum(case when po.status in ('sent','partially_received') then l.qty_ordered - coalesce(r.counted, 0) else 0 end), 0) as qty_on_order,
+         c.qty_committed - coalesce(sum(r.counted), 0)
+           - coalesce(sum(case when po.status in ('sent','partially_received') then l.qty_ordered - coalesce(r.counted, 0) else 0 end), 0) as qty_available
+  from material_contracts c
+  left join purchase_order_lines l on l.contract_id = c.id
+  left join purchase_orders po on po.id = l.po_id
+  left join (select po_line_id, sum(qty_counted) counted from receipt_lines group by 1) r on r.po_line_id = l.id
   group by c.id;
 
 create view material_requirements with (security_invoker = true) as
@@ -3888,6 +3898,93 @@ begin
   return private.complete_command_request(p_request_id, v_result);
 end $$;
 
+-- ---------------------------------------------------------------- Purchasing
+-- Vendors, materials and contracts are plain upserts. Lead time is typed on
+-- the vendor (spec 2026-09-07 §3); a contract never gates ordering (§4).
+create function upsert_vendor(
+  p_brewery uuid, p_vendor uuid, p_name text, p_email text, p_phone text, p_lead_time_days int,
+  p_payment_terms text, p_active boolean, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.vendors;
+begin
+  perform private.assert_staff(p_brewery, array['admin','warehouse','brewer']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'upsert_vendor', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'vendor', p_vendor, 'name', p_name, 'email', p_email, 'phone', p_phone,
+      'lead_time_days', p_lead_time_days, 'payment_terms', p_payment_terms, 'active', p_active));
+  if v_replay is not null then return v_replay; end if;
+  if p_vendor is null then
+    insert into public.vendors (brewery_id, name, email, phone, lead_time_days, payment_terms, active)
+    values (p_brewery, p_name, p_email, p_phone, p_lead_time_days, coalesce(p_payment_terms, 'net30'), coalesce(p_active, true))
+    returning * into v_row;
+  else
+    update public.vendors set name = p_name, email = p_email, phone = p_phone, lead_time_days = p_lead_time_days,
+      payment_terms = coalesce(p_payment_terms, payment_terms), active = coalesce(p_active, active)
+    where id = p_vendor and brewery_id = p_brewery returning * into v_row;
+    if v_row.id is null then raise exception 'vendor not found'; end if;
+  end if;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- The unit vocabulary is fixed: a 44 lb hop box is purchase_uom each with
+-- purchase_uom_factor 44, never a "box" unit. Units are refused once a
+-- movement exists, because every ledger row was written in them.
+create function upsert_material(
+  p_brewery uuid, p_material uuid, p_name text, p_category public.material_category, p_base_uom public.uom,
+  p_purchase_uom public.uom, p_purchase_uom_factor numeric, p_lot_tracked boolean, p_default_vendor uuid,
+  p_reorder_point numeric, p_active boolean, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.materials;
+begin
+  perform private.assert_staff(p_brewery, array['admin','warehouse','brewer']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'upsert_material', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'material', p_material, 'name', p_name, 'category', p_category,
+      'base_uom', p_base_uom, 'purchase_uom', p_purchase_uom, 'purchase_uom_factor', p_purchase_uom_factor,
+      'lot_tracked', p_lot_tracked, 'default_vendor', p_default_vendor, 'reorder_point', p_reorder_point, 'active', p_active));
+  if v_replay is not null then return v_replay; end if;
+  if p_material is null then
+    insert into public.materials (brewery_id, name, category, base_uom, purchase_uom, purchase_uom_factor, lot_tracked, default_vendor_id, reorder_point, active)
+    values (p_brewery, p_name, p_category, p_base_uom, p_purchase_uom, coalesce(p_purchase_uom_factor, 1),
+            coalesce(p_lot_tracked, false), p_default_vendor, p_reorder_point, coalesce(p_active, true))
+    returning * into v_row;
+  else
+    select * into v_row from public.materials where id = p_material and brewery_id = p_brewery for update;
+    if v_row.id is null then raise exception 'material not found'; end if;
+    if (v_row.base_uom, v_row.purchase_uom, v_row.purchase_uom_factor) is distinct from (p_base_uom, p_purchase_uom, coalesce(p_purchase_uom_factor, 1))
+       and exists (select 1 from public.material_movements where material_id = p_material) then
+      raise exception 'material is in use: its units cannot change';
+    end if;
+    update public.materials set name = p_name, category = p_category, base_uom = p_base_uom, purchase_uom = p_purchase_uom,
+      purchase_uom_factor = coalesce(p_purchase_uom_factor, 1), lot_tracked = coalesce(p_lot_tracked, lot_tracked),
+      default_vendor_id = p_default_vendor, reorder_point = p_reorder_point, active = coalesce(p_active, active)
+    where id = p_material returning * into v_row;
+  end if;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+create function upsert_material_contract(
+  p_brewery uuid, p_contract uuid, p_vendor uuid, p_material uuid, p_qty_committed numeric, p_unit_cost_cents int,
+  p_starts_on date, p_ends_on date, p_contract_no text, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.material_contracts;
+begin
+  perform private.assert_staff(p_brewery, array['admin','warehouse','brewer']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'upsert_material_contract', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'contract', p_contract, 'vendor', p_vendor, 'material', p_material,
+      'qty_committed', p_qty_committed, 'unit_cost_cents', p_unit_cost_cents, 'starts_on', p_starts_on, 'ends_on', p_ends_on, 'contract_no', p_contract_no));
+  if v_replay is not null then return v_replay; end if;
+  if p_contract is null then
+    insert into public.material_contracts (brewery_id, vendor_id, material_id, qty_committed, unit_cost_cents, starts_on, ends_on, contract_no)
+    values (p_brewery, p_vendor, p_material, p_qty_committed, p_unit_cost_cents, p_starts_on, p_ends_on, p_contract_no)
+    returning * into v_row;
+  else
+    update public.material_contracts set vendor_id = p_vendor, material_id = p_material, qty_committed = p_qty_committed,
+      unit_cost_cents = p_unit_cost_cents, starts_on = p_starts_on, ends_on = p_ends_on, contract_no = p_contract_no
+    where id = p_contract and brewery_id = p_brewery returning * into v_row;
+    if v_row.id is null then raise exception 'contract not found'; end if;
+  end if;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
 -- ---------------------------------------------------------------- Stock transfers
 -- Internal moves of stuff between two locations (spec 2026-09-06 Decision 3).
 create function private.lock_transfer(p_transfer uuid, p_allowed public.stock_transfer_status[]) returns public.stock_transfers
@@ -5175,7 +5272,9 @@ grant select on breweries, brewery_users, customer_users,
 -- Security-invoker views retain the underlying tables' RLS predicates; expose
 -- only the derived reads consumed by registered commands.
 grant select on on_hand, bin_on_hand, atp, invoice_totals, keg_deposit_balances, portal_brewery, sku_prices,
-  format_volumes, occupancy_volumes, product_volume_requirements to authenticated;
+  format_volumes, occupancy_volumes, product_volume_requirements,
+  material_on_hand, material_bin_on_hand, material_lot_on_hand, material_on_order, material_last_cost,
+  contract_balances, material_requirements to authenticated;
 grant all on all tables in schema public to service_role;
 grant all on all sequences in schema public to service_role;
 
@@ -5253,7 +5352,10 @@ grant execute on function
   schedule_packaging_run(uuid,uuid,date,uuid,jsonb,uuid),
   update_packaging_run(uuid,uuid,uuid,jsonb,timestamptz,uuid),
   close_packaging_run(uuid,uuid,numeric,jsonb,text,date,date,uuid,uuid,uuid),
-  record_repack(uuid,uuid,uuid,uuid,numeric,uuid,numeric,uuid)
+  record_repack(uuid,uuid,uuid,uuid,numeric,uuid,numeric,uuid),
+  upsert_vendor(uuid,uuid,text,text,text,int,text,boolean,uuid),
+  upsert_material(uuid,uuid,text,public.material_category,public.uom,public.uom,numeric,boolean,uuid,numeric,boolean,uuid),
+  upsert_material_contract(uuid,uuid,uuid,uuid,numeric,int,date,date,text,uuid)
   to authenticated;
 grant usage on schema private, extensions to service_role;
 -- service_role reaches `private` only for the UUID default its seed inserts

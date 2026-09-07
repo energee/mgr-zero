@@ -189,6 +189,7 @@ omitted. They have no roles until they are built.
 | `get_delivery_stop` | Delivery & routes | ✓ | ✓ | ✓ |  |  |
 | `get_gravity_unit` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ |  |
 | `get_invoice` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
+| `get_material_on_hand` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |
 | `get_on_hand` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `get_order` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `get_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |
@@ -209,7 +210,7 @@ omitted. They have no roles until they are built.
 | `list_formats` | Packaging | ✓ | ✓ | ✓ |  |  |
 | `list_invoices` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `list_locations` | Inventory & locations | ✓ | ✓ | ✓ | ✓ |  |
-| `list_materials` | Purchasing & materials | ✓ |  |  | ✓ |  |
+| `list_materials` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |
 | `list_movements` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `list_occupancies` | Packaging | ✓ |  | ✓ | ✓ |  |
 | `list_orders` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
@@ -221,6 +222,7 @@ omitted. They have no roles until they are built.
 | `list_standing_allocations` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `list_stock_transfers` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `list_team_members` | Team & brewery settings | ✓ | ✓ | ✓ |  |  |
+| `list_vendors_and_contracts` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |
 | `list_vessels` | Production | ✓ |  |  | ✓ |  |
 | `move_stock_bin` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `portal_catalog` | Customer portal |  |  |  |  | ✓ |
@@ -267,9 +269,12 @@ omitted. They have no roles until they are built.
 | `upsert_brand` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `upsert_customer` | Customers | ✓ | ✓ |  |  |  |
 | `upsert_format` | Packaging | ✓ | ✓ |  |  |  |
+| `upsert_material` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |
+| `upsert_material_contract` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |
 | `upsert_price_group` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `upsert_sale_channel` | Catalog & pricing | ✓ |  |  |  |  |
 | `upsert_ship_to` | Customers | ✓ | ✓ |  |  |  |
+| `upsert_vendor` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |
 | `upsert_vessel` | Production | ✓ |  |  | ✓ |  |
 {/* end ops:roles */}
 
@@ -1870,13 +1875,32 @@ unreceived PO never inflates what a packaging run believes it has.
 
 {/* ops:purchasing */}
 
+#### get_material_on_hand [#get_material_on_hand]
+
+`query` · admin, warehouse, brewer
+
+Material on hand by location and bin, in base units; optionally one location
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_material_on_hand", "input": {} }'
+```
+
 #### list_materials [#list_materials]
 
-`query` · admin, brewer
+`query` · admin, warehouse, brewer
 
-Materials, alphabetical, with category and extract potential
+Materials, alphabetical, with kind, units, lot tracking, default vendor, and extract potential
 
-Takes no input.
+| Field | Type | Required |
+| --- | --- | --- |
+| `includeInactive` | boolean | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -1885,11 +1909,99 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_materials", "input": {} }'
 ```
 
+#### list_vendors_and_contracts [#list_vendors_and_contracts]
+
+`query` · admin, warehouse, brewer
+
+Vendors, alphabetical, with lead time and each one's contracts and their drawdown (committed, received, on order, available)
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_vendors_and_contracts", "input": {} }'
+```
+
+#### upsert_material [#upsert_material]
+
+`command` · admin, warehouse, brewer
+
+Create or edit a material definition: kind, base and purchase units with the factor between them, lot tracking, default vendor. Units are refused once movements exist
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `name` | string | yes |
+| `category` | malt or hop or yeast or adjunct or chemical or packaging or other | yes |
+| `baseUom` | lb or kg or oz or g or each or l or gal or ml | yes |
+| `purchaseUom` | lb or kg or oz or g or each or l or gal or ml | yes |
+| `id` | uuid | no |
+| `purchaseUomFactor` | number | no |
+| `lotTracked` | boolean | no |
+| `defaultVendorId` | uuid | no |
+| `reorderPoint` | number | no |
+| `active` | boolean | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_material", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "category": "malt", "baseUom": "lb", "purchaseUom": "lb" } }'
+```
+
+#### upsert_material_contract [#upsert_material_contract]
+
+`command` · admin, warehouse, brewer
+
+Create or edit a purchasing commitment for one material with one vendor; releases are ordered against it all year, and it never gates ordering
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `vendorId` | uuid | yes |
+| `materialId` | uuid | yes |
+| `qtyCommitted` | number | yes |
+| `id` | uuid | no |
+| `unitCostCents` | integer | no |
+| `startsOn` | date (YYYY-MM-DD) | no |
+| `endsOn` | date (YYYY-MM-DD) | no |
+| `contractNo` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_material_contract", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "vendorId": "00000000-0000-0000-0000-000000000000", "materialId": "00000000-0000-0000-0000-000000000000", "qtyCommitted": 1 } }'
+```
+
+#### upsert_vendor [#upsert_vendor]
+
+`command` · admin, warehouse, brewer
+
+Create or edit a supplier: contact, payment terms, and the typed lead time Planning dates a buy-by from
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `name` | string | yes |
+| `id` | uuid | no |
+| `email` | string | no |
+| `phone` | string | no |
+| `leadTimeDays` | integer | no |
+| `paymentTerms` | due_on_receipt or net15 or net30 | no |
+| `active` | boolean | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_vendor", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string" } }'
+```
+
 ---
 
 **Designed, not yet available** {/* purchasing-designed */}
 
-1 of the 14 operations in this area are available today; the 13 below are not.
+6 of the 14 operations in this area are available today; the 8 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
@@ -1897,17 +2009,12 @@ The screens need them and the backend has not built them, so calling one returns
 | --- | --- | --- |
 | `create_purchase_order` | command | New PO |
 | `draft_purchase_order_from_requirements` | command | Planning |
-| `get_material_on_hand` | query | Materials on hand, Cycle count, Repack |
 | `get_material_requirements` | query | New PO, Planning |
 | `get_purchase_order` | query | Receive PO, Receipt |
 | `list_purchase_orders` | query | Purchase orders |
-| `list_vendors_and_contracts` | query | New PO, Vendors, Vendor, Contracts, Contract, Planning |
 | `receive_purchase_order` | command | Receive PO |
 | `record_material_count` | command | Cycle count |
 | `send_purchase_order` | command | Receive PO |
-| `upsert_material` | command | Material |
-| `upsert_material_contract` | command | Contract |
-| `upsert_vendor` | command | Vendor |
 
 {/* end ops:purchasing */}
 

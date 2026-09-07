@@ -11,5 +11,6 @@ import "./chat";
 import "./today";
 import "./production";
 import "./packaging";
+import "./purchasing";
 import "./settings";
 export {};
