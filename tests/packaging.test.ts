@@ -7,6 +7,14 @@
 // intended brand yet is fair game. `product_volume_requirements` reads the
 // open runs as demand and the unbrewed/in-tank batches as supply, so the
 // brewhouse can see what still has to be brewed.
+//
+// Also here: `record_repack`, repacking finished goods — breaking a composed
+// format (a case) into the atomic one it is made of (six four-packs). The two
+// FG ledger rows share one `ref` and must net to zero volume, so a repack can
+// never invent or destroy beer; the parent format's BOM decides what happens
+// to the packaging material that came off (a tray returns to stock, glue is
+// consumed). One level only — `format_components` is one deep by design, and
+// the call only ever breaks down: the components lookup is directional.
 import { beforeAll, describe, expect, it } from "vitest";
 import { admin, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
@@ -32,11 +40,68 @@ async function brewInto(vesselName: string, brand: string | null, bbl: number, o
   return { occupancyId: day.occupancy.id, batchId: batch.id, vesselId: vessel.id };
 }
 
+let repackLocationId: string;
+let repackBinId: string;
+let caseSkuId: string;
+let fourPackSkuId: string;
+let looseSkuId: string;
+let trayId: string;
+let caseFormatId: string;
+
+const FOUR_PACK_BBL = 0.0645;
+const PER_CASE = 6;
+
+async function insert<T extends Record<string, unknown>>(table: string, row: T): Promise<string> {
+  const { data, error } = await admin.from(table).insert(row).select("id").single();
+  if (error) throw error;
+  return data.id as string;
+}
+
 beforeAll(async () => {
   b = await makeBrewery();
   ctx = await makeStaffCtx(b.id, "brewer");
   stout = await seedCatalog(b.id, { product: "Stout", sku: "Stout case", bblPerUnit: 0.0645 });
   pils = await seedCatalog(b.id, { product: "Pils", sku: "Pils case", bblPerUnit: 0.0645 });
+
+  // Fixtures for record_repack: a warehouse role can write inventory
+  // movements, so a second ctx is used for those calls below.
+  const warehouseCtx = await makeStaffCtx(b.id, "warehouse");
+  ({ id: repackLocationId, binId: repackBinId } = await seedLocation(b.id, { name: "Repack warehouse" }));
+
+  const repackBrandId = await insert("brands", { brewery_id: b.id, name: "Repack IPA" });
+  // The atomic child carries the typed volume; the composed parent derives it.
+  const fourPackFormatId = await insert("formats", {
+    brewery_id: b.id, name: "4-pack 16oz", basis: "packaged", package_type: "can", bbl_per_unit: FOUR_PACK_BBL,
+  });
+  caseFormatId = await insert("formats", {
+    brewery_id: b.id, name: "case of 6 4-packs", basis: "packaged", package_type: "can",
+  });
+  const { error: ce } = await admin.from("format_components").insert({
+    brewery_id: b.id, parent_format_id: caseFormatId, child_format_id: fourPackFormatId, qty: PER_CASE,
+  });
+  if (ce) throw ce;
+
+  caseSkuId = await insert("skus", { brewery_id: b.id, brand_id: repackBrandId, format_id: caseFormatId, name: "Repack IPA case" });
+  fourPackSkuId = await insert("skus", { brewery_id: b.id, brand_id: repackBrandId, format_id: fourPackFormatId, name: "Repack IPA 4-pack" });
+
+  // An unrelated packaged format under the same brand: not a component of the case.
+  const looseFormatId = await insert("formats", {
+    brewery_id: b.id, name: "single 16oz", basis: "packaged", package_type: "can", bbl_per_unit: FOUR_PACK_BBL / 4,
+  });
+  looseSkuId = await insert("skus", { brewery_id: b.id, brand_id: repackBrandId, format_id: looseFormatId, name: "Repack IPA single" });
+
+  // The tray comes off whole when the case is broken, so it goes back on the shelf.
+  trayId = await insert("materials", {
+    brewery_id: b.id, name: "case tray", category: "packaging", base_uom: "each", purchase_uom: "each",
+  });
+  const { error: be } = await admin.from("format_bom").insert({
+    brewery_id: b.id, format_id: caseFormatId, material_id: trayId, qty_per_unit: 1, on_break: "return_to_stock",
+  });
+  if (be) throw be;
+
+  await runCommand("record_movement", {
+    skuId: caseSkuId, locationId: repackLocationId, binId: repackBinId, qty: 10, type: "opening_balance",
+  }, warehouseCtx);
 });
 
 describe("planning a packaging run before a tank exists", () => {
@@ -394,5 +459,111 @@ describe("closing the run", () => {
       runId: run.id, bblDrawn: 3, outputs: [{ skuId: sku.id, qtyActual: 50 }],
       lotCode: "L-tracked", packagedOn: "2026-12-05", locationId: wh.id, binId: wh.binId,
     }, ctx)).rejects.toThrow(/cannot post BOM for lot-tracked material "Tracked crown" yet/);
+  });
+});
+
+describe("record_repack", () => {
+  it("breaks one case into six four-packs, volume-neutral, and returns the tray to stock", async () => {
+    const warehouseCtx = await makeStaffCtx(b.id, "warehouse");
+    await runCommand("record_repack", {
+      locationId: repackLocationId, binId: repackBinId, parentSkuId: caseSkuId, parentQty: 1,
+      childSkuId: fourPackSkuId, childQty: PER_CASE,
+    }, warehouseCtx);
+
+    const { data: moves, error } = await admin.from("inventory_movements")
+      .select("sku_id, qty, bbl, type, ref").eq("brewery_id", b.id).eq("type", "repack");
+    if (error) throw error;
+    expect(moves).toHaveLength(2);
+    const refs = new Set((moves as { ref: string }[]).map((m) => m.ref));
+    expect(refs.size).toBe(1);
+    expect([...refs][0]).toBeTruthy();
+
+    const rows = moves as { sku_id: string; qty: number; bbl: number }[];
+    const parent = rows.find((m) => m.sku_id === caseSkuId)!;
+    const child = rows.find((m) => m.sku_id === fourPackSkuId)!;
+    expect(Number(parent.qty)).toBe(-1);
+    expect(Number(child.qty)).toBe(PER_CASE);
+    expect(Math.abs(Number(parent.bbl) + Number(child.bbl))).toBeLessThan(0.000001);
+
+    const { data: mats, error: me } = await admin.from("material_movements")
+      .select("material_id, qty, type, location_id, bin_id").eq("brewery_id", b.id).eq("material_id", trayId);
+    if (me) throw me;
+    expect(mats).toEqual([
+      { material_id: trayId, qty: 1, type: "return_to_stock", location_id: repackLocationId, bin_id: repackBinId },
+    ]);
+  });
+
+  it("consumes a BOM material marked consumed on break", async () => {
+    const warehouseCtx = await makeStaffCtx(b.id, "warehouse");
+    // Glue is destroyed when the case is opened; the tray is not. Same call,
+    // opposite signs, so on_break is what decides the direction.
+    const glueId = await insert("materials", {
+      brewery_id: b.id, name: "case glue", category: "packaging", base_uom: "each", purchase_uom: "each",
+    });
+    const { error } = await admin.from("format_bom").insert({
+      brewery_id: b.id, format_id: caseFormatId, material_id: glueId, qty_per_unit: 2, on_break: "consumed",
+    });
+    if (error) throw error;
+
+    await runCommand("record_repack", {
+      locationId: repackLocationId, binId: repackBinId, parentSkuId: caseSkuId, parentQty: 1,
+      childSkuId: fourPackSkuId, childQty: PER_CASE,
+    }, warehouseCtx);
+
+    const { data, error: me } = await admin.from("material_movements")
+      .select("qty, type").eq("brewery_id", b.id).eq("material_id", glueId);
+    if (me) throw me;
+    expect(data).toEqual([{ qty: -2, type: "consumption" }]);
+  });
+
+  it("refuses, by name, a BOM material that is lot-tracked", async () => {
+    const warehouseCtx = await makeStaffCtx(b.id, "warehouse");
+    // enforce_material_lot demands a lot_id on a consumption/return_to_stock
+    // row, and a repack has nowhere to name a lot; the impl must say so up
+    // front instead of failing deep in the trigger with a bare uuid.
+    const shrinkId = await insert("materials", {
+      brewery_id: b.id, name: "shrink wrap", category: "packaging", base_uom: "each",
+      purchase_uom: "each", lot_tracked: true,
+    });
+    const { error } = await admin.from("format_bom").insert({
+      brewery_id: b.id, format_id: caseFormatId, material_id: shrinkId, qty_per_unit: 1, on_break: "consumed",
+    });
+    if (error) throw error;
+
+    await expect(runCommand("record_repack", {
+      locationId: repackLocationId, binId: repackBinId, parentSkuId: caseSkuId, parentQty: 1,
+      childSkuId: fourPackSkuId, childQty: PER_CASE,
+    }, warehouseCtx)).rejects.toThrow(/lot-tracked material "shrink wrap"/);
+
+    // Nothing was written: the refusal comes before the FG rows.
+    const { count } = await admin.from("inventory_movements")
+      .select("id", { count: "exact", head: true }).eq("brewery_id", b.id).eq("type", "repack");
+    expect(count).toBe(4);
+
+    await admin.from("format_bom").delete().eq("format_id", caseFormatId).eq("material_id", shrinkId);
+  });
+
+  it("rejects a child quantity that is not parentQty × the component quantity", async () => {
+    const warehouseCtx = await makeStaffCtx(b.id, "warehouse");
+    await expect(runCommand("record_repack", {
+      locationId: repackLocationId, binId: repackBinId, parentSkuId: caseSkuId, parentQty: 1,
+      childSkuId: fourPackSkuId, childQty: 5,
+    }, warehouseCtx)).rejects.toThrow(/volume-neutral|expected 6/i);
+  });
+
+  it("rejects a pair of SKUs whose formats are not one-level components", async () => {
+    const warehouseCtx = await makeStaffCtx(b.id, "warehouse");
+    await expect(runCommand("record_repack", {
+      locationId: repackLocationId, binId: repackBinId, parentSkuId: caseSkuId, parentQty: 1,
+      childSkuId: looseSkuId, childQty: PER_CASE,
+    }, warehouseCtx)).rejects.toThrow(/not a component/i);
+  });
+
+  it("rejects a repack the bin does not have the stock for", async () => {
+    const warehouseCtx = await makeStaffCtx(b.id, "warehouse");
+    await expect(runCommand("record_repack", {
+      locationId: repackLocationId, binId: repackBinId, parentSkuId: caseSkuId, parentQty: 999,
+      childSkuId: fourPackSkuId, childQty: 999 * PER_CASE,
+    }, warehouseCtx)).rejects.toThrow(/on hand/i);
   });
 });

@@ -47,6 +47,7 @@ const AUTHENTICATED_RPCS = [
   "record_fermentation_reading(uuid,uuid,timestamp with time zone,numeric,numeric,numeric,text,uuid)",
   "record_inventory_movement(uuid,uuid,uuid,uuid,numeric,movement_type,uuid,text,text,uuid)",
   "record_pick(uuid,jsonb,uuid)",
+  "record_repack(uuid,uuid,uuid,uuid,numeric,uuid,numeric,uuid)",
   "record_stock_transfer_pick(uuid,jsonb,uuid)",
   "record_submitted_order_occurrence(uuid)",
   "release_allocation(uuid,uuid)",

@@ -235,6 +235,7 @@ omitted. They have no roles until they are built.
 | `record_fermentation_reading` | Production | ✓ |  |  | ✓ |  |
 | `record_movement` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `record_pick` | Orders & invoicing | ✓ |  | ✓ |  |  |
+| `record_repack` | Packaging | ✓ |  | ✓ |  |  |
 | `record_stock_transfer_pick` | Orders & invoicing | ✓ |  | ✓ |  |  |
 | `release_allocation` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `replace_format_bom` | Packaging | ✓ | ✓ |  |  |  |
@@ -2265,6 +2266,28 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_packaging_runs", "input": {} }'
 ```
 
+#### record_repack [#record_repack]
+
+`command` · admin, warehouse
+
+Break a composed SKU into its component SKU at one bin: paired volume-neutral ledger rows under one ref, plus the parent format's BOM material movements
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+| `binId` | uuid | yes |
+| `parentSkuId` | uuid | yes |
+| `parentQty` | number | yes |
+| `childSkuId` | uuid | yes |
+| `childQty` | number | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_repack", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "locationId": "00000000-0000-0000-0000-000000000000", "binId": "00000000-0000-0000-0000-000000000000", "parentSkuId": "00000000-0000-0000-0000-000000000000", "parentQty": 1, "childSkuId": "00000000-0000-0000-0000-000000000000", "childQty": 1 } }'
+```
+
 #### replace_format_bom [#replace_format_bom]
 
 `command` · admin, sales
@@ -2368,14 +2391,13 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* packaging-designed */}
 
-10 of the 12 operations in this area are available today; the 2 below are not.
+11 of the 12 operations in this area are available today; the 1 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
 | `get_format_components` | query | Formats, Format, Repack |
-| `record_repack` | command | Repack |
 
 {/* end ops:packaging */}
 

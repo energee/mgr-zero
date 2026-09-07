@@ -4,7 +4,9 @@
 // only then can the run start. The brand is therefore the run's identity and
 // the occupancy is optional — see `packaging_runs` in the baseline, whose
 // check constraint enforces "no tank, no start" and whose trigger refuses a
-// tank already promised to a different brand.
+// tank already promised to a different brand. Also here: `record_repack`,
+// which breaks a composed unit (a case) into the units it is made of — a
+// shape change, never a production or a removal.
 //
 // `product_volume_requirements` (a view) reads these plans back as demand and
 // answers the brewhouse's question: what still has to be brewed?
@@ -83,6 +85,40 @@ defineCommand({
     p_lot_code: i.lotCode, p_packaged_on: i.packagedOn, p_best_by: i.bestBy ?? null,
     p_location: i.locationId, p_bin: i.binId, p_request_id: execution.requestId,
   })),
+});
+
+// `record_repack`: breaking a composed unit (a case) into the units it is
+// made of. It is a shape change, never a production or a removal, so the
+// RPC writes both FG ledger rows under one `ref` and refuses to commit
+// unless their volumes cancel. Composition is one level deep (§16.2a), so
+// the two SKUs must share a brand and their formats must be joined by
+// exactly one `format_components` row; `childQty` is pinned to
+// `parentQty ×` that row's quantity. The parent format's BOM decides what
+// happens to the packaging that came off — consumed, or returned to the
+// shelf.
+defineCommand({
+  name: "record_repack",
+  description:
+    "Break a composed SKU into its component SKU at one bin: paired volume-neutral ledger rows under one ref, plus the parent format's BOM material movements",
+  roles: ["admin", "warehouse"],
+  requiresConfirmation: true,
+  input: z.object({
+    locationId: z.string().uuid(),
+    binId: z.string().uuid(),
+    parentSkuId: z.string().uuid(),
+    parentQty: z.number().positive(),
+    childSkuId: z.string().uuid(),
+    childQty: z.number().positive(),
+  }),
+  handler: async (ctx, i, execution) => {
+    const r = (await unwrap(ctx.db.rpc("record_repack", {
+      p_brewery: ctx.breweryId, p_location: i.locationId, p_bin: i.binId,
+      p_parent_sku: i.parentSkuId, p_parent_qty: i.parentQty,
+      p_child_sku: i.childSkuId, p_child_qty: i.childQty,
+      p_request_id: execution.requestId,
+    }))) as { ref: string; parent_qty: number; child_qty: number };
+    return { ref: r.ref, parentQty: r.parent_qty, childQty: r.child_qty };
+  },
 });
 
 type RunRow = {
