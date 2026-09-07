@@ -72,19 +72,40 @@ type BtnKind = BtnBase | `${BtnBase} disabled`;
 type VolumeUnit = "oz" | "gal" | "bbl" | "mL" | "L";
 
 export const E = {
-  hd: (t: React.ReactNode, r: React.ReactNode = "") => (
-    <div className="flex items-baseline justify-between gap-2">
-      <h1 className="text-lg font-semibold">{t}</h1>
-      <span className="text-xs text-muted-foreground">{r}</span>
-    </div>
-  ),
-  /** A detail screen's header: an arrow link to the parent area above the title. */
-  back: (to: React.ReactNode, title: React.ReactNode) => (
-    <div className="flex flex-col gap-1">
-      <a href="#" className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Icon icon={ArrowLeft01Icon} />{to}</a>
-      <h1 className="text-lg font-semibold">{title}</h1>
-    </div>
-  ),
+  /** Page title. `action` is a list-create button (New order, Add customer):
+   *  full-width under the title on the phone, on the title row from md up. */
+  hd: (t: React.ReactNode, r: React.ReactNode = "", action?: React.ReactNode) => {
+    const title = (
+      <div className="flex items-baseline justify-between gap-2">
+        <h1 className="text-lg font-semibold">{t}</h1>
+        <span className="text-xs text-muted-foreground">{r}</span>
+      </div>
+    );
+    if (!action) return title;
+    return (
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        {title}
+        {action}
+      </div>
+    );
+  },
+  /** A detail screen's header: an arrow link to the parent area above the title.
+   *  `action` is the same list-create slot `hd` takes. */
+  back: (to: React.ReactNode, title: React.ReactNode, action?: React.ReactNode) => {
+    const head = (
+      <div className="flex flex-col gap-1">
+        <a href="#" className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Icon icon={ArrowLeft01Icon} />{to}</a>
+        <h1 className="text-lg font-semibold">{title}</h1>
+      </div>
+    );
+    if (!action) return head;
+    return (
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        {head}
+        {action}
+      </div>
+    );
+  },
   ttl: (t: React.ReactNode) => <h2 className="mt-2 text-sm font-medium text-muted-foreground">{t}</h2>,
   /** `icon` says which kind of thing a row is — only in lists that mix kinds
    * (Today, search); a homogeneous list gets none (docs/plans/hugeicons.md §3). */
@@ -126,6 +147,9 @@ export const E = {
   ),
   /** An on/off setting. */
   sw: (on: boolean, label: string) => <Switch defaultChecked={on} aria-label={label} />,
+  /** Fills the phone column; hugs the label from md up (`w-fit`, not `w-auto`:
+   *  a column flex item with width:auto still stretches). Entry cards override
+   *  back to full-width because they stay a phone-width column on the desk. */
   btn: (t: React.ReactNode, k: BtnKind = "p") => {
     const [kind, disabled] = k.split(" ") as [BtnBase, string?];
     return (
@@ -133,6 +157,7 @@ export const E = {
         variant={kind === "g" ? "outline" : kind === "ghost" ? "ghost" : kind === "del" ? "destructive" : "default"}
         disabled={Boolean(disabled)}
         className={cn(
+          "w-full md:w-fit",
           kind === "irr" && "bg-irreversible text-irreversible-foreground hover:bg-irreversible/90",
           // Solid, not shadcn's tint (whose dark:bg-destructive/20 would otherwise
           // win): a loss should carry the same weight as the teal commit beside it.
@@ -194,9 +219,10 @@ export const E = {
   ),
   /** An atomic format's volume: a qty whose unit addon is the per-instance unit choice. */
   volume: (value: string, units: VolumeUnit[], on = 0) => <VolumeField value={value} units={units} on={on} />,
-  /** Commit; CommandForm lifts this out of the scroll region so the verb stays on the phone. */
+  /** Commit; CommandForm lifts this out of the scroll region so the verb stays on the phone.
+   *  Stacked on the phone, right-aligned on the desk — same as CommandFormFooter. */
   pin: (t: React.ReactNode) => (
-    <div data-pin className="flex flex-col gap-2">
+    <div data-pin className="flex flex-col gap-2 md:flex-row md:justify-end">
       {t}
     </div>
   ),

@@ -251,8 +251,7 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     spec: "Warehouse default rows shown; the chips are the kinds the role may open (a brewer has no POs or routes) and an explicit chip choice is remembered. Rows sort by urgency/due time, not newest activity.",
     body: (<>
-      {E.hd("Work", "warehouse default")}
-      {E.btn("New order", "g")}
+      {E.hd("Work", "warehouse default", E.btn("New order", "g"))}
       {E.tabs(WORK_CHIPS, 0, "w-full", WORK_TABS)}
       {E.row("ORD-0231 · Ridgeline", "submitted · ships today", E.act("Confirm", "success"), "", Package01Icon)}
       {E.row("ORD-0229 · Al’s Bar", "picked · restock 3 Pils staged", E.act("Put back", "attention"), "w", Package01Icon)}
@@ -310,8 +309,7 @@ export const SCREENS: Screen[] = [
       {E.row("Demo Brewing", "current", "✓", "ok")}
       {E.row("Ridgeline Contract Brewing", "", E.act("Switch"))}
       {E.sp()}
-      {E.btn("Change password", "g")}
-      {E.btn("Sign out", "del")}
+      {E.btns([["Change password", "g"], ["Sign out", "del"]])}
     </>),
   },
   {
@@ -349,8 +347,7 @@ export const SCREENS: Screen[] = [
     states: [["permission", "admin only", 1], ["active", "inventory and work may use it"], ["empty", "Add location is the only action"]],
     spec: "Settings links here instead of editing whichever location happened to be selected.",
     body: (<>
-      {E.back("Settings", "Locations")}
-      {E.btn("Add location")}
+      {E.back("Settings", "Locations", E.btn("Add location"))}
       {E.row("Warehouse", "warehouse · 186 inventory units", E.act("Edit"))}
       {E.row("Taproom", "taproom · 11 taps · 2 bins", E.act("Edit"))}
     </>),
@@ -720,8 +717,7 @@ export const SCREENS: Screen[] = [
     states: [["short", "ATP below zero links to the competing orders"], ["empty", "no finished goods yet: Add SKU is the only action"]],
     spec: "The Beer landing's Finished goods row opens this list. On-hand, allocated and ATP stay together on each SKU; Review opens SKU detail and a shortage opens the shortfall. Add SKU opens the existing product and SKU flow.",
     body: (<>
-      {E.back("Beer", "Finished goods")}
-      {E.btn("Add SKU")}
+      {E.back("Beer", "Finished goods", E.btn("Add SKU"))}
       {E.row("Hazy IPA · ½ bbl keg", "15 on hand · 4 allocated · ATP 11", E.act("Review"))}
       {E.row("Pils · 16 oz case", "18 on hand · 24 allocated · ATP −6", E.act("Shortfall", "attention"), "w")}
       {E.row("Stout · ⅙ bbl keg", "9 on hand · 2 allocated · ATP 7", E.act("Review"))}
@@ -908,8 +904,7 @@ export const SCREENS: Screen[] = [
     states: [["filtered", "one state chip selected"], ["empty", "no orders in this state: New order stays available"]],
     spec: "The Work list with the Orders tab active. Rows cover the active order states and name the next valid action; New order opens the order-entry sheet. Order and Confirm order return here.",
     body: (<>
-      {E.hd("Work", "sales default")}
-      {E.btn("New order")}
+      {E.hd("Work", "sales default", E.btn("New order"))}
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         {E.tabs(WORK_CHIPS, 1, "w-full md:w-fit", WORK_TABS)}
         {E.tabs(ORDER_STATES, 0, "w-full justify-start overflow-x-auto md:w-fit")}
@@ -1147,8 +1142,8 @@ export const SCREENS: Screen[] = [
     name: "Weekly count",
     to: { "Record count": "Weekly count", "Create transfer order": "Order" },
     job: "Target-state count plus active suggested transfer",
-    reads: "get_taproom_count_snapshot [view; SCHEMA-GATE] · replenishment_suggestions [design] · list_locations",
-    writes: "record_taproom_count [SCHEMA-GATE: durable count + lines + optional movements in one RPC] · create_taproom_transfer [design; one RPC: order with explicit source + destination + lines + allocations]",
+    reads: "get_taproom_count_snapshot [view; SCHEMA-GATE] · replenishment_suggestions · list_locations",
+    writes: "record_taproom_count [SCHEMA-GATE: durable count + lines + optional movements in one RPC] · create_replenishment_order",
     states: permitted("warehouse or admin required"),
     spec: "Count is target-state only and disabled until durable count persistence lands; the taproom lead uses the warehouse permission bundle. INVERTED (this frame was drawn the other way round): the physical count is the source of truth and posts the depletion, connected or not. POS supplies expected consumption and posts nothing, so disconnecting removes the expected column and changes nothing about what the count writes. That is also why a keg moving warehouse → taproom stays on the books as taproom stock: a taproom transfer carries no channel, and the beer leaves only when a count says it is gone, which makes a month-end count yield the month’s removal cleanly. Variance is drawn twice on purpose: inline while someone can still recount, and as a report where a pattern across weeks (one line, one shift) is the only place it becomes legible. Counts are in kegs and cases, so qty never needs fractional widening.",
     body: (<>
@@ -1271,11 +1266,10 @@ export const SCREENS: Screen[] = [
     writes: "upsert_customer · upsert_ship_to · invite_customer_user [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI]",
     states: DEFAULT_STATES,
     body: (<>
-      {E.back("More", "Customers")}
+      {E.back("More", "Customers", E.btn("Add customer"))}
       {E.inp("Search customers")}
       {E.row("Ridgeline Tap Room", "retailer · PA · 2 portal users", E.act("Open"))}
       {E.row("Al’s Bar", "retailer · OH · brewery remits", E.act("Open"), "w")}
-      {E.btn("Add customer")}
     </>),
   },
   {
@@ -1501,11 +1495,10 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     spec: "Brand facts (ABV and tax class) edit on Brand; SKU associates the brand with a Format. Volume and packaging stay on the Format. This page remains a list with simple pricing, never the v1 price matrix.",
     body: (<>
-      {E.back("More", "Catalog")}
+      {E.back("More", "Catalog", E.btn("Add brand"))}
       {E.nav("Hazy IPA", "IPA · 6.8% · 3 SKUs")}
       {E.nav("Pils", "Lager · 4.9% · 2 SKUs")}
       {E.nav("Stout", "Stout · 7.2% · 1 SKU")}
-      {E.btn("Add brand")}
       {E.nav("Price lists", "3 tiers")}
     </>),
   },
@@ -1578,8 +1571,7 @@ export const SCREENS: Screen[] = [
     states: [["permission", "sales or admin required", 1], ["active", "available to price and sell"], ["inactive", "history remains", 1], ["empty", "Add SKU is the only action"]],
     spec: "Product links here instead of showing an arbitrary one of three SKUs inline.",
     body: (<>
-      {E.back("Product", "Hazy IPA · SKUs")}
-      {E.btn("Add SKU")}
+      {E.back("Product", "Hazy IPA · SKUs", E.btn("Add SKU"))}
       {E.row("½ bbl keg", `${formatVolume("0.50000000")} · active`, E.act("Edit"))}
       {E.row("⅙ bbl keg", `${formatVolume("0.16666667")} · active`, E.act("Edit"))}
       {E.row("case · 24×16 oz", `${formatVolume("0.09677419")} · active`, E.act("Edit"))}
@@ -1695,8 +1687,7 @@ export const SCREENS: Screen[] = [
       {E.row("Status", "Unpaid", "", "w")}
       {E.tbl(["Item", "Qty", "Amount"], [["Hazy IPA · ½ bbl", "4", INV.hazyAmount], ["Pils · 16 oz case", "6", INV.pilsAmount], ["Keg deposit · NON", "4", INV.depositAmount]])}
       {E.info("Pay by card or bank transfer through QuickBooks. You will not need an account.")}
-      {E.btn("Pay invoice")}
-      {E.btn("Download PDF", "g")}
+      {E.btns([["Pay invoice", "p"], ["Download PDF", "g"]])}
       {E.nav("Question this invoice", "sends a note to Demo Brewing")}
       {E.info("Opens QuickBooks in a new tab. This link keeps working; it is re-checked each time you open it.")}
     </>),
@@ -1808,8 +1799,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.fld("Signed in as", PORTAL_BUYER.email)}
       {E.fld("Account", PORTAL_BUYER.account)}
-      {E.btn("Change password", "g")}
-      {E.btn("Sign out", "g")}
+      {E.btns([["Change password", "g"], ["Sign out", "g"]])}
     </>),
   },
   {
@@ -1824,11 +1814,10 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     spec: "Complete batch stays disabled until close/reconciliation identity exists: the batch’s closing time, the occupancy close and the typed automatic reconciliation must commit atomically. Tile fill derives from occupancy vs vessel capacity, never from a status column. Reading is the one primary; Transfer and Brew day are outline. A tile opens Vessel detail.",
     body: (<>
-      {E.back("Beer", "Cellar")}
+      {E.back("Beer", "Cellar", E.btn("Add vessel", "g"))}
       {E.tiles([["FV1", "Pils · 12.8 / 15 bbl", "1.9 °P · read 4 h", 0, 85], ["FV2", "Hazy · 9.0 / 15 bbl", "7.5 °P · read 8 h", 0, 60], ["FV3", "Stout · 13.5 / 15 bbl", "5.2 °P · overdue 31 h", 1, 90], ["BT1", "Pils · 7.0 / 10 bbl", "carbing", 0, 70], ["BT2", "Empty · 0 / 10 bbl", "available", 0, 0], ["FB1", "Saison · 0.4 / 1 bbl", "aging · read 1 d", 0, 40]], "c2")}
       {E.btns([["Reading", "p"], ["Transfer", "g"], ["Brew day", "g"]], "c3")}
       {E.nav("FV3 · fermenter · 15 bbl", "occupancy, readings and vessel facts")}
-      {E.btn("Add vessel", "g")}
       {E.gated("Complete batch")}
       {E.sp()}
     </>),
@@ -1918,8 +1907,7 @@ export const SCREENS: Screen[] = [
     states: [["planned", "Start is the next action"], ["active", "the row names the next reading or transfer"], ["empty", "no batches yet: New batch is the only action"]],
     spec: "The Work list with the Batches tab active. Planned batches sort before active batches due for attention; every row names its next action. New batch opens Schedule batch, and Schedule batch and Brew day return here.",
     body: (<>
-      {E.hd("Work", "brewer default")}
-      {E.btn("New batch")}
+      {E.hd("Work", "brewer default", E.btn("New batch"))}
       {E.tabs(WORK_CHIPS, 2, "w-full", WORK_TABS)}
       {E.ttl("Planned")}
       {E.row("B-0416 · Hazy IPA v4", "Fri 9/4 · 15 bbl", E.act("Start", "info"))}
@@ -1933,14 +1921,15 @@ export const SCREENS: Screen[] = [
     slice: 4,
     tab: "Work",
     name: "Schedule batch",
-    job: "Set recipe, date and planned barrels before brew day",
-    reads: "get_brew_day [design]",
-    writes: "schedule_batch [design; single planned-batch row]",
-    states: [["permission", "brewer or admin required", 1], ["planned", "Save schedule is the one verb"], ["brew day", "Record brew day is its own screen"]],
-    spec: "The planned mode of brew day: recipe, date and planned barrels. Record brew day is a separate screen so this page has one primary.",
+    job: "Set date and planned barrels; recipe and brand are intent, not commitments",
+    reads: "get_brew_day [design] · list_recipes · list_brands [SCHEMA-GATE: revision 2 §16.1, products → brands]",
+    writes: "schedule_batch [design; single planned-batch row; the recipe version is already nullable, and SCHEMA-GATE: revision 2 §16.9 turns product_id into a nullable intended_brand_id]",
+    states: [["permission", "brewer or admin required", 1], ["planned", "Save schedule is the one verb"], ["no recipe yet", "date and barrels alone hold the slot"], ["no brand yet", "identity waits for packaging, which already requires one"], ["brew day", "Record brew day is its own screen"]],
+    spec: "The planned mode of brew day: date, planned barrels, and two optional statements of intent. Only date and barrels commit anything: they reserve the slot. The recipe version is already optional in the schema, and revision 2 makes the brand optional too, because identity is optional at brew and required at packaging, where every finished lot must already name a brand. Requiring either here enforces nothing the lot does not, and only forces the decision earlier than the business makes it. Keeping brand as intent is also what keeps the gap between what a batch was meant to be and what it shipped as worth querying, rather than rewriting history when a batch blends or turns into something else. Record brew day is a separate screen so this page has one primary.",
     body: (<>
       {E.back("Batches", "B-0416 · Hazy")}
-      {E.pick("Recipe", "Hazy IPA v4", ["Hazy IPA v4", "Pils v3", "Stout v2"])}
+      {E.pick("Recipe · optional", "Hazy IPA v4", ["Not decided", "Hazy IPA v4", "Pils v3", "Stout v2"])}
+      {E.pick("Brand · optional", "Hazy IPA", ["Not decided", "Hazy IPA", "Pils", "Stout"])}
       {E.edit("Planned barrels", "15", "number")}
       {E.edit("Date", "2026-09-04", "date")}
       {E.sp()}
@@ -2050,8 +2039,7 @@ export const SCREENS: Screen[] = [
     states: [["short", "a planned run whose materials fall short says so on the row and its next action is Resolve, not Start"], ["due today", "the same row also appears in Today for the brewer"], ["closed", "recent runs stay for a few weeks with lot, output and yield; after that they are history under Search and Lot trace"], ["empty", "no runs planned: the button is the only thing on the page"]],
     spec: "The Work list with the Runs tab active, which is the packaging list: Work is where everything in motion lives, so runs get no rail entry of their own. Upcoming sorts by planned date and every row names its next action. Recent breaks Work's in-motion rule on purpose, because a brewer plans the next run against the last one's yield; it is kept short and the full history stays in Search. Schedule run opens the sheet; a row opens the run, where closing happens.",
     body: (<>
-      {E.hd("Work", "brewer default")}
-      {E.btn("Schedule run")}
+      {E.hd("Work", "brewer default", E.btn("Schedule run"))}
       {E.tabs(WORK_CHIPS, 3, "w-full", WORK_TABS)}
       {E.ttl("Upcoming")}
       {E.row("RUN-0031 · Hazy cans", "Fri 9/5 · FV3 · 118 cases planned · 480 ends short", E.act("Resolve", "attention"), "w")}
@@ -2125,8 +2113,7 @@ export const SCREENS: Screen[] = [
     states: [["draft", "Send is the next action"], ["partial", "Receive stays available for the remainder"], ["empty", "no open purchase orders: New PO is the only action"]],
     spec: "The Work list with the POs tab active. Each row names the next action; New PO opens the existing vendor purchase draft, and Receive PO returns here.",
     body: (<>
-      {E.hd("Work", "warehouse default")}
-      {E.btn("New PO")}
+      {E.hd("Work", "warehouse default", E.btn("New PO"))}
       {E.tabs(WORK_CHIPS, 4, "w-full", WORK_TABS)}
       {E.row("PO-0142 · Country Malt", "sent · due Thu", E.act("Receive", "info"))}
       {E.row("PO-0141 · YCH", "partially received · 1 Citra box due", E.act("Receive", "info"), "w")}
@@ -2224,8 +2211,7 @@ export const SCREENS: Screen[] = [
     states: [["expiring", "the earliest best-by date needs attention"], ["empty", "no materials yet: Add material is the only action"]],
     spec: "The Beer landing's Materials row opens this list. Count opens Cycle count for that material; Add material opens the existing material and vendor flow.",
     body: (<>
-      {E.back("Beer", "Materials on hand")}
-      {E.btn("Add material")}
+      {E.back("Beer", "Materials on hand", E.btn("Add material"))}
       {E.row("Cans · 16 oz", "3,100 each · 2 lots · best by none", E.act("Count", "info"))}
       {E.row("Citra 2026 · YCH", "262 lb · 1 lot · best by 8/31/27", E.act("Count", "info"))}
       {E.row("2-row 2026 · Country Malt", "8,800 lb · 3 lots · best by 3/15/27", E.act("Count", "info"))}
@@ -2265,8 +2251,7 @@ export const SCREENS: Screen[] = [
     states: [["permission", "warehouse or brewer required", 1], ["active", "available for purchase orders"], ["contract", "committed quantity summarized"], ["empty", "Add vendor is the only action"]],
     spec: "Materials, vendors and contracts are separate lists so each row has one predictable destination.",
     body: (<>
-      {E.back("More", "Vendors")}
-      {E.btn("Add vendor")}
+      {E.back("More", "Vendors", E.btn("Add vendor"))}
       {E.row("YCH", "hops · 1 active contract", E.act("Edit"))}
       {E.row("Country Malt", "grain · 1 active contract", E.act("Edit"))}
       {E.row("CanSource", "packaging · 3 materials", E.act("Edit"))}
@@ -2286,8 +2271,7 @@ export const SCREENS: Screen[] = [
     states: [["permission", "warehouse or brewer required", 1], ["active", "available to recipes and purchase orders"], ["inactive", "history remains", 1], ["empty", "Add material is the only action"]],
     spec: "This list owns material facts; Materials on hand remains the inventory view.",
     body: (<>
-      {E.back("Vendors", "Materials")}
-      {E.btn("Add material")}
+      {E.back("Vendors", "Materials", E.btn("Add material"))}
       {E.row("Citra", "hop · lb · 262 lb on hand", E.act("Edit"))}
       {E.row("2-row", "grain · lb · 8,800 lb on hand", E.act("Edit"))}
       {E.row("Cans · 16 oz", "packaging · each · 3,100 on hand", E.act("Edit"))}
@@ -2350,8 +2334,7 @@ export const SCREENS: Screen[] = [
     states: [["permission", "warehouse or brewer required", 1], ["active", "committed, received, on order and available all shown"], ["releases in flight", "orders placed and not yet arrived hold back availability", 1], ["fulfilled", "history remains"], ["empty", "Add contract is the only action"]],
     spec: "Each commitment is one vendor and one material. A contract is not an order: it commits a volume for a crop year, and releases are ordered against it all year, so the same contract is drawn down many times. That is why availability counts orders placed as well as deliveries taken. Counting only what has arrived would let two releases be placed against the same remaining quantity, and the over-draw would surface weeks later at receiving. Received is what accounting reconciles against; available is what a buyer decides against. Both are shown because they answer different questions.",
     body: (<>
-      {E.back("Vendors", "Contracts")}
-      {E.btn("Add contract")}
+      {E.back("Vendors", "Contracts", E.btn("Add contract"))}
       {E.row("YCH · Citra 2026", "400 committed · 262 received · 100 on order · 38 lb available", E.act("Edit"), "w")}
       {E.row("Country Malt · 2-row 2026", "20,000 committed · 8,800 received · 0 on order · 11,200 lb available", E.act("Edit"))}
     </>),
@@ -2393,8 +2376,7 @@ export const SCREENS: Screen[] = [
     states: [["draft version", "Finish is the next action"], ["empty", "no recipes yet: Create recipe is the only action"]],
     spec: "The More landing's Recipes row opens this list. Each row opens Recipe at its current version and names the next action; Create recipe opens the same surface with only name and style.",
     body: (<>
-      {E.back("More", "Recipes")}
-      {E.btn("Create recipe")}
+      {E.back("More", "Recipes", E.btn("Create recipe"))}
       {E.row("Hazy IPA v4", "IPA · 15 bbl · updated Aug 28", E.act("Review"))}
       {E.row("Pils v3", "German pils · 15 bbl · updated Aug 21", E.act("Review"))}
       {E.row("Stout v2", "Stout · draft version", E.act("Finish", "primary"), "w")}
@@ -2774,8 +2756,7 @@ export const SCREENS: Screen[] = [
     states: [["unassigned", "shipped orders waiting for a route are called out"], ["empty", "no routes yet: New route is the only action"]],
     spec: "The Work list with the Routes tab active. Every row names its next action; New route opens Route in builder mode, and Route returns here.",
     body: (<>
-      {E.hd("Work", "driver default")}
-      {E.btn("New route")}
+      {E.hd("Work", "driver default", E.btn("New route"))}
       {E.tabs(WORK_CHIPS, 5, "w-full", WORK_TABS)}
       {E.row("Route A · Thu", "3 stops · Maria · departed 8:10", E.act("Resume", "info"))}
       {E.row("Route B · Fri", "2 stops · driver not assigned", E.act("Assign", "attention"), "w")}
@@ -3014,8 +2995,7 @@ export const SCREENS: Screen[] = [
       {E.row("Last message from Slack", "Today · 8:42 AM", E.status("Succeeded", "ok"))}
       {E.row("Last delivery", "Today · 8:43 AM", E.status("Succeeded", "ok"))}
       {E.row("Queued", "3 deliveries", E.status("Paused", "w"), "w")}
-      {E.btn("Reauthorize Slack")}
-      {E.btn("Disable integration", "g")}
+      {E.btns([["Reauthorize Slack", "p"], ["Disable integration", "g"]])}
     </>),
   },
   {
@@ -3273,8 +3253,7 @@ export const SCREENS: Screen[] = [
     states: [["unused", "a tier with no customers can still be edited"], ["empty", "no price lists yet: Create price list is the only action"]],
     spec: "Reached from Catalog. Each row names its next action and opens Price tiers; Create price list opens the same surface for a new tier.",
     body: (<>
-      {E.back("Catalog", "Price lists")}
-      {E.btn("Create price list")}
+      {E.back("Catalog", "Price lists", E.btn("Create price list"))}
       {E.row("Wholesale · standard", "18 customers · 12 priced formats", E.act("Edit prices"))}
       {E.row("Wholesale · distributor", "3 customers · 12 priced formats", E.act("Edit prices"))}
       {E.row("Taproom", "no customers · 8 priced formats", E.act("Edit prices"))}
