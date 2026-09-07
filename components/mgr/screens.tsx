@@ -975,7 +975,7 @@ export const SCREENS: Screen[] = [
     to: { Pick: "Pick", "Adjust order to 7 cases": "Pick" },
     job: "Resolve one short line before the pick can finish",
     reads: "get_order",
-    writes: "resolve_short_pick [design; one RPC: short_reason + chosen resolution (line qty + allocation) + order_events row]",
+    writes: "resolve_short_pick [one RPC: short_reason + chosen resolution (line qty + allocation) + order_events row]",
     states: [["permission", "warehouse or admin required", 1], ["adjust down", "ordered 10 → 7 · allocation shrinks · ATP recovers"], ["keep staged", "7 staged · 3 remain owed · the order keeps its Pick action"], ["resumed", "Pick reopens showing 7 already picked · only the owed 3 need counting"], ["stale", "another picker changed this line · recheck", 1], ["offline", "resolution waits for live ATP", 1]],
     spec: "Opens from a Pick line whose count is below ordered. Reason is required; exactly one resolution is chosen and the verb names it: adjusting the order is green (mutable order edit); keeping the remainder staged is also green. Keeping the remainder owed does not finish the pick: the order stays picked with a line below ordered and keeps its Pick row in Work and Today until every line reaches its ordered quantity, and reopening Pick shows what is already counted. The restock implication is copy in the preview, never a status column. Done picking completes afterward on the Pick frame.",
     body: (<>
@@ -997,7 +997,7 @@ export const SCREENS: Screen[] = [
     name: "Pick",
     job: "Default lines to ordered; touch only exceptions",
     reads: "get_order",
-    writes: "record_pick · resolve_short_pick [design; one RPC]",
+    writes: "record_pick · resolve_short_pick",
     states: [["permission", "warehouse or admin required", 1], ["short pick", "a line below ordered opens the Short pick frame", 1], ["partly picked", "reopened after a kept-owed line · counted lines start at what was picked"], ["concurrent", "another picker changed qty"], ["cancelled", "staged · restock now", 1], ["offline", "queue whole pick set once"]],
     spec: "2 taps from Today: Pick → Done picking (all-as-ordered only). Shortage is not a chip here: entering a count below ordered opens Short pick.",
     body: (<>
@@ -1019,7 +1019,7 @@ export const SCREENS: Screen[] = [
     to: { "Put back 3 cases": "Today" },
     job: "Confirm staged quantities were re-shelved after a restock",
     reads: "get_order [restock flag and staged qtys]",
-    writes: "confirm_restock [design; one RPC: clears needs_restock + order_events row]",
+    writes: "confirm_restock [one RPC: clears needs_restock + order_events row]",
     states: [["permission", "warehouse or admin required", 1], ["pending", "Today Put back is the standing row"], ["done", "flag cleared · row leaves Today"], ["cancelled order", "the flag survives cancel · this is the only way back"], ["stale", "someone re-picked · the flag is already clear", 1]],
     spec: "Today’s Put back row opens this. Staged 3 Pils cases after ORD-0229 was adjusted down. The verb writes: it clears the restock flag and appends the order event, because a cancelled order can never be re-picked or shipped and would otherwise leave its row standing on Today forever. Inventory already sits in Warehouse as staged, so nothing moves in the ledger.",
     body: (<>
@@ -1192,7 +1192,7 @@ export const SCREENS: Screen[] = [
     to: { Release: "Order", Adjust: "Order", "Edit par": "Bin", "Taproom par": "Bin" },
     job: "Change named quantities; never invent priority",
     reads: "get_shortfalls · list_standing_allocations",
-    writes: "adjust_order_lines · release_allocation [design; Program 1 ships it] · set_taproom_par · set_standing_allocation",
+    writes: "adjust_order_lines · release_allocation · set_taproom_par · set_standing_allocation",
     states: DEFAULT_STATES,
     spec: "There is no ranking command or priority column; every change is a named quantity edit. Taproom par edits the bin's par (§16.6 keys pars on bins), the same row the Bin sheet shows.",
     body: (<>
@@ -1775,7 +1775,7 @@ export const SCREENS: Screen[] = [
     portal: "Account",
     name: "Account",
     job: "Read own ship-to, signed-in membership and deposit details",
-    reads: "get_portal_account [design]",
+    reads: "get_portal_account",
     writes: "none",
     states: DEFAULT_STATES,
     spec: "Peer portal users are not listed; the composer exposes only account-safe reads and order commands.",
@@ -2838,8 +2838,8 @@ export const SCREENS: Screen[] = [
     tab: "Work",
     name: "Confirm delivery",
     job: "Name receiving contact, then commit delivery and invoice",
-    reads: "get_delivery_stop [design; require persisted on-delivery invoice timing]",
-    writes: "confirm_delivery [design; one RPC: delivered_at + signed_by + invoice only when persisted mode is on-delivery; never ships]",
+    reads: "get_delivery_stop",
+    writes: "confirm_delivery [one RPC: delivered_at + signed_by + invoice only when persisted mode is on-delivery; never ships]",
     states: [["offline", "keep stop open; commit waits", 1], ["response lost", "same requestId returns result"], ["permission", "warehouse membership and being the route’s assigned driver, or admin", 1], ["success", "INV number after commit"]],
     spec: "2 taps: receiving-contact chip from the ship-to → Delivered. Back goes to Driver route. The receiving name is stored as text; the UI never implies a signature image is retained.",
     body: (<>

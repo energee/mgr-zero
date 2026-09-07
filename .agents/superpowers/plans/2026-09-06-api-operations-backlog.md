@@ -4,18 +4,12 @@
 
 # API operations backlog
 
-108 operations the screens declare they need that the command registry does not yet answer, against 55 that it does.
+98 operations the screens declare they need that the command registry does not yet answer, against 65 that it does.
 
 This is the backend push, scoped. Each row names the operation a screen asked for and the screens waiting on it, so an area can be built and shipped whole rather than a command at a time. `/docs/api` publishes the same list per area, marked designed, so an integrator sees the roadmap without being told a date.
 
 Nothing here is a schema decision. An operation appears because a screen named it in its `reads` or `writes`; what it takes and returns is settled when it is built.
 
-## Customer portal — 2 to build, 7 built
-
-| Operation | Kind | Needed by |
-| --- | --- | --- |
-| `get_portal_account` | query | Account |
-| `portal_invoice` | query | Pay invoice, Payment unavailable, Question invoice, Paid invoice |
 ## Compliance — 9 to build, 0 built
 
 | Operation | Kind | Needed by |
@@ -112,29 +106,23 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `swap_keg` | command | Tap board, Swap keg |
 | `tap_keg` | command | Tap board |
 | `update_keg_pool` | command | Keg fleet |
-## Delivery & routes — 7 to build, 0 built
+## Delivery & routes — 4 to build, 3 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
-| `confirm_delivery` | command | Confirm delivery |
 | `depart_route` | command | Route |
-| `get_delivery_stop` | query | Confirm delivery |
 | `list_routes` | query | Routes |
 | `return_route` | command | Route, Return route, Driver route |
-| `return_shipment` | command | Return and credit |
 | `save_route` | command | Route |
-## Orders & invoicing — 7 to build, 16 built
+## Orders & invoicing — 4 to build, 19 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
-| `confirm_restock` | command | Put back |
 | `list_invoice_questions` | query | Sales |
 | `raise_invoice_question` | command | Question invoice |
-| `release_allocation` | command | Pars and allocation |
 | `resolve_invoice_question` | command | Invoice |
-| `resolve_short_pick` | command | Short pick, Pick |
 | `write_off_invoice` | command | Invoices |
-## Inventory & locations — 7 to build, 6 built
+## Inventory & locations — 6 to build, 7 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
@@ -144,7 +132,6 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `list_bins` | query | Location bins |
 | `reverse_inventory_movement` | command | SKU detail |
 | `update_bin` | command | Location bins, Bin |
-| `update_location` | command | Settings, Location detail |
 ## Team & brewery settings — 6 to build, 4 built
 
 | Operation | Kind | Needed by |
@@ -155,14 +142,13 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `set_brewery_operating_defaults` | command | Chat settings |
 | `update_brewery` | command | Settings |
 | `update_staff_role` | command | Team, Team member |
-## Today & notifications — 7 to build, 6 built
+## Today & notifications — 6 to build, 7 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
 | `get_chat_link_intent` | query | Link your Slack |
 | `get_notification_occurrence` | query | Personal DM |
 | `get_notification_preferences` | query | Chat settings, Notification preferences |
-| `get_shortfalls` | query | Sales, Composer answer, Pars and allocation |
 | `issue_chat_link_proof` | command | Link identity |
 | `search_entities` | query | Search, Entity picker |
 | `snooze_notification` | command | Personal DM, Notification preferences |
