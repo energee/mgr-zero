@@ -36,10 +36,10 @@ jobs:
         with: { node-version: 22 }
       - uses: oven-sh/setup-bun@v2
         with: { bun-version-file: ".bun-version" }
-      # PR-description directives (TODO: / DOCS:) must be well-formed so the
-      # dreaming and documentation workflows can act on them without a model.
+      # A `TODO: <item>` line in the PR description must name one open TODO.md
+      # item, so the dreaming workflow can move it without a model.
       - name: PR directives are well-formed
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && contains(github.event.pull_request.body, 'TODO:')
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: bun scripts/pr-directives.ts check

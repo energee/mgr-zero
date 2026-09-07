@@ -105,6 +105,7 @@ jobs:
       # when the model has nothing to dream about. scripts/pr-directives.ts.
       - uses: oven-sh/setup-bun@v2
         if: steps.window.outputs.new == 'true'
+        with: { bun-version-file: ".bun-version" }
       - name: Move finished TODO items to Done
         if: steps.window.outputs.new == 'true'
         env:

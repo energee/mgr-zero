@@ -4,7 +4,7 @@ Index written 2026-09-07 against `main` @ `b3f6a91` (Programs 0–4b merged)  Th
 program's own plan holds the tasks. An item is done when its PR is merged and
 its screens are ungated in `components/mgr/screens.tsx`. It then leaves this
 file via a `TODO: <unique substring>` line in the PR description (see
-`AGENTS.md` step 6). This file only shrinks.
+`scripts/pr-directives.ts`). This file only shrinks.
 
 Counts come from a source read of the 167 MGR (non-venue) inventory screens
 against `app/`: 55 live, 13 partial, 32 missing but ungated, 67 gated.

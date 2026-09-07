@@ -1,6 +1,6 @@
-// tests/pr-directives.test.ts — the pure half of scripts/pr-directives.ts.
+// tests/pr-directives.test.ts — lib/pr-directives.ts, the pure half of the CLI.
 import { describe, expect, it } from "vitest";
-import { check, moveDone, openItems, parseDirectives } from "../scripts/pr-directives";
+import { check, moveDone, openItems, parseTodoTargets } from "@/lib/pr-directives";
 
 const TODO = `# TODO
 
@@ -16,10 +16,10 @@ const PROGRESS = `# PROGRESS
 - 2026-09-07 — Programs 0–4b (#185)
 `;
 
-describe("parseDirectives", () => {
-  it("reads TODO: and DOCS: lines anywhere in the body", () => {
-    expect(parseDirectives("Progress note.\nTODO: Program 6\n\nDOCS: none \n")).toEqual({ todo: ["Program 6"], docs: "none" });
-    expect(parseDirectives("no markers")).toEqual({ todo: [], docs: null });
+describe("parseTodoTargets", () => {
+  it("reads TODO: lines anywhere in the body", () => {
+    expect(parseTodoTargets("Progress note.\nTODO: Program 6 \nDOCS: none\n")).toEqual(["Program 6"]);
+    expect(parseTodoTargets("no markers")).toEqual([]);
   });
 });
 
@@ -30,11 +30,10 @@ describe("openItems", () => {
 });
 
 describe("check", () => {
-  it("passes a unique match and DOCS: none", () => expect(check(TODO, "TODO: program 6\nDOCS: none")).toEqual([]));
-  it("fails zero and ambiguous matches and unknown DOCS values", () => {
+  it("passes a unique, case-insensitive match", () => expect(check(TODO, "TODO: program 6\nDOCS: none")).toEqual([]));
+  it("fails zero and ambiguous matches", () => {
     expect(check(TODO, "TODO: Program 9")).toHaveLength(1);
     expect(check(TODO, "TODO: merged")).toHaveLength(1);
-    expect(check(TODO, "DOCS: staff-guide")).toHaveLength(1);
   });
 });
 
