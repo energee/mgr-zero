@@ -2002,8 +2002,8 @@ export const SCREENS: Screen[] = [
     job: "Plan a run separately, then create lot and movements on close",
     reads: "get_packaging_run [design; revalidate selected source occupancy] · list_locations",
     writes: "schedule_packaging_run [design; one RPC: run with explicit source occupancy + planned outputs] · close_packaging_run [design; one RPC: revalidate source + close + lot + outputs + material movements at explicit locations]",
-    states: permitted("brewer or warehouse required"),
-    spec: "The close half of the packaging frame; planning and editing the plan live in the Schedule packaging run sheet until the run starts. Close is a copper review ( revalidated source, actual outputs, lot, explicit FG destination, material consumption/return/damage, yield/loss). Print labels is presentation after commit: measured thermal keg-collar/lot labels per plan §3. No packaging-day-actuals screen.",
+    states: [["permission", "brewer or warehouse required", 1], ["short", "a material is short · resolve or explicitly override before starting", 1], ["no damage", "the ordinary close · both fields stay at zero and nothing extra posts"], ["damage", "a named quantity is written off to an explicit bin", 1]],
+    spec: "The close half of the packaging frame; planning and editing the plan live in the Schedule packaging run sheet until the run starts. Close is a copper review ( revalidated source, actual outputs, lot, explicit finished-goods destination, material consumption and damage, yield/loss). Consumption is derived from what was actually packaged, never from the plan, which is why leftover material needs no entry: 118 cases consumed 2,832 cans and ends, and the rest never left the shelf to be returned. Damage is the one thing nobody can derive, so it is the one thing asked for, optional and starting at zero. It is asked only where material is issued in whole units and comes back short: labels and ends, not every line of the bill of materials, because a prompt on all five is friction nobody completes. Labels are never counted here. Nobody can count what is left on a roll, and a screen that asks will simply be given a guess that posts as fact; the roll is reconciled at cycle count by counting whole rolls instead. A damaged unit names its destination for the same reason finished goods do: material written off against the wrong bin is worse than material nobody tracked. Print labels is presentation after commit: measured thermal keg-collar/lot labels per plan §3. No packaging-day-actuals screen.",
     body: (<>
       {E.back("Work", "RUN-0031 · started")}
       {E.fld("Packaging source", "FV3 · B-0416")}
@@ -2012,7 +2012,10 @@ export const SCREENS: Screen[] = [
       {E.fld("Packaged", "118 cases")}
       {E.pick("Lot", "L-240905-HZ", ["L-240905-HZ", "new lot"])}
       {E.pick("Finished goods destination", "Warehouse · selected", ["Warehouse · selected", "Taproom"])}
-      {E.tape([["FV3 · B-0416", "source checked"], ["+118 cases · production in", "Warehouse · new lot"], ["−2,832 cans + ends · consumption", "FIFO"], ["Labels returned / damaged", "24 / 6"], ["Beer loss · 0.30 bbl", "yield 97.9%"]])}
+      {E.edit("Labels damaged · optional", "6", "number")}
+      {E.edit("Ends damaged · optional", "0", "number")}
+      {E.pick("Write off to", "Warehouse · packaging bin", ["Warehouse · packaging bin", "Cellar · packaging bin"])}
+      {E.tape([["FV3 · B-0416", "source checked"], ["+118 cases · production in", "Warehouse · new lot"], ["−2,832 cans + ends · consumption", "derived from 118 cases"], ["−6 labels · damage", "Warehouse · packaging bin"], ["Beer loss · 0.30 bbl", "yield 97.9%"]])}
       {E.btn("Close packaging run", "irr")}
     </>),
   },
@@ -2173,7 +2176,7 @@ export const SCREENS: Screen[] = [
     spec: "Send PO (green) shows while the PO is draft; receiving needs a sent PO. Each lot-tracked line takes a lot code and best-by typed off the vendor packaging, prefilled from the lot the PO named so the ordinary receipt is a glance and no typing. When the PO named none the field opens empty and offers that material\u2019s recent lots, which is what keeps one vendor lot from becoming two records over a stray space. The receive RPC creates the material lot from what is entered here, never from the PO: the package is the only writer of a lot code. A difference is a substitution, which is reported and never blocked. Punctuation or case alone never reads as one: the schema spec owns that comparison rule. Untracked lines (rice hulls) ask for none. Only counted quantity posts; over and short are both visible and both allowed, and the keypad never clamps an over-count as the only guard. PO status is trigger-derived; never write a loaded/status flag.",
     body: (<>
       {E.back("Purchase orders", "PO-0142 · Country Malt")}
-      {E.fld("Status", "sent Mon · expected Thu")}
+      {E.fld("Status", "sent Mon · expected Thu · nothing received yet")}
       {E.line("2-row · 55 lb bags", "expected 40 · lot from the PO", E.stq(42), "w", <>
         {E.edit("Lot", "CM-26-4410", "text", ["CM-26-4410", "CM-26-4288", "CM-25-9910"])}
         {E.edit("Best by", "2027-03-31", "date")}
@@ -2196,14 +2199,15 @@ export const SCREENS: Screen[] = [
     tab: "Work",
     name: "Receipt",
     to: { Work: "Purchase orders" },
-    job: "What posted after a receive, including over and short",
-    reads: "get_purchase_order [design]",
+    job: "What posted after a receive, including over, short and what is still owed",
+    reads: "get_purchase_order [design; ordered less counted per line]",
     writes: "none",
-    states: [["permission", "warehouse or admin required", 1], ["partial", "the PO is partially received"], ["complete", "every line met expected"]],
-    spec: "Post-commit of Receive PO. The tape is the receipt; status is derived.",
+    states: [["permission", "warehouse or admin required", 1], ["partial", "the PO is partially received · the remainder is named"], ["complete", "every line met expected · nothing is owed"]],
+    spec: "Post-commit of Receive PO. The tape is the receipt; status is derived. The remainder is the ordered quantity less everything counted so far, and it is the number a buyer chases a vendor with, so it is stated rather than left to be worked out from the tape. It is derived on read for the same reason status is: a stored balance would need its own correction path the moment a recount lands, and a recount is the ordinary way a miscount is fixed here.",
     body: (<>
       {E.back("Work", "PO-0142 · received")}
       {E.fld("Status", "partially received")}
+      {E.fld("Still owed", "1 Citra box · 44 lb")}
       {E.tape([["+2,310 lb 2-row · receipt", "lot CM-26-4410 · over 2 bags"], ["+132 lb Citra · receipt", "lot 2026-CIT-91 · substituted · short 1"], ["+300 lb rice hulls · receipt", "not lot-tracked"]])}
       {E.info("2-row is over by 2 bags and Citra short 1 on a substituted lot.")}
     </>),
@@ -2238,8 +2242,8 @@ export const SCREENS: Screen[] = [
     job: "Post only variance as an append-only movement",
     reads: "get_material_on_hand [design]",
     writes: "record_material_count [design; one RPC: count + lines + adjustment movements against named lots]",
-    states: [["permission", "warehouse or brewer required", 1], ["one lot", "the variance lands on it · nothing to choose"], ["several lots", "a shortage consumes earliest best-by first; an overage lands on the newest lot"], ["no best-by", "lots with none fall to receipt order behind those that have one"], ["split", "a shortage crossing two lots names both in the preview", 1]],
-    spec: "A count is one number and a material may hold several lots, so the RPC has to decide which lot moves. A shortage consumes earliest best-by first, not earliest receipt: best-by is what a recall and an expiry sweep read, and consuming the freshest lot first would leave the oldest to expire on the shelf. An overage lands on the newest lot, since unrecorded stock is far likelier to be the delivery just counted in than one from six months ago. The chosen lot is always named in the preview: a variance that silently splits across two lots is the one thing this sheet must not do quietly.",
+    states: [["permission", "warehouse or brewer required", 1], ["one lot", "the variance lands on it · nothing to choose"], ["several lots", "a shortage consumes earliest best-by first; an overage lands on the newest lot"], ["no best-by", "lots with none fall to receipt order behind those that have one"], ["split", "a shortage crossing two lots names both in the preview", 1], ["counted in rolls", "labels are counted as whole rolls · the open roll is excluded and its remainder falls into the variance", 1]],
+    spec: "A count is one number and a material may hold several lots, so the RPC has to decide which lot moves. A shortage consumes earliest best-by first, not earliest receipt: best-by is what a recall and an expiry sweep read, and consuming the freshest lot first would leave the oldest to expire on the shelf. An overage lands on the newest lot, since unrecorded stock is far likelier to be the delivery just counted in than one from six months ago. The chosen lot is always named in the preview: a variance that silently splits across two lots is the one thing this sheet must not do quietly. Labels are the exception to counting units, and the reason is practical: nobody counts two thousand labels left on a roll, and a sheet that asks will be handed a guess that posts as fact. Whole rolls are counted instead and the open roll is excluded, so the error is bounded at one roll and the same variance absorbs it at the next count. Applicator waste is what makes the drift, since packaging consumes one label per unit packaged while the real line wastes a little more; counting rolls on a routine keeps that from accumulating unnoticed.",
     body: (<>
       {E.nav("Material", "Cans · 16 oz")}
       {E.qty("3050", E.tabs(["each", "case"], 0, "w-fit"))}
@@ -2339,16 +2343,16 @@ export const SCREENS: Screen[] = [
     tab: "More",
     name: "Contracts",
     to: { Edit: "Contract" },
-    job: "List material commitments and remaining quantities",
-    reads: "list_vendors_and_contracts [design]",
+    job: "List material commitments and what is still free to release",
+    reads: "list_vendors_and_contracts [design; committed, received and ordered-not-yet-received per contract]",
     writes: "none [creation and editing happen on Contract]",
-    states: [["permission", "warehouse or brewer required", 1], ["active", "remaining quantity shown"], ["fulfilled", "history remains"], ["empty", "Add contract is the only action"]],
-    spec: "Each commitment is one vendor and one material.",
+    states: [["permission", "warehouse or brewer required", 1], ["active", "committed, received, on order and available all shown"], ["releases in flight", "orders placed and not yet arrived hold back availability", 1], ["fulfilled", "history remains"], ["empty", "Add contract is the only action"]],
+    spec: "Each commitment is one vendor and one material. A contract is not an order: it commits a volume for a crop year, and releases are ordered against it all year, so the same contract is drawn down many times. That is why availability counts orders placed as well as deliveries taken. Counting only what has arrived would let two releases be placed against the same remaining quantity, and the over-draw would surface weeks later at receiving. Received is what accounting reconciles against; available is what a buyer decides against. Both are shown because they answer different questions.",
     body: (<>
       {E.back("Vendors", "Contracts")}
       {E.btn("Add contract")}
-      {E.row("YCH · Citra 2026", "400 lb committed · 138 lb remaining", E.act("Edit"))}
-      {E.row("Country Malt · 2-row 2026", "20,000 lb committed · 11,200 lb remaining", E.act("Edit"))}
+      {E.row("YCH · Citra 2026", "400 committed · 262 received · 100 on order · 38 lb available", E.act("Edit"), "w")}
+      {E.row("Country Malt · 2-row 2026", "20,000 committed · 8,800 received · 0 on order · 11,200 lb available", E.act("Edit"))}
     </>),
   },
   {
@@ -2361,13 +2365,15 @@ export const SCREENS: Screen[] = [
     job: "Create or edit one material purchasing commitment",
     reads: "list_materials · list_vendors_and_contracts [design]",
     writes: "upsert_material_contract [design]",
-    states: [["permission", "warehouse or brewer required", 1], ["new", "vendor, material and quantity required"], ["received", "received quantity is read-only"]],
-    spec: "Receipts update progress; this sheet only owns the commitment.",
+    states: [["permission", "warehouse or brewer required", 1], ["new", "vendor, material and quantity required"], ["received", "received and on-order quantities are read-only"]],
+    spec: "This sheet owns the commitment and nothing else. Receipts and open releases both update progress, and neither is editable here: a quantity a buyer could type over would stop being evidence. Available is the commitment less what has arrived and less what is already ordered, which is the only one of the four numbers worth acting on.",
     body: (<>
       {E.nav("Vendor", "YCH")}
       {E.nav("Material", "Citra 2026")}
       {E.edit("Contract quantity", "400", "number")}
       {E.fld("Received", "262 lb · read-only")}
+      {E.fld("On order", "100 lb · read-only")}
+      {E.fld("Available to release", "38 lb")}
       {E.edit("Starts", "2026-09-01", "date")}
       {E.edit("Ends", "2026-10-31", "date")}
       {E.edit("Unit cost", "$9.40")}
@@ -2865,18 +2871,22 @@ export const SCREENS: Screen[] = [
     slice: 8,
     group: "Desk",
     name: "Planning",
-    to: { "Hazy ATP negative 9/9": "Pars and allocation" },
-    job: "See demand gaps and draft a PO without priority state",
-    reads: "get_planning_shortfalls [view; demand, supply and gap by week]",
-    writes: "draft_purchase_order_from_requirements [design; one RPC: draft PO + lines]",
-    states: [["gap", "demand exceeds supply in that week · the only actionable row"], ["covered", "supply meets demand · shown so the horizon reads continuously"], ["no vendor", "no contract and no lead time on the material · the row cannot draft a PO", 1], ["empty", "nothing planned and nothing ordered"]],
-    spec: "The three columns are defined so the gap is arithmetic rather than judgement. Demand is confirmed and submitted order lines by requested ship week, plus taproom pars; supply is on-hand ATP plus the planned outputs of packaging runs already scheduled into that week. The horizon runs as far ahead as the longest material lead time can still be acted on, which is why it is drawn two weeks and not a quarter: a gap nobody can still buy for is a report, not a plan. A drafted PO goes to the vendor holding an active contract for that material, and failing that the shortest lead time on the material; the quantity is the gap rounded up to its purchase unit. Nothing here ranks or prioritises, in keeping with Pars and allocation: every change stays a named quantity.",
+    to: { "Hazy ATP negative 9/9": "Pars and allocation", "Draft 1 purchase order": "New PO", "Lindenmeyr Munroe": "Vendor", "Blue Label": "Vendor" },
+    job: "See demand gaps and draft one purchase order per vendor, without priority state",
+    reads: "get_planning_shortfalls [view; demand, supply and gap by week; supply must net open purchase orders] · get_material_requirements [design] · list_vendors_and_contracts [design]",
+    writes: "draft_purchase_order_from_requirements [design; one RPC per resolved vendor: draft PO + lines]",
+    states: [["gap", "demand exceeds supply in that week · the only actionable row"], ["covered", "supply meets demand · shown so the horizon reads continuously"], ["one vendor", "the whole shortfall resolves to a single supplier · the verb is singular"], ["several vendors", "a bill of materials spans suppliers · one draft each, named before the verb commits"], ["partly unbuyable", "the slowest supplier is already past its buy-by date · its lines are drawn out of reach, the rest still draft", 1], ["no vendor", "no contract and no default supplier on the material · the row cannot draft", 1], ["empty", "nothing planned and nothing ordered"]],
+    spec: "The three columns are defined so the gap is arithmetic rather than judgement. Demand is confirmed and submitted order lines by requested ship week, plus taproom pars; supply is on-hand availability plus the planned outputs of packaging runs already scheduled into that week, less anything already on an open purchase order. That last term is what stops a gap being ordered twice, and it is the mirror of the rule that an unreceived order never inflates what a packaging run believes it has. The horizon runs as far ahead as the slowest supplier behind the shortfall can still be acted on: a gap nobody can still buy for is a report, not a plan. A shortfall is summed per material first and resolved to a supplier second, so a material whose supplier changes mid-horizon does not fragment into two half-orders. Resolution is the active contract for that material, then the material’s default supplier, and otherwise the row cannot draft. Because an order carries one supplier, one shortfall becomes one draft per supplier, and the verb says how many before it commits. Quantities are the gap rounded up to the purchase unit, since nobody buys part of a bag. Lead time belongs to the supplier, not the material, so the buy-by date is the slowest of the suppliers a bill of materials resolves to: cans at three days stay orderable on a run whose labels at seven days no longer are. Nothing here ranks or prioritises, in keeping with Pars and allocation: every change stays a named quantity.",
     body: (<>
       {E.back("More", "Planning")}
       {E.tbl(["week", "demand", "supply", "gap"], [["9/7", "48 bbl", "40 bbl", <><span className="text-warning-foreground">−8</span></>], ["9/14", "52 bbl", "60 bbl", "+8"]])}
-      {E.row("Sept 12 packaging", "short 480 ends · lead 10 days", E.act("Review"), "w")}
+      {E.row("Sept 12 packaging", "short 480 ends · buy by 9/2", E.act("Review"), "w")}
       {E.row("Hazy ATP negative 9/9", "open named shortfall", E.act("Review"))}
-      {E.btn("Draft purchase order")}
+      {E.ttl("Drafts this creates")}
+      {E.row("Lindenmeyr Munroe", "cans, ends, quadpacks, trays · 3 day lead", "4 lines")}
+      {E.row("Blue Label", "labels · 7 day lead · past the buy-by date", "out of reach", "w")}
+      {E.info("Labels can no longer arrive for the 9/7 week, so that line is left out. The four Lindenmeyr lines still draft.")}
+      {E.btn("Draft 1 purchase order")}
     </>),
   },
   {
