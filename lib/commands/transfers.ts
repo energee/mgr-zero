@@ -5,22 +5,17 @@
 // (inventory.ts), and create_stock_transfer refuses same-location pairs.
 import { z } from "zod";
 import { defineCommand, defineQuery, unwrap } from "./registry";
+import { stockLine } from "./stock-line";
 
 const roles = ["admin", "warehouse"] as const;
 const readRoles = ["admin", "sales", "warehouse"] as const;
-
-const line = z.object({
-  skuId: z.string().uuid().optional(), materialId: z.string().uuid().optional(),
-  kegPoolId: z.string().uuid().optional(), kegSize: z.string().optional(),
-  qty: z.number().positive(), fromBinId: z.string().uuid(), toBinId: z.string().uuid(), note: z.string().optional(),
-}); // exactly one of skuId / materialId / kegPoolId, and kegSize with kegPoolId: the table checks say so
 
 defineCommand({
   name: "create_stock_transfer", description: "Draft a stock transfer between two locations: sku, material or keg-pool lines, each with a from-bin and a to-bin",
   roles: [...roles],
   input: z.object({
     fromLocationId: z.string().uuid(), toLocationId: z.string().uuid(),
-    requestedDate: z.string().date().optional(), note: z.string().optional(), lines: z.array(line).min(1),
+    requestedDate: z.string().date().optional(), note: z.string().optional(), lines: z.array(stockLine).min(1),
   }),
   handler: async (ctx, i, execution) => {
     const r = await unwrap(ctx.db.rpc("create_stock_transfer", {
@@ -69,10 +64,10 @@ defineQuery({
   roles: [...readRoles],
   input: z.object({ transferId: z.string().uuid() }),
   handler: async (ctx, i) => {
-    const transfer = await unwrap(ctx.db.from("stock_transfers")
-      .select("*, from_location:locations!stock_transfers_from_location_id_brewery_id_fkey(name), to_location:locations!stock_transfers_to_location_id_brewery_id_fkey(name)")
-      .eq("id", i.transferId).single());
-    const [lines, bins] = await Promise.all([
+    const [transfer, lines, bins] = await Promise.all([
+      unwrap(ctx.db.from("stock_transfers")
+        .select("*, from_location:locations!stock_transfers_from_location_id_brewery_id_fkey(name), to_location:locations!stock_transfers_to_location_id_brewery_id_fkey(name)")
+        .eq("id", i.transferId).single()),
       unwrap(ctx.db.from("stock_transfer_lines").select("*, skus(name), materials(name), keg_pools(name)").eq("transfer_id", i.transferId)),
       unwrap(ctx.db.from("bins").select("id, name").eq("brewery_id", ctx.breweryId)),
     ]);

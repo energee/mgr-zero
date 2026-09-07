@@ -5,13 +5,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useBrewery } from "../../brewery-provider";
-import { command } from "@/lib/commands/client";
+import { useCommandAction } from "@/lib/commands/use-command-form";
 import type { PickLine } from "./pick-form";
 
 export type ShortLine = { line: PickLine; qty: number };
@@ -26,25 +24,13 @@ export function ShortPickForm({ orderId, short, onOpenChange }: { orderId: strin
 }
 
 function Fields({ orderId, short, onDone }: { orderId: string; short: ShortLine; onDone: () => void }) {
-  const breweryId = useBrewery();
-  const router = useRouter();
   const [qty, setQty] = useState(String(short.qty));
   const [reason, setReason] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, run } = useCommandAction();
   const owed = short.line.qtyOrdered - Number(qty || 0);
 
   async function resolve(resolution: "adjust_down" | "keep_owed") {
-    setBusy(true); setError(null);
-    try {
-      await command(breweryId, "resolve_short_pick", { orderId, lineId: short.line.id, qtyPicked: Number(qty), reason, resolution });
-      onDone();
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "resolve_short_pick failed");
-    } finally {
-      setBusy(false);
-    }
+    await run("resolve_short_pick", { orderId, lineId: short.line.id, qtyPicked: Number(qty), reason, resolution }, onDone);
   }
 
   return (

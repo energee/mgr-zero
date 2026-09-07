@@ -106,8 +106,10 @@ defineQuery({
       .eq("id", i.deliveryId).single());
     // to-one embeds come back as objects; without generated types supabase-js says array
     const { shipments } = delivery as unknown as { shipments: { id: string; orders: { id: string } } };
-    const lines = await unwrap(ctx.db.from("order_lines").select("id, qty_shipped, skus(name)").eq("order_id", shipments.orders.id).gt("qty_shipped", 0));
-    const invoice = await unwrap(ctx.db.from("invoices").select("id, invoice_no").eq("shipment_id", shipments.id).eq("kind", "invoice").maybeSingle());
+    const [lines, invoice] = await Promise.all([
+      unwrap(ctx.db.from("order_lines").select("id, qty_shipped, skus(name)").eq("order_id", shipments.orders.id).gt("qty_shipped", 0)),
+      unwrap(ctx.db.from("invoices").select("id, invoice_no").eq("shipment_id", shipments.id).eq("kind", "invoice").maybeSingle()),
+    ]);
     return { delivery, lines, invoice };
   },
 });

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
 export type FormatOption = { id: string; name: string };
@@ -25,10 +26,10 @@ export function SkuForm({ brandId, formats }: { brandId: string; formats: Format
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <Label htmlFor="sku-format">Format</Label>
-          <select id="sku-format" className="h-9 rounded-md border bg-transparent px-2 text-sm" value={formatId} onChange={(e) => setFormatId(e.target.value)} required>
+          <NativeSelect id="sku-format" value={formatId} onChange={(e) => setFormatId(e.target.value)} required>
             {formats.length ? null : <option value="">Add a packaged format first</option>}
             {formats.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-          </select>
+          </NativeSelect>
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="sku-name">Name (optional)</Label>

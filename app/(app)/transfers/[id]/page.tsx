@@ -8,7 +8,7 @@ import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
-import { trfNo } from "../trf-no";
+import { trfNo } from "@/lib/mgr/doc-no";
 import { TransferActions } from "./transfer-actions";
 
 type Detail = {
@@ -22,7 +22,8 @@ export default async function TransferPage({ params }: { params: Promise<{ id: s
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const { transfer, lines, bins } = await orNotFound(runCommand("get_stock_transfer", { transferId: id }, ctx) as Promise<Detail>);
-  const bin = (b: string) => bins.find((x) => x.id === b)?.name ?? "—";
+  const binById = new Map(bins.map((b) => [b.id, b.name]));
+  const bin = (id: string) => binById.get(id) ?? "—";
   const what = (l: Detail["lines"][number]) => l.skus?.name ?? l.materials?.name ?? (l.keg_pools ? `${l.keg_pools.name} · ${l.keg_size?.replace("_", " ")}` : "Line");
   const done = transfer.status === "received";
   return (

@@ -7,7 +7,7 @@ import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { NewTransferForm } from "./new-transfer-form";
-import { trfNo } from "./trf-no";
+import { trfNo } from "@/lib/mgr/doc-no";
 
 type Transfer = { id: string; transfer_no: number | null; status: string; from_location_id: string; to_location_id: string; stock_transfer_lines: { id: string }[] };
 type Location = { id: string; name: string; kind: string };
@@ -24,7 +24,8 @@ export default async function TransfersPage() {
   const [transfers, locations, bins, skus] = (await Promise.all([
     runCommand("list_stock_transfers", {}, ctx), runCommand("list_locations", {}, ctx), runCommand("list_bins", {}, ctx), runCommand("list_skus", {}, ctx),
   ])) as [Transfer[], Location[], Bin[], Sku[]];
-  const locName = (id: string) => locations.find((l) => l.id === id)?.name ?? "—";
+  const locationById = new Map(locations.map((l) => [l.id, l.name]));
+  const locName = (id: string) => locationById.get(id) ?? "—";
   return (
     <>
       {E.hd("Transfers", "between locations", <NewTransferForm locations={locations} bins={bins} skus={skus.map((s) => ({ id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name }))} />)}

@@ -7,6 +7,7 @@ import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
+import { docNo } from "@/lib/mgr/doc-no";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { DeliveredForm } from "./delivered-form";
 
@@ -37,7 +38,7 @@ export default async function DeliveryStopPage({ params }: { params: Promise<{ i
       {delivery.delivered_at ? (
         <>
           {E.fld("Received by", delivery.signed_by ?? "")}
-          {E.status(invoice?.invoice_no ? `INV-${String(invoice.invoice_no).padStart(4, "0")}` : "Delivered", "ok")}
+          {E.status(docNo("INV", invoice?.invoice_no ?? null, "Delivered"), "ok")}
         </>
       ) : (
         <>

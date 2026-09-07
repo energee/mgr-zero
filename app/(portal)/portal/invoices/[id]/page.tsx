@@ -7,20 +7,22 @@ import { getActiveCustomer } from "@/lib/portal";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
+import { docNo } from "@/lib/mgr/doc-no";
+import { money } from "@/lib/mgr/money";
 import { orNotFound } from "@/lib/mgr/not-found";
 
 type Detail = {
   invoice: { id: string; invoice_no: number | null; kind: "invoice" | "credit_memo"; issued_on: string; due_on: string | null; paid_at: string | null; total_cents: number };
   lines: { id: string; kind: string; qty: number; amount_cents: number; description: string | null; skus: { name: string } | null }[];
 };
-const money = (cents: number) => `${cents < 0 ? "−" : ""}$${(Math.abs(cents) / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
 export default async function PortalInvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const customer = await getActiveCustomer();
   const ctx = await buildContext(customer.breweryId);
   const { invoice, lines } = await orNotFound(runCommand("portal_invoice", { invoiceId: id }, ctx) as Promise<Detail>);
-  const no = invoice.invoice_no ? `${invoice.kind === "credit_memo" ? "CM" : "INV"}-${String(invoice.invoice_no).padStart(4, "0")}` : invoice.kind === "credit_memo" ? "Credit memo" : "Invoice";
+  const creditMemo = invoice.kind === "credit_memo";
+  const no = docNo(creditMemo ? "CM" : "INV", invoice.invoice_no, creditMemo ? "Credit memo" : "Invoice");
   const paid = invoice.paid_at !== null;
   return (
     <>

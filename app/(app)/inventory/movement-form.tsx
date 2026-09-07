@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
@@ -87,21 +88,18 @@ export function MovementForm({
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="movement-bin">Bin</Label>
-            {/* Native, not the Radix Select: inside a form Radix mirrors a programmatic
-                value into a hidden <select> whose options only exist once the menu has
-                opened, reads back "" and resets it, so the preselect never sticks. */}
-            <select
+            <NativeSelect
               id="movement-bin"
+              className="w-fit"
               value={binId}
               onChange={(e) => setBinId(e.target.value)}
               disabled={!locationId}
-              className="h-9 w-fit rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs disabled:opacity-50"
             >
               <option value="">Select a bin</option>
               {bins.filter((b) => b.location_id === locationId).map((b) => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="movement-type">Type</Label>

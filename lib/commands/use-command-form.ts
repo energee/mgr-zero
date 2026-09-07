@@ -1,8 +1,9 @@
-// lib/commands/use-command-form.ts — the form lifecycle every mutation form
-// (rendered in components/mgr/command-form.tsx) shares: open/close, one command action (with its serialized request
-// ID), inline error (rendered by CommandFormMessage as role="alert"), and
-// refresh on success. Forms own only their fields and
-// how to build the command input.
+// lib/commands/use-command-form.ts — the two client-side command lifecycles.
+// useCommandAction is the primitive: run one command, hold busy/error (rendered
+// by CommandFormMessage as role="alert"), refresh on success. useCommandForm
+// adds the open/close and reset a mutation form needs (rendered in
+// components/mgr/command-form.tsx). Forms own only their fields and how to
+// build the command input.
 "use client";
 
 import { useState } from "react";
@@ -10,12 +11,35 @@ import { useRouter } from "next/navigation";
 import { useBrewery } from "@/app/(app)/brewery-provider";
 import { command } from "./client";
 
-export function useCommandForm(name: string, opts: { build: () => unknown; reset: () => void }) {
+export function useCommandAction() {
   const breweryId = useBrewery();
   const router = useRouter();
-  const [open, setOpenState] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  // Resolves true on success, so a caller that navigates away can wait for it.
+  async function run(name: string, input: unknown, onSuccess?: () => void) {
+    setBusy(true);
+    setError(null);
+    try {
+      await command(breweryId, name, input);
+      onSuccess?.();
+      router.refresh();
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `${name} failed`);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return { busy, error, setError, run };
+}
+
+export function useCommandForm(name: string, opts: { build: () => unknown; reset: () => void }) {
+  const { busy, error, setError, run } = useCommandAction();
+  const [open, setOpenState] = useState(false);
 
   function setOpen(next: boolean) {
     setOpenState(next);
@@ -24,18 +48,8 @@ export function useCommandForm(name: string, opts: { build: () => unknown; reset
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setSubmitting(true);
-    setError(null);
-    try {
-      await command(breweryId, name, opts.build());
-      setOpen(false);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : `${name} failed`);
-    } finally {
-      setSubmitting(false);
-    }
+    await run(name, opts.build(), () => setOpen(false));
   }
 
-  return { open, setOpen, error, submitting, submit };
+  return { open, setOpen, error, submitting: busy, submit };
 }

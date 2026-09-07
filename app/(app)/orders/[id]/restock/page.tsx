@@ -7,6 +7,7 @@ import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
+import { docNo } from "@/lib/mgr/doc-no";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { PutBackButton } from "./put-back-button";
 
@@ -18,7 +19,7 @@ export default async function RestockPage({ params }: { params: Promise<{ id: st
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const { order, lines } = await orNotFound(runCommand("get_order", { orderId: id }, ctx) as Promise<{ order: Order; lines: Line[] }>);
-  const label = order.order_no ? `ORD-${String(order.order_no).padStart(4, "0")}` : "Order";
+  const label = docNo("ORD", order.order_no, "Order");
   // What is on the floor and no longer wanted: everything picked on a
   // cancelled order, the picked excess on an adjusted-down one.
   const staged = lines

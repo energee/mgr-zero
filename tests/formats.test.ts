@@ -2,7 +2,7 @@
 // bbl_per_unit is typed (schema §16.2); packaged formats hold stock, poured
 // ones are a ratio back to a keg and hold none.
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaffCtx } from "./helpers";
+import { admin, makeBrewery, makeStaffCtx, seedLocation } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -40,9 +40,8 @@ describe("format_components", () => {
     expect(Number(derived.bbl_per_unit)).toBeCloseTo(0.012, 6);
     expect(derived.composed).toBe(true);
     const sku = await runCommand("create_sku", { brandId: brand!.id, formatId: caseFmt.id }, ctx) as { id: string };
-    const { data: loc } = await admin.from("locations").insert({ brewery_id: ctx.breweryId, name: "Comp WH", kind: "warehouse" }).select("id").single();
-    const { data: bin } = await admin.from("bins").insert({ brewery_id: ctx.breweryId, location_id: loc!.id, name: "Cold" }).select("id").single();
-    const { data: mv } = await admin.from("inventory_movements").insert({ brewery_id: ctx.breweryId, sku_id: sku.id, location_id: loc!.id, bin_id: bin!.id, qty: 10, type: "opening_balance", created_by: ctx.userId }).select("bbl").single();
+    const { id: locId, binId } = await seedLocation(ctx.breweryId, { name: "Comp WH" });
+    const { data: mv } = await admin.from("inventory_movements").insert({ brewery_id: ctx.breweryId, sku_id: sku.id, location_id: locId, bin_id: binId, qty: 10, type: "opening_balance", created_by: ctx.userId }).select("bbl").single();
     expect(Number(mv!.bbl)).toBeCloseTo(0.12, 6);
     await expect(runCommand("replace_format_components", { formatId: four.id, components: [{ childFormatId: caseFmt.id, qty: 1 }] }, ctx)).rejects.toThrow(/cycle|one level|derives/i);
     await expect(runCommand("replace_format_components", { formatId: caseFmt.id, components: [{ childFormatId: caseFmt.id, qty: 1 }] }, ctx)).rejects.toThrow(/cycle|one level/i);

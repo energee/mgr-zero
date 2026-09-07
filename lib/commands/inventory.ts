@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { defineCommand, defineQuery, unwrap, Ctx, CommandExecution } from "./registry";
+import { stockLine } from "./stock-line";
 
 const movementInput = z.object({
   skuId: z.string().uuid(), locationId: z.string().uuid(), binId: z.string().uuid(),
@@ -75,11 +76,7 @@ defineQuery({
 defineCommand({
   name: "move_stock_bin", description: "Move stock between two bins of one location: paired ledger rows, no transfer document; a cross-location pair is refused",
   roles: ["admin", "warehouse"],
-  input: z.object({
-    skuId: z.string().uuid().optional(), materialId: z.string().uuid().optional(),
-    kegPoolId: z.string().uuid().optional(), kegSize: z.string().optional(),
-    qty: z.number().positive(), fromBinId: z.string().uuid(), toBinId: z.string().uuid(), note: z.string().optional(),
-  }), // exactly one of skuId / materialId / kegPoolId: the RPC raises
+  input: stockLine,
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("move_stock_bin", {
     p_brewery: ctx.breweryId, p_sku: i.skuId ?? null, p_material: i.materialId ?? null, p_keg_pool: i.kegPoolId ?? null, p_keg_size: i.kegSize ?? null,
     p_qty: i.qty, p_from_bin: i.fromBinId, p_to_bin: i.toBinId, p_note: i.note ?? null, p_request_id: execution.requestId,

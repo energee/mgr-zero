@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
 export function PriceFormatForm({ priceListId, formats }: { priceListId: string; formats: { id: string; name: string }[] }) {
@@ -22,10 +23,10 @@ export function PriceFormatForm({ priceListId, formats }: { priceListId: string;
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <Label htmlFor="price-format">Format</Label>
-          <select id="price-format" className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs" value={formatId} onChange={(e) => setFormatId(e.target.value)}>
+          <NativeSelect id="price-format" value={formatId} onChange={(e) => setFormatId(e.target.value)}>
             <option value="">Select a format</option>
             {formats.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-          </select>
+          </NativeSelect>
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="price-format-dollars">Unit price (USD)</Label>

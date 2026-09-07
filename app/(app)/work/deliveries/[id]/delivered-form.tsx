@@ -4,31 +4,18 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { command } from "@/lib/commands/client";
-import { useBrewery } from "@/app/(app)/brewery-provider";
+import { useCommandAction } from "@/lib/commands/use-command-form";
 
 export function DeliveredForm({ deliveryId, suggestions }: { deliveryId: string; suggestions: string[] }) {
-  const breweryId = useBrewery();
-  const router = useRouter();
   const [signedBy, setSignedBy] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, run } = useCommandAction();
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true); setError(null);
-    try {
-      await command(breweryId, "confirm_delivery", { deliveryId, signedBy });
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "confirm_delivery failed");
-    } finally {
-      setBusy(false);
-    }
+    await run("confirm_delivery", { deliveryId, signedBy });
   }
   return (
     <form onSubmit={submit} className="flex flex-col gap-3">

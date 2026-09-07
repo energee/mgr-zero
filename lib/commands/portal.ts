@@ -124,8 +124,10 @@ defineQuery({
   handler: async (ctx, i) => {
     const customerId = requireCustomer(ctx);
     // RLS already scopes to the caller's customer; the customer_id filter makes a foreign id a plain not_found
-    const invoice = await unwrap(ctx.db.from("invoices").select("id, invoice_no, kind, issued_on, due_on, paid_at").eq("id", i.invoiceId).eq("customer_id", customerId).single());
-    const lines = await unwrap(ctx.db.from("invoice_lines").select("id, kind, qty, unit_price_cents, amount_cents, description, skus(name)").eq("invoice_id", i.invoiceId));
+    const [invoice, lines] = await Promise.all([
+      unwrap(ctx.db.from("invoices").select("id, invoice_no, kind, issued_on, due_on, paid_at").eq("id", i.invoiceId).eq("customer_id", customerId).single()),
+      unwrap(ctx.db.from("invoice_lines").select("id, kind, qty, unit_price_cents, amount_cents, description, skus(name)").eq("invoice_id", i.invoiceId)),
+    ]);
     const total_cents = (lines as { amount_cents: number }[]).reduce((n, l) => n + l.amount_cents, 0);
     return { invoice: { ...invoice, total_cents }, lines };
   },

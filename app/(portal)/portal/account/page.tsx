@@ -6,6 +6,7 @@ import { getActiveCustomer } from "@/lib/portal";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
+import { money } from "@/lib/mgr/money";
 
 type Account = {
   customer: { id: string; name: string };
@@ -25,7 +26,7 @@ export default async function PortalAccountPage() {
       {E.row("You · buyer", "this login", "active")}
       {acct.deposits.map((d) => (
         <div key={d.kegSize ?? "all"}>
-          {E.row("Keg deposits held", `${d.kegsOnDeposit} × ${d.kegSize ?? "keg"}`, `$${(d.depositCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`)}
+          {E.row("Keg deposits held", `${d.kegsOnDeposit} × ${d.kegSize ?? "keg"}`, money(d.depositCents))}
         </div>
       ))}
       {E.info("Contact the brewery to change account details.")}

@@ -6,6 +6,7 @@ import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
+import { money } from "@/lib/mgr/money";
 import { PriceListForm } from "./price-list-form";
 import { PriceForm } from "./price-form";
 import { PriceFormatForm } from "./price-format-form";
@@ -22,9 +23,6 @@ function skuLabel(sku: Sku | undefined) {
   return sku.brands?.name ? `${sku.brands.name} — ${sku.name}` : sku.name;
 }
 
-function formatCents(cents: number) {
-  return `$${(cents / 100).toFixed(2)}`;
-}
 
 export default async function PricingPage() {
   const brewery = await getActiveBrewery();
@@ -35,7 +33,6 @@ export default async function PricingPage() {
     runCommand("list_formats", { basis: "packaged" }, ctx),
   ])) as [PriceList[], Sku[], Format[]];
 
-  const skuById = new Map(skus.map((s) => [s.id, s]));
   const skuOptions = skus.map((s) => ({ id: s.id, label: skuLabel(s) }));
 
   return (
@@ -69,8 +66,8 @@ export default async function PricingPage() {
                   <tbody>
                     {list.price_list_formats.map((row) => (
                       <tr key={row.format_id} className="border-t">
-                        <td className="py-1">{row.formats?.name ?? formats.find((f) => f.id === row.format_id)?.name ?? "—"}</td>
-                        <td className="py-1">{formatCents(row.unit_price_cents)}</td>
+                        <td className="py-1">{row.formats?.name ?? "—"}</td>
+                        <td className="py-1">{money(row.unit_price_cents)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -90,8 +87,8 @@ export default async function PricingPage() {
                   <tbody>
                     {list.price_list_items.map((item) => (
                       <tr key={item.sku_id} className="border-t">
-                        <td className="py-1">{item.skus?.name ?? skuLabel(skuById.get(item.sku_id))}</td>
-                        <td className="py-1">{formatCents(item.unit_price_cents)}</td>
+                        <td className="py-1">{item.skus?.name ?? "—"}</td>
+                        <td className="py-1">{money(item.unit_price_cents)}</td>
                         <td className="py-1 text-right"><ClearOverrideButton priceListId={list.id} skuId={item.sku_id} /></td>
                       </tr>
                     ))}

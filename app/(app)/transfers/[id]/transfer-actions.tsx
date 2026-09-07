@@ -3,26 +3,14 @@
 // default to the ordered qty), Receive (picked; quantities default to picked).
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
-import { command } from "@/lib/commands/client";
-import { useBrewery } from "@/app/(app)/brewery-provider";
+import { useCommandAction } from "@/lib/commands/use-command-form";
 
 type Line = { id: string; qty: number; qtyPicked: number | null };
 
 export function TransferActions({ transferId, status, lines }: { transferId: string; status: string; lines: Line[] }) {
-  const breweryId = useBrewery();
-  const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  async function run(name: string, input: unknown) {
-    setBusy(true); setError(null);
-    try { await command(breweryId, name, input); router.refresh(); }
-    catch (err) { setError(err instanceof Error ? err.message : `${name} failed`); }
-    finally { setBusy(false); }
-  }
+  const { busy, error, run } = useCommandAction();
   const irreversible = "w-full bg-irreversible text-irreversible-foreground hover:bg-irreversible/90 md:w-fit";
   return (
     <div className="flex flex-col gap-2">

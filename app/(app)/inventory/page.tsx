@@ -34,8 +34,10 @@ export default async function InventoryPage() {
   ])) as [Sku[], Location[], Bin[], BinOnHandRow[], AtpRow[], Movement[]];
 
   const skuById = new Map(skus.map((s) => [s.id, s]));
-  const locationName = (id: string) => locations.find((l) => l.id === id)?.name ?? "—";
-  const binName = (id: string) => bins.find((b) => b.id === id)?.name ?? "—";
+  const locationById = new Map(locations.map((l) => [l.id, l.name]));
+  const binById = new Map(bins.map((b) => [b.id, b.name]));
+  const locationName = (id: string) => locationById.get(id) ?? "—";
+  const binName = (id: string) => binById.get(id) ?? "—";
   const atpBySku = new Map(atp.map((a) => [a.sku_id, a.qty]));
 
   return (
