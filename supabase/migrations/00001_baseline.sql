@@ -784,11 +784,18 @@ create trigger batch_additions_movement_trigger before insert or update on batch
   for each row execute function enforce_consumption_movement();
 
 -- ---------------------------------------------------------------- packaging + lots
+-- A run is planned against a brand ("600 cans of Stout on Friday") days before
+-- anyone knows which tank it comes out of, so brand_id is required and
+-- occupancy_id is not. The check is the promotion gate: a run may sit
+-- brand-only for as long as it likes, but the moment it starts (or closes) it
+-- must name the tank it drew from, because bbl_drawn is subtracted from that
+-- occupancy in occupancy_volumes.
 create table packaging_runs (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
   run_no bigint,                                       -- trigger
-  occupancy_id uuid not null,                          -- exactly one source occupancy
+  brand_id uuid not null,                              -- what is being packaged, known first
+  occupancy_id uuid,                                   -- the one source occupancy, once picked
   planned_on date not null,
   started_at timestamptz,
   closed_at timestamptz,
@@ -798,11 +805,38 @@ create table packaging_runs (
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
   unique (brewery_id, run_no),
+  check ((started_at is null and closed_at is null) or occupancy_id is not null),
+  foreign key (brand_id, brewery_id) references brands (id, brewery_id),
   foreign key (occupancy_id, brewery_id) references vessel_occupancies (id, brewery_id)
 );
 create index packaging_runs_planned_idx on packaging_runs (brewery_id, planned_on);
 create index packaging_runs_occ_idx on packaging_runs (occupancy_id);
+create index packaging_runs_brand_idx on packaging_runs (brewery_id, brand_id);
 create trigger packaging_runs_no before insert on packaging_runs for each row execute function private.set_doc_no('run_no','run');
+
+-- Picking the tank is where brand identity is checked, not written. A batch
+-- that already intends a brand may only be packaged as that brand; a batch
+-- with no intended brand is fair game, and stays unbranded -- promoting the
+-- run's brand onto the batch would silently decide something the brewer did
+-- not. The occupancy must also be this brewery's: the composite FK above
+-- catches that too, but a trigger reading across tenants deserves its own say.
+create function enforce_packaging_run_brand() returns trigger language plpgsql set search_path = '' as $$
+declare v_brewery uuid; v_intended uuid;
+begin
+  if new.occupancy_id is null then return new; end if;
+  select o.brewery_id, b.intended_brand_id into v_brewery, v_intended
+  from public.vessel_occupancies o join public.batches b on b.id = o.batch_id
+  where o.id = new.occupancy_id;
+  if v_brewery is null or v_brewery <> new.brewery_id then
+    raise exception 'occupancy not found';
+  end if;
+  if v_intended is not null and v_intended <> new.brand_id then
+    raise exception 'packaging run brand does not match the tank''s batch brand';
+  end if;
+  return new;
+end $$;
+create trigger packaging_runs_brand before insert or update of occupancy_id on packaging_runs
+  for each row execute function enforce_packaging_run_brand();
 
 create table lots (   -- 1:1 with packaging runs
   id uuid primary key default private.new_uuid(),
@@ -1670,6 +1704,43 @@ create view packaging_run_requirements with (security_invoker = true) as
   left join material_on_order oo on oo.material_id = bom.material_id
   where r.closed_at is null
   group by r.id, bom.material_id, oh.qty, oo.qty;
+
+-- What the brewhouse still owes each brand. Demand is every open packaging
+-- run's planned units converted to barrels; supply is beer already committed
+-- to that brand -- batches scheduled but not yet brewed, plus what is sitting
+-- in open occupancies, counted through the batch's intended brand. brew_bbl is
+-- the shortfall, floored at zero: a surplus is not a negative brew.
+-- ponytail: the 30-day horizon stands in for a cancel state. Runs have no
+-- cancelled status yet, so an abandoned plan would inflate demand forever;
+-- dropping runs planned more than 30 days ago is the cheap approximation.
+-- Replace the date window with `and r.status <> 'cancelled'` when runs get one.
+create view product_volume_requirements with (security_invoker = true) as
+  with demand as (
+    select r.brewery_id, r.brand_id, sum(o.qty_planned * f.bbl_per_unit) as bbl
+    from packaging_runs r
+    join packaging_run_outputs o on o.run_id = r.id
+    join skus s on s.id = o.sku_id
+    join format_volumes f on f.id = s.format_id
+    where r.closed_at is null and r.planned_on >= current_date - 30
+    group by 1, 2
+  ),
+  supply as (
+    select brewery_id, brand_id, sum(bbl) as bbl from (
+      select b.brewery_id, b.intended_brand_id as brand_id, b.planned_bbl as bbl
+      from batches b where b.brewed_on is null and b.intended_brand_id is not null
+      union all
+      select ov.brewery_id, b.intended_brand_id, ov.bbl
+      from occupancy_volumes ov join batches b on b.id = ov.batch_id
+      where ov.ended_at is null and b.intended_brand_id is not null
+    ) parts group by 1, 2
+  )
+  select br.brewery_id, br.id as brand_id, br.name as brand_name,
+         coalesce(d.bbl, 0) as demand_bbl,
+         coalesce(p.bbl, 0) as supply_bbl,
+         greatest(coalesce(d.bbl, 0) - coalesce(p.bbl, 0), 0) as brew_bbl
+  from brands br
+  left join demand d on d.brand_id = br.id and d.brewery_id = br.brewery_id
+  left join supply p on p.brand_id = br.id and p.brewery_id = br.brewery_id;
 
 create view packaging_run_yields with (security_invoker = true) as
   select r.id as run_id, r.brewery_id, r.bbl_drawn,
@@ -3393,6 +3464,110 @@ begin
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
+-- An occupancy a packaging run may draw from: this brewery's, still open.
+-- Null passes -- "no tank yet" is the normal state of a planned run.
+create function private.assert_open_occupancy(p_brewery uuid, p_occupancy uuid) returns void
+language plpgsql set search_path = '' as $$
+declare v_ended timestamptz; v_found boolean;
+begin
+  if p_occupancy is null then return; end if;
+  select true, o.ended_at into v_found, v_ended from public.vessel_occupancies o
+  where o.id = p_occupancy and o.brewery_id = p_brewery;
+  if v_found is null then raise exception 'occupancy not found'; end if;
+  if v_ended is not null then raise exception 'occupancy is closed'; end if;
+end $$;
+
+-- Replace a run's planned outputs. Every sku must belong to the run's brand,
+-- so a run's outputs can never quietly package something else.
+create function private.replace_packaging_run_outputs(
+  p_brewery uuid, p_run uuid, p_brand uuid, p_outputs jsonb
+) returns void language plpgsql set search_path = '' as $$
+declare v_line jsonb; v_sku_brand uuid;
+begin
+  if p_outputs is null then return; end if;
+  delete from public.packaging_run_outputs where run_id = p_run;
+  for v_line in select * from jsonb_array_elements(coalesce(p_outputs, '[]'::jsonb)) loop
+    select s.brand_id into v_sku_brand from public.skus s
+    where s.id = (v_line->>'sku_id')::uuid and s.brewery_id = p_brewery;
+    if v_sku_brand is null then raise exception 'sku not found'; end if;
+    if v_sku_brand <> p_brand then
+      raise exception 'sku % is not a package of this run''s brand', v_line->>'sku_id';
+    end if;
+    insert into public.packaging_run_outputs (brewery_id, run_id, sku_id, qty_planned)
+    values (p_brewery, p_run, (v_line->>'sku_id')::uuid, (v_line->>'qty_planned')::numeric);
+  end loop;
+end $$;
+
+-- ---------------------------------------------------------------- packaging
+-- Planning a run needs only a brand and a date; the tank comes later
+-- (packaging_runs' check constraint). Outputs are the units the run intends to
+-- fill, and every one must be a sku of the run's own brand -- a Stout run
+-- cannot plan Pils cans. An empty outputs list is fine: "Friday is a Stout
+-- day" is a real plan.
+create function schedule_packaging_run(
+  p_brewery uuid, p_brand uuid, p_planned_on date, p_occupancy uuid, p_outputs jsonb, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid; v_replay jsonb; v_run public.packaging_runs;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin','brewer','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'schedule_packaging_run', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'brand', p_brand, 'planned_on', p_planned_on,
+      'occupancy', p_occupancy, 'outputs', p_outputs));
+  if v_replay is not null then return v_replay; end if;
+
+  if not exists (select 1 from public.brands where id = p_brand and brewery_id = p_brewery) then
+    raise exception 'brand not found';
+  end if;
+  perform private.assert_open_occupancy(p_brewery, p_occupancy);
+
+  insert into public.packaging_runs (brewery_id, brand_id, occupancy_id, planned_on, created_by)
+  values (p_brewery, p_brand, p_occupancy, p_planned_on, v_actor) returning * into v_run;
+  perform private.replace_packaging_run_outputs(p_brewery, v_run.id, p_brand, p_outputs);
+
+  return private.complete_command_request(p_request_id, to_jsonb(v_run));
+end $$;
+
+-- The plan changes right up until the run starts: pick the tank, redo the
+-- counts, then stamp started_at. Outputs are replaced wholesale rather than
+-- diffed -- nothing downstream references a planned output until close writes
+-- movement_id, so delete-and-insert loses nothing. A closed run is history.
+create function update_packaging_run(
+  p_brewery uuid, p_run uuid, p_occupancy uuid, p_outputs jsonb, p_started_at timestamptz, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_run public.packaging_runs;
+begin
+  perform private.assert_staff(p_brewery, array['admin','brewer','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'update_packaging_run', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'run', p_run, 'occupancy', p_occupancy,
+      'outputs', p_outputs, 'started_at', p_started_at));
+  if v_replay is not null then return v_replay; end if;
+
+  select * into v_run from public.packaging_runs where id = p_run and brewery_id = p_brewery for update;
+  if v_run.id is null then raise exception 'packaging run not found'; end if;
+  if v_run.closed_at is not null then raise exception 'packaging run is closed'; end if;
+
+  if p_occupancy is not null then
+    perform private.assert_open_occupancy(p_brewery, p_occupancy);
+    -- The brand trigger fires on this update and has the last word.
+    update public.packaging_runs set occupancy_id = p_occupancy where id = p_run returning * into v_run;
+  end if;
+
+  -- Translate the check constraint into the sentence a brewer would say. The
+  -- constraint still stands behind this for anything that writes directly.
+  if p_started_at is not null and v_run.occupancy_id is null then
+    raise exception 'pick the tank this run draws from before starting it';
+  end if;
+  if p_started_at is not null then
+    update public.packaging_runs set started_at = p_started_at where id = p_run returning * into v_run;
+  end if;
+
+  if p_outputs is not null then
+    perform private.replace_packaging_run_outputs(p_brewery, p_run, v_run.brand_id, p_outputs);
+  end if;
+
+  return private.complete_command_request(p_request_id, to_jsonb(v_run));
+end $$;
+
 -- ---------------------------------------------------------------- Stock transfers
 -- Internal moves of stuff between two locations (spec 2026-09-06 Decision 3).
 create function private.lock_transfer(p_transfer uuid, p_allowed public.stock_transfer_status[]) returns public.stock_transfers
@@ -4679,7 +4854,8 @@ grant select on breweries, brewery_users, customer_users,
   to authenticated;
 -- Security-invoker views retain the underlying tables' RLS predicates; expose
 -- only the derived reads consumed by registered commands.
-grant select on on_hand, bin_on_hand, atp, invoice_totals, keg_deposit_balances, portal_brewery, sku_prices to authenticated;
+grant select on on_hand, bin_on_hand, atp, invoice_totals, keg_deposit_balances, portal_brewery, sku_prices,
+  format_volumes, occupancy_volumes, product_volume_requirements to authenticated;
 grant all on all tables in schema public to service_role;
 grant all on all sequences in schema public to service_role;
 
@@ -4751,7 +4927,9 @@ grant execute on function
   schedule_batch(uuid,uuid,uuid,date,numeric,text,uuid),
   record_brew_day(uuid,uuid,uuid,numeric,date,uuid),
   record_cellar_transfer(uuid,uuid,uuid,numeric,numeric,uuid),
-  record_fermentation_reading(uuid,uuid,timestamptz,numeric,numeric,numeric,text,uuid)
+  record_fermentation_reading(uuid,uuid,timestamptz,numeric,numeric,numeric,text,uuid),
+  schedule_packaging_run(uuid,uuid,date,uuid,jsonb,uuid),
+  update_packaging_run(uuid,uuid,uuid,jsonb,timestamptz,uuid)
   to authenticated;
 grant usage on schema private, extensions to service_role;
 -- service_role reaches `private` only for the UUID default its seed inserts

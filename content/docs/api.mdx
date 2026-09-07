@@ -189,6 +189,7 @@ omitted. They have no roles until they are built.
 | `get_invoice` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `get_on_hand` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `get_order` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
+| `get_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |
 | `get_portal_account` | Customer portal |  |  |  |  | ✓ |
 | `get_recipe` | Production | ✓ |  |  | ✓ |  |
 | `get_shortfalls` | Today & notifications | ✓ | ✓ | ✓ |  |  |
@@ -207,7 +208,9 @@ omitted. They have no roles until they are built.
 | `list_invoices` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `list_locations` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `list_movements` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
+| `list_occupancies` | Packaging | ✓ |  | ✓ | ✓ |  |
 | `list_orders` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
+| `list_packaging_runs` | Packaging | ✓ |  | ✓ | ✓ |  |
 | `list_price_groups` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
 | `list_recipes` | Production | ✓ |  |  | ✓ |  |
 | `list_sale_channels` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
@@ -239,6 +242,7 @@ omitted. They have no roles until they are built.
 | `resolve_short_pick` | Orders & invoicing | ✓ |  | ✓ |  |  |
 | `return_shipment` | Delivery & routes | ✓ | ✓ |  |  |  |
 | `schedule_batch` | Production | ✓ |  |  | ✓ |  |
+| `schedule_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |
 | `set_brewery_quiet_hours` | Team & brewery settings | ✓ |  |  |  |  |
 | `set_channel_price` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `set_notification_destination` | Today & notifications | ✓ |  |  |  |  |
@@ -253,6 +257,7 @@ omitted. They have no roles until they are built.
 | `update_bin` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `update_draft_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `update_location` | Inventory & locations | ✓ |  |  |  |  |
+| `update_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |
 | `upsert_brand` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `upsert_customer` | Customers | ✓ | ✓ |  |  |  |
 | `upsert_format` | Packaging | ✓ | ✓ |  |  |  |
@@ -2171,6 +2176,23 @@ before it is scheduled rather than after.
 
 {/* ops:packaging */}
 
+#### get_packaging_run [#get_packaging_run]
+
+`query` · admin, brewer, warehouse
+
+One packaging run with the packages it plans to fill
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `runId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_packaging_run", "input": { "runId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 #### list_formats [#list_formats]
 
 `query` · admin, sales, warehouse
@@ -2186,6 +2208,36 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_formats", "input": {} }'
+```
+
+#### list_occupancies [#list_occupancies]
+
+`query` · admin, brewer, warehouse
+
+Tanks with beer in them right now: the vessel, the batch, the brand it intends and how many barrels are left
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_occupancies", "input": {} }'
+```
+
+#### list_packaging_runs [#list_packaging_runs]
+
+`query` · admin, brewer, warehouse
+
+Packaging runs by planned date, newest first, with the brand each one packages, the tank it draws from and the units planned
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_packaging_runs", "input": {} }'
 ```
 
 #### replace_format_bom [#replace_format_bom]
@@ -2224,6 +2276,46 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "replace_format_components", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "formatId": "00000000-0000-0000-0000-000000000000", "components": [ { "childFormatId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
 ```
 
+#### schedule_packaging_run [#schedule_packaging_run]
+
+`command` · admin, brewer, warehouse
+
+Plan a packaging run: the brand being packaged, the date, the units intended, and optionally the tank it draws from
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `brandId` | uuid | yes |
+| `plannedOn` | string | yes |
+| `outputs` | array of object | yes |
+| `occupancyId` | uuid | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "schedule_packaging_run", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "brandId": "00000000-0000-0000-0000-000000000000", "plannedOn": "2026-01-31", "outputs": [ { "skuId": "00000000-0000-0000-0000-000000000000", "qtyPlanned": 1 } ] } }'
+```
+
+#### update_packaging_run [#update_packaging_run]
+
+`command` · admin, brewer, warehouse
+
+Revise a planned run: pick the tank it draws from, replace the planned units, or stamp it started (which needs a tank)
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `runId` | uuid | yes |
+| `occupancyId` | uuid | no |
+| `outputs` | array of object | no |
+| `startedAt` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "update_packaging_run", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "runId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 #### upsert_format [#upsert_format]
 
 `command` · admin, sales
@@ -2251,7 +2343,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* packaging-designed */}
 
-4 of the 12 operations in this area are available today; the 8 below are not.
+9 of the 12 operations in this area are available today; the 3 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
@@ -2259,12 +2351,7 @@ The screens need them and the backend has not built them, so calling one returns
 | --- | --- | --- |
 | `close_packaging_run` | command | Close packaging run |
 | `get_format_components` | query | Formats, Format, Repack |
-| `get_packaging_run` | query | Close packaging run, Run closed |
-| `list_occupancies` | query | Schedule packaging run |
-| `list_packaging_runs` | query | Packaging runs |
 | `record_repack` | command | Repack |
-| `schedule_packaging_run` | command | Close packaging run, Schedule packaging run |
-| `update_packaging_run` | command | Schedule packaging run |
 
 {/* end ops:packaging */}
 
