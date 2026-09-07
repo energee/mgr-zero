@@ -643,10 +643,13 @@ describe("SCREENS", () => {
     const move = html("Record movement");
     expect(move).toContain("md:hidden");
     expect(move).toContain("hidden md:block");
-    // Team: no selection-less bulk remove; the role Select lives on the
-    // Team member sheet since #72 split editors out of list pages.
+    // Team: no selection-less bulk remove; the role editor lives on the
+    // Team member sheet since #72 split editors out of list pages. Roles are
+    // a set (2026-09-07: roles staff_role[]), so it is one switch per role.
     expect(html("Team")).not.toMatch(/Remove selected member/);
-    expect(html("Team member")).toContain("data-slot=\"select-trigger\"");
+    const member = html("Team member");
+    expect(member).not.toContain("data-slot=\"select-trigger\"");
+    expect(member.match(/role="switch"/g)?.length).toBe(5);
     // Sign in: a link, not a card row.
     expect(html("Sign in")).toMatch(/<a [^>]*>Forgot password\?<\/a>/);
     // Product: no one-option chip group.

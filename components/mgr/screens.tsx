@@ -613,7 +613,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Settings", "Team")}
       {E.row("Maria Alvarez", "@maria · admin", "you", "", E.face())}
-      {E.nav("Dave Chen", "@dave · brewer", "", E.face({ src: "/mock/dave.jpg" }))}
+      {E.nav("Dave Chen", "@dave · brewer · sales", "", E.face({ src: "/mock/dave.jpg" }))}
       {E.nav("Ted", "@ted · sales", "", E.face({ src: "/mock/ted.jpg" }))}
       {E.nav("Sam Ortiz", "@sam · warehouse", "", E.face({ src: "/mock/sam.jpg" }))}
       {E.row("wes@demobrewing.com", "invited Tue · pending", "", "w", E.face({ name: "wes@demobrewing.com" }))}
@@ -626,16 +626,21 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "Team member",
-    to: { "Save role": "Team", "Remove Dave": "Team" },
-    job: "Change one member's role or remove that membership",
+    to: { "Save roles": "Team", "Remove Dave": "Team" },
+    job: "Change one member's roles or remove that membership",
     reads: "list_team_members",
-    writes: "update_staff_role · revoke_staff [design]",
-    states: [["permission", "admin only", 1], ["member", "role can change"], ["last admin", "remove and role change refused", 1], ["self", "remove refused", 1]],
-    spec: "The destructive action belongs to the named member, so there is no ambiguous selected-member state. Drawn for another member, never the signed-in one: opening your own row is the self state, where Remove is refused.",
+    writes: "update_staff_roles · revoke_staff [design; SCHEMA-GATE: roles is an array on the membership row]",
+    states: [["permission", "admin only", 1], ["member", "any set of roles; at least one"], ["no role", "Save refused until one is on", 1], ["last admin", "remove and turning off Admin refused", 1], ["self", "remove refused", 1]],
+    spec: "A member holds a set of roles, not one: a person who sells and brews is both, and sees the union of each role's navigation and actions. Every role is a switch; at least one must stay on. The destructive action belongs to the named member, so there is no ambiguous selected-member state. Drawn for another member, never the signed-in one: opening your own row is the self state, where Remove is refused.",
     body: (<>
       {E.row("Dave Chen", "dave@demobrewing.com", "", "", E.face({ className: "size-10", src: "/mock/dave.jpg" }))}
-      {E.pick("Role", "Brewer", ["Admin", "Sales", "Warehouse", "Brewer", "Taproom"])}
-      {E.btn("Save role")}
+      {E.ttl("Roles")}
+      {E.row("Admin", "everything, including team and settings", E.sw(false, "Admin"))}
+      {E.row("Sales", "orders, customers, price lists", E.sw(true, "Sales"))}
+      {E.row("Warehouse", "pick, receive, count, transfer", E.sw(false, "Warehouse"))}
+      {E.row("Brewer", "batches, cellar, packaging", E.sw(true, "Brewer"))}
+      {E.row("Taproom", "taps, pours, menu", E.sw(false, "Taproom"))}
+      {E.btn("Save roles")}
       {E.note("Removing Dave ends this brewery membership. Their sign-in account remains.")}
       {E.btn("Remove Dave", "del")}
     </>),
