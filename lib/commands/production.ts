@@ -244,4 +244,57 @@ defineQuery({
   },
 });
 
+// ------------------------------------------------------------ cellar
+// Moving beer writes one ledger row; nothing stores a volume. What is in a
+// vessel is derived (occupancy_volumes), so the RPC's job is to write the
+// transfer, open a receiving occupancy when the target vessel is empty, and
+// close the source only once the view says it is empty.
+defineCommand({
+  name: "record_cellar_transfer",
+  description: "Move beer out of one occupancy into a vessel: opens an occupancy if the vessel is empty, blends into the open one if it is not, and closes the source when it empties",
+  input: z.object({
+    fromOccupancyId: z.string().uuid(),
+    toVesselId: z.string().uuid(),
+    volumeBbl: z.number().positive(),
+    lossBbl: z.number().nonnegative().optional(),
+  }),
+  roles: ["admin", "brewer"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_cellar_transfer", {
+    p_brewery: ctx.breweryId, p_from_occupancy: i.fromOccupancyId, p_to_vessel: i.toVesselId,
+    p_volume_bbl: i.volumeBbl, p_loss_bbl: i.lossBbl ?? 0, p_request_id: execution.requestId,
+  })),
+});
+
+// Manual entry only, in °F and °Plato (brewing-domain.md). Gravity and pH are
+// optional because a quick temperature check is a legitimate reading; a closed
+// occupancy takes none at all.
+defineCommand({
+  name: "record_fermentation_reading",
+  description: "Log a fermentation reading against an open occupancy: temperature in °F, optionally gravity in °Plato, pH and a note",
+  input: z.object({
+    occupancyId: z.string().uuid(),
+    at: z.string().datetime({ offset: true }),
+    tempF: z.number(),
+    gravityPlato: z.number().optional(),
+    ph: z.number().optional(),
+    note: z.string().optional(),
+  }),
+  roles: ["admin", "brewer"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_fermentation_reading", {
+    p_brewery: ctx.breweryId, p_occupancy: i.occupancyId, p_at: i.at, p_temp_f: i.tempF,
+    p_gravity_plato: i.gravityPlato ?? null, p_ph: i.ph ?? null, p_note: i.note ?? null,
+    p_request_id: execution.requestId,
+  })),
+});
+
+// A plain read: fermentation_readings carries the staff_read policy, so
+// PostgREST already scopes this to the caller's brewery.
+defineQuery({
+  name: "list_fermentation_readings", description: "Readings logged against one occupancy, newest first",
+  input: z.object({ occupancyId: z.string().uuid() }), roles: ["admin", "brewer"],
+  handler: (ctx, i) => unwrap(ctx.db.from("fermentation_readings")
+    .select("id, occupancy_id, at, temp_f, gravity_plato, ph, note")
+    .eq("brewery_id", ctx.breweryId).eq("occupancy_id", i.occupancyId).order("at", { ascending: false })),
+});
+
 export {};

@@ -250,3 +250,155 @@ describe("vessels and batches refuse other tenants and other roles", () => {
     await expect(runCommand("list_batches", {}, sales)).rejects.toThrow(/permission denied/);
   });
 });
+
+// ------------------------------------------------------------ cellar transfers
+// The cellar has no "volume" column: occupancy_volumes derives what is in a
+// vessel from initial_bbl plus transfers in, minus transfers out and their
+// loss. record_cellar_transfer must therefore come out right through the view,
+// and close the source only when the view says it is empty.
+describe("cellar transfers", () => {
+  const volume = async (occupancyId: string) => {
+    const { data, error } = await admin.from("occupancy_volumes").select("bbl").eq("occupancy_id", occupancyId).single();
+    if (error) throw error;
+    return Number(data.bbl);
+  };
+  const occupancyRow = async (occupancyId: string) => {
+    const { data, error } = await admin.from("vessel_occupancies")
+      .select("id, batch_id, vessel_id, ended_at").eq("id", occupancyId).single();
+    if (error) throw error;
+    return data as { id: string; batch_id: string; vessel_id: string; ended_at: string | null };
+  };
+
+  // A brewed batch sitting in its own fermenter, ready to be moved.
+  async function brew(name: string, bbl: number, brewedOn: string) {
+    const vessel = (await runCommand("upsert_vessel", { name, kind: "fermenter", capacityBbl: 30 }, ctx)) as { id: string };
+    const batch = (await runCommand("schedule_batch", { plannedOn: brewedOn, plannedBbl: bbl }, ctx)) as { id: string };
+    const day = (await runCommand("record_brew_day",
+      { batchId: batch.id, vesselId: vessel.id, initialBbl: bbl, brewedOn }, ctx)) as { occupancy: { id: string } };
+    return { vesselId: vessel.id, batchId: batch.id, occupancyId: day.occupancy.id };
+  }
+
+  it("moves part of a batch into an empty vessel, then closes the source when it empties", async () => {
+    const source = await brew("XFER-FV1", 10, "2026-11-01");
+    const brite = (await runCommand("upsert_vessel", { name: "XFER-BR1", kind: "brite", capacityBbl: 30 }, ctx)) as { id: string };
+
+    const first = (await runCommand("record_cellar_transfer",
+      { fromOccupancyId: source.occupancyId, toVesselId: brite.id, volumeBbl: 5 }, ctx)) as {
+        transfer: { bbl: number; loss_bbl: number }; to_occupancy: { id: string; batch_id: string }; from_occupancy: { ended_at: string | null };
+      };
+    expect(Number(first.transfer.bbl)).toBe(5);
+    // Filled by transfer, so the new occupancy opens at zero and carries the source's batch.
+    expect(first.to_occupancy.batch_id).toBe(source.batchId);
+    expect(first.from_occupancy.ended_at).toBeNull();
+    expect(await volume(source.occupancyId)).toBe(5);
+    expect(await volume(first.to_occupancy.id)).toBe(5);
+
+    // The rest, with a bit of cellar loss: the source is now empty and closes.
+    const second = (await runCommand("record_cellar_transfer",
+      { fromOccupancyId: source.occupancyId, toVesselId: brite.id, volumeBbl: 4.5, lossBbl: 0.5 }, ctx)) as {
+        to_occupancy: { id: string }; from_occupancy: { ended_at: string | null };
+      };
+    expect(second.to_occupancy.id).toBe(first.to_occupancy.id);
+    expect(second.from_occupancy.ended_at).not.toBeNull();
+    expect(await volume(source.occupancyId)).toBe(0);
+    expect(await volume(first.to_occupancy.id)).toBe(9.5);
+    expect((await occupancyRow(source.occupancyId)).ended_at).not.toBeNull();
+  });
+
+  it("blends into an occupied vessel, leaving the target's batch identity alone", async () => {
+    const host = await brew("BLEND-FV1", 6, "2026-11-02");
+    const donor = await brew("BLEND-FV2", 4, "2026-11-02");
+
+    const blended = (await runCommand("record_cellar_transfer",
+      { fromOccupancyId: donor.occupancyId, toVesselId: host.vesselId, volumeBbl: 4 }, ctx)) as {
+        to_occupancy: { id: string; batch_id: string };
+      };
+    expect(blended.to_occupancy.id).toBe(host.occupancyId);
+    expect(blended.to_occupancy.batch_id).toBe(host.batchId);   // no "new batch from two parents"
+    expect(await volume(host.occupancyId)).toBe(10);
+    expect(await volume(donor.occupancyId)).toBe(0);
+    expect((await occupancyRow(donor.occupancyId)).ended_at).not.toBeNull();
+  });
+
+  it("refuses more than is in the vessel, its own vessel, and a closed source", async () => {
+    const source = await brew("XFER-FV2", 8, "2026-11-03");
+    const target = (await runCommand("upsert_vessel", { name: "XFER-BR2", kind: "brite", capacityBbl: 30 }, ctx)) as { id: string };
+
+    await expect(runCommand("record_cellar_transfer",
+      { fromOccupancyId: source.occupancyId, toVesselId: target.id, volumeBbl: 8, lossBbl: 0.5 }, ctx))
+      .rejects.toThrow(/only 8/);
+    await expect(runCommand("record_cellar_transfer",
+      { fromOccupancyId: source.occupancyId, toVesselId: source.vesselId, volumeBbl: 1 }, ctx))
+      .rejects.toThrow(/itself/);
+    expect(await volume(source.occupancyId)).toBe(8);   // nothing moved
+
+    await runCommand("record_cellar_transfer",
+      { fromOccupancyId: source.occupancyId, toVesselId: target.id, volumeBbl: 8 }, ctx);
+    await expect(runCommand("record_cellar_transfer",
+      { fromOccupancyId: source.occupancyId, toVesselId: target.id, volumeBbl: 1 }, ctx))
+      .rejects.toThrow(/closed/);
+  });
+
+  it("refuses another brewery's occupancy and vessel, and roles that are not admin or brewer", async () => {
+    const mine = await brew("XFER-FV3", 5, "2026-11-04");
+    const otherB = await makeBrewery();
+    const otherCtx = await makeStaffCtx(otherB.id, "brewer");
+    const theirVessel = (await runCommand("upsert_vessel", { name: "Their BR", kind: "brite", capacityBbl: 30 }, otherCtx)) as { id: string };
+
+    await expect(runCommand("record_cellar_transfer",
+      { fromOccupancyId: mine.occupancyId, toVesselId: theirVessel.id, volumeBbl: 1 }, ctx)).rejects.toThrow(/vessel not found/);
+    await expect(runCommand("record_cellar_transfer",
+      { fromOccupancyId: mine.occupancyId, toVesselId: theirVessel.id, volumeBbl: 1 }, otherCtx)).rejects.toThrow(/occupancy not found/);
+
+    const sales = await makeStaffCtx(b.id, "sales");
+    await expect(runCommand("record_cellar_transfer",
+      { fromOccupancyId: mine.occupancyId, toVesselId: theirVessel.id, volumeBbl: 1 }, sales)).rejects.toThrow(/permission denied/);
+    expect(await volume(mine.occupancyId)).toBe(5);
+  });
+});
+
+// ------------------------------------------------------------ fermentation readings
+// Readings are manual entry in °F and °Plato (brewing-domain.md); nothing is
+// ever synthesized, and a closed occupancy takes no more of them.
+describe("fermentation readings", () => {
+  let occupancyId: string;
+
+  beforeAll(async () => {
+    const vessel = (await runCommand("upsert_vessel", { name: "READ-FV1", kind: "fermenter", capacityBbl: 20 }, ctx)) as { id: string };
+    const batch = (await runCommand("schedule_batch", { plannedOn: "2026-11-10", plannedBbl: 12 }, ctx)) as { id: string };
+    const day = (await runCommand("record_brew_day",
+      { batchId: batch.id, vesselId: vessel.id, initialBbl: 12, brewedOn: "2026-11-10" }, ctx)) as { occupancy: { id: string } };
+    occupancyId = day.occupancy.id;
+  });
+
+  it("records readings and lists them newest first", async () => {
+    await runCommand("record_fermentation_reading", {
+      occupancyId, at: "2026-11-10T18:00:00Z", tempF: 68, gravityPlato: 14.2, ph: 5.2, note: "pitched",
+    }, ctx);
+    await runCommand("record_fermentation_reading", { occupancyId, at: "2026-11-11T18:00:00Z", tempF: 70.5, gravityPlato: 8.4 }, ctx);
+
+    const rows = (await runCommand("list_fermentation_readings", { occupancyId }, ctx)) as {
+      at: string; temp_f: number; gravity_plato: number | null; ph: number | null; note: string | null;
+    }[];
+    expect(rows).toHaveLength(2);
+    expect(new Date(rows[0].at).toISOString()).toBe("2026-11-11T18:00:00.000Z");
+    expect(Number(rows[0].temp_f)).toBe(70.5);
+    expect(rows[0].ph).toBeNull();
+    expect(Number(rows[1].gravity_plato)).toBe(14.2);
+    expect(rows[1].note).toBe("pitched");
+  });
+
+  it("refuses a reading on a closed occupancy, another brewery's occupancy, and a non-brewer role", async () => {
+    const otherCtx = await makeStaffCtx((await makeBrewery()).id, "brewer");
+    await expect(runCommand("record_fermentation_reading", { occupancyId, at: "2026-11-11T19:00:00Z", tempF: 68 }, otherCtx))
+      .rejects.toThrow(/occupancy not found/);
+    const sales = await makeStaffCtx(b.id, "sales");
+    await expect(runCommand("record_fermentation_reading", { occupancyId, at: "2026-11-11T19:00:00Z", tempF: 68 }, sales))
+      .rejects.toThrow(/permission denied/);
+
+    const brite = (await runCommand("upsert_vessel", { name: "READ-BR1", kind: "brite", capacityBbl: 20 }, ctx)) as { id: string };
+    await runCommand("record_cellar_transfer", { fromOccupancyId: occupancyId, toVesselId: brite.id, volumeBbl: 12 }, ctx);
+    await expect(runCommand("record_fermentation_reading", { occupancyId, at: "2026-11-12T18:00:00Z", tempF: 68 }, ctx))
+      .rejects.toThrow(/closed/);
+  });
+});

@@ -3304,6 +3304,95 @@ begin
     jsonb_build_object('batch', to_jsonb(v_batch), 'occupancy', to_jsonb(v_occ)));
 end $$;
 
+-- ---------------------------------------------------------------- cellar
+-- Moving beer is a ledger entry, never a column edit: occupancy_volumes derives
+-- what is in a vessel from initial_bbl, transfers in, transfers out (volume plus
+-- its loss) and packaging draws. So this writes exactly one transfers row and
+-- lets the view speak. The target vessel is locked before the source occupancy
+-- — the same vessel-first order record_brew_day uses — so two brewers racing
+-- into one brite queue instead of deadlocking. An empty target gets a fresh
+-- occupancy at initial_bbl 0 carrying the source's batch; an occupied one is
+-- blended into and keeps its own batch identity (a "new batch from two parents"
+-- is deliberately not modelled). Every timestamp is now(), so a same-day
+-- transfer never collides with a brew day's midnight range start.
+create function record_cellar_transfer(
+  p_brewery uuid, p_from_occupancy uuid, p_to_vessel uuid, p_volume_bbl numeric, p_loss_bbl numeric, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_actor uuid; v_replay jsonb; v_vessel public.vessels;
+  v_from public.vessel_occupancies; v_to public.vessel_occupancies; v_row public.transfers;
+  v_available numeric; v_now timestamptz := now();
+  -- numeric(10,3) rounding means "empty" is never exactly zero after a split.
+  c_epsilon constant numeric := 0.0005;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin','brewer']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'record_cellar_transfer', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'from_occupancy', p_from_occupancy, 'to_vessel', p_to_vessel,
+      'volume_bbl', p_volume_bbl, 'loss_bbl', p_loss_bbl));
+  if v_replay is not null then return v_replay; end if;
+
+  select * into v_vessel from public.vessels where id = p_to_vessel and brewery_id = p_brewery for update;
+  if v_vessel.id is null then raise exception 'vessel not found'; end if;
+  select * into v_from from public.vessel_occupancies
+    where id = p_from_occupancy and brewery_id = p_brewery for update;
+  if v_from.id is null then raise exception 'occupancy not found'; end if;
+  if v_from.ended_at is not null then raise exception 'occupancy is closed'; end if;
+  if v_from.vessel_id = p_to_vessel then raise exception 'a vessel cannot be transferred into itself'; end if;
+
+  select bbl into v_available from public.occupancy_volumes where occupancy_id = v_from.id;
+  if p_volume_bbl + coalesce(p_loss_bbl, 0) > v_available + c_epsilon then
+    raise exception 'only % bbl in that vessel; asked for %', v_available, p_volume_bbl + coalesce(p_loss_bbl, 0);
+  end if;
+
+  select * into v_to from public.vessel_occupancies
+    where vessel_id = p_to_vessel and brewery_id = p_brewery and ended_at is null for update;
+  if v_to.id is null then
+    insert into public.vessel_occupancies (brewery_id, vessel_id, batch_id, started_at, initial_bbl)
+    values (p_brewery, p_to_vessel, v_from.batch_id, v_now, 0) returning * into v_to;
+  end if;
+
+  insert into public.transfers (brewery_id, from_occupancy_id, to_occupancy_id, bbl, loss_bbl, at, created_by)
+  values (p_brewery, v_from.id, v_to.id, p_volume_bbl, coalesce(p_loss_bbl, 0), v_now, v_actor) returning * into v_row;
+
+  -- Re-read the view: it now includes the row just written.
+  select bbl into v_available from public.occupancy_volumes where occupancy_id = v_from.id;
+  if v_available <= c_epsilon then
+    -- greatest(): a brew day may be dated ahead of today, so the occupancy can
+    -- start in the future. tstzrange would reject an ended_at below its start;
+    -- an empty range there simply frees the vessel.
+    update public.vessel_occupancies set ended_at = greatest(v_from.started_at, v_now)
+    where id = v_from.id returning * into v_from;
+  end if;
+
+  return private.complete_command_request(p_request_id, jsonb_build_object(
+    'transfer', to_jsonb(v_row), 'from_occupancy', to_jsonb(v_from), 'to_occupancy', to_jsonb(v_to)));
+end $$;
+
+-- Readings are manual entry in °F and °Plato (brewing-domain.md); nothing is
+-- ever synthesized. A closed occupancy takes no more of them — the beer has
+-- left the vessel, so a reading against it would describe nothing.
+create function record_fermentation_reading(
+  p_brewery uuid, p_occupancy uuid, p_at timestamptz, p_temp_f numeric,
+  p_gravity_plato numeric, p_ph numeric, p_note text, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid; v_replay jsonb; v_occ public.vessel_occupancies; v_row public.fermentation_readings;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin','brewer']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'record_fermentation_reading', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'occupancy', p_occupancy, 'at', p_at, 'temp_f', p_temp_f,
+      'gravity_plato', p_gravity_plato, 'ph', p_ph, 'note', p_note));
+  if v_replay is not null then return v_replay; end if;
+
+  select * into v_occ from public.vessel_occupancies where id = p_occupancy and brewery_id = p_brewery;
+  if v_occ.id is null then raise exception 'occupancy not found'; end if;
+  if v_occ.ended_at is not null then raise exception 'occupancy is closed'; end if;
+
+  insert into public.fermentation_readings (brewery_id, occupancy_id, at, temp_f, gravity_plato, ph, note, created_by)
+  values (p_brewery, p_occupancy, coalesce(p_at, now()), p_temp_f, p_gravity_plato, p_ph, p_note, v_actor)
+  returning * into v_row;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
 -- ---------------------------------------------------------------- Stock transfers
 -- Internal moves of stuff between two locations (spec 2026-09-06 Decision 3).
 create function private.lock_transfer(p_transfer uuid, p_allowed public.stock_transfer_status[]) returns public.stock_transfers
@@ -4060,7 +4149,7 @@ create view private.today_candidates with (security_invoker = true) as
          v.name,
          'reading due',
          coalesce(last.at, vo.started_at) + make_interval(hours => b.fermentation_reading_due_hours),
-         '/beer/cellar/' || vo.id || '/reading',
+         '/cellar/' || vo.id || '/reading',
          array['admin','brewer']::text[],
          null::uuid
     from vessel_occupancies vo
@@ -4070,10 +4159,10 @@ create view private.today_candidates with (security_invoker = true) as
     where vo.ended_at is null;
 grant select on private.today_candidates to service_role;
 
--- ponytail: delivery_next and fermentation_reading_overdue join this list when
--- their MGR pages/commands ship (slice 4 cellar reading, slice 10 delivery stop).
+-- ponytail: delivery_next joins this list when its MGR page ships (slice 10
+-- delivery stop). fermentation_reading_overdue is live: /cellar/<occupancy>/reading exists.
 create function today_live_reasons() returns text[]
-language sql immutable set search_path = '' as $$ select array['submitted_order','pick_due','restock_due'] $$;
+language sql immutable set search_path = '' as $$ select array['submitted_order','pick_due','restock_due','fermentation_reading_overdue'] $$;
 
 create function get_today_items(p_brewery uuid, p_now timestamptz default now())
 returns setof private.today_candidates
@@ -4660,7 +4749,9 @@ grant execute on function
   create_recipe_version(uuid,uuid,numeric,numeric,numeric,int,numeric,text,jsonb,uuid),
   upsert_vessel(uuid,uuid,text,public.vessel_kind,numeric,uuid),
   schedule_batch(uuid,uuid,uuid,date,numeric,text,uuid),
-  record_brew_day(uuid,uuid,uuid,numeric,date,uuid)
+  record_brew_day(uuid,uuid,uuid,numeric,date,uuid),
+  record_cellar_transfer(uuid,uuid,uuid,numeric,numeric,uuid),
+  record_fermentation_reading(uuid,uuid,timestamptz,numeric,numeric,numeric,text,uuid)
   to authenticated;
 grant usage on schema private, extensions to service_role;
 -- service_role reaches `private` only for the UUID default its seed inserts

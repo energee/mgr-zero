@@ -202,6 +202,7 @@ omitted. They have no roles until they are built.
 | `list_brands` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
 | `list_channel_prices` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `list_customers` | Customers | ✓ | ✓ | ✓ |  |  |
+| `list_fermentation_readings` | Production | ✓ |  |  | ✓ |  |
 | `list_formats` | Packaging | ✓ | ✓ | ✓ |  |  |
 | `list_invoices` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `list_locations` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
@@ -226,6 +227,8 @@ omitted. They have no roles until they are built.
 | `portal_update_draft_order` | Customer portal |  |  |  |  | ✓ |
 | `receive_stock_transfer` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `record_brew_day` | Production | ✓ |  |  | ✓ |  |
+| `record_cellar_transfer` | Production | ✓ |  |  | ✓ |  |
+| `record_fermentation_reading` | Production | ✓ |  |  | ✓ |  |
 | `record_movement` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `record_pick` | Orders & invoicing | ✓ |  | ✓ |  |  |
 | `record_stock_transfer_pick` | Orders & invoicing | ✓ |  | ✓ |  |  |
@@ -1986,6 +1989,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_batches", "input": {} }'
 ```
 
+#### list_fermentation_readings [#list_fermentation_readings]
+
+`query` · admin, brewer
+
+Readings logged against one occupancy, newest first
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `occupancyId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_fermentation_readings", "input": { "occupancyId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 #### list_recipes [#list_recipes]
 
 `query` · admin, brewer
@@ -2036,6 +2056,48 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_brew_day", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "batchId": "00000000-0000-0000-0000-000000000000", "vesselId": "00000000-0000-0000-0000-000000000000", "initialBbl": 1, "brewedOn": "2026-01-31" } }'
 ```
 
+#### record_cellar_transfer [#record_cellar_transfer]
+
+`command` · admin, brewer
+
+Move beer out of one occupancy into a vessel: opens an occupancy if the vessel is empty, blends into the open one if it is not, and closes the source when it empties
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `fromOccupancyId` | uuid | yes |
+| `toVesselId` | uuid | yes |
+| `volumeBbl` | number | yes |
+| `lossBbl` | number | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_cellar_transfer", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "fromOccupancyId": "00000000-0000-0000-0000-000000000000", "toVesselId": "00000000-0000-0000-0000-000000000000", "volumeBbl": 1 } }'
+```
+
+#### record_fermentation_reading [#record_fermentation_reading]
+
+`command` · admin, brewer
+
+Log a fermentation reading against an open occupancy: temperature in °F, optionally gravity in °Plato, pH and a note
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `occupancyId` | uuid | yes |
+| `at` | string | yes |
+| `tempF` | number | yes |
+| `gravityPlato` | number | no |
+| `ph` | number | no |
+| `note` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_fermentation_reading", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "occupancyId": "00000000-0000-0000-0000-000000000000", "at": "2026-01-31T12:00:00Z", "tempF": 1 } }'
+```
+
 #### schedule_batch [#schedule_batch]
 
 `command` · admin, brewer
@@ -2081,7 +2143,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* production-designed */}
 
-10 of the 19 operations in this area are available today; the 9 below are not.
+13 of the 19 operations in this area are available today; the 6 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
@@ -2090,11 +2152,8 @@ The screens need them and the backend has not built them, so calling one returns
 | `complete_batch` | command | Cellar map |
 | `get_recipe_outcomes` | query | Recipe |
 | `get_water_profile` | query | Water profile |
-| `list_fermentation_readings` | query | Vessel detail |
 | `list_water_profiles` | query | Water, Water profiles |
 | `record_batch_addition` | command | Cellar addition |
-| `record_cellar_transfer` | command | Cellar transfer |
-| `record_fermentation_reading` | command | Fermentation reading, Fermentation reading form |
 | `upsert_water_profile` | command | Water profile |
 
 {/* end ops:production */}

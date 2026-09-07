@@ -134,6 +134,10 @@ describe("get_today (registered reader)", () => {
 });
 
 describe("today candidates (shared projection) and internal scan", () => {
+  // The overdue occupancy the first test creates; the live-reason gate below
+  // asserts a brewer now reaches it.
+  let overdueOccupancyId: string;
+
   it("derives delivery-next and fermentation-overdue rules once, honouring cadence", async () => {
     const driver = await makeStaff(b.id, "warehouse");
     const orderA = await createOrder("2026-09-05", true, true);
@@ -148,6 +152,7 @@ describe("today candidates (shared projection) and internal scan", () => {
     const brand = await ins("brands", { brewery_id: b.id, name: "Hazy" });
     const batch = await ins("batches", { brewery_id: b.id, intended_brand_id: brand.id, planned_on: "2026-09-01", planned_bbl: 15, created_by: adminCtx.userId });
     const occupancy = await ins("vessel_occupancies", { brewery_id: b.id, vessel_id: vessel.id, batch_id: batch.id, started_at: "2026-09-04T00:00:00Z" });
+    overdueOccupancyId = occupancy.id;
     await ins("fermentation_readings", { brewery_id: b.id, occupancy_id: occupancy.id, at: "2026-09-04T06:00:00Z", created_by: adminCtx.userId });
 
     const rows = async () => (await sql.query(
@@ -159,7 +164,7 @@ describe("today candidates (shared projection) and internal scan", () => {
       subject_id: stop2.id, href: `/work/deliveries/${stop2.id}`, recipient_roles: ["admin", "warehouse"], assigned_user_id: driver.id,
     });
     const overdue = candidates.find((r) => r.reason === "fermentation_reading_overdue")!;
-    expect(overdue).toMatchObject({ subject_id: occupancy.id, href: `/beer/cellar/${occupancy.id}/reading`, recipient_roles: ["admin", "brewer"] });
+    expect(overdue).toMatchObject({ subject_id: occupancy.id, href: `/cellar/${occupancy.id}/reading`, recipient_roles: ["admin", "brewer"] });
     expect(new Date(overdue.due_at).toISOString()).toBe("2026-09-05T06:00:00.000Z"); // last reading + 24 h
 
     await admin.from("breweries").update({ fermentation_reading_due_hours: 48 }).eq("id", b.id);
@@ -169,11 +174,15 @@ describe("today candidates (shared projection) and internal scan", () => {
 
   it("gates both readers to reasons whose MGR destinations exist", async () => {
     const live = (await sql.query("select public.today_live_reasons() as r")).rows[0].r;
-    expect(live).toEqual(["submitted_order", "pick_due", "restock_due"]);
+    expect(live).toEqual(["submitted_order", "pick_due", "restock_due", "fermentation_reading_overdue"]);
     const scanned = (await sql.query("select distinct reason from public.scan_chat_today_candidates($1, $2)", [b.id, "2026-09-10T12:00:00Z"])).rows.map((r) => r.reason).sort();
-    expect(scanned).toEqual(["pick_due", "restock_due", "submitted_order"]);
+    expect(scanned).toEqual(["fermentation_reading_overdue", "pick_due", "restock_due", "submitted_order"]);
     const reasons = new Set((await today(adminCtx, "2026-09-10T12:00:00Z")).map((i) => i.reason));
-    expect([...reasons].sort()).toEqual(["pick_due", "restock_due", "submitted_order"]);
+    expect([...reasons].sort()).toEqual(["fermentation_reading_overdue", "pick_due", "restock_due", "submitted_order"]);
+
+    // The cellar reading page ships, so a brewer now sees the overdue vessel.
+    const forBrewer = await today(brewer, "2026-09-10T12:00:00Z");
+    expect(forBrewer.map((i) => [i.reason, i.href])).toEqual([["fermentation_reading_overdue", `/cellar/${overdueOccupancyId}/reading`]]);
   });
 
   it("denies the internal scan to authenticated users", async () => {
