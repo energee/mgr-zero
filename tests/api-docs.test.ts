@@ -303,4 +303,40 @@ describe("HTTP API reference", () => {
       expect(outcomes, `${name} does not claim a request id; the outcomes section must say so`).toContain(`\`${name}\``);
     }
   });
+
+  // `null` can be the documented way to use a field — set_brewery_quiet_hours
+  // says "null clears them" — but typeLabel unwrapped `nullable` without
+  // recording it, so the table read `string` / Required `yes` and a caller had
+  // no way to learn that clearing was possible at all (2026-09-06 review).
+  it("says so in the field table when a field accepts null", () => {
+    const schema = getCommandDefinition("set_brewery_quiet_hours")?.input;
+    expect(schema, "set_brewery_quiet_hours is no longer registered").toBeDefined();
+    const fields = fieldsOf(schema!);
+    for (const name of ["start", "end"]) {
+      const field = fields.find((f) => f.name === name);
+      expect(field, `${name} is gone from the schema`).toBeDefined();
+      expect(field!.type, `${name} is hhmm.nullable(); the table must admit null`).toContain("null");
+    }
+    // A field that is not nullable must not claim to be.
+    expect(fields.find((f) => f.name === "installationId")!.type).not.toContain("null");
+    // " or null", never "| null" — the label sits in a Markdown table cell.
+    expect(fields.find((f) => f.name === "start")!.type).not.toContain("|");
+  });
+
+  // Claims the reference makes about itself have to survive a grep, which is
+  // what .agents/agents/http-api.md step 6 tells the maintainer to do. These
+  // two did not: an absolute about ids, and a fail-closed warning that stayed
+  // behind in one area when the operation moved to another.
+  it("makes no claim its own generated tables disprove", () => {
+    const page = read("content/docs/api.mdx");
+    // set_notification_destination.externalDestinationId is a Slack channel
+    // id: z.string().min(1), rendered `string` in its own table 100 lines up.
+    expect(page).not.toContain("Every id in every operation, without exception");
+    // invite_customer_user always raises; it renders under Customers while the
+    // sentence explaining that lives in the Team area's prose.
+    const customers = page.slice(page.indexOf("{/* ops:customers */}"), page.indexOf("{/* end ops:customers */}"));
+    expect(customers, "invite_customer_user is documented here").toContain("invite_customer_user");
+    const invite = page.slice(page.indexOf("#### invite_customer_user"));
+    expect(invite.slice(0, 600), "its example must not read as runnable").toMatch(/not available in this release/);
+  });
 });

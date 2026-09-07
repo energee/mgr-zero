@@ -36,10 +36,26 @@ export function isOptional(node: any): boolean {
   return false;
 }
 
+/** True when `null` is an accepted value, at any depth of the wrapper chain. */
+export function isNullable(node: any): boolean {
+  for (let n = node; n?.def && WRAPPERS.has(n.def.type); n = n.def.innerType) {
+    if (n.def.type === "nullable") return true;
+    if (!n.def.innerType) break;
+  }
+  return false;
+}
+
 /** A human type label for one schema node, e.g. `uuid`, `integer`, `keg or can`.
- * Enum members join with " or ", not "|" — the label lands inside a Markdown
- * table cell, where a bare pipe would break the row. */
+ * Members join with " or ", not "|" — the label lands inside a Markdown table
+ * cell, where a bare pipe would break the row. A nullable field says so: `null`
+ * can be the documented way to use it (set_brewery_quiet_hours clears its
+ * quiet hours that way), and unwrapping `nullable` silently left the table
+ * reading `string` / Required `yes`, with nothing to suggest otherwise. */
 export function typeLabel(node: any): string {
+  return isNullable(node) ? `${baseLabel(node)} or null` : baseLabel(node);
+}
+
+function baseLabel(node: any): string {
   const inner = unwrapOptional(node);
   const format = formats(inner);
   switch (inner.def.type) {

@@ -334,7 +334,12 @@ land in are snake_case. Response payloads come back in the database's own shape,
 so a field you send as `skuId` reads back as `sku_id`. That asymmetry is real
 and worth handling in one mapping layer rather than at each call site.
 
-**Ids are UUIDs.** Every id in every operation, without exception.
+**Ids are UUIDs** wherever the id belongs to MGR — every record you create,
+read or reference here. The exception is an id minted by somebody else and
+stored as it arrives: `externalDestinationId` on
+`set_notification_destination` is a Slack channel id, and its field table says
+`string` for that reason. Read the table when it disagrees with this line; it
+is generated from the schema and this sentence is not.
 
 **Money is integer cents.** `unitPriceCents: 1250` is $12.50. There are no
 floats in prices anywhere in the API, because a fraction of a cent that survives
@@ -470,7 +475,7 @@ Mute/unmute one notification reason for yourself and optionally override your qu
 | --- | --- | --- |
 | `reason` | submitted_order or pick_due or delivery_next or fermentation_reading_overdue or operations_digest | yes |
 | `enabled` | boolean | yes |
-| `quietHours` | object | no |
+| `quietHours` | object or null | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -1165,6 +1170,11 @@ destination reporting, so an address is a compliance record, not just a label.
 Portal orders ship from one warehouse per brewery, set with
 `set_portal_fulfillment_source`; portal ordering fails until it is set.
 
+`invite_customer_user` is registered but fails closed in this release, like the
+staff invitations it belongs with: it validates its input and then raises,
+writing nothing. Its example below is well-formed and will still return
+`400 bad_request`.
+
 {/* ops:customers */}
 
 #### get_customer [#get_customer]
@@ -1630,8 +1640,8 @@ Set the brewery-wide quiet hours (brewery time) that delay every personal chat n
 | Field | Type | Required |
 | --- | --- | --- |
 | `installationId` | uuid | yes |
-| `start` | string | yes |
-| `end` | string | yes |
+| `start` | string or null | yes |
+| `end` | string or null | yes |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
