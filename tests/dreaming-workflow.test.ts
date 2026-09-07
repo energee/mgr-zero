@@ -127,7 +127,12 @@ describe("dreaming workflow", () => {
     expect(prompt).toMatch(/digests[\s\S]{0,40}(if any|when present|may be\s+none)/i);
     expect(agents).toContain(".agents/DRIFT.md");
     expect(architecture).toContain("| `lib/chat/` |");
-    expect(readme).toContain("`get_today`");
+    // A contradiction the agent resolved is written where the fact belongs and
+    // leaves the ledger; the pair is the invariant, not the filename. The
+    // command table this once pinned to README is now the generated HTTP API
+    // reference and README only links to it, so follow the content there.
+    expect(read("content/docs/api.mdx")).toContain("`get_today`");
+    expect(readme).toContain("/docs/api");
     expect(drift).not.toContain("`get_today`");
     for (const line of drift.split("\n").filter((l) => l.startsWith("-"))) {
       expect(line).toMatch(/^- \[ \] /);

@@ -10,12 +10,16 @@ const read = (path: string) => readFileSync(resolve(root, path), "utf8");
 // content/docs/meta.json is the one list of guides: it orders the sidebar, so
 // a guide missing from it is invisible. Everything else here derives from it.
 const GUIDES: string[] = JSON.parse(read("content/docs/meta.json")).pages;
+// The API reference is integrator documentation: same site and sidebar, but it
+// carries code blocks and words like "schema" that the customer guides forbid.
+// tests/api-docs.test.ts owns it; everything here is about the guides.
+const CUSTOMER_GUIDES = GUIDES.filter((g) => g !== "api");
 
 describe("customer guides (MDX)", () => {
   it("has exactly the pages meta.json lists, each with frontmatter and no code", () => {
     const files = readdirSync(resolve(root, "content/docs")).filter((f) => f.endsWith(".mdx")).sort();
     expect(files).toEqual(GUIDES.map((g) => `${g}.mdx`).sort());
-    for (const guide of GUIDES) {
+    for (const guide of CUSTOMER_GUIDES) {
       const mdx = read(`content/docs/${guide}.mdx`);
       expect(mdx).toMatch(/^---\n(?:\w+: .+\n)*title: .+\ndescription: .+\n(?:\w+: .+\n)*---\n/);
       // Prose only: no imports/exports, scripts, raw HTML or styling hooks.
@@ -23,6 +27,11 @@ describe("customer guides (MDX)", () => {
       expect(mdx).not.toMatch(/<(?:script|style|link|iframe|img|div|span|p|a)\b/i);
       expect(mdx).not.toMatch(/\b(?:RLS|schema|command ID|slice \d|implementation gate)\b/i);
     }
+  });
+
+  it("gives the API reference a place in the sidebar and on the chooser", () => {
+    expect(GUIDES).toContain("api");
+    expect(read("content/docs/index.mdx")).toContain('href="/docs/api"');
   });
 
   it("keeps the master chooser linked to both audiences and the audiences apart", () => {
@@ -42,7 +51,7 @@ describe("customer guides (MDX)", () => {
   });
 
   it("points every in-page link at an anchor the guide actually declares", () => {
-    const broken = GUIDES.flatMap((guide) => {
+    const broken = CUSTOMER_GUIDES.flatMap((guide) => {
       const mdx = read(`content/docs/${guide}.mdx`);
       // Headings declare their anchor inline as `## Title [#slug]`.
       const declared = new Set([...mdx.matchAll(/\[#([a-z0-9-]+)\]/g)].map((m) => m[1]));
