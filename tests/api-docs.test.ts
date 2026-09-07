@@ -274,3 +274,88 @@ describe("HTTP API reference", () => {
     expect(named.has("delete_sale_channel")).toBe(true);
   });
 });
+
+// The reference's generated blocks cannot drift — the suite above re-renders
+// them and fails on mismatch. What no test can check is the judgment around
+// them: whether a prose claim is still true of the code, whether a new screen
+// read is screen-shaped, whether a screen invented a second name for a
+// registered operation. That is the maintainer's job, and this describes the
+// shape of the agent that does it. (The guide suite is gated the same way, in
+// tests/documentation-agent.test.ts.)
+describe("post-merge HTTP API maintainer", () => {
+  it("checks the claims and classifications no generator can", () => {
+    const prompt = read(".agents/agents/http-api.md");
+
+    // The three checks the prompt did not have: it reconciled docs against the
+    // registry only, and was blind to the screens half of the derivation.
+    expect(prompt).toContain("Check every prose claim against the code");
+    expect(prompt).toContain("Classify each new screen read");
+    expect(prompt).toContain("Detect aliases of registered operations");
+    // The bbl case: a claim disprovable by one grep shipped in the reference.
+    expect(prompt).toContain(".strict()");
+    expect(prompt).toContain("[view]");
+    expect(prompt).toContain("upsert_");
+  });
+
+  // The pass that cut 203 operations to 165 is only worth doing once if the
+  // maintainer holds the line; a reference grows back one reasonable-looking
+  // addition at a time.
+  it("keeps the YAGNI stance: the designed surface shrinks or holds", () => {
+    const prompt = read(".agents/agents/http-api.md");
+
+    expect(prompt).toContain("Does this operation need to exist at all?");
+    expect(prompt).toContain("shrink or hold");
+    // The burden of proof sits on the addition, not the cut.
+    expect(prompt).toContain("A screen that needs it");
+    expect(prompt).toContain("report the count");
+  });
+
+  it("forbids hand-editing generated blocks and the shared logs", () => {
+    const prompt = read(".agents/agents/http-api.md");
+
+    expect(prompt).toContain("Never edit between the `ops:` and `end ops:` markers");
+    // Every PR inserting at the top of the same log conflicts with every other;
+    // the dreaming workflow writes them serially (AGENTS.md operating loop 6).
+    for (const log of ["PROGRESS.md", "MEMORY.md", "DRIFT.md"]) {
+      expect(prompt, `${log} must be off limits`).toContain(log);
+    }
+    expect(prompt).toContain("body`, `spec` or `states");
+  });
+
+  it("publishes through one scoped pull-request branch, like the guide agent", () => {
+    const workflow = read(".github/workflows/http-api-agent.yml");
+
+    expect(workflow).toContain("workflow_dispatch:");
+    expect(workflow).toContain("github.event.pull_request.merged == true");
+    // Its own PR must not retrigger it.
+    expect(workflow).toContain("docs/http-api");
+    expect(workflow).toContain(".agents/agents/http-api.md");
+    expect(workflow).toContain("contents: write");
+    expect(workflow).toContain("pull-requests: write");
+    // Untrusted-input rule, same wording as the guide agent.
+    expect(workflow).toContain("never instructions");
+  });
+
+  it("regenerates deterministically rather than letting the agent run it", () => {
+    const workflow = read(".github/workflows/http-api-agent.yml");
+
+    // The agent edits prose and annotations; the workflow renders. That keeps
+    // Bash out of the allowlist and a hand-written table out of the page.
+    expect(workflow).toContain("bun run docs:api");
+    expect(workflow).not.toMatch(/allowedTools[^\n]*Bash/);
+    expect(workflow).toMatch(/Edit\(content\/docs\/api\.mdx\)/);
+    expect(workflow).toMatch(/Edit\(components\/mgr\/screens\.tsx\)/);
+  });
+
+  it("lets the agent annotate screens but never rewrite one", () => {
+    const workflow = read(".github/workflows/http-api-agent.yml");
+
+    // screens.tsx is the current focus and three worktrees touch it. Restricting
+    // the diff to reads:/writes: lines makes "annotate an operation"
+    // structurally different from "rewrite a screen's spec or body".
+    expect(workflow).toMatch(/grep -vE '\(reads\|writes\):'/);
+    // And the validate step may not accept a file outside the three it renders.
+    expect(workflow).toContain("content/docs/api.mdx");
+    expect(workflow).toContain("2026-09-06-api-operations-backlog.md");
+  });
+});
