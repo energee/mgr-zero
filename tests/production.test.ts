@@ -166,8 +166,9 @@ describe("brew day overlaps a closed occupancy", () => {
     const first = (await runCommand("schedule_batch", { plannedOn: "2026-10-01", plannedBbl: 30 }, ctx)) as { id: string };
     await runCommand("record_brew_day", { batchId: first.id, vesselId: vessel.id, initialBbl: 30, brewedOn: "2026-10-01" }, ctx);
 
-    // No close RPC exists yet (that is the cellar-transfer task), so end the
-    // occupancy directly: the vessel is empty from 10-05 on.
+    // record_cellar_transfer closes an occupancy at now(), never at a chosen
+    // past instant, so a *backdated* close is still a direct update: the
+    // vessel needs to read as empty from 10-05 on.
     sql(`update vessel_occupancies set ended_at = timestamptz '2026-10-05'
          where batch_id = '${first.id}' and ended_at is null`, true);
 
