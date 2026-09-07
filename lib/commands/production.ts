@@ -74,9 +74,10 @@ defineQuery({
     .eq("brewery_id", ctx.breweryId).eq("active", true).order("name")),
 });
 
-// A missing extract snapshot predicts as 1.0 — no extract, which is what a
-// material with no typed potential (a hop, a chemical) contributes. Number()
-// guards the numeric columns against a driver that hands them back as strings.
+// Number() guards the numeric columns against a driver that hands them back as
+// strings. A missing extract snapshot is NOT defaulted here — it is passed
+// through as null so recipeGravity can skip the ingredient outright rather
+// than have a made-up potential move the predicted OG.
 const num = (v: unknown, fallback = 0) => (v === null || v === undefined ? fallback : Number(v));
 
 defineQuery({
@@ -104,7 +105,10 @@ defineQuery({
         brewhouseEfficiency: num(version.brewhouse_efficiency),
         yeastAttenuation: num(version.yeast_attenuation),
         ingredients: ingredients.map((l) => ({
-          perBblQty: num(l.per_bbl_qty), extractPotential: num(l.extract_snapshot, 1), stage: l.stage as string,
+          // A null snapshot stays null: recipeGravity skips that ingredient
+          // rather than defaulting its potential, which would silently move
+          // the predicted OG.
+          perBblQty: num(l.per_bbl_qty), extractPotential: l.extract_snapshot == null ? null : num(l.extract_snapshot), stage: l.stage as string,
         })),
       }),
     };

@@ -57,4 +57,29 @@ describe("recipeGravity", () => {
     expect(result.fgPlato).toBe(0);
     expect(result.abv).toBeCloseTo(0, 5);
   });
+
+  it("skips an ingredient with no extract potential instead of producing NaN", () => {
+    // extract_snapshot is null in SQL whenever the material never had a
+    // potential typed on it (a hop, an unmeasured adjunct). Reaching the
+    // formula with null used to make the whole prediction NaN; the ingredient
+    // is skipped and the rest still predicts.
+    const withUnknown = recipeGravity({
+      mashTempF: 152,
+      brewhouseEfficiency: 0.75,
+      yeastAttenuation: 0.75,
+      ingredients: [
+        { perBblQty: 10, extractPotential: 1.037, stage: "mash" },
+        { perBblQty: 5, extractPotential: null, stage: "mash" },
+        { perBblQty: 5, extractPotential: undefined, stage: "mash" },
+      ],
+    });
+    const known = recipeGravity({
+      mashTempF: 152,
+      brewhouseEfficiency: 0.75,
+      yeastAttenuation: 0.75,
+      ingredients: [{ perBblQty: 10, extractPotential: 1.037, stage: "mash" }],
+    });
+    expect(Number.isNaN(withUnknown.ogPlato)).toBe(false);
+    expect(withUnknown).toEqual(known);
+  });
 });
