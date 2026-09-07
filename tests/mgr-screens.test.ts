@@ -3,12 +3,12 @@
 // every record carries its metadata, `states` is a caption (never rendered
 // into the body), and each body renders through the E vocabulary without
 // throwing. Rendering uses react-dom/server, so no DOM is needed.
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { describe, expect, it } from "vitest";
-import { SCREENS, type Screen } from "../components/mgr/screens";
+import { INV, SCREENS, type Screen } from "../components/mgr/screens";
 import { E, splitPinned } from "../components/mgr/e";
 import { VenueFrame } from "../components/mgr/venue";
 import { AppShell } from "../components/mgr/app-shell";
@@ -26,7 +26,8 @@ const body = (name: string) => {
   return html;
 };
 
-/** The same body as plain text, tags stripped — what a reader would see. */
+/** The same body as plain text, tags stripped — what a reader would see.
+ *  Goes through the `body` memo, so a screen asserted twice renders once. */
 const text = (name: string) => body(name).replace(/<[^>]*>/g, " ");
 
 describe("SCREENS", () => {
@@ -98,6 +99,76 @@ describe("SCREENS", () => {
     expect(ferm).toContain("Total 18 days");
     expect(ferm).toMatch(/dry hop day 4 falls in Primary/);
     expect(ferm).toContain("Add stage");
+  });
+
+  it("shows a SKU the barcode its group resolves, and never claims to own one", () => {
+    const sku = SCREENS.find((s) => s.name === "SKU")!;
+    expect(sku.spec).not.toMatch(/UPC\/provider mappings/);
+    expect(String(sku.spec)).toMatch(/price group/i);
+    expect(text("SKU")).toContain("Barcode");
+    expect(text("SKU")).toContain(INV.upc);
+  });
+
+  it("lets a recipe parent suggest a price group without pricing a version", () => {
+    const recipe = SCREENS.find((s) => s.name === "Recipe")!;
+    expect(text("Recipe")).toContain("Default price group");
+    expect(text("Recipe")).toMatch(/pre-fill/i);
+    expect(String(recipe.writes)).not.toMatch(/price/i);
+  });
+
+  it("gives a price group a cost ceiling and a barcode per format", () => {
+    const group = SCREENS.find((s) => s.name === "Price group")!;
+    const drawn = text("Price group");
+    expect(drawn).toContain("Cost ceiling");
+    expect(drawn).toMatch(/suggest/i);
+    expect(drawn).toContain("UPC");
+    expect(drawn).toContain(INV.upc);
+    // A keg carries no retail code and that is permanent, not unfinished
+    // setup, so the empty cell reads "none" and earns no states entry.
+    expect(drawn).toContain("none");
+    expect((group.states ?? []).map(([name]) => name)).not.toContain("no barcode");
+  });
+
+  // "Tier" is claimed vocabulary three times over — a distributor's product
+  // type, v1's COGS band, and this app's customer price list — so the concept
+  // is a price group wherever a person reads it. The rule spans every copy
+  // surface, not just SCREENS: it first went stale in the API reference, where
+  // "price list" had wrapped across a line and a line-oriented sweep could not
+  // see it. Hence the file sweep below, whitespace-normalized. Wire names
+  // (price_list, priceList) are the shipped contract and keep their spelling.
+  it("names the pricing surfaces price groups, never tiers", () => {
+    const names = SCREENS.map((s) => s.name);
+    expect(names).toContain("Price groups");
+    expect(names).toContain("Price group");
+    expect(names).not.toContain("Price lists");
+    expect(names).not.toContain("Price tiers");
+  });
+
+  it("keeps the retired pricing words out of every copy surface", () => {
+    // Every surface a person reads. "price list"/"price tier" is retired
+    // everywhere; the bare word "tier" is judged only where all the text is
+    // user copy, because lib/ uses it correctly for resolver precedence.
+    const copyOnly = [
+      "components/mgr/screens.tsx", "content/docs/staff-guide.mdx", "content/docs/api.mdx",
+      "app/(app)/pricing/page.tsx", "app/(app)/customers/page.tsx",
+      "app/(app)/customers/[id]/page.tsx", "app/(app)/customers/customer-form.tsx",
+      "app/(app)/pricing/price-list-form.tsx", "app/(app)/invoices/[id]/credit-memo-form.tsx",
+      "app/(app)/settings/channels/page.tsx",
+      "app/(app)/settings/channels/delete-channel-button.tsx",
+    ];
+    const alsoCode = [...copyOnly, "lib/mgr/nav.ts", "lib/mgr/screen-links.ts",
+      "lib/commands/customers.ts", "lib/commands/portal.ts"];
+    // Wire names are the shipped contract and keep the old spelling.
+    const prose = (file: string) =>
+      readFileSync(resolve(__dirname, "..", file), "utf8")
+        .replace(/price_list\w*|priceList\w*|PriceList\w*|price-list[\w-]*/g, " ")
+        .replace(/\s+/g, " ");
+    for (const file of alsoCode) {
+      expect(prose(file), `${file}: retired pricing word`).not.toMatch(/price (list|tier)/i);
+    }
+    for (const file of copyOnly) {
+      expect(prose(file), `${file}: retired word "tier"`).not.toMatch(/\btiers?\b/i);
+    }
   });
 
   it("gives Search and Entity picker a labeled command input and grouped results", () => {
@@ -192,7 +263,7 @@ describe("SCREENS", () => {
       expect.soft(screen?.surface, name).toBe(surface);
     }
     const bodyText = (name: string) => renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === name)!.body));
-    for (const destination of ["Vendors", "Sale channels", "Formats", "Price tiers", "Bins", "Chat"]) {
+    for (const destination of ["Vendors", "Sale channels", "Formats", "Price group", "Bins", "Chat"]) {
       expect.soft(bodyText("More"), destination).toContain(destination);
     }
     expect(bodyText("Team")).not.toContain("Remove selected member");
@@ -204,7 +275,7 @@ describe("SCREENS", () => {
     const sheets = ["Invite portal user", "Fix mapping", "Package BOM", "SKU", "Brand approval", "State registration", "License", "Channel", "Format", "Override", "Bin"];
     for (const name of sheets) expect.soft(SCREENS.find((s) => s.name === name)?.surface, name).toBe("sheet");
     expect(SCREENS.find((s) => s.name === "Invoice")?.surface).toBeUndefined();
-    for (const name of ["Customers", "Invoices", "Catalog", "Vendors", "Compliance registry", "Sale channels", "Formats", "Price tiers", "Location bins"]) {
+    for (const name of ["Customers", "Invoices", "Catalog", "Vendors", "Compliance registry", "Sale channels", "Formats", "Price group", "Location bins"]) {
       const html = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === name)!.body));
       expect.soft(html, `${name}: inline save`).not.toMatch(/>Save[^<]*<\/button>/);
     }
@@ -299,7 +370,7 @@ describe("SCREENS", () => {
     const venue = renderToStaticMarkup(VenueFrame({ venue: pushed.venue!, children: pushed.body }));
     expect(venue).toContain("9/3/26");
     expect(venue).not.toContain("9/11/26");
-    const tier = SCREENS.find((s) => s.name === "Price tiers")!;
+    const tier = SCREENS.find((s) => s.name === "Price group")!;
     const tierText = renderToStaticMarkup(createElement("div", null, tier.body)).replace(/<[^>]*>/g, " ");
     expect(tierText).toContain("$150.00");
     expect(tierText).not.toContain("$185.00");
@@ -700,7 +771,7 @@ describe("SCREENS", () => {
       ["Locations", "Add location"], ["Finished goods", "Add SKU"], ["Customers", "Add customer"],
       ["Catalog", "Add brand"], ["SKU list", "Add SKU"], ["Cellar map", "Add vessel"],
       ["Materials on hand", "Add material"], ["Vendors", "Add vendor"], ["Materials", "Add material"],
-      ["Contracts", "Add contract"], ["Recipes", "Create recipe"], ["Price lists", "Create price list"],
+      ["Contracts", "Add contract"], ["Recipes", "Create recipe"], ["Price groups", "Create price group"],
     ] as const) {
       const html = body(name);
       expect(html, name).toMatch(new RegExp(`md:flex-row[^>]*>[\\s\\S]*${action}`));

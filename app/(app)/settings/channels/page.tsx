@@ -4,7 +4,7 @@
 // add/edit go through upsert_sale_channel and removal through
 // delete_sale_channel, both admin-only. Wholesale is pinned by name
 // (private.ship_order_impl looks it up that way) so it can be neither renamed
-// nor deleted, and a channel a movement or price list references cannot be
+// nor deleted, and a channel a movement or price group references cannot be
 // deleted either — both refusals surface inline. Failures throw to the (app)
 // error boundary.
 import { getActiveBrewery } from "@/lib/brewery";

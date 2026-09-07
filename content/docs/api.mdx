@@ -395,8 +395,8 @@ does not fail. It is simply ignored, because two sources for one number is how
 ledgers drift. Read the computed value back rather than assuming yours was used.
 
 Prices on order lines are snapshotted at creation from the customer's price
-list. You do not send them, and changing a price list later does not rewrite an
-existing order.
+group. You do not send them, and changing a price group later does not rewrite
+an existing order.
 
 ### Nothing is edited in place [#append-only]
 
@@ -568,7 +568,7 @@ The screens need them and the backend has not built them, so calling one returns
 
 An order moves `draft → submitted → confirmed → picked → shipped`, or
 `cancelled` any time before shipping. Line items are `{ skuId, qty }` and prices
-are snapshotted from the customer's price list when the order is created, so a
+are snapshotted from the customer's price group when the order is created, so a
 later price change never rewrites an existing order. Mutations return
 `{ order_id }` unless noted otherwise.
 
@@ -1338,8 +1338,12 @@ carrying `unitsPerCase` and `bblPerUnit`. `bblPerUnit` is a numeric string, not 
 float, so a barrel figure never picks up binary rounding on its way to a tax
 form.
 
-Prices live on price lists rather than on SKUs. A customer references a price
-list, and `set_price` sets one SKU's `unitPriceCents` on it as an integer.
+Prices live on price groups rather than on SKUs. A customer references a price
+group, and `set_price` sets one SKU's `unitPriceCents` in it as an integer.
+
+The wire names keep `price_list` (`upsert_price_list`, `set_price_list_item`,
+and the rest). That spelling is the shipped contract and does not change; the
+concept it names is a price group.
 
 {/* ops:catalog */}
 
@@ -1417,7 +1421,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales
 
-Price lists with the channel they price for, their format defaults and per-SKU overrides
+Price groups with the channel they price for, their format defaults and per-SKU overrides
 
 Takes no input.
 
@@ -1462,7 +1466,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Set a price list's default price for a format (integer cents); every SKU on that format sells at it unless overridden
+Set a price group's default price for a format (integer cents); every SKU on that format sells at it unless overridden
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -1481,7 +1485,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Override one SKU's price on a price list (integer cents); without an override the SKU sells at the tier's format default
+Override one SKU's price in a price group (integer cents); without an override the SKU sells at the group's format default
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -1524,7 +1528,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Create or edit a price list: its name and the sale channel it prices for
+Create or edit a price group: its name and the sale channel it prices for
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -1568,7 +1572,7 @@ The screens need them and the backend has not built them, so calling one returns
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
-| `get_price_list` | query | Price tiers, Override |
+| `get_price_list` | query | Price group, Override |
 | `get_sku` | query | SKU |
 | `update_sku` | command | Catalog, Brand, SKU |
 
@@ -1577,7 +1581,7 @@ The screens need them and the backend has not built them, so calling one returns
 ### Customers [#customers]
 
 A customer is a distributor, retailer, brewery, or other account, carrying a
-two-letter `state`, an optional price list, licence number, and payment terms.
+two-letter `state`, an optional price group, licence number, and payment terms.
 `upsert_customer` creates when `id` is omitted and updates when it is present.
 
 Ship-to addresses matter beyond delivery. The state on the ship-to drives excise
@@ -1631,7 +1635,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Customers alphabetical with price list name
+Customers alphabetical with price group name
 
 Takes no input.
 

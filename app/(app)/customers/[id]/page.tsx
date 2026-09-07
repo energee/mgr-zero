@@ -50,7 +50,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           <div className="text-sm text-muted-foreground">
             {customer.type} · {customer.state} · {customer.payment_terms}
             {customer.license_no ? ` · license ${customer.license_no}` : ""}
-            {customer.price_lists?.name ? ` · price list: ${customer.price_lists.name}` : ""}
+            {customer.price_lists?.name ? ` · price group: ${customer.price_lists.name}` : ""}
           </div>
         </div>
         <div className="flex items-center gap-2">

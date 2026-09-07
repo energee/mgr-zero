@@ -1,4 +1,4 @@
-// tests/pricing.test.ts — price tiers price formats by default and override per
+// tests/pricing.test.ts — price groups price formats by default and override per
 // SKU (schema §16.4, unification plan D5A). Orders snapshot the override when
 // present, else the format default; a SKU with neither is not priced.
 import { describe, it, expect, beforeAll } from "vitest";
@@ -24,7 +24,7 @@ const draftPrice = async () => {
   return data!.unit_price_cents;
 };
 
-describe("price tiers", () => {
+describe("price groups", () => {
   it("unpriced sku is refused; format default prices it; sku override wins; clearing the override falls back", async () => {
     await expect(draftPrice()).rejects.toThrow(/priced/);
     await runCommand("set_price_list_format", { priceListId, formatId, unitPriceCents: 18000 }, ctx);

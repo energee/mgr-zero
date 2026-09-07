@@ -1,6 +1,6 @@
 // app/(app)/settings/channels/delete-channel-button.tsx — delete_sale_channel.
 // The refusals are product copy, not stack traces: "channel is in use" (a
-// movement or price list references it) and the Wholesale message both come
+// movement or price group references it) and the Wholesale message both come
 // back as CommandError text and render inline beside the row.
 "use client";
 

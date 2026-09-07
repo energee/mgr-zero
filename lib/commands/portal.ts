@@ -53,7 +53,7 @@ defineQuery({
   input: z.object({}),
   handler: async (ctx) => {
     const customerId = requireCustomer(ctx);
-    // RLS limits price tiers to the caller's list and skus to active ones;
+    // RLS limits price groups to the caller's own and skus to active ones;
     // sku_prices already resolves override-or-format-default (§16.4).
     const [prices, avail] = await Promise.all([
       unwrap(ctx.db.from("sku_prices").select("sku_id, sku_name, brand_name, unit_price_cents")),

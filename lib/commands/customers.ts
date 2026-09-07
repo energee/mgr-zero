@@ -41,7 +41,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "upsert_price_list", description: "Create or edit a price list: its name and the sale channel it prices for",
+  name: "upsert_price_list", description: "Create or edit a price group: its name and the sale channel it prices for",
   roles: [...roles],
   input: z.object({ id: z.string().uuid().optional(), name: z.string().min(1), channelId: z.string().uuid() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_price_list", {
@@ -50,7 +50,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "set_price_list_item", description: "Override one SKU's price on a price list (integer cents); without an override the SKU sells at the tier's format default",
+  name: "set_price_list_item", description: "Override one SKU's price in a price group (integer cents); without an override the SKU sells at the group's format default",
   roles: [...roles],
   input: z.object({ priceListId: z.string().uuid(), skuId: z.string().uuid(), unitPriceCents: z.number().int().nonnegative() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_price", {
@@ -69,7 +69,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "set_price_list_format", description: "Set a price list's default price for a format (integer cents); every SKU on that format sells at it unless overridden",
+  name: "set_price_list_format", description: "Set a price group's default price for a format (integer cents); every SKU on that format sells at it unless overridden",
   input: z.object({ priceListId: z.string().uuid(), formatId: z.string().uuid(), unitPriceCents: z.number().int().nonnegative() }),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_price_list_format", {
@@ -87,7 +87,7 @@ defineCommand({
 });
 
 defineQuery({
-  name: "list_customers", description: "Customers alphabetical with price list name",
+  name: "list_customers", description: "Customers alphabetical with price group name",
   roles: ["admin", "sales", "warehouse"],
   input: z.object({}),
   handler: (ctx) => unwrap(ctx.db.from("customers").select("*, price_lists(name)").eq("brewery_id", ctx.breweryId).order("name")),
@@ -105,7 +105,7 @@ defineQuery({
 });
 
 defineQuery({
-  name: "list_price_lists", description: "Price lists with the channel they price for, their format defaults and per-SKU overrides",
+  name: "list_price_lists", description: "Price groups with the channel they price for, their format defaults and per-SKU overrides",
   roles: ["admin", "sales"],
   input: z.object({}),
   handler: (ctx) => unwrap(ctx.db.from("price_lists").select("*, sale_channels(name), price_list_formats(format_id, unit_price_cents, formats(name)), price_list_items(sku_id, unit_price_cents, skus(name))").eq("brewery_id", ctx.breweryId).order("name")),
