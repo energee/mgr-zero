@@ -255,6 +255,13 @@ A **new** `requestId` is a new write, every time. Generating one inside your
 retry loop rather than outside it is the single most common way to create
 duplicate orders, because each attempt then looks like a fresh intention.
 
+This holds for every command that writes through a ledger RPC. Five do not yet:
+`set_notification_preference`, `set_brewery_quiet_hours`,
+`set_notification_destination`, `consume_chat_link_proof`, and
+`unlink_chat_user` still require a `requestId`, but nothing on the server
+checks it — a retry with a different payload lands as `200`, not `409`. Treat
+those five as not-yet-idempotent until this note is removed.
+
 ### Where to generate it [#where]
 
 Generate the id at the moment the user commits — pressing Submit — not when the
@@ -327,7 +334,12 @@ land in are snake_case. Response payloads come back in the database's own shape,
 so a field you send as `skuId` reads back as `sku_id`. That asymmetry is real
 and worth handling in one mapping layer rather than at each call site.
 
-**Ids are UUIDs.** Every id in every operation, without exception.
+**Ids are UUIDs** wherever the id belongs to MGR — every record you create,
+read or reference here. The exception is an id minted by somebody else and
+stored as it arrives: `externalDestinationId` on
+`set_notification_destination` is a Slack channel id, and its field table says
+`string` for that reason. Read the table when it disagrees with this line; it
+is generated from the schema and this sentence is not.
 
 **Money is integer cents.** `unitPriceCents: 1250` is $12.50. There are no
 floats in prices anywhere in the API, because a fraction of a cent that survives
@@ -463,7 +475,7 @@ Mute/unmute one notification reason for yourself and optionally override your qu
 | --- | --- | --- |
 | `reason` | submitted_order or pick_due or delivery_next or fermentation_reading_overdue or operations_digest | yes |
 | `enabled` | boolean | yes |
-| `quietHours` | object | no |
+| `quietHours` | object or null | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -1038,7 +1050,7 @@ Create a sellable format of a product
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_sku", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "productId": "00000000-0000-0000-0000-000000000000", "name": "string", "packageType": "keg", "bblPerUnit": "string" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_sku", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "productId": "00000000-0000-0000-0000-000000000000", "name": "string", "packageType": "keg", "bblPerUnit": "1" } }'
 ```
 
 #### list_price_lists [#list_price_lists]
@@ -1158,6 +1170,11 @@ destination reporting, so an address is a compliance record, not just a label.
 Portal orders ship from one warehouse per brewery, set with
 `set_portal_fulfillment_source`; portal ordering fails until it is set.
 
+`invite_customer_user` is registered but fails closed in this release, like the
+staff invitations it belongs with: it validates its input and then raises,
+writing nothing. Its example below is well-formed and will still return
+`400 bad_request`.
+
 {/* ops:customers */}
 
 #### get_customer [#get_customer]
@@ -1192,7 +1209,7 @@ Invite a customer portal user — not available in this release
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "invite_customer_user", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "email": "string", "customerId": "00000000-0000-0000-0000-000000000000" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "invite_customer_user", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "email": "user@example.com", "customerId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### list_customers [#list_customers]
@@ -1247,7 +1264,7 @@ Create or update a customer account
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_customer", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "type": "distributor", "state": "string" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_customer", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "type": "distributor", "state": "CA" } }'
 ```
 
 #### upsert_ship_to [#upsert_ship_to]
@@ -1271,7 +1288,7 @@ Create or update a ship-to address (state drives excise dest_state)
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_ship_to", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "customerId": "00000000-0000-0000-0000-000000000000", "label": "string", "address1": "string", "city": "string", "state": "string", "zip": "string" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_ship_to", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "customerId": "00000000-0000-0000-0000-000000000000", "label": "string", "address1": "string", "city": "string", "state": "CA", "zip": "string" } }'
 ```
 
 {/* end ops:customers */}
@@ -1572,13 +1589,13 @@ Bulk CSV import — not available in this release
 | Field | Type | Required |
 | --- | --- | --- |
 | `kind` | customers or ship_tos or products_skus or price_list_items or opening_balances | yes |
-| `rows` | array of record | yes |
+| `rows` | array of record of string | yes |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "import_csv", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "kind": "customers", "rows": [ null ] } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "import_csv", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "kind": "customers", "rows": [ { "field": "string" } ] } }'
 ```
 
 #### invite_staff [#invite_staff]
@@ -1596,7 +1613,7 @@ Invite staff — not available in this release
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "invite_staff", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "email": "string", "role": "admin" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "invite_staff", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "email": "user@example.com", "role": "admin" } }'
 ```
 
 #### list_team_members [#list_team_members]
@@ -1623,14 +1640,14 @@ Set the brewery-wide quiet hours (brewery time) that delay every personal chat n
 | Field | Type | Required |
 | --- | --- | --- |
 | `installationId` | uuid | yes |
-| `start` | string | yes |
-| `end` | string | yes |
+| `start` | string or null | yes |
+| `end` | string or null | yes |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_brewery_quiet_hours", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "installationId": "00000000-0000-0000-0000-000000000000", "start": "string", "end": "string" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_brewery_quiet_hours", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "installationId": "00000000-0000-0000-0000-000000000000", "start": "12:00", "end": "12:00" } }'
 ```
 
 ---

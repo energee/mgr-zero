@@ -1,5 +1,5 @@
 // lib/mgr/api-reference.ts — renders one area's operations as the markdown that
-// lives inside content/docs/api/<area>.mdx. Fumadocs extracts its "On this
+// lives inside content/docs/api.mdx. Fumadocs extracts its "On this
 // page" tree from MDX headings at compile time, so a component cannot put an
 // operation in the table of contents: each operation has to be a real heading
 // in the file. Levels are chosen for the TOC's three indents (fumadocs-ui

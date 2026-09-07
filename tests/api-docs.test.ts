@@ -273,6 +273,72 @@ describe("HTTP API reference", () => {
     // a design change, not a rename.
     expect(named.has("delete_sale_channel")).toBe(true);
   });
+
+  // A published example is a promise a caller can copy-paste. sampleValue only
+  // recognised uuid/date/length_equals and fell back to the literal "string"
+  // for every other check, so a schema with an email, a state-code regex, an
+  // HH:MM check or a numeric string documented an example its own handler
+  // rejects (2026-09-06 review).
+  it("generates an example every operation's own schema accepts", () => {
+    for (const tool of listTools()) {
+      const schema = getCommandDefinition(tool.name)?.input;
+      if (!schema) continue;
+      const result = schema.safeParse(sampleInput(schema));
+      expect(result.success, `${tool.name}: ${result.success ? "" : JSON.stringify(result.error?.issues)}`).toBe(true);
+    }
+  });
+
+  // The idempotency contract in the Conventions page is stated as universal,
+  // but only a command whose RPC claims the request id (private.command_requests)
+  // actually honours it; the rest reach the handler on every retry regardless
+  // of payload. Naming the exceptions keeps the promise from being false for
+  // whichever command is registered next without a claiming RPC.
+  it("names every registered command that does not honour the idempotency contract", () => {
+    const page = read("content/docs/api.mdx");
+    const outcomes = page.slice(page.indexOf("### The three outcomes"), page.indexOf("## Errors"));
+    const exempt = ["set_notification_preference", "set_brewery_quiet_hours", "set_notification_destination",
+      "consume_chat_link_proof", "unlink_chat_user"];
+    for (const name of exempt) {
+      expect(listTools().some((t) => t.name === name), `${name} is no longer registered; drop it from this list`).toBe(true);
+      expect(outcomes, `${name} does not claim a request id; the outcomes section must say so`).toContain(`\`${name}\``);
+    }
+  });
+
+  // `null` can be the documented way to use a field — set_brewery_quiet_hours
+  // says "null clears them" — but typeLabel unwrapped `nullable` without
+  // recording it, so the table read `string` / Required `yes` and a caller had
+  // no way to learn that clearing was possible at all (2026-09-06 review).
+  it("says so in the field table when a field accepts null", () => {
+    const schema = getCommandDefinition("set_brewery_quiet_hours")?.input;
+    expect(schema, "set_brewery_quiet_hours is no longer registered").toBeDefined();
+    const fields = fieldsOf(schema!);
+    for (const name of ["start", "end"]) {
+      const field = fields.find((f) => f.name === name);
+      expect(field, `${name} is gone from the schema`).toBeDefined();
+      expect(field!.type, `${name} is hhmm.nullable(); the table must admit null`).toContain("null");
+    }
+    // A field that is not nullable must not claim to be.
+    expect(fields.find((f) => f.name === "installationId")!.type).not.toContain("null");
+    // " or null", never "| null" — the label sits in a Markdown table cell.
+    expect(fields.find((f) => f.name === "start")!.type).not.toContain("|");
+  });
+
+  // Claims the reference makes about itself have to survive a grep, which is
+  // what .agents/agents/http-api.md step 6 tells the maintainer to do. These
+  // two did not: an absolute about ids, and a fail-closed warning that stayed
+  // behind in one area when the operation moved to another.
+  it("makes no claim its own generated tables disprove", () => {
+    const page = read("content/docs/api.mdx");
+    // set_notification_destination.externalDestinationId is a Slack channel
+    // id: z.string().min(1), rendered `string` in its own table 100 lines up.
+    expect(page).not.toContain("Every id in every operation, without exception");
+    // invite_customer_user always raises; it renders under Customers while the
+    // sentence explaining that lives in the Team area's prose.
+    const customers = page.slice(page.indexOf("{/* ops:customers */}"), page.indexOf("{/* end ops:customers */}"));
+    expect(customers, "invite_customer_user is documented here").toContain("invite_customer_user");
+    const invite = page.slice(page.indexOf("#### invite_customer_user"));
+    expect(invite.slice(0, 600), "its example must not read as runnable").toMatch(/not available in this release/);
+  });
 });
 
 // The reference's generated blocks cannot drift — the suite above re-renders

@@ -39,7 +39,7 @@
 | `components/mgr/screens.tsx`, `lib/mgr/screen-links.ts` | ungate Location bins / Bin, storage kind, bin on Record movement, per-location keg rows |
 | `tests/bins.test.ts` (new) | bins table, seeding, RPC guards, ledger invariant, views |
 | `tests/rls-ledger.test.ts`, `tests/schema-conventions.test.ts`, `tests/commands-inventory.test.ts`, `tests/rls-command-boundary.test.ts` | existing writers gain `location_id` / `bin_id` / `binId` |
-| `README.md` § HTTP API, `content/docs/staff-guide.mdx`, `.agents/superpowers/specs/2026-08-31-mgr-schema-design.md`, `.agents/ARCHITECTURE.md` | docs |
+| `content/docs/api.mdx` (via `bun run docs:api` — a `reads`/`writes` name in `components/mgr/screens.tsx` is what adds an operation, never a hand-edit between its `ops:` markers), `content/docs/staff-guide.mdx`, `.agents/superpowers/specs/2026-08-31-mgr-schema-design.md`, `.agents/ARCHITECTURE.md` | docs |
 
 ---
 
