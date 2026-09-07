@@ -13,8 +13,7 @@ const line = z.object({
   skuId: z.string().uuid().optional(), materialId: z.string().uuid().optional(),
   kegPoolId: z.string().uuid().optional(), kegSize: z.string().optional(),
   qty: z.number().positive(), fromBinId: z.string().uuid(), toBinId: z.string().uuid(), note: z.string().optional(),
-}).refine((l) => [l.skuId, l.materialId, l.kegPoolId].filter(Boolean).length === 1, "exactly one of skuId, materialId, kegPoolId")
-  .refine((l) => (l.kegPoolId === undefined) === (l.kegSize === undefined), "kegSize goes with kegPoolId");
+}); // exactly one of skuId / materialId / kegPoolId, and kegSize with kegPoolId: the table checks say so
 
 defineCommand({
   name: "create_stock_transfer", description: "Draft a stock transfer between two locations: sku, material or keg-pool lines, each with a from-bin and a to-bin",

@@ -79,7 +79,7 @@ defineCommand({
     skuId: z.string().uuid().optional(), materialId: z.string().uuid().optional(),
     kegPoolId: z.string().uuid().optional(), kegSize: z.string().optional(),
     qty: z.number().positive(), fromBinId: z.string().uuid(), toBinId: z.string().uuid(), note: z.string().optional(),
-  }).refine((i) => [i.skuId, i.materialId, i.kegPoolId].filter(Boolean).length === 1, "exactly one of skuId, materialId, kegPoolId"),
+  }), // exactly one of skuId / materialId / kegPoolId: the RPC raises
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("move_stock_bin", {
     p_brewery: ctx.breweryId, p_sku: i.skuId ?? null, p_material: i.materialId ?? null, p_keg_pool: i.kegPoolId ?? null, p_keg_size: i.kegSize ?? null,
     p_qty: i.qty, p_from_bin: i.fromBinId, p_to_bin: i.toBinId, p_note: i.note ?? null, p_request_id: execution.requestId,

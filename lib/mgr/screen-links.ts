@@ -302,6 +302,7 @@ export const ROUTES: Record<string, string> = {
   "/orders": "Orders",
   "/pick": "Pick sheet",
   "/replenishment": "Pars and allocation",
+  "/transfers": "Complete transfer",   // the live stock-transfer pages have no own record yet; Complete transfer is the transfer frame
   "/orders#batches": "Batches",
   "/orders#packaging": "Packaging runs",
   "/orders#purchase-orders": "Purchase orders",

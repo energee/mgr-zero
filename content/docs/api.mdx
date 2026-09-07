@@ -173,7 +173,7 @@ omitted. They have no roles until they are built.
 | `create_product` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `create_replenishment_order` | Taproom & kegs | ✓ | ✓ |  |  |  |
 | `create_sku` | Catalog & pricing | ✓ | ✓ |  |  |  |
-| `create_stock_transfer` |  | ✓ |  | ✓ |  |  |
+| `create_stock_transfer` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `daily_pick_sheet` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `delete_bin` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `get_atp` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
@@ -186,7 +186,7 @@ omitted. They have no roles until they are built.
 | `get_order` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `get_portal_account` | Customer portal |  |  |  |  | ✓ |
 | `get_shortfalls` | Today & notifications | ✓ | ✓ | ✓ |  |  |
-| `get_stock_transfer` |  | ✓ | ✓ | ✓ |  |  |
+| `get_stock_transfer` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `get_today` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
 | `import_csv` | Team & brewery settings | ✓ |  |  |  |  |
 | `invite_customer_user` | Customers | ✓ | ✓ |  |  |  |
@@ -201,7 +201,7 @@ omitted. They have no roles until they are built.
 | `list_products` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
 | `list_skus` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
 | `list_standing_allocations` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
-| `list_stock_transfers` |  | ✓ | ✓ | ✓ |  |  |
+| `list_stock_transfers` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `list_team_members` | Team & brewery settings | ✓ | ✓ | ✓ |  |  |
 | `move_stock_bin` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `portal_catalog` | Customer portal |  |  |  |  | ✓ |
@@ -212,7 +212,7 @@ omitted. They have no roles until they are built.
 | `portal_orders` | Customer portal |  |  |  |  | ✓ |
 | `portal_submit_order` | Customer portal |  |  |  |  | ✓ |
 | `portal_update_draft_order` | Customer portal |  |  |  |  | ✓ |
-| `receive_stock_transfer` |  | ✓ |  | ✓ |  |  |
+| `receive_stock_transfer` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `record_movement` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `record_pick` | Orders & invoicing | ✓ |  | ✓ |  |  |
 | `record_stock_transfer_pick` | Orders & invoicing | ✓ |  | ✓ |  |  |
@@ -229,7 +229,7 @@ omitted. They have no roles until they are built.
 | `set_taproom_par` | Taproom & kegs | ✓ | ✓ |  |  |  |
 | `ship_order` | Orders & invoicing | ✓ |  | ✓ |  |  |
 | `submit_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
-| `submit_stock_transfer` |  | ✓ |  | ✓ |  |  |
+| `submit_stock_transfer` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `unlink_chat_user` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
 | `update_bin` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `update_draft_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
@@ -1014,6 +1014,27 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_location", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "kind": "warehouse" } }'
 ```
 
+#### create_stock_transfer [#create_stock_transfer]
+
+`command` · admin, warehouse
+
+Draft a stock transfer between two locations: sku, material or keg-pool lines, each with a from-bin and a to-bin
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `fromLocationId` | uuid | yes |
+| `toLocationId` | uuid | yes |
+| `lines` | array of object | yes |
+| `requestedDate` | date (YYYY-MM-DD) | no |
+| `note` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_stock_transfer", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "fromLocationId": "00000000-0000-0000-0000-000000000000", "toLocationId": "00000000-0000-0000-0000-000000000000", "lines": [ { "qty": 1, "fromBinId": "00000000-0000-0000-0000-000000000000", "toBinId": "00000000-0000-0000-0000-000000000000" } ] } }'
+```
+
 #### delete_bin [#delete_bin]
 
 `command` · admin, warehouse
@@ -1083,6 +1104,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_on_hand", "input": {} }'
 ```
 
+#### get_stock_transfer [#get_stock_transfer]
+
+`query` · admin, sales, warehouse
+
+One stock transfer with its lines, location and bin names
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `transferId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_stock_transfer", "input": { "transferId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 #### list_bins [#list_bins]
 
 `query` · admin, sales, warehouse
@@ -1133,6 +1171,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_movements", "input": {} }'
 ```
 
+#### list_stock_transfers [#list_stock_transfers]
+
+`query` · admin, sales, warehouse
+
+Stock transfers, newest first, with their lines
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `status` | draft or submitted or picked or in_transit or received or cancelled | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_stock_transfers", "input": {} }'
+```
+
 #### move_stock_bin [#move_stock_bin]
 
 `command` · admin, warehouse
@@ -1157,6 +1212,24 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "move_stock_bin", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "qty": 1, "fromBinId": "00000000-0000-0000-0000-000000000000", "toBinId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
+#### receive_stock_transfer [#receive_stock_transfer]
+
+`command` · admin, warehouse
+
+Receive a picked transfer: paired volume-neutral ledger rows per line (FG, material or kegs) in one transaction; the transfer becomes received
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `transferId` | uuid | yes |
+| `lines` | array of object | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "receive_stock_transfer", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "transferId": "00000000-0000-0000-0000-000000000000", "lines": [ { "lineId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
+```
+
 #### record_movement [#record_movement]
 
 `command` · admin, warehouse
@@ -1179,6 +1252,23 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_movement", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "skuId": "00000000-0000-0000-0000-000000000000", "locationId": "00000000-0000-0000-0000-000000000000", "binId": "00000000-0000-0000-0000-000000000000", "qty": 1, "type": "opening_balance" } }'
+```
+
+#### submit_stock_transfer [#submit_stock_transfer]
+
+`command` · admin, warehouse
+
+Submit a draft stock transfer
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `transferId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "submit_stock_transfer", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "transferId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### update_bin [#update_bin]
@@ -1222,7 +1312,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* inventory-designed */}
 
-13 of the 14 operations in this area are available today; the 1 below are not.
+18 of the 19 operations in this area are available today; the 1 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 

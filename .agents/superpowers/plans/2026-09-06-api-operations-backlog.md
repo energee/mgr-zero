@@ -127,7 +127,7 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `raise_invoice_question` | command | Question invoice |
 | `resolve_invoice_question` | command | Invoice |
 | `write_off_invoice` | command | Invoices |
-## Inventory & locations: 1 to build, 13 built
+## Inventory & locations: 1 to build, 18 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
