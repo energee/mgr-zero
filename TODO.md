@@ -53,7 +53,8 @@ tests.
 - [ ] Program 10 — explorer parity merged
 - [ ] Program 11 — access and import merged
 - [ ] Program 16 — chat settings merged
-- [ ] Program 12 — taproom truth merged (confirm the four §16.16 defaults in the remainder plan first)
+- [ ] Per-role RLS spec for the `taproom` role (§16.16 q3, decided 2026-09-07: the role ships with it) — written and reviewed before Program 12
+- [ ] Program 12 — taproom truth merged (§16.16 decided 2026-09-07: brand-owned poured formats as name + ounces, three fill chips, guest kegs by label + nominal size)
 - [ ] Program 13 — QuickBooks merged
 - [ ] Program 15 — composer merged
 - [ ] Program 14 — Square and menu merged
