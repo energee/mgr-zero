@@ -41,6 +41,9 @@ consolidation: make the living agent docs match reality, citing evidence.
   rewrite its one line to the new state. When the PR description says the
   workstream is finished, or absorbed by a program in `TODO.md`, move the
   line to Done with the date and drop it from Now.
+- `TODO.md` is the roadmap checklist. When a merged PR's description names a
+  program or item listed there, move that line to its Done section with the
+  date and PR number; never tick a box in place.
 - Feature PRs do not edit the logs themselves (AGENTS.md step 6); the PR
   description carries the progress note and any durable decision. Treat that
   text as the primary input for `PROGRESS.md` and `MEMORY.md`.

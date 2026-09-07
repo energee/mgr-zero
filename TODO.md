@@ -2,8 +2,10 @@
 
 Index written 2026-09-07 against `main` @ `b3f6a91` (Programs 0–4b merged) with
 Program 5 open as PR #194 on `lane-production`. This is the checklist; each
-program's own plan holds the tasks. Tick a box here only when the program's PR
-is merged and its screens are ungated in `components/mgr/screens.tsx`.
+program's own plan holds the tasks. An item is done when its PR is merged and
+its screens are ungated in `components/mgr/screens.tsx`; move it to Done at the
+bottom with the date and PR, don't tick it. The dreaming workflow does this
+from merged PR descriptions.
 
 Counts come from a source read of the 167 MGR (non-venue) inventory screens
 against `app/`: 55 live, 13 partial, 32 missing but ungated, 67 gated.
@@ -104,3 +106,7 @@ Programs 13, 14, 16 implement the actions they describe.
 - [ ] Vercel project and env (ask first)
 - [ ] README's login → catalog → inventory verification on the hosted project
 - [ ] Database-backed suites green in CI on every merge above
+
+## Done
+
+- 2026-09-07 — Programs 0–4b: harness, ordering pilot, locations/bins/transfers, catalog identity, sale channels, pricing grid (#185)
