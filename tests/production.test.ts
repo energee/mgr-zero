@@ -3,7 +3,7 @@
 // material later never moves an old version's predicted gravity. get_recipe
 // computes OG/FG/ABV in TypeScript (lib/recipe-gravity.ts), never in SQL.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, makeBrewery, makeStaffCtx, sql } from "./helpers";
+import { admin, makeBrewery, makeStaffCtx, seedCatalog, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import { recipeGravity } from "@/lib/recipe-gravity";
 import "@/lib/commands/all";
@@ -153,5 +153,100 @@ describe("vessels, scheduling and brew day", () => {
     // list_batches shows the open vessel on the brewed batch.
     const after = (await runCommand("list_batches", {}, ctx)) as { id: string; vessel_name: string | null }[];
     expect(after.find((r) => r.id === batch.id)?.vessel_name).toBe("FV-1");
+  });
+});
+
+// A backdated brew day is the case `ended_at is null` misses: the vessel is
+// empty *now*, but the day being recorded falls inside a stretch it was full.
+// The pre-check uses the same range predicate as the gist exclusion, so this
+// reports `occupied` rather than dying on the raw constraint name.
+describe("brew day overlaps a closed occupancy", () => {
+  it("refuses a backdated brew inside a closed stretch, and allows one after it", async () => {
+    const vessel = (await runCommand("upsert_vessel", { name: "FV-BACKDATE", kind: "fermenter", capacityBbl: 30 }, ctx)) as { id: string };
+    const first = (await runCommand("schedule_batch", { plannedOn: "2026-10-01", plannedBbl: 30 }, ctx)) as { id: string };
+    await runCommand("record_brew_day", { batchId: first.id, vesselId: vessel.id, initialBbl: 30, brewedOn: "2026-10-01" }, ctx);
+
+    // No close RPC exists yet (that is the cellar-transfer task), so end the
+    // occupancy directly: the vessel is empty from 10-05 on.
+    sql(`update vessel_occupancies set ended_at = timestamptz '2026-10-05'
+         where batch_id = '${first.id}' and ended_at is null`, true);
+
+    const backdated = (await runCommand("schedule_batch", { plannedOn: "2026-10-03", plannedBbl: 30 }, ctx)) as { id: string };
+    await expect(runCommand("record_brew_day",
+      { batchId: backdated.id, vesselId: vessel.id, initialBbl: 30, brewedOn: "2026-10-03" }, ctx))
+      .rejects.toThrow(/occupied/);
+
+    // A brew day after the stretch closed is fine, and leaves brewed_on unset
+    // on the batch that was refused above.
+    await runCommand("record_brew_day", { batchId: backdated.id, vesselId: vessel.id, initialBbl: 28, brewedOn: "2026-10-06" }, ctx);
+    const day = (await runCommand("get_brew_day", { batchId: backdated.id }, ctx)) as {
+      batch: { brewed_on: string }; occupancy: { initial_bbl: number } | null;
+    };
+    expect(day.batch.brewed_on).toBe("2026-10-06");
+    expect(day.occupancy).toMatchObject({ initial_bbl: 28 });
+  });
+});
+
+// Tenancy and roles. Every id these RPCs accept is matched against p_brewery,
+// so another brewery's vessel, brand, recipe version or batch reads as missing
+// rather than leaking that it exists.
+describe("vessels and batches refuse other tenants and other roles", () => {
+  let other: { id: string };
+  let otherCtx: Awaited<ReturnType<typeof makeStaffCtx>>;
+  let otherVessel: string;
+  let otherBrand: string;
+  let otherRecipeVersion: string;
+  let otherBatch: string;
+
+  beforeAll(async () => {
+    other = await makeBrewery();
+    otherCtx = await makeStaffCtx(other.id, "brewer");
+    otherVessel = ((await runCommand("upsert_vessel", { name: "Their FV", kind: "fermenter", capacityBbl: 20 }, otherCtx)) as { id: string }).id;
+    otherBrand = (await seedCatalog(other.id)).brandId;
+    otherBatch = ((await runCommand("schedule_batch", { plannedOn: "2026-10-01", plannedBbl: 20 }, otherCtx)) as { id: string }).id;
+
+    const { data: m, error } = await admin.from("materials").insert({
+      brewery_id: other.id, name: "Their Malt", category: "malt", base_uom: "lb", purchase_uom: "lb", extract_potential: 1.037,
+    }).select("id").single();
+    if (error) throw error;
+    const recipe = (await runCommand("create_recipe", { name: "Their Recipe" }, otherCtx)) as { id: string };
+    otherRecipeVersion = ((await runCommand("create_recipe_version", {
+      recipeId: recipe.id, mashTempF: 152, brewhouseEfficiency: 0.75, yeastAttenuation: 0.78,
+      ingredients: [{ materialId: m.id as string, perBblQty: 60, stage: "mash" }],
+    }, otherCtx)) as { id: string }).id;
+  });
+
+  it("refuses another brewery's vessel, brand, recipe version and batch", async () => {
+    await expect(runCommand("upsert_vessel",
+      { id: otherVessel, name: "Stolen", kind: "fermenter", capacityBbl: 20 }, ctx)).rejects.toThrow(/vessel not found/);
+
+    await expect(runCommand("schedule_batch",
+      { intendedBrandId: otherBrand, plannedOn: "2026-10-01", plannedBbl: 10 }, ctx)).rejects.toThrow(/brand not found/);
+    await expect(runCommand("schedule_batch",
+      { recipeVersionId: otherRecipeVersion, plannedOn: "2026-10-01", plannedBbl: 10 }, ctx)).rejects.toThrow(/recipe version not found/);
+
+    const mine = (await runCommand("schedule_batch", { plannedOn: "2026-10-01", plannedBbl: 10 }, ctx)) as { id: string };
+    await expect(runCommand("record_brew_day",
+      { batchId: mine.id, vesselId: otherVessel, initialBbl: 10, brewedOn: "2026-10-01" }, ctx)).rejects.toThrow(/vessel not found/);
+
+    const myVessel = (await runCommand("upsert_vessel", { name: "FV-TENANCY", kind: "fermenter", capacityBbl: 20 }, ctx)) as { id: string };
+    await expect(runCommand("record_brew_day",
+      { batchId: otherBatch, vesselId: myVessel.id, initialBbl: 10, brewedOn: "2026-10-01" }, ctx)).rejects.toThrow(/batch not found/);
+
+    // Neither brewery's rows moved: the other batch is still unbrewed.
+    const theirs = (await runCommand("get_brew_day", { batchId: otherBatch }, otherCtx)) as { batch: { brewed_on: string | null } };
+    expect(theirs.batch.brewed_on).toBeNull();
+  });
+
+  it("refuses sales, which is neither admin nor brewer", async () => {
+    const sales = await makeStaffCtx(b.id, "sales");
+    await expect(runCommand("upsert_vessel", { name: "Sales FV", kind: "fermenter", capacityBbl: 10 }, sales))
+      .rejects.toThrow(/permission denied/);
+    await expect(runCommand("schedule_batch", { plannedOn: "2026-10-01", plannedBbl: 10 }, sales))
+      .rejects.toThrow(/permission denied/);
+    await expect(runCommand("record_brew_day",
+      { batchId: crypto.randomUUID(), vesselId: crypto.randomUUID(), initialBbl: 10, brewedOn: "2026-10-01" }, sales))
+      .rejects.toThrow(/permission denied/);
+    await expect(runCommand("list_batches", {}, sales)).rejects.toThrow(/permission denied/);
   });
 });

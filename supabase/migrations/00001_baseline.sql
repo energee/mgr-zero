@@ -3270,7 +3270,8 @@ end $$;
 -- thinks in days, and the gist exclusion on (vessel_id, tstzrange) then reads
 -- as "this vessel was this batch's from that day on". The vessel row is locked
 -- first so two concurrent brews queue rather than race the constraint, and the
--- open-occupancy check can report `occupied` instead of a constraint name.
+-- overlap check — the same range predicate the constraint uses — can report
+-- `occupied` instead of a constraint name.
 create function record_brew_day(
   p_brewery uuid, p_batch uuid, p_vessel uuid, p_initial_bbl numeric, p_brewed_on date, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
@@ -3287,8 +3288,14 @@ begin
   select * into v_batch from public.batches where id = p_batch and brewery_id = p_brewery for update;
   if v_batch.id is null then raise exception 'batch not found'; end if;
   if v_batch.brewed_on is not null then raise exception 'batch % was already brewed on %', v_batch.batch_no, v_batch.brewed_on; end if;
-  if exists (select 1 from public.vessel_occupancies o where o.vessel_id = p_vessel and o.ended_at is null)
-    then raise exception 'vessel % is occupied; empty it first', v_vessel.name; end if;
+  -- Exactly the predicate the gist exclusion enforces, so a backdated brew day
+  -- that lands inside a *closed* occupancy still gets this readable error
+  -- rather than the raw constraint name. `ended_at is null` alone would miss it.
+  if exists (
+    select 1 from public.vessel_occupancies o
+    where o.vessel_id = p_vessel
+      and tstzrange(o.started_at, o.ended_at) && tstzrange(p_brewed_on::timestamptz, null)
+  ) then raise exception 'vessel % is occupied on %; empty it first', v_vessel.name, p_brewed_on; end if;
 
   update public.batches set brewed_on = p_brewed_on where id = p_batch returning * into v_batch;
   insert into public.vessel_occupancies (brewery_id, vessel_id, batch_id, started_at, initial_bbl)

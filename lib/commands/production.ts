@@ -148,8 +148,9 @@ defineCommand({
 });
 
 // One call: it stamps batches.brewed_on and opens the vessel occupancy that
-// makes the beer findable. Brewing into a vessel that still holds an open
-// occupancy is refused — empty it (transfer or package) first.
+// makes the beer findable. Brewing into a vessel whose occupancy overlaps the
+// brew day is refused — including a backdated day that falls inside a stretch
+// the vessel was full but has since been emptied.
 defineCommand({
   name: "record_brew_day", description: "Record that a scheduled batch was brewed: stamps the brew date and moves it into a vessel that is not already occupied",
   input: z.object({
