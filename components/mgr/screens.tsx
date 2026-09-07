@@ -296,13 +296,13 @@ export const SCREENS: Screen[] = [
     step: 1, slice: "all", group: "Global", surface: "sheet", name: "Search", job: "Search every permitted entity kind",
     reads: "search_entities [design]", writes: "none",
     states: [["empty", "No matches · change the term"], ["loading", "row-shaped skeletons"], ["offline", "cached matches only", 1], ["permission", "Results honor row access"], ["document number", "ORD-0231 matches exactly and sorts first"]],
-    spec: "One registered search across the entity kinds the caller's role can read; the chips narrow what is already permitted and never widen it, and RLS decides the rows either way, so a term matching a customer the caller cannot see returns nothing rather than a redacted row. A document number (ORD-0231, INV-1042, L-240831-HZ) matches exactly and sorts above name matches, because someone typing one is holding it in their hand; names match on prefix. This is also where history lives: a run closed months ago leaves the Work list and is found here.",
+    spec: "One registered search across the entity kinds the caller's role can read; results are grouped by kind and arrow keys move between matches; filtering never widens what is permitted, and RLS decides the rows either way, so a term matching a customer the caller cannot see returns nothing rather than a redacted row. A document number (ORD-0231, INV-1042, L-240831-HZ) matches exactly and sorts above name matches, because someone typing one is holding it in their hand; names match on prefix. This is also where history lives: a run closed months ago leaves the Work list and is found here.",
     body: (<>
-      {E.search()}
-      {E.chips(["all", "SKU", "order", "lot"], 0)}
-      {E.nav("Hazy IPA · ½ bbl", "SKU · ATP 11", "", BeerIcon)}
-      {E.nav("ORD-0231 · Ridgeline", "order · 4 × Hazy", "", Package01Icon)}
-      {E.nav("L-240831-HZ", "lot · packaged 8/31", "", TaskDone01Icon)}
+      {E.palette("Search", [
+        { heading: "SKUs", items: [["Hazy IPA · ½ bbl", "ATP 11"]] },
+        { heading: "Orders", items: [["ORD-0231 · Ridgeline", "4 × Hazy"]] },
+        { heading: "Lots", items: [["L-240831-HZ", "packaged 8/31"]] },
+      ])}
     </>),
   },
   {
@@ -808,13 +808,13 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     spec: "48px rows; visible keyboard focus; one registered search behind the field.",
     body: (<>
-      {E.search()}
-      {E.ttl("Recent")}
-      {E.row("Hazy IPA · ½ bbl keg", "11 ready")}
-      {E.row("Pils · 16 oz case", "6 short", "", "w")}
-      {E.row("Stout · ⅙ bbl keg", "7 ready")}
-      {E.ttl("All SKUs")}
-      {E.blank("A–Z")}
+      {E.palette("Search SKUs", [
+        { heading: "Recent", items: [["Hazy IPA · ½ bbl keg", "11 ready", "←"]] },
+        { heading: "All SKUs", items: [
+          ["Pils · 16 oz case", "6 short", "←"],
+          ["Stout · ⅙ bbl keg", "7 ready", "←"],
+        ] },
+      ])}
     </>),
   },
   {

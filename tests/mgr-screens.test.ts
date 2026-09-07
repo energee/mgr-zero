@@ -27,6 +27,22 @@ const body = (name: string) => {
 };
 
 describe("SCREENS", () => {
+  it("gives Search and Entity picker a labeled command input and grouped results", () => {
+    for (const name of ["Search", "Entity picker"]) {
+      expect(body(name)).toContain('cmdk-input=""');
+      expect(body(name)).toContain('role="combobox"');
+      expect(body(name)).toContain('cmdk-list=""');
+      expect(body(name)).toContain('cmdk-group-heading=""');
+    }
+  });
+
+  it("keeps picker selection a return action and availability readable", () => {
+    expect(body("Entity picker").match(/data-to="←"/g)).toHaveLength(3);
+    expect(body("Entity picker")).toContain("6 short");
+    expect(body("Entity picker")).toContain("Recent");
+    expect(body("Entity picker")).toContain("All SKUs");
+  });
+
   it("ports the step-1 frames with names, jobs and IO", () => {
     const step1 = SCREENS.filter((s) => s.step === 1);
     expect(step1.map((s) => s.name)).toEqual([
