@@ -825,7 +825,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse
 
-Ship a picked order: movements + allocation fulfillment + invoice, one transaction
+Ship a picked order: movements + allocation fulfillment + invoice (now, or deferred to confirm_delivery), one transaction; anything held back below picked flags a restock
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -833,6 +833,7 @@ Ship a picked order: movements + allocation fulfillment + invoice, one transacti
 | `ship` | array of object | yes |
 | `carrier` | string | no |
 | `tracking` | string | no |
+| `invoiceTiming` | now or on_delivery | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

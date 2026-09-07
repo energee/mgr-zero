@@ -244,3 +244,38 @@ describe("resolve_short_pick", () => {
     expect(blank.error?.message).toMatch(/reason/);
   });
 });
+
+describe("ship invoice timing", () => {
+  it("on_delivery ship posts movements and no invoice", async () => {
+    const id = await confirmedOrder(4);
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 4 }], p_request_id: crypto.randomUUID() });
+    const { data, error } = await staffDb.rpc("ship_order", {
+      p_order: id, p_ship: [{ line_id: line.id, qty_shipped: 4 }],
+      p_carrier: null, p_tracking: null, p_invoice_timing: "on_delivery",
+      p_request_id: crypto.randomUUID(),
+    });
+    expect(error).toBeNull();
+    expect((data as { invoice_id: string | null }).invoice_id).toBeNull();
+    const { data: sh } = await admin.from("shipments").select("id, invoice_timing").eq("order_id", id).single();
+    expect(sh!.invoice_timing).toBe("on_delivery");
+    const { data: invs } = await admin.from("invoices").select("id").eq("shipment_id", sh!.id);
+    expect(invs!.length).toBe(0);
+    const { data: mv } = await admin.from("inventory_movements").select("type").eq("ref", id);
+    expect(mv!.map((m) => m.type)).toEqual(["sale_removal"]);
+  });
+
+  it("short ship below picked sets needs_restock", async () => {
+    const id = await confirmedOrder(10);
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 10 }], p_request_id: crypto.randomUUID() });
+    const { error } = await staffDb.rpc("ship_order", {
+      p_order: id, p_ship: [{ line_id: line.id, qty_shipped: 9 }],
+      p_carrier: null, p_tracking: null, p_invoice_timing: "now",
+      p_request_id: crypto.randomUUID(),
+    });
+    expect(error).toBeNull();
+    const { data: o } = await admin.from("orders").select("needs_restock").eq("id", id).single();
+    expect(o!.needs_restock).toBe(true);
+  });
+});

@@ -889,6 +889,8 @@ create table shipments (
   order_id uuid not null unique,                       -- one shipment per order; remainder is cancelled
   shipped_at timestamptz not null default now(),
   carrier text, tracking text,
+  -- 'now' invoices at ship; 'on_delivery' waits for confirm_delivery
+  invoice_timing text not null default 'now' check (invoice_timing in ('now','on_delivery')),
   created_by uuid not null references auth.users(id),
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
@@ -1623,7 +1625,7 @@ begin
   return jsonb_build_object('order_id', p_order);
 end $$;
 
-create function private.ship_order_impl(p_order uuid, p_ship jsonb, p_carrier text, p_tracking text) returns jsonb
+create function private.ship_order_impl(p_order uuid, p_ship jsonb, p_carrier text, p_tracking text, p_invoice_timing text default 'now') returns jsonb
 language plpgsql set search_path = '' as $$
 declare o public.orders; sp record; v_state text; v_invoice uuid; v_shipment uuid;
 begin
@@ -1640,12 +1642,14 @@ begin
   ) then
     raise exception 'ship list must cover every order line';
   end if;
-  insert into public.shipments (brewery_id, order_id, carrier, tracking, created_by)
-  values (o.brewery_id, p_order, p_carrier, p_tracking, auth.uid()) returning id into v_shipment;
+  insert into public.shipments (brewery_id, order_id, carrier, tracking, invoice_timing, created_by)
+  values (o.brewery_id, p_order, p_carrier, p_tracking, coalesce(p_invoice_timing, 'now'), auth.uid()) returning id into v_shipment;
   if o.kind = 'wholesale' then
     select state into v_state from public.ship_tos where id = o.ship_to_id;
-    -- Empty-invoice guard: only create invoice if at least one line ships qty > 0
-    if exists (select 1 from jsonb_array_elements(p_ship) e where (e->>'qty_shipped')::numeric > 0) then
+    -- Empty-invoice guard: only create invoice if at least one line ships qty > 0;
+    -- on_delivery defers the invoice to confirm_delivery
+    if coalesce(p_invoice_timing, 'now') = 'now'
+       and exists (select 1 from jsonb_array_elements(p_ship) e where (e->>'qty_shipped')::numeric > 0) then
     insert into public.invoices (brewery_id, kind, customer_id, shipment_id, issued_on)
     values (o.brewery_id, 'invoice', o.customer_id, v_shipment, current_date)
     returning id into v_invoice;
@@ -1658,9 +1662,11 @@ begin
         insert into public.inventory_movements (brewery_id, sku_id, location_id, qty, type, channel, dest_state, ref, created_by)
         select o.brewery_id, ol.sku_id, o.from_location_id, -sp.qty, 'sale_removal', 'wholesale', v_state, p_order, auth.uid()
         from public.order_lines ol where ol.id = sp.line_id;
-        insert into public.invoice_lines (brewery_id, invoice_id, kind, sku_id, qty, unit_price_cents, description)
-        select o.brewery_id, v_invoice, 'sku', ol.sku_id, sp.qty, ol.unit_price_cents, s.name
-        from public.order_lines ol join public.skus s on s.id = ol.sku_id where ol.id = sp.line_id;
+        if v_invoice is not null then
+          insert into public.invoice_lines (brewery_id, invoice_id, kind, sku_id, qty, unit_price_cents, description)
+          select o.brewery_id, v_invoice, 'sku', ol.sku_id, sp.qty, ol.unit_price_cents, s.name
+          from public.order_lines ol join public.skus s on s.id = ol.sku_id where ol.id = sp.line_id;
+        end if;
       else
         insert into public.inventory_movements (brewery_id, sku_id, location_id, qty, type, ref, created_by)
         select o.brewery_id, ol.sku_id, o.from_location_id, -sp.qty, 'taproom_transfer', p_order, auth.uid()
@@ -1676,7 +1682,14 @@ begin
         where source = 'order_line' and ref = sp.line_id and status = 'open';
     end if;
   end loop;
-  update public.orders set status = 'shipped', shipped_at = now(), needs_restock = false where id = p_order;
+  -- anything picked but held back is staged on the floor: put it back
+  update public.orders
+     set status = 'shipped', shipped_at = now(),
+         needs_restock = exists (
+           select 1 from jsonb_array_elements(p_ship) e
+           join public.order_lines ol on ol.id = (e->>'line_id')::uuid
+           where (e->>'qty_shipped')::numeric < coalesce(ol.qty_picked, ol.qty_ordered))
+   where id = p_order;
   insert into public.order_events (brewery_id, order_id, actor, event, payload)
   values (o.brewery_id, p_order, auth.uid(), 'shipped',
           jsonb_build_object('ship', p_ship, 'carrier', p_carrier, 'invoice_id', v_invoice));
@@ -2510,14 +2523,15 @@ begin
   v_result := private.record_pick_impl(p_order,p_picks); return private.complete_command_request(p_request_id,v_result);
 end $$;
 
-create function ship_order(p_order uuid,p_ship jsonb,p_carrier text,p_tracking text,p_request_id uuid) returns jsonb
+create function ship_order(p_order uuid,p_ship jsonb,p_carrier text,p_tracking text,p_request_id uuid,p_invoice_timing text default 'now') returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare v_brewery uuid; v_replay jsonb; v_result jsonb;
 begin
+  if p_invoice_timing not in ('now','on_delivery') then raise exception 'unknown invoice timing'; end if;
   v_brewery := private.assert_order_staff(p_order,array['admin','warehouse']::public.staff_role[]);
-  v_replay := private.claim_command_request(v_brewery,'ship_order',p_request_id,jsonb_build_object('order',p_order,'ship',p_ship,'carrier',p_carrier,'tracking',p_tracking));
+  v_replay := private.claim_command_request(v_brewery,'ship_order',p_request_id,jsonb_build_object('order',p_order,'ship',p_ship,'carrier',p_carrier,'tracking',p_tracking,'invoice_timing',p_invoice_timing));
   if v_replay is not null then return v_replay; end if;
-  v_result := private.ship_order_impl(p_order,p_ship,p_carrier,p_tracking); return private.complete_command_request(p_request_id,v_result);
+  v_result := private.ship_order_impl(p_order,p_ship,p_carrier,p_tracking,p_invoice_timing); return private.complete_command_request(p_request_id,v_result);
 end $$;
 
 create function create_credit_memo(p_invoice uuid,p_lines jsonb,p_location uuid,p_reason text,p_request_id uuid) returns jsonb
@@ -3673,7 +3687,7 @@ grant execute on function
   record_pick(uuid,jsonb,uuid),
   confirm_restock(uuid,uuid),
   resolve_short_pick(uuid,uuid,numeric,text,text,uuid),
-  ship_order(uuid,jsonb,text,text,uuid),
+  ship_order(uuid,jsonb,text,text,uuid,text),
   create_credit_memo(uuid,jsonb,uuid,text,uuid),
   set_standing_allocation(uuid,uuid,numeric,uuid),
   create_replenishment_order(uuid,uuid,jsonb,uuid)

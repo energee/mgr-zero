@@ -42,7 +42,7 @@ const AUTHENTICATED_RPCS = [
   "set_price(uuid,uuid,uuid,integer,uuid)",
   "set_standing_allocation(uuid,uuid,numeric,uuid)",
   "set_taproom_par(uuid,uuid,uuid,numeric,uuid)",
-  "ship_order(uuid,jsonb,text,text,uuid)",
+  "ship_order(uuid,jsonb,text,text,uuid,text)",
   "staff_role(uuid)",
   "submit_order(uuid,uuid)",
   "today_live_reasons()",

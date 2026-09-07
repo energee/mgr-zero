@@ -1080,7 +1080,7 @@ export const SCREENS: Screen[] = [
     to: { "Ship order": "Shipment done" },
     job: "The On delivery state of Ship and invoice",
     reads: "get_order",
-    writes: "ship_order [SCHEMA-GATE: persist explicit on-delivery invoice timing on the shipment; then the same one RPC without the invoice; confirm_delivery invoices later]",
+    writes: "ship_order [invoice_timing = on_delivery persisted on the shipment; the same one RPC without the invoice; confirm_delivery invoices later]",
     states: [["stale", "picked qty changed · preview", 1], ["offline", "wait for live recheck", 1], ["permission", "warehouse or admin required", 1], ["schema gate", "deferred mode cannot persist yet", 1]],
     spec: "Folded into Ship and invoice as the On delivery chip. Same fields as Invoice now; the commit stays disabled until invoice timing can be saved. Two screens both titled Ship was confusing.",
     body: (<>

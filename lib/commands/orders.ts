@@ -101,15 +101,15 @@ defineCommand({
 });
 
 defineCommand({
-  name: "ship_order", description: "Ship a picked order: movements + allocation fulfillment + invoice, one transaction",
+  name: "ship_order", description: "Ship a picked order: movements + allocation fulfillment + invoice (now, or deferred to confirm_delivery), one transaction; anything held back below picked flags a restock",
   roles: [...warehouseRoles], requiresConfirmation: true,
   input: z.object({
     orderId: z.string().uuid(), carrier: z.string().optional(), tracking: z.string().optional(),
-    ship: pickLines,
+    ship: pickLines, invoiceTiming: z.enum(["now", "on_delivery"]).default("now"),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("ship_order", {
     p_order: i.orderId, p_ship: i.ship.map(s => ({ line_id: s.lineId, qty_shipped: s.qty })),
-    p_carrier: i.carrier ?? null, p_tracking: i.tracking ?? null, p_request_id: execution.requestId,
+    p_carrier: i.carrier ?? null, p_tracking: i.tracking ?? null, p_invoice_timing: i.invoiceTiming, p_request_id: execution.requestId,
   })),
 });
 

@@ -2,7 +2,8 @@
 // command. The plpgsql fn requires the ship array to cover every order line,
 // so unpicked/held-back lines are sent with qty 0; qty defaults to each
 // line's qty_picked. On success shows a link to the created invoice when the
-// order shipped anything on a wholesale order (taproom transfers get none).
+// order shipped anything on a wholesale order (taproom transfers get none);
+// "Invoice on delivery" defers it to confirm_delivery.
 // Calls the command endpoint directly (not useCommandForm) so it can read
 // the invoice_id back out of the response.
 "use client";
@@ -32,6 +33,7 @@ export function ShipForm({ orderId, lines }: { orderId: string; lines: ShipLine[
   const idBase = useId();
   const [carrier, setCarrier] = useState("");
   const [tracking, setTracking] = useState("");
+  const [onDelivery, setOnDelivery] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [shipped, setShipped] = useState(false);
@@ -41,6 +43,7 @@ export function ShipForm({ orderId, lines }: { orderId: string; lines: ShipLine[
     setQtys(initialQtys(lines));
     setCarrier("");
     setTracking("");
+    setOnDelivery(false);
     setError(null);
     setShipped(false);
     setInvoiceId(null);
@@ -55,6 +58,7 @@ export function ShipForm({ orderId, lines }: { orderId: string; lines: ShipLine[
         orderId,
         carrier: carrier || undefined,
         tracking: tracking || undefined,
+        invoiceTiming: onDelivery ? "on_delivery" : "now",
         ship: lines.map((l) => ({ lineId: l.id, qty: Number(qtys[l.id] ?? 0) })),
       })) as { invoice_id: string | null };
       setInvoiceId(data.invoice_id ?? null);
@@ -77,7 +81,7 @@ export function ShipForm({ orderId, lines }: { orderId: string; lines: ShipLine[
                 View invoice
               </Link>
             ) : (
-              <p className="text-sm text-muted-foreground">No invoice was created.</p>
+              <p className="text-sm text-muted-foreground">{onDelivery ? "Invoice waits for delivery confirmation." : "No invoice was created."}</p>
             )}
             <CommandFormFooter>
               <Button onClick={() => setOpen(false)}>Close</Button>
@@ -113,10 +117,14 @@ export function ShipForm({ orderId, lines }: { orderId: string; lines: ShipLine[
                 <Input id="ship-tracking" value={tracking} onChange={(e) => setTracking(e.target.value)} />
               </div>
             </div>
+            <Label className="flex items-center gap-2 font-normal">
+              <input type="checkbox" checked={onDelivery} onChange={(e) => setOnDelivery(e.target.checked)} />
+              Invoice on delivery
+            </Label>
             <CommandFormMessage error={error} />
             <CommandFormFooter>
               <Button type="submit" disabled={busy}>
-                {busy ? "Shipping…" : "Ship"}
+                {busy ? "Shipping…" : onDelivery ? "Ship, invoice on delivery" : "Ship and invoice"}
               </Button>
             </CommandFormFooter>
           </form>
