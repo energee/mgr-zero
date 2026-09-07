@@ -40,7 +40,7 @@ create type customer_type as enum ('distributor','retailer','brewery','other');
 create type package_type as enum ('keg','can','bottle');
 create type keg_size as enum ('half_bbl','quarter_bbl','sixth_bbl','fifty_l','thirty_l','twenty_l');
 create type keg_container_source as enum ('owned_fleet','per_fill_rental','one_way_material');
-create type location_kind as enum ('warehouse','taproom');
+create type location_kind as enum ('warehouse','taproom','storage');
 create type movement_type as enum
   ('opening_balance','production_in','adjustment','sale_removal','taproom_transfer',
    'depletion','return_in','destruction','loss','sample','festival_removal');
@@ -318,6 +318,23 @@ create table locations (
 alter table breweries add column portal_fulfillment_location_id uuid;
 alter table breweries add foreign key (portal_fulfillment_location_id, id)
   references locations (id, brewery_id);
+
+-- Physical subdivisions of a location (spec 2026-09-06 Decision 1; §16.6). Every
+-- location is seeded with three inside create_location and can never drop below
+-- one (delete_bin). Ledger rows reach a bin through (bin_id, location_id,
+-- brewery_id) so a bin can only ever be filed under its own location.
+create table bins (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references breweries(id),
+  location_id uuid not null,
+  name text not null,
+  created_at timestamptz not null default now(),
+  unique (id, brewery_id),
+  unique (location_id, name),
+  unique (id, location_id, brewery_id),
+  foreign key (location_id, brewery_id) references locations (id, brewery_id)
+);
+create index bins_brewery_idx on bins (brewery_id, location_id);
 
 create table inventory_movements (
   id uuid primary key default private.new_uuid(),
@@ -2129,6 +2146,10 @@ begin
     jsonb_build_object('brewery', p_brewery, 'name', p_name, 'kind', p_kind));
   if v_replay is not null then return v_replay; end if;
   insert into public.locations (brewery_id, name, kind) values (p_brewery, p_name, p_kind) returning * into v_row;
+  -- A location always has at least one bin; the trio is a starting point the
+  -- brewery renames or trims (never to zero: delete_bin refuses the last one).
+  insert into public.bins (brewery_id, location_id, name)
+    values (p_brewery, v_row.id, 'Walk-in'), (p_brewery, v_row.id, 'Cold'), (p_brewery, v_row.id, 'Dry');
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
@@ -2721,7 +2742,7 @@ begin
   -- limited below to the exact RPC path and command roles that own them.
   foreach t in array array[
     'customers','ship_tos','vendors','materials','material_lots','products','keg_pools','skus',
-    'price_lists','price_list_items','sku_bom','locations','allocations','taproom_pars',
+    'price_lists','price_list_items','sku_bom','locations','bins','allocations','taproom_pars',
     'recipes','recipe_versions','recipe_ingredients','vessels','batches','vessel_occupancies',
     'fermentation_readings','batch_additions','packaging_runs','lots','packaging_run_outputs',
     'packaging_run_consumptions','material_contracts','purchase_orders','purchase_order_lines',
@@ -3732,7 +3753,7 @@ revoke all on all sequences in schema public from public, anon, authenticated;
 -- material lives in private.integration_tokens behind service-only RPCs.
 grant select on breweries, brewery_users, customer_users,
   customers, ship_tos, vendors, materials, material_lots, products, keg_pools, skus,
-  price_lists, price_list_items, sku_bom, locations, inventory_movements, allocations, taproom_pars,
+  price_lists, price_list_items, sku_bom, locations, bins, inventory_movements, allocations, taproom_pars,
   recipes, recipe_versions, recipe_ingredients, vessels, batches, vessel_occupancies, transfers,
   volume_adjustments, fermentation_readings, material_movements, batch_additions, packaging_runs,
   lots, packaging_run_outputs, packaging_run_consumptions, material_contracts, purchase_orders,

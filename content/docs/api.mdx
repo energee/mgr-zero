@@ -952,12 +952,12 @@ promising stock.
 
 `command` · admin
 
-Create a warehouse or taproom location
+Create a warehouse, taproom or storage location; it starts with the Walk-in, Cold and Dry bins
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `name` | string | yes |
-| `kind` | warehouse or taproom | yes |
+| `kind` | warehouse or taproom or storage | yes |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -1060,13 +1060,13 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin
 
-Rename a location or change its kind; movement history is untouched
+Rename a location or change its kind (warehouse, taproom or storage); movement history is untouched
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `locationId` | uuid | yes |
 | `name` | string | yes |
-| `kind` | warehouse or taproom | yes |
+| `kind` | warehouse or taproom or storage | yes |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

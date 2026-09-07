@@ -27,8 +27,8 @@ defineCommand({
 });
 
 defineCommand({
-  name: "create_location", description: "Create a warehouse or taproom location",
-  input: z.object({ name: z.string().min(1), kind: z.enum(["warehouse", "taproom"]) }),
+  name: "create_location", description: "Create a warehouse, taproom or storage location; it starts with the Walk-in, Cold and Dry bins",
+  input: z.object({ name: z.string().min(1), kind: z.enum(["warehouse", "taproom", "storage"]) }),
   roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_location", {
     p_brewery: ctx.breweryId, p_name: i.name, p_kind: i.kind, p_request_id: execution.requestId,
@@ -36,8 +36,8 @@ defineCommand({
 });
 
 defineCommand({
-  name: "update_location", description: "Rename a location or change its kind; movement history is untouched",
-  input: z.object({ locationId: z.string().uuid(), name: z.string().trim().min(1), kind: z.enum(["warehouse", "taproom"]) }),
+  name: "update_location", description: "Rename a location or change its kind (warehouse, taproom or storage); movement history is untouched",
+  input: z.object({ locationId: z.string().uuid(), name: z.string().trim().min(1), kind: z.enum(["warehouse", "taproom", "storage"]) }),
   roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_location", {
     p_brewery: ctx.breweryId, p_id: i.locationId, p_name: i.name, p_kind: i.kind, p_request_id: execution.requestId,

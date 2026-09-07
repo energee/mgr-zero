@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
-type Kind = "warehouse" | "taproom";
+type Kind = "warehouse" | "taproom" | "storage";
 
 export function LocationForm({ location }: { location?: { id: string; name: string; kind: Kind } }) {
   const [name, setName] = useState(location?.name ?? "");
@@ -36,6 +36,7 @@ export function LocationForm({ location }: { location?: { id: string; name: stri
               <SelectGroup>
                 <SelectItem value="warehouse">Warehouse</SelectItem>
                 <SelectItem value="taproom">Taproom</SelectItem>
+                <SelectItem value="storage">Storage</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>

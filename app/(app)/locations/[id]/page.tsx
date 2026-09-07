@@ -10,7 +10,8 @@ import { isUuid } from "@/lib/commands/context";
 import { notFound } from "next/navigation";
 import { LocationForm } from "../location-form";
 
-type LocationRow = { id: string; name: string; kind: "warehouse" | "taproom" };
+type LocationRow = { id: string; name: string; kind: "warehouse" | "taproom" | "storage" };
+const KIND_LABEL: Record<LocationRow["kind"], string> = { warehouse: "Warehouse", taproom: "Taproom", storage: "Storage" };
 
 export default async function LocationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -22,7 +23,7 @@ export default async function LocationPage({ params }: { params: Promise<{ id: s
   return (
     <>
       {E.back("Locations", location.name, brewery.role === "admin" ? <LocationForm location={location} /> : undefined, "/locations")}
-      {E.fld("Type", location.kind === "taproom" ? "Taproom" : "Warehouse")}
+      {E.fld("Type", KIND_LABEL[location.kind])}
       {E.fld("Timezone", "Brewery default")}
       {E.gated("Location bins")}
     </>
