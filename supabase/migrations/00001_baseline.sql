@@ -3382,9 +3382,12 @@ end $$;
 -- its loss) and packaging draws. So this writes exactly one transfers row and
 -- lets the view speak. The target vessel is locked before the source occupancy
 -- — the same vessel-first order record_brew_day uses — so two brewers racing
--- into one brite queue instead of deadlocking. An empty target gets a fresh
--- occupancy at initial_bbl 0 carrying the source's batch; an occupied one is
--- blended into and keeps its own batch identity (a "new batch from two parents"
+-- into one brite queue behind the same lock instead of taking it in opposite
+-- orders. That order does not make deadlock impossible: a mutual swap
+-- (A -> B while B -> A) still takes the two locks in opposite orders and
+-- Postgres aborts one side, which the caller retries.
+-- An empty target gets a fresh occupancy at initial_bbl 0 carrying the
+-- source's batch; an occupied one is blended into and keeps its own batch identity (a "new batch from two parents"
 -- is deliberately not modelled). Every timestamp is now(), so a same-day
 -- transfer never collides with a brew day's midnight range start.
 create function record_cellar_transfer(
@@ -3738,7 +3741,7 @@ end $$;
 -- consumption, `return_to_stock` puts it back on the same bin's shelf.
 create function private.record_repack_impl(
   p_brewery uuid, p_location uuid, p_bin uuid, p_parent_sku uuid, p_parent_qty numeric,
-  p_child_sku uuid, p_child_qty numeric
+  p_child_sku uuid, p_child_qty numeric, p_actor uuid
 ) returns jsonb language plpgsql set search_path = '' as $$
 declare
   v_ref uuid := private.new_uuid();
@@ -3790,8 +3793,10 @@ begin
   end if;
 
   insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, ref, created_by)
-  values (p_brewery, p_parent_sku, p_location, p_bin, -p_parent_qty, 'repack', v_ref, auth.uid()),
-         (p_brewery, p_child_sku,  p_location, p_bin,  p_child_qty,  'repack', v_ref, auth.uid());
+  -- created_by is the actor assert_staff verified in the public wrapper, not
+  -- auth.uid() read again here: the wrapper is the one place identity is proven.
+  values (p_brewery, p_parent_sku, p_location, p_bin, -p_parent_qty, 'repack', v_ref, p_actor),
+         (p_brewery, p_child_sku,  p_location, p_bin,  p_child_qty,  'repack', v_ref, p_actor);
 
   -- The trigger froze bbl on each row from format_volumes; if the pair does not
   -- cancel the repack invented or destroyed beer, so the whole call rolls back.
@@ -3804,7 +3809,7 @@ begin
   select p_brewery, bom.material_id, p_location, p_bin,
          case bom.on_break when 'consumed' then -(bom.qty_per_unit * p_parent_qty) else bom.qty_per_unit * p_parent_qty end,
          case bom.on_break when 'consumed' then 'consumption' else 'return_to_stock' end::public.material_movement_type,
-         'repack ' || v_ref, auth.uid()
+         'repack ' || v_ref, p_actor
   from public.format_bom bom
   where bom.brewery_id = p_brewery and bom.format_id = v_parent.format_id;
 
@@ -3815,14 +3820,14 @@ create function record_repack(
   p_brewery uuid, p_location uuid, p_bin uuid, p_parent_sku uuid, p_parent_qty numeric,
   p_child_sku uuid, p_child_qty numeric, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_replay jsonb; v_result jsonb;
+declare v_replay jsonb; v_result jsonb; v_actor uuid;
 begin
-  perform private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
+  v_actor := private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'record_repack', p_request_id,
     jsonb_build_object('brewery', p_brewery, 'location', p_location, 'bin', p_bin, 'parent_sku', p_parent_sku,
                        'parent_qty', p_parent_qty, 'child_sku', p_child_sku, 'child_qty', p_child_qty));
   if v_replay is not null then return v_replay; end if;
-  v_result := private.record_repack_impl(p_brewery, p_location, p_bin, p_parent_sku, p_parent_qty, p_child_sku, p_child_qty);
+  v_result := private.record_repack_impl(p_brewery, p_location, p_bin, p_parent_sku, p_parent_qty, p_child_sku, p_child_qty, v_actor);
   return private.complete_command_request(p_request_id, v_result);
 end $$;
 

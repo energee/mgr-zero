@@ -12,7 +12,7 @@
 //   GU        = sum(perBblQty * (extractPotential - 1) * 1000 * brewhouseEfficiency) / 31
 //   OG (SG)   = 1 + GU / 1000
 //   FG (SG)   = 1 + (OG - 1) * (1 - yeastAttenuation)
-//   Plato(SG) = -616.868 + 1111.14*SG - 630.272*SG^2 + 135.997*SG^3   (ASBC cubic)
+//   Plato(SG) = max(0, -616.868 + 1111.14*SG - 630.272*SG^2 + 135.997*SG^3)  (ASBC cubic, clamped at water)
 //   ABV       = (OG - FG) * 131.25
 //
 // mashTempF is accepted (recipe_versions.mash_temp_f) but does not affect
@@ -39,9 +39,13 @@ export type RecipeGravityResult = {
 
 const BBL_TO_GALLONS = 31;
 
-/** ASBC cubic approximation converting specific gravity to degrees Plato. */
+/**
+ * ASBC cubic approximation converting specific gravity to degrees Plato.
+ * Clamped at 0: the cubic returns -0.003 at SG 1.000, and negative Plato is
+ * not a thing a brewer can read — water is 0 °P.
+ */
 function sgToPlato(sg: number): number {
-  return -616.868 + 1111.14 * sg - 630.272 * sg ** 2 + 135.997 * sg ** 3;
+  return Math.max(0, -616.868 + 1111.14 * sg - 630.272 * sg ** 2 + 135.997 * sg ** 3);
 }
 
 /** Predicts OG/FG/ABV from a recipe version's mash-stage ingredients. */

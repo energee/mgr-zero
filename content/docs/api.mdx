@@ -200,14 +200,14 @@ omitted. They have no roles until they are built.
 | `invite_customer_user` | Customers | ✓ | ✓ |  |  |  |
 | `invite_staff` | Team & brewery settings | ✓ |  |  |  |  |
 | `list_batches` | Production | ✓ |  |  | ✓ |  |
-| `list_bins` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
-| `list_brands` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
+| `list_bins` | Inventory & locations | ✓ | ✓ | ✓ | ✓ |  |
+| `list_brands` | Catalog & pricing | ✓ | ✓ | ✓ | ✓ |  |
 | `list_channel_prices` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `list_customers` | Customers | ✓ | ✓ | ✓ |  |  |
 | `list_fermentation_readings` | Production | ✓ |  |  | ✓ |  |
 | `list_formats` | Packaging | ✓ | ✓ | ✓ |  |  |
 | `list_invoices` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
-| `list_locations` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
+| `list_locations` | Inventory & locations | ✓ | ✓ | ✓ | ✓ |  |
 | `list_materials` | Purchasing & materials | ✓ |  |  | ✓ |  |
 | `list_movements` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `list_occupancies` | Packaging | ✓ |  | ✓ | ✓ |  |
@@ -216,7 +216,7 @@ omitted. They have no roles until they are built.
 | `list_price_groups` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
 | `list_recipes` | Production | ✓ |  |  | ✓ |  |
 | `list_sale_channels` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
-| `list_skus` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
+| `list_skus` | Catalog & pricing | ✓ | ✓ | ✓ | ✓ |  |
 | `list_standing_allocations` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `list_stock_transfers` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `list_team_members` | Team & brewery settings | ✓ | ✓ | ✓ |  |  |
@@ -1164,7 +1164,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 #### list_bins [#list_bins]
 
-`query` · admin, sales, warehouse
+`query` · admin, sales, warehouse, brewer
 
 Bins of one location (or all), alphabetical
 
@@ -1181,7 +1181,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 #### list_locations [#list_locations]
 
-`query` · admin, sales, warehouse
+`query` · admin, sales, warehouse, brewer
 
 Warehouses and taprooms, alphabetical
 
@@ -1455,7 +1455,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 #### list_brands [#list_brands]
 
-`query` · admin, sales, warehouse
+`query` · admin, sales, warehouse, brewer
 
 Brands with their style and SKUs, alphabetical
 
@@ -1517,7 +1517,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 #### list_skus [#list_skus]
 
-`query` · admin, sales, warehouse
+`query` · admin, sales, warehouse, brewer
 
 SKUs with their brand and format, alphabetical
 

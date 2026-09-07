@@ -9,7 +9,7 @@ describe("recipeGravity", () => {
     //   GU = 10 * (1.037-1)*1000 * 0.75 / 31 = 277.5 / 31 = 8.9516129032258...
     //   OG(SG) = 1 + 8.9516129032258/1000 = 1.0089516129032258
     //   FG(SG) = 1 + (OG-1)*(1-0.75) = 1.0022379032258064
-    //   Plato(SG) = -616.868 + 1111.14*SG - 630.272*SG^2 + 135.997*SG^3
+    //   Plato(SG) = max(0, -616.868 + 1111.14*SG - 630.272*SG^2 + 135.997*SG^3)
     //     ogPlato = 2.294056595291295 -> 2.29
     //     fgPlato = 0.5745809755756852 -> 0.57
     //   ABV = (OG - FG) * 131.25 = 0.8811743951613049 -> 0.88
@@ -45,16 +45,16 @@ describe("recipeGravity", () => {
   });
 
   it("answers water's Plato and zero ABV for no mash ingredients", () => {
-    // No mash ingredients -> OG = FG = 1.000 SG. The ASBC cubic isn't exactly
-    // zero at SG 1 (Plato(1) = -616.868 + 1111.14 - 630.272 + 135.997 = -0.003).
+    // No mash ingredients -> OG = FG = 1.000 SG. The ASBC cubic reads -0.003
+    // at SG 1, so the conversion clamps at 0: water is 0 °P, never negative.
     const result = recipeGravity({
       mashTempF: 152,
       brewhouseEfficiency: 0.75,
       yeastAttenuation: 0.75,
       ingredients: [],
     });
-    expect(result.ogPlato).toBeCloseTo(-0.003, 3);
-    expect(result.fgPlato).toBeCloseTo(-0.003, 3);
+    expect(result.ogPlato).toBe(0);
+    expect(result.fgPlato).toBe(0);
     expect(result.abv).toBeCloseTo(0, 5);
   });
 });

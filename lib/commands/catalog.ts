@@ -94,8 +94,9 @@ defineCommand({
 // RLS; the three writes are the idempotent RPCs. A location never drops below
 // one bin and a bin that ever recorded stock is not deleted — delete_bin raises both.
 defineQuery({
+  // Brewers read bins too: packaging output lands in one.
   name: "list_bins", description: "Bins of one location (or all), alphabetical",
-  input: z.object({ locationId: z.string().uuid().optional() }), roles: ["admin", "sales", "warehouse"],
+  input: z.object({ locationId: z.string().uuid().optional() }), roles: ["admin", "sales", "warehouse", "brewer"],
   handler: (ctx, i) => {
     let q = ctx.db.from("bins").select("id, location_id, name").eq("brewery_id", ctx.breweryId).order("name");
     if (i.locationId) q = q.eq("location_id", i.locationId);
@@ -204,7 +205,8 @@ defineCommand({
 });
 
 defineQuery({
+  // Brewers read brands too: recipes, batches and packaging runs all name one.
   name: "list_brands", description: "Brands with their style and SKUs, alphabetical",
-  input: z.object({}), roles: ["admin", "sales", "warehouse"],
+  input: z.object({}), roles: ["admin", "sales", "warehouse", "brewer"],
   handler: (ctx) => unwrap(ctx.db.from("brands").select("*, styles(name), skus(id, name, format_id, active)").eq("brewery_id", ctx.breweryId).order("name")),
 });

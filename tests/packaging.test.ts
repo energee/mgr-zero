@@ -617,3 +617,131 @@ describe("record_repack", () => {
     }, warehouseCtx)).rejects.toThrow(/on hand/i);
   });
 });
+
+// Tenancy and roles for packaging, mirroring the vessels/batches block in
+// tests/production.test.ts. Every id these RPCs take is matched against
+// p_brewery, so another brewery's tank or SKU reads as missing (or fails the
+// composite FK) rather than being packaged into this brewery's ledger.
+describe("packaging refuses other tenants and other roles", () => {
+  let other: { id: string };
+  let otherCtx: Awaited<ReturnType<typeof makeStaffCtx>>;
+  let otherOccupancyId: string;
+  let otherSkuId: string;
+  let otherBrandId: string;
+
+  const runCount = async () => {
+    const { count, error } = await admin.from("packaging_runs")
+      .select("id", { count: "exact", head: true }).eq("brewery_id", b.id);
+    if (error) throw error;
+    return count ?? 0;
+  };
+  const repackCount = async () => {
+    const { count, error } = await admin.from("inventory_movements")
+      .select("id", { count: "exact", head: true }).eq("brewery_id", b.id).eq("type", "repack");
+    if (error) throw error;
+    return count ?? 0;
+  };
+
+  beforeAll(async () => {
+    other = await makeBrewery();
+    otherCtx = await makeStaffCtx(other.id, "brewer");
+    const cat = await seedCatalog(other.id, { product: "Their IPA", sku: "Their IPA case" });
+    otherBrandId = cat.brandId;
+    otherSkuId = cat.skuId;
+
+    const vessel = (await runCommand("upsert_vessel",
+      { name: "Their FV", kind: "fermenter", capacityBbl: 40 }, otherCtx)) as { id: string };
+    const batch = (await runCommand("schedule_batch",
+      { intendedBrandId: otherBrandId, plannedOn: "2026-11-02", plannedBbl: 20 }, otherCtx)) as { id: string };
+    otherOccupancyId = ((await runCommand("record_brew_day",
+      { batchId: batch.id, vesselId: vessel.id, initialBbl: 20, brewedOn: "2026-11-02" }, otherCtx)) as {
+        occupancy: { id: string };
+      }).occupancy.id;
+  });
+
+  it("refuses another brewery's tank and another brewery's SKU when scheduling", async () => {
+    const before = await runCount();
+
+    await expect(runCommand("schedule_packaging_run", {
+      brandId: stout.brandId, plannedOn: "2026-11-03", occupancyId: otherOccupancyId,
+      outputs: [{ skuId: stout.skuId, qtyPlanned: 10 }],
+    }, ctx)).rejects.toThrow();
+
+    await expect(runCommand("schedule_packaging_run", {
+      brandId: stout.brandId, plannedOn: "2026-11-03",
+      outputs: [{ skuId: otherSkuId, qtyPlanned: 10 }],
+    }, ctx)).rejects.toThrow();
+
+    await expect(runCommand("schedule_packaging_run", {
+      brandId: otherBrandId, plannedOn: "2026-11-03",
+      outputs: [{ skuId: stout.skuId, qtyPlanned: 10 }],
+    }, ctx)).rejects.toThrow();
+
+    // Nothing was written: each call rolled back whole.
+    expect(await runCount()).toBe(before);
+  });
+
+  it("refuses another brewery's tank and SKU when revising a run", async () => {
+    const run = (await runCommand("schedule_packaging_run", {
+      brandId: stout.brandId, plannedOn: "2026-11-04",
+      outputs: [{ skuId: stout.skuId, qtyPlanned: 12 }],
+    }, ctx)) as { id: string };
+
+    await expect(runCommand("update_packaging_run",
+      { runId: run.id, occupancyId: otherOccupancyId }, ctx)).rejects.toThrow();
+    await expect(runCommand("update_packaging_run",
+      { runId: run.id, outputs: [{ skuId: otherSkuId, qtyPlanned: 3 }] }, ctx)).rejects.toThrow();
+
+    // The run kept its own plan and never picked up the foreign tank.
+    const { data, error } = await admin.from("packaging_runs")
+      .select("occupancy_id, packaging_run_outputs(sku_id, qty_planned)").eq("id", run.id).single();
+    if (error) throw error;
+    expect(data.occupancy_id).toBeNull();
+    expect(data.packaging_run_outputs).toEqual([{ sku_id: stout.skuId, qty_planned: 12 }]);
+
+    // The other brewery cannot reach into this run either.
+    await expect(runCommand("update_packaging_run",
+      { runId: run.id, outputs: [{ skuId: otherSkuId, qtyPlanned: 1 }] }, otherCtx)).rejects.toThrow();
+  });
+
+  it("refuses another brewery's SKU in a repack", async () => {
+    const warehouseCtx = await makeStaffCtx(b.id, "warehouse");
+    const before = await repackCount();
+
+    await expect(runCommand("record_repack", {
+      locationId: repackLocationId, binId: repackBinId, parentSkuId: caseSkuId, parentQty: 1,
+      childSkuId: otherSkuId, childQty: PER_CASE,
+    }, warehouseCtx)).rejects.toThrow(/sku not found|not a component|brand/i);
+
+    await expect(runCommand("record_repack", {
+      locationId: repackLocationId, binId: repackBinId, parentSkuId: otherSkuId, parentQty: 1,
+      childSkuId: fourPackSkuId, childQty: PER_CASE,
+    }, warehouseCtx)).rejects.toThrow(/sku not found|not a component|brand/i);
+
+    expect(await repackCount()).toBe(before);
+  });
+
+  it("refuses sales, which packages nothing", async () => {
+    const sales = await makeStaffCtx(b.id, "sales");
+    await expect(runCommand("schedule_packaging_run", {
+      brandId: stout.brandId, plannedOn: "2026-11-05", outputs: [{ skuId: stout.skuId, qtyPlanned: 5 }],
+    }, sales)).rejects.toThrow(/permission denied/);
+    await expect(runCommand("close_packaging_run", {
+      runId: crypto.randomUUID(), bblDrawn: 1, outputs: [], lotCode: "L-SALES",
+      packagedOn: "2026-11-05", locationId: repackLocationId, binId: repackBinId,
+    }, sales)).rejects.toThrow(/permission denied/);
+    await expect(runCommand("record_repack", {
+      locationId: repackLocationId, binId: repackBinId, parentSkuId: caseSkuId, parentQty: 1,
+      childSkuId: fourPackSkuId, childQty: PER_CASE,
+    }, sales)).rejects.toThrow(/permission denied/);
+  });
+
+  // A brewer is not a warehouse hand: repack is a stock-shape change, and the
+  // rail hides it from brewers (commit e199de0), so the command must too.
+  it("refuses a brewer on repack", async () => {
+    await expect(runCommand("record_repack", {
+      locationId: repackLocationId, binId: repackBinId, parentSkuId: caseSkuId, parentQty: 1,
+      childSkuId: fourPackSkuId, childQty: PER_CASE,
+    }, ctx)).rejects.toThrow(/permission denied/);
+  });
+});
