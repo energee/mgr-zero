@@ -44,6 +44,12 @@ describe("stock transfer lifecycle", () => {
     expect(row.transferId).toMatch(/^[0-9a-f-]{36}$/i);
     const { data: hdr } = await admin.from("stock_transfers").select("status, transfer_no, note").eq("id", row.transferId).single();
     expect(hdr).toMatchObject({ status: "draft", transfer_no: 1, note: "weekly" });
+    const detail = await runCommand("get_stock_transfer", { transferId: row.transferId }, ctx) as
+      { transfer: { from_location: { name: string }; to_location: { name: string } }; lines: { skus: { name: string } }[]; bins: unknown[] };
+    expect(detail.transfer.from_location.name).toBe("WH");
+    expect(detail.transfer.to_location.name).toBe("Storage");
+    expect(detail.lines[0].skus.name).toBe("IPA case");
+    expect(detail.bins.length).toBe(6);
 
     await runCommand("submit_stock_transfer", { transferId: row.transferId }, ctx);
     const { data: line } = await admin.from("stock_transfer_lines").select("id").eq("transfer_id", row.transferId).single();

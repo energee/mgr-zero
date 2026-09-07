@@ -259,6 +259,10 @@ MGR creates a separate credit memo at the prices frozen on the invoice lines, ne
 
 **Locations** (open `/locations`; Settings links here) lists every warehouse and taproom. Admin sees **Add location**: a name and a type, *Warehouse* or *Taproom*. Names are unique within the brewery. Select **Edit** on a row to open the location: its type, the brewery's timezone, and a gated **Location bins** row (bins are not built yet). Admin can rename a location or change its type with **Edit** then **Save location**; movement history stays exactly as recorded.
 
+## Stock transfers [#transfers]
+
+**Transfers** (Work tab; Warehouse and Admin) move stock between two of the brewery's locations without an order or an invoice. **New transfer** takes a source and destination location, the bin at each end (the first bin is preselected), and SKU lines with quantities. Materials and empty kegs move through the same command from the API. The document is numbered TRF-0001 upward and walks **Submit**, **Record pick** (quantities default to what was requested), and **Receive**. Receiving writes the paired stock movements in one step, out of the source bin and into the destination bin, so on hand changes place and nothing counts as a removal; the fleet total for kegs is unchanged. A same-location pair is refused: moving stock between two bins of one location is a bin move, which writes the paired rows without a document.
+
 ## Taproom replenishment [#replenishment]
 
 <Screen name="Pars and allocation" />

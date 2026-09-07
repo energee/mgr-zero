@@ -66,6 +66,22 @@ defineCommand({
 });
 
 defineQuery({
+  name: "get_stock_transfer", description: "One stock transfer with its lines, location and bin names",
+  roles: [...readRoles],
+  input: z.object({ transferId: z.string().uuid() }),
+  handler: async (ctx, i) => {
+    const transfer = await unwrap(ctx.db.from("stock_transfers")
+      .select("*, from_location:locations!stock_transfers_from_location_id_brewery_id_fkey(name), to_location:locations!stock_transfers_to_location_id_brewery_id_fkey(name)")
+      .eq("id", i.transferId).single());
+    const [lines, bins] = await Promise.all([
+      unwrap(ctx.db.from("stock_transfer_lines").select("*, skus(name), materials(name), keg_pools(name)").eq("transfer_id", i.transferId)),
+      unwrap(ctx.db.from("bins").select("id, name").eq("brewery_id", ctx.breweryId)),
+    ]);
+    return { transfer, lines, bins };
+  },
+});
+
+defineQuery({
   name: "list_stock_transfers", description: "Stock transfers, newest first, with their lines",
   roles: [...readRoles],
   input: z.object({ status: z.enum(["draft", "submitted", "picked", "in_transit", "received", "cancelled"]).optional() }),
