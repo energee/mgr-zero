@@ -10,6 +10,7 @@ const AUTHENTICATED_RPCS = [
   "begin_chat_installation(uuid,text,text,text)",
   "begin_chat_reauthorization(uuid,text,text)",
   "cancel_order(uuid,text,uuid)",
+  "clear_price_list_item(uuid,uuid,uuid,uuid)",
   "confirm_delivery(uuid,text,uuid)",
   "confirm_order(uuid,uuid)",
   "confirm_restock(uuid,uuid)",
@@ -18,9 +19,8 @@ const AUTHENTICATED_RPCS = [
   "create_credit_memo(uuid,jsonb,uuid,text,uuid)",
   "create_location(uuid,text,location_kind,uuid)",
   "create_order(uuid,order_kind,uuid,uuid,uuid,uuid,date,text,text,jsonb,uuid)",
-  "create_product(uuid,text,text,numeric,uuid)",
   "create_replenishment_order(uuid,uuid,jsonb,uuid)",
-  "create_sku(uuid,uuid,text,package_type,integer,numeric,uuid)",
+  "create_sku(uuid,uuid,uuid,text,text,uuid)",
   "create_stock_transfer(uuid,uuid,uuid,date,text,jsonb,uuid)",
   "delete_bin(uuid,uuid,uuid)",
   "disable_chat_installation(uuid)",
@@ -42,6 +42,8 @@ const AUTHENTICATED_RPCS = [
   "record_stock_transfer_pick(uuid,jsonb,uuid)",
   "record_submitted_order_occurrence(uuid)",
   "release_allocation(uuid,uuid)",
+  "replace_format_bom(uuid,uuid,jsonb,uuid)",
+  "replace_format_components(uuid,uuid,jsonb,uuid)",
   "resolve_short_pick(uuid,uuid,numeric,text,text,uuid)",
   "return_shipment(uuid,jsonb,uuid,text,uuid)",
   "set_brewery_quiet_hours(uuid,time without time zone,time without time zone)",
@@ -49,6 +51,7 @@ const AUTHENTICATED_RPCS = [
   "set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text)",
   "set_portal_fulfillment_source(uuid,uuid,uuid)",
   "set_price(uuid,uuid,uuid,integer,uuid)",
+  "set_price_list_format(uuid,uuid,uuid,integer,uuid)",
   "set_standing_allocation(uuid,uuid,numeric,uuid)",
   "set_taproom_par(uuid,uuid,uuid,numeric,uuid)",
   "ship_order(uuid,jsonb,text,text,uuid,text)",
@@ -60,6 +63,7 @@ const AUTHENTICATED_RPCS = [
   "update_bin(uuid,uuid,text,uuid)",
   "update_draft_order(uuid,uuid,date,text,text,jsonb,uuid)",
   "update_location(uuid,uuid,text,location_kind,uuid)",
+  "upsert_brand(uuid,uuid,text,text,numeric,text,text,text,text,uuid)",
   "upsert_customer(uuid,uuid,text,customer_type,text,uuid,text,text,uuid)",
   "upsert_format(uuid,uuid,text,format_basis,package_type,keg_size,integer,numeric,uuid)",
   "upsert_price_list(uuid,uuid,text,uuid)",
@@ -74,6 +78,7 @@ describe("authenticated RPC allowlist", () => {
         and has_function_privilege('authenticated', p.oid, 'execute')
         and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')
       order by 1`);
-    expect(actual).toEqual(AUTHENTICATED_RPCS);
+    // same comparator on both sides: Postgres collation orders punctuation differently from JS
+    expect([...actual].sort()).toEqual([...AUTHENTICATED_RPCS].sort());
   });
 });

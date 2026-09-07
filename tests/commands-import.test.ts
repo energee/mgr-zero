@@ -19,7 +19,7 @@ describe("import_csv (blocked)", () => {
     await expect(runCommand("import_csv", { kind: "products_skus", rows: [
       { product: "Hazy IPA", style: "IPA", abv: "6.5", sku_name: "1/2 bbl keg", package_type: "keg", units_per_case: "", bbl_per_unit: "0.5" },
     ] }, ctx)).rejects.toThrow(/not available/i);
-    const { data } = await admin.from("products").select("id").eq("brewery_id", b.id);
+    const { data } = await admin.from("brands").select("id").eq("brewery_id", b.id);
     expect(data).toEqual([]);
   });
 

@@ -1,28 +1,29 @@
 import { z } from "zod";
 import { defineCommand, defineQuery, unwrap } from "./registry";
 
+// Brands (§16.1): the sellable identity. Style is found or created in the
+// brewery's own styles list; description, category, price group and hops are
+// the optional Brand-screen facts.
 defineCommand({
-  name: "create_product", description: "Create a beer brand/product",
-  input: z.object({ name: z.string().min(1), style: z.string().optional(), abv: z.number().optional() }),
+  name: "upsert_brand", description: "Create or edit a brand: name, style (added to the brewery's styles when new), ABV, and optional description, category, price group, hops",
+  input: z.object({
+    id: z.string().uuid().optional(), name: z.string().trim().min(1), style: z.string().optional(), abv: z.number().optional(),
+    description: z.string().optional(), category: z.string().optional(), priceGroup: z.string().optional(), hops: z.string().optional(),
+  }),
   roles: ["admin", "sales"],
-  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_product", {
-    p_brewery: ctx.breweryId, p_name: i.name, p_style: i.style ?? null, p_abv: i.abv ?? null,
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_brand", {
+    p_brewery: ctx.breweryId, p_id: i.id ?? null, p_name: i.name, p_style: i.style ?? null, p_abv: i.abv ?? null,
+    p_description: i.description ?? null, p_category: i.category ?? null, p_price_group: i.priceGroup ?? null, p_hops: i.hops ?? null,
     p_request_id: execution.requestId,
   })),
 });
 
 defineCommand({
-  name: "create_sku", description: "Create a sellable format of a product",
-  input: z.object({
-    productId: z.string().uuid(), name: z.string().min(1),
-    packageType: z.enum(["keg", "can", "bottle"]), unitsPerCase: z.number().int().optional(),
-    bblPerUnit: z.string().regex(/^\d+(\.\d+)?$/, "numeric string"), // string preserves exact numeric
-  }),
+  name: "create_sku", description: "Create a SKU: one brand × one packaged format; the name defaults to brand · format",
+  input: z.object({ brandId: z.string().uuid(), formatId: z.string().uuid(), name: z.string().optional(), upc: z.string().optional() }),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_sku", {
-    p_brewery: ctx.breweryId, p_product: i.productId, p_name: i.name,
-    p_package_type: i.packageType, p_units_per_case: i.unitsPerCase ?? null,
-    p_bbl_per_unit: i.bblPerUnit, p_request_id: execution.requestId,
+    p_brewery: ctx.breweryId, p_brand: i.brandId, p_format: i.formatId, p_name: i.name ?? null, p_upc: i.upc ?? null, p_request_id: execution.requestId,
   })),
 });
 
@@ -40,6 +41,24 @@ defineCommand({
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_format", {
     p_brewery: ctx.breweryId, p_id: i.id ?? null, p_name: i.name, p_basis: i.basis, p_package_type: i.packageType ?? null,
     p_keg_size: i.kegSize ?? null, p_units_per_case: i.unitsPerCase ?? null, p_bbl_per_unit: i.bblPerUnit ?? null, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "replace_format_components", description: "Replace a composed format's children (one level: atomic packaged children); its volume is derived from them",
+  input: z.object({ formatId: z.string().uuid(), components: z.array(z.object({ childFormatId: z.string().uuid(), qty: z.number().positive() })) }),
+  roles: ["admin", "sales"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("replace_format_components", {
+    p_brewery: ctx.breweryId, p_format: i.formatId, p_components: i.components.map((c) => ({ child_format_id: c.childFormatId, qty: c.qty })), p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "replace_format_bom", description: "Replace a format's packaging bill of materials: material, qty per unit, and what happens to it on break (consumed or return_to_stock)",
+  input: z.object({ formatId: z.string().uuid(), lines: z.array(z.object({ materialId: z.string().uuid(), qtyPerUnit: z.number().positive(), onBreak: z.enum(["consumed", "return_to_stock"]).default("consumed") })) }),
+  roles: ["admin", "sales"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("replace_format_bom", {
+    p_brewery: ctx.breweryId, p_format: i.formatId, p_lines: i.lines.map((l) => ({ material_id: l.materialId, qty_per_unit: l.qtyPerUnit, on_break: l.onBreak })), p_request_id: execution.requestId,
   })),
 });
 
@@ -112,7 +131,7 @@ defineCommand({
 });
 
 defineQuery({
-  name: "list_products", description: "Products with their SKUs, alphabetical",
+  name: "list_brands", description: "Brands with their style and SKUs, alphabetical",
   input: z.object({}), roles: ["admin", "sales", "warehouse"],
-  handler: (ctx) => unwrap(ctx.db.from("products").select("*, skus(*)").eq("brewery_id", ctx.breweryId).order("name")),
+  handler: (ctx) => unwrap(ctx.db.from("brands").select("*, styles(name), skus(id, name, format_id, active)").eq("brewery_id", ctx.breweryId).order("name")),
 });

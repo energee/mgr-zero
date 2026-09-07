@@ -12,7 +12,7 @@ import { trfNo } from "./trf-no";
 type Transfer = { id: string; transfer_no: number | null; status: string; from_location_id: string; to_location_id: string; stock_transfer_lines: { id: string }[] };
 type Location = { id: string; name: string; kind: string };
 type Bin = { id: string; location_id: string; name: string };
-type Sku = { id: string; name: string; products: { name: string } | null };
+type Sku = { id: string; name: string; brands: { name: string } | null };
 
 const VERB: Record<string, [string, "info" | "attention" | "success"]> = {
   draft: ["Submit", "info"], submitted: ["Pick", "info"], picked: ["Receive", "success"], in_transit: ["Receive", "success"],
@@ -27,7 +27,7 @@ export default async function TransfersPage() {
   const locName = (id: string) => locations.find((l) => l.id === id)?.name ?? "—";
   return (
     <>
-      {E.hd("Transfers", "between locations", <NewTransferForm locations={locations} bins={bins} skus={skus.map((s) => ({ id: s.id, label: s.products ? `${s.products.name} — ${s.name}` : s.name }))} />)}
+      {E.hd("Transfers", "between locations", <NewTransferForm locations={locations} bins={bins} skus={skus.map((s) => ({ id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name }))} />)}
       {transfers.length === 0
         ? E.blank("No transfers yet")
         : transfers.map((t) => {

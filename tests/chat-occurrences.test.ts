@@ -53,8 +53,9 @@ beforeAll(async () => {
   await runCommand("set_notification_preference", { reason: "submitted_order", enabled: false }, mutedSales);
   whId = (await ins("locations", { brewery_id: b.id, name: "WH", kind: "warehouse" })).id;
   whBinId = (await ins("bins", { brewery_id: b.id, location_id: whId, name: "Cold" })).id;
-  const product = await ins("products", { brewery_id: b.id, name: "IPA" });
-  skuId = (await ins("skus", { brewery_id: b.id, product_id: product.id, name: "IPA 1/2bbl", package_type: "keg", bbl_per_unit: 0.5 })).id;
+  const brand = await ins("brands", { brewery_id: b.id, name: "IPA" });
+  const format = await ins("formats", { brewery_id: b.id, name: "1/2 bbl keg", basis: "packaged", package_type: "keg", keg_size: "half_bbl", bbl_per_unit: 0.5 });
+  skuId = (await ins("skus", { brewery_id: b.id, brand_id: brand.id, format_id: format.id, name: "IPA 1/2bbl" })).id;
   const pl = await ins("price_lists", { brewery_id: b.id, name: "std" });
   await ins("price_list_items", { brewery_id: b.id, price_list_id: pl.id, sku_id: skuId, unit_price_cents: 12000 });
   customerId = (await ins("customers", { brewery_id: b.id, name: "Bar", type: "retailer", state: "PA", price_list_id: pl.id })).id;

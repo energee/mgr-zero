@@ -204,6 +204,8 @@ describe("HTTP API reference", () => {
   it("never designs an alias of an operation the registry already answers", () => {
     const retired: Record<string, string> = {
       create_customer: "upsert_customer",
+      create_product: "upsert_brand",
+      list_products: "list_brands",
       update_customer: "upsert_customer",
       create_ship_to: "upsert_ship_to",
       update_ship_to: "upsert_ship_to",

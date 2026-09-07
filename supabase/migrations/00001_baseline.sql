@@ -216,16 +216,35 @@ create table material_lots (
 );
 
 -- ---------------------------------------------------------------- catalog
-create table products (
+-- The brewery's own style list (Brand screen: a picker; typing a new one
+-- offers Add and the brand save creates it). No separate styles screen.
+create table styles (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
   name text not null,
-  style text,
-  abv numeric(4,2),
-  ttb_tax_class text not null default 'beer',
-  created_at timestamptz not null default now(),
   unique (id, brewery_id),
   unique (brewery_id, name)
+);
+
+-- A brand is the sellable identity (§16.1); a batch is a production instance.
+-- description, category, price_group and hops are optional facts drawn on the
+-- Brand screen; price_group is a label price tiers may price by (§16.4), never
+-- a price on the brand.
+create table brands (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references breweries(id),
+  name text not null,
+  style_id uuid,
+  abv numeric(4,2),
+  ttb_tax_class text not null default 'beer',
+  description text,
+  category text,
+  price_group text,
+  hops text,
+  created_at timestamptz not null default now(),
+  unique (id, brewery_id),
+  unique (brewery_id, name),
+  foreign key (style_id, brewery_id) references styles (id, brewery_id)
 );
 
 -- The sellable shape (§16.2): the only place bbl_per_unit is typed. packaged
@@ -249,6 +268,30 @@ create table formats (
 );
 create index formats_brewery_idx on formats (brewery_id, basis);
 
+-- Formats compose one level (§16.2a): a case is six four-packs. Only atomic
+-- formats carry a typed volume; a composed one derives it (format_volumes).
+create table format_components (
+  brewery_id uuid not null references breweries(id),
+  parent_format_id uuid not null,
+  child_format_id uuid not null,
+  qty numeric(12,6) not null check (qty > 0),
+  primary key (parent_format_id, child_format_id),
+  foreign key (parent_format_id, brewery_id) references formats (id, brewery_id),
+  foreign key (child_format_id, brewery_id) references formats (id, brewery_id),
+  check (parent_format_id <> child_format_id)
+);
+create index format_components_brewery_idx on format_components (brewery_id, parent_format_id);
+
+-- bbl_per_unit for every format: typed on an atomic one, summed from the
+-- children of a composed one. Null means the format cannot yet hold stock.
+create view format_volumes with (security_invoker = true) as
+  select f.id, f.brewery_id, f.name, f.basis,
+         coalesce(f.bbl_per_unit,
+                  (select sum(c.qty * cf.bbl_per_unit) from format_components c join formats cf on cf.id = c.child_format_id
+                    where c.parent_format_id = f.id)) as bbl_per_unit,
+         exists (select 1 from format_components c where c.parent_format_id = f.id) as composed
+  from formats f;
+
 create table keg_pools (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
@@ -267,39 +310,53 @@ create table keg_pools (
   check (kind <> 'pay_per_fill' or per_fill_cents is not null)
 );
 
+-- A SKU is exactly one brand × one packaged format (§16.2): the stable id
+-- inventory, orders, pricing and provider mappings hang off. Package facts and
+-- bbl_per_unit live on the format. ponytail: name is stored, filled by
+-- create_sku from brand and format; a rename of either does not rewrite it.
 create table skus (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
-  product_id uuid not null,
-  name text not null,                    -- "1/2 bbl keg", "16oz 4-pack"
-  package_type package_type not null,
-  units_per_case int,
-  bbl_per_unit numeric(12,8) not null check (bbl_per_unit > 0),   -- exact fraction; basis of all TTB math
+  brand_id uuid not null,
+  format_id uuid not null,
+  name text not null,
   upc text,
-  keg_size keg_size,
   container_source keg_container_source,
   keg_pool_id uuid,
   qbo_item_id text,
   active boolean not null default true,
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
-  unique (product_id, name),
-  foreign key (product_id, brewery_id) references products (id, brewery_id),
+  unique (brand_id, format_id),
+  foreign key (brand_id, brewery_id) references brands (id, brewery_id),
+  foreign key (format_id, brewery_id) references formats (id, brewery_id),
   foreign key (keg_pool_id, brewery_id) references keg_pools (id, brewery_id),
-  -- keg fields are only meaningful on kegs; kegs may leave them unset (slice 5 fills them in)
-  check (package_type = 'keg' or (keg_size is null and container_source is null)),
   check ((coalesce(container_source in ('owned_fleet','per_fill_rental'), false)) = (keg_pool_id is not null))
 );
-create index skus_brewery_idx on skus (brewery_id, product_id);
+create index skus_brewery_idx on skus (brewery_id, brand_id);
 create unique index skus_upc_uidx on skus (brewery_id, upc) where upc is not null;
 
+-- Price tiers (§16.4): a tier prices formats by default and overrides per SKU.
+-- channel_id is nullable until Program 4 adds sale_channels.
 create table price_lists (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
   name text not null,
+  channel_id uuid,
   unique (id, brewery_id),
   unique (brewery_id, name)
 );
+
+create table price_list_formats (
+  price_list_id uuid not null,
+  format_id uuid not null,
+  brewery_id uuid not null references breweries(id),
+  unit_price_cents int not null check (unit_price_cents >= 0),
+  primary key (price_list_id, format_id),
+  foreign key (price_list_id, brewery_id) references price_lists (id, brewery_id),
+  foreign key (format_id, brewery_id) references formats (id, brewery_id)
+);
+create index price_list_formats_brewery_idx on price_list_formats (brewery_id, price_list_id);
 
 create table price_list_items (
   price_list_id uuid not null,
@@ -314,17 +371,35 @@ create table price_list_items (
 alter table customers add constraint customers_price_list_fk
   foreign key (price_list_id, brewery_id) references price_lists (id, brewery_id);
 
+-- The price of every SKU on every tier: the SKU override when present, else
+-- the tier's default for the SKU's format. Orders snapshot from here.
+create view sku_prices with (security_invoker = true) as
+  select s.brewery_id, pl.id as price_list_id, s.id as sku_id, s.name as sku_name, b.name as brand_name, s.active,
+         coalesce(pli.unit_price_cents, plf.unit_price_cents) as unit_price_cents,
+         case when pli.sku_id is not null then 'override' else 'format' end as source
+  from skus s
+  join brands b on b.id = s.brand_id
+  join price_lists pl on pl.brewery_id = s.brewery_id
+  left join price_list_items pli on pli.price_list_id = pl.id and pli.sku_id = s.id
+  left join price_list_formats plf on plf.price_list_id = pl.id and plf.format_id = s.format_id
+  where pli.sku_id is not null or plf.format_id is not null;
+
 -- Packaging BOM: materials consumed per single SKU unit (incl. one-way kegs).
-create table sku_bom (
+-- Packaging BOM belongs to the format, not the SKU (§16.12): a case tray is
+-- the same for every brand packed in that case. on_break says what happens
+-- to the material when a composed unit is broken open (§16.10).
+create type format_material_disposition as enum ('consumed','return_to_stock');
+create table format_bom (
   brewery_id uuid not null references breweries(id),
-  sku_id uuid not null,
+  format_id uuid not null,
   material_id uuid not null,
   qty_per_unit numeric(14,6) not null check (qty_per_unit > 0),   -- material base uom
-  primary key (sku_id, material_id),
-  foreign key (sku_id, brewery_id) references skus (id, brewery_id),
+  on_break format_material_disposition not null default 'consumed',
+  primary key (format_id, material_id),
+  foreign key (format_id, brewery_id) references formats (id, brewery_id),
   foreign key (material_id, brewery_id) references materials (id, brewery_id)
 );
-create index sku_bom_material_idx on sku_bom (material_id);
+create index format_bom_material_idx on format_bom (material_id);
 
 -- ---------------------------------------------------------------- FG ledger
 create table locations (
@@ -404,7 +479,9 @@ create index movements_lot_idx on inventory_movements (lot_id) where lot_id is n
 
 create function enforce_bbl_integrity() returns trigger language plpgsql set search_path = '' as $$
 begin
-  select (new.qty * s.bbl_per_unit) into new.bbl from public.skus s where s.id = new.sku_id;
+  select (new.qty * f.bbl_per_unit) into new.bbl
+    from public.skus s join public.format_volumes f on f.id = s.format_id where s.id = new.sku_id;
+  if new.bbl is null then raise exception 'format has no bbl_per_unit'; end if;
   return new;
 end $$;
 create trigger inventory_movements_bbl_trigger before insert on inventory_movements
@@ -442,13 +519,13 @@ create table taproom_pars (
 create table recipes (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
-  product_id uuid,
+  brand_id uuid,
   name text not null,
   note text,
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
   unique (brewery_id, name),
-  foreign key (product_id, brewery_id) references products (id, brewery_id)
+  foreign key (brand_id, brewery_id) references brands (id, brewery_id)
 );
 
 create table recipe_versions (
@@ -501,7 +578,7 @@ create table batches (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
   batch_no bigint,                                     -- trigger
-  product_id uuid not null,
+  intended_brand_id uuid,                              -- intent, not a commitment (§16.9): identity is required at packaging
   recipe_version_id uuid,
   planned_on date not null,
   planned_bbl numeric(10,3) not null check (planned_bbl > 0),
@@ -512,11 +589,11 @@ create table batches (
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
   unique (brewery_id, batch_no),
-  foreign key (product_id, brewery_id) references products (id, brewery_id),
+  foreign key (intended_brand_id, brewery_id) references brands (id, brewery_id),
   foreign key (recipe_version_id, brewery_id) references recipe_versions (id, brewery_id)
 );
 create index batches_planned_idx on batches (brewery_id, planned_on);
-create index batches_product_idx on batches (product_id);
+create index batches_brand_idx on batches (brewery_id, intended_brand_id);
 create trigger batches_no before insert on batches for each row execute function private.set_doc_no('batch_no','batch');
 
 create table vessel_occupancies (
@@ -685,7 +762,7 @@ create table lots (   -- 1:1 with packaging runs
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
   packaging_run_id uuid not null unique,
-  product_id uuid not null,
+  brand_id uuid not null,
   code text not null,
   packaged_on date not null,
   best_by date,
@@ -693,7 +770,7 @@ create table lots (   -- 1:1 with packaging runs
   unique (id, brewery_id),
   unique (brewery_id, code),
   foreign key (packaging_run_id, brewery_id) references packaging_runs (id, brewery_id),
-  foreign key (product_id, brewery_id) references products (id, brewery_id)
+  foreign key (brand_id, brewery_id) references brands (id, brewery_id)
 );
 alter table inventory_movements add constraint inventory_movements_lot_fk
   foreign key (lot_id, brewery_id) references lots (id, brewery_id);
@@ -1306,27 +1383,27 @@ create index pos_sales_sold_idx on pos_sales (brewery_id, sold_at);
 create index pos_sales_unposted_idx on pos_sales (brewery_id) where movement_id is null;
 
 -- ---------------------------------------------------------------- compliance
-create table product_approvals (
+create table brand_approvals (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
-  product_id uuid not null,
+  brand_id uuid not null,
   kind approval_kind not null,
   ttb_id text not null,
   approved_on date, expires_on date,
   note text,
-  unique (product_id, kind, ttb_id),
-  foreign key (product_id, brewery_id) references products (id, brewery_id)
+  unique (brand_id, kind, ttb_id),
+  foreign key (brand_id, brewery_id) references brands (id, brewery_id)
 );
 
 create table state_registrations (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
-  product_id uuid not null,
+  brand_id uuid not null,
   state text not null check (state ~ '^[A-Z]{2}$'),
   registration_no text,
   approved_on date, expires_on date,
-  unique (product_id, state),
-  foreign key (product_id, brewery_id) references products (id, brewery_id)
+  unique (brand_id, state),
+  foreign key (brand_id, brewery_id) references brands (id, brewery_id)
 );
 
 create table brewery_state_licenses (
@@ -1499,7 +1576,8 @@ create view material_requirements with (security_invoker = true) as
     union all
     select r.brewery_id, bom.material_id, sum(o.qty_planned * bom.qty_per_unit)
     from packaging_runs r join packaging_run_outputs o on o.run_id = r.id
-    join sku_bom bom on bom.sku_id = o.sku_id
+    join skus s on s.id = o.sku_id
+    join format_bom bom on bom.format_id = s.format_id
     where r.closed_at is null group by 1,2)
   select req.brewery_id, req.material_id, sum(req.required) as required,
          coalesce(oh.qty, 0) as on_hand, coalesce(oo.qty, 0) as on_order,
@@ -1540,7 +1618,8 @@ create view packaging_run_requirements with (security_invoker = true) as
          sum(o.qty_planned * bom.qty_per_unit) - coalesce(oh.qty, 0) - coalesce(oo.qty, 0) as short
   from packaging_runs r
   join packaging_run_outputs o on o.run_id = r.id
-  join sku_bom bom on bom.sku_id = o.sku_id
+  join skus s on s.id = o.sku_id
+  join format_bom bom on bom.format_id = s.format_id
   left join material_on_hand oh on oh.material_id = bom.material_id
   left join material_on_order oo on oo.material_id = bom.material_id
   where r.closed_at is null
@@ -1548,11 +1627,12 @@ create view packaging_run_requirements with (security_invoker = true) as
 
 create view packaging_run_yields with (security_invoker = true) as
   select r.id as run_id, r.brewery_id, r.bbl_drawn,
-         coalesce(sum(o.qty_actual * s.bbl_per_unit), 0) as bbl_packaged,
-         r.bbl_drawn - coalesce(sum(o.qty_actual * s.bbl_per_unit), 0) as loss_bbl
+         coalesce(sum(o.qty_actual * f.bbl_per_unit), 0) as bbl_packaged,
+         r.bbl_drawn - coalesce(sum(o.qty_actual * f.bbl_per_unit), 0) as loss_bbl
   from packaging_runs r
   left join packaging_run_outputs o on o.run_id = r.id
   left join skus s on s.id = o.sku_id
+  left join format_volumes f on f.id = s.format_id
   where r.closed_at is not null
   group by r.id;
 
@@ -1602,10 +1682,10 @@ create function private.order_line_price(p_brewery uuid, p_price_list uuid, p_sk
 language plpgsql stable set search_path = '' as $$
 declare v int;
 begin
-  select pli.unit_price_cents into v
-  from public.price_list_items pli
-  join public.skus s on s.id = pli.sku_id and s.brewery_id = pli.brewery_id
-  where pli.brewery_id = p_brewery and pli.price_list_id = p_price_list and pli.sku_id = p_sku and s.active;
+  -- SKU override if present, else the tier's format default (§16.4)
+  select p.unit_price_cents into v
+  from public.sku_prices p join public.skus s on s.id = p.sku_id
+  where p.brewery_id = p_brewery and p.price_list_id = p_price_list and p.sku_id = p_sku and s.active;
   if v is null then raise exception 'sku % is not active and priced for this customer', p_sku; end if;
   return v;
 end $$;
@@ -2252,31 +2332,87 @@ begin
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
-create function create_product(
-  p_brewery uuid, p_name text, p_style text, p_abv numeric, p_request_id uuid
-) returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_replay jsonb; v_row public.products;
+-- One RPC replaces a composed format's children. One level only: children
+-- must be atomic packaged formats (typed volume, no components of their own),
+-- and the parent carries no typed volume, so the derived one is the only one.
+create function replace_format_components(p_brewery uuid, p_format uuid, p_components jsonb, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_parent public.formats; c record; v_child public.formats;
 begin
   perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
-  v_replay := private.claim_command_request(p_brewery, 'create_product', p_request_id,
-    jsonb_build_object('brewery', p_brewery, 'name', p_name, 'style', p_style, 'abv', p_abv));
+  v_replay := private.claim_command_request(p_brewery, 'replace_format_components', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'format', p_format, 'components', p_components));
   if v_replay is not null then return v_replay; end if;
-  insert into public.products (brewery_id, name, style, abv) values (p_brewery, p_name, p_style, p_abv) returning * into v_row;
+  select * into v_parent from public.formats where id = p_format and brewery_id = p_brewery for update;
+  if v_parent.id is null then raise exception 'format not found'; end if;
+  if v_parent.basis <> 'packaged' then raise exception 'only a packaged format composes'; end if;
+  if v_parent.bbl_per_unit is not null then raise exception 'a composed format derives its volume: clear bbl_per_unit first'; end if;
+  if exists (select 1 from public.format_components where child_format_id = p_format) then
+    raise exception 'one level only: this format is already a component of another';
+  end if;
+  delete from public.format_components where parent_format_id = p_format;
+  for c in select (e->>'child_format_id')::uuid as child, (e->>'qty')::numeric as qty from jsonb_array_elements(coalesce(p_components, '[]'::jsonb)) e loop
+    select * into v_child from public.formats where id = c.child and brewery_id = p_brewery;
+    if v_child.id is null then raise exception 'child format not found'; end if;
+    if v_child.id = p_format then raise exception 'a format cannot contain itself (cycle)'; end if;
+    if v_child.basis <> 'packaged' or v_child.bbl_per_unit is null
+       or exists (select 1 from public.format_components where parent_format_id = v_child.id) then
+      raise exception 'one level only: children must be atomic packaged formats (a cycle or a composed child is refused)';
+    end if;
+    insert into public.format_components (brewery_id, parent_format_id, child_format_id, qty) values (p_brewery, p_format, c.child, c.qty);
+  end loop;
+  return private.complete_command_request(p_request_id,
+    (select to_jsonb(v) from public.format_volumes v where v.id = p_format));
+end $$;
+
+-- upsert_brand: name, optional style (found or created in the brewery's own
+-- styles list), ABV, and the optional Brand-screen facts.
+create function upsert_brand(
+  p_brewery uuid, p_id uuid, p_name text, p_style text, p_abv numeric,
+  p_description text, p_category text, p_price_group text, p_hops text, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.brands; v_style uuid;
+begin
+  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'upsert_brand', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'id', p_id, 'name', p_name, 'style', p_style, 'abv', p_abv,
+                       'description', p_description, 'category', p_category, 'price_group', p_price_group, 'hops', p_hops));
+  if v_replay is not null then return v_replay; end if;
+  if nullif(trim(p_style), '') is not null then
+    insert into public.styles (brewery_id, name) values (p_brewery, trim(p_style))
+      on conflict (brewery_id, name) do update set name = excluded.name returning id into v_style;
+  end if;
+  if p_id is null then
+    insert into public.brands (brewery_id, name, style_id, abv, description, category, price_group, hops)
+    values (p_brewery, p_name, v_style, p_abv, p_description, p_category, p_price_group, p_hops) returning * into v_row;
+  else
+    update public.brands set name = p_name, style_id = v_style, abv = p_abv, description = p_description,
+      category = p_category, price_group = p_price_group, hops = p_hops
+    where id = p_id and brewery_id = p_brewery returning * into v_row;
+    if v_row.id is null then raise exception 'brand not found'; end if;
+  end if;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
+-- create_sku: one brand × one packaged format. The display name is filled
+-- from both unless given.
 create function create_sku(
-  p_brewery uuid, p_product uuid, p_name text, p_package_type public.package_type,
-  p_units_per_case int, p_bbl_per_unit numeric, p_request_id uuid
+  p_brewery uuid, p_brand uuid, p_format uuid, p_name text, p_upc text, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_replay jsonb; v_row public.skus;
+declare v_replay jsonb; v_row public.skus; v_brand public.brands; v_format public.formats;
 begin
   perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'create_sku', p_request_id,
-    jsonb_build_object('brewery', p_brewery, 'product', p_product, 'name', p_name, 'package_type', p_package_type, 'units_per_case', p_units_per_case, 'bbl_per_unit', p_bbl_per_unit));
+    jsonb_build_object('brewery', p_brewery, 'brand', p_brand, 'format', p_format, 'name', p_name, 'upc', p_upc));
   if v_replay is not null then return v_replay; end if;
-  insert into public.skus (brewery_id, product_id, name, package_type, units_per_case, bbl_per_unit)
-    values (p_brewery, p_product, p_name, p_package_type, p_units_per_case, p_bbl_per_unit) returning * into v_row;
+  select * into v_brand from public.brands where id = p_brand and brewery_id = p_brewery;
+  select * into v_format from public.formats where id = p_format and brewery_id = p_brewery;
+  if v_brand.id is null then raise exception 'brand not found'; end if;
+  if v_format.id is null then raise exception 'format not found'; end if;
+  if v_format.basis <> 'packaged' then raise exception 'a sku needs a packaged format; a poured format is never stock'; end if;
+  if (select bbl_per_unit from public.format_volumes where id = p_format) is null then raise exception 'format has no volume yet: type bbl_per_unit or add components'; end if;
+  insert into public.skus (brewery_id, brand_id, format_id, name, upc)
+    values (p_brewery, p_brand, p_format, coalesce(nullif(trim(p_name), ''), v_brand.name || ' · ' || v_format.name), p_upc) returning * into v_row;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
@@ -2412,6 +2548,62 @@ begin
     if not found then raise exception 'ship-to not found'; end if;
   end if;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- A tier's default price for a format; every SKU on that format sells at it
+-- unless set_price overrides the SKU.
+create function set_price_list_format(
+  p_brewery uuid, p_price_list uuid, p_format uuid, p_unit_price_cents int, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.price_list_formats;
+begin
+  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
+  if not exists (select 1 from public.price_lists pl join public.formats f on f.brewery_id = pl.brewery_id
+                 where pl.id = p_price_list and f.id = p_format and pl.brewery_id = p_brewery) then
+    raise exception 'permission denied' using errcode = '42501';
+  end if;
+  v_replay := private.claim_command_request(p_brewery, 'set_price_list_format', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'price_list', p_price_list, 'format', p_format, 'unit_price_cents', p_unit_price_cents));
+  if v_replay is not null then return v_replay; end if;
+  insert into public.price_list_formats (brewery_id, price_list_id, format_id, unit_price_cents)
+    values (p_brewery, p_price_list, p_format, p_unit_price_cents)
+    on conflict (price_list_id, format_id) do update set unit_price_cents = excluded.unit_price_cents
+    returning * into v_row;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- Drop a SKU override so the format default applies again.
+create function clear_price_list_item(p_brewery uuid, p_price_list uuid, p_sku uuid, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_n int;
+begin
+  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'clear_price_list_item', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'price_list', p_price_list, 'sku', p_sku));
+  if v_replay is not null then return v_replay; end if;
+  delete from public.price_list_items where brewery_id = p_brewery and price_list_id = p_price_list and sku_id = p_sku;
+  get diagnostics v_n = row_count;
+  return private.complete_command_request(p_request_id, jsonb_build_object('price_list_id', p_price_list, 'sku_id', p_sku, 'cleared', v_n > 0));
+end $$;
+
+-- One RPC replaces a format's packaging bill of materials (§16.12).
+create function replace_format_bom(p_brewery uuid, p_format uuid, p_lines jsonb, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; l record;
+begin
+  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'replace_format_bom', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'format', p_format, 'lines', p_lines));
+  if v_replay is not null then return v_replay; end if;
+  if not exists (select 1 from public.formats where id = p_format and brewery_id = p_brewery) then raise exception 'format not found'; end if;
+  delete from public.format_bom where format_id = p_format;
+  for l in select (e->>'material_id')::uuid as material_id, (e->>'qty_per_unit')::numeric as qty,
+                  coalesce(e->>'on_break', 'consumed')::public.format_material_disposition as on_break
+           from jsonb_array_elements(coalesce(p_lines, '[]'::jsonb)) e loop
+    insert into public.format_bom (brewery_id, format_id, material_id, qty_per_unit, on_break) values (p_brewery, p_format, l.material_id, l.qty, l.on_break);
+  end loop;
+  return private.complete_command_request(p_request_id, jsonb_build_object('format_id', p_format,
+    'lines', (select coalesce(jsonb_agg(jsonb_build_object('material_id', material_id, 'qty_per_unit', qty_per_unit, 'on_break', on_break)), '[]'::jsonb) from public.format_bom where format_id = p_format)));
 end $$;
 
 create function upsert_price_list(p_brewery uuid, p_id uuid, p_name text, p_request_id uuid)
@@ -3097,7 +3289,7 @@ create index packaging_run_outputs_brewery_idx on packaging_run_outputs (brewery
 create index pos_item_mappings_brewery_idx on pos_item_mappings (brewery_id);
 create index pos_locations_brewery_idx on pos_locations (brewery_id);
 create index price_list_items_brewery_idx on price_list_items (brewery_id);
-create index product_approvals_brewery_idx on product_approvals (brewery_id);
+create index brand_approvals_brewery_idx on brand_approvals (brewery_id);
 create index purchase_order_lines_brewery_idx on purchase_order_lines (brewery_id);
 create index receipt_lines_brewery_idx on receipt_lines (brewery_id);
 create index receipts_brewery_idx on receipts (brewery_id);
@@ -3105,7 +3297,7 @@ create index recipe_ingredients_brewery_idx on recipe_ingredients (brewery_id);
 create index recipe_versions_brewery_idx on recipe_versions (brewery_id);
 create index ship_tos_brewery_idx on ship_tos (brewery_id);
 create index shipments_brewery_idx on shipments (brewery_id);
-create index sku_bom_brewery_idx on sku_bom (brewery_id);
+create index format_bom_brewery_idx on format_bom (brewery_id);
 create index state_registrations_brewery_idx on state_registrations (brewery_id);
 create index taproom_pars_brewery_idx on taproom_pars (brewery_id);
 create index transfers_brewery_idx on transfers (brewery_id);
@@ -3117,14 +3309,14 @@ begin
   -- Staff read their tenant's registered query surface. Writes are explicitly
   -- limited below to the exact RPC path and command roles that own them.
   foreach t in array array[
-    'customers','ship_tos','vendors','materials','material_lots','products','keg_pools','skus',
-    'formats','price_lists','price_list_items','sku_bom','locations','bins','stock_transfers','stock_transfer_lines','allocations','taproom_pars',
+    'customers','ship_tos','vendors','materials','material_lots','styles','brands','keg_pools','skus',
+    'formats','format_components','format_bom','price_lists','price_list_formats','price_list_items','locations','bins','stock_transfers','stock_transfer_lines','allocations','taproom_pars',
     'recipes','recipe_versions','recipe_ingredients','vessels','batches','vessel_occupancies',
     'fermentation_readings','batch_additions','packaging_runs','lots','packaging_run_outputs',
     'packaging_run_consumptions','material_contracts','purchase_orders','purchase_order_lines',
     'receipts','receipt_lines','material_counts','material_count_lines','orders','order_lines',
     'shipments','invoices','invoice_lines','pos_locations','pos_item_mappings','pos_sales',
-    'product_approvals','state_registrations','brewery_state_licenses','report_filings',
+    'brand_approvals','state_registrations','brewery_state_licenses','report_filings',
     'routes','deliveries']
   loop
     execute format('alter table %I enable row level security', t);
@@ -3163,11 +3355,17 @@ create policy self_read on customer_users for select using (user_id = (select au
 -- Portal customers
 create policy customer_read_own on customers for select using (id in (select my_customer_ids()));
 create policy customer_own on ship_tos for select using (customer_id in (select my_customer_ids()));
-create policy customer_read on products for select
+create policy customer_read on brands for select
+  using (brewery_id in (select c.brewery_id from customers c where c.id in (select my_customer_ids())));
+create policy customer_read on formats for select
   using (brewery_id in (select c.brewery_id from customers c where c.id in (select my_customer_ids())));
 create policy customer_read on skus for select
   using (active and brewery_id in (select c.brewery_id from customers c where c.id in (select my_customer_ids())));
 create policy customer_own_prices on price_list_items for select
+  using (price_list_id in (select c.price_list_id from customers c where c.id in (select my_customer_ids())));
+create policy customer_own_price_list on price_lists for select
+  using (id in (select c.price_list_id from customers c where c.id in (select my_customer_ids())));
+create policy customer_own_prices on price_list_formats for select
   using (price_list_id in (select c.price_list_id from customers c where c.id in (select my_customer_ids())));
 create policy customer_read_portal_source on locations for select
   using (
@@ -4128,19 +4326,19 @@ revoke all on all sequences in schema public from public, anon, authenticated;
 -- qbo_connections and pos_connections hold connection metadata only; token
 -- material lives in private.integration_tokens behind service-only RPCs.
 grant select on breweries, brewery_users, customer_users,
-  customers, ship_tos, vendors, materials, material_lots, products, keg_pools, skus,
-  formats, price_lists, price_list_items, sku_bom, locations, bins, stock_transfers, stock_transfer_lines, inventory_movements, allocations, taproom_pars,
+  customers, ship_tos, vendors, materials, material_lots, styles, brands, keg_pools, skus,
+  formats, format_components, format_bom, price_lists, price_list_formats, price_list_items, locations, bins, stock_transfers, stock_transfer_lines, inventory_movements, allocations, taproom_pars,
   recipes, recipe_versions, recipe_ingredients, vessels, batches, vessel_occupancies, transfers,
   volume_adjustments, fermentation_readings, material_movements, batch_additions, packaging_runs,
   lots, packaging_run_outputs, packaging_run_consumptions, material_contracts, purchase_orders,
   purchase_order_lines, receipts, receipt_lines, material_counts, material_count_lines, orders,
   order_lines, order_events, shipments, invoices, invoice_lines, keg_events,
-  pos_locations, pos_item_mappings, pos_sales, product_approvals, state_registrations,
+  pos_locations, pos_item_mappings, pos_sales, brand_approvals, state_registrations,
   brewery_state_licenses, report_filings, routes, deliveries, qbo_connections, pos_connections
   to authenticated;
 -- Security-invoker views retain the underlying tables' RLS predicates; expose
 -- only the derived reads consumed by registered commands.
-grant select on on_hand, bin_on_hand, atp, invoice_totals, keg_deposit_balances, portal_brewery to authenticated;
+grant select on on_hand, bin_on_hand, atp, invoice_totals, keg_deposit_balances, portal_brewery, sku_prices to authenticated;
 grant all on all tables in schema public to service_role;
 grant all on all sequences in schema public to service_role;
 
@@ -4163,9 +4361,10 @@ revoke all on all functions in schema private from public, anon, authenticated;
 grant execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), portal_availability(uuid), portal_brewery_rows()
   to authenticated;
 grant execute on function
-  create_product(uuid,text,text,numeric,uuid),
-  create_sku(uuid,uuid,text,public.package_type,int,numeric,uuid),
+  create_sku(uuid,uuid,uuid,text,text,uuid),
+  upsert_brand(uuid,uuid,text,text,numeric,text,text,text,text,uuid),
   upsert_format(uuid,uuid,text,public.format_basis,public.package_type,public.keg_size,int,numeric,uuid),
+  replace_format_components(uuid,uuid,jsonb,uuid),
   create_location(uuid,text,public.location_kind,uuid),
   update_location(uuid,uuid,text,public.location_kind,uuid),
   create_bin(uuid,uuid,text,uuid),
@@ -4175,6 +4374,9 @@ grant execute on function
   upsert_ship_to(uuid,uuid,uuid,text,text,text,text,text,text,uuid),
   upsert_price_list(uuid,uuid,text,uuid),
   set_price(uuid,uuid,uuid,int,uuid),
+  set_price_list_format(uuid,uuid,uuid,int,uuid),
+  clear_price_list_item(uuid,uuid,uuid,uuid),
+  replace_format_bom(uuid,uuid,jsonb,uuid),
   record_inventory_movement(uuid,uuid,uuid,uuid,numeric,public.movement_type,public.sale_channel,text,text,uuid),
   set_taproom_par(uuid,uuid,uuid,numeric,uuid),
   set_portal_fulfillment_source(uuid,uuid,uuid),

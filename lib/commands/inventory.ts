@@ -120,9 +120,9 @@ defineQuery({
 });
 
 defineQuery({
-  name: "list_skus", description: "SKUs with their product name, alphabetical",
+  name: "list_skus", description: "SKUs with their brand and format, alphabetical",
   input: z.object({}), roles: [...readRoles],
-  handler: (ctx) => unwrap(ctx.db.from("skus").select("id, name, products(name)").eq("brewery_id", ctx.breweryId).order("name")),
+  handler: (ctx) => unwrap(ctx.db.from("skus").select("id, name, active, brand_id, format_id, brands(name), formats(name, bbl_per_unit, package_type)").eq("brewery_id", ctx.breweryId).order("name")),
 });
 
 defineQuery({

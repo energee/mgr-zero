@@ -24,13 +24,13 @@ describe("test database isolation", () => {
 });
 
 describe("seed helpers", () => {
-  it("seedCatalog rows are visible to list_products; seedLocation and seedCustomer link up", async () => {
+  it("seedCatalog rows are visible to list_brands; seedLocation and seedCustomer link up", async () => {
     const b = await makeBrewery();
     const ctx = await makeStaffCtx(b.id);
-    const { productId, skuId } = await seedCatalog(b.id, { product: "Pils", sku: "Pils keg", packageType: "keg" });
-    const products = await runCommand("list_products", {}, ctx) as { id: string; skus?: { id: string }[] }[];
-    expect(products.map(p => p.id)).toContain(productId);
-    expect(JSON.stringify(products)).toContain(skuId);
+    const { brandId, skuId } = await seedCatalog(b.id, { product: "Pils", sku: "Pils keg", packageType: "keg" });
+    const brands = await runCommand("list_brands", {}, ctx) as { id: string; skus?: { id: string }[] }[];
+    expect(brands.map(p => p.id)).toContain(brandId);
+    expect(brands.find(p => p.id === brandId)?.skus?.map(s => s.id)).toContain(skuId);
 
     const loc = await seedLocation(b.id, { kind: "taproom" });
     expect(loc.kind).toBe("taproom");

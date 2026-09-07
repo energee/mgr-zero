@@ -12,7 +12,7 @@ let adminCtx: StaffCtx;
 let salesCtx: StaffCtx;
 let warehouseCtx: StaffCtx;
 let brewerCtx: StaffCtx;
-let productId: string;
+let formatId: string;
 let skuId: string;
 let locationId: string;
 let binId: string;
@@ -28,7 +28,7 @@ beforeAll(async () => {
   warehouseCtx = await makeStaffCtx(brewery.id, "warehouse");
   brewerCtx = await makeStaffCtx(brewery.id, "brewer");
 
-  ({ productId, skuId } = await seedCatalog(brewery.id, { product: "Boundary IPA", sku: "Boundary case" }));
+  ({ formatId, skuId } = await seedCatalog(brewery.id, { product: "Boundary IPA", sku: "Boundary case" }));
   ({ id: locationId, binId } = await seedLocation(brewery.id, { name: "Boundary warehouse" }));
   taproomId = (await seedLocation(brewery.id, { name: "Boundary taproom", kind: "taproom" })).id;
   ({ customerId, shipToId, priceListId } = await seedCustomer(brewery.id, { name: "Boundary customer" }));
@@ -38,15 +38,15 @@ beforeAll(async () => {
 });
 
 describe("staff command database boundary", () => {
-  it("denies raw product inserts to every staff role", async () => {
-    const adminRaw = await adminCtx.db.from("products")
-      .insert({ brewery_id: brewery.id, name: "admin raw product" });
-    const salesRaw = await salesCtx.db.from("products")
-      .insert({ brewery_id: brewery.id, name: "sales raw product" });
-    const warehouseRaw = await warehouseCtx.db.from("products")
-      .insert({ brewery_id: brewery.id, name: "warehouse raw product" });
-    const brewerRaw = await brewerCtx.db.from("products")
-      .insert({ brewery_id: brewery.id, name: "brewer raw product" });
+  it("denies raw brand inserts to every staff role", async () => {
+    const adminRaw = await adminCtx.db.from("brands")
+      .insert({ brewery_id: brewery.id, name: "admin raw brand" });
+    const salesRaw = await salesCtx.db.from("brands")
+      .insert({ brewery_id: brewery.id, name: "sales raw brand" });
+    const warehouseRaw = await warehouseCtx.db.from("brands")
+      .insert({ brewery_id: brewery.id, name: "warehouse raw brand" });
+    const brewerRaw = await brewerCtx.db.from("brands")
+      .insert({ brewery_id: brewery.id, name: "brewer raw brand" });
 
     expect(adminRaw.error?.code).toBe("42501");
     expect(salesRaw.error?.code).toBe("42501");
@@ -54,16 +54,12 @@ describe("staff command database boundary", () => {
     expect(brewerRaw.error?.code).toBe("42501");
   });
 
-  it("allows sales to create products only through its RPC and rejects warehouse and brewer", async () => {
-    const allowed = await salesCtx.db.rpc("create_product", { p_request_id: crypto.randomUUID(),
-      p_brewery: brewery.id, p_name: "sales rpc product", p_style: null, p_abv: null,
-    });
-    const warehouse = await warehouseCtx.db.rpc("create_product", { p_request_id: crypto.randomUUID(),
-      p_brewery: brewery.id, p_name: "warehouse rpc product", p_style: null, p_abv: null,
-    });
-    const brewer = await brewerCtx.db.rpc("create_product", { p_request_id: crypto.randomUUID(),
-      p_brewery: brewery.id, p_name: "brewer rpc product", p_style: null, p_abv: null,
-    });
+  it("allows sales to create brands only through its RPC and rejects warehouse and brewer", async () => {
+    const args = (name: string) => ({ p_request_id: crypto.randomUUID(), p_brewery: brewery.id, p_id: null, p_name: name,
+      p_style: null, p_abv: null, p_description: null, p_category: null, p_price_group: null, p_hops: null });
+    const allowed = await salesCtx.db.rpc("upsert_brand", args("sales rpc product"));
+    const warehouse = await warehouseCtx.db.rpc("upsert_brand", args("warehouse rpc product"));
+    const brewer = await brewerCtx.db.rpc("upsert_brand", args("brewer rpc product"));
 
     expect(allowed.error).toBeNull();
     expect(allowed.data).toMatchObject({ name: "sales rpc product", brewery_id: brewery.id });
@@ -213,35 +209,22 @@ describe("tenant-safe document counters", () => {
 describe("registered staff mutation role × RPC matrix", () => {
   const matrix: MatrixCase[] = [
     {
-      command: "create_product", rpc: "create_product", allowed: ["admin", "sales"],
+      command: "upsert_brand", rpc: "upsert_brand", allowed: ["admin", "sales"],
       input: async role => {
-        const name = unique("matrix product", role);
+        const name = unique("matrix brand", role);
         return {
-          command: { name },
-          rpc: { p_brewery: brewery.id, p_name: name, p_style: null, p_abv: null },
+          command: { name, style: "Lager" },
+          rpc: { p_brewery: brewery.id, p_id: null, p_name: name, p_style: "Lager", p_abv: null, p_description: null, p_category: null, p_price_group: null, p_hops: null },
         };
       },
     },
     {
       command: "create_sku", rpc: "create_sku", allowed: ["admin", "sales"],
       input: async role => {
-        const name = unique("matrix sku", role);
+        const { data: b } = await admin.from("brands").insert({ brewery_id: brewery.id, name: unique("matrix sku brand", role) }).select("id").single();
         return {
-          command: { productId, name, packageType: "can", bblPerUnit: "0.0645" },
-          rpc: {
-            p_brewery: brewery.id, p_product: productId, p_name: name, p_package_type: "can",
-            p_units_per_case: null, p_bbl_per_unit: "0.0645",
-          },
-        };
-      },
-    },
-    {
-      command: "update_location", rpc: "update_location", allowed: ["admin"],
-      input: async role => {
-        const name = unique("matrix renamed", role);
-        return {
-          command: { locationId, name, kind: "warehouse" },
-          rpc: { p_brewery: brewery.id, p_id: locationId, p_name: name, p_kind: "warehouse" },
+          command: { brandId: b!.id, formatId },
+          rpc: { p_brewery: brewery.id, p_brand: b!.id, p_format: formatId, p_name: null, p_upc: null },
         };
       },
     },
@@ -254,6 +237,31 @@ describe("registered staff mutation role × RPC matrix", () => {
           rpc: { p_brewery: brewery.id, p_id: null, p_name: name, p_basis: "packaged", p_package_type: "can", p_keg_size: null, p_units_per_case: null, p_bbl_per_unit: 0.0645 },
         };
       },
+    },
+    {
+      command: "replace_format_components", rpc: "replace_format_components", allowed: ["admin", "sales"],
+      input: async role => {
+        const { data: parent } = await admin.from("formats").insert({ brewery_id: brewery.id, name: unique("matrix case", role), basis: "packaged", package_type: "can" }).select("id").single();
+        return {
+          command: { formatId: parent!.id, components: [{ childFormatId: formatId, qty: 6 }] },
+          rpc: { p_brewery: brewery.id, p_format: parent!.id, p_components: [{ child_format_id: formatId, qty: 6 }] },
+        };
+      },
+    },
+    {
+      command: "replace_format_bom", rpc: "replace_format_bom", allowed: ["admin", "sales"],
+      input: async () => ({ command: { formatId, lines: [] }, rpc: { p_brewery: brewery.id, p_format: formatId, p_lines: [] } }),
+    },
+    {
+      command: "set_price_list_format", rpc: "set_price_list_format", allowed: ["admin", "sales"],
+      input: async () => ({
+        command: { priceListId, formatId, unitPriceCents: 1800 },
+        rpc: { p_brewery: brewery.id, p_price_list: priceListId, p_format: formatId, p_unit_price_cents: 1800 },
+      }),
+    },
+    {
+      command: "clear_price_list_item", rpc: "clear_price_list_item", allowed: ["admin", "sales"],
+      input: async () => ({ command: { priceListId, skuId }, rpc: { p_brewery: brewery.id, p_price_list: priceListId, p_sku: skuId } }),
     },
     {
       command: "create_location", rpc: "create_location", allowed: ["admin"],

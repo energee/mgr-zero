@@ -81,7 +81,7 @@ describe("bins", () => {
     const a = (await runCommand("create_location", { name: "Ledger A", kind: "warehouse" }, ctx)) as Row;
     const b = (await runCommand("create_location", { name: "Ledger B", kind: "warehouse" }, ctx)) as Row;
     const [binB] = (await runCommand("list_bins", { locationId: b.id }, ctx)) as Row[];
-    const { skuId } = await seedCatalog(ctx.breweryId, { product: "Bin Pils" });
+    const { skuId } = await seedCatalog(ctx.breweryId, { product: "Bin Pils", format: "Bin can" });
     const { data: mat } = await admin.from("materials").insert({
       brewery_id: ctx.breweryId, name: "Bin malt", category: "malt", base_uom: "lb", purchase_uom: "lb", lot_tracked: false,
     }).select().single();
@@ -133,7 +133,7 @@ describe("bins", () => {
   it("record_movement requires a bin and get_bin_on_hand reports per bin while on_hand stays per location", async () => {
     const loc = (await runCommand("create_location", { name: "Split WH", kind: "warehouse" }, ctx)) as Row;
     const [b1, b2] = (await runCommand("list_bins", { locationId: loc.id }, ctx)) as Row[];
-    const { skuId } = await seedCatalog(ctx.breweryId, { product: "Split Pils" });
+    const { skuId } = await seedCatalog(ctx.breweryId, { product: "Split Pils", format: "Split can" });
     await expect(runCommand("record_movement", { skuId, locationId: loc.id, qty: 1, type: "opening_balance" }, ctx)).rejects.toBeTruthy();
     await runCommand("record_movement", { skuId, locationId: loc.id, binId: b1.id, qty: 10, type: "opening_balance" }, ctx);
     await runCommand("record_movement", { skuId, locationId: loc.id, binId: b2.id, qty: 5, type: "opening_balance" }, ctx);
@@ -147,7 +147,7 @@ describe("bins", () => {
   it("delete_bin refuses a bin that ever recorded stock, even at net zero", async () => {
     const loc = (await runCommand("create_location", { name: "Stock WH", kind: "warehouse" }, ctx)) as Row;
     const [bin] = (await runCommand("list_bins", { locationId: loc.id }, ctx)) as Row[];
-    const { skuId } = await seedCatalog(ctx.breweryId, { product: "Stock Pils" });
+    const { skuId } = await seedCatalog(ctx.breweryId, { product: "Stock Pils", format: "Stock can" });
     await runCommand("record_movement", { skuId, locationId: loc.id, binId: bin.id, qty: 2, type: "opening_balance" }, ctx);
     await expect(runCommand("delete_bin", { binId: bin.id }, ctx))
       .rejects.toMatchObject({ message: expect.stringMatching(/recorded stock/i) });

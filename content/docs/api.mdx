@@ -162,6 +162,7 @@ omitted. They have no roles until they are built.
 | --- | --- | --- | --- | --- | --- | --- |
 | `adjust_order_lines` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `cancel_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
+| `clear_price_list_item` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `confirm_delivery` | Delivery & routes | ✓ |  | ✓ |  |  |
 | `confirm_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `confirm_restock` | Orders & invoicing | ✓ |  | ✓ |  |  |
@@ -170,7 +171,6 @@ omitted. They have no roles until they are built.
 | `create_credit_memo` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `create_location` | Inventory & locations | ✓ |  |  |  |  |
 | `create_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
-| `create_product` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `create_replenishment_order` | Taproom & kegs | ✓ | ✓ |  |  |  |
 | `create_sku` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `create_stock_transfer` | Inventory & locations | ✓ |  | ✓ |  |  |
@@ -192,6 +192,7 @@ omitted. They have no roles until they are built.
 | `invite_customer_user` | Customers | ✓ | ✓ |  |  |  |
 | `invite_staff` | Team & brewery settings | ✓ |  |  |  |  |
 | `list_bins` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
+| `list_brands` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
 | `list_customers` | Customers | ✓ | ✓ | ✓ |  |  |
 | `list_formats` | Packaging | ✓ | ✓ | ✓ |  |  |
 | `list_invoices` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
@@ -199,7 +200,6 @@ omitted. They have no roles until they are built.
 | `list_movements` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `list_orders` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `list_price_lists` | Catalog & pricing | ✓ | ✓ |  |  |  |
-| `list_products` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
 | `list_skus` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
 | `list_standing_allocations` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `list_stock_transfers` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
@@ -218,6 +218,8 @@ omitted. They have no roles until they are built.
 | `record_pick` | Orders & invoicing | ✓ |  | ✓ |  |  |
 | `record_stock_transfer_pick` | Orders & invoicing | ✓ |  | ✓ |  |  |
 | `release_allocation` | Orders & invoicing | ✓ | ✓ |  |  |  |
+| `replace_format_bom` | Packaging | ✓ | ✓ |  |  |  |
+| `replace_format_components` | Packaging | ✓ | ✓ |  |  |  |
 | `replenishment_suggestions` | Taproom & kegs | ✓ | ✓ | ✓ |  |  |
 | `resolve_short_pick` | Orders & invoicing | ✓ |  | ✓ |  |  |
 | `return_shipment` | Delivery & routes | ✓ | ✓ |  |  |  |
@@ -226,6 +228,7 @@ omitted. They have no roles until they are built.
 | `set_notification_preference` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
 | `set_portal_fulfillment_source` | Customers | ✓ |  |  |  |  |
 | `set_price` | Catalog & pricing | ✓ | ✓ |  |  |  |
+| `set_price_list_format` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `set_standing_allocation` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `set_taproom_par` | Taproom & kegs | ✓ | ✓ |  |  |  |
 | `ship_order` | Orders & invoicing | ✓ |  | ✓ |  |  |
@@ -235,6 +238,7 @@ omitted. They have no roles until they are built.
 | `update_bin` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `update_draft_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `update_location` | Inventory & locations | ✓ |  |  |  |  |
+| `upsert_brand` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `upsert_customer` | Customers | ✓ | ✓ |  |  |  |
 | `upsert_format` | Packaging | ✓ | ✓ |  |  |  |
 | `upsert_price_list` | Catalog & pricing | ✓ | ✓ |  |  |  |
@@ -1336,51 +1340,64 @@ list, and `set_price` sets one SKU's `unitPriceCents` on it as an integer.
 
 {/* ops:catalog */}
 
-#### create_product [#create_product]
+#### clear_price_list_item [#clear_price_list_item]
 
 `command` · admin, sales
 
-Create a beer brand/product
+Remove a SKU's price override so the format default applies
 
 | Field | Type | Required |
 | --- | --- | --- |
-| `name` | string | yes |
-| `style` | string | no |
-| `abv` | number | no |
+| `priceListId` | uuid | yes |
+| `skuId` | uuid | yes |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_product", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "clear_price_list_item", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "priceListId": "00000000-0000-0000-0000-000000000000", "skuId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### create_sku [#create_sku]
 
 `command` · admin, sales
 
-Create a sellable format of a product
+Create a SKU: one brand × one packaged format; the name defaults to brand · format
 
 | Field | Type | Required |
 | --- | --- | --- |
-| `productId` | uuid | yes |
-| `name` | string | yes |
-| `packageType` | keg or can or bottle | yes |
-| `bblPerUnit` | string | yes |
-| `unitsPerCase` | integer | no |
+| `brandId` | uuid | yes |
+| `formatId` | uuid | yes |
+| `name` | string | no |
+| `upc` | string | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_sku", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "productId": "00000000-0000-0000-0000-000000000000", "name": "string", "packageType": "keg", "bblPerUnit": "1" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_sku", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "brandId": "00000000-0000-0000-0000-000000000000", "formatId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+#### list_brands [#list_brands]
+
+`query` · admin, sales, warehouse
+
+Brands with their style and SKUs, alphabetical
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_brands", "input": {} }'
 ```
 
 #### list_price_lists [#list_price_lists]
 
 `query` · admin, sales
 
-Price lists with their per-SKU prices
+Price lists with their format defaults and per-SKU overrides
 
 Takes no input.
 
@@ -1391,26 +1408,11 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_price_lists", "input": {} }'
 ```
 
-#### list_products [#list_products]
-
-`query` · admin, sales, warehouse
-
-Products with their SKUs, alphabetical
-
-Takes no input.
-
-```bash
-curl -X POST "$MGR_URL/api/command" \
-  -H 'content-type: application/json' \
-  -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_products", "input": {} }'
-```
-
 #### list_skus [#list_skus]
 
 `query` · admin, sales, warehouse
 
-SKUs with their product name, alphabetical
+SKUs with their brand and format, alphabetical
 
 Takes no input.
 
@@ -1425,7 +1427,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Set a SKU's price on a price list (integer cents)
+Override one SKU's price on a price list (integer cents); without an override the SKU sells at the tier's format default
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -1438,6 +1440,49 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_price", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "priceListId": "00000000-0000-0000-0000-000000000000", "skuId": "00000000-0000-0000-0000-000000000000", "unitPriceCents": 1 } }'
+```
+
+#### set_price_list_format [#set_price_list_format]
+
+`command` · admin, sales
+
+Set a price list's default price for a format (integer cents); every SKU on that format sells at it unless overridden
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `priceListId` | uuid | yes |
+| `formatId` | uuid | yes |
+| `unitPriceCents` | integer | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_price_list_format", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "priceListId": "00000000-0000-0000-0000-000000000000", "formatId": "00000000-0000-0000-0000-000000000000", "unitPriceCents": 1 } }'
+```
+
+#### upsert_brand [#upsert_brand]
+
+`command` · admin, sales
+
+Create or edit a brand: name, style (added to the brewery's styles when new), ABV, and optional description, category, price group, hops
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `name` | string | yes |
+| `id` | uuid | no |
+| `style` | string | no |
+| `abv` | number | no |
+| `description` | string | no |
+| `category` | string | no |
+| `priceGroup` | string | no |
+| `hops` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_brand", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string" } }'
 ```
 
 #### upsert_price_list [#upsert_price_list]
@@ -1462,22 +1507,18 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* catalog-designed */}
 
-7 of the 18 operations in this area are available today; the 11 below are not.
+9 of the 16 operations in this area are available today; the 7 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
-| `clear_price_list_item` | command | Price tiers, Override |
 | `delete_sale_channel` | command | Sale channels, Channel |
 | `get_price_list` | query | Price tiers, Override |
 | `get_sku` | query | SKU |
-| `list_brands` | query | Catalog, Brand, Schedule batch |
 | `list_sale_channels` | query | Square locations, Sale channels, Channel |
-| `set_price_list_format` | command | Price tiers |
 | `set_price_list_item` | command | Catalog, Price tiers, Override |
 | `update_sku` | command | Catalog, Brand, SKU |
-| `upsert_brand` | command | Catalog, Brand |
 | `upsert_sale_channel` | command | Sale channels, Channel |
 
 {/* end ops:catalog */}
@@ -1817,6 +1858,42 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_formats", "input": {} }'
 ```
 
+#### replace_format_bom [#replace_format_bom]
+
+`command` · admin, sales
+
+Replace a format's packaging bill of materials: material, qty per unit, and what happens to it on break (consumed or return_to_stock)
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `formatId` | uuid | yes |
+| `lines` | array of object | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "replace_format_bom", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "formatId": "00000000-0000-0000-0000-000000000000", "lines": [ { "materialId": "00000000-0000-0000-0000-000000000000", "qtyPerUnit": 1 } ] } }'
+```
+
+#### replace_format_components [#replace_format_components]
+
+`command` · admin, sales
+
+Replace a composed format's children (one level: atomic packaged children); its volume is derived from them
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `formatId` | uuid | yes |
+| `components` | array of object | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "replace_format_components", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "formatId": "00000000-0000-0000-0000-000000000000", "components": [ { "childFormatId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
+```
+
 #### upsert_format [#upsert_format]
 
 `command` · admin, sales
@@ -1844,7 +1921,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* packaging-designed */}
 
-2 of the 12 operations in this area are available today; the 10 below are not.
+4 of the 12 operations in this area are available today; the 8 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
@@ -1856,8 +1933,6 @@ The screens need them and the backend has not built them, so calling one returns
 | `list_occupancies` | query | Schedule packaging run |
 | `list_packaging_runs` | query | Packaging runs |
 | `record_repack` | command | Repack |
-| `replace_format_bom` | command | Package BOM, Formats, Format |
-| `replace_format_components` | command | Formats, Format |
 | `schedule_packaging_run` | command | Close packaging run, Schedule packaging run |
 | `update_packaging_run` | command | Schedule packaging run |
 

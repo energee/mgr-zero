@@ -65,28 +65,34 @@ CSV import has no screen yet, so there is no **Import** link. See [Actions not y
   <Card title="Closing a form">Closing without saving throws away the edits and puts the form back to its defaults.</Card>
 </Cards>
 
-## Catalog: products and SKUs [#catalog]
+## Catalog: brands, formats, and SKUs [#catalog]
 
-*A product is the beer, such as Hazy IPA. A SKU is one sellable package of that beer, such as a half-barrel keg or a case of cans. Admin and Sales can create products and SKUs. Warehouse has no link here (the planned **Menu** entry is hidden until built), though the page is readable at its address. **New Product** and **New SKU** still appear for Warehouse, but submitting either returns a permission error. Catalog is not reachable by Brewer.*
+*A brand is the beer, such as Hazy IPA. A format is the physical shape it ships or pours in, such as a half-barrel keg or a case of 16 oz cans. A SKU is one brand in one packaged format, the thing inventory, pricing, and orders refer to. Admin and Sales can create brands, formats, and SKUs. Warehouse has no link here (the planned **Menu** entry is hidden until built), though the page is readable at its address. **New Brand**, **New Format**, and **New SKU** still appear for Warehouse, but submitting any of them returns a permission error. Catalog is not reachable by Brewer.*
 
-### Create a product
+### Create a brand
 
-1. Open **Catalog** and select **New Product**.
-2. Enter **Name** (required), **Style** (optional), and **ABV** (optional percentage; type `6.5` for 6.5%).
-3. Select **Create**. Product names must be unique within the brewery. The product lands alphabetically and starts as **No SKUs yet**.
+1. Open **Catalog** and select **New Brand**.
+2. Enter **Name** (required), **Style** (optional; a new style is added to the brewery's list), and **ABV** (optional percentage; type `6.5` for 6.5%). **Description**, **Category**, **Price group**, and **Hops** are optional notes.
+3. Select **Create**. Brand names must be unique within the brewery. The brand lands alphabetically and starts as **No SKUs yet**.
+
+### Create a format
+
+1. Under **Formats**, select **New Format**.
+2. Enter **Name** and choose **Basis**: `packaged` holds stock; `poured` is a glass served at the taproom and never holds stock.
+3. For a packaged format choose **Package type** (`keg`, `can`, or `bottle`), the **Keg size** for kegs, and optionally **Units per case** and **BBL per unit**.
+4. Select **Create**. Format names must be unique within the brewery.
 
 ### Create a SKU
 
-1. Find the product and select **New SKU**.
-2. Enter **Name**. Choose **Package type** (`keg`, `can`, or `bottle`; default `keg`).
-3. Optionally enter whole-number **Units per case**. **BBL per unit** is required.
-4. Select **Create**. A SKU name must be unique within its product. After that, the SKU is available in inventory, pricing, and order forms.
+1. Find the brand and select **New SKU**.
+2. Choose a packaged **Format**. **Name** is optional and defaults to *Brand · Format*; **UPC** is optional.
+3. Select **Create**. A brand has at most one SKU per format. After that, the SKU is available in inventory, pricing, and order forms.
 
-**BBL per unit** is the barrel volume of one inventory unit. One US beer barrel is 31 gallons (3,968 fl oz). Half-barrel keg = `0.5`. Sixth-barrel keg is about `0.16666667`. A 24 × 16 oz case is `384 ÷ 3968`, about `0.09677419`. Type this on the SKU before you record inventory. It is an editable number, not a row you tap to change.
+**BBL per unit** is the barrel volume of one inventory unit and lives on the format, so every SKU in that format shares it. One US beer barrel is 31 gallons (3,968 fl oz). Half-barrel keg = `0.5`. Sixth-barrel keg is about `0.16666667`. A 24 × 16 oz case is `384 ÷ 3968`, about `0.09677419`. Set it on the format before you record inventory.
 
 Catalog shows this as **Volume** in brewery units: common keg fractions stay in bbl, smaller exact totals use whole gallons, and anything under a gallon uses fluid ounces. So `0.5` reads as **½ bbl**, a 24 × 16 oz case as **3 gal**, and a can as **16 oz**. A volume that converts to no whole unit stays in bbl. MGR still stores and calculates all beer volume in bbl.
 
-An empty Catalog says **No products yet.**
+An empty Catalog says **No brands yet.** and an empty Formats section **No formats yet.**
 
 Wholesale Shop lists the packages the brewery has put on the wholesale list — ½ keg, ⅙ keg, case, bottle — grouped under the beer name. Buyers do not see warehouse counts. Staff designate, on the packaging plan, which run outputs land on that list. Prices come from the buyer's assigned [price list](#pricing); a package with no price for that buyer does not appear on Shop.
 
@@ -135,7 +141,7 @@ Wholesale Shop lists the packages the brewery has put on the wholesale list — 
 **Samples and festival removals:** these need a destination state, and the form has no destination-state field. Do not fake it with another type. Use your brewery's approved recording procedure.
 </Callout>
 
-MGR calculates and stores barrel volume for every movement from quantity × the SKU's BBL per unit. Movements cannot be edited or deleted. See [Errors and corrections](#errors-corrections) before you try to fix inventory.
+MGR calculates and stores barrel volume for every movement from quantity × the BBL per unit of the SKU's format. Movements cannot be edited or deleted. See [Errors and corrections](#errors-corrections) before you try to fix inventory.
 
 Empty sections say **No inventory recorded yet.** or **No movements recorded yet.**
 
@@ -301,7 +307,7 @@ If the link is missing, expired, already used, or belongs to another account, go
 
 **A page fails to load.** Select **Try again** once. If it still fails, give your administrator the brewery or customer name, page, approximate time, and the action you tried.
 
-**A record seems missing.** Confirm the brewery shown in the navigation, clear any order-status filter, and check the exact product, SKU, customer, or location name.
+**A record seems missing.** Confirm the brewery shown in the navigation, clear any order-status filter, and check the exact brand, SKU, customer, or location name.
 
 **A page says "Not found".** Opening an order, customer, or invoice link that matches nothing in your brewery shows a Not found page with a link back to Today, not an error. The record was removed, the link is wrong, or it belongs to a brewery you are not signed in to. Switch brewery, or ask the person who sent the link.
 
@@ -318,7 +324,7 @@ Do not hunt for hidden controls for these:
 - staff or customer-portal invitations
 - CSV import
 - adding, renaming or removing bins, setting taproom pars, or choosing the warehouse that fulfills wholesale-customer portal orders, from the interface
-- editing products or SKUs after creation
+- editing brands, formats, or SKUs after creation
 - deleting customers, ship-tos, prices, price lists, inventory history, orders, invoices, or credit memos
 - editing staff roles or seeing staff email addresses
 - recording payments

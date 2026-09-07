@@ -8,13 +8,13 @@ import "@/lib/commands/all";
 import { PriceListForm } from "./price-list-form";
 import { PriceForm } from "./price-form";
 
-type Sku = { id: string; name: string; products: { name: string } | null };
+type Sku = { id: string; name: string; brands: { name: string } | null };
 type PriceListItem = { sku_id: string; unit_price_cents: number; skus: { name: string } | null };
 type PriceList = { id: string; name: string; price_list_items: PriceListItem[] };
 
 function skuLabel(sku: Sku | undefined) {
   if (!sku) return "—";
-  return sku.products?.name ? `${sku.products.name} — ${sku.name}` : sku.name;
+  return sku.brands?.name ? `${sku.brands.name} — ${sku.name}` : sku.name;
 }
 
 function formatCents(cents: number) {

@@ -53,18 +53,16 @@ defineQuery({
   input: z.object({}),
   handler: async (ctx) => {
     const customerId = requireCustomer(ctx);
-    // RLS limits price_list_items to the caller's list and skus to active.
+    // RLS limits price tiers to the caller's list and skus to active ones;
+    // sku_prices already resolves override-or-format-default (§16.4).
     const [prices, avail] = await Promise.all([
-      unwrap(ctx.db.from("price_list_items").select("sku_id, unit_price_cents, skus(id, name, products(name))")),
+      unwrap(ctx.db.from("sku_prices").select("sku_id, sku_name, brand_name, unit_price_cents")),
       unwrap(ctx.db.rpc("portal_availability", { p_customer: customerId })),
     ]);
     const badges = new Map((avail as { sku_id: string; badge: string }[]).map(a => [a.sku_id, a.badge]));
-    // postgrest-js infers embedded resources as arrays without generated DB
-    // types; both sku_id->skus and product_id->products are many-to-one, so
-    // the real JSON shape at runtime is a single nested object per row.
-    const priceRows = prices as unknown as { sku_id: string; unit_price_cents: number; skus: { name: string; products: { name: string } } }[];
+    const priceRows = prices as { sku_id: string; sku_name: string; brand_name: string; unit_price_cents: number }[];
     return priceRows.map(p => ({
-      skuId: p.sku_id, name: p.skus.name, product: p.skus.products.name,
+      skuId: p.sku_id, name: p.sku_name, product: p.brand_name,
       unitPriceCents: p.unit_price_cents, badge: badges.get(p.sku_id) ?? "out",
     }));
   },

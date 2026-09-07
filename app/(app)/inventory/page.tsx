@@ -9,7 +9,7 @@ import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { MovementForm } from "./movement-form";
 
-type Sku = { id: string; name: string; products: { name: string } | null };
+type Sku = { id: string; name: string; brands: { name: string } | null };
 type Location = { id: string; name: string; kind: string };
 type Bin = { id: string; location_id: string; name: string };
 type BinOnHandRow = { sku_id: string; location_id: string; bin_id: string; qty: string };
@@ -18,7 +18,7 @@ type Movement = { id: string; created_at: string; type: string; qty: string; sku
 
 function skuLabel(sku: Sku | undefined) {
   if (!sku) return "—";
-  return sku.products?.name ? `${sku.products.name} — ${sku.name}` : sku.name;
+  return sku.brands?.name ? `${sku.brands.name} — ${sku.name}` : sku.name;
 }
 
 export default async function InventoryPage() {

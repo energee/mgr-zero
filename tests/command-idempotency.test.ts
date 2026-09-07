@@ -23,10 +23,10 @@ beforeAll(async () => {
 describe("command request idempotency", () => {
   it("returns the original mutation result for an identical request id", async () => {
     const requestId = crypto.randomUUID();
-    const payload = { p_brewery: breweryId, p_name: "Replay IPA", p_style: "IPA", p_abv: 6.5, p_request_id: requestId };
+    const payload = { p_brewery: breweryId, p_id: null, p_name: "Replay IPA", p_style: "IPA", p_abv: 6.5, p_description: null, p_category: null, p_price_group: null, p_hops: null, p_request_id: requestId };
 
-    const first = await staffDb.rpc("create_product", payload);
-    const replay = await staffDb.rpc("create_product", payload);
+    const first = await staffDb.rpc("upsert_brand", payload);
+    const replay = await staffDb.rpc("upsert_brand", payload);
 
     expect(first.error).toBeNull();
     expect(replay.error).toBeNull();
@@ -35,11 +35,11 @@ describe("command request idempotency", () => {
 
   it("rejects reuse of a request id with a different payload", async () => {
     const requestId = crypto.randomUUID();
-    const first = await staffDb.rpc("create_product", {
-      p_brewery: breweryId, p_name: "Original", p_style: null, p_abv: null, p_request_id: requestId,
+    const first = await staffDb.rpc("upsert_brand", {
+      p_brewery: breweryId, p_name: "Original", p_id: null, p_style: null, p_abv: null, p_description: null, p_category: null, p_price_group: null, p_hops: null, p_request_id: requestId,
     });
-    const mismatch = await staffDb.rpc("create_product", {
-      p_brewery: breweryId, p_name: "Different", p_style: null, p_abv: null, p_request_id: requestId,
+    const mismatch = await staffDb.rpc("upsert_brand", {
+      p_brewery: breweryId, p_name: "Different", p_id: null, p_style: null, p_abv: null, p_description: null, p_category: null, p_price_group: null, p_hops: null, p_request_id: requestId,
     });
 
     expect(first.error).toBeNull();
@@ -49,11 +49,16 @@ describe("command request idempotency", () => {
 
   it("rejects request reuse across command names and breweries", async () => {
     const requestId = crypto.randomUUID();
-    const first = await staffDb.rpc("create_product", {
+    const first = await staffDb.rpc("upsert_brand", {
       p_brewery: breweryId,
       p_name: "Bound request",
+      p_id: null,
       p_style: null,
       p_abv: null,
+      p_description: null,
+      p_category: null,
+      p_price_group: null,
+      p_hops: null,
       p_request_id: requestId,
     });
     expect(first.error).toBeNull();
@@ -72,11 +77,16 @@ describe("command request idempotency", () => {
       user_id: staffUserId,
       role: "admin",
     });
-    const breweryMismatch = await staffDb.rpc("create_product", {
+    const breweryMismatch = await staffDb.rpc("upsert_brand", {
       p_brewery: otherBrewery.id,
       p_name: "Wrong brewery",
+      p_id: null,
       p_style: null,
       p_abv: null,
+      p_description: null,
+      p_category: null,
+      p_price_group: null,
+      p_hops: null,
       p_request_id: requestId,
     });
     expect(breweryMismatch.error?.message).toMatch(/request id.*different payload/i);

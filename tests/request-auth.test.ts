@@ -85,7 +85,7 @@ describe("request authentication", () => {
       new Request("http://localhost/api/command", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ breweryId: brewery.id, name: "list_products", input: {} }),
+        body: JSON.stringify({ breweryId: brewery.id, name: "list_brands", input: {} }),
       })
     );
 

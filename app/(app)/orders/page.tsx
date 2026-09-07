@@ -23,7 +23,7 @@ type Order = {
 type CustomerRow = { id: string; name: string };
 type ShipTo = { id: string; label: string };
 type LocationRow = { id: string; name: string; kind: "warehouse" | "taproom" };
-type SkuRow = { id: string; name: string; products: { name: string } | null };
+type SkuRow = { id: string; name: string; brands: { name: string } | null };
 
 const STATUSES: OrderStatus[] = ["draft", "submitted", "confirmed", "picked", "shipped", "cancelled"];
 
@@ -54,7 +54,7 @@ export default async function OrdersPage({
     shipTos: shipTosByCustomer[i].shipTos.map((s) => ({ id: s.id, label: s.label })),
   }));
   const locations: LocationOption[] = locationRows.map((l) => ({ id: l.id, name: l.name, kind: l.kind }));
-  const skus: SkuOption[] = skuRows.map((s) => ({ id: s.id, label: s.products ? `${s.products.name} — ${s.name}` : s.name }));
+  const skus: SkuOption[] = skuRows.map((s) => ({ id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name }));
 
   return (
     <div className="flex flex-col gap-6">

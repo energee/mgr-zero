@@ -118,7 +118,7 @@ describe("cross-brewery tenant consistency (composite FKs)", () => {
   // brewery B — a cross-tenant write RLS never caught. The composite FKs
   // added in the baseline migration make that combination impossible at the database level.
   let bA: any, bB: any, staffA: any;
-  let skuA: any, skuB: any, locA: any, locB: any, productB: any;
+  let skuA: any, skuB: any, locA: any, locB: any, brandB: any, formatA: any;
 
   beforeAll(async () => {
     bA = await makeBrewery();
@@ -126,8 +126,8 @@ describe("cross-brewery tenant consistency (composite FKs)", () => {
     staffA = await makeStaff(bA.id, "warehouse");
     const catA = await seedCatalog(bA.id, { product: "A Product", sku: "A Sku", packageType: "keg", bblPerUnit: 0.5 });
     const catB = await seedCatalog(bB.id, { product: "B Product", sku: "B Sku", packageType: "keg", bblPerUnit: 0.5 });
-    skuA = { id: catA.skuId };
-    productB = { id: catB.productId }; skuB = { id: catB.skuId };
+    skuA = { id: catA.skuId }; formatA = { id: catA.formatId };
+    brandB = { id: catB.brandId }; skuB = { id: catB.skuId };
     locA = await seedLocation(bA.id, { name: "A WH" });
     locB = await seedLocation(bB.id, { name: "B WH" });
   });
@@ -148,11 +148,11 @@ describe("cross-brewery tenant consistency (composite FKs)", () => {
     expect(error).not.toBeNull();
   });
 
-  it("rejects a sku whose product_id belongs to a different brewery than brewery_id", async () => {
+  it("rejects a sku whose brand_id belongs to a different brewery than brewery_id", async () => {
     // Admin client bypasses RLS but not FK constraints — this proves the DB
     // rejects the combination regardless of who is issuing the write.
     const { error } = await admin.from("skus").insert({
-      brewery_id: bA.id, product_id: productB.id, name: "Sneaky Sku", package_type: "keg", bbl_per_unit: 0.5,
+      brewery_id: bA.id, brand_id: brandB.id, format_id: formatA.id, name: "Sneaky Sku",
     });
     expect(error).not.toBeNull();
   });

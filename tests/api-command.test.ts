@@ -51,7 +51,7 @@ describe("POST /api/command bearer auth", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     try {
-      await expect(command("brewery-id", "create_product", { name: "Pils" })).resolves.toEqual({ created: true });
+      await expect(command("brewery-id", "upsert_brand", { name: "Pils" })).resolves.toEqual({ created: true });
       const [, options] = fetchMock.mock.calls[0] as [string, { body: string }];
       const body = JSON.parse(options.body) as { requestId: string };
       expect(body.requestId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
@@ -79,14 +79,14 @@ describe("POST /api/command bearer auth", () => {
   ])("browser client rejects a non-envelope response (%i) instead of crashing on its shape", async (status, json) => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status, json }));
     try {
-      await expect(command("brewery-id", "create_product", { name: "Pils" })).rejects.toThrow(`malformed response (${status})`);
+      await expect(command("brewery-id", "upsert_brand", { name: "Pils" })).rejects.toThrow(`malformed response (${status})`);
     } finally {
       vi.unstubAllGlobals();
     }
   });
 
   it("runs a query without a request id and returns a correlation id", async () => {
-    const res = await POST(commandReq({ breweryId, name: "list_products", input: {} }, adminToken));
+    const res = await POST(commandReq({ breweryId, name: "list_brands", input: {} }, adminToken));
     const json = await res.json();
     expect(res.status).toBe(200);
     expect(json).toMatchObject({ ok: true, correlationId: expect.any(String) });
@@ -149,27 +149,27 @@ describe("POST /api/command bearer auth", () => {
   });
 
   it("rejects a bad token", async () => {
-    const res = await POST(commandReq({ breweryId, name: "list_products", input: {} }, "not-a-jwt"));
+    const res = await POST(commandReq({ breweryId, name: "list_brands", input: {} }, "not-a-jwt"));
     const json = await res.json();
     expect(res.status).toBe(401);
     expect(json).toMatchObject({ ok: false, error: { message: "unauthenticated" }, correlationId: expect.any(String) });
   });
 
   it("rejects a malformed Authorization header", async () => {
-    const res = await POST(commandReq({ breweryId, name: "list_products", input: {} }, ""));
+    const res = await POST(commandReq({ breweryId, name: "list_brands", input: {} }, ""));
     expect(res.status).toBe(401);
   });
 
   it("rejects a valid user who is not a member", async () => {
     const other = await makeStaff((await makeBrewery()).id, "admin");
-    const res = await POST(commandReq({ breweryId, name: "list_products", input: {} }, await signIn(other.email)));
+    const res = await POST(commandReq({ breweryId, name: "list_brands", input: {} }, await signIn(other.email)));
     const json = await res.json();
     expect(res.status).toBe(403);
     expect(json).toMatchObject({ ok: false, error: { message: "not a member of this brewery" }, correlationId: expect.any(String) });
   });
 
   it("treats a non-UUID breweryId as not-a-member, never a 500", async () => {
-    const res = await POST(commandReq({ breweryId: "not-a-uuid", name: "list_products", input: {} }, adminToken));
+    const res = await POST(commandReq({ breweryId: "not-a-uuid", name: "list_brands", input: {} }, adminToken));
     expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({ ok: false, error: { message: "not a member of this brewery" }, correlationId: expect.any(String) });
   });
@@ -177,7 +177,7 @@ describe("POST /api/command bearer auth", () => {
   it("rejects a command the role cannot run", async () => {
     const res = await POST(commandReq({
       breweryId,
-      name: "create_product",
+      name: "upsert_brand",
       input: { name: "Nope" },
       requestId: randomUUID(),
     }, warehouseToken));

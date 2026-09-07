@@ -65,19 +65,26 @@ export function sql(q: string, quiet = false): string[] {
 
 // Seed helpers: the one place tests create catalog/location/customer rows, so
 // a schema change (Program 3 renames products→brands+formats) is one edit.
+// brand + packaged format + the sku that is their product (§16.1, §16.2).
 export async function seedCatalog(
   breweryId: string,
-  opts: { product?: string; sku?: string; packageType?: "keg" | "can" | "bottle"; bblPerUnit?: number } = {},
+  opts: { product?: string; sku?: string; packageType?: "keg" | "can" | "bottle"; bblPerUnit?: number; format?: string } = {},
 ) {
-  const { data: p, error: pe } = await admin.from("products")
+  const { data: b, error: be } = await admin.from("brands")
     .insert({ brewery_id: breweryId, name: opts.product ?? "IPA" }).select("id").single();
-  if (pe) throw pe;
+  if (be) throw be;
+  const formatName = opts.format ?? `${opts.packageType ?? "can"} ${opts.bblPerUnit ?? 0.0645} bbl`;
+  const existing = await admin.from("formats").select("id").eq("brewery_id", breweryId).eq("name", formatName).maybeSingle();
+  const { data: f, error: fe } = existing.data ? { data: existing.data, error: null } : await admin.from("formats").insert({
+    brewery_id: breweryId, name: formatName, basis: "packaged",
+    package_type: opts.packageType ?? "can", keg_size: opts.packageType === "keg" ? "half_bbl" : null, bbl_per_unit: opts.bblPerUnit ?? 0.0645,
+  }).select("id").single();
+  if (fe) throw fe;
   const { data: s, error: se } = await admin.from("skus").insert({
-    brewery_id: breweryId, product_id: p.id, name: opts.sku ?? "IPA case",
-    package_type: opts.packageType ?? "can", bbl_per_unit: opts.bblPerUnit ?? 0.0645,
+    brewery_id: breweryId, brand_id: b.id, format_id: f.id, name: opts.sku ?? "IPA case",
   }).select("id").single();
   if (se) throw se;
-  return { productId: p.id as string, skuId: s.id as string };
+  return { brandId: b.id as string, skuId: s.id as string, formatId: f.id as string };
 }
 
 // Mirrors create_location: a location is born with Walk-in, Cold and Dry.

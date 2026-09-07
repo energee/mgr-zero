@@ -47,7 +47,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "set_price", description: "Set a SKU's price on a price list (integer cents)",
+  name: "set_price", description: "Override one SKU's price on a price list (integer cents); without an override the SKU sells at the tier's format default",
   roles: [...roles],
   input: z.object({ priceListId: z.string().uuid(), skuId: z.string().uuid(), unitPriceCents: z.number().int().nonnegative() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_price", {
@@ -62,6 +62,24 @@ defineCommand({
   input: z.object({ locationId: z.string().uuid() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_portal_fulfillment_source", {
     p_brewery: ctx.breweryId, p_location: i.locationId, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "set_price_list_format", description: "Set a price list's default price for a format (integer cents); every SKU on that format sells at it unless overridden",
+  input: z.object({ priceListId: z.string().uuid(), formatId: z.string().uuid(), unitPriceCents: z.number().int().nonnegative() }),
+  roles: ["admin", "sales"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_price_list_format", {
+    p_brewery: ctx.breweryId, p_price_list: i.priceListId, p_format: i.formatId, p_unit_price_cents: i.unitPriceCents, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "clear_price_list_item", description: "Remove a SKU's price override so the format default applies",
+  input: z.object({ priceListId: z.string().uuid(), skuId: z.string().uuid() }),
+  roles: ["admin", "sales"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("clear_price_list_item", {
+    p_brewery: ctx.breweryId, p_price_list: i.priceListId, p_sku: i.skuId, p_request_id: execution.requestId,
   })),
 });
 
@@ -84,8 +102,8 @@ defineQuery({
 });
 
 defineQuery({
-  name: "list_price_lists", description: "Price lists with their per-SKU prices",
+  name: "list_price_lists", description: "Price lists with their format defaults and per-SKU overrides",
   roles: ["admin", "sales"],
   input: z.object({}),
-  handler: (ctx) => unwrap(ctx.db.from("price_lists").select("*, price_list_items(sku_id, unit_price_cents, skus(name))").eq("brewery_id", ctx.breweryId).order("name")),
+  handler: (ctx) => unwrap(ctx.db.from("price_lists").select("*, price_list_formats(format_id, unit_price_cents, formats(name)), price_list_items(sku_id, unit_price_cents, skus(name))").eq("brewery_id", ctx.breweryId).order("name")),
 });
