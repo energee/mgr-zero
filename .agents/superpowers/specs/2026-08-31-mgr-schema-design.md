@@ -110,8 +110,16 @@ money cents.
 default '{}'`. Premises = brewery (one per). RLS: `staff_read` select `is_staff_of(id)`;
 `admin_update` update `staff_role(id)='admin'`. No `unique(id, brewery_id)` (it is the root).
 
-### `brewery_users` — unchanged
-pk `(brewery_id, user_id)`, `role staff_role`. RLS unchanged (`member_read`, `admin_write`).
+### `brewery_users` — roles become an array (decided 2026-09-07)
+pk `(brewery_id, user_id)`, `roles staff_role[] not null check (cardinality(roles) > 0)`.
+One person sells and brews; forcing a single role made them admin or made them
+choose. An array on the same row is the smallest change: `staff_role(b)` becomes
+`staff_roles(b)` returning the array, `assert_staff(p_brewery, p_roles)` already
+takes an array and checks overlap (`roles && p_roles`), every RPC call site stays
+as written, and `navFor` unions the nav of each role. A junction table was
+rejected: a second table, RLS, and a join for no behavior the array lacks. Last
+admin is now "the last row whose array contains admin". RLS unchanged
+(`member_read`, `admin_write`).
 The current brewery-bound command context cannot bootstrap these two rows, and the listed
 policies intentionally expose no client insert path. SaaS provisioning remains blocked
 until a registered pre-tenant `provision_brewery` command and narrow RLS bootstrap path can

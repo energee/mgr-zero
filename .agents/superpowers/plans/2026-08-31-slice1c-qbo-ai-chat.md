@@ -12,7 +12,7 @@
 
 **Goal:** QuickBooks Online invoices-out / payments-back, and the AI chat composer that turns typed intent into a previewed, explicitly-confirmed registry command.
 
-**Architecture:** QBO is a thin `lib/qbo.ts` fetch wrapper (plain OAuth2, no Intuit SDK) plus registry commands. OAuth tokens never touch a public table: they are written and read only through `lib/supabase/integration-tokens.ts` (`storeIntegrationTokens` / `readIntegrationTokens`), which authorizes the caller with the RLS-bound client before calling the service-only `store_integration_tokens` / `read_integration_tokens` RPCs over `private.integration_tokens`. Every push must persist its exact payload + the invoice's `qbo_idempotency_key` before POSTing, with durable recovery for the later external result; the blocked tasks below do not yet meet that contract. The composer is a registry query (`compose_command`) that gives the LLM only `aiExposed` command schemas; the server canonicalizes candidates through `preview_command`; the UI commits only on an explicit verb click.
+**Architecture:** QBO is a thin `lib/qbo.ts` fetch wrapper (plain OAuth2, no Intuit SDK) plus registry commands. OAuth tokens never touch a public table: they are written and read only through `lib/supabase/integration-tokens.ts` (`storeIntegrationTokens` / `readIntegrationTokens`), which authorizes the caller with the RLS-bound client before calling the service-only `store_integration_tokens` / `read_integration_tokens` RPCs over `private.integration_tokens`. Every push must persist its exact payload + the invoice's `qbo_idempotency_key` before POSTing, with durable recovery for the later external result; the blocked tasks below do not yet meet that contract. The AI side is superseded: the one-shot composer is replaced by the agent loop in `.agents/superpowers/specs/2026-09-07-mgr-ai-chat-design.md` (plan `2026-09-07-ai-chat.md`); `preview_command` and the explicit verb click survive there unchanged.
 
 **Tech Stack:** Next.js App Router, Supabase (Postgres/RLS), Zod, `@anthropic-ai/sdk` (**new dependency — approving this plan approves adding it**; QBO uses plain `fetch`, no new dep).
 
@@ -37,7 +37,7 @@ the blocked QBO tasks below are not current implementation instructions.
 
 - Every domain operation is a registry command/query dispatched through `app/api/command/route.ts`; no business logic in routes/pages (iron rule 1).
 - Every multi-row write is one plpgsql function (iron rule 5). Edit `supabase/migrations/00001_baseline.sql` in place + `npx supabase db reset`; never a second migration file.
-- Composer contract (UI plan §2): server (`preview_command`), not the model, canonicalizes; previews never invent document numbers ("assigned on commit"); every AI write waits for an explicit click on its verb; no auto-commit setting; composer history is device-local.
+- Composer contract (UI plan §2): server (`preview_command`), not the model, canonicalizes; previews never invent document numbers ("assigned on commit"); every AI write waits for an explicit click on its verb; no auto-commit setting; chat history is server-owned (`2026-09-07-mgr-ai-chat-design.md` §5).
 - `push_invoice_to_qbo` (UI plan): persist exact payload + stable request ID **before** POST; uncertain response reconciles by the same ID before retry; online only.
 - `connect_qbo`: durable OAuth after admin permission check; `get_qbo_connection` returns health only, **never tokens**. Token material crosses exactly one boundary: `lib/supabase/integration-tokens.ts`.
 - Every new SQL writer follows `.agents/ARCHITECTURE.md` iron rule 5 and is pinned by the boundary/schema tests named there.
@@ -52,8 +52,7 @@ Slice 1B is merged (#15). `invoices`, `qbo_connections`, the mapping columns, th
 ## Parallelism
 
 - Track A (QBO): Tasks 1 → 2 → 3 → 4 → 5 → 6 → 7 (sequential within track).
-- Track B (Composer): Tasks 8 → 9 → 10 (sequential within track).
-- Tracks A and B are fully independent of each other. Task 11 (docs/validation) last.
+- Track B (Composer): moved to `2026-09-07-ai-chat.md`. Task 11 (docs/validation) last.
 
 ---
 
@@ -228,67 +227,26 @@ Handler order (the ordering is the spec's durability requirement — payload per
 - [ ] **Step 4: Commit** `feat(1c): QBO integrations screen + Today failure row`
 - [ ] **Step 5:** Add the same **Push to QuickBooks** button (with the confirmation dialog) to `app/(app)/invoices/[id]/page.tsx`; update `public/docs/staff-guide.html` (Integrations screen, push action, failure row, corrections) in the same commit.
 
-### Task 8: Registry — `aiExposed` flag + `preview_command`
+### Tasks 8–10: AI composer — superseded
 
-**Files:**
-- Modify: `lib/commands/registry.ts`, existing `lib/commands/{catalog,inventory}.ts` (tag safe defs), `lib/commands/all.ts`
-- Create: `lib/commands/preview.ts`
-- Test: `tests/registry.test.ts` (extend), `tests/commands-preview.test.ts`
-
-**Interfaces:**
-- Produces: `Def` gains `aiExposed?: boolean` (default false) and optional `preview?: (ctx: Ctx, input: In) => Promise<Record<string, unknown>>`; `listTools(opts?: { aiOnly?: boolean })` filters to tagged defs; exported `getCommand(name: string)`; query `preview_command` (roles `"any"`, input `{ command: z.string(), input: z.unknown() }`, **not aiExposed**) → `{ name, description, requiresConfirmation, valid: boolean, errors: string[] | null, canonical: unknown, preview: Record<string, unknown> | null, allowed: boolean }`. It runs `safeParse`, the role check, and the optional `preview` hook; it **never** calls `handler`.
-- Consumes: nothing new.
-
-- [ ] **Step 1: Failing tests**: `listTools({aiOnly:true})` excludes untagged commands and `preview_command` itself; valid `create_product` input → `valid:true`, `canonical` = Zod-parsed input, `requiresConfirmation` echoed; invalid input → `valid:false` with messages and nothing written to the DB; a command the ctx role can't run → `allowed:false`; `preview` is null when the def has no hook (previews never invent document numbers — numbers only exist post-commit).
-- [ ] **Step 2:** run — FAIL. **Step 3:** implement; tag `aiExposed: true` on the hop-green set only: catalog CRUD commands/queries, `record_movement`, `get_on_hand`, `get_atp`, `list_movements`. Leave `import_csv`, `invite_staff`, `invite_customer_user` (fail-closed, P1.9) and everything copper/gated untagged; tag the merged 1B read queries (`list_orders`, `get_order`, `list_invoices`, …) only after confirming each is hop-green in the UI plan.
-- [ ] **Step 4:** run — PASS. **Step 5: Commit** `feat(1c): aiExposed registry flag + preview_command canonical preview`
-
-### Task 9: `compose_command` — LLM intent → candidate
-
-**Files:**
-- Create: `lib/commands/compose.ts`
-- Modify: `lib/commands/all.ts`, `package.json` (add `@anthropic-ai/sdk`), `.env.example` (+`ANTHROPIC_API_KEY`), README env table
-- Test: `tests/commands-compose.test.ts`
-
-**Interfaces:**
-- Produces: query `compose_command` (roles `"any"`, input `{ text: z.string().min(1) }`) → `{ candidate: { command: string, input: unknown } | null, message: string }`; test hook `_setModelClient(fake)` mirroring the `_clearRegistry` convention.
-- Consumes: `listTools({aiOnly:true})` (Task 8), filtered again to the ctx role's runnable set; Zod → JSON Schema via Zod 4's built-in `z.toJSONSchema`.
-- Model call: one Anthropic Messages request, model `claude-sonnet-5`, `tool_choice: {type:"auto"}`, system prompt: "Propose exactly one registered command for the user's intent, or reply asking for the missing field. Never invent quantities, sources, or destinations." A returned `tool_use` block becomes `candidate` verbatim — the server does not trust it; the UI must run it through `preview_command` before showing a proposal.
-
-- [ ] **Step 1: Failing tests** (stubbed client only — never the network): stub returns `tool_use` for `create_product` → `candidate` carries it; stub returns plain text → `candidate:null`, `message` set; a `customer`-role ctx's captured request contains no staff-only tools; `compose_command` and `preview_command` are absent from the tool list.
-- [ ] **Step 2:** run — FAIL. **Step 3:** `npm i @anthropic-ai/sdk` (approved via this plan), implement. **Step 4:** run — PASS, plus `npx tsc --noEmit`. **Step 5: Commit** `feat(1c): compose_command LLM intent-to-candidate with role-filtered tools`
-
-### Task 10: Composer UI (staff shell)
-
-**Files:**
-- Create: `app/(app)/composer.tsx`
-- Modify: `app/(app)/page.tsx` (mount at bottom of Today), `app/(app)/layout.tsx` (⌘K on desktop)
-- Test: rendered-page check (manual).
-
-**Interfaces:**
-- Consumes: `compose_command` → `preview_command` → normal client `runCommand` call on explicit confirm.
-
-Flow (UI plan §2 verbatim requirements): text → `compose_command`; if candidate, `preview_command`; proposal card shows every field that will be written plus warnings, with any document number labelled "assigned on commit"; primary button is the command's verb (e.g. **Create product**), plus **Open as form** (deep-link to the owning form prefilled via query params where the form exists; omit otherwise) and **Dismiss**; `requiresConfirmation` commands additionally get the `AlertDialog`. No auto-commit code path exists. History: last 20 entries in `localStorage` behind a visible **History** button (device-local per the plan), reads/writes wrapped in try/catch.
-
-- [ ] **Step 1:** Build it.
-- [ ] **Step 2:** Look at the rendered flow against local Supabase with `ANTHROPIC_API_KEY` set: type "new product called Haze King, 6.8%", confirm the write happens only on the verb click, and an ambiguous intent shows the model's clarifying message. `npx tsc --noEmit && npm run lint`.
-- [ ] **Step 3: Commit** `feat(1c): chat composer — compose → preview → explicit-verb commit`
-- [ ] **Step 4:** Mount the same component in `app/(portal)/layout.tsx` for customers (UI plan §3); Tasks 8–9's role filtering already restricts a `customer` ctx to portal commands — add one test in `tests/commands-compose.test.ts` proving a customer ctx's tool list contains only `portal_*` names.
+Moved to `.agents/superpowers/plans/2026-09-07-ai-chat.md` (spec
+`2026-09-07-mgr-ai-chat-design.md`), which replaces the one-shot composer with
+a registry-scoped agent loop. Nothing here remains current.
 
 ### Task 11: Docs + final validation
 
 **Files:**
-- Modify: `.agents/ARCHITECTURE.md` (ownership rows for `lib/qbo.ts`, `lib/commands/{qbo,preview,compose}.ts`, `app/api/qbo/callback`; note the compose→preview→commit contract is now implemented and that `lib/supabase/integration-tokens.ts` stays the only token boundary), `README.md` (env table for every new command), `content/docs/api.mdx` (run `bun run docs:api` after each command names its `reads`/`writes` in `components/mgr/screens.tsx` — never hand-edit between its `ops:` markers), the applicable `public/docs/{staff,portal}-guide.html` files, `.agents/PROGRESS.md`; `components/mgr/screens.tsx` only if the built Integrations/composer screens diverged from their frames (the frames stay in step with the plan).
+- Modify: `.agents/ARCHITECTURE.md` (ownership rows for `lib/qbo.ts`, `lib/commands/qbo.ts`, `app/api/qbo/callback`; `preview.ts` and the chat loop are owned by `2026-09-07-ai-chat.md` Task 9 and that `lib/supabase/integration-tokens.ts` stays the only token boundary), `README.md` (env table for every new command), `content/docs/api.mdx` (run `bun run docs:api` after each command names its `reads`/`writes` in `components/mgr/screens.tsx` — never hand-edit between its `ops:` markers), the applicable `public/docs/{staff,portal}-guide.html` files, `.agents/PROGRESS.md`; `components/mgr/screens.tsx` only if the built Integrations/composer screens diverged from their frames (the frames stay in step with the plan).
 
 - [ ] **Step 1:** Full gate: `npx vitest run && npx tsc --noEmit && npm run lint`; `git diff` review (NUL-byte check); one from-scratch `npx supabase db reset` to prove the baseline replays.
 - [ ] **Step 2:** Update the docs above; verify every new file carries its module-level comment.
-- [ ] **Step 3: Commit** `docs(1c): architecture/progress updates for QBO + composer`
+- [ ] **Step 3: Commit** `docs(1c): architecture/progress updates for QBO`
 
 ---
 
 ## Self-review notes
 
-- Spec coverage: UI-plan rows `connect_qbo` (T3), `set_qbo_customer_mapping`/`set_qbo_item_mapping` (T4), `push_invoice_to_qbo` incl. persist-before-POST + reconcile-by-ID (T5), `get_qbo_connection` health-only (T3), `get_qbo_mapping_candidates` (T4), payments-back from the parent spec (T6), composer contract §2 (T8–T10), Today "QBO failures" row (T7). Deliberately out, per the specs: `connect_square` (slice 7), QBO disconnect commands (`compensation: null` until exact disconnect commands exist), server-owned composer history (device-local until a schema exists), voice transport.
+- Spec coverage: UI-plan rows `connect_qbo` (T3), `set_qbo_customer_mapping`/`set_qbo_item_mapping` (T4), `push_invoice_to_qbo` incl. persist-before-POST + reconcile-by-ID (T5), `get_qbo_connection` health-only (T3), `get_qbo_mapping_candidates` (T4), payments-back from the parent spec (T6), composer contract §2 (T8–T10, superseded by `2026-09-07-ai-chat.md`), Today "QBO failures" row (T7). Deliberately out, per the specs: `connect_square` (slice 7), QBO disconnect commands (`compensation: null` until exact disconnect commands exist), server-owned composer history (device-local until a schema exists), voice transport.
 - `qbo_pushes.status` reuses the `qbo_sync_status` enum — one vocabulary, `pending → pushed | push_failed` matching the invoice column.
-- Type consistency: `start_qbo_push(p_brewery, p_invoice_id, p_payload) → uuid` identical in T1/T5; `listTools({aiOnly})` in T8/T9; `Ctx` unchanged throughout.
+- Type consistency: `start_qbo_push(p_brewery, p_invoice_id, p_payload) → uuid` identical in T1/T5; `Ctx` unchanged throughout.
 - Revised 2026-09-01 on `audit-p1-authz` (see "Audit corrections" above); no 1C code exists on that branch.

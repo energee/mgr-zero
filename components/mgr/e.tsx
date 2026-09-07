@@ -71,6 +71,16 @@ type BtnBase = "p" | "g" | "ghost" | "irr" | "del";
 type BtnKind = BtnBase | `${BtnBase} disabled`;
 type VolumeUnit = "oz" | "gal" | "bbl" | "mL" | "L";
 
+/** A row is a tap target when its trailing slot declares `data-tap`: the Open
+ *  chevron (E.nav) or a verb (E.act). A switch or a stepper there is its own
+ *  control, so the row around it keeps the plain cursor. Read by CSS on the
+ *  row, never by inspecting the child. */
+const TAP_ROW = "has-[[data-tap]]:cursor-pointer has-[[data-tap]]:select-none has-[[data-tap]]:hover:bg-accent/50";
+
+const fieldGrid = (fields: React.ReactNode[], className: string) => (
+  <div className={cn("grid gap-2 [&>*]:min-w-0", className)}>{Children.toArray(fields)}</div>
+);
+
 export const E = {
   /** Page title. `action` is a list-create button (New order, Add customer):
    *  full-width under the title on the phone, on the title row from md up. */
@@ -115,7 +125,7 @@ export const E = {
    *  "Citra lot" to a Citra row by name. Item is flex-wrap, so the footer
    *  takes a full line without any layout of its own. */
   row: (t: React.ReactNode, s: React.ReactNode = "", n: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement, foot?: React.ReactNode) => (
-    <Item variant="outline" data-gated={cls === "dis" || undefined} className={cn(cls === "dis" && "opacity-50")}>
+    <Item variant="outline" data-gated={cls === "dis" || undefined} className={cn(cls === "dis" ? "cursor-not-allowed opacity-50" : TAP_ROW)}>
       {(icon || dotColor[cls]) && (
         <ItemMedia className={CENTER_MEDIA}>
           {icon ? <RowMedia icon={icon} cls={cls} /> : <Dot cls={cls} />}
@@ -131,7 +141,7 @@ export const E = {
   ),
   /** Soft-filled workflow entry. Tone describes the action, independently of row status. */
   act: (t: React.ReactNode, tone: "primary" | "success" | "attention" | "info" | "destructive" = "primary") => (
-    <Button variant="ghost" size="sm" data-row-action className={cn(
+    <Button variant="ghost" size="sm" data-row-action data-tap className={cn(
       tone === "destructive" && "bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive",
       tone === "primary" && "bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary",
       tone === "success" && "bg-success text-success-foreground hover:bg-success/80 hover:text-success-foreground",
@@ -157,7 +167,8 @@ export const E = {
         variant={kind === "g" ? "outline" : kind === "ghost" ? "ghost" : kind === "del" ? "destructive" : "default"}
         disabled={Boolean(disabled)}
         className={cn(
-          "w-full md:w-fit",
+          // A lone verb sits where a group would end: right, on the desk.
+          "w-full md:w-fit md:self-end",
           kind === "irr" && "bg-irreversible text-irreversible-foreground hover:bg-irreversible/90",
           // Solid, not shadcn's tint (whose dark:bg-destructive/20 would otherwise
           // win): a loss should carry the same weight as the teal commit beside it.
@@ -258,7 +269,7 @@ export const E = {
     // not typed: the same −/+ stepper Weekly count uses.
     if (type === "number") {
       return (
-        <Field orientation="horizontal">
+        <Field>
           <FieldLabel>{label}</FieldLabel>
           {E.stq(Number(value), label)}
         </Field>
@@ -270,18 +281,25 @@ export const E = {
     // share one list. A caller cannot forget to disambiguate.
     const listId = suggestions?.length ? `list-${suggestions.join("-").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}` : undefined;
     return (
-      <Field orientation="horizontal">
+      <Field>
         <FieldLabel>{label}</FieldLabel>
         <Input type={type} defaultValue={value} aria-label={label} list={listId} />
         {listId ? <datalist id={listId}>{suggestions!.map((o) => <option key={o} value={o} />)}</datalist> : null}
       </Field>
     );
   },
+  /** Short fields side by side on desk, stacked on a phone. The frame is an
+   *  iframe, so md: means the desk width, never the docs page around it. */
+  cols: (...fields: React.ReactNode[]) => fieldGrid(fields, "md:grid-cols-2 md:gap-x-6"),
+  /** Fields that read as one phrase (a quantity, its unit, and what it is per)
+   *  stay on one line at every width; three at most, or the phone can’t. */
+  inline: (...fields: [React.ReactNode, React.ReactNode, React.ReactNode?]) =>
+    fieldGrid(fields, fields.length === 3 ? "grid-cols-3" : "grid-cols-2"),
   /** A time-of-day window as one two-thumb range: start and end are 24-hour "hh:mm". */
   window: (label: string, start: string, end: string) => <TimeWindowField label={label} start={start} end={end} />,
   /** A picked value: a Select for short fixed lists; long lists (SKU, customer) keep opening Entity picker. */
   pick: (label: string, value: string, options: string[]) => (
-    <Field orientation="horizontal">
+    <Field>
       <FieldLabel>{label}</FieldLabel>
       <Select defaultValue={value}>
         <SelectTrigger aria-label={label}><SelectValue /></SelectTrigger>
@@ -364,7 +382,16 @@ export const E = {
       <EmptyDescription>{t}</EmptyDescription>
     </Empty>
   ),
-  inp: (t: string) => <Input placeholder={t} aria-label={t} />,
+  /** A blank labeled input. The label sits over the control like every other
+   *  field (shadcn Field default); `hint` is the placeholder, never the label. */
+  inp: (label: string, hint?: string) => (
+    <Field>
+      <FieldLabel>{label}</FieldLabel>
+      <Input placeholder={hint} aria-label={label} />
+    </Field>
+  ),
+  /** A search box: the one input whose placeholder is its whole label. */
+  search: (t = "Search") => <Input type="search" placeholder={t} aria-label={t} />,
   stq: (v: number, label = "Quantity") => (
     <ButtonGroup>
       <Button variant="outline" size="icon" aria-label="Decrease">−</Button>
@@ -373,7 +400,7 @@ export const E = {
     </ButtonGroup>
   ),
   gated: (t: React.ReactNode, why: React.ReactNode = "isn’t available yet") => E.row(t, why, "", "dis", SquareLock01Icon),
-  nav: (t: React.ReactNode, s: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement) => E.row(t, s, <DirectionIcon label="Open" />, cls, icon),
+  nav: (t: React.ReactNode, s: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement) => E.row(t, s, <span data-tap><DirectionIcon label="Open" /></span>, cls, icon),
   /** A document line: a material or SKU with its quantity and the fields that
    *  belong to it. No line wants an icon, so this fills that slot rather than
    *  every call site writing the hole. */
