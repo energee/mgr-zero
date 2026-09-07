@@ -1242,10 +1242,12 @@ export const SCREENS: Screen[] = [
     spec: "Source is required and becomes the order's from-location; the app never guesses “Warehouse.” Save draft lands on the Order screen, where Submit lives.",
     body: (<>
       {E.back("Orders", "New order")}
-      {E.pick("Customer", "Ridgeline Tap Room", ["Ridgeline Tap Room", "Al’s Bar", "Teresa’s"])}
-      {E.pick("Source location", "Warehouse", ["Warehouse", "Taproom"])}
-      {E.pick("Ship-to", "Main · Phoenixville, PA", ["Main · Phoenixville, PA", "Dock"])}
-      {E.edit("Customer PO", "4471")}
+      {E.cols(
+        E.pick("Customer", "Ridgeline Tap Room", ["Ridgeline Tap Room", "Al’s Bar", "Teresa’s"]),
+        E.pick("Ship-to", "Main · Phoenixville, PA", ["Main · Phoenixville, PA", "Dock"]),
+        E.pick("Source location", "Warehouse", ["Warehouse", "Taproom"]),
+        E.edit("Customer PO", "4471"),
+      )}
       {E.edit("Requested ship", "2026-09-03", "date")}
       {E.row("Hazy IPA · ½ bbl keg", "ATP 11 at Warehouse", E.stq(4))}
       {E.row("Pils · 16 oz case", "ATP −6 at Warehouse", E.stq(10), "w")}
