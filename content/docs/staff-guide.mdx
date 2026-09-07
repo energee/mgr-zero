@@ -286,6 +286,14 @@ MGR creates a separate credit memo at the prices frozen on the invoice lines, ne
 
 The page says **No taprooms configured.** when none exist, or **No pars set for this taproom.** when there are no suggestions. The current interface has no controls to create locations or set par levels.
 
+## Recipes [#recipes]
+
+A recipe version is the process spec a brewer follows: the ingredients and the stage each is added at, the pre-boil volume and boil time, the whirlpool and knockout temperatures, and links to the mash schedule, the fermentation schedule, and the water. A version cannot be edited once it is cut. Create the next version instead, so what a past batch was brewed from stays true.
+
+The mash schedule is the list of rests, each with a temperature and a length. The fermentation schedule is the list of stages, each with a temperature and a number of days; a dry hop written for day 4 falls inside whichever stage covers that day.
+
+Your source water is set once in Settings and every recipe starts from it. A recipe overrides it only when that batch genuinely uses different water, such as a blend with osmosis water. Water profiles themselves live in Catalog, so a new water report is one edit rather than one per recipe.
+
 ## Team [#team]
 
 <Screen name="Team" />

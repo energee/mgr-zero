@@ -26,9 +26,26 @@ import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-ic
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
 import { formatVolume } from "@/lib/volume";
+import { saccharificationRest, type Step, totalDuration } from "@/lib/mgr/recipe-schedule";
 import {
   BeerIcon, DeliveryTruck01Icon, Package01Icon, Route01Icon, Tag01Icon, TaskDone01Icon, ThermometerIcon, WifiDisconnected01Icon,
 } from "@hugeicons/core-free-icons";
+
+/** The drawn mash schedule. Rows and footer both read it, so the total and the
+ *  conversion rest can never disagree with the steps above them. */
+const MASH_STEPS: Step[] = [
+  { name: "Mash-in", kind: "infusion", tempF: 104, duration: 15 },
+  { name: "Saccharification", kind: "infusion", tempF: 152, duration: 60 },
+  { name: "Mash-out", kind: "direct heat", tempF: 168, duration: 10 },
+];
+
+/** The drawn fermentation schedule; `duration` is days. Same rule as MASH_STEPS. */
+const FERM_STAGES: Step[] = [
+  { name: "Primary", kind: "primary", tempF: 68, duration: 4 },
+  { name: "Diacetyl rest", kind: "diacetyl rest", tempF: 72, duration: 2 },
+  { name: "Cold crash", kind: "cold crash", tempF: 34, duration: 2 },
+  { name: "Conditioning", kind: "conditioning", tempF: 34, duration: 10 },
+];
 
 /** Every staff role with what it opens; Team member draws one switch each. */
 const ROLES: [string, string, boolean][] = [
@@ -323,6 +340,7 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 1, slice: "all", tab: "More", name: "Settings", job: "Edit brewery/location basics and route to rare setup",
+    to: { "Source water · Municipal · Denver": "Water profiles" },
     reads: "list_locations · list_team_members", writes: "update_brewery · update_location [design; mutable single rows]",
     states: permitted("admin only"),
     spec: "Invoices remains a first-class More and desk-rail destination. TTB registry number and PA license are brewery columns and feed the compliance report header. The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. Deployment mode is read-only. Team opens the Team frame.",
@@ -336,6 +354,7 @@ export const SCREENS: Screen[] = [
       {E.edit("Reading overdue after (hours)", OVERDUE_HOURS, "number")}
       {E.fld("Deployment", "dedicated · read-only")}
       {E.btn("Save brewery")}
+      {E.nav("Source water · Municipal · Denver", "every recipe starts here unless it overrides")}
       {E.nav("Locations", "Warehouse · Taproom")}
       {E.nav("Team", "3 members · 1 pending invite")}
       {E.nav("Accounting", "QuickBooks · connection and push defaults", "", QuickBooksMark)}
@@ -1513,6 +1532,7 @@ export const SCREENS: Screen[] = [
       {E.nav("Pils", "Lager · 4.9% · 2 SKUs")}
       {E.nav("Stout", "Stout · 7.2% · 1 SKU")}
       {E.nav("Price lists", "3 tiers")}
+      {E.nav("Water profiles", "3 profiles")}
     </>),
   },
   {
@@ -1985,18 +2005,19 @@ export const SCREENS: Screen[] = [
     slice: 4,
     tab: "Work",
     name: "Brew day",
-    to: { "2-row": "Entity picker", "Citra \u00b7 boil": "Entity picker", "Yeast": "Entity picker" },
+    to: { "2-row": "Entity picker", "Citra \u00b7 boil": "Entity picker", "Yeast": "Entity picker", "Brew sheet · Hazy IPA v4": "Mash schedule" },
     job: "Consume actual lots and set knockout baseline",
     reads: "get_brew_day [design]",
     writes: "record_brew_day [design; one RPC: additions + material movements + occupancy]",
     states: permitted("brewer or admin required"),
-    spec: "Brew-day mode: actual lots and knockout vessel. Planned recipe/date/barrels live on Schedule batch so this page has one primary. Record brew day posts immutable material consumption for mash/boil/whirlpool stages only; the 18 lb Citra dry hop is posted later from Cellar addition. Yeast is consumed as a material lot, not a culture generation (plan §8).",
+    spec: "The brew sheet row is a read-out of the version’s process spec, opened frozen; brew day captures actuals, and fermentation reality arrives through Fermentation reading, so there is no mash-actuals form here. Brew-day mode: actual lots and knockout vessel. Planned recipe/date/barrels live on Schedule batch so this page has one primary. Record brew day posts immutable material consumption for mash/boil/whirlpool stages only; the 18 lb Citra dry hop is posted later from Cellar addition. Yeast is consumed as a material lot, not a culture generation (plan §8).",
     body: (<>
       {E.back("Batches", "B-0416 · Hazy")}
       {E.nav("2-row", "lot L-0821 · 660 lb")}
       {E.nav("Citra · boil", "lot L-0790 · 6 lb")}
       {E.nav("Yeast", "WLP066 · lot Y-0312 · 1 brink")}
       {E.fld("Knockout baseline", <>14.6 bbl {E.arrow()} FV2</>)}
+      {E.nav("Brew sheet · Hazy IPA v4", "mash 3 steps · whirlpool 20 min · read only")}
       {E.tape([["Start B-0416 · Hazy IPA v4", ""], ["Consume additions", "named material lots"], [<>Knockout 14.6 bbl {E.arrow()} FV2</>, "loss baseline"]])}
       {E.sp()}
       {E.btn("Record brew day", "irr")}
@@ -2436,12 +2457,12 @@ export const SCREENS: Screen[] = [
     slice: 3,
     tab: "More",
     name: "Recipe",
-    to: { Create: "Recipe", "Recipe parent \u00b7 Hazy IPA \u00b7 IPA": "Recipe" },
+    to: { Create: "Recipe", "Recipe parent \u00b7 Hazy IPA \u00b7 IPA": "Recipe", "Mash schedule · 3 steps": "Mash schedule", "Fermentation schedule · 4 stages": "Fermentation schedule", "Water · Municipal Denver to Hazy target": "Water" },
     job: "Author immutable versions from assumptions; actuals keep predictions honest",
     reads: "list_recipes · get_recipe [design] · get_recipe_outcomes [design; per-batch actual OG/FG/ABV + realized efficiency/attenuation, derived from fermentation readings, never stored]",
-    writes: "create_recipe [design; mutable parent row] · create_recipe_version [design; one RPC: immutable version + ingredients; SCHEMA-GATE: assumption columns on recipe_versions + per-ingredient extract snapshot + extract potential on materials; typed target_og/fg/abv columns drop]",
+    writes: "create_recipe [design; mutable parent row] · create_recipe_version [design; one RPC: immutable version + ingredients; SCHEMA-GATE: assumption and process-spec columns on recipe_versions (pre-boil volume, boil, whirlpool min/temp/rest, knockout temp, notes) + per-ingredient extract snapshot + extract potential on materials; typed target_og/fg/abv columns drop]",
     states: permitted("brewer or admin required"),
-    spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. Versioning is disabled behind its schema gate. A new parent takes name and style only; versions append, and history is never edited. Costing lives on desk.",
+    spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. Versioning is disabled behind its schema gate. A new parent takes name and style only; versions append, and history is never edited. Costing lives on desk. A version is the executable process spec, not only the prediction inputs: volumes, boil, whirlpool and knockout are scalars here, while the mash and fermentation schedules and water open as their own screens because they repeat and carry add, reorder and delete. The mash temperature is gone from this page, because every mash step carries one and a scalar beside them is a second answer to one question. Batch size and knockout volume are gone too: the scale chips already state the batch size and Brew day already records knockout volume as its baseline. Three note fields become one.",
     body: (<>
       {E.back("Recipes", "Hazy IPA v4")}
       {E.row("Recipe parent · Hazy IPA · IPA", "name and style only", E.act("Create"))}
@@ -2450,13 +2471,164 @@ export const SCREENS: Screen[] = [
       {E.row("Citra", "boil · 10 min · 0.4 lb / bbl", "6 lb")}
       {E.row("Citra", "dry hop · day 4 · 1.2 lb / bbl", "18 lb")}
       {E.row("+ add ingredient", "material · stage · timing", "")}
-      {E.fld("Mash temp", "152 °F")}
-      {E.fld("Brewhouse efficiency", "72 %")}
-      {E.fld("Yeast attenuation", "78 % · WLP066")}
+      {E.cols(
+        E.edit("Pre-boil volume bbl", "16.8", "number"),
+        E.edit("Boil time min", "60", "number"),
+      )}
+      {E.cols(
+        E.edit("Whirlpool min", "20", "number"),
+        E.edit("Whirlpool temp °F", "180", "number"),
+      )}
+      {E.cols(
+        E.edit("Whirlpool rest min", "10", "number"),
+        E.edit("Knockout temp °F", "65", "number"),
+      )}
+      {E.cols(
+        E.edit("Brewhouse efficiency %", "72", "number"),
+        E.edit("Yeast attenuation %", "78", "number"),
+      )}
+      {E.nav("Mash schedule · 3 steps", "152 °F saccharification rest")}
+      {E.nav("Fermentation schedule · 4 stages", "18 days · dry hop day 4 in Primary")}
+      {E.nav("Water · Municipal Denver to Hazy target", "3 salts and acids")}
+      {E.edit("Notes", "Whirlpool hard, knock out cold.")}
       {E.info("Predicted: OG 15.2 °P · FG 3.3 °P · ABV 6.5%")}
       {E.tape([["B-0413 · OG 14.8 · FG 3.5 · ABV 6.0%", "eff 68% · att 76%"], ["B-0398 · OG 15.1 · FG 3.4 · ABV 6.3%", "eff 71% · att 77%"]])}
       {E.note("Actuals run −0.4 °P OG vs predicted (eff 68–71% vs 72% assumed). Lower the assumption on v5?")}
       {E.gated("Create recipe version", "isn’t available yet: assumptions have no columns to live in. A brewery with no version cannot schedule a batch, so brew day waits on this too")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 3,
+    tab: "More",
+    name: "Mash schedule",
+    to: { Edit: "Mash step", "Add step": "Mash step", "Mash-in": "Mash step", Saccharification: "Mash step", "Mash-out": "Mash step" },
+    job: "Order the rests a brewer actually holds on the day",
+    reads: "get_recipe [design; the version’s mash schedule]",
+    writes: "create_recipe_version [design; the steps are written with their version, never alone; SCHEMA-GATE: recipe process spec]",
+    states: [["permission", "brewer or admin required", 1], ["draft", "steps add, reorder and delete"], ["frozen", "a cut version reads only · create the next version to change it", 1], ["empty", "no steps yet: Add step is the only action"]],
+    spec: "Its own screen because it repeats: add, reorder and delete are verbs a scalar field never needs, and inlining them on Recipe would give that page a second primary. A version is immutable, so this surface is an editor on a draft and a read-out once cut: one whole-screen mode rather than a toggle threaded through a long page. The footer names the conversion rest because Recipe no longer carries a mash temperature of its own; without it the number the prediction reads would have no visible home.",
+    body: (<>
+      {E.back("Recipe", "Hazy IPA v4 · Mash schedule", E.btn("Add step"))}
+      {MASH_STEPS.map((s) => (
+        <Fragment key={s.name}>{E.row(s.name, `${s.kind} · ${s.tempF} °F · ${s.duration} min`, E.act("Edit"))}</Fragment>
+      ))}
+      {E.info(`Total ${totalDuration(MASH_STEPS)} min · the ${saccharificationRest(MASH_STEPS)!.tempF} °F rest feeds the prediction.`)}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 3,
+    tab: "More",
+    surface: "sheet",
+    name: "Mash step",
+    to: { "Save step": "Mash schedule", "Delete step": "Mash schedule" },
+    job: "One rest: what the brewer does, at what temperature, for how long",
+    reads: "get_recipe [design]",
+    writes: "create_recipe_version [design; SCHEMA-GATE: recipe process spec]",
+    states: [["permission", "brewer or admin required", 1], ["draft", "editable until the version is cut"], ["frozen", "a cut version reads only", 1]],
+    spec: "Type and name both stay: they look redundant until a recipe has two infusion steps, where the type says what the brewer does and the name says which one it is. Position comes from list order, never a typed number.",
+    body: (<>
+      {E.edit("Step name", "Saccharification")}
+      {E.pick("Type", "infusion", ["infusion", "decoction", "direct heat", "rest"])}
+      {E.cols(
+        E.edit("Temp °F", "152", "number"),
+        E.edit("Duration min", "60", "number"),
+      )}
+      {E.edit("Notes · optional", "")}
+      {E.btns([["Delete step", "g"], "Save step"])}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 3,
+    tab: "More",
+    name: "Fermentation schedule",
+    to: { Edit: "Fermentation stage", "Add stage": "Fermentation stage", Primary: "Fermentation stage", "Diacetyl rest": "Fermentation stage", "Cold crash": "Fermentation stage", Conditioning: "Fermentation stage" },
+    job: "State the temperatures and days a batch is meant to hold",
+    reads: "get_recipe [design; the version’s fermentation schedule]",
+    writes: "create_recipe_version [design; written with their version, never alone; SCHEMA-GATE: recipe process spec]",
+    states: [["permission", "brewer or admin required", 1], ["draft", "stages add, reorder and delete"], ["frozen", "a cut version reads only · create the next version to change it", 1], ["empty", "no stages yet: Add stage is the only action"]],
+    spec: "The same shape as Mash schedule and for the same reason. The footer places the dry hop because Recipe draws a dry hop on a day number, and a day number means nothing without this list: day 4 is the last day of Primary, which is why a brewer chose it. The separate fermentation-days and conditioning-days fields v1 kept beside this list are dropped, because the list sums to them and two sources for one number is the failure this design keeps removing.",
+    body: (<>
+      {E.back("Recipe", "Hazy IPA v4 · Fermentation", E.btn("Add stage"))}
+      {FERM_STAGES.map((s) => (
+        <Fragment key={s.name}>{E.row(s.name, `${s.tempF} °F · ${s.duration} days`, E.act("Edit"))}</Fragment>
+      ))}
+      {E.info(`Total ${totalDuration(FERM_STAGES)} days · dry hop day 4 falls in Primary.`)}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 3,
+    tab: "More",
+    surface: "sheet",
+    name: "Fermentation stage",
+    to: { "Save stage": "Fermentation schedule", "Delete stage": "Fermentation schedule" },
+    job: "One stage: a temperature held for a number of days",
+    reads: "get_recipe [design]",
+    writes: "create_recipe_version [design; SCHEMA-GATE: recipe process spec]",
+    states: [["permission", "brewer or admin required", 1], ["draft", "editable until the version is cut"], ["frozen", "a cut version reads only", 1]],
+    spec: "Stage type and name both stay, as on Mash step: two custom stages need the type to say what happens and the name to say which one. Position comes from list order.",
+    body: (<>
+      {E.edit("Stage name", "Diacetyl rest")}
+      {E.pick("Stage", "diacetyl rest", ["primary", "secondary", "diacetyl rest", "cold crash", "conditioning", "lagering", "custom"])}
+      {E.cols(
+        E.edit("Temp °F", "72", "number"),
+        E.edit("Duration days", "2", "number"),
+      )}
+      {E.edit("Notes · optional", "")}
+      {E.btns([["Delete stage", "g"], "Save stage"])}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 3,
+    tab: "More",
+    name: "Water",
+    to: { Add: "Water addition", Edit: "Water addition", "Add addition": "Water addition", Gypsum: "Water addition", "Calcium chloride": "Water addition", "Lactic acid": "Water addition" },
+    job: "State the water a version starts from, aims at, and what goes in it",
+    reads: "get_recipe [design] · list_water_profiles [design]",
+    writes: "create_recipe_version [design; water values and the water additions are written with the version; SCHEMA-GATE: recipe process spec]",
+    states: [["permission", "brewer or admin required", 1], ["brewery source", "the source profile comes from Settings unless this version overrides it"], ["overridden source", "an osmosis blend or a second supply"], ["draft", "additions add, reorder and delete"], ["frozen", "a cut version reads only", 1]],
+    spec: "Source water is what comes out of the tap, so it is a Settings value and this screen shows it as the brewery default; a version overrides it only for the case that genuinely varies, an osmosis blend or a second supply. v1 stored it per recipe, so every recipe repeated the same municipal profile and a new water report meant editing all of them. Each addition carries one stage, not v1’s pair of timing and target: for water chemistry those are one axis wearing two hats, since a salt added at mash time goes into the mash by definition. The sulfate to chloride line is example text; ion deltas, salt contribution and pH prediction are calculations this slice does not build, and if they arrive they go through the same shared formula rule Recipe sets for gravity and strength.",
+    body: (<>
+      {E.back("Recipe", "Hazy IPA v4 · Water")}
+      {E.fld("Source profile", "Municipal · Denver · brewery default")}
+      {E.pick("Target profile", "Hazy target", ["Hazy target", "Burton", "Municipal · Denver"])}
+      {E.cols(
+        E.edit("Mash water gal", "9.5", "number"),
+        E.edit("Sparge water gal", "12.0", "number"),
+      )}
+      {E.edit("Target mash pH", "5.35")}
+      {E.ttl("Salts and acids")}
+      {E.row("Gypsum", "4.0 g · mash", E.act("Edit"))}
+      {E.row("Calcium chloride", "6.0 g · mash", E.act("Edit"))}
+      {E.row("Lactic acid", "3.0 mL · sparge", E.act("Edit"))}
+      {E.row("Add addition", "material · amount · stage", E.act("Add"))}
+      {E.info("Sulfate to chloride 0.9 · chloride forward, as the target says.")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 3,
+    tab: "More",
+    surface: "sheet",
+    name: "Water addition",
+    to: { "Save addition": "Water", "Delete addition": "Water" },
+    job: "One salt or acid, its amount, and where it goes",
+    reads: "get_recipe [design] · list_materials",
+    writes: "create_recipe_version [design; SCHEMA-GATE: recipe process spec]",
+    states: [["permission", "brewer or admin required", 1], ["draft", "editable until the version is cut"], ["frozen", "a cut version reads only", 1]],
+    spec: "One stage field, never a timing and a target both. The material comes from the materials catalog that already exists, so a salt is bought, stocked and consumed like any other input.",
+    body: (<>
+      {E.pick("Material", "Gypsum", ["Gypsum", "Calcium chloride", "Epsom salt", "Lactic acid", "Phosphoric acid"])}
+      {E.inline(
+        E.edit("Amount", "4.0", "number"),
+        E.pick("Unit", "g", ["g", "mL", "oz"]),
+      )}
+      {E.pick("Stage", "mash", ["mash", "sparge", "kettle"])}
+      {E.btns([["Delete addition", "g"], "Save addition"])}
     </>),
   },
   {
@@ -3290,6 +3462,53 @@ export const SCREENS: Screen[] = [
       {E.tbl(["Material", "Qty", "On break"], [["Can body", "1", "consumed"], ["Can end", "1", "consumed"]])}
       {E.info("If the volume or BOM differs, create another Format.")}
       {E.gated("Save format", "isn’t available yet: package facts still live on each SKU")}
+    </>),
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "More",
+    name: "Water profiles",
+    to: { Edit: "Water profile", "Add profile": "Water profile", "Municipal · Denver": "Water profile", Burton: "Water profile", "Hazy target": "Water profile" },
+    job: "Keep the water a brewery starts from and the waters it aims at",
+    reads: "list_water_profiles [design]",
+    writes: "none [creation and editing happen on Water profile]",
+    states: [["permission", "brewer or admin required", 1], ["source", "the brewery’s own supply · set once in Settings"], ["empty", "no profiles yet: Add profile is the only action"]],
+    spec: "A catalog entity beside Formats and price groups, because a profile is referenced by many recipes and edited in one place: a new water report is one edit, not fifty. No quick-create dialog, which v1 needed only because profiles were buried inside the recipe form; reached from Catalog, Add profile is already one tap away.",
+    body: (<>
+      {E.back("Catalog", "Water profiles", E.btn("Add profile"))}
+      {E.row("Municipal · Denver", "Calcium 42 · Magnesium 8 · Sodium 22 · Sulfate 65 · Chloride 30 · Bicarbonate 110", E.act("Edit"))}
+      {E.row("Burton", "Calcium 275 · Magnesium 40 · Sodium 25 · Sulfate 610 · Chloride 35 · Bicarbonate 270", E.act("Edit"))}
+      {E.row("Hazy target", "Calcium 110 · Magnesium 10 · Sodium 15 · Sulfate 90 · Chloride 180 · Bicarbonate 40", E.act("Edit"))}
+    </>),
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "More",
+    surface: "sheet",
+    name: "Water profile",
+    to: { "Save profile": "Water profiles" },
+    job: "Name a water and its six ions",
+    reads: "get_water_profile [design]",
+    writes: "upsert_water_profile [design; SCHEMA-GATE: a water profiles table]",
+    states: [["permission", "brewer or admin required", 1], ["in use", "a profile a recipe references cannot be deleted", 1]],
+    spec: "Six ions in parts per million, the set every brewing water calculation reads. No ion arithmetic here: this screen records a measurement or a target, and any delta between two profiles is a calculation this slice does not build.",
+    body: (<>
+      {E.edit("Profile name", "Hazy target")}
+      {E.cols(
+        E.edit("Calcium ppm", "110", "number"),
+        E.edit("Magnesium ppm", "10", "number"),
+      )}
+      {E.cols(
+        E.edit("Sodium ppm", "15", "number"),
+        E.edit("Sulfate ppm", "90", "number"),
+      )}
+      {E.cols(
+        E.edit("Chloride ppm", "180", "number"),
+        E.edit("Bicarbonate ppm", "40", "number"),
+      )}
+      {E.btn("Save profile")}
     </>),
   },
   {
