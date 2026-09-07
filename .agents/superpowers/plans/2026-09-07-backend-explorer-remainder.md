@@ -48,16 +48,12 @@ Chat disconnected, Chat settings, Linked people, Link your Slack, Disconnect Sla
 
 Pushed invoice, Payment, Credit memo, Push rejected, Square sales receipt, Taproom sale, Refund, Item library, Published item, Retired item, Link identity, Personal queue, Personal DM, Team digest, Notification preferences, Fermentation reading form (Slack), Order confirmation form (Slack).
 
-## Recommended open-question defaults (Program 12)
+## Program 12 open questions — decided 2026-09-07
 
-Confirm or override before Program 12 executes:
-
-| Question | Recommended default |
-| --- | --- |
-| §16.16 q2 poured binding | Bind a poured format to **one packaged format** (bin availability is exact) |
-| §16.16 q3 taproom role | **Do not ship the role.** Tap board and weekly count use warehouse (already on the Weekly count record) |
-| §16.16 q4 remaining fill | **Three chips** already drawn (Empty / About ¼ / About ½). No weighing in this pass |
-| Guest keg identity (DRIFT.md) | Swap stays gated for **new** guest kegs until interval has `label` + `nominal_bbl`; existing kick of a guest already on the board is allowed |
+Recorded in the schema design spec §16.16. Poured formats are brand-owned
+(name + ounces); the `taproom` role ships **with** per-role RLS, which needs
+its own spec before Program 12 (TODO.md lists it); fill is three chips; guest
+kegs carry `label` + `nominal_bbl`, new guest swaps gated until then.
 
 ## Execution order after 0–9
 
