@@ -255,6 +255,16 @@ describe("registered staff mutation role × RPC matrix", () => {
       },
     },
     {
+      command: "create_bin", rpc: "create_bin", allowed: ["admin", "warehouse"],
+      input: async role => {
+        const name = unique("matrix bin", role);
+        return {
+          command: { locationId, name },
+          rpc: { p_brewery: brewery.id, p_location: locationId, p_name: name },
+        };
+      },
+    },
+    {
       command: "upsert_customer", rpc: "upsert_customer", allowed: ["admin", "sales"],
       input: async role => {
         const name = unique("matrix customer", role);

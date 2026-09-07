@@ -44,6 +44,46 @@ defineCommand({
   })),
 });
 
+// Bins subdivide a location (spec 2026-09-06 Decision 1). Reads go through
+// RLS; the three writes are the idempotent RPCs. A location never drops below
+// one bin and a bin that ever recorded stock is not deleted — delete_bin raises both.
+defineQuery({
+  name: "list_bins", description: "Bins of one location (or all), alphabetical",
+  input: z.object({ locationId: z.string().uuid().optional() }), roles: ["admin", "sales", "warehouse"],
+  handler: (ctx, i) => {
+    let q = ctx.db.from("bins").select("id, location_id, name").eq("brewery_id", ctx.breweryId).order("name");
+    if (i.locationId) q = q.eq("location_id", i.locationId);
+    return unwrap(q);
+  },
+});
+
+defineCommand({
+  name: "create_bin", description: "Add a bin to a location",
+  input: z.object({ locationId: z.string().uuid(), name: z.string().min(1) }),
+  roles: ["admin", "warehouse"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_bin", {
+    p_brewery: ctx.breweryId, p_location: i.locationId, p_name: i.name, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "update_bin", description: "Rename a bin",
+  input: z.object({ binId: z.string().uuid(), name: z.string().min(1) }),
+  roles: ["admin", "warehouse"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_bin", {
+    p_brewery: ctx.breweryId, p_bin: i.binId, p_name: i.name, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "delete_bin", description: "Remove an empty bin; a location keeps at least one",
+  input: z.object({ binId: z.string().uuid() }),
+  roles: ["admin", "warehouse"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("delete_bin", {
+    p_brewery: ctx.breweryId, p_bin: i.binId, p_request_id: execution.requestId,
+  })),
+});
+
 defineQuery({
   name: "list_products", description: "Products with their SKUs, alphabetical",
   input: z.object({}), roles: ["admin", "sales", "warehouse"],

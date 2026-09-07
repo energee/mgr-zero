@@ -35,4 +35,46 @@ describe("bins", () => {
     const { error } = await admin.from("bins").insert({ brewery_id: other.id, location_id: loc.id, name: "Stolen" });
     expect(error?.code).toBe("23503");
   });
+
+  it("list_bins returns a location's bins alphabetically, warehouse can read", async () => {
+    const wh = await makeStaffCtx(ctx.breweryId, "warehouse");
+    const loc = (await runCommand("create_location", { name: "List WH", kind: "warehouse" }, ctx)) as Row;
+    const bins = (await runCommand("list_bins", { locationId: loc.id }, wh)) as Row[];
+    expect(bins.map((b) => b.name)).toEqual(["Cold", "Dry", "Walk-in"]);
+    const sales = await makeStaffCtx(ctx.breweryId, "sales");
+    expect(((await runCommand("list_bins", { locationId: loc.id }, sales)) as Row[]).length).toBe(3);
+  });
+
+  it("create_bin and update_bin are warehouse-or-admin and idempotent by request", async () => {
+    const wh = await makeStaffCtx(ctx.breweryId, "warehouse");
+    const sales = await makeStaffCtx(ctx.breweryId, "sales");
+    const loc = (await runCommand("create_location", { name: "Cmd WH", kind: "warehouse" }, ctx)) as Row;
+    const bin = (await runCommand("create_bin", { locationId: loc.id, name: "Rack 3" }, wh)) as Row;
+    expect(bin.name).toBe("Rack 3");
+    const renamed = (await runCommand("update_bin", { binId: bin.id, name: "Rack 3 · top" }, wh)) as Row;
+    expect(renamed.name).toBe("Rack 3 · top");
+    await expect(runCommand("create_bin", { locationId: loc.id, name: "Nope" }, sales))
+      .rejects.toMatchObject({ code: "permission_denied" });
+  });
+
+  it("delete_bin removes an empty bin but refuses the last one", async () => {
+    const loc = (await runCommand("create_location", { name: "Del WH", kind: "warehouse" }, ctx)) as Row;
+    const bins = (await runCommand("list_bins", { locationId: loc.id }, ctx)) as Row[];
+    await runCommand("delete_bin", { binId: bins[0].id }, ctx);
+    await runCommand("delete_bin", { binId: bins[1].id }, ctx);
+    await expect(runCommand("delete_bin", { binId: bins[2].id }, ctx))
+      .rejects.toMatchObject({ message: expect.stringMatching(/at least one bin/i) });
+    const left = (await runCommand("list_bins", { locationId: loc.id }, ctx)) as Row[];
+    expect(left).toHaveLength(1);
+    const renamed = (await runCommand("update_bin", { binId: left[0].id, name: "Only" }, ctx)) as Row;
+    expect(renamed.name).toBe("Only");
+  });
+
+  it("a bin belongs to the caller's brewery or the RPC refuses it", async () => {
+    const otherCtx = await makeStaffCtx((await makeBrewery()).id, "admin");
+    const loc = (await runCommand("create_location", { name: "Tenant WH", kind: "warehouse" }, ctx)) as Row;
+    const bins = (await runCommand("list_bins", { locationId: loc.id }, ctx)) as Row[];
+    await expect(runCommand("update_bin", { binId: bins[0].id, name: "Hijack" }, otherCtx)).rejects.toBeTruthy();
+    await expect(runCommand("delete_bin", { binId: bins[0].id }, otherCtx)).rejects.toBeTruthy();
+  });
 });

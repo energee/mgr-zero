@@ -4,7 +4,7 @@
 
 # API operations backlog
 
-99 operations the screens declare they need that the command registry does not yet answer, against 65 that it does.
+95 operations the screens declare they need that the command registry does not yet answer, against 69 that it does.
 
 This is the backend push, scoped. Each row names the operation a screen asked for and the screens waiting on it, so an area can be built and shipped whole rather than a command at a time. `/docs/api` publishes the same list per area, marked designed, so an integrator sees the roadmap without being told a date.
 
@@ -127,16 +127,12 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `raise_invoice_question` | command | Question invoice |
 | `resolve_invoice_question` | command | Invoice |
 | `write_off_invoice` | command | Invoices |
-## Inventory & locations: 6 to build, 7 built
+## Inventory & locations: 2 to build, 11 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
-| `create_bin` | command | Location bins, Bin |
-| `delete_bin` | command | Location bins, Bin |
 | `get_bin` | query | Bin |
-| `list_bins` | query | Location bins |
 | `reverse_inventory_movement` | command | SKU detail |
-| `update_bin` | command | Location bins, Bin |
 ## Team & brewery settings: 6 to build, 4 built
 
 | Operation | Kind | Needed by |

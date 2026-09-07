@@ -2153,6 +2153,61 @@ begin
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
+create function create_bin(
+  p_brewery uuid, p_location uuid, p_name text, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.bins;
+begin
+  perform private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'create_bin', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'location', p_location, 'name', p_name));
+  if v_replay is not null then return v_replay; end if;
+  insert into public.bins (brewery_id, location_id, name) values (p_brewery, p_location, p_name) returning * into v_row;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+create function update_bin(
+  p_brewery uuid, p_bin uuid, p_name text, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.bins;
+begin
+  perform private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'update_bin', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'bin', p_bin, 'name', p_name));
+  if v_replay is not null then return v_replay; end if;
+  update public.bins set name = p_name where id = p_bin and brewery_id = p_brewery returning * into v_row;
+  if not found then raise exception 'bin not found'; end if;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- Two guards, both under a row lock on the location so concurrent deletes
+-- cannot empty it between them: a location keeps at least one bin, and a bin
+-- that has ever recorded stock is never removed. The ledgers are append-only
+-- and reference the bin, so "move the stock out first" cannot make it
+-- deletable — a net-zero balance still leaves rows behind. Rename it instead.
+create function delete_bin(
+  p_brewery uuid, p_bin uuid, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.bins; v_used boolean;
+begin
+  perform private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'delete_bin', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'bin', p_bin));
+  if v_replay is not null then return v_replay; end if;
+  select b.* into v_row from public.bins b where b.id = p_bin and b.brewery_id = p_brewery;
+  if not found then raise exception 'bin not found'; end if;
+  perform 1 from public.locations where id = v_row.location_id for update;
+  if (select count(*) from public.bins where location_id = v_row.location_id) <= 1 then
+    raise exception 'a location keeps at least one bin; rename it instead';
+  end if;
+  v_used := false;  -- Task 3 replaces this with the three-ledger exists check once bin_id exists
+  if v_used then
+    raise exception 'bin has recorded stock and cannot be removed; rename it instead';
+  end if;
+  delete from public.bins where id = p_bin;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
 create function upsert_customer(
   p_brewery uuid, p_id uuid, p_name text, p_type public.customer_type, p_state text,
   p_price_list uuid, p_license_no text, p_payment_terms text, p_request_id uuid
@@ -3791,6 +3846,9 @@ grant execute on function
   create_sku(uuid,uuid,text,public.package_type,int,numeric,uuid),
   create_location(uuid,text,public.location_kind,uuid),
   update_location(uuid,uuid,text,public.location_kind,uuid),
+  create_bin(uuid,uuid,text,uuid),
+  update_bin(uuid,uuid,text,uuid),
+  delete_bin(uuid,uuid,uuid),
   upsert_customer(uuid,uuid,text,public.customer_type,text,uuid,text,text,uuid),
   upsert_ship_to(uuid,uuid,uuid,text,text,text,text,text,text,uuid),
   upsert_price_list(uuid,uuid,text,uuid),

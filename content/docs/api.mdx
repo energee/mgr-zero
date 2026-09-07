@@ -166,6 +166,7 @@ omitted. They have no roles until they are built.
 | `confirm_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `confirm_restock` | Orders & invoicing | ✓ |  | ✓ |  |  |
 | `consume_chat_link_proof` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
+| `create_bin` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `create_credit_memo` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `create_location` | Inventory & locations | ✓ |  |  |  |  |
 | `create_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
@@ -173,6 +174,7 @@ omitted. They have no roles until they are built.
 | `create_replenishment_order` | Taproom & kegs | ✓ | ✓ |  |  |  |
 | `create_sku` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `daily_pick_sheet` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
+| `delete_bin` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `get_atp` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `get_chat_link_status` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
 | `get_customer` | Customers | ✓ | ✓ | ✓ |  |  |
@@ -186,6 +188,7 @@ omitted. They have no roles until they are built.
 | `import_csv` | Team & brewery settings | ✓ |  |  |  |  |
 | `invite_customer_user` | Customers | ✓ | ✓ |  |  |  |
 | `invite_staff` | Team & brewery settings | ✓ |  |  |  |  |
+| `list_bins` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `list_customers` | Customers | ✓ | ✓ | ✓ |  |  |
 | `list_invoices` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `list_locations` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
@@ -220,6 +223,7 @@ omitted. They have no roles until they are built.
 | `ship_order` | Orders & invoicing | ✓ |  | ✓ |  |  |
 | `submit_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `unlink_chat_user` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
+| `update_bin` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `update_draft_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `update_location` | Inventory & locations | ✓ |  |  |  |  |
 | `upsert_customer` | Customers | ✓ | ✓ |  |  |  |
@@ -948,6 +952,24 @@ promising stock.
 
 {/* ops:inventory */}
 
+#### create_bin [#create_bin]
+
+`command` · admin, warehouse
+
+Add a bin to a location
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+| `name` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_bin", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "locationId": "00000000-0000-0000-0000-000000000000", "name": "string" } }'
+```
+
 #### create_location [#create_location]
 
 `command` · admin
@@ -964,6 +986,23 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_location", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "kind": "warehouse" } }'
+```
+
+#### delete_bin [#delete_bin]
+
+`command` · admin, warehouse
+
+Remove an empty bin; a location keeps at least one
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `binId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "delete_bin", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "binId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### get_atp [#get_atp]
@@ -998,6 +1037,23 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_on_hand", "input": {} }'
+```
+
+#### list_bins [#list_bins]
+
+`query` · admin, sales, warehouse
+
+Bins of one location (or all), alphabetical
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_bins", "input": {} }'
 ```
 
 #### list_locations [#list_locations]
@@ -1056,6 +1112,24 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_movement", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "skuId": "00000000-0000-0000-0000-000000000000", "locationId": "00000000-0000-0000-0000-000000000000", "qty": 1, "type": "opening_balance" } }'
 ```
 
+#### update_bin [#update_bin]
+
+`command` · admin, warehouse
+
+Rename a bin
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `binId` | uuid | yes |
+| `name` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "update_bin", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "binId": "00000000-0000-0000-0000-000000000000", "name": "string" } }'
+```
+
 #### update_location [#update_location]
 
 `command` · admin
@@ -1079,18 +1153,14 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* inventory-designed */}
 
-7 of the 13 operations in this area are available today; the 6 below are not.
+11 of the 13 operations in this area are available today; the 2 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
-| `create_bin` | command | Location bins, Bin |
-| `delete_bin` | command | Location bins, Bin |
 | `get_bin` | query | Bin |
-| `list_bins` | query | Location bins |
 | `reverse_inventory_movement` | command | SKU detail |
-| `update_bin` | command | Location bins, Bin |
 
 {/* end ops:inventory */}
 
