@@ -116,26 +116,28 @@ describe("SCREENS", () => {
     expect(String(recipe.writes)).not.toMatch(/price/i);
   });
 
-  it("gives a price group a cost ceiling and a barcode per format", () => {
+  it("gives a price group a position and a cost ceiling, and no prices of its own", () => {
     const group = SCREENS.find((s) => s.name === "Price group")!;
     const drawn = text("Price group");
+    expect(drawn).toContain("Position");
     expect(drawn).toContain("Cost ceiling");
     expect(drawn).toMatch(/suggest/i);
-    expect(drawn).toContain("UPC");
-    expect(drawn).toContain(INV.upc);
-    // A keg carries no retail code and that is permanent, not unfinished
-    // setup, so the empty cell reads "none" and earns no states entry.
+    // An empty ceiling is a finished state, not unfinished setup, so it reads
+    // "none" and earns no states entry. The barcode per group × format is a
+    // follow-on table (price_group_barcodes), not part of the price grid.
     expect(drawn).toContain("none");
+    expect(drawn).not.toContain("UPC");
     expect((group.states ?? []).map(([name]) => name)).not.toContain("no barcode");
   });
 
   // "Tier" is claimed vocabulary three times over — a distributor's product
-  // type, v1's COGS band, and this app's customer price list — so the concept
-  // is a price group wherever a person reads it. The rule spans every copy
-  // surface, not just SCREENS: it first went stale in the API reference, where
-  // "price list" had wrapped across a line and a line-oriented sweep could not
-  // see it. Hence the file sweep below, whitespace-normalized. Wire names
-  // (price_list, priceList) are the shipped contract and keep their spelling.
+  // type, v1's COGS band, and this app's own pricing — so the concept is a
+  // price group wherever a person reads it. The rule spans every copy surface,
+  // not just SCREENS: it first went stale in the API reference, where the
+  // retired phrase had wrapped across a line and a line-oriented sweep could
+  // not see it. Hence the file sweep below, whitespace-normalized. Since the
+  // price grid (spec 2026-09-07-mgr-pricing-grid-naming) the retired wording is
+  // gone from the wire too, so nothing is exempted from the sweep.
   it("names the pricing surfaces price groups, never tiers", () => {
     const names = SCREENS.map((s) => s.name);
     expect(names).toContain("Price groups");
@@ -152,17 +154,15 @@ describe("SCREENS", () => {
       "components/mgr/screens.tsx", "content/docs/staff-guide.mdx", "content/docs/api.mdx",
       "app/(app)/pricing/page.tsx", "app/(app)/customers/page.tsx",
       "app/(app)/customers/[id]/page.tsx", "app/(app)/customers/customer-form.tsx",
-      "app/(app)/pricing/price-list-form.tsx", "app/(app)/invoices/[id]/credit-memo-form.tsx",
+      "app/(app)/pricing/price-cell-form.tsx", "app/(app)/pricing/group-form.tsx",
+      "app/(app)/catalog/brand-form.tsx", "app/(app)/invoices/[id]/credit-memo-form.tsx",
       "app/(app)/settings/channels/page.tsx",
       "app/(app)/settings/channels/delete-channel-button.tsx",
     ];
     const alsoCode = [...copyOnly, "lib/mgr/nav.ts", "lib/mgr/screen-links.ts",
       "lib/commands/customers.ts", "lib/commands/portal.ts"];
-    // Wire names are the shipped contract and keep the old spelling.
     const prose = (file: string) =>
-      readFileSync(resolve(__dirname, "..", file), "utf8")
-        .replace(/price_list\w*|priceList\w*|PriceList\w*|price-list[\w-]*/g, " ")
-        .replace(/\s+/g, " ");
+      readFileSync(resolve(__dirname, "..", file), "utf8").replace(/\s+/g, " ");
     for (const file of alsoCode) {
       expect(prose(file), `${file}: retired pricing word`).not.toMatch(/price (list|tier)/i);
     }
@@ -214,7 +214,7 @@ describe("SCREENS", () => {
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands or leaves; the venue split is
     // derived rather than counted by hand in a comment that kept growing.
-    expect(SCREENS).toHaveLength(180);
+    expect(SCREENS).toHaveLength(179);
     expect(SCREENS.filter((s) => s.venue)).toHaveLength(17);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
@@ -272,7 +272,7 @@ describe("SCREENS", () => {
   });
 
   it("splits list pages from their row editors", () => {
-    const sheets = ["Invite portal user", "Fix mapping", "Package BOM", "SKU", "Brand approval", "State registration", "License", "Channel", "Format", "Override", "Bin"];
+    const sheets = ["Invite portal user", "Fix mapping", "Package BOM", "SKU", "Brand approval", "State registration", "License", "Channel", "Format", "Bin"];
     for (const name of sheets) expect.soft(SCREENS.find((s) => s.name === name)?.surface, name).toBe("sheet");
     expect(SCREENS.find((s) => s.name === "Invoice")?.surface).toBeUndefined();
     for (const name of ["Customers", "Invoices", "Catalog", "Vendors", "Compliance registry", "Sale channels", "Formats", "Price group", "Location bins"]) {
@@ -370,10 +370,10 @@ describe("SCREENS", () => {
     const venue = renderToStaticMarkup(VenueFrame({ venue: pushed.venue!, children: pushed.body }));
     expect(venue).toContain("9/3/26");
     expect(venue).not.toContain("9/11/26");
-    const tier = SCREENS.find((s) => s.name === "Price group")!;
-    const tierText = renderToStaticMarkup(createElement("div", null, tier.body)).replace(/<[^>]*>/g, " ");
-    expect(tierText).toContain("$150.00");
-    expect(tierText).not.toContain("$185.00");
+    const grid = SCREENS.find((s) => s.name === "Price groups")!;
+    const gridText = renderToStaticMarkup(createElement("div", null, grid.body)).replace(/<[^>]*>/g, " ");
+    expect(gridText).toContain("$150.00");
+    expect(gridText).not.toContain("$185.00");
     const history = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Invoice history")!.body));
     expect(history.match(/INV-1042/g)).toHaveLength(1);
     expect(history).not.toContain("INV-0198");

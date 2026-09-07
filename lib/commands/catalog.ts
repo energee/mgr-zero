@@ -133,8 +133,9 @@ defineCommand({
 // Sale channels (§16.3): the brewery's own list of what a removal is sold
 // through, each with the tax treatment frozen onto the movements it classifies.
 // Editing the list is admin work; anyone who records or reads a movement needs
-// to see it. 'Wholesale' is pinned by name because private.ship_order_impl
-// looks it up that way — the RPCs refuse to rename or delete that row.
+// to see it. No channel name is load-bearing: an order carries its own channel,
+// so shipping never looks one up by name and every row renames and deletes
+// alike (whatever references a channel holds it by on delete restrict).
 const TAX_TREATMENTS = ["taxable", "export", "vessel_supplies", "research", "transfer_in_bond"] as const;
 
 defineQuery({
@@ -144,7 +145,7 @@ defineQuery({
 });
 
 defineCommand({
-  name: "upsert_sale_channel", description: "Create or edit a sale channel: its name and the tax treatment its removals are recorded under; Wholesale cannot be renamed",
+  name: "upsert_sale_channel", description: "Create or edit a sale channel: its name and the tax treatment its removals are recorded under",
   input: z.object({ id: z.string().uuid().optional(), name: z.string().trim().min(1), taxTreatment: z.enum(TAX_TREATMENTS) }),
   roles: ["admin"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_sale_channel", {
@@ -153,16 +154,17 @@ defineCommand({
 });
 
 defineCommand({
-  name: "delete_sale_channel", description: "Remove a sale channel no movement has used; Wholesale cannot be removed",
+  name: "delete_sale_channel", description: "Remove a sale channel nothing references",
   input: z.object({ channelId: z.string().uuid() }),
   roles: ["admin"],
   handler: async (ctx, i, execution) => {
     const result = await ctx.db.rpc("delete_sale_channel", {
       p_brewery: ctx.breweryId, p_id: i.channelId, p_request_id: execution.requestId,
     });
-    // inventory_movements references the channel `on delete restrict`, so a
-    // used channel comes back as a raw foreign-key violation; say it in
-    // product terms rather than letting it fall through to a generic 500.
+    // inventory_movements, customers, orders and channel_prices all reference
+    // the channel `on delete restrict`, so a channel in use comes back as a raw
+    // foreign-key violation; say it in product terms rather than letting it
+    // fall through to a generic 500.
     if (result.error?.code === "23503") throw new CommandError("channel is in use");
     return unwrap(Promise.resolve(result));
   },

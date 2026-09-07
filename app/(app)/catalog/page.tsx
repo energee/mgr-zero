@@ -12,6 +12,7 @@ import { BrandForm } from "./brand-form";
 import { FormatForm } from "./format-form";
 import { SkuForm, type FormatOption } from "./sku-form";
 
+type PriceGroup = { id: string; name: string };
 type Sku = { id: string; name: string; format_id: string; active: boolean };
 type Brand = { id: string; name: string; abv: number | null; styles: { name: string } | null; skus: Sku[] };
 type Format = {
@@ -22,9 +23,10 @@ type Format = {
 export default async function CatalogPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [brands, formats] = await Promise.all([
+  const [brands, formats, groups] = await Promise.all([
     runCommand("list_brands", {}, ctx) as Promise<Brand[]>,
     runCommand("list_formats", {}, ctx) as Promise<Format[]>,
+    runCommand("list_price_groups", {}, ctx) as Promise<PriceGroup[]>,
   ]);
   const formatById = new Map(formats.map((f) => [f.id, f]));
   const packaged: FormatOption[] = formats.filter((f) => f.basis === "packaged").map((f) => ({ id: f.id, name: f.name }));
@@ -34,7 +36,7 @@ export default async function CatalogPage() {
       <section className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-semibold">Catalog</h1>
-          <BrandForm />
+          <BrandForm groups={groups.map((g) => ({ id: g.id, name: g.name }))} />
         </div>
 
         {brands.length ? (

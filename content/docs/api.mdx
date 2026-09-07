@@ -1408,7 +1408,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin
 
-Remove a sale channel no movement has used; Wholesale cannot be removed
+Remove a sale channel nothing references
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -1566,7 +1566,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin
 
-Create or edit a sale channel: its name and the tax treatment its removals are recorded under; Wholesale cannot be renamed
+Create or edit a sale channel: its name and the tax treatment its removals are recorded under
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -1585,20 +1585,14 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* catalog-designed */}
 
-13 of the 21 operations in this area are available today; the 8 below are not.
+13 of the 15 operations in this area are available today; the 2 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
-| `clear_price_list_item` | command | Price group, Override |
-| `get_price_list` | query | Price group, Override |
 | `get_sku` | query | SKU |
-| `list_price_lists` | query | Price groups, Price group |
-| `set_price_list_format` | command | Price group |
-| `set_price_list_item` | command | Catalog, Price group, Override |
 | `update_sku` | command | Catalog, Brand, SKU |
-| `upsert_price_list` | command | Catalog, Price group |
 
 {/* end ops:catalog */}
 

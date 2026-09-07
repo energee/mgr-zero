@@ -1,4 +1,7 @@
-// app/(app)/catalog/brand-form.tsx — CommandForm (bottom sheet on phone, dialog on desk) for the upsert_brand command (create only from here).
+// app/(app)/catalog/brand-form.tsx — CommandForm (bottom sheet on phone, dialog
+// on desk) for the upsert_brand command (create only from here). Price group is
+// a select over the brewery’s price groups (the rows of the price grid): the
+// brand sits on one, and every SKU of it is priced by that row’s cells.
 "use client";
 
 import { useState } from "react";
@@ -6,9 +9,10 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
-const EMPTY = { name: "", style: "", abv: "", description: "", category: "", priceGroup: "", hops: "" };
+const EMPTY = { name: "", style: "", abv: "", description: "", category: "", priceGroupId: "", hops: "" };
 type Fields = typeof EMPTY;
 
 // Closes over nothing, so it lives outside the component.
@@ -21,7 +25,7 @@ function field(id: string, label: string, value: string, set: (v: string) => voi
   );
 }
 
-export function BrandForm() {
+export function BrandForm({ groups }: { groups: { id: string; name: string }[] }) {
   const [f, setF] = useState<Fields>(EMPTY);
   const set = (k: keyof Fields) => (v: string) => setF((prev) => ({ ...prev, [k]: v }));
   const form = useCommandForm("upsert_brand", {
@@ -29,7 +33,7 @@ export function BrandForm() {
     build: () => ({
       name: f.name, style: f.style || undefined, abv: f.abv ? Number(f.abv) : undefined,
       description: f.description || undefined, category: f.category || undefined,
-      priceGroup: f.priceGroup || undefined, hops: f.hops || undefined,
+      priceGroupId: f.priceGroupId || undefined, hops: f.hops || undefined,
     }),
     reset: () => setF(EMPTY),
   });
@@ -42,7 +46,13 @@ export function BrandForm() {
         {field("brand-abv", "ABV", f.abv, set("abv"), { type: "number", step: "0.01" })}
         {field("brand-description", "Description", f.description, set("description"))}
         {field("brand-category", "Category", f.category, set("category"))}
-        {field("brand-price-group", "Price group", f.priceGroup, set("priceGroup"))}
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="brand-price-group">Price group</Label>
+          <NativeSelect id="brand-price-group" value={f.priceGroupId} onChange={(e) => set("priceGroupId")(e.target.value)}>
+            <option value="">Unpriced</option>
+            {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </NativeSelect>
+        </div>
         {field("brand-hops", "Hops", f.hops, set("hops"))}
         <CommandFormMessage error={form.error} />
         <CommandFormFooter>

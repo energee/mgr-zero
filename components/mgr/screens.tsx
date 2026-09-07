@@ -297,7 +297,7 @@ export const SCREENS: Screen[] = [
       {E.hd("More")}
       {E.nav("Invoices", "QuickBooks Online mapping and push", "", QuickBooksMark)}
       {E.nav("Catalog", "brands and SKUs")}
-      {E.nav("Price groups", "customer price groups")}
+      {E.nav("Price groups", "rows of the price grid")}
       {E.nav("Customers", "accounts and ship-tos")}
       {E.nav("Recipes", "formulas and versions")}
       {E.nav("Compliance months", "reports and filing status")}
@@ -1322,7 +1322,7 @@ export const SCREENS: Screen[] = [
       {E.pick("Type", "Retailer", ["Retailer", "Distributor"])}
       {E.edit("License number", "PA R-55821")}
       {E.edit("Terms", "Net 30")}
-      {E.pick("Price group", "Wholesale · standard", ["Wholesale · standard", "Wholesale · distributor", "Taproom"])}
+      {E.pick("Sale channel", "Wholesale", CHANNELS)}
       {E.pick("Tax treatment", "Inherit from channel", ["Inherit from channel", ...TAX_TREATMENTS])}
       {E.nav("Ship-tos", "Main · Dock")}
       {E.row("Portal users", "2 active", E.act("Invite"))}
@@ -1525,7 +1525,7 @@ export const SCREENS: Screen[] = [
     to: { "Hazy IPA": "Brand", Pils: "Brand", Stout: "Brand" },
     job: "Define brands, their sellable formats and prices without ledger writes",
     reads: "list_brands · list_skus",
-    writes: "upsert_brand · create_sku · update_sku [design] · upsert_price_list · set_price_list_item",
+    writes: "upsert_brand · create_sku · update_sku [design]",
     states: DEFAULT_STATES,
     spec: "Brand facts (ABV and tax class) edit on Brand; SKU associates the brand with a Format. Volume and packaging stay on the Format. This page remains a list with simple pricing, never the v1 price matrix.",
     body: (<>
@@ -1533,7 +1533,7 @@ export const SCREENS: Screen[] = [
       {E.nav("Hazy IPA", "IPA · 6.8% · 3 SKUs")}
       {E.nav("Pils", "Lager · 4.9% · 2 SKUs")}
       {E.nav("Stout", "Stout · 7.2% · 1 SKU")}
-      {E.nav("Price groups", "3 groups")}
+      {E.nav("Price groups", "3 channels · 8 groups")}
       {E.nav("Water profiles", "3 profiles")}
     </>),
   },
@@ -1573,7 +1573,7 @@ export const SCREENS: Screen[] = [
         E.pick("Style", "Hazy IPA", ["Hazy IPA", "IPA", "Pils", "Add “Cold IPA”"]),
         E.edit("ABV", "6.8"),
         E.pick("Category", "Core", ["Core", "Seasonal", "One-off", "Barrel-aged"]),
-        E.pick("Price group", "Standard", ["Standard", "Specialty", "Barrel-aged"]),
+        E.pick("Price group", "3", ["1", "2", "3", "4", "5", "6", "7", "8"]),
       )}
       {E.ttl("Sell sheet")}
       {E.edit("Description", "Juicy, soft, Citra-forward")}
@@ -3521,17 +3521,20 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Price groups",
-    to: { Taproom: "Price group", "Wholesale · standard": "Price group", "Wholesale · distributor": "Price group" },
-    job: "See customer price groups and open the prices each group owns",
-    reads: "list_price_lists",
-    writes: "none [creation and pricing happen on Price group]",
-    states: [["unused", "a group with no customers can still be edited"], ["empty", "no price groups yet: Create price group is the only action"]],
-    spec: "Reached from Catalog. Each row names its next action and opens Price group; Create price group opens the same surface for a new group.",
+    to: { "1": "Price group", "2": "Price group", "3": "Price group" },
+    job: "Price every beer from one grid: groups down, formats across, a table per sale channel",
+    reads: "list_sale_channels · list_price_groups · list_formats · list_channel_prices",
+    writes: "set_channel_price · clear_channel_price · upsert_price_group · delete_price_group",
+    states: [["permission", "sales or admin required", 1], ["empty cell", "unpriced · an order for a SKU on that group and format is refused on that channel", 1], ["empty", "no price groups yet: Create price group is the only action"], ["in use", "a group a brand sits on, or a cell prices, cannot be removed", 1]],
+    spec: "Reached from Catalog. The brewery's price sheet is one grid: rows are price groups, columns are formats, and each sale channel gets its own table. A beer sits on one group (Catalog → Brand → Price group) and a customer sits on one channel, so the price of any SKU for any customer is the single cell where the two meet. Nothing else prices anything: no per-customer list, no per-SKU exception (the barrel-aged one is simply a higher group), no brewery default. Tapping a cell edits that one price; clearing it makes those SKUs unpriced on that channel. A group's name opens Price group, where its position and cost ceiling live.",
     body: (<>
       {E.back("Catalog", "Price groups", E.btn("Create price group"))}
-      {E.row("Wholesale · standard", "18 customers · 12 priced formats", E.act("Edit prices"))}
-      {E.row("Wholesale · distributor", "3 customers · 12 priced formats", E.act("Edit prices"))}
-      {E.row("Taproom", "no customers · 8 priced formats", E.act("Edit prices"))}
+      {E.info("Rows are price groups and columns are formats, one table per sale channel. A beer sits on one group and a customer on one channel; the cell where they meet is the price.")}
+      {E.ttl("Wholesale")}
+      <div className="min-w-0 overflow-x-auto">{E.tbl(["Group", "½ bbl keg", "sixtel", "case · 24×16oz"], [[E.link("1", "Price group"), "$132.00", "$53.00", "$46.00"], [E.link("2", "Price group"), INV.hazyPrice, "$95.00", INV.pilsPrice], [E.link("3", "Price group"), "$240.00", "$140.00", "not priced"]])}</div>
+      {E.ttl("Taproom")}
+      <div className="min-w-0 overflow-x-auto">{E.tbl(["Group", "pint", "crowler"], [[E.link("1", "Price group"), "$7.00", "$14.00"], [E.link("2", "Price group"), "$8.00", "$16.00"], [E.link("3", "Price group"), "$11.00", "not priced"]])}</div>
+      {E.info("An empty cell is unpriced: those SKUs cannot be ordered on that channel. Clear a cell to unprice it again.")}
     </>),
   },
   {
@@ -3539,44 +3542,21 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Price group",
-    to: { Edit: "Override", Add: "Override" },
-    job: "Price a format once per group and override only the exceptions",
-    reads: "list_price_lists [+ channel_id §16.4] · get_price_list [design; formats and SKU overrides]",
-    writes: "upsert_price_list · set_price_list_format · set_price_list_item · clear_price_list_item [price_list_formats is the group default, price_list_items the SKU override; channel_id waits for sale channels]",
-    states: [["permission", "sales or admin required", 1], ["inherited", "the format price is what the customer sees"], ["overridden", "one brand × format priced away from the group", 1], ["poured", "a pour is priceable here and is not a SKU"], ["no price", "neither a format default nor an override · the line cannot be sold", 1], ["no ceiling", "the group is chosen by hand · nothing is suggested"], ["suggested", "a cost inside the band proposes this group · a person confirms", 0]],
-    spec: "A price group is the pricing a customer is already assigned, so nothing here is a new relationship; revision 2 adds the channel and makes a format priceable, so a taproom pour (which is not a SKU) can be priced at all. Drawn format-default with a per-SKU override, matching Menu and POS item, which already read “format default” and offer Reset to format price. §16.16 q1 leaves the direction open; drawing it the other way would make those two shipped frames inconsistent.",
+    to: { Remove: "Price groups", "Remove price group": "Price groups" },
+    job: "Name one row of the price grid, place it, and give it an optional cost ceiling",
+    reads: "list_price_groups",
+    writes: "upsert_price_group · delete_price_group",
+    states: [["permission", "sales or admin required", 1], ["no ceiling", "the group is chosen by hand · nothing is suggested"], ["suggested", "a cost inside the band proposes this group · a person confirms", 0], ["in use", "a brand sits on it or a cell prices it · Remove is refused", 1]],
+    spec: "A price group is one row of the grid and holds no prices of its own: the prices are the cells on Price groups. What lives here is the row itself: its name, its position in the sheet, and the optional cost ceiling that sorts the rows and suggests a group for a beer whose cost lands in the band. Nobody is moved automatically, and costing does not exist yet, so nothing reads the ceiling today. Removal is refused while a brand sits on the group or any cell prices it, in product words rather than a foreign-key error.",
     body: (<>
-      {E.back("Price groups", "Wholesale · standard")}
-      {E.edit("Group name", "Wholesale · standard")}
-      {E.pick("Channel", "Wholesale", CHANNELS)}
+      {E.back("Price groups", "2")}
+      {E.edit("Group name", "2")}
+      {E.edit("Position", "2", "number")}
       {E.edit("Cost ceiling", "$1.85")}
-      {E.info("Groups sort by ceiling and the lower bound is the previous group’s. A cost inside this band suggests the group; nobody is moved automatically.")}
-      {E.ttl("Format defaults")}
-      {E.tbl(["Format", "Price", "UPC", "Source"], [["½ bbl keg", INV.hazyPrice, "none", "group default"], ["sixtel", "$95.00", "none", "group default"], ["case · 24×16oz", INV.pilsPrice, INV.upc, "group default"]])}
-      {E.info("Every brand in this group scans as the group’s code for that format. Kegs carry no retail code: they move on lot numbers, so a blank UPC is finished, not unfinished.")}
-      {E.ttl("Brand × format overrides")}
-      {E.row("Barrel-aged Stout · ½ bbl keg", `$240.00 · against a ${INV.hazyPrice} default`, E.act("Edit"), "w")}
-      {E.row("Add override", "brand · format · price", E.act("Add"))}
-      {E.info(`All halves are ${INV.hazyPrice}, except the barrel-aged one. Clear an override and the row rejoins the group.`)}
-    </>),
-  },
-  {
-    step: 8,
-    slice: 1,
-    tab: "More",
-    surface: "sheet",
-    name: "Override",
-    to: { "Save override": "Price group", "Clear override": "Price group" },
-    job: "Price one brand and format away from its group default",
-    reads: "get_price_list [design; §16.4]",
-    writes: "set_price_list_item · clear_price_list_item",
-    states: [["permission", "sales or admin required", 1], ["overridden", "customer sees this price"], ["cleared", "format default applies"]],
-    body: (<>
-      {E.pick("Brand", "Barrel-aged Stout", ["Barrel-aged Stout", "Hazy IPA", "Pils"])}
-      {E.pick("Format", "½ bbl keg", ["½ bbl keg", "⅙ bbl keg", "case · 24×16oz"])}
-      {E.inp("Price", "$240.00")}
-      {E.info(`Clear this override to use the ${INV.hazyPrice} format default.`)}
-      {E.btns([["Clear override", "g"], "Save override"])}
+      {E.info("Groups sort by position, and the lower bound of a ceiling is the previous group’s. A cost inside this band suggests the group; nobody is moved automatically. Leave it empty and it reads none.")}
+      {E.fld("Cost ceiling · group 1", "none")}
+      {E.fld("Prices", `${INV.hazyPrice} on Wholesale · ½ bbl keg, and 5 more cells`)}
+      {E.row("Remove price group", "refused while a brand sits on it or a cell prices it", E.act("Remove", "destructive"), "w")}
     </>),
   },
   {
