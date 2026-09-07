@@ -64,7 +64,7 @@ Supabase access token for a member of the brewery.
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "…", "name": "list_products", "input": {} }'
+  -d '{ "breweryId": "…", "name": "list_brands", "input": {} }'
 ```
 
 From the browser the app calls the same endpoint through `lib/commands/client.ts`,
@@ -126,7 +126,7 @@ access token:
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "…", "name": "list_products", "input": {} }'
+  -d '{ "breweryId": "…", "name": "list_brands", "input": {} }'
 ```
 
 The `breweryId` in the body then decides *which* brewery the caller is acting
@@ -578,8 +578,11 @@ Confirming creates allocations and returns `{ order_id, warnings }`, where
 negative. These are soft warnings. The confirm still succeeds, because the
 brewery, not the API, decides whether to oversell.
 
-Shipping is one transaction: inventory movements, allocation fulfilment and the
-invoice together, returning `{ order_id, invoice_id }`. A credit memo reverses
+Shipping is one transaction: inventory movements, allocation fulfilment and
+(unless deferred) the invoice, returning `{ order_id, invoice_id }`.
+`invoiceTiming: "on_delivery"` ships without invoicing yet — `invoice_id`
+comes back null, and `confirm_delivery` invoices later at the shipped
+quantities and order prices. A credit memo reverses
 part of an invoice as negative lines at the original prices plus return-in
 movements. Invoices are never edited.
 
@@ -986,6 +989,13 @@ On-hand is the sum of movements per SKU and location. Available-to-promise is
 on-hand minus open allocations: the number a salesperson should be shown before
 promising stock.
 
+A stock transfer moves finished goods, materials, or empty kegs between two of
+the brewery's locations, bin to bin, without an order or an invoice.
+`create_stock_transfer` refuses a transfer whose source and destination
+location are the same — move within one location with `move_stock_bin`
+instead. `receive_stock_transfer` posts every line's paired ledger rows in one
+transaction, so a transfer is never left half-received.
+
 {/* ops:inventory */}
 
 #### create_bin [#create_bin]
@@ -1334,10 +1344,11 @@ The screens need them and the backend has not built them, so calling one returns
 
 ### Catalog & pricing [#catalog]
 
-A product is the beer. A SKU is a sellable format of it (keg, can, or bottle)
-carrying `unitsPerCase` and `bblPerUnit`. `bblPerUnit` is a numeric string, not a
-float, so a barrel figure never picks up binary rounding on its way to a tax
-form.
+A brand is the beer's sellable identity — name, style, ABV, tax class. A
+format is the physical package (keg, can, bottle); it owns `unitsPerCase` and
+`bblPerUnit`. A poured format (a pint, a taster) never holds stock: it is a
+ratio back to the keg it pours from, and never becomes a SKU. A SKU is one
+brand × one packaged format, with an optional UPC.
 
 Prices live on a grid, not on SKUs. A price group is a row of that grid and a
 brand sits on one; a sale channel is the column and a customer sits on one.
