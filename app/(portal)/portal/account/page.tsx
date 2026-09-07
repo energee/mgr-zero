@@ -1,23 +1,34 @@
-// app/(portal)/portal/account/page.tsx — the Account tab: which customer
-// this login is, with no portal write. Ship-tos and deposits stay brewery-side
-// until a customer-safe read exists; the design frame at Account shows the
-// target-state list.
+// app/(portal)/portal/account/page.tsx — the Account tab, drawn to the
+// Account screen record from get_portal_account: ship-tos, this login's
+// membership, keg deposits held. No portal write; peers are never listed.
+import { E } from "@/components/mgr/e";
 import { getActiveCustomer } from "@/lib/portal";
+import { buildContext } from "@/lib/commands/context";
+import { runCommand } from "@/lib/commands/registry";
+import "@/lib/commands/all";
+
+type Account = {
+  customer: { id: string; name: string };
+  shipTos: { id: string; label: string; city: string; state: string }[];
+  membership: { userId: string };
+  deposits: { kegSize: string | null; kegsOnDeposit: number; depositCents: number }[];
+};
 
 export default async function PortalAccountPage() {
   const customer = await getActiveCustomer();
+  const ctx = await buildContext(customer.breweryId);
+  const acct = (await runCommand("get_portal_account", {}, ctx)) as Account;
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-xl font-semibold">Account</h1>
-      <dl className="flex flex-col text-sm">
-        <div className="flex items-center justify-between gap-4 py-2">
-          <dt className="text-muted-foreground">Customer</dt>
-          <dd className="text-right">{customer.customerName}</dd>
+    <>
+      {E.hd("Account", acct.customer.name)}
+      {acct.shipTos.map((s) => <div key={s.id}>{E.row(`${s.label} ship-to`, `${s.city}, ${s.state}`)}</div>)}
+      {E.row("You · buyer", "this login", "active")}
+      {acct.deposits.map((d) => (
+        <div key={d.kegSize ?? "all"}>
+          {E.row("Keg deposits held", `${d.kegsOnDeposit} × ${d.kegSize ?? "keg"}`, `$${(d.depositCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`)}
         </div>
-      </dl>
-      <p className="text-sm text-muted-foreground">
-        Contact the brewery to change ship-tos or other account details.
-      </p>
-    </div>
+      ))}
+      {E.info("Contact the brewery to change account details.")}
+    </>
   );
 }

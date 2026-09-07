@@ -98,3 +98,37 @@ defineQuery({
   input: z.object({}),
   handler: (ctx) => unwrap(ctx.db.from("invoices").select("*, invoice_lines(*, skus(name))").eq("customer_id", requireCustomer(ctx)).order("created_at", { ascending: false })),
 });
+
+defineQuery({
+  name: "get_portal_account", description: "Portal: the caller's customer, ship-tos, this login's membership, and keg deposits held; peer portal users are never listed",
+  roles: "customer",
+  input: z.object({}),
+  handler: async (ctx) => {
+    const customerId = requireCustomer(ctx);
+    const [customer, shipTos, deposits] = await Promise.all([
+      unwrap(ctx.db.from("customers").select("id, name").eq("id", customerId).single()),
+      unwrap(ctx.db.from("ship_tos").select("id, label, address1, city, state, zip").eq("customer_id", customerId).order("label")),
+      unwrap(ctx.db.from("keg_deposit_balances").select("keg_size, kegs_on_deposit, deposit_cents").eq("customer_id", customerId)),
+    ]);
+    return {
+      customer, shipTos, membership: { userId: ctx.userId },
+      deposits: (deposits as { keg_size: string | null; kegs_on_deposit: number; deposit_cents: number }[])
+        .filter((d) => d.kegs_on_deposit !== 0)
+        .map((d) => ({ kegSize: d.keg_size, kegsOnDeposit: d.kegs_on_deposit, depositCents: d.deposit_cents })),
+    };
+  },
+});
+
+defineQuery({
+  name: "portal_invoice", description: "Portal: one of the caller's invoices or credit memos with its lines and total; another customer's id is not found",
+  roles: "customer",
+  input: z.object({ invoiceId: z.string().uuid() }),
+  handler: async (ctx, i) => {
+    const customerId = requireCustomer(ctx);
+    // RLS already scopes to the caller's customer; the customer_id filter makes a foreign id a plain not_found
+    const invoice = await unwrap(ctx.db.from("invoices").select("id, invoice_no, kind, issued_on, due_on, paid_at").eq("id", i.invoiceId).eq("customer_id", customerId).single());
+    const lines = await unwrap(ctx.db.from("invoice_lines").select("id, kind, qty, unit_price_cents, amount_cents, description, skus(name)").eq("invoice_id", i.invoiceId));
+    const total_cents = (lines as { amount_cents: number }[]).reduce((n, l) => n + l.amount_cents, 0);
+    return { invoice: { ...invoice, total_cents }, lines };
+  },
+});

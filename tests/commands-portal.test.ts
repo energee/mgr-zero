@@ -190,3 +190,27 @@ describe("portal commands", () => {
     expect(order!.from_location_id).toBe(brewery!.portal_fulfillment_location_id);
   });
 });
+
+describe("account and invoice reads", () => {
+  it("get_portal_account returns the caller's customer, ship-tos, membership and deposits only", async () => {
+    const acct = await runCommand("get_portal_account", {}, custCtx) as {
+      customer: { id: string; name: string }; shipTos: { id: string; label: string; city: string; state: string }[];
+      membership: { userId: string }; deposits: { kegSize: string | null; kegsOnDeposit: number; depositCents: number }[];
+    };
+    expect(acct.customer.id).toBe(customerId);
+    expect(acct.shipTos.map((s) => s.id)).toContain(shipToId);
+    expect(acct.membership.userId).toBe(custCtx.userId);
+    expect(acct.deposits).toEqual([]);
+  });
+
+  it("portal_invoice returns the caller's own invoice with lines, and not_found for another customer's", async () => {
+    const { data: inv } = await admin.from("invoices").insert({ brewery_id: b.id, customer_id: customerId, kind: "invoice" }).select().single();
+    await admin.from("invoice_lines").insert({ brewery_id: b.id, invoice_id: inv!.id, kind: "sku", sku_id: skuId, qty: 2, unit_price_cents: 3600, description: "IPA case" });
+    const other = await seedCustomer(b.id, { name: "Not mine", priceListId });
+    const { data: foreign } = await admin.from("invoices").insert({ brewery_id: b.id, customer_id: other.customerId, kind: "invoice" }).select().single();
+    const one = await runCommand("portal_invoice", { invoiceId: inv!.id }, custCtx) as { invoice: { id: string; total_cents: number }; lines: { qty: number }[] };
+    expect(one.invoice.id).toBe(inv!.id);
+    expect(one.lines.map((l) => Number(l.qty))).toEqual([2]);
+    await expect(runCommand("portal_invoice", { invoiceId: foreign!.id }, custCtx)).rejects.toMatchObject({ code: "not_found" });
+  });
+});

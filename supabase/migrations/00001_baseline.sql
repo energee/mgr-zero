@@ -3727,7 +3727,7 @@ grant select on breweries, brewery_users, customer_users,
   to authenticated;
 -- Security-invoker views retain the underlying tables' RLS predicates; expose
 -- only the derived reads consumed by registered commands.
-grant select on on_hand, atp, invoice_totals, portal_brewery to authenticated;
+grant select on on_hand, atp, invoice_totals, keg_deposit_balances, portal_brewery to authenticated;
 grant all on all tables in schema public to service_role;
 grant all on all sequences in schema public to service_role;
 

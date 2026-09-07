@@ -1,7 +1,9 @@
 // app/(portal)/portal/invoices/page.tsx — the caller's invoices and credit
 // memos (portal_invoices). portal_invoices returns raw invoice_lines rather
 // than a subtotal_cents column (unlike staff's list_invoices, which reads
-// the invoice_totals view), so totals are summed client-side here.
+// the invoice_totals view), so totals are summed client-side here. The
+// number opens the invoice detail (portal_invoice).
+import Link from "next/link";
 import { getActiveCustomer } from "@/lib/portal";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
@@ -39,7 +41,7 @@ export default async function PortalInvoicesPage() {
               const totalCents = inv.invoice_lines.reduce((sum, l) => sum + l.amount_cents, 0);
               return (
                 <tr key={inv.id} className="border-t">
-                  <td className="py-1">{inv.invoice_no ?? inv.id.slice(0, 8)}</td>
+                  <td className="py-1"><Link href={`/portal/invoices/${inv.id}`} className="underline underline-offset-2">{inv.invoice_no ?? inv.id.slice(0, 8)}</Link></td>
                   <td className="py-1">
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs ${
