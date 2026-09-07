@@ -13,7 +13,7 @@ jobs:
   maintain:
     if: >-
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref != 'documentation/user-guide')
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref != 'documentation/user-guide' && !contains(github.event.pull_request.body, 'DOCS: none'))
     runs-on: ubuntu-latest
     permissions:
       contents: read

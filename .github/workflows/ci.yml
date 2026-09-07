@@ -36,6 +36,13 @@ jobs:
         with: { node-version: 22 }
       - uses: oven-sh/setup-bun@v2
         with: { bun-version-file: ".bun-version" }
+      # A `TODO: <item>` line in the PR description must name one open TODO.md
+      # item, so the dreaming workflow can move it without a model.
+      - name: PR directives are well-formed
+        if: github.event_name == 'pull_request' && contains(github.event.pull_request.body, 'TODO:')
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: bun scripts/pr-directives.ts check
       - run: bun install --frozen-lockfile
       - uses: supabase/setup-cli@v1
         with: { version: 2.116.0 }
