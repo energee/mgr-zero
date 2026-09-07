@@ -378,6 +378,18 @@ describe("registered staff mutation role × RPC matrix", () => {
       },
     },
     {
+      command: "confirm_restock", rpc: "confirm_restock", allowed: ["admin", "warehouse"],
+      input: async () => {
+        // adjust-after-pick is what sets needs_restock
+        const orderId = await confirmedOrder();
+        const lineId = await orderLine(orderId);
+        const db = contexts().admin.db;
+        await db.rpc("record_pick", { p_order: orderId, p_picks: [{ line_id: lineId, qty_picked: 1 }], p_request_id: crypto.randomUUID() });
+        await db.rpc("adjust_order_lines", { p_order: orderId, p_lines: [{ sku_id: skuId, qty: 1 }], p_reason: "cut", p_request_id: crypto.randomUUID() });
+        return { command: { orderId }, rpc: { p_order: orderId } };
+      },
+    },
+    {
       command: "ship_order", rpc: "ship_order", allowed: ["admin", "warehouse"],
       input: async () => {
         const { orderId, lineId } = await pickedOrder();

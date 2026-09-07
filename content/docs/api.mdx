@@ -165,6 +165,7 @@ omitted — they have no roles until they are built.
 | `adjust_order_lines` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `cancel_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `confirm_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
+| `confirm_restock` | Orders & invoicing | ✓ |  | ✓ |  |  |
 | `consume_chat_link_proof` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
 | `create_credit_memo` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `create_location` | Inventory & locations | ✓ |  |  |  |  |
@@ -595,6 +596,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "confirm_order", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "orderId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
+#### confirm_restock [#confirm_restock]
+
+`command` · admin, warehouse
+
+Confirm staged quantities were put back; clears needs_restock; no ledger movement
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `orderId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "confirm_restock", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "orderId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 #### create_credit_memo [#create_credit_memo]
 
 `command` · admin, sales
@@ -844,13 +862,12 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* orders-designed */}
 
-16 of the 23 operations in this area are available today; the 7 below are not.
+17 of the 23 operations in this area are available today; the 6 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
-| `confirm_restock` | command | Put back |
 | `list_invoice_questions` | query | Sales |
 | `raise_invoice_question` | command | Question invoice |
 | `release_allocation` | command | Pars and allocation |

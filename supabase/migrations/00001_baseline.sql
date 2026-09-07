@@ -2435,6 +2435,31 @@ begin
   v_result := private.cancel_order_impl(p_order,p_reason); return private.complete_command_request(p_request_id,v_result);
 end $$;
 
+-- Put back: staged beer after an adjust-after-pick or cancel-when-picked was
+-- re-shelved. Clears the flag and records it; the ledger never moved.
+create function private.confirm_restock_impl(p_order uuid) returns jsonb
+language plpgsql set search_path = '' as $$
+declare o public.orders;
+begin
+  select * into o from public.orders where id = p_order for update;
+  if not found then raise exception 'order not found'; end if;
+  if o.needs_restock is not true then raise exception 'order is not waiting for restock'; end if;
+  update public.orders set needs_restock = false where id = p_order;
+  insert into public.order_events (brewery_id, order_id, actor, event, payload)
+  values (o.brewery_id, p_order, auth.uid(), 'restocked', '{}'::jsonb);
+  return jsonb_build_object('order_id', p_order);
+end $$;
+
+create function confirm_restock(p_order uuid,p_request_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_brewery uuid; v_replay jsonb; v_result jsonb;
+begin
+  v_brewery := private.assert_order_staff(p_order,array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(v_brewery,'confirm_restock',p_request_id,jsonb_build_object('order',p_order));
+  if v_replay is not null then return v_replay; end if;
+  v_result := private.confirm_restock_impl(p_order); return private.complete_command_request(p_request_id,v_result);
+end $$;
+
 create function record_pick(p_order uuid,p_picks jsonb,p_request_id uuid) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare v_brewery uuid; v_replay jsonb; v_result jsonb;
@@ -3603,6 +3628,7 @@ grant execute on function
   adjust_order_lines(uuid,jsonb,text,uuid),
   cancel_order(uuid,text,uuid),
   record_pick(uuid,jsonb,uuid),
+  confirm_restock(uuid,uuid),
   ship_order(uuid,jsonb,text,text,uuid),
   create_credit_memo(uuid,jsonb,uuid,text,uuid),
   set_standing_allocation(uuid,uuid,numeric,uuid),

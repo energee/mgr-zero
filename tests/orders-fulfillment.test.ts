@@ -173,3 +173,29 @@ describe("replenishment", () => {
     expect(Number(mv!.find(m => m.location_id === tapId)!.qty)).toBe(3);
   });
 });
+
+describe("confirm_restock", () => {
+  it("clears needs_restock and writes an order event; no movement", async () => {
+    const id = await confirmedOrder(4);
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 4 }], p_request_id: crypto.randomUUID() });
+    await staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 2 }], p_reason: "cut", p_request_id: crypto.randomUUID() });
+    const before = await admin.from("inventory_movements").select("id").eq("ref", id);
+    const { data, error } = await staffDb.rpc("confirm_restock", { p_order: id, p_request_id: crypto.randomUUID() });
+    expect(error).toBeNull();
+    expect((data as { order_id: string }).order_id).toBe(id);
+    const { data: o } = await admin.from("orders").select("needs_restock").eq("id", id).single();
+    expect(o!.needs_restock).toBe(false);
+    const { data: ev } = await admin.from("order_events").select("event").eq("order_id", id).eq("event", "restocked");
+    expect(ev!.length).toBe(1);
+    const after = await admin.from("inventory_movements").select("id").eq("ref", id);
+    expect(after.data!.length).toBe(before.data!.length);
+  });
+
+  it("is a conflict when the flag is already clear", async () => {
+    const id = await confirmedOrder(2);
+    const { error } = await staffDb.rpc("confirm_restock", { p_order: id, p_request_id: crypto.randomUUID() });
+    expect(error).not.toBeNull();
+    expect(error!.message).toMatch(/not waiting for restock/);
+  });
+});

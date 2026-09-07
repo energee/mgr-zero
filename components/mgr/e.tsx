@@ -91,11 +91,12 @@ export const E = {
     );
   },
   /** A detail screen's header: an arrow link to the parent area above the title.
-   *  `action` is the same list-create slot `hd` takes. */
-  back: (to: React.ReactNode, title: React.ReactNode, action?: React.ReactNode) => {
+   *  `action` is the same list-create slot `hd` takes; `href` is where the
+   *  arrow goes on a live page (fixtures leave it "#"). */
+  back: (to: React.ReactNode, title: React.ReactNode, action?: React.ReactNode, href = "#") => {
     const head = (
       <div className="flex flex-col gap-1">
-        <a href="#" className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Icon icon={ArrowLeft01Icon} />{to}</a>
+        <Link href={href} className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Icon icon={ArrowLeft01Icon} />{to}</Link>
         <h1 className="text-lg font-semibold">{title}</h1>
       </div>
     );

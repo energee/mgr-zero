@@ -70,6 +70,13 @@ defineCommand({
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("cancel_order", { p_order: i.orderId, p_reason: i.reason, p_request_id: execution.requestId })),
 });
 
+defineCommand({
+  name: "confirm_restock", description: "Confirm staged quantities were put back; clears needs_restock; no ledger movement",
+  roles: [...warehouseRoles],
+  input: z.object({ orderId: z.string().uuid() }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("confirm_restock", { p_order: i.orderId, p_request_id: execution.requestId })),
+});
+
 const pickLines = z.array(z.object({ lineId: z.string().uuid(), qty: z.number().nonnegative() })).min(1);
 
 defineCommand({

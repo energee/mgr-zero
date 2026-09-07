@@ -11,6 +11,7 @@ const AUTHENTICATED_RPCS = [
   "begin_chat_reauthorization(uuid,text,text)",
   "cancel_order(uuid,text,uuid)",
   "confirm_order(uuid,uuid)",
+  "confirm_restock(uuid,uuid)",
   "consume_chat_link_proof(text)",
   "create_credit_memo(uuid,jsonb,uuid,text,uuid)",
   "create_location(uuid,text,location_kind,uuid)",
