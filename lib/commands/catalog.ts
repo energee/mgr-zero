@@ -26,6 +26,33 @@ defineCommand({
   })),
 });
 
+// Formats (§16.2): the physical shape, and the only place bbl_per_unit is
+// typed. A poured format holds no stock and carries no package facts.
+const KEG_SIZES = ["half_bbl", "quarter_bbl", "sixth_bbl", "fifty_l", "thirty_l", "twenty_l"] as const;
+defineCommand({
+  name: "upsert_format", description: "Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) or poured (a glass, never stock)",
+  input: z.object({
+    id: z.string().uuid().optional(), name: z.string().trim().min(1), basis: z.enum(["packaged", "poured"]),
+    packageType: z.enum(["keg", "can", "bottle"]).optional(), kegSize: z.enum(KEG_SIZES).optional(),
+    unitsPerCase: z.number().int().positive().optional(), bblPerUnit: z.number().positive().optional(),
+  }),
+  roles: ["admin", "sales"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_format", {
+    p_brewery: ctx.breweryId, p_id: i.id ?? null, p_name: i.name, p_basis: i.basis, p_package_type: i.packageType ?? null,
+    p_keg_size: i.kegSize ?? null, p_units_per_case: i.unitsPerCase ?? null, p_bbl_per_unit: i.bblPerUnit ?? null, p_request_id: execution.requestId,
+  })),
+});
+
+defineQuery({
+  name: "list_formats", description: "Formats, alphabetical, packaged and poured",
+  input: z.object({ basis: z.enum(["packaged", "poured"]).optional() }), roles: ["admin", "sales", "warehouse"],
+  handler: (ctx, i) => {
+    let q = ctx.db.from("formats").select().eq("brewery_id", ctx.breweryId).order("name");
+    if (i.basis) q = q.eq("basis", i.basis);
+    return unwrap(q);
+  },
+});
+
 defineCommand({
   name: "create_location", description: "Create a warehouse, taproom or storage location; it starts with the Walk-in, Cold and Dry bins",
   input: z.object({ name: z.string().min(1), kind: z.enum(["warehouse", "taproom", "storage"]) }),

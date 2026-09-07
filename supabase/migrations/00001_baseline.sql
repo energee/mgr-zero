@@ -38,6 +38,7 @@ $$;
 create type staff_role as enum ('admin','sales','warehouse','brewer');
 create type customer_type as enum ('distributor','retailer','brewery','other');
 create type package_type as enum ('keg','can','bottle');
+create type format_basis as enum ('packaged','poured');
 create type keg_size as enum ('half_bbl','quarter_bbl','sixth_bbl','fifty_l','thirty_l','twenty_l');
 create type keg_container_source as enum ('owned_fleet','per_fill_rental','one_way_material');
 create type location_kind as enum ('warehouse','taproom','storage');
@@ -226,6 +227,27 @@ create table products (
   unique (id, brewery_id),
   unique (brewery_id, name)
 );
+
+-- The sellable shape (§16.2): the only place bbl_per_unit is typed. packaged
+-- holds stock (what a bin holds, what a SKU is); poured never does, it is a
+-- ratio back to the keg it is drawn from. Atomic formats carry a volume;
+-- composed ones derive it from format_components (§16.2a).
+create table formats (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references breweries(id),
+  name text not null,
+  basis format_basis not null,
+  package_type package_type,                -- container; null for poured
+  keg_size keg_size,
+  units_per_case int check (units_per_case > 0),
+  bbl_per_unit numeric(12,8) check (bbl_per_unit > 0),   -- atomic packaged only
+  created_at timestamptz not null default now(),
+  unique (id, brewery_id),
+  unique (brewery_id, name),
+  check (basis = 'packaged' or (bbl_per_unit is null and package_type is null and keg_size is null and units_per_case is null)),
+  check (package_type = 'keg' or keg_size is null)
+);
+create index formats_brewery_idx on formats (brewery_id, basis);
 
 create table keg_pools (
   id uuid primary key default private.new_uuid(),
@@ -2207,6 +2229,29 @@ begin
   return p_result;
 end $$;
 
+create function upsert_format(
+  p_brewery uuid, p_id uuid, p_name text, p_basis public.format_basis, p_package_type public.package_type,
+  p_keg_size public.keg_size, p_units_per_case int, p_bbl_per_unit numeric, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.formats;
+begin
+  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'upsert_format', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'id', p_id, 'name', p_name, 'basis', p_basis, 'package_type', p_package_type,
+                       'keg_size', p_keg_size, 'units_per_case', p_units_per_case, 'bbl_per_unit', p_bbl_per_unit));
+  if v_replay is not null then return v_replay; end if;
+  if p_id is null then
+    insert into public.formats (brewery_id, name, basis, package_type, keg_size, units_per_case, bbl_per_unit)
+    values (p_brewery, p_name, p_basis, p_package_type, p_keg_size, p_units_per_case, p_bbl_per_unit) returning * into v_row;
+  else
+    update public.formats set name = p_name, basis = p_basis, package_type = p_package_type, keg_size = p_keg_size,
+      units_per_case = p_units_per_case, bbl_per_unit = p_bbl_per_unit
+    where id = p_id and brewery_id = p_brewery returning * into v_row;
+    if v_row.id is null then raise exception 'format not found'; end if;
+  end if;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
 create function create_product(
   p_brewery uuid, p_name text, p_style text, p_abv numeric, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
@@ -3073,7 +3118,7 @@ begin
   -- limited below to the exact RPC path and command roles that own them.
   foreach t in array array[
     'customers','ship_tos','vendors','materials','material_lots','products','keg_pools','skus',
-    'price_lists','price_list_items','sku_bom','locations','bins','stock_transfers','stock_transfer_lines','allocations','taproom_pars',
+    'formats','price_lists','price_list_items','sku_bom','locations','bins','stock_transfers','stock_transfer_lines','allocations','taproom_pars',
     'recipes','recipe_versions','recipe_ingredients','vessels','batches','vessel_occupancies',
     'fermentation_readings','batch_additions','packaging_runs','lots','packaging_run_outputs',
     'packaging_run_consumptions','material_contracts','purchase_orders','purchase_order_lines',
@@ -4084,7 +4129,7 @@ revoke all on all sequences in schema public from public, anon, authenticated;
 -- material lives in private.integration_tokens behind service-only RPCs.
 grant select on breweries, brewery_users, customer_users,
   customers, ship_tos, vendors, materials, material_lots, products, keg_pools, skus,
-  price_lists, price_list_items, sku_bom, locations, bins, stock_transfers, stock_transfer_lines, inventory_movements, allocations, taproom_pars,
+  formats, price_lists, price_list_items, sku_bom, locations, bins, stock_transfers, stock_transfer_lines, inventory_movements, allocations, taproom_pars,
   recipes, recipe_versions, recipe_ingredients, vessels, batches, vessel_occupancies, transfers,
   volume_adjustments, fermentation_readings, material_movements, batch_additions, packaging_runs,
   lots, packaging_run_outputs, packaging_run_consumptions, material_contracts, purchase_orders,
@@ -4120,6 +4165,7 @@ grant execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid)
 grant execute on function
   create_product(uuid,text,text,numeric,uuid),
   create_sku(uuid,uuid,text,public.package_type,int,numeric,uuid),
+  upsert_format(uuid,uuid,text,public.format_basis,public.package_type,public.keg_size,int,numeric,uuid),
   create_location(uuid,text,public.location_kind,uuid),
   update_location(uuid,uuid,text,public.location_kind,uuid),
   create_bin(uuid,uuid,text,uuid),

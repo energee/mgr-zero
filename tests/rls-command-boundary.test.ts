@@ -246,6 +246,16 @@ describe("registered staff mutation role × RPC matrix", () => {
       },
     },
     {
+      command: "upsert_format", rpc: "upsert_format", allowed: ["admin", "sales"],
+      input: async role => {
+        const name = unique("matrix format", role);
+        return {
+          command: { name, basis: "packaged", packageType: "can", bblPerUnit: 0.0645 },
+          rpc: { p_brewery: brewery.id, p_id: null, p_name: name, p_basis: "packaged", p_package_type: "can", p_keg_size: null, p_units_per_case: null, p_bbl_per_unit: 0.0645 },
+        };
+      },
+    },
+    {
       command: "create_location", rpc: "create_location", allowed: ["admin"],
       input: async role => {
         const name = unique("matrix location", role);

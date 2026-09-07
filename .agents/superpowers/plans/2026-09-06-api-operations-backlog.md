@@ -4,7 +4,7 @@
 
 # API operations backlog
 
-94 operations the screens declare they need that the command registry does not yet answer, against 77 that it does.
+92 operations the screens declare they need that the command registry does not yet answer, against 79 that it does.
 
 This is the backend push, scoped. Each row names the operation a screen asked for and the screens waiting on it, so an area can be built and shipped whole rather than a command at a time. `/docs/api` publishes the same list per area, marked designed, so an integrator sees the roadmap without being told a date.
 
@@ -81,14 +81,13 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `update_sku` | command | Catalog, Brand, SKU |
 | `upsert_brand` | command | Catalog, Brand |
 | `upsert_sale_channel` | command | Sale channels, Channel |
-## Packaging: 12 to build, 0 built
+## Packaging: 10 to build, 2 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
 | `close_packaging_run` | command | Close packaging run |
 | `get_format_components` | query | Formats, Format, Repack |
 | `get_packaging_run` | query | Close packaging run, Run closed |
-| `list_formats` | query | Package BOM, SKU, Schedule packaging run, Formats, Format |
 | `list_occupancies` | query | Schedule packaging run |
 | `list_packaging_runs` | query | Packaging runs |
 | `record_repack` | command | Repack |
@@ -96,7 +95,6 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `replace_format_components` | command | Formats, Format |
 | `schedule_packaging_run` | command | Close packaging run, Schedule packaging run |
 | `update_packaging_run` | command | Schedule packaging run |
-| `upsert_format` | command | Formats, Format |
 ## Taproom & kegs: 10 to build, 3 built
 
 | Operation | Kind | Needed by |
