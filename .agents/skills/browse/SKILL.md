@@ -22,8 +22,14 @@ Then follow that guide. Repo-specific rules on top of it:
    `S=$(git branch --show-current | tr / -)` then `bunx agent-browser --session "$S" …`.
    Sessions isolate cookies/tabs; without one, parallel `.agents/worktrees/<branch>`
    runs share a browser and log each other out.
-2. **Target the right port.** `bun run dev` is 3000; `bun run test:e2e` runs its own
-   `next dev` on 3100. Log in via the dev accounts in `README.md`.
+2. **Target the port `next dev` actually printed, not 3000.** `bun run dev` wants
+   3000 and `bun run test:e2e` runs its own `next dev` on 3100, but a parallel
+   `.agents/worktrees/<branch>` session may already hold 3000, and Next silently
+   takes 3001 instead (`⚠ Port 3000 is in use by process …, using available port
+   3001`). Browsing the wrong one renders another worktree's tree, so your change
+   reads as "not applied" when it applied fine. Read the port off the dev server's
+   own output, or `lsof -a -p "$(lsof -ti tcp:3000 | head -1)" -d cwd` to see whose
+   checkout owns it. Log in via the dev accounts in `README.md`.
 3. **Close your session when done:** `bunx agent-browser --session "$S" close`.
 4. **Prefer `snapshot` → `@ref` clicks** over guessing CSS selectors; prefer
    `get text` / `eval` over screenshots when you need a value, not a look.
