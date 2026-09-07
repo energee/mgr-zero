@@ -31,7 +31,7 @@ export const API_AREAS = [
   { slug: "portal", title: "Customer portal", match: /^(portal_|get_portal_|list_portal_)/ },
   { slug: "compliance", title: "Compliance", match: /(compliance|brand_approval|state_registration|state_license|trace_lot|loss)/ },
   { slug: "purchasing", title: "Purchasing & materials", match: /(purchase_order|vendor|material)/ },
-  { slug: "production", title: "Production", match: /(batch|brew_day|cellar|vessel|fermentation|recipe)/ },
+  { slug: "production", title: "Production", match: /(batch|brew_day|cellar|vessel|fermentation|recipe|water_profile)/ },
   { slug: "catalog", title: "Catalog & pricing", match: /(product|sku|brand|price|sale_channel|sales_channel)/ },
   { slug: "packaging", title: "Packaging", match: /(packaging_run|format|repack|occupanc)/ },
   { slug: "taproom", title: "Taproom & kegs", match: /(keg|taproom|_taps|replenishment)/ },

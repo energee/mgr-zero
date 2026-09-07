@@ -4,7 +4,7 @@
 
 # API operations backlog
 
-85 operations the screens declare they need that the command registry does not yet answer, against 83 that it does.
+88 operations the screens declare they need that the command registry does not yet answer, against 83 that it does.
 
 This is the backend push, scoped. Each row names the operation a screen asked for and the screens waiting on it, so an area can be built and shipped whole rather than a command at a time. `/docs/api` publishes the same list per area, marked designed, so an integrator sees the roadmap without being told a date.
 
@@ -37,7 +37,7 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `get_material_on_hand` | query | Materials on hand, Cycle count, Repack |
 | `get_material_requirements` | query | New PO, Planning |
 | `get_purchase_order` | query | Receive PO, Receipt |
-| `list_materials` | query | Package BOM, New PO, Materials, Material, Contract |
+| `list_materials` | query | Package BOM, New PO, Materials, Material, Contract, Water addition |
 | `list_purchase_orders` | query | Purchase orders |
 | `list_vendors_and_contracts` | query | New PO, Vendors, Vendor, Contracts, Contract, Planning |
 | `receive_purchase_order` | command | Receive PO |
@@ -46,26 +46,29 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `upsert_material` | command | Material |
 | `upsert_material_contract` | command | Contract |
 | `upsert_vendor` | command | Vendor |
-## Production: 16 to build, 0 built
+## Production: 19 to build, 0 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
 | `complete_batch` | command | Cellar map |
 | `create_recipe` | command | Recipe |
-| `create_recipe_version` | command | Recipe |
+| `create_recipe_version` | command | Recipe, Mash schedule, Mash step, Fermentation schedule, Fermentation stage, Water, Water addition |
 | `get_brew_day` | query | Schedule batch, Brew day |
-| `get_recipe` | query | Cellar addition, Recipe |
+| `get_recipe` | query | Cellar addition, Recipe, Mash schedule, Mash step, Fermentation schedule, Fermentation stage, Water, Water addition |
 | `get_recipe_outcomes` | query | Recipe |
+| `get_water_profile` | query | Water profile |
 | `list_batches` | query | Batches |
 | `list_fermentation_readings` | query | Vessel detail |
 | `list_recipes` | query | Schedule batch, Recipes, Recipe |
 | `list_vessels` | query | Vessel detail |
+| `list_water_profiles` | query | Water, Water profiles |
 | `record_batch_addition` | command | Cellar addition |
 | `record_brew_day` | command | Brew day |
 | `record_cellar_transfer` | command | Cellar transfer |
 | `record_fermentation_reading` | command | Fermentation reading, Fermentation reading form |
 | `schedule_batch` | command | Schedule batch |
 | `upsert_vessel` | command | Cellar map, Vessel detail |
+| `upsert_water_profile` | command | Water profile |
 ## Catalog & pricing: 6 to build, 9 built
 
 | Operation | Kind | Needed by |

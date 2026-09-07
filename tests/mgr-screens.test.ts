@@ -26,7 +26,80 @@ const body = (name: string) => {
   return html;
 };
 
+/** The same body as plain text, tags stripped — what a reader would see. */
+const text = (name: string) => body(name).replace(/<[^>]*>/g, " ");
+
 describe("SCREENS", () => {
+  it("gives brew day the sheet to follow and no new capture", () => {
+    const brew = text("Brew day");
+    expect(brew).toMatch(/Brew sheet · Hazy IPA v4/);
+    expect(brew).not.toMatch(/Actual mash|Mash actual/i);
+    expect(String(SCREENS.find((s) => s.name === "Brew day")!.writes)).toContain("record_brew_day");
+  });
+
+  it("sets the brewery's source water once, in Settings", () => {
+    const settings = text("Settings");
+    expect(settings).toMatch(/Source water/);
+  });
+
+  it("makes a recipe version executable without restating the batch size", () => {
+    const recipe = text("Recipe");
+    expect(recipe).toContain("Pre-boil volume");
+    expect(recipe).toContain("Boil time");
+    expect(recipe).toContain("Whirlpool rest");
+    expect(recipe).toContain("Knockout temp");
+    expect(recipe).toContain("Notes");
+    expect(recipe).toContain("Mash schedule · 3 steps");
+    expect(recipe).toContain("Fermentation schedule · 4 stages");
+    expect(recipe).toMatch(/Water · /);
+    // Spec D4: one place holds the mash temperature, and it is the schedule.
+    expect(recipe).not.toMatch(/Mash temp/);
+    // Spec D3: the scale chips already state the batch size.
+    expect(recipe).not.toMatch(/Batch size|Knockout volume/);
+    // The process-spec scalars are drawn but have no columns yet, so the
+    // record's own SCHEMA-GATE has to name them.
+    const gate = String(SCREENS.find((s) => s.name === "Recipe")!.writes);
+    expect(gate).toMatch(/SCHEMA-GATE:[^\]]*process-spec columns/);
+    expect(gate).toMatch(/whirlpool/i);
+  });
+
+  it("keeps water profiles in the catalog, with their ion values", () => {
+    const list = text("Water profiles");
+    expect(list).toContain("Burton");
+    expect(list).toContain("Sulfate 610");
+    const catalogText = text("Catalog");
+    expect(catalogText).toContain("Water profiles");
+  });
+
+  it("gives water one stage axis and a brewery-default source", () => {
+    const water = text("Water");
+    expect(water).toContain("Gypsum");
+    expect(water).toMatch(/brewery default/);
+    expect(water).toContain("Target mash pH");
+    // Spec D7: one stage axis. The addition sheet asks where a salt goes once,
+    // never a timing and a target that can contradict each other.
+    const sheet = text("Water addition");
+    expect(sheet).toContain("Stage");
+    expect(sheet).not.toMatch(/\bTiming\b|\bTarget\b/);
+  });
+
+  it("draws a mash schedule with its steps, total and conversion rest", () => {
+    const mash = text("Mash schedule");
+    expect(mash).toContain("Saccharification");
+    expect(mash).toContain("152 °F");
+    expect(mash).toContain("Total 85 min");
+    expect(mash).toMatch(/feeds the prediction/);
+    expect(mash).toContain("Add step");
+  });
+
+  it("draws a fermentation schedule that places the dry hop", () => {
+    const ferm = text("Fermentation schedule");
+    expect(ferm).toContain("Diacetyl rest");
+    expect(ferm).toContain("Total 18 days");
+    expect(ferm).toMatch(/dry hop day 4 falls in Primary/);
+    expect(ferm).toContain("Add stage");
+  });
+
   it("gives Search and Entity picker a labeled command input and grouped results", () => {
     for (const name of ["Search", "Entity picker"]) {
       expect(body(name)).toContain('cmdk-input=""');
@@ -70,7 +143,7 @@ describe("SCREENS", () => {
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands or leaves; the venue split is
     // derived rather than counted by hand in a comment that kept growing.
-    expect(SCREENS).toHaveLength(172);
+    expect(SCREENS).toHaveLength(180);
     expect(SCREENS.filter((s) => s.venue)).toHaveLength(17);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });

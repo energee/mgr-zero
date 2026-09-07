@@ -1775,7 +1775,7 @@ The screens need them and the backend has not built them, so calling one returns
 | `get_material_on_hand` | query | Materials on hand, Cycle count, Repack |
 | `get_material_requirements` | query | New PO, Planning |
 | `get_purchase_order` | query | Receive PO, Receipt |
-| `list_materials` | query | Package BOM, New PO, Materials, Material, Contract |
+| `list_materials` | query | Package BOM, New PO, Materials, Material, Contract, Water addition |
 | `list_purchase_orders` | query | Purchase orders |
 | `list_vendors_and_contracts` | query | New PO, Vendors, Vendor, Contracts, Contract, Planning |
 | `receive_purchase_order` | command | Receive PO |
@@ -1802,7 +1802,7 @@ reading notification is measured against.
 
 **Designed, not yet available** {/* production-designed */}
 
-None of the 16 operations in this area are available yet.
+None of the 19 operations in this area are available yet.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
@@ -1810,20 +1810,23 @@ The screens need them and the backend has not built them, so calling one returns
 | --- | --- | --- |
 | `complete_batch` | command | Cellar map |
 | `create_recipe` | command | Recipe |
-| `create_recipe_version` | command | Recipe |
+| `create_recipe_version` | command | Recipe, Mash schedule, Mash step, Fermentation schedule, Fermentation stage, Water, Water addition |
 | `get_brew_day` | query | Schedule batch, Brew day |
-| `get_recipe` | query | Cellar addition, Recipe |
+| `get_recipe` | query | Cellar addition, Recipe, Mash schedule, Mash step, Fermentation schedule, Fermentation stage, Water, Water addition |
 | `get_recipe_outcomes` | query | Recipe |
+| `get_water_profile` | query | Water profile |
 | `list_batches` | query | Batches |
 | `list_fermentation_readings` | query | Vessel detail |
 | `list_recipes` | query | Schedule batch, Recipes, Recipe |
 | `list_vessels` | query | Vessel detail |
+| `list_water_profiles` | query | Water, Water profiles |
 | `record_batch_addition` | command | Cellar addition |
 | `record_brew_day` | command | Brew day |
 | `record_cellar_transfer` | command | Cellar transfer |
 | `record_fermentation_reading` | command | Fermentation reading, Fermentation reading form |
 | `schedule_batch` | command | Schedule batch |
 | `upsert_vessel` | command | Cellar map, Vessel detail |
+| `upsert_water_profile` | command | Water profile |
 
 {/* end ops:production */}
 
