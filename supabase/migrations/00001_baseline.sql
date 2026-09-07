@@ -198,6 +198,7 @@ create table materials (
   default_vendor_id uuid,
   lead_time_days int,
   reorder_point numeric(14,4),                          -- base uom
+  extract_potential numeric,                             -- SG-style potential, e.g. 1.037 = 37 PPG (lib/recipe-gravity.ts)
   active boolean not null default true,
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
@@ -577,8 +578,8 @@ create table recipe_versions (
   brewery_id uuid not null references breweries(id),
   recipe_id uuid not null,
   version int not null,
-  target_og_plato numeric(5,2), target_fg_plato numeric(5,2),   -- °Plato (brewing-domain.md)
-  target_abv numeric(4,2), target_ibu numeric(5,1),
+  target_ibu numeric(5,1),                               -- °Plato/ABV targets dropped: lib/recipe-gravity.ts predicts OG/FG/ABV from the assumptions below
+  mash_temp_f numeric, brewhouse_efficiency numeric, yeast_attenuation numeric, -- efficiency/attenuation are fractions (0.75), not percents; recipeGravity's inputs
   boil_minutes int,
   note text,
   created_by uuid not null references auth.users(id),
@@ -597,6 +598,7 @@ create table recipe_ingredients (
   stage ingredient_stage not null,
   timing_minutes int,
   sort int not null default 0,
+  extract_snapshot numeric,                              -- materials.extract_potential at recipe-version save time (lib/recipe-gravity.ts)
   unique (id, brewery_id),
   foreign key (recipe_version_id, brewery_id) references recipe_versions (id, brewery_id),
   foreign key (material_id, brewery_id) references materials (id, brewery_id)
