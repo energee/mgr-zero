@@ -1604,7 +1604,7 @@ export const SCREENS: Screen[] = [
     to: { Change: "Account", "½ bbl keg": "Shop", "⅙ bbl keg": "Shop", "case · 24×16 oz": "Shop", "12 oz bottle": "Shop", "Coming up": "Coming up" },
     job: "A buyer catalog: listed packages by brand, quantity, Place order",
     reads: "portal_catalog [SCHEMA/RLS-GATE: return customer-allowed fulfillment source and filter to packages the brewery has listed for wholesale]",
-    writes: "submit_order [SCHEMA/RLS-GATE: validate allowed from_location_id; one RPC: order + lines + submitted status]",
+    writes: "portal_create_order · portal_submit_order",
     states: [["empty catalog", "call brewery; nothing orderable"], ["missing price", "item cannot enter cart", 1], ["no ship-to", "contact brewery; choose an existing ship-to", 1], ["unlisted package", "a format not on the wholesale list is absent", 1], ["receipt", "ORD number after commit"]],
     spec: "Grouped by brand; each row is a package the brewery listed for wholesale (½ keg, ⅙ keg, case, bottle). The list is the offer, not warehouse ATP: no in/low/out badges, no counts. Unlisted packages are absent, not greyed. Schedule packaging run is where staff designate the list. Review stays disabled until the schema/RLS contract supplies and validates a customer-allowed source; it never silently chooses Warehouse. Stepper − and + each ship as 48×48 targets. No staff vocabulary (ATP, gates, fulfillment engineering) anywhere in the portal. No persistent cart: leaving the page keeps nothing. Reorder on a shipped order still prefills Review.",
     body: (<>
@@ -1654,7 +1654,7 @@ export const SCREENS: Screen[] = [
     to: { "Hazy IPA · ½ bbl keg": "Review order", "Pils · 16 oz case": "Review order" },
     job: "Confirm quantities, ship-to and fulfillment line, then place the order",
     reads: "portal_catalog [SCHEMA/RLS-GATE: return customer-allowed fulfillment source and filter to packages the brewery has listed for wholesale]",
-    writes: "submit_order [SCHEMA/RLS-GATE: validate allowed from_location_id; one RPC: order + lines + submitted status]",
+    writes: "portal_create_order · portal_submit_order",
     states: [["price changed", "revalidated price shown before Place order", 1], ["inactive SKU", "line removed · told plainly", 1], ["submit error", "keep quantities · Retry safe", 1], ["duplicate", "same request returns the same ORD number"]],
     spec: "The confirm step for the shop steppers and for Reorder from a shipped order. Buyer copy only: price, package, quantity, “Ships from Warehouse”, Place order. No ATP, no gate names. Place order stays disabled until the source contract exists. After submit the portal is read-only; changes go through the brewery.",
     body: (<>
