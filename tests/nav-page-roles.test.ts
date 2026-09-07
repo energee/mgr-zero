@@ -13,13 +13,14 @@ import { STAFF_NAV, type NavItem } from "../lib/mgr/nav";
 
 /** href → every registry operation the page (and its detail page) calls. */
 const PAGE_QUERIES: Record<string, readonly string[]> = {
-  "/recipes": ["list_recipes", "list_brands", "get_recipe", "list_materials"],
+  "/recipes": ["list_recipes", "list_brands", "get_recipe", "list_materials", "get_gravity_unit"],
   "/batches": ["list_batches", "list_brands", "list_recipes", "list_vessels", "get_recipe", "get_brew_day"],
-  "/cellar": ["list_occupancies", "list_vessels"],
+  "/cellar": ["list_occupancies", "list_vessels", "get_gravity_unit"],
   "/packaging": [
     "list_packaging_runs", "list_brands", "list_occupancies", "list_locations", "list_bins", "list_skus",
     "get_packaging_run",
   ],
+  "/settings/units": ["get_gravity_unit"],
 };
 
 const flatten = (items: readonly NavItem[]): NavItem[] => items.flatMap((i) => [i, ...(i.children ?? [])]);

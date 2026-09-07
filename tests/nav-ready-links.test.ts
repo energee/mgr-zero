@@ -40,9 +40,16 @@ describe("shippedNav", () => {
     }
   });
 
-  it("drops a group whose every child is planned, so brewer sees only its shipped areas today", () => {
+  it("drops a group whose every child is planned or hidden from the role", () => {
     expect(navFor(shippedNav(STAFF_NAV), "brewer").map((t) => t.label)).toEqual(["Today", "Beer", "Work", "More"]);
-    expect(navFor(shippedNav(STAFF_NAV), "warehouse").map((t) => t.label)).toEqual(["Today", "Beer", "Work"]);
+    // Warehouse now keeps More: Units is a personal display preference every
+    // staff role may set (set_my_gravity_unit admits all four), so it is the
+    // one child of that group warehouse can see. The group's own href
+    // (/invoices) stays openable for warehouse — list_invoices admits it — so
+    // the phone tab still lands somewhere real.
+    expect(navFor(shippedNav(STAFF_NAV), "warehouse").map((t) => t.label)).toEqual(["Today", "Beer", "Work", "More"]);
+    expect(navFor(shippedNav(STAFF_NAV), "warehouse").find((t) => t.label === "More")!.children!.map((c) => c.label))
+      .toEqual(["Units"]);
     expect(navFor(shippedNav(STAFF_NAV), "admin").find((t) => t.label === "More")!.children!.map((c) => c.label))
       .toEqual(["Invoices", "Catalog", "Customers", "Price groups", "Recipes", "Settings", "Sale channels", "Units"]);
   });

@@ -75,7 +75,7 @@ export const STAFF_NAV: readonly NavItem[] = [
       { label: "Import", href: "/settings/team#import", planned: true, roles: ["admin"] },
       { label: "Settings", href: "/settings/team", roles: ["admin"] },
       { label: "Sale channels", href: "/settings/channels", roles: ["admin"] },
-      { label: "Units", href: "/settings/units", roles: ["brewer"] },
+      { label: "Units", href: "/settings/units" },
     ],
   },
 ];

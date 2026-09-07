@@ -3,7 +3,7 @@
 // functions are the only place a brewer's chosen unit turns a stored Plato
 // number into text and typed text back into Plato. Pure: no database.
 import { describe, expect, it } from "vitest";
-import { formatGravity, parseGravity } from "@/lib/mgr/gravity-unit";
+import { formatGravity, INVALID_GRAVITY, parseGravity } from "@/lib/mgr/gravity-unit";
 import { platoToSg, sgToPlato } from "@/lib/recipe-gravity";
 
 describe("formatGravity", () => {
@@ -34,11 +34,25 @@ describe("parseGravity", () => {
     expect(dotted!).toBeCloseTo(12.4, 1);
   });
 
-  it("returns null for anything that is not a number", () => {
-    for (const bad of ["", "  ", "abc", "1.0.5"]) {
-      expect(parseGravity(bad, "plato"), bad).toBeNull();
-      expect(parseGravity(bad, "sg"), bad).toBeNull();
+  it("reads empty input as null — nothing was typed, which is legal for an optional field", () => {
+    for (const blank of ["", "  ", "\t"]) {
+      expect(parseGravity(blank, "plato"), JSON.stringify(blank)).toBeNull();
+      expect(parseGravity(blank, "sg"), JSON.stringify(blank)).toBeNull();
     }
+  });
+
+  it("reads garbage as INVALID, distinct from empty, so a form can say so instead of dropping it", () => {
+    for (const bad of ["abc", "1.0.5", "12,5", "-", "Infinity"]) {
+      expect(parseGravity(bad, "plato"), bad).toBe(INVALID_GRAVITY);
+      expect(parseGravity(bad, "sg"), bad).toBe(INVALID_GRAVITY);
+    }
+  });
+
+  it("rejects a number outside any gravity a brewer can read", () => {
+    expect(parseGravity("-1", "plato")).toBe(INVALID_GRAVITY);
+    expect(parseGravity("400", "plato")).toBe(INVALID_GRAVITY);
+    // 0.5 is neither a decimal SG (>= 0.9) nor points (>= 100).
+    expect(parseGravity("0.5", "sg")).toBe(INVALID_GRAVITY);
   });
 });
 
@@ -48,7 +62,9 @@ describe("round trips", () => {
       expect(parseGravity(formatGravity(plato, "plato"), "plato")).toBeCloseTo(plato, 1);
       // SG carries three decimals, so the trip is lossy by design; 0.1 °P is
       // finer than any hydrometer a brewer reads.
-      expect(parseGravity(formatGravity(plato, "sg"), "sg"), `${plato} °P`).toBeCloseTo(plato, 0);
+      const back = parseGravity(formatGravity(plato, "sg"), "sg") as number;
+      // The documented bound: the two approximations disagree by ~0.1 °P.
+      expect(Math.abs(back - plato), `${plato} °P -> ${back}`).toBeLessThan(0.15);
     }
   });
 

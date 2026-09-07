@@ -4,8 +4,15 @@
 // it is made and the server component re-reads on router.refresh(). "Use
 // brewery default" is the null personal override, which is why the personal
 // select's value is a string sentinel rather than an empty option.
+//
+// Each select holds its own chosen value in state rather than reading the
+// server prop directly: the write and the router.refresh() that follows it are
+// not instant, and a controlled select bound to the stale prop visibly snaps
+// back to the old unit for that gap. State seeded from the prop, re-synced when
+// the refreshed prop arrives, keeps the control on what the brewer just picked.
 "use client";
 
+import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { CommandFormMessage } from "@/components/mgr/command-form";
@@ -23,6 +30,20 @@ export function GravityUnitForm({
   breweryLabel: string;
 }) {
   const { busy, error, run } = useCommandAction();
+  const [breweryChoice, setBreweryChoice] = useState<string>(brewery);
+  const [mineChoice, setMineChoice] = useState<string>(mine ?? DEFAULT);
+
+  // The server props are the truth once they catch up — including a refresh
+  // that failed, which puts the controls back on what is actually stored.
+  // Adjusted during render (React's documented "derive state from props"
+  // pattern) rather than in an effect, which would be a second render pass and
+  // is what react-hooks/set-state-in-effect forbids.
+  const [seen, setSeen] = useState({ brewery, mine });
+  if (seen.brewery !== brewery || seen.mine !== mine) {
+    setSeen({ brewery, mine });
+    setBreweryChoice(brewery);
+    setMineChoice(mine ?? DEFAULT);
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -32,9 +53,9 @@ export function GravityUnitForm({
           <NativeSelect
             id="gu-brewery"
             className="max-w-xs"
-            value={brewery}
+            value={breweryChoice}
             disabled={busy}
-            onChange={(e) => run("set_brewery_gravity_unit", { unit: e.target.value })}
+            onChange={(e) => { setBreweryChoice(e.target.value); run("set_brewery_gravity_unit", { unit: e.target.value }); }}
           >
             {GRAVITY_UNITS.map((u) => (
               <option key={u} value={u}>{gravityUnitLabel(u)}</option>
@@ -51,9 +72,12 @@ export function GravityUnitForm({
         <NativeSelect
           id="gu-mine"
           className="max-w-xs"
-          value={mine ?? DEFAULT}
+          value={mineChoice}
           disabled={busy}
-          onChange={(e) => run("set_my_gravity_unit", { unit: e.target.value === DEFAULT ? null : e.target.value })}
+          onChange={(e) => {
+            setMineChoice(e.target.value);
+            run("set_my_gravity_unit", { unit: e.target.value === DEFAULT ? null : e.target.value });
+          }}
         >
           <option value={DEFAULT}>Use brewery default ({breweryLabel})</option>
           {GRAVITY_UNITS.map((u) => (

@@ -1922,16 +1922,15 @@ export const SCREENS: Screen[] = [
     surface: "sheet",
     name: "Fermentation reading",
     to: { "Record reading": "Vessel detail" },
-    job: "Record any values taken; SG converts to stored Plato",
-    reads: "get_cellar_map [view; occupancy + last reading]",
+    job: "Record any values taken, in the unit set on Settings · Units",
+    reads: "get_cellar_map [view; occupancy + last reading] · get_gravity_unit",
     writes: "record_fermentation_reading [design; mutable reading row]",
     states: permitted("brewer or admin required"),
-    spec: "One reading may contain gravity, temperature, pH, or any combination. Blank values remain absent; prior values are reference only, never silently copied. Each value is typed; Gravity is the default.",
+    spec: "One reading may contain gravity, temperature, pH, or any combination. Blank values remain absent; prior values are reference only, never silently copied. Each value is typed; Gravity is the default. The gravity field is labelled and read in whichever unit the reader chose on Settings, then Units; there is no toggle on this sheet, because a unit is a standing preference rather than a per-reading decision. Gravity is stored in degrees Plato whatever is chosen, so switching never moves a reading already taken.",
     body: (<>
-      {E.qty("1.019", "SG · prior 1.021", "Gravity")}
+      {E.qty("1.019", "prior 1.021", "Gravity (per your unit setting)")}
       {E.qty("68.2", "°F · prior 67.8", "Temperature")}
       {E.qty("", "prior 4.21", "pH")}
-      {E.chips(["SG", "°P"], 0)}
       {E.info("Enter only values taken now; blanks are not rewritten.")}
       {E.inp("Note", "optional")}
       {E.pin(<>
