@@ -160,7 +160,7 @@ describe("SCREENS", () => {
       "app/(app)/settings/channels/delete-channel-button.tsx",
     ];
     const alsoCode = [...copyOnly, "lib/mgr/nav.ts", "lib/mgr/screen-links.ts",
-      "lib/commands/customers.ts", "lib/commands/portal.ts"];
+      "lib/commands/customers.ts", "lib/commands/portal.ts", "lib/commands/catalog.ts"];
     const prose = (file: string) =>
       readFileSync(resolve(__dirname, "..", file), "utf8").replace(/\s+/g, " ");
     for (const file of alsoCode) {

@@ -1599,7 +1599,8 @@ The screens need them and the backend has not built them, so calling one returns
 ### Customers [#customers]
 
 A customer is a distributor, retailer, brewery, or other account, carrying a
-two-letter `state`, an optional price group, licence number, and payment terms.
+two-letter `state`, a required sale channel (which decides its prices), and an
+optional licence number and payment terms.
 `upsert_customer` creates when `id` is omitted and updates when it is present.
 
 Ship-to addresses matter beyond delivery. The state on the ship-to drives excise

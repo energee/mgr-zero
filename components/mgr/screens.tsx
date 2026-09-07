@@ -1565,7 +1565,7 @@ export const SCREENS: Screen[] = [
     reads: "list_brands · list_skus",
     writes: "upsert_brand · update_sku [design; the products to brands rename] · create_sku",
     states: [["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class; description, category, price group and hops optional"], ["new style", "typing a style no one has used offers Add; saved with the brand", 0], ["new SKU", "choose one existing Format; a poured format (pint, taster) is a SKU that holds no stock"], ["inactive SKU", "hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"]],
-    spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table [SCHEMA-GATE: a per-brewery styles table that the brand references]; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category, price group and hops are optional [SCHEMA-GATE: nullable columns on the brand; price group is a label the group prices by format, not a price on the brand (§16.4)]. Package facts live on Formats, while the SKU is the stable brand × format identity used by inventory, orders, pricing and provider mappings; draft pours are SKUs on a poured format (§16.2). No UPC scan or container source editor here.",
+    spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table [SCHEMA-GATE: a per-brewery styles table that the brand references]; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category and hops are optional nullable columns; price group is the row of the price grid the brand sits on, so the price of any of its SKUs is the cell where the customer's sale channel meets that group and the SKU's format. The brand carries no price of its own, and a brand on no group is unpriced everywhere. Package facts live on Formats, while the SKU is the stable brand × format identity used by inventory, orders, pricing and provider mappings; draft pours are SKUs on a poured format (§16.2). No UPC scan or container source editor here.",
     body: (<>
       {E.back("Catalog", "Hazy IPA")}
       {E.edit("Brand name", "Hazy IPA")}
@@ -2469,7 +2469,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Recipes", "Hazy IPA v4")}
       {E.row("Recipe parent · Hazy IPA · IPA", "name and style only", E.act("Create"))}
-      {E.pick("Default price group · optional", "Standard", ["Not decided", "Standard", "Specialty", "Barrel-aged"])}
+      {E.pick("Default price group · optional", "3", ["Not decided", "1", "2", "3", "4", "5", "6", "7", "8"])}
       {E.info("A pre-fill for the brand a batch packages into, nothing more. The version carries no price and no group; changing this cuts no new version.")}
       {E.chips(["per bbl", "15 bbl", "30 bbl"], 1)}
       {E.row("2-row", "mash · 44 lb / bbl", "660 lb")}

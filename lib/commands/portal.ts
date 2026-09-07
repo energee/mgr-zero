@@ -53,8 +53,10 @@ defineQuery({
   input: z.object({}),
   handler: async (ctx) => {
     const customerId = requireCustomer(ctx);
-    // RLS limits price groups to the caller's own and skus to active ones;
-    // sku_prices already resolves override-or-format-default (§16.4).
+    // RLS limits channel prices to the caller's own sale channel and skus to
+    // active ones; sku_prices already resolves the grid lookup (the cell where
+    // the caller's sale channel meets the brand's price group and the SKU's
+    // format), so a SKU with no group or an empty cell simply has no row.
     const [prices, avail] = await Promise.all([
       unwrap(ctx.db.from("sku_prices").select("sku_id, sku_name, brand_name, unit_price_cents")),
       unwrap(ctx.db.rpc("portal_availability", { p_customer: customerId })),

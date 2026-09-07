@@ -172,7 +172,7 @@ defineCommand({
 
 // Price groups (spec 2026-09-07-mgr-pricing-grid-naming): the rows of the
 // price grid. A brand sits on one; a cell prices that row on a channel for a
-// format. Warehouse reads them (they name a brand's tier) but never prices.
+// format. Warehouse reads them (they name a brand's price group) but never prices.
 defineQuery({
   name: "list_price_groups", description: "Rows of the price grid in position order",
   roles: ["admin", "sales", "warehouse"],
