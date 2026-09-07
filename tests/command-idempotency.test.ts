@@ -1,7 +1,7 @@
 // tests/command-idempotency.test.ts — verifies durable request replay at the database API boundary.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, asUser, makeBrewery, makeStaff } from "./helpers";
+import { admin, asUser, makeBrewery, makeStaff, seedCatalog, seedLocation } from "./helpers";
 
 let breweryId: string;
 let staffUserId: string;
@@ -15,23 +15,8 @@ beforeAll(async () => {
   const staff = await makeStaff(breweryId, "admin");
   staffUserId = staff.id;
   staffDb = await asUser(staff.email);
-  const product = await admin.from("products")
-    .insert({ brewery_id: breweryId, name: "Idempotency product" })
-    .select("id")
-    .single();
-  const sku = await admin.from("skus").insert({
-    brewery_id: breweryId,
-    product_id: product.data!.id,
-    name: "Idempotency SKU",
-    package_type: "keg",
-    bbl_per_unit: 0.5,
-  }).select("id").single();
-  const location = await admin.from("locations")
-    .insert({ brewery_id: breweryId, name: "Idempotency warehouse", kind: "warehouse" })
-    .select("id")
-    .single();
-  skuId = sku.data!.id;
-  locationId = location.data!.id;
+  ({ skuId } = await seedCatalog(breweryId, { product: "Idempotency product", sku: "Idempotency SKU", packageType: "keg", bblPerUnit: 0.5 }));
+  locationId = (await seedLocation(breweryId, { name: "Idempotency warehouse" })).id;
 });
 
 describe("command request idempotency", () => {

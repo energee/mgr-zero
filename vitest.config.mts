@@ -1,5 +1,6 @@
 import { defineConfig } from "vitest/config";
 import { loadEnv } from "vite";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -9,9 +10,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(projectRoot, "."),
-      "server-only": fileURLToPath(
-        new URL("./node_modules/next/dist/compiled/server-only/empty.js", import.meta.url)
-      ),
+      // Resolved, not a relative path: a worktree's node_modules is empty and
+      // Bun walks up to the main checkout's.
+      "server-only": createRequire(import.meta.url).resolve("next/dist/compiled/server-only/empty.js"),
     },
   },
   test: {

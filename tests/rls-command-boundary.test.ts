@@ -1,7 +1,7 @@
 // tests/rls-command-boundary.test.ts — live PostgREST proof that staff writes use only role-scoped RPCs.
 // Every mutation RPC takes a p_request_id (request ledger); direct calls here mint a fresh one.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, makeBrewery, makeStaffCtx } from "./helpers";
+import { admin, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedCustomer } from "./helpers";
 import { runCommand, type Ctx } from "../lib/commands/registry";
 import "../lib/commands/all";
 
@@ -27,42 +27,13 @@ beforeAll(async () => {
   warehouseCtx = await makeStaffCtx(brewery.id, "warehouse");
   brewerCtx = await makeStaffCtx(brewery.id, "brewer");
 
-  const { data: product, error: productError } = await admin.from("products")
-    .insert({ brewery_id: brewery.id, name: "Boundary IPA" }).select().single();
-  if (productError) throw productError;
-  productId = product.id;
-  const { data: sku, error: skuError } = await admin.from("skus")
-    .insert({ brewery_id: brewery.id, product_id: product.id, name: "Boundary case", package_type: "can", bbl_per_unit: 0.0645 })
-    .select().single();
-  if (skuError) throw skuError;
-  skuId = sku.id;
-
-  const { data: location, error: locationError } = await admin.from("locations")
-    .insert({ brewery_id: brewery.id, name: "Boundary warehouse", kind: "warehouse" }).select().single();
-  if (locationError) throw locationError;
-  locationId = location.id;
-  const { data: taproom, error: taproomError } = await admin.from("locations")
-    .insert({ brewery_id: brewery.id, name: "Boundary taproom", kind: "taproom" }).select().single();
-  if (taproomError) throw taproomError;
-  taproomId = taproom.id;
-
-  const { data: priceList, error: priceListError } = await admin.from("price_lists")
-    .insert({ brewery_id: brewery.id, name: "Boundary wholesale" }).select().single();
-  if (priceListError) throw priceListError;
+  ({ productId, skuId } = await seedCatalog(brewery.id, { product: "Boundary IPA", sku: "Boundary case" }));
+  locationId = (await seedLocation(brewery.id, { name: "Boundary warehouse" })).id;
+  taproomId = (await seedLocation(brewery.id, { name: "Boundary taproom", kind: "taproom" })).id;
+  ({ customerId, shipToId, priceListId } = await seedCustomer(brewery.id, { name: "Boundary customer" }));
   const { error: priceError } = await admin.from("price_list_items")
-    .insert({ brewery_id: brewery.id, price_list_id: priceList.id, sku_id: skuId, unit_price_cents: 1200 });
+    .insert({ brewery_id: brewery.id, price_list_id: priceListId, sku_id: skuId, unit_price_cents: 1200 });
   if (priceError) throw priceError;
-  priceListId = priceList.id;
-  const { data: customer, error: customerError } = await admin.from("customers")
-    .insert({ brewery_id: brewery.id, name: "Boundary customer", type: "retailer", state: "PA", price_list_id: priceList.id })
-    .select().single();
-  if (customerError) throw customerError;
-  customerId = customer.id;
-  const { data: shipTo, error: shipToError } = await admin.from("ship_tos")
-    .insert({ brewery_id: brewery.id, customer_id: customerId, label: "Boundary", address1: "1 Boundary Way", city: "Phila", state: "PA", zip: "19107" })
-    .select().single();
-  if (shipToError) throw shipToError;
-  shipToId = shipTo.id;
 });
 
 describe("staff command database boundary", () => {

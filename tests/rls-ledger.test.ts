@@ -1,6 +1,6 @@
 // tests/rls-ledger.test.ts
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaff, asUser } from "./helpers";
+import { admin, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation } from "./helpers";
 import "../lib/commands/all";
 
 describe("ledger integrity + RLS", () => {
@@ -8,9 +8,8 @@ describe("ledger integrity + RLS", () => {
   beforeAll(async () => {
     b = await makeBrewery();
     staff = await makeStaff(b.id, "warehouse");
-    const { data: p } = await admin.from("products").insert({ brewery_id: b.id, name: "Hazy IPA" }).select().single();
-    ({ data: sku } = await admin.from("skus").insert({ brewery_id: b.id, product_id: p!.id, name: "1/2 bbl keg", package_type: "keg", bbl_per_unit: 0.5 }).select().single());
-    ({ data: loc } = await admin.from("locations").insert({ brewery_id: b.id, name: "Main WH", kind: "warehouse" }).select().single());
+    sku = { id: (await seedCatalog(b.id, { product: "Hazy IPA", sku: "1/2 bbl keg", packageType: "keg", bblPerUnit: 0.5 })).skuId };
+    loc = await seedLocation(b.id, { name: "Main WH" });
   });
 
   it("staff cannot write the ledger directly; it is append-only even for service_role", async () => {
@@ -67,9 +66,8 @@ describe("removal_shape CHECK: channel/dest_state required on removals, null oth
   beforeAll(async () => {
     b = await makeBrewery();
     staff = await makeStaff(b.id, "warehouse");
-    const { data: p } = await admin.from("products").insert({ brewery_id: b.id, name: "Check Test IPA" }).select().single();
-    ({ data: sku } = await admin.from("skus").insert({ brewery_id: b.id, product_id: p!.id, name: "Check Sku", package_type: "keg", bbl_per_unit: 0.5 }).select().single());
-    ({ data: loc } = await admin.from("locations").insert({ brewery_id: b.id, name: "Check WH", kind: "warehouse" }).select().single());
+    sku = { id: (await seedCatalog(b.id, { product: "Check Test IPA", sku: "Check Sku", packageType: "keg", bblPerUnit: 0.5 })).skuId };
+    loc = await seedLocation(b.id, { name: "Check WH" });
   });
 
   it("festival_removal and sample require dest_state, just like sale_removal", async () => {
@@ -120,18 +118,18 @@ describe("cross-brewery tenant consistency (composite FKs)", () => {
   // brewery B — a cross-tenant write RLS never caught. The composite FKs
   // added in the baseline migration make that combination impossible at the database level.
   let bA: any, bB: any, staffA: any;
-  let skuA: any, skuB: any, locA: any, locB: any, productA: any, productB: any;
+  let skuA: any, skuB: any, locA: any, locB: any, productB: any;
 
   beforeAll(async () => {
     bA = await makeBrewery();
     bB = await makeBrewery();
     staffA = await makeStaff(bA.id, "warehouse");
-    ({ data: productA } = await admin.from("products").insert({ brewery_id: bA.id, name: "A Product" }).select().single());
-    ({ data: productB } = await admin.from("products").insert({ brewery_id: bB.id, name: "B Product" }).select().single());
-    ({ data: skuA } = await admin.from("skus").insert({ brewery_id: bA.id, product_id: productA!.id, name: "A Sku", package_type: "keg", bbl_per_unit: 0.5 }).select().single());
-    ({ data: skuB } = await admin.from("skus").insert({ brewery_id: bB.id, product_id: productB!.id, name: "B Sku", package_type: "keg", bbl_per_unit: 0.5 }).select().single());
-    ({ data: locA } = await admin.from("locations").insert({ brewery_id: bA.id, name: "A WH", kind: "warehouse" }).select().single());
-    ({ data: locB } = await admin.from("locations").insert({ brewery_id: bB.id, name: "B WH", kind: "warehouse" }).select().single());
+    const catA = await seedCatalog(bA.id, { product: "A Product", sku: "A Sku", packageType: "keg", bblPerUnit: 0.5 });
+    const catB = await seedCatalog(bB.id, { product: "B Product", sku: "B Sku", packageType: "keg", bblPerUnit: 0.5 });
+    skuA = { id: catA.skuId };
+    productB = { id: catB.productId }; skuB = { id: catB.skuId };
+    locA = await seedLocation(bA.id, { name: "A WH" });
+    locB = await seedLocation(bB.id, { name: "B WH" });
   });
 
   it("rejects an inventory_movement whose sku_id belongs to a different brewery than brewery_id", async () => {

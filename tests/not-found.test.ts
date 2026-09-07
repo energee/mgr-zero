@@ -4,7 +4,7 @@
 // bearer context's handling of membership-query failures.
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { admin, asUser, makeBrewery, makeCustomerUser, makeStaffCtx } from "./helpers";
+import { asUser, makeBrewery, makeCustomerUser, makeStaffCtx, seedCustomer } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import { ctxForBearer } from "@/lib/commands/context";
 import "@/lib/commands/all";
@@ -30,10 +30,9 @@ describe("get_* commands with an unknown or malformed id", () => {
 describe("portal_order with an unknown or malformed id (review on #144)", () => {
   let cust: { db: Awaited<ReturnType<typeof asUser>>; userId: string; breweryId: string; role: "customer"; customerId: string };
   beforeAll(async () => {
-    const { data: pl } = await admin.from("price_lists").insert({ brewery_id: ctx.breweryId, name: "std" }).select().single();
-    const { data: c } = await admin.from("customers").insert({ brewery_id: ctx.breweryId, name: "Bar", type: "retailer", state: "PA", price_list_id: pl!.id }).select().single();
-    const user = await makeCustomerUser(c!.id);
-    cust = { db: await asUser(user.email), userId: user.id, breweryId: ctx.breweryId, role: "customer", customerId: c!.id };
+    const { customerId } = await seedCustomer(ctx.breweryId);
+    const user = await makeCustomerUser(customerId);
+    cust = { db: await asUser(user.email), userId: user.id, breweryId: ctx.breweryId, role: "customer", customerId };
   });
   it("unknown uuid → 404 not_found", async () => {
     await expect(runCommand("portal_order", { orderId: NIL }, cust)).rejects.toMatchObject({ status: 404, code: "not_found" });

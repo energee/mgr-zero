@@ -1,14 +1,14 @@
 // tests/rls-tenancy.test.ts
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaff, makeCustomerUser, asUser } from "./helpers";
+import { admin, makeBrewery, makeStaff, makeCustomerUser, asUser, seedCustomer } from "./helpers";
 
 describe("tenancy RLS", () => {
   let bA: any, bB: any, staffA: any, custB: any;
   beforeAll(async () => {
     bA = await makeBrewery(); bB = await makeBrewery();
     staffA = await makeStaff(bA.id, "admin");
-    const { data: c } = await admin.from("customers").insert({ brewery_id: bB.id, name: "Bar X", state: "PA" }).select().single();
-    custB = { customer: c, user: await makeCustomerUser(c!.id) };
+    const c = { id: (await seedCustomer(bB.id, { name: "Bar X" })).customerId };
+    custB = { customer: c, user: await makeCustomerUser(c.id) };
   });
 
   it("staff of A cannot see brewery B", async () => {

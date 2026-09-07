@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Ctx } from "@/lib/commands/registry";
 import { readIntegrationTokens, storeIntegrationTokens } from "@/lib/supabase/integration-tokens";
-import { admin, asUser, makeBrewery, makeCustomerUser, makeStaff } from "./helpers";
+import { admin, asUser, makeBrewery, makeCustomerUser, makeStaff, seedCustomer } from "./helpers";
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54341";
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
@@ -33,13 +33,8 @@ describe("integration token isolation", () => {
       makeStaff(brewery.id, "warehouse"),
       makeStaff(brewery.id, "brewer"),
     ]);
-    const { data: customer, error: customerError } = await admin
-      .from("customers")
-      .insert({ brewery_id: brewery.id, name: `secret customer ${crypto.randomUUID()}`, state: "PA" })
-      .select()
-      .single();
-    expect(customerError).toBeNull();
-    const customerUser = await makeCustomerUser(customer!.id);
+    const customer = { id: (await seedCustomer(brewery.id, { name: `secret customer ${crypto.randomUUID()}` })).customerId };
+    const customerUser = await makeCustomerUser(customer.id);
 
     const { data: qboConnection, error: qboError } = await admin.from("qbo_connections").insert({
       brewery_id: brewery.id,

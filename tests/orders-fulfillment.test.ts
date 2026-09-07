@@ -1,6 +1,6 @@
 // tests/orders-fulfillment.test.ts — pick → ship → movements + invoice; credit memo; replenishment; needs_restock.
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaff, asUser } from "./helpers";
+import { admin, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation, seedCustomer } from "./helpers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 let b: { id: string }, staffDb: SupabaseClient, staffId: string;
@@ -10,19 +10,12 @@ beforeAll(async () => {
   // identical seed to tests/orders-lifecycle.test.ts, plus a taproom location:
   b = await makeBrewery();
   const staff = await makeStaff(b.id); staffId = staff.id; staffDb = await asUser(staff.email);
-  const { data: wh } = await admin.from("locations").insert({ brewery_id: b.id, name: "WH", kind: "warehouse" }).select().single();
-  whId = wh!.id;
-  const { data: tap } = await admin.from("locations").insert({ brewery_id: b.id, name: "Taproom", kind: "taproom" }).select().single();
-  tapId = tap!.id;
-  const { data: p } = await admin.from("products").insert({ brewery_id: b.id, name: "IPA" }).select().single();
-  const { data: s } = await admin.from("skus").insert({ brewery_id: b.id, product_id: p!.id, name: "IPA 1/2bbl", package_type: "keg", bbl_per_unit: 0.5 }).select().single();
-  skuId = s!.id;
-  const { data: pl } = await admin.from("price_lists").insert({ brewery_id: b.id, name: "std" }).select().single();
-  await admin.from("price_list_items").insert({ brewery_id: b.id, price_list_id: pl!.id, sku_id: skuId, unit_price_cents: 12000 });
-  const { data: c } = await admin.from("customers").insert({ brewery_id: b.id, name: "Bar", type: "retailer", state: "PA", price_list_id: pl!.id }).select().single();
-  customerId = c!.id;
-  const { data: st } = await admin.from("ship_tos").insert({ brewery_id: b.id, customer_id: customerId, label: "m", address1: "1", city: "P", state: "PA", zip: "19100" }).select().single();
-  shipToId = st!.id;
+  whId = (await seedLocation(b.id)).id;
+  tapId = (await seedLocation(b.id, { name: "Taproom", kind: "taproom" })).id;
+  ({ skuId } = await seedCatalog(b.id, { sku: "IPA 1/2bbl", packageType: "keg", bblPerUnit: 0.5 }));
+  const cust = await seedCustomer(b.id);
+  ({ customerId, shipToId } = cust);
+  await admin.from("price_list_items").insert({ brewery_id: b.id, price_list_id: cust.priceListId, sku_id: skuId, unit_price_cents: 12000 });
   await admin.from("inventory_movements").insert({ brewery_id: b.id, sku_id: skuId, location_id: whId, qty: 100, type: "opening_balance", created_by: staffId });
 });
 

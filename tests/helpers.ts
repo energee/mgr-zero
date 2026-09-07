@@ -62,3 +62,51 @@ export function sql(q: string, quiet = false): string[] {
   const args = quiet ? [DB, "-Atq", "-c", q] : [DB, "-Atc", q];
   return execFileSync("psql", args, { encoding: "utf8" }).trim().split("\n").filter(Boolean);
 }
+
+// Seed helpers: the one place tests create catalog/location/customer rows, so
+// a schema change (Program 3 renames products→brands+formats) is one edit.
+export async function seedCatalog(
+  breweryId: string,
+  opts: { product?: string; sku?: string; packageType?: "keg" | "can" | "bottle"; bblPerUnit?: number } = {},
+) {
+  const { data: p, error: pe } = await admin.from("products")
+    .insert({ brewery_id: breweryId, name: opts.product ?? "IPA" }).select("id").single();
+  if (pe) throw pe;
+  const { data: s, error: se } = await admin.from("skus").insert({
+    brewery_id: breweryId, product_id: p.id, name: opts.sku ?? "IPA case",
+    package_type: opts.packageType ?? "can", bbl_per_unit: opts.bblPerUnit ?? 0.0645,
+  }).select("id").single();
+  if (se) throw se;
+  return { productId: p.id as string, skuId: s.id as string };
+}
+
+export async function seedLocation(breweryId: string, opts: { name?: string; kind?: "warehouse" | "taproom" } = {}) {
+  const row = { brewery_id: breweryId, name: opts.name ?? "WH", kind: opts.kind ?? "warehouse" };
+  const { data, error } = await admin.from("locations").insert(row).select("id, name, kind").single();
+  if (error) throw error;
+  return data as { id: string; name: string; kind: string };
+}
+
+// A customer with one ship-to and a price list (created empty unless given).
+export async function seedCustomer(
+  breweryId: string,
+  opts: { name?: string; state?: string; priceListId?: string } = {},
+) {
+  let priceListId = opts.priceListId;
+  if (!priceListId) {
+    const { data, error } = await admin.from("price_lists")
+      .insert({ brewery_id: breweryId, name: "std" }).select("id").single();
+    if (error) throw error;
+    priceListId = data.id as string;
+  }
+  const state = opts.state ?? "PA";
+  const { data: c, error: ce } = await admin.from("customers").insert({
+    brewery_id: breweryId, name: opts.name ?? "Bar", type: "retailer", state, price_list_id: priceListId,
+  }).select("id").single();
+  if (ce) throw ce;
+  const { data: st, error: se } = await admin.from("ship_tos").insert({
+    brewery_id: breweryId, customer_id: c.id, label: "main", address1: "1 Main St", city: "Town", state, zip: "19100",
+  }).select("id").single();
+  if (se) throw se;
+  return { customerId: c.id as string, shipToId: st.id as string, priceListId };
+}

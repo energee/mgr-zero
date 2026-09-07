@@ -1,6 +1,6 @@
 // tests/orders-lifecycle.test.ts — create → submit → confirm → adjust → cancel via rpc.
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaff, asUser } from "./helpers";
+import { admin, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation, seedCustomer } from "./helpers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 let b: { id: string }, staffDb: SupabaseClient, staffId: string;
@@ -9,24 +9,12 @@ let customerId: string, shipToId: string, whId: string, skuId: string;
 beforeAll(async () => {
   b = await makeBrewery();
   const staff = await makeStaff(b.id); staffId = staff.id; staffDb = await asUser(staff.email);
-  const { data: wh, error: whErr } = await admin.from("locations").insert({ brewery_id: b.id, name: "WH", kind: "warehouse" }).select().single();
-  if (whErr) throw new Error(`Failed to create location: ${whErr.message}`);
-  whId = wh!.id;
-  const { data: p, error: pErr } = await admin.from("products").insert({ brewery_id: b.id, name: "IPA" }).select().single();
-  if (pErr) throw new Error(`Failed to create product: ${pErr.message}`);
-  const { data: s, error: sErr } = await admin.from("skus").insert({ brewery_id: b.id, product_id: p!.id, name: "IPA 1/2bbl", package_type: "keg", bbl_per_unit: 0.5 }).select().single();
-  if (sErr) throw new Error(`Failed to create SKU: ${sErr.message}`);
-  skuId = s!.id;
-  const { data: pl, error: plErr } = await admin.from("price_lists").insert({ brewery_id: b.id, name: "std" }).select().single();
-  if (plErr) throw new Error(`Failed to create price list: ${plErr.message}`);
-  const { error: pliErr } = await admin.from("price_list_items").insert({ brewery_id: b.id, price_list_id: pl!.id, sku_id: skuId, unit_price_cents: 12000 });
+  whId = (await seedLocation(b.id)).id;
+  ({ skuId } = await seedCatalog(b.id, { sku: "IPA 1/2bbl", packageType: "keg", bblPerUnit: 0.5 }));
+  const cust = await seedCustomer(b.id);
+  ({ customerId, shipToId } = cust);
+  const { error: pliErr } = await admin.from("price_list_items").insert({ brewery_id: b.id, price_list_id: cust.priceListId, sku_id: skuId, unit_price_cents: 12000 });
   if (pliErr) throw new Error(`Failed to create price list item: ${pliErr.message}`);
-  const { data: c, error: cErr } = await admin.from("customers").insert({ brewery_id: b.id, name: "Bar", type: "retailer", state: "PA", price_list_id: pl!.id }).select().single();
-  if (cErr) throw new Error(`Failed to create customer: ${cErr.message}`);
-  customerId = c!.id;
-  const { data: st, error: stErr } = await admin.from("ship_tos").insert({ brewery_id: b.id, customer_id: customerId, label: "m", address1: "1", city: "P", state: "PA", zip: "19100" }).select().single();
-  if (stErr) throw new Error(`Failed to create ship_to: ${stErr.message}`);
-  shipToId = st!.id;
   // on-hand: 100 units
   const { error: imErr } = await admin.from("inventory_movements").insert({ brewery_id: b.id, sku_id: skuId, location_id: whId, qty: 100, type: "opening_balance", created_by: staffId });
   if (imErr) throw new Error(`Failed to create inventory movement: ${imErr.message}`);

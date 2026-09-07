@@ -1,6 +1,6 @@
 // tests/commands-customers.test.ts — customer/ship-to/price-list CRUD commands.
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaffCtx } from "./helpers";
+import { admin, makeBrewery, makeStaffCtx, seedCatalog } from "./helpers";
 import { runCommand } from "../lib/commands/registry";
 import "../lib/commands/all";
 
@@ -9,9 +9,7 @@ let b: { id: string }, ctx: Awaited<ReturnType<typeof makeStaffCtx>>, skuId: str
 beforeAll(async () => {
   b = await makeBrewery();
   ctx = await makeStaffCtx(b.id, "sales");
-  const { data: p } = await admin.from("products").insert({ brewery_id: b.id, name: "IPA" }).select().single();
-  const { data: s } = await admin.from("skus").insert({ brewery_id: b.id, product_id: p!.id, name: "IPA case", package_type: "can", bbl_per_unit: 0.0645 }).select().single();
-  skuId = s!.id;
+  ({ skuId } = await seedCatalog(b.id));
 });
 
 describe("customer CRUD", () => {
