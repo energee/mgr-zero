@@ -232,10 +232,8 @@ create table styles (
   unique (brewery_id, name)
 );
 
--- A brand is the sellable identity (§16.1); a batch is a production instance.
--- description, category and hops are optional facts drawn on the Brand screen.
--- price_group_id is the row of the price grid this beer sits on
--- (specs/2026-09-07-mgr-pricing-grid-naming.md); null means unpriced everywhere.
+-- A row of the price grid (specs/2026-09-07-mgr-pricing-grid-naming.md): the
+-- brands that sit on it all price alike, cell by cell, in channel_prices below.
 create table price_groups (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
@@ -249,6 +247,10 @@ create table price_groups (
 );
 create index price_groups_brewery_idx on price_groups (brewery_id, position);
 
+-- A brand is the sellable identity (§16.1); a batch is a production instance.
+-- description, category and hops are optional facts drawn on the Brand screen.
+-- price_group_id is the row of the price grid this beer sits on
+-- (specs/2026-09-07-mgr-pricing-grid-naming.md); null means unpriced everywhere.
 create table brands (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),

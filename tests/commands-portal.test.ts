@@ -80,7 +80,7 @@ describe("portal commands", () => {
       .rejects.toThrow(/ship-to not found/);
   });
 
-  it("rejects a sku that is not priced on the caller's list or is inactive", async () => {
+  it("rejects a sku that is not priced on the caller's sale channel or is inactive", async () => {
     const unpriced = await seedCatalog(b.id, { product: "Unpriced", sku: "keg", packageType: "keg", bblPerUnit: 0.5 });
     await expect(runCommand("portal_create_order", { shipToId, lines: [{ skuId: unpriced.skuId, qty: 1 }] }, custCtx))
       .rejects.toThrow(/not active and priced/);
@@ -111,7 +111,7 @@ describe("portal commands", () => {
     expect(inactive.error?.message).toMatch(/not active and priced/);
   });
 
-  it("ignores any client-supplied price: the line price is always the list price", async () => {
+  it("ignores any client-supplied price: the line price is always the grid price", async () => {
     const created = await runCommand("portal_create_order", {
       shipToId, lines: [{ skuId, qty: 1, unitPriceCents: 1 } as unknown as { skuId: string; qty: number }],
     }, custCtx) as { order_id: string };

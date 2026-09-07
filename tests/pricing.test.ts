@@ -5,10 +5,11 @@ import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
 let b: { id: string }; let ctx: Awaited<ReturnType<typeof makeStaffCtx>>;
-let cat: Awaited<ReturnType<typeof seedCatalog>>; let wholesale: string; let taproom: string;
+let cat: Awaited<ReturnType<typeof seedCatalog>>; let wholesale: string; let taproom: string; let group: string;
 beforeAll(async () => {
   b = await makeBrewery(); ctx = await makeStaffCtx(b.id, "sales"); cat = await seedCatalog(b.id);
   wholesale = await channelId(b.id, "Wholesale"); taproom = await channelId(b.id, "Taproom");
+  group = await seedPriceGroup(b.id, "1", 1);   // the one row every describe below prices on
 });
 
 // The grid RPCs run as staff: assert_staff reads auth.uid(), which the service
@@ -17,13 +18,51 @@ async function setCell(channel: string, group: string, cents: number) {
   return ctx.db.rpc("set_channel_price", { p_brewery: b.id, p_sale_channel: channel, p_price_group: group, p_format: cat.formatId, p_unit_price_cents: cents, p_request_id: crypto.randomUUID() });
 }
 
+const group_rpc = (p: Record<string, unknown>) => ctx.db.rpc("upsert_price_group", { p_brewery: b.id, p_id: null, p_cost_ceiling_cents: null, p_request_id: crypto.randomUUID(), ...p });
+
 describe("price groups", () => {
   it("a group is unique by name and by position within a brewery", async () => {
-    const t = await seedPriceGroup(b.id, "1", 1);
     const dupName = await admin.from("price_groups").insert({ brewery_id: b.id, name: "1", position: 9 });
     const dupPos = await admin.from("price_groups").insert({ brewery_id: b.id, name: "9", position: 1 });
     expect(dupName.error?.code).toBe("23505"); expect(dupPos.error?.code).toBe("23505");
-    expect(t).toBeTruthy();
+  });
+  it("upsert_price_group creates, renames, and refuses a duplicate name or position", async () => {
+    const made = await group_rpc({ p_name: "2", p_position: 2 });
+    expect(made.error).toBeNull();
+    expect(made.data).toMatchObject({ name: "2", position: 2, cost_ceiling_cents: null });
+    const id = (made.data as { id: string }).id;
+
+    // an update keeps the row and takes the ceiling (#189 D7: it only suggests)
+    const renamed = await group_rpc({ p_id: id, p_name: "2A", p_position: 2, p_cost_ceiling_cents: 4200 });
+    expect(renamed.error).toBeNull();
+    expect(renamed.data).toMatchObject({ id, name: "2A", cost_ceiling_cents: 4200 });
+
+    const dupName = await group_rpc({ p_name: "1", p_position: 7 });
+    expect(dupName.error?.message).toBe("a price group with that name or position already exists");
+    const dupPos = await group_rpc({ p_name: "7", p_position: 1 });
+    expect(dupPos.error?.message).toBe("a price group with that name or position already exists");
+    const dupOnUpdate = await group_rpc({ p_id: id, p_name: "1", p_position: 2 });
+    expect(dupOnUpdate.error?.message).toBe("a price group with that name or position already exists");
+  });
+  it("upsert_price_group and delete_price_group refuse an unknown id", async () => {
+    const unknown = crypto.randomUUID();
+    const updated = await group_rpc({ p_id: unknown, p_name: "ghost", p_position: 99 });
+    expect(updated.error?.message).toBe("price group not found");
+    const deleted = await ctx.db.rpc("delete_price_group", { p_brewery: b.id, p_id: unknown, p_request_id: crypto.randomUUID() });
+    expect(deleted.error?.message).toBe("price group not found");
+  });
+  it("delete_price_group removes an unused group but a group a brand sits on is held by the FK", async () => {
+    const spare = await group_rpc({ p_name: "spare", p_position: 50 });
+    const spareId = (spare.data as { id: string }).id;
+    const gone = await ctx.db.rpc("delete_price_group", { p_brewery: b.id, p_id: spareId, p_request_id: crypto.randomUUID() });
+    expect(gone.error).toBeNull();
+    expect(gone.data).toEqual({ id: spareId, deleted: true });
+    expect((await admin.from("price_groups").select("id").eq("id", spareId).maybeSingle()).data).toBeNull();
+
+    // cat.brandId sits on `group` (set below); the composite FK raises 23503.
+    await admin.from("brands").update({ price_group_id: group }).eq("id", cat.brandId);
+    const held = await ctx.db.rpc("delete_price_group", { p_brewery: b.id, p_id: group, p_request_id: crypto.randomUUID() });
+    expect(held.error?.code).toBe("23503");
   });
   it("a brand on another brewery's group is rejected by the composite FK", async () => {
     const other = await makeBrewery(); const foreign = await seedPriceGroup(other.id, "1", 1);
@@ -33,9 +72,7 @@ describe("price groups", () => {
 });
 
 describe("channel prices resolve one cell per channel × group × format", () => {
-  let group: string;
   beforeAll(async () => {
-    group = (await admin.from("price_groups").select("id").eq("brewery_id", b.id).eq("name", "1").single()).data!.id;
     await admin.from("brands").update({ price_group_id: group }).eq("id", cat.brandId);
   });
   it("an unpriced sku is not in sku_prices; a cell prices every sku of that brand's group on that channel", async () => {
@@ -68,6 +105,13 @@ describe("customers and orders carry the channel", () => {
   it("a customer needs a sale channel", async () => {
     const { error } = await admin.from("customers").insert({ brewery_id: b.id, name: "NoChan", type: "retailer", state: "PA" });
     expect(error?.code).toBe("23502");
+    // and the RPC says so in words rather than letting the not-null speak
+    const rpc = await ctx.db.rpc("upsert_customer", {
+      p_brewery: b.id, p_id: null, p_name: "NoChan RPC", p_type: "retailer", p_state: "PA",
+      p_sale_channel: null, p_license_no: null, p_payment_terms: null, p_tax_treatment: null,
+      p_request_id: crypto.randomUUID(),
+    });
+    expect(rpc.error?.message).toBe("customer needs a sale channel");
   });
   it("create_order copies the customer's channel and prices lines from it; an unpriced sku is refused", async () => {
     const cust = await seedCustomer(b.id, { name: "Grid Bar" });
