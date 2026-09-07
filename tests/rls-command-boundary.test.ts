@@ -267,6 +267,20 @@ describe("registered staff mutation role × RPC matrix", () => {
       },
     },
     {
+      command: "receive_stock_transfer", rpc: "receive_stock_transfer", allowed: ["admin", "warehouse"],
+      input: async () => {
+        const to = await seedLocation(brewery.id, { name: unique("matrix receive", "admin"), kind: "storage" });
+        const db = contexts().admin.db;
+        const { data } = await db.rpc("create_stock_transfer", { p_brewery: brewery.id, p_from: locationId, p_to: to.id, p_requested: null, p_note: null,
+          p_lines: [{ sku_id: skuId, qty: 1, from_bin_id: binId, to_bin_id: to.binId }], p_request_id: crypto.randomUUID() });
+        const transferId = (data as { transfer_id: string }).transfer_id;
+        await db.rpc("submit_stock_transfer", { p_transfer: transferId, p_request_id: crypto.randomUUID() });
+        const { data: line } = await admin.from("stock_transfer_lines").select("id").eq("transfer_id", transferId).single();
+        await db.rpc("record_stock_transfer_pick", { p_transfer: transferId, p_picks: [{ line_id: line!.id, qty: 1 }], p_request_id: crypto.randomUUID() });
+        return { command: { transferId, lines: [{ lineId: line!.id, qty: 1 }] }, rpc: { p_transfer: transferId, p_lines: [{ line_id: line!.id, qty: 1 }] } };
+      },
+    },
+    {
       command: "create_bin", rpc: "create_bin", allowed: ["admin", "warehouse"],
       input: async role => {
         const name = unique("matrix bin", role);

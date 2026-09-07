@@ -53,6 +53,18 @@ defineCommand({
   })),
 });
 
+defineCommand({
+  name: "receive_stock_transfer", description: "Receive a picked transfer: paired volume-neutral ledger rows per line (FG, material or kegs) in one transaction; the transfer becomes received",
+  roles: [...roles], requiresConfirmation: true,
+  input: z.object({ transferId: z.string().uuid(), lines: z.array(z.object({ lineId: z.string().uuid(), qty: z.number().nonnegative() })) }),
+  handler: async (ctx, i, execution) => {
+    const r = await unwrap(ctx.db.rpc("receive_stock_transfer", {
+      p_transfer: i.transferId, p_lines: i.lines.map((l) => ({ line_id: l.lineId, qty: l.qty })), p_request_id: execution.requestId,
+    })) as { transfer_id: string };
+    return { transferId: r.transfer_id };
+  },
+});
+
 defineQuery({
   name: "list_stock_transfers", description: "Stock transfers, newest first, with their lines",
   roles: [...readRoles],

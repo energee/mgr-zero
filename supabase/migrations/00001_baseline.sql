@@ -1534,10 +1534,12 @@ create view packaging_run_yields with (security_invoker = true) as
   where r.closed_at is not null
   group by r.id;
 
+-- transferred_in/out move kegs between bins and net to zero across the pair, so
+-- keg_fleet_totals (no location) ignores them and stays the fleet.
 create view keg_bin_totals with (security_invoker = true) as
   select brewery_id, pool_id, keg_size, location_id, bin_id,
-         sum(case reason when 'acquired' then qty when 'found' then qty
-                         when 'retired' then -qty when 'lost' then -qty else 0 end)::int as qty
+         sum(case reason when 'acquired' then qty when 'found' then qty when 'transferred_in' then qty
+                         when 'retired' then -qty when 'lost' then -qty when 'transferred_out' then -qty else 0 end)::int as qty
   from keg_events group by 1,2,3,4,5;
 
 create view keg_fleet_totals with (security_invoker = true) as
@@ -2885,6 +2887,50 @@ begin
   return private.complete_command_request(p_request_id, jsonb_build_object('transfer_id', p_transfer));
 end $$;
 
+-- Receive: the stock arrives. Paired, volume-neutral ledger rows per line —
+-- negative at the source bin, positive at the destination bin — into whichever
+-- ledger the line addresses, all in this one RPC; the fleet total and the TTB
+-- removal figures never move.
+create function private.receive_stock_transfer_impl(p_transfer uuid, p_lines jsonb) returns jsonb
+language plpgsql set search_path = '' as $$
+declare t public.stock_transfers; l public.stock_transfer_lines; rq record; v_qty numeric;
+begin
+  t := private.lock_transfer(p_transfer, array['picked','in_transit']::public.stock_transfer_status[]);
+  for l in select * from public.stock_transfer_lines where transfer_id = p_transfer loop
+    select (e->>'qty')::numeric into v_qty from jsonb_array_elements(coalesce(p_lines, '[]'::jsonb)) e where (e->>'line_id')::uuid = l.id;
+    v_qty := coalesce(v_qty, l.qty_picked, l.qty);
+    if v_qty <= 0 then continue; end if;
+    if l.sku_id is not null then
+      insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, ref, created_by)
+      values (t.brewery_id, l.sku_id, t.from_location_id, l.from_bin_id, -v_qty, 'location_transfer', t.id, auth.uid()),
+             (t.brewery_id, l.sku_id, t.to_location_id,   l.to_bin_id,    v_qty, 'location_transfer', t.id, auth.uid());
+    elsif l.material_id is not null then
+      insert into public.material_movements (brewery_id, material_id, location_id, bin_id, qty, type, note, created_by)
+      values (t.brewery_id, l.material_id, t.from_location_id, l.from_bin_id, -v_qty, 'transfer_out', 'transfer ' || t.id, auth.uid()),
+             (t.brewery_id, l.material_id, t.to_location_id,   l.to_bin_id,    v_qty, 'transfer_in',  'transfer ' || t.id, auth.uid());
+    else
+      insert into public.keg_events (brewery_id, pool_id, keg_size, location_id, bin_id, qty, reason, note, created_by)
+      values (t.brewery_id, l.keg_pool_id, l.keg_size, t.from_location_id, l.from_bin_id, v_qty::int, 'transferred_out', 'transfer ' || t.id, auth.uid()),
+             (t.brewery_id, l.keg_pool_id, l.keg_size, t.to_location_id,   l.to_bin_id,   v_qty::int, 'transferred_in',  'transfer ' || t.id, auth.uid());
+    end if;
+  end loop;
+  update public.stock_transfers set status = 'received', received_at = now() where id = p_transfer;
+  return jsonb_build_object('transfer_id', p_transfer);
+end $$;
+
+create function receive_stock_transfer(p_transfer uuid, p_lines jsonb, p_request_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_brewery uuid; v_replay jsonb; v_result jsonb;
+begin
+  select brewery_id into v_brewery from public.stock_transfers where id = p_transfer;
+  if v_brewery is null then raise exception 'permission denied' using errcode = '42501'; end if;
+  perform private.assert_staff(v_brewery, array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(v_brewery, 'receive_stock_transfer', p_request_id, jsonb_build_object('transfer', p_transfer, 'lines', p_lines));
+  if v_replay is not null then return v_replay; end if;
+  v_result := private.receive_stock_transfer_impl(p_transfer, p_lines);
+  return private.complete_command_request(p_request_id, v_result);
+end $$;
+
 -- Release one open reservation so its quantity returns to ATP (Pars and
 -- allocation screen). Only an open allocation can be released.
 create function release_allocation(p_allocation uuid,p_request_id uuid) returns jsonb
@@ -4066,6 +4112,7 @@ grant execute on function
   create_stock_transfer(uuid,uuid,uuid,date,text,jsonb,uuid),
   submit_stock_transfer(uuid,uuid),
   record_stock_transfer_pick(uuid,jsonb,uuid),
+  receive_stock_transfer(uuid,jsonb,uuid),
   set_standing_allocation(uuid,uuid,numeric,uuid),
   create_replenishment_order(uuid,uuid,jsonb,uuid)
   to authenticated;
