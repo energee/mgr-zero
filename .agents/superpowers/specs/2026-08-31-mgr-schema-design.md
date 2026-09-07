@@ -346,12 +346,14 @@ stores no sync cursor, so neither the command nor UI may claim cursor durability
 
 ### `vendors`
 `name text, contact_name, email, phone, address text, payment_terms text default 'net30',
-qbo_vendor_id text, active bool default true`. unique `(brewery_id, name)`.
+lead_time_days int >= 0, qbo_vendor_id text, active bool default true`. unique `(brewery_id, name)`.
+Lead time is the vendor's, not the material's (2026-09-07 purchasing spec §3): the
+observed `ordered_on → received_on` dates are keyed by the PO's vendor.
 
 ### `materials`
 `name, category material_category, base_uom uom, purchase_uom uom, purchase_uom_factor
 numeric > 0 default 1` (base units per purchase unit: a 50 lb bag = `each`→`lb`, 50),
-`lot_tracked bool default false`, `default_vendor_id → vendors`, `lead_time_days int`,
+`lot_tracked bool default false`, `default_vendor_id → vendors`,
 `reorder_point numeric` (base uom), `active bool`. unique `(brewery_id, name)`.
 
 ### `material_lots`

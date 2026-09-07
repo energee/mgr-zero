@@ -185,6 +185,7 @@ create table vendors (
   name text not null,
   contact_name text, email text, phone text, address text,
   payment_terms text not null default 'net30',
+  lead_time_days int check (lead_time_days >= 0),      -- per vendor, not per material (spec 2026-09-07 §3): the only dates that can check it are keyed by the PO's vendor
   qbo_vendor_id text,
   active boolean not null default true,
   created_at timestamptz not null default now(),
@@ -201,8 +202,7 @@ create table materials (
   purchase_uom uom not null,
   purchase_uom_factor numeric(14,6) not null default 1 check (purchase_uom_factor > 0), -- base units per purchase unit
   lot_tracked boolean not null default false,
-  default_vendor_id uuid,
-  lead_time_days int,
+  default_vendor_id uuid,                              -- Planning drafts to the active contract's vendor, else this one, else "no vendor"
   reorder_point numeric(14,4),                          -- base uom
   extract_potential numeric,                             -- SG-style potential, e.g. 1.037 = 37 PPG (lib/recipe-gravity.ts)
   active boolean not null default true,
@@ -971,17 +971,27 @@ create table receipt_lines (
 );
 create index receipt_lines_po_line_idx on receipt_lines (po_line_id);
 
--- Derive PO received / partially_received from counted receipts.
+-- Derive PO received / partially_received from counted receipts. A PO with no
+-- lines derives NULL (bool_and over zero rows), not partially_received: the
+-- trigger then leaves the status alone (spec 2026-09-07 §2).
+create function private.po_receipt_status(p_po uuid) returns public.po_status
+language sql stable set search_path = '' as $$
+  select case bool_and(coalesce(r.counted, 0) >= l.qty_ordered)
+           when true then 'received'::public.po_status
+           when false then 'partially_received'::public.po_status
+         end
+  from public.purchase_order_lines l
+  left join (select po_line_id, sum(qty_counted) counted from public.receipt_lines group by 1) r on r.po_line_id = l.id
+  where l.po_id = p_po
+$$;
+
 create function update_po_status() returns trigger language plpgsql set search_path = '' as $$
-declare po uuid; complete boolean;
+declare po uuid; v_status public.po_status;
 begin
   select po_id into po from public.purchase_order_lines where id = new.po_line_id;
-  select bool_and(coalesce(r.counted, 0) >= l.qty_ordered) into complete
-    from public.purchase_order_lines l
-    left join (select po_line_id, sum(qty_counted) counted from public.receipt_lines group by 1) r on r.po_line_id = l.id
-    where l.po_id = po;
-  update public.purchase_orders
-    set status = case when complete then 'received' else 'partially_received' end::public.po_status
+  v_status := private.po_receipt_status(po);
+  if v_status is null then return null; end if;
+  update public.purchase_orders set status = v_status
     where id = po and status in ('draft','sent','partially_received');
   return null;
 end $$;
