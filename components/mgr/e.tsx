@@ -159,7 +159,8 @@ export const E = {
         variant={kind === "g" ? "outline" : kind === "ghost" ? "ghost" : kind === "del" ? "destructive" : "default"}
         disabled={Boolean(disabled)}
         className={cn(
-          "w-full md:w-fit",
+          // A lone verb sits where a group would end: right, on the desk.
+          "w-full md:w-fit md:self-end",
           kind === "irr" && "bg-irreversible text-irreversible-foreground hover:bg-irreversible/90",
           // Solid, not shadcn's tint (whose dark:bg-destructive/20 would otherwise
           // win): a loss should carry the same weight as the teal commit beside it.
