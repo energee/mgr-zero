@@ -258,7 +258,7 @@ export const E = {
     // not typed: the same −/+ stepper Weekly count uses.
     if (type === "number") {
       return (
-        <Field orientation="horizontal">
+        <Field>
           <FieldLabel>{label}</FieldLabel>
           {E.stq(Number(value), label)}
         </Field>
@@ -270,7 +270,7 @@ export const E = {
     // share one list. A caller cannot forget to disambiguate.
     const listId = suggestions?.length ? `list-${suggestions.join("-").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}` : undefined;
     return (
-      <Field orientation="horizontal">
+      <Field>
         <FieldLabel>{label}</FieldLabel>
         <Input type={type} defaultValue={value} aria-label={label} list={listId} />
         {listId ? <datalist id={listId}>{suggestions!.map((o) => <option key={o} value={o} />)}</datalist> : null}
@@ -286,7 +286,7 @@ export const E = {
   window: (label: string, start: string, end: string) => <TimeWindowField label={label} start={start} end={end} />,
   /** A picked value: a Select for short fixed lists; long lists (SKU, customer) keep opening Entity picker. */
   pick: (label: string, value: string, options: string[]) => (
-    <Field orientation="horizontal">
+    <Field>
       <FieldLabel>{label}</FieldLabel>
       <Select defaultValue={value}>
         <SelectTrigger aria-label={label}><SelectValue /></SelectTrigger>
@@ -369,7 +369,21 @@ export const E = {
       <EmptyDescription>{t}</EmptyDescription>
     </Empty>
   ),
-  inp: (t: string) => <Input placeholder={t} aria-label={t} />,
+  /** A blank labeled input. "Label · example" splits into the label and a
+   *  placeholder; a lone word is the label. Label sits over the control like
+   *  every other field (shadcn Field default), never as the placeholder. */
+  inp: (t: string) => {
+    const [raw, hint] = t.split(" · ");
+    const label = raw.charAt(0).toUpperCase() + raw.slice(1);
+    return (
+      <Field>
+        <FieldLabel>{label}</FieldLabel>
+        <Input placeholder={hint} aria-label={label} />
+      </Field>
+    );
+  },
+  /** A search box: the one input whose placeholder is its whole label. */
+  search: (t = "Search") => <Input type="search" placeholder={t} aria-label={t} />,
   stq: (v: number, label = "Quantity") => (
     <ButtonGroup>
       <Button variant="outline" size="icon" aria-label="Decrease">−</Button>

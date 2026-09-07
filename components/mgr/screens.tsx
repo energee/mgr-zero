@@ -289,7 +289,7 @@ export const SCREENS: Screen[] = [
     states: [["empty", "No matches · change the term"], ["loading", "row-shaped skeletons"], ["offline", "cached matches only", 1], ["permission", "Results honor row access"], ["document number", "ORD-0231 matches exactly and sorts first"]],
     spec: "One registered search across the entity kinds the caller's role can read; the chips narrow what is already permitted and never widen it, and RLS decides the rows either way, so a term matching a customer the caller cannot see returns nothing rather than a redacted row. A document number (ORD-0231, INV-1042, L-240831-HZ) matches exactly and sorts above name matches, because someone typing one is holding it in their hand; names match on prefix. This is also where history lives: a run closed months ago leaves the Work list and is found here.",
     body: (<>
-      {E.inp("Search")}
+      {E.search()}
       {E.chips(["all", "SKU", "order", "lot"], 0)}
       {E.nav("Hazy IPA · ½ bbl", "SKU · ATP 11", "", BeerIcon)}
       {E.nav("ORD-0231 · Ridgeline", "order · 4 × Hazy", "", Package01Icon)}
@@ -803,7 +803,7 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     spec: "48px rows; visible keyboard focus; one registered search behind the field.",
     body: (<>
-      {E.inp("Search")}
+      {E.search()}
       {E.ttl("Recent")}
       {E.row("Hazy IPA · ½ bbl keg", "11 ready")}
       {E.row("Pils · 16 oz case", "6 short", "", "w")}
@@ -1251,9 +1251,9 @@ export const SCREENS: Screen[] = [
         E.pick("Customer", "Ridgeline Tap Room", ["Ridgeline Tap Room", "Al’s Bar", "Teresa’s"]),
         E.pick("Ship-to", "Main · Phoenixville, PA", ["Main · Phoenixville, PA", "Dock"]),
         E.pick("Source location", "Warehouse", ["Warehouse", "Taproom"]),
-        E.edit("Customer PO", "4471"),
+        E.edit("Requested ship", "2026-09-03", "date"),
       )}
-      {E.edit("Requested ship", "2026-09-03", "date")}
+      {E.edit("Customer PO", "4471")}
       {E.row("Hazy IPA · ½ bbl keg", "ATP 11 at Warehouse", E.stq(4))}
       {E.row("Pils · 16 oz case", "ATP −6 at Warehouse", E.stq(10), "w")}
       {E.btn("Add line", "g")}
@@ -1274,7 +1274,7 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     body: (<>
       {E.back("More", "Customers", E.btn("Add customer"))}
-      {E.inp("Search customers")}
+      {E.search("Search customers")}
       {E.row("Ridgeline Tap Room", "retailer · PA · 2 portal users", E.act("Open"))}
       {E.row("Al’s Bar", "retailer · OH · brewery remits", E.act("Open"), "w")}
     </>),
