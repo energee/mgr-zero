@@ -3,12 +3,12 @@
 // live-reason gate that keeps unshipped destinations out of both readers.
 import { beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
-import { admin, asUser, makeBrewery, makeCustomerUser, makeStaff, makeStaffCtx } from "./helpers";
+import { admin, asUser, DB, makeBrewery, makeCustomerUser, makeStaff, makeStaffCtx } from "./helpers";
 import { runCommand, type Ctx as CommandCtx } from "@/lib/commands/registry";
 import type { TodayItem } from "@/lib/commands/today";
 import "@/lib/commands/all";
 
-const sql = new pg.Pool({ connectionString: process.env.POSTGRES_URL ?? "postgresql://postgres:postgres@127.0.0.1:54342/postgres" });
+const sql = new pg.Pool({ connectionString: DB });
 
 type Ctx = Awaited<ReturnType<typeof makeStaffCtx>>;
 let b: { id: string }, adminCtx: Ctx, sales: Ctx, warehouse: Ctx, brewer: Ctx;
@@ -89,6 +89,27 @@ describe("get_today (registered reader)", () => {
     expect(before).toMatch(/^[0-9a-f]{32}$/);
   });
 
+  it("shows restock_due to warehouse when needs_restock is set, including cancelled orders", async () => {
+    const id = await createOrder("2026-09-07", true, true);
+    const { data: line } = await admin.from("order_lines").select("id").eq("order_id", id).single();
+    await adminCtx.db.rpc("record_pick", {
+      p_order: id, p_picks: [{ line_id: line!.id, qty_picked: 1 }], p_request_id: crypto.randomUUID(),
+    });
+    await adminCtx.db.rpc("adjust_order_lines", {
+      p_order: id, p_lines: [{ sku_id: skuId, qty: 1 }], p_reason: "cut", p_request_id: crypto.randomUUID(),
+    });
+    // adjust after pick sets needs_restock; cancel must keep it
+    await adminCtx.db.rpc("cancel_order", { p_order: id, p_reason: "customer dropped", p_request_id: crypto.randomUUID() });
+    const rows = await today(warehouse, "2026-09-07T12:00:00Z");
+    const restock = rows.find((i) => i.reason === "restock_due" && i.subjectId === id);
+    expect(restock).toBeDefined();
+    expect(restock!.href).toBe(`/orders/${id}/restock`);
+    expect(restock!.recipientRoles).toEqual(["admin", "warehouse"]);
+    expect(await today(sales, "2026-09-07T12:00:00Z")).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ reason: "restock_due", subjectId: id })]),
+    );
+  });
+
   it("rejects customers", async () => {
     const customerUser = await makeCustomerUser(customerId);
     const ctx = { db: await asUser(customerUser.email), userId: customerUser.id, breweryId: b.id, role: "customer" as const, customerId };
@@ -137,11 +158,11 @@ describe("today candidates (shared projection) and internal scan", () => {
 
   it("gates both readers to reasons whose MGR destinations exist", async () => {
     const live = (await sql.query("select public.today_live_reasons() as r")).rows[0].r;
-    expect(live).toEqual(["submitted_order", "pick_due"]);
+    expect(live).toEqual(["submitted_order", "pick_due", "restock_due"]);
     const scanned = (await sql.query("select distinct reason from public.scan_chat_today_candidates($1, $2)", [b.id, "2026-09-10T12:00:00Z"])).rows.map((r) => r.reason).sort();
-    expect(scanned).toEqual(["pick_due", "submitted_order"]);
+    expect(scanned).toEqual(["pick_due", "restock_due", "submitted_order"]);
     const reasons = new Set((await today(adminCtx, "2026-09-10T12:00:00Z")).map((i) => i.reason));
-    expect([...reasons].sort()).toEqual(["pick_due", "submitted_order"]);
+    expect([...reasons].sort()).toEqual(["pick_due", "restock_due", "submitted_order"]);
   });
 
   it("denies the internal scan to authenticated users", async () => {

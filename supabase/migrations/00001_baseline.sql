@@ -2998,6 +2998,18 @@ create view private.today_candidates with (security_invoker = true) as
     from orders o join breweries b on b.id = o.brewery_id
     where o.status = 'confirmed' and o.requested_ship_date is not null
   union all
+  -- standing work, not date-due: staged beer to put back while the flag is set
+  select o.brewery_id, 'restock_due', 'order', o.id::text,
+         md5(concat_ws('|', o.status, o.needs_restock)),
+         'ORD-' || lpad(o.order_no::text, 4, '0'),
+         'restock staged beer',
+         null::timestamptz,
+         '/orders/' || o.id || '/restock',
+         array['admin','warehouse']::text[],
+         null::uuid
+    from orders o
+    where o.needs_restock = true
+  union all
   -- only the lowest undelivered stop of an open route is "next"
   select r.brewery_id, 'delivery_next', 'delivery', d.id::text,
          md5(concat_ws('|', r.driver_user_id, r.delivery_date, d.stop_no, d.delivered_at, r.returned_at)),
@@ -3033,7 +3045,7 @@ grant select on private.today_candidates to service_role;
 -- ponytail: delivery_next and fermentation_reading_overdue join this list when
 -- their MGR pages/commands ship (slice 4 cellar reading, slice 10 delivery stop).
 create function today_live_reasons() returns text[]
-language sql immutable set search_path = '' as $$ select array['submitted_order','pick_due'] $$;
+language sql immutable set search_path = '' as $$ select array['submitted_order','pick_due','restock_due'] $$;
 
 create function get_today_items(p_brewery uuid, p_now timestamptz default now())
 returns setof private.today_candidates
@@ -3045,7 +3057,7 @@ language sql stable security definer set search_path = '' as $$
     join public.brewery_users bu on bu.brewery_id = c.brewery_id and bu.user_id = auth.uid()
     where c.brewery_id = p_brewery
       and c.reason = any (public.today_live_reasons())
-      and (c.reason = 'submitted_order' or c.due_at <= p_now)
+      and (c.reason = 'submitted_order' or c.due_at is null or c.due_at <= p_now)
       and (bu.role = 'admin'
            or (bu.role::text = any (c.recipient_roles) and (c.assigned_user_id is null or c.assigned_user_id = auth.uid())))
     order by c.due_at nulls last, c.safe_label
@@ -3058,7 +3070,7 @@ language sql stable security definer set search_path = '' as $$
     from private.today_candidates c
     where c.brewery_id = p_brewery_id
       and c.reason = any (public.today_live_reasons())
-      and (c.reason = 'submitted_order' or c.due_at <= p_now)
+      and (c.reason = 'submitted_order' or c.due_at is null or c.due_at <= p_now)
 $$;
 
 revoke execute on function today_live_reasons(), get_today_items(uuid, timestamptz), scan_chat_today_candidates(uuid, timestamptz)

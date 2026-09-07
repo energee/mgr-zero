@@ -48,7 +48,7 @@ CSV import has no screen or control yet, so there is no **Import** link (see [Ac
 The **Me** control in the header shows your brewery and role, switches between light and dark mode, and offers **Sign out**. Forms open as a panel from the bottom of the screen on a phone and as a centered dialog on wider screens. On a phone, page actions such as **New order** or **Save** span the column. On a wider screen, create actions sit on the title row and other actions hug their label rather than stretching across the page. Sign-in and other entry cards stay a narrow column, so their buttons still span that card.
 
 <Cards>
-  <Card title="Today">The tab you land on after signing in. It currently shows only a **Dashboard** heading — there is no work queue, row actions, or shortcut button here yet. Use the **Beer, Work**, and **More** tabs — along the bottom on a phone, in the left rail on wider screens — to reach the work your role allows, such as Inventory, Orders, and Pick.</Card>
+  <Card title="Today">The tab you land on after signing in: one row per piece of work your role can finish now, each with its order number, a short detail line, and the verb that opens it. Admin sees everything; Sales sees submitted orders (**Confirm**); Warehouse sees confirmed orders whose requested ship date has arrived (**Pick**) and orders holding staged beer that needs restocking (**Put back**), including cancelled ones, until the restock is confirmed. A dot on the icon marks a row needing attention. With nothing waiting, Today says **Nothing waiting** and offers **Record movement**, which opens Inventory.</Card>
   <Card title="Forms">A successful form closes and refreshes the page. An error stays in the open form with the entered values.</Card>
   <Card title="Closing a form">Closing without saving clears changes and restores the form defaults.</Card>
 </Cards>
@@ -260,7 +260,7 @@ Admin can open **Team** from **Settings** to see current staff memberships. The 
 
 When your brewery’s Slack connection is available, open its MGR App Home and choose **Link MGR account**. Sign in to MGR if asked. A valid link confirms that Slack is linked.
 
-Linked App Home shows a role-filtered **Today** queue with up to 20 current items. Admin sees all live items; Sales sees submitted orders to review; Warehouse sees confirmed orders whose requested ship date is due. Select **Open** on an item to view its order in MGR. With no current work, App Home says **You’re caught up**.
+Linked App Home shows a role-filtered **Today** queue with up to 20 current items. Admin sees all live items; Sales sees submitted orders to review; Warehouse sees confirmed orders whose requested ship date is due and orders with staged beer to put back. Select **Open** on an item to view its order in MGR. With no current work, App Home says **You’re caught up**.
 
 Linked eligible staff also receive private Slack messages for newly submitted orders and picks that become due. The message contains a safe order label, requested-date detail, and **Open in MGR**; when the work resolves, the existing message changes to **Resolved**. MGR never posts customer contacts, prices, or notes to Slack.
 

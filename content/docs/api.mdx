@@ -434,7 +434,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer
 
-Role-filtered work that is assigned, due, or overdue right now (submitted orders, picks due; more reasons as their pages ship)
+Role-filtered work that is assigned, due, or overdue right now (submitted orders, picks due, restocks due; more reasons as their pages ship)
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -473,7 +473,7 @@ Mute/unmute one notification reason for yourself and optionally override your qu
 
 | Field | Type | Required |
 | --- | --- | --- |
-| `reason` | submitted_order or pick_due or delivery_next or fermentation_reading_overdue or operations_digest | yes |
+| `reason` | submitted_order or pick_due or restock_due or delivery_next or fermentation_reading_overdue or operations_digest | yes |
 | `enabled` | boolean | yes |
 | `quietHours` | object or null | no |
 

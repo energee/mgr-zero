@@ -5,6 +5,7 @@
 // Target sizing under a coarse pointer lives in app/globals.css, so nothing
 // here sets heights. Screen authors use only these and never components/ui.
 import * as React from "react";
+import Link from "next/link";
 import { Children, Fragment, isValidElement, type ReactNode } from "react";
 import { Alert02Icon, ArrowLeft01Icon, InformationCircleIcon, SquareLock01Icon } from "@hugeicons/core-free-icons";
 import { DatePicker } from "@/components/mgr/date-picker";
@@ -129,15 +130,16 @@ export const E = {
       {foot ? <ItemFooter className="mt-3 flex-col items-stretch gap-2 border-t pt-3">{foot}</ItemFooter> : null}
     </Item>
   ),
-  /** Soft-filled workflow entry. Tone describes the action, independently of row status. */
-  act: (t: React.ReactNode, tone: "primary" | "success" | "attention" | "info" | "destructive" = "primary") => (
-    <Button variant="ghost" size="sm" data-row-action className={cn(
+  /** Soft-filled workflow entry. Tone describes the action, independently of row status.
+   *  `href` makes it a link on a live page; fixtures leave it out. */
+  act: (t: React.ReactNode, tone: "primary" | "success" | "attention" | "info" | "destructive" = "primary", href?: string) => (
+    <Button variant="ghost" size="sm" data-row-action asChild={Boolean(href)} className={cn(
       tone === "destructive" && "bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive",
       tone === "primary" && "bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary",
       tone === "success" && "bg-success text-success-foreground hover:bg-success/80 hover:text-success-foreground",
       tone === "attention" && "bg-attention text-attention-foreground hover:bg-attention/80 hover:text-attention-foreground",
       tone === "info" && "bg-info text-info-foreground hover:bg-info/80 hover:text-info-foreground",
-    )}>{t}</Button>
+    )}>{href ? <Link href={href}>{t}</Link> : t}</Button>
   ),
   /** A status word. Never clickable. */
   status: (t: React.ReactNode, tone: "ok" | "w" | "" = "") => (
@@ -150,12 +152,13 @@ export const E = {
   /** Fills the phone column; hugs the label from md up (`w-fit`, not `w-auto`:
    *  a column flex item with width:auto still stretches). Entry cards override
    *  back to full-width because they stay a phone-width column on the desk. */
-  btn: (t: React.ReactNode, k: BtnKind = "p") => {
+  btn: (t: React.ReactNode, k: BtnKind = "p", href?: string) => {
     const [kind, disabled] = k.split(" ") as [BtnBase, string?];
     return (
       <Button
         variant={kind === "g" ? "outline" : kind === "ghost" ? "ghost" : kind === "del" ? "destructive" : "default"}
         disabled={Boolean(disabled)}
+        asChild={Boolean(href) && !disabled}
         className={cn(
           "w-full md:w-fit",
           kind === "irr" && "bg-irreversible text-irreversible-foreground hover:bg-irreversible/90",
@@ -165,7 +168,7 @@ export const E = {
         )}
         {...(kind === "irr" ? { "data-variant": "irreversible" } : {})}
       >
-        {t}
+        {href && !disabled ? <Link href={href}>{t}</Link> : t}
       </Button>
     );
   },

@@ -40,7 +40,7 @@ const openPathFor = (n: PortableNotification) =>
   n.actions.find((a) => a.id === "open_mgr")?.url ?? `/orders/${n.subject.id}`;
 
 const REASON_LABEL: Record<PortableNotification["reason"], string> = {
-  submitted_order: "Review submitted order", pick_due: "Pick due", delivery_next: "Next stop",
+  submitted_order: "Review submitted order", pick_due: "Pick due", restock_due: "Put back staged beer", delivery_next: "Next stop",
   fermentation_reading_overdue: "Reading overdue", operations_digest: "Operations",
 };
 
