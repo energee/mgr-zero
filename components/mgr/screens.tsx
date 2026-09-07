@@ -2461,6 +2461,91 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 7,
+    slice: 3,
+    tab: "More",
+    name: "Mash schedule",
+    to: { Edit: "Mash step", "Add step": "Mash step", "Mash-in": "Mash step", Saccharification: "Mash step", "Mash-out": "Mash step" },
+    job: "Order the rests a brewer actually holds on the day",
+    reads: "get_recipe [design; the version’s mash schedule]",
+    writes: "create_recipe_version [design; the steps are written with their version, never alone; SCHEMA-GATE: recipe process spec]",
+    states: [["permission", "brewer or admin required", 1], ["draft", "steps add, reorder and delete"], ["frozen", "a cut version reads only · create the next version to change it", 1], ["empty", "no steps yet: Add step is the only action"]],
+    spec: "Its own screen because it repeats: add, reorder and delete are verbs a scalar field never needs, and inlining them on Recipe would give that page a second primary. A version is immutable, so this surface is an editor on a draft and a read-out once cut: one whole-screen mode rather than a toggle threaded through a long page. The footer names the conversion rest because Recipe no longer carries a mash temperature of its own; without it the number the prediction reads would have no visible home.",
+    body: (<>
+      {E.back("Recipe", "Hazy IPA v4 · Mash schedule", E.btn("Add step"))}
+      {E.row("Mash-in", "infusion · 104 °F · 15 min", E.act("Edit"))}
+      {E.row("Saccharification", "infusion · 152 °F · 60 min", E.act("Edit"))}
+      {E.row("Mash-out", "direct heat · 168 °F · 10 min", E.act("Edit"))}
+      {E.info("Total 85 min · the 152 °F rest feeds the prediction.")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 3,
+    tab: "More",
+    surface: "sheet",
+    name: "Mash step",
+    to: { "Save step": "Mash schedule", "Delete step": "Mash schedule" },
+    job: "One rest: what the brewer does, at what temperature, for how long",
+    reads: "get_recipe [design]",
+    writes: "create_recipe_version [design; SCHEMA-GATE: recipe process spec]",
+    states: [["permission", "brewer or admin required", 1], ["draft", "editable until the version is cut"], ["frozen", "a cut version reads only", 1]],
+    spec: "Type and name both stay: they look redundant until a recipe has two infusion steps, where the type says what the brewer does and the name says which one it is. Position comes from list order, never a typed number.",
+    body: (<>
+      {E.edit("Step name", "Saccharification")}
+      {E.pick("Type", "infusion", ["infusion", "decoction", "direct heat", "rest"])}
+      {E.cols(
+        E.edit("Temp °F", "152", "number"),
+        E.edit("Duration min", "60", "number"),
+      )}
+      {E.edit("Notes · optional", "")}
+      {E.btns([["Delete step", "g"], "Save step"])}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 3,
+    tab: "More",
+    name: "Fermentation schedule",
+    to: { Edit: "Fermentation stage", "Add stage": "Fermentation stage", Primary: "Fermentation stage", "Diacetyl rest": "Fermentation stage", "Cold crash": "Fermentation stage", Conditioning: "Fermentation stage" },
+    job: "State the temperatures and days a batch is meant to hold",
+    reads: "get_recipe [design; the version’s fermentation schedule]",
+    writes: "create_recipe_version [design; written with their version, never alone; SCHEMA-GATE: recipe process spec]",
+    states: [["permission", "brewer or admin required", 1], ["draft", "stages add, reorder and delete"], ["frozen", "a cut version reads only · create the next version to change it", 1], ["empty", "no stages yet: Add stage is the only action"]],
+    spec: "The same shape as Mash schedule and for the same reason. The footer places the dry hop because Recipe draws a dry hop on a day number, and a day number means nothing without this list: day 4 is the last day of Primary, which is why a brewer chose it. The separate fermentation-days and conditioning-days fields v1 kept beside this list are dropped, because the list sums to them and two sources for one number is the failure this design keeps removing.",
+    body: (<>
+      {E.back("Recipe", "Hazy IPA v4 · Fermentation", E.btn("Add stage"))}
+      {E.row("Primary", "68 °F · 4 days", E.act("Edit"))}
+      {E.row("Diacetyl rest", "72 °F · 2 days", E.act("Edit"))}
+      {E.row("Cold crash", "34 °F · 2 days", E.act("Edit"))}
+      {E.row("Conditioning", "34 °F · 10 days", E.act("Edit"))}
+      {E.info("Total 18 days · dry hop day 4 falls in Primary.")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 3,
+    tab: "More",
+    surface: "sheet",
+    name: "Fermentation stage",
+    to: { "Save stage": "Fermentation schedule", "Delete stage": "Fermentation schedule" },
+    job: "One stage: a temperature held for a number of days",
+    reads: "get_recipe [design]",
+    writes: "create_recipe_version [design; SCHEMA-GATE: recipe process spec]",
+    states: [["permission", "brewer or admin required", 1], ["draft", "editable until the version is cut"], ["frozen", "a cut version reads only", 1]],
+    spec: "Stage type and name both stay, as on Mash step: two custom stages need the type to say what happens and the name to say which one. Position comes from list order.",
+    body: (<>
+      {E.edit("Stage name", "Diacetyl rest")}
+      {E.pick("Stage", "diacetyl rest", ["primary", "secondary", "diacetyl rest", "cold crash", "conditioning", "lagering", "custom"])}
+      {E.cols(
+        E.edit("Temp °F", "72", "number"),
+        E.edit("Duration days", "2", "number"),
+      )}
+      {E.edit("Notes · optional", "")}
+      {E.btns([["Delete stage", "g"], "Save stage"])}
+    </>),
+  },
+  {
+    step: 7,
     slice: 6,
     tab: "More",
     name: "Compliance months",

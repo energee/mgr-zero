@@ -27,6 +27,27 @@ const body = (name: string) => {
 };
 
 describe("SCREENS", () => {
+  it("draws a mash schedule with its steps, total and conversion rest", () => {
+    const mash = SCREENS.find((s) => s.name === "Mash schedule")!;
+    const text = renderToStaticMarkup(createElement("div", null, mash.body))
+      .replace(/<[^>]*>/g, " ");
+    expect(text).toContain("Saccharification");
+    expect(text).toContain("152 °F");
+    expect(text).toContain("Total 85 min");
+    expect(text).toMatch(/feeds the prediction/);
+    expect(text).toContain("Add step");
+  });
+
+  it("draws a fermentation schedule that places the dry hop", () => {
+    const ferm = SCREENS.find((s) => s.name === "Fermentation schedule")!;
+    const text = renderToStaticMarkup(createElement("div", null, ferm.body))
+      .replace(/<[^>]*>/g, " ");
+    expect(text).toContain("Diacetyl rest");
+    expect(text).toContain("Total 18 days");
+    expect(text).toMatch(/dry hop day 4 falls in Primary/);
+    expect(text).toContain("Add stage");
+  });
+
   it("gives Search and Entity picker a labeled command input and grouped results", () => {
     for (const name of ["Search", "Entity picker"]) {
       expect(body(name)).toContain('cmdk-input=""');
@@ -70,7 +91,7 @@ describe("SCREENS", () => {
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands or leaves; the venue split is
     // derived rather than counted by hand in a comment that kept growing.
-    expect(SCREENS).toHaveLength(172);
+    expect(SCREENS).toHaveLength(176);
     expect(SCREENS.filter((s) => s.venue)).toHaveLength(17);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
