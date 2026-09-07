@@ -173,6 +173,7 @@ omitted. They have no roles until they are built.
 | `create_product` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `create_replenishment_order` | Taproom & kegs | ✓ | ✓ |  |  |  |
 | `create_sku` | Catalog & pricing | ✓ | ✓ |  |  |  |
+| `create_stock_transfer` |  | ✓ |  | ✓ |  |  |
 | `daily_pick_sheet` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `delete_bin` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `get_atp` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
@@ -199,6 +200,7 @@ omitted. They have no roles until they are built.
 | `list_products` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
 | `list_skus` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
 | `list_standing_allocations` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
+| `list_stock_transfers` |  | ✓ | ✓ | ✓ |  |  |
 | `list_team_members` | Team & brewery settings | ✓ | ✓ | ✓ |  |  |
 | `portal_catalog` | Customer portal |  |  |  |  | ✓ |
 | `portal_create_order` | Customer portal |  |  |  |  | ✓ |
@@ -210,6 +212,7 @@ omitted. They have no roles until they are built.
 | `portal_update_draft_order` | Customer portal |  |  |  |  | ✓ |
 | `record_movement` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `record_pick` | Orders & invoicing | ✓ |  | ✓ |  |  |
+| `record_stock_transfer_pick` | Orders & invoicing | ✓ |  | ✓ |  |  |
 | `release_allocation` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `replenishment_suggestions` | Taproom & kegs | ✓ | ✓ | ✓ |  |  |
 | `resolve_short_pick` | Orders & invoicing | ✓ |  | ✓ |  |  |
@@ -223,6 +226,7 @@ omitted. They have no roles until they are built.
 | `set_taproom_par` | Taproom & kegs | ✓ | ✓ |  |  |  |
 | `ship_order` | Orders & invoicing | ✓ |  | ✓ |  |  |
 | `submit_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
+| `submit_stock_transfer` |  | ✓ |  | ✓ |  |  |
 | `unlink_chat_user` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
 | `update_bin` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `update_draft_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
@@ -806,6 +810,24 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_pick", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "orderId": "00000000-0000-0000-0000-000000000000", "picks": [ { "lineId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
 ```
 
+#### record_stock_transfer_pick [#record_stock_transfer_pick]
+
+`command` · admin, warehouse
+
+Record picked quantities per transfer line; the transfer becomes picked
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `transferId` | uuid | yes |
+| `picks` | array of object | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_stock_transfer_pick", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "transferId": "00000000-0000-0000-0000-000000000000", "picks": [ { "lineId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
+```
+
 #### release_allocation [#release_allocation]
 
 `command` · admin, sales
@@ -927,7 +949,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* orders-designed */}
 
-19 of the 23 operations in this area are available today; the 4 below are not.
+20 of the 24 operations in this area are available today; the 4 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 

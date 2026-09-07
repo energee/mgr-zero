@@ -1,7 +1,7 @@
 // lib/commands/all.ts — imports all command definitions (side-effect: registers every command).
-// Tasks 9, 10 add imports here.
 import "./catalog";
 import "./inventory";
+import "./transfers";
 import "./import";
 import "./invites";
 import "./orders";

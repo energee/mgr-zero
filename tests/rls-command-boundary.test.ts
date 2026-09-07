@@ -256,6 +256,17 @@ describe("registered staff mutation role × RPC matrix", () => {
       },
     },
     {
+      command: "create_stock_transfer", rpc: "create_stock_transfer", allowed: ["admin", "warehouse"],
+      input: async () => {
+        const to = await seedLocation(brewery.id, { name: unique("matrix storage", "admin"), kind: "storage" });
+        return {
+          command: { fromLocationId: locationId, toLocationId: to.id, lines: [{ skuId, qty: 1, fromBinId: binId, toBinId: to.binId }] },
+          rpc: { p_brewery: brewery.id, p_from: locationId, p_to: to.id, p_requested: null, p_note: null,
+                 p_lines: [{ sku_id: skuId, qty: 1, from_bin_id: binId, to_bin_id: to.binId }] },
+        };
+      },
+    },
+    {
       command: "create_bin", rpc: "create_bin", allowed: ["admin", "warehouse"],
       input: async role => {
         const name = unique("matrix bin", role);

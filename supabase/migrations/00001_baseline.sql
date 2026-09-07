@@ -2808,6 +2808,83 @@ begin
   v_result := private.return_shipment_impl(p_invoice,p_lines,p_location,p_reason); return private.complete_command_request(p_request_id,v_result);
 end $$;
 
+-- ---------------------------------------------------------------- Stock transfers
+-- Internal moves of stuff between two locations (spec 2026-09-06 Decision 3).
+create function private.lock_transfer(p_transfer uuid, p_allowed public.stock_transfer_status[]) returns public.stock_transfers
+language plpgsql set search_path = '' as $$
+declare t public.stock_transfers;
+begin
+  select * into t from public.stock_transfers where id = p_transfer for update;
+  if not found then raise exception 'transfer not found'; end if;
+  if not (t.status = any(p_allowed)) then raise exception 'transfer is %', t.status; end if;
+  return t;
+end $$;
+
+create function private.create_stock_transfer_impl(
+  p_brewery uuid, p_from uuid, p_to uuid, p_requested date, p_note text, p_lines jsonb
+) returns jsonb language plpgsql set search_path = '' as $$
+declare v_id uuid; l record;
+begin
+  if p_from = p_to then raise exception 'same location: use move_stock_bin'; end if;
+  if p_lines is null or jsonb_array_length(p_lines) = 0 then raise exception 'a transfer needs at least one line'; end if;
+  insert into public.stock_transfers (brewery_id, from_location_id, to_location_id, requested_date, note, created_by)
+  values (p_brewery, p_from, p_to, p_requested, p_note, auth.uid()) returning id into v_id;
+  for l in select
+      (e->>'sku_id')::uuid as sku_id, (e->>'material_id')::uuid as material_id,
+      (e->>'keg_pool_id')::uuid as keg_pool_id, (e->>'keg_size')::public.keg_size as keg_size,
+      (e->>'qty')::numeric as qty, (e->>'from_bin_id')::uuid as from_bin, (e->>'to_bin_id')::uuid as to_bin, e->>'note' as note
+    from jsonb_array_elements(p_lines) e loop
+    insert into public.stock_transfer_lines (brewery_id, transfer_id, sku_id, material_id, keg_pool_id, keg_size, qty, from_bin_id, to_bin_id, note)
+    values (p_brewery, v_id, l.sku_id, l.material_id, l.keg_pool_id, l.keg_size, l.qty, l.from_bin, l.to_bin, l.note);
+  end loop;
+  return jsonb_build_object('transfer_id', v_id);
+end $$;
+
+create function create_stock_transfer(
+  p_brewery uuid, p_from uuid, p_to uuid, p_requested date, p_note text, p_lines jsonb, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_result jsonb;
+begin
+  perform private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'create_stock_transfer', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'from', p_from, 'to', p_to, 'requested', p_requested, 'note', p_note, 'lines', p_lines));
+  if v_replay is not null then return v_replay; end if;
+  v_result := private.create_stock_transfer_impl(p_brewery, p_from, p_to, p_requested, p_note, p_lines);
+  return private.complete_command_request(p_request_id, v_result);
+end $$;
+
+create function submit_stock_transfer(p_transfer uuid, p_request_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_brewery uuid; v_replay jsonb; t public.stock_transfers;
+begin
+  select brewery_id into v_brewery from public.stock_transfers where id = p_transfer;
+  if v_brewery is null then raise exception 'permission denied' using errcode = '42501'; end if;
+  perform private.assert_staff(v_brewery, array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(v_brewery, 'submit_stock_transfer', p_request_id, jsonb_build_object('transfer', p_transfer));
+  if v_replay is not null then return v_replay; end if;
+  t := private.lock_transfer(p_transfer, array['draft']::public.stock_transfer_status[]);
+  update public.stock_transfers set status = 'submitted' where id = p_transfer;
+  return private.complete_command_request(p_request_id, jsonb_build_object('transfer_id', p_transfer));
+end $$;
+
+create function record_stock_transfer_pick(p_transfer uuid, p_picks jsonb, p_request_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_brewery uuid; v_replay jsonb; t public.stock_transfers; pk record;
+begin
+  select brewery_id into v_brewery from public.stock_transfers where id = p_transfer;
+  if v_brewery is null then raise exception 'permission denied' using errcode = '42501'; end if;
+  perform private.assert_staff(v_brewery, array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(v_brewery, 'record_stock_transfer_pick', p_request_id, jsonb_build_object('transfer', p_transfer, 'picks', p_picks));
+  if v_replay is not null then return v_replay; end if;
+  t := private.lock_transfer(p_transfer, array['submitted','picked']::public.stock_transfer_status[]);
+  for pk in select (e->>'line_id')::uuid as line_id, (e->>'qty')::numeric as qty from jsonb_array_elements(p_picks) e loop
+    update public.stock_transfer_lines set qty_picked = pk.qty where id = pk.line_id and transfer_id = p_transfer;
+    if not found then raise exception 'transfer line % not found', pk.line_id; end if;
+  end loop;
+  update public.stock_transfers set status = 'picked' where id = p_transfer;
+  return private.complete_command_request(p_request_id, jsonb_build_object('transfer_id', p_transfer));
+end $$;
+
 -- Release one open reservation so its quantity returns to ATP (Pars and
 -- allocation screen). Only an open allocation can be released.
 create function release_allocation(p_allocation uuid,p_request_id uuid) returns jsonb
@@ -3986,6 +4063,9 @@ grant execute on function
   create_credit_memo(uuid,jsonb,uuid,text,uuid),
   return_shipment(uuid,jsonb,uuid,text,uuid),
   release_allocation(uuid,uuid),
+  create_stock_transfer(uuid,uuid,uuid,date,text,jsonb,uuid),
+  submit_stock_transfer(uuid,uuid),
+  record_stock_transfer_pick(uuid,jsonb,uuid),
   set_standing_allocation(uuid,uuid,numeric,uuid),
   create_replenishment_order(uuid,uuid,jsonb,uuid)
   to authenticated;
