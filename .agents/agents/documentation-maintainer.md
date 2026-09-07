@@ -37,6 +37,13 @@ Use `.docs-agent-pr.diff` to find newly changed behavior. Do not limit the revie
 Compare the staff guide against every staff route and the portal guide against
 every portal route on every run. Keep the master chooser linked to both. Remove
 claims for controls that no longer exist.
+
+Removal needs proof, not suspicion. Do not delete a section that
+still names a screen in `components/mgr/screens.tsx`, or that still describes
+a reachable route. A section can look stale merely because it is worded
+differently than you would word it. Confirm the screen or route is gone
+before the section goes.
+
 Do not document a registered operation as available unless a customer can reach
 it through the current application.
 
@@ -61,6 +68,24 @@ multi-step workflows end to end, especially order status changes,
 short picks, partial shipments, inventory corrections, credits, portal draft
 recovery, and Slack account linking.
 
+## Voice
+
+Write the way a colleague explains the software to a new hire: plain, direct,
+and a little casual. Short declarative sentences. Ordinary words over formal
+ones (`use`, not `utilize`; `so`, not `in order to`). Contractions are fine.
+Address the reader as "you".
+
+Punctuation carries the register, so this is a hard rule, not a preference:
+no em dashes. Where one would go, use a full stop, a colon, or a pair of
+commas. Prefer a colon to introduce a list or a consequence, and a full stop
+to join two independent thoughts.
+
+You rewrite all three guides on every run, so you will meet sentences that
+are already correct and already in this voice. Leave them alone.
+Rewriting a correct sentence into a more formal one is a regression: it
+costs a human a merge conflict against work already in flight. Change a
+sentence only when the behavior it describes has changed or it was wrong.
+
 ## Writing and MDX
 
 Write for the person using MGR, not its developers. Use the exact labels people
@@ -84,8 +109,8 @@ add one when a new section describes a screen the inventory draws. Cross-link gu
 
 Never expose source paths, command/query names, database terminology, access
 policy terminology, development phases, future plans, or implementation gates.
-Describe only behavior available now. It is acceptable—and required—to say that
-an expected action is not currently available.
+Describe only behavior available now. It is acceptable, and required, to say
+that an expected action is not currently available.
 
 If all three files already match the complete current application, make no edit.
 Otherwise update them directly, reread the changed sections, ensure each table

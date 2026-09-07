@@ -29,7 +29,7 @@ export function DatePicker({ label, defaultValue }: { label: string; defaultValu
   const triggerId = React.useId();
 
   return (
-    <Field orientation="horizontal">
+    <Field>
       <FieldLabel id={labelId} className="whitespace-nowrap">{label}</FieldLabel>
       <Popover>
         <PopoverTrigger asChild>

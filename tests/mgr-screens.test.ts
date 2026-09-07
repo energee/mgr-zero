@@ -27,6 +27,22 @@ const body = (name: string) => {
 };
 
 describe("SCREENS", () => {
+  it("gives Search and Entity picker a labeled command input and grouped results", () => {
+    for (const name of ["Search", "Entity picker"]) {
+      expect(body(name)).toContain('cmdk-input=""');
+      expect(body(name)).toContain('role="combobox"');
+      expect(body(name)).toContain('cmdk-list=""');
+      expect(body(name)).toContain('cmdk-group-heading=""');
+    }
+  });
+
+  it("keeps picker selection a return action and availability readable", () => {
+    expect(body("Entity picker").match(/data-to="←"/g)).toHaveLength(3);
+    expect(body("Entity picker")).toContain("6 short");
+    expect(body("Entity picker")).toContain("Recent");
+    expect(body("Entity picker")).toContain("All SKUs");
+  });
+
   it("ports the step-1 frames with names, jobs and IO", () => {
     const step1 = SCREENS.filter((s) => s.step === 1);
     expect(step1.map((s) => s.name)).toEqual([
@@ -54,7 +70,7 @@ describe("SCREENS", () => {
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands or leaves; the venue split is
     // derived rather than counted by hand in a comment that kept growing.
-    expect(SCREENS).toHaveLength(171);
+    expect(SCREENS).toHaveLength(172);
     expect(SCREENS.filter((s) => s.venue)).toHaveLength(17);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
@@ -119,7 +135,7 @@ describe("SCREENS", () => {
       const html = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === name)!.body));
       expect.soft(html, `${name}: inline save`).not.toMatch(/>Save[^<]*<\/button>/);
     }
-    const product = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Product")!.body));
+    const product = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Brand")!.body));
     expect(product).not.toContain("Save SKU");
   });
 
@@ -627,6 +643,29 @@ describe("SCREENS", () => {
     expect(firstRun).toMatch(/>Add location</);
   });
 
+  it("labels every field over its control and marks only nav and verb rows as taps", () => {
+    const r = (n: unknown) => renderToStaticMarkup(createElement("div", null, n as never));
+    // A blank input carries a real label; the example is the placeholder.
+    const inp = r(E.inp("Address", "114 Bridge St"));
+    expect(inp).toMatch(/<label[^>]*>Address<\/label>/);
+    expect(inp).toContain('placeholder="114 Bridge St"');
+    const search = r(E.search("Search customers"));
+    expect(search).toMatch(/type="search"/);
+    expect(search).not.toContain("<label");
+    // No field is drawn label-beside-control any more.
+    for (const s of SCREENS) expect.soft(body(s.name), s.name).not.toMatch(/data-slot="field"[^>]*data-orientation="horizontal"/);
+    // Grids: cols pairs from md up; inline sizes to its count at every width.
+    expect(r(E.cols(E.edit("A", "1"), E.edit("B", "2")))).toContain("md:grid-cols-2");
+    expect(r(E.inline(E.edit("A", "1"), E.edit("B", "2")))).toMatch(/class="[^"]*\bgrid-cols-2\b/);
+    expect(r(E.inline(E.edit("A", "1"), E.edit("B", "2"), E.edit("C", "3")))).toMatch(/class="[^"]*\bgrid-cols-3\b/);
+    // Rows declare a tap through their trailing slot: the chevron and a verb do, a switch or stepper does not.
+    expect(r(E.nav("Open me"))).toMatch(/data-tap="/);
+    expect(r(E.row("Verb", "", E.act("Review")))).toMatch(/data-tap="/);
+    expect(r(E.row("Switch", "", E.sw(true, "On")))).not.toMatch(/data-tap="/);
+    expect(r(E.row("Stepper", "", E.stq(3)))).not.toMatch(/data-tap="/);
+    expect(r(E.gated("Later"))).toContain("data-gated");
+  });
+
   it("uses the control that does the job on view switchers and roles (#99)", () => {
     // Issue 99: filter chips were standing in for view switchers, a
     // one-option chip group, a link and a role editor.
@@ -643,16 +682,19 @@ describe("SCREENS", () => {
     const move = html("Record movement");
     expect(move).toContain("md:hidden");
     expect(move).toContain("hidden md:block");
-    // Team: no selection-less bulk remove; the role Select lives on the
-    // Team member sheet since #72 split editors out of list pages.
+    // Team: no selection-less bulk remove; the role editor lives on the
+    // Team member sheet since #72 split editors out of list pages. Roles are
+    // a set (2026-09-07: roles staff_role[]), so it is one switch per role.
     expect(html("Team")).not.toMatch(/Remove selected member/);
-    expect(html("Team member")).toContain("data-slot=\"select-trigger\"");
+    const member = html("Team member");
+    expect(member).not.toContain("data-slot=\"select-trigger\"");
+    expect(member.match(/role="switch"/g)?.length).toBe(5);
     // Sign in: a link, not a card row.
     expect(html("Sign in")).toMatch(/<a [^>]*>Forgot password\?<\/a>/);
     // Product: no one-option chip group.
-    const product = SCREENS.find((s) => s.name === "Product")!;
-    expect(renderToStaticMarkup(createElement("div", null, product.body))).not.toContain("tax class");
-    expect(JSON.stringify(product.states)).toMatch(/tax class/);
+    const brand = SCREENS.find((s) => s.name === "Brand")!;
+    expect(body("Brand")).not.toContain("tax class");
+    expect(JSON.stringify(brand.states)).toMatch(/tax class/);
     // Every date field is the calendar picker; no screen falls back to the OS date input.
     for (const name of ["New order", "Schedule batch", "Schedule packaging run", "Receive PO"]) {
       expect(html(name), name).toContain('data-slot="popover-trigger"');
@@ -673,7 +715,7 @@ describe("SCREENS", () => {
     // row act can still open the next screen.
     const named = [
       "Today", "Taproom", "Order", "Cellar map", "Tap board", "Swap keg",
-      "Weekly count", "Brew day", "Route", "Settings", "Product", "Vendors",
+      "Weekly count", "Brew day", "Route", "Settings", "Brand", "Vendors",
       "POS mapping", "Planning", "Schedule batch", "Vessel detail", "Kick keg", "Return route",
     ];
     const filled = (html: string) =>

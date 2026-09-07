@@ -4,13 +4,18 @@
 
 # API operations backlog
 
-98 operations the screens declare they need that the command registry does not yet answer, against 65 that it does.
+99 operations the screens declare they need that the command registry does not yet answer, against 65 that it does.
 
 This is the backend push, scoped. Each row names the operation a screen asked for and the screens waiting on it, so an area can be built and shipped whole rather than a command at a time. `/docs/api` publishes the same list per area, marked designed, so an integrator sees the roadmap without being told a date.
 
 Nothing here is a schema decision. An operation appears because a screen named it in its `reads` or `writes`; what it takes and returns is settled when it is built.
 
-## Compliance — 9 to build, 0 built
+## Customer portal: 1 to build, 9 built
+
+| Operation | Kind | Needed by |
+| --- | --- | --- |
+| `portal_schedule` | query | Coming up |
+## Compliance: 9 to build, 0 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
@@ -23,7 +28,7 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `upsert_brand_approval` | command | Compliance registry, Brand approval |
 | `upsert_brewery_state_license` | command | Compliance registry, License |
 | `upsert_state_registration` | command | Compliance registry, State registration |
-## Purchasing & materials — 14 to build, 0 built
+## Purchasing & materials: 14 to build, 0 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
@@ -41,7 +46,7 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `upsert_material` | command | Material |
 | `upsert_material_contract` | command | Contract |
 | `upsert_vendor` | command | Vendor |
-## Production — 16 to build, 0 built
+## Production: 16 to build, 0 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
@@ -61,7 +66,7 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `record_fermentation_reading` | command | Fermentation reading, Fermentation reading form |
 | `schedule_batch` | command | Schedule batch |
 | `upsert_vessel` | command | Cellar map, Vessel detail |
-## Catalog & pricing — 11 to build, 7 built
+## Catalog & pricing: 11 to build, 7 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
@@ -69,14 +74,14 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `delete_sale_channel` | command | Sale channels, Channel |
 | `get_price_list` | query | Price tiers, Override |
 | `get_sku` | query | SKU |
-| `list_brands` | query | Catalog, Product, Schedule batch |
+| `list_brands` | query | Catalog, Brand, Schedule batch |
 | `list_sale_channels` | query | Square locations, Sale channels, Channel |
 | `set_price_list_format` | command | Price tiers |
 | `set_price_list_item` | command | Catalog, Price tiers, Override |
-| `update_sku` | command | Catalog, Product, SKU |
-| `upsert_brand` | command | Catalog, Product |
+| `update_sku` | command | Catalog, Brand, SKU |
+| `upsert_brand` | command | Catalog, Brand |
 | `upsert_sale_channel` | command | Sale channels, Channel |
-## Packaging — 12 to build, 0 built
+## Packaging: 12 to build, 0 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
@@ -92,7 +97,7 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `schedule_packaging_run` | command | Close packaging run, Schedule packaging run |
 | `update_packaging_run` | command | Schedule packaging run |
 | `upsert_format` | command | Formats, Format |
-## Taproom & kegs — 10 to build, 3 built
+## Taproom & kegs: 10 to build, 3 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
@@ -106,7 +111,7 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `swap_keg` | command | Tap board, Swap keg |
 | `tap_keg` | command | Tap board |
 | `update_keg_pool` | command | Keg fleet |
-## Delivery & routes — 4 to build, 3 built
+## Delivery & routes: 4 to build, 3 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
@@ -114,7 +119,7 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `list_routes` | query | Routes |
 | `return_route` | command | Route, Return route, Driver route |
 | `save_route` | command | Route |
-## Orders & invoicing — 4 to build, 19 built
+## Orders & invoicing: 4 to build, 19 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
@@ -122,7 +127,7 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `raise_invoice_question` | command | Question invoice |
 | `resolve_invoice_question` | command | Invoice |
 | `write_off_invoice` | command | Invoices |
-## Inventory & locations — 6 to build, 7 built
+## Inventory & locations: 6 to build, 7 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
@@ -132,7 +137,7 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `list_bins` | query | Location bins |
 | `reverse_inventory_movement` | command | SKU detail |
 | `update_bin` | command | Location bins, Bin |
-## Team & brewery settings — 6 to build, 4 built
+## Team & brewery settings: 6 to build, 4 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
@@ -141,8 +146,8 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `revoke_staff` | command | Team, Team member |
 | `set_brewery_operating_defaults` | command | Chat settings |
 | `update_brewery` | command | Settings |
-| `update_staff_role` | command | Team, Team member |
-## Today & notifications — 6 to build, 7 built
+| `update_staff_roles` | command | Team, Team member |
+## Today & notifications: 6 to build, 7 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |

@@ -1,25 +1,23 @@
 ---
 icon: explore
 title: "Screen explorer"
-description: "Walk MGR: filter every screen by name, area and surface, open one in its real shell, and tap through to the next. The same inventory as the screen inventory page, for browsing rather than reading."
+description: "Walk MGR: filter every screen by name, area, and surface, open one in its real shell, and tap through to the next."
 ---
 
-Find a screen by name, or by a word in what it does, its spec or its states,
-narrow by area or surface, and open it in the real shell. Taps inside the
-screen walk to the next one: a row opens its detail, a verb opens the sheet it
-names, the Work chips open their own lists, a tab that names a screen opens
-it and any other tab filters the rows under it, and the rail switches areas.
-A verb with nowhere to go still acts: an add-a-line button adds an unsaved
-line, and a commit verb closes its sheet or returns along the trail, flashing
-done when there is nowhere to return. The trail above the frame shows the walk and
-its Back button retraces it, as the browser's back button does. The persona
-menu signs you in as a demo person for each role: the header and Me sheet show
-them, the rail and the More entries filter to their role, Today becomes their
-landing, and a screen their role may not open lands on No access, including
-the one on view when you switch. The Phone toggle shows the selected screen at
-phone width; that preview draws the default person and its taps do not walk.
-Every link on this page reopens the same screen, persona and filters. Under
-each frame, "In the inventory" jumps to the same screen on the
-[screen inventory](/docs/screens) page and "Frame alone" opens it by itself.
+Find a screen by name, or by a word in what it does, its spec, or its states. Narrow by area or surface, then open it in the real shell.
+
+Taps inside the screen walk to the next one: a row opens its detail, a verb opens the sheet it names, the Work chips open their own lists, a tab that names a screen opens it, and any other tab filters the rows under it. The rail switches areas.
+
+A verb with nowhere to go still acts. An add-a-line button adds an unsaved line. A commit verb closes its sheet or returns along the trail, flashing done when there is nowhere to return.
+
+The trail above the frame shows the walk. Its Back button retraces it, same as the browser's back button.
+
+The persona menu signs you in as a demo person for each role. The header and Me sheet show them. The rail and the More entries filter to their role. Today becomes their landing. A screen their role may not open lands on No access, including the one in view when you switch.
+
+The Phone toggle shows the selected screen at phone width. That preview draws the default person, and its taps do not walk.
+
+Row actions in these frames carry a soft color fill: purple for general work such as Edit and Finish, green for Confirm, orange for corrective work such as Put back and Assign, cyan for operational work such as Pick, Count, and Resume, and pink for destructive workflows such as Disconnect. Selecting a row action opens the workflow. It does not itself commit the change.
+
+Every link on this page reopens the same screen, persona, and filters. Under each frame, **In the inventory** jumps to the same screen on the [screen inventory](/docs/screens) page, and **Frame alone** opens it by itself.
 
 <ScreenExplorer />

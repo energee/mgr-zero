@@ -11,7 +11,7 @@ export const IMPORT_ROW_CAP = 5000;
 
 defineCommand({
   name: "import_csv",
-  description: "Bulk CSV import — not available in this release",
+  description: "Bulk CSV import (not available in this release)",
   input: z.object({
     kind: z.enum(["customers", "ship_tos", "products_skus", "price_list_items", "opening_balances"]),
     rows: z.array(z.record(z.string(), z.string())).max(IMPORT_ROW_CAP, `at most ${IMPORT_ROW_CAP} rows per import batch`),

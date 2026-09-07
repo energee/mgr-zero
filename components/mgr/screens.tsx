@@ -20,7 +20,7 @@
 // oz, bbl); an option that is a phrase rather than a term takes sentence case
 // (Empty, About ¼ left, Customer remits). A lowercase list here is the rule,
 // not an oversight.
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-icons";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
@@ -29,6 +29,15 @@ import { formatVolume } from "@/lib/volume";
 import {
   BeerIcon, DeliveryTruck01Icon, Package01Icon, Route01Icon, Tag01Icon, TaskDone01Icon, ThermometerIcon, WifiDisconnected01Icon,
 } from "@hugeicons/core-free-icons";
+
+/** Every staff role with what it opens; Team member draws one switch each. */
+const ROLES: [string, string, boolean][] = [
+  ["Admin", "everything, including team and settings", false],
+  ["Sales", "orders, customers, price lists", true],
+  ["Warehouse", "pick, receive, count, transfer", false],
+  ["Brewer", "batches, cellar, packaging", true],
+  ["Taproom", "taps, pours, menu", false],
+];
 
 export const PORTAL_BUYER = { name: "Jordan Lee", account: "Ridgeline Tap Room", email: "jordan@ridgelinetap.com" };
 
@@ -287,13 +296,13 @@ export const SCREENS: Screen[] = [
     step: 1, slice: "all", group: "Global", surface: "sheet", name: "Search", job: "Search every permitted entity kind",
     reads: "search_entities [design]", writes: "none",
     states: [["empty", "No matches · change the term"], ["loading", "row-shaped skeletons"], ["offline", "cached matches only", 1], ["permission", "Results honor row access"], ["document number", "ORD-0231 matches exactly and sorts first"]],
-    spec: "One registered search across the entity kinds the caller's role can read; the chips narrow what is already permitted and never widen it, and RLS decides the rows either way, so a term matching a customer the caller cannot see returns nothing rather than a redacted row. A document number (ORD-0231, INV-1042, L-240831-HZ) matches exactly and sorts above name matches, because someone typing one is holding it in their hand; names match on prefix. This is also where history lives: a run closed months ago leaves the Work list and is found here.",
+    spec: "One registered search across the entity kinds the caller's role can read; results are grouped by kind and arrow keys move between matches; filtering never widens what is permitted, and RLS decides the rows either way, so a term matching a customer the caller cannot see returns nothing rather than a redacted row. A document number (ORD-0231, INV-1042, L-240831-HZ) matches exactly and sorts above name matches, because someone typing one is holding it in their hand; names match on prefix. This is also where history lives: a run closed months ago leaves the Work list and is found here.",
     body: (<>
-      {E.inp("Search")}
-      {E.chips(["all", "SKU", "order", "lot"], 0)}
-      {E.nav("Hazy IPA · ½ bbl", "SKU · ATP 11", "", BeerIcon)}
-      {E.nav("ORD-0231 · Ridgeline", "order · 4 × Hazy", "", Package01Icon)}
-      {E.nav("L-240831-HZ", "lot · packaged 8/31", "", TaskDone01Icon)}
+      {E.palette("Search", [
+        { heading: "SKUs", items: [["Hazy IPA · ½ bbl", "ATP 11"]] },
+        { heading: "Orders", items: [["ORD-0231 · Ridgeline", "4 × Hazy"]] },
+        { heading: "Lots", items: [["L-240831-HZ", "packaged 8/31"]] },
+      ])}
     </>),
   },
   {
@@ -463,8 +472,8 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.sp()}
       {E.ttl("Sign in")}
-      {E.inp("email")}
-      {E.inp("password")}
+      {E.inp("Email")}
+      {E.inp("Password")}
       {E.btn("Sign in")}
       {E.btn("Email me a link", "g")}
       {E.link("Forgot password?", "Reset password")}
@@ -507,7 +516,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.sp()}
       {E.ttl("Reset password")}
-      {E.inp("email")}
+      {E.inp("Email")}
       {E.btn("Send reset link")}
       {E.sp()}
     </>),
@@ -549,8 +558,8 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.sp()}
       {E.ttl("Sign in to your account")}
-      {E.inp("email")}
-      {E.inp("password")}
+      {E.inp("Email")}
+      {E.inp("Password")}
       {E.btn("Sign in")}
       {E.link("Forgot password?", "Portal forgot password")}
       {E.sp()}
@@ -572,7 +581,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.sp()}
       {E.ttl("Reset password")}
-      {E.inp("email")}
+      {E.inp("Email")}
       {E.btn("Send reset link")}
       {E.info("If that email is on an account, a reset link is on its way.")}
       {E.sp()}
@@ -607,13 +616,13 @@ export const SCREENS: Screen[] = [
     name: "Team",
     job: "Roster, roles, pending invites and revocation",
     reads: "list_team_members",
-    writes: "update_staff_role [design; single row] · revoke_staff [design; single membership row ends] · invite_staff [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI] · the taproom role [SCHEMA-GATE: revision 2 §16.13/§16.16 q3: staff_role gains taproom, but P-staff is role-agnostic, so the narrow per-role policies are undesigned]",
+    writes: "update_staff_roles [design; single row, roles array] · revoke_staff [design; single membership row ends] · invite_staff [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI] · the taproom role [SCHEMA-GATE: revision 2 §16.13/§16.16 q3: staff_role gains taproom, but P-staff is role-agnostic, so the narrow per-role policies are undesigned]",
     states: [["last admin", "role change refused · keep one admin", 1], ["pending", "invite sent · not yet accepted"], ["permission", "admin only", 1]],
     spec: "A person shows as @handle, the local part of their email; it is derived, not a stored column. A pending invite has no account yet, so it shows the full address it was sent to. From Settings. A member row opens the Team member sheet, where the role changes in one write and Remove ends the membership (Auth user untouched; re-invite is the compensation). The invite stays disabled with the same human copy as first run until its gate closes.",
     body: (<>
       {E.back("Settings", "Team")}
       {E.row("Maria Alvarez", "@maria · admin", "you", "", E.face())}
-      {E.nav("Dave Chen", "@dave · brewer", "", E.face({ src: "/mock/dave.jpg" }))}
+      {E.nav("Dave Chen", "@dave · brewer · sales", "", E.face({ src: "/mock/dave.jpg" }))}
       {E.nav("Ted", "@ted · sales", "", E.face({ src: "/mock/ted.jpg" }))}
       {E.nav("Sam Ortiz", "@sam · warehouse", "", E.face({ src: "/mock/sam.jpg" }))}
       {E.row("wes@demobrewing.com", "invited Tue · pending", "", "w", E.face({ name: "wes@demobrewing.com" }))}
@@ -626,16 +635,17 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "Team member",
-    to: { "Save role": "Team", "Remove Dave": "Team" },
-    job: "Change one member's role or remove that membership",
+    to: { "Save roles": "Team", "Remove Dave": "Team" },
+    job: "Change one member's roles or remove that membership",
     reads: "list_team_members",
-    writes: "update_staff_role · revoke_staff [design]",
-    states: [["permission", "admin only", 1], ["member", "role can change"], ["last admin", "remove and role change refused", 1], ["self", "remove refused", 1]],
-    spec: "The destructive action belongs to the named member, so there is no ambiguous selected-member state. Drawn for another member, never the signed-in one: opening your own row is the self state, where Remove is refused.",
+    writes: "update_staff_roles · revoke_staff [design; SCHEMA-GATE: roles is an array on the membership row]",
+    states: [["permission", "admin only", 1], ["member", "any set of roles; at least one"], ["no role", "Save refused until one is on", 1], ["last admin", "remove and turning off Admin refused", 1], ["self", "remove refused", 1]],
+    spec: "A member holds a set of roles, not one: a person who sells and brews is both, and sees the union of each role's navigation and actions. Every role is a switch; at least one must stay on. The destructive action belongs to the named member, so there is no ambiguous selected-member state. Drawn for another member, never the signed-in one: opening your own row is the self state, where Remove is refused.",
     body: (<>
       {E.row("Dave Chen", "dave@demobrewing.com", "", "", E.face({ className: "size-10", src: "/mock/dave.jpg" }))}
-      {E.pick("Role", "Brewer", ["Admin", "Sales", "Warehouse", "Brewer", "Taproom"])}
-      {E.btn("Save role")}
+      {E.ttl("Roles")}
+      {ROLES.map(([name, does, on]) => <Fragment key={name}>{E.row(name, does, E.sw(on, name))}</Fragment>)}
+      {E.btn("Save roles")}
       {E.note("Removing Dave ends this brewery membership. Their sign-in account remains.")}
       {E.btn("Remove Dave", "del")}
     </>),
@@ -666,7 +676,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Today",
     name: "First-run checklist",
-    to: { "Add location": "First-run checklist", "2 \u00b7 Import CSV": "Import", "3 \u00b7 Add a brand": "Product", Add: "Product", "5 \u00b7 Opening inventory": "Record movement" },
+    to: { "Add location": "First-run checklist", "2 \u00b7 Import CSV": "Import", "3 \u00b7 Add a brand": "Brand", Add: "Brand", "5 \u00b7 Opening inventory": "Record movement" },
     job: "Turn an empty brewery into usable truth",
     reads: "get_first_run_state [view]",
     writes: "create_location · invite_staff [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI]",
@@ -798,13 +808,13 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     spec: "48px rows; visible keyboard focus; one registered search behind the field.",
     body: (<>
-      {E.inp("Search")}
-      {E.ttl("Recent")}
-      {E.row("Hazy IPA · ½ bbl keg", "11 ready")}
-      {E.row("Pils · 16 oz case", "6 short", "", "w")}
-      {E.row("Stout · ⅙ bbl keg", "7 ready")}
-      {E.ttl("All SKUs")}
-      {E.blank("A–Z")}
+      {E.palette("Search SKUs", [
+        { heading: "Recent", items: [["Hazy IPA · ½ bbl keg", "11 ready", "←"]] },
+        { heading: "All SKUs", items: [
+          ["Pils · 16 oz case", "6 short", "←"],
+          ["Stout · ⅙ bbl keg", "7 ready", "←"],
+        ] },
+      ])}
     </>),
   },
   {
@@ -1048,7 +1058,7 @@ export const SCREENS: Screen[] = [
       {E.row("Pils · 16 oz case", "ordered 10 · picked 10", E.stq(9), "w")}
       {E.nav("Reason", "required", "w")}
       {E.info("Shipping 9 of 10 Pils: the remaining 1 is cancelled and its allocation released. There is no backorder.")}
-      {E.inp("Carrier · tracking · optional")}
+      {E.inp("Carrier", "tracking · optional")}
       {E.chips(["Invoice now", "On delivery"], 0)}
       {E.tape([["−4 Hazy ½ bbl · sale removal · PA", "2.00 bbl"], ["−9 Pils cases · sale removal · PA", "0.87 bbl"], ["1 Pils case released · restock", ""], ["invoice number", "assigned on commit"]])}
       {E.sp()}
@@ -1242,11 +1252,13 @@ export const SCREENS: Screen[] = [
     spec: "Source is required and becomes the order's from-location; the app never guesses “Warehouse.” Save draft lands on the Order screen, where Submit lives.",
     body: (<>
       {E.back("Orders", "New order")}
-      {E.pick("Customer", "Ridgeline Tap Room", ["Ridgeline Tap Room", "Al’s Bar", "Teresa’s"])}
-      {E.pick("Source location", "Warehouse", ["Warehouse", "Taproom"])}
-      {E.pick("Ship-to", "Main · Phoenixville, PA", ["Main · Phoenixville, PA", "Dock"])}
+      {E.cols(
+        E.pick("Customer", "Ridgeline Tap Room", ["Ridgeline Tap Room", "Al’s Bar", "Teresa’s"]),
+        E.pick("Ship-to", "Main · Phoenixville, PA", ["Main · Phoenixville, PA", "Dock"]),
+        E.pick("Source location", "Warehouse", ["Warehouse", "Taproom"]),
+        E.edit("Requested ship", "2026-09-03", "date"),
+      )}
       {E.edit("Customer PO", "4471")}
-      {E.edit("Requested ship", "2026-09-03", "date")}
       {E.row("Hazy IPA · ½ bbl keg", "ATP 11 at Warehouse", E.stq(4))}
       {E.row("Pils · 16 oz case", "ATP −6 at Warehouse", E.stq(10), "w")}
       {E.btn("Add line", "g")}
@@ -1267,7 +1279,7 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     body: (<>
       {E.back("More", "Customers", E.btn("Add customer"))}
-      {E.inp("Search customers")}
+      {E.search("Search customers")}
       {E.row("Ridgeline Tap Room", "retailer · PA · 2 portal users", E.act("Open"))}
       {E.row("Al’s Bar", "retailer · OH · brewery remits", E.act("Open"), "w")}
     </>),
@@ -1328,11 +1340,11 @@ export const SCREENS: Screen[] = [
     spec: "Editing an address never rewrites the destination recorded on an existing order.",
     body: (<>
       {E.ttl("Main ship-to")}
-      {E.inp("Label · Main")}
-      {E.inp("Address · 114 Bridge St")}
-      {E.inp("City · Phoenixville")}
-      {E.inp("State · PA")}
-      {E.inp("Postal code · 19460")}
+      {E.inp("Label", "Main")}
+      {E.inp("Address", "114 Bridge St")}
+      {E.inp("City", "Phoenixville")}
+      {E.inp("State", "PA")}
+      {E.inp("Postal code", "19460")}
       {E.row("Default ship-to", "selected first on new orders", E.sw(true, "Default ship-to"), "ok")}
       {E.btn("Save ship-to")}
     </>),
@@ -1488,7 +1500,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Catalog",
-    to: { "Hazy IPA": "Product", Pils: "Product", Stout: "Product" },
+    to: { "Hazy IPA": "Brand", Pils: "Brand", Stout: "Brand" },
     job: "Define brands, their sellable formats and prices without ledger writes",
     reads: "list_brands · list_skus",
     writes: "upsert_brand · create_sku · update_sku · upsert_price_list · set_price_list_item [existing/design]",
@@ -1525,17 +1537,24 @@ export const SCREENS: Screen[] = [
     step: 5,
     slice: 1,
     tab: "More",
-    name: "Product",
+    name: "Brand",
     job: "Sellable facts without ledger writes, including the TTB fields",
     reads: "list_brands · list_skus",
     writes: "upsert_brand* · create_sku* · update_sku [design]",
-    states: [["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class"], ["new SKU", "choose one existing Format"], ["inactive SKU", "hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"]],
-    spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Package facts live on Formats, while the SKU is the stable brand × format identity used by inventory, orders, pricing and provider mappings. No UPC scan or container source editor here.",
+    states: [["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class; description, category, price group and hops optional"], ["new style", "typing a style no one has used offers Add; saved with the brand", 0], ["new SKU", "choose one existing Format; a poured format (pint, taster) is a SKU that holds no stock"], ["inactive SKU", "hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"]],
+    spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table [SCHEMA-GATE: a per-brewery styles table that the brand references]; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category, price group and hops are optional [SCHEMA-GATE: nullable columns on the brand; price group is a label the price tier prices by format, not a price on the brand (§16.4)]. Package facts live on Formats, while the SKU is the stable brand × format identity used by inventory, orders, pricing and provider mappings; draft pours are SKUs on a poured format (§16.2). No UPC scan or container source editor here.",
     body: (<>
       {E.back("Catalog", "Hazy IPA")}
       {E.edit("Brand name", "Hazy IPA")}
-      {E.edit("Style", "IPA")}
-      {E.edit("ABV", "6.8")}
+      {E.cols(
+        E.pick("Style", "Hazy IPA", ["Hazy IPA", "IPA", "Pils", "Add “Cold IPA”"]),
+        E.edit("ABV", "6.8"),
+        E.pick("Category", "Core", ["Core", "Seasonal", "One-off", "Barrel-aged"]),
+        E.pick("Price group", "Standard", ["Standard", "Specialty", "Barrel-aged"]),
+      )}
+      {E.ttl("Sell sheet")}
+      {E.edit("Description", "Juicy, soft, Citra-forward")}
+      {E.edit("Hops", "Citra, Mosaic")}
       {E.btn("Save brand")}
       {E.nav("SKU list", "3 active packages")}
     </>),
@@ -1569,9 +1588,9 @@ export const SCREENS: Screen[] = [
     reads: "list_skus",
     writes: "none [creation and editing happen on SKU detail]",
     states: [["permission", "sales or admin required", 1], ["active", "available to price and sell"], ["inactive", "history remains", 1], ["empty", "Add SKU is the only action"]],
-    spec: "Product links here instead of showing an arbitrary one of three SKUs inline.",
+    spec: "Brand links here instead of showing an arbitrary one of three SKUs inline.",
     body: (<>
-      {E.back("Product", "Hazy IPA · SKUs", E.btn("Add SKU"))}
+      {E.back("Brand", "Hazy IPA · SKUs", E.btn("Add SKU"))}
       {E.row("½ bbl keg", `${formatVolume("0.50000000")} · active`, E.act("Edit"))}
       {E.row("⅙ bbl keg", `${formatVolume("0.16666667")} · active`, E.act("Edit"))}
       {E.row("case · 24×16 oz", `${formatVolume("0.09677419")} · active`, E.act("Edit"))}
@@ -1582,10 +1601,10 @@ export const SCREENS: Screen[] = [
     slice: 1,
     portal: "Order",
     name: "Shop",
-    to: { Change: "Account", "½ bbl keg": "Shop", "⅙ bbl keg": "Shop", "case · 24×16 oz": "Shop", "12 oz bottle": "Shop" },
+    to: { Change: "Account", "½ bbl keg": "Shop", "⅙ bbl keg": "Shop", "case · 24×16 oz": "Shop", "12 oz bottle": "Shop", "Coming up": "Coming up" },
     job: "A buyer catalog: listed packages by brand, quantity, Place order",
     reads: "portal_catalog [SCHEMA/RLS-GATE: return customer-allowed fulfillment source and filter to packages the brewery has listed for wholesale]",
-    writes: "submit_order [SCHEMA/RLS-GATE: validate allowed from_location_id; one RPC: order + lines + submitted status]",
+    writes: "portal_create_order · portal_submit_order",
     states: [["empty catalog", "call brewery; nothing orderable"], ["missing price", "item cannot enter cart", 1], ["no ship-to", "contact brewery; choose an existing ship-to", 1], ["unlisted package", "a format not on the wholesale list is absent", 1], ["receipt", "ORD number after commit"]],
     spec: "Grouped by brand; each row is a package the brewery listed for wholesale (½ keg, ⅙ keg, case, bottle). The list is the offer, not warehouse ATP: no in/low/out badges, no counts. Unlisted packages are absent, not greyed. Schedule packaging run is where staff designate the list. Review stays disabled until the schema/RLS contract supplies and validates a customer-allowed source; it never silently chooses Warehouse. Stepper − and + each ship as 48×48 targets. No staff vocabulary (ATP, gates, fulfillment engineering) anywhere in the portal. No persistent cart: leaving the page keeps nothing. Reorder on a shipped order still prefills Review.",
     body: (<>
@@ -1598,6 +1617,7 @@ export const SCREENS: Screen[] = [
       {E.row("12 oz bottle", "$18.00", E.stq(0))}
       {E.ttl("Stout")}
       {E.row("⅙ bbl keg", "$62.00", E.stq(0))}
+      {E.nav("Coming up", "what’s brewing next")}
       {E.row("Ships from", "Warehouse")}
       {E.row("Ship-to · requested date", "Main · Wed 9/9", E.act("Change"))}
       {E.sp()}
@@ -1610,12 +1630,31 @@ export const SCREENS: Screen[] = [
     step: 6,
     slice: 1,
     portal: "Order",
+    name: "Coming up",
+    to: { "Hazy IPA": "Shop", "Pils": "Shop", "Saison": "Shop" },
+    job: "See what the brewery plans to brew next and jump to that brand on Shop",
+    reads: "portal_schedule [SCHEMA/RLS-GATE: view over planned batches exposing brand + planned week only; no customer policy on batches]",
+    writes: "none",
+    states: [["nothing planned", "check back; the brewery has not scheduled a batch"], ["brand not listed", "row shows the brand with no package to order; ask the brewery", 1]],
+    spec: "Planned batches (not yet brewed) as one row per brand and expected week, soonest first. A brand row opens Shop scrolled to that brand; a brand with nothing listed for wholesale still appears so the buyer can ask. Nothing else about the batch is shown: no volume, recipe, tank, lot, or exact day. Reached from Shop; not a nav tab.",
+    body: (<>
+      {E.hd("Coming up", "Ridgeline")}
+      {E.nav("Hazy IPA", "week of Sep 14")}
+      {E.nav("Pils", "week of Sep 21")}
+      {E.nav("Saison", "week of Oct 5 · not yet listed", "w")}
+      {E.info("Dates are the brewery’s plan and can move. Ask Demo Brewing to be notified when a batch is packaged.")}
+    </>),
+  },
+  {
+    step: 6,
+    slice: 1,
+    portal: "Order",
     surface: "sheet",
     name: "Review order",
     to: { "Hazy IPA · ½ bbl keg": "Review order", "Pils · 16 oz case": "Review order" },
     job: "Confirm quantities, ship-to and fulfillment line, then place the order",
     reads: "portal_catalog [SCHEMA/RLS-GATE: return customer-allowed fulfillment source and filter to packages the brewery has listed for wholesale]",
-    writes: "submit_order [SCHEMA/RLS-GATE: validate allowed from_location_id; one RPC: order + lines + submitted status]",
+    writes: "portal_create_order · portal_submit_order",
     states: [["price changed", "revalidated price shown before Place order", 1], ["inactive SKU", "line removed · told plainly", 1], ["submit error", "keep quantities · Retry safe", 1], ["duplicate", "same request returns the same ORD number"]],
     spec: "The confirm step for the shop steppers and for Reorder from a shipped order. Buyer copy only: price, package, quantity, “Ships from Warehouse”, Place order. No ATP, no gate names. Place order stays disabled until the source contract exists. After submit the portal is read-only; changes go through the brewery.",
     body: (<>
@@ -1870,7 +1909,7 @@ export const SCREENS: Screen[] = [
       {E.qty("", "prior 4.21", "pH")}
       {E.chips(["SG", "°P"], 0)}
       {E.info("Enter only values taken now; blanks are not rewritten.")}
-      {E.inp("Note · optional")}
+      {E.inp("Note", "optional")}
       {E.pin(<>
         {E.btn("Record reading")}
       </>)}
@@ -2297,9 +2336,11 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.edit("Material name", "Citra")}
       {E.pick("Kind", "Hop", ["Malt", "Hop", "Yeast", "Adjunct", "Chemical", "Packaging", "Other"])}
-      {E.pick("Unit", "lb", ["lb", "oz", "kg", "each"])}
-      {E.pick("Purchase unit", "each", ["each", "lb", "kg", "oz", "g", "l", "gal", "ml"])}
-      {E.edit("Base units per purchase unit", "44", "number")}
+      {E.inline(
+        E.edit("Base units", "44", "number"),
+        E.pick("Purchase unit", "each", ["each", "lb", "kg", "oz", "g", "l", "gal", "ml"]),
+        E.pick("Unit", "lb", ["lb", "oz", "kg", "each"]),
+      )}
       {E.info("A 44 lb box is purchase unit each with 44 base units, not a “box” unit: the schema has one unit vocabulary and packaging is the factor.")}
       {E.row("Lot-tracked", "receipts name a lot · consumption picks one", E.sw(true, "Lot-tracked"), "ok")}
       {E.row("Active", "available to recipes and purchase orders", E.sw(true, "Material active"), "ok")}
@@ -2321,8 +2362,10 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.edit("Vendor name", "YCH")}
       {E.edit("Email", "orders@ych.example", "email")}
-      {E.pick("Terms", "Net 30", ["Due on receipt", "Net 15", "Net 30"])}
-      {E.edit("Lead time (days)", "7", "number")}
+      {E.inline(
+        E.pick("Terms", "Net 30", ["Due on receipt", "Net 15", "Net 30"]),
+        E.edit("Lead time (days)", "7", "number"),
+      )}
       {E.info("The typed figure is what Planning dates a buy-by from. Received orders give an observed average that is read, never stored.")}
       {E.btn("Save vendor")}
     </>),
@@ -2490,8 +2533,8 @@ export const SCREENS: Screen[] = [
     states: [["approved", "orders may proceed"], ["pending", "order confirmation warns", 1]],
     body: (<>
       {E.pick("Brand", "Stout", ["Hazy IPA", "Pils", "Stout"])}
-      {E.inp("COLA number · pending")}
-      {E.inp("Formula number · not required")}
+      {E.inp("COLA number", "pending")}
+      {E.inp("Formula number", "not required")}
       {E.btn("Save approval")}
     </>),
   },
@@ -2509,8 +2552,8 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.pick("Brand", "Hazy IPA", ["Hazy IPA", "Pils", "Stout"])}
       {E.pick("State", "Ohio", ["Pennsylvania", "Ohio"])}
-      {E.inp("Registration number · OH-88214")}
-      {E.inp("Expires · 12/31/2026")}
+      {E.inp("Registration number", "OH-88214")}
+      {E.inp("Expires", "12/31/2026")}
       {E.btn("Save registration")}
     </>),
   },
@@ -2527,8 +2570,8 @@ export const SCREENS: Screen[] = [
     states: [["current", "orders may proceed"], ["expired", "order confirmation warns", 1]],
     body: (<>
       {E.pick("State", "Pennsylvania", ["Pennsylvania", "Ohio"])}
-      {E.inp("License number · G-21884")}
-      {E.inp("Expires · 6/30/2027")}
+      {E.inp("License number", "G-21884")}
+      {E.inp("Expires", "6/30/2027")}
       {E.btn("Save license")}
     </>),
   },
@@ -3301,7 +3344,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.pick("Brand", "Barrel-aged Stout", ["Barrel-aged Stout", "Hazy IPA", "Pils"])}
       {E.pick("Format", "½ bbl keg", ["½ bbl keg", "⅙ bbl keg", "case · 24×16oz"])}
-      {E.inp("Price · $240.00")}
+      {E.inp("Price", "$240.00")}
       {E.info(`Clear this override to use the ${INV.hazyPrice} format default.`)}
       {E.btns([["Clear override", "g"], "Save override"])}
     </>),
