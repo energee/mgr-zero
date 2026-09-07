@@ -27,7 +27,6 @@ the same job, fields, verbs, and states as its `SCREENS` record; the record's
 | 8 | Delivery and routes (save / depart / return, driver) | `.agents/superpowers/plans/2026-09-07-backend-program-8-delivery-routes.md` | 13 |
 | 9 | Compliance (report, filing, registry, COLA) | `.agents/superpowers/plans/2026-09-07-backend-program-9-compliance.md` | 17 |
 
-- [ ] Program 5 — production and packaging merged
 - [ ] Program 6 — purchasing merged
 - [ ] Program 7 — taproom and kegs merged (needs 2)
 - [ ] Program 8 — delivery and routes merged (needs 2 phase 3)
@@ -53,7 +52,8 @@ tests.
 - [ ] Program 10 — explorer parity merged
 - [ ] Program 11 — access and import merged
 - [ ] Program 16 — chat settings merged
-- [ ] Program 12 — taproom truth merged (confirm the four §16.16 defaults in the remainder plan first)
+- [ ] Per-role RLS spec for the `taproom` role — docs PR before Program 12. Matrix approved 2026-09-07: taproom reads and writes tap board, keg taps, weekly count, taproom bins and on-hand; reads brands, formats, SKUs, menu, POS mapping; own rows only on chat links and notification preferences; nothing else. Mechanism: keep `is_staff_of` for the four existing roles, add a `taproom_can(table)` predicate every policy consults, one baseline edit, one test walking every table as a taproom user
+- [ ] Program 12 — taproom truth merged (§16.16 decided 2026-09-07: brand-owned poured formats as name + ounces, three fill chips, guest kegs by label + nominal size)
 - [ ] Program 13 — QuickBooks merged
 - [ ] Program 15 — composer merged
 - [ ] Program 14 — Square and menu merged
@@ -105,7 +105,13 @@ Programs 13, 14, 16 implement the actions they describe.
 - [ ] Adversarial walkthrough baseline (`.agents/superpowers/specs/2026-09-04-adversarial-walkthrough-review.md`): map the `/docs/screens-explore` walkthrough against it per its entry template
 - [ ] Supabase advisors on a hosted project (local `db lint` is clean)
 
-## Release — no plan owns this yet
+## Release — after Program 9 is merged, all ask-first
+
+Decided 2026-09-07: no hosted project until Program 9 lands. Integration
+credentials (QuickBooks, Square, Slack sandbox apps) are created when each of
+Programs 13, 14, 16 starts, by Ted; each program adds its env names to
+`.env.example` in its first PR.
+
 
 - [ ] Hosted Supabase project (ask first)
 - [ ] Vercel project and env (ask first)

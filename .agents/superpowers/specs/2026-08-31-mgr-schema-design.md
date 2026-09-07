@@ -1226,17 +1226,30 @@ different label; swap is the tap primitive and `staff_role` gains `taproom`
 by a person rather than by provenance (§16.14); the paid/voided guarantee moves
 to the read side instead of a CHECK (§16.11).
 
-Still open:
+**Resolved 2026-09-07 (Ted, in review of Program 12's open questions):**
 
-1. Tiers priced by format with SKU override, or the reverse? (§16.4)
-2. Does a poured format bind to one packaged format, or to a brand? Binding to a
-   format makes bin-derived availability exact. (§16.2)
-3. What RLS does `taproom` get? The role itself is decided (§16.13), but §0's
-   `P-staff` is role-agnostic, so adding the enum value grants full staff
-   read/write. The per-role policies that make the surface narrow are undesigned
-   and unscheduled — this blocks shipping the role. (§16.13)
-4. Quarters or eighths for fill — and do you weigh kegs? Tare weights are known
-   per keg size, so weighing turns an estimate into a measurement. (§16.8)
+1. Tiers are priced by format with a SKU override — shipped as Program 4b
+   (§16.4).
+2. A poured format belongs to a **brand**, not the brewery: each brand lists
+   its poured formats as a name and a size in ounces (a pint, a taster). A
+   pour is a ratio back to whichever keg of that brand is open at that
+   location, so bin-derived availability is per brand rather than per keg
+   size. §16.2's `formats` table keeps `basis = 'poured'` only as the
+   vocabulary; Program 12's plan redraws the storage (brand-owned rows with
+   `name`, `ounces`) before the tap board and POS mapping use it.
+3. The `taproom` role **ships with per-role RLS**. A per-role policy spec —
+   which tables a bartender reads, which they write, and how `P-staff`
+   splits — is written and reviewed before Program 12 starts; TODO.md
+   carries it as its own item between Programs 7 and 12.
+4. Remaining fill is three chips — Empty, about ¼, about ½ — as Kick keg and
+   Swap keg already draw. No weighing; a report estimate stays coarse.
+
+Guest kegs (DRIFT §16.13): `keg_taps` gains a free-text `label` and
+`nominal_bbl` so a keg with no brand or SKU still yields. Kicking a guest keg
+already on the board works now; tapping a new one stays SCHEMA-GATE until the
+columns land in Program 12.
+
+Nothing in §16.16 is open.
 
 ### 16.17 Build order when this is migrated
 
