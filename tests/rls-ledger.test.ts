@@ -14,7 +14,7 @@ describe("ledger integrity + RLS", () => {
 
   it("staff cannot write the ledger directly; it is append-only even for service_role", async () => {
     const db = await asUser(staff.email);
-    const row = { brewery_id: b.id, sku_id: sku.id, location_id: loc.id, qty: 10, bbl: 5, type: "opening_balance", created_by: staff.id } as const;
+    const row = { brewery_id: b.id, sku_id: sku.id, location_id: loc.id, bin_id: loc.binId, qty: 10, bbl: 5, type: "opening_balance", created_by: staff.id } as const;
     // No INSERT/UPDATE/DELETE grants for app roles: writes go through record_inventory_movement().
     const direct = await db.from("inventory_movements").insert(row).select().single();
     expect(direct.error?.code).toBe("42501");
@@ -30,7 +30,7 @@ describe("ledger integrity + RLS", () => {
 
   it("sale_removal without dest_state is rejected by CHECK", async () => {
     const { error } = await admin.from("inventory_movements").insert({
-      brewery_id: b.id, sku_id: sku.id, location_id: loc.id,
+      brewery_id: b.id, sku_id: sku.id, location_id: loc.id, bin_id: loc.binId,
       qty: -1, bbl: -0.5, type: "sale_removal", channel: "wholesale", created_by: staff.id,
     });
     expect(error).not.toBeNull();
@@ -48,7 +48,7 @@ describe("ledger integrity + RLS", () => {
   it("trigger overwrites bbl: client-supplied value is ignored, computed from qty * bbl_per_unit", async () => {
     // Insert with deliberately wrong bbl (should be 2 * 0.5 = 1, not 999)
     const { data: m, error } = await admin.from("inventory_movements").insert({
-      brewery_id: b.id, sku_id: sku.id, location_id: loc.id,
+      brewery_id: b.id, sku_id: sku.id, location_id: loc.id, bin_id: loc.binId,
       qty: 2, bbl: 999, type: "production_in", created_by: staff.id,
     }).select().single();
     expect(error).toBeNull();
@@ -73,12 +73,12 @@ describe("removal_shape CHECK: channel/dest_state required on removals, null oth
   it("festival_removal and sample require dest_state, just like sale_removal", async () => {
     for (const type of ["festival_removal", "sample"] as const) {
       const { error } = await admin.from("inventory_movements").insert({
-        brewery_id: b.id, sku_id: sku.id, location_id: loc.id,
+        brewery_id: b.id, sku_id: sku.id, location_id: loc.id, bin_id: loc.binId,
         qty: -1, bbl: -0.5, type, created_by: staff.id,
       });
       expect(error, `${type} without dest_state should be rejected`).not.toBeNull();
       const ok = await admin.from("inventory_movements").insert({
-        brewery_id: b.id, sku_id: sku.id, location_id: loc.id,
+        brewery_id: b.id, sku_id: sku.id, location_id: loc.id, bin_id: loc.binId,
         qty: -1, bbl: -0.5, type, dest_state: "PA", created_by: staff.id,
       });
       expect(ok.error, `${type} with dest_state should be accepted`).toBeNull();
@@ -95,7 +95,7 @@ describe("removal_shape CHECK: channel/dest_state required on removals, null oth
     ];
     for (const { type, qty } of nonRemovals) {
       const { error } = await admin.from("inventory_movements").insert({
-        brewery_id: b.id, sku_id: sku.id, location_id: loc.id,
+        brewery_id: b.id, sku_id: sku.id, location_id: loc.id, bin_id: loc.binId,
         qty, bbl: qty * 0.5, type, channel: "wholesale", created_by: staff.id,
       });
       expect(error, `${type} with a channel should be rejected`).not.toBeNull();
@@ -104,7 +104,7 @@ describe("removal_shape CHECK: channel/dest_state required on removals, null oth
 
   it("depletion requires channel=taproom and rejects a dest_state", async () => {
     const { error } = await admin.from("inventory_movements").insert({
-      brewery_id: b.id, sku_id: sku.id, location_id: loc.id,
+      brewery_id: b.id, sku_id: sku.id, location_id: loc.id, bin_id: loc.binId,
       qty: -1, bbl: -0.5, type: "depletion", channel: "taproom", dest_state: "PA", created_by: staff.id,
     });
     expect(error, "depletion with a dest_state should be rejected").not.toBeNull();
@@ -134,7 +134,7 @@ describe("cross-brewery tenant consistency (composite FKs)", () => {
 
   it("rejects an inventory_movement whose sku_id belongs to a different brewery than brewery_id", async () => {
     const { error } = await admin.from("inventory_movements").insert({
-      brewery_id: bA.id, sku_id: skuB.id, location_id: locA.id,
+      brewery_id: bA.id, sku_id: skuB.id, location_id: locA.id, bin_id: locA.binId,
       qty: 1, bbl: 0.5, type: "opening_balance", created_by: staffA.id,
     });
     expect(error).not.toBeNull();
@@ -142,7 +142,7 @@ describe("cross-brewery tenant consistency (composite FKs)", () => {
 
   it("rejects an inventory_movement whose location_id belongs to a different brewery than brewery_id", async () => {
     const { error } = await admin.from("inventory_movements").insert({
-      brewery_id: bA.id, sku_id: skuA.id, location_id: locB.id,
+      brewery_id: bA.id, sku_id: skuA.id, location_id: locB.id, bin_id: locB.binId,
       qty: 1, bbl: 0.5, type: "opening_balance", created_by: staffA.id,
     });
     expect(error).not.toBeNull();

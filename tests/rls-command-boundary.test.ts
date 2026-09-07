@@ -15,6 +15,7 @@ let brewerCtx: StaffCtx;
 let productId: string;
 let skuId: string;
 let locationId: string;
+let binId: string;
 let taproomId: string;
 let priceListId: string;
 let customerId: string;
@@ -28,7 +29,7 @@ beforeAll(async () => {
   brewerCtx = await makeStaffCtx(brewery.id, "brewer");
 
   ({ productId, skuId } = await seedCatalog(brewery.id, { product: "Boundary IPA", sku: "Boundary case" }));
-  locationId = (await seedLocation(brewery.id, { name: "Boundary warehouse" })).id;
+  ({ id: locationId, binId } = await seedLocation(brewery.id, { name: "Boundary warehouse" }));
   taproomId = (await seedLocation(brewery.id, { name: "Boundary taproom", kind: "taproom" })).id;
   ({ customerId, shipToId, priceListId } = await seedCustomer(brewery.id, { name: "Boundary customer" }));
   const { error: priceError } = await admin.from("price_list_items")
@@ -94,11 +95,11 @@ describe("staff command database boundary", () => {
 
   it("keeps warehouse movement and sales order lifecycle RPCs role-bound", async () => {
     const movement = await warehouseCtx.db.rpc("record_inventory_movement", { p_request_id: crypto.randomUUID(),
-      p_brewery: brewery.id, p_sku: skuId, p_location: locationId, p_qty: 10,
+      p_brewery: brewery.id, p_sku: skuId, p_location: locationId, p_bin: binId, p_qty: 10,
       p_type: "opening_balance", p_channel: null, p_dest_state: null, p_note: null,
     });
     const salesMovement = await salesCtx.db.rpc("record_inventory_movement", { p_request_id: crypto.randomUUID(),
-      p_brewery: brewery.id, p_sku: skuId, p_location: locationId, p_qty: 10,
+      p_brewery: brewery.id, p_sku: skuId, p_location: locationId, p_bin: binId, p_qty: 10,
       p_type: "opening_balance", p_channel: null, p_dest_state: null, p_note: null,
     });
     const order = await salesCtx.db.rpc("create_order", { p_request_id: crypto.randomUUID(),
@@ -310,9 +311,9 @@ describe("registered staff mutation role × RPC matrix", () => {
     {
       command: "record_movement", rpc: "record_inventory_movement", allowed: ["admin", "warehouse"],
       input: async () => ({
-        command: { skuId, locationId, qty: 1, type: "opening_balance" },
+        command: { skuId, locationId, binId, qty: 1, type: "opening_balance" },
         rpc: {
-          p_brewery: brewery.id, p_sku: skuId, p_location: locationId, p_qty: 1,
+          p_brewery: brewery.id, p_sku: skuId, p_location: locationId, p_bin: binId, p_qty: 1,
           p_type: "opening_balance", p_channel: null, p_dest_state: null, p_note: null,
         },
       }),

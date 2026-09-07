@@ -3,7 +3,7 @@
 // .agents/superpowers/specs/2026-09-06-mgr-locations-bins-transfers-design.md, Decision 1.
 import { describe, it, expect, beforeAll } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { admin, makeBrewery, makeStaffCtx } from "./helpers";
+import { admin, makeBrewery, makeStaffCtx, seedCatalog } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -76,5 +76,84 @@ describe("bins", () => {
     const bins = (await runCommand("list_bins", { locationId: loc.id }, ctx)) as Row[];
     await expect(runCommand("update_bin", { binId: bins[0].id, name: "Hijack" }, otherCtx)).rejects.toBeTruthy();
     await expect(runCommand("delete_bin", { binId: bins[0].id }, otherCtx)).rejects.toBeTruthy();
+  });
+  it("every ledger row names a bin, and the bin must belong to the row's location", async () => {
+    const a = (await runCommand("create_location", { name: "Ledger A", kind: "warehouse" }, ctx)) as Row;
+    const b = (await runCommand("create_location", { name: "Ledger B", kind: "warehouse" }, ctx)) as Row;
+    const [binB] = (await runCommand("list_bins", { locationId: b.id }, ctx)) as Row[];
+    const { skuId } = await seedCatalog(ctx.breweryId, { product: "Bin Pils" });
+    const { data: mat } = await admin.from("materials").insert({
+      brewery_id: ctx.breweryId, name: "Bin malt", category: "malt", base_uom: "lb", purchase_uom: "lb", lot_tracked: false,
+    }).select().single();
+    const { data: pool } = await admin.from("keg_pools").insert({ brewery_id: ctx.breweryId, name: "Bin pool", kind: "owned" }).select().single();
+
+    // the wrong location for the bin is a FK violation on every ledger, not app code
+    const fg = await admin.from("inventory_movements").insert({
+      brewery_id: ctx.breweryId, sku_id: skuId, location_id: a.id, bin_id: binB.id, qty: 1, bbl: 0, type: "opening_balance", created_by: ctx.userId,
+    });
+    expect(fg.error?.code).toBe("23503");
+    const mm = await admin.from("material_movements").insert({
+      brewery_id: ctx.breweryId, material_id: mat!.id, location_id: a.id, bin_id: binB.id, qty: 5, type: "opening_balance", created_by: ctx.userId,
+    });
+    expect(mm.error?.code).toBe("23503");
+    const ke = await admin.from("keg_events").insert({
+      brewery_id: ctx.breweryId, pool_id: pool!.id, keg_size: "sixth_bbl", location_id: a.id, bin_id: binB.id, qty: 3, reason: "acquired", created_by: ctx.userId,
+    });
+    expect(ke.error?.code).toBe("23503");
+
+    // and a missing bin is rejected outright
+    const noBin = await admin.from("material_movements").insert({
+      brewery_id: ctx.breweryId, material_id: mat!.id, location_id: a.id, qty: 5, type: "opening_balance", created_by: ctx.userId,
+    });
+    expect(noBin.error?.code).toBe("23502");
+  });
+
+  it("the keg list reads back per pool × size × location: Microstar 36 here, 40 in storage", async () => {
+    const wh = (await runCommand("create_location", { name: "Keg WH", kind: "warehouse" }, ctx)) as Row;
+    const st = (await runCommand("create_location", { name: "Keg storage", kind: "storage" }, ctx)) as Row;
+    const [binW] = (await runCommand("list_bins", { locationId: wh.id }, ctx)) as Row[];
+    const [binS] = (await runCommand("list_bins", { locationId: st.id }, ctx)) as Row[];
+    const { data: vendor } = await admin.from("vendors").insert({ brewery_id: ctx.breweryId, name: "Microstar" }).select().single();
+    const { data: pool } = await admin.from("keg_pools").insert({
+      brewery_id: ctx.breweryId, name: "Microstar", kind: "pay_per_fill", vendor_id: vendor!.id, per_fill_cents: 900,
+    }).select().single();
+    for (const [bin, loc, qty] of [[binW, wh, 36], [binS, st, 40]] as const) {
+      const { error } = await admin.from("keg_events").insert({
+        brewery_id: ctx.breweryId, pool_id: pool!.id, keg_size: "sixth_bbl", location_id: loc.id, bin_id: bin.id, qty, reason: "acquired", created_by: ctx.userId,
+      });
+      expect(error).toBeNull();
+    }
+    // neither keg view is granted to authenticated yet (no registered command reads them), so read as admin
+    const { data: rows } = await admin.from("keg_bin_totals").select("location_id, qty").eq("pool_id", pool!.id).order("qty");
+    expect(rows!.map((r) => [r.location_id, r.qty])).toEqual([[wh.id, 36], [st.id, 40]]);
+    const { data: total } = await admin.from("keg_fleet_totals").select("qty").eq("pool_id", pool!.id).single();
+    expect(total!.qty).toBe(76);
+  });
+
+  it("record_movement requires a bin and get_bin_on_hand reports per bin while on_hand stays per location", async () => {
+    const loc = (await runCommand("create_location", { name: "Split WH", kind: "warehouse" }, ctx)) as Row;
+    const [b1, b2] = (await runCommand("list_bins", { locationId: loc.id }, ctx)) as Row[];
+    const { skuId } = await seedCatalog(ctx.breweryId, { product: "Split Pils" });
+    await expect(runCommand("record_movement", { skuId, locationId: loc.id, qty: 1, type: "opening_balance" }, ctx)).rejects.toBeTruthy();
+    await runCommand("record_movement", { skuId, locationId: loc.id, binId: b1.id, qty: 10, type: "opening_balance" }, ctx);
+    await runCommand("record_movement", { skuId, locationId: loc.id, binId: b2.id, qty: 5, type: "opening_balance" }, ctx);
+    const perBin = (await runCommand("get_bin_on_hand", { skuId }, ctx)) as { bin_id: string; qty: number | string }[];
+    expect(perBin.map((r) => [r.bin_id, Number(r.qty)]).sort()).toEqual([[b1.id, 10], [b2.id, 5]].sort());
+    const perLoc = (await runCommand("get_on_hand", { skuId }, ctx)) as { qty: number | string }[];
+    expect(perLoc).toHaveLength(1);
+    expect(Number(perLoc[0].qty)).toBe(15);
+  });
+
+  it("delete_bin refuses a bin that ever recorded stock, even at net zero", async () => {
+    const loc = (await runCommand("create_location", { name: "Stock WH", kind: "warehouse" }, ctx)) as Row;
+    const [bin] = (await runCommand("list_bins", { locationId: loc.id }, ctx)) as Row[];
+    const { skuId } = await seedCatalog(ctx.breweryId, { product: "Stock Pils" });
+    await runCommand("record_movement", { skuId, locationId: loc.id, binId: bin.id, qty: 2, type: "opening_balance" }, ctx);
+    await expect(runCommand("delete_bin", { binId: bin.id }, ctx))
+      .rejects.toMatchObject({ message: expect.stringMatching(/recorded stock/i) });
+    // Moving it all back out does not lift the refusal: the ledgers are append-only.
+    await runCommand("record_movement", { skuId, locationId: loc.id, binId: bin.id, qty: -2, type: "adjustment" }, ctx);
+    await expect(runCommand("delete_bin", { binId: bin.id }, ctx))
+      .rejects.toMatchObject({ message: expect.stringMatching(/recorded stock/i) });
   });
 });

@@ -64,7 +64,7 @@ describe("standing taproom allocations", () => {
     const tap = await seedLocation(b.id, { name: "Tap", kind: "taproom" });
     const tapId = tap.id;
     await admin.from("inventory_movements").insert({
-      brewery_id: b.id, sku_id: skuId, location_id: tapId, qty: 20, type: "opening_balance", created_by: adminCtx.userId,
+      brewery_id: b.id, sku_id: skuId, location_id: tapId, bin_id: tap.binId, qty: 20, type: "opening_balance", created_by: adminCtx.userId,
     });
     const atpBefore = await runCommand("get_atp", { skuId }, adminCtx) as { sku_id: string; qty: number }[];
     const before = atpBefore.find(r => r.sku_id === skuId)!.qty;

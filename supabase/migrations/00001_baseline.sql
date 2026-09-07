@@ -341,6 +341,7 @@ create table inventory_movements (
   brewery_id uuid not null references breweries(id),
   sku_id uuid not null,
   location_id uuid not null,
+  bin_id uuid not null,
   qty numeric(12,2) not null check (qty <> 0),   -- signed units
   bbl numeric(14,8) not null,                    -- qty * bbl_per_unit, frozen at write time (trigger)
   type movement_type not null,
@@ -354,6 +355,8 @@ create table inventory_movements (
   unique (id, brewery_id),
   foreign key (sku_id, brewery_id) references skus (id, brewery_id),
   foreign key (location_id, brewery_id) references locations (id, brewery_id),
+  -- the bin must be one of this location's bins, structurally (spec 2026-09-06 Decision 1)
+  foreign key (bin_id, location_id, brewery_id) references bins (id, location_id, brewery_id),
   -- removals must be negative and classified; inflows positive.
   constraint removal_shape check (
     case type
@@ -371,7 +374,7 @@ create table inventory_movements (
       else true
     end)
 );
-create index movements_onhand_idx on inventory_movements (brewery_id, sku_id, location_id);
+create index movements_onhand_idx on inventory_movements (brewery_id, sku_id, location_id, bin_id);
 create index movements_created_idx on inventory_movements (brewery_id, created_at);
 create index movements_lot_idx on inventory_movements (lot_id) where lot_id is not null;
 
@@ -558,6 +561,8 @@ create table material_movements (   -- ledger
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
   material_id uuid not null,
+  location_id uuid not null,                           -- materials are per site (spec 2026-09-06 Decision 2)
+  bin_id uuid not null,
   lot_id uuid,                                         -- required iff materials.lot_tracked (trigger)
   qty numeric(14,4) not null check (qty <> 0),         -- base uom, signed
   type material_movement_type not null,
@@ -568,6 +573,8 @@ create table material_movements (   -- ledger
   unique (id, brewery_id),
   foreign key (material_id, brewery_id) references materials (id, brewery_id),
   foreign key (lot_id, material_id, brewery_id) references material_lots (id, material_id, brewery_id),
+  foreign key (location_id, brewery_id) references locations (id, brewery_id),
+  foreign key (bin_id, location_id, brewery_id) references bins (id, location_id, brewery_id),
   constraint material_sign check (
     case type
       when 'receipt'         then qty > 0
@@ -581,6 +588,7 @@ create table material_movements (   -- ledger
 create index material_movements_material_idx on material_movements (brewery_id, material_id);
 create index material_movements_lot_idx on material_movements (brewery_id, material_id, lot_id) where lot_id is not null;
 create index material_movements_created_idx on material_movements (brewery_id, created_at);
+create index material_movements_onhand_idx on material_movements (brewery_id, material_id, location_id, bin_id);
 
 create function enforce_material_lot() returns trigger language plpgsql set search_path = '' as $$
 declare tracked boolean;
@@ -975,6 +983,8 @@ create table keg_events (   -- ledger
   brewery_id uuid not null references breweries(id),
   pool_id uuid not null,
   keg_size keg_size not null,
+  location_id uuid not null,   -- for shipped: where they left from; for returned: where they came back into
+  bin_id uuid not null,
   qty int not null check (qty > 0),
   reason keg_event_reason not null,
   customer_id uuid,
@@ -984,6 +994,8 @@ create table keg_events (   -- ledger
   created_by uuid not null references auth.users(id),
   created_at timestamptz not null default now(),
   foreign key (pool_id, brewery_id) references keg_pools (id, brewery_id),
+  foreign key (location_id, brewery_id) references locations (id, brewery_id),
+  foreign key (bin_id, location_id, brewery_id) references bins (id, location_id, brewery_id),
   foreign key (customer_id, brewery_id) references customers (id, brewery_id),
   foreign key (shipment_id, brewery_id) references shipments (id, brewery_id),
   check (case reason
@@ -993,7 +1005,7 @@ create table keg_events (   -- ledger
     when 'retired'  then customer_id is null
     else true end)
 );
-create index keg_events_pool_idx on keg_events (brewery_id, pool_id, keg_size);
+create index keg_events_pool_idx on keg_events (brewery_id, pool_id, keg_size, location_id, bin_id);
 create index keg_events_customer_idx on keg_events (customer_id) where customer_id is not null;
 create index keg_events_shipment_idx on keg_events (shipment_id) where shipment_id is not null;
 
@@ -1313,6 +1325,12 @@ create view atp with (security_invoker = true) as
              where a.status = 'open' and a.brewery_id = o.brewery_id and a.sku_id = o.sku_id), 0) as qty
   from on_hand o group by o.brewery_id, o.sku_id;
 
+-- Bin grain, beside on_hand rather than replacing it: atp and taproom_replenishment
+-- keep their location-grain join. Spec 2026-09-06 Decision 2.
+create view bin_on_hand with (security_invoker = true) as
+  select brewery_id, sku_id, location_id, bin_id, sum(qty) as qty
+  from inventory_movements group by 1,2,3,4;
+
 create view lot_on_hand with (security_invoker = true) as
   select brewery_id, lot_id, sku_id, location_id, sum(qty) as qty
   from inventory_movements where lot_id is not null group by 1,2,3,4;
@@ -1346,6 +1364,10 @@ create view pos_unmapped_items with (security_invoker = true) as
 
 create view material_on_hand with (security_invoker = true) as
   select brewery_id, material_id, sum(qty) as qty from material_movements group by 1,2;
+
+create view material_bin_on_hand with (security_invoker = true) as
+  select brewery_id, material_id, location_id, bin_id, sum(qty) as qty
+  from material_movements group by 1,2,3,4;
 
 create view material_lot_on_hand with (security_invoker = true) as
   select m.brewery_id, m.material_id, m.lot_id, l.received_on, sum(m.qty) as qty
@@ -1437,6 +1459,12 @@ create view packaging_run_yields with (security_invoker = true) as
   where r.closed_at is not null
   group by r.id;
 
+create view keg_bin_totals with (security_invoker = true) as
+  select brewery_id, pool_id, keg_size, location_id, bin_id,
+         sum(case reason when 'acquired' then qty when 'found' then qty
+                         when 'retired' then -qty when 'lost' then -qty else 0 end)::int as qty
+  from keg_events group by 1,2,3,4,5;
+
 create view keg_fleet_totals with (security_invoker = true) as
   select brewery_id, pool_id, keg_size,
          sum(case reason when 'acquired' then qty when 'found' then qty
@@ -1492,6 +1520,16 @@ begin
     raise exception 'order requires at least one line';
   end if;
 end $$;
+-- Order-driven movements have no bin on the order (a later phase may add one),
+-- so they post to the location's alphabetically first bin ('Cold' for a fresh
+-- location). Name, not created_at: the seeded trio shares one transaction
+-- timestamp. The brewery names the bin it wants order stock to land in so it
+-- sorts first.
+create function private.first_bin(p_location uuid) returns uuid
+language sql stable set search_path = '' as $$
+  select id from public.bins where location_id = p_location order by name limit 1
+$$;
+
 create function private.create_order_impl(
   p_brewery uuid, p_kind public.order_kind, p_customer uuid, p_ship_to uuid,
   p_from_location uuid, p_to_location uuid, p_requested date, p_po text, p_note text, p_lines jsonb
@@ -1676,8 +1714,8 @@ begin
     update public.order_lines set qty_shipped = sp.qty where id = sp.line_id and order_id = p_order;
     if sp.qty > 0 then
       if o.kind = 'wholesale' then
-        insert into public.inventory_movements (brewery_id, sku_id, location_id, qty, type, channel, dest_state, ref, created_by)
-        select o.brewery_id, ol.sku_id, o.from_location_id, -sp.qty, 'sale_removal', 'wholesale', v_state, p_order, auth.uid()
+        insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, channel, dest_state, ref, created_by)
+        select o.brewery_id, ol.sku_id, o.from_location_id, private.first_bin(o.from_location_id), -sp.qty, 'sale_removal', 'wholesale', v_state, p_order, auth.uid()
         from public.order_lines ol where ol.id = sp.line_id;
         if v_invoice is not null then
           insert into public.invoice_lines (brewery_id, invoice_id, kind, sku_id, qty, unit_price_cents, description)
@@ -1685,11 +1723,11 @@ begin
           from public.order_lines ol join public.skus s on s.id = ol.sku_id where ol.id = sp.line_id;
         end if;
       else
-        insert into public.inventory_movements (brewery_id, sku_id, location_id, qty, type, ref, created_by)
-        select o.brewery_id, ol.sku_id, o.from_location_id, -sp.qty, 'taproom_transfer', p_order, auth.uid()
+        insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, ref, created_by)
+        select o.brewery_id, ol.sku_id, o.from_location_id, private.first_bin(o.from_location_id), -sp.qty, 'taproom_transfer', p_order, auth.uid()
         from public.order_lines ol where ol.id = sp.line_id;
-        insert into public.inventory_movements (brewery_id, sku_id, location_id, qty, type, ref, created_by)
-        select o.brewery_id, ol.sku_id, o.to_location_id, sp.qty, 'taproom_transfer', p_order, auth.uid()
+        insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, ref, created_by)
+        select o.brewery_id, ol.sku_id, o.to_location_id, private.first_bin(o.to_location_id), sp.qty, 'taproom_transfer', p_order, auth.uid()
         from public.order_lines ol where ol.id = sp.line_id;
       end if;
       update public.allocations set status = 'fulfilled'
@@ -1738,8 +1776,8 @@ begin
     insert into public.invoice_lines (brewery_id, invoice_id, kind, sku_id, qty, unit_price_cents, description, credited_invoice_line_id)
     select v_inv.brewery_id, v_cm, 'sku', il.sku_id, -cl.qty, il.unit_price_cents, il.description, il.id
     from public.invoice_lines il where il.id = cl.line_id and il.invoice_id = p_invoice;
-    insert into public.inventory_movements (brewery_id, sku_id, location_id, qty, type, ref, note, created_by)
-    select v_inv.brewery_id, il.sku_id, p_location, cl.qty, 'return_in', v_cm, p_reason, auth.uid()
+    insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, ref, note, created_by)
+    select v_inv.brewery_id, il.sku_id, p_location, private.first_bin(p_location), cl.qty, 'return_in', v_cm, p_reason, auth.uid()
     from public.invoice_lines il where il.id = cl.line_id and il.invoice_id = p_invoice;
   end loop;
   -- Append to the originating order's event log, if this invoice came from a
@@ -2200,7 +2238,9 @@ begin
   if (select count(*) from public.bins where location_id = v_row.location_id) <= 1 then
     raise exception 'a location keeps at least one bin; rename it instead';
   end if;
-  v_used := false;  -- Task 3 replaces this with the three-ledger exists check once bin_id exists
+  v_used := exists (select 1 from public.inventory_movements where bin_id = p_bin)
+         or exists (select 1 from public.material_movements  where bin_id = p_bin)
+         or exists (select 1 from public.keg_events          where bin_id = p_bin);
   if v_used then
     raise exception 'bin has recorded stock and cannot be removed; rename it instead';
   end if;
@@ -2297,17 +2337,17 @@ begin
 end $$;
 
 create function record_inventory_movement(
-  p_brewery uuid, p_sku uuid, p_location uuid, p_qty numeric, p_type public.movement_type,
+  p_brewery uuid, p_sku uuid, p_location uuid, p_bin uuid, p_qty numeric, p_type public.movement_type,
   p_channel public.sale_channel, p_dest_state text, p_note text, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_replay jsonb; v_row public.inventory_movements;
 begin
   perform private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'record_inventory_movement', p_request_id,
-    jsonb_build_object('brewery', p_brewery, 'sku', p_sku, 'location', p_location, 'qty', p_qty, 'type', p_type, 'channel', p_channel, 'dest_state', p_dest_state, 'note', p_note));
+    jsonb_build_object('brewery', p_brewery, 'sku', p_sku, 'location', p_location, 'bin', p_bin, 'qty', p_qty, 'type', p_type, 'channel', p_channel, 'dest_state', p_dest_state, 'note', p_note));
   if v_replay is not null then return v_replay; end if;
-  insert into public.inventory_movements (brewery_id, sku_id, location_id, qty, type, channel, dest_state, note, created_by)
-    values (p_brewery, p_sku, p_location, p_qty, p_type, p_channel, p_dest_state, p_note, auth.uid()) returning * into v_row;
+  insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, channel, dest_state, note, created_by)
+    values (p_brewery, p_sku, p_location, p_bin, p_qty, p_type, p_channel, p_dest_state, p_note, auth.uid()) returning * into v_row;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
@@ -2676,8 +2716,8 @@ begin
   v_memo := (private.create_credit_memo_impl(p_invoice, p_lines, p_location, p_reason)->>'invoice_id')::uuid;
   if p_reason = 'damaged' then
     select brewery_id into v_brewery from public.invoices where id = p_invoice;
-    insert into public.inventory_movements (brewery_id, sku_id, location_id, qty, type, ref, note, created_by)
-    select v_brewery, m.sku_id, m.location_id, -m.qty, 'loss', v_memo, 'damaged return', auth.uid()
+    insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, ref, note, created_by)
+    select v_brewery, m.sku_id, m.location_id, m.bin_id, -m.qty, 'loss', v_memo, 'damaged return', auth.uid()
     from public.inventory_movements m where m.ref = v_memo and m.type = 'return_in';
   end if;
   return jsonb_build_object('credit_memo_id', v_memo);
@@ -3819,7 +3859,7 @@ grant select on breweries, brewery_users, customer_users,
   to authenticated;
 -- Security-invoker views retain the underlying tables' RLS predicates; expose
 -- only the derived reads consumed by registered commands.
-grant select on on_hand, atp, invoice_totals, keg_deposit_balances, portal_brewery to authenticated;
+grant select on on_hand, bin_on_hand, atp, invoice_totals, keg_deposit_balances, portal_brewery to authenticated;
 grant all on all tables in schema public to service_role;
 grant all on all sequences in schema public to service_role;
 
@@ -3853,7 +3893,7 @@ grant execute on function
   upsert_ship_to(uuid,uuid,uuid,text,text,text,text,text,text,uuid),
   upsert_price_list(uuid,uuid,text,uuid),
   set_price(uuid,uuid,uuid,int,uuid),
-  record_inventory_movement(uuid,uuid,uuid,numeric,public.movement_type,public.sale_channel,text,text,uuid),
+  record_inventory_movement(uuid,uuid,uuid,uuid,numeric,public.movement_type,public.sale_channel,text,text,uuid),
   set_taproom_par(uuid,uuid,uuid,numeric,uuid),
   set_portal_fulfillment_source(uuid,uuid,uuid),
   create_order(uuid,public.order_kind,uuid,uuid,uuid,uuid,date,text,text,jsonb,uuid),

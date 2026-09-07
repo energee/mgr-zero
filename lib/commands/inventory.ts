@@ -2,7 +2,7 @@ import { z } from "zod";
 import { defineCommand, defineQuery, unwrap, Ctx, CommandExecution } from "./registry";
 
 const movementInput = z.object({
-  skuId: z.string().uuid(), locationId: z.string().uuid(),
+  skuId: z.string().uuid(), locationId: z.string().uuid(), binId: z.string().uuid(),
   qty: z.number().refine(n => n !== 0, "qty cannot be 0"),
   type: z.enum(["opening_balance", "production_in", "adjustment", "sale_removal", "taproom_transfer",
                 "depletion", "return_in", "destruction", "loss", "sample", "festival_removal"]),
@@ -12,13 +12,14 @@ const movementInput = z.object({
 });
 
 /**
- * Appends an inventory movement through its security-invoker RPC. `bbl` is
- * not supplied: the DB trigger (enforce_bbl_integrity, 00001_baseline.sql)
+ * Appends an inventory movement through its security-definer RPC. `binId` is
+ * required: every ledger row names a bin and there is no default bin. `bbl`
+ * is not supplied: the DB trigger (enforce_bbl_integrity, 00001_baseline.sql)
  * computes it from `qty * skus.bbl_per_unit`.
  */
 export function insertMovement(ctx: Ctx, input: z.infer<typeof movementInput>, execution: CommandExecution) {
   return unwrap(ctx.db.rpc("record_inventory_movement", {
-    p_brewery: ctx.breweryId, p_sku: input.skuId, p_location: input.locationId, p_qty: input.qty,
+    p_brewery: ctx.breweryId, p_sku: input.skuId, p_location: input.locationId, p_bin: input.binId, p_qty: input.qty,
     p_type: input.type, p_channel: input.channel ?? null, p_dest_state: input.destState ?? null,
     p_note: input.note ?? null, p_request_id: execution.requestId,
   }));
@@ -65,6 +66,17 @@ defineQuery({
   handler: (ctx, i) => {
     let q = ctx.db.from("on_hand").select().eq("brewery_id", ctx.breweryId);
     if (i.skuId) q = q.eq("sku_id", i.skuId);
+    return unwrap(q);
+  },
+});
+
+defineQuery({
+  name: "get_bin_on_hand", description: "On-hand quantity per SKU/location/bin",
+  input: z.object({ skuId: z.string().uuid().optional(), locationId: z.string().uuid().optional() }), roles: [...readRoles],
+  handler: (ctx, i) => {
+    let q = ctx.db.from("bin_on_hand").select().eq("brewery_id", ctx.breweryId);
+    if (i.skuId) q = q.eq("sku_id", i.skuId);
+    if (i.locationId) q = q.eq("location_id", i.locationId);
     return unwrap(q);
   },
 });

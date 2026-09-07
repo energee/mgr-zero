@@ -6,19 +6,19 @@ import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
 let b: { id: string }, staffDb: SupabaseClient, staffId: string;
-let customerId: string, shipToId: string, whId: string, tapId: string, skuId: string;
+let customerId: string, shipToId: string, whId: string, whBinId: string, tapId: string, skuId: string;
 
 beforeAll(async () => {
   // identical seed to tests/orders-lifecycle.test.ts, plus a taproom location:
   b = await makeBrewery();
   const staff = await makeStaff(b.id); staffId = staff.id; staffDb = await asUser(staff.email);
-  whId = (await seedLocation(b.id)).id;
+  ({ id: whId, binId: whBinId } = await seedLocation(b.id));
   tapId = (await seedLocation(b.id, { name: "Taproom", kind: "taproom" })).id;
   ({ skuId } = await seedCatalog(b.id, { sku: "IPA 1/2bbl", packageType: "keg", bblPerUnit: 0.5 }));
   const cust = await seedCustomer(b.id);
   ({ customerId, shipToId } = cust);
   await admin.from("price_list_items").insert({ brewery_id: b.id, price_list_id: cust.priceListId, sku_id: skuId, unit_price_cents: 12000 });
-  await admin.from("inventory_movements").insert({ brewery_id: b.id, sku_id: skuId, location_id: whId, qty: 100, type: "opening_balance", created_by: staffId });
+  await admin.from("inventory_movements").insert({ brewery_id: b.id, sku_id: skuId, location_id: whId, bin_id: whBinId, qty: 100, type: "opening_balance", created_by: staffId });
 });
 
 async function confirmedOrder(qty = 10) {

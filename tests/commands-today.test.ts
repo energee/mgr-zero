@@ -12,7 +12,7 @@ const sql = new pg.Pool({ connectionString: DB });
 
 type Ctx = Awaited<ReturnType<typeof makeStaffCtx>>;
 let b: { id: string }, adminCtx: Ctx, sales: Ctx, warehouse: Ctx, brewer: Ctx;
-let customerId: string, shipToId: string, whId: string, skuId: string;
+let customerId: string, shipToId: string, whId: string, whBinId: string, skuId: string;
 
 async function ins<T = { id: string }>(table: string, row: Record<string, unknown>): Promise<T> {
   const { data, error } = await admin.from(table).insert(row).select().single();
@@ -41,13 +41,14 @@ beforeAll(async () => {
     makeStaffCtx(b.id, "admin"), makeStaffCtx(b.id, "sales"), makeStaffCtx(b.id, "warehouse"), makeStaffCtx(b.id, "brewer"),
   ]);
   whId = (await ins("locations", { brewery_id: b.id, name: "WH", kind: "warehouse" })).id;
+  whBinId = (await ins("bins", { brewery_id: b.id, location_id: whId, name: "Cold" })).id;
   const product = await ins("products", { brewery_id: b.id, name: "IPA" });
   skuId = (await ins("skus", { brewery_id: b.id, product_id: product.id, name: "IPA 1/2bbl", package_type: "keg", bbl_per_unit: 0.5 })).id;
   const pl = await ins("price_lists", { brewery_id: b.id, name: "std" });
   await ins("price_list_items", { brewery_id: b.id, price_list_id: pl.id, sku_id: skuId, unit_price_cents: 12000 });
   customerId = (await ins("customers", { brewery_id: b.id, name: "Secret Bar LLC", type: "retailer", state: "PA", price_list_id: pl.id })).id;
   shipToId = (await ins("ship_tos", { brewery_id: b.id, customer_id: customerId, label: "m", address1: "1", city: "P", state: "PA", zip: "19100" })).id;
-  await ins("inventory_movements", { brewery_id: b.id, sku_id: skuId, location_id: whId, qty: 100, type: "opening_balance", created_by: adminCtx.userId });
+  await ins("inventory_movements", { brewery_id: b.id, sku_id: skuId, location_id: whId, bin_id: whBinId, qty: 100, type: "opening_balance", created_by: adminCtx.userId });
 });
 
 describe("get_today (registered reader)", () => {

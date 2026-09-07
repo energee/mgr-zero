@@ -176,6 +176,7 @@ omitted. They have no roles until they are built.
 | `daily_pick_sheet` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `delete_bin` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `get_atp` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
+| `get_bin_on_hand` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `get_chat_link_status` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
 | `get_customer` | Customers | ✓ | ✓ | ✓ |  |  |
 | `get_delivery_stop` | Delivery & routes | ✓ | ✓ | ✓ |  |  |
@@ -1022,6 +1023,24 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_atp", "input": {} }'
 ```
 
+#### get_bin_on_hand [#get_bin_on_hand]
+
+`query` · admin, sales, warehouse
+
+On-hand quantity per SKU/location/bin
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `skuId` | uuid | no |
+| `locationId` | uuid | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_bin_on_hand", "input": {} }'
+```
+
 #### get_on_hand [#get_on_hand]
 
 `query` · admin, sales, warehouse
@@ -1099,6 +1118,7 @@ Append an inventory movement (immutable; corrections are reversals)
 | --- | --- | --- |
 | `skuId` | uuid | yes |
 | `locationId` | uuid | yes |
+| `binId` | uuid | yes |
 | `qty` | number | yes |
 | `type` | opening_balance or production_in or adjustment or sale_removal or taproom_transfer or depletion or return_in or destruction or loss or sample or festival_removal | yes |
 | `channel` | wholesale or taproom or dtc or export | no |
@@ -1109,7 +1129,7 @@ Append an inventory movement (immutable; corrections are reversals)
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_movement", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "skuId": "00000000-0000-0000-0000-000000000000", "locationId": "00000000-0000-0000-0000-000000000000", "qty": 1, "type": "opening_balance" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_movement", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "skuId": "00000000-0000-0000-0000-000000000000", "locationId": "00000000-0000-0000-0000-000000000000", "binId": "00000000-0000-0000-0000-000000000000", "qty": 1, "type": "opening_balance" } }'
 ```
 
 #### update_bin [#update_bin]
@@ -1153,13 +1173,12 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* inventory-designed */}
 
-11 of the 13 operations in this area are available today; the 2 below are not.
+12 of the 13 operations in this area are available today; the 1 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
-| `get_bin` | query | Bin |
 | `reverse_inventory_movement` | command | SKU detail |
 
 {/* end ops:inventory */}

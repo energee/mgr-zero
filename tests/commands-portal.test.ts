@@ -7,20 +7,20 @@ import { runCommand } from "../lib/commands/registry";
 import "../lib/commands/all";
 
 let b: { id: string }, adminCtx: Awaited<ReturnType<typeof makeStaffCtx>>;
-let customerId: string, shipToId: string, priceListId: string, skuId: string, warehouseId: string;
+let customerId: string, shipToId: string, priceListId: string, skuId: string, warehouseId: string, warehouseBinId: string;
 let custCtx: { db: Awaited<ReturnType<typeof asUser>>; userId: string; breweryId: string; role: "customer"; customerId: string };
 
 beforeAll(async () => {
   b = await makeBrewery();
   adminCtx = await makeStaffCtx(b.id, "admin");
-  warehouseId = (await seedLocation(b.id)).id;
+  ({ id: warehouseId, binId: warehouseBinId } = await seedLocation(b.id));
   ({ skuId } = await seedCatalog(b.id));
   ({ customerId, shipToId, priceListId } = await seedCustomer(b.id));
   await admin.from("price_list_items").insert({ brewery_id: b.id, price_list_id: priceListId, sku_id: skuId, unit_price_cents: 3600 });
   // Put stock on hand so the "in" badge tier is reachable.
   const { data: loc } = await admin.from("locations").select("id").eq("id", warehouseId).single();
   await admin.from("inventory_movements").insert({
-    brewery_id: b.id, sku_id: skuId, location_id: loc!.id, qty: 100, bbl: 100 * 0.0645,
+    brewery_id: b.id, sku_id: skuId, location_id: loc!.id, bin_id: warehouseBinId, qty: 100, bbl: 100 * 0.0645,
     type: "production_in", created_by: adminCtx.userId,
   });
   const custUser = await makeCustomerUser(customerId);

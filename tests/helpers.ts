@@ -80,11 +80,17 @@ export async function seedCatalog(
   return { productId: p.id as string, skuId: s.id as string };
 }
 
-export async function seedLocation(breweryId: string, opts: { name?: string; kind?: "warehouse" | "taproom" } = {}) {
+// Mirrors create_location: a location is born with Walk-in, Cold and Dry.
+// `binId` is the alphabetically first (Cold), the one order stock lands in.
+export async function seedLocation(breweryId: string, opts: { name?: string; kind?: "warehouse" | "taproom" | "storage" } = {}) {
   const row = { brewery_id: breweryId, name: opts.name ?? "WH", kind: opts.kind ?? "warehouse" };
   const { data, error } = await admin.from("locations").insert(row).select("id, name, kind").single();
   if (error) throw error;
-  return data as { id: string; name: string; kind: string };
+  const { data: bins, error: be } = await admin.from("bins")
+    .insert(["Walk-in", "Cold", "Dry"].map((name) => ({ brewery_id: breweryId, location_id: data.id, name }))).select("id, name");
+  if (be) throw be;
+  const binId = (bins as { id: string; name: string }[]).sort((a, b) => a.name.localeCompare(b.name))[0].id;
+  return { ...(data as { id: string; name: string; kind: string }), binId };
 }
 
 // A customer with one ship-to and a price list (created empty unless given).

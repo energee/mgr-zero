@@ -21,7 +21,9 @@ async function seed() {
   });
   const lot = await mk<{ id: string }>("material_lots", { brewery_id: b.id, material_id: tracked.id, lot_code: "L1" });
   const pool = await mk<{ id: string }>("keg_pools", { brewery_id: b.id, name: "Owned", kind: "owned" });
-  return { b, staff, db, tracked, untracked, lot, pool };
+  const loc = await mk<{ id: string }>("locations", { brewery_id: b.id, name: "Conv WH", kind: "warehouse" });
+  const bin = await mk<{ id: string }>("bins", { brewery_id: b.id, location_id: loc.id, name: "Conv bin" });
+  return { b, staff, db, tracked, untracked, lot, pool, loc, bin };
 }
 
 describe("schema conventions (live DB)", () => {
@@ -31,13 +33,13 @@ describe("schema conventions (live DB)", () => {
   it("composite FK: a material_movement cannot reference another brewery's material", async () => {
     const other = await makeBrewery();
     const { error } = await admin.from("material_movements").insert({
-      brewery_id: other.id, material_id: s.untracked.id, qty: 5, type: "opening_balance", created_by: s.staff.id,
+      brewery_id: other.id, material_id: s.untracked.id, location_id: s.loc.id, bin_id: s.bin.id, qty: 5, type: "opening_balance", created_by: s.staff.id,
     });
     expect(error?.code).toBe("23503"); // foreign_key_violation
   });
 
   it("lot_tracked material: consumption without lot_id is rejected; with lot_id accepted", async () => {
-    const base = { brewery_id: s.b.id, material_id: s.tracked.id, qty: -1, type: "consumption", created_by: s.staff.id };
+    const base = { brewery_id: s.b.id, material_id: s.tracked.id, location_id: s.loc.id, bin_id: s.bin.id, qty: -1, type: "consumption", created_by: s.staff.id };
     const { error } = await admin.from("material_movements").insert(base);
     expect(error?.code).toBe("23514"); // check_violation raised by enforce_material_lot()
     const ok = await admin.from("material_movements").insert({ ...base, lot_id: s.lot.id });
@@ -46,7 +48,7 @@ describe("schema conventions (live DB)", () => {
 
   it("untracked material: a lot_id is rejected", async () => {
     const { error } = await admin.from("material_movements").insert({
-      brewery_id: s.b.id, material_id: s.untracked.id, lot_id: s.lot.id, qty: 1, type: "receipt", created_by: s.staff.id,
+      brewery_id: s.b.id, material_id: s.untracked.id, lot_id: s.lot.id, location_id: s.loc.id, bin_id: s.bin.id, qty: 1, type: "receipt", created_by: s.staff.id,
     });
     // the composite FK (lot_id, material_id) fails before the trigger runs; either way it is rejected
     expect(error).not.toBeNull();
@@ -54,11 +56,11 @@ describe("schema conventions (live DB)", () => {
 
   it("material_movements and keg_events reject UPDATE and DELETE", async () => {
     const { data: mm, error: e1 } = await admin.from("material_movements")
-      .insert({ brewery_id: s.b.id, material_id: s.untracked.id, qty: 100, type: "opening_balance", created_by: s.staff.id })
+      .insert({ brewery_id: s.b.id, material_id: s.untracked.id, location_id: s.loc.id, bin_id: s.bin.id, qty: 100, type: "opening_balance", created_by: s.staff.id })
       .select().single();
     expect(e1).toBeNull();
     const { data: ke, error: e2 } = await admin.from("keg_events")
-      .insert({ brewery_id: s.b.id, pool_id: s.pool.id, keg_size: "half_bbl", qty: 10, reason: "acquired", created_by: s.staff.id })
+      .insert({ brewery_id: s.b.id, pool_id: s.pool.id, location_id: s.loc.id, bin_id: s.bin.id, keg_size: "half_bbl", qty: 10, reason: "acquired", created_by: s.staff.id })
       .select().single();
     expect(e2).toBeNull();
 

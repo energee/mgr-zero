@@ -23,7 +23,7 @@ const sql = new pg.Pool({ connectionString: adminUrl });
 
 type Ctx = Awaited<ReturnType<typeof makeStaffCtx>>;
 let b: { id: string }, adminCtx: Ctx, sales: Ctx, inst: { id: string; external_installation_id: string };
-let customerId: string, shipToId: string, whId: string, skuId: string;
+let customerId: string, shipToId: string, whId: string, whBinId: string, skuId: string;
 
 const calls = { sends: [] as { destinationId: string; at: number; notification: { subject: { safeLabel: string }; detail: string } }[], updates: [] as { ref: { messageId: string }; resolved?: boolean }[], homes: [] as { externalUserId: string; items: readonly unknown[]; linkUrl?: string }[] };
 let failNext: unknown = null;
@@ -73,13 +73,14 @@ beforeAll(async () => {
   inst = await ins("chat_installations", { brewery_id: b.id, provider: "slack", external_installation_id: teamId, display_label: "Demo", state: "active", installer_user_id: adminCtx.userId, token_store_key: `slack:installation:${teamId}` });
   await Promise.all([linkWithDm(adminCtx, "U-admin"), linkWithDm(sales, "U-sales")]);
   whId = (await ins("locations", { brewery_id: b.id, name: "WH", kind: "warehouse" })).id;
+  whBinId = (await ins("bins", { brewery_id: b.id, location_id: whId, name: "Cold" })).id;
   const product = await ins("products", { brewery_id: b.id, name: "IPA" });
   skuId = (await ins("skus", { brewery_id: b.id, product_id: product.id, name: "IPA 1/2bbl", package_type: "keg", bbl_per_unit: 0.5 })).id;
   const pl = await ins("price_lists", { brewery_id: b.id, name: "std" });
   await ins("price_list_items", { brewery_id: b.id, price_list_id: pl.id, sku_id: skuId, unit_price_cents: 12000 });
   customerId = (await ins("customers", { brewery_id: b.id, name: "Bar", type: "retailer", state: "PA", price_list_id: pl.id })).id;
   shipToId = (await ins("ship_tos", { brewery_id: b.id, customer_id: customerId, label: "m", address1: "1", city: "P", state: "PA", zip: "19100" })).id;
-  await ins("inventory_movements", { brewery_id: b.id, sku_id: skuId, location_id: whId, qty: 100, type: "opening_balance", created_by: adminCtx.userId });
+  await ins("inventory_movements", { brewery_id: b.id, sku_id: skuId, location_id: whId, bin_id: whBinId, qty: 100, type: "opening_balance", created_by: adminCtx.userId });
   await drain();
 });
 afterAll(async () => { await sql.end(); });

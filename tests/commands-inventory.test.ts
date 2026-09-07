@@ -17,7 +17,8 @@ describe("inventory commands", () => {
     const p = (await runCommand("create_product", { name: "Pils" }, ctx)) as EntityWithId;
     const s = (await runCommand("create_sku", { productId: p.id, name: "1/6 bbl keg", packageType: "keg", bblPerUnit: "0.16666667" }, ctx)) as EntityWithId;
     const l = (await runCommand("create_location", { name: "WH", kind: "warehouse" }, ctx)) as EntityWithId;
-    await runCommand("record_movement", { skuId: s.id, locationId: l.id, qty: 12, type: "opening_balance" }, ctx);
+    const [bin] = (await runCommand("list_bins", { locationId: l.id }, ctx)) as EntityWithId[];
+    await runCommand("record_movement", { skuId: s.id, locationId: l.id, binId: bin.id, qty: 12, type: "opening_balance" }, ctx);
     const oh = (await runCommand("get_on_hand", { skuId: s.id }, ctx)) as OnHandRow[];
     expect(Number(oh[0].qty)).toBe(12);
   });
@@ -26,7 +27,8 @@ describe("inventory commands", () => {
     const p = (await runCommand("create_product", { name: "Stout" }, ctx)) as EntityWithId;
     const s = (await runCommand("create_sku", { productId: p.id, name: "1/2 bbl keg", packageType: "keg", bblPerUnit: "0.5" }, ctx)) as EntityWithId;
     const l = (await runCommand("create_location", { name: "WH2", kind: "warehouse" }, ctx)) as EntityWithId;
-    await expect(runCommand("record_movement", { skuId: s.id, locationId: l.id, qty: -1, type: "sale_removal", channel: "wholesale" }, ctx))
+    const [bin] = (await runCommand("list_bins", { locationId: l.id }, ctx)) as EntityWithId[];
+    await expect(runCommand("record_movement", { skuId: s.id, locationId: l.id, binId: bin.id, qty: -1, type: "sale_removal", channel: "wholesale" }, ctx))
       .rejects.toThrow();
   });
 });
