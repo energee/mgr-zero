@@ -100,6 +100,25 @@ describe("SCREENS", () => {
     expect(ferm).toContain("Add stage");
   });
 
+  it("shows a SKU the barcode its group resolves, and never claims to own one", () => {
+    const sku = SCREENS.find((s) => s.name === "SKU")!;
+    expect(sku.spec).not.toMatch(/UPC\/provider mappings/);
+    expect(String(sku.spec)).toMatch(/price group/i);
+    const text = renderToStaticMarkup(createElement("div", null, sku.body))
+      .replace(/<[^>]*>/g, " ");
+    expect(text).toContain("Barcode");
+    expect(text).toContain("00810123450127");
+  });
+
+  it("lets a recipe parent suggest a price group without pricing a version", () => {
+    const recipe = SCREENS.find((s) => s.name === "Recipe")!;
+    const text = renderToStaticMarkup(createElement("div", null, recipe.body))
+      .replace(/<[^>]*>/g, " ");
+    expect(text).toContain("Default price group");
+    expect(text).toMatch(/pre-fill/i);
+    expect(String(recipe.writes)).not.toMatch(/price/i);
+  });
+
   it("gives a price group a cost ceiling that only suggests", () => {
     const group = SCREENS.find((s) => s.name === "Price group")!;
     const text = renderToStaticMarkup(createElement("div", null, group.body))
