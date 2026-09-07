@@ -3640,7 +3640,13 @@ begin
   select * into v_occupancy from public.vessel_occupancies
   where id = v_run.occupancy_id and brewery_id = p_brewery for update;
   if v_occupancy.id is null then raise exception 'occupancy not found'; end if;
-  if v_occupancy.ended_at is not null then raise exception 'occupancy is closed'; end if;
+  -- The over-draw check below would refuse this anyway -- an ended occupancy
+  -- holds nothing -- but only for a run that drew something. Saying it here
+  -- keeps a zero-bbl close from quietly booking beer against an emptied tank,
+  -- and names the order the two steps belong in.
+  if v_occupancy.ended_at is not null then
+    raise exception 'the tank was emptied before this run closed; close runs before transferring the heel out';
+  end if;
 
   select bbl into v_available from public.occupancy_volumes where occupancy_id = v_occupancy.id;
   if p_bbl_drawn > coalesce(v_available, 0) + c_epsilon then
@@ -3654,6 +3660,11 @@ begin
     raise exception 'package % is listed twice; give it one line with the total', v_dupe;
   end if;
 
+  -- lots is unique (brewery_id, code); say so as a sentence rather than let a
+  -- 23505 carrying a constraint name reach the brewer.
+  if exists (select 1 from public.lots where brewery_id = p_brewery and code = p_lot_code) then
+    raise exception 'lot code "%" is already used', p_lot_code;
+  end if;
   insert into public.lots (brewery_id, packaging_run_id, brand_id, code, packaged_on, best_by)
   values (p_brewery, p_run, v_run.brand_id, p_lot_code, p_packaged_on, p_best_by)
   returning id into v_lot;

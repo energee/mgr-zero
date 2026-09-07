@@ -460,6 +460,56 @@ describe("closing the run", () => {
       lotCode: "L-tracked", packagedOn: "2026-12-05", locationId: wh.id, binId: wh.binId,
     }, ctx)).rejects.toThrow(/cannot post BOM for lot-tracked material "Tracked crown" yet/);
   });
+
+  it("explains an emptied tank instead of blaming the volume", async () => {
+    // A brewer who racks the heel out before closing the paperwork ends the
+    // occupancy, and the run is left pointing at a tank that no longer exists.
+    // The over-draw check would refuse any real draw anyway, but it would talk
+    // about barrels; this says what actually happened and in what order the two
+    // steps belong.
+    const { runId, occupancyId } = await startedRun("FV-EMPTIED", 12, "2026-12-06");
+    const brite = (await runCommand("upsert_vessel",
+      { name: "BT-EMPTIED", kind: "brite", capacityBbl: 60 }, ctx)) as { id: string };
+    await runCommand("record_cellar_transfer",
+      { fromOccupancyId: occupancyId, toVesselId: brite.id, volumeBbl: 12 }, ctx);
+
+    const ended = await admin.from("vessel_occupancies").select("ended_at").eq("id", occupancyId).single();
+    expect(ended.data?.ended_at).toBeTruthy();
+
+    await expect(runCommand("close_packaging_run", {
+      runId, bblDrawn: 0, outputs: [], lotCode: "L-emptied", packagedOn: "2026-12-06",
+      locationId: wh.id, binId: wh.binId,
+    }, ctx)).rejects.toThrow(/the tank was emptied before this run closed; close runs before transferring the heel out/);
+  });
+
+  it("refuses the same package listed twice, leaving the run open and lotless", async () => {
+    const { runId } = await startedRun("FV-DUPE", 20, "2026-12-07");
+    await expect(runCommand("close_packaging_run", {
+      runId, bblDrawn: 5,
+      outputs: [{ skuId: stout.skuId, qtyActual: 100 }, { skuId: stout.skuId, qtyActual: 50 }],
+      lotCode: "L-dupe", packagedOn: "2026-12-07", locationId: wh.id, binId: wh.binId,
+    }, ctx)).rejects.toThrow(/listed twice; give it one line with the total/);
+
+    // The whole close is one transaction: nothing of it may survive the refusal.
+    const run = (await admin.from("packaging_runs").select("closed_at, bbl_drawn").eq("id", runId).single()).data!;
+    expect(run.closed_at).toBeNull();
+    expect(run.bbl_drawn).toBeNull();
+    expect((await admin.from("lots").select("id").eq("packaging_run_id", runId)).data).toEqual([]);
+  });
+
+  it("names a lot code that is already used rather than leaking the unique constraint", async () => {
+    const first = await startedRun("FV-LOT-1", 20, "2026-12-08");
+    await runCommand("close_packaging_run", {
+      runId: first.runId, bblDrawn: 5, outputs: [{ skuId: stout.skuId, qtyActual: 10 }],
+      lotCode: "L-taken", packagedOn: "2026-12-08", locationId: wh.id, binId: wh.binId,
+    }, ctx);
+
+    const second = await startedRun("FV-LOT-2", 20, "2026-12-09");
+    await expect(runCommand("close_packaging_run", {
+      runId: second.runId, bblDrawn: 5, outputs: [{ skuId: stout.skuId, qtyActual: 10 }],
+      lotCode: "L-taken", packagedOn: "2026-12-09", locationId: wh.id, binId: wh.binId,
+    }, ctx)).rejects.toThrow(/lot code "L-taken" is already used/);
+  });
 });
 
 describe("record_repack", () => {
