@@ -1365,14 +1365,13 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* taproom-designed */}
 
-3 of the 14 operations in this area are available today; the 11 below are not.
+3 of the 13 operations in this area are available today; the 10 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
 | `create_keg_pool` | command | Keg fleet |
-| `create_taproom_transfer` | command | Weekly count |
 | `get_customer_keg_balance` | query | Customer keg balance |
 | `kick_keg` | command | Tap board, Kick keg |
 | `list_keg_events` | query | Keg event history |
