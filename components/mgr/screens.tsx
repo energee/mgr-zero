@@ -2880,7 +2880,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("More", "Planning")}
       {E.tbl(["week", "demand", "supply", "gap"], [["9/7", "48 bbl", "40 bbl", <><span className="text-warning-foreground">−8</span></>], ["9/14", "52 bbl", "60 bbl", "+8"]])}
-      {E.row("Sept 12 packaging", "short 480 ends · buy by 9/2", E.act("Review"), "w")}
+      {E.row("Sept 12 packaging", "short 480 ends · buy by 9/5", E.act("Review"), "w")}
       {E.row("Hazy ATP negative 9/9", "open named shortfall", E.act("Review"))}
       {E.ttl("Drafts this creates")}
       {E.row("Lindenmeyr Munroe", "cans, ends, quadpacks, trays · 3 day lead", "4 lines")}
