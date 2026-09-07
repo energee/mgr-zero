@@ -64,6 +64,16 @@ defineQuery({
     .eq("brewery_id", ctx.breweryId).order("name")),
 });
 
+// The recipe version editor's ingredient picker: a name and category per
+// material, plus whether it typed an extract potential (so the picker can
+// warn that a boil/hop-style addition contributes no gravity).
+defineQuery({
+  name: "list_materials", description: "Materials, alphabetical, with category and extract potential",
+  input: z.object({}), roles: ["admin", "brewer"],
+  handler: (ctx) => unwrap(ctx.db.from("materials").select("id, name, category, extract_potential")
+    .eq("brewery_id", ctx.breweryId).eq("active", true).order("name")),
+});
+
 // A missing extract snapshot predicts as 1.0 — no extract, which is what a
 // material with no typed potential (a hop, a chemical) contributes. Number()
 // guards the numeric columns against a driver that hands them back as strings.

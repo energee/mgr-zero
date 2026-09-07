@@ -290,11 +290,61 @@ The page says **No taprooms configured.** when none exist, or **No pars set for 
 
 ## Recipes [#recipes]
 
-A recipe version is the process spec a brewer follows: the ingredients and the stage each is added at, the pre-boil volume and boil time, the whirlpool and knockout temperatures, and links to the mash schedule, the fermentation schedule, and the water. A version cannot be edited once it is cut. Create the next version instead, so what a past batch was brewed from stays true.
+<Screen name="Recipes" />
 
-The mash schedule is the list of rests, each with a temperature and a length. The fermentation schedule is the list of stages, each with a temperature and a number of days; a dry hop written for day 4 falls inside whichever stage covers that day.
+<Screen name="Recipe" />
 
-Your source water is set once in Settings and every recipe starts from it. A recipe overrides it only when that batch genuinely uses different water, such as a blend with osmosis water. Water profiles themselves live in Catalog, so a new water report is one edit rather than one per recipe.
+*Admin and Brewer.*
+
+Open **Recipes** from the **More** navigation to see every recipe, alphabetical, with the brand each one brews. Select **New recipe** for a **Name**, an optional **Brand**, and an optional note; the brand is intent only — identity is required at packaging, not here. Select a row to open the recipe.
+
+A recipe version is the process spec a brewer follows: the mash temperature, brewhouse efficiency and yeast attenuation, an optional boil length and target IBU, and its ingredients — each a material, a quantity per barrel, the stage it enters at (*mash*, *boil*, *whirlpool*, *fermentation*, *dry hop*, *packaging*, or *other*), and an optional timing in minutes. A version cannot be edited once it is saved; select **New version** to write the next one, so what a past batch was brewed from stays true.
+
+Only mash-stage ingredients predict gravity. As you add ingredients, MGR previews the version's predicted OG, FG and ABV live, using the same calculation the record reads back afterward — nothing is stored, so a later edit to a material's typed extract potential can never move an old version's prediction; a new version snapshots the value it saw at the moment it was saved.
+
+## Batches [#batches]
+
+<Screen name="Batches" />
+
+<Screen name="Schedule batch" />
+
+<Screen name="Brew day" />
+
+*Admin and Brewer.*
+
+Open **Batches** from the **Work** navigation to see planned and brewed batches by date, newest first, each with the brand, recipe and vessel it names today. Select **New batch** for a **Recipe version** and a **Brand**, both optional, plus the **Planned barrels** and **Date** that actually reserve the slot — a batch names nothing further until it is brewed, and identity is not required until packaging.
+
+Select a planned batch to record its brew day: choose the **Vessel** it knocked out into, the **Knockout barrels**, and the **Brewed on** date, then select **Record brew day**. This stamps the brew date and opens the vessel's occupancy in one step; it is refused if the vessel is already occupied, including a backdated day that falls inside a stretch the vessel was full but has since been emptied. A brewed batch's page shows the vessel and knockout volume it landed in instead of the brew-day form.
+
+Vessels themselves are managed at the bottom of the Batches page: **New vessel** (or **Edit** on a row) takes a **Name**, a **Kind** (*fermenter*, *brite*, *barrel*, *kettle*, or *other*), and a **Capacity** in barrels. A vessel's contents are never entered directly — they always derive from its open occupancy.
+
+## Cellar [#cellar]
+
+<Screen name="Cellar transfer" />
+
+<Screen name="Fermentation reading" />
+
+*Admin and Brewer.*
+
+Open **Cellar** from the **Beer** navigation to see every occupied tank: its vessel, the brand it holds, the barrels in it, and how long it has been there. Select **Transfer** for a **From** occupancy, a **To** vessel, the **Barrels moving**, and an optional **Loss (bbl)**. Moving into an empty vessel opens a new occupancy there; moving into an already-occupied vessel blends into it, keeping that vessel's existing batch identity — a blend is never a new batch. A source occupancy closes automatically once it empties.
+
+Select **Reading** on a tank to open its reading log and record the next one: **Temperature** is required; **Gravity (°Plato)**, **pH**, and a note are each optional, because a quick temperature check is a legitimate reading on its own. Readings never overwrite one another — each is its own row, newest first.
+
+## Packaging [#packaging]
+
+<Screen name="Packaging runs" />
+
+<Screen name="Schedule packaging run" />
+
+<Screen name="Close packaging run" />
+
+*Admin, Brewer, and Warehouse.*
+
+Open **Packaging** from the **Work** navigation to see every run by planned date, newest first, with its next action named on the row. Select **Schedule run** for a **Brand**, a **Planned date**, an optional **Source tank**, and planned output lines (a SKU and a quantity each) — a run is identified by the brand it packages from the moment it is planned; the tank can be picked later.
+
+A run without a tank shows **Pick source** on its page: choose a **Source tank** and confirm. Once it has a tank, **Start** stamps it started — both picking the tank and starting require one, so an unsourced run can never begin. A started run's page becomes the close form: **Barrels drawn**, the **Actual outputs** for each planned SKU (defaulting to the planned quantity), a **Lot code**, **Packaged on** and an optional **Best by** date, and the **Finished goods location** and bin the packaged units land in — all four of the last group are required, because a vessel has no location of its own for the goods to appear at. Select **Close packaging run** to write the lot, the finished-goods stock, and the packaging materials consumed in one step. The tank itself stays open afterward; emptying it is a separate Cellar transfer.
+
+**Repack**, next to Schedule run, breaks a composed unit (a case) into the units it is made of at one location and bin — a shape change, never a production or a removal. Choose the **Location** and **Bin**, the SKU you are **Breaking** and its quantity, and the SKU you are packing it **Into** and its quantity. It is refused unless the two SKUs share a brand and their formats are joined by exactly one composition record, and unless the volumes on both sides match exactly.
 
 ## Team [#team]
 

@@ -83,6 +83,16 @@ describe("recipes and immutable versions", () => {
     expect(listed.map((r) => r.id)).toContain(recipe.id);
   });
 
+  // The recipe version editor needs a name to show beside each ingredient
+  // row; this is the query it reads that from.
+  it("lists materials alphabetically for the ingredient picker", async () => {
+    const listed = (await runCommand("list_materials", {}, ctx)) as { id: string; name: string; category: string }[];
+    const names = listed.map((m) => m.name);
+    expect(names).toContain("Pale Ale Malt");
+    expect(names).toContain("Citra");
+    expect(names).toEqual([...names].sort());
+  });
+
   it("refuses an efficiency or attenuation outside (0,1]", async () => {
     const recipe = (await runCommand("create_recipe", { name: "Fraction check" }, ctx)) as { id: string };
     const bad = (v: Record<string, number>) => runCommand("create_recipe_version", {

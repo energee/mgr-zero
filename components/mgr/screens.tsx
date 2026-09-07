@@ -159,9 +159,9 @@ const INVITE_GATE = "isn’t available yet; invitations are being made retry-saf
 const REVERSAL_GATE = "isn’t available yet: a reversal needs an auditable link and TTB semantics. Until it closes no movement anywhere in MGR can be corrected, and a mistyped removal reaches the report";
 
 // The Work list chips, in the order every Work list draws them.
-const WORK_CHIPS = ["all", "orders", "transfers", "batches", "runs", "POs", "routes"];
-/** The screen each Work chip opens: the chips are one bar drawn on the Work lists. */
-export const WORK_TABS: Record<string, string> = { all: "Work", orders: "Orders", transfers: "Transfers", batches: "Batches", runs: "Packaging runs", POs: "Purchase orders", routes: "Routes" };
+const WORK_CHIPS = ["all", "orders", "batches", "runs", "POs", "routes"];
+/** The screen each Work chip opens: the chips are one bar drawn on six screens. */
+export const WORK_TABS: Record<string, string> = { all: "Work", orders: "Orders", batches: "Batches", runs: "Packaging runs", POs: "Purchase orders", routes: "Routes" };
 const ORDER_STATES = ["all states", "draft", "submitted", "confirmed", "picked", "shipped"];
 
 // The states every screen can reach; a record with designed states lists its own instead.
@@ -387,7 +387,7 @@ export const SCREENS: Screen[] = [
     slice: "all",
     tab: "More",
     name: "Location detail",
-    to: { "Save location": "Locations", "Location bins": "Location bins" },
+    to: { "Save location": "Locations" },
     job: "Edit one location and open its physical bins",
     reads: "list_locations",
     writes: "update_location",
@@ -976,7 +976,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Work",
     name: "Order",
-    to: { Adjust: "Adjust lines", "Add line": "New order", Cancel: "Orders" },
+    to: { Adjust: "Short pick", "Add line": "New order", Cancel: "Orders" },
     job: "The staff home for one order: state, next action, lines, events, restock",
     reads: "get_order · get_atp",
     writes: "submit_order · adjust_order_lines [sets needs_restock on a picked order] · confirm_order · cancel_order [needs_restock while quantities are staged]",
@@ -997,27 +997,6 @@ export const SCREENS: Screen[] = [
       {E.tape([["created · Ted", "Mon 9:02"], ["submitted · Ted", "Mon 9:05"], ["confirmed · Maria", "Mon 14:10"], ["picked · Dave · 4 / 10 / 2", "Tue 8:40"], [<>line adjusted · Pils 10 {E.arrow()} 7 · customer cut</>, "Tue 9:15"], ["restock pending · 3 Pils staged", "Tue 9:15"]])}
       {E.btns([["Ship", "p"], ["Cancel order", "del"]])}
       {E.info("Cancel asks you to confirm. Allocations release.")}
-    </>),
-  },
-  {
-    step: 5,
-    slice: 1,
-    tab: "Work",
-    surface: "sheet",
-    name: "Adjust lines",
-    to: { "Save lines": "Order" },
-    job: "Replace the lines on a confirmed or picked order and say why",
-    reads: "get_order · list_skus",
-    writes: "adjust_order_lines [sets needs_restock on a picked order]",
-    states: [["permission", "sales or admin required", 1], ["picked", "qty below picked stages the rest for Put back"], ["stale", "another user changed a line · refresh", 1]],
-    spec: "Opens from Order · Adjust. This is a line edit, not a short pick: Short pick is pick-time shortage from the Pick frame. Reason is required. Saving replaces the full line set in one RPC.",
-    body: (<>
-      {E.back("ORD-0229", "Adjust lines")}
-      {E.row("Hazy IPA · ½ bbl keg", "", E.stq(4))}
-      {E.row("Pils · 16 oz case", "picked 10", E.stq(7), "w")}
-      {E.row("Stout · ⅙ bbl keg", "", E.stq(2))}
-      {E.edit("Reason", "customer cut")}
-      {E.btn("Save lines")}
     </>),
   },
   {
@@ -1134,8 +1113,8 @@ export const SCREENS: Screen[] = [
     job: "The On delivery state of Ship and invoice",
     reads: "get_order",
     writes: "ship_order [invoice_timing = on_delivery persisted on the shipment; the same one RPC without the invoice; confirm_delivery invoices later]",
-    states: [["stale", "picked qty changed · preview", 1], ["offline", "wait for live recheck", 1], ["permission", "warehouse or admin required", 1]],
-    spec: "Folded into Ship and invoice as the On delivery chip. Same fields as Invoice now; the timing is saved on the shipment so Confirm delivery can invoice later. Two screens both titled Ship was confusing.",
+    states: [["stale", "picked qty changed · preview", 1], ["offline", "wait for live recheck", 1], ["permission", "warehouse or admin required", 1], ["schema gate", "deferred mode cannot persist yet", 1]],
+    spec: "Folded into Ship and invoice as the On delivery chip. Same fields as Invoice now; the commit stays disabled until invoice timing can be saved. Two screens both titled Ship was confusing.",
     body: (<>
       {E.back("ORD-0231", "Ship")}
       {E.pick("Fulfillment source", "Warehouse", ["Warehouse", "Taproom"])}
@@ -1143,8 +1122,9 @@ export const SCREENS: Screen[] = [
       {E.row("Pils · 16 oz case", "picked 10", E.stq(10), "ok")}
       {E.chips(["Invoice now", "On delivery"], 1)}
       {E.tape([["−4 Hazy ½ bbl · sale removal · PA", "2.00 bbl"], ["−10 Pils cases · sale removal · PA", "0.97 bbl"], ["invoice number", "deferred to delivery"]])}
+      {E.note("Shipping on delivery isn’t available yet; invoice timing can’t be saved. Choose Invoice now to ship today.")}
       {E.sp()}
-      {E.btn("Ship order", "irr")}
+      {E.btn("Ship order", "irr disabled")}
     </>),
   },
   {
@@ -1152,7 +1132,6 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Work",
     name: "Complete transfer",
-    to: { "TRF-0088": "Order" },
     job: "Finish a taproom transfer order: same movements, no invoice",
     reads: "get_order",
     writes: "ship_order [taproom_transfer kind: paired taproom_transfer movements (−source, +destination); no invoice]",
@@ -1167,68 +1146,6 @@ export const SCREENS: Screen[] = [
       {E.info("No invoice: this is an internal move.")}
       {E.sp()}
       {E.btn("Complete transfer", "irr")}
-    </>),
-  },
-  {
-    step: 5,
-    slice: 1,
-    tab: "Work",
-    name: "Transfers",
-    to: { Submit: "Transfer detail", Pick: "Transfer detail", Receive: "Transfer detail", Open: "Transfer detail", "New transfer": "New transfer", "TRF-0007": "Transfer detail", "TRF-0006": "Transfer detail" },
-    job: "Move stock between two locations without an order or an invoice",
-    reads: "list_stock_transfers · list_locations · list_bins · list_skus",
-    writes: "create_stock_transfer",
-    states: [["empty", "New transfer is the only action"], ["draft", "Submit is next"], ["submitted", "Pick is next"], ["picked", "Receive writes the paired movements"], ["permission", "warehouse or admin required", 1]],
-    spec: "The Work list with the Transfers tab active. This is the stock-transfer document (from/to location, bins on each line), not the taproom replenishment order that Complete transfer ships. A same-location pair is refused: that is a bin move.",
-    body: (<>
-      {E.hd("Work", "between locations", E.btn("New transfer"))}
-      {E.tabs(WORK_CHIPS, 2, "w-full", WORK_TABS)}
-      {E.row("TRF-0007", "Warehouse to Taproom · 2 lines · submitted", E.act("Pick", "info"), "w")}
-      {E.row("TRF-0006", "Warehouse to Storage · 1 line · picked", E.act("Receive", "success"), "w")}
-    </>),
-  },
-  {
-    step: 5,
-    slice: 1,
-    tab: "Work",
-    surface: "sheet",
-    name: "New transfer",
-    to: { "Create transfer": "Transfer detail" },
-    job: "Draft a stock transfer: two locations, a bin at each end, SKU lines",
-    reads: "list_locations · list_bins · list_skus",
-    writes: "create_stock_transfer",
-    states: [["permission", "warehouse or admin required", 1], ["same location", "refused · use a bin move", 1], ["empty lines", "Create stays off until one SKU has a qty"]],
-    spec: "Opens from Transfers · New transfer. Materials and kegs move through the same command from the API; this sheet draws the SKU case. Bins default to the first bin at each location.",
-    body: (<>
-      {E.back("Transfers", "New transfer")}
-      {E.pick("From", "Warehouse", ["Warehouse", "Taproom", "Storage"])}
-      {E.pick("From bin", "Walk-in", ["Walk-in", "Cold", "Dry"])}
-      {E.pick("To", "Taproom", ["Taproom", "Storage"])}
-      {E.pick("To bin", "Cold", ["Walk-in", "Cold", "Dry"])}
-      {E.row("Hazy IPA · ½ bbl keg", "", E.stq(2))}
-      {E.row("Pils · 16 oz case", "", E.stq(4))}
-      {E.btn("Create transfer")}
-    </>),
-  },
-  {
-    step: 5,
-    slice: 1,
-    tab: "Work",
-    name: "Transfer detail",
-    to: { Transfers: "Transfers", Submit: "Transfer detail", "Record pick": "Transfer detail", Receive: "Transfer detail", "TRF-0007": "Transfers" },
-    job: "One next verb: Submit, Record pick, or Receive the paired movements",
-    reads: "get_stock_transfer",
-    writes: "submit_stock_transfer · record_stock_transfer_pick · receive_stock_transfer [one RPC: paired location_transfer movements, no invoice]",
-    states: [["draft", "Submit is the one verb"], ["submitted", "Record pick defaults to requested qty"], ["picked", "Receive is irreversible"], ["received", "read-only tape · the stock has changed place"], ["permission", "warehouse or admin required", 1]],
-    spec: "Not Complete transfer: that ships a taproom replenishment order. Receive posts both ledger halves or neither. No invoice.",
-    body: (<>
-      {E.back("Transfers", "TRF-0007")}
-      {E.fld(<>From {E.arrow(null)} to</>, <>Warehouse {E.arrow()} Taproom</>)}
-      {E.fld("Status", "submitted")}
-      {E.row("Hazy IPA · ½ bbl keg", "Walk-in to Cold", "2")}
-      {E.row("Pils · 16 oz case", "Walk-in to Cold", "4")}
-      {E.sp()}
-      {E.btn("Record pick")}
     </>),
   },
   {
@@ -1628,7 +1545,7 @@ export const SCREENS: Screen[] = [
     name: "Package BOM",
     job: "Replace the packaging materials consumed by one format",
     reads: "list_formats · list_materials [design]",
-    writes: "replace_format_bom",
+    writes: "replace_format_bom [SCHEMA-GATE: revision 2 §16.12; one RPC replaces the selected Format BOM]",
     states: [["permission", "sales or admin required", 1], ["complete", "every material has a quantity"], ["empty", "the Format consumes no tracked packaging"]],
     spec: "The BOM belongs entirely to the Format. A different material list requires another Format; SKUs never override it.",
     body: (<>
@@ -1647,8 +1564,8 @@ export const SCREENS: Screen[] = [
     job: "Sellable facts without ledger writes, including the TTB fields",
     reads: "list_brands · list_skus",
     writes: "upsert_brand · update_sku [design; the products to brands rename] · create_sku",
-    states: [["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class; description, category, price group and hops optional"], ["new style", "typing a style no one has used offers Add; saved with the brand", 0], ["new SKU", "choose one existing packaged Format; a poured format (pint, taster) is never a SKU. Square publishes it as brand × format"], ["inactive SKU", "hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"]],
-    spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category and hops are optional nullable columns; price group is the row of the price grid the brand sits on, so the price of any of its packaged SKUs is the cell where the customer's sale channel meets that group and the SKU's format. The brand carries no price of its own, and a brand on no group is unpriced everywhere. Package facts live on Formats. A SKU is one brand × one packaged format. A poured format is never a SKU: the menu publishes brand × pint to Square, and a sale depletes the keg SKU. No container source editor here.",
+    states: [["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class; description, category, price group and hops optional"], ["new style", "typing a style no one has used offers Add; saved with the brand", 0], ["new SKU", "choose one existing Format; a poured format (pint, taster) is a SKU that holds no stock"], ["inactive SKU", "hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"]],
+    spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table [SCHEMA-GATE: a per-brewery styles table that the brand references]; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category and hops are optional nullable columns; price group is the row of the price grid the brand sits on, so the price of any of its SKUs is the cell where the customer's sale channel meets that group and the SKU's format. The brand carries no price of its own, and a brand on no group is unpriced everywhere. Package facts live on Formats, while the SKU is the stable brand × format identity used by inventory, orders, pricing and provider mappings; draft pours are SKUs on a poured format (§16.2). No UPC scan or container source editor here.",
     body: (<>
       {E.back("Catalog", "Hazy IPA")}
       {E.edit("Brand name", "Hazy IPA")}
@@ -1673,14 +1590,14 @@ export const SCREENS: Screen[] = [
     name: "SKU",
     to: { "Save SKU": "SKU list" },
     job: "Associate one shared package format with a brand",
-    reads: "list_formats",
-    writes: "create_sku · update_sku [design; no update_sku command yet]",
+    reads: "get_sku · list_formats [design; §16.2]",
+    writes: "create_sku · update_sku [SCHEMA-GATE: revision 2 §16.2, SKU becomes brand × format]",
     states: [["permission", "sales or admin required", 1], ["active", "available to price and sell"], ["inactive", "history remains", 1], ["in use", "format cannot change; create another SKU", 1]],
-    spec: "A SKU is one brand × one packaged format. It owns active state, optional UPC, and provider mappings. Price lives on the grid cell (sale channel × price group × format), never as a SKU exception. Group-shared barcodes are a follow-on table; until then a SKU may carry its own UPC. Name, volume and packaging derive from the Format. A different volume or BOM is a different Format.",
+    spec: "A SKU owns the stable sellable identity, active state, provider mappings and any price exception. Its barcode is not its own: it resolves through the brand's price group for this format, so every brand in a group scans alike and there is no SKU override to drift. Its name, volume and packaging derive from the selected Format. There are no SKU packaging overrides: a different volume or BOM is a different Format.",
     body: (<>
       {E.pick("Format", "½ bbl keg", ["½ bbl keg", "⅙ bbl keg", "case · 24×16 oz"])}
       {E.row("Active", "available to price and sell", E.sw(true, "Active"))}
-      {E.edit("UPC (optional)", INV.upc)}
+      {E.fld("Barcode", `${INV.upc} · Standard group`)}
       {E.info("Volume and packaging come from the Format. Create another Format when either differs.")}
       {E.btn("Save SKU")}
     </>),
@@ -1710,10 +1627,10 @@ export const SCREENS: Screen[] = [
     name: "Shop",
     to: { Change: "Account", "½ bbl keg": "Shop", "⅙ bbl keg": "Shop", "case · 24×16 oz": "Shop", "12 oz bottle": "Shop", "Coming up": "Coming up" },
     job: "A buyer catalog: listed packages by brand, quantity, Place order",
-    reads: "portal_catalog · get_portal_account",
+    reads: "portal_catalog [SCHEMA/RLS-GATE: return customer-allowed fulfillment source and filter to packages the brewery has listed for wholesale]",
     writes: "portal_create_order · portal_submit_order",
-    states: [["empty catalog", "call brewery; nothing orderable"], ["missing price", "item cannot enter cart", 1], ["no ship-to", "contact brewery; choose an existing ship-to", 1], ["no source", "Review stays off until the brewery sets where orders ship from", 1], ["unlisted package", "a format not on the wholesale list is absent", 1], ["receipt", "ORD number after commit"]],
-    spec: "Grouped by brand; each row is a package the brewery listed for wholesale (½ keg, ⅙ keg, case, bottle). The list is the offer, not warehouse ATP: no in/low/out badges, no counts. Unlisted packages are absent, not greyed. Schedule packaging run is where staff designate the list. Drawn with a fulfillment source already set; the no-source state keeps Review off and never silently chooses Warehouse. Stepper − and + each ship as 48×48 targets. No staff vocabulary (ATP, gates, fulfillment engineering) anywhere in the portal. No persistent cart: leaving the page keeps nothing. Reorder on a shipped order still prefills Review.",
+    states: [["empty catalog", "call brewery; nothing orderable"], ["missing price", "item cannot enter cart", 1], ["no ship-to", "contact brewery; choose an existing ship-to", 1], ["unlisted package", "a format not on the wholesale list is absent", 1], ["receipt", "ORD number after commit"]],
+    spec: "Grouped by brand; each row is a package the brewery listed for wholesale (½ keg, ⅙ keg, case, bottle). The list is the offer, not warehouse ATP: no in/low/out badges, no counts. Unlisted packages are absent, not greyed. Schedule packaging run is where staff designate the list. Review stays disabled until the schema/RLS contract supplies and validates a customer-allowed source; it never silently chooses Warehouse. Stepper − and + each ship as 48×48 targets. No staff vocabulary (ATP, gates, fulfillment engineering) anywhere in the portal. No persistent cart: leaving the page keeps nothing. Reorder on a shipped order still prefills Review.",
     body: (<>
       {E.hd("Order", "Ridgeline")}
       {E.ttl("Hazy IPA")}
@@ -1729,7 +1646,8 @@ export const SCREENS: Screen[] = [
       {E.row("Ship-to · requested date", "Main · Wed 9/9", E.act("Change"))}
       {E.sp()}
       {E.info("Kegs add a $30.00 refundable deposit each, shown on review.")}
-      {E.btn("Review order · $828.00", "p")}
+      {E.btn("Review order · $828.00", "p disabled")}
+      {E.info("Review is unavailable until the brewery sets where your orders ship from. Until then the portal shows your catalog, orders and invoices, and orders are placed by calling the brewery.")}
     </>),
   },
   {
@@ -1759,10 +1677,10 @@ export const SCREENS: Screen[] = [
     name: "Review order",
     to: { "Hazy IPA · ½ bbl keg": "Review order", "Pils · 16 oz case": "Review order" },
     job: "Confirm quantities, ship-to and fulfillment line, then place the order",
-    reads: "portal_catalog · get_portal_account",
+    reads: "portal_catalog [SCHEMA/RLS-GATE: return customer-allowed fulfillment source and filter to packages the brewery has listed for wholesale]",
     writes: "portal_create_order · portal_submit_order",
-    states: [["price changed", "revalidated price shown before Place order", 1], ["inactive SKU", "line removed · told plainly", 1], ["no source", "Place order stays off until the brewery sets where orders ship from", 1], ["submit error", "keep quantities · Retry safe", 1], ["duplicate", "same request returns the same ORD number"]],
-    spec: "The confirm step for the shop steppers and for Reorder from a shipped order. Buyer copy only: price, package, quantity, “Ships from Warehouse”, Place order. No ATP, no gate names. Drawn with a fulfillment source already set. After submit the portal is read-only; changes go through the brewery.",
+    states: [["price changed", "revalidated price shown before Place order", 1], ["inactive SKU", "line removed · told plainly", 1], ["submit error", "keep quantities · Retry safe", 1], ["duplicate", "same request returns the same ORD number"]],
+    spec: "The confirm step for the shop steppers and for Reorder from a shipped order. Buyer copy only: price, package, quantity, “Ships from Warehouse”, Place order. No ATP, no gate names. Place order stays disabled until the source contract exists. After submit the portal is read-only; changes go through the brewery.",
     body: (<>
       {E.row("Hazy IPA · ½ bbl keg", INV.hazyPrice, E.stq(4, "Hazy IPA quantity"))}
       {E.row("Pils · 16 oz case", INV.pilsPrice, E.stq(6, "Pils quantity"))}
@@ -1775,7 +1693,8 @@ export const SCREENS: Screen[] = [
       {E.fld("Your PO number", "optional")}
       {E.info("Order number is assigned when you place the order.")}
       {E.sp()}
-      {E.btn(`Place order · ${INV.total}`, "p")}
+      {E.btn(`Place order · ${INV.total}`, "p disabled")}
+      {E.info("Placing an order isn’t available until the brewery sets where yours ship from.")}
     </>),
   },
   {
@@ -2056,7 +1975,7 @@ export const SCREENS: Screen[] = [
     spec: "The Work list with the Batches tab active. Planned batches sort before active batches due for attention; every row names its next action. New batch opens Schedule batch, and Schedule batch and Brew day return here.",
     body: (<>
       {E.hd("Work", "brewer default", E.btn("New batch"))}
-      {E.tabs(WORK_CHIPS, 3, "w-full", WORK_TABS)}
+      {E.tabs(WORK_CHIPS, 2, "w-full", WORK_TABS)}
       {E.ttl("Planned")}
       {E.row("B-0416 · Hazy IPA v4", "Fri 9/4 · 15 bbl", E.act("Start", "info"))}
       {E.ttl("Active")}
@@ -2070,8 +1989,8 @@ export const SCREENS: Screen[] = [
     tab: "Work",
     name: "Schedule batch",
     job: "Set date and planned barrels; recipe and brand are intent, not commitments",
-    reads: "get_brew_day [design] · list_recipes · list_brands",
-    writes: "schedule_batch [design; single planned-batch row; recipe version and intended brand are optional]",
+    reads: "get_brew_day [design] · list_recipes · list_brands [SCHEMA-GATE: revision 2 §16.1, products → brands]",
+    writes: "schedule_batch [single planned-batch row; both the recipe version and the intended brand are nullable]",
     states: [["permission", "brewer or admin required", 1], ["planned", "Save schedule is the one verb"], ["no recipe yet", "date and barrels alone hold the slot"], ["no brand yet", "identity waits for packaging, which already requires one"], ["brew day", "Record brew day is its own screen"]],
     spec: "The planned mode of brew day: date, planned barrels, and two optional statements of intent. Only date and barrels commit anything: they reserve the slot. The recipe version is already optional in the schema, and revision 2 makes the brand optional too, because identity is optional at brew and required at packaging, where every finished lot must already name a brand. Requiring either here enforces nothing the lot does not, and only forces the decision earlier than the business makes it. Keeping brand as intent is also what keeps the gap between what a batch was meant to be and what it shipped as worth querying, rather than rewriting history when a batch blends or turns into something else. Record brew day is a separate screen so this page has one primary.",
     body: (<>
@@ -2139,7 +2058,7 @@ export const SCREENS: Screen[] = [
     to: { "Close packaging run": "Run closed", Work: "Packaging runs" },
     job: "Plan a run separately, then create lot and movements on close",
     reads: "get_packaging_run [design; revalidate selected source occupancy] · list_locations",
-    writes: "schedule_packaging_run [design; one RPC: run with explicit source occupancy + planned outputs] · close_packaging_run [design; one RPC: revalidate source + close + lot + outputs + material movements at explicit locations]",
+    writes: "schedule_packaging_run [one RPC: run planned against a brand, with an optional source occupancy, + planned outputs] · update_packaging_run [pick the tank, or stamp the run started: both require a tank] · close_packaging_run [one RPC: revalidate source + close + lot + outputs + material movements at explicit locations]",
     states: [["permission", "brewer or warehouse required", 1], ["short", "a material is short · resolve or explicitly override before starting", 1], ["no damage", "the ordinary close · both fields stay at zero and nothing extra posts"], ["damage", "a named quantity is written off to an explicit bin", 1]],
     spec: "The close half of the packaging frame; planning and editing the plan live in the Schedule packaging run sheet until the run starts. Close is a copper review ( revalidated source, actual outputs, lot, explicit finished-goods destination, material consumption and damage, yield/loss). Consumption is derived from what was actually packaged, never from the plan, which is why leftover material needs no entry: 118 cases consumed 2,832 cans and ends, and the rest never left the shelf to be returned. Damage is the one thing nobody can derive, so it is the one thing asked for, optional and starting at zero. It is asked only where material is issued in whole units and comes back short: labels and ends, not every line of the bill of materials, because a prompt on all five is friction nobody completes. Labels are never counted here. Nobody can count what is left on a roll, and a screen that asks will simply be given a guess that posts as fact; the roll is reconciled at cycle count by counting whole rolls instead. A damaged unit names its destination for the same reason finished goods do: material written off against the wrong bin is worse than material nobody tracked. Print labels is presentation after commit: measured thermal keg-collar/lot labels per plan §3. No packaging-day-actuals screen.",
     body: (<>
@@ -2189,7 +2108,7 @@ export const SCREENS: Screen[] = [
     spec: "The Work list with the Runs tab active, which is the packaging list: Work is where everything in motion lives, so runs get no rail entry of their own. Upcoming sorts by planned date and every row names its next action. Recent breaks Work's in-motion rule on purpose, because a brewer plans the next run against the last one's yield; it is kept short and the full history stays in Search. Schedule run opens the sheet; a row opens the run, where closing happens.",
     body: (<>
       {E.hd("Work", "brewer default", E.btn("Schedule run"))}
-      {E.tabs(WORK_CHIPS, 4, "w-full", WORK_TABS)}
+      {E.tabs(WORK_CHIPS, 3, "w-full", WORK_TABS)}
       {E.ttl("Upcoming")}
       {E.row("RUN-0031 · Hazy cans", "Fri 9/5 · FV3 · 118 cases planned · 480 ends short", E.act("Resolve", "attention"), "w")}
       {E.row("RUN-0032 · Pils ½ bbl", "Tue 9/9 · FV1 · 40 kegs planned", E.act("Start", "info"))}
@@ -2210,7 +2129,7 @@ export const SCREENS: Screen[] = [
     to: { "Save run plan": "Close packaging run", "FV3 · Hazy IPA": "Entity picker" },
     job: "Plan a run against one source occupancy and see shortages before the day",
     reads: "list_occupancies [design; open, with volume and contents] · list_formats [design; for the brand in the source] · get_material_shortfalls [view; preview for the planned outputs]",
-    writes: "schedule_packaging_run [design; one RPC: run with explicit source occupancy + planned outputs, each flagged on/off the wholesale list] · update_packaging_run [design; same sheet reopens a planned run until it starts]",
+    writes: "schedule_packaging_run [one RPC: run planned against a brand, with an optional source occupancy, + planned outputs, each flagged on/off the wholesale list] · update_packaging_run [same sheet reopens a planned run until it starts; picking the tank or starting both require one]",
     states: [["permission", "brewer or warehouse required", 1], ["source chosen", "the brand comes from what is in the vessel, so only that brand's formats are offered"], ["short", "the materials table shows the shortage now, not on the day; Save still works, Start will not"], ["editing", "a planned run reopens here with its values filled; a started run cannot be rescheduled, only closed"], ["no open occupancy", "nothing to package: the source picker says so and links to Cellar"]],
     spec: "The plan half of the packaging frame, pulled out so a run can be scheduled before it exists and edited until it starts. One source occupancy, chosen exactly, is the rule that lets close revalidate it later. Planned outputs are counts per format; the sheet converts to barrels and shows what is left in the vessel so a plan cannot exceed the source. Each output can be listed on the wholesale shop (the brand × package buyers will see); listing is the offer, not an ATP promise, and a format left off is absent from Shop. Materials are previewed from the format BOM so a shortage is a planning fact, not a surprise at the line. Saving writes the run and its planned outputs in one RPC and lands on the run; nothing moves in the ledger until close.",
     body: (<>
@@ -2264,7 +2183,7 @@ export const SCREENS: Screen[] = [
     spec: "The Work list with the POs tab active. Each row names the next action; New PO opens the existing vendor purchase draft, and Receive PO returns here.",
     body: (<>
       {E.hd("Work", "warehouse default", E.btn("New PO"))}
-      {E.tabs(WORK_CHIPS, 5, "w-full", WORK_TABS)}
+      {E.tabs(WORK_CHIPS, 4, "w-full", WORK_TABS)}
       {E.row("PO-0142 · Country Malt", "sent · due Thu", E.act("Receive", "info"))}
       {E.row("PO-0141 · YCH", "partially received · 1 Citra box due", E.act("Receive", "info"), "w")}
       {E.row("PO-0143 · CanSource", "draft · 4 pallets", E.act("Send", "info"))}
@@ -2544,7 +2463,7 @@ export const SCREENS: Screen[] = [
     to: { Create: "Recipe", "Recipe parent \u00b7 Hazy IPA \u00b7 IPA": "Recipe", "Mash schedule · 3 steps": "Mash schedule", "Fermentation schedule · 4 stages": "Fermentation schedule", "Water · Municipal Denver to Hazy target": "Water" },
     job: "Author immutable versions from assumptions; actuals keep predictions honest",
     reads: "list_recipes · get_recipe [design] · get_recipe_outcomes [design; per-batch actual OG/FG/ABV + realized efficiency/attenuation, derived from fermentation readings, never stored]",
-    writes: "create_recipe [design; mutable parent row] · create_recipe_version [design; one RPC: immutable version + ingredients; SCHEMA-GATE: assumption and process-spec columns on recipe_versions (pre-boil volume, boil, whirlpool min/temp/rest, knockout temp, notes) + per-ingredient extract snapshot + extract potential on materials; typed target_og/fg/abv columns drop]",
+    writes: "create_recipe [design; mutable parent row] · create_recipe_version [one RPC: immutable version + ingredients, with assumption columns on recipe_versions and per-ingredient extract snapshot on recipe_ingredients; SCHEMA-GATE: process-spec columns (pre-boil volume, whirlpool min/temp/rest, knockout temp) remain unbuilt]",
     states: [...permitted("brewer or admin required"), ["no group yet", "the brand picks one at packaging · nothing is blocked"]],
     spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. Versioning is disabled behind its schema gate. A new parent takes name and style only; versions append, and history is never edited. Costing lives on desk. A version is the executable process spec, not only the prediction inputs: volumes, boil, whirlpool and knockout are scalars here, while the mash and fermentation schedules and water open as their own screens because they repeat and carry add, reorder and delete. The mash temperature is gone from this page, because every mash step carries one and a scalar beside them is a second answer to one question. Batch size and knockout volume are gone too: the scale chips already state the batch size and Brew day already records knockout volume as its baseline. Three note fields become one.",
     body: (<>
@@ -3065,7 +2984,7 @@ export const SCREENS: Screen[] = [
     spec: "The Work list with the Routes tab active. Every row names its next action; New route opens Route in builder mode, and Route returns here.",
     body: (<>
       {E.hd("Work", "driver default", E.btn("New route"))}
-      {E.tabs(WORK_CHIPS, 6, "w-full", WORK_TABS)}
+      {E.tabs(WORK_CHIPS, 5, "w-full", WORK_TABS)}
       {E.row("Route A · Thu", "3 stops · Maria · departed 8:10", E.act("Resume", "info"))}
       {E.row("Route B · Fri", "2 stops · driver not assigned", E.act("Assign", "attention"), "w")}
       {E.row("ORD-0236 · Dock", "shipped · no route", E.act("Add to route", "attention"), "w")}
@@ -3451,7 +3370,7 @@ export const SCREENS: Screen[] = [
     writes: "set_pos_price_override [design; nullable override keyed by pos_location] · clear_pos_price_override [design]",
     states: [["permission", "warehouse or admin required", 1], ["inherited", "no override · the format price is what publishes"], ["overridden", "this row is priced away from the default", 1], ["reset", "override cleared · the row rejoins the format price"], ["no price at all", "no format default and no override · Save stays disabled", 1], ["per location", "a second taproom overrides the same row separately", 1], ["format changed", "conversion and premise follow the format, not this sheet"], ["tax preserved", "publishing never clears the provider’s tax assignment", 1]],
     redrawn: true,
-    spec: "Against the brand and format schema, Serving and Premise are no longer authored here. A format owns its conversion (a pint is 1/124 of a ½ bbl) and its premise, so this sheet reads them instead of asking again. What is left is a register price, not a wholesale grid cell: an optional override keyed by POS location, so an empty field lets a format-wide Taproom cell propagate and the Warehouse register can ring a different number than the Taproom without either row copying a wholesale price. Availability stays a rule, not a per-keg switch: MGR retires the row when taproom stock runs out and re-publishes under the same provider id when it returns. Price still lands on the variation rather than the item, so an override writes to the format’s variation id.",
+    spec: "Against the brand and format schema, Serving and Premise are no longer authored here. A format owns its conversion (a pint is 1/124 of a ½ bbl) and its premise, so this sheet reads them instead of asking again; the same fact stored twice is exactly the coupling the channel change had to unwind. What is left is the one thing inventory cannot answer: a price exception. Optional and keyed by POS location, so an empty override lets a format-wide change propagate and the Warehouse can price the same brand differently from the Taproom without either row copying a number. Availability stays a rule, not a per-keg switch: MGR retires the row when taproom stock runs out and re-publishes under the same provider id when it returns. Price still lands on the variation rather than the item, so an override writes to the format’s variation id.",
     body: (<>
       {E.fld("Brand", "Hazy IPA")}
       {E.fld("Format", "pint · poured")}
@@ -3517,13 +3436,14 @@ export const SCREENS: Screen[] = [
     tab: "More",
     name: "Formats",
     job: "Enter volume once on an atomic format and derive every shape above it",
-    reads: "list_formats · get_format_components [design; composed children, not a registered query yet]",
+    reads: "list_formats [design; §16.2] · get_format_components [design; §16.2a]",
     writes: "upsert_format · replace_format_components [one RPC replaces the child set] · replace_format_bom [one RPC replaces the bill; formats, format_components and format_bom superseded skus.bbl_per_unit and sku_bom]",
     states: [["permission", "sales or admin required", 1], ["atomic", "owns one volume entered in an allowed unit"], ["children missing", "a composed format cannot be created before its children", 1], ["poured", "never holds stock · a ratio back to the keg"], ["in use", "editing a format never moves frozen movement bbl"]],
     spec: "Volume is the basis of all TTB math, so exactly one atomic Format owns it. The input receives its allowed units per instance: US beer packages offer oz, gal and bbl; metric formats may offer mL and L. The server converts the entry to canonical bbl. Composed formats compute volume from their children, which is also what makes repack (§16.10) validated rather than asserted. The basis says only whether the shape holds stock. Each BOM line's on-break disposition is what the repack sheet reads.",
     body: (<>
-      {E.back("Settings", "Formats", E.btn("Add format"))}
+      {E.back("Settings", "Formats")}
       {E.tbl(["Format", "Basis", "Volume", "From"], [["16 oz can", "packaged", formatVolume("0.00403226"), "unit"], ["four-pack", "packaged", formatVolume("0.01612903"), "4 × can"], ["case · 24×16oz", "packaged", formatVolume("0.09677419"), "6 × four-pack"], ["½ bbl keg", "packaged", formatVolume("0.50000000"), "unit"], ["pint", "poured", formatVolume("0.00403226"), "1/124 × ½ bbl"]])}
+      {E.gated("Add format", "isn’t available yet: package facts still live on each SKU")}
     </>),
   },
   {
@@ -3534,7 +3454,7 @@ export const SCREENS: Screen[] = [
     name: "Format",
     to: { "Save format": "Formats" },
     job: "Create or edit one atomic or composed package format",
-    reads: "list_formats · get_format_components [design; composed children, not a registered query yet]",
+    reads: "list_formats [design; §16.2] · get_format_components [design; §16.2a]",
     writes: "upsert_format · replace_format_components · replace_format_bom",
     states: [["permission", "sales or admin required", 1], ["atomic", "volume unit choices are set by this input"], ["composed", "volume derives from child formats"]],
     body: (<>
@@ -3546,7 +3466,7 @@ export const SCREENS: Screen[] = [
       {E.ttl("Packaging BOM")}
       {E.tbl(["Material", "Qty", "On break"], [["Can body", "1", "consumed"], ["Can end", "1", "consumed"]])}
       {E.info("If the volume or BOM differs, create another Format.")}
-      {E.btn("Save format")}
+      {E.gated("Save format", "isn’t available yet: package facts still live on each SKU")}
     </>),
   },
   {
@@ -3614,7 +3534,7 @@ export const SCREENS: Screen[] = [
       <div className="min-w-0 overflow-x-auto">{E.tbl(["Group", "½ bbl keg", "sixtel", "case · 24×16oz"], [[E.link("1", "Price group"), "$132.00", "$53.00", "$46.00"], [E.link("2", "Price group"), INV.hazyPrice, "$95.00", INV.pilsPrice], [E.link("3", "Price group"), "$240.00", "$140.00", "not priced"]])}</div>
       {E.ttl("Taproom")}
       <div className="min-w-0 overflow-x-auto">{E.tbl(["Group", "pint", "crowler"], [[E.link("1", "Price group"), "$7.00", "$14.00"], [E.link("2", "Price group"), "$8.00", "$16.00"], [E.link("3", "Price group"), "$11.00", "not priced"]])}</div>
-      {E.info("An empty cell is unpriced: that package cannot sell on this channel. Clear a cell to unprice it again.")}
+      {E.info("An empty cell is unpriced: those SKUs cannot be ordered on that channel. Clear a cell to unprice it again.")}
     </>),
   },
   {
@@ -3648,10 +3568,10 @@ export const SCREENS: Screen[] = [
     job: "Subdivide a location without making every query carry an or-null",
     reads: "list_locations · list_bins",
     writes: "create_bin · update_bin · delete_bin",
-    states: [["permission", "warehouse or admin required", 1], ["last bin", "a location keeps at least one · rename it instead", 1], ["has history", "a bin that ever recorded stock is renamed, not removed", 1]],
-    spec: "Opened from Location detail. Every location starts with Walk-in, Cold and Dry. Rename or remove what doesn’t match the building, but a location always keeps one bin, so no on-hand or availability query carries a nullable branch. Bins are physical subdivisions a menu can read; they are explicitly not tap lines (§16.8). Par on a bin waits on a later schema change.",
+    states: [["permission", "warehouse or admin required", 1], ["last bin", "a location keeps at least one · rename it instead", 1], ["has history", "a bin that ever recorded stock is renamed, not removed", 1], ["par on a bin", "keep 4 cases in the to-go fridge"]],
+    spec: "Every location starts with Walk-in, Cold and Dry. Rename or remove what doesn’t match the building, but a location always keeps one bin, so no on-hand or availability query carries a nullable branch. Bins are physical subdivisions a menu can read; they are explicitly not tap lines (§16.8), which are hand-maintained state nothing downstream validates.",
     body: (<>
-      {E.back("Location detail", "Bins")}
+      {E.back("Settings", "Taproom · bins")}
       {E.nav("Walk-in", "38 cases · 12 kegs")}
       {E.nav("Cold", "22 cases")}
       {E.nav("Dry", "6 cases")}

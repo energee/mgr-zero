@@ -40,10 +40,10 @@ describe("shippedNav", () => {
     }
   });
 
-  it("drops a group whose every child is planned, so brewer sees Today alone today", () => {
-    expect(navFor(shippedNav(STAFF_NAV), "brewer").map((t) => t.label)).toEqual(["Today"]);
+  it("drops a group whose every child is planned, so brewer sees only its shipped areas today", () => {
+    expect(navFor(shippedNav(STAFF_NAV), "brewer").map((t) => t.label)).toEqual(["Today", "Beer", "Work", "More"]);
     expect(navFor(shippedNav(STAFF_NAV), "warehouse").map((t) => t.label)).toEqual(["Today", "Beer", "Work"]);
     expect(navFor(shippedNav(STAFF_NAV), "admin").find((t) => t.label === "More")!.children!.map((c) => c.label))
-      .toEqual(["Invoices", "Catalog", "Customers", "Price groups", "Settings", "Sale channels", "Locations"]);
+      .toEqual(["Invoices", "Catalog", "Customers", "Price groups", "Recipes", "Settings", "Sale channels"]);
   });
 });

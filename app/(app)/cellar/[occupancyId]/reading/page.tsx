@@ -1,0 +1,39 @@
+// app/(app)/cellar/[occupancyId]/reading/page.tsx — one occupancy's
+// fermentation readings (list_fermentation_readings), newest first, with a
+// form to log the next one. Today's "fermentation reading overdue" reason
+// links here.
+import { E } from "@/components/mgr/e";
+import { getActiveBrewery } from "@/lib/brewery";
+import { buildContext } from "@/lib/commands/context";
+import { runCommand } from "@/lib/commands/registry";
+import "@/lib/commands/all";
+import { ReadingForm } from "./reading-form";
+
+type Occupancy = { occupancy_id: string; vessel_name: string | null; brand_name: string | null; bbl: number };
+type Reading = { id: string; at: string; temp_f: number; gravity_plato: number | null; ph: number | null; note: string | null };
+
+export default async function OccupancyReadingPage({ params }: { params: Promise<{ occupancyId: string }> }) {
+  const { occupancyId } = await params;
+  const brewery = await getActiveBrewery();
+  const ctx = await buildContext(brewery.id);
+  const [occupancies, readings] = (await Promise.all([
+    runCommand("list_occupancies", {}, ctx), runCommand("list_fermentation_readings", { occupancyId }, ctx),
+  ])) as [Occupancy[], Reading[]];
+  const occupancy = occupancies.find((o) => o.occupancy_id === occupancyId);
+
+  return (
+    <>
+      {E.back("Cellar", occupancy ? `${occupancy.vessel_name ?? "—"} · ${occupancy.brand_name ?? "no brand yet"}` : "Fermentation reading", <ReadingForm occupancyId={occupancyId} />)}
+      {readings.length === 0
+        ? E.blank("No readings yet")
+        : readings.map((r) => (
+            <div key={r.id}>
+              {E.row(
+                new Date(r.at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
+                `${r.temp_f} °F${r.gravity_plato !== null ? ` · ${r.gravity_plato} °P` : ""}${r.ph !== null ? ` · pH ${r.ph}` : ""}${r.note ? ` · ${r.note}` : ""}`,
+              )}
+            </div>
+          ))}
+    </>
+  );
+}

@@ -5,3 +5,5 @@ export const docNo = (prefix: string, n: number | null, fallback: string) =>
   n ? `${prefix}-${String(n).padStart(4, "0")}` : fallback;
 
 export const trfNo = (n: number | null) => docNo("TRF", n, "Transfer");
+export const batNo = (n: number | null) => docNo("B", n, "Batch");
+export const runNo = (n: number | null) => docNo("RUN", n, "Run");

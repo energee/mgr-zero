@@ -208,6 +208,7 @@ omitted. They have no roles until they are built.
 | `list_formats` | Packaging | ✓ | ✓ | ✓ |  |  |
 | `list_invoices` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `list_locations` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
+| `list_materials` | Purchasing & materials | ✓ |  |  | ✓ |  |
 | `list_movements` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `list_occupancies` | Packaging | ✓ |  | ✓ | ✓ |  |
 | `list_orders` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
@@ -1866,11 +1867,26 @@ unreceived PO never inflates what a packaging run believes it has.
 
 {/* ops:purchasing */}
 
+#### list_materials [#list_materials]
+
+`query` · admin, brewer
+
+Materials, alphabetical, with category and extract potential
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_materials", "input": {} }'
+```
+
 ---
 
 **Designed, not yet available** {/* purchasing-designed */}
 
-None of the 14 operations in this area are available yet.
+1 of the 14 operations in this area are available today; the 13 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
@@ -1881,7 +1897,6 @@ The screens need them and the backend has not built them, so calling one returns
 | `get_material_on_hand` | query | Materials on hand, Cycle count, Repack |
 | `get_material_requirements` | query | New PO, Planning |
 | `get_purchase_order` | query | Receive PO, Receipt |
-| `list_materials` | query | Package BOM, New PO, Materials, Material, Contract, Water addition |
 | `list_purchase_orders` | query | Purchase orders |
 | `list_vendors_and_contracts` | query | New PO, Vendors, Vendor, Contracts, Contract, Planning |
 | `receive_purchase_order` | command | Receive PO |

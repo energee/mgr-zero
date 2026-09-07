@@ -4,7 +4,7 @@
 
 # API operations backlog
 
-64 operations the screens declare they need that the command registry does not yet answer, against 107 that it does.
+63 operations the screens declare they need that the command registry does not yet answer, against 108 that it does.
 
 This is the backend push, scoped. Each row names the operation a screen asked for and the screens waiting on it, so an area can be built and shipped whole rather than a command at a time. `/docs/api` publishes the same list per area, marked designed, so an integrator sees the roadmap without being told a date.
 
@@ -28,7 +28,7 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `upsert_brand_approval` | command | Compliance registry, Brand approval |
 | `upsert_brewery_state_license` | command | Compliance registry, License |
 | `upsert_state_registration` | command | Compliance registry, State registration |
-## Purchasing & materials: 14 to build, 0 built
+## Purchasing & materials: 13 to build, 1 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
@@ -37,7 +37,6 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `get_material_on_hand` | query | Materials on hand, Cycle count, Repack |
 | `get_material_requirements` | query | New PO, Planning |
 | `get_purchase_order` | query | Receive PO, Receipt |
-| `list_materials` | query | Package BOM, New PO, Materials, Material, Contract, Water addition |
 | `list_purchase_orders` | query | Purchase orders |
 | `list_vendors_and_contracts` | query | New PO, Vendors, Vendor, Contracts, Contract, Planning |
 | `receive_purchase_order` | command | Receive PO |
