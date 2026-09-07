@@ -10,7 +10,7 @@ import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
-import { formatGravity, gravityUnitLabel, type GravityUnit } from "@/lib/mgr/gravity-unit";
+import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { GravityUnitForm } from "./gravity-unit-form";
 
 type Effective = { brewery: GravityUnit; mine: GravityUnit | null; effective: GravityUnit };
@@ -35,7 +35,6 @@ export default async function UnitsPage() {
         brewery={units.brewery}
         mine={units.mine}
         canSetBrewery={ctx.role === "admin"}
-        breweryLabel={gravityUnitLabel(units.brewery)}
       />
     </div>
   );

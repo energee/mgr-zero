@@ -7,7 +7,7 @@
 // its Plato result in the reader's chosen unit (`unit`, from get_gravity_unit).
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
@@ -49,11 +49,13 @@ export function NewVersionForm({ recipeId, materials, unit }: { recipeId: string
     },
   });
 
-  const preview = useMemo(() => {
-    const eff = Number(brewhouseEfficiency), att = Number(yeastAttenuation), temp = Number(mashTempF);
+  // Recomputed every render: the inputs are a handful of numbers, and a memo
+  // keyed on the fresh `validLines` array would never hit anyway.
+  const preview = (() => {
+    const eff = Number(brewhouseEfficiency), att = Number(yeastAttenuation);
     if (!(eff > 0 && eff <= 1) || !(att > 0 && att <= 1) || validLines.length === 0) return null;
     return recipeGravity({
-      mashTempF: temp, brewhouseEfficiency: eff, yeastAttenuation: att,
+      brewhouseEfficiency: eff, yeastAttenuation: att,
       ingredients: validLines.map((l) => {
         const m = materials.find((mm) => mm.id === l.materialId);
         // A material with no extract_potential contributes nothing rather than
@@ -61,7 +63,7 @@ export function NewVersionForm({ recipeId, materials, unit }: { recipeId: string
         return { perBblQty: Number(l.perBblQty), extractPotential: m?.extract_potential ?? null, stage: l.stage };
       }),
     });
-  }, [mashTempF, brewhouseEfficiency, yeastAttenuation, validLines, materials]);
+  })();
 
   const setLine = (i: number, patch: Partial<Line>) => setLines((prev) => prev.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   const ready = mashTempF && brewhouseEfficiency && yeastAttenuation && validLines.length > 0;

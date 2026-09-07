@@ -24,10 +24,16 @@ export default async function PackagingRunPage({ params }: { params: Promise<{ i
   const { id } = await params;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [{ run, outputs }, occupancies, locations, bins] = (await Promise.all([
-    orNotFound(runCommand("get_packaging_run", { runId: id }, ctx)),
-    runCommand("list_occupancies", {}, ctx), runCommand("list_locations", {}, ctx), runCommand("list_bins", {}, ctx),
-  ])) as [{ run: Run; outputs: Output[] }, Occupancy[], Location[], Bin[]];
+  const { run, outputs } = (await orNotFound(runCommand("get_packaging_run", { runId: id }, ctx))) as { run: Run; outputs: Output[] };
+  // One action per state, so one set of options: tanks to pick from, or the
+  // location and bin a close lands in. A closed run needs neither.
+  const picking = !run.closed_at && !run.occupancy_id;
+  const closing = !run.closed_at && !!run.started_at;
+  const [occupancies, locations, bins] = (await Promise.all([
+    picking ? runCommand("list_occupancies", {}, ctx) : [],
+    closing ? runCommand("list_locations", {}, ctx) : [],
+    closing ? runCommand("list_bins", {}, ctx) : [],
+  ])) as [Occupancy[], Location[], Bin[]];
 
   return (
     <>

@@ -17,8 +17,7 @@ type Batch = {
   brand_name: string | null; recipe_name: string | null; vessel_name: string | null;
 };
 type Brand = { id: string; name: string };
-type Recipe = { id: string; name: string };
-type Version = { id: string; version: number };
+type Recipe = { id: string; name: string; latest_version_id: string | null; latest_version: number | null };
 type Vessel = { id: string; name: string; kind: string; capacity_bbl: number; active: boolean };
 
 export default async function BatchesPage() {
@@ -29,12 +28,10 @@ export default async function BatchesPage() {
     runCommand("list_recipes", {}, ctx), runCommand("list_vessels", {}, ctx),
   ])) as [Batch[], Brand[], Recipe[], Vessel[]];
 
-  // schedule_batch names a recipe *version*, so the picker needs each
-  // recipe's latest one; recipes are few, so N get_recipe reads are fine.
-  const recipeVersions = (await Promise.all(recipes.map(async (r) => {
-    const got = (await runCommand("get_recipe", { recipeId: r.id }, ctx)) as { version: Version | null };
-    return got.version ? { id: got.version.id, label: `${r.name} v${got.version.version}` } : null;
-  }))).filter((v): v is { id: string; label: string } => v !== null);
+  // schedule_batch names a recipe *version*; list_recipes carries each
+  // recipe's latest one, and a recipe with no version yet cannot be brewed.
+  const recipeVersions = recipes.flatMap((r) =>
+    r.latest_version_id ? [{ id: r.latest_version_id, label: `${r.name} v${r.latest_version}` }] : []);
 
   return (
     <>

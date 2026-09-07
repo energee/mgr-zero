@@ -7,24 +7,22 @@
 // override on their own brewery_users row, and null there means "follow the
 // brewery".
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap } from "./registry";
-
-const GRAVITY_UNITS = ["plato", "sg"] as const;
-const STAFF = ["admin", "sales", "warehouse", "brewer"] as const;
+import { defineCommand, defineQuery, unwrap, STAFF_ROLES } from "./registry";
+import { GRAVITY_UNITS, type GravityUnit } from "@/lib/mgr/gravity-unit";
 
 defineQuery({
   name: "get_gravity_unit",
   description: "The gravity display unit in force for the caller: the brewery default, their own override (null = none), and the effective one",
   input: z.object({}),
-  roles: [...STAFF],
+  roles: STAFF_ROLES,
   handler: async (ctx) => {
     const [brewery, membership] = await Promise.all([
       unwrap(ctx.db.from("breweries").select("gravity_unit").eq("id", ctx.breweryId).single()),
       unwrap(ctx.db.from("brewery_users").select("gravity_unit")
         .eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId).single()),
     ]);
-    const breweryUnit = (brewery?.gravity_unit ?? "plato") as (typeof GRAVITY_UNITS)[number];
-    const mine = (membership?.gravity_unit ?? null) as (typeof GRAVITY_UNITS)[number] | null;
+    const breweryUnit = (brewery?.gravity_unit ?? "plato") as GravityUnit;
+    const mine = (membership?.gravity_unit ?? null) as GravityUnit | null;
     return { brewery: breweryUnit, mine, effective: mine ?? breweryUnit };
   },
 });
@@ -43,7 +41,7 @@ defineCommand({
   name: "set_my_gravity_unit",
   description: "Set your own gravity display unit, or null to follow the brewery default",
   input: z.object({ unit: z.enum(GRAVITY_UNITS).nullable() }),
-  roles: [...STAFF],
+  roles: STAFF_ROLES,
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_my_gravity_unit", {
     p_brewery: ctx.breweryId, p_unit: i.unit, p_request_id: execution.requestId,
   })),

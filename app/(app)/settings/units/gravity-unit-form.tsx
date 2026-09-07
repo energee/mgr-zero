@@ -14,24 +14,22 @@
 
 import { useState } from "react";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { NONE, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { GRAVITY_UNITS, gravityUnitLabel, type GravityUnit } from "@/lib/mgr/gravity-unit";
 
-const DEFAULT = "__default__";
 
 export function GravityUnitForm({
-  brewery, mine, canSetBrewery, breweryLabel,
+  brewery, mine, canSetBrewery,
 }: {
   brewery: GravityUnit;
   mine: GravityUnit | null;
   canSetBrewery: boolean;
-  breweryLabel: string;
 }) {
   const { busy, error, run } = useCommandAction();
   const [breweryChoice, setBreweryChoice] = useState<string>(brewery);
-  const [mineChoice, setMineChoice] = useState<string>(mine ?? DEFAULT);
+  const [mineChoice, setMineChoice] = useState<string>(mine ?? NONE);
 
   // The server props are the truth once they catch up — including a refresh
   // that failed, which puts the controls back on what is actually stored.
@@ -42,7 +40,7 @@ export function GravityUnitForm({
   if (seen.brewery !== brewery || seen.mine !== mine) {
     setSeen({ brewery, mine });
     setBreweryChoice(brewery);
-    setMineChoice(mine ?? DEFAULT);
+    setMineChoice(mine ?? NONE);
   }
 
   return (
@@ -75,12 +73,12 @@ export function GravityUnitForm({
           disabled={busy}
           onValueChange={(v) => {
             setMineChoice(v);
-            run("set_my_gravity_unit", { unit: v === DEFAULT ? null : v });
+            run("set_my_gravity_unit", { unit: v === NONE ? null : v });
           }}
         >
           <SelectTrigger id="gu-mine"><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value={DEFAULT}>Use brewery default ({breweryLabel})</SelectItem>
+            <SelectItem value={NONE}>Use brewery default ({gravityUnitLabel(brewery)})</SelectItem>
             {GRAVITY_UNITS.map((u) => (
               <SelectItem key={u} value={u}>{gravityUnitLabel(u)}</SelectItem>
             ))}

@@ -7,7 +7,8 @@
 // material is retyped. `get_recipe` predicts OG/FG/ABV here in TypeScript
 // (lib/recipe-gravity.ts) — the schema stores assumptions, never results.
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap, CommandError } from "./registry";
+import { defineCommand, defineQuery, unwrap, CommandError, type Ctx } from "./registry";
+import { brandNames, isoDate } from "./packaging";
 import { recipeGravity } from "@/lib/recipe-gravity";
 
 const INGREDIENT_STAGES = ["mash", "boil", "whirlpool", "fermentation", "dry_hop", "packaging", "other"] as const;
@@ -57,11 +58,23 @@ defineCommand({
   })),
 });
 
+// Each recipe carries its latest version (id and number): schedule_batch names
+// a *version*, so the batch picker needs it without a get_recipe per recipe.
 defineQuery({
-  name: "list_recipes", description: "Recipes, alphabetical, with the brand each one brews",
+  name: "list_recipes", description: "Recipes, alphabetical, with the brand each one brews and its latest version",
   input: z.object({}), roles: ["admin", "brewer"],
-  handler: (ctx) => unwrap(ctx.db.from("recipes").select("id, name, brand_id, note, created_at")
-    .eq("brewery_id", ctx.breweryId).order("name")),
+  handler: async (ctx) => {
+    const recipes = (await unwrap(ctx.db.from("recipes").select("id, name, brand_id, note, created_at")
+      .eq("brewery_id", ctx.breweryId).order("name"))) ?? [];
+    if (recipes.length === 0) return [];
+    const versions = (await unwrap(ctx.db.from("recipe_versions").select("id, recipe_id, version")
+      .in("recipe_id", recipes.map((r) => r.id as string)).order("version", { ascending: false }))) ?? [];
+    const latest = new Map<string, { id: string; version: number }>();
+    for (const v of versions) if (!latest.has(v.recipe_id as string)) latest.set(v.recipe_id as string, { id: v.id as string, version: v.version as number });
+    return recipes.map((r) => ({
+      ...r, latest_version_id: latest.get(r.id as string)?.id ?? null, latest_version: latest.get(r.id as string)?.version ?? null,
+    }));
+  },
 });
 
 // The recipe version editor's ingredient picker: a name and category per
@@ -78,20 +91,23 @@ defineQuery({
 // strings. A missing extract snapshot is NOT defaulted here — it is passed
 // through as null so recipeGravity can skip the ingredient outright rather
 // than have a made-up potential move the predicted OG.
-const num = (v: unknown, fallback = 0) => (v === null || v === undefined ? fallback : Number(v));
+const num = (v: unknown) => Number(v ?? 0);
 
 defineQuery({
   name: "get_recipe",
   description: "One recipe with its latest version, that version's ingredients, and the OG/FG/ABV they predict",
   input: z.object({ recipeId: z.string().uuid() }), roles: ["admin", "brewer"],
   handler: async (ctx, i) => {
-    const recipe = await unwrap(ctx.db.from("recipes").select("id, name, brand_id, note, created_at")
-      .eq("brewery_id", ctx.breweryId).eq("id", i.recipeId).maybeSingle());
+    // The recipe and its latest version are independent reads; the version
+    // query filters by recipe_id alone, so both go out at once.
+    const [recipe, version] = await Promise.all([
+      unwrap(ctx.db.from("recipes").select("id, name, brand_id, note, created_at")
+        .eq("brewery_id", ctx.breweryId).eq("id", i.recipeId).maybeSingle()),
+      unwrap(ctx.db.from("recipe_versions")
+        .select("id, version, mash_temp_f, brewhouse_efficiency, yeast_attenuation, boil_minutes, target_ibu, note, created_at")
+        .eq("recipe_id", i.recipeId).order("version", { ascending: false }).limit(1).maybeSingle()),
+    ]);
     if (!recipe) throw new CommandError("recipe not found", 404, "not_found");
-
-    const version = await unwrap(ctx.db.from("recipe_versions")
-      .select("id, version, mash_temp_f, brewhouse_efficiency, yeast_attenuation, boil_minutes, target_ibu, note, created_at")
-      .eq("recipe_id", i.recipeId).order("version", { ascending: false }).limit(1).maybeSingle());
     if (!version) return { recipe, version: null, ingredients: [], ogPlato: null, fgPlato: null, abv: null };
 
     const ingredients = await unwrap(ctx.db.from("recipe_ingredients")
@@ -101,7 +117,6 @@ defineQuery({
     return {
       recipe, version, ingredients,
       ...recipeGravity({
-        mashTempF: num(version.mash_temp_f),
         brewhouseEfficiency: num(version.brewhouse_efficiency),
         yeastAttenuation: num(version.yeast_attenuation),
         ingredients: ingredients.map((l) => ({
@@ -117,7 +132,6 @@ defineQuery({
 
 // ------------------------------------------------------------ vessels, batches
 const VESSEL_KINDS = ["fermenter", "brite", "barrel", "kettle", "other"] as const;
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "expected YYYY-MM-DD");
 
 defineCommand({
   name: "upsert_vessel", description: "Create or rename a vessel: its name, kind and capacity. Contents are never stored here — they are derived from the open occupancy",
@@ -188,15 +202,6 @@ type BatchRow = {
   planned_on: string; planned_bbl: number; brewed_on: string | null; note: string | null;
 };
 
-type Ctx = Parameters<Parameters<typeof defineQuery>[0]["handler"]>[0];
-
-async function brandNames(ctx: Ctx, batches: BatchRow[]) {
-  const ids = [...new Set(batches.map((b) => b.intended_brand_id).filter((v): v is string => !!v))];
-  if (ids.length === 0) return new Map<string, string>();
-  const rows = (await unwrap(ctx.db.from("brands").select("id, name").in("id", ids))) ?? [];
-  return new Map(rows.map((r) => [r.id as string, r.name as string]));
-}
-
 // A batch names a recipe *version*; the human-readable name lives one hop
 // further out on the recipe itself.
 async function recipeNames(ctx: Ctx, batches: BatchRow[]) {
@@ -233,9 +238,11 @@ defineQuery({
       .eq("brewery_id", ctx.breweryId).order("planned_on", { ascending: false })) ?? []) as BatchRow[];
     if (batches.length === 0) return [];
 
-    const brands = await brandNames(ctx, batches);
-    const recipes = await recipeNames(ctx, batches);
-    const vessels = await openVessels(ctx, batches.map((b) => b.id));
+    const [brands, recipes, vessels] = await Promise.all([
+      brandNames(ctx, batches.map((b) => b.intended_brand_id)),
+      recipeNames(ctx, batches),
+      openVessels(ctx, batches.map((b) => b.id)),
+    ]);
 
     return batches.map((b) => ({
       ...b,

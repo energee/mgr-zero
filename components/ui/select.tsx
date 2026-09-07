@@ -178,7 +178,13 @@ function SelectScrollDownButton({
   )
 }
 
+// ponytail: Radix Select refuses an empty-string item, so a form's "nothing
+// chosen" choice is this sentinel, mapped back to "" at the edge:
+//   value={x || NONE} onValueChange={(v) => setX(v === NONE ? "" : v)}
+const NONE = "__none__"
+
 export {
+  NONE,
   Select,
   SelectContent,
   SelectGroup,

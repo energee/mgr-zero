@@ -34,16 +34,18 @@ function verb(run: Run): [string, "info" | "attention" | "success"] {
 export default async function PackagingPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [runs, brands, occupancies, locations, bins, skus] = (await Promise.all([
-    runCommand("list_packaging_runs", {}, ctx), runCommand("list_brands", {}, ctx), runCommand("list_occupancies", {}, ctx),
-    runCommand("list_locations", {}, ctx), runCommand("list_bins", {}, ctx), runCommand("list_skus", {}, ctx),
-  ])) as [Run[], Brand[], Occupancy[], Location[], Bin[], Sku[]];
-  const skuOptions = skus.map((s) => ({ id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name }));
   const canRepack = brewery.role === "admin" || brewery.role === "warehouse";
+  const [runs, brands, occupancies, skus, locations, bins] = (await Promise.all([
+    runCommand("list_packaging_runs", {}, ctx), runCommand("list_brands", {}, ctx), runCommand("list_occupancies", {}, ctx),
+    runCommand("list_skus", {}, ctx),
+    // Only the repack form needs these; a brewer never sees it.
+    canRepack ? runCommand("list_locations", {}, ctx) : [], canRepack ? runCommand("list_bins", {}, ctx) : [],
+  ])) as [Run[], Brand[], Occupancy[], Sku[], Location[], Bin[]];
+  const skuOptions = skus.map((s) => ({ id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name }));
 
   return (
     <>
-      {E.hd("Packaging", "runs", <div className="flex gap-2"><ScheduleRunForm brands={brands} occupancies={occupancies} skus={skuOptions} />{canRepack ? <RepackForm locations={locations} bins={bins} skus={skuOptions} /> : undefined}</div>)}
+      {E.hd("Packaging", "runs", <div className="flex gap-2"><ScheduleRunForm brands={brands} occupancies={occupancies} skus={skuOptions} />{canRepack ? <RepackForm locations={locations} bins={bins} skus={skuOptions} /> : null}</div>)}
       {runs.length === 0
         ? E.blank("No runs planned")
         : runs.map((r) => {

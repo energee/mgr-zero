@@ -7,9 +7,8 @@
 import { platoToSg, sgToPlato } from "@/lib/recipe-gravity";
 
 /** The two units a brewer may choose to see and type gravity in. */
-export type GravityUnit = "plato" | "sg";
-
-export const GRAVITY_UNITS: readonly GravityUnit[] = ["plato", "sg"];
+export const GRAVITY_UNITS = ["plato", "sg"] as const;
+export type GravityUnit = (typeof GRAVITY_UNITS)[number];
 
 /** The label a person reads for a unit ("Plato", "Specific gravity"). */
 export const gravityUnitLabel = (unit: GravityUnit) => (unit === "sg" ? "Specific gravity" : "Plato");

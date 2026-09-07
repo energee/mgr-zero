@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap, Ctx, CommandExecution } from "./registry";
+import { defineCommand, defineQuery, unwrap, Ctx, CommandExecution, STAFF_ROLES } from "./registry";
 import { stockLine } from "./stock-line";
 
 const movementInput = z.object({
@@ -119,14 +119,14 @@ defineQuery({
 defineQuery({
   // Brewers read SKUs too: the packaging pages pick the SKU a run fills.
   name: "list_skus", description: "SKUs with their brand and format, alphabetical",
-  input: z.object({}), roles: ["admin", "sales", "warehouse", "brewer"],
+  input: z.object({}), roles: STAFF_ROLES,
   handler: (ctx) => unwrap(ctx.db.from("skus").select("id, name, active, brand_id, format_id, brands(name), formats(name, bbl_per_unit, package_type)").eq("brewery_id", ctx.breweryId).order("name")),
 });
 
 defineQuery({
   // Brewers read locations too: a packaging run puts its output somewhere.
   name: "list_locations", description: "Warehouses and taprooms, alphabetical",
-  input: z.object({}), roles: ["admin", "sales", "warehouse", "brewer"],
+  input: z.object({}), roles: STAFF_ROLES,
   handler: (ctx) => unwrap(ctx.db.from("locations").select("id, name, kind").eq("brewery_id", ctx.breweryId).order("name")),
 });
 

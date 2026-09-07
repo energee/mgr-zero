@@ -13,7 +13,9 @@
 import { z } from "zod";
 import { defineCommand, defineQuery, unwrap, CommandError, type Ctx } from "./registry";
 
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "expected YYYY-MM-DD");
+// z.string().date() rather than a regex: api-schema.ts renders it as
+// "date (YYYY-MM-DD)" in /docs/api, as orders.ts and transfers.ts already do.
+export const isoDate = z.string().date();
 
 const outputs = z.array(z.object({
   skuId: z.string().uuid(),
@@ -130,7 +132,8 @@ type RunRow = {
 // Names for a set of brand ids, in one read. Embedded selects are avoided
 // throughout the command layer (see production.ts): every join here is an
 // explicit id -> name map, which keeps the composite-FK tables unambiguous.
-async function brandNames(ctx: Ctx, ids: (string | null)[]) {
+// production.ts shares this one.
+export async function brandNames(ctx: Ctx, ids: (string | null)[]) {
   const unique = [...new Set(ids.filter((v): v is string => !!v))];
   if (unique.length === 0) return new Map<string, string>();
   const rows = (await unwrap(ctx.db.from("brands").select("id, name")
@@ -172,9 +175,11 @@ defineQuery({
       .eq("brewery_id", ctx.breweryId).order("planned_on", { ascending: false })) ?? []) as RunRow[];
     if (runs.length === 0) return [];
 
-    const brands = await brandNames(ctx, runs.map((r) => r.brand_id));
-    const vessels = await vesselNames(ctx, runs.map((r) => r.occupancy_id));
-    const qty = await plannedQty(ctx, runs.map((r) => r.id));
+    const [brands, vessels, qty] = await Promise.all([
+      brandNames(ctx, runs.map((r) => r.brand_id)),
+      vesselNames(ctx, runs.map((r) => r.occupancy_id)),
+      plannedQty(ctx, runs.map((r) => r.id)),
+    ]);
 
     return runs.map((r) => ({
       ...r,
@@ -194,11 +199,13 @@ defineQuery({
       .eq("brewery_id", ctx.breweryId).eq("id", i.runId).maybeSingle())) as RunRow | null;
     if (!run) throw new CommandError("packaging run not found", 404, "not_found");
 
-    const brands = await brandNames(ctx, [run.brand_id]);
-    const vessels = await vesselNames(ctx, [run.occupancy_id]);
-    const rows = (await unwrap(ctx.db.from("packaging_run_outputs")
-      .select("id, sku_id, qty_planned, qty_actual")
-      .eq("brewery_id", ctx.breweryId).eq("run_id", i.runId).order("id"))) ?? [];
+    const [brands, vessels, rows] = await Promise.all([
+      brandNames(ctx, [run.brand_id]),
+      vesselNames(ctx, [run.occupancy_id]),
+      unwrap(ctx.db.from("packaging_run_outputs")
+        .select("id, sku_id, qty_planned, qty_actual")
+        .eq("brewery_id", ctx.breweryId).eq("run_id", i.runId).order("id")).then((r) => r ?? []),
+    ]);
     const skus = (await unwrap(ctx.db.from("skus").select("id, name")
       .eq("brewery_id", ctx.breweryId).in("id", [...new Set(rows.map((o) => o.sku_id as string))]))) ?? [];
     const skuNames = new Map(skus.map((s) => [s.id as string, s.name as string]));
@@ -228,11 +235,13 @@ defineQuery({
       .eq("brewery_id", ctx.breweryId).is("ended_at", null).order("started_at"))) ?? [];
     if (rows.length === 0) return [];
 
-    const vessels = (await unwrap(ctx.db.from("vessels").select("id, name")
-      .in("id", [...new Set(rows.map((r) => r.vessel_id as string))]))) ?? [];
+    const [vessels, batches] = await Promise.all([
+      unwrap(ctx.db.from("vessels").select("id, name")
+        .in("id", [...new Set(rows.map((r) => r.vessel_id as string))])).then((v) => v ?? []),
+      unwrap(ctx.db.from("batches").select("id, batch_no, intended_brand_id")
+        .in("id", [...new Set(rows.map((r) => r.batch_id as string))])).then((b) => b ?? []),
+    ]);
     const vesselNameById = new Map(vessels.map((v) => [v.id as string, v.name as string]));
-    const batches = (await unwrap(ctx.db.from("batches").select("id, batch_no, intended_brand_id")
-      .in("id", [...new Set(rows.map((r) => r.batch_id as string))]))) ?? [];
     const batchById = new Map(batches.map((b) => [b.id as string, b]));
     const brands = await brandNames(ctx, batches.map((b) => b.intended_brand_id as string | null));
 

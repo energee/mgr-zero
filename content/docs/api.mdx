@@ -2035,7 +2035,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, brewer
 
-Recipes, alphabetical, with the brand each one brews
+Recipes, alphabetical, with the brand each one brews and its latest version
 
 Takes no input.
 
@@ -2072,7 +2072,7 @@ Record that a scheduled batch was brewed: stamps the brew date and moves it into
 | `batchId` | uuid | yes |
 | `vesselId` | uuid | yes |
 | `initialBbl` | number | yes |
-| `brewedOn` | string | yes |
+| `brewedOn` | date (YYYY-MM-DD) | yes |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -2131,7 +2131,7 @@ Pencil a brew day into the calendar: planned date and volume, optionally the bra
 
 | Field | Type | Required |
 | --- | --- | --- |
-| `plannedOn` | string | yes |
+| `plannedOn` | date (YYYY-MM-DD) | yes |
 | `plannedBbl` | number | yes |
 | `intendedBrandId` | uuid | no |
 | `recipeVersionId` | uuid | no |
@@ -2208,10 +2208,10 @@ Close a started run: record the barrels drawn and the units actually filled, whi
 | `bblDrawn` | number | yes |
 | `outputs` | array of object | yes |
 | `lotCode` | string | yes |
-| `packagedOn` | string | yes |
+| `packagedOn` | date (YYYY-MM-DD) | yes |
 | `locationId` | uuid | yes |
 | `binId` | uuid | yes |
-| `bestBy` | string | no |
+| `bestBy` | date (YYYY-MM-DD) | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -2351,7 +2351,7 @@ Plan a packaging run: the brand being packaged, the date, the units intended, an
 | Field | Type | Required |
 | --- | --- | --- |
 | `brandId` | uuid | yes |
-| `plannedOn` | string | yes |
+| `plannedOn` | date (YYYY-MM-DD) | yes |
 | `outputs` | array of object | yes |
 | `occupancyId` | uuid | no |
 

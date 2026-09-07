@@ -1,6 +1,6 @@
 // lib/recipe-gravity.ts — the one pure gravity calculation recipe RPCs and
 // the editor preview call: given a recipe version's assumption columns
-// (mashTempF, brewhouseEfficiency, yeastAttenuation) and its ingredients'
+// (brewhouseEfficiency, yeastAttenuation) and its ingredients'
 // per-bbl quantities and extract potentials, predicts OG/FG/ABV.
 //
 // Only `stage: "mash"` ingredients contribute extract here. That is a
@@ -31,8 +31,8 @@
 //   Plato(SG) = max(0, -616.868 + 1111.14*SG - 630.272*SG^2 + 135.997*SG^3)  (ASBC cubic, clamped at water)
 //   ABV       = (OG - FG) * 131.25
 //
-// mashTempF is accepted (recipe_versions.mash_temp_f) but does not affect
-// this gravity prediction; it is reserved for a later mash-efficiency model.
+// recipe_versions.mash_temp_f is stored but not an input here: it is reserved
+// for a later mash-efficiency model, so callers do not marshal it.
 
 export type RecipeGravityIngredient = {
   perBblQty: number;
@@ -43,7 +43,6 @@ export type RecipeGravityIngredient = {
 };
 
 export type RecipeGravityInput = {
-  mashTempF: number;
   brewhouseEfficiency: number;
   yeastAttenuation: number;
   ingredients: RecipeGravityIngredient[];

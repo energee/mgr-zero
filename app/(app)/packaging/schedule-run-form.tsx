@@ -9,12 +9,9 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { NONE, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
-// ponytail: Radix Select refuses an empty-string item, so the "nothing chosen"
-// choice is a sentinel mapped back to "" at the edge; state stays as before.
-const NONE = "__none__";
 
 type Brand = { id: string; name: string };
 type Occupancy = { occupancy_id: string; vessel_name: string | null; brand_name: string | null; bbl: number };

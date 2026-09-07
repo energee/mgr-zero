@@ -3494,7 +3494,7 @@ create function record_fermentation_reading(
   p_brewery uuid, p_occupancy uuid, p_at timestamptz, p_temp_f numeric,
   p_gravity_plato numeric, p_ph numeric, p_note text, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_actor uuid; v_replay jsonb; v_occ public.vessel_occupancies; v_row public.fermentation_readings;
+declare v_actor uuid; v_replay jsonb; v_row public.fermentation_readings;
 begin
   v_actor := private.assert_staff(p_brewery, array['admin','brewer']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'record_fermentation_reading', p_request_id,
@@ -3502,9 +3502,7 @@ begin
       'gravity_plato', p_gravity_plato, 'ph', p_ph, 'note', p_note));
   if v_replay is not null then return v_replay; end if;
 
-  select * into v_occ from public.vessel_occupancies where id = p_occupancy and brewery_id = p_brewery;
-  if v_occ.id is null then raise exception 'occupancy not found'; end if;
-  if v_occ.ended_at is not null then raise exception 'occupancy is closed'; end if;
+  perform private.assert_open_occupancy(p_brewery, p_occupancy);
 
   insert into public.fermentation_readings (brewery_id, occupancy_id, at, temp_f, gravity_plato, ph, note, created_by)
   values (p_brewery, p_occupancy, coalesce(p_at, now()), p_temp_f, p_gravity_plato, p_ph, p_note, v_actor)
@@ -3525,24 +3523,32 @@ begin
   if v_ended is not null then raise exception 'occupancy is closed'; end if;
 end $$;
 
--- Replace a run's planned outputs. Every sku must belong to the run's brand,
--- so a run's outputs can never quietly package something else.
-create function private.replace_packaging_run_outputs(
-  p_brewery uuid, p_run uuid, p_brand uuid, p_outputs jsonb
-) returns void language plpgsql set search_path = '' as $$
-declare v_line jsonb; v_sku_brand uuid; v_dupe uuid;
+-- One line per package is the rule for a run's planned and actual outputs.
+-- unique (run_id, sku_id) would catch a repeat, but as a constraint name;
+-- say so before the insert does.
+create function private.assert_one_line_per_sku(p_outputs jsonb) returns void
+language plpgsql set search_path = '' as $$
+declare v_dupe uuid;
 begin
-  if p_outputs is null then return; end if;
-  -- unique (run_id, sku_id) would catch this, but as a constraint name. One
-  -- line per package is the rule; say so before the insert does.
   select (value->>'sku_id')::uuid into v_dupe
   from jsonb_array_elements(coalesce(p_outputs, '[]'::jsonb))
   group by 1 having count(*) > 1 limit 1;
   if v_dupe is not null then
     raise exception 'package % is listed twice; give it one line with the total', v_dupe;
   end if;
+end $$;
+
+-- Replace a run's planned outputs. Every sku must belong to the run's brand,
+-- so a run's outputs can never quietly package something else.
+create function private.replace_packaging_run_outputs(
+  p_brewery uuid, p_run uuid, p_brand uuid, p_outputs jsonb
+) returns void language plpgsql set search_path = '' as $$
+declare v_line jsonb; v_sku_brand uuid;
+begin
+  if p_outputs is null then return; end if;
+  perform private.assert_one_line_per_sku(p_outputs);
   delete from public.packaging_run_outputs where run_id = p_run;
-  for v_line in select * from jsonb_array_elements(coalesce(p_outputs, '[]'::jsonb)) loop
+  for v_line in select * from jsonb_array_elements(p_outputs) loop
     select s.brand_id into v_sku_brand from public.skus s
     where s.id = (v_line->>'sku_id')::uuid and s.brewery_id = p_brewery;
     if v_sku_brand is null then raise exception 'sku not found'; end if;
@@ -3610,18 +3616,16 @@ begin
 
   -- Translate the check constraint into the sentence a brewer would say. The
   -- constraint still stands behind this for anything that writes directly.
-  if p_started_at is not null and v_run.occupancy_id is null then
-    raise exception 'pick the tank this run draws from before starting it';
-  end if;
   if p_started_at is not null then
-    -- Re-check the tank that is actually attached, not just one passed in now:
-    -- a run may have picked its occupancy days ago and that occupancy may have
-    -- been emptied since. Nothing else would catch it -- the trigger only fires
-    -- when occupancy_id itself is written, and the check constraint asks only
-    -- that the column be non-null.
-    perform private.assert_open_occupancy(p_brewery, coalesce(p_occupancy, v_run.occupancy_id));
-  end if;
-  if p_started_at is not null then
+    if v_run.occupancy_id is null then
+      raise exception 'pick the tank this run draws from before starting it';
+    end if;
+    -- Re-check the tank that is actually attached (v_run was re-read above if
+    -- one was passed in now): a run may have picked its occupancy days ago and
+    -- that occupancy may have been emptied since. Nothing else would catch it
+    -- -- the trigger only fires when occupancy_id itself is written, and the
+    -- check constraint asks only that the column be non-null.
+    perform private.assert_open_occupancy(p_brewery, v_run.occupancy_id);
     update public.packaging_runs set started_at = p_started_at where id = p_run returning * into v_run;
   end if;
 
@@ -3649,7 +3653,7 @@ create function close_packaging_run(
 declare
   v_actor uuid; v_replay jsonb; v_run public.packaging_runs; v_lot uuid; v_available numeric;
   v_occupancy public.vessel_occupancies;
-  v_dupe uuid; v_line jsonb; v_sku uuid; v_qty numeric; v_format uuid;
+  v_line jsonb; v_sku uuid; v_qty numeric; v_format uuid;
   v_movement uuid; v_consumption uuid; v_bom record;
   -- numeric(10,3) rounding means "empty" is never exactly zero after a split.
   c_epsilon constant numeric := 0.0005;
@@ -3700,12 +3704,7 @@ begin
     raise exception 'only % bbl in that tank; asked to draw %', coalesce(v_available, 0), p_bbl_drawn;
   end if;
 
-  select (value->>'sku_id')::uuid into v_dupe
-  from jsonb_array_elements(coalesce(p_outputs, '[]'::jsonb))
-  group by 1 having count(*) > 1 limit 1;
-  if v_dupe is not null then
-    raise exception 'package % is listed twice; give it one line with the total', v_dupe;
-  end if;
+  perform private.assert_one_line_per_sku(p_outputs);
 
   -- lots is unique (brewery_id, code); say so as a sentence rather than let a
   -- 23505 carrying a constraint name reach the brewer.
@@ -3844,7 +3843,11 @@ begin
 
   -- The trigger froze bbl on each row from format_volumes; if the pair does not
   -- cancel the repack invented or destroyed beer, so the whole call rolls back.
-  select coalesce(sum(m.bbl), 0) into v_net from public.inventory_movements m where m.ref = v_ref and m.type = 'repack';
+  -- Filtered on the on-hand index columns too: `ref` alone has no index, and
+  -- the two rows just written are exactly this brewery/bin/sku pair.
+  select coalesce(sum(m.bbl), 0) into v_net from public.inventory_movements m
+   where m.brewery_id = p_brewery and m.location_id = p_location and m.bin_id = p_bin
+     and m.sku_id in (p_parent_sku, p_child_sku) and m.ref = v_ref and m.type = 'repack';
   if abs(v_net) >= 0.000001 then
     raise exception 'repack is not volume-neutral: % bbl left over', v_net;
   end if;

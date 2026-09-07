@@ -3,7 +3,7 @@
 // material later never moves an old version's predicted gravity. get_recipe
 // computes OG/FG/ABV in TypeScript (lib/recipe-gravity.ts), never in SQL.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, makeBrewery, makeStaffCtx, seedCatalog, sql } from "./helpers";
+import { admin, makeBrewery, makeStaffCtx, seedCatalog, seedMaterial, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import { recipeGravity } from "@/lib/recipe-gravity";
 import "@/lib/commands/all";
@@ -15,19 +15,11 @@ let hop: string;
 
 // A malt with a typed extract potential and a hop without one: the hop proves
 // the boil stage is excluded from gravity and that a null potential is tolerated.
-async function seedMaterial(name: string, category: string, extractPotential: number | null) {
-  const { data, error } = await admin.from("materials").insert({
-    brewery_id: b.id, name, category, base_uom: "lb", purchase_uom: "lb", extract_potential: extractPotential,
-  }).select("id").single();
-  if (error) throw error;
-  return data.id as string;
-}
-
 beforeAll(async () => {
   b = await makeBrewery();
   ctx = await makeStaffCtx(b.id, "brewer");
-  malt = await seedMaterial("Pale Ale Malt", "malt", 1.037);
-  hop = await seedMaterial("Citra", "hop", null);
+  malt = await seedMaterial(b.id, { name: "Pale Ale Malt", category: "malt", extractPotential: 1.037 });
+  hop = await seedMaterial(b.id, { name: "Citra", category: "hop" });
 });
 
 describe("recipes and immutable versions", () => {
@@ -74,7 +66,7 @@ describe("recipes and immutable versions", () => {
     expect(got.recipe).toMatchObject({ id: recipe.id, name: "Flagship IPA" });
     expect(got.version).toMatchObject({ id: v2.id, version: 2 });
     const expected = recipeGravity({
-      mashTempF: 150, brewhouseEfficiency: 0.8, yeastAttenuation: 0.8,
+      brewhouseEfficiency: 0.8, yeastAttenuation: 0.8,
       ingredients: [{ perBblQty: 70, extractPotential: 1.02, stage: "mash" }],
     });
     expect({ ogPlato: got.ogPlato, fgPlato: got.fgPlato, abv: got.abv }).toEqual(expected);
@@ -216,10 +208,7 @@ describe("vessels and batches refuse other tenants and other roles", () => {
     otherBrand = (await seedCatalog(other.id)).brandId;
     otherBatch = ((await runCommand("schedule_batch", { plannedOn: "2026-10-01", plannedBbl: 20 }, otherCtx)) as { id: string }).id;
 
-    const { data: m, error } = await admin.from("materials").insert({
-      brewery_id: other.id, name: "Their Malt", category: "malt", base_uom: "lb", purchase_uom: "lb", extract_potential: 1.037,
-    }).select("id").single();
-    if (error) throw error;
+    const m = { id: await seedMaterial(other.id, { name: "Their Malt", category: "malt", extractPotential: 1.037 }) };
     const recipe = (await runCommand("create_recipe", { name: "Their Recipe" }, otherCtx)) as { id: string };
     otherRecipeVersion = ((await runCommand("create_recipe_version", {
       recipeId: recipe.id, mashTempF: 152, brewhouseEfficiency: 0.75, yeastAttenuation: 0.78,

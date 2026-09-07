@@ -3,7 +3,7 @@
 // live-reason gate that keeps unshipped destinations out of both readers.
 import { beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
-import { admin, asUser, channelId, DB, makeBrewery, makeCustomerUser, makeStaff, makeStaffCtx, priceSku } from "./helpers";
+import { admin, asUser, channelId, DB, ins, makeBrewery, makeCustomerUser, makeStaff, makeStaffCtx, priceSku } from "./helpers";
 import { runCommand, type Ctx as CommandCtx } from "@/lib/commands/registry";
 import type { TodayItem } from "@/lib/commands/today";
 import "@/lib/commands/all";
@@ -13,12 +13,6 @@ const sql = new pg.Pool({ connectionString: DB });
 type Ctx = Awaited<ReturnType<typeof makeStaffCtx>>;
 let b: { id: string }, adminCtx: Ctx, sales: Ctx, warehouse: Ctx, brewer: Ctx;
 let customerId: string, shipToId: string, whId: string, whBinId: string, skuId: string;
-
-async function ins<T = { id: string }>(table: string, row: Record<string, unknown>): Promise<T> {
-  const { data, error } = await admin.from(table).insert(row).select().single();
-  if (error) throw new Error(`${table}: ${error.message}`);
-  return data as T;
-}
 
 async function createOrder(requested: string, submit = false, confirm = false) {
   const { data, error } = await adminCtx.db.rpc("create_order", { p_request_id: crypto.randomUUID(),

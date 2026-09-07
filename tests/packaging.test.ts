@@ -16,7 +16,7 @@
 // consumed). One level only — `format_components` is one deep by design, and
 // the call only ever breaks down: the components lookup is directional.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
+import { admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedMaterial, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -51,11 +51,7 @@ let caseFormatId: string;
 const FOUR_PACK_BBL = 0.0645;
 const PER_CASE = 6;
 
-async function insert<T extends Record<string, unknown>>(table: string, row: T): Promise<string> {
-  const { data, error } = await admin.from(table).insert(row).select("id").single();
-  if (error) throw error;
-  return data.id as string;
-}
+const insert = async (table: string, row: Record<string, unknown>) => (await ins(table, row)).id;
 
 beforeAll(async () => {
   b = await makeBrewery();
@@ -91,9 +87,7 @@ beforeAll(async () => {
   looseSkuId = await insert("skus", { brewery_id: b.id, brand_id: repackBrandId, format_id: looseFormatId, name: "Repack IPA single" });
 
   // The tray comes off whole when the case is broken, so it goes back on the shelf.
-  trayId = await insert("materials", {
-    brewery_id: b.id, name: "case tray", category: "packaging", base_uom: "each", purchase_uom: "each",
-  });
+  trayId = await seedMaterial(b.id, { name: "case tray", category: "packaging", uom: "each" });
   const { error: be } = await admin.from("format_bom").insert({
     brewery_id: b.id, format_id: caseFormatId, material_id: trayId, qty_per_unit: 1, on_break: "return_to_stock",
   });
@@ -319,11 +313,8 @@ describe("closing the run", () => {
   let tray: string;
   let lid: string;
 
-  const material = async (name: string, lotTracked = false) =>
-    (await admin.from("materials").insert({
-      brewery_id: b.id, name, category: "packaging",
-      base_uom: "each", purchase_uom: "each", lot_tracked: lotTracked,
-    }).select("id").single()).data!.id as string;
+  const material = (name: string, lotTracked = false) =>
+    seedMaterial(b.id, { name, category: "packaging", uom: "each", lotTracked });
 
   beforeAll(async () => {
     const adminCtx = await makeStaffCtx(b.id, "admin");
