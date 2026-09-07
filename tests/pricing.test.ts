@@ -133,3 +133,58 @@ describe("customers and orders carry the channel", () => {
     const chans = await db.from("sale_channels").select("id"); expect(chans.data).toEqual([]);
   });
 });
+
+// The commands over those RPCs. Its own brewery: the describes above leave
+// `b` with groups "1" and "2A", and these assert on the whole group list.
+describe("pricing commands", () => {
+  let cb: { id: string }; let cctx: Awaited<ReturnType<typeof makeStaffCtx>>;
+  let ccat: Awaited<ReturnType<typeof seedCatalog>>; let cWholesale: string;
+  beforeAll(async () => {
+    cb = await makeBrewery(); cctx = await makeStaffCtx(cb.id, "sales"); ccat = await seedCatalog(cb.id);
+    cWholesale = await channelId(cb.id, "Wholesale");
+    await seedPriceGroup(cb.id, "1", 1);
+  });
+
+  it("upsert_price_group creates and renames; a duplicate position is refused with copy", async () => {
+    const t = await runCommand("upsert_price_group", { name: "2", position: 2 }, cctx) as { id: string; name: string };
+    expect(t.name).toBe("2");
+    const renamed = await runCommand("upsert_price_group", { id: t.id, name: "two", position: 2, costCeilingCents: 900 }, cctx) as { name: string; cost_ceiling_cents: number };
+    expect(renamed).toMatchObject({ name: "two", cost_ceiling_cents: 900 });
+    await expect(runCommand("upsert_price_group", { name: "three", position: 1 }, cctx)).rejects.toThrow(/already exists/);
+    const groups = await runCommand("list_price_groups", {}, cctx) as { name: string }[];
+    expect(groups.map((x) => x.name)).toEqual(["1", "two"]);
+  });
+
+  it("set_channel_price fills a cell, list_channel_prices reads it, clear_channel_price empties it; a group in use cannot be deleted", async () => {
+    const groups = await runCommand("list_price_groups", {}, cctx) as { id: string; name: string }[];
+    const t2 = groups.find((x) => x.name === "two")!.id;
+    await runCommand("set_channel_price", { saleChannelId: cWholesale, priceGroupId: t2, formatId: ccat.formatId, unitPriceCents: 15400 }, cctx);
+    const cells = await runCommand("list_channel_prices", { saleChannelId: cWholesale }, cctx) as { price_group_id: string; unit_price_cents: number; price_groups: { name: string }; formats: { name: string } }[];
+    const cell = cells.find((c) => c.price_group_id === t2)!;
+    expect(cell.unit_price_cents).toBe(15400);
+    expect(cell.price_groups.name).toBe("two");
+    expect(cell.formats.name).toBeTruthy();
+    await expect(runCommand("delete_price_group", { priceGroupId: t2 }, cctx)).rejects.toThrow(/in use/);
+    await runCommand("clear_channel_price", { saleChannelId: cWholesale, priceGroupId: t2, formatId: ccat.formatId }, cctx);
+    await runCommand("delete_price_group", { priceGroupId: t2 }, cctx);
+    expect((await runCommand("list_price_groups", {}, cctx) as unknown[]).length).toBe(1);
+  });
+
+  it("upsert_customer requires a sale channel and upsert_brand takes a price group", async () => {
+    await expect(runCommand("upsert_customer", { name: "X", type: "retailer", state: "PA" }, cctx)).rejects.toThrow();
+    const c = await runCommand("upsert_customer", { name: "X", type: "retailer", state: "PA", saleChannelId: cWholesale }, cctx) as { id: string; sale_channel_id: string };
+    expect(c.sale_channel_id).toBe(cWholesale);
+    const listed = await runCommand("list_customers", {}, cctx) as { id: string; sale_channels: { name: string } }[];
+    expect(listed.find((r) => r.id === c.id)!.sale_channels.name).toBe("Wholesale");
+    const pg = (await runCommand("list_price_groups", {}, cctx) as { id: string }[])[0].id;
+    const br = await runCommand("upsert_brand", { id: ccat.brandId, name: "Hazy", priceGroupId: pg }, cctx) as { price_group_id: string };
+    expect(br.price_group_id).toBe(pg);
+  });
+
+  it("warehouse can list groups but not set a price", async () => {
+    const wh = await makeStaffCtx(cb.id, "warehouse");
+    await runCommand("list_price_groups", {}, wh);
+    const pg = (await runCommand("list_price_groups", {}, cctx) as { id: string }[])[0].id;
+    await expect(runCommand("set_channel_price", { saleChannelId: cWholesale, priceGroupId: pg, formatId: ccat.formatId, unitPriceCents: 1 }, wh)).rejects.toThrow();
+  });
+});

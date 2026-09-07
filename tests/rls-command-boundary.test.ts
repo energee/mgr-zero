@@ -132,6 +132,9 @@ const contexts = (): Record<StaffRole, StaffCtx> => ({
   brewer: brewerCtx,
 });
 const unique = (label: string, role: StaffRole) => `${label} ${role} ${crypto.randomUUID().slice(0, 8)}`;
+// price_groups is unique on (brewery, position); the seed helper takes 1.
+let position = 1;
+const nextPosition = () => ++position;
 
 async function draftOrder() {
   const order = await runCommand("create_order", {
@@ -312,11 +315,53 @@ describe("registered staff mutation role × RPC matrix", () => {
       input: async role => {
         const name = unique("matrix customer", role);
         return {
-          command: { name, type: "retailer", state: "PA" },
+          command: { name, type: "retailer", state: "PA", saleChannelId },
           rpc: {
             p_id: null, p_brewery: brewery.id, p_name: name, p_type: "retailer", p_state: "PA",
             p_sale_channel: saleChannelId, p_license_no: null, p_payment_terms: null, p_tax_treatment: null,
           },
+        };
+      },
+    },
+    {
+      command: "upsert_price_group", rpc: "upsert_price_group", allowed: ["admin", "sales"],
+      input: async role => {
+        const name = unique("matrix group", role);
+        const position = nextPosition();
+        return {
+          command: { name, position },
+          rpc: { p_brewery: brewery.id, p_id: null, p_name: name, p_position: position, p_cost_ceiling_cents: null },
+        };
+      },
+    },
+    {
+      command: "delete_price_group", rpc: "delete_price_group", allowed: ["admin", "sales"],
+      input: async role => {
+        const { data } = await admin.from("price_groups")
+          .insert({ brewery_id: brewery.id, name: unique("matrix drop group", role), position: nextPosition() }).select("id").single();
+        return { command: { priceGroupId: data!.id }, rpc: { p_brewery: brewery.id, p_id: data!.id } };
+      },
+    },
+    {
+      command: "set_channel_price", rpc: "set_channel_price", allowed: ["admin", "sales"],
+      input: async role => {
+        const { data } = await admin.from("price_groups")
+          .insert({ brewery_id: brewery.id, name: unique("matrix cell group", role), position: nextPosition() }).select("id").single();
+        return {
+          command: { saleChannelId, priceGroupId: data!.id, formatId, unitPriceCents: 1500 },
+          rpc: { p_brewery: brewery.id, p_sale_channel: saleChannelId, p_price_group: data!.id, p_format: formatId, p_unit_price_cents: 1500 },
+        };
+      },
+    },
+    {
+      command: "clear_channel_price", rpc: "clear_channel_price", allowed: ["admin", "sales"],
+      input: async role => {
+        const { data } = await admin.from("price_groups")
+          .insert({ brewery_id: brewery.id, name: unique("matrix clear group", role), position: nextPosition() }).select("id").single();
+        await admin.from("channel_prices").insert({ brewery_id: brewery.id, sale_channel_id: saleChannelId, price_group_id: data!.id, format_id: formatId, unit_price_cents: 1500 });
+        return {
+          command: { saleChannelId, priceGroupId: data!.id, formatId },
+          rpc: { p_brewery: brewery.id, p_sale_channel: saleChannelId, p_price_group: data!.id, p_format: formatId },
         };
       },
     },

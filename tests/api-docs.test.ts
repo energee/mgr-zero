@@ -205,13 +205,13 @@ describe("HTTP API reference", () => {
     const retired: Record<string, string> = {
       create_customer: "upsert_customer",
       create_product: "upsert_brand",
-      set_price: "set_price_list_item",
+      set_price: "set_channel_price",
       list_products: "list_brands",
       update_customer: "upsert_customer",
       create_ship_to: "upsert_ship_to",
       update_ship_to: "upsert_ship_to",
-      create_price_list: "upsert_price_list",
-      update_price_list: "upsert_price_list",
+      create_price_group: "upsert_price_group",
+      update_price_group: "upsert_price_group",
       adjust_order_line: "adjust_order_lines",
       get_daily_pick_sheet: "daily_pick_sheet",
       get_portal_catalog: "portal_catalog",
@@ -246,7 +246,7 @@ describe("HTTP API reference", () => {
     }
   });
   // Catalog entities settled on upsert + list (upsert_customer, upsert_ship_to,
-  // upsert_price_list are registered and work); these five spelled out full
+  // upsert_price_group are registered and work); these five spelled out full
   // CRUD instead. A separate create and update double the idempotency surface
   // a caller has to get right for one entity (YAGNI pass, 2026-09-06).
   it("designs catalog entities as upsert + list, not spelled-out CRUD", () => {

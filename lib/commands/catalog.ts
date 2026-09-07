@@ -8,12 +8,12 @@ defineCommand({
   name: "upsert_brand", description: "Create or edit a brand: name, style (added to the brewery's styles when new), ABV, and optional description, category, price group, hops",
   input: z.object({
     id: z.string().uuid().optional(), name: z.string().trim().min(1), style: z.string().optional(), abv: z.number().optional(),
-    description: z.string().optional(), category: z.string().optional(), priceGroup: z.string().optional(), hops: z.string().optional(),
+    description: z.string().optional(), category: z.string().optional(), priceGroupId: z.string().uuid().optional(), hops: z.string().optional(),
   }),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_brand", {
     p_brewery: ctx.breweryId, p_id: i.id ?? null, p_name: i.name, p_style: i.style ?? null, p_abv: i.abv ?? null,
-    p_description: i.description ?? null, p_category: i.category ?? null, p_price_group: i.priceGroup ?? null, p_hops: i.hops ?? null,
+    p_description: i.description ?? null, p_category: i.category ?? null, p_price_group: i.priceGroupId ?? null, p_hops: i.hops ?? null,
     p_request_id: execution.requestId,
   })),
 });
@@ -164,6 +164,39 @@ defineCommand({
     // used channel comes back as a raw foreign-key violation; say it in
     // product terms rather than letting it fall through to a generic 500.
     if (result.error?.code === "23503") throw new CommandError("channel is in use");
+    return unwrap(Promise.resolve(result));
+  },
+});
+
+// Price groups (spec 2026-09-07-mgr-pricing-grid-naming): the rows of the
+// price grid. A brand sits on one; a cell prices that row on a channel for a
+// format. Warehouse reads them (they name a brand's tier) but never prices.
+defineQuery({
+  name: "list_price_groups", description: "Rows of the price grid in position order",
+  roles: ["admin", "sales", "warehouse"],
+  input: z.object({}),
+  handler: (ctx) => unwrap(ctx.db.from("price_groups").select("*").eq("brewery_id", ctx.breweryId).order("position")),
+});
+
+defineCommand({
+  name: "upsert_price_group", description: "Create or rename a price group (a row of the price grid), set its position and optional cost ceiling",
+  roles: ["admin", "sales"],
+  input: z.object({ id: z.string().uuid().optional(), name: z.string().min(1), position: z.number().int().positive(), costCeilingCents: z.number().int().nonnegative().optional() }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_price_group", {
+    p_brewery: ctx.breweryId, p_id: i.id ?? null, p_name: i.name, p_position: i.position, p_cost_ceiling_cents: i.costCeilingCents ?? null, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "delete_price_group", description: "Remove a price group no brand sits on and no cell prices",
+  roles: ["admin", "sales"],
+  input: z.object({ priceGroupId: z.string().uuid() }),
+  handler: async (ctx, i, execution) => {
+    const result = await ctx.db.rpc("delete_price_group", { p_brewery: ctx.breweryId, p_id: i.priceGroupId, p_request_id: execution.requestId });
+    // brands and channel_prices reference the group `on delete restrict`, so a
+    // group still in use comes back as a raw foreign-key violation; say it in
+    // product terms rather than letting it fall through to a generic 500.
+    if (result.error?.code === "23503") throw new CommandError("price group is in use");
     return unwrap(Promise.resolve(result));
   },
 });

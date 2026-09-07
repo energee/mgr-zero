@@ -1,7 +1,7 @@
 // tests/commands-catalog.test.ts — catalog commands must use the idempotent database API.
 import { beforeAll, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { makeBrewery, makeStaffCtx } from "./helpers";
+import { makeBrewery, makeStaffCtx, seedPriceGroup } from "./helpers";
 import { runCommand } from "../lib/commands/registry";
 import "../lib/commands/all";
 
@@ -18,7 +18,7 @@ beforeAll(async () => {
 
 describe("catalog commands", () => {
   it("creates catalog records through RPC-backed commands: brand, format, sku = brand × format", async () => {
-    const brand = await runCommand("upsert_brand", { name: "Command Lager", style: "Lager", abv: 5.1, priceGroup: "Standard" }, salesCtx) as { id: string; style_id: string };
+    const brand = await runCommand("upsert_brand", { name: "Command Lager", style: "Lager", abv: 5.1, priceGroupId: await seedPriceGroup(salesCtx.breweryId, "Standard", 1) }, salesCtx) as { id: string; style_id: string };
     const fmt = await runCommand("upsert_format", { name: "16 oz can", basis: "packaged", packageType: "can", bblPerUnit: 0.004 }, salesCtx) as { id: string };
     const sku = await runCommand("create_sku", { brandId: brand.id, formatId: fmt.id }, salesCtx) as { id: string; name: string };
     const location = await runCommand("create_location", { name: "Command Warehouse", kind: "warehouse" }, adminCtx) as { id: string };

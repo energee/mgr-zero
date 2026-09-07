@@ -170,9 +170,9 @@ describe("sale channel commands", () => {
   });
 
   it("upsert_customer carries an optional tax treatment override, null inherits", async () => {
-    const plain = (await runCommand("upsert_customer", { name: "Plain Bar", type: "retailer", state: "PA" }, ctx)) as { id: string; tax_treatment: string | null };
+    const plain = (await runCommand("upsert_customer", { name: "Plain Bar", type: "retailer", state: "PA", saleChannelId: await channelId(breweryId, "Wholesale") }, ctx)) as { id: string; tax_treatment: string | null };
     expect(plain.tax_treatment).toBeNull();
-    const vessel = (await runCommand("upsert_customer", { id: plain.id, name: "Plain Bar", type: "retailer", state: "PA", taxTreatment: "vessel_supplies" }, ctx)) as { tax_treatment: string | null };
+    const vessel = (await runCommand("upsert_customer", { id: plain.id, name: "Plain Bar", type: "retailer", state: "PA", saleChannelId: await channelId(breweryId, "Wholesale"), taxTreatment: "vessel_supplies" }, ctx)) as { tax_treatment: string | null };
     expect(vessel.tax_treatment).toBe("vessel_supplies");
   });
 });

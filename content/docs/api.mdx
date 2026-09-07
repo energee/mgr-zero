@@ -162,7 +162,7 @@ omitted. They have no roles until they are built.
 | --- | --- | --- | --- | --- | --- | --- |
 | `adjust_order_lines` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `cancel_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
-| `clear_price_list_item` | Catalog & pricing | ✓ | ✓ |  |  |  |
+| `clear_channel_price` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `confirm_delivery` | Delivery & routes | ✓ |  | ✓ |  |  |
 | `confirm_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `confirm_restock` | Orders & invoicing | ✓ |  | ✓ |  |  |
@@ -176,6 +176,7 @@ omitted. They have no roles until they are built.
 | `create_stock_transfer` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `daily_pick_sheet` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `delete_bin` | Inventory & locations | ✓ |  | ✓ |  |  |
+| `delete_price_group` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `delete_sale_channel` | Catalog & pricing | ✓ |  |  |  |  |
 | `get_atp` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `get_bin_on_hand` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
@@ -194,13 +195,14 @@ omitted. They have no roles until they are built.
 | `invite_staff` | Team & brewery settings | ✓ |  |  |  |  |
 | `list_bins` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `list_brands` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
+| `list_channel_prices` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `list_customers` | Customers | ✓ | ✓ | ✓ |  |  |
 | `list_formats` | Packaging | ✓ | ✓ | ✓ |  |  |
 | `list_invoices` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `list_locations` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `list_movements` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `list_orders` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
-| `list_price_lists` | Catalog & pricing | ✓ | ✓ |  |  |  |
+| `list_price_groups` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
 | `list_sale_channels` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
 | `list_skus` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
 | `list_standing_allocations` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
@@ -226,11 +228,10 @@ omitted. They have no roles until they are built.
 | `resolve_short_pick` | Orders & invoicing | ✓ |  | ✓ |  |  |
 | `return_shipment` | Delivery & routes | ✓ | ✓ |  |  |  |
 | `set_brewery_quiet_hours` | Team & brewery settings | ✓ |  |  |  |  |
+| `set_channel_price` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `set_notification_destination` | Today & notifications | ✓ |  |  |  |  |
 | `set_notification_preference` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
 | `set_portal_fulfillment_source` | Customers | ✓ |  |  |  |  |
-| `set_price_list_format` | Catalog & pricing | ✓ | ✓ |  |  |  |
-| `set_price_list_item` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `set_standing_allocation` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `set_taproom_par` | Taproom & kegs | ✓ | ✓ |  |  |  |
 | `ship_order` | Orders & invoicing | ✓ |  | ✓ |  |  |
@@ -243,7 +244,7 @@ omitted. They have no roles until they are built.
 | `upsert_brand` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `upsert_customer` | Customers | ✓ | ✓ |  |  |  |
 | `upsert_format` | Packaging | ✓ | ✓ |  |  |  |
-| `upsert_price_list` | Catalog & pricing | ✓ | ✓ |  |  |  |
+| `upsert_price_group` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `upsert_sale_channel` | Catalog & pricing | ✓ |  |  |  |  |
 | `upsert_ship_to` | Customers | ✓ | ✓ |  |  |  |
 {/* end ops:roles */}
@@ -1338,31 +1339,32 @@ carrying `unitsPerCase` and `bblPerUnit`. `bblPerUnit` is a numeric string, not 
 float, so a barrel figure never picks up binary rounding on its way to a tax
 form.
 
-Prices live on price groups rather than on SKUs. A customer references a price
-group, and `set_price` sets one SKU's `unitPriceCents` in it as an integer.
-
-The wire names keep `price_list` (`upsert_price_list`, `set_price_list_item`,
-and the rest). That spelling is the shipped contract and does not change; the
-concept it names is a price group.
+Prices live on a grid, not on SKUs. A price group is a row of that grid and a
+brand sits on one; a sale channel is the column and a customer sits on one.
+`set_channel_price` fills one cell — sale channel × price group × format —
+with an integer `unitPriceCents`, and every SKU of that group and format sells
+at it on that channel. `clear_channel_price` empties the cell, which unprices
+those SKUs on that channel. There is no per-SKU exception.
 
 {/* ops:catalog */}
 
-#### clear_price_list_item [#clear_price_list_item]
+#### clear_channel_price [#clear_channel_price]
 
 `command` · admin, sales
 
-Remove a SKU's price override so the format default applies
+Empty one cell of the price grid; SKUs on that group and format become unpriced on that channel
 
 | Field | Type | Required |
 | --- | --- | --- |
-| `priceListId` | uuid | yes |
-| `skuId` | uuid | yes |
+| `saleChannelId` | uuid | yes |
+| `priceGroupId` | uuid | yes |
+| `formatId` | uuid | yes |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "clear_price_list_item", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "priceListId": "00000000-0000-0000-0000-000000000000", "skuId": "00000000-0000-0000-0000-000000000000" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "clear_channel_price", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "saleChannelId": "00000000-0000-0000-0000-000000000000", "priceGroupId": "00000000-0000-0000-0000-000000000000", "formatId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### create_sku [#create_sku]
@@ -1383,6 +1385,23 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_sku", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "brandId": "00000000-0000-0000-0000-000000000000", "formatId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+#### delete_price_group [#delete_price_group]
+
+`command` · admin, sales
+
+Remove a price group no brand sits on and no cell prices
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `priceGroupId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "delete_price_group", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "priceGroupId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### delete_sale_channel [#delete_sale_channel]
@@ -1417,11 +1436,28 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_brands", "input": {} }'
 ```
 
-#### list_price_lists [#list_price_lists]
+#### list_channel_prices [#list_channel_prices]
 
 `query` · admin, sales
 
-Price groups with the channel they price for, their format defaults and per-SKU overrides
+The price grid for one sale channel: one cell per price group × format (integer cents)
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `saleChannelId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_channel_prices", "input": { "saleChannelId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+#### list_price_groups [#list_price_groups]
+
+`query` · admin, sales, warehouse
+
+Rows of the price grid in position order
 
 Takes no input.
 
@@ -1429,7 +1465,7 @@ Takes no input.
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_price_lists", "input": {} }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_price_groups", "input": {} }'
 ```
 
 #### list_sale_channels [#list_sale_channels]
@@ -1462,15 +1498,16 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_skus", "input": {} }'
 ```
 
-#### set_price_list_format [#set_price_list_format]
+#### set_channel_price [#set_channel_price]
 
 `command` · admin, sales
 
-Set a price group's default price for a format (integer cents); every SKU on that format sells at it unless overridden
+Fill one cell of the price grid: every SKU on that group and format sells at it on that channel
 
 | Field | Type | Required |
 | --- | --- | --- |
-| `priceListId` | uuid | yes |
+| `saleChannelId` | uuid | yes |
+| `priceGroupId` | uuid | yes |
 | `formatId` | uuid | yes |
 | `unitPriceCents` | integer | yes |
 
@@ -1478,26 +1515,7 @@ Set a price group's default price for a format (integer cents); every SKU on tha
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_price_list_format", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "priceListId": "00000000-0000-0000-0000-000000000000", "formatId": "00000000-0000-0000-0000-000000000000", "unitPriceCents": 1 } }'
-```
-
-#### set_price_list_item [#set_price_list_item]
-
-`command` · admin, sales
-
-Override one SKU's price in a price group (integer cents); without an override the SKU sells at the group's format default
-
-| Field | Type | Required |
-| --- | --- | --- |
-| `priceListId` | uuid | yes |
-| `skuId` | uuid | yes |
-| `unitPriceCents` | integer | yes |
-
-```bash
-curl -X POST "$MGR_URL/api/command" \
-  -H 'content-type: application/json' \
-  -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_price_list_item", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "priceListId": "00000000-0000-0000-0000-000000000000", "skuId": "00000000-0000-0000-0000-000000000000", "unitPriceCents": 1 } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_channel_price", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "saleChannelId": "00000000-0000-0000-0000-000000000000", "priceGroupId": "00000000-0000-0000-0000-000000000000", "formatId": "00000000-0000-0000-0000-000000000000", "unitPriceCents": 1 } }'
 ```
 
 #### upsert_brand [#upsert_brand]
@@ -1514,7 +1532,7 @@ Create or edit a brand: name, style (added to the brewery's styles when new), AB
 | `abv` | number | no |
 | `description` | string | no |
 | `category` | string | no |
-| `priceGroup` | string | no |
+| `priceGroupId` | uuid | no |
 | `hops` | string | no |
 
 ```bash
@@ -1524,23 +1542,24 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_brand", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string" } }'
 ```
 
-#### upsert_price_list [#upsert_price_list]
+#### upsert_price_group [#upsert_price_group]
 
 `command` · admin, sales
 
-Create or edit a price group: its name and the sale channel it prices for
+Create or rename a price group (a row of the price grid), set its position and optional cost ceiling
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `name` | string | yes |
-| `channelId` | uuid | yes |
+| `position` | integer | yes |
 | `id` | uuid | no |
+| `costCeilingCents` | integer | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_price_list", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "channelId": "00000000-0000-0000-0000-000000000000" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_price_group", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "position": 1 } }'
 ```
 
 #### upsert_sale_channel [#upsert_sale_channel]
@@ -1566,15 +1585,20 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* catalog-designed */}
 
-12 of the 15 operations in this area are available today; the 3 below are not.
+13 of the 21 operations in this area are available today; the 8 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
+| `clear_price_list_item` | command | Price group, Override |
 | `get_price_list` | query | Price group, Override |
 | `get_sku` | query | SKU |
+| `list_price_lists` | query | Price groups, Price group |
+| `set_price_list_format` | command | Price group |
+| `set_price_list_item` | command | Catalog, Price group, Override |
 | `update_sku` | command | Catalog, Brand, SKU |
+| `upsert_price_list` | command | Catalog, Price group |
 
 {/* end ops:catalog */}
 
@@ -1600,7 +1624,7 @@ writing nothing. Its example below is well-formed and will still return
 
 `query` · admin, sales, warehouse
 
-One customer with ship-tos
+One customer with its sale channel name and ship-tos
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -1635,7 +1659,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Customers alphabetical with price group name
+Customers alphabetical with sale channel name
 
 Takes no input.
 
@@ -1667,15 +1691,15 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Create or update a customer account, optionally overriding the tax treatment its removals are recorded under
+Create or update a customer account: its sale channel decides its prices and where its removals post; tax treatment may override the channel default
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `name` | string | yes |
 | `type` | distributor or retailer or brewery or other | yes |
 | `state` | string | yes |
+| `saleChannelId` | uuid | yes |
 | `id` | uuid | no |
-| `priceListId` | uuid | no |
 | `licenseNumber` | string | no |
 | `paymentTerms` | string | no |
 | `taxTreatment` | taxable or export or vessel_supplies or research or transfer_in_bond | no |
@@ -1684,7 +1708,7 @@ Create or update a customer account, optionally overriding the tax treatment its
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_customer", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "type": "distributor", "state": "CA" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_customer", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "type": "distributor", "state": "CA", "saleChannelId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### upsert_ship_to [#upsert_ship_to]
@@ -2133,7 +2157,7 @@ Bulk CSV import (not available in this release)
 
 | Field | Type | Required |
 | --- | --- | --- |
-| `kind` | customers or ship_tos or products_skus or price_list_items or opening_balances | yes |
+| `kind` | customers or ship_tos or products_skus or channel_prices or opening_balances | yes |
 | `rows` | array of record of string | yes |
 
 ```bash
