@@ -173,14 +173,15 @@ Empty lists say **No customers yet.** or **No ship-tos yet.** You cannot delete 
 
 <Screen name="Price lists" />
 
-*Admin and Sales can create or rename lists and set a per-SKU price. A customer sees only the prices from the list assigned to them.*
+*Admin and Sales manage price lists. A customer is assigned one list; order lines snapshot their price from it when the order is created.*
+
+A price list prices **formats** by default and **SKUs** by exception. "All ½ bbl kegs are $185, except the barrel-aged one" is two entries: a format price and one SKU override.
 
 1. Open **Price lists** (the page heading is **Pricing**) and select **New Price List**. Enter a required name and select **Create**. The name must be unique within the brewery.
-2. Use **Edit** to rename a list. The new name must also be unique.
-3. Select **Set Price**, choose the SKU, and enter **Unit price (USD)** with up to cents. Zero is allowed.
-4. Select **Save**. Setting the same SKU again replaces its current price on that list.
+2. On a list select **Format price**, pick a packaged format, enter the unit price in dollars (stored as whole cents), and **Save**. Every SKU on that format now sells at that price on that list.
+3. To price one SKU differently, select **SKU override**, pick the SKU, enter its price, and **Save**. **Clear** on an override row removes it and the format default applies again.
 
-A list with no entries says **No prices set yet.** An empty Pricing screen says **No price lists yet.** There is no delete-price or delete-list control.
+A SKU with neither a format price nor an override on a customer's list cannot be ordered for that customer, and does not appear in that customer's portal Shop. A list with no format prices says **No format prices yet.** An empty Pricing screen says **No price lists yet.** There is no delete-list control.
 
 ## Staff orders [#orders]
 

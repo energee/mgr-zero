@@ -67,7 +67,7 @@ describe("Data API mutation boundary", () => {
       par_qty: 5,
     });
 
-    const priceAttempt = await staffDb.rpc("set_price", {
+    const priceAttempt = await staffDb.rpc("set_price_list_item", {
       p_brewery: breweryId,
       p_price_list: priceList.data!.id,
       p_sku: sku.data!.id,

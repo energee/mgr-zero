@@ -1504,7 +1504,7 @@ export const SCREENS: Screen[] = [
     to: { "Hazy IPA": "Brand", Pils: "Brand", Stout: "Brand" },
     job: "Define brands, their sellable formats and prices without ledger writes",
     reads: "list_brands · list_skus",
-    writes: "upsert_brand · create_sku · update_sku · upsert_price_list · set_price_list_item [existing/design]",
+    writes: "upsert_brand · create_sku · update_sku [design] · upsert_price_list · set_price_list_item",
     states: DEFAULT_STATES,
     spec: "Brand facts (ABV and tax class) edit on Brand; SKU associates the brand with a Format. Volume and packaging stay on the Format. This page remains a list with simple pricing, never the v1 price matrix.",
     body: (<>
@@ -3259,7 +3259,7 @@ export const SCREENS: Screen[] = [
     name: "Formats",
     job: "Enter volume once on an atomic format and derive every shape above it",
     reads: "list_formats [design; §16.2] · get_format_components [design; §16.2a]",
-    writes: "upsert_format · replace_format_components [design; one RPC replaces the child set] · replace_format_bom [SCHEMA-GATE: revision 2 §16.2/16.2a/16.12: formats, format_components and format_bom supersede skus.bbl_per_unit and sku_bom]",
+    writes: "upsert_format · replace_format_components [one RPC replaces the child set] · replace_format_bom [one RPC replaces the bill; formats, format_components and format_bom superseded skus.bbl_per_unit and sku_bom]",
     states: [["permission", "sales or admin required", 1], ["atomic", "owns one volume entered in an allowed unit"], ["children missing", "a composed format cannot be created before its children", 1], ["poured", "never holds stock · a ratio back to the keg"], ["in use", "editing a format never moves frozen movement bbl"]],
     spec: "Volume is the basis of all TTB math, so exactly one atomic Format owns it. The input receives its allowed units per instance: US beer packages offer oz, gal and bbl; metric formats may offer mL and L. The server converts the entry to canonical bbl. Composed formats compute volume from their children, which is also what makes repack (§16.10) validated rather than asserted. The basis says only whether the shape holds stock. Each BOM line's on-break disposition is what the repack sheet reads.",
     body: (<>
@@ -3277,7 +3277,7 @@ export const SCREENS: Screen[] = [
     to: { "Save format": "Formats" },
     job: "Create or edit one atomic or composed package format",
     reads: "list_formats [design; §16.2] · get_format_components [design; §16.2a]",
-    writes: "upsert_format · replace_format_components · replace_format_bom [SCHEMA-GATE: revision 2 §16.2/16.2a/16.12]",
+    writes: "upsert_format · replace_format_components · replace_format_bom",
     states: [["permission", "sales or admin required", 1], ["atomic", "volume unit choices are set by this input"], ["composed", "volume derives from child formats"]],
     body: (<>
       {E.edit("Format name", "16 oz can")}
@@ -3317,7 +3317,7 @@ export const SCREENS: Screen[] = [
     to: { Edit: "Override", Add: "Override" },
     job: "Price a format once per tier and override only the exceptions",
     reads: "list_price_lists [+ channel_id §16.4] · get_price_list [design; formats and SKU overrides]",
-    writes: "upsert_price_list · set_price_list_format · set_price_list_item · clear_price_list_item [SCHEMA-GATE: revision 2 §16.4: price_lists.channel_id and price_list_formats]",
+    writes: "upsert_price_list · set_price_list_format · set_price_list_item · clear_price_list_item [price_list_formats is the tier default, price_list_items the SKU override; channel_id waits for sale channels]",
     states: [["permission", "sales or admin required", 1], ["inherited", "the format price is what the customer sees"], ["overridden", "one brand × format priced away from the tier", 1], ["poured", "a pour is priceable here and is not a SKU"], ["no price", "neither a format default nor an override · the line cannot be sold", 1]],
     spec: "Price lists are already tiers and the customer's assigned price list already assigns them; revision 2 adds the channel and makes a format priceable, so a taproom pour (which is not a SKU) can be priced at all. Drawn format-default with a per-SKU override, matching Menu and POS item, which already read “format default” and offer Reset to format price. §16.16 q1 leaves the direction open; drawing it the other way would make those two shipped frames inconsistent.",
     body: (<>
@@ -3341,7 +3341,7 @@ export const SCREENS: Screen[] = [
     to: { "Save override": "Price tiers", "Clear override": "Price tiers" },
     job: "Price one brand and format away from its tier default",
     reads: "get_price_list [design; §16.4]",
-    writes: "set_price_list_item · clear_price_list_item [SCHEMA-GATE: revision 2 §16.4]",
+    writes: "set_price_list_item · clear_price_list_item",
     states: [["permission", "sales or admin required", 1], ["overridden", "customer sees this price"], ["cleared", "format default applies"]],
     body: (<>
       {E.pick("Brand", "Barrel-aged Stout", ["Barrel-aged Stout", "Hazy IPA", "Pils"])}

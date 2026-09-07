@@ -47,7 +47,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "set_price", description: "Override one SKU's price on a price list (integer cents); without an override the SKU sells at the tier's format default",
+  name: "set_price_list_item", description: "Override one SKU's price on a price list (integer cents); without an override the SKU sells at the tier's format default",
   roles: [...roles],
   input: z.object({ priceListId: z.string().uuid(), skuId: z.string().uuid(), unitPriceCents: z.number().int().nonnegative() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_price", {

@@ -356,7 +356,7 @@ describe("registered staff mutation role × RPC matrix", () => {
       },
     },
     {
-      command: "set_price", rpc: "set_price", allowed: ["admin", "sales"],
+      command: "set_price_list_item", rpc: "set_price_list_item", allowed: ["admin", "sales"],
       input: async () => ({
         command: { priceListId: priceListId, skuId, unitPriceCents: 1300 },
         rpc: { p_brewery: brewery.id, p_price_list: priceListId, p_sku: skuId, p_unit_price_cents: 1300 },

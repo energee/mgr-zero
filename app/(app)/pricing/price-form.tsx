@@ -1,4 +1,5 @@
-// app/(app)/pricing/price-form.tsx — CommandForm (bottom sheet on phone, dialog on desk) for the set_price command.
+// app/(app)/pricing/price-form.tsx — CommandForm (bottom sheet on phone, dialog on desk) for set_price_list_item:
+// one SKU's override on a price list (the format default applies otherwise).
 // Staff enter dollars; this converts to integer cents before sending (the
 // command's unit_price_cents column is integer cents, per schema).
 "use client";
@@ -20,14 +21,14 @@ export function PriceForm({
 }) {
   const [skuId, setSkuId] = useState("");
   const [dollars, setDollars] = useState("");
-  const form = useCommandForm("set_price", {
+  const form = useCommandForm("set_price_list_item", {
     build: () => ({ priceListId, skuId, unitPriceCents: Math.round(Number(dollars) * 100) }),
     reset: () => { setSkuId(""); setDollars(""); },
   });
 
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Set Price" trigger={<Button variant="outline" size="sm">
-          Set Price
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title="SKU override" trigger={<Button variant="outline" size="sm">
+          SKU override
         </Button>}>
         <form onSubmit={form.submit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">

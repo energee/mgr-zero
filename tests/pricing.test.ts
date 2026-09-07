@@ -28,7 +28,7 @@ describe("price tiers", () => {
     await expect(draftPrice()).rejects.toThrow(/priced/);
     await runCommand("set_price_list_format", { priceListId, formatId, unitPriceCents: 18000 }, ctx);
     expect(await draftPrice()).toBe(18000);
-    await runCommand("set_price", { priceListId, skuId, unitPriceCents: 18500 }, ctx);
+    await runCommand("set_price_list_item", { priceListId, skuId, unitPriceCents: 18500 }, ctx);
     expect(await draftPrice()).toBe(18500);
     const cleared = await runCommand("clear_price_list_item", { priceListId, skuId }, ctx) as { cleared: boolean };
     expect(cleared.cleared).toBe(true);

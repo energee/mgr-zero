@@ -205,6 +205,7 @@ describe("HTTP API reference", () => {
     const retired: Record<string, string> = {
       create_customer: "upsert_customer",
       create_product: "upsert_brand",
+      set_price: "set_price_list_item",
       list_products: "list_brands",
       update_customer: "upsert_customer",
       create_ship_to: "upsert_ship_to",
