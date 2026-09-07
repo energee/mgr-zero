@@ -18,7 +18,7 @@ The header shows your customer account name; navigation offers **Order, Orders, 
 
 <Screen name="Shop" />
 
-*You see the brands and packages priced on your account’s assigned price list — a package without a price for your account never appears here. MGR does not show warehouse quantities. The brewery must also have configured the warehouse used to fulfill portal orders.*
+*You see brands and the packages the brewery has listed for your account — ½ keg, ⅙ keg, case, or bottle. Exact warehouse counts are not shown. A package that is not listed is not on Shop. The brewery must also have configured the warehouse used to fulfill portal orders.*
 
 1. Review each brand, its listed packages, and the unit price.
 2. Enter positive whole-unit quantities for the packages you want.
@@ -35,12 +35,6 @@ Both buttons stay disabled without a ship-to, without a positive line, or while 
 <Callout type="warn">
 **Draft limitation:** after **Save draft**, MGR opens a read-only order page. You cannot edit or submit that saved draft from the order page. Ask brewery staff to finish or cancel it. If you stay on Shop after saving (or after a submission MGR could not confirm), further edits to quantities, ship-to, PO number, or note replace the saved draft's contents the next time you select **Save draft** or **Submit order**; the same order is reused, so no duplicate draft is created. If MGR cannot confirm submission, use **View order status** before retrying: the order may already be submitted. Contact the brewery if its status remains unclear.
 </Callout>
-
-## Coming up [#coming-up]
-
-<Screen name="Coming up" />
-
-Select **Coming up** on Shop to see what the brewery plans to brew next: one row per brand with the expected week, soonest first. Select a brand to return to Shop at that brand's listed packages. A brand that is planned but not yet listed for your account still appears, marked **not yet listed**, so you can ask the brewery about it. Dates are the brewery's plan and can move; volumes, tanks, and recipes are never shown. With nothing scheduled, the page says so.
 
 ## Order statuses [#statuses]
 
@@ -86,7 +80,7 @@ The portal currently has no invoice-detail or payment action. Contact the brewer
 
 **A page says “Not found”.** The order or invoice at that address does not exist for your account, or the link is wrong. Open **Orders** or **Invoices** and pick the record from the list.
 
-**A product, order, or invoice seems missing.** Confirm the customer account name shown in navigation. Shop includes only packages priced on that account’s assigned price list; Orders and Invoices include only that account’s records.
+**A product, order, or invoice seems missing.** Confirm the customer account name shown in navigation. Shop includes only packages the brewery has listed and priced for that account; Orders and Invoices include only that account’s records.
 
 There are currently no portal controls for public sign-up, password reset, adding ship-tos, changing account information, editing saved drafts or submitting them after leaving Shop, cancelling orders, opening invoice detail, or recording payment. **Account** is the tab for the customer name on this login.
 
