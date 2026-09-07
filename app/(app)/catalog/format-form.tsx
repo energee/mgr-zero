@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
 const PACKAGE_TYPES = ["keg", "can", "bottle"] as const;
@@ -41,25 +41,30 @@ export function FormatForm() {
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="format-basis">Basis</Label>
-          <NativeSelect id="format-basis" value={basis} onChange={(e) => setBasis(e.target.value as typeof basis)}>
-            <option value="packaged">packaged (holds stock)</option>
-            <option value="poured">poured (a glass, never stock)</option>
-          </NativeSelect>
+          <Select value={basis} onValueChange={(v) => setBasis(v as typeof basis)}>
+            <SelectTrigger id="format-basis"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="packaged">packaged (holds stock)</SelectItem>
+              <SelectItem value="poured">poured (a glass, never stock)</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         {packaged ? (
           <>
             <div className="flex flex-col gap-2">
               <Label htmlFor="format-package-type">Package type</Label>
-              <NativeSelect id="format-package-type" value={packageType} onChange={(e) => setPackageType(e.target.value as typeof packageType)}>
-                {PACKAGE_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-              </NativeSelect>
+              <Select value={packageType} onValueChange={(v) => setPackageType(v as typeof packageType)}>
+                <SelectTrigger id="format-package-type"><SelectValue /></SelectTrigger>
+                <SelectContent>{PACKAGE_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+              </Select>
             </div>
             {packageType === "keg" ? (
               <div className="flex flex-col gap-2">
                 <Label htmlFor="format-keg-size">Keg size</Label>
-                <NativeSelect id="format-keg-size" value={kegSize} onChange={(e) => setKegSize(e.target.value as typeof kegSize)}>
-                  {KEG_SIZES.map((k) => <option key={k} value={k}>{k.replace(/_/g, " ")}</option>)}
-                </NativeSelect>
+                <Select value={kegSize} onValueChange={(v) => setKegSize(v as typeof kegSize)}>
+                  <SelectTrigger id="format-keg-size"><SelectValue /></SelectTrigger>
+                  <SelectContent>{KEG_SIZES.map((k) => <SelectItem key={k} value={k}>{k.replace(/_/g, " ")}</SelectItem>)}</SelectContent>
+                </Select>
               </div>
             ) : null}
             <div className="flex flex-col gap-2">

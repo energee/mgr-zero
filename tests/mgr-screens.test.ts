@@ -215,7 +215,7 @@ describe("SCREENS", () => {
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands or leaves; the venue split is
     // derived rather than counted by hand in a comment that kept growing.
-    expect(SCREENS).toHaveLength(183);
+    expect(SCREENS).toHaveLength(184);
     expect(SCREENS.filter((s) => s.venue)).toHaveLength(17);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });

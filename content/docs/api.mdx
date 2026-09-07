@@ -163,6 +163,7 @@ omitted. They have no roles until they are built.
 | `adjust_order_lines` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `cancel_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `clear_channel_price` | Catalog & pricing | ✓ | ✓ |  |  |  |
+| `close_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |
 | `confirm_delivery` | Delivery & routes | ✓ |  | ✓ |  |  |
 | `confirm_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `confirm_restock` | Orders & invoicing | ✓ |  | ✓ |  |  |
@@ -171,6 +172,8 @@ omitted. They have no roles until they are built.
 | `create_credit_memo` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `create_location` | Inventory & locations | ✓ |  |  |  |  |
 | `create_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
+| `create_recipe` | Production | ✓ |  |  | ✓ |  |
+| `create_recipe_version` | Production | ✓ |  |  | ✓ |  |
 | `create_replenishment_order` | Taproom & kegs | ✓ | ✓ |  |  |  |
 | `create_sku` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `create_stock_transfer` | Inventory & locations | ✓ |  | ✓ |  |  |
@@ -180,34 +183,45 @@ omitted. They have no roles until they are built.
 | `delete_sale_channel` | Catalog & pricing | ✓ |  |  |  |  |
 | `get_atp` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `get_bin_on_hand` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
+| `get_brew_day` | Production | ✓ |  |  | ✓ |  |
 | `get_chat_link_status` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
 | `get_customer` | Customers | ✓ | ✓ | ✓ |  |  |
 | `get_delivery_stop` | Delivery & routes | ✓ | ✓ | ✓ |  |  |
+| `get_gravity_unit` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ |  |
 | `get_invoice` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `get_on_hand` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `get_order` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
+| `get_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |
 | `get_portal_account` | Customer portal |  |  |  |  | ✓ |
+| `get_recipe` | Production | ✓ |  |  | ✓ |  |
 | `get_shortfalls` | Today & notifications | ✓ | ✓ | ✓ |  |  |
 | `get_stock_transfer` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `get_today` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
 | `import_csv` | Team & brewery settings | ✓ |  |  |  |  |
 | `invite_customer_user` | Customers | ✓ | ✓ |  |  |  |
 | `invite_staff` | Team & brewery settings | ✓ |  |  |  |  |
-| `list_bins` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
-| `list_brands` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
+| `list_batches` | Production | ✓ |  |  | ✓ |  |
+| `list_bins` | Inventory & locations | ✓ | ✓ | ✓ | ✓ |  |
+| `list_brands` | Catalog & pricing | ✓ | ✓ | ✓ | ✓ |  |
 | `list_channel_prices` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `list_customers` | Customers | ✓ | ✓ | ✓ |  |  |
+| `list_fermentation_readings` | Production | ✓ |  |  | ✓ |  |
 | `list_formats` | Packaging | ✓ | ✓ | ✓ |  |  |
 | `list_invoices` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
-| `list_locations` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
+| `list_locations` | Inventory & locations | ✓ | ✓ | ✓ | ✓ |  |
+| `list_materials` | Purchasing & materials | ✓ |  |  | ✓ |  |
 | `list_movements` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
+| `list_occupancies` | Packaging | ✓ |  | ✓ | ✓ |  |
 | `list_orders` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
+| `list_packaging_runs` | Packaging | ✓ |  | ✓ | ✓ |  |
 | `list_price_groups` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
+| `list_recipes` | Production | ✓ |  |  | ✓ |  |
 | `list_sale_channels` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
-| `list_skus` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
+| `list_skus` | Catalog & pricing | ✓ | ✓ | ✓ | ✓ |  |
 | `list_standing_allocations` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `list_stock_transfers` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `list_team_members` | Team & brewery settings | ✓ | ✓ | ✓ |  |  |
+| `list_vessels` | Production | ✓ |  |  | ✓ |  |
 | `move_stock_bin` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `portal_catalog` | Customer portal |  |  |  |  | ✓ |
 | `portal_create_order` | Customer portal |  |  |  |  | ✓ |
@@ -218,8 +232,12 @@ omitted. They have no roles until they are built.
 | `portal_submit_order` | Customer portal |  |  |  |  | ✓ |
 | `portal_update_draft_order` | Customer portal |  |  |  |  | ✓ |
 | `receive_stock_transfer` | Inventory & locations | ✓ |  | ✓ |  |  |
+| `record_brew_day` | Production | ✓ |  |  | ✓ |  |
+| `record_cellar_transfer` | Production | ✓ |  |  | ✓ |  |
+| `record_fermentation_reading` | Production | ✓ |  |  | ✓ |  |
 | `record_movement` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `record_pick` | Orders & invoicing | ✓ |  | ✓ |  |  |
+| `record_repack` | Packaging | ✓ |  | ✓ |  |  |
 | `record_stock_transfer_pick` | Orders & invoicing | ✓ |  | ✓ |  |  |
 | `release_allocation` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `replace_format_bom` | Packaging | ✓ | ✓ |  |  |  |
@@ -227,8 +245,12 @@ omitted. They have no roles until they are built.
 | `replenishment_suggestions` | Taproom & kegs | ✓ | ✓ | ✓ |  |  |
 | `resolve_short_pick` | Orders & invoicing | ✓ |  | ✓ |  |  |
 | `return_shipment` | Delivery & routes | ✓ | ✓ |  |  |  |
+| `schedule_batch` | Production | ✓ |  |  | ✓ |  |
+| `schedule_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |
+| `set_brewery_gravity_unit` | Team & brewery settings | ✓ |  |  |  |  |
 | `set_brewery_quiet_hours` | Team & brewery settings | ✓ |  |  |  |  |
 | `set_channel_price` | Catalog & pricing | ✓ | ✓ |  |  |  |
+| `set_my_gravity_unit` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ |  |
 | `set_notification_destination` | Today & notifications | ✓ |  |  |  |  |
 | `set_notification_preference` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
 | `set_portal_fulfillment_source` | Customers | ✓ |  |  |  |  |
@@ -241,12 +263,14 @@ omitted. They have no roles until they are built.
 | `update_bin` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `update_draft_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `update_location` | Inventory & locations | ✓ |  |  |  |  |
+| `update_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |
 | `upsert_brand` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `upsert_customer` | Customers | ✓ | ✓ |  |  |  |
 | `upsert_format` | Packaging | ✓ | ✓ |  |  |  |
 | `upsert_price_group` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `upsert_sale_channel` | Catalog & pricing | ✓ |  |  |  |  |
 | `upsert_ship_to` | Customers | ✓ | ✓ |  |  |  |
+| `upsert_vessel` | Production | ✓ |  |  | ✓ |  |
 {/* end ops:roles */}
 
 ## Idempotency & retries [#idempotency]
@@ -1143,7 +1167,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 #### list_bins [#list_bins]
 
-`query` · admin, sales, warehouse
+`query` · admin, sales, warehouse, brewer
 
 Bins of one location (or all), alphabetical
 
@@ -1160,7 +1184,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 #### list_locations [#list_locations]
 
-`query` · admin, sales, warehouse
+`query` · admin, sales, warehouse, brewer
 
 Warehouses and taprooms, alphabetical
 
@@ -1434,7 +1458,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 #### list_brands [#list_brands]
 
-`query` · admin, sales, warehouse
+`query` · admin, sales, warehouse, brewer
 
 Brands with their style and SKUs, alphabetical
 
@@ -1496,7 +1520,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 #### list_skus [#list_skus]
 
-`query` · admin, sales, warehouse
+`query` · admin, sales, warehouse, brewer
 
 SKUs with their brand and format, alphabetical
 
@@ -1846,11 +1870,26 @@ unreceived PO never inflates what a packaging run believes it has.
 
 {/* ops:purchasing */}
 
+#### list_materials [#list_materials]
+
+`query` · admin, brewer
+
+Materials, alphabetical, with category and extract potential
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_materials", "input": {} }'
+```
+
 ---
 
 **Designed, not yet available** {/* purchasing-designed */}
 
-None of the 14 operations in this area are available yet.
+1 of the 14 operations in this area are available today; the 13 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
@@ -1861,7 +1900,6 @@ The screens need them and the backend has not built them, so calling one returns
 | `get_material_on_hand` | query | Materials on hand, Cycle count, Repack |
 | `get_material_requirements` | query | New PO, Planning |
 | `get_purchase_order` | query | Receive PO, Receipt |
-| `list_materials` | query | Package BOM, New PO, Materials, Material, Contract, Water addition |
 | `list_purchase_orders` | query | Purchase orders |
 | `list_vendors_and_contracts` | query | New PO, Vendors, Vendor, Contracts, Contract, Planning |
 | `receive_purchase_order` | command | Receive PO |
@@ -1884,34 +1922,263 @@ reading notification is measured against.
 
 {/* ops:production */}
 
+#### create_recipe [#create_recipe]
+
+`command` · admin, brewer
+
+Create a recipe: a name, optionally the brand it brews, and a note; its brewing facts live on versions
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `name` | string | yes |
+| `brandId` | uuid | no |
+| `note` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_recipe", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string" } }'
+```
+
+#### create_recipe_version [#create_recipe_version]
+
+`command` · admin, brewer
+
+Add the next version of a recipe with its ingredients; versions are immutable and snapshot each material's extract potential
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `recipeId` | uuid | yes |
+| `mashTempF` | number | yes |
+| `brewhouseEfficiency` | number | yes |
+| `yeastAttenuation` | number | yes |
+| `ingredients` | array of object | yes |
+| `boilMinutes` | integer | no |
+| `targetIbu` | number | no |
+| `note` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_recipe_version", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "recipeId": "00000000-0000-0000-0000-000000000000", "mashTempF": 1, "brewhouseEfficiency": 1, "yeastAttenuation": 1, "ingredients": [ { "materialId": "00000000-0000-0000-0000-000000000000", "perBblQty": 1, "stage": "mash" } ] } }'
+```
+
+#### get_brew_day [#get_brew_day]
+
+`query` · admin, brewer
+
+One batch with the occupancy it is currently sitting in: the vessel's name and the volume that went in
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `batchId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_brew_day", "input": { "batchId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+#### get_recipe [#get_recipe]
+
+`query` · admin, brewer
+
+One recipe with its latest version, that version's ingredients, and the OG/FG/ABV they predict
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `recipeId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_recipe", "input": { "recipeId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+#### list_batches [#list_batches]
+
+`query` · admin, brewer
+
+Batches by planned date, newest first, with the brand and recipe they intend and the vessel each one currently sits in
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_batches", "input": {} }'
+```
+
+#### list_fermentation_readings [#list_fermentation_readings]
+
+`query` · admin, brewer
+
+Readings logged against one occupancy, newest first
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `occupancyId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_fermentation_readings", "input": { "occupancyId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+#### list_recipes [#list_recipes]
+
+`query` · admin, brewer
+
+Recipes, alphabetical, with the brand each one brews and its latest version
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_recipes", "input": {} }'
+```
+
+#### list_vessels [#list_vessels]
+
+`query` · admin, brewer
+
+Vessels, alphabetical, with kind and capacity
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_vessels", "input": {} }'
+```
+
+#### record_brew_day [#record_brew_day]
+
+`command` · admin, brewer
+
+Record that a scheduled batch was brewed: stamps the brew date and moves it into a vessel that is not already occupied
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `batchId` | uuid | yes |
+| `vesselId` | uuid | yes |
+| `initialBbl` | number | yes |
+| `brewedOn` | date (YYYY-MM-DD) | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_brew_day", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "batchId": "00000000-0000-0000-0000-000000000000", "vesselId": "00000000-0000-0000-0000-000000000000", "initialBbl": 1, "brewedOn": "2026-01-31" } }'
+```
+
+#### record_cellar_transfer [#record_cellar_transfer]
+
+`command` · admin, brewer
+
+Move beer out of one occupancy into a vessel: opens an occupancy if the vessel is empty, blends into the open one if it is not, and closes the source when it empties
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `fromOccupancyId` | uuid | yes |
+| `toVesselId` | uuid | yes |
+| `volumeBbl` | number | yes |
+| `lossBbl` | number | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_cellar_transfer", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "fromOccupancyId": "00000000-0000-0000-0000-000000000000", "toVesselId": "00000000-0000-0000-0000-000000000000", "volumeBbl": 1 } }'
+```
+
+#### record_fermentation_reading [#record_fermentation_reading]
+
+`command` · admin, brewer
+
+Log a fermentation reading against an open occupancy: temperature in °F, optionally gravity in °Plato, pH and a note
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `occupancyId` | uuid | yes |
+| `at` | string | yes |
+| `tempF` | number | yes |
+| `gravityPlato` | number | no |
+| `ph` | number | no |
+| `note` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_fermentation_reading", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "occupancyId": "00000000-0000-0000-0000-000000000000", "at": "2026-01-31T12:00:00Z", "tempF": 1 } }'
+```
+
+#### schedule_batch [#schedule_batch]
+
+`command` · admin, brewer
+
+Pencil a brew day into the calendar: planned date and volume, optionally the brand it is meant to become and the recipe version to brew
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `plannedOn` | date (YYYY-MM-DD) | yes |
+| `plannedBbl` | number | yes |
+| `intendedBrandId` | uuid | no |
+| `recipeVersionId` | uuid | no |
+| `note` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "schedule_batch", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "plannedOn": "2026-01-31", "plannedBbl": 1 } }'
+```
+
+#### upsert_vessel [#upsert_vessel]
+
+`command` · admin, brewer
+
+Create or rename a vessel: its name, kind and capacity. Contents are never stored here — they are derived from the open occupancy
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `name` | string | yes |
+| `kind` | fermenter or brite or barrel or kettle or other | yes |
+| `capacityBbl` | number | yes |
+| `id` | uuid | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_vessel", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "kind": "fermenter", "capacityBbl": 1 } }'
+```
+
 ---
 
 **Designed, not yet available** {/* production-designed */}
 
-None of the 19 operations in this area are available yet.
+13 of the 19 operations in this area are available today; the 6 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
 | `complete_batch` | command | Cellar map |
-| `create_recipe` | command | Recipe |
-| `create_recipe_version` | command | Recipe, Mash schedule, Mash step, Fermentation schedule, Fermentation stage, Water, Water addition |
-| `get_brew_day` | query | Schedule batch, Brew day |
-| `get_recipe` | query | Cellar addition, Recipe, Mash schedule, Mash step, Fermentation schedule, Fermentation stage, Water, Water addition |
 | `get_recipe_outcomes` | query | Recipe |
 | `get_water_profile` | query | Water profile |
-| `list_batches` | query | Batches |
-| `list_fermentation_readings` | query | Vessel detail |
-| `list_recipes` | query | Schedule batch, Recipes, Recipe |
-| `list_vessels` | query | Vessel detail |
 | `list_water_profiles` | query | Water, Water profiles |
 | `record_batch_addition` | command | Cellar addition |
-| `record_brew_day` | command | Brew day |
-| `record_cellar_transfer` | command | Cellar transfer |
-| `record_fermentation_reading` | command | Fermentation reading, Fermentation reading form |
-| `schedule_batch` | command | Schedule batch |
-| `upsert_vessel` | command | Cellar map, Vessel detail |
 | `upsert_water_profile` | command | Water profile |
 
 {/* end ops:production */}
@@ -1929,6 +2196,47 @@ before it is scheduled rather than after.
 
 {/* ops:packaging */}
 
+#### close_packaging_run [#close_packaging_run]
+
+`command` · admin, brewer, warehouse
+
+Close a started run: record the barrels drawn and the units actually filled, which writes the lot, the production_in stock and the packaging materials consumed
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `runId` | uuid | yes |
+| `bblDrawn` | number | yes |
+| `outputs` | array of object | yes |
+| `lotCode` | string | yes |
+| `packagedOn` | date (YYYY-MM-DD) | yes |
+| `locationId` | uuid | yes |
+| `binId` | uuid | yes |
+| `bestBy` | date (YYYY-MM-DD) | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "close_packaging_run", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "runId": "00000000-0000-0000-0000-000000000000", "bblDrawn": 1, "outputs": [ { "skuId": "00000000-0000-0000-0000-000000000000", "qtyActual": 1 } ], "lotCode": "string", "packagedOn": "2026-01-31", "locationId": "00000000-0000-0000-0000-000000000000", "binId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+#### get_packaging_run [#get_packaging_run]
+
+`query` · admin, brewer, warehouse
+
+One packaging run with the packages it plans to fill
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `runId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_packaging_run", "input": { "runId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 #### list_formats [#list_formats]
 
 `query` · admin, sales, warehouse
@@ -1944,6 +2252,58 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_formats", "input": {} }'
+```
+
+#### list_occupancies [#list_occupancies]
+
+`query` · admin, brewer, warehouse
+
+Tanks with beer in them right now: the vessel, the batch, the brand it intends and how many barrels are left
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_occupancies", "input": {} }'
+```
+
+#### list_packaging_runs [#list_packaging_runs]
+
+`query` · admin, brewer, warehouse
+
+Packaging runs by planned date, newest first, with the brand each one packages, the tank it draws from and the units planned
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_packaging_runs", "input": {} }'
+```
+
+#### record_repack [#record_repack]
+
+`command` · admin, warehouse
+
+Break a composed SKU into its component SKU at one bin: paired volume-neutral ledger rows under one ref, plus the parent format's BOM material movements
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+| `binId` | uuid | yes |
+| `parentSkuId` | uuid | yes |
+| `parentQty` | number | yes |
+| `childSkuId` | uuid | yes |
+| `childQty` | number | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_repack", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "locationId": "00000000-0000-0000-0000-000000000000", "binId": "00000000-0000-0000-0000-000000000000", "parentSkuId": "00000000-0000-0000-0000-000000000000", "parentQty": 1, "childSkuId": "00000000-0000-0000-0000-000000000000", "childQty": 1 } }'
 ```
 
 #### replace_format_bom [#replace_format_bom]
@@ -1982,6 +2342,46 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "replace_format_components", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "formatId": "00000000-0000-0000-0000-000000000000", "components": [ { "childFormatId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
 ```
 
+#### schedule_packaging_run [#schedule_packaging_run]
+
+`command` · admin, brewer, warehouse
+
+Plan a packaging run: the brand being packaged, the date, the units intended, and optionally the tank it draws from
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `brandId` | uuid | yes |
+| `plannedOn` | date (YYYY-MM-DD) | yes |
+| `outputs` | array of object | yes |
+| `occupancyId` | uuid | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "schedule_packaging_run", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "brandId": "00000000-0000-0000-0000-000000000000", "plannedOn": "2026-01-31", "outputs": [ { "skuId": "00000000-0000-0000-0000-000000000000", "qtyPlanned": 1 } ] } }'
+```
+
+#### update_packaging_run [#update_packaging_run]
+
+`command` · admin, brewer, warehouse
+
+Revise a planned run: pick the tank it draws from, replace the planned units, or stamp it started (which needs a tank)
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `runId` | uuid | yes |
+| `occupancyId` | uuid | no |
+| `outputs` | array of object | no |
+| `startedAt` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "update_packaging_run", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "runId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 #### upsert_format [#upsert_format]
 
 `command` · admin, sales
@@ -2009,20 +2409,13 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* packaging-designed */}
 
-4 of the 12 operations in this area are available today; the 8 below are not.
+11 of the 12 operations in this area are available today; the 1 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
-| `close_packaging_run` | command | Close packaging run |
 | `get_format_components` | query | Formats, Format, Repack |
-| `get_packaging_run` | query | Close packaging run, Run closed |
-| `list_occupancies` | query | Schedule packaging run |
-| `list_packaging_runs` | query | Packaging runs |
-| `record_repack` | command | Repack |
-| `schedule_packaging_run` | command | Close packaging run, Schedule packaging run |
-| `update_packaging_run` | command | Schedule packaging run |
 
 {/* end ops:packaging */}
 
@@ -2154,6 +2547,21 @@ validate their input and then raise, writing nothing.
 
 {/* ops:team */}
 
+#### get_gravity_unit [#get_gravity_unit]
+
+`query` · admin, sales, warehouse, brewer
+
+The gravity display unit in force for the caller: the brewery default, their own override (null = none), and the effective one
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_gravity_unit", "input": {} }'
+```
+
 #### import_csv [#import_csv]
 
 `command` · admin
@@ -2205,6 +2613,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_team_members", "input": {} }'
 ```
 
+#### set_brewery_gravity_unit [#set_brewery_gravity_unit]
+
+`command` · admin
+
+Set the brewery-wide default unit gravity is shown and entered in (storage stays degrees Plato)
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `unit` | plato or sg | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_brewery_gravity_unit", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "unit": "plato" } }'
+```
+
 #### set_brewery_quiet_hours [#set_brewery_quiet_hours]
 
 `command` · admin
@@ -2224,11 +2649,28 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_brewery_quiet_hours", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "installationId": "00000000-0000-0000-0000-000000000000", "start": "12:00", "end": "12:00" } }'
 ```
 
+#### set_my_gravity_unit [#set_my_gravity_unit]
+
+`command` · admin, sales, warehouse, brewer
+
+Set your own gravity display unit, or null to follow the brewery default
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `unit` | plato or sg or null | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_my_gravity_unit", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "unit": "plato" } }'
+```
+
 ---
 
 **Designed, not yet available** {/* team-designed */}
 
-4 of the 10 operations in this area are available today; the 6 below are not.
+7 of the 13 operations in this area are available today; the 6 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 

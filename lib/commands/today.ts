@@ -3,7 +3,7 @@
 // live in private.today_candidates; this layer only maps columns and rechecks
 // role visibility. No provider code enters the command layer.
 import { z } from "zod";
-import { defineQuery, unwrap, type StaffRole } from "./registry";
+import { defineQuery, unwrap, type StaffRole, STAFF_ROLES } from "./registry";
 
 export type TodayItem = {
   reason: "submitted_order" | "pick_due" | "restock_due" | "delivery_next" | "fermentation_reading_overdue";
@@ -27,7 +27,7 @@ defineQuery({
   name: "get_today",
   description: "Role-filtered work that is assigned, due, or overdue right now (submitted orders, picks due, restocks due; more reasons as their pages ship)",
   input: z.object({ now: z.string().datetime({ offset: true }).optional() }),
-  roles: ["admin", "sales", "warehouse", "brewer"],
+  roles: STAFF_ROLES,
   handler: async (ctx, i): Promise<TodayItem[]> => {
     const rows = await unwrap(ctx.db.rpc("get_today_items", { p_brewery: ctx.breweryId, p_now: i.now ?? new Date().toISOString() })) as Row[];
     return rows

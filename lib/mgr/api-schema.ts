@@ -89,7 +89,7 @@ function baseLabel(node: any): string {
 // format that might fit it.
 const STRING_CANDIDATES = [
   "string", "00000000-0000-0000-0000-000000000000", "2026-01-31", "CA",
-  "user@example.com", "12:00", "1", "1.0",
+  "user@example.com", "12:00", "2026-01-31T12:00:00Z", "1", "1.0",
 ];
 const NUMBER_CANDIDATES = [1, 1.5, 0];
 

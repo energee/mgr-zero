@@ -2003,16 +2003,15 @@ export const SCREENS: Screen[] = [
     surface: "sheet",
     name: "Fermentation reading",
     to: { "Record reading": "Vessel detail" },
-    job: "Record any values taken; SG converts to stored Plato",
-    reads: "get_cellar_map [view; occupancy + last reading]",
+    job: "Record any values taken, in the unit set on Settings · Units",
+    reads: "get_cellar_map [view; occupancy + last reading] · get_gravity_unit",
     writes: "record_fermentation_reading [design; mutable reading row]",
     states: permitted("brewer or admin required"),
-    spec: "One reading may contain gravity, temperature, pH, or any combination. Blank values remain absent; prior values are reference only, never silently copied. Each value is typed; Gravity is the default.",
+    spec: "One reading may contain gravity, temperature, pH, or any combination. Blank values remain absent; prior values are reference only, never silently copied. Each value is typed; Gravity is the default. The gravity field is labelled and read in whichever unit the reader chose on Settings, then Units; there is no toggle on this sheet, because a unit is a standing preference rather than a per-reading decision. Gravity is stored in degrees Plato whatever is chosen, so switching never moves a reading already taken.",
     body: (<>
-      {E.qty("1.019", "SG · prior 1.021", "Gravity")}
+      {E.qty("1.019", "prior 1.021", "Gravity (per your unit setting)")}
       {E.qty("68.2", "°F · prior 67.8", "Temperature")}
       {E.qty("", "prior 4.21", "pH")}
-      {E.chips(["SG", "°P"], 0)}
       {E.info("Enter only values taken now; blanks are not rewritten.")}
       {E.inp("Note", "optional")}
       {E.pin(<>
@@ -2071,7 +2070,7 @@ export const SCREENS: Screen[] = [
     name: "Schedule batch",
     job: "Set date and planned barrels; recipe and brand are intent, not commitments",
     reads: "get_brew_day [design] · list_recipes · list_brands",
-    writes: "schedule_batch [design; single planned-batch row; recipe version and intended brand are optional]",
+    writes: "schedule_batch [single planned-batch row; both the recipe version and the intended brand are nullable]",
     states: [["permission", "brewer or admin required", 1], ["planned", "Save schedule is the one verb"], ["no recipe yet", "date and barrels alone hold the slot"], ["no brand yet", "identity waits for packaging, which already requires one"], ["brew day", "Record brew day is its own screen"]],
     spec: "The planned mode of brew day: date, planned barrels, and two optional statements of intent. Only date and barrels commit anything: they reserve the slot. The recipe version is already optional in the schema, and revision 2 makes the brand optional too, because identity is optional at brew and required at packaging, where every finished lot must already name a brand. Requiring either here enforces nothing the lot does not, and only forces the decision earlier than the business makes it. Keeping brand as intent is also what keeps the gap between what a batch was meant to be and what it shipped as worth querying, rather than rewriting history when a batch blends or turns into something else. Record brew day is a separate screen so this page has one primary.",
     body: (<>
@@ -2139,7 +2138,7 @@ export const SCREENS: Screen[] = [
     to: { "Close packaging run": "Run closed", Work: "Packaging runs" },
     job: "Plan a run separately, then create lot and movements on close",
     reads: "get_packaging_run [design; revalidate selected source occupancy] · list_locations",
-    writes: "schedule_packaging_run [design; one RPC: run with explicit source occupancy + planned outputs] · close_packaging_run [design; one RPC: revalidate source + close + lot + outputs + material movements at explicit locations]",
+    writes: "schedule_packaging_run [one RPC: run planned against a brand, with an optional source occupancy, + planned outputs] · update_packaging_run [pick the tank, or stamp the run started: both require a tank] · close_packaging_run [one RPC: revalidate source + close + lot + outputs + material movements at explicit locations]",
     states: [["permission", "brewer or warehouse required", 1], ["short", "a material is short · resolve or explicitly override before starting", 1], ["no damage", "the ordinary close · both fields stay at zero and nothing extra posts"], ["damage", "a named quantity is written off to an explicit bin", 1]],
     spec: "The close half of the packaging frame; planning and editing the plan live in the Schedule packaging run sheet until the run starts. Close is a copper review ( revalidated source, actual outputs, lot, explicit finished-goods destination, material consumption and damage, yield/loss). Consumption is derived from what was actually packaged, never from the plan, which is why leftover material needs no entry: 118 cases consumed 2,832 cans and ends, and the rest never left the shelf to be returned. Damage is the one thing nobody can derive, so it is the one thing asked for, optional and starting at zero. It is asked only where material is issued in whole units and comes back short: labels and ends, not every line of the bill of materials, because a prompt on all five is friction nobody completes. Labels are never counted here. Nobody can count what is left on a roll, and a screen that asks will simply be given a guess that posts as fact; the roll is reconciled at cycle count by counting whole rolls instead. A damaged unit names its destination for the same reason finished goods do: material written off against the wrong bin is worse than material nobody tracked. Print labels is presentation after commit: measured thermal keg-collar/lot labels per plan §3. No packaging-day-actuals screen.",
     body: (<>
@@ -2210,7 +2209,7 @@ export const SCREENS: Screen[] = [
     to: { "Save run plan": "Close packaging run", "FV3 · Hazy IPA": "Entity picker" },
     job: "Plan a run against one source occupancy and see shortages before the day",
     reads: "list_occupancies [design; open, with volume and contents] · list_formats [design; for the brand in the source] · get_material_shortfalls [view; preview for the planned outputs]",
-    writes: "schedule_packaging_run [design; one RPC: run with explicit source occupancy + planned outputs, each flagged on/off the wholesale list] · update_packaging_run [design; same sheet reopens a planned run until it starts]",
+    writes: "schedule_packaging_run [one RPC: run planned against a brand, with an optional source occupancy, + planned outputs, each flagged on/off the wholesale list] · update_packaging_run [same sheet reopens a planned run until it starts; picking the tank or starting both require one]",
     states: [["permission", "brewer or warehouse required", 1], ["source chosen", "the brand comes from what is in the vessel, so only that brand's formats are offered"], ["short", "the materials table shows the shortage now, not on the day; Save still works, Start will not"], ["editing", "a planned run reopens here with its values filled; a started run cannot be rescheduled, only closed"], ["no open occupancy", "nothing to package: the source picker says so and links to Cellar"]],
     spec: "The plan half of the packaging frame, pulled out so a run can be scheduled before it exists and edited until it starts. One source occupancy, chosen exactly, is the rule that lets close revalidate it later. Planned outputs are counts per format; the sheet converts to barrels and shows what is left in the vessel so a plan cannot exceed the source. Each output can be listed on the wholesale shop (the brand × package buyers will see); listing is the offer, not an ATP promise, and a format left off is absent from Shop. Materials are previewed from the format BOM so a shortage is a planning fact, not a surprise at the line. Saving writes the run and its planned outputs in one RPC and lands on the run; nothing moves in the ledger until close.",
     body: (<>
@@ -2544,7 +2543,7 @@ export const SCREENS: Screen[] = [
     to: { Create: "Recipe", "Recipe parent \u00b7 Hazy IPA \u00b7 IPA": "Recipe", "Mash schedule · 3 steps": "Mash schedule", "Fermentation schedule · 4 stages": "Fermentation schedule", "Water · Municipal Denver to Hazy target": "Water" },
     job: "Author immutable versions from assumptions; actuals keep predictions honest",
     reads: "list_recipes · get_recipe [design] · get_recipe_outcomes [design; per-batch actual OG/FG/ABV + realized efficiency/attenuation, derived from fermentation readings, never stored]",
-    writes: "create_recipe [design; mutable parent row] · create_recipe_version [design; one RPC: immutable version + ingredients; SCHEMA-GATE: assumption and process-spec columns on recipe_versions (pre-boil volume, boil, whirlpool min/temp/rest, knockout temp, notes) + per-ingredient extract snapshot + extract potential on materials; typed target_og/fg/abv columns drop]",
+    writes: "create_recipe [design; mutable parent row] · create_recipe_version [one RPC: immutable version + ingredients, with assumption columns on recipe_versions and per-ingredient extract snapshot on recipe_ingredients; SCHEMA-GATE: process-spec columns (pre-boil volume, whirlpool min/temp/rest, knockout temp) remain unbuilt]",
     states: [...permitted("brewer or admin required"), ["no group yet", "the brand picks one at packaging · nothing is blocked"]],
     spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. Versioning is disabled behind its schema gate. A new parent takes name and style only; versions append, and history is never edited. Costing lives on desk. A version is the executable process spec, not only the prediction inputs: volumes, boil, whirlpool and knockout are scalars here, while the mash and fermentation schedules and water open as their own screens because they repeat and carry add, reorder and delete. The mash temperature is gone from this page, because every mash step carries one and a scalar beside them is a second answer to one question. Batch size and knockout volume are gone too: the scale chips already state the batch size and Brew day already records knockout volume as its baseline. Three note fields become one.",
     body: (<>
@@ -3509,6 +3508,26 @@ export const SCREENS: Screen[] = [
       {E.info("Customers may override this. Sales without a customer take the channel default.")}
       {E.note("A channel with movements cannot be deleted.")}
       {E.btn("Save channel")}
+    </>),
+  },
+  {
+    step: 8,
+    slice: 1,
+    tab: "More",
+    name: "Units",
+    job: "Choose the unit gravity is shown and typed in, for the brewery and for yourself",
+    reads: "get_gravity_unit",
+    writes: "set_brewery_gravity_unit · set_my_gravity_unit",
+    states: [["brewery default", "admins only see and set this row", 1], ["personal override", "any staff role sets their own"], ["inherit", "“Use brewery default” clears the override"]],
+    spec: "Gravity is stored in °Plato everywhere and that never changes: this screen changes only what is printed and how a typed value is read back, so an existing reading cannot move. Two controls over one value because the two audiences differ. An admin sets what the brewery reads by default, and any brewer may override it for themselves without asking anyone. A membership with no unit of its own follows the brewery, which is why the personal control offers a third option rather than an empty one. SG input accepts both spellings a brewer uses, 1.050 and 1050.",
+    body: (<>
+      {E.back("Settings", "Units")}
+      {E.info("Gravity is always stored in °Plato. This changes only how it is shown and typed.")}
+      {E.ttl("Brewery default")}
+      {E.chips(["Plato", "Specific gravity"], 0)}
+      {E.ttl("Your preference")}
+      {E.chips(["Use brewery default", "Plato", "Specific gravity"], 0)}
+      {E.fld("A 12.5 °P reading shows as", "12.5 °P")}
     </>),
   },
   {

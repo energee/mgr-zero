@@ -4,6 +4,8 @@ import { z, ZodType } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type StaffRole = "admin" | "sales" | "warehouse" | "brewer";
+/** Every staff role: the `roles` of a read that all of staff may run. */
+export const STAFF_ROLES: StaffRole[] = ["admin", "sales", "warehouse", "brewer"];
 export type Ctx = { db: SupabaseClient; userId: string; breweryId: string; role: StaffRole | "customer"; customerId?: string };
 
 /** Distinguishes side-effect-free reads from write operations that require idempotency metadata. */

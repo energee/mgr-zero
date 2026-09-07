@@ -44,7 +44,7 @@ create type keg_container_source as enum ('owned_fleet','per_fill_rental','one_w
 create type location_kind as enum ('warehouse','taproom','storage');
 create type movement_type as enum
   ('opening_balance','production_in','adjustment','sale_removal','taproom_transfer',
-   'depletion','return_in','destruction','loss','sample','festival_removal','location_transfer');
+   'depletion','return_in','destruction','loss','sample','festival_removal','location_transfer','repack');
 -- TTB removal tax treatment (§16.3). `taxable` is a taxpaid removal; the rest
 -- are the removals-without-payment-of-tax vocabulary. A sale channel carries a
 -- default, a customer may override it, and the resolved value is frozen onto
@@ -79,17 +79,23 @@ create table breweries (
   timezone text not null default 'America/New_York',
   settings jsonb not null default '{}',
   fermentation_reading_due_hours int not null default 24 check (fermentation_reading_due_hours between 1 and 168),
+  gravity_unit text not null default 'plato' check (gravity_unit in ('plato','sg')),
   created_at timestamptz not null default now()
 );
 comment on column breweries.settings is 'staff-only; never store secrets here';
+comment on column breweries.gravity_unit is
+  'display only: how this brewery reads and types gravity by default. Gravity is STORED in degrees Plato everywhere (fermentation_readings.gravity_plato, recipe predictions); this never changes a stored number. A member may override it on brewery_users.gravity_unit.';
 
 create table brewery_users (
   brewery_id uuid not null references breweries(id),
   user_id uuid not null references auth.users(id),
   role staff_role not null,
+  gravity_unit text check (gravity_unit in ('plato','sg')),
   created_at timestamptz not null default now(),
   primary key (brewery_id, user_id)
 );
+comment on column brewery_users.gravity_unit is
+  'display only, and null means "use the brewery default" (breweries.gravity_unit). Storage stays degrees Plato regardless.';
 
 -- Access helpers (security definer so RLS policies can call them cheaply).
 create function my_brewery_ids() returns setof uuid
@@ -198,6 +204,7 @@ create table materials (
   default_vendor_id uuid,
   lead_time_days int,
   reorder_point numeric(14,4),                          -- base uom
+  extract_potential numeric,                             -- SG-style potential, e.g. 1.037 = 37 PPG (lib/recipe-gravity.ts)
   active boolean not null default true,
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
@@ -510,6 +517,7 @@ create table inventory_movements (
       when 'adjustment'       then sale_channel_id is null and dest_state is null and tax_treatment is null
       when 'taproom_transfer' then sale_channel_id is null and dest_state is null and tax_treatment is null
       when 'location_transfer' then sale_channel_id is null and dest_state is null and tax_treatment is null
+      when 'repack'           then sale_channel_id is null and dest_state is null and tax_treatment is null
       else true
     end)
 );
@@ -577,8 +585,8 @@ create table recipe_versions (
   brewery_id uuid not null references breweries(id),
   recipe_id uuid not null,
   version int not null,
-  target_og_plato numeric(5,2), target_fg_plato numeric(5,2),   -- °Plato (brewing-domain.md)
-  target_abv numeric(4,2), target_ibu numeric(5,1),
+  target_ibu numeric(5,1),                               -- °Plato/ABV targets dropped: lib/recipe-gravity.ts predicts OG/FG/ABV from the assumptions below
+  mash_temp_f numeric, brewhouse_efficiency numeric, yeast_attenuation numeric, -- efficiency/attenuation are fractions (0.75), not percents; recipeGravity's inputs
   boil_minutes int,
   note text,
   created_by uuid not null references auth.users(id),
@@ -597,6 +605,7 @@ create table recipe_ingredients (
   stage ingredient_stage not null,
   timing_minutes int,
   sort int not null default 0,
+  extract_snapshot numeric,                              -- materials.extract_potential at recipe-version save time (lib/recipe-gravity.ts)
   unique (id, brewery_id),
   foreign key (recipe_version_id, brewery_id) references recipe_versions (id, brewery_id),
   foreign key (material_id, brewery_id) references materials (id, brewery_id)
@@ -782,11 +791,18 @@ create trigger batch_additions_movement_trigger before insert or update on batch
   for each row execute function enforce_consumption_movement();
 
 -- ---------------------------------------------------------------- packaging + lots
+-- A run is planned against a brand ("600 cans of Stout on Friday") days before
+-- anyone knows which tank it comes out of, so brand_id is required and
+-- occupancy_id is not. The check is the promotion gate: a run may sit
+-- brand-only for as long as it likes, but the moment it starts (or closes) it
+-- must name the tank it drew from, because bbl_drawn is subtracted from that
+-- occupancy in occupancy_volumes.
 create table packaging_runs (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
   run_no bigint,                                       -- trigger
-  occupancy_id uuid not null,                          -- exactly one source occupancy
+  brand_id uuid not null,                              -- what is being packaged, known first
+  occupancy_id uuid,                                   -- the one source occupancy, once picked
   planned_on date not null,
   started_at timestamptz,
   closed_at timestamptz,
@@ -796,11 +812,38 @@ create table packaging_runs (
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
   unique (brewery_id, run_no),
+  check ((started_at is null and closed_at is null) or occupancy_id is not null),
+  foreign key (brand_id, brewery_id) references brands (id, brewery_id),
   foreign key (occupancy_id, brewery_id) references vessel_occupancies (id, brewery_id)
 );
 create index packaging_runs_planned_idx on packaging_runs (brewery_id, planned_on);
 create index packaging_runs_occ_idx on packaging_runs (occupancy_id);
+create index packaging_runs_brand_idx on packaging_runs (brewery_id, brand_id);
 create trigger packaging_runs_no before insert on packaging_runs for each row execute function private.set_doc_no('run_no','run');
+
+-- Picking the tank is where brand identity is checked, not written. A batch
+-- that already intends a brand may only be packaged as that brand; a batch
+-- with no intended brand is fair game, and stays unbranded -- promoting the
+-- run's brand onto the batch would silently decide something the brewer did
+-- not. The occupancy must also be this brewery's: the composite FK above
+-- catches that too, but a trigger reading across tenants deserves its own say.
+create function enforce_packaging_run_brand() returns trigger language plpgsql set search_path = '' as $$
+declare v_brewery uuid; v_intended uuid;
+begin
+  if new.occupancy_id is null then return new; end if;
+  select o.brewery_id, b.intended_brand_id into v_brewery, v_intended
+  from public.vessel_occupancies o join public.batches b on b.id = o.batch_id
+  where o.id = new.occupancy_id;
+  if v_brewery is null or v_brewery <> new.brewery_id then
+    raise exception 'occupancy not found';
+  end if;
+  if v_intended is not null and v_intended <> new.brand_id then
+    raise exception 'packaging run brand does not match the tank''s batch brand';
+  end if;
+  return new;
+end $$;
+create trigger packaging_runs_brand before insert or update of occupancy_id on packaging_runs
+  for each row execute function enforce_packaging_run_brand();
 
 create table lots (   -- 1:1 with packaging runs
   id uuid primary key default private.new_uuid(),
@@ -1668,6 +1711,43 @@ create view packaging_run_requirements with (security_invoker = true) as
   left join material_on_order oo on oo.material_id = bom.material_id
   where r.closed_at is null
   group by r.id, bom.material_id, oh.qty, oo.qty;
+
+-- What the brewhouse still owes each brand. Demand is every open packaging
+-- run's planned units converted to barrels; supply is beer already committed
+-- to that brand -- batches scheduled but not yet brewed, plus what is sitting
+-- in open occupancies, counted through the batch's intended brand. brew_bbl is
+-- the shortfall, floored at zero: a surplus is not a negative brew.
+-- ponytail: the 30-day horizon stands in for a cancel state. Runs have no
+-- cancelled status yet, so an abandoned plan would inflate demand forever;
+-- dropping runs planned more than 30 days ago is the cheap approximation.
+-- Replace the date window with `and r.status <> 'cancelled'` when runs get one.
+create view product_volume_requirements with (security_invoker = true) as
+  with demand as (
+    select r.brewery_id, r.brand_id, sum(o.qty_planned * f.bbl_per_unit) as bbl
+    from packaging_runs r
+    join packaging_run_outputs o on o.run_id = r.id
+    join skus s on s.id = o.sku_id
+    join format_volumes f on f.id = s.format_id
+    where r.closed_at is null and r.planned_on >= current_date - 30
+    group by 1, 2
+  ),
+  supply as (
+    select brewery_id, brand_id, sum(bbl) as bbl from (
+      select b.brewery_id, b.intended_brand_id as brand_id, b.planned_bbl as bbl
+      from batches b where b.brewed_on is null and b.intended_brand_id is not null
+      union all
+      select ov.brewery_id, b.intended_brand_id, ov.bbl
+      from occupancy_volumes ov join batches b on b.id = ov.batch_id
+      where ov.ended_at is null and b.intended_brand_id is not null
+    ) parts group by 1, 2
+  )
+  select br.brewery_id, br.id as brand_id, br.name as brand_name,
+         coalesce(d.bbl, 0) as demand_bbl,
+         coalesce(p.bbl, 0) as supply_bbl,
+         greatest(coalesce(d.bbl, 0) - coalesce(p.bbl, 0), 0) as brew_bbl
+  from brands br
+  left join demand d on d.brand_id = br.id and d.brewery_id = br.brewery_id
+  left join supply p on p.brand_id = br.id and p.brewery_id = br.brewery_id;
 
 create view packaging_run_yields with (security_invoker = true) as
   select r.id as run_id, r.brewery_id, r.bbl_drawn,
@@ -2607,6 +2687,44 @@ begin
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
+-- ---------------------------------------------------------------- display preferences
+-- Gravity unit is a *display* choice: every gravity in this database is stored
+-- in degrees Plato and stays that way. The brewery default sits on breweries;
+-- a member may override it for themselves on their own brewery_users row, and
+-- null there means "follow the brewery". Both setters are ordinary
+-- request-ledgered commands so a retried save cannot double-apply.
+create function set_brewery_gravity_unit(
+  p_brewery uuid, p_unit text, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_unit text;
+begin
+  perform private.assert_staff(p_brewery, array['admin']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'set_brewery_gravity_unit', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'unit', p_unit));
+  if v_replay is not null then return v_replay; end if;
+  update public.breweries set gravity_unit = p_unit where id = p_brewery returning gravity_unit into v_unit;
+  return private.complete_command_request(p_request_id, jsonb_build_object('unit', v_unit));
+end $$;
+
+-- p_unit null clears the personal override, dropping the caller back to the
+-- brewery default. Any staff role may set their own; it reaches no one else's
+-- row because the update is keyed on auth.uid().
+create function set_my_gravity_unit(
+  p_brewery uuid, p_unit text, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_rows int;
+begin
+  perform private.assert_staff(p_brewery, array['admin','sales','warehouse','brewer']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'set_my_gravity_unit', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'unit', p_unit));
+  if v_replay is not null then return v_replay; end if;
+  update public.brewery_users set gravity_unit = p_unit
+    where brewery_id = p_brewery and user_id = auth.uid();
+  get diagnostics v_rows = row_count;
+  if v_rows = 0 then raise exception 'membership not found'; end if;
+  return private.complete_command_request(p_request_id, jsonb_build_object('unit', p_unit));
+end $$;
+
 -- p_tax_treatment is the customer's override of its sale channel's default
 -- (§16.3): null means inherit, and every write sets it, so clearing an
 -- override is passing null rather than a second command.
@@ -3147,6 +3265,617 @@ begin
   v_replay := private.claim_command_request(v_brewery,'return_shipment',p_request_id,jsonb_build_object('invoice',p_invoice,'lines',p_lines,'location',p_location,'reason',p_reason));
   if v_replay is not null then return v_replay; end if;
   v_result := private.return_shipment_impl(p_invoice,p_lines,p_location,p_reason); return private.complete_command_request(p_request_id,v_result);
+end $$;
+
+-- ---------------------------------------------------------------- recipes
+-- A recipe is a name; every fact about how it is brewed lives on a version,
+-- and a version is immutable — there is deliberately no update RPC. Editing a
+-- recipe means adding the next version, so a batch that points at version 1
+-- still reads exactly what was brewed. `version` is max+1 under a lock on the
+-- recipe row, so two concurrent saves queue rather than collide on the
+-- (recipe_id, version) unique index.
+create function create_recipe(p_brewery uuid, p_brand uuid, p_name text, p_note text, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.recipes;
+begin
+  perform private.assert_staff(p_brewery, array['admin','brewer']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'create_recipe', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'brand', p_brand, 'name', p_name, 'note', p_note));
+  if v_replay is not null then return v_replay; end if;
+  insert into public.recipes (brewery_id, brand_id, name, note)
+  values (p_brewery, p_brand, p_name, p_note) returning * into v_row;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- One call writes the version and its ingredients, so a version never exists
+-- without the lines it was costed and predicted from. Each line snapshots
+-- materials.extract_potential into extract_snapshot: the material may be
+-- retyped tomorrow, but this version's predicted gravity (lib/recipe-gravity.ts,
+-- which reads the snapshot) must not move. Gravity itself is never computed or
+-- stored here — get_recipe predicts it in TypeScript.
+create function create_recipe_version(
+  p_brewery uuid, p_recipe uuid, p_mash_temp_f numeric, p_brewhouse_efficiency numeric,
+  p_yeast_attenuation numeric, p_boil_minutes int, p_target_ibu numeric, p_note text,
+  p_ingredients jsonb, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid; v_replay jsonb; v_recipe public.recipes; v_row public.recipe_versions;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin','brewer']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'create_recipe_version', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'recipe', p_recipe, 'mash_temp_f', p_mash_temp_f,
+      'brewhouse_efficiency', p_brewhouse_efficiency, 'yeast_attenuation', p_yeast_attenuation,
+      'boil_minutes', p_boil_minutes, 'target_ibu', p_target_ibu, 'note', p_note, 'ingredients', p_ingredients));
+  if v_replay is not null then return v_replay; end if;
+  -- The lock serializes concurrent saves of the same recipe; max+1 is read under it.
+  select * into v_recipe from public.recipes where id = p_recipe and brewery_id = p_brewery for update;
+  if v_recipe.id is null then raise exception 'recipe not found'; end if;
+  if jsonb_array_length(p_ingredients) = 0 then raise exception 'a recipe version needs at least one ingredient'; end if;
+
+  insert into public.recipe_versions (brewery_id, recipe_id, version, mash_temp_f, brewhouse_efficiency,
+    yeast_attenuation, boil_minutes, target_ibu, note, created_by)
+  select p_brewery, p_recipe, coalesce(max(rv.version), 0) + 1, p_mash_temp_f, p_brewhouse_efficiency,
+    p_yeast_attenuation, p_boil_minutes, p_target_ibu, p_note, v_actor
+  from public.recipe_versions rv where rv.recipe_id = p_recipe
+  returning * into v_row;
+
+  insert into public.recipe_ingredients (brewery_id, recipe_version_id, material_id, per_bbl_qty, stage,
+    timing_minutes, sort, extract_snapshot)
+  select p_brewery, v_row.id, (line->>'material_id')::uuid, (line->>'per_bbl_qty')::numeric,
+    (line->>'stage')::public.ingredient_stage, (line->>'timing_minutes')::int, (ord - 1)::int,
+    (select m.extract_potential from public.materials m
+      where m.id = (line->>'material_id')::uuid and m.brewery_id = p_brewery)
+  from jsonb_array_elements(p_ingredients) with ordinality as t(line, ord);
+
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- ---------------------------------------------------------------- vessels and batches
+-- A vessel is cellar hardware; it deliberately has no status column, because
+-- what is in it is derived from the open row in vessel_occupancies.
+create function upsert_vessel(
+  p_brewery uuid, p_vessel uuid, p_name text, p_kind public.vessel_kind, p_capacity_bbl numeric, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.vessels;
+begin
+  perform private.assert_staff(p_brewery, array['admin','brewer']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'upsert_vessel', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'vessel', p_vessel, 'name', p_name, 'kind', p_kind, 'capacity_bbl', p_capacity_bbl));
+  if v_replay is not null then return v_replay; end if;
+  if p_vessel is null then
+    insert into public.vessels (brewery_id, name, kind, capacity_bbl)
+    values (p_brewery, p_name, p_kind, p_capacity_bbl) returning * into v_row;
+  else
+    update public.vessels set name = p_name, kind = p_kind, capacity_bbl = p_capacity_bbl
+    where id = p_vessel and brewery_id = p_brewery returning * into v_row;
+    if v_row.id is null then raise exception 'vessel not found'; end if;
+  end if;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- Scheduling is intent, not commitment: the brand is optional (§16.9 — identity
+-- is required at packaging, not at the kettle) and so is the recipe version, so
+-- a brewer can pencil in a brew day before deciding what goes in it. Neither is
+-- cross-checked against the other: a recipe may itself be brand-less.
+create function schedule_batch(
+  p_brewery uuid, p_brand uuid, p_recipe_version uuid, p_planned_on date, p_planned_bbl numeric,
+  p_note text, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid; v_replay jsonb; v_row public.batches;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin','brewer']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'schedule_batch', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'brand', p_brand, 'recipe_version', p_recipe_version,
+      'planned_on', p_planned_on, 'planned_bbl', p_planned_bbl, 'note', p_note));
+  if v_replay is not null then return v_replay; end if;
+  -- The composite FKs on (intended_brand_id, brewery_id) and
+  -- (recipe_version_id, brewery_id) already refuse another tenant's rows; these
+  -- checks only turn that into a readable error.
+  if p_brand is not null and not exists (select 1 from public.brands where id = p_brand and brewery_id = p_brewery)
+    then raise exception 'brand not found'; end if;
+  if p_recipe_version is not null and not exists (
+    select 1 from public.recipe_versions where id = p_recipe_version and brewery_id = p_brewery)
+    then raise exception 'recipe version not found'; end if;
+
+  insert into public.batches (brewery_id, intended_brand_id, recipe_version_id, planned_on, planned_bbl, note, created_by)
+  values (p_brewery, p_brand, p_recipe_version, p_planned_on, p_planned_bbl, p_note, v_actor) returning * into v_row;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- One call stamps the brew day and opens the occupancy, so a brewed batch is
+-- never sitting in nowhere. started_at is midnight of brewed_on: the cellar
+-- thinks in days, and the gist exclusion on (vessel_id, tstzrange) then reads
+-- as "this vessel was this batch's from that day on". The vessel row is locked
+-- first so two concurrent brews queue rather than race the constraint, and the
+-- overlap check — the same range predicate the constraint uses — can report
+-- `occupied` instead of a constraint name.
+create function record_brew_day(
+  p_brewery uuid, p_batch uuid, p_vessel uuid, p_initial_bbl numeric, p_brewed_on date, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_batch public.batches; v_vessel public.vessels; v_occ public.vessel_occupancies;
+begin
+  perform private.assert_staff(p_brewery, array['admin','brewer']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'record_brew_day', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'batch', p_batch, 'vessel', p_vessel,
+      'initial_bbl', p_initial_bbl, 'brewed_on', p_brewed_on));
+  if v_replay is not null then return v_replay; end if;
+
+  select * into v_vessel from public.vessels where id = p_vessel and brewery_id = p_brewery for update;
+  if v_vessel.id is null then raise exception 'vessel not found'; end if;
+  select * into v_batch from public.batches where id = p_batch and brewery_id = p_brewery for update;
+  if v_batch.id is null then raise exception 'batch not found'; end if;
+  if v_batch.brewed_on is not null then raise exception 'batch % was already brewed on %', v_batch.batch_no, v_batch.brewed_on; end if;
+  -- Exactly the predicate the gist exclusion enforces, so a backdated brew day
+  -- that lands inside a *closed* occupancy still gets this readable error
+  -- rather than the raw constraint name. `ended_at is null` alone would miss it.
+  if exists (
+    select 1 from public.vessel_occupancies o
+    where o.vessel_id = p_vessel
+      and tstzrange(o.started_at, o.ended_at) && tstzrange(p_brewed_on::timestamptz, null)
+  ) then raise exception 'vessel % is occupied on %; empty it first', v_vessel.name, p_brewed_on; end if;
+
+  update public.batches set brewed_on = p_brewed_on where id = p_batch returning * into v_batch;
+  insert into public.vessel_occupancies (brewery_id, vessel_id, batch_id, started_at, initial_bbl)
+  values (p_brewery, p_vessel, p_batch, p_brewed_on::timestamptz, p_initial_bbl) returning * into v_occ;
+  return private.complete_command_request(p_request_id,
+    jsonb_build_object('batch', to_jsonb(v_batch), 'occupancy', to_jsonb(v_occ)));
+end $$;
+
+-- ---------------------------------------------------------------- cellar
+-- Moving beer is a ledger entry, never a column edit: occupancy_volumes derives
+-- what is in a vessel from initial_bbl, transfers in, transfers out (volume plus
+-- its loss) and packaging draws. So this writes exactly one transfers row and
+-- lets the view speak. The target vessel is locked before the source occupancy
+-- — the same vessel-first order record_brew_day uses — so two brewers racing
+-- into one brite queue behind the same lock instead of taking it in opposite
+-- orders. That order does not make deadlock impossible: a mutual swap
+-- (A -> B while B -> A) still takes the two locks in opposite orders and
+-- Postgres aborts one side, which the caller retries.
+-- An empty target gets a fresh occupancy at initial_bbl 0 carrying the
+-- source's batch; an occupied one is blended into and keeps its own batch identity (a "new batch from two parents"
+-- is deliberately not modelled). Every timestamp is now(), so a same-day
+-- transfer never collides with a brew day's midnight range start.
+create function record_cellar_transfer(
+  p_brewery uuid, p_from_occupancy uuid, p_to_vessel uuid, p_volume_bbl numeric, p_loss_bbl numeric, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_actor uuid; v_replay jsonb; v_vessel public.vessels;
+  v_from public.vessel_occupancies; v_to public.vessel_occupancies; v_row public.transfers;
+  v_available numeric; v_now timestamptz := now();
+  -- numeric(10,3) rounding means "empty" is never exactly zero after a split.
+  c_epsilon constant numeric := 0.0005;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin','brewer']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'record_cellar_transfer', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'from_occupancy', p_from_occupancy, 'to_vessel', p_to_vessel,
+      'volume_bbl', p_volume_bbl, 'loss_bbl', p_loss_bbl));
+  if v_replay is not null then return v_replay; end if;
+
+  select * into v_vessel from public.vessels where id = p_to_vessel and brewery_id = p_brewery for update;
+  if v_vessel.id is null then raise exception 'vessel not found'; end if;
+  select * into v_from from public.vessel_occupancies
+    where id = p_from_occupancy and brewery_id = p_brewery for update;
+  if v_from.id is null then raise exception 'occupancy not found'; end if;
+  if v_from.ended_at is not null then raise exception 'occupancy is closed'; end if;
+  if v_from.vessel_id = p_to_vessel then raise exception 'a vessel cannot be transferred into itself'; end if;
+
+  select bbl into v_available from public.occupancy_volumes where occupancy_id = v_from.id;
+  if p_volume_bbl + coalesce(p_loss_bbl, 0) > v_available + c_epsilon then
+    raise exception 'only % bbl in that vessel; asked for %', v_available, p_volume_bbl + coalesce(p_loss_bbl, 0);
+  end if;
+
+  select * into v_to from public.vessel_occupancies
+    where vessel_id = p_to_vessel and brewery_id = p_brewery and ended_at is null for update;
+  if v_to.id is null then
+    insert into public.vessel_occupancies (brewery_id, vessel_id, batch_id, started_at, initial_bbl)
+    values (p_brewery, p_to_vessel, v_from.batch_id, v_now, 0) returning * into v_to;
+  end if;
+
+  insert into public.transfers (brewery_id, from_occupancy_id, to_occupancy_id, bbl, loss_bbl, at, created_by)
+  values (p_brewery, v_from.id, v_to.id, p_volume_bbl, coalesce(p_loss_bbl, 0), v_now, v_actor) returning * into v_row;
+
+  -- Re-read the view: it now includes the row just written.
+  select bbl into v_available from public.occupancy_volumes where occupancy_id = v_from.id;
+  if v_available <= c_epsilon then
+    -- greatest(): a brew day may be dated ahead of today, so the occupancy can
+    -- start in the future. tstzrange would reject an ended_at below its start;
+    -- an empty range there simply frees the vessel.
+    update public.vessel_occupancies set ended_at = greatest(v_from.started_at, v_now)
+    where id = v_from.id returning * into v_from;
+  end if;
+
+  return private.complete_command_request(p_request_id, jsonb_build_object(
+    'transfer', to_jsonb(v_row), 'from_occupancy', to_jsonb(v_from), 'to_occupancy', to_jsonb(v_to)));
+end $$;
+
+-- Readings are manual entry in °F and °Plato (brewing-domain.md); nothing is
+-- ever synthesized. A closed occupancy takes no more of them — the beer has
+-- left the vessel, so a reading against it would describe nothing.
+create function record_fermentation_reading(
+  p_brewery uuid, p_occupancy uuid, p_at timestamptz, p_temp_f numeric,
+  p_gravity_plato numeric, p_ph numeric, p_note text, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid; v_replay jsonb; v_row public.fermentation_readings;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin','brewer']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'record_fermentation_reading', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'occupancy', p_occupancy, 'at', p_at, 'temp_f', p_temp_f,
+      'gravity_plato', p_gravity_plato, 'ph', p_ph, 'note', p_note));
+  if v_replay is not null then return v_replay; end if;
+
+  perform private.assert_open_occupancy(p_brewery, p_occupancy);
+
+  insert into public.fermentation_readings (brewery_id, occupancy_id, at, temp_f, gravity_plato, ph, note, created_by)
+  values (p_brewery, p_occupancy, coalesce(p_at, now()), p_temp_f, p_gravity_plato, p_ph, p_note, v_actor)
+  returning * into v_row;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- An occupancy a packaging run may draw from: this brewery's, still open.
+-- Null passes -- "no tank yet" is the normal state of a planned run.
+create function private.assert_open_occupancy(p_brewery uuid, p_occupancy uuid) returns void
+language plpgsql set search_path = '' as $$
+declare v_ended timestamptz; v_found boolean;
+begin
+  if p_occupancy is null then return; end if;
+  select true, o.ended_at into v_found, v_ended from public.vessel_occupancies o
+  where o.id = p_occupancy and o.brewery_id = p_brewery;
+  if v_found is null then raise exception 'occupancy not found'; end if;
+  if v_ended is not null then raise exception 'occupancy is closed'; end if;
+end $$;
+
+-- One line per package is the rule for a run's planned and actual outputs.
+-- unique (run_id, sku_id) would catch a repeat, but as a constraint name;
+-- say so before the insert does.
+create function private.assert_one_line_per_sku(p_outputs jsonb) returns void
+language plpgsql set search_path = '' as $$
+declare v_dupe uuid;
+begin
+  select (value->>'sku_id')::uuid into v_dupe
+  from jsonb_array_elements(coalesce(p_outputs, '[]'::jsonb))
+  group by 1 having count(*) > 1 limit 1;
+  if v_dupe is not null then
+    raise exception 'package % is listed twice; give it one line with the total', v_dupe;
+  end if;
+end $$;
+
+-- Replace a run's planned outputs. Every sku must belong to the run's brand,
+-- so a run's outputs can never quietly package something else.
+create function private.replace_packaging_run_outputs(
+  p_brewery uuid, p_run uuid, p_brand uuid, p_outputs jsonb
+) returns void language plpgsql set search_path = '' as $$
+declare v_line jsonb; v_sku_brand uuid;
+begin
+  if p_outputs is null then return; end if;
+  perform private.assert_one_line_per_sku(p_outputs);
+  delete from public.packaging_run_outputs where run_id = p_run;
+  for v_line in select * from jsonb_array_elements(p_outputs) loop
+    select s.brand_id into v_sku_brand from public.skus s
+    where s.id = (v_line->>'sku_id')::uuid and s.brewery_id = p_brewery;
+    if v_sku_brand is null then raise exception 'sku not found'; end if;
+    if v_sku_brand <> p_brand then
+      raise exception 'sku % is not a package of this run''s brand', v_line->>'sku_id';
+    end if;
+    insert into public.packaging_run_outputs (brewery_id, run_id, sku_id, qty_planned)
+    values (p_brewery, p_run, (v_line->>'sku_id')::uuid, (v_line->>'qty_planned')::numeric);
+  end loop;
+end $$;
+
+-- ---------------------------------------------------------------- packaging
+-- Planning a run needs only a brand and a date; the tank comes later
+-- (packaging_runs' check constraint). Outputs are the units the run intends to
+-- fill, and every one must be a sku of the run's own brand -- a Stout run
+-- cannot plan Pils cans. An empty outputs list is fine: "Friday is a Stout
+-- day" is a real plan.
+create function schedule_packaging_run(
+  p_brewery uuid, p_brand uuid, p_planned_on date, p_occupancy uuid, p_outputs jsonb, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid; v_replay jsonb; v_run public.packaging_runs;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin','brewer','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'schedule_packaging_run', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'brand', p_brand, 'planned_on', p_planned_on,
+      'occupancy', p_occupancy, 'outputs', p_outputs));
+  if v_replay is not null then return v_replay; end if;
+
+  if not exists (select 1 from public.brands where id = p_brand and brewery_id = p_brewery) then
+    raise exception 'brand not found';
+  end if;
+  perform private.assert_open_occupancy(p_brewery, p_occupancy);
+
+  insert into public.packaging_runs (brewery_id, brand_id, occupancy_id, planned_on, created_by)
+  values (p_brewery, p_brand, p_occupancy, p_planned_on, v_actor) returning * into v_run;
+  perform private.replace_packaging_run_outputs(p_brewery, v_run.id, p_brand, p_outputs);
+
+  return private.complete_command_request(p_request_id, to_jsonb(v_run));
+end $$;
+
+-- The plan changes right up until the run starts: pick the tank, redo the
+-- counts, then stamp started_at. Outputs are replaced wholesale rather than
+-- diffed -- nothing downstream references a planned output until close writes
+-- movement_id, so delete-and-insert loses nothing. A closed run is history.
+create function update_packaging_run(
+  p_brewery uuid, p_run uuid, p_occupancy uuid, p_outputs jsonb, p_started_at timestamptz, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_run public.packaging_runs;
+begin
+  perform private.assert_staff(p_brewery, array['admin','brewer','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'update_packaging_run', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'run', p_run, 'occupancy', p_occupancy,
+      'outputs', p_outputs, 'started_at', p_started_at));
+  if v_replay is not null then return v_replay; end if;
+
+  select * into v_run from public.packaging_runs where id = p_run and brewery_id = p_brewery for update;
+  if v_run.id is null then raise exception 'packaging run not found'; end if;
+  if v_run.closed_at is not null then raise exception 'packaging run is closed'; end if;
+
+  if p_occupancy is not null then
+    perform private.assert_open_occupancy(p_brewery, p_occupancy);
+    -- The brand trigger fires on this update and has the last word.
+    update public.packaging_runs set occupancy_id = p_occupancy where id = p_run returning * into v_run;
+  end if;
+
+  -- Translate the check constraint into the sentence a brewer would say. The
+  -- constraint still stands behind this for anything that writes directly.
+  if p_started_at is not null then
+    if v_run.occupancy_id is null then
+      raise exception 'pick the tank this run draws from before starting it';
+    end if;
+    -- Re-check the tank that is actually attached (v_run was re-read above if
+    -- one was passed in now): a run may have picked its occupancy days ago and
+    -- that occupancy may have been emptied since. Nothing else would catch it
+    -- -- the trigger only fires when occupancy_id itself is written, and the
+    -- check constraint asks only that the column be non-null.
+    perform private.assert_open_occupancy(p_brewery, v_run.occupancy_id);
+    update public.packaging_runs set started_at = p_started_at where id = p_run returning * into v_run;
+  end if;
+
+  if p_outputs is not null then
+    perform private.replace_packaging_run_outputs(p_brewery, p_run, v_run.brand_id, p_outputs);
+  end if;
+
+  return private.complete_command_request(p_request_id, to_jsonb(v_run));
+end $$;
+
+-- Closing turns beer into stock, in one transaction: one lot for the whole
+-- run, a production_in movement per package actually filled, the packaging
+-- materials consumed off the shelf, and bbl_drawn on the run -- which
+-- occupancy_volumes already subtracts from the tank.
+--
+-- A vessel has no location, so the close names the location and bin the
+-- finished goods land in; without one a production_in movement has nowhere to
+-- go. The occupancy is deliberately left open: whether a tank is done, and
+-- what heel is left in it, is a cellar decision made by ending the occupancy,
+-- not a side effect of packaging.
+create function close_packaging_run(
+  p_brewery uuid, p_run uuid, p_bbl_drawn numeric, p_outputs jsonb, p_lot_code text,
+  p_packaged_on date, p_best_by date, p_location uuid, p_bin uuid, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_actor uuid; v_replay jsonb; v_run public.packaging_runs; v_lot uuid; v_available numeric;
+  v_occupancy public.vessel_occupancies;
+  v_line jsonb; v_sku uuid; v_qty numeric; v_format uuid;
+  v_movement uuid; v_consumption uuid; v_bom record;
+  -- numeric(10,3) rounding means "empty" is never exactly zero after a split.
+  c_epsilon constant numeric := 0.0005;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin','brewer','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'close_packaging_run', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'run', p_run, 'bbl_drawn', p_bbl_drawn,
+      'outputs', p_outputs, 'lot_code', p_lot_code, 'packaged_on', p_packaged_on,
+      'best_by', p_best_by, 'location', p_location, 'bin', p_bin));
+  if v_replay is not null then return v_replay; end if;
+
+  select * into v_run from public.packaging_runs where id = p_run and brewery_id = p_brewery for update;
+  if v_run.id is null then raise exception 'packaging run not found'; end if;
+  if v_run.closed_at is not null then raise exception 'packaging run is closed'; end if;
+  -- The check constraint says the same thing as a constraint name; these are
+  -- the two sentences a brewer would actually say.
+  if v_run.occupancy_id is null then
+    raise exception 'pick the tank this run drew from before closing it';
+  end if;
+  if v_run.started_at is null then raise exception 'start the run before closing it'; end if;
+
+  -- Finished goods have to land somewhere real: the bin must be a bin of that
+  -- location, and the location this brewery's.
+  if not exists (
+    select 1 from public.bins b join public.locations l on l.id = b.location_id
+    where b.id = p_bin and b.location_id = p_location and l.brewery_id = p_brewery
+  ) then
+    raise exception 'bin does not belong to that location';
+  end if;
+
+  -- Lock the tank before reading its volume, as record_cellar_transfer does:
+  -- the run lock above serialises closes of *this* run, but two runs drawing
+  -- the same tank (or a cellar transfer out of it) would otherwise both see
+  -- the pre-draw volume and both pass the check below.
+  select * into v_occupancy from public.vessel_occupancies
+  where id = v_run.occupancy_id and brewery_id = p_brewery for update;
+  if v_occupancy.id is null then raise exception 'occupancy not found'; end if;
+  -- The over-draw check below would refuse this anyway -- an ended occupancy
+  -- holds nothing -- but only for a run that drew something. Saying it here
+  -- keeps a zero-bbl close from quietly booking beer against an emptied tank,
+  -- and names the order the two steps belong in.
+  if v_occupancy.ended_at is not null then
+    raise exception 'the tank was emptied before this run closed; close runs before transferring the heel out';
+  end if;
+
+  select bbl into v_available from public.occupancy_volumes where occupancy_id = v_occupancy.id;
+  if p_bbl_drawn > coalesce(v_available, 0) + c_epsilon then
+    raise exception 'only % bbl in that tank; asked to draw %', coalesce(v_available, 0), p_bbl_drawn;
+  end if;
+
+  perform private.assert_one_line_per_sku(p_outputs);
+
+  -- lots is unique (brewery_id, code); say so as a sentence rather than let a
+  -- 23505 carrying a constraint name reach the brewer.
+  if exists (select 1 from public.lots where brewery_id = p_brewery and code = p_lot_code) then
+    raise exception 'lot code "%" is already used', p_lot_code;
+  end if;
+  insert into public.lots (brewery_id, packaging_run_id, brand_id, code, packaged_on, best_by)
+  values (p_brewery, p_run, v_run.brand_id, p_lot_code, p_packaged_on, p_best_by)
+  returning id into v_lot;
+
+  -- A planned line nobody filled is settled at zero rather than left null: the
+  -- run is history now, and "we filled none of those" is the answer.
+  update public.packaging_run_outputs set qty_actual = 0 where run_id = p_run;
+
+  for v_line in select * from jsonb_array_elements(coalesce(p_outputs, '[]'::jsonb)) loop
+    v_sku := (v_line->>'sku_id')::uuid;
+    v_qty := (v_line->>'qty_actual')::numeric;
+    if v_qty is null or v_qty < 0 then
+      raise exception 'qty_actual must not be negative';
+    end if;
+    if not exists (select 1 from public.packaging_run_outputs where run_id = p_run and sku_id = v_sku) then
+      raise exception 'sku % is not one of this run''s planned outputs', v_sku;
+    end if;
+    if v_qty = 0 then continue; end if;
+
+    select s.format_id into v_format from public.skus s where s.id = v_sku and s.brewery_id = p_brewery;
+
+    -- One production_in per package filled, all carrying the run's lot and the
+    -- run id as ref, so the whole close reads back as one event. bbl is frozen
+    -- from the format by the enforce_bbl_integrity trigger.
+    insert into public.inventory_movements
+      (brewery_id, sku_id, location_id, bin_id, qty, type, lot_id, ref, created_by)
+    values (p_brewery, v_sku, p_location, p_bin, v_qty, 'production_in', v_lot, p_run, v_actor)
+    returning id into v_movement;
+    update public.packaging_run_outputs set qty_actual = v_qty, movement_id = v_movement
+    where run_id = p_run and sku_id = v_sku;
+
+    -- The packaging bill belongs to the format (§16.12), and every line of it
+    -- comes off the same shelf the finished goods land on.
+    for v_bom in
+      select fb.material_id, fb.qty_per_unit, m.name, m.lot_tracked
+      from public.format_bom fb join public.materials m on m.id = fb.material_id
+      where fb.format_id = v_format
+    loop
+      if v_bom.lot_tracked then
+        -- ponytail: which lot of crowns went into a run is a real question with
+        -- no UI behind it yet (FEFO or an explicit pick), and enforce_material_lot
+        -- would reject a null lot_id anyway. Refuse loudly rather than invent one.
+        -- Upgrade path: take a lot_id per BOM line on the close input.
+        raise exception 'cannot post BOM for lot-tracked material "%" yet', v_bom.name;
+      end if;
+      insert into public.material_movements
+        (brewery_id, material_id, location_id, bin_id, qty, type, created_by)
+      values (p_brewery, v_bom.material_id, p_location, p_bin,
+              -(v_bom.qty_per_unit * v_qty), 'consumption', v_actor)
+      returning id into v_consumption;
+      insert into public.packaging_run_consumptions (brewery_id, run_id, movement_id)
+      values (p_brewery, p_run, v_consumption);
+    end loop;
+  end loop;
+
+  update public.packaging_runs set closed_at = now(), bbl_drawn = p_bbl_drawn
+  where id = p_run returning * into v_run;
+
+  return private.complete_command_request(p_request_id, to_jsonb(v_run));
+end $$;
+
+-- ---------------------------------------------------------------- packaging
+-- Repack: breaking a composed unit into the units it is made of (§16.10).
+-- Nothing is brewed or removed, so the two FG rows share
+-- one `ref` and their volumes must cancel — the function asserts that before it
+-- returns, which is the whole point of the command. Composition is one level
+-- deep (§16.2a), so the pair must be joined by exactly one format_components
+-- row; childQty is pinned to parentQty x that row's qty, because any other
+-- ratio is what would make the volumes fail to net. The parent format's BOM
+-- says what happens to the packaging that came off: `consumed` writes a
+-- consumption, `return_to_stock` puts it back on the same bin's shelf.
+create function private.record_repack_impl(
+  p_brewery uuid, p_location uuid, p_bin uuid, p_parent_sku uuid, p_parent_qty numeric,
+  p_child_sku uuid, p_child_qty numeric, p_actor uuid
+) returns jsonb language plpgsql set search_path = '' as $$
+declare
+  v_ref uuid := private.new_uuid();
+  v_parent public.skus; v_child public.skus;
+  v_component numeric; v_expected numeric; v_on_hand numeric; v_net numeric;
+  v_lot_tracked text;
+begin
+  if p_parent_qty <= 0 then raise exception 'parentQty must be positive'; end if;
+  -- Composite FKs on inventory_movements already pin location/bin/sku to this
+  -- brewery; these lookups are scoped too so the error is a sentence, not 23503.
+  select * into v_parent from public.skus where id = p_parent_sku and brewery_id = p_brewery;
+  select * into v_child  from public.skus where id = p_child_sku  and brewery_id = p_brewery;
+  if v_parent.id is null or v_child.id is null then raise exception 'sku not found'; end if;
+  if v_parent.brand_id <> v_child.brand_id then raise exception 'a repack stays inside one brand'; end if;
+
+  select c.qty into v_component from public.format_components c
+   where c.brewery_id = p_brewery and c.parent_format_id = v_parent.format_id and c.child_format_id = v_child.format_id;
+  if v_component is null then
+    raise exception 'format % is not a component of format %: composition is one level deep',
+      v_child.format_id, v_parent.format_id;
+  end if;
+
+  v_expected := p_parent_qty * v_component;
+  if p_child_qty <> v_expected then
+    raise exception 'childQty % does not match parentQty % x % per unit: expected %, and only that ratio is volume-neutral',
+      p_child_qty, p_parent_qty, v_component, v_expected;
+  end if;
+
+  -- A lot-tracked material needs a lot chosen for it, and a repack has nowhere
+  -- to say which one; enforce_material_lot would otherwise fail the call with a
+  -- bare uuid. Refuse up front, by name, before a single row is written.
+  -- ponytail: take an optional per-material lot pick on the input and pass it
+  -- through to material_movements.lot_id when someone lot-tracks packaging.
+  select m.name into v_lot_tracked
+  from public.format_bom bom join public.materials m on m.id = bom.material_id
+  where bom.brewery_id = p_brewery and bom.format_id = v_parent.format_id and m.lot_tracked
+  order by m.name limit 1;
+  if v_lot_tracked is not null then
+    raise exception 'repack cannot post BOM for lot-tracked material "%" yet; mark it untracked or remove it from the format''s BOM', v_lot_tracked;
+  end if;
+
+  -- The bin cannot go short. Same balance bin_on_hand reads, at the same grain;
+  -- read straight from the ledger because that view is security_invoker.
+  select coalesce(sum(m.qty), 0) into v_on_hand from public.inventory_movements m
+   where m.brewery_id = p_brewery and m.sku_id = p_parent_sku
+     and m.location_id = p_location and m.bin_id = p_bin;
+  if v_on_hand < p_parent_qty then
+    raise exception 'only % on hand in that bin, cannot repack %', v_on_hand, p_parent_qty;
+  end if;
+
+  insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, ref, created_by)
+  -- created_by is the actor assert_staff verified in the public wrapper, not
+  -- auth.uid() read again here: the wrapper is the one place identity is proven.
+  values (p_brewery, p_parent_sku, p_location, p_bin, -p_parent_qty, 'repack', v_ref, p_actor),
+         (p_brewery, p_child_sku,  p_location, p_bin,  p_child_qty,  'repack', v_ref, p_actor);
+
+  -- The trigger froze bbl on each row from format_volumes; if the pair does not
+  -- cancel the repack invented or destroyed beer, so the whole call rolls back.
+  -- Filtered on the on-hand index columns too: `ref` alone has no index, and
+  -- the two rows just written are exactly this brewery/bin/sku pair.
+  select coalesce(sum(m.bbl), 0) into v_net from public.inventory_movements m
+   where m.brewery_id = p_brewery and m.location_id = p_location and m.bin_id = p_bin
+     and m.sku_id in (p_parent_sku, p_child_sku) and m.ref = v_ref and m.type = 'repack';
+  if abs(v_net) >= 0.000001 then
+    raise exception 'repack is not volume-neutral: % bbl left over', v_net;
+  end if;
+
+  insert into public.material_movements (brewery_id, material_id, location_id, bin_id, qty, type, note, created_by)
+  select p_brewery, bom.material_id, p_location, p_bin,
+         case bom.on_break when 'consumed' then -(bom.qty_per_unit * p_parent_qty) else bom.qty_per_unit * p_parent_qty end,
+         case bom.on_break when 'consumed' then 'consumption' else 'return_to_stock' end::public.material_movement_type,
+         'repack ' || v_ref, p_actor
+  from public.format_bom bom
+  where bom.brewery_id = p_brewery and bom.format_id = v_parent.format_id;
+
+  return jsonb_build_object('ref', v_ref, 'parent_qty', p_parent_qty, 'child_qty', p_child_qty);
+end $$;
+
+create function record_repack(
+  p_brewery uuid, p_location uuid, p_bin uuid, p_parent_sku uuid, p_parent_qty numeric,
+  p_child_sku uuid, p_child_qty numeric, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_result jsonb; v_actor uuid;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'record_repack', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'location', p_location, 'bin', p_bin, 'parent_sku', p_parent_sku,
+                       'parent_qty', p_parent_qty, 'child_sku', p_child_sku, 'child_qty', p_child_qty));
+  if v_replay is not null then return v_replay; end if;
+  v_result := private.record_repack_impl(p_brewery, p_location, p_bin, p_parent_sku, p_parent_qty, p_child_sku, p_child_qty, v_actor);
+  return private.complete_command_request(p_request_id, v_result);
 end $$;
 
 -- ---------------------------------------------------------------- Stock transfers
@@ -3905,7 +4634,7 @@ create view private.today_candidates with (security_invoker = true) as
          v.name,
          'reading due',
          coalesce(last.at, vo.started_at) + make_interval(hours => b.fermentation_reading_due_hours),
-         '/beer/cellar/' || vo.id || '/reading',
+         '/cellar/' || vo.id || '/reading',
          array['admin','brewer']::text[],
          null::uuid
     from vessel_occupancies vo
@@ -3915,10 +4644,10 @@ create view private.today_candidates with (security_invoker = true) as
     where vo.ended_at is null;
 grant select on private.today_candidates to service_role;
 
--- ponytail: delivery_next and fermentation_reading_overdue join this list when
--- their MGR pages/commands ship (slice 4 cellar reading, slice 10 delivery stop).
+-- ponytail: delivery_next joins this list when its MGR page ships (slice 10
+-- delivery stop). fermentation_reading_overdue is live: /cellar/<occupancy>/reading exists.
 create function today_live_reasons() returns text[]
-language sql immutable set search_path = '' as $$ select array['submitted_order','pick_due','restock_due'] $$;
+language sql immutable set search_path = '' as $$ select array['submitted_order','pick_due','restock_due','fermentation_reading_overdue'] $$;
 
 create function get_today_items(p_brewery uuid, p_now timestamptz default now())
 returns setof private.today_candidates
@@ -4435,7 +5164,8 @@ grant select on breweries, brewery_users, customer_users,
   to authenticated;
 -- Security-invoker views retain the underlying tables' RLS predicates; expose
 -- only the derived reads consumed by registered commands.
-grant select on on_hand, bin_on_hand, atp, invoice_totals, keg_deposit_balances, portal_brewery, sku_prices to authenticated;
+grant select on on_hand, bin_on_hand, atp, invoice_totals, keg_deposit_balances, portal_brewery, sku_prices,
+  format_volumes, occupancy_volumes, product_volume_requirements to authenticated;
 grant all on all tables in schema public to service_role;
 grant all on all sequences in schema public to service_role;
 
@@ -4470,6 +5200,8 @@ grant execute on function
   upsert_customer(uuid,uuid,text,public.customer_type,text,uuid,text,text,public.tax_treatment,uuid),
   upsert_sale_channel(uuid,uuid,text,public.tax_treatment,uuid),
   delete_sale_channel(uuid,uuid,uuid),
+  set_brewery_gravity_unit(uuid,text,uuid),
+  set_my_gravity_unit(uuid,text,uuid),
   upsert_ship_to(uuid,uuid,uuid,text,text,text,text,text,text,uuid),
   upsert_price_group(uuid,uuid,text,int,int,uuid),
   delete_price_group(uuid,uuid,uuid),
@@ -4500,7 +5232,18 @@ grant execute on function
   receive_stock_transfer(uuid,jsonb,uuid),
   move_stock_bin(uuid,uuid,uuid,uuid,public.keg_size,numeric,uuid,uuid,text,uuid),
   set_standing_allocation(uuid,uuid,numeric,uuid),
-  create_replenishment_order(uuid,uuid,jsonb,uuid)
+  create_replenishment_order(uuid,uuid,jsonb,uuid),
+  create_recipe(uuid,uuid,text,text,uuid),
+  create_recipe_version(uuid,uuid,numeric,numeric,numeric,int,numeric,text,jsonb,uuid),
+  upsert_vessel(uuid,uuid,text,public.vessel_kind,numeric,uuid),
+  schedule_batch(uuid,uuid,uuid,date,numeric,text,uuid),
+  record_brew_day(uuid,uuid,uuid,numeric,date,uuid),
+  record_cellar_transfer(uuid,uuid,uuid,numeric,numeric,uuid),
+  record_fermentation_reading(uuid,uuid,timestamptz,numeric,numeric,numeric,text,uuid),
+  schedule_packaging_run(uuid,uuid,date,uuid,jsonb,uuid),
+  update_packaging_run(uuid,uuid,uuid,jsonb,timestamptz,uuid),
+  close_packaging_run(uuid,uuid,numeric,jsonb,text,date,date,uuid,uuid,uuid),
+  record_repack(uuid,uuid,uuid,uuid,numeric,uuid,numeric,uuid)
   to authenticated;
 grant usage on schema private, extensions to service_role;
 -- service_role reaches `private` only for the UUID default its seed inserts

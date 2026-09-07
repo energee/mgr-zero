@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
 type Location = { id: string; name: string };
@@ -37,30 +37,35 @@ export function NewTransferForm({ locations, bins, skus }: { locations: Location
         <div className="grid grid-cols-2 gap-2">
           <div className="flex flex-col gap-2">
             <Label htmlFor="trf-from">From</Label>
-            <NativeSelect id="trf-from" value={fromId} onChange={(e) => { setFromId(e.target.value); setFromBin(firstBin(e.target.value)); }}>
-              <option value="">Location</option>{locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </NativeSelect>
-            <NativeSelect aria-label="From bin" value={fromBin} onChange={(e) => setFromBin(e.target.value)} disabled={!fromId}>
-              {bins.filter((b) => b.location_id === fromId).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </NativeSelect>
+            <Select value={fromId} onValueChange={(v) => { setFromId(v); setFromBin(firstBin(v)); }}>
+              <SelectTrigger id="trf-from"><SelectValue placeholder="Location" /></SelectTrigger>
+              <SelectContent>{locations.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent>
+            </Select>
+            <Select value={fromBin} onValueChange={setFromBin} disabled={!fromId}>
+              <SelectTrigger aria-label="From bin"><SelectValue placeholder="Bin" /></SelectTrigger>
+              <SelectContent>{bins.filter((b) => b.location_id === fromId).map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
+            </Select>
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="trf-to">To</Label>
-            <NativeSelect id="trf-to" value={toId} onChange={(e) => { setToId(e.target.value); setToBin(firstBin(e.target.value)); }}>
-              <option value="">Location</option>{locations.filter((l) => l.id !== fromId).map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-            </NativeSelect>
-            <NativeSelect aria-label="To bin" value={toBin} onChange={(e) => setToBin(e.target.value)} disabled={!toId}>
-              {bins.filter((b) => b.location_id === toId).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </NativeSelect>
+            <Select value={toId} onValueChange={(v) => { setToId(v); setToBin(firstBin(v)); }}>
+              <SelectTrigger id="trf-to"><SelectValue placeholder="Location" /></SelectTrigger>
+              <SelectContent>{locations.filter((l) => l.id !== fromId).map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent>
+            </Select>
+            <Select value={toBin} onValueChange={setToBin} disabled={!toId}>
+              <SelectTrigger aria-label="To bin"><SelectValue placeholder="Bin" /></SelectTrigger>
+              <SelectContent>{bins.filter((b) => b.location_id === toId).map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
+            </Select>
           </div>
         </div>
         <div className="flex flex-col gap-2">
           <Label>Lines</Label>
           {lines.map((l, i) => (
             <div key={i} className="flex gap-2">
-              <NativeSelect aria-label={`Line ${i + 1} SKU`} value={l.skuId} onChange={(e) => setLines((prev) => prev.map((x, j) => (j === i ? { ...x, skuId: e.target.value } : x)))}>
-                <option value="">SKU</option>{skus.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-              </NativeSelect>
+              <Select value={l.skuId} onValueChange={(v) => setLines((prev) => prev.map((x, j) => (j === i ? { ...x, skuId: v } : x)))}>
+                <SelectTrigger aria-label={`Line ${i + 1} SKU`}><SelectValue placeholder="SKU" /></SelectTrigger>
+                <SelectContent>{skus.map((s) => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
+              </Select>
               <Input aria-label={`Line ${i + 1} qty`} type="number" min="0" step="any" className="w-24" value={l.qty} onChange={(e) => setLines((prev) => prev.map((x, j) => (j === i ? { ...x, qty: e.target.value } : x)))} />
             </div>
           ))}

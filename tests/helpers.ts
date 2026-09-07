@@ -63,6 +63,24 @@ export function sql(q: string, quiet = false): string[] {
   return execFileSync("psql", args, { encoding: "utf8" }).trim().split("\n").filter(Boolean);
 }
 
+/** Insert one row as the service role and return it; the raw-row fixture tests share. */
+export async function ins<T = { id: string }>(table: string, row: Record<string, unknown>): Promise<T> {
+  const { data, error } = await admin.from(table).insert(row).select().single();
+  if (error) throw new Error(`${table}: ${error.message}`);
+  return data as T;
+}
+
+/** A material row (malt, hop, packaging); returns its id. */
+export async function seedMaterial(breweryId: string, o: {
+  name: string; category: string; uom?: string; extractPotential?: number | null; lotTracked?: boolean;
+}) {
+  const uom = o.uom ?? "lb";
+  return (await ins("materials", {
+    brewery_id: breweryId, name: o.name, category: o.category, base_uom: uom, purchase_uom: uom,
+    extract_potential: o.extractPotential ?? null, lot_tracked: o.lotTracked ?? false,
+  })).id;
+}
+
 // Seed helpers: the one place tests create catalog/location/customer rows, so
 // a schema change (Program 3 renames products→brands+formats) is one edit.
 // brand + packaged format + the sku that is their product (§16.1, §16.2).

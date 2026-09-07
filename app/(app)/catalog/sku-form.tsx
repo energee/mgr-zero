@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
 export type FormatOption = { id: string; name: string };
@@ -26,10 +26,10 @@ export function SkuForm({ brandId, formats }: { brandId: string; formats: Format
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <Label htmlFor="sku-format">Format</Label>
-          <NativeSelect id="sku-format" value={formatId} onChange={(e) => setFormatId(e.target.value)} required>
-            {formats.length ? null : <option value="">Add a packaged format first</option>}
-            {formats.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-          </NativeSelect>
+          <Select value={formatId} onValueChange={setFormatId} required>
+            <SelectTrigger id="sku-format"><SelectValue placeholder="Add a packaged format first" /></SelectTrigger>
+            <SelectContent>{formats.map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}</SelectContent>
+          </Select>
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="sku-name">Name (optional)</Label>
