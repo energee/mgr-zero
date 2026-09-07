@@ -336,6 +336,7 @@ export const SCREENS: Screen[] = [
       {E.edit("Reading overdue after (hours)", OVERDUE_HOURS, "number")}
       {E.fld("Deployment", "dedicated · read-only")}
       {E.btn("Save brewery")}
+      {E.nav("Source water · Municipal · Denver", "every recipe starts here unless it overrides")}
       {E.nav("Locations", "Warehouse · Taproom")}
       {E.nav("Team", "3 members · 1 pending invite")}
       {E.nav("Accounting", "QuickBooks · connection and push defaults", "", QuickBooksMark)}
@@ -1991,13 +1992,14 @@ export const SCREENS: Screen[] = [
     reads: "get_brew_day [design]",
     writes: "record_brew_day [design; one RPC: additions + material movements + occupancy]",
     states: permitted("brewer or admin required"),
-    spec: "Brew-day mode: actual lots and knockout vessel. Planned recipe/date/barrels live on Schedule batch so this page has one primary. Record brew day posts immutable material consumption for mash/boil/whirlpool stages only; the 18 lb Citra dry hop is posted later from Cellar addition. Yeast is consumed as a material lot, not a culture generation (plan §8).",
+    spec: "The brew sheet row is a read-out of the version’s process spec, opened frozen; brew day captures actuals, and fermentation reality arrives through Fermentation reading, so there is no mash-actuals form here. Brew-day mode: actual lots and knockout vessel. Planned recipe/date/barrels live on Schedule batch so this page has one primary. Record brew day posts immutable material consumption for mash/boil/whirlpool stages only; the 18 lb Citra dry hop is posted later from Cellar addition. Yeast is consumed as a material lot, not a culture generation (plan §8).",
     body: (<>
       {E.back("Batches", "B-0416 · Hazy")}
       {E.nav("2-row", "lot L-0821 · 660 lb")}
       {E.nav("Citra · boil", "lot L-0790 · 6 lb")}
       {E.nav("Yeast", "WLP066 · lot Y-0312 · 1 brink")}
       {E.fld("Knockout baseline", <>14.6 bbl {E.arrow()} FV2</>)}
+      {E.nav("Brew sheet · Hazy IPA v4", "mash 3 steps · whirlpool 20 min · read only")}
       {E.tape([["Start B-0416 · Hazy IPA v4", ""], ["Consume additions", "named material lots"], [<>Knockout 14.6 bbl {E.arrow()} FV2</>, "loss baseline"]])}
       {E.sp()}
       {E.btn("Record brew day", "irr")}
@@ -2442,7 +2444,7 @@ export const SCREENS: Screen[] = [
     reads: "list_recipes · get_recipe [design] · get_recipe_outcomes [design; per-batch actual OG/FG/ABV + realized efficiency/attenuation, derived from fermentation readings, never stored]",
     writes: "create_recipe [design; mutable parent row] · create_recipe_version [design; one RPC: immutable version + ingredients; SCHEMA-GATE: assumption columns on recipe_versions + per-ingredient extract snapshot + extract potential on materials; typed target_og/fg/abv columns drop]",
     states: permitted("brewer or admin required"),
-    spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. Versioning is disabled behind its schema gate. A new parent takes name and style only; versions append, and history is never edited. Costing lives on desk.",
+    spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. Versioning is disabled behind its schema gate. A new parent takes name and style only; versions append, and history is never edited. Costing lives on desk. A version is the executable process spec, not only the prediction inputs: volumes, boil, whirlpool and knockout are scalars here, while the mash and fermentation schedules and water open as their own screens because they repeat and carry add, reorder and delete. The mash temperature is gone from this page, because every mash step carries one and a scalar beside them is a second answer to one question. Batch size and knockout volume are gone too: the scale chips already state the batch size and Brew day already records knockout volume as its baseline. Three note fields become one.",
     body: (<>
       {E.back("Recipes", "Hazy IPA v4")}
       {E.row("Recipe parent · Hazy IPA · IPA", "name and style only", E.act("Create"))}
@@ -2451,9 +2453,26 @@ export const SCREENS: Screen[] = [
       {E.row("Citra", "boil · 10 min · 0.4 lb / bbl", "6 lb")}
       {E.row("Citra", "dry hop · day 4 · 1.2 lb / bbl", "18 lb")}
       {E.row("+ add ingredient", "material · stage · timing", "")}
-      {E.fld("Mash temp", "152 °F")}
-      {E.fld("Brewhouse efficiency", "72 %")}
-      {E.fld("Yeast attenuation", "78 % · WLP066")}
+      {E.cols(
+        E.edit("Pre-boil volume bbl", "16.8", "number"),
+        E.edit("Boil time min", "60", "number"),
+      )}
+      {E.cols(
+        E.edit("Whirlpool min", "20", "number"),
+        E.edit("Whirlpool temp °F", "180", "number"),
+      )}
+      {E.cols(
+        E.edit("Whirlpool rest min", "10", "number"),
+        E.edit("Knockout temp °F", "65", "number"),
+      )}
+      {E.cols(
+        E.edit("Brewhouse efficiency %", "72", "number"),
+        E.edit("Yeast attenuation %", "78", "number"),
+      )}
+      {E.nav("Mash schedule · 3 steps", "152 °F saccharification rest")}
+      {E.nav("Fermentation schedule · 4 stages", "18 days · dry hop day 4 in Primary")}
+      {E.nav("Water · Municipal Denver to Hazy target", "3 salts and acids")}
+      {E.edit("Notes", "Whirlpool hard, knock out cold.")}
       {E.info("Predicted: OG 15.2 °P · FG 3.3 °P · ABV 6.5%")}
       {E.tape([["B-0413 · OG 14.8 · FG 3.5 · ABV 6.0%", "eff 68% · att 76%"], ["B-0398 · OG 15.1 · FG 3.4 · ABV 6.3%", "eff 71% · att 77%"]])}
       {E.note("Actuals run −0.4 °P OG vs predicted (eff 68–71% vs 72% assumed). Lower the assumption on v5?")}

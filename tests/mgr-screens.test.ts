@@ -27,6 +27,40 @@ const body = (name: string) => {
 };
 
 describe("SCREENS", () => {
+  it("gives brew day the sheet to follow and no new capture", () => {
+    const brew = SCREENS.find((s) => s.name === "Brew day")!;
+    const text = renderToStaticMarkup(createElement("div", null, brew.body))
+      .replace(/<[^>]*>/g, " ");
+    expect(text).toMatch(/Brew sheet · Hazy IPA v4/);
+    expect(text).not.toMatch(/Actual mash|Mash actual/i);
+    expect(String(brew.writes)).toBe("record_brew_day [design; one RPC: additions + material movements + occupancy]");
+  });
+
+  it("sets the brewery's source water once, in Settings", () => {
+    const settings = SCREENS.find((s) => s.name === "Settings")!;
+    const text = renderToStaticMarkup(createElement("div", null, settings.body))
+      .replace(/<[^>]*>/g, " ");
+    expect(text).toMatch(/Source water/);
+  });
+
+  it("makes a recipe version executable without restating the batch size", () => {
+    const recipe = SCREENS.find((s) => s.name === "Recipe")!;
+    const text = renderToStaticMarkup(createElement("div", null, recipe.body))
+      .replace(/<[^>]*>/g, " ");
+    expect(text).toContain("Pre-boil volume");
+    expect(text).toContain("Boil time");
+    expect(text).toContain("Whirlpool rest");
+    expect(text).toContain("Knockout temp");
+    expect(text).toContain("Notes");
+    expect(text).toContain("Mash schedule · 3 steps");
+    expect(text).toContain("Fermentation schedule · 4 stages");
+    expect(text).toMatch(/Water · /);
+    // Spec D4: one place holds the mash temperature, and it is the schedule.
+    expect(text).not.toMatch(/Mash temp/);
+    // Spec D3: the scale chips already state the batch size.
+    expect(text).not.toMatch(/Batch size|Knockout volume/);
+  });
+
   it("keeps water profiles in the catalog, with their ion values", () => {
     const list = SCREENS.find((s) => s.name === "Water profiles")!;
     const text = renderToStaticMarkup(createElement("div", null, list.body))

@@ -136,6 +136,8 @@ export const TAPS: [string | RegExp, string][] = [
   ["Add format", "Format"],
   [/^Mash schedule · /, "Mash schedule"],
   [/^Water · /, "Water"],
+  [/^Brew sheet · /, "Mash schedule"],
+  [/^Source water · /, "Water profiles"],
   ["Water profiles", "Water profiles"],
   ["Add step", "Mash step"],
   [/^Fermentation schedule · /, "Fermentation schedule"],
