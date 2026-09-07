@@ -89,6 +89,29 @@ defineCommand({
   })),
 });
 
+defineCommand({
+  name: "confirm_delivery", description: "Sign a delivery stop; an on-delivery shipment gets its invoice now (shipped quantities, order prices); never moves stock",
+  roles: [...warehouseRoles], requiresConfirmation: true,
+  input: z.object({ deliveryId: z.string().uuid(), signedBy: z.string().trim().min(1) }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("confirm_delivery", { p_delivery: i.deliveryId, p_signed_by: i.signedBy, p_request_id: execution.requestId })),
+});
+
+defineQuery({
+  name: "get_delivery_stop", description: "One delivery stop: route, ship-to, shipped lines, invoice timing, and whether it is signed",
+  roles: [...readRoles],
+  input: z.object({ deliveryId: z.string().uuid() }),
+  handler: async (ctx, i) => {
+    const delivery = await unwrap(ctx.db.from("deliveries")
+      .select("id, stop_no, delivered_at, signed_by, routes(id, name, delivery_date, driver_user_id), shipments(id, invoice_timing, orders(id, order_no, customers(name), ship_tos(label, city, state)))")
+      .eq("id", i.deliveryId).single());
+    // to-one embeds come back as objects; without generated types supabase-js says array
+    const { shipments } = delivery as unknown as { shipments: { id: string; orders: { id: string } } };
+    const lines = await unwrap(ctx.db.from("order_lines").select("id, qty_shipped, skus(name)").eq("order_id", shipments.orders.id).gt("qty_shipped", 0));
+    const invoice = await unwrap(ctx.db.from("invoices").select("id, invoice_no").eq("shipment_id", shipments.id).eq("kind", "invoice").maybeSingle());
+    return { delivery, lines, invoice };
+  },
+});
+
 const pickLines = z.array(z.object({ lineId: z.string().uuid(), qty: z.number().nonnegative() })).min(1);
 
 defineCommand({

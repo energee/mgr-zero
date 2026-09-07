@@ -2513,6 +2513,45 @@ begin
   v_result := private.resolve_short_pick_impl(p_order,p_line,p_qty_picked,p_reason,p_resolution); return private.complete_command_request(p_request_id,v_result);
 end $$;
 
+-- Confirm delivery: the stop is signed; an on_delivery shipment gets its
+-- invoice now, at the shipped quantities and order prices. Never moves stock.
+create function private.confirm_delivery_impl(p_delivery uuid, p_signed_by text) returns jsonb
+language plpgsql set search_path = '' as $$
+declare d public.deliveries; sh public.shipments; o public.orders; v_invoice uuid;
+begin
+  select * into d from public.deliveries where id = p_delivery for update;
+  if not found then raise exception 'delivery not found'; end if;
+  if d.delivered_at is not null then raise exception 'already delivered'; end if;
+  select * into sh from public.shipments where id = d.shipment_id;
+  select * into o from public.orders where id = sh.order_id;
+  update public.deliveries set delivered_at = now(), signed_by = nullif(trim(p_signed_by), '') where id = p_delivery;
+  select id into v_invoice from public.invoices where shipment_id = sh.id and kind = 'invoice' limit 1;
+  if v_invoice is null and sh.invoice_timing = 'on_delivery' and o.kind = 'wholesale'
+     and exists (select 1 from public.order_lines ol where ol.order_id = o.id and coalesce(ol.qty_shipped, 0) > 0) then
+    insert into public.invoices (brewery_id, kind, customer_id, shipment_id, issued_on)
+    values (o.brewery_id, 'invoice', o.customer_id, sh.id, current_date) returning id into v_invoice;
+    insert into public.invoice_lines (brewery_id, invoice_id, kind, sku_id, qty, unit_price_cents, description)
+    select o.brewery_id, v_invoice, 'sku', ol.sku_id, ol.qty_shipped, ol.unit_price_cents, s.name
+    from public.order_lines ol join public.skus s on s.id = ol.sku_id
+    where ol.order_id = o.id and coalesce(ol.qty_shipped, 0) > 0;
+  end if;
+  insert into public.order_events (brewery_id, order_id, actor, event, payload)
+  values (o.brewery_id, o.id, auth.uid(), 'delivered', jsonb_build_object('delivery_id', p_delivery, 'signed_by', p_signed_by, 'invoice_id', v_invoice));
+  return jsonb_build_object('delivery_id', p_delivery, 'invoice_id', v_invoice);
+end $$;
+
+create function confirm_delivery(p_delivery uuid,p_signed_by text,p_request_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_brewery uuid; v_replay jsonb; v_result jsonb;
+begin
+  select brewery_id into v_brewery from public.deliveries where id = p_delivery;
+  if v_brewery is null then raise exception 'permission denied' using errcode = '42501'; end if;
+  perform private.assert_staff(v_brewery,array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(v_brewery,'confirm_delivery',p_request_id,jsonb_build_object('delivery',p_delivery,'signed_by',p_signed_by));
+  if v_replay is not null then return v_replay; end if;
+  v_result := private.confirm_delivery_impl(p_delivery,p_signed_by); return private.complete_command_request(p_request_id,v_result);
+end $$;
+
 create function record_pick(p_order uuid,p_picks jsonb,p_request_id uuid) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare v_brewery uuid; v_replay jsonb; v_result jsonb;
@@ -3686,6 +3725,7 @@ grant execute on function
   cancel_order(uuid,text,uuid),
   record_pick(uuid,jsonb,uuid),
   confirm_restock(uuid,uuid),
+  confirm_delivery(uuid,text,uuid),
   resolve_short_pick(uuid,uuid,numeric,text,text,uuid),
   ship_order(uuid,jsonb,text,text,uuid,text),
   create_credit_memo(uuid,jsonb,uuid,text,uuid),

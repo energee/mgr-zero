@@ -2,6 +2,8 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { admin, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation, seedCustomer } from "./helpers";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { runCommand } from "@/lib/commands/registry";
+import "@/lib/commands/all";
 
 let b: { id: string }, staffDb: SupabaseClient, staffId: string;
 let customerId: string, shipToId: string, whId: string, tapId: string, skuId: string;
@@ -277,5 +279,40 @@ describe("ship invoice timing", () => {
     expect(error).toBeNull();
     const { data: o } = await admin.from("orders").select("needs_restock").eq("id", id).single();
     expect(o!.needs_restock).toBe(true);
+  });
+});
+
+describe("confirm_delivery", () => {
+  it("invoices an on_delivery shipment once, signs the stop, and moves nothing", async () => {
+    const id = await confirmedOrder(3);
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 3 }], p_request_id: crypto.randomUUID() });
+    await staffDb.rpc("ship_order", {
+      p_order: id, p_ship: [{ line_id: line.id, qty_shipped: 3 }],
+      p_carrier: null, p_tracking: null, p_invoice_timing: "on_delivery", p_request_id: crypto.randomUUID(),
+    });
+    const { data: sh } = await admin.from("shipments").select("id").eq("order_id", id).single();
+    const { data: route } = await admin.from("routes").insert({ brewery_id: b.id, delivery_date: "2026-09-08", driver_user_id: staffId, name: "A" }).select().single();
+    const { data: del } = await admin.from("deliveries").insert({ brewery_id: b.id, route_id: route!.id, shipment_id: sh!.id, stop_no: 1 }).select().single();
+    const mvBefore = await admin.from("inventory_movements").select("id").eq("ref", id);
+    const { data, error } = await staffDb.rpc("confirm_delivery", { p_delivery: del!.id, p_signed_by: "Dana", p_request_id: crypto.randomUUID() });
+    expect(error).toBeNull();
+    const invoiceId = (data as { invoice_id: string }).invoice_id;
+    expect(invoiceId).toMatch(/^[0-9a-f-]{36}$/i);
+    const { data: d2 } = await admin.from("deliveries").select("signed_by,delivered_at").eq("id", del!.id).single();
+    expect(d2!.signed_by).toBe("Dana");
+    expect(d2!.delivered_at).not.toBeNull();
+    const { data: il } = await admin.from("invoice_lines").select("qty, unit_price_cents").eq("invoice_id", invoiceId);
+    expect(il).toEqual([{ qty: 3, unit_price_cents: 12000 }]);
+    const mvAfter = await admin.from("inventory_movements").select("id").eq("ref", id);
+    expect(mvAfter.data!.length).toBe(mvBefore.data!.length);
+    const again = await staffDb.rpc("confirm_delivery", { p_delivery: del!.id, p_signed_by: "Dana", p_request_id: crypto.randomUUID() });
+    expect(again.error?.message).toMatch(/already delivered/);
+    const stop = await runCommand("get_delivery_stop", { deliveryId: del!.id }, { db: staffDb, userId: staffId, breweryId: b.id, role: "admin" }) as
+      { delivery: { signed_by: string; shipments: { invoice_timing: string } }; lines: { qty_shipped: number }[]; invoice: { id: string } | null };
+    expect(stop.delivery.signed_by).toBe("Dana");
+    expect(stop.delivery.shipments.invoice_timing).toBe("on_delivery");
+    expect(stop.lines.map((l) => Number(l.qty_shipped))).toEqual([3]);
+    expect(stop.invoice?.id).toBe(invoiceId);
   });
 });
