@@ -1,4 +1,5 @@
 // app/(app)/inventory/movement-form.tsx — CommandForm (bottom sheet on phone, dialog on desk) for the record_movement command.
+// Picking a location preselects its first bin (list_bins is alphabetical), so the common case is one tap.
 "use client";
 
 import { useState } from "react";
@@ -26,19 +27,22 @@ const requiresChannel = (type: MovementType) => type === "depletion";
 export function MovementForm({
   skus,
   locations,
+  bins,
 }: {
   skus: { id: string; label: string }[];
   locations: { id: string; name: string; kind: string }[];
+  bins: { id: string; location_id: string; name: string }[];
 }) {
   const [skuId, setSkuId] = useState("");
   const [locationId, setLocationId] = useState("");
+  const [binId, setBinId] = useState("");
   const [qty, setQty] = useState("");
   const [type, setType] = useState<MovementType>("opening_balance");
   const [channel, setChannel] = useState<(typeof CHANNELS)[number]>("taproom");
   const [note, setNote] = useState("");
   const form = useCommandForm("record_movement", {
-    build: () => ({ skuId, locationId, qty: Number(qty), type, channel: requiresChannel(type) ? channel : undefined, note: note || undefined }),
-    reset: () => { setSkuId(""); setLocationId(""); setQty(""); setType("opening_balance"); setChannel("taproom"); setNote(""); },
+    build: () => ({ skuId, locationId, binId, qty: Number(qty), type, channel: requiresChannel(type) ? channel : undefined, note: note || undefined }),
+    reset: () => { setSkuId(""); setLocationId(""); setBinId(""); setQty(""); setType("opening_balance"); setChannel("taproom"); setNote(""); },
   });
 
   function onTypeChange(next: MovementType) {
@@ -68,7 +72,7 @@ export function MovementForm({
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="movement-location">Location</Label>
-            <Select value={locationId} onValueChange={setLocationId}>
+            <Select value={locationId} onValueChange={(v) => { setLocationId(v); setBinId(bins.filter((b) => b.location_id === v)[0]?.id ?? ""); }}>
               <SelectTrigger id="movement-location">
                 <SelectValue placeholder="Select a location" />
               </SelectTrigger>
@@ -77,6 +81,23 @@ export function MovementForm({
                   {locations.map((l) => (
                     <SelectItem key={l.id} value={l.id}>
                       {l.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="movement-bin">Bin</Label>
+            <Select value={binId} onValueChange={setBinId} disabled={!locationId}>
+              <SelectTrigger id="movement-bin">
+                <SelectValue placeholder="Select a bin" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {bins.filter((b) => b.location_id === locationId).map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.name}
                     </SelectItem>
                   ))}
                 </SelectGroup>
@@ -131,7 +152,7 @@ export function MovementForm({
           </div>
           <CommandFormMessage error={form.error} />
           <CommandFormFooter>
-            <Button type="submit" disabled={form.submitting || !skuId || !locationId}>
+            <Button type="submit" disabled={form.submitting || !skuId || !locationId || !binId}>
               {form.submitting ? "Recording…" : "Record"}
             </Button>
           </CommandFormFooter>
