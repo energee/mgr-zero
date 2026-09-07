@@ -2331,9 +2331,11 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.edit("Material name", "Citra")}
       {E.pick("Kind", "Hop", ["Malt", "Hop", "Yeast", "Adjunct", "Chemical", "Packaging", "Other"])}
-      {E.pick("Unit", "lb", ["lb", "oz", "kg", "each"])}
-      {E.pick("Purchase unit", "each", ["each", "lb", "kg", "oz", "g", "l", "gal", "ml"])}
-      {E.edit("Base units per purchase unit", "44", "number")}
+      {E.inline(
+        E.edit("Base units", "44", "number"),
+        E.pick("Purchase unit", "each", ["each", "lb", "kg", "oz", "g", "l", "gal", "ml"]),
+        E.pick("Unit", "lb", ["lb", "oz", "kg", "each"]),
+      )}
       {E.info("A 44 lb box is purchase unit each with 44 base units, not a “box” unit: the schema has one unit vocabulary and packaging is the factor.")}
       {E.row("Lot-tracked", "receipts name a lot · consumption picks one", E.sw(true, "Lot-tracked"), "ok")}
       {E.row("Active", "available to recipes and purchase orders", E.sw(true, "Material active"), "ok")}
