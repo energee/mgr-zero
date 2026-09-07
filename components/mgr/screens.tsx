@@ -3521,7 +3521,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Price groups",
-    to: { Taproom: "Price group" },
+    to: { Taproom: "Price group", "Wholesale · standard": "Price group", "Wholesale · distributor": "Price group" },
     job: "See customer price groups and open the prices each group owns",
     reads: "list_price_lists",
     writes: "none [creation and pricing happen on Price group]",
