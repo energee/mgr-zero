@@ -32,8 +32,8 @@ change the search term.
 | --- | --- |
 | **Admin** | Every staff screen and action that exists. |
 | **Sales** | Catalog; customers and pricing; create, submit, confirm, adjust, and cancel orders, plus credits; view inventory; invoices; replenishment suggestions and creating the replenishment order. |
-| **Warehouse** | View inventory and record movements; view orders, pick, and ship; create, pick, and receive stock transfers; view replenishment suggestions (**Create replenishment order** is on the page but submitting it returns a permission error). After a wholesale ship, **View invoice** opens the invoice that just landed. Catalog, Customers, the Invoices list, Team, and Locations open if you type their address, but Warehouse has no More tab, so none of those show up in navigation. |
-| **Brewer** | Today, and linking your Slack account from App Home. No Beer, Work, or More tab, because every Brewer area is still planned. See [Navigate MGR](#navigation). |
+| **Warehouse** | View inventory and record movements; view orders, pick, and ship; view replenishment suggestions (**Create replenishment order** is on the page but submitting it returns a permission error); schedule, pick a tank for, start, and close packaging runs, and repack. Catalog, Customers, the Invoices list, and Team open if you type their address, but Warehouse has no More tab, so none of those show up in navigation. |
+| **Brewer** | Today; linking your Slack account from App Home; Recipes and versions; Batches, vessels, and recording brew day; Cellar transfers and fermentation readings; packaging runs (schedule, pick a tank, start, and close) — but not **Repack**, which is Admin and Warehouse only. See [Navigate MGR](#navigation). |
 
 <Callout type="info">
 A permission error is the end of that attempt. Ask an administrator. Hitting submit again will not change your access.
@@ -45,16 +45,16 @@ A permission error is the end of that attempt. Ask an administrator. Hitting sub
 
 The brewery name in the header is the brewery whose records you are looking at. Navigation has up to four sections: **Today**, **Beer**, **Work**, and **More**. On a phone they sit as tabs along the bottom, and tapping the tab opens that group's primary page. On a wider screen they sit in a left rail.
 
-- **Beer** holds **Inventory**.
-- **Work** holds **Orders**, **Pick**, **Replenishment**, and **Transfers**.
-- **More** holds **Invoices**, **Catalog**, **Customers**, **Price groups**, **Settings** (the team roster), **Sale channels**, and **Locations**.
+- **Beer** holds **Inventory** and **Cellar**.
+- **Work** holds **Orders**, **Pick**, **Replenishment**, **Transfers**, **Batches**, and **Packaging**.
+- **More** holds **Invoices**, **Catalog**, **Customers**, **Price groups**, **Recipes**, **Settings** (the team roster), and **Sale channels**.
 
-Links your role cannot use are simply not shown. Planned areas stay hidden until they are built (Taproom, Taps, Cellar, Materials, Kegs, Batches, Packaging, POs, Deliveries, Menu, Recipes, Compliance, Planning, Import), so a tab with nothing you can open does not appear.
+Links your role cannot use are simply not shown. Planned areas stay hidden until they are built (Taproom, Taps, Materials, Kegs, POs, Deliveries, Menu, Compliance, Planning, Import), so a tab with nothing you can open does not appear.
 
 CSV import has no screen yet, so there is no **Import** link. See [Actions not yet available](#unavailable).
 
 <Callout type="warn">
-**Brewer navigation:** Brewer sees only the Today tab. Cellar, Materials, Batches, Packaging, Recipes, and Planning are planned and hidden. Today and Slack account linking are the only staff features Brewer can use right now.
+**Brewer navigation:** Brewer sees Today, Beer (Cellar), Work (Batches, Packaging), and More (Recipes). Materials, Taps, Taproom, and Planning are planned and hidden. Repack, on the Packaging page, is Admin and Warehouse only, so Brewer does not see that button.
 </Callout>
 
 **Me** in the header shows your brewery and role, lets you **Switch to light mode** or **Switch to dark mode**, and offers **Sign out**. Forms open as a panel from the bottom of the screen on a phone and as a centered dialog on a wider screen. On a phone, page actions such as **New Order** or **Save** span the column. On a wider screen, create actions sit on the title row and other actions hug their label instead of stretching across the page. Sign-in and other entry cards stay a narrow column, so their buttons still span that card.
@@ -264,13 +264,9 @@ MGR creates a separate credit memo at the prices frozen on the invoice lines, ne
 
 <Screen name="Locations" />
 
-**Locations** (More rail, or `/locations`; Settings also links here) lists every warehouse, taproom and storage location. Admin sees **Add location**: a name and a type, *Warehouse*, *Taproom* or *Storage*. Names are unique within the brewery. Select **Edit** on a row to open the location: its type, the brewery's timezone, and **Location bins**. Admin can rename a location or change its type with **Edit** then **Save location**; movement history stays exactly as recorded.
-
-**Location bins** (open from the location) lists Walk-in, Cold and Dry to start. Warehouse and Admin can add, rename or remove a bin. A location always keeps at least one: rename the last instead of removing it. A bin that has ever held stock is renamed, not removed.
+**Locations** (open `/locations`; Settings links here) lists every warehouse and taproom. Admin sees **Add location**: a name and a type, *Warehouse* or *Taproom*. Names are unique within the brewery. Select **Edit** on a row to open the location: its type, the brewery's timezone, and a gated **Location bins** row (bins are not built yet). Admin can rename a location or change its type with **Edit** then **Save location**; movement history stays exactly as recorded.
 
 ## Stock transfers [#transfers]
-
-<Screen name="Transfers" />
 
 **Transfers** (Work tab; Warehouse and Admin) move stock between two of the brewery's locations without an order or an invoice. **New transfer** takes a source and destination location, the bin at each end (the first bin is preselected), and SKU lines with quantities. Materials and empty kegs move through the same command from the API. The document is numbered TRF-0001 upward and walks **Submit**, **Record pick** (quantities default to what was requested), and **Receive**. Receiving writes the paired stock movements in one step, out of the source bin and into the destination bin, so on hand changes place and nothing counts as a removal; the fleet total for kegs is unchanged. A same-location pair is refused: moving stock between two bins of one location is a bin move, which writes the paired rows without a document.
 
@@ -286,7 +282,7 @@ MGR creates a separate credit memo at the prices frozen on the invoice lines, ne
 4. Edit **Transfer qty** as needed. Only positive lines are included.
 5. Select **Create replenishment order**. MGR creates it already confirmed, ready for warehouse picking.
 
-The page says **No taprooms configured.** when none exist, or **No pars set for this taproom.** when there are no suggestions. Admin creates locations from [Locations](#locations). The current interface has no controls to set par levels.
+The page says **No taprooms configured.** when none exist, or **No pars set for this taproom.** when there are no suggestions. The current interface has no controls to create locations or set par levels.
 
 ## Recipes [#recipes]
 
@@ -344,7 +340,7 @@ Open **Packaging** from the **Work** navigation to see every run by planned date
 
 A run without a tank shows **Pick source** on its page: choose a **Source tank** and confirm. Once it has a tank, **Start** stamps it started — both picking the tank and starting require one, so an unsourced run can never begin. A started run's page becomes the close form: **Barrels drawn**, the **Actual outputs** for each planned SKU (defaulting to the planned quantity), a **Lot code**, **Packaged on** and an optional **Best by** date, and the **Finished goods location** and bin the packaged units land in — all four of the last group are required, because a vessel has no location of its own for the goods to appear at. Select **Close packaging run** to write the lot, the finished-goods stock, and the packaging materials consumed in one step. The tank itself stays open afterward; emptying it is a separate Cellar transfer.
 
-**Repack**, next to Schedule run, breaks a composed unit (a case) into the units it is made of at one location and bin — a shape change, never a production or a removal. Choose the **Location** and **Bin**, the SKU you are **Breaking** and its quantity, and the SKU you are packing it **Into** and its quantity. It is refused unless the two SKUs share a brand and their formats are joined by exactly one composition record, and unless the volumes on both sides match exactly.
+**Repack** (Admin and Warehouse only — a Brewer does not see this button), next to Schedule run, breaks a composed unit (a case) into the units it is made of at one location and bin — a shape change, never a production or a removal. Choose the **Location** and **Bin**, the SKU you are **Breaking** and its quantity, and the SKU you are packing it **Into** and its quantity. It is refused unless the two SKUs share a brand and their formats are joined by exactly one composition record, and unless the volumes on both sides match exactly.
 
 ## Team [#team]
 
@@ -407,7 +403,7 @@ Do not hunt for hidden controls for these:
 - switching between breweries when a staff account belongs to more than one
 - staff or customer-portal invitations
 - CSV import
-- setting taproom pars, or choosing the warehouse that fulfills wholesale-customer portal orders, from the interface
+- adding, renaming or removing bins, setting taproom pars, or choosing the warehouse that fulfills wholesale-customer portal orders, from the interface
 - editing brands, formats, or SKUs after creation
 - deleting customers, ship-tos, inventory history, orders, invoices, or credit memos
 - editing staff roles or seeing staff email addresses

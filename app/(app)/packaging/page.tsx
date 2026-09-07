@@ -2,7 +2,8 @@
 // newest first (list_packaging_runs), each opening its own page to pick a
 // tank, start, or close. Schedule run is schedule-run-form.tsx →
 // schedule_packaging_run; Repack is repack-form.tsx → record_repack, a
-// shape change unrelated to any one run.
+// shape change unrelated to any one run — admin/warehouse only (record_repack's
+// own roles), so it is hidden from a brewer rather than offered and refused.
 import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -38,10 +39,11 @@ export default async function PackagingPage() {
     runCommand("list_locations", {}, ctx), runCommand("list_bins", {}, ctx), runCommand("list_skus", {}, ctx),
   ])) as [Run[], Brand[], Occupancy[], Location[], Bin[], Sku[]];
   const skuOptions = skus.map((s) => ({ id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name }));
+  const canRepack = brewery.role === "admin" || brewery.role === "warehouse";
 
   return (
     <>
-      {E.hd("Packaging", "runs", <div className="flex gap-2"><ScheduleRunForm brands={brands} occupancies={occupancies} skus={skuOptions} /><RepackForm locations={locations} bins={bins} skus={skuOptions} /></div>)}
+      {E.hd("Packaging", "runs", <div className="flex gap-2"><ScheduleRunForm brands={brands} occupancies={occupancies} skus={skuOptions} />{canRepack ? <RepackForm locations={locations} bins={bins} skus={skuOptions} /> : undefined}</div>)}
       {runs.length === 0
         ? E.blank("No runs planned")
         : runs.map((r) => {
