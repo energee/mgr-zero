@@ -109,6 +109,25 @@ command, run this before calling the work done.
    commands" and list the command names you checked. No PROGRESS/MEMORY
    update for a no-op.
 
+## In CI
+
+`.github/workflows/http-api-agent.yml` runs this prompt after every merge to
+`main`, with a narrower reach than you have interactively. There you may edit
+only `content/docs/api.mdx`, `components/mgr/screens.tsx` and
+`lib/mgr/api-operations.ts`, and you have no shell. So:
+
+- **Do not run `bun run docs:api`** — the workflow runs it for you, after you
+  stop, on exactly the sources you changed. Change a screen's `reads`/`writes`
+  or the prose and leave the generated blocks alone; they will be correct.
+- **`lib/commands/` is read-only to you there.** A registry `description` or
+  `roles` that reads badly as documentation (step 2) is still worth finding —
+  name it and the fix you would make in your closing summary, so it reaches the
+  pull request description rather than being silently dropped.
+- **`tests/api-command.test.ts` is out of reach too.** If the envelope or auth
+  changed under you, say so plainly instead of editing around it; that is a
+  code change wearing a docs change's clothes, and it needs its own PR.
+- Everything else — steps 1 through 4, and 6 through 8 — applies unchanged.
+
 ## The YAGNI stance
 
 The reference is a promise, and every operation on it is one more thing that

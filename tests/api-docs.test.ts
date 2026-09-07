@@ -358,4 +358,43 @@ describe("post-merge HTTP API maintainer", () => {
     expect(workflow).toContain("content/docs/api.mdx");
     expect(workflow).toContain("2026-09-06-api-operations-backlog.md");
   });
+
+  // Two jobs, because maintain runs the model with read-only permissions and
+  // publish holds the App token. Carrying the work between them as file copies
+  // meant publish laid a snapshot of an older tree over a fresh `main`: a PR
+  // merging in between was silently reverted, and the backlog never arrived at
+  // all, because it lives under `.agents/` and upload-artifact drops hidden
+  // paths by default (2026-09-06 review).
+  it("carries the change between jobs as a patch, not a snapshot", () => {
+    const workflow = read(".github/workflows/http-api-agent.yml");
+
+    // One visible file, so no hidden path can be dropped on the way.
+    expect(workflow).toContain("api-reference.patch");
+    expect(workflow).not.toMatch(/path:\s*\|[\s\S]{0,400}\.agents\//);
+    // --3way turns "someone else moved this file" into a conflict the run
+    // reports, rather than an overwrite nobody sees until it is on main.
+    expect(workflow).toContain("git apply --3way");
+    // --3way needs the pre-image blobs, which a depth-1 checkout may not have.
+    expect(workflow).toContain("fetch-depth: 0");
+    // A run that finds nothing to change is a no-op, not a red workflow.
+    expect(workflow).toContain("git diff --cached --quiet");
+  });
+
+  // The prompt is also the interactive `/http-api` agent, where Bash and the
+  // command modules are in reach. In CI they are not, so it has to say which
+  // steps do not apply there — otherwise every run spends its turns on tools
+  // the workflow denies, and the registry `description` it is told to check is
+  // one it cannot fix.
+  it("tells the agent which of its own steps CI cannot run", () => {
+    const prompt = read(".agents/agents/http-api.md");
+    const workflow = read(".github/workflows/http-api-agent.yml");
+
+    expect(prompt).toContain("## In CI");
+    expect(prompt).toContain("the workflow runs it for you");
+    // Everything the prompt says to edit outside the allowlist must be called
+    // out there as report-only.
+    expect(prompt).toContain("lib/commands/");
+    expect(prompt).toContain("tests/api-command.test.ts");
+    expect(workflow).toContain("## In CI");
+  });
 });
