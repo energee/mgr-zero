@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
 type Location = { id: string; name: string };
@@ -34,29 +34,33 @@ export function RepackForm({ locations, bins, skus }: { locations: Location[]; b
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <Label htmlFor="rp-loc">Location</Label>
-          <NativeSelect id="rp-loc" value={locationId} onChange={(e) => { setLocationId(e.target.value); setBinId(""); }}>
-            <option value="">Location</option>{locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-          </NativeSelect>
+          <Select value={locationId} onValueChange={(v) => { setLocationId(v); setBinId(""); }}>
+            <SelectTrigger id="rp-loc"><SelectValue placeholder="Location" /></SelectTrigger>
+            <SelectContent>{locations.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent>
+          </Select>
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="rp-bin">Bin</Label>
-          <NativeSelect id="rp-bin" value={binId} onChange={(e) => setBinId(e.target.value)} disabled={!locationId}>
-            <option value="">Bin</option>{bins.filter((b) => b.location_id === locationId).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </NativeSelect>
+          <Select value={binId} onValueChange={setBinId} disabled={!locationId}>
+            <SelectTrigger id="rp-bin"><SelectValue placeholder="Bin" /></SelectTrigger>
+            <SelectContent>{bins.filter((b) => b.location_id === locationId).map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
+          </Select>
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div className="flex flex-col gap-2">
             <Label htmlFor="rp-parent">Breaking</Label>
-            <NativeSelect id="rp-parent" value={parentSkuId} onChange={(e) => setParentSkuId(e.target.value)}>
-              <option value="">SKU</option>{skus.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-            </NativeSelect>
+            <Select value={parentSkuId} onValueChange={setParentSkuId}>
+              <SelectTrigger id="rp-parent"><SelectValue placeholder="SKU" /></SelectTrigger>
+              <SelectContent>{skus.map((s) => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
+            </Select>
             <Input aria-label="Parent qty" type="number" min="0" step="any" placeholder="qty" value={parentQty} onChange={(e) => setParentQty(e.target.value)} />
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="rp-child">Into</Label>
-            <NativeSelect id="rp-child" value={childSkuId} onChange={(e) => setChildSkuId(e.target.value)}>
-              <option value="">SKU</option>{skus.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-            </NativeSelect>
+            <Select value={childSkuId} onValueChange={setChildSkuId}>
+              <SelectTrigger id="rp-child"><SelectValue placeholder="SKU" /></SelectTrigger>
+              <SelectContent>{skus.map((s) => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
+            </Select>
             <Input aria-label="Child qty" type="number" min="0" step="any" placeholder="qty" value={childQty} onChange={(e) => setChildQty(e.target.value)} />
           </div>
         </div>

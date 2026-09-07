@@ -1,8 +1,7 @@
 // app/(app)/settings/channels/channel-form.tsx — CommandForm (bottom sheet on
 // phone, dialog on desk) over upsert_sale_channel. Doubles as create (no
 // `channel` prop) and edit (`channel` pre-fills name + treatment and the input
-// carries `id`). Tax treatment is a native <select>: the Radix Select drops a
-// preselected value inside a form (see components/ui/native-select.tsx).
+// carries `id`).
 "use client";
 
 import { useState } from "react";
@@ -10,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { TAX_TREATMENTS, treatmentLabel } from "./tax-treatments";
 
@@ -43,11 +42,10 @@ export function ChannelForm({ channel }: { channel?: SaleChannelEditData }) {
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="channel-treatment">Tax treatment</Label>
-          <NativeSelect id="channel-treatment" value={taxTreatment} onChange={(e) => setTaxTreatment(e.target.value)} required>
-            {TAX_TREATMENTS.map((t) => (
-              <option key={t} value={t}>{treatmentLabel(t)}</option>
-            ))}
-          </NativeSelect>
+          <Select value={taxTreatment} onValueChange={setTaxTreatment} required>
+            <SelectTrigger id="channel-treatment"><SelectValue /></SelectTrigger>
+            <SelectContent>{TAX_TREATMENTS.map((t) => <SelectItem key={t} value={t}>{treatmentLabel(t)}</SelectItem>)}</SelectContent>
+          </Select>
         </div>
         <p className="text-sm text-muted-foreground">
           Customers may override this. Sales without a customer take the channel default.

@@ -9,8 +9,12 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
+
+// ponytail: Radix Select refuses an empty-string item, so the "nothing chosen"
+// choice is a sentinel mapped back to "" at the edge; state stays as before.
+const NONE = "__none__";
 
 type Brand = { id: string; name: string };
 type RecipeVersion = { id: string; label: string };
@@ -34,15 +38,23 @@ export function NewBatchForm({ brands, recipeVersions }: { brands: Brand[]; reci
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <Label htmlFor="bat-recipe">Recipe version · optional</Label>
-          <NativeSelect id="bat-recipe" value={recipeVersionId} onChange={(e) => setRecipeVersionId(e.target.value)}>
-            <option value="">Not decided</option>{recipeVersions.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
-          </NativeSelect>
+          <Select value={recipeVersionId || NONE} onValueChange={(v) => setRecipeVersionId(v === NONE ? "" : v)}>
+            <SelectTrigger id="bat-recipe"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>Not decided</SelectItem>
+              {recipeVersions.map((v) => <SelectItem key={v.id} value={v.id}>{v.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="bat-brand">Brand · optional</Label>
-          <NativeSelect id="bat-brand" value={intendedBrandId} onChange={(e) => setIntendedBrandId(e.target.value)}>
-            <option value="">Not decided</option>{brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </NativeSelect>
+          <Select value={intendedBrandId || NONE} onValueChange={(v) => setIntendedBrandId(v === NONE ? "" : v)}>
+            <SelectTrigger id="bat-brand"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>Not decided</SelectItem>
+              {brands.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="bat-bbl">Planned barrels</Label>

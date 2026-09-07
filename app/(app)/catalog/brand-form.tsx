@@ -9,8 +9,12 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
+
+// ponytail: Radix Select refuses an empty-string item, so the "nothing chosen"
+// choice is a sentinel mapped back to "" at the edge; state stays as before.
+const NONE = "__none__";
 
 const EMPTY = { name: "", style: "", abv: "", description: "", category: "", priceGroupId: "", hops: "" };
 type Fields = typeof EMPTY;
@@ -48,10 +52,13 @@ export function BrandForm({ groups }: { groups: { id: string; name: string }[] }
         {field("brand-category", "Category", f.category, set("category"))}
         <div className="flex flex-col gap-2">
           <Label htmlFor="brand-price-group">Price group</Label>
-          <NativeSelect id="brand-price-group" value={f.priceGroupId} onChange={(e) => set("priceGroupId")(e.target.value)}>
-            <option value="">Unpriced</option>
-            {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </NativeSelect>
+          <Select value={f.priceGroupId || NONE} onValueChange={(v) => set("priceGroupId")(v === NONE ? "" : v)}>
+            <SelectTrigger id="brand-price-group"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>Unpriced</SelectItem>
+              {groups.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
         {field("brand-hops", "Hops", f.hops, set("hops"))}
         <CommandFormMessage error={form.error} />

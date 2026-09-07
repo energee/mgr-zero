@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { recipeGravity } from "@/lib/recipe-gravity";
@@ -95,12 +95,14 @@ export function NewVersionForm({ recipeId, materials, unit }: { recipeId: string
           <Label>Ingredients</Label>
           {lines.map((l, i) => (
             <div key={i} className="flex flex-wrap gap-2">
-              <NativeSelect aria-label={`Line ${i + 1} material`} className="min-w-40 flex-1" value={l.materialId} onChange={(e) => setLine(i, { materialId: e.target.value })}>
-                <option value="">Material</option>{materials.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </NativeSelect>
-              <NativeSelect aria-label={`Line ${i + 1} stage`} className="w-32" value={l.stage} onChange={(e) => setLine(i, { stage: e.target.value as Line["stage"] })}>
-                {STAGES.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
-              </NativeSelect>
+              <Select value={l.materialId} onValueChange={(v) => setLine(i, { materialId: v })}>
+                <SelectTrigger aria-label={`Line ${i + 1} material`} className="min-w-40 flex-1"><SelectValue placeholder="Material" /></SelectTrigger>
+                <SelectContent>{materials.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}</SelectContent>
+              </Select>
+              <Select value={l.stage} onValueChange={(v) => setLine(i, { stage: v as Line["stage"] })}>
+                <SelectTrigger aria-label={`Line ${i + 1} stage`} className="w-32"><SelectValue /></SelectTrigger>
+                <SelectContent>{STAGES.map((s) => <SelectItem key={s} value={s}>{s.replace("_", " ")}</SelectItem>)}</SelectContent>
+              </Select>
               <Input aria-label={`Line ${i + 1} per bbl`} type="number" min="0" step="any" className="w-24" placeholder="per bbl" value={l.perBblQty} onChange={(e) => setLine(i, { perBblQty: e.target.value })} />
               <Input aria-label={`Line ${i + 1} timing minutes`} type="number" min="0" step="1" className="w-24" placeholder="min · optional" value={l.timingMinutes} onChange={(e) => setLine(i, { timingMinutes: e.target.value })} />
             </div>

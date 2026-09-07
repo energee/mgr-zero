@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
 type Occupancy = { occupancy_id: string; vessel_name: string | null; batch_no: number | null; brand_name: string | null; bbl: number };
@@ -30,20 +30,23 @@ export function CellarTransferForm({ occupancies, vessels }: { occupancies: Occu
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <Label htmlFor="ct-from">From</Label>
-          <NativeSelect id="ct-from" value={fromOccupancyId} onChange={(e) => setFromOccupancyId(e.target.value)}>
-            <option value="">Source occupancy</option>
-            {occupancies.map((o) => (
-              <option key={o.occupancy_id} value={o.occupancy_id}>
-                {o.vessel_name ?? "—"} · {o.brand_name ?? "no brand"} · {Number(o.bbl)} bbl
-              </option>
-            ))}
-          </NativeSelect>
+          <Select value={fromOccupancyId} onValueChange={setFromOccupancyId}>
+            <SelectTrigger id="ct-from"><SelectValue placeholder="Source occupancy" /></SelectTrigger>
+            <SelectContent>
+              {occupancies.map((o) => (
+                <SelectItem key={o.occupancy_id} value={o.occupancy_id}>
+                  {o.vessel_name ?? "—"} · {o.brand_name ?? "no brand"} · {Number(o.bbl)} bbl
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="ct-to">To</Label>
-          <NativeSelect id="ct-to" value={toVesselId} onChange={(e) => setToVesselId(e.target.value)}>
-            <option value="">Destination vessel</option>{vessels.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-          </NativeSelect>
+          <Select value={toVesselId} onValueChange={setToVesselId}>
+            <SelectTrigger id="ct-to"><SelectValue placeholder="Destination vessel" /></SelectTrigger>
+            <SelectContent>{vessels.map((v) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
+          </Select>
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="ct-vol">Barrels moving</Label>

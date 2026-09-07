@@ -9,8 +9,12 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
+
+// ponytail: Radix Select refuses an empty-string item, so the "nothing chosen"
+// choice is a sentinel mapped back to "" at the edge; state stays as before.
+const NONE = "__none__";
 
 type Brand = { id: string; name: string };
 type Occupancy = { occupancy_id: string; vessel_name: string | null; brand_name: string | null; bbl: number };
@@ -36,18 +40,22 @@ export function ScheduleRunForm({ brands, occupancies, skus }: { brands: Brand[]
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <Label htmlFor="sr-brand">Brand</Label>
-          <NativeSelect id="sr-brand" value={brandId} onChange={(e) => setBrandId(e.target.value)}>
-            <option value="">Brand</option>{brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </NativeSelect>
+          <Select value={brandId} onValueChange={setBrandId}>
+            <SelectTrigger id="sr-brand"><SelectValue placeholder="Brand" /></SelectTrigger>
+            <SelectContent>{brands.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
+          </Select>
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="sr-source">Source tank · optional</Label>
-          <NativeSelect id="sr-source" value={occupancyId} onChange={(e) => setOccupancyId(e.target.value)}>
-            <option value="">No source yet</option>
-            {occupancies.map((o) => (
-              <option key={o.occupancy_id} value={o.occupancy_id}>{o.vessel_name ?? "—"} · {o.brand_name ?? "no brand"} · {Number(o.bbl)} bbl</option>
-            ))}
-          </NativeSelect>
+          <Select value={occupancyId || NONE} onValueChange={(v) => setOccupancyId(v === NONE ? "" : v)}>
+            <SelectTrigger id="sr-source"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>No source yet</SelectItem>
+              {occupancies.map((o) => (
+                <SelectItem key={o.occupancy_id} value={o.occupancy_id}>{o.vessel_name ?? "—"} · {o.brand_name ?? "no brand"} · {Number(o.bbl)} bbl</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="sr-date">Planned date</Label>
@@ -57,9 +65,10 @@ export function ScheduleRunForm({ brands, occupancies, skus }: { brands: Brand[]
           <Label>Planned outputs</Label>
           {lines.map((l, i) => (
             <div key={i} className="flex gap-2">
-              <NativeSelect aria-label={`Line ${i + 1} SKU`} value={l.skuId} onChange={(e) => setLines((prev) => prev.map((x, j) => (j === i ? { ...x, skuId: e.target.value } : x)))}>
-                <option value="">SKU</option>{skus.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-              </NativeSelect>
+              <Select value={l.skuId} onValueChange={(v) => setLines((prev) => prev.map((x, j) => (j === i ? { ...x, skuId: v } : x)))}>
+                <SelectTrigger aria-label={`Line ${i + 1} SKU`}><SelectValue placeholder="SKU" /></SelectTrigger>
+                <SelectContent>{skus.map((s) => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
+              </Select>
               <Input aria-label={`Line ${i + 1} qty`} type="number" min="0" step="any" className="w-24" value={l.qtyPlanned} onChange={(e) => setLines((prev) => prev.map((x, j) => (j === i ? { ...x, qtyPlanned: e.target.value } : x)))} />
             </div>
           ))}

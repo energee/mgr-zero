@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
 const KINDS = ["fermenter", "brite", "barrel", "kettle", "other"] as const;
@@ -33,9 +33,10 @@ export function VesselForm({ vessel }: { vessel?: Vessel }) {
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="ves-kind">Kind</Label>
-          <NativeSelect id="ves-kind" value={kind} onChange={(e) => setKind(e.target.value as Kind)}>
-            {KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
-          </NativeSelect>
+          <Select value={kind} onValueChange={(v) => setKind(v as Kind)}>
+            <SelectTrigger id="ves-kind"><SelectValue /></SelectTrigger>
+            <SelectContent>{KINDS.map((k) => <SelectItem key={k} value={k}>{k}</SelectItem>)}</SelectContent>
+          </Select>
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="ves-cap">Capacity (bbl)</Label>

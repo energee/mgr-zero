@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
@@ -93,18 +92,14 @@ export function MovementForm({
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="movement-bin">Bin</Label>
-            <NativeSelect
-              id="movement-bin"
-              className="w-fit"
-              value={binId}
-              onChange={(e) => setBinId(e.target.value)}
-              disabled={!locationId}
-            >
-              <option value="">Select a bin</option>
-              {bins.filter((b) => b.location_id === locationId).map((b) => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
-            </NativeSelect>
+            <Select value={binId} onValueChange={setBinId} disabled={!locationId}>
+              <SelectTrigger id="movement-bin"><SelectValue placeholder="Select a bin" /></SelectTrigger>
+              <SelectContent>
+                {bins.filter((b) => b.location_id === locationId).map((b) => (
+                  <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="movement-type">Type</Label>
@@ -126,16 +121,14 @@ export function MovementForm({
           {requiresChannel(type) && (
             <div className="flex flex-col gap-2">
               <Label htmlFor="movement-channel">Channel</Label>
-              <NativeSelect
-                id="movement-channel"
-                value={saleChannelId}
-                onChange={(e) => setSaleChannelId(e.target.value)}
-                required
-              >
-                {channels.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </NativeSelect>
+              <Select value={saleChannelId} onValueChange={setSaleChannelId} required>
+                <SelectTrigger id="movement-channel"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {channels.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
           <div className="flex flex-col gap-2">

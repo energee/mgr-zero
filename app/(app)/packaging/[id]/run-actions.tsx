@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 
 type Occupancy = { occupancy_id: string; vessel_name: string | null; brand_name: string | null; bbl: number };
@@ -25,10 +25,10 @@ export function PickTankForm({ runId, occupancies }: { runId: string; occupancie
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
         <Label htmlFor="pt-source">Source tank</Label>
-        <NativeSelect id="pt-source" value={occupancyId} onChange={(e) => setOccupancyId(e.target.value)}>
-          <option value="">Choose tank</option>
-          {occupancies.map((o) => <option key={o.occupancy_id} value={o.occupancy_id}>{o.vessel_name ?? "—"} · {o.brand_name ?? "no brand"} · {Number(o.bbl)} bbl</option>)}
-        </NativeSelect>
+        <Select value={occupancyId} onValueChange={setOccupancyId}>
+          <SelectTrigger id="pt-source"><SelectValue placeholder="Choose tank" /></SelectTrigger>
+          <SelectContent>{occupancies.map((o) => <SelectItem key={o.occupancy_id} value={o.occupancy_id}>{o.vessel_name ?? "—"} · {o.brand_name ?? "no brand"} · {Number(o.bbl)} bbl</SelectItem>)}</SelectContent>
+        </Select>
       </div>
       <CommandFormMessage error={error} />
       <Button className="w-full md:w-fit" disabled={busy || !occupancyId} onClick={() => run("update_packaging_run", { runId, occupancyId })}>Pick source</Button>
@@ -88,12 +88,14 @@ export function CloseRunForm({ runId, outputs, locations, bins }: { runId: strin
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor="cr-loc">Finished goods location</Label>
-        <NativeSelect id="cr-loc" value={locationId} onChange={(e) => { setLocationId(e.target.value); setBinId(""); }}>
-          <option value="">Location</option>{locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-        </NativeSelect>
-        <NativeSelect aria-label="Bin" value={binId} onChange={(e) => setBinId(e.target.value)} disabled={!locationId}>
-          <option value="">Bin</option>{bins.filter((b) => b.location_id === locationId).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-        </NativeSelect>
+        <Select value={locationId} onValueChange={(v) => { setLocationId(v); setBinId(""); }}>
+          <SelectTrigger id="cr-loc"><SelectValue placeholder="Location" /></SelectTrigger>
+          <SelectContent>{locations.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent>
+        </Select>
+        <Select value={binId} onValueChange={setBinId} disabled={!locationId}>
+          <SelectTrigger aria-label="Bin"><SelectValue placeholder="Bin" /></SelectTrigger>
+          <SelectContent>{bins.filter((b) => b.location_id === locationId).map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
+        </Select>
       </div>
       <CommandFormMessage error={error} />
       <Button

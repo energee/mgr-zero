@@ -1,9 +1,7 @@
 // app/(app)/customers/customer-form.tsx — CommandForm (bottom sheet on phone, dialog on desk) for the upsert_customer
 // command. Doubles as create (no `customer` prop) and edit (`customer` prop
 // pre-fills fields and the command input carries `id`, per plan decision 8).
-// Sale channel is required — it decides the customer's prices — and is a native
-// <select> because the Radix Select drops a preselected value inside a form
-// (see components/ui/native-select.tsx).
+// Sale channel is required — it decides the customer's prices.
 "use client";
 
 import { useState } from "react";
@@ -11,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
@@ -107,11 +104,10 @@ export function CustomerForm({
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="customer-sale-channel">Sale channel</Label>
-            <NativeSelect id="customer-sale-channel" value={saleChannelId} onChange={(e) => setSaleChannelId(e.target.value)} required>
-              {channels.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </NativeSelect>
+            <Select value={saleChannelId} onValueChange={setSaleChannelId} required>
+              <SelectTrigger id="customer-sale-channel"><SelectValue /></SelectTrigger>
+              <SelectContent>{channels.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+            </Select>
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="customer-license">License number</Label>

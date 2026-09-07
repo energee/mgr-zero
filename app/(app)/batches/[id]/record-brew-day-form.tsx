@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 
 type Vessel = { id: string; name: string; kind: string; capacity_bbl: number };
@@ -23,9 +23,10 @@ export function RecordBrewDayForm({ batchId, plannedBbl, vessels }: { batchId: s
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
         <Label htmlFor="bd-vessel">Vessel</Label>
-        <NativeSelect id="bd-vessel" value={vesselId} onChange={(e) => setVesselId(e.target.value)}>
-          <option value="">Choose vessel</option>{vessels.map((v) => <option key={v.id} value={v.id}>{v.name} · {v.kind} · {Number(v.capacity_bbl)} bbl</option>)}
-        </NativeSelect>
+        <Select value={vesselId} onValueChange={setVesselId}>
+          <SelectTrigger id="bd-vessel"><SelectValue placeholder="Choose vessel" /></SelectTrigger>
+          <SelectContent>{vessels.map((v) => <SelectItem key={v.id} value={v.id}>{v.name} · {v.kind} · {Number(v.capacity_bbl)} bbl</SelectItem>)}</SelectContent>
+        </Select>
       </div>
       <div className="flex flex-col gap-2">
         <Label htmlFor="bd-bbl">Knockout barrels</Label>

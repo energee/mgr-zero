@@ -1,5 +1,5 @@
 // app/(app)/settings/units/gravity-unit-form.tsx — the two inline controls on
-// the Units page. Both are plain <select>s over useCommandAction (no dialog:
+// the Units page. Both are Selects over useCommandAction (no dialog:
 // there is nothing to confirm and one field to change), so a choice saves as
 // it is made and the server component re-reads on router.refresh(). "Use
 // brewery default" is the null personal override, which is why the personal
@@ -14,7 +14,7 @@
 
 import { useState } from "react";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 import { GRAVITY_UNITS, gravityUnitLabel, type GravityUnit } from "@/lib/mgr/gravity-unit";
@@ -50,17 +50,18 @@ export function GravityUnitForm({
       {canSetBrewery ? (
         <div className="flex flex-col gap-2">
           <Label htmlFor="gu-brewery">Brewery default</Label>
-          <NativeSelect
-            id="gu-brewery"
-            className="max-w-xs"
+          <Select
             value={breweryChoice}
             disabled={busy}
-            onChange={(e) => { setBreweryChoice(e.target.value); run("set_brewery_gravity_unit", { unit: e.target.value }); }}
+            onValueChange={(v) => { setBreweryChoice(v); run("set_brewery_gravity_unit", { unit: v }); }}
           >
-            {GRAVITY_UNITS.map((u) => (
-              <option key={u} value={u}>{gravityUnitLabel(u)}</option>
-            ))}
-          </NativeSelect>
+            <SelectTrigger id="gu-brewery"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {GRAVITY_UNITS.map((u) => (
+                <SelectItem key={u} value={u}>{gravityUnitLabel(u)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <p className="text-sm text-muted-foreground">
             What everyone here sees unless they choose otherwise below.
           </p>
@@ -69,21 +70,22 @@ export function GravityUnitForm({
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="gu-mine">Your preference</Label>
-        <NativeSelect
-          id="gu-mine"
-          className="max-w-xs"
+        <Select
           value={mineChoice}
           disabled={busy}
-          onChange={(e) => {
-            setMineChoice(e.target.value);
-            run("set_my_gravity_unit", { unit: e.target.value === DEFAULT ? null : e.target.value });
+          onValueChange={(v) => {
+            setMineChoice(v);
+            run("set_my_gravity_unit", { unit: v === DEFAULT ? null : v });
           }}
         >
-          <option value={DEFAULT}>Use brewery default ({breweryLabel})</option>
-          {GRAVITY_UNITS.map((u) => (
-            <option key={u} value={u}>{gravityUnitLabel(u)}</option>
-          ))}
-        </NativeSelect>
+          <SelectTrigger id="gu-mine"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value={DEFAULT}>Use brewery default ({breweryLabel})</SelectItem>
+            {GRAVITY_UNITS.map((u) => (
+              <SelectItem key={u} value={u}>{gravityUnitLabel(u)}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <p className="text-sm text-muted-foreground">
           Yours alone — it changes nothing for anyone else.
         </p>

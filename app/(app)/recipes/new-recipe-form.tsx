@@ -9,8 +9,12 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
+
+// ponytail: Radix Select refuses an empty-string item, so the "nothing chosen"
+// choice is a sentinel mapped back to "" at the edge; state stays as before.
+const NONE = "__none__";
 
 type Brand = { id: string; name: string };
 
@@ -31,9 +35,13 @@ export function NewRecipeForm({ brands }: { brands: Brand[] }) {
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="rec-brand">Brand · optional</Label>
-          <NativeSelect id="rec-brand" value={brandId} onChange={(e) => setBrandId(e.target.value)}>
-            <option value="">Not decided</option>{brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </NativeSelect>
+          <Select value={brandId || NONE} onValueChange={(v) => setBrandId(v === NONE ? "" : v)}>
+            <SelectTrigger id="rec-brand"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>Not decided</SelectItem>
+              {brands.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="rec-note">Note · optional</Label>
