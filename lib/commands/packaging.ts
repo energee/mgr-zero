@@ -56,6 +56,35 @@ defineCommand({
   })),
 });
 
+// Closing is the moment beer becomes stock. `locationId`/`binId` are required
+// rather than derived: a vessel has no location, so the finished goods would
+// otherwise have nowhere to land. Missing planned packages settle at zero --
+// the run is history once it closes, so "we filled none of those" is stated,
+// not left null. The occupancy stays open on purpose: emptying the tank is a
+// cellar decision (`record_cellar_transfer` / ending the occupancy), not a
+// side effect of packaging.
+defineCommand({
+  name: "close_packaging_run",
+  description: "Close a started run: record the barrels drawn and the units actually filled, which writes the lot, the production_in stock and the packaging materials consumed",
+  input: z.object({
+    runId: z.string().uuid(),
+    bblDrawn: z.number().nonnegative(),
+    outputs: z.array(z.object({ skuId: z.string().uuid(), qtyActual: z.number().nonnegative() })),
+    lotCode: z.string().min(1),
+    packagedOn: isoDate,
+    bestBy: isoDate.optional(),
+    locationId: z.string().uuid(),
+    binId: z.string().uuid(),
+  }),
+  roles: ["admin", "brewer", "warehouse"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("close_packaging_run", {
+    p_brewery: ctx.breweryId, p_run: i.runId, p_bbl_drawn: i.bblDrawn,
+    p_outputs: i.outputs.map((o) => ({ sku_id: o.skuId, qty_actual: o.qtyActual })),
+    p_lot_code: i.lotCode, p_packaged_on: i.packagedOn, p_best_by: i.bestBy ?? null,
+    p_location: i.locationId, p_bin: i.binId, p_request_id: execution.requestId,
+  })),
+});
+
 type RunRow = {
   id: string; run_no: number; brand_id: string; occupancy_id: string | null;
   planned_on: string; started_at: string | null; closed_at: string | null;

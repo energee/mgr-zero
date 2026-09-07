@@ -11,6 +11,7 @@ const AUTHENTICATED_RPCS = [
   "begin_chat_reauthorization(uuid,text,text)",
   "cancel_order(uuid,text,uuid)",
   "clear_channel_price(uuid,uuid,uuid,uuid,uuid)",
+  "close_packaging_run(uuid,uuid,numeric,jsonb,text,date,date,uuid,uuid,uuid)",
   "confirm_delivery(uuid,text,uuid)",
   "confirm_order(uuid,uuid)",
   "confirm_restock(uuid,uuid)",

@@ -8,13 +8,13 @@
 // open runs as demand and the unbrewed/in-tank batches as supply, so the
 // brewhouse can see what still has to be brewed.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, makeBrewery, makeStaffCtx, seedCatalog, sql } from "./helpers";
+import { admin, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
 let b: { id: string };
 let ctx: Awaited<ReturnType<typeof makeStaffCtx>>;
-let stout: { brandId: string; skuId: string };
+let stout: { brandId: string; skuId: string; formatId: string };
 let pils: { brandId: string; skuId: string };
 
 // A fermenter with `bbl` of beer in it, carrying a batch that intends `brand`
@@ -240,5 +240,159 @@ describe("what the brewhouse still has to brew", () => {
       brand_name: string | null; bbl: number;
     }[];
     expect(occs).toEqual([expect.objectContaining({ vessel_name: "FV-AMBER", brand_name: "Amber", bbl: 25 })]);
+  });
+});
+
+// Closing is the moment beer becomes stock: one lot, one production_in
+// movement per package actually filled, the packaging materials consumed off
+// the shelf, and bbl_drawn subtracted from the tank by `occupancy_volumes`.
+// Vessels have no location, so the close names the location and bin the
+// finished goods land in — the movements have to go somewhere real.
+describe("closing the run", () => {
+  let wh: { id: string; binId: string };
+  let kegSkuId: string;
+  let tray: string;
+  let lid: string;
+
+  const material = async (name: string, lotTracked = false) =>
+    (await admin.from("materials").insert({
+      brewery_id: b.id, name, category: "packaging",
+      base_uom: "each", purchase_uom: "each", lot_tracked: lotTracked,
+    }).select("id").single()).data!.id as string;
+
+  beforeAll(async () => {
+    const adminCtx = await makeStaffCtx(b.id, "admin");
+    wh = await seedLocation(b.id, { name: "Packaging WH" });
+    // A second package of the same brand, on its own format with no BOM, so a
+    // planned-but-unfilled line has something to be.
+    const kegFormat = (await runCommand("upsert_format", {
+      name: "½ bbl keg", basis: "packaged", packageType: "keg", kegSize: "half_bbl", bblPerUnit: 0.5,
+    }, adminCtx)) as { id: string };
+    kegSkuId = ((await runCommand("create_sku",
+      { brandId: stout.brandId, formatId: kegFormat.id, name: "Stout keg" }, adminCtx)) as { id: string }).id;
+    tray = await material("Case tray");
+    lid = await material("Can lid");
+    await runCommand("replace_format_bom", {
+      formatId: stout.formatId,
+      lines: [{ materialId: tray, qtyPerUnit: 1 }, { materialId: lid, qtyPerUnit: 24 }],
+    }, adminCtx);
+  });
+
+  // A run standing in a tank with `bbl` in it, started and ready to close.
+  async function startedRun(vessel: string, bbl: number, plannedOn: string, on = "2026-11-10") {
+    const { occupancyId } = await brewInto(vessel, stout.brandId, bbl, on);
+    const run = (await runCommand("schedule_packaging_run", {
+      brandId: stout.brandId, plannedOn, occupancyId,
+      outputs: [{ skuId: stout.skuId, qtyPlanned: 400 }, { skuId: kegSkuId, qtyPlanned: 10 }],
+    }, ctx)) as { id: string };
+    await runCommand("update_packaging_run", { runId: run.id, startedAt: `${plannedOn}T14:00:00Z` }, ctx);
+    return { runId: run.id, occupancyId };
+  }
+
+  it("writes the lot, a production_in per package filled, the BOM consumptions, and draws the tank down", async () => {
+    const { runId, occupancyId } = await startedRun("FV-CLOSE", 30, "2026-12-01");
+
+    const closed = (await runCommand("close_packaging_run", {
+      runId, bblDrawn: 25, outputs: [{ skuId: stout.skuId, qtyActual: 396 }],
+      lotCode: "L2026-336", packagedOn: "2026-12-01", bestBy: "2027-06-01",
+      locationId: wh.id, binId: wh.binId,
+    }, ctx)) as { closed_at: string; bbl_drawn: string };
+    expect(closed.closed_at).toBeTruthy();
+    expect(Number(closed.bbl_drawn)).toBe(25);
+
+    const lot = (await admin.from("lots").select("id, code, brand_id, packaged_on, best_by")
+      .eq("packaging_run_id", runId).single()).data!;
+    expect(lot).toMatchObject({
+      code: "L2026-336", brand_id: stout.brandId, packaged_on: "2026-12-01", best_by: "2027-06-01",
+    });
+
+    const moves = (await admin.from("inventory_movements")
+      .select("id, sku_id, qty, type, lot_id, location_id, bin_id, ref").eq("ref", runId)).data!;
+    expect(moves).toEqual([expect.objectContaining({
+      sku_id: stout.skuId, type: "production_in", lot_id: lot.id,
+      location_id: wh.id, bin_id: wh.binId,
+    })]);
+    expect(Number(moves[0].qty)).toBe(396);
+
+    // The filled line carries its movement; the planned-but-unfilled keg line
+    // is settled at zero rather than left ambiguous.
+    const outs = (await admin.from("packaging_run_outputs")
+      .select("sku_id, qty_actual, movement_id").eq("run_id", runId)).data!;
+    const bySku = new Map(outs.map((o) => [o.sku_id as string, o]));
+    expect(Number(bySku.get(stout.skuId)!.qty_actual)).toBe(396);
+    expect(bySku.get(stout.skuId)!.movement_id).toBe(moves[0].id);
+    expect(Number(bySku.get(kegSkuId)!.qty_actual)).toBe(0);
+    expect(bySku.get(kegSkuId)!.movement_id).toBeNull();
+
+    const cons = (await admin.from("packaging_run_consumptions").select("movement_id").eq("run_id", runId)).data!;
+    expect(cons).toHaveLength(2);
+    const mm = (await admin.from("material_movements")
+      .select("material_id, qty, type, location_id, bin_id")
+      .in("id", cons.map((c) => c.movement_id))).data!;
+    expect(mm.every((m) => m.type === "consumption" && m.location_id === wh.id && m.bin_id === wh.binId)).toBe(true);
+    const qtyByMaterial = new Map(mm.map((m) => [m.material_id as string, Number(m.qty)]));
+    expect(qtyByMaterial.get(tray)).toBe(-396);
+    expect(qtyByMaterial.get(lid)).toBe(-396 * 24);
+
+    const [vol] = sql(`select round(bbl,3) from occupancy_volumes where occupancy_id = '${occupancyId}'`, true);
+    expect(vol.trim()).toBe("5.000");
+  });
+
+  it("refuses a second close, an unknown package, and more beer than the tank holds", async () => {
+    const { runId } = await startedRun("FV-CLOSE-2", 20, "2026-12-02");
+    const close = (over: Record<string, unknown> = {}) => runCommand("close_packaging_run", {
+      runId, bblDrawn: 10, outputs: [{ skuId: stout.skuId, qtyActual: 100 }],
+      lotCode: `L-${Math.random().toString(36).slice(2, 8)}`, packagedOn: "2026-12-02",
+      locationId: wh.id, binId: wh.binId, ...over,
+    }, ctx);
+
+    await expect(close({ outputs: [{ skuId: pils.skuId, qtyActual: 1 }] }))
+      .rejects.toThrow(/not one of this run's planned outputs/);
+    await expect(close({ bblDrawn: 20.5 })).rejects.toThrow(/more than the tank holds|only .* bbl/i);
+
+    await close();
+    await expect(close()).rejects.toThrow(/closed/);
+  });
+
+  it("refuses to close a run with no tank, or one that never started", async () => {
+    const noTank = (await runCommand("schedule_packaging_run",
+      { brandId: stout.brandId, plannedOn: "2026-12-03", outputs: [] }, ctx)) as { id: string };
+    const args = {
+      bblDrawn: 1, outputs: [], lotCode: "L-notank", packagedOn: "2026-12-03",
+      locationId: wh.id, binId: wh.binId,
+    };
+    await expect(runCommand("close_packaging_run", { runId: noTank.id, ...args }, ctx))
+      .rejects.toThrow(/tank|occupancy/i);
+
+    const { occupancyId } = await brewInto("FV-NOSTART", stout.brandId, 10, "2026-11-11");
+    const unstarted = (await runCommand("schedule_packaging_run",
+      { brandId: stout.brandId, plannedOn: "2026-12-04", occupancyId, outputs: [] }, ctx)) as { id: string };
+    await expect(runCommand("close_packaging_run",
+      { runId: unstarted.id, ...args, lotCode: "L-nostart", packagedOn: "2026-12-04" }, ctx))
+      .rejects.toThrow(/start the run before closing it/);
+  });
+
+  it("refuses a BOM line whose material is lot-tracked rather than inventing a lot", async () => {
+    const adminCtx = await makeStaffCtx(b.id, "admin");
+    const yeast = await material("Tracked crown", true);
+    const fmt = (await runCommand("upsert_format", {
+      name: "tracked can", basis: "packaged", packageType: "can", bblPerUnit: 0.0645,
+    }, adminCtx)) as { id: string };
+    await runCommand("replace_format_bom",
+      { formatId: fmt.id, lines: [{ materialId: yeast, qtyPerUnit: 1 }] }, adminCtx);
+    const sku = (await runCommand("create_sku",
+      { brandId: stout.brandId, formatId: fmt.id, name: "Stout tracked" }, adminCtx)) as { id: string };
+
+    const { occupancyId } = await brewInto("FV-TRACKED", stout.brandId, 10, "2026-11-12");
+    const run = (await runCommand("schedule_packaging_run", {
+      brandId: stout.brandId, plannedOn: "2026-12-05", occupancyId,
+      outputs: [{ skuId: sku.id, qtyPlanned: 50 }],
+    }, ctx)) as { id: string };
+    await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-12-05T14:00:00Z" }, ctx);
+
+    await expect(runCommand("close_packaging_run", {
+      runId: run.id, bblDrawn: 3, outputs: [{ skuId: sku.id, qtyActual: 50 }],
+      lotCode: "L-tracked", packagedOn: "2026-12-05", locationId: wh.id, binId: wh.binId,
+    }, ctx)).rejects.toThrow(/cannot post BOM for lot-tracked material "Tracked crown" yet/);
   });
 });

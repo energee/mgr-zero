@@ -3584,6 +3584,126 @@ begin
   return private.complete_command_request(p_request_id, to_jsonb(v_run));
 end $$;
 
+-- Closing turns beer into stock, in one transaction: one lot for the whole
+-- run, a production_in movement per package actually filled, the packaging
+-- materials consumed off the shelf, and bbl_drawn on the run -- which
+-- occupancy_volumes already subtracts from the tank.
+--
+-- A vessel has no location, so the close names the location and bin the
+-- finished goods land in; without one a production_in movement has nowhere to
+-- go. The occupancy is deliberately left open: whether a tank is done, and
+-- what heel is left in it, is a cellar decision made by ending the occupancy,
+-- not a side effect of packaging.
+create function close_packaging_run(
+  p_brewery uuid, p_run uuid, p_bbl_drawn numeric, p_outputs jsonb, p_lot_code text,
+  p_packaged_on date, p_best_by date, p_location uuid, p_bin uuid, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_actor uuid; v_replay jsonb; v_run public.packaging_runs; v_lot uuid; v_available numeric;
+  v_dupe uuid; v_line jsonb; v_sku uuid; v_qty numeric; v_format uuid;
+  v_movement uuid; v_consumption uuid; v_bom record;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin','brewer','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'close_packaging_run', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'run', p_run, 'bbl_drawn', p_bbl_drawn,
+      'outputs', p_outputs, 'lot_code', p_lot_code, 'packaged_on', p_packaged_on,
+      'best_by', p_best_by, 'location', p_location, 'bin', p_bin));
+  if v_replay is not null then return v_replay; end if;
+
+  select * into v_run from public.packaging_runs where id = p_run and brewery_id = p_brewery for update;
+  if v_run.id is null then raise exception 'packaging run not found'; end if;
+  if v_run.closed_at is not null then raise exception 'packaging run is closed'; end if;
+  -- The check constraint says the same thing as a constraint name; these are
+  -- the two sentences a brewer would actually say.
+  if v_run.occupancy_id is null then
+    raise exception 'pick the tank this run drew from before closing it';
+  end if;
+  if v_run.started_at is null then raise exception 'start the run before closing it'; end if;
+
+  -- Finished goods have to land somewhere real: the bin must be a bin of that
+  -- location, and the location this brewery's.
+  if not exists (
+    select 1 from public.bins b join public.locations l on l.id = b.location_id
+    where b.id = p_bin and b.location_id = p_location and l.brewery_id = p_brewery
+  ) then
+    raise exception 'bin does not belong to that location';
+  end if;
+
+  -- Only what the tank actually holds may be drawn. The epsilon absorbs the
+  -- numeric(10,3) rounding of a brewer who draws a tank dry.
+  select bbl into v_available from public.occupancy_volumes where occupancy_id = v_run.occupancy_id;
+  if p_bbl_drawn > coalesce(v_available, 0) + 0.0005 then
+    raise exception 'the tank holds only % bbl', round(coalesce(v_available, 0), 3);
+  end if;
+
+  select (value->>'sku_id')::uuid into v_dupe
+  from jsonb_array_elements(coalesce(p_outputs, '[]'::jsonb))
+  group by 1 having count(*) > 1 limit 1;
+  if v_dupe is not null then
+    raise exception 'package % is listed twice; give it one line with the total', v_dupe;
+  end if;
+
+  insert into public.lots (brewery_id, packaging_run_id, brand_id, code, packaged_on, best_by)
+  values (p_brewery, p_run, v_run.brand_id, p_lot_code, p_packaged_on, p_best_by)
+  returning id into v_lot;
+
+  -- A planned line nobody filled is settled at zero rather than left null: the
+  -- run is history now, and "we filled none of those" is the answer.
+  update public.packaging_run_outputs set qty_actual = 0 where run_id = p_run;
+
+  for v_line in select * from jsonb_array_elements(coalesce(p_outputs, '[]'::jsonb)) loop
+    v_sku := (v_line->>'sku_id')::uuid;
+    v_qty := (v_line->>'qty_actual')::numeric;
+    if v_qty is null or v_qty < 0 then
+      raise exception 'qty_actual must not be negative';
+    end if;
+    if not exists (select 1 from public.packaging_run_outputs where run_id = p_run and sku_id = v_sku) then
+      raise exception 'sku % is not one of this run''s planned outputs', v_sku;
+    end if;
+    if v_qty = 0 then continue; end if;
+
+    select s.format_id into v_format from public.skus s where s.id = v_sku and s.brewery_id = p_brewery;
+
+    -- One production_in per package filled, all carrying the run's lot and the
+    -- run id as ref, so the whole close reads back as one event. bbl is frozen
+    -- from the format by the enforce_bbl_integrity trigger.
+    insert into public.inventory_movements
+      (brewery_id, sku_id, location_id, bin_id, qty, type, lot_id, ref, created_by)
+    values (p_brewery, v_sku, p_location, p_bin, v_qty, 'production_in', v_lot, p_run, v_actor)
+    returning id into v_movement;
+    update public.packaging_run_outputs set qty_actual = v_qty, movement_id = v_movement
+    where run_id = p_run and sku_id = v_sku;
+
+    -- The packaging bill belongs to the format (§16.12), and every line of it
+    -- comes off the same shelf the finished goods land on.
+    for v_bom in
+      select fb.material_id, fb.qty_per_unit, m.name, m.lot_tracked
+      from public.format_bom fb join public.materials m on m.id = fb.material_id
+      where fb.format_id = v_format
+    loop
+      if v_bom.lot_tracked then
+        -- ponytail: which lot of crowns went into a run is a real question with
+        -- no UI behind it yet (FEFO or an explicit pick), and enforce_material_lot
+        -- would reject a null lot_id anyway. Refuse loudly rather than invent one.
+        -- Upgrade path: take a lot_id per BOM line on the close input.
+        raise exception 'cannot post BOM for lot-tracked material "%" yet', v_bom.name;
+      end if;
+      insert into public.material_movements
+        (brewery_id, material_id, location_id, bin_id, qty, type, created_by)
+      values (p_brewery, v_bom.material_id, p_location, p_bin,
+              -(v_bom.qty_per_unit * v_qty), 'consumption', v_actor)
+      returning id into v_consumption;
+      insert into public.packaging_run_consumptions (brewery_id, run_id, movement_id)
+      values (p_brewery, p_run, v_consumption);
+    end loop;
+  end loop;
+
+  update public.packaging_runs set closed_at = now(), bbl_drawn = p_bbl_drawn
+  where id = p_run returning * into v_run;
+
+  return private.complete_command_request(p_request_id, to_jsonb(v_run));
+end $$;
+
 -- ---------------------------------------------------------------- Stock transfers
 -- Internal moves of stuff between two locations (spec 2026-09-06 Decision 3).
 create function private.lock_transfer(p_transfer uuid, p_allowed public.stock_transfer_status[]) returns public.stock_transfers
@@ -4945,7 +5065,8 @@ grant execute on function
   record_cellar_transfer(uuid,uuid,uuid,numeric,numeric,uuid),
   record_fermentation_reading(uuid,uuid,timestamptz,numeric,numeric,numeric,text,uuid),
   schedule_packaging_run(uuid,uuid,date,uuid,jsonb,uuid),
-  update_packaging_run(uuid,uuid,uuid,jsonb,timestamptz,uuid)
+  update_packaging_run(uuid,uuid,uuid,jsonb,timestamptz,uuid),
+  close_packaging_run(uuid,uuid,numeric,jsonb,text,date,date,uuid,uuid,uuid)
   to authenticated;
 grant usage on schema private, extensions to service_role;
 -- service_role reaches `private` only for the UUID default its seed inserts
