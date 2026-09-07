@@ -182,6 +182,7 @@ omitted. They have no roles until they are built.
 | `delete_bin` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `delete_price_group` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `delete_sale_channel` | Catalog & pricing | ✓ |  |  |  |  |
+| `draft_purchase_order_from_requirements` | Purchasing & materials | ✓ |  | ✓ |  |  |
 | `get_atp` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `get_bin_on_hand` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `get_brew_day` | Production | ✓ |  |  | ✓ |  |
@@ -191,6 +192,7 @@ omitted. They have no roles until they are built.
 | `get_gravity_unit` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ |  |
 | `get_invoice` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `get_material_on_hand` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |
+| `get_material_requirements` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |
 | `get_on_hand` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `get_order` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `get_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |
@@ -1900,6 +1902,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_purchase_order", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "vendorId": "00000000-0000-0000-0000-000000000000", "lines": [ { "materialId": "00000000-0000-0000-0000-000000000000", "qtyOrdered": 1 } ] } }'
 ```
 
+#### draft_purchase_order_from_requirements [#draft_purchase_order_from_requirements]
+
+`command` · admin, warehouse
+
+Draft one purchase order per vendor for the chosen material gaps, quantities rounded up to whole purchase units, contract price up to the available commitment; materials with no vendor are skipped and named
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `materialIds` | array of uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "draft_purchase_order_from_requirements", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "materialIds": [ "00000000-0000-0000-0000-000000000000" ] } }'
+```
+
 #### get_material_on_hand [#get_material_on_hand]
 
 `query` · admin, warehouse, brewer
@@ -1915,6 +1934,21 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_material_on_hand", "input": {} }'
+```
+
+#### get_material_requirements [#get_material_requirements]
+
+`query` · admin, warehouse, brewer
+
+Material gaps for Planning: required, on hand, on order, short (base units), whole purchase units short, needed-by date, and the vendor and contract each gap resolves to; a null vendor cannot draft
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_material_requirements", "input": {} }'
 ```
 
 #### get_purchase_order [#get_purchase_order]
@@ -2099,14 +2133,12 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* purchasing-designed */}
 
-11 of the 14 operations in this area are available today; the 3 below are not.
+13 of the 14 operations in this area are available today; the 1 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
-| `draft_purchase_order_from_requirements` | command | Planning |
-| `get_material_requirements` | query | New PO, Planning |
 | `record_material_count` | command | Cycle count |
 
 {/* end ops:purchasing */}

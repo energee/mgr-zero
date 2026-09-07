@@ -147,3 +147,47 @@ describe("purchase orders: draft, mark sent, receive", () => {
     expect(po.id).toBeTruthy();
   });
 });
+
+describe("planning: draft purchase orders from material gaps", () => {
+  it("one draft per resolved vendor, gap rounded up to the purchase unit; a material with no vendor is skipped", async () => {
+    const brewer = await makeStaffCtx(b.id, "admin");
+    const cm = (await runCommand("upsert_vendor", { name: "Country Malt Group", leadTimeDays: 5 }, ctx)) as { id: string };
+    const pale = (await runCommand("upsert_material", { name: "Pale malt", category: "malt", baseUom: "lb", purchaseUom: "each", purchaseUomFactor: 55, defaultVendorId: cm.id }, ctx)) as { id: string };
+    const wheat = (await runCommand("upsert_material", { name: "Wheat malt", category: "malt", baseUom: "lb", purchaseUom: "each", purchaseUomFactor: 55, defaultVendorId: cm.id }, ctx)) as { id: string };
+    const orphan = (await runCommand("upsert_material", { name: "Mystery yeast", category: "yeast", baseUom: "each", purchaseUom: "each" }, ctx)) as { id: string };
+
+    // A 10 bbl unbrewed batch needs 600 lb pale, 100 lb wheat, 2 yeast; 130 lb pale is on hand.
+    const recipe = (await runCommand("create_recipe", { name: "Wheat Ale" }, brewer)) as { id: string };
+    const version = (await runCommand("create_recipe_version", {
+      recipeId: recipe.id, mashTempF: 152, brewhouseEfficiency: 0.75, yeastAttenuation: 0.78,
+      ingredients: [
+        { materialId: pale.id, perBblQty: 60, stage: "mash" },
+        { materialId: wheat.id, perBblQty: 10, stage: "mash" },
+        { materialId: orphan.id, perBblQty: 0.2, stage: "fermentation" },
+      ],
+    }, brewer)) as { id: string };
+    await runCommand("schedule_batch", { recipeVersionId: version.id, plannedOn: "2026-10-01", plannedBbl: 10 }, brewer);
+    const wh = await seedLocation(b.id, { name: "Grain room" });
+    await admin.from("material_movements").insert({ brewery_id: b.id, material_id: pale.id, location_id: wh.id, bin_id: wh.binId, qty: 130, type: "opening_balance", created_by: ctx.userId });
+
+    const reqs = (await runCommand("get_material_requirements", {}, ctx)) as {
+      material_id: string; required: number; on_hand: number; on_order: number; short: number; needed_by: string;
+      vendor_id: string | null; vendor_name: string | null; lead_time_days: number | null; contract_id: string | null; purchase_units_short: number;
+    }[];
+    expect(reqs.find((r) => r.material_id === pale.id)).toMatchObject({ required: 600, on_hand: 130, on_order: 0, short: 470, needed_by: "2026-10-01", vendor_id: cm.id, vendor_name: "Country Malt Group", lead_time_days: 5, purchase_units_short: 9 });
+    expect(reqs.find((r) => r.material_id === orphan.id)).toMatchObject({ short: 2, vendor_id: null });
+
+    const drafted = (await runCommand("draft_purchase_order_from_requirements", { materialIds: [pale.id, wheat.id, orphan.id] }, ctx)) as {
+      purchaseOrderIds: string[]; skipped: { materialId: string; reason: string }[];
+    };
+    expect(drafted.purchaseOrderIds).toHaveLength(1);
+    expect(drafted.skipped).toEqual([{ materialId: orphan.id, reason: "no_vendor" }]);
+    const po = (await runCommand("get_purchase_order", { poId: drafted.purchaseOrderIds[0] }, ctx)) as { status: string; vendor_id: string; lines: { material_id: string; qty_ordered: number }[] };
+    expect(po).toMatchObject({ status: "draft", vendor_id: cm.id });
+    expect(po.lines.map((l) => [l.material_id, l.qty_ordered]).sort()).toEqual([[pale.id, 9], [wheat.id, 2]].sort());
+
+    // The draft is not yet supply (only a sent PO is on order), so the gap stands until it is marked sent.
+    const again = (await runCommand("get_material_requirements", {}, ctx)) as { material_id: string; on_order: number }[];
+    expect(again.find((r) => r.material_id === pale.id)!.on_order).toBe(0);
+  });
+});

@@ -241,3 +241,41 @@ defineQuery({
     };
   },
 });
+
+// Planning's material gaps: the material_requirements view (demand, supply,
+// gap, needed-by, resolved vendor and contract) with names and the vendor's
+// typed lead time, so the page can date a buy-by and name the drafts.
+defineQuery({
+  name: "get_material_requirements",
+  description: "Material gaps for Planning: required, on hand, on order, short (base units), whole purchase units short, needed-by date, and the vendor and contract each gap resolves to; a null vendor cannot draft",
+  input: z.object({}), roles: [...PURCHASING],
+  handler: async (ctx) => {
+    const [rows, materials, vendors] = await Promise.all([
+      unwrap(ctx.db.from("material_requirements").select("material_id, required, on_hand, on_order, short, needed_by, purchase_units_short, vendor_id, contract_id").eq("brewery_id", ctx.breweryId)),
+      unwrap(ctx.db.from("materials").select("id, name, base_uom, purchase_uom, purchase_uom_factor").eq("brewery_id", ctx.breweryId)),
+      unwrap(ctx.db.from("vendors").select("id, name, lead_time_days").eq("brewery_id", ctx.breweryId)),
+    ]);
+    const material = new Map((materials ?? []).map((m) => [m.id as string, m]));
+    const vendor = new Map((vendors ?? []).map((v) => [v.id as string, v]));
+    return (rows ?? []).map((r) => {
+      const m = material.get(r.material_id as string);
+      const v = r.vendor_id ? vendor.get(r.vendor_id as string) : undefined;
+      return {
+        material_id: r.material_id, material_name: m?.name ?? null, base_uom: m?.base_uom ?? null, purchase_uom: m?.purchase_uom ?? null,
+        required: Number(r.required), on_hand: Number(r.on_hand), on_order: Number(r.on_order), short: Number(r.short),
+        purchase_units_short: Number(r.purchase_units_short), needed_by: r.needed_by,
+        vendor_id: r.vendor_id ?? null, vendor_name: v?.name ?? null, lead_time_days: v?.lead_time_days ?? null, contract_id: r.contract_id ?? null,
+      };
+    }).sort((a, b) => (a.needed_by ?? "").localeCompare(b.needed_by ?? "") || (a.material_name ?? "").localeCompare(b.material_name ?? ""));
+  },
+});
+
+defineCommand({
+  name: "draft_purchase_order_from_requirements",
+  description: "Draft one purchase order per vendor for the chosen material gaps, quantities rounded up to whole purchase units, contract price up to the available commitment; materials with no vendor are skipped and named",
+  input: z.object({ materialIds: z.array(z.string().uuid()).min(1) }),
+  roles: [...PO_ROLES],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("draft_purchase_order_from_requirements", {
+    p_brewery: ctx.breweryId, p_materials: i.materialIds, p_request_id: execution.requestId,
+  })),
+});

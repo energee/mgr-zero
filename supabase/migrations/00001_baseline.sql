@@ -1711,24 +1711,40 @@ create view vendor_lead_times with (security_invoker = true) as
   from per_po where recency <= 10
   group by 1, 2, 3;
 
+-- Material gaps for Planning (spec 2026-09-07 §5). Demand is what committed
+-- consumers will draw: unbrewed batches through their recipe, open packaging
+-- runs through the format BOM. Supply nets on hand and open POs so a gap is
+-- never ordered twice. Summed per material first, resolved to a vendor second
+-- (§3): the contract with commitment still available, else the material's
+-- default vendor, else no vendor and the row cannot draft. Base uom;
+-- purchase_units_short is the gap rounded up to whole purchase units.
 create view material_requirements with (security_invoker = true) as
   with req as (
-    select b.brewery_id, ri.material_id, sum(ri.per_bbl_qty * b.planned_bbl) as required
+    select b.brewery_id, ri.material_id, sum(ri.per_bbl_qty * b.planned_bbl) as required, min(b.planned_on) as needed_by
     from batches b join recipe_ingredients ri on ri.recipe_version_id = b.recipe_version_id
     where b.brewed_on is null group by 1,2
     union all
-    select r.brewery_id, bom.material_id, sum(o.qty_planned * bom.qty_per_unit)
+    select r.brewery_id, bom.material_id, sum(o.qty_planned * bom.qty_per_unit), min(r.planned_on)
     from packaging_runs r join packaging_run_outputs o on o.run_id = r.id
     join skus s on s.id = o.sku_id
     join format_bom bom on bom.format_id = s.format_id
-    where r.closed_at is null group by 1,2)
-  select req.brewery_id, req.material_id, sum(req.required) as required,
-         coalesce(oh.qty, 0) as on_hand, coalesce(oo.qty, 0) as on_order,
-         sum(req.required) - coalesce(oh.qty, 0) - coalesce(oo.qty, 0) as short
-  from req
-  left join material_on_hand oh on oh.material_id = req.material_id
-  left join material_on_order oo on oo.material_id = req.material_id
-  group by 1,2, oh.qty, oo.qty;
+    where r.closed_at is null group by 1,2),
+  gap as (
+    select req.brewery_id, req.material_id, sum(req.required) as required, min(req.needed_by) as needed_by,
+           coalesce(oh.qty, 0) as on_hand, coalesce(oo.qty, 0) as on_order,
+           sum(req.required) - coalesce(oh.qty, 0) - coalesce(oo.qty, 0) as short
+    from req
+    left join material_on_hand oh on oh.material_id = req.material_id
+    left join material_on_order oo on oo.material_id = req.material_id
+    group by 1,2, oh.qty, oo.qty)
+  select gap.*, ceil(greatest(gap.short, 0) / m.purchase_uom_factor) as purchase_units_short,
+         coalesce(c.vendor_id, m.default_vendor_id) as vendor_id, c.contract_id
+  from gap join materials m on m.id = gap.material_id
+  left join lateral (
+    select cb.contract_id, cb.vendor_id from contract_balances cb join material_contracts mc on mc.id = cb.contract_id
+    where cb.material_id = gap.material_id and cb.qty_available > 0
+      and (mc.starts_on is null or mc.starts_on <= current_date) and (mc.ends_on is null or mc.ends_on >= current_date)
+    order by mc.ends_on nulls last limit 1) c on true;
 
 create view recipe_version_costs with (security_invoker = true) as
   select ri.recipe_version_id, ri.brewery_id,
@@ -4115,6 +4131,56 @@ begin
   return private.complete_command_request(p_request_id, jsonb_build_object('receipt_id', v_receipt_id, 'po_id', p_po, 'status', v_po.status));
 end $$;
 
+-- Planning's verb: one draft PO per vendor the chosen gaps resolve to (§5).
+-- Quantities are whole purchase units. A contracted material takes the
+-- contract's price up to its available commitment and a spot line (no
+-- contract, no price) beyond it — a draft that priced everything at contract
+-- rate would be wrong money (§4). Materials with no vendor are reported, not
+-- drafted. Drafts are not supply: the gap stands until the PO is marked sent.
+create function draft_purchase_order_from_requirements(p_brewery uuid, p_materials uuid[], p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_actor uuid; v_replay jsonb; r record; v_po uuid; v_pos jsonb := '[]'; v_skipped jsonb := '[]';
+  v_units numeric; v_contracted numeric; v_price int;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'draft_purchase_order_from_requirements', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'materials', to_jsonb(p_materials)));
+  if v_replay is not null then return v_replay; end if;
+  for r in
+    select mr.*, m.purchase_uom_factor
+    from public.material_requirements mr join public.materials m on m.id = mr.material_id
+    where mr.brewery_id = p_brewery and mr.material_id = any(p_materials) and mr.short > 0
+    order by mr.vendor_id, mr.material_id
+  loop
+    if r.vendor_id is null then
+      v_skipped := v_skipped || jsonb_build_object('materialId', r.material_id, 'reason', 'no_vendor');
+      continue;
+    end if;
+    select id into v_po from public.purchase_orders where id = any(array(select jsonb_array_elements_text(v_pos))::uuid[]) and vendor_id = r.vendor_id;
+    if v_po is null then
+      insert into public.purchase_orders (brewery_id, vendor_id, note, created_by)
+      values (p_brewery, r.vendor_id, 'Drafted from Planning', v_actor) returning id into v_po;
+      v_pos := v_pos || to_jsonb(v_po);
+    end if;
+    v_units := r.purchase_units_short;
+    v_contracted := 0;
+    if r.contract_id is not null then
+      select least(v_units, floor(cb.qty_available)), mc.unit_cost_cents into v_contracted, v_price
+      from public.contract_balances cb join public.material_contracts mc on mc.id = cb.contract_id where cb.contract_id = r.contract_id;
+      if v_contracted > 0 then
+        insert into public.purchase_order_lines (brewery_id, po_id, material_id, qty_ordered, unit_cost_cents, contract_id)
+        values (p_brewery, v_po, r.material_id, v_contracted, v_price, r.contract_id);
+      end if;
+    end if;
+    if v_units - v_contracted > 0 then
+      insert into public.purchase_order_lines (brewery_id, po_id, material_id, qty_ordered)
+      values (p_brewery, v_po, r.material_id, v_units - v_contracted);
+    end if;
+  end loop;
+  return private.complete_command_request(p_request_id, jsonb_build_object('purchaseOrderIds', v_pos, 'skipped', v_skipped));
+end $$;
+
 -- ---------------------------------------------------------------- Stock transfers
 -- Internal moves of stuff between two locations (spec 2026-09-06 Decision 3).
 create function private.lock_transfer(p_transfer uuid, p_allowed public.stock_transfer_status[]) returns public.stock_transfers
@@ -5488,7 +5554,8 @@ grant execute on function
   upsert_material_contract(uuid,uuid,uuid,uuid,numeric,int,date,date,text,uuid),
   create_purchase_order(uuid,uuid,date,text,jsonb,uuid),
   send_purchase_order(uuid,uuid,text,uuid),
-  receive_purchase_order(uuid,uuid,uuid,uuid,date,jsonb,uuid)
+  receive_purchase_order(uuid,uuid,uuid,uuid,date,jsonb,uuid),
+  draft_purchase_order_from_requirements(uuid,uuid[],uuid)
   to authenticated;
 grant usage on schema private, extensions to service_role;
 -- service_role reaches `private` only for the UUID default its seed inserts
