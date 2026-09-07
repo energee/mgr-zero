@@ -32,7 +32,7 @@ change the search term.
 | --- | --- |
 | **Admin** | Every staff screen and action that exists. |
 | **Sales** | Catalog; customers and pricing; create, submit, confirm, adjust, and cancel orders, plus credits; view inventory; invoices; replenishment suggestions and creating the replenishment order. |
-| **Warehouse** | View inventory and record movements; view orders, pick, and ship; view replenishment suggestions (**Create replenishment order** is on the page but submitting it returns a permission error). After a wholesale ship, **View invoice** opens the invoice that just landed. Catalog, Customers, the Invoices list, and Team open if you type their address, but Warehouse has no More tab, so none of those show up in navigation. |
+| **Warehouse** | View inventory and record movements; view orders, pick, and ship; create, pick, and receive stock transfers; view replenishment suggestions (**Create replenishment order** is on the page but submitting it returns a permission error). After a wholesale ship, **View invoice** opens the invoice that just landed. Catalog, Customers, the Invoices list, Team, and Locations open if you type their address, but Warehouse has no More tab, so none of those show up in navigation. |
 | **Brewer** | Today, and linking your Slack account from App Home. No Beer, Work, or More tab, because every Brewer area is still planned. See [Navigate MGR](#navigation). |
 
 <Callout type="info">
@@ -46,8 +46,8 @@ A permission error is the end of that attempt. Ask an administrator. Hitting sub
 The brewery name in the header is the brewery whose records you are looking at. Navigation has up to four sections: **Today**, **Beer**, **Work**, and **More**. On a phone they sit as tabs along the bottom, and tapping the tab opens that group's primary page. On a wider screen they sit in a left rail.
 
 - **Beer** holds **Inventory**.
-- **Work** holds **Orders**, **Pick**, and **Replenishment**.
-- **More** holds **Invoices**, **Catalog**, **Customers**, **Price groups**, **Settings** (the team roster), and **Sale channels**.
+- **Work** holds **Orders**, **Pick**, **Replenishment**, and **Transfers**.
+- **More** holds **Invoices**, **Catalog**, **Customers**, **Price groups**, **Settings** (the team roster), **Sale channels**, and **Locations**.
 
 Links your role cannot use are simply not shown. Planned areas stay hidden until they are built (Taproom, Taps, Cellar, Materials, Kegs, Batches, Packaging, POs, Deliveries, Menu, Recipes, Compliance, Planning, Import), so a tab with nothing you can open does not appear.
 
@@ -264,9 +264,13 @@ MGR creates a separate credit memo at the prices frozen on the invoice lines, ne
 
 <Screen name="Locations" />
 
-**Locations** (open `/locations`; Settings links here) lists every warehouse and taproom. Admin sees **Add location**: a name and a type, *Warehouse* or *Taproom*. Names are unique within the brewery. Select **Edit** on a row to open the location: its type, the brewery's timezone, and a gated **Location bins** row (bins are not built yet). Admin can rename a location or change its type with **Edit** then **Save location**; movement history stays exactly as recorded.
+**Locations** (More rail, or `/locations`; Settings also links here) lists every warehouse, taproom and storage location. Admin sees **Add location**: a name and a type, *Warehouse*, *Taproom* or *Storage*. Names are unique within the brewery. Select **Edit** on a row to open the location: its type, the brewery's timezone, and **Location bins**. Admin can rename a location or change its type with **Edit** then **Save location**; movement history stays exactly as recorded.
+
+**Location bins** (open from the location) lists Walk-in, Cold and Dry to start. Warehouse and Admin can add, rename or remove a bin. A location always keeps at least one: rename the last instead of removing it. A bin that has ever held stock is renamed, not removed.
 
 ## Stock transfers [#transfers]
+
+<Screen name="Transfers" />
 
 **Transfers** (Work tab; Warehouse and Admin) move stock between two of the brewery's locations without an order or an invoice. **New transfer** takes a source and destination location, the bin at each end (the first bin is preselected), and SKU lines with quantities. Materials and empty kegs move through the same command from the API. The document is numbered TRF-0001 upward and walks **Submit**, **Record pick** (quantities default to what was requested), and **Receive**. Receiving writes the paired stock movements in one step, out of the source bin and into the destination bin, so on hand changes place and nothing counts as a removal; the fleet total for kegs is unchanged. A same-location pair is refused: moving stock between two bins of one location is a bin move, which writes the paired rows without a document.
 
@@ -282,7 +286,7 @@ MGR creates a separate credit memo at the prices frozen on the invoice lines, ne
 4. Edit **Transfer qty** as needed. Only positive lines are included.
 5. Select **Create replenishment order**. MGR creates it already confirmed, ready for warehouse picking.
 
-The page says **No taprooms configured.** when none exist, or **No pars set for this taproom.** when there are no suggestions. The current interface has no controls to create locations or set par levels.
+The page says **No taprooms configured.** when none exist, or **No pars set for this taproom.** when there are no suggestions. Admin creates locations from [Locations](#locations). The current interface has no controls to set par levels.
 
 ## Recipes [#recipes]
 
@@ -353,7 +357,7 @@ Do not hunt for hidden controls for these:
 - switching between breweries when a staff account belongs to more than one
 - staff or customer-portal invitations
 - CSV import
-- adding, renaming or removing bins, setting taproom pars, or choosing the warehouse that fulfills wholesale-customer portal orders, from the interface
+- setting taproom pars, or choosing the warehouse that fulfills wholesale-customer portal orders, from the interface
 - editing brands, formats, or SKUs after creation
 - deleting customers, ship-tos, inventory history, orders, invoices, or credit memos
 - editing staff roles or seeing staff email addresses

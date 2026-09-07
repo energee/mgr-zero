@@ -44,6 +44,6 @@ describe("shippedNav", () => {
     expect(navFor(shippedNav(STAFF_NAV), "brewer").map((t) => t.label)).toEqual(["Today"]);
     expect(navFor(shippedNav(STAFF_NAV), "warehouse").map((t) => t.label)).toEqual(["Today", "Beer", "Work"]);
     expect(navFor(shippedNav(STAFF_NAV), "admin").find((t) => t.label === "More")!.children!.map((c) => c.label))
-      .toEqual(["Invoices", "Catalog", "Customers", "Price groups", "Settings", "Sale channels"]);
+      .toEqual(["Invoices", "Catalog", "Customers", "Price groups", "Settings", "Sale channels", "Locations"]);
   });
 });

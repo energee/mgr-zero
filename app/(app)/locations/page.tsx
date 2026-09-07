@@ -9,7 +9,7 @@ import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { LocationForm } from "./location-form";
 
-type LocationRow = { id: string; name: string; kind: "warehouse" | "taproom" };
+type LocationRow = { id: string; name: string; kind: "warehouse" | "taproom" | "storage" };
 
 export default async function LocationsPage() {
   const brewery = await getActiveBrewery();

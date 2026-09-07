@@ -42,7 +42,7 @@ describe("customer guides (MDX)", () => {
     expect(master).toContain('href="/docs/portal-guide"');
     expect(staff).not.toContain("[#customer-portal]");
     expect(portal).not.toContain("Record Movement");
-    for (const section of ["sign-in", "roles", "navigation", "catalog", "inventory", "customers", "pricing", "orders", "pick-sheet", "invoices", "replenishment", "team", "slack", "errors-corrections", "unavailable"]) {
+    for (const section of ["sign-in", "roles", "navigation", "catalog", "inventory", "customers", "pricing", "orders", "pick-sheet", "invoices", "locations", "transfers", "replenishment", "team", "slack", "errors-corrections", "unavailable"]) {
       expect(staff).toContain(`[#${section}]`);
     }
     for (const section of ["access", "shop", "statuses", "orders", "invoices", "account", "help"]) {
