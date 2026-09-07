@@ -89,21 +89,21 @@ export function MovementForm({
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="movement-bin">Bin</Label>
-            <Select value={binId} onValueChange={setBinId} disabled={!locationId}>
-              <SelectTrigger id="movement-bin">
-                {/* explicit label: Radix shows nothing for a value whose item has not mounted yet */}
-                <SelectValue placeholder="Select a bin">{bins.find((b) => b.id === binId)?.name}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {bins.filter((b) => b.location_id === locationId).map((b) => (
-                    <SelectItem key={b.id} value={b.id}>
-                      {b.name}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+            {/* Native, not the Radix Select: inside a form Radix mirrors a programmatic
+                value into a hidden <select> whose options only exist once the menu has
+                opened, reads back "" and resets it, so the preselect never sticks. */}
+            <select
+              id="movement-bin"
+              value={binId}
+              onChange={(e) => setBinId(e.target.value)}
+              disabled={!locationId}
+              className="h-9 w-fit rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs disabled:opacity-50"
+            >
+              <option value="">Select a bin</option>
+              {bins.filter((b) => b.location_id === locationId).map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="movement-type">Type</Label>
