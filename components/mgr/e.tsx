@@ -115,7 +115,9 @@ export const E = {
    *  "Citra lot" to a Citra row by name. Item is flex-wrap, so the footer
    *  takes a full line without any layout of its own. */
   row: (t: React.ReactNode, s: React.ReactNode = "", n: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement, foot?: React.ReactNode) => (
-    <Item variant="outline" data-gated={cls === "dis" || undefined} className={cn(cls === "dis" && "opacity-50")}>
+    // A row that carries a chevron or a verb is a tap target, so it says so:
+    // pointer and a hover tint, not the text cursor a static card shows.
+    <Item variant="outline" data-gated={cls === "dis" || undefined} className={cn(cls === "dis" ? "cursor-not-allowed opacity-50" : n && typeof n !== "string" && "cursor-pointer select-none hover:bg-accent/50")}>
       {(icon || dotColor[cls]) && (
         <ItemMedia className={CENTER_MEDIA}>
           {icon ? <RowMedia icon={icon} cls={cls} /> : <Dot cls={cls} />}
