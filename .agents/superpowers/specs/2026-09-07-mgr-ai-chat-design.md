@@ -21,7 +21,10 @@ Corollaries:
   by widening the model's access. `/docs/api` already reports the gap
   (`available` vs `designed`).
 - A `customer` ctx sees only `portal_*` operations.
-- Fail-closed commands (`import_csv`, `invite_*`) are never tagged.
+- Never tagged: fail-closed commands (`import_csv`, `invite_*`), flow
+  plumbing that only a UI step can call correctly (`consume_chat_link_proof`,
+  `unlink_chat_user`), and `preview_command` itself. Everything else registered
+  is tagged; the live list is `/docs/api`, never a hand-kept table here.
 - Forms stay first-class. Model outage, rate cap, or timeout degrades to the
   form; it never blocks the write path.
 
