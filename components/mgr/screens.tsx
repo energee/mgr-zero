@@ -345,7 +345,7 @@ export const SCREENS: Screen[] = [
     to: { Taproom: "Location detail", Warehouse: "Location detail", Edit: "Location detail" },
     job: "List brewery locations and create the next one",
     reads: "list_locations",
-    writes: "create_location [design]",
+    writes: "create_location",
     states: [["permission", "admin only", 1], ["active", "inventory and work may use it"], ["empty", "Add location is the only action"]],
     spec: "Settings links here instead of editing whichever location happened to be selected.",
     body: (<>
@@ -1197,7 +1197,7 @@ export const SCREENS: Screen[] = [
     to: { Release: "Order", Adjust: "Order", "Edit par": "Bin", "Taproom par": "Bin" },
     job: "Change named quantities; never invent priority",
     reads: "get_shortfalls · list_standing_allocations [design]",
-    writes: "adjust_order_lines [design; one RPC: line + allocation] · release_allocation · set_taproom_par · set_taproom_standing_allocation [design]",
+    writes: "adjust_order_lines [design; one RPC: line + allocation] · release_allocation · set_taproom_par · set_standing_allocation",
     states: DEFAULT_STATES,
     spec: "There is no ranking command or priority column; every change is a named quantity edit. Taproom par edits the bin's par (§16.6 keys pars on bins), the same row the Bin sheet shows.",
     body: (<>
