@@ -107,7 +107,7 @@ export const TAPS: [string | RegExp, string][] = [
   ["Re-push", "Invoice"],
   ["QuickBooks", "Accounting"],
   ["Fix", "Fix mapping"],
-  ["Add brand", "Product"],
+  ["Add brand", "Brand"],
   ["Save brand", "Catalog"],
   ["\u00bd bbl keg", "SKU"],
   ["\u2159 bbl keg", "SKU"],

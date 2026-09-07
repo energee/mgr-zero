@@ -140,15 +140,14 @@ a gap to close, not a convention to trust.
   RPCs. It does not by itself enable the AI composer or an offline outbox;
   registry-owned preview/version contracts and explicit eligibility remain
   required below.
-- **AI proposals are registry-owned contracts.** Before composer writes ship,
-  registry metadata must declare each write command's risk, preview/canonicalize
-  hook, compensation, and offline/replay eligibility. The language layer emits
-  only a candidate command name + input. An internal registered
-  `preview_command` operation (not AI-exposed) calls that hook and returns
-  canonical effects, warnings, and a version token. Commit sends the same
-  `requestId` + preview token, re-resolves and revalidates server-side, and
-  rejects stale state; it never trusts model output or a cached proposal. This
-  is a design prerequisite, not a claim about the current registry.
+- **AI proposals are registry-owned contracts.** The language layer emits
+  only a candidate command name + input; an internal registered
+  `preview_command` (not AI-exposed) canonicalizes and issues a version token;
+  commit revalidates and rejects stale state. The full contract (registry
+  fields, loop, attribution, limits) is
+  `.agents/superpowers/specs/2026-09-07-mgr-ai-chat-design.md`; plan
+  `.agents/superpowers/plans/2026-09-07-ai-chat.md`. This is a design
+  prerequisite, not a claim about the current registry.
 - **Inventory correction and taproom counts need durable identity.** The current
   FG ledger has neither a structured reversal link nor sign rules/report semantics
   for an exact opposite entry, so `reverse_inventory_movement` remains disabled.

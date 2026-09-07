@@ -72,7 +72,7 @@ export function CommandForm({
           <DialogHeader className="shrink-0"><DialogTitle>{title}</DialogTitle></DialogHeader>
           {body("-mx-4")}
           {foot("-mx-4")}
-          <DialogPrimitive.Close asChild><Button variant="destructive" size="sm" className="self-end">Close</Button></DialogPrimitive.Close>
+          <FormClose className="absolute top-3 right-3" />
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </Dialog>

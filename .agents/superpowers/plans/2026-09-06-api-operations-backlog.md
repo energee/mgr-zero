@@ -4,18 +4,19 @@
 
 # API operations backlog
 
-108 operations the screens declare they need that the command registry does not yet answer, against 55 that it does.
+109 operations the screens declare they need that the command registry does not yet answer, against 55 that it does.
 
 This is the backend push, scoped. Each row names the operation a screen asked for and the screens waiting on it, so an area can be built and shipped whole rather than a command at a time. `/docs/api` publishes the same list per area, marked designed, so an integrator sees the roadmap without being told a date.
 
 Nothing here is a schema decision. An operation appears because a screen named it in its `reads` or `writes`; what it takes and returns is settled when it is built.
 
-## Customer portal — 2 to build, 7 built
+## Customer portal — 3 to build, 7 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
 | `get_portal_account` | query | Account |
 | `portal_invoice` | query | Pay invoice, Payment unavailable, Question invoice, Paid invoice |
+| `portal_schedule` | query | Coming up |
 ## Compliance — 9 to build, 0 built
 
 | Operation | Kind | Needed by |
@@ -75,12 +76,12 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `delete_sale_channel` | command | Sale channels, Channel |
 | `get_price_list` | query | Price tiers, Override |
 | `get_sku` | query | SKU |
-| `list_brands` | query | Catalog, Product, Schedule batch |
+| `list_brands` | query | Catalog, Brand, Schedule batch |
 | `list_sale_channels` | query | Square locations, Sale channels, Channel |
 | `set_price_list_format` | command | Price tiers |
 | `set_price_list_item` | command | Catalog, Price tiers, Override |
-| `update_sku` | command | Catalog, Product, SKU |
-| `upsert_brand` | command | Catalog, Product |
+| `update_sku` | command | Catalog, Brand, SKU |
+| `upsert_brand` | command | Catalog, Brand |
 | `upsert_sale_channel` | command | Sale channels, Channel |
 ## Packaging — 12 to build, 0 built
 
@@ -154,7 +155,7 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `revoke_staff` | command | Team, Team member |
 | `set_brewery_operating_defaults` | command | Chat settings |
 | `update_brewery` | command | Settings |
-| `update_staff_role` | command | Team, Team member |
+| `update_staff_roles` | command | Team, Team member |
 ## Today & notifications — 7 to build, 6 built
 
 | Operation | Kind | Needed by |
