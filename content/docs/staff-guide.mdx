@@ -32,7 +32,7 @@ change the search term.
 | --- | --- |
 | **Admin** | Every staff screen and action that exists. |
 | **Sales** | Catalog; customers and pricing; create, submit, confirm, adjust, and cancel orders, plus credits; view inventory; invoices; replenishment suggestions and creating the replenishment order. |
-| **Warehouse** | View inventory and record movements; view orders, pick, and ship; view replenishment suggestions (**Create replenishment order** is on the page but submitting it returns a permission error). After a wholesale ship, **View invoice** opens the invoice that just landed. Catalog, the Invoices list, and Team open if you type their address, but Warehouse has no More tab, so none of those show up in navigation. |
+| **Warehouse** | View inventory and record movements; view orders, pick, and ship; view replenishment suggestions (**Create replenishment order** is on the page but submitting it returns a permission error). After a wholesale ship, **View invoice** opens the invoice that just landed. Catalog, Customers, the Invoices list, and Team open if you type their address, but Warehouse has no More tab, so none of those show up in navigation. |
 | **Brewer** | Today, and linking your Slack account from App Home. No Beer, Work, or More tab, because every Brewer area is still planned. See [Navigate MGR](#navigation). |
 
 <Callout type="info">
@@ -139,7 +139,7 @@ Empty sections say **No inventory recorded yet.** or **No movements recorded yet
 
 ## Customers and ship-tos [#customers]
 
-*Admin and Sales can create and edit customers and ship-to addresses. The list shows name, type, home state, assigned price list, and payment terms.*
+*Admin and Sales can create and edit customers and ship-to addresses. Warehouse has no link here, but the page is readable at its address: **New Customer** and **Edit** still appear, but submitting either returns a permission error. The list shows name, type, home state, assigned price list, and payment terms.*
 
 ### Create or edit a customer
 
@@ -197,7 +197,7 @@ An order can become `cancelled` any time before shipping. The Orders screen list
 7. Select **Create**. The button stays disabled until the required fields are chosen: for wholesale, a customer, a ship-to, a from location, and at least one line with a SKU and a quantity above zero; for a transfer, a destination instead of the customer and ship-to. The result is a draft. Wholesale line prices are captured from the customer's current price list. Later price-list changes do not rewrite those lines.
 
 <Callout type="info">
-On a new brewery with nothing to choose yet, the form says **Before creating an order, add a customer, a location and a SKU.** with links to **Customers** and **Catalog**, and **Create** stays disabled until those exist.
+On a new brewery with nothing to choose yet, the form says **Before creating an order, add a customer, a location, and a SKU.** with links to **Customers** and **Catalog**, and **Create** stays disabled until those exist.
 </Callout>
 
 <Callout type="warn">
