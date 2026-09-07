@@ -1534,11 +1534,14 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Catalog", "Hazy IPA")}
       {E.edit("Brand name", "Hazy IPA")}
-      {E.pick("Style", "Hazy IPA", ["Hazy IPA", "IPA", "Pils", "Add “Cold IPA”"])}
-      {E.edit("ABV", "6.8")}
+      {E.cols(
+        E.pick("Style", "Hazy IPA", ["Hazy IPA", "IPA", "Pils", "Add “Cold IPA”"]),
+        E.edit("ABV", "6.8"),
+        E.pick("Category", "Core", ["Core", "Seasonal", "One-off", "Barrel-aged"]),
+        E.pick("Price group", "Standard", ["Standard", "Specialty", "Barrel-aged"]),
+      )}
+      {E.ttl("Sell sheet")}
       {E.edit("Description", "Juicy, soft, Citra-forward")}
-      {E.pick("Category", "Core", ["Core", "Seasonal", "One-off", "Barrel-aged"])}
-      {E.pick("Price group", "Standard", ["Standard", "Specialty", "Barrel-aged"])}
       {E.edit("Hops", "Citra, Mosaic")}
       {E.btn("Save brand")}
       {E.nav("SKU list", "3 active packages")}

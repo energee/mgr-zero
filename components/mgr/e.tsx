@@ -277,6 +277,11 @@ export const E = {
       </Field>
     );
   },
+  /** Short fields side by side on desk, stacked on a phone. The frame is an
+   *  iframe, so md: means the desk width, never the docs page around it. */
+  cols: (...fields: React.ReactNode[]) => (
+    <div className="grid gap-2 md:grid-cols-2 md:gap-x-6">{fields.map((f, i) => <Fragment key={i}>{f}</Fragment>)}</div>
+  ),
   /** A time-of-day window as one two-thumb range: start and end are 24-hour "hh:mm". */
   window: (label: string, start: string, end: string) => <TimeWindowField label={label} start={start} end={end} />,
   /** A picked value: a Select for short fixed lists; long lists (SKU, customer) keep opening Entity picker. */
