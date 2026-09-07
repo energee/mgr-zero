@@ -3,7 +3,7 @@
 // Lead time lives on the vendor (spec 2026-09-07 §3); a PO status is derived
 // from counted receipts and an empty PO never looks received (§2).
 import { beforeAll, describe, expect, it } from "vitest";
-import { makeBrewery, makeStaffCtx, sql } from "./helpers";
+import { admin, makeBrewery, makeStaffCtx, seedLocation, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -61,5 +61,89 @@ describe("vendors, materials, contracts", () => {
   it("a sales user may not edit vendors", async () => {
     const sales = await makeStaffCtx(b.id, "sales");
     await expect(runCommand("upsert_vendor", { name: "Nope" }, sales)).rejects.toThrow(/permission/i);
+  });
+});
+
+describe("purchase orders: draft, mark sent, receive", () => {
+  it("draft → sent (mailto) → partial receipt → received; open balance and status derive from counts", async () => {
+    const wh = await seedLocation(b.id);
+    const vendor = (await runCommand("upsert_vendor", { name: "Country Malt", leadTimeDays: 7 }, ctx)) as { id: string };
+    const malt = (await runCommand("upsert_material", { name: "2-row", category: "malt", baseUom: "lb", purchaseUom: "each", purchaseUomFactor: 55, lotTracked: true }, ctx)) as { id: string };
+    const hulls = (await runCommand("upsert_material", { name: "Rice hulls", category: "adjunct", baseUom: "lb", purchaseUom: "each", purchaseUomFactor: 50 }, ctx)) as { id: string };
+
+    const po = (await runCommand("create_purchase_order", {
+      vendorId: vendor.id, expectedOn: "2026-09-10",
+      lines: [
+        { materialId: malt.id, qtyOrdered: 4, unitCostCents: 2850, expectedLotCode: "CM-26-4410" },
+        { materialId: hulls.id, qtyOrdered: 6, unitCostCents: 62 },
+      ],
+    }, ctx)) as { id: string; status: string; po_no: number };
+    expect(po.status).toBe("draft");
+    expect(po.po_no).toBeGreaterThan(0);
+
+    // Receiving a draft is refused: sent is the state that means awaiting receipt.
+    await expect(runCommand("receive_purchase_order", { poId: po.id, locationId: wh.id, binId: wh.binId, lines: [] }, ctx)).rejects.toThrow(/draft/);
+
+    const sent = (await runCommand("send_purchase_order", { poId: po.id, sentVia: "mailto" }, ctx)) as { status: string; sent_via: string; sent_by: string; ordered_on: string };
+    expect(sent).toMatchObject({ status: "sent", sent_via: "mailto", sent_by: ctx.userId });
+    expect(sent.ordered_on).toBeTruthy();
+    await expect(runCommand("send_purchase_order", { poId: po.id, sentVia: "external" }, ctx)).rejects.toThrow(/sent/);
+
+    const detail = (await runCommand("get_purchase_order", { poId: po.id }, ctx)) as { lines: { id: string; material_id: string; qty_ordered: number; qty_received: number; qty_open: number }[] };
+    const maltLine = detail.lines.find((l) => l.material_id === malt.id)!;
+    const hullsLine = detail.lines.find((l) => l.material_id === hulls.id)!;
+    expect(maltLine).toMatchObject({ qty_ordered: 4, qty_received: 0, qty_open: 4 });
+
+    // 3 of 4 malt bags on a substituted lot, all 6 hulls: partially received, one bag open.
+    const receipt = (await runCommand("receive_purchase_order", {
+      poId: po.id, locationId: wh.id, binId: wh.binId, receivedOn: "2026-09-11",
+      lines: [
+        { poLineId: maltLine.id, qtyCounted: 3, lotCode: "CM-26-4288", bestBy: "2027-03-31" },
+        { poLineId: hullsLine.id, qtyCounted: 6 },
+      ],
+    }, ctx)) as { status: string; receipt_id: string };
+    expect(receipt.status).toBe("partially_received");
+
+    const after = (await runCommand("get_purchase_order", { poId: po.id }, ctx)) as { status: string; lines: { material_id: string; qty_received: number; qty_open: number }[] };
+    expect(after.status).toBe("partially_received");
+    expect(after.lines.find((l) => l.material_id === malt.id)).toMatchObject({ qty_received: 3, qty_open: 1 });
+    expect(after.lines.find((l) => l.material_id === hulls.id)).toMatchObject({ qty_received: 6, qty_open: 0 });
+
+    // Ledger: base units (3 bags × 55 lb), the lot read off the package, the hulls untracked.
+    const moves = await admin.from("material_movements").select("material_id, qty, type, lot_id, bin_id").eq("brewery_id", b.id).order("qty");
+    expect(moves.data).toHaveLength(2);
+    expect(moves.data!.find((m) => m.material_id === malt.id)).toMatchObject({ qty: 165, type: "receipt", bin_id: wh.binId });
+    expect(moves.data!.find((m) => m.material_id === hulls.id)).toMatchObject({ qty: 300, lot_id: null });
+    const lot = await admin.from("material_lots").select("lot_code, vendor_id, best_by").eq("material_id", malt.id);
+    expect(lot.data).toEqual([{ lot_code: "CM-26-4288", vendor_id: vendor.id, best_by: "2027-03-31" }]);
+
+    // Replaying the same request does not double-receive.
+    const requestId = crypto.randomUUID();
+    const first = await runCommand("receive_purchase_order", { poId: po.id, locationId: wh.id, binId: wh.binId, receivedOn: "2026-09-18", lines: [{ poLineId: maltLine.id, qtyCounted: 1, lotCode: "CM-26-4288" }] }, ctx, { requestId, correlationId: requestId });
+    const replay = await runCommand("receive_purchase_order", { poId: po.id, locationId: wh.id, binId: wh.binId, receivedOn: "2026-09-18", lines: [{ poLineId: maltLine.id, qtyCounted: 1, lotCode: "CM-26-4288" }] }, ctx, { requestId, correlationId: requestId });
+    expect(replay).toEqual(first);
+    expect((await admin.from("receipts").select("id").eq("po_id", po.id)).data).toHaveLength(2);
+
+    const done = (await runCommand("get_purchase_order", { poId: po.id }, ctx)) as { status: string };
+    expect(done.status).toBe("received");
+
+    // Observed lead time: sent 2026-09-?? (today) → last receipt 09-18; promised 09-10. One PO, tagged mailto.
+    const lead = (await runCommand("list_vendors_and_contracts", {}, ctx)) as { id: string; observed: { sent_via: string; n: number; avg_lead_days: number; avg_late_days: number }[] }[];
+    const cm = lead.find((v) => v.id === vendor.id)!;
+    expect(cm.observed).toHaveLength(1);
+    expect(cm.observed[0]).toMatchObject({ sent_via: "mailto", n: 1, avg_late_days: 8 });
+
+    const list = (await runCommand("list_purchase_orders", {}, ctx)) as { id: string }[];
+    expect(list.map((p) => p.id)).not.toContain(po.id);            // received POs leave the open list
+    const all = (await runCommand("list_purchase_orders", { includeClosed: true }, ctx)) as { id: string; vendor_name: string; status: string }[];
+    expect(all.find((p) => p.id === po.id)).toMatchObject({ vendor_name: "Country Malt", status: "received" });
+  });
+
+  it("a PO needs at least one line, and a contract never gates ordering", async () => {
+    const vendor = (await runCommand("upsert_vendor", { name: "Spot Hops" }, ctx)) as { id: string };
+    const hop = (await runCommand("upsert_material", { name: "Mosaic", category: "hop", baseUom: "lb", purchaseUom: "lb" }, ctx)) as { id: string };
+    await expect(runCommand("create_purchase_order", { vendorId: vendor.id, lines: [] }, ctx)).rejects.toThrow();
+    const po = (await runCommand("create_purchase_order", { vendorId: vendor.id, lines: [{ materialId: hop.id, qtyOrdered: 20, unitCostCents: 1800 }] }, ctx)) as { id: string };
+    expect(po.id).toBeTruthy();
   });
 });

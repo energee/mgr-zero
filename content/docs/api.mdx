@@ -172,6 +172,7 @@ omitted. They have no roles until they are built.
 | `create_credit_memo` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `create_location` | Inventory & locations | ✓ |  |  |  |  |
 | `create_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
+| `create_purchase_order` | Purchasing & materials | ✓ |  | ✓ |  |  |
 | `create_recipe` | Production | ✓ |  |  | ✓ |  |
 | `create_recipe_version` | Production | ✓ |  |  | ✓ |  |
 | `create_replenishment_order` | Taproom & kegs | ✓ | ✓ |  |  |  |
@@ -194,6 +195,7 @@ omitted. They have no roles until they are built.
 | `get_order` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `get_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |
 | `get_portal_account` | Customer portal |  |  |  |  | ✓ |
+| `get_purchase_order` | Purchasing & materials | ✓ |  | ✓ |  |  |
 | `get_recipe` | Production | ✓ |  |  | ✓ |  |
 | `get_shortfalls` | Today & notifications | ✓ | ✓ | ✓ |  |  |
 | `get_stock_transfer` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
@@ -216,6 +218,7 @@ omitted. They have no roles until they are built.
 | `list_orders` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `list_packaging_runs` | Packaging | ✓ |  | ✓ | ✓ |  |
 | `list_price_groups` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
+| `list_purchase_orders` | Purchasing & materials | ✓ |  | ✓ |  |  |
 | `list_recipes` | Production | ✓ |  |  | ✓ |  |
 | `list_sale_channels` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
 | `list_skus` | Catalog & pricing | ✓ | ✓ | ✓ | ✓ |  |
@@ -233,6 +236,7 @@ omitted. They have no roles until they are built.
 | `portal_orders` | Customer portal |  |  |  |  | ✓ |
 | `portal_submit_order` | Customer portal |  |  |  |  | ✓ |
 | `portal_update_draft_order` | Customer portal |  |  |  |  | ✓ |
+| `receive_purchase_order` | Purchasing & materials | ✓ |  | ✓ |  |  |
 | `receive_stock_transfer` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `record_brew_day` | Production | ✓ |  |  | ✓ |  |
 | `record_cellar_transfer` | Production | ✓ |  |  | ✓ |  |
@@ -249,6 +253,7 @@ omitted. They have no roles until they are built.
 | `return_shipment` | Delivery & routes | ✓ | ✓ |  |  |  |
 | `schedule_batch` | Production | ✓ |  |  | ✓ |  |
 | `schedule_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |
+| `send_purchase_order` | Purchasing & materials | ✓ |  | ✓ |  |  |
 | `set_brewery_gravity_unit` | Team & brewery settings | ✓ |  |  |  |  |
 | `set_brewery_quiet_hours` | Team & brewery settings | ✓ |  |  |  |  |
 | `set_channel_price` | Catalog & pricing | ✓ | ✓ |  |  |  |
@@ -1875,6 +1880,26 @@ unreceived PO never inflates what a packaging run believes it has.
 
 {/* ops:purchasing */}
 
+#### create_purchase_order [#create_purchase_order]
+
+`command` · admin, warehouse
+
+Draft a purchase order with all its lines in one write; a contracted line takes the contract price unless one is typed, and the expected lot is advisory
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `vendorId` | uuid | yes |
+| `lines` | array of object | yes |
+| `expectedOn` | date (YYYY-MM-DD) | no |
+| `note` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_purchase_order", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "vendorId": "00000000-0000-0000-0000-000000000000", "lines": [ { "materialId": "00000000-0000-0000-0000-000000000000", "qtyOrdered": 1 } ] } }'
+```
+
 #### get_material_on_hand [#get_material_on_hand]
 
 `query` · admin, warehouse, brewer
@@ -1890,6 +1915,23 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_material_on_hand", "input": {} }'
+```
+
+#### get_purchase_order [#get_purchase_order]
+
+`query` · admin, warehouse
+
+One purchase order with vendor, lines (ordered, received so far, still open), and its receipts
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `poId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_purchase_order", "input": { "poId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### list_materials [#list_materials]
@@ -1909,11 +1951,28 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_materials", "input": {} }'
 ```
 
+#### list_purchase_orders [#list_purchase_orders]
+
+`query` · admin, warehouse
+
+Open purchase orders (draft, sent, partially received) with vendor and what each still owes; includeClosed adds received and cancelled
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `includeClosed` | boolean | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_purchase_orders", "input": {} }'
+```
+
 #### list_vendors_and_contracts [#list_vendors_and_contracts]
 
 `query` · admin, warehouse, brewer
 
-Vendors, alphabetical, with lead time and each one's contracts and their drawdown (committed, received, on order, available)
+Vendors, alphabetical, with typed and observed lead time and each one's contracts and their drawdown (committed, received, on order, available)
 
 Takes no input.
 
@@ -1922,6 +1981,45 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_vendors_and_contracts", "input": {} }'
+```
+
+#### receive_purchase_order [#receive_purchase_order]
+
+`command` · admin, warehouse
+
+Count what arrived against a sent purchase order at one bin: receipt, lines (over or short both allowed), lots read off the package, and receipt movements in one write; status derives from the counts
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `poId` | uuid | yes |
+| `locationId` | uuid | yes |
+| `binId` | uuid | yes |
+| `lines` | array of object | yes |
+| `receivedOn` | date (YYYY-MM-DD) | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "receive_purchase_order", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "poId": "00000000-0000-0000-0000-000000000000", "locationId": "00000000-0000-0000-0000-000000000000", "binId": "00000000-0000-0000-0000-000000000000", "lines": [ { "poLineId": "00000000-0000-0000-0000-000000000000", "qtyCounted": 1 } ] } }'
+```
+
+#### send_purchase_order [#send_purchase_order]
+
+`command` · admin, warehouse
+
+Mark a draft purchase order sent by mail client (mailto) or outside MGR (external): an attestation, dated today; no email is sent
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `poId` | uuid | yes |
+| `sentVia` | mailto or external | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "send_purchase_order", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "poId": "00000000-0000-0000-0000-000000000000", "sentVia": "mailto" } }'
 ```
 
 #### upsert_material [#upsert_material]
@@ -2001,20 +2099,15 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* purchasing-designed */}
 
-6 of the 14 operations in this area are available today; the 8 below are not.
+11 of the 14 operations in this area are available today; the 3 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
-| `create_purchase_order` | command | New PO |
 | `draft_purchase_order_from_requirements` | command | Planning |
 | `get_material_requirements` | query | New PO, Planning |
-| `get_purchase_order` | query | Receive PO, Receipt |
-| `list_purchase_orders` | query | Purchase orders |
-| `receive_purchase_order` | command | Receive PO |
 | `record_material_count` | command | Cycle count |
-| `send_purchase_order` | command | Receive PO |
 
 {/* end ops:purchasing */}
 
