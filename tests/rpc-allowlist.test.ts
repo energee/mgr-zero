@@ -23,6 +23,7 @@ const AUTHENTICATED_RPCS = [
   "create_sku(uuid,uuid,uuid,text,text,uuid)",
   "create_stock_transfer(uuid,uuid,uuid,date,text,jsonb,uuid)",
   "delete_bin(uuid,uuid,uuid)",
+  "delete_sale_channel(uuid,uuid,uuid)",
   "disable_chat_installation(uuid)",
   "disconnect_chat_installation(uuid)",
   "find_chat_oauth_intent(text)",
@@ -64,9 +65,10 @@ const AUTHENTICATED_RPCS = [
   "update_draft_order(uuid,uuid,date,text,text,jsonb,uuid)",
   "update_location(uuid,uuid,text,location_kind,uuid)",
   "upsert_brand(uuid,uuid,text,text,numeric,text,text,text,text,uuid)",
-  "upsert_customer(uuid,uuid,text,customer_type,text,uuid,text,text,uuid)",
+  "upsert_customer(uuid,uuid,text,customer_type,text,uuid,text,text,tax_treatment,uuid)",
   "upsert_format(uuid,uuid,text,format_basis,package_type,keg_size,integer,numeric,uuid)",
   "upsert_price_list(uuid,uuid,text,uuid)",
+  "upsert_sale_channel(uuid,uuid,text,tax_treatment,uuid)",
   "upsert_ship_to(uuid,uuid,uuid,text,text,text,text,text,text,uuid)",
 ];
 

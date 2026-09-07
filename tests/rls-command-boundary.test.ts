@@ -76,11 +76,11 @@ describe("staff command database boundary", () => {
     });
     const customer = await salesCtx.db.rpc("upsert_customer", { p_request_id: crypto.randomUUID(),
       p_id: null, p_brewery: brewery.id, p_name: "sales rpc customer", p_type: "retailer", p_state: "PA",
-      p_price_list: null, p_license_no: null, p_payment_terms: null,
+      p_price_list: null, p_license_no: null, p_payment_terms: null, p_tax_treatment: null,
     });
     const warehouseCustomer = await warehouseCtx.db.rpc("upsert_customer", { p_request_id: crypto.randomUUID(),
       p_id: null, p_brewery: brewery.id, p_name: "warehouse rpc customer", p_type: "retailer", p_state: "PA",
-      p_price_list: null, p_license_no: null, p_payment_terms: null,
+      p_price_list: null, p_license_no: null, p_payment_terms: null, p_tax_treatment: null,
     });
 
     expect(location.error).toBeNull();
@@ -327,8 +327,29 @@ describe("registered staff mutation role × RPC matrix", () => {
           command: { name, type: "retailer", state: "PA" },
           rpc: {
             p_id: null, p_brewery: brewery.id, p_name: name, p_type: "retailer", p_state: "PA",
-            p_price_list: null, p_license_no: null, p_payment_terms: null,
+            p_price_list: null, p_license_no: null, p_payment_terms: null, p_tax_treatment: null,
           },
+        };
+      },
+    },
+    {
+      command: "upsert_sale_channel", rpc: "upsert_sale_channel", allowed: ["admin"],
+      input: async role => {
+        const name = unique("matrix channel", role);
+        return {
+          command: { name, taxTreatment: "taxable" },
+          rpc: { p_brewery: brewery.id, p_id: null, p_name: name, p_tax_treatment: "taxable" },
+        };
+      },
+    },
+    {
+      command: "delete_sale_channel", rpc: "delete_sale_channel", allowed: ["admin"],
+      input: async role => {
+        const name = unique("matrix drop channel", role);
+        const { data } = await admin.from("sale_channels").insert({ brewery_id: brewery.id, name }).select("id").single();
+        return {
+          command: { channelId: data!.id },
+          rpc: { p_brewery: brewery.id, p_id: data!.id },
         };
       },
     },

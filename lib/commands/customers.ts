@@ -6,7 +6,7 @@ import { defineCommand, defineQuery, unwrap } from "./registry";
 const roles = ["admin", "sales"] as const;
 
 defineCommand({
-  name: "upsert_customer", description: "Create or update a customer account",
+  name: "upsert_customer", description: "Create or update a customer account, optionally overriding the tax treatment its removals are recorded under",
   roles: [...roles],
   input: z.object({
     id: z.string().uuid().optional(), name: z.string().min(1),
@@ -14,11 +14,14 @@ defineCommand({
     state: z.string().regex(/^[A-Z]{2}$/), // customers.state is NOT NULL (home state)
     priceListId: z.string().uuid().optional(), licenseNumber: z.string().optional(),
     paymentTerms: z.string().optional(),
+    // Overrides the sale channel's tax treatment for this customer's removals
+    // (§16.3); omit it to inherit the channel default.
+    taxTreatment: z.enum(["taxable", "export", "vessel_supplies", "research", "transfer_in_bond"]).optional(),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_customer", {
     p_brewery: ctx.breweryId, p_id: i.id ?? null, p_name: i.name, p_type: i.type, p_state: i.state,
     p_price_list: i.priceListId ?? null, p_license_no: i.licenseNumber ?? null,
-    p_payment_terms: i.paymentTerms || null, p_request_id: execution.requestId,
+    p_payment_terms: i.paymentTerms || null, p_tax_treatment: i.taxTreatment ?? null, p_request_id: execution.requestId,
   })),
 });
 

@@ -19,30 +19,35 @@ const MOVEMENT_TYPES = [
 ] as const;
 type MovementType = (typeof MOVEMENT_TYPES)[number];
 
-// Mirrors the DB CHECK (removal_shape): only depletion requires a channel
-// among the staff-facing types above. The picker is a plain id field until
-// Program 4 Task 2 fetches the brewery's channels (list_sale_channels).
+// Mirrors the DB CHECK (removal_shape): sale_removal and depletion each name a
+// channel, and only depletion is staff-facing here (sale_removal comes from
+// shipping). The channels are the brewery's own rows, read by list_sale_channels.
 const requiresChannel = (type: MovementType) => type === "depletion";
 
 export function MovementForm({
   skus,
   locations,
   bins,
+  channels,
 }: {
   skus: { id: string; label: string }[];
   locations: { id: string; name: string; kind: string }[];
   bins: { id: string; location_id: string; name: string }[];
+  channels: { id: string; name: string }[];
 }) {
   const [skuId, setSkuId] = useState("");
   const [locationId, setLocationId] = useState("");
   const [binId, setBinId] = useState("");
   const [qty, setQty] = useState("");
   const [type, setType] = useState<MovementType>("opening_balance");
-  const [saleChannelId, setSaleChannelId] = useState("");
+  // A hand-entered movement is a taproom event far more often than not, so
+  // Taproom is preselected when the brewery still has that seeded channel.
+  const defaultChannelId = (channels.find((c) => c.name === "Taproom") ?? channels[0])?.id ?? "";
+  const [saleChannelId, setSaleChannelId] = useState(defaultChannelId);
   const [note, setNote] = useState("");
   const form = useCommandForm("record_movement", {
     build: () => ({ skuId, locationId, binId, qty: Number(qty), type, saleChannelId: requiresChannel(type) ? saleChannelId : undefined, note: note || undefined }),
-    reset: () => { setSkuId(""); setLocationId(""); setBinId(""); setQty(""); setType("opening_balance"); setSaleChannelId(""); setNote(""); },
+    reset: () => { setSkuId(""); setLocationId(""); setBinId(""); setQty(""); setType("opening_balance"); setSaleChannelId(defaultChannelId); setNote(""); },
   });
 
   function onTypeChange(next: MovementType) {
@@ -121,7 +126,16 @@ export function MovementForm({
           {requiresChannel(type) && (
             <div className="flex flex-col gap-2">
               <Label htmlFor="movement-channel">Channel</Label>
-              <Input id="movement-channel" value={saleChannelId} onChange={(e) => setSaleChannelId(e.target.value)} required />
+              <NativeSelect
+                id="movement-channel"
+                value={saleChannelId}
+                onChange={(e) => setSaleChannelId(e.target.value)}
+                required
+              >
+                {channels.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </NativeSelect>
             </div>
           )}
           <div className="flex flex-col gap-2">

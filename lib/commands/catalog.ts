@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap } from "./registry";
+import { defineCommand, defineQuery, unwrap, CommandError } from "./registry";
 
 // Brands (§16.1): the sellable identity. Style is found or created in the
 // brewery's own styles list; description, category, price group and hops are
@@ -128,6 +128,44 @@ defineCommand({
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("delete_bin", {
     p_brewery: ctx.breweryId, p_bin: i.binId, p_request_id: execution.requestId,
   })),
+});
+
+// Sale channels (§16.3): the brewery's own list of what a removal is sold
+// through, each with the tax treatment frozen onto the movements it classifies.
+// Editing the list is admin work; anyone who records or reads a movement needs
+// to see it. 'Wholesale' is pinned by name because private.ship_order_impl
+// looks it up that way — the RPCs refuse to rename or delete that row.
+const TAX_TREATMENTS = ["taxable", "export", "vessel_supplies", "research", "transfer_in_bond"] as const;
+
+defineQuery({
+  name: "list_sale_channels", description: "Sale channels with their tax treatment, alphabetical",
+  input: z.object({}), roles: ["admin", "sales", "warehouse"],
+  handler: (ctx) => unwrap(ctx.db.from("sale_channels").select("id, name, tax_treatment").eq("brewery_id", ctx.breweryId).order("name")),
+});
+
+defineCommand({
+  name: "upsert_sale_channel", description: "Create or edit a sale channel: its name and the tax treatment its removals are recorded under; Wholesale cannot be renamed",
+  input: z.object({ id: z.string().uuid().optional(), name: z.string().trim().min(1), taxTreatment: z.enum(TAX_TREATMENTS) }),
+  roles: ["admin"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_sale_channel", {
+    p_brewery: ctx.breweryId, p_id: i.id ?? null, p_name: i.name, p_tax_treatment: i.taxTreatment, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "delete_sale_channel", description: "Remove a sale channel no movement has used; Wholesale cannot be removed",
+  input: z.object({ channelId: z.string().uuid() }),
+  roles: ["admin"],
+  handler: async (ctx, i, execution) => {
+    const result = await ctx.db.rpc("delete_sale_channel", {
+      p_brewery: ctx.breweryId, p_id: i.channelId, p_request_id: execution.requestId,
+    });
+    // inventory_movements references the channel `on delete restrict`, so a
+    // used channel comes back as a raw foreign-key violation; say it in
+    // product terms rather than letting it fall through to a generic 500.
+    if (result.error?.code === "23503") throw new CommandError("channel is in use");
+    return unwrap(Promise.resolve(result));
+  },
 });
 
 defineQuery({

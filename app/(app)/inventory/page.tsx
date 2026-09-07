@@ -12,6 +12,7 @@ import { MovementForm } from "./movement-form";
 type Sku = { id: string; name: string; brands: { name: string } | null };
 type Location = { id: string; name: string; kind: string };
 type Bin = { id: string; location_id: string; name: string };
+type SaleChannel = { id: string; name: string; tax_treatment: string };
 type BinOnHandRow = { sku_id: string; location_id: string; bin_id: string; qty: string };
 type AtpRow = { sku_id: string; qty: string };
 type Movement = { id: string; created_at: string; type: string; qty: string; sku_id: string; location_id: string; note: string | null };
@@ -24,14 +25,15 @@ function skuLabel(sku: Sku | undefined) {
 export default async function InventoryPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [skus, locations, bins, onHand, atp, movements] = (await Promise.all([
+  const [skus, locations, bins, channels, onHand, atp, movements] = (await Promise.all([
     runCommand("list_skus", {}, ctx),
     runCommand("list_locations", {}, ctx),
     runCommand("list_bins", {}, ctx),
+    runCommand("list_sale_channels", {}, ctx),
     runCommand("get_bin_on_hand", {}, ctx),
     runCommand("get_atp", {}, ctx),
     runCommand("list_movements", { limit: 50 }, ctx),
-  ])) as [Sku[], Location[], Bin[], BinOnHandRow[], AtpRow[], Movement[]];
+  ])) as [Sku[], Location[], Bin[], SaleChannel[], BinOnHandRow[], AtpRow[], Movement[]];
 
   const skuById = new Map(skus.map((s) => [s.id, s]));
   const locationById = new Map(locations.map((l) => [l.id, l.name]));
@@ -44,7 +46,7 @@ export default async function InventoryPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Inventory</h1>
-        <MovementForm skus={skus.map((s) => ({ id: s.id, label: skuLabel(s) }))} locations={locations} bins={bins} />
+        <MovementForm skus={skus.map((s) => ({ id: s.id, label: skuLabel(s) }))} locations={locations} bins={bins} channels={channels} />
       </div>
 
       <section className="flex flex-col gap-2">

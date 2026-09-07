@@ -2562,22 +2562,74 @@ begin
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
+-- Sale channels are brewery-owned rows, but one name is load-bearing:
+-- private.ship_order_impl finds the wholesale channel by the literal name
+-- 'Wholesale'. Renaming or deleting that row would break shipping, so both
+-- RPCs refuse it. Everything else about it (its tax treatment) stays editable.
+create function upsert_sale_channel(
+  p_brewery uuid, p_id uuid, p_name text, p_tax_treatment public.tax_treatment, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.sale_channels;
+begin
+  perform private.assert_staff(p_brewery, array['admin']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'upsert_sale_channel', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'id', p_id, 'name', p_name, 'tax_treatment', p_tax_treatment));
+  if v_replay is not null then return v_replay; end if;
+  if p_id is null then
+    insert into public.sale_channels (brewery_id, name, tax_treatment)
+      values (p_brewery, p_name, p_tax_treatment) returning * into v_row;
+  else
+    select * into v_row from public.sale_channels where id = p_id and brewery_id = p_brewery;
+    if not found then raise exception 'sale channel not found'; end if;
+    if v_row.name = 'Wholesale' and p_name <> 'Wholesale' then
+      raise exception 'Wholesale is the shipping channel' using errcode = 'P0001';
+    end if;
+    update public.sale_channels set name = p_name, tax_treatment = p_tax_treatment
+      where id = p_id and brewery_id = p_brewery returning * into v_row;
+  end if;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- A channel a movement references is held by the inventory_movements foreign
+-- key (on delete restrict), which raises 23503; the command turns that into
+-- 'channel is in use'. Wholesale is refused before the delete is attempted.
+create function delete_sale_channel(
+  p_brewery uuid, p_id uuid, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.sale_channels;
+begin
+  perform private.assert_staff(p_brewery, array['admin']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'delete_sale_channel', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'id', p_id));
+  if v_replay is not null then return v_replay; end if;
+  select * into v_row from public.sale_channels where id = p_id and brewery_id = p_brewery;
+  if not found then raise exception 'sale channel not found'; end if;
+  if v_row.name = 'Wholesale' then
+    raise exception 'Wholesale is the shipping channel' using errcode = 'P0001';
+  end if;
+  delete from public.sale_channels where id = p_id and brewery_id = p_brewery;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- p_tax_treatment is the customer's override of its sale channel's default
+-- (§16.3): null means inherit, and every write sets it, so clearing an
+-- override is passing null rather than a second command.
 create function upsert_customer(
   p_brewery uuid, p_id uuid, p_name text, p_type public.customer_type, p_state text,
-  p_price_list uuid, p_license_no text, p_payment_terms text, p_request_id uuid
+  p_price_list uuid, p_license_no text, p_payment_terms text, p_tax_treatment public.tax_treatment, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_replay jsonb; v_row public.customers;
 begin
   perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'upsert_customer', p_request_id,
-    jsonb_build_object('brewery', p_brewery, 'id', p_id, 'name', p_name, 'type', p_type, 'state', p_state, 'price_list', p_price_list, 'license_no', p_license_no, 'payment_terms', p_payment_terms));
+    jsonb_build_object('brewery', p_brewery, 'id', p_id, 'name', p_name, 'type', p_type, 'state', p_state, 'price_list', p_price_list, 'license_no', p_license_no, 'payment_terms', p_payment_terms, 'tax_treatment', p_tax_treatment));
   if v_replay is not null then return v_replay; end if;
   if p_id is null then
-    insert into public.customers (brewery_id, name, type, state, price_list_id, license_no, payment_terms)
-      values (p_brewery, p_name, p_type, p_state, p_price_list, p_license_no, coalesce(p_payment_terms, 'net30')) returning * into v_row;
+    insert into public.customers (brewery_id, name, type, state, price_list_id, license_no, payment_terms, tax_treatment)
+      values (p_brewery, p_name, p_type, p_state, p_price_list, p_license_no, coalesce(p_payment_terms, 'net30'), p_tax_treatment) returning * into v_row;
   else
     update public.customers set name = p_name, type = p_type, state = p_state, price_list_id = p_price_list,
-      license_no = p_license_no, payment_terms = coalesce(p_payment_terms, payment_terms)
+      license_no = p_license_no, payment_terms = coalesce(p_payment_terms, payment_terms), tax_treatment = p_tax_treatment
       where id = p_id and brewery_id = p_brewery returning * into v_row;
     if not found then raise exception 'customer not found'; end if;
   end if;
@@ -4432,7 +4484,9 @@ grant execute on function
   create_bin(uuid,uuid,text,uuid),
   update_bin(uuid,uuid,text,uuid),
   delete_bin(uuid,uuid,uuid),
-  upsert_customer(uuid,uuid,text,public.customer_type,text,uuid,text,text,uuid),
+  upsert_customer(uuid,uuid,text,public.customer_type,text,uuid,text,text,public.tax_treatment,uuid),
+  upsert_sale_channel(uuid,uuid,text,public.tax_treatment,uuid),
+  delete_sale_channel(uuid,uuid,uuid),
   upsert_ship_to(uuid,uuid,uuid,text,text,text,text,text,text,uuid),
   upsert_price_list(uuid,uuid,text,uuid),
   set_price(uuid,uuid,uuid,int,uuid),

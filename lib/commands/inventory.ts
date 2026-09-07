@@ -27,7 +27,7 @@ export function insertMovement(ctx: Ctx, input: z.infer<typeof movementInput>, e
 }
 
 defineCommand({
-  name: "record_movement", description: "Append an inventory movement (immutable; corrections are reversals)",
+  name: "record_movement", description: "Append an inventory movement (immutable; corrections are reversals); sale_removal and depletion each name a saleChannelId, which no other type may carry",
   input: movementInput, roles: ["admin", "warehouse"],
   handler: (ctx, input, execution) => insertMovement(ctx, input, execution),
 });
