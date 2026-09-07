@@ -68,15 +68,27 @@ word cannot carry ours. "Price group" is unclaimed. The rename is cheap: "tier"
 appears nowhere in the customer guides, and its four hits in `content/docs/api.mdx`
 are generated screen names that `bun run docs:api` regenerates.
 
-**D9 — Category is not the price group.** The Brand screen already lists an
-optional `category`, gated and undefined elsewhere in the schema spec. It is a
-taxonomy — discrete and declared, someone says "this is an IPA". A price group is
-a cost band — continuous and derived, a cost falls in a range. Confirmed
-2026-09-07: price follows cost, not product type; IPAs cluster in one band
-because they cost alike, which is coincidence rather than mechanism. So the two
-are separate axes, a brand carries both, and only the group prices. This is what
-keeps D7 alive: had price followed category, the ceiling would never be consulted
-and the band mechanism would be dead weight.
+**D9 — The band is its own axis; Style and Category are not it.** The Brand
+screen already draws three pickers, and only one of them prices:
+
+| Field | Drawn values | What it is |
+| --- | --- | --- |
+| `Style` | Hazy IPA, IPA, Pils | product type — what a distributor calls a "tier" |
+| `Category` | Core, Seasonal, One-off, Barrel-aged | release cadence |
+| `Price group` | Standard, Specialty, Barrel-aged | the cost band |
+
+Style is discrete and declared; a price group is a band a cost falls into.
+Confirmed 2026-09-07: price follows cost, not product type. IPAs cluster in one
+band because they cost alike, which is coincidence rather than mechanism, so the
+axes stay separate and only the group prices. This is what keeps D7 alive: had
+price followed style, the ceiling would never be consulted and the band
+mechanism would be dead weight.
+
+"Barrel-aged" appearing as both a Category and a Price group value is not
+duplication — it is a cadence that also genuinely costs more. If every Category
+value came to mirror a Price group value, the band would have turned out not to
+be independent and D7 should be revisited. One overlap of four is the
+coincidence this decision predicts.
 
 ## Resolution chain
 
@@ -114,9 +126,11 @@ here, matching what Price tiers, Menu and POS item already draw.
 **Price group** (was `Price tiers`; the list screen `Price lists` becomes `Price groups`) — gains `Cost ceiling` and a UPC column in
 Format defaults: `[Format, Price, UPC, Source]`. Behind `SCHEMA-GATE`.
 
-**Brand** (named `Product` before `origin/backend`) — gains one `Price group` field. This is the binding point.
-Pre-filled from the recipe parent's default when the brand is created, and
-changeable at any time. Behind `SCHEMA-GATE`.
+**Brand** (named `Product` before `origin/backend`) — **already drawn.** The
+`Price group` picker exists at `screens.tsx:1553`, gated by the brand screen's
+own `[SCHEMA-GATE: nullable columns on the brand …]`. This design adds nothing
+here; it only makes the group that picker names carry a barcode and a ceiling.
+The recipe parent's default pre-fills it on brand creation.
 
 **SKU** — spec sentence at the "SKU owns the stable sellable identity, active
 state, UPC/provider mappings" line is corrected: the SKU keeps provider mappings
