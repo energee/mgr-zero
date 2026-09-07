@@ -101,12 +101,13 @@ describe("SCREENS", () => {
     expect(ferm).toContain("Add stage");
   });
 
-  it("shows a SKU the barcode its group resolves, and never claims to own one", () => {
+  it("lets a SKU carry an optional UPC; price is never a SKU exception", () => {
     const sku = SCREENS.find((s) => s.name === "SKU")!;
     expect(sku.spec).not.toMatch(/UPC\/provider mappings/);
-    expect(String(sku.spec)).toMatch(/price group/i);
-    expect(text("SKU")).toContain("Barcode");
-    expect(text("SKU")).toContain(INV.upc);
+    expect(sku.spec).not.toMatch(/price exception/);
+    expect(String(sku.writes)).not.toMatch(/SCHEMA-GATE: revision 2 §16\.2/);
+    expect(text("SKU")).toMatch(/UPC/);
+    expect(body("SKU")).toContain(INV.upc);
   });
 
   it("lets a recipe parent suggest a price group without pricing a version", () => {
@@ -214,7 +215,7 @@ describe("SCREENS", () => {
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands or leaves; the venue split is
     // derived rather than counted by hand in a comment that kept growing.
-    expect(SCREENS).toHaveLength(180);
+    expect(SCREENS).toHaveLength(184);
     expect(SCREENS.filter((s) => s.venue)).toHaveLength(17);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
@@ -684,8 +685,8 @@ describe("SCREENS", () => {
     for (const name of names) expect(SCREENS.some((s) => s.name === name), name).toBe(true);
     const shop = SCREENS.find((s) => s.name === "Shop")!;
     const shopHtml = renderToStaticMarkup(createElement("div", null, shop.body));
-    expect(shopHtml).toMatch(/p disabled|disabled/);
-    expect(shopHtml).toMatch(/ship from/i);
+    expect(shopHtml).toMatch(/Ships from/);
+    expect(shopHtml).toMatch(/Review order/);
     const history = SCREENS.find((s) => s.name === "Order history")!;
     const historyHtml = renderToStaticMarkup(createElement("div", null, history.body));
     expect(historyHtml).toMatch(/Reorder/);
@@ -766,7 +767,7 @@ describe("SCREENS", () => {
     expect(back).toContain("md:flex-row");
     expect(back).toContain("Add customer");
     for (const [name, action] of [
-      ["Work", "New order"], ["Orders", "New order"], ["Batches", "New batch"],
+      ["Work", "New order"], ["Orders", "New order"], ["Transfers", "New transfer"], ["Batches", "New batch"],
       ["Packaging runs", "Schedule run"], ["Purchase orders", "New PO"], ["Routes", "New route"],
       ["Locations", "Add location"], ["Finished goods", "Add SKU"], ["Customers", "Add customer"],
       ["Catalog", "Add brand"], ["SKU list", "Add SKU"], ["Cellar map", "Add vessel"],
@@ -818,7 +819,7 @@ describe("SCREENS", () => {
     for (const name of ["Compliance registry", "Chat settings", "Menu", "Tap board", "Variance by brand"]) {
       expect(html(name), name).toContain("tablist");
     }
-    for (const name of ["Work", "Orders", "Batches", "Packaging runs", "Purchase orders", "Routes"]) {
+    for (const name of ["Work", "Orders", "Transfers", "Batches", "Packaging runs", "Purchase orders", "Routes"]) {
       expect(html(name), name).toContain("tablist");
     }
     expect(html("Packaging runs")).toContain("data-active:bg-primary");
@@ -874,5 +875,37 @@ describe("SCREENS", () => {
       const html = renderToStaticMarkup(createElement("div", null, s!.hd, s!.body));
       expect(filled(html).length, name).toBeLessThanOrEqual(1);
     }
+  });
+
+  it("treats a poured format as never a SKU", () => {
+    const brand = SCREENS.find((s) => s.name === "Brand")!;
+    expect(JSON.stringify(brand.states)).toMatch(/never a SKU/);
+    expect(String(brand.spec)).not.toMatch(/draft pours are SKUs/i);
+    expect(String(brand.spec)).not.toMatch(/SCHEMA-GATE:[^\]]*styles table/);
+  });
+
+  it("ungates Formats, Ship on delivery, and Shop once those writes exist", () => {
+    expect(body("Formats")).not.toContain("data-gated");
+    expect(body("Format")).not.toContain("data-gated");
+    expect(String(SCREENS.find((s) => s.name === "Package BOM")!.writes)).not.toMatch(/SCHEMA-GATE/);
+    const ship = SCREENS.find((s) => s.name === "Ship on delivery")!;
+    expect((ship.states ?? []).map(([n]) => n)).not.toContain("schema gate");
+    expect(body("Ship on delivery")).not.toMatch(/isn't available yet/);
+    expect(body("Shop")).not.toMatch(/Review is unavailable/);
+    expect(String(SCREENS.find((s) => s.name === "Shop")!.reads)).not.toMatch(/SCHEMA\/RLS-GATE/);
+  });
+
+  it("opens Order Adjust on Adjust lines, not Short pick", () => {
+    expect(SCREENS.find((s) => s.name === "Order")!.to?.Adjust).toBe("Adjust lines");
+    expect(SCREENS.some((s) => s.name === "Adjust lines")).toBe(true);
+    expect(SCREENS.find((s) => s.name === "Short pick")!.spec).toMatch(/Opens from a Pick line/);
+  });
+
+  it("draws the stock-transfer document separately from Complete transfer", () => {
+    for (const name of ["Transfers", "New transfer", "Transfer detail"]) {
+      expect(SCREENS.some((s) => s.name === name), name).toBe(true);
+    }
+    expect(String(SCREENS.find((s) => s.name === "Transfers")!.writes)).toContain("create_stock_transfer");
+    expect(String(SCREENS.find((s) => s.name === "Complete transfer")!.writes)).toContain("ship_order");
   });
 });

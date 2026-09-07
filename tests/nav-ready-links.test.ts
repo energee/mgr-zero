@@ -51,6 +51,6 @@ describe("shippedNav", () => {
     expect(navFor(shippedNav(STAFF_NAV), "warehouse").find((t) => t.label === "More")!.children!.map((c) => c.label))
       .toEqual(["Units"]);
     expect(navFor(shippedNav(STAFF_NAV), "admin").find((t) => t.label === "More")!.children!.map((c) => c.label))
-      .toEqual(["Invoices", "Catalog", "Customers", "Price groups", "Recipes", "Settings", "Sale channels", "Units"]);
+      .toEqual(["Invoices", "Catalog", "Customers", "Price groups", "Recipes", "Settings", "Sale channels", "Locations", "Units"]);
   });
 });
