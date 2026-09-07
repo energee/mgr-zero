@@ -62,3 +62,7 @@ next-env.d.ts
 
 # Loose screenshots from browser eyeball checks
 /*.png
+
+# supabase CLI scratch in the test stack workdir
+/tests/supabase/supabase/.branches/
+/tests/supabase/supabase/.temp/

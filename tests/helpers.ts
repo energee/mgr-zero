@@ -52,10 +52,12 @@ export async function makeStaffCtx(breweryId: string, role: "admin" | "sales" | 
   return { db, userId: staff.id, breweryId, role };
 }
 
-// psql against the local database for pg_catalog assertions (schema-* tests):
-// present on dev machines via libpq and on ubuntu-latest CI; DATABASE_URL
-// overrides the local Supabase default. `quiet` drops psql's own chatter.
-const DB = process.env.DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:54342/postgres";
+// psql against the test database for pg_catalog assertions (schema-* tests):
+// present on dev machines via libpq and on ubuntu-latest CI. DATABASE_URL comes
+// from .env.test.local (scripts/test-db.sh → the mgr_test stack on 54352);
+// the fallback is CI's single fresh stack. `quiet` drops psql's own chatter.
+export const TEST_DB_PORT = 54352;
+export const DB = process.env.DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:54342/postgres";
 export function sql(q: string, quiet = false): string[] {
   const args = quiet ? [DB, "-Atq", "-c", q] : [DB, "-Atc", q];
   return execFileSync("psql", args, { encoding: "utf8" }).trim().split("\n").filter(Boolean);

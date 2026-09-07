@@ -18,6 +18,8 @@ export default defineConfig({
     include: ["tests/**/*.test.ts"],
     testTimeout: 20000,
     fileParallelism: false,
-    env: loadEnv("", process.cwd(), ""),
+    // Mode "test" layers .env.test.local (written by scripts/test-db.sh: the
+    // throwaway stack on 5435x) over .env.local (the app stack next dev uses).
+    env: loadEnv("test", process.cwd(), ""),
   },
 });

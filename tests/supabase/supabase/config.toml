@@ -1,0 +1,63 @@
+# tests/supabase/supabase/config.toml — the throwaway vitest stack.
+# Same baseline as supabase/config.toml (migrations is a symlink), different
+# project_id and ports (5435x) so `next dev` keeps its own database on 5434x.
+# Start/reset it with `bash scripts/test-db.sh`; never point the app here.
+project_id = "mgr_test"
+
+[api]
+enabled = true
+port = 54351
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+auto_expose_new_tables = false
+
+[db]
+port = 54352
+shadow_port = 54350
+health_timeout = "2m"
+major_version = 17
+
+[db.pooler]
+enabled = false
+
+[db.migrations]
+enabled = true
+
+[db.seed]
+enabled = false
+
+[realtime]
+enabled = false
+
+[studio]
+enabled = false
+
+[local_smtp]
+enabled = true
+port = 54354
+
+[storage]
+enabled = false
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+jwt_expiry = 3600
+enable_signup = true
+minimum_password_length = 6
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+
+[auth.rate_limit]
+email_sent = 2
+sign_in_sign_ups = 30
+token_verifications = 30
+
+[edge_runtime]
+enabled = false
+
+[analytics]
+enabled = false
