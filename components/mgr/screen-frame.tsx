@@ -43,8 +43,8 @@ export function ScreenFrame({ screen: s, persona = PERSONAS[0] }: { screen: Scre
   }
   if (s.surface === "entry") {
     return (
-      <div className="flex flex-col justify-end bg-background p-4 @md:items-center @md:justify-center">
-        <div className="flex w-full flex-col gap-2 rounded-xl border bg-card p-6 @md:max-w-[420px]">
+      <div className="flex flex-col justify-end bg-background p-4 md:items-center md:justify-center">
+        <div className="flex w-full flex-col gap-2 rounded-xl border bg-card p-6 [&_[data-slot=button]]:w-full md:max-w-[420px]">
           {s.hd}
           {s.body}
         </div>

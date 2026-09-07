@@ -12,6 +12,7 @@ import { SCREENS, type Screen } from "../components/mgr/screens";
 import { E, splitPinned } from "../components/mgr/e";
 import { VenueFrame } from "../components/mgr/venue";
 import { AppShell } from "../components/mgr/app-shell";
+import { ScreenFrame } from "../components/mgr/screen-frame";
 
 /** One screen's body as static markup, by name. Rendered once and kept: the
  *  suite asks for the same handful of screens across a dozen assertions. */
@@ -558,6 +559,51 @@ describe("SCREENS", () => {
     expect(btns).not.toContain("md:grid-cols-3");
     const tiles = renderToStaticMarkup(E.tiles([["FV1", "Pils"], ["FV2", "Hazy"]]));
     expect(tiles).toContain("auto-fill");
+    // Page actions fill the phone column and hug the label from md up. Entry
+    // cards stay a phone-width column even on a desk, so they keep the fill.
+    const btn = renderToStaticMarkup(E.btn("Save"));
+    expect(btn).toContain("w-full");
+    expect(btn).toContain("md:w-fit");
+    const pin = renderToStaticMarkup(E.pin(E.btn("Record")));
+    expect(pin).toContain("md:flex-row");
+    expect(pin).toContain("md:justify-end");
+    const signIn = SCREENS.find((s) => s.name === "Sign in")!;
+    const signInHtml = renderToStaticMarkup(createElement(ScreenFrame, { screen: signIn }));
+    expect(signInHtml).toMatch(/\[&amp;_\[data-slot=button\]\]:w-full/);
+    expect(signInHtml).toContain("md:max-w-[420px]");
+  });
+
+  it("places list-create actions on the title row", () => {
+    // A New/Add/Create/Schedule on a list is a header action, not a second
+    // full-width row between the title and the list. Form commits, in-form
+    // Add line, and the first-run inline Add location stay in the body.
+    const hd = renderToStaticMarkup(E.hd("Work", "sales default", E.btn("New order")));
+    expect(hd).toContain("md:flex-row");
+    expect(hd).toContain("md:justify-between");
+    expect(hd).toContain("New order");
+    const back = renderToStaticMarkup(E.back("More", "Customers", E.btn("Add customer")));
+    expect(back).toContain("md:flex-row");
+    expect(back).toContain("Add customer");
+    for (const [name, action] of [
+      ["Work", "New order"], ["Orders", "New order"], ["Batches", "New batch"],
+      ["Packaging runs", "Schedule run"], ["Purchase orders", "New PO"], ["Routes", "New route"],
+      ["Locations", "Add location"], ["Finished goods", "Add SKU"], ["Customers", "Add customer"],
+      ["Catalog", "Add brand"], ["SKU list", "Add SKU"], ["Cellar map", "Add vessel"],
+      ["Materials on hand", "Add material"], ["Vendors", "Add vendor"], ["Materials", "Add material"],
+      ["Contracts", "Add contract"], ["Recipes", "Create recipe"], ["Price lists", "Create price list"],
+    ] as const) {
+      const html = body(name);
+      expect(html, name).toMatch(new RegExp(`md:flex-row[^>]*>[\\s\\S]*${action}`));
+      const at = html.indexOf(`>${action}<`);
+      const item = html.indexOf('data-slot="item"');
+      expect(at, name).toBeGreaterThan(-1);
+      if (item !== -1) expect(at, `${name}: ${action} before the list`).toBeLessThan(item);
+    }
+    expect(body("Me")).toMatch(/md:flex[\s\S]*Change password[\s\S]*Sign out/);
+    expect(body("Portal Me")).toMatch(/md:flex[\s\S]*Change password[\s\S]*Sign out/);
+    const firstRun = body("First-run checklist");
+    expect(firstRun).not.toMatch(/md:flex-row[^>]*>[\s\S]*Set up Demo Brewing[\s\S]*Add location/);
+    expect(firstRun).toMatch(/>Add location</);
   });
 
   it("uses the control that does the job on view switchers and roles (#99)", () => {
