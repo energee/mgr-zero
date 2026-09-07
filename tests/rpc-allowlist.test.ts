@@ -41,6 +41,7 @@ const AUTHENTICATED_RPCS = [
   "portal_create_order(uuid,uuid,uuid,text,text,jsonb,uuid)",
   "receive_stock_transfer(uuid,jsonb,uuid)",
   "reconcile_chat_installation(uuid,boolean,text)",
+  "record_brew_day(uuid,uuid,uuid,numeric,date,uuid)",
   "record_inventory_movement(uuid,uuid,uuid,uuid,numeric,movement_type,uuid,text,text,uuid)",
   "record_pick(uuid,jsonb,uuid)",
   "record_stock_transfer_pick(uuid,jsonb,uuid)",
@@ -50,6 +51,7 @@ const AUTHENTICATED_RPCS = [
   "replace_format_components(uuid,uuid,jsonb,uuid)",
   "resolve_short_pick(uuid,uuid,numeric,text,text,uuid)",
   "return_shipment(uuid,jsonb,uuid,text,uuid)",
+  "schedule_batch(uuid,uuid,uuid,date,numeric,text,uuid)",
   "set_brewery_quiet_hours(uuid,time without time zone,time without time zone)",
   "set_notification_destination(uuid,text)",
   "set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text)",
@@ -72,6 +74,7 @@ const AUTHENTICATED_RPCS = [
   "upsert_price_group(uuid,uuid,text,integer,integer,uuid)",
   "upsert_sale_channel(uuid,uuid,text,tax_treatment,uuid)",
   "upsert_ship_to(uuid,uuid,uuid,text,text,text,text,text,text,uuid)",
+  "upsert_vessel(uuid,uuid,text,vessel_kind,numeric,uuid)",
 ];
 
 describe("authenticated RPC allowlist", () => {

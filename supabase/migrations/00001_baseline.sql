@@ -3213,6 +3213,90 @@ begin
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
+-- ---------------------------------------------------------------- vessels and batches
+-- A vessel is cellar hardware; it deliberately has no status column, because
+-- what is in it is derived from the open row in vessel_occupancies.
+create function upsert_vessel(
+  p_brewery uuid, p_vessel uuid, p_name text, p_kind public.vessel_kind, p_capacity_bbl numeric, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.vessels;
+begin
+  perform private.assert_staff(p_brewery, array['admin','brewer']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'upsert_vessel', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'vessel', p_vessel, 'name', p_name, 'kind', p_kind, 'capacity_bbl', p_capacity_bbl));
+  if v_replay is not null then return v_replay; end if;
+  if p_vessel is null then
+    insert into public.vessels (brewery_id, name, kind, capacity_bbl)
+    values (p_brewery, p_name, p_kind, p_capacity_bbl) returning * into v_row;
+  else
+    update public.vessels set name = p_name, kind = p_kind, capacity_bbl = p_capacity_bbl
+    where id = p_vessel and brewery_id = p_brewery returning * into v_row;
+    if v_row.id is null then raise exception 'vessel not found'; end if;
+  end if;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- Scheduling is intent, not commitment: the brand is optional (§16.9 — identity
+-- is required at packaging, not at the kettle) and so is the recipe version, so
+-- a brewer can pencil in a brew day before deciding what goes in it. Neither is
+-- cross-checked against the other: a recipe may itself be brand-less.
+create function schedule_batch(
+  p_brewery uuid, p_brand uuid, p_recipe_version uuid, p_planned_on date, p_planned_bbl numeric,
+  p_note text, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid; v_replay jsonb; v_row public.batches;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin','brewer']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'schedule_batch', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'brand', p_brand, 'recipe_version', p_recipe_version,
+      'planned_on', p_planned_on, 'planned_bbl', p_planned_bbl, 'note', p_note));
+  if v_replay is not null then return v_replay; end if;
+  -- The composite FKs on (intended_brand_id, brewery_id) and
+  -- (recipe_version_id, brewery_id) already refuse another tenant's rows; these
+  -- checks only turn that into a readable error.
+  if p_brand is not null and not exists (select 1 from public.brands where id = p_brand and brewery_id = p_brewery)
+    then raise exception 'brand not found'; end if;
+  if p_recipe_version is not null and not exists (
+    select 1 from public.recipe_versions where id = p_recipe_version and brewery_id = p_brewery)
+    then raise exception 'recipe version not found'; end if;
+
+  insert into public.batches (brewery_id, intended_brand_id, recipe_version_id, planned_on, planned_bbl, note, created_by)
+  values (p_brewery, p_brand, p_recipe_version, p_planned_on, p_planned_bbl, p_note, v_actor) returning * into v_row;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- One call stamps the brew day and opens the occupancy, so a brewed batch is
+-- never sitting in nowhere. started_at is midnight of brewed_on: the cellar
+-- thinks in days, and the gist exclusion on (vessel_id, tstzrange) then reads
+-- as "this vessel was this batch's from that day on". The vessel row is locked
+-- first so two concurrent brews queue rather than race the constraint, and the
+-- open-occupancy check can report `occupied` instead of a constraint name.
+create function record_brew_day(
+  p_brewery uuid, p_batch uuid, p_vessel uuid, p_initial_bbl numeric, p_brewed_on date, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_batch public.batches; v_vessel public.vessels; v_occ public.vessel_occupancies;
+begin
+  perform private.assert_staff(p_brewery, array['admin','brewer']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'record_brew_day', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'batch', p_batch, 'vessel', p_vessel,
+      'initial_bbl', p_initial_bbl, 'brewed_on', p_brewed_on));
+  if v_replay is not null then return v_replay; end if;
+
+  select * into v_vessel from public.vessels where id = p_vessel and brewery_id = p_brewery for update;
+  if v_vessel.id is null then raise exception 'vessel not found'; end if;
+  select * into v_batch from public.batches where id = p_batch and brewery_id = p_brewery for update;
+  if v_batch.id is null then raise exception 'batch not found'; end if;
+  if v_batch.brewed_on is not null then raise exception 'batch % was already brewed on %', v_batch.batch_no, v_batch.brewed_on; end if;
+  if exists (select 1 from public.vessel_occupancies o where o.vessel_id = p_vessel and o.ended_at is null)
+    then raise exception 'vessel % is occupied; empty it first', v_vessel.name; end if;
+
+  update public.batches set brewed_on = p_brewed_on where id = p_batch returning * into v_batch;
+  insert into public.vessel_occupancies (brewery_id, vessel_id, batch_id, started_at, initial_bbl)
+  values (p_brewery, p_vessel, p_batch, p_brewed_on::timestamptz, p_initial_bbl) returning * into v_occ;
+  return private.complete_command_request(p_request_id,
+    jsonb_build_object('batch', to_jsonb(v_batch), 'occupancy', to_jsonb(v_occ)));
+end $$;
+
 -- ---------------------------------------------------------------- Stock transfers
 -- Internal moves of stuff between two locations (spec 2026-09-06 Decision 3).
 create function private.lock_transfer(p_transfer uuid, p_allowed public.stock_transfer_status[]) returns public.stock_transfers
@@ -4566,7 +4650,10 @@ grant execute on function
   set_standing_allocation(uuid,uuid,numeric,uuid),
   create_replenishment_order(uuid,uuid,jsonb,uuid),
   create_recipe(uuid,uuid,text,text,uuid),
-  create_recipe_version(uuid,uuid,numeric,numeric,numeric,int,numeric,text,jsonb,uuid)
+  create_recipe_version(uuid,uuid,numeric,numeric,numeric,int,numeric,text,jsonb,uuid),
+  upsert_vessel(uuid,uuid,text,public.vessel_kind,numeric,uuid),
+  schedule_batch(uuid,uuid,uuid,date,numeric,text,uuid),
+  record_brew_day(uuid,uuid,uuid,numeric,date,uuid)
   to authenticated;
 grant usage on schema private, extensions to service_role;
 -- service_role reaches `private` only for the UUID default its seed inserts

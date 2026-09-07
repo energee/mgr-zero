@@ -99,3 +99,59 @@ describe("recipes and immutable versions", () => {
         and column_name in ('target_og_plato','target_fg_plato','target_abv') order by 1`)).toEqual([]);
   });
 });
+
+// Vessels, scheduling and the brew day. A batch is scheduled before it is
+// brewed and may carry no brand: identity is only required at packaging
+// (§16.9). `record_brew_day` is the one call that stamps brewed_on and opens
+// the vessel occupancy, so a batch can never be brewed into nowhere.
+describe("vessels, scheduling and brew day", () => {
+  let fv: string;
+
+  it("creates and renames a vessel, and lists it", async () => {
+    const v = (await runCommand("upsert_vessel", { name: "FV1", kind: "fermenter", capacityBbl: 30 }, ctx)) as { id: string };
+    expect(v.id).toBeTruthy();
+    fv = v.id;
+
+    const renamed = (await runCommand("upsert_vessel",
+      { id: fv, name: "FV-1", kind: "fermenter", capacityBbl: 31 }, ctx)) as { id: string; name: string; capacity_bbl: number };
+    expect(renamed).toMatchObject({ id: fv, name: "FV-1", capacity_bbl: 31 });
+
+    const listed = (await runCommand("list_vessels", {}, ctx)) as { id: string; name: string }[];
+    expect(listed.filter((r) => r.id === fv)).toEqual([expect.objectContaining({ name: "FV-1" })]);
+  });
+
+  it("schedules a batch with no brand, brews it into the fermenter, and refuses a second brew there", async () => {
+    const batch = (await runCommand("schedule_batch",
+      { plannedOn: "2026-10-01", plannedBbl: 30, note: "no brand yet" }, ctx)) as { id: string; intended_brand_id: string | null };
+    expect(batch.intended_brand_id).toBeNull();
+
+    const listed = (await runCommand("list_batches", {}, ctx)) as {
+      id: string; brand_name: string | null; recipe_name: string | null;
+      planned_on: string; brewed_on: string | null; vessel_name: string | null;
+    }[];
+    expect(listed.find((r) => r.id === batch.id))
+      .toMatchObject({ brand_name: null, recipe_name: null, planned_on: "2026-10-01", brewed_on: null, vessel_name: null });
+
+    await runCommand("record_brew_day", { batchId: batch.id, vesselId: fv, initialBbl: 29.5, brewedOn: "2026-10-01" }, ctx);
+
+    const day = (await runCommand("get_brew_day", { batchId: batch.id }, ctx)) as {
+      batch: { id: string; brewed_on: string };
+      occupancy: { id: string; initial_bbl: number; vessel_name: string } | null;
+    };
+    expect(day.batch).toMatchObject({ id: batch.id, brewed_on: "2026-10-01" });
+    expect(day.occupancy).toMatchObject({ initial_bbl: 29.5, vessel_name: "FV-1" });
+
+    // The same batch cannot be brewed twice.
+    await expect(runCommand("record_brew_day",
+      { batchId: batch.id, vesselId: fv, initialBbl: 10, brewedOn: "2026-10-02" }, ctx)).rejects.toThrow(/already brewed/);
+
+    // Nor can a second batch move into a vessel whose occupancy is still open.
+    const second = (await runCommand("schedule_batch", { plannedOn: "2026-10-02", plannedBbl: 30 }, ctx)) as { id: string };
+    await expect(runCommand("record_brew_day",
+      { batchId: second.id, vesselId: fv, initialBbl: 30, brewedOn: "2026-10-02" }, ctx)).rejects.toThrow(/occupied/);
+
+    // list_batches shows the open vessel on the brewed batch.
+    const after = (await runCommand("list_batches", {}, ctx)) as { id: string; vessel_name: string | null }[];
+    expect(after.find((r) => r.id === batch.id)?.vessel_name).toBe("FV-1");
+  });
+});
