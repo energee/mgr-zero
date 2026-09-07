@@ -73,7 +73,7 @@ Nothing here is a schema decision. An operation appears because a screen named i
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
-| `get_price_list` | query | Price tiers, Override |
+| `get_price_list` | query | Price group, Override |
 | `get_sku` | query | SKU |
 | `update_sku` | command | Catalog, Brand, SKU |
 ## Packaging: 8 to build, 4 built

@@ -7,7 +7,7 @@
 //
 // Two things this file deliberately does not draw. A create surface is the
 // edit surface with empty values (Create brewery is the pattern), so Add
-// customer, Add location, New PO, Add keg pool and Create price list open the
+// customer, Add location, New PO, Add keg pool and Create price group open the
 // records already here rather than earning frames of their own. And the
 // composer strip is shell chrome — screen-frame.tsx passes E.comp() to both
 // shells — so it is present under every staff and portal frame without any
@@ -50,7 +50,7 @@ const FERM_STAGES: Step[] = [
 /** Every staff role with what it opens; Team member draws one switch each. */
 const ROLES: [string, string, boolean][] = [
   ["Admin", "everything, including team and settings", false],
-  ["Sales", "orders, customers, price lists", true],
+  ["Sales", "orders, customers, price groups", true],
   ["Warehouse", "pick, receive, count, transfer", false],
   ["Brewer", "batches, cellar, packaging", true],
   ["Taproom", "taps, pours, menu", false],
@@ -103,8 +103,11 @@ const today = (rows: ReactNode) => (
 // One invoice threaded through the AR list, the portal and the QuickBooks
 // venue frames, plus its named siblings. Every invoice number in this file
 // comes from here, so one order cannot end up with two of them.
-const INV = {
+export const INV = {
   no: "INV-1042",
+  /** The Standard group's case code: the SKU frame reads what the group owns,
+   *  so both frames must show one number or the feature contradicts itself. */
+  upc: "00810123450127",
   order: "ORD-0231",
   paid: "INV-1037",
   failed: "INV-1039",
@@ -287,7 +290,6 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 1, slice: "all", tab: "More", name: "More", job: "Setup and desk review, never standing work",
-    to: { "Price tiers": "Price lists" },
     reads: "none [role navigation manifest]", writes: "none",
     states: DEFAULT_STATES,
     spec: "Role-filtered; hidden entries leave no gaps. Standing work remains in Today, Beer or Work.",
@@ -295,7 +297,7 @@ export const SCREENS: Screen[] = [
       {E.hd("More")}
       {E.nav("Invoices", "QuickBooks Online mapping and push", "", QuickBooksMark)}
       {E.nav("Catalog", "brands and SKUs")}
-      {E.nav("Price tiers", "customer price lists")}
+      {E.nav("Price groups", "customer price groups")}
       {E.nav("Customers", "accounts and ship-tos")}
       {E.nav("Recipes", "formulas and versions")}
       {E.nav("Compliance months", "reports and filing status")}
@@ -1245,14 +1247,14 @@ export const SCREENS: Screen[] = [
     reads: "get_order",
     writes: "return_shipment [one RPC: return_in movements at explicit destination + loss movement for a damaged return + credit memo at the invoiced price; owned-fleet keg_events linked to shipment when slice 9 is enabled]",
     states: [["permission", "sales or warehouse required", 1], ["unsold", "returns as sellable stock at the chosen destination"], ["damaged", "returns, then posts loss in the same RPC · never re-sold", 1], ["wrong item", "sellable · the mis-picked SKU goes back on the shelf"], ["invoice paid", "the credit memo sits unapplied as available credit", 1], ["partial", "only the returned units credit back"]],
-    spec: "Reason decides the beer, never the money. Unsold and wrong item return as sellable stock at the destination; damaged returns and is written to loss in the same RPC, because beer that came back broken is not inventory and pretending otherwise puts it back on a pick list. The credit is the price frozen on the original invoice line and the deposit is the one recorded on the original shipment, never today's price list, on the same principle that freezes a channel onto a movement at write time. A paid invoice can still be returned: the credit memo lands unapplied and sits as available credit, which is the state the QuickBooks credit-memo frame already draws.",
+    spec: "Reason decides the beer, never the money. Unsold and wrong item return as sellable stock at the destination; damaged returns and is written to loss in the same RPC, because beer that came back broken is not inventory and pretending otherwise puts it back on a pick list. The credit is the price frozen on the original invoice line and the deposit is the one recorded on the original shipment, never today's price group, on the same principle that freezes a channel onto a movement at write time. A paid invoice can still be returned: the credit memo lands unapplied and sits as available credit, which is the state the QuickBooks credit-memo frame already draws.",
     body: (<>
       {E.back("ORD-0231", "Beer return")}
       {E.row("Hazy IPA · ½ bbl keg", "shipped 4 · returning", E.stq(1))}
       {E.chips(["damaged", "wrong item", "unsold"])}
       {E.pick("Return to", "Warehouse · original fulfillment source", ["Warehouse · original fulfillment source", "Taproom"])}
       {E.row("Deposit refund", "½ bbl pool · 1 · as deposited", "−$30.00")}
-      {E.info(`Credited at the price on ${INV.no}, not today’s price list.`)}
+      {E.info(`Credited at the price on ${INV.no}, not today’s price group.`)}
       {E.tape([["+1 Hazy ½ bbl · return in", "Warehouse"], ["−1 Hazy ½ bbl · loss · damaged", "not sellable"], ["credit memo number · on commit", "−$180.00"]])}
       {E.note("Empty-keg asset returns are a different Keg fleet command.")}
       {E.sp()}
@@ -1320,7 +1322,7 @@ export const SCREENS: Screen[] = [
       {E.pick("Type", "Retailer", ["Retailer", "Distributor"])}
       {E.edit("License number", "PA R-55821")}
       {E.edit("Terms", "Net 30")}
-      {E.pick("Price list", "Wholesale · standard", ["Wholesale · standard", "Wholesale · distributor", "Taproom"])}
+      {E.pick("Price group", "Wholesale · standard", ["Wholesale · standard", "Wholesale · distributor", "Taproom"])}
       {E.pick("Tax treatment", "Inherit from channel", ["Inherit from channel", ...TAX_TREATMENTS])}
       {E.nav("Ship-tos", "Main · Dock")}
       {E.row("Portal users", "2 active", E.act("Invite"))}
@@ -1531,7 +1533,7 @@ export const SCREENS: Screen[] = [
       {E.nav("Hazy IPA", "IPA · 6.8% · 3 SKUs")}
       {E.nav("Pils", "Lager · 4.9% · 2 SKUs")}
       {E.nav("Stout", "Stout · 7.2% · 1 SKU")}
-      {E.nav("Price lists", "3 tiers")}
+      {E.nav("Price groups", "3 groups")}
       {E.nav("Water profiles", "3 profiles")}
     </>),
   },
@@ -1561,9 +1563,9 @@ export const SCREENS: Screen[] = [
     name: "Brand",
     job: "Sellable facts without ledger writes, including the TTB fields",
     reads: "list_brands · list_skus",
-    writes: "upsert_brand* · create_sku* · update_sku [design]",
+    writes: "upsert_brand · update_sku [design; the products to brands rename] · create_sku",
     states: [["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class; description, category, price group and hops optional"], ["new style", "typing a style no one has used offers Add; saved with the brand", 0], ["new SKU", "choose one existing Format; a poured format (pint, taster) is a SKU that holds no stock"], ["inactive SKU", "hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"]],
-    spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table [SCHEMA-GATE: a per-brewery styles table that the brand references]; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category, price group and hops are optional [SCHEMA-GATE: nullable columns on the brand; price group is a label the price tier prices by format, not a price on the brand (§16.4)]. Package facts live on Formats, while the SKU is the stable brand × format identity used by inventory, orders, pricing and provider mappings; draft pours are SKUs on a poured format (§16.2). No UPC scan or container source editor here.",
+    spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table [SCHEMA-GATE: a per-brewery styles table that the brand references]; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category, price group and hops are optional [SCHEMA-GATE: nullable columns on the brand; price group is a label the group prices by format, not a price on the brand (§16.4)]. Package facts live on Formats, while the SKU is the stable brand × format identity used by inventory, orders, pricing and provider mappings; draft pours are SKUs on a poured format (§16.2). No UPC scan or container source editor here.",
     body: (<>
       {E.back("Catalog", "Hazy IPA")}
       {E.edit("Brand name", "Hazy IPA")}
@@ -1591,10 +1593,11 @@ export const SCREENS: Screen[] = [
     reads: "get_sku · list_formats [design; §16.2]",
     writes: "create_sku · update_sku [SCHEMA-GATE: revision 2 §16.2, SKU becomes brand × format]",
     states: [["permission", "sales or admin required", 1], ["active", "available to price and sell"], ["inactive", "history remains", 1], ["in use", "format cannot change; create another SKU", 1]],
-    spec: "A SKU owns the stable sellable identity, active state, UPC/provider mappings and any price exception. Its name, volume and packaging derive from the selected Format. There are no SKU packaging overrides: a different volume or BOM is a different Format.",
+    spec: "A SKU owns the stable sellable identity, active state, provider mappings and any price exception. Its barcode is not its own: it resolves through the brand's price group for this format, so every brand in a group scans alike and there is no SKU override to drift. Its name, volume and packaging derive from the selected Format. There are no SKU packaging overrides: a different volume or BOM is a different Format.",
     body: (<>
       {E.pick("Format", "½ bbl keg", ["½ bbl keg", "⅙ bbl keg", "case · 24×16 oz"])}
       {E.row("Active", "available to price and sell", E.sw(true, "Active"))}
+      {E.fld("Barcode", `${INV.upc} · Standard group`)}
       {E.info("Volume and packaging come from the Format. Create another Format when either differs.")}
       {E.btn("Save SKU")}
     </>),
@@ -2461,11 +2464,13 @@ export const SCREENS: Screen[] = [
     job: "Author immutable versions from assumptions; actuals keep predictions honest",
     reads: "list_recipes · get_recipe [design] · get_recipe_outcomes [design; per-batch actual OG/FG/ABV + realized efficiency/attenuation, derived from fermentation readings, never stored]",
     writes: "create_recipe [design; mutable parent row] · create_recipe_version [design; one RPC: immutable version + ingredients; SCHEMA-GATE: assumption and process-spec columns on recipe_versions (pre-boil volume, boil, whirlpool min/temp/rest, knockout temp, notes) + per-ingredient extract snapshot + extract potential on materials; typed target_og/fg/abv columns drop]",
-    states: permitted("brewer or admin required"),
+    states: [...permitted("brewer or admin required"), ["no group yet", "the brand picks one at packaging · nothing is blocked"]],
     spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. Versioning is disabled behind its schema gate. A new parent takes name and style only; versions append, and history is never edited. Costing lives on desk. A version is the executable process spec, not only the prediction inputs: volumes, boil, whirlpool and knockout are scalars here, while the mash and fermentation schedules and water open as their own screens because they repeat and carry add, reorder and delete. The mash temperature is gone from this page, because every mash step carries one and a scalar beside them is a second answer to one question. Batch size and knockout volume are gone too: the scale chips already state the batch size and Brew day already records knockout volume as its baseline. Three note fields become one.",
     body: (<>
       {E.back("Recipes", "Hazy IPA v4")}
       {E.row("Recipe parent · Hazy IPA · IPA", "name and style only", E.act("Create"))}
+      {E.pick("Default price group · optional", "Standard", ["Not decided", "Standard", "Specialty", "Barrel-aged"])}
+      {E.info("A pre-fill for the brand a batch packages into, nothing more. The version carries no price and no group; changing this cuts no new version.")}
       {E.chips(["per bbl", "15 bbl", "30 bbl"], 1)}
       {E.row("2-row", "mash · 44 lb / bbl", "660 lb")}
       {E.row("Citra", "boil · 10 min · 0.4 lb / bbl", "6 lb")}
@@ -3515,15 +3520,15 @@ export const SCREENS: Screen[] = [
     step: 8,
     slice: 1,
     tab: "More",
-    name: "Price lists",
-    to: { Taproom: "Price tiers" },
-    job: "See customer price tiers and open the prices each tier owns",
+    name: "Price groups",
+    to: { Taproom: "Price group", "Wholesale · standard": "Price group", "Wholesale · distributor": "Price group" },
+    job: "See customer price groups and open the prices each group owns",
     reads: "list_price_lists",
-    writes: "none [creation and pricing happen on Price tiers]",
-    states: [["unused", "a tier with no customers can still be edited"], ["empty", "no price lists yet: Create price list is the only action"]],
-    spec: "Reached from Catalog. Each row names its next action and opens Price tiers; Create price list opens the same surface for a new tier.",
+    writes: "none [creation and pricing happen on Price group]",
+    states: [["unused", "a group with no customers can still be edited"], ["empty", "no price groups yet: Create price group is the only action"]],
+    spec: "Reached from Catalog. Each row names its next action and opens Price group; Create price group opens the same surface for a new group.",
     body: (<>
-      {E.back("Catalog", "Price lists", E.btn("Create price list"))}
+      {E.back("Catalog", "Price groups", E.btn("Create price group"))}
       {E.row("Wholesale · standard", "18 customers · 12 priced formats", E.act("Edit prices"))}
       {E.row("Wholesale · distributor", "3 customers · 12 priced formats", E.act("Edit prices"))}
       {E.row("Taproom", "no customers · 8 priced formats", E.act("Edit prices"))}
@@ -3533,23 +3538,26 @@ export const SCREENS: Screen[] = [
     step: 8,
     slice: 1,
     tab: "More",
-    name: "Price tiers",
+    name: "Price group",
     to: { Edit: "Override", Add: "Override" },
-    job: "Price a format once per tier and override only the exceptions",
+    job: "Price a format once per group and override only the exceptions",
     reads: "list_price_lists [+ channel_id §16.4] · get_price_list [design; formats and SKU overrides]",
-    writes: "upsert_price_list · set_price_list_format · set_price_list_item · clear_price_list_item [price_list_formats is the tier default, price_list_items the SKU override; channel_id waits for sale channels]",
-    states: [["permission", "sales or admin required", 1], ["inherited", "the format price is what the customer sees"], ["overridden", "one brand × format priced away from the tier", 1], ["poured", "a pour is priceable here and is not a SKU"], ["no price", "neither a format default nor an override · the line cannot be sold", 1]],
-    spec: "Price lists are already tiers and the customer's assigned price list already assigns them; revision 2 adds the channel and makes a format priceable, so a taproom pour (which is not a SKU) can be priced at all. Drawn format-default with a per-SKU override, matching Menu and POS item, which already read “format default” and offer Reset to format price. §16.16 q1 leaves the direction open; drawing it the other way would make those two shipped frames inconsistent.",
+    writes: "upsert_price_list · set_price_list_format · set_price_list_item · clear_price_list_item [price_list_formats is the group default, price_list_items the SKU override; channel_id waits for sale channels]",
+    states: [["permission", "sales or admin required", 1], ["inherited", "the format price is what the customer sees"], ["overridden", "one brand × format priced away from the group", 1], ["poured", "a pour is priceable here and is not a SKU"], ["no price", "neither a format default nor an override · the line cannot be sold", 1], ["no ceiling", "the group is chosen by hand · nothing is suggested"], ["suggested", "a cost inside the band proposes this group · a person confirms", 0]],
+    spec: "A price group is the pricing a customer is already assigned, so nothing here is a new relationship; revision 2 adds the channel and makes a format priceable, so a taproom pour (which is not a SKU) can be priced at all. Drawn format-default with a per-SKU override, matching Menu and POS item, which already read “format default” and offer Reset to format price. §16.16 q1 leaves the direction open; drawing it the other way would make those two shipped frames inconsistent.",
     body: (<>
-      {E.back("Price lists", "Wholesale tier")}
-      {E.edit("Tier name", "Wholesale · standard")}
+      {E.back("Price groups", "Wholesale · standard")}
+      {E.edit("Group name", "Wholesale · standard")}
       {E.pick("Channel", "Wholesale", CHANNELS)}
+      {E.edit("Cost ceiling", "$1.85")}
+      {E.info("Groups sort by ceiling and the lower bound is the previous group’s. A cost inside this band suggests the group; nobody is moved automatically.")}
       {E.ttl("Format defaults")}
-      {E.tbl(["Format", "Price", "Source"], [["½ bbl keg", INV.hazyPrice, "tier default"], ["sixtel", "$95.00", "tier default"], ["case · 24×16oz", INV.pilsPrice, "tier default"]])}
+      {E.tbl(["Format", "Price", "UPC", "Source"], [["½ bbl keg", INV.hazyPrice, "none", "group default"], ["sixtel", "$95.00", "none", "group default"], ["case · 24×16oz", INV.pilsPrice, INV.upc, "group default"]])}
+      {E.info("Every brand in this group scans as the group’s code for that format. Kegs carry no retail code: they move on lot numbers, so a blank UPC is finished, not unfinished.")}
       {E.ttl("Brand × format overrides")}
       {E.row("Barrel-aged Stout · ½ bbl keg", `$240.00 · against a ${INV.hazyPrice} default`, E.act("Edit"), "w")}
       {E.row("Add override", "brand · format · price", E.act("Add"))}
-      {E.info(`All halves are ${INV.hazyPrice}, except the barrel-aged one. Clear an override and the row rejoins the tier.`)}
+      {E.info(`All halves are ${INV.hazyPrice}, except the barrel-aged one. Clear an override and the row rejoins the group.`)}
     </>),
   },
   {
@@ -3558,8 +3566,8 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "Override",
-    to: { "Save override": "Price tiers", "Clear override": "Price tiers" },
-    job: "Price one brand and format away from its tier default",
+    to: { "Save override": "Price group", "Clear override": "Price group" },
+    job: "Price one brand and format away from its group default",
     reads: "get_price_list [design; §16.4]",
     writes: "set_price_list_item · clear_price_list_item",
     states: [["permission", "sales or admin required", 1], ["overridden", "customer sees this price"], ["cleared", "format default applies"]],

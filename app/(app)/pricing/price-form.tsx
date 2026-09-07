@@ -1,5 +1,5 @@
 // app/(app)/pricing/price-form.tsx — CommandForm (bottom sheet on phone, dialog on desk) for set_price_list_item:
-// one SKU's override on a price list (the format default applies otherwise).
+// one SKU's override in a price group (the format default applies otherwise).
 // Staff enter dollars; this converts to integer cents before sending (the
 // command's unit_price_cents column is integer cents, per schema).
 "use client";
