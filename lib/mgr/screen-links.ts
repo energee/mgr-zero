@@ -25,7 +25,6 @@ export const TAPS: [string | RegExp, string][] = [
   [/^(Hazy IPA|Pils|Stout) · /, "SKU detail"],
   [/^Review order\b/, "Review order"],
   [/^Place order\b/, "Order detail"],
-  [/^Same as last week$/, "Review order"],
   ["Confirm", "Confirm order"],
   ["Confirm order", "Order"],
   ["Save draft", "Order"],

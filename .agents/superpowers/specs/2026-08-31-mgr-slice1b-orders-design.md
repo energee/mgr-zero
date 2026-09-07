@@ -44,9 +44,11 @@ given its own screen yet), QBO push and AI chat (1C), barcodes/bins/waves/routes
    quantities to credit → one transaction writes a `credit_memo` invoice with
    negative lines at original prices plus `return_in` movements. No free-form
    credit memos in 1B.
-7. **Portal surface** — beyond ordering: read-only invoices/credit memos,
-   their price-list catalog, and in/low/out availability badges derived from
-   ATP (never raw quantities).
+7. **Portal surface** — beyond ordering: read-only invoices/credit memos
+   and their price-list catalog grouped by brand and listed package (½ keg,
+   ⅙ keg, case, bottle). The shop is the wholesale offer, not ATP: no in/low/out
+   badges and no counts. Staff designate which packaging-run outputs are on
+   that list; Confirm still sees ATP.
 8. **Supporting CRUD** — full create/edit screens for customers (ship-tos
    inline) and price lists, alongside the existing CSV import.
 

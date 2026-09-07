@@ -63,7 +63,7 @@ not a claim that arbitrary numeric or multi-line data takes two literal taps.
 | Warehouse — pick a three-line order | Today **Pick** (1) → prefilled **Done picking** (1) = **2 taps**. | Today order (1) → Edit quantities (1) → three single-digit counts (3) → **Done picking** (1) = **6 taps minimum**; a short line adds reason/restock choices. | The two-tap path is only for all-as-ordered. `record_pick` is one atomic write for every line plus picked status. A shortage opens the **Short pick** frame: reason (1) + resolution chip (1) + verb (1) on top of the counts — never claim ≤2 for a short line. Restock after a cancel/adjust is a further standing Today/Work row, not part of the pick count. |
 | Taproom lead — weekly three-SKU count | Today `Weekly count` (1) → three single-digit counts (3) → **Record count** (1) = **5 taps minimum**. | Beer (1) → Taproom (1) → Weekly count (1) → three counts (3) → Record count (1) = **7 taps minimum**. | Over 3. This is a target-state screen; its Today row and commit stay disabled until the durable count occurrence/lines SCHEMA-GATE is resolved. |
 | Sales / admin — confirm order | Today **Confirm** (1) → **Confirm order** (1) = **2 taps** when blocking review is absent. | Work (1) → order (1) → Confirm order (1) = **3 taps**. | Meets the ≤2 landing-page promise. Any ATP/registration warning inserts a review step rather than hiding risk. |
-| Wholesale customer — repeat last order | Portal Order → **Same as last week** (1) → proposal **Place order** (1) = **2 taps**. | For a three-line new order: three `+` taps (3) → Review (1) → Place order (1) = **5 taps minimum**. | Meets the promise only when the prior fulfillment source, ship-to, prices, and active SKUs revalidate unchanged. Portal submit stays gated until a customer-safe source allowlist/default and RLS read exist. |
+| Wholesale customer — place an order | Portal Order → quantities on listed packages → **Review** (1) → **Place order** (1). | For a three-line new order: three `+` taps (3) → Review (1) → Place order (1) = **5 taps minimum**. Repeat is **Reorder** on a shipped order, which prefills Review. | Shop shows listed packages only (½ keg, ⅙ keg, case, bottle), never warehouse ATP. Portal submit stays gated until a customer-safe source allowlist/default and RLS read exist. |
 | Delivery driver — confirm drop | Driver landing shows the next stop: known signer chip (1) → **Delivered** (1) = **2 taps**. | Route (1) → stop (1) → signer field (1) → name keystrokes → Delivered (1) = **4 + name length**. | Meets the happy path. The schema stores `signed_by` text, not a signature asset; the UI must not imply an image signature is retained. |
 
 The composer can still be the fastest path for a fully entered sentence, but typed
@@ -288,7 +288,7 @@ controls, so a wall tablet is desktop layout with glove-safe targets.
 `/portal` is a complete separate shell with **Order · Orders · Invoices · Account** on
 phone and desktop. Order is the landing route; all four have selected, focus, loading,
 empty, and error states. Composer is restricted to the current customer's orderable
-catalog, own orders/invoices, repeat-order proposal, and draft/submit
+catalog, own orders/invoices, and draft/submit
 commands. The portal does not expose ATP/on-hand: those views are staff-only under the
 baseline RLS, while staff still receive the soft availability warning at confirm. It
 cannot discover staff tools or other customers. Portal copy is buyer-facing: price,
@@ -360,7 +360,7 @@ Dialog/Sheet on desk.
 | **Returns / credit memos** (1) | Take shipped beer back | Positive returned qty + reason → exact return rows + negative invoice preview | Same plus QBO credit status |
 | **Settings** | Rare configuration | Brewery (name, timezone, **TTB registry number**, **PA license**, fermentation-reading cadence default 24 h), Locations (**Add location**), Team, Chat Integrations, Import; deployment mode read-only if shown; no Notifications history. Chat includes disconnected/active/health controls and a fixture-only preview gallery for App Home, personal DM, private digest, preferences, gated forms, and reauthorization. | Same, wider controls with the preview beside settings when space permits |
 
-Portal frames are **Portal · Order** (steppers + Same as last week), **Portal · Review**
+Portal frames are **Portal · Order** (brands with listed packages — ½ keg, ⅙ keg, case, bottle — and steppers; no last-week shortcut, no ATP badges), **Portal · Review**
 (quantities, ship-to, "Ships from Warehouse", **Place order** — buyer copy only, disabled
 until the source contract exists; no persistent cart), **Portal · Orders** (rows expand
 into lines and adjusted-quantity copy; no staff verbs; read-only after submit), **Portal ·

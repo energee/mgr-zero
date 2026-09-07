@@ -1582,18 +1582,22 @@ export const SCREENS: Screen[] = [
     slice: 1,
     portal: "Order",
     name: "Shop",
-    to: { Change: "Account", "Hazy IPA · ½ bbl keg": "Shop", "Pils · 16 oz case": "Shop", "Stout · ⅙ bbl keg": "Shop" },
-    job: "A buyer catalog: price, package, quantity, Place order",
+    to: { Change: "Account", "½ bbl keg": "Shop", "⅙ bbl keg": "Shop", "case · 24×16 oz": "Shop", "12 oz bottle": "Shop" },
+    job: "A buyer catalog: listed packages by brand, quantity, Place order",
     reads: "portal_catalog [SCHEMA/RLS-GATE: return customer-allowed fulfillment source]",
     writes: "submit_order [SCHEMA/RLS-GATE: validate allowed from_location_id; one RPC: order + lines + submitted status]",
-    states: [["empty catalog", "call brewery; nothing orderable"], ["missing price", "item cannot enter cart", 1], ["no ship-to", "contact brewery; choose an existing ship-to", 1], ["repeat recheck", "SKU, price, ship-to and source revalidate", 1], ["receipt", "ORD number after commit"]],
-    spec: "Target 2 taps: Same as last week → Place order (the repeat proposal opens Review prefilled). Review stays disabled until the schema/RLS contract supplies and validates a customer-allowed source; it never silently chooses Warehouse. Stepper − and + each ship as 48×48 targets. No staff vocabulary (ATP, gates, fulfillment engineering) anywhere in the portal. No persistent cart: leaving the page keeps nothing.",
+    states: [["empty catalog", "call brewery; nothing orderable"], ["missing price", "item cannot enter cart", 1], ["no ship-to", "contact brewery; choose an existing ship-to", 1], ["unlisted package", "a format not on the wholesale list is absent", 1], ["receipt", "ORD number after commit"]],
+    spec: "Grouped by brand; each row is a package the brewery listed for wholesale (½ keg, ⅙ keg, case, bottle). The list is the offer, not warehouse ATP: no in/low/out badges, no counts. Unlisted packages are absent, not greyed. Schedule packaging run is where staff designate the list. Review stays disabled until the schema/RLS contract supplies and validates a customer-allowed source; it never silently chooses Warehouse. Stepper − and + each ship as 48×48 targets. No staff vocabulary (ATP, gates, fulfillment engineering) anywhere in the portal. No persistent cart: leaving the page keeps nothing. Reorder on a shipped order still prefills Review.",
     body: (<>
       {E.hd("Order", "Ridgeline")}
-      {E.btn("Same as last week", "g")}
-      {E.row("Hazy IPA · ½ bbl keg", INV.hazyPrice, E.stq(4))}
-      {E.row("Pils · 16 oz case", INV.pilsPrice, E.stq(6))}
-      {E.row("Stout · ⅙ bbl keg", "$62.00", E.stq(0))}
+      {E.ttl("Hazy IPA")}
+      {E.row("½ bbl keg", INV.hazyPrice, E.stq(4))}
+      {E.row("case · 24×16 oz", "$42.00", E.stq(0))}
+      {E.ttl("Pils")}
+      {E.row("case · 24×16 oz", INV.pilsPrice, E.stq(6))}
+      {E.row("12 oz bottle", "$18.00", E.stq(0))}
+      {E.ttl("Stout")}
+      {E.row("⅙ bbl keg", "$62.00", E.stq(0))}
       {E.row("Ships from", "Warehouse")}
       {E.row("Ship-to · requested date", "Main · Wed 9/9", E.act("Change"))}
       {E.sp()}
@@ -1613,7 +1617,7 @@ export const SCREENS: Screen[] = [
     reads: "portal_catalog [SCHEMA/RLS-GATE: return customer-allowed fulfillment source]",
     writes: "submit_order [SCHEMA/RLS-GATE: validate allowed from_location_id; one RPC: order + lines + submitted status]",
     states: [["price changed", "revalidated price shown before Place order", 1], ["inactive SKU", "line removed · told plainly", 1], ["submit error", "keep quantities · Retry safe", 1], ["duplicate", "same request returns the same ORD number"]],
-    spec: "The confirm step for both the stepper path and Same as last week. Buyer copy only: price, package, quantity, “Ships from Warehouse”, Place order. No ATP, no gate names. Place order stays disabled until the source contract exists. After submit the portal is read-only; changes go through the brewery.",
+    spec: "The confirm step for the shop steppers and for Reorder from a shipped order. Buyer copy only: price, package, quantity, “Ships from Warehouse”, Place order. No ATP, no gate names. Place order stays disabled until the source contract exists. After submit the portal is read-only; changes go through the brewery.",
     body: (<>
       {E.row("Hazy IPA · ½ bbl keg", INV.hazyPrice, E.stq(4, "Hazy IPA quantity"))}
       {E.row("Pils · 16 oz case", INV.pilsPrice, E.stq(6, "Pils quantity"))}
@@ -2060,14 +2064,15 @@ export const SCREENS: Screen[] = [
     reads: "list_occupancies [design; open, with volume and contents] · list_formats [design; for the brand in the source] · get_material_shortfalls [view; preview for the planned outputs]",
     writes: "schedule_packaging_run [design; one RPC: run with explicit source occupancy + planned outputs] · update_packaging_run [design; same sheet reopens a planned run until it starts]",
     states: [["permission", "brewer or warehouse required", 1], ["source chosen", "the brand comes from what is in the vessel, so only that brand's formats are offered"], ["short", "the materials table shows the shortage now, not on the day; Save still works, Start will not"], ["editing", "a planned run reopens here with its values filled; a started run cannot be rescheduled, only closed"], ["no open occupancy", "nothing to package: the source picker says so and links to Cellar"]],
-    spec: "The plan half of the packaging frame, pulled out so a run can be scheduled before it exists and edited until it starts. One source occupancy, chosen exactly, is the rule that lets close revalidate it later. Planned outputs are counts per format; the sheet converts to barrels and shows what is left in the vessel so a plan cannot exceed the source. Materials are previewed from the format BOM so a shortage is a planning fact, not a surprise at the line. Saving writes the run and its planned outputs in one RPC and lands on the run; nothing moves in the ledger until close.",
+    spec: "The plan half of the packaging frame, pulled out so a run can be scheduled before it exists and edited until it starts. One source occupancy, chosen exactly, is the rule that lets close revalidate it later. Planned outputs are counts per format; the sheet converts to barrels and shows what is left in the vessel so a plan cannot exceed the source. Each output can be listed on the wholesale shop (the brand × package buyers will see); listing is the offer, not an ATP promise, and a format left off is absent from Shop. Materials are previewed from the format BOM so a shortage is a planning fact, not a surprise at the line. Saving writes the run and its planned outputs in one RPC and lands on the run; nothing moves in the ledger until close.",
     body: (<>
       {E.edit("Planned date", "2026-09-05", "date")}
       {E.ttl("Source")}
       {E.nav("FV3 · Hazy IPA", "B-0416 · 42.0 bbl · gravity 2.1 · ready")}
       {E.ttl("Planned outputs")}
-      {E.row("Hazy · cans (case of 24)", "39.6 bbl", E.stq(118))}
-      {E.row("Hazy · ½ bbl keg", "2.0 bbl", E.stq(4))}
+      {E.row("Hazy · case · 24×16 oz", "39.6 bbl · on the wholesale list", <>{E.stq(118)}{E.sw(true, "On the wholesale list")}</>)}
+      {E.row("Hazy · ½ bbl keg", "2.0 bbl · on the wholesale list", <>{E.stq(4)}{E.sw(true, "On the wholesale list")}</>)}
+      {E.row("Hazy · ⅙ bbl keg", "not listed this run", <>{E.stq(0)}{E.sw(false, "On the wholesale list")}</>)}
       {E.fld("Left in FV3", "0.4 bbl · loss at close unless held")}
       {E.ttl("Materials")}
       {E.tbl(["need", "have", "short"], [["cans 2,832", "3,100", "0"], ["ends 2,832", "2,400", <><span className="text-warning-foreground">432</span></>], ["labels 2,832", "5,000", "0"], ["trays 118", "140", "0"]])}
