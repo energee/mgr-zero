@@ -1,6 +1,6 @@
 // tests/commands-inventory.test.ts — exercises the command handlers with a real RLS-bound Ctx.
 import { describe, it, expect, beforeAll } from "vitest";
-import { makeBrewery, makeStaffCtx } from "./helpers";
+import { makeBrewery, makeStaffCtx, channelId } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -30,7 +30,8 @@ describe("inventory commands", () => {
     const s = (await runCommand("create_sku", { brandId: p.id, formatId: f.id }, ctx)) as EntityWithId;
     const l = (await runCommand("create_location", { name: "WH2", kind: "warehouse" }, ctx)) as EntityWithId;
     const [bin] = (await runCommand("list_bins", { locationId: l.id }, ctx)) as EntityWithId[];
-    await expect(runCommand("record_movement", { skuId: s.id, locationId: l.id, binId: bin.id, qty: -1, type: "sale_removal", channel: "wholesale" }, ctx))
+    const wholesale = await channelId(ctx.breweryId, "Wholesale");
+    await expect(runCommand("record_movement", { skuId: s.id, locationId: l.id, binId: bin.id, qty: -1, type: "sale_removal", saleChannelId: wholesale }, ctx))
       .rejects.toThrow();
   });
 });

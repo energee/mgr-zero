@@ -1,6 +1,6 @@
 // tests/rls-ledger.test.ts
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation } from "./helpers";
+import { admin, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation, channelId } from "./helpers";
 import "../lib/commands/all";
 
 describe("ledger integrity + RLS", () => {
@@ -31,7 +31,8 @@ describe("ledger integrity + RLS", () => {
   it("sale_removal without dest_state is rejected by CHECK", async () => {
     const { error } = await admin.from("inventory_movements").insert({
       brewery_id: b.id, sku_id: sku.id, location_id: loc.id, bin_id: loc.binId,
-      qty: -1, bbl: -0.5, type: "sale_removal", channel: "wholesale", created_by: staff.id,
+      qty: -1, bbl: -0.5, type: "sale_removal", sale_channel_id: await channelId(b.id, "Wholesale"),
+      tax_treatment: "taxable", created_by: staff.id,
     });
     expect(error).not.toBeNull();
   });
@@ -58,7 +59,7 @@ describe("ledger integrity + RLS", () => {
   });
 });
 
-describe("removal_shape CHECK: channel/dest_state required on removals, null otherwise", () => {
+describe("removal_shape CHECK: channel/tax_treatment/dest_state required on removals, null otherwise", () => {
   // Uses its own brewery/sku/location (rather than the shared fixtures above)
   // so accepted inserts here don't pollute the on_hand/atp sums asserted
   // elsewhere in this file.
@@ -96,18 +97,30 @@ describe("removal_shape CHECK: channel/dest_state required on removals, null oth
     for (const { type, qty } of nonRemovals) {
       const { error } = await admin.from("inventory_movements").insert({
         brewery_id: b.id, sku_id: sku.id, location_id: loc.id, bin_id: loc.binId,
-        qty, bbl: qty * 0.5, type, channel: "wholesale", created_by: staff.id,
+        qty, bbl: qty * 0.5, type, sale_channel_id: await channelId(b.id, "Wholesale"),
+        tax_treatment: "taxable", created_by: staff.id,
       });
       expect(error, `${type} with a channel should be rejected`).not.toBeNull();
     }
   });
 
-  it("depletion requires channel=taproom and rejects a dest_state", async () => {
-    const { error } = await admin.from("inventory_movements").insert({
+  // Since #42 the depletion CHECK no longer pins the channel to Taproom: a
+  // brewery names its own channels, and dest_state discipline comes from the
+  // movement type, not the channel.
+  it("depletion requires a channel, accepts any channel, and rejects a dest_state", async () => {
+    const dtc = await channelId(b.id, "DTC");
+    const row = {
       brewery_id: b.id, sku_id: sku.id, location_id: loc.id, bin_id: loc.binId,
-      qty: -1, bbl: -0.5, type: "depletion", channel: "taproom", dest_state: "PA", created_by: staff.id,
-    });
-    expect(error, "depletion with a dest_state should be rejected").not.toBeNull();
+      qty: -1, bbl: -0.5, type: "depletion", created_by: staff.id,
+    } as const;
+    const noChannel = await admin.from("inventory_movements").insert({ ...row, tax_treatment: "taxable" });
+    expect(noChannel.error, "depletion without a channel should be rejected").not.toBeNull();
+    const withState = await admin.from("inventory_movements")
+      .insert({ ...row, sale_channel_id: dtc, tax_treatment: "taxable", dest_state: "PA" });
+    expect(withState.error, "depletion with a dest_state should be rejected").not.toBeNull();
+    const ok = await admin.from("inventory_movements")
+      .insert({ ...row, sale_channel_id: dtc, tax_treatment: "taxable" });
+    expect(ok.error, "depletion on any channel should be accepted").toBeNull();
   });
 });
 

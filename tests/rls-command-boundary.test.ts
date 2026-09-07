@@ -92,11 +92,11 @@ describe("staff command database boundary", () => {
   it("keeps warehouse movement and sales order lifecycle RPCs role-bound", async () => {
     const movement = await warehouseCtx.db.rpc("record_inventory_movement", { p_request_id: crypto.randomUUID(),
       p_brewery: brewery.id, p_sku: skuId, p_location: locationId, p_bin: binId, p_qty: 10,
-      p_type: "opening_balance", p_channel: null, p_dest_state: null, p_note: null,
+      p_type: "opening_balance", p_sale_channel: null, p_dest_state: null, p_note: null,
     });
     const salesMovement = await salesCtx.db.rpc("record_inventory_movement", { p_request_id: crypto.randomUUID(),
       p_brewery: brewery.id, p_sku: skuId, p_location: locationId, p_bin: binId, p_qty: 10,
-      p_type: "opening_balance", p_channel: null, p_dest_state: null, p_note: null,
+      p_type: "opening_balance", p_sale_channel: null, p_dest_state: null, p_note: null,
     });
     const order = await salesCtx.db.rpc("create_order", { p_request_id: crypto.randomUUID(),
       p_brewery: brewery.id, p_kind: "wholesale", p_customer: customerId, p_ship_to: shipToId,
@@ -302,7 +302,7 @@ describe("registered staff mutation role × RPC matrix", () => {
       command: "move_stock_bin", rpc: "move_stock_bin", allowed: ["admin", "warehouse"],
       input: async () => {
         const { data: bins } = await admin.from("bins").select("id").eq("location_id", locationId).order("name");
-        await contexts().admin.db.rpc("record_inventory_movement", { p_brewery: brewery.id, p_sku: skuId, p_location: locationId, p_bin: bins![0].id, p_qty: 5, p_type: "opening_balance", p_channel: null, p_dest_state: null, p_note: null, p_request_id: crypto.randomUUID() });
+        await contexts().admin.db.rpc("record_inventory_movement", { p_brewery: brewery.id, p_sku: skuId, p_location: locationId, p_bin: bins![0].id, p_qty: 5, p_type: "opening_balance", p_sale_channel: null, p_dest_state: null, p_note: null, p_request_id: crypto.randomUUID() });
         return {
           command: { skuId, qty: 1, fromBinId: bins![0].id, toBinId: bins![1].id },
           rpc: { p_brewery: brewery.id, p_sku: skuId, p_material: null, p_keg_pool: null, p_keg_size: null, p_qty: 1, p_from_bin: bins![0].id, p_to_bin: bins![1].id, p_note: null },
@@ -368,7 +368,7 @@ describe("registered staff mutation role × RPC matrix", () => {
         command: { skuId, locationId, binId, qty: 1, type: "opening_balance" },
         rpc: {
           p_brewery: brewery.id, p_sku: skuId, p_location: locationId, p_bin: binId, p_qty: 1,
-          p_type: "opening_balance", p_channel: null, p_dest_state: null, p_note: null,
+          p_type: "opening_balance", p_sale_channel: null, p_dest_state: null, p_note: null,
         },
       }),
     },

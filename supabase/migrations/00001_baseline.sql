@@ -45,7 +45,11 @@ create type location_kind as enum ('warehouse','taproom','storage');
 create type movement_type as enum
   ('opening_balance','production_in','adjustment','sale_removal','taproom_transfer',
    'depletion','return_in','destruction','loss','sample','festival_removal','location_transfer');
-create type sale_channel as enum ('wholesale','taproom','dtc','export');
+-- TTB removal tax treatment (§16.3). `taxable` is a taxpaid removal; the rest
+-- are the removals-without-payment-of-tax vocabulary. A sale channel carries a
+-- default, a customer may override it, and the resolved value is frozen onto
+-- the movement so a filed month is never restated by a later edit.
+create type tax_treatment as enum ('taxable','export','vessel_supplies','research','transfer_in_bond');
 create type allocation_source as enum ('order_line','taproom_standing');
 create type allocation_status as enum ('open','fulfilled','released');
 create type order_kind as enum ('wholesale','taproom_transfer');
@@ -135,6 +139,8 @@ create table customers (
   price_list_id uuid,                                  -- FK added after price_lists
   qbo_customer_id text,
   payment_terms text not null default 'net30',
+  -- null = inherit the sale channel's default tax treatment (§16.3).
+  tax_treatment tax_treatment,
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
   unique (brewery_id, name)
@@ -434,6 +440,38 @@ create table bins (
 );
 create index bins_brewery_idx on bins (brewery_id, location_id);
 
+-- Sale channels (§16.3, docs/plans/sale-channels-customizable.md): a per-brewery
+-- lookup modelled on `locations`, replacing the old `sale_channel` enum so a
+-- brewery names its own channels. `tax_treatment` is the channel default; a
+-- customer may override it. Movements reference a channel with `on delete
+-- restrict`, so "removable only if unused" is enforced by Postgres.
+create table sale_channels (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references breweries(id),
+  name text not null,
+  tax_treatment tax_treatment not null default 'taxable',
+  unique (id, brewery_id),
+  unique (brewery_id, name)
+);
+create index sale_channels_brewery_idx on sale_channels (brewery_id);
+
+-- Every brewery is born with the four defaults. A trigger rather than a
+-- creation path because rows arrive from seed scripts, onboarding and every
+-- test fixture; one trigger covers all of them.
+create function private.seed_sale_channels() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  insert into public.sale_channels (brewery_id, name, tax_treatment) values
+    (new.id, 'Wholesale', 'taxable'),
+    (new.id, 'Taproom',   'taxable'),
+    (new.id, 'DTC',       'taxable'),
+    (new.id, 'Export',    'export');
+  return new;
+end $$;
+
+create trigger seed_sale_channels_on_brewery
+  after insert on breweries for each row execute function private.seed_sale_channels();
+
 create table inventory_movements (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
@@ -443,7 +481,9 @@ create table inventory_movements (
   qty numeric(12,2) not null check (qty <> 0),   -- signed units
   bbl numeric(14,8) not null,                    -- qty * bbl_per_unit, frozen at write time (trigger)
   type movement_type not null,
-  channel sale_channel,
+  sale_channel_id uuid,
+  -- resolved at write time (customer override -> channel default) and frozen.
+  tax_treatment tax_treatment,
   dest_state text,
   lot_id uuid,                                   -- FK to lots added below
   ref uuid,                                      -- order_id / pos_sale id / run id
@@ -455,21 +495,24 @@ create table inventory_movements (
   foreign key (location_id, brewery_id) references locations (id, brewery_id),
   -- the bin must be one of this location's bins, structurally (spec 2026-09-06 Decision 1)
   foreign key (bin_id, location_id, brewery_id) references bins (id, location_id, brewery_id),
+  -- the channel must belong to this movement's brewery, structurally; restrict
+  -- so a referenced channel cannot be deleted out from under the ledger.
+  foreign key (sale_channel_id, brewery_id) references sale_channels (id, brewery_id) on delete restrict,
   -- removals must be negative and classified; inflows positive.
   constraint removal_shape check (
     case type
-      when 'sale_removal'     then qty < 0 and channel is not null and dest_state is not null
-      when 'depletion'        then qty < 0 and channel = 'taproom' and dest_state is null
-      when 'destruction'      then qty < 0 and channel is null and dest_state is null
-      when 'loss'             then qty < 0 and channel is null and dest_state is null
+      when 'sale_removal' then qty < 0 and sale_channel_id is not null and dest_state is not null and tax_treatment is not null
+      when 'depletion'    then qty < 0 and sale_channel_id is not null and dest_state is null and tax_treatment is not null
+      when 'destruction'      then qty < 0 and sale_channel_id is null and dest_state is null and tax_treatment is null
+      when 'loss'             then qty < 0 and sale_channel_id is null and dest_state is null and tax_treatment is null
       when 'sample'           then qty < 0 and dest_state is not null
       when 'festival_removal' then qty < 0 and dest_state is not null
-      when 'opening_balance'  then qty > 0 and channel is null and dest_state is null
-      when 'production_in'    then qty > 0 and channel is null and dest_state is null
-      when 'return_in'        then qty > 0 and channel is null and dest_state is null
-      when 'adjustment'       then channel is null and dest_state is null
-      when 'taproom_transfer' then channel is null and dest_state is null
-      when 'location_transfer' then channel is null and dest_state is null
+      when 'opening_balance'  then qty > 0 and sale_channel_id is null and dest_state is null and tax_treatment is null
+      when 'production_in'    then qty > 0 and sale_channel_id is null and dest_state is null and tax_treatment is null
+      when 'return_in'        then qty > 0 and sale_channel_id is null and dest_state is null and tax_treatment is null
+      when 'adjustment'       then sale_channel_id is null and dest_state is null and tax_treatment is null
+      when 'taproom_transfer' then sale_channel_id is null and dest_state is null and tax_treatment is null
+      when 'location_transfer' then sale_channel_id is null and dest_state is null and tax_treatment is null
       else true
     end)
 );
@@ -1861,7 +1904,9 @@ end $$;
 
 create function private.ship_order_impl(p_order uuid, p_ship jsonb, p_carrier text, p_tracking text, p_invoice_timing text default 'now') returns jsonb
 language plpgsql set search_path = '' as $$
-declare o public.orders; sp record; v_state text; v_invoice uuid; v_shipment uuid;
+declare
+  o public.orders; sp record; v_state text; v_invoice uuid; v_shipment uuid;
+  v_channel uuid; v_tax public.tax_treatment;
 begin
   o := private.lock_order(p_order, array['picked']::public.order_status[]);
   -- Full-coverage guard: ensure p_ship covers every order line. Runs after the
@@ -1880,6 +1925,17 @@ begin
   values (o.brewery_id, p_order, p_carrier, p_tracking, coalesce(p_invoice_timing, 'now'), auth.uid()) returning id into v_shipment;
   if o.kind = 'wholesale' then
     select state into v_state from public.ship_tos where id = o.ship_to_id;
+    -- One lookup for the whole shipment: the channel a wholesale ship removes
+    -- under, and the tax treatment frozen onto every movement it writes
+    -- (customer override -> channel default, §16.3).
+    select sc.id, coalesce(c.tax_treatment, sc.tax_treatment)
+      into v_channel, v_tax
+      from public.sale_channels sc
+      left join public.customers c on c.id = o.customer_id
+     where sc.brewery_id = o.brewery_id and sc.name = 'Wholesale';
+    if v_channel is null then
+      raise exception 'sale channel Wholesale not found' using errcode = 'P0002';
+    end if;
     -- Empty-invoice guard: only create invoice if at least one line ships qty > 0;
     -- on_delivery defers the invoice to confirm_delivery
     if coalesce(p_invoice_timing, 'now') = 'now'
@@ -1893,8 +1949,8 @@ begin
     update public.order_lines set qty_shipped = sp.qty where id = sp.line_id and order_id = p_order;
     if sp.qty > 0 then
       if o.kind = 'wholesale' then
-        insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, channel, dest_state, ref, created_by)
-        select o.brewery_id, ol.sku_id, o.from_location_id, private.first_bin(o.from_location_id), -sp.qty, 'sale_removal', 'wholesale', v_state, p_order, auth.uid()
+        insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, sale_channel_id, tax_treatment, dest_state, ref, created_by)
+        select o.brewery_id, ol.sku_id, o.from_location_id, private.first_bin(o.from_location_id), -sp.qty, 'sale_removal', v_channel, v_tax, v_state, p_order, auth.uid()
         from public.order_lines ol where ol.id = sp.line_id;
         if v_invoice is not null then
           insert into public.invoice_lines (brewery_id, invoice_id, kind, sku_id, qty, unit_price_cents, description)
@@ -2652,16 +2708,22 @@ end $$;
 
 create function record_inventory_movement(
   p_brewery uuid, p_sku uuid, p_location uuid, p_bin uuid, p_qty numeric, p_type public.movement_type,
-  p_channel public.sale_channel, p_dest_state text, p_note text, p_request_id uuid
+  p_sale_channel uuid, p_dest_state text, p_note text, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_replay jsonb; v_row public.inventory_movements;
+declare v_replay jsonb; v_row public.inventory_movements; v_tax public.tax_treatment;
 begin
   perform private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'record_inventory_movement', p_request_id,
-    jsonb_build_object('brewery', p_brewery, 'sku', p_sku, 'location', p_location, 'bin', p_bin, 'qty', p_qty, 'type', p_type, 'channel', p_channel, 'dest_state', p_dest_state, 'note', p_note));
+    jsonb_build_object('brewery', p_brewery, 'sku', p_sku, 'location', p_location, 'bin', p_bin, 'qty', p_qty, 'type', p_type, 'sale_channel', p_sale_channel, 'dest_state', p_dest_state, 'note', p_note));
   if v_replay is not null then return v_replay; end if;
-  insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, channel, dest_state, note, created_by)
-    values (p_brewery, p_sku, p_location, p_bin, p_qty, p_type, p_channel, p_dest_state, p_note, auth.uid()) returning * into v_row;
+  -- A staff-entered movement has no customer, so the channel default is the
+  -- resolved treatment; the composite FK below rejects another brewery's channel.
+  if p_sale_channel is not null then
+    select tax_treatment into v_tax from public.sale_channels
+     where id = p_sale_channel and brewery_id = p_brewery;
+  end if;
+  insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, sale_channel_id, tax_treatment, dest_state, note, created_by)
+    values (p_brewery, p_sku, p_location, p_bin, p_qty, p_type, p_sale_channel, v_tax, p_dest_state, p_note, auth.uid()) returning * into v_row;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
@@ -3310,7 +3372,7 @@ begin
   -- limited below to the exact RPC path and command roles that own them.
   foreach t in array array[
     'customers','ship_tos','vendors','materials','material_lots','styles','brands','keg_pools','skus',
-    'formats','format_components','format_bom','price_lists','price_list_formats','price_list_items','locations','bins','stock_transfers','stock_transfer_lines','allocations','taproom_pars',
+    'formats','format_components','format_bom','price_lists','price_list_formats','price_list_items','locations','bins','sale_channels','stock_transfers','stock_transfer_lines','allocations','taproom_pars',
     'recipes','recipe_versions','recipe_ingredients','vessels','batches','vessel_occupancies',
     'fermentation_readings','batch_additions','packaging_runs','lots','packaging_run_outputs',
     'packaging_run_consumptions','material_contracts','purchase_orders','purchase_order_lines',
@@ -4327,7 +4389,7 @@ revoke all on all sequences in schema public from public, anon, authenticated;
 -- material lives in private.integration_tokens behind service-only RPCs.
 grant select on breweries, brewery_users, customer_users,
   customers, ship_tos, vendors, materials, material_lots, styles, brands, keg_pools, skus,
-  formats, format_components, format_bom, price_lists, price_list_formats, price_list_items, locations, bins, stock_transfers, stock_transfer_lines, inventory_movements, allocations, taproom_pars,
+  formats, format_components, format_bom, price_lists, price_list_formats, price_list_items, locations, bins, sale_channels, stock_transfers, stock_transfer_lines, inventory_movements, allocations, taproom_pars,
   recipes, recipe_versions, recipe_ingredients, vessels, batches, vessel_occupancies, transfers,
   volume_adjustments, fermentation_readings, material_movements, batch_additions, packaging_runs,
   lots, packaging_run_outputs, packaging_run_consumptions, material_contracts, purchase_orders,
@@ -4377,7 +4439,7 @@ grant execute on function
   set_price_list_format(uuid,uuid,uuid,int,uuid),
   clear_price_list_item(uuid,uuid,uuid,uuid),
   replace_format_bom(uuid,uuid,jsonb,uuid),
-  record_inventory_movement(uuid,uuid,uuid,uuid,numeric,public.movement_type,public.sale_channel,text,text,uuid),
+  record_inventory_movement(uuid,uuid,uuid,uuid,numeric,public.movement_type,uuid,text,text,uuid),
   set_taproom_par(uuid,uuid,uuid,numeric,uuid),
   set_portal_fulfillment_source(uuid,uuid,uuid),
   create_order(uuid,public.order_kind,uuid,uuid,uuid,uuid,date,text,text,jsonb,uuid),

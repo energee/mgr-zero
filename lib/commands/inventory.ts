@@ -6,7 +6,7 @@ const movementInput = z.object({
   qty: z.number().refine(n => n !== 0, "qty cannot be 0"),
   type: z.enum(["opening_balance", "production_in", "adjustment", "sale_removal", "taproom_transfer",
                 "depletion", "return_in", "destruction", "loss", "sample", "festival_removal"]),
-  channel: z.enum(["wholesale", "taproom", "dtc", "export"]).optional(),
+  saleChannelId: z.string().uuid().optional(),
   destState: z.string().length(2).optional(),
   note: z.string().optional(),
 });
@@ -20,7 +20,7 @@ const movementInput = z.object({
 export function insertMovement(ctx: Ctx, input: z.infer<typeof movementInput>, execution: CommandExecution) {
   return unwrap(ctx.db.rpc("record_inventory_movement", {
     p_brewery: ctx.breweryId, p_sku: input.skuId, p_location: input.locationId, p_bin: input.binId, p_qty: input.qty,
-    p_type: input.type, p_channel: input.channel ?? null, p_dest_state: input.destState ?? null,
+    p_type: input.type, p_sale_channel: input.saleChannelId ?? null, p_dest_state: input.destState ?? null,
     p_note: input.note ?? null, p_request_id: execution.requestId,
   }));
 }

@@ -37,7 +37,7 @@ const AUTHENTICATED_RPCS = [
   "portal_create_order(uuid,uuid,uuid,text,text,jsonb,uuid)",
   "receive_stock_transfer(uuid,jsonb,uuid)",
   "reconcile_chat_installation(uuid,boolean,text)",
-  "record_inventory_movement(uuid,uuid,uuid,uuid,numeric,movement_type,sale_channel,text,text,uuid)",
+  "record_inventory_movement(uuid,uuid,uuid,uuid,numeric,movement_type,uuid,text,text,uuid)",
   "record_pick(uuid,jsonb,uuid)",
   "record_stock_transfer_pick(uuid,jsonb,uuid)",
   "record_submitted_order_occurrence(uuid)",

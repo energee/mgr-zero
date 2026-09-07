@@ -1,12 +1,12 @@
 // tests/orders-fulfillment.test.ts — pick → ship → movements + invoice; credit memo; replenishment; needs_restock.
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation, seedCustomer } from "./helpers";
+import { admin, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation, seedCustomer, channelId } from "./helpers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
 let b: { id: string }, staffDb: SupabaseClient, staffId: string;
-let customerId: string, shipToId: string, whId: string, whBinId: string, tapId: string, skuId: string;
+let customerId: string, shipToId: string, whId: string, whBinId: string, tapId: string, skuId: string, priceListId: string;
 
 beforeAll(async () => {
   // identical seed to tests/orders-lifecycle.test.ts, plus a taproom location:
@@ -16,7 +16,7 @@ beforeAll(async () => {
   tapId = (await seedLocation(b.id, { name: "Taproom", kind: "taproom" })).id;
   ({ skuId } = await seedCatalog(b.id, { sku: "IPA 1/2bbl", packageType: "keg", bblPerUnit: 0.5 }));
   const cust = await seedCustomer(b.id);
-  ({ customerId, shipToId } = cust);
+  ({ customerId, shipToId, priceListId } = cust);
   await admin.from("price_list_items").insert({ brewery_id: b.id, price_list_id: cust.priceListId, sku_id: skuId, unit_price_cents: 12000 });
   await admin.from("inventory_movements").insert({ brewery_id: b.id, sku_id: skuId, location_id: whId, bin_id: whBinId, qty: 100, type: "opening_balance", created_by: staffId });
 });
@@ -52,6 +52,12 @@ describe("pick and ship", () => {
     expect(Number(mv![0].qty)).toBe(-8);
     expect(mv![0].type).toBe("sale_removal");
     expect(mv![0].dest_state).toBe("PA");
+    // The removal is classified by the brewery's Wholesale channel, and the
+    // channel's tax treatment is frozen onto the row (§16.3).
+    const { data: ch } = await admin.from("sale_channels").select("name,tax_treatment").eq("id", mv![0].sale_channel_id).single();
+    expect(ch!.name).toBe("Wholesale");
+    expect(ch!.tax_treatment).toBe("taxable");
+    expect(mv![0].tax_treatment).toBe("taxable");
     const { data: il } = await admin.from("invoice_lines").select().eq("invoice_id", inv);
     expect(Number(il![0].qty)).toBe(8);
     expect(il![0].unit_price_cents).toBe(12000);
@@ -368,5 +374,28 @@ describe("release_allocation and get_shortfalls", () => {
     const after = await runCommand("get_shortfalls", {}, ctx) as { skuId: string }[];
     expect(after.some((s) => s.skuId === skuId)).toBe(false);
     await expect(runCommand("release_allocation", { allocationId: alloc!.id }, ctx)).rejects.toThrow(/not open/);
+  });
+});
+
+describe("frozen tax treatment on a wholesale ship", () => {
+  it("a customer's tax_treatment overrides the channel default on the movement", async () => {
+    const { customerId: exporterId, shipToId: exporterShipTo } = await seedCustomer(b.id, { name: "Exporter", priceListId });
+    await admin.from("customers").update({ tax_treatment: "export" }).eq("id", exporterId);
+    const { data, error } = await staffDb.rpc("create_order", {
+      p_brewery: b.id, p_kind: "wholesale", p_customer: exporterId, p_ship_to: exporterShipTo,
+      p_from_location: whId, p_to_location: null, p_requested: null, p_po: null, p_note: null,
+      p_lines: [{ sku_id: skuId, qty: 2 }], p_request_id: crypto.randomUUID(),
+    });
+    expect(error).toBeNull();
+    const id = (data as { order_id: string }).order_id;
+    await staffDb.rpc("submit_order", { p_order: id, p_request_id: crypto.randomUUID() });
+    await staffDb.rpc("confirm_order", { p_order: id, p_request_id: crypto.randomUUID() });
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 2 }], p_request_id: crypto.randomUUID() });
+    const ship = await staffDb.rpc("ship_order", { p_order: id, p_ship: [{ line_id: line.id, qty_shipped: 2 }], p_carrier: null, p_tracking: null, p_request_id: crypto.randomUUID() });
+    expect(ship.error).toBeNull();
+    const { data: mv } = await admin.from("inventory_movements").select("sale_channel_id, tax_treatment").eq("ref", id).single();
+    expect(mv!.sale_channel_id).toBe(await channelId(b.id, "Wholesale"));
+    expect(mv!.tax_treatment).toBe("export");
   });
 });

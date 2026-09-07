@@ -102,7 +102,7 @@ describe("command request idempotency", () => {
       p_bin: binId,
       p_qty: 2,
       p_type: "opening_balance",
-      p_channel: null,
+      p_sale_channel: null,
       p_dest_state: null,
       p_note: note,
       p_request_id: requestId,

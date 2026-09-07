@@ -18,10 +18,9 @@ const MOVEMENT_TYPES = [
 ] as const;
 type MovementType = (typeof MOVEMENT_TYPES)[number];
 
-const CHANNELS = ["wholesale", "taproom", "dtc", "export"] as const;
-
 // Mirrors the DB CHECK (removal_shape): only depletion requires a channel
-// (fixed to taproom) among the staff-facing types above.
+// among the staff-facing types above. The picker is a plain id field until
+// Program 4 Task 2 fetches the brewery's channels (list_sale_channels).
 const requiresChannel = (type: MovementType) => type === "depletion";
 
 export function MovementForm({
@@ -38,16 +37,15 @@ export function MovementForm({
   const [binId, setBinId] = useState("");
   const [qty, setQty] = useState("");
   const [type, setType] = useState<MovementType>("opening_balance");
-  const [channel, setChannel] = useState<(typeof CHANNELS)[number]>("taproom");
+  const [saleChannelId, setSaleChannelId] = useState("");
   const [note, setNote] = useState("");
   const form = useCommandForm("record_movement", {
-    build: () => ({ skuId, locationId, binId, qty: Number(qty), type, channel: requiresChannel(type) ? channel : undefined, note: note || undefined }),
-    reset: () => { setSkuId(""); setLocationId(""); setBinId(""); setQty(""); setType("opening_balance"); setChannel("taproom"); setNote(""); },
+    build: () => ({ skuId, locationId, binId, qty: Number(qty), type, saleChannelId: requiresChannel(type) ? saleChannelId : undefined, note: note || undefined }),
+    reset: () => { setSkuId(""); setLocationId(""); setBinId(""); setQty(""); setType("opening_balance"); setSaleChannelId(""); setNote(""); },
   });
 
   function onTypeChange(next: MovementType) {
     setType(next);
-    if (next === "depletion") setChannel("taproom");
   }
 
   return (
@@ -125,20 +123,7 @@ export function MovementForm({
           {requiresChannel(type) && (
             <div className="flex flex-col gap-2">
               <Label htmlFor="movement-channel">Channel</Label>
-              <Select value={channel} onValueChange={(v) => setChannel(v as (typeof CHANNELS)[number])}>
-                <SelectTrigger id="movement-channel">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {CHANNELS.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+              <Input id="movement-channel" value={saleChannelId} onChange={(e) => setSaleChannelId(e.target.value)} required />
             </div>
           )}
           <div className="flex flex-col gap-2">

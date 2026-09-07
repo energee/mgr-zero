@@ -123,3 +123,12 @@ export async function seedCustomer(
   if (se) throw se;
   return { customerId: c.id as string, shipToId: st.id as string, priceListId };
 }
+
+// A brewery's seeded sale channel by name (Wholesale, Taproom, DTC, Export —
+// written by the trigger on breweries insert; see 00001_baseline.sql).
+export async function channelId(breweryId: string, name: string): Promise<string> {
+  const { data, error } = await admin.from("sale_channels")
+    .select("id").eq("brewery_id", breweryId).eq("name", name).single();
+  if (error) throw error;
+  return data.id as string;
+}
