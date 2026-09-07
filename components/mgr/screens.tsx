@@ -26,9 +26,26 @@ import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-ic
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
 import { formatVolume } from "@/lib/volume";
+import { saccharificationRest, type Step, totalDuration } from "@/lib/mgr/recipe-schedule";
 import {
   BeerIcon, DeliveryTruck01Icon, Package01Icon, Route01Icon, Tag01Icon, TaskDone01Icon, ThermometerIcon, WifiDisconnected01Icon,
 } from "@hugeicons/core-free-icons";
+
+/** The drawn mash schedule. Rows and footer both read it, so the total and the
+ *  conversion rest can never disagree with the steps above them. */
+const MASH_STEPS: Step[] = [
+  { name: "Mash-in", kind: "infusion", tempF: 104, duration: 15 },
+  { name: "Saccharification", kind: "infusion", tempF: 152, duration: 60 },
+  { name: "Mash-out", kind: "direct heat", tempF: 168, duration: 10 },
+];
+
+/** The drawn fermentation schedule; `duration` is days. Same rule as MASH_STEPS. */
+const FERM_STAGES: Step[] = [
+  { name: "Primary", kind: "primary", tempF: 68, duration: 4 },
+  { name: "Diacetyl rest", kind: "diacetyl rest", tempF: 72, duration: 2 },
+  { name: "Cold crash", kind: "cold crash", tempF: 34, duration: 2 },
+  { name: "Conditioning", kind: "conditioning", tempF: 34, duration: 10 },
+];
 
 /** Every staff role with what it opens; Team member draws one switch each. */
 const ROLES: [string, string, boolean][] = [
@@ -323,6 +340,7 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 1, slice: "all", tab: "More", name: "Settings", job: "Edit brewery/location basics and route to rare setup",
+    to: { "Source water · Municipal · Denver": "Water profiles" },
     reads: "list_locations · list_team_members", writes: "update_brewery · update_location [design; mutable single rows]",
     states: permitted("admin only"),
     spec: "Invoices remains a first-class More and desk-rail destination. TTB registry number and PA license are brewery columns and feed the compliance report header. The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. Deployment mode is read-only. Team opens the Team frame.",
@@ -1987,7 +2005,7 @@ export const SCREENS: Screen[] = [
     slice: 4,
     tab: "Work",
     name: "Brew day",
-    to: { "2-row": "Entity picker", "Citra \u00b7 boil": "Entity picker", "Yeast": "Entity picker" },
+    to: { "2-row": "Entity picker", "Citra \u00b7 boil": "Entity picker", "Yeast": "Entity picker", "Brew sheet · Hazy IPA v4": "Mash schedule" },
     job: "Consume actual lots and set knockout baseline",
     reads: "get_brew_day [design]",
     writes: "record_brew_day [design; one RPC: additions + material movements + occupancy]",
@@ -2439,10 +2457,10 @@ export const SCREENS: Screen[] = [
     slice: 3,
     tab: "More",
     name: "Recipe",
-    to: { Create: "Recipe", "Recipe parent \u00b7 Hazy IPA \u00b7 IPA": "Recipe" },
+    to: { Create: "Recipe", "Recipe parent \u00b7 Hazy IPA \u00b7 IPA": "Recipe", "Mash schedule · 3 steps": "Mash schedule", "Fermentation schedule · 4 stages": "Fermentation schedule", "Water · Municipal Denver to Hazy target": "Water" },
     job: "Author immutable versions from assumptions; actuals keep predictions honest",
     reads: "list_recipes · get_recipe [design] · get_recipe_outcomes [design; per-batch actual OG/FG/ABV + realized efficiency/attenuation, derived from fermentation readings, never stored]",
-    writes: "create_recipe [design; mutable parent row] · create_recipe_version [design; one RPC: immutable version + ingredients; SCHEMA-GATE: assumption columns on recipe_versions + per-ingredient extract snapshot + extract potential on materials; typed target_og/fg/abv columns drop]",
+    writes: "create_recipe [design; mutable parent row] · create_recipe_version [design; one RPC: immutable version + ingredients; SCHEMA-GATE: assumption and process-spec columns on recipe_versions (pre-boil volume, boil, whirlpool min/temp/rest, knockout temp, notes) + per-ingredient extract snapshot + extract potential on materials; typed target_og/fg/abv columns drop]",
     states: permitted("brewer or admin required"),
     spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. Versioning is disabled behind its schema gate. A new parent takes name and style only; versions append, and history is never edited. Costing lives on desk. A version is the executable process spec, not only the prediction inputs: volumes, boil, whirlpool and knockout are scalars here, while the mash and fermentation schedules and water open as their own screens because they repeat and carry add, reorder and delete. The mash temperature is gone from this page, because every mash step carries one and a scalar beside them is a second answer to one question. Batch size and knockout volume are gone too: the scale chips already state the batch size and Brew day already records knockout volume as its baseline. Three note fields become one.",
     body: (<>
@@ -2492,10 +2510,10 @@ export const SCREENS: Screen[] = [
     spec: "Its own screen because it repeats: add, reorder and delete are verbs a scalar field never needs, and inlining them on Recipe would give that page a second primary. A version is immutable, so this surface is an editor on a draft and a read-out once cut: one whole-screen mode rather than a toggle threaded through a long page. The footer names the conversion rest because Recipe no longer carries a mash temperature of its own; without it the number the prediction reads would have no visible home.",
     body: (<>
       {E.back("Recipe", "Hazy IPA v4 · Mash schedule", E.btn("Add step"))}
-      {E.row("Mash-in", "infusion · 104 °F · 15 min", E.act("Edit"))}
-      {E.row("Saccharification", "infusion · 152 °F · 60 min", E.act("Edit"))}
-      {E.row("Mash-out", "direct heat · 168 °F · 10 min", E.act("Edit"))}
-      {E.info("Total 85 min · the 152 °F rest feeds the prediction.")}
+      {MASH_STEPS.map((s) => (
+        <Fragment key={s.name}>{E.row(s.name, `${s.kind} · ${s.tempF} °F · ${s.duration} min`, E.act("Edit"))}</Fragment>
+      ))}
+      {E.info(`Total ${totalDuration(MASH_STEPS)} min · the ${saccharificationRest(MASH_STEPS)!.tempF} °F rest feeds the prediction.`)}
     </>),
   },
   {
@@ -2534,11 +2552,10 @@ export const SCREENS: Screen[] = [
     spec: "The same shape as Mash schedule and for the same reason. The footer places the dry hop because Recipe draws a dry hop on a day number, and a day number means nothing without this list: day 4 is the last day of Primary, which is why a brewer chose it. The separate fermentation-days and conditioning-days fields v1 kept beside this list are dropped, because the list sums to them and two sources for one number is the failure this design keeps removing.",
     body: (<>
       {E.back("Recipe", "Hazy IPA v4 · Fermentation", E.btn("Add stage"))}
-      {E.row("Primary", "68 °F · 4 days", E.act("Edit"))}
-      {E.row("Diacetyl rest", "72 °F · 2 days", E.act("Edit"))}
-      {E.row("Cold crash", "34 °F · 2 days", E.act("Edit"))}
-      {E.row("Conditioning", "34 °F · 10 days", E.act("Edit"))}
-      {E.info("Total 18 days · dry hop day 4 falls in Primary.")}
+      {FERM_STAGES.map((s) => (
+        <Fragment key={s.name}>{E.row(s.name, `${s.tempF} °F · ${s.duration} days`, E.act("Edit"))}</Fragment>
+      ))}
+      {E.info(`Total ${totalDuration(FERM_STAGES)} days · dry hop day 4 falls in Primary.`)}
     </>),
   },
   {
@@ -2606,7 +2623,7 @@ export const SCREENS: Screen[] = [
     spec: "One stage field, never a timing and a target both. The material comes from the materials catalog that already exists, so a salt is bought, stocked and consumed like any other input.",
     body: (<>
       {E.pick("Material", "Gypsum", ["Gypsum", "Calcium chloride", "Epsom salt", "Lactic acid", "Phosphoric acid"])}
-      {E.cols(
+      {E.inline(
         E.edit("Amount", "4.0", "number"),
         E.pick("Unit", "g", ["g", "mL", "oz"]),
       )}
