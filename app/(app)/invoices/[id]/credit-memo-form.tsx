@@ -1,8 +1,9 @@
 // app/(app)/invoices/[id]/credit-memo-form.tsx — CommandForm (bottom sheet on phone, dialog on desk) for the
-// create_credit_memo command: qty per invoice line to credit (0 = skip), a
-// return-to location, and a reason. The plpgsql fn writes negative invoice
-// lines at the original prices plus return_in movements at the chosen
-// location.
+// return_shipment command (screen record Return and credit): qty per invoice
+// line to return (0 = skip), a return-to location, and the reason, which
+// decides the beer and never the money: unsold and wrong item come back
+// sellable, damaged comes back and is written to loss in the same call.
+// The credit is always at the price frozen on the invoice line.
 "use client";
 
 import { useState } from "react";
@@ -34,7 +35,7 @@ export function CreditMemoForm({
     setReason("");
   }
 
-  const form = useCommandForm("create_credit_memo", {
+  const form = useCommandForm("return_shipment", {
     build: () => ({
       invoiceId,
       locationId,
@@ -47,12 +48,12 @@ export function CreditMemoForm({
   });
 
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Create credit memo" trigger={<Button size="sm" variant="outline">
-          Credit memo
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Return shipment" trigger={<Button size="sm" variant="outline">
+          Return
         </Button>}>
         <form onSubmit={form.submit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <Label>Lines to credit</Label>
+            <Label>Lines returning</Label>
             {lines.map((l) => (
               <div key={l.id} className="flex items-center gap-2">
                 <Label className="flex-1 font-normal">
@@ -90,12 +91,24 @@ export function CreditMemoForm({
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="cm-reason">Reason</Label>
-            <Input id="cm-reason" value={reason} onChange={(e) => setReason(e.target.value)} required />
+            <Select value={reason} onValueChange={setReason}>
+              <SelectTrigger id="cm-reason">
+                <SelectValue placeholder="Why is it coming back?" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="unsold">Unsold · back to stock</SelectItem>
+                  <SelectItem value="wrong_item">Wrong item · back to stock</SelectItem>
+                  <SelectItem value="damaged">Damaged · written to loss</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
+          <p className="text-sm text-muted-foreground">Credited at the price on this invoice, not today’s price list.</p>
           <CommandFormMessage error={form.error} />
           <CommandFormFooter>
-            <Button type="submit" disabled={form.submitting}>
-              {form.submitting ? "Saving…" : "Create"}
+            <Button type="submit" disabled={form.submitting || !reason || !locationId}>
+              {form.submitting ? "Saving…" : "Return shipment"}
             </Button>
           </CommandFormFooter>
         </form>

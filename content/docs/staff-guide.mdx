@@ -222,20 +222,20 @@ Select **Print** to open the browser print dialog. MGR hides the staff navigatio
 
 <Screen name="Invoices" />
 
-*Admin and Sales can open the Invoices list from the **Invoices** link. Warehouse can open it by entering the address directly (it has no More tab yet) and sees the invoice created by a wholesale shipment it records from a link shown right after shipping. Only Admin and Sales can create a credit memo.*
+*Admin and Sales can open the Invoices list from the **Invoices** link. Warehouse can open it by entering the address directly (it has no More tab yet) and sees the invoice created by a wholesale shipment it records from a link shown right after shipping. Only Admin and Sales can return beer against an invoice.*
 
 The Invoices list shows number, kind, customer, total, and paid date. Open an invoice number to see issue date, line quantities, captured unit prices, amounts, and total. An empty list says **No invoices yet**. Payment is display-only; there is no record-payment action.
 
-### Correct a shipped invoice
+### Return beer and correct the invoice
 
-<Screen name="Invoice" />
+<Screen name="Return and credit" />
 
-1. Open an invoice and select **Credit memo**.
-2. Enter the positive quantity to credit for each applicable line. Leave unrelated lines at zero. A credit cannot exceed the remaining uncredited quantity.
-3. Choose **Return to location** and enter a required **Reason**.
-4. Select **Create**.
+1. Open the invoice and select **Return**.
+2. Enter the quantity coming back for each applicable line. Leave unrelated lines at zero. A return cannot exceed the remaining uncredited quantity.
+3. Choose **Return to location** and the **Reason**: *Unsold* and *Wrong item* put the beer back as sellable stock at that location; *Damaged* puts it back and writes the same quantity to loss in the same step, so broken beer never lands on a pick list.
+4. Select **Return shipment**.
 
-MGR creates a separate credit memo at the original prices, adds the credited quantity back to the selected location, and records the correction on the originating order’s timeline. Credit memos cannot themselves be credited.
+MGR creates a separate credit memo at the prices frozen on the invoice lines, never today's price list, records the return-in (and, for damaged, the loss) against that credit memo, and notes the correction on the originating order's timeline. A paid invoice can still be returned; the credit sits as available credit. Credit memos cannot themselves be credited.
 
 ## Taproom replenishment [#replenishment]
 
@@ -281,7 +281,7 @@ If the link is missing, expired, already used, or belongs to another account, re
 
 **Inventory is wrong.** Do a physical count and identify what happened. Record an adjustment only for a verified count difference. Never disguise a sale, sample, loss, destruction, festival removal, return, or transfer as another type. Add a note that explains the correction.
 
-**A shipped order or invoice is wrong.** Do not add an unrelated inventory movement. Create a credit memo from the invoice so the financial correction and returned stock stay linked to the shipment history.
+**A shipped order or invoice is wrong.** Do not add an unrelated inventory movement. Use **Return** on the invoice so the credit and the returned stock stay linked to the shipment history.
 
 ## Actions not yet available [#unavailable]
 

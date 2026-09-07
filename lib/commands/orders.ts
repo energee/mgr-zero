@@ -137,6 +137,46 @@ defineCommand({
 });
 
 defineCommand({
+  name: "release_allocation", description: "Release one open reservation so its quantity returns to ATP",
+  roles: [...salesRoles],
+  input: z.object({ allocationId: z.string().uuid() }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("release_allocation", { p_allocation: i.allocationId, p_request_id: execution.requestId })),
+});
+
+defineQuery({
+  name: "get_shortfalls", description: "SKUs whose available-to-promise is negative, with on-hand and open reservations",
+  roles: [...readRoles],
+  input: z.object({}),
+  handler: async (ctx) => {
+    const [atp, onHand, allocs] = await Promise.all([
+      unwrap(ctx.db.from("atp").select("sku_id, qty, skus(name)").eq("brewery_id", ctx.breweryId).lt("qty", 0)),
+      unwrap(ctx.db.from("on_hand").select("sku_id, qty").eq("brewery_id", ctx.breweryId)),
+      unwrap(ctx.db.from("allocations").select("sku_id, qty").eq("brewery_id", ctx.breweryId).eq("status", "open")),
+    ]);
+    const sum = (rows: { sku_id: string; qty: number }[]) => rows.reduce((m, r) => m.set(r.sku_id, (m.get(r.sku_id) ?? 0) + Number(r.qty)), new Map<string, number>());
+    const onHandBySku = sum(onHand as { sku_id: string; qty: number }[]);
+    const allocatedBySku = sum(allocs as { sku_id: string; qty: number }[]);
+    return (atp as unknown as { sku_id: string; qty: number; skus: { name: string } | null }[]).map((r) => ({
+      skuId: r.sku_id, skuName: r.skus?.name ?? r.sku_id, atp: Number(r.qty),
+      onHand: onHandBySku.get(r.sku_id) ?? 0, allocated: allocatedBySku.get(r.sku_id) ?? 0,
+    }));
+  },
+});
+
+defineCommand({
+  name: "return_shipment", description: "Return shipped beer: credit memo at the invoiced price + return_in at the destination; a damaged return is also written to loss in the same transaction",
+  roles: [...salesRoles], requiresConfirmation: true,
+  input: z.object({
+    invoiceId: z.string().uuid(), locationId: z.string().uuid(), reason: z.enum(["damaged", "wrong_item", "unsold"]),
+    lines: z.array(z.object({ invoiceLineId: z.string().uuid(), qty: z.number().positive() })).min(1),
+  }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("return_shipment", {
+    p_invoice: i.invoiceId, p_lines: i.lines.map(l => ({ invoice_line_id: l.invoiceLineId, qty: l.qty })),
+    p_location: i.locationId, p_reason: i.reason, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
   name: "create_credit_memo", description: "Credit an invoice: negative lines at original prices + return_in movements",
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({

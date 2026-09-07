@@ -1721,8 +1721,8 @@ begin
     insert into public.invoice_lines (brewery_id, invoice_id, kind, sku_id, qty, unit_price_cents, description, credited_invoice_line_id)
     select v_inv.brewery_id, v_cm, 'sku', il.sku_id, -cl.qty, il.unit_price_cents, il.description, il.id
     from public.invoice_lines il where il.id = cl.line_id and il.invoice_id = p_invoice;
-    insert into public.inventory_movements (brewery_id, sku_id, location_id, qty, type, note, created_by)
-    select v_inv.brewery_id, il.sku_id, p_location, cl.qty, 'return_in', p_reason, auth.uid()
+    insert into public.inventory_movements (brewery_id, sku_id, location_id, qty, type, ref, note, created_by)
+    select v_inv.brewery_id, il.sku_id, p_location, cl.qty, 'return_in', v_cm, p_reason, auth.uid()
     from public.invoice_lines il where il.id = cl.line_id and il.invoice_id = p_invoice;
   end loop;
   -- Append to the originating order's event log, if this invoice came from a
@@ -2571,6 +2571,50 @@ begin
   v_replay := private.claim_command_request(v_brewery,'ship_order',p_request_id,jsonb_build_object('order',p_order,'ship',p_ship,'carrier',p_carrier,'tracking',p_tracking,'invoice_timing',p_invoice_timing));
   if v_replay is not null then return v_replay; end if;
   v_result := private.ship_order_impl(p_order,p_ship,p_carrier,p_tracking,p_invoice_timing); return private.complete_command_request(p_request_id,v_result);
+end $$;
+
+-- Return shipment: the credit memo above, then the beer. Reason decides the
+-- beer, never the money: unsold and wrong_item come back sellable at the
+-- destination; damaged comes back and is written to loss in the same call.
+create function private.return_shipment_impl(p_invoice uuid, p_lines jsonb, p_location uuid, p_reason text) returns jsonb
+language plpgsql set search_path = '' as $$
+declare v_memo uuid; v_brewery uuid;
+begin
+  if p_reason not in ('damaged','wrong_item','unsold') then raise exception 'unknown return reason'; end if;
+  v_memo := (private.create_credit_memo_impl(p_invoice, p_lines, p_location, p_reason)->>'invoice_id')::uuid;
+  if p_reason = 'damaged' then
+    select brewery_id into v_brewery from public.invoices where id = p_invoice;
+    insert into public.inventory_movements (brewery_id, sku_id, location_id, qty, type, ref, note, created_by)
+    select v_brewery, m.sku_id, m.location_id, -m.qty, 'loss', v_memo, 'damaged return', auth.uid()
+    from public.inventory_movements m where m.ref = v_memo and m.type = 'return_in';
+  end if;
+  return jsonb_build_object('credit_memo_id', v_memo);
+end $$;
+
+create function return_shipment(p_invoice uuid,p_lines jsonb,p_location uuid,p_reason text,p_request_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_brewery uuid; v_replay jsonb; v_result jsonb;
+begin
+  v_brewery := private.assert_invoice_staff(p_invoice,array['admin','sales']::public.staff_role[]);
+  v_replay := private.claim_command_request(v_brewery,'return_shipment',p_request_id,jsonb_build_object('invoice',p_invoice,'lines',p_lines,'location',p_location,'reason',p_reason));
+  if v_replay is not null then return v_replay; end if;
+  v_result := private.return_shipment_impl(p_invoice,p_lines,p_location,p_reason); return private.complete_command_request(p_request_id,v_result);
+end $$;
+
+-- Release one open reservation so its quantity returns to ATP (Pars and
+-- allocation screen). Only an open allocation can be released.
+create function release_allocation(p_allocation uuid,p_request_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_brewery uuid; v_replay jsonb; v_status text;
+begin
+  select brewery_id, status into v_brewery, v_status from public.allocations where id = p_allocation;
+  if v_brewery is null then raise exception 'permission denied' using errcode = '42501'; end if;
+  perform private.assert_staff(v_brewery,array['admin','sales']::public.staff_role[]);
+  v_replay := private.claim_command_request(v_brewery,'release_allocation',p_request_id,jsonb_build_object('allocation',p_allocation));
+  if v_replay is not null then return v_replay; end if;
+  if v_status <> 'open' then raise exception 'allocation is not open'; end if;
+  update public.allocations set status = 'released' where id = p_allocation and status = 'open';
+  return private.complete_command_request(p_request_id, jsonb_build_object('allocation_id', p_allocation));
 end $$;
 
 create function create_credit_memo(p_invoice uuid,p_lines jsonb,p_location uuid,p_reason text,p_request_id uuid) returns jsonb
@@ -3729,6 +3773,8 @@ grant execute on function
   resolve_short_pick(uuid,uuid,numeric,text,text,uuid),
   ship_order(uuid,jsonb,text,text,uuid,text),
   create_credit_memo(uuid,jsonb,uuid,text,uuid),
+  return_shipment(uuid,jsonb,uuid,text,uuid),
+  release_allocation(uuid,uuid),
   set_standing_allocation(uuid,uuid,numeric,uuid),
   create_replenishment_order(uuid,uuid,jsonb,uuid)
   to authenticated;

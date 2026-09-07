@@ -316,3 +316,57 @@ describe("confirm_delivery", () => {
     expect(stop.invoice?.id).toBe(invoiceId);
   });
 });
+
+describe("return_shipment", () => {
+  it("unsold return credits at the invoiced price and restocks; damaged also posts loss", async () => {
+    const id = await confirmedOrder(5);
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 5 }], p_request_id: crypto.randomUUID() });
+    const shipped = await staffDb.rpc("ship_order", {
+      p_order: id, p_ship: [{ line_id: line.id, qty_shipped: 5 }],
+      p_carrier: null, p_tracking: null, p_invoice_timing: "now", p_request_id: crypto.randomUUID(),
+    });
+    const invId = (shipped.data as { invoice_id: string }).invoice_id;
+    const { data: il } = await admin.from("invoice_lines").select().eq("invoice_id", invId).single();
+
+    const unsold = await staffDb.rpc("return_shipment", {
+      p_invoice: invId, p_location: whId, p_reason: "unsold",
+      p_lines: [{ invoice_line_id: il!.id, qty: 1 }], p_request_id: crypto.randomUUID(),
+    });
+    expect(unsold.error).toBeNull();
+    const memoId = (unsold.data as { credit_memo_id: string }).credit_memo_id;
+    const { data: memoLines } = await admin.from("invoice_lines").select("qty, unit_price_cents").eq("invoice_id", memoId);
+    expect(memoLines).toEqual([{ qty: -1, unit_price_cents: 12000 }]); // credited at the invoiced price
+    const { data: back } = await admin.from("inventory_movements").select("type,qty,location_id").eq("ref", memoId);
+    expect(back).toEqual([{ type: "return_in", qty: 1, location_id: whId }]);
+
+    const damaged = await staffDb.rpc("return_shipment", {
+      p_invoice: invId, p_location: whId, p_reason: "damaged",
+      p_lines: [{ invoice_line_id: il!.id, qty: 1 }], p_request_id: crypto.randomUUID(),
+    });
+    expect(damaged.error).toBeNull();
+    const memo2 = (damaged.data as { credit_memo_id: string }).credit_memo_id;
+    const { data: mvs } = await admin.from("inventory_movements").select("type,qty").eq("ref", memo2);
+    expect(mvs!.sort((a, b) => a.type.localeCompare(b.type))).toEqual([{ type: "loss", qty: -1 }, { type: "return_in", qty: 1 }]);
+  });
+});
+
+describe("release_allocation and get_shortfalls", () => {
+  it("get_shortfalls lists negative-ATP skus; release_allocation frees the reservation", async () => {
+    const ctx = { db: staffDb, userId: staffId, breweryId: b.id, role: "admin" as const };
+    const id = await confirmedOrder(1000); // opening balance is 100
+    const line = await lineOf(id);
+    const { data: alloc } = await admin.from("allocations").select("id").eq("ref", line.id).single();
+    const short = await runCommand("get_shortfalls", {}, ctx) as { skuId: string; skuName: string; atp: number }[];
+    const row = short.find((s) => s.skuId === skuId);
+    expect(row).toBeDefined();
+    expect(row!.atp).toBeLessThan(0);
+    expect(row!.skuName).toBe("IPA 1/2bbl");
+    await runCommand("release_allocation", { allocationId: alloc!.id }, ctx);
+    const { data: a2 } = await admin.from("allocations").select("status").eq("id", alloc!.id).single();
+    expect(a2!.status).toBe("released");
+    const after = await runCommand("get_shortfalls", {}, ctx) as { skuId: string }[];
+    expect(after.some((s) => s.skuId === skuId)).toBe(false);
+    await expect(runCommand("release_allocation", { allocationId: alloc!.id }, ctx)).rejects.toThrow(/not open/);
+  });
+});

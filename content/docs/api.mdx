@@ -182,6 +182,7 @@ omitted — they have no roles until they are built.
 | `get_invoice` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `get_on_hand` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `get_order` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
+| `get_shortfalls` | Today & notifications | ✓ | ✓ | ✓ |  |  |
 | `get_today` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
 | `import_csv` | Team & brewery settings | ✓ |  |  |  |  |
 | `invite_customer_user` | Customers | ✓ | ✓ |  |  |  |
@@ -205,8 +206,10 @@ omitted — they have no roles until they are built.
 | `portal_update_draft_order` | Customer portal |  |  |  |  | ✓ |
 | `record_movement` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `record_pick` | Orders & invoicing | ✓ |  | ✓ |  |  |
+| `release_allocation` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `replenishment_suggestions` | Taproom & kegs | ✓ | ✓ | ✓ |  |  |
 | `resolve_short_pick` | Orders & invoicing | ✓ |  | ✓ |  |  |
+| `return_shipment` | Delivery & routes | ✓ | ✓ |  |  |  |
 | `set_brewery_quiet_hours` | Team & brewery settings | ✓ |  |  |  |  |
 | `set_notification_destination` | Today & notifications | ✓ |  |  |  |  |
 | `set_notification_preference` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
@@ -434,6 +437,21 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_chat_link_status", "input": { "installationId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
+#### get_shortfalls [#get_shortfalls]
+
+`query` · admin, sales, warehouse
+
+SKUs whose available-to-promise is negative, with on-hand and open reservations
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_shortfalls", "input": {} }'
+```
+
 #### get_today [#get_today]
 
 `query` · admin, sales, warehouse, brewer
@@ -509,7 +527,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* today-designed */}
 
-6 of the 13 operations in this area are available today; the 7 below are not.
+7 of the 13 operations in this area are available today; the 6 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
 
@@ -518,7 +536,6 @@ The screens need them and the backend has not built them, so calling one returns
 | `get_chat_link_intent` | query | Link your Slack |
 | `get_notification_occurrence` | query | Personal DM |
 | `get_notification_preferences` | query | Chat settings, Notification preferences |
-| `get_shortfalls` | query | Sales, Composer answer, Pars and allocation |
 | `issue_chat_link_proof` | command | Link identity |
 | `search_entities` | query | Search, Entity picker |
 | `snooze_notification` | command | Personal DM, Notification preferences |
@@ -783,6 +800,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_pick", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "orderId": "00000000-0000-0000-0000-000000000000", "picks": [ { "lineId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
 ```
 
+#### release_allocation [#release_allocation]
+
+`command` · admin, sales
+
+Release one open reservation so its quantity returns to ATP
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `allocationId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "release_allocation", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "allocationId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 #### resolve_short_pick [#resolve_short_pick]
 
 `command` · admin, warehouse
@@ -887,7 +921,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* orders-designed */}
 
-18 of the 23 operations in this area are available today; the 5 below are not.
+19 of the 23 operations in this area are available today; the 4 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
 
@@ -895,7 +929,6 @@ The screens need them and the backend has not built them, so calling one returns
 | --- | --- | --- |
 | `list_invoice_questions` | query | Sales |
 | `raise_invoice_question` | command | Question invoice |
-| `release_allocation` | command | Pars and allocation |
 | `resolve_invoice_question` | command | Invoice |
 | `write_off_invoice` | command | Invoices |
 
@@ -1588,11 +1621,31 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_delivery_stop", "input": { "deliveryId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
+#### return_shipment [#return_shipment]
+
+`command` · admin, sales
+
+Return shipped beer: credit memo at the invoiced price + return_in at the destination; a damaged return is also written to loss in the same transaction
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `invoiceId` | uuid | yes |
+| `locationId` | uuid | yes |
+| `reason` | damaged or wrong_item or unsold | yes |
+| `lines` | array of object | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "return_shipment", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "invoiceId": "00000000-0000-0000-0000-000000000000", "locationId": "00000000-0000-0000-0000-000000000000", "reason": "damaged", "lines": [ { "invoiceLineId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
+```
+
 ---
 
 **Designed, not yet available** {/* delivery-designed */}
 
-2 of the 7 operations in this area are available today; the 5 below are not.
+3 of the 7 operations in this area are available today; the 4 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
 
@@ -1601,7 +1654,6 @@ The screens need them and the backend has not built them, so calling one returns
 | `depart_route` | command | Route |
 | `list_routes` | query | Routes |
 | `return_route` | command | Route, Return route, Driver route |
-| `return_shipment` | command | Return and credit |
 | `save_route` | command | Route |
 
 {/* end ops:delivery */}

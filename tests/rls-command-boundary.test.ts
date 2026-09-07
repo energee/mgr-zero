@@ -415,6 +415,31 @@ describe("registered staff mutation role × RPC matrix", () => {
       },
     },
     {
+      command: "release_allocation", rpc: "release_allocation", allowed: ["admin", "sales"],
+      input: async () => {
+        const orderId = await confirmedOrder();
+        const lineId = await orderLine(orderId);
+        const { data: alloc } = await admin.from("allocations").select("id").eq("ref", lineId).eq("status", "open").single();
+        return { command: { allocationId: alloc!.id }, rpc: { p_allocation: alloc!.id } };
+      },
+    },
+    {
+      command: "return_shipment", rpc: "return_shipment", allowed: ["admin", "sales"],
+      input: async () => {
+        const orderId = await confirmedOrder();
+        const lineId = await orderLine(orderId);
+        const db = contexts().admin.db;
+        await db.rpc("record_pick", { p_order: orderId, p_picks: [{ line_id: lineId, qty_picked: 1 }], p_request_id: crypto.randomUUID() });
+        const { data } = await db.rpc("ship_order", { p_order: orderId, p_ship: [{ line_id: lineId, qty_shipped: 1 }], p_carrier: null, p_tracking: null, p_request_id: crypto.randomUUID() });
+        const invoiceId = (data as { invoice_id: string }).invoice_id;
+        const { data: il } = await admin.from("invoice_lines").select("id").eq("invoice_id", invoiceId).single();
+        return {
+          command: { invoiceId, locationId, reason: "unsold", lines: [{ invoiceLineId: il!.id, qty: 1 }] },
+          rpc: { p_invoice: invoiceId, p_location: locationId, p_reason: "unsold", p_lines: [{ invoice_line_id: il!.id, qty: 1 }] },
+        };
+      },
+    },
+    {
       command: "ship_order", rpc: "ship_order", allowed: ["admin", "warehouse"],
       input: async () => {
         const { orderId, lineId } = await pickedOrder();
