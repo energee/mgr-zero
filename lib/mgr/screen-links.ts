@@ -135,6 +135,8 @@ export const TAPS: [string | RegExp, string][] = [
   [/^(\d+ sales|\d+ refund) · /, "POS sale detail"],
   ["Add format", "Format"],
   [/^Mash schedule · /, "Mash schedule"],
+  [/^Water · /, "Water"],
+  ["Water profiles", "Water profiles"],
   ["Add step", "Mash step"],
   [/^Fermentation schedule · /, "Fermentation schedule"],
   ["Add stage", "Fermentation stage"],

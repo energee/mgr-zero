@@ -27,6 +27,34 @@ const body = (name: string) => {
 };
 
 describe("SCREENS", () => {
+  it("keeps water profiles in the catalog, with their ion values", () => {
+    const list = SCREENS.find((s) => s.name === "Water profiles")!;
+    const text = renderToStaticMarkup(createElement("div", null, list.body))
+      .replace(/<[^>]*>/g, " ");
+    expect(text).toContain("Burton");
+    expect(text).toContain("Sulfate 610");
+    const catalog = SCREENS.find((s) => s.name === "Catalog")!;
+    const catalogText = renderToStaticMarkup(createElement("div", null, catalog.body))
+      .replace(/<[^>]*>/g, " ");
+    expect(catalogText).toContain("Water profiles");
+  });
+
+  it("gives water one stage axis and a brewery-default source", () => {
+    const water = SCREENS.find((s) => s.name === "Water")!;
+    const text = renderToStaticMarkup(createElement("div", null, water.body))
+      .replace(/<[^>]*>/g, " ");
+    expect(text).toContain("Gypsum");
+    expect(text).toMatch(/brewery default/);
+    expect(text).toContain("Target mash pH");
+    // Spec D7: one stage axis. The addition sheet asks where a salt goes once,
+    // never a timing and a target that can contradict each other.
+    const addition = SCREENS.find((s) => s.name === "Water addition")!;
+    const sheet = renderToStaticMarkup(createElement("div", null, addition.body))
+      .replace(/<[^>]*>/g, " ");
+    expect(sheet).toContain("Stage");
+    expect(sheet).not.toMatch(/\bTiming\b|\bTarget\b/);
+  });
+
   it("draws a mash schedule with its steps, total and conversion rest", () => {
     const mash = SCREENS.find((s) => s.name === "Mash schedule")!;
     const text = renderToStaticMarkup(createElement("div", null, mash.body))
@@ -91,7 +119,7 @@ describe("SCREENS", () => {
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands or leaves; the venue split is
     // derived rather than counted by hand in a comment that kept growing.
-    expect(SCREENS).toHaveLength(176);
+    expect(SCREENS).toHaveLength(180);
     expect(SCREENS.filter((s) => s.venue)).toHaveLength(17);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });

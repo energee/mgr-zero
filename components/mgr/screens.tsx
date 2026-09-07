@@ -1513,6 +1513,7 @@ export const SCREENS: Screen[] = [
       {E.nav("Pils", "Lager · 4.9% · 2 SKUs")}
       {E.nav("Stout", "Stout · 7.2% · 1 SKU")}
       {E.nav("Price lists", "3 tiers")}
+      {E.nav("Water profiles", "3 profiles")}
     </>),
   },
   {
@@ -2546,6 +2547,56 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 7,
+    slice: 3,
+    tab: "More",
+    name: "Water",
+    to: { Add: "Water addition", Edit: "Water addition", "Add addition": "Water addition", Gypsum: "Water addition", "Calcium chloride": "Water addition", "Lactic acid": "Water addition" },
+    job: "State the water a version starts from, aims at, and what goes in it",
+    reads: "get_recipe [design] · list_water_profiles [design]",
+    writes: "create_recipe_version [design; water values and the water additions are written with the version; SCHEMA-GATE: recipe process spec]",
+    states: [["permission", "brewer or admin required", 1], ["brewery source", "the source profile comes from Settings unless this version overrides it"], ["overridden source", "an osmosis blend or a second supply"], ["draft", "additions add, reorder and delete"], ["frozen", "a cut version reads only", 1]],
+    spec: "Source water is what comes out of the tap, so it is a Settings value and this screen shows it as the brewery default; a version overrides it only for the case that genuinely varies, an osmosis blend or a second supply. v1 stored it per recipe, so every recipe repeated the same municipal profile and a new water report meant editing all of them. Each addition carries one stage, not v1’s pair of timing and target: for water chemistry those are one axis wearing two hats, since a salt added at mash time goes into the mash by definition. The sulfate to chloride line is example text; ion deltas, salt contribution and pH prediction are calculations this slice does not build, and if they arrive they go through the same shared formula rule Recipe sets for gravity and strength.",
+    body: (<>
+      {E.back("Recipe", "Hazy IPA v4 · Water")}
+      {E.fld("Source profile", "Municipal · Denver · brewery default")}
+      {E.pick("Target profile", "Hazy target", ["Hazy target", "Burton", "Municipal · Denver"])}
+      {E.cols(
+        E.edit("Mash water gal", "9.5", "number"),
+        E.edit("Sparge water gal", "12.0", "number"),
+      )}
+      {E.edit("Target mash pH", "5.35")}
+      {E.ttl("Salts and acids")}
+      {E.row("Gypsum", "4.0 g · mash", E.act("Edit"))}
+      {E.row("Calcium chloride", "6.0 g · mash", E.act("Edit"))}
+      {E.row("Lactic acid", "3.0 mL · sparge", E.act("Edit"))}
+      {E.row("Add addition", "material · amount · stage", E.act("Add"))}
+      {E.info("Sulfate to chloride 0.9 · chloride forward, as the target says.")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 3,
+    tab: "More",
+    surface: "sheet",
+    name: "Water addition",
+    to: { "Save addition": "Water", "Delete addition": "Water" },
+    job: "One salt or acid, its amount, and where it goes",
+    reads: "get_recipe [design] · list_materials",
+    writes: "create_recipe_version [design; SCHEMA-GATE: recipe process spec]",
+    states: [["permission", "brewer or admin required", 1], ["draft", "editable until the version is cut"], ["frozen", "a cut version reads only", 1]],
+    spec: "One stage field, never a timing and a target both. The material comes from the materials catalog that already exists, so a salt is bought, stocked and consumed like any other input.",
+    body: (<>
+      {E.pick("Material", "Gypsum", ["Gypsum", "Calcium chloride", "Epsom salt", "Lactic acid", "Phosphoric acid"])}
+      {E.cols(
+        E.edit("Amount", "4.0", "number"),
+        E.pick("Unit", "g", ["g", "mL", "oz"]),
+      )}
+      {E.pick("Stage", "mash", ["mash", "sparge", "kettle"])}
+      {E.btns([["Delete addition", "g"], "Save addition"])}
+    </>),
+  },
+  {
+    step: 7,
     slice: 6,
     tab: "More",
     name: "Compliance months",
@@ -3374,6 +3425,53 @@ export const SCREENS: Screen[] = [
       {E.tbl(["Material", "Qty", "On break"], [["Can body", "1", "consumed"], ["Can end", "1", "consumed"]])}
       {E.info("If the volume or BOM differs, create another Format.")}
       {E.gated("Save format", "isn’t available yet: package facts still live on each SKU")}
+    </>),
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "More",
+    name: "Water profiles",
+    to: { Edit: "Water profile", "Add profile": "Water profile", "Municipal · Denver": "Water profile", Burton: "Water profile", "Hazy target": "Water profile" },
+    job: "Keep the water a brewery starts from and the waters it aims at",
+    reads: "list_water_profiles [design]",
+    writes: "none [creation and editing happen on Water profile]",
+    states: [["permission", "brewer or admin required", 1], ["source", "the brewery’s own supply · set once in Settings"], ["empty", "no profiles yet: Add profile is the only action"]],
+    spec: "A catalog entity beside Formats and price groups, because a profile is referenced by many recipes and edited in one place: a new water report is one edit, not fifty. No quick-create dialog, which v1 needed only because profiles were buried inside the recipe form; reached from Catalog, Add profile is already one tap away.",
+    body: (<>
+      {E.back("Catalog", "Water profiles", E.btn("Add profile"))}
+      {E.row("Municipal · Denver", "Calcium 42 · Magnesium 8 · Sodium 22 · Sulfate 65 · Chloride 30 · Bicarbonate 110", E.act("Edit"))}
+      {E.row("Burton", "Calcium 275 · Magnesium 40 · Sodium 25 · Sulfate 610 · Chloride 35 · Bicarbonate 270", E.act("Edit"))}
+      {E.row("Hazy target", "Calcium 110 · Magnesium 10 · Sodium 15 · Sulfate 90 · Chloride 180 · Bicarbonate 40", E.act("Edit"))}
+    </>),
+  },
+  {
+    step: 5,
+    slice: 1,
+    tab: "More",
+    surface: "sheet",
+    name: "Water profile",
+    to: { "Save profile": "Water profiles" },
+    job: "Name a water and its six ions",
+    reads: "get_water_profile [design]",
+    writes: "upsert_water_profile [design; SCHEMA-GATE: a water profiles table]",
+    states: [["permission", "brewer or admin required", 1], ["in use", "a profile a recipe references cannot be deleted", 1]],
+    spec: "Six ions in parts per million, the set every brewing water calculation reads. No ion arithmetic here: this screen records a measurement or a target, and any delta between two profiles is a calculation this slice does not build.",
+    body: (<>
+      {E.edit("Profile name", "Hazy target")}
+      {E.cols(
+        E.edit("Calcium ppm", "110", "number"),
+        E.edit("Magnesium ppm", "10", "number"),
+      )}
+      {E.cols(
+        E.edit("Sodium ppm", "15", "number"),
+        E.edit("Sulfate ppm", "90", "number"),
+      )}
+      {E.cols(
+        E.edit("Chloride ppm", "180", "number"),
+        E.edit("Bicarbonate ppm", "40", "number"),
+      )}
+      {E.btn("Save profile")}
     </>),
   },
   {
