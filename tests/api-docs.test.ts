@@ -273,4 +273,34 @@ describe("HTTP API reference", () => {
     // a design change, not a rename.
     expect(named.has("delete_sale_channel")).toBe(true);
   });
+
+  // A published example is a promise a caller can copy-paste. sampleValue only
+  // recognised uuid/date/length_equals and fell back to the literal "string"
+  // for every other check, so a schema with an email, a state-code regex, an
+  // HH:MM check or a numeric string documented an example its own handler
+  // rejects (2026-09-06 review).
+  it("generates an example every operation's own schema accepts", () => {
+    for (const tool of listTools()) {
+      const schema = getCommandDefinition(tool.name)?.input;
+      if (!schema) continue;
+      const result = schema.safeParse(sampleInput(schema));
+      expect(result.success, `${tool.name}: ${result.success ? "" : JSON.stringify(result.error?.issues)}`).toBe(true);
+    }
+  });
+
+  // The idempotency contract in the Conventions page is stated as universal,
+  // but only a command whose RPC claims the request id (private.command_requests)
+  // actually honours it; the rest reach the handler on every retry regardless
+  // of payload. Naming the exceptions keeps the promise from being false for
+  // whichever command is registered next without a claiming RPC.
+  it("names every registered command that does not honour the idempotency contract", () => {
+    const page = read("content/docs/api.mdx");
+    const outcomes = page.slice(page.indexOf("### The three outcomes"), page.indexOf("## Errors"));
+    const exempt = ["set_notification_preference", "set_brewery_quiet_hours", "set_notification_destination",
+      "consume_chat_link_proof", "unlink_chat_user"];
+    for (const name of exempt) {
+      expect(listTools().some((t) => t.name === name), `${name} is no longer registered; drop it from this list`).toBe(true);
+      expect(outcomes, `${name} does not claim a request id; the outcomes section must say so`).toContain(`\`${name}\``);
+    }
+  });
 });
