@@ -3,12 +3,12 @@
 // every record carries its metadata, `states` is a caption (never rendered
 // into the body), and each body renders through the E vocabulary without
 // throwing. Rendering uses react-dom/server, so no DOM is needed.
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { describe, expect, it } from "vitest";
-import { SCREENS, type Screen } from "../components/mgr/screens";
+import { INV, SCREENS, type Screen } from "../components/mgr/screens";
 import { E, splitPinned } from "../components/mgr/e";
 import { VenueFrame } from "../components/mgr/venue";
 import { AppShell } from "../components/mgr/app-shell";
@@ -26,7 +26,8 @@ const body = (name: string) => {
   return html;
 };
 
-/** The same body as plain text, tags stripped — what a reader would see. */
+/** The same body as plain text, tags stripped — what a reader would see.
+ *  Goes through the `body` memo, so a screen asserted twice renders once. */
 const text = (name: string) => body(name).replace(/<[^>]*>/g, " ");
 
 describe("SCREENS", () => {
@@ -104,47 +105,68 @@ describe("SCREENS", () => {
     const sku = SCREENS.find((s) => s.name === "SKU")!;
     expect(sku.spec).not.toMatch(/UPC\/provider mappings/);
     expect(String(sku.spec)).toMatch(/price group/i);
-    const text = renderToStaticMarkup(createElement("div", null, sku.body))
-      .replace(/<[^>]*>/g, " ");
-    expect(text).toContain("Barcode");
-    expect(text).toContain("00810123450127");
+    expect(text("SKU")).toContain("Barcode");
+    expect(text("SKU")).toContain(INV.upc);
   });
 
   it("lets a recipe parent suggest a price group without pricing a version", () => {
     const recipe = SCREENS.find((s) => s.name === "Recipe")!;
-    const text = renderToStaticMarkup(createElement("div", null, recipe.body))
-      .replace(/<[^>]*>/g, " ");
-    expect(text).toContain("Default price group");
-    expect(text).toMatch(/pre-fill/i);
+    expect(text("Recipe")).toContain("Default price group");
+    expect(text("Recipe")).toMatch(/pre-fill/i);
     expect(String(recipe.writes)).not.toMatch(/price/i);
   });
 
-  it("gives a price group a cost ceiling that only suggests", () => {
+  it("gives a price group a cost ceiling and a barcode per format", () => {
     const group = SCREENS.find((s) => s.name === "Price group")!;
-    const text = renderToStaticMarkup(createElement("div", null, group.body))
-      .replace(/<[^>]*>/g, " ");
-    expect(text).toContain("Cost ceiling");
-    expect(text).toMatch(/suggest/i);
-  });
-
-  it("barcodes a price group per format, and stays quiet when there is none", () => {
-    const group = SCREENS.find((s) => s.name === "Price group")!;
-    const text = renderToStaticMarkup(createElement("div", null, group.body))
-      .replace(/<[^>]*>/g, " ");
-    expect(text).toContain("UPC");
-    expect(text).toContain("00810123450127");
-    expect(text).toContain("none");
+    const drawn = text("Price group");
+    expect(drawn).toContain("Cost ceiling");
+    expect(drawn).toMatch(/suggest/i);
+    expect(drawn).toContain("UPC");
+    expect(drawn).toContain(INV.upc);
+    // A keg carries no retail code and that is permanent, not unfinished
+    // setup, so the empty cell reads "none" and earns no states entry.
+    expect(drawn).toContain("none");
     expect((group.states ?? []).map(([name]) => name)).not.toContain("no barcode");
   });
 
+  // "Tier" is claimed vocabulary three times over — a distributor's product
+  // type, v1's COGS band, and this app's customer price list — so the concept
+  // is a price group wherever a person reads it. The rule spans every copy
+  // surface, not just SCREENS: it first went stale in the API reference, where
+  // "price list" had wrapped across a line and a line-oriented sweep could not
+  // see it. Hence the file sweep below, whitespace-normalized. Wire names
+  // (price_list, priceList) are the shipped contract and keep their spelling.
   it("names the pricing surfaces price groups, never tiers", () => {
-    expect(SCREENS.map((s) => s.name)).toEqual(
-      expect.arrayContaining(["Price groups", "Price group"]));
-    expect(SCREENS.map((s) => s.name)).not.toEqual(
-      expect.arrayContaining(["Price lists", "Price tiers"]));
-    const drawn = SCREENS.map((s) =>
-      renderToStaticMarkup(createElement("div", null, s.body))).join(" ");
-    expect(drawn).not.toMatch(/\btiers?\b/i);
+    const names = SCREENS.map((s) => s.name);
+    expect(names).toContain("Price groups");
+    expect(names).toContain("Price group");
+    expect(names).not.toContain("Price lists");
+    expect(names).not.toContain("Price tiers");
+  });
+
+  it("keeps the retired pricing words out of every copy surface", () => {
+    // Every surface a person reads. "price list"/"price tier" is retired
+    // everywhere; the bare word "tier" is judged only where all the text is
+    // user copy, because lib/ uses it correctly for resolver precedence.
+    const copyOnly = [
+      "components/mgr/screens.tsx", "content/docs/staff-guide.mdx", "content/docs/api.mdx",
+      "app/(app)/pricing/page.tsx", "app/(app)/customers/page.tsx",
+      "app/(app)/customers/[id]/page.tsx", "app/(app)/customers/customer-form.tsx",
+      "app/(app)/pricing/price-list-form.tsx", "app/(app)/invoices/[id]/credit-memo-form.tsx",
+    ];
+    const alsoCode = [...copyOnly, "lib/mgr/nav.ts", "lib/mgr/screen-links.ts",
+      "lib/commands/customers.ts", "lib/commands/portal.ts"];
+    // Wire names are the shipped contract and keep the old spelling.
+    const prose = (file: string) =>
+      readFileSync(resolve(__dirname, "..", file), "utf8")
+        .replace(/price_list\w*|priceList\w*|PriceList\w*|price-list[\w-]*/g, " ")
+        .replace(/\s+/g, " ");
+    for (const file of alsoCode) {
+      expect(prose(file), `${file}: retired pricing word`).not.toMatch(/price (list|tier)/i);
+    }
+    for (const file of copyOnly) {
+      expect(prose(file), `${file}: retired word "tier"`).not.toMatch(/\btiers?\b/i);
+    }
   });
 
   it("gives Search and Entity picker a labeled command input and grouped results", () => {

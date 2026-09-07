@@ -8,16 +8,14 @@ import { resolveBarcode, type BarcodeLookup } from "../lib/mgr/price-group-barco
 const lookup: BarcodeLookup = {
   brandGroup: (brand) =>
     ({ "Hazy IPA": "Standard", Pils: "Standard", "Barrel-aged Stout": "Specialty" })[brand],
-  group: (name) =>
+  formats: (group) =>
     ({
-      Standard: { name: "Standard", formats: [
+      Standard: [
         { format: "case · 24×16oz", upc: "00810123450127" },
         { format: "½ bbl keg", upc: null },
-      ] },
-      Specialty: { name: "Specialty", formats: [
-        { format: "case · 24×16oz", upc: "00810123450134" },
-      ] },
-    })[name],
+      ],
+      Specialty: [{ format: "case · 24×16oz", upc: "00810123450134" }],
+    })[group],
 };
 
 describe("resolveBarcode", () => {
@@ -31,9 +29,10 @@ describe("resolveBarcode", () => {
   });
 
   it("returns null rather than throwing at every missing hop", () => {
+    // The three distinct hops: an explicit null code, a format the group
+    // never priced, and a brand in no group at all.
     expect(resolveBarcode(lookup, "Hazy IPA", "½ bbl keg")).toBeNull();
     expect(resolveBarcode(lookup, "Hazy IPA", "sixtel")).toBeNull();
     expect(resolveBarcode(lookup, "Guest cider", "case · 24×16oz")).toBeNull();
-    expect(resolveBarcode(lookup, "Barrel-aged Stout", "½ bbl keg")).toBeNull();
   });
 });

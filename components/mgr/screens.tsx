@@ -103,8 +103,11 @@ const today = (rows: ReactNode) => (
 // One invoice threaded through the AR list, the portal and the QuickBooks
 // venue frames, plus its named siblings. Every invoice number in this file
 // comes from here, so one order cannot end up with two of them.
-const INV = {
+export const INV = {
   no: "INV-1042",
+  /** The Standard group's case code: the SKU frame reads what the group owns,
+   *  so both frames must show one number or the feature contradicts itself. */
+  upc: "00810123450127",
   order: "ORD-0231",
   paid: "INV-1037",
   failed: "INV-1039",
@@ -1594,7 +1597,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.pick("Format", "½ bbl keg", ["½ bbl keg", "⅙ bbl keg", "case · 24×16 oz"])}
       {E.row("Active", "available to price and sell", E.sw(true, "Active"))}
-      {E.fld("Barcode", "00810123450127 · Standard group")}
+      {E.fld("Barcode", `${INV.upc} · Standard group`)}
       {E.info("Volume and packaging come from the Format. Create another Format when either differs.")}
       {E.btn("Save SKU")}
     </>),
@@ -3541,7 +3544,7 @@ export const SCREENS: Screen[] = [
     reads: "list_price_lists [+ channel_id §16.4] · get_price_list [design; formats and SKU overrides]",
     writes: "upsert_price_list · set_price_list_format · set_price_list_item · clear_price_list_item [price_list_formats is the group default, price_list_items the SKU override; channel_id waits for sale channels]",
     states: [["permission", "sales or admin required", 1], ["inherited", "the format price is what the customer sees"], ["overridden", "one brand × format priced away from the group", 1], ["poured", "a pour is priceable here and is not a SKU"], ["no price", "neither a format default nor an override · the line cannot be sold", 1], ["no ceiling", "the group is chosen by hand · nothing is suggested"], ["suggested", "a cost inside the band proposes this group · a person confirms", 0]],
-    spec: "A price group is what the shipped price list already was, and the customer's assigned one already assigns it; revision 2 adds the channel and makes a format priceable, so a taproom pour (which is not a SKU) can be priced at all. Drawn format-default with a per-SKU override, matching Menu and POS item, which already read “format default” and offer Reset to format price. §16.16 q1 leaves the direction open; drawing it the other way would make those two shipped frames inconsistent.",
+    spec: "A price group is the pricing a customer is already assigned, so nothing here is a new relationship; revision 2 adds the channel and makes a format priceable, so a taproom pour (which is not a SKU) can be priced at all. Drawn format-default with a per-SKU override, matching Menu and POS item, which already read “format default” and offer Reset to format price. §16.16 q1 leaves the direction open; drawing it the other way would make those two shipped frames inconsistent.",
     body: (<>
       {E.back("Price groups", "Wholesale · standard")}
       {E.edit("Group name", "Wholesale · standard")}
@@ -3549,7 +3552,7 @@ export const SCREENS: Screen[] = [
       {E.edit("Cost ceiling", "$1.85")}
       {E.info("Groups sort by ceiling and the lower bound is the previous group’s. A cost inside this band suggests the group; nobody is moved automatically.")}
       {E.ttl("Format defaults")}
-      {E.tbl(["Format", "Price", "UPC", "Source"], [["½ bbl keg", INV.hazyPrice, "none", "group default"], ["sixtel", "$95.00", "none", "group default"], ["case · 24×16oz", INV.pilsPrice, "00810123450127", "group default"]])}
+      {E.tbl(["Format", "Price", "UPC", "Source"], [["½ bbl keg", INV.hazyPrice, "none", "group default"], ["sixtel", "$95.00", "none", "group default"], ["case · 24×16oz", INV.pilsPrice, INV.upc, "group default"]])}
       {E.info("Every brand in this group scans as the group’s code for that format. Kegs carry no retail code: they move on lot numbers, so a blank UPC is finished, not unfinished.")}
       {E.ttl("Brand × format overrides")}
       {E.row("Barrel-aged Stout · ½ bbl keg", `$240.00 · against a ${INV.hazyPrice} default`, E.act("Edit"), "w")}

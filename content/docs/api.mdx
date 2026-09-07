@@ -395,8 +395,8 @@ does not fail. It is simply ignored, because two sources for one number is how
 ledgers drift. Read the computed value back rather than assuming yours was used.
 
 Prices on order lines are snapshotted at creation from the customer's price
-list. You do not send them, and changing a price list later does not rewrite an
-existing order.
+group. You do not send them, and changing a price group later does not rewrite
+an existing order.
 
 ### Nothing is edited in place [#append-only]
 
@@ -1338,8 +1338,12 @@ carrying `unitsPerCase` and `bblPerUnit`. `bblPerUnit` is a numeric string, not 
 float, so a barrel figure never picks up binary rounding on its way to a tax
 form.
 
-Prices live on price lists rather than on SKUs. A customer references a price
-list, and `set_price` sets one SKU's `unitPriceCents` on it as an integer.
+Prices live on price groups rather than on SKUs. A customer references a price
+group, and `set_price` sets one SKU's `unitPriceCents` in it as an integer.
+
+The wire names keep `price_list` (`upsert_price_list`, `set_price_list_item`,
+and the rest). That spelling is the shipped contract and does not change; the
+concept it names is a price group.
 
 {/* ops:catalog */}
 
