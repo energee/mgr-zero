@@ -77,7 +77,7 @@ export function renderArea(slug: ApiAreaSlug): string {
       live.length > 0
         ? `${live.length} of the ${operations.length} operations in this area are available today; the ${planned.length} below are not.`
         : `None of the ${operations.length} operations in this area are available yet.`,
-      "The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.",
+      "The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.",
       ["| Operation | Kind | Needed by |", "| --- | --- | --- |", ...planned.map(designed)].join("\n"),
     );
   }
@@ -143,7 +143,7 @@ export function renderBacklog(): string {
     const built = inArea.length - rows.length;
     if (rows.length === 0) return "";
     return [
-      `## ${area.title} — ${rows.length} to build, ${built} built`,
+      `## ${area.title}: ${rows.length} to build, ${built} built`,
       "",
       "| Operation | Kind | Needed by |",
       "| --- | --- | --- |",

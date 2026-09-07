@@ -6,15 +6,15 @@ description: "One endpoint for every read and write: how to call it, the rules t
 
 ## Overview [#overview]
 
-MGR has one HTTP endpoint. There are no resource URLs and no verbs to choose
-between — you POST an operation name and its input, and the response is always
-the same envelope. Everything else in this section is a rule that holds across
-every operation, or the operations themselves.
+MGR has one HTTP endpoint. No resource URLs, no verb shopping. You POST an
+operation name and its input, and the response is always the same envelope.
+Everything else in this section is a rule that holds across every operation,
+or the operations themselves.
 
 ### The endpoint [#endpoint]
 
-Registered operations are either queries, which are side-effect-free reads, or
-commands, which write:
+Registered operations are either queries (side-effect-free reads) or commands
+(writes):
 
 ```http
 POST /api/command
@@ -29,8 +29,8 @@ content-type: application/json
 ```
 
 `breweryId`, `name` and `input` are always required. `requestId` is required for
-every command and optional for queries — see [idempotency](#idempotency)
-for why it exists and what reusing one does.
+every command and optional for queries. See [idempotency](#idempotency) for why
+it exists and what reusing one does.
 
 ### Responses [#responses]
 
@@ -46,11 +46,11 @@ Failure carries a code and a message instead:
 { "ok": false, "error": { "code": "not_found", "message": "…" }, "correlationId": "…" }
 ```
 
-Two things are true of every response, success or failure. It has a
-server-generated `correlationId` — log it, because it is what ties your client's
-view of a request to the server's. And a command's response echoes the
-`requestId` you submitted, so a queued write can be matched to its result
-without keeping the request body around.
+Every response, success or failure, has a server-generated `correlationId`.
+Log it. That is the value that ties your client's view of a request to the
+server's. A command's response also echoes the `requestId` you submitted, so a
+queued write can be matched to its result without keeping the request body
+around.
 
 Status codes and every `error.code` are on the [errors page](#errors).
 
@@ -94,11 +94,11 @@ const { ok, data, error } = await res.json();
 
 ### Before you build [#before]
 
-Four rules hold across every operation. Reading them once is faster than
-meeting each one as a bug.
+Four rules hold across every operation. Read them once here instead of meeting
+each one as a bug.
 
 <Cards>
-  <Card title="Authentication & roles" href="#authentication">Proving who you are, which brewery you act in, and the role matrix for every operation.</Card>
+  <Card title="Authentication & roles" href="#authentication">Who you are, which brewery you act in, and the role matrix for every operation.</Card>
   <Card title="Idempotency & retries" href="#idempotency">Why writes carry a requestId, and how to retry without duplicating an order.</Card>
   <Card title="Errors" href="#errors">Every code the endpoint returns, what it means, and what to do about it.</Card>
   <Card title="Conventions" href="#conventions">Field naming, money as cents, dates, volumes as strings, and the fields the server computes.</Card>
@@ -107,15 +107,14 @@ meeting each one as a bug.
 ### Availability [#availability]
 
 Operations are listed by area, each marked with its status. **Available**
-operations are registered today and the endpoint answers them; each carries the
-roles that may call it, its fields, and an example request. **Designed**
-operations are ones the screens need that the backend has not built — calling
+operations are registered today and the endpoint answers them. Each one lists
+the roles that may call it, its fields, and an example request. **Designed**
+operations are ones the screens need that the backend has not built. Calling
 one returns `404 unknown_command`.
 
-Both lists are generated from the command registry and from the screens
-themselves, so neither can drift from the product. The designed list is, in
-effect, the roadmap: it says what is coming and which screen is waiting on it,
-without promising a date.
+Both lists are generated from the command registry and from the screens, so
+neither can drift from the product. The designed list is the roadmap: what is
+coming, and which screen is waiting on it. No dates.
 
 ## Authentication & roles [#authentication]
 
@@ -131,33 +130,32 @@ curl -X POST "$MGR_URL/api/command" \
 ```
 
 The `breweryId` in the body then decides *which* brewery the caller is acting
-in. Being signed in is not enough: the caller must be a member of that brewery,
-either staff — a `brewery_users` row with role `admin`, `sales`, `warehouse` or
-`brewer` — or a portal user, a `customer_users` row linked to one of the
-brewery's customers, which carries the role `customer`.
+in. Being signed in is not enough. The caller must be a member of that brewery:
+staff (`brewery_users` with role `admin`, `sales`, `warehouse` or `brewer`) or
+a portal user (`customer_users` linked to one of the brewery's customers, role
+`customer`).
 
-Failing either check is a different error, and the distinction is worth
-handling: `401 unauthenticated` means the token is missing or expired and the
-caller should sign in again, while `403 not_member` means the token is fine and
-the `breweryId` is wrong.
+The two failures are different, and that difference is worth handling.
+`401 unauthenticated` means the token is missing or expired: sign in again.
+`403 not_member` means the token is fine and the `breweryId` is wrong.
 
 ### Roles are enforced twice [#enforcement]
 
-An operation lists the roles that may call it, and the endpoint refuses the rest
+An operation lists the roles that may call it. The endpoint refuses the rest
 with `403 permission_denied` before the handler runs. Below that, Postgres
 row-level security scopes every query to the caller's brewery, so a role that
-slipped through would still read nothing. This matters when you are debugging an
-empty result: an empty list and a forbidden read look the same from outside, and
-that is deliberate — a caller cannot probe another tenant's data by watching
-which ids return `404` rather than `403`.
+slipped through would still read nothing. That matters when you are debugging an
+empty result: an empty list and a forbidden read look the same from outside, on
+purpose. A caller cannot probe another tenant's data by watching which ids
+return `404` rather than `403`.
 
-A portal user sees only their own customer's records, which is why the portal
-operations are a separate set rather than the staff ones with a filter applied.
+A portal user sees only their own customer's records. That is why the portal
+operations are a separate set, not the staff ones with a filter applied.
 
 ### Which role may call what [#matrix]
 
 Every available operation, and the roles that admit it. Designed operations are
-omitted — they have no roles until they are built.
+omitted. They have no roles until they are built.
 
 {/* ops:roles */}
 | Operation | Area | admin | sales | warehouse | brewer | customer |
@@ -222,11 +220,11 @@ omitted — they have no roles until they are built.
 ## Idempotency & retries [#idempotency]
 
 A network that drops a response has not told you whether the write happened.
-Retrying blindly risks a duplicate order; not retrying risks losing one. The
+Retrying blindly risks a duplicate order. Not retrying risks losing one. The
 `requestId` removes the guess.
 
-Every command — every write — must carry a client-generated RFC 9562/4122 UUID
-as `requestId`. Queries may omit it, because a repeated read costs nothing.
+Every command (every write) must carry a client-generated RFC 9562/4122 UUID as
+`requestId`. Queries may omit it. A repeated read costs nothing.
 
 ```ts
 const requestId = crypto.randomUUID();   // once, before the first attempt
@@ -235,7 +233,7 @@ async function submit() {
   return fetch(`${MGR_URL}/api/command`, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-    // The same requestId on every attempt — that is what makes the retry safe.
+    // The same requestId on every attempt. That is what makes the retry safe.
     body: JSON.stringify({ breweryId, name: "create_order", requestId, input }),
   });
 }
@@ -248,7 +246,7 @@ server recognises the write it already did and answers with the original result
 rather than performing it twice.
 
 Reusing one with a **different payload** is `409 conflict`. That is the endpoint
-telling you two different writes are wearing the same id — almost always a
+telling you two different writes are wearing the same id. Almost always a
 client that generated the id once and then mutated the form.
 
 A **new** `requestId` is a new write, every time. Generating one inside your
@@ -259,17 +257,17 @@ This holds for every command that writes through a ledger RPC. Five do not yet:
 `set_notification_preference`, `set_brewery_quiet_hours`,
 `set_notification_destination`, `consume_chat_link_proof`, and
 `unlink_chat_user` still require a `requestId`, but nothing on the server
-checks it — a retry with a different payload lands as `200`, not `409`. Treat
+checks it. A retry with a different payload lands as `200`, not `409`. Treat
 those five as not-yet-idempotent until this note is removed.
 
 ### Where to generate it [#where]
 
-Generate the id at the moment the user commits — pressing Submit — not when the
+Generate the id at the moment the user commits (pressing Submit), not when the
 request is built. `lib/commands/client.ts` does exactly this in the app: one id
 per invocation, reused by any transport-level retry underneath it.
 
 Timeouts and `5xx` responses are the cases worth retrying, with the same id.
-A `4xx` other than `409` will not change on retry: fix the request instead.
+A `4xx` other than `409` will not change on retry. Fix the request instead.
 
 ## Errors [#errors]
 
@@ -284,8 +282,8 @@ A failure is the same envelope as a success, with `ok: false`:
 }
 ```
 
-Branch on `code`, never on `message`. The code is a contract; the message is
-written for a person and will be reworded. Both are safe to show a user — the
+Branch on `code`, never on `message`. The code is a contract. The message is
+written for a person and will be reworded. Both are safe to show a user. The
 endpoint never returns raw database text, which is why an unmapped database
 failure arrives as a generic `db_error` while the detail goes to the server log
 under the same `correlationId` you were given.
@@ -298,13 +296,13 @@ one value that ties what your client saw to what the server recorded.
 | --- | --- | --- | --- |
 | 400 | `bad_request` | A domain rule refused the write, such as shipping an order that was never picked. | Read the message: it is the rule, written for a person. Change the state or the input. |
 | 400 | `duplicate_command` | Two operations tried to register the same name. A server fault, not a caller one. | Report it; no request will succeed until it is fixed. |
-| 400 | `invalid_input` | The `input` failed the operation's schema. The message names each offending field. | Fix the fields the message names — the operation's field table lists types and which are required. |
+| 400 | `invalid_input` | The `input` failed the operation's schema. The message names each offending field. | Fix the fields the message names. The operation's field table lists types and which are required. |
 | 400 | `invalid_request` | The body was not JSON, or `breweryId`, `name` or `input` was missing. | Send all three fields with `content-type: application/json`. |
 | 400 | `invalid_request_id` | A command arrived without a `requestId`, or with one that is not an RFC 9562/4122 UUID. | Generate a UUID per write and send it; queries may omit it. |
 | 401 | `unauthenticated` | No usable session cookie or bearer token. | Send `authorization: Bearer <supabase access_token>`, or call from a logged-in browser session. |
 | 403 | `not_member` | Authenticated, but not a member of the brewery named by `breweryId`. | Check the `breweryId`. Membership is staff (`brewery_users`) or a portal user (`customer_users`). |
 | 403 | `permission_denied` | A member of the brewery, but the operation does not admit that role. | Each operation lists the roles allowed to call it; the role matrix collects them. |
-| 404 | `not_found` | An id in the input matches no record the caller may see. | Confirm the id belongs to this brewery — row-level security makes another tenant's row indistinguishable from a missing one. |
+| 404 | `not_found` | An id in the input matches no record the caller may see. | Confirm the id belongs to this brewery. Row-level security makes another tenant's row indistinguishable from a missing one. |
 | 404 | `unknown_command` | No operation is registered under that `name`. | Check the spelling. An operation marked designed is not registered yet and answers this. |
 | 409 | `conflict` | A `requestId` was reused with a different payload. | Reuse a requestId only to retry the identical write; generate a new one for a new write. |
 | 500 | `db_error` | The database refused the write for a reason not mapped to a public code. Logged server-side. | Retry once with the same `requestId`. If it persists, quote the `correlationId` from the response. |
@@ -331,28 +329,28 @@ repeated in each field table.
 
 **Field names are camelCase** in `input`, even though the database columns they
 land in are snake_case. Response payloads come back in the database's own shape,
-so a field you send as `skuId` reads back as `sku_id`. That asymmetry is real
-and worth handling in one mapping layer rather than at each call site.
+so a field you send as `skuId` reads back as `sku_id`. That asymmetry is real.
+Handle it in one mapping layer rather than at each call site.
 
-**Ids are UUIDs** wherever the id belongs to MGR — every record you create,
-read or reference here. The exception is an id minted by somebody else and
-stored as it arrives: `externalDestinationId` on
-`set_notification_destination` is a Slack channel id, and its field table says
-`string` for that reason. Read the table when it disagrees with this line; it
-is generated from the schema and this sentence is not.
+**Ids are UUIDs** wherever the id belongs to MGR: every record you create, read,
+or reference here. The exception is an id minted by somebody else and stored as
+it arrives. `externalDestinationId` on `set_notification_destination` is a Slack
+channel id, and its field table says `string` for that reason. Read the table
+when it disagrees with this line. The table is generated from the schema. This
+sentence is not.
 
 **Money is integer cents.** `unitPriceCents: 1250` is $12.50. There are no
 floats in prices anywhere in the API, because a fraction of a cent that survives
 a few multiplications becomes a discrepancy on an invoice.
 
 **Dates are `YYYY-MM-DD` strings**, not timestamps, wherever the field means a
-calendar day — a requested ship date is a day, not an instant. Fields that
+calendar day. A requested ship date is a day, not an instant. Fields that
 genuinely mean an instant, such as `now` on `get_today`, take an offset-aware
 ISO timestamp so the server never has to guess a timezone.
 
 **Volumes are numeric strings.** `bblPerUnit` is `"0.1651"`, not `0.1651`. A
 barrel figure feeds excise reporting, and binary floating point cannot represent
-most decimal fractions exactly; passing it as a string keeps the exact decimal
+most decimal fractions exactly. Passing it as a string keeps the exact decimal
 the brewery entered all the way to the tax form.
 
 **`limit` defaults to 50 and caps at 200** on every operation that takes one.
@@ -362,7 +360,7 @@ the brewery entered all the way to the tax form.
 Some values are derived and must not be sent. `bbl` on an inventory movement is
 computed from the SKU and the quantity. A field an operation does not declare is
 dropped before the handler runs rather than trusted, so sending your own `bbl`
-does not fail — it is simply ignored, because two sources for one number is how
+does not fail. It is simply ignored, because two sources for one number is how
 ledgers drift. Read the computed value back rather than assuming yours was used.
 
 Prices on order lines are snapshotted at creation from the customer's price
@@ -372,7 +370,7 @@ existing order.
 ### Nothing is edited in place [#append-only]
 
 The inventory ledger is append-only: a correction is a new movement in the
-opposite direction, never an edit. Invoices work the same way — a credit memo is
+opposite direction, never an edit. Invoices work the same way. A credit memo is
 negative lines at the original prices. Where you might expect an update or a
 delete, look for the compensating operation instead.
 
@@ -390,8 +388,8 @@ overdue, filtered by their role. `get_today` takes an optional offset-aware ISO
 
 Notification `reason` is `submitted_order`, `pick_due`, `delivery_next`,
 `fermentation_reading_overdue`, or `operations_digest`. A preference enables or
-mutes one reason for the calling member; quiet hours use `HH:MM` start and end
-with an optional timezone, and brewery-wide quiet hours set by an admin apply on
+mutes one reason for the calling member. Quiet hours use `HH:MM` start and end
+with an optional timezone. Brewery-wide quiet hours set by an admin apply on
 top of them.
 
 {/* ops:today */}
@@ -507,7 +505,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 6 of the 13 operations in this area are available today; the 7 below are not.
 
-The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
+The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
@@ -531,13 +529,13 @@ later price change never rewrites an existing order. Mutations return
 
 Confirming creates allocations and returns `{ order_id, warnings }`, where
 `warnings` is `[{ sku_id, atp }]` for any SKU whose available-to-promise went
-negative. These are soft warnings — the confirm still succeeds, because the
+negative. These are soft warnings. The confirm still succeeds, because the
 brewery, not the API, decides whether to oversell.
 
 Shipping is one transaction: inventory movements, allocation fulfilment and the
 invoice together, returning `{ order_id, invoice_id }`. A credit memo reverses
 part of an invoice as negative lines at the original prices plus return-in
-movements; invoices are never edited.
+movements. Invoices are never edited.
 
 {/* ops:orders */}
 
@@ -846,7 +844,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 16 of the 23 operations in this area are available today; the 7 below are not.
 
-The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
+The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
@@ -863,13 +861,13 @@ The screens need them and the backend has not built them, so calling one returns
 ### Inventory & locations [#inventory]
 
 The ledger is immutable. A movement is appended, never edited or deleted, and a
-correction is a new movement in the opposite direction — which is what makes the
+correction is a new movement in the opposite direction. That is what makes the
 history admissible for excise reporting. `bbl` is computed server-side from the
 SKU, so a caller must not send it.
 
 On-hand is the sum of movements per SKU and location. Available-to-promise is
-on-hand minus open allocations, which is the number a salesperson should be
-shown before promising stock.
+on-hand minus open allocations: the number a salesperson should be shown before
+promising stock.
 
 {/* ops:inventory */}
 
@@ -987,7 +985,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 6 of the 13 operations in this area are available today; the 7 below are not.
 
-The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
+The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
@@ -1003,12 +1001,12 @@ The screens need them and the backend has not built them, so calling one returns
 
 ### Catalog & pricing [#catalog]
 
-A product is the beer; a SKU is a sellable format of it — keg, can or bottle —
+A product is the beer. A SKU is a sellable format of it (keg, can, or bottle)
 carrying `unitsPerCase` and `bblPerUnit`. `bblPerUnit` is a numeric string, not a
 float, so a barrel figure never picks up binary rounding on its way to a tax
 form.
 
-Prices live on price lists rather than on SKUs: a customer references a price
+Prices live on price lists rather than on SKUs. A customer references a price
 list, and `set_price` sets one SKU's `unitPriceCents` on it as an integer.
 
 {/* ops:catalog */}
@@ -1141,7 +1139,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 7 of the 18 operations in this area are available today; the 11 below are not.
 
-The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
+The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
@@ -1161,14 +1159,14 @@ The screens need them and the backend has not built them, so calling one returns
 
 ### Customers [#customers]
 
-A customer is a distributor, retailer, brewery or other account, carrying a
-two-letter `state`, an optional price list, licence number and payment terms.
+A customer is a distributor, retailer, brewery, or other account, carrying a
+two-letter `state`, an optional price list, licence number, and payment terms.
 `upsert_customer` creates when `id` is omitted and updates when it is present.
 
-Ship-to addresses matter beyond delivery: the state on the ship-to drives excise
+Ship-to addresses matter beyond delivery. The state on the ship-to drives excise
 destination reporting, so an address is a compliance record, not just a label.
 Portal orders ship from one warehouse per brewery, set with
-`set_portal_fulfillment_source`; portal ordering fails until it is set.
+`set_portal_fulfillment_source`. Portal ordering fails until that is set.
 
 `invite_customer_user` is registered but fails closed in this release, like the
 staff invitations it belongs with: it validates its input and then raises,
@@ -1198,7 +1196,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Invite a customer portal user — not available in this release
+Invite a customer portal user (not available in this release)
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -1300,7 +1298,7 @@ not have: a par level per SKU, and standing allocations that reserve stock
 against a recurring need. Setting a standing allocation to zero releases it.
 
 Replenishment reads the gap between par and on-hand and suggests a transfer
-quantity; `create_replenishment_order` turns those quantities into an
+quantity. `create_replenishment_order` turns those quantities into an
 already-confirmed taproom transfer, skipping the draft and submit steps a
 wholesale order goes through.
 
@@ -1367,7 +1365,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 3 of the 13 operations in this area are available today; the 10 below are not.
 
-The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
+The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
@@ -1391,7 +1389,7 @@ labels. They carry their own on-hand and their own counts, separate from the
 finished-goods ledger, because a shortfall in either stops a run for different
 reasons.
 
-A purchase order is drafted — optionally from computed material requirements —
+A purchase order is drafted (optionally from computed material requirements),
 sent to a vendor, then received. Receiving is what writes material stock, so an
 unreceived PO never inflates what a packaging run believes it has.
 
@@ -1403,7 +1401,7 @@ unreceived PO never inflates what a packaging run believes it has.
 
 None of the 14 operations in this area are available yet.
 
-The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
+The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
@@ -1429,7 +1427,7 @@ The screens need them and the backend has not built them, so calling one returns
 A recipe is versioned: a batch references the version it was brewed to, so a
 later recipe change never rewrites the history of beer already made.
 
-The cellar map is the read behind vessel work — what is in each tank, and for how
+The cellar map is the read behind vessel work: what is in each tank, and for how
 long. Fermentation readings are appended per batch and are what an overdue
 reading notification is measured against.
 
@@ -1441,7 +1439,7 @@ reading notification is measured against.
 
 None of the 16 operations in this area are available yet.
 
-The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
+The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
@@ -1466,7 +1464,7 @@ The screens need them and the backend has not built them, so calling one returns
 
 ### Packaging [#packaging]
 
-A format is a packaging configuration — what a SKU is filled into and what that
+A format is a packaging configuration: what a SKU is filled into and what that
 consumes. Its bill of material is replaced wholesale rather than patched line by
 line, so a partially edited BOM never exists.
 
@@ -1483,7 +1481,7 @@ before it is scheduled rather than after.
 
 None of the 12 operations in this area are available yet.
 
-The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
+The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
@@ -1505,9 +1503,9 @@ The screens need them and the backend has not built them, so calling one returns
 ### Delivery & routes [#delivery]
 
 A route groups picked orders into one driver's run. It is built, saved,
-departed, and returned; a stop is confirmed as delivered on the way. What does
+departed, and returned. A stop is confirmed as delivered on the way. What does
 not get delivered comes back on the same route, which is why the return step
-exists separately from delivery confirmation — the stock has to land somewhere
+exists separately from delivery confirmation: the stock has to land somewhere
 before the route can close.
 
 {/* ops:delivery */}
@@ -1518,7 +1516,7 @@ before the route can close.
 
 None of the 7 operations in this area are available yet.
 
-The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
+The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
@@ -1550,7 +1548,7 @@ changes the underlying records.
 
 None of the 9 operations in this area are available yet.
 
-The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
+The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
@@ -1570,7 +1568,7 @@ The screens need them and the backend has not built them, so calling one returns
 
 Staff roles are `admin`, `sales`, `warehouse` and `brewer`, and every operation
 in this reference lists the roles allowed to call it. A membership is what ties a
-user to a brewery; revoking one ends access without deleting the history that
+user to a brewery. Revoking one ends access without deleting the history that
 member wrote.
 
 Invitations and CSV import are registered but fail closed in this release: they
@@ -1582,7 +1580,7 @@ validate their input and then raise, writing nothing.
 
 `command` · admin
 
-Bulk CSV import — not available in this release
+Bulk CSV import (not available in this release)
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -1600,7 +1598,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin
 
-Invite staff — not available in this release
+Invite staff (not available in this release)
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -1618,7 +1616,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Staff memberships for the brewery (user id + role; emails live in auth and are not readable under RLS)
+Staff memberships for the brewery (user id and role; emails are not returned)
 
 Takes no input.
 
@@ -1654,7 +1652,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 4 of the 10 operations in this area are available today; the 6 below are not.
 
-The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
+The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
@@ -1670,13 +1668,13 @@ The screens need them and the backend has not built them, so calling one returns
 ### Customer portal [#portal]
 
 Callers with the `customer` role are portal users, not staff. They see only
-their own customer's data, and these are the only operations that role can call
-— the scope is enforced server-side, not by which operations the client chooses
+their own customer's data, and these are the only operations that role can call.
+The scope is enforced server-side, not by which operations the client chooses
 to show.
 
 Portal orders are wholesale orders shipped from the brewery's warehouse, and
 they move through the same lifecycle staff orders do. A portal user drafts,
-updates and submits; confirming, picking and shipping stay with the brewery.
+updates, and submits. Confirming, picking, and shipping stay with the brewery.
 
 {/* ops:portal */}
 
@@ -1806,7 +1804,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 7 of the 10 operations in this area are available today; the 3 below are not.
 
-The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
+The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
