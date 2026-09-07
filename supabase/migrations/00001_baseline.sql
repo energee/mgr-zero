@@ -3600,8 +3600,11 @@ create function close_packaging_run(
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare
   v_actor uuid; v_replay jsonb; v_run public.packaging_runs; v_lot uuid; v_available numeric;
+  v_occupancy public.vessel_occupancies;
   v_dupe uuid; v_line jsonb; v_sku uuid; v_qty numeric; v_format uuid;
   v_movement uuid; v_consumption uuid; v_bom record;
+  -- numeric(10,3) rounding means "empty" is never exactly zero after a split.
+  c_epsilon constant numeric := 0.0005;
 begin
   v_actor := private.assert_staff(p_brewery, array['admin','brewer','warehouse']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'close_packaging_run', p_request_id,
@@ -3629,11 +3632,18 @@ begin
     raise exception 'bin does not belong to that location';
   end if;
 
-  -- Only what the tank actually holds may be drawn. The epsilon absorbs the
-  -- numeric(10,3) rounding of a brewer who draws a tank dry.
-  select bbl into v_available from public.occupancy_volumes where occupancy_id = v_run.occupancy_id;
-  if p_bbl_drawn > coalesce(v_available, 0) + 0.0005 then
-    raise exception 'the tank holds only % bbl', round(coalesce(v_available, 0), 3);
+  -- Lock the tank before reading its volume, as record_cellar_transfer does:
+  -- the run lock above serialises closes of *this* run, but two runs drawing
+  -- the same tank (or a cellar transfer out of it) would otherwise both see
+  -- the pre-draw volume and both pass the check below.
+  select * into v_occupancy from public.vessel_occupancies
+  where id = v_run.occupancy_id and brewery_id = p_brewery for update;
+  if v_occupancy.id is null then raise exception 'occupancy not found'; end if;
+  if v_occupancy.ended_at is not null then raise exception 'occupancy is closed'; end if;
+
+  select bbl into v_available from public.occupancy_volumes where occupancy_id = v_occupancy.id;
+  if p_bbl_drawn > coalesce(v_available, 0) + c_epsilon then
+    raise exception 'only % bbl in that tank; asked to draw %', coalesce(v_available, 0), p_bbl_drawn;
   end if;
 
   select (value->>'sku_id')::uuid into v_dupe
