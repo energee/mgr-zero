@@ -2931,6 +2931,44 @@ begin
   return private.complete_command_request(p_request_id, v_result);
 end $$;
 
+-- Bin move: stock changes bin inside one location. No document, no status,
+-- just the paired ledger rows (spec 2026-09-06 Decision 5). Two locations is a
+-- stock transfer.
+create function move_stock_bin(
+  p_brewery uuid, p_sku uuid, p_material uuid, p_keg_pool uuid, p_keg_size public.keg_size,
+  p_qty numeric, p_from_bin uuid, p_to_bin uuid, p_note text, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_from public.bins; v_to public.bins;
+begin
+  perform private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'move_stock_bin', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'sku', p_sku, 'material', p_material, 'keg_pool', p_keg_pool, 'keg_size', p_keg_size,
+                       'qty', p_qty, 'from_bin', p_from_bin, 'to_bin', p_to_bin, 'note', p_note));
+  if v_replay is not null then return v_replay; end if;
+  if p_qty <= 0 then raise exception 'qty must be positive'; end if;
+  if num_nonnulls(p_sku, p_material, p_keg_pool) <> 1 then raise exception 'exactly one of sku, material, keg pool'; end if;
+  if p_from_bin = p_to_bin then raise exception 'from and to bin are the same'; end if;
+  select * into v_from from public.bins where id = p_from_bin and brewery_id = p_brewery;
+  select * into v_to   from public.bins where id = p_to_bin   and brewery_id = p_brewery;
+  if v_from.id is null or v_to.id is null then raise exception 'bin not found'; end if;
+  if v_from.location_id <> v_to.location_id then raise exception 'bins are in different locations: use create_stock_transfer'; end if;
+  if p_sku is not null then
+    insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, note, created_by)
+    values (p_brewery, p_sku, v_from.location_id, p_from_bin, -p_qty, 'location_transfer', p_note, auth.uid()),
+           (p_brewery, p_sku, v_to.location_id,   p_to_bin,    p_qty, 'location_transfer', p_note, auth.uid());
+  elsif p_material is not null then
+    insert into public.material_movements (brewery_id, material_id, location_id, bin_id, qty, type, note, created_by)
+    values (p_brewery, p_material, v_from.location_id, p_from_bin, -p_qty, 'transfer_out', p_note, auth.uid()),
+           (p_brewery, p_material, v_to.location_id,   p_to_bin,    p_qty, 'transfer_in',  p_note, auth.uid());
+  else
+    if p_keg_size is null then raise exception 'keg_size is required with a keg pool'; end if;
+    insert into public.keg_events (brewery_id, pool_id, keg_size, location_id, bin_id, qty, reason, note, created_by)
+    values (p_brewery, p_keg_pool, p_keg_size, v_from.location_id, p_from_bin, p_qty::int, 'transferred_out', p_note, auth.uid()),
+           (p_brewery, p_keg_pool, p_keg_size, v_to.location_id,   p_to_bin,   p_qty::int, 'transferred_in',  p_note, auth.uid());
+  end if;
+  return private.complete_command_request(p_request_id, jsonb_build_object('from_bin_id', p_from_bin, 'to_bin_id', p_to_bin, 'qty', p_qty));
+end $$;
+
 -- Release one open reservation so its quantity returns to ATP (Pars and
 -- allocation screen). Only an open allocation can be released.
 create function release_allocation(p_allocation uuid,p_request_id uuid) returns jsonb
@@ -4113,6 +4151,7 @@ grant execute on function
   submit_stock_transfer(uuid,uuid),
   record_stock_transfer_pick(uuid,jsonb,uuid),
   receive_stock_transfer(uuid,jsonb,uuid),
+  move_stock_bin(uuid,uuid,uuid,uuid,public.keg_size,numeric,uuid,uuid,text,uuid),
   set_standing_allocation(uuid,uuid,numeric,uuid),
   create_replenishment_order(uuid,uuid,jsonb,uuid)
   to authenticated;

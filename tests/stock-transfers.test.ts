@@ -101,3 +101,27 @@ describe("receive_stock_transfer", () => {
     await expect(runCommand("receive_stock_transfer", { transferId, lines: [] }, ctx)).rejects.toThrow(/received/);
   });
 });
+
+describe("move_stock_bin", () => {
+  it("relocates inside one location with paired rows and no document; refuses a cross-location pair", async () => {
+    const b = await makeBrewery();
+    const ctx = await makeStaffCtx(b.id, "warehouse");
+    const wh = await seedLocation(b.id, { name: "WH", kind: "warehouse" });
+    const other = await seedLocation(b.id, { name: "Storage", kind: "storage" });
+    const { data: bins } = await admin.from("bins").select("id").eq("location_id", wh.id).order("name");
+    const { skuId } = await seedCatalog(b.id);
+    await runCommand("record_movement", { skuId, locationId: wh.id, binId: bins![0].id, qty: 4, type: "opening_balance" }, ctx);
+    const before = await admin.from("stock_transfers").select("id", { count: "exact", head: true }).eq("brewery_id", b.id);
+    await runCommand("move_stock_bin", { skuId, qty: 1, fromBinId: bins![0].id, toBinId: bins![1].id }, ctx);
+    const { data: onHand } = await admin.from("bin_on_hand").select("bin_id, qty").eq("sku_id", skuId).order("qty");
+    expect(onHand!.map((r) => [r.bin_id, Number(r.qty)])).toEqual([[bins![1].id, 1], [bins![0].id, 3]]);
+    const { data: mvs } = await admin.from("inventory_movements").select("type, location_id").eq("sku_id", skuId).eq("type", "location_transfer");
+    expect(mvs!.length).toBe(2);
+    expect(mvs!.every((m) => m.location_id === wh.id)).toBe(true);
+    const after = await admin.from("stock_transfers").select("id", { count: "exact", head: true }).eq("brewery_id", b.id);
+    expect(after.count).toBe(before.count); // no document
+    await expect(runCommand("move_stock_bin", { skuId, qty: 1, fromBinId: bins![0].id, toBinId: other.binId }, ctx))
+      .rejects.toThrow(/create_stock_transfer/);
+    await expect(runCommand("move_stock_bin", { skuId, qty: 1, fromBinId: bins![0].id, toBinId: bins![0].id }, ctx)).rejects.toBeTruthy();
+  });
+});
