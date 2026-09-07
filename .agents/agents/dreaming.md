@@ -37,9 +37,9 @@ consolidation: make the living agent docs match reality, citing evidence.
   decision or non-obvious operational constraint.
 - `PROGRESS.md` tracks workstream state changes, not every merged PR. Keep its
   entries to one line; commits and owning docs hold implementation detail.
-- `PROGRESS.md` has no Now section: add dated Done lines only. Never edit
-  `TODO.md`; `scripts/pr-directives.ts` moves its finished items into Done
-  before you run, from `TODO:` lines in merged PR descriptions.
+- `PROGRESS.md` has no Now section: add dated Done lines only.
+  `scripts/pr-directives.ts` has already moved finished `TODO.md` items
+  there before you run.
 - Feature PRs do not edit the logs themselves (AGENTS.md step 6); the PR
   description carries the progress note and any durable decision. Treat that
   text as the primary input for `PROGRESS.md` and `MEMORY.md`.

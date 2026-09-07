@@ -1,12 +1,10 @@
 # TODO — everything left to match `/docs/screens-explore`
 
-Index written 2026-09-07 against `main` @ `b3f6a91` (Programs 0–4b merged) with
-Program 5 open as PR #194 on `lane-production`. This is the checklist; each
+Index written 2026-09-07 against `main` @ `b3f6a91` (Programs 0–4b merged)  This is the checklist; each
 program's own plan holds the tasks. An item is done when its PR is merged and
 its screens are ungated in `components/mgr/screens.tsx`. It then leaves this
-file: a `TODO: <text>` line in the PR description (any unique substring, e.g.
-`TODO: Program 6`) makes the dreaming workflow move the line to
-`.agents/PROGRESS.md` Done with the date and PR. This file only shrinks.
+file via a `TODO: <unique substring>` line in the PR description (see
+`AGENTS.md` step 6). This file only shrinks.
 
 Counts come from a source read of the 167 MGR (non-venue) inventory screens
 against `app/`: 55 live, 13 partial, 32 missing but ungated, 67 gated.
@@ -20,14 +18,14 @@ the same job, fields, verbs, and states as its `SCREENS` record; the record's
 
 ## Phase 1 — backend programs (in order; each is a PR stack)
 
-| # | Program | Plan | Tasks | Status |
-| --- | --- | --- | --- | --- |
-| 0–4b | Harness, ordering, bins/transfers, catalog identity, channels, pricing | `2026-09-07-backend-database-integration.md` | — | merged #185 |
-| 5 | Production and packaging | `backend-program-5-production-packaging.md` | 28 | PR #194 green, unmerged |
-| 6 | Purchasing (vendors, POs, receipts, contracts, lead times) | `backend-program-6-purchasing.md` | 20 | not started |
-| 7 | Taproom and kegs (pools, events, fleet; not tap board) | `backend-program-7-taproom-kegs.md` | 10 | not started |
-| 8 | Delivery and routes (save / depart / return, driver) | `backend-program-8-delivery-routes.md` | 13 | not started |
-| 9 | Compliance (report, filing, registry, COLA) | `backend-program-9-compliance.md` | 17 | not started |
+| # | Program | Plan | Tasks |
+| --- | --- | --- | --- |
+| 0–4b | Harness, ordering, bins/transfers, catalog identity, channels, pricing | `.agents/superpowers/plans/2026-09-07-backend-database-integration.md` | — |
+| 5 | Production and packaging | `.agents/superpowers/plans/2026-09-07-backend-program-5-production-packaging.md` | 28 |
+| 6 | Purchasing (vendors, POs, receipts, contracts, lead times) | `.agents/superpowers/plans/2026-09-07-backend-program-6-purchasing.md` | 20 |
+| 7 | Taproom and kegs (pools, events, fleet; not tap board) | `.agents/superpowers/plans/2026-09-07-backend-program-7-taproom-kegs.md` | 10 |
+| 8 | Delivery and routes (save / depart / return, driver) | `.agents/superpowers/plans/2026-09-07-backend-program-8-delivery-routes.md` | 13 |
+| 9 | Compliance (report, filing, registry, COLA) | `.agents/superpowers/plans/2026-09-07-backend-program-9-compliance.md` | 17 |
 
 - [ ] 5 merged
 - [ ] 6 merged
@@ -35,7 +33,7 @@ the same job, fields, verbs, and states as its `SCREENS` record; the record's
 - [ ] 8 merged (needs 2 phase 3)
 - [ ] 9 merged
 
-## Phase 2 — explorer remainder (`backend-explorer-remainder.md`)
+## Phase 2 — explorer remainder (`.agents/superpowers/plans/2026-09-07-backend-explorer-remainder.md`)
 
 Order: 10 (parity test red early) → 11 ∥ 16 → 12 (needs 2 + 7) → 13 ∥ 15
 (after 1) → 14 (after 12). Do not start one before its named gate closes in
@@ -43,13 +41,13 @@ tests.
 
 | # | Program | Plan | Tasks | Closes |
 | --- | --- | --- | --- | --- |
-| 10 | Explorer parity | `backend-program-10-explorer-parity.md` | 33 | shell pages, Search, Permission denied, Session expired, Entity picker, password reset (staff + portal), Portal sign-in / Me, confirmation screens, Team role/revoke, Invoices, Question invoice |
-| 11 | Access and import | `backend-program-11-access-import.md` | 22 | Create brewery, Accept / Expired invite, Invite portal user, Import, First-run invite/import |
-| 12 | Taproom truth | `backend-program-12-taproom-truth.md` | 21 | Weekly count, Variance by brand, Tap board, Kick / Swap keg, SKU reverse, complete_batch, loss queue |
-| 13 | QuickBooks | `backend-program-13-quickbooks.md` | 17 | Connect / Disconnect / Mapping conflict / Fix mapping, Accounting push, Pay invoice |
-| 14 | Square and menu | `backend-program-14-square-pos.md` | 13 | Point of sale, Connect Square, locations, connector, Menu, POS item / mapping / sale detail |
-| 15 | Composer | `backend-program-15-composer.md` | 18 | Composer proposal / question / answer, Offline outbox |
-| 16 | Chat settings | `backend-program-16-chat-settings.md` | 9 | Chat disconnected / settings, Linked people, Disconnect Slack, Reauthorization |
+| 10 | Explorer parity | `.agents/superpowers/plans/2026-09-07-backend-program-10-explorer-parity.md` | 33 | shell pages, Search, Permission denied, Session expired, Entity picker, password reset (staff + portal), Portal sign-in / Me, confirmation screens, Team role/revoke, Invoices, Question invoice |
+| 11 | Access and import | `.agents/superpowers/plans/2026-09-07-backend-program-11-access-import.md` | 22 | Create brewery, Accept / Expired invite, Invite portal user, Import, First-run invite/import |
+| 12 | Taproom truth | `.agents/superpowers/plans/2026-09-07-backend-program-12-taproom-truth.md` | 21 | Weekly count, Variance by brand, Tap board, Kick / Swap keg, SKU reverse, complete_batch, loss queue |
+| 13 | QuickBooks | `.agents/superpowers/plans/2026-09-07-backend-program-13-quickbooks.md` | 17 | Connect / Disconnect / Mapping conflict / Fix mapping, Accounting push, Pay invoice |
+| 14 | Square and menu | `.agents/superpowers/plans/2026-09-07-backend-program-14-square-pos.md` | 13 | Point of sale, Connect Square, locations, connector, Menu, POS item / mapping / sale detail |
+| 15 | Composer | `.agents/superpowers/plans/2026-09-07-backend-program-15-composer.md` | 18 | Composer proposal / question / answer, Offline outbox |
+| 16 | Chat settings | `.agents/superpowers/plans/2026-09-07-backend-program-16-chat-settings.md` | 9 | Chat disconnected / settings, Linked people, Disconnect Slack, Reauthorization |
 
 - [ ] 10 parity test committed red
 - [ ] 10 merged
@@ -83,7 +81,7 @@ land early as their own small PRs.
 - [ ] Customer detail portal-invite section (Program 11)
 - [ ] No membership as its own entry screen
 
-## Spec drift to close (`2026-09-07-screens-drift.md`, root worktree)
+## Spec drift to close (`.agents/superpowers/plans/2026-09-07-screens-drift.md`, uncommitted in the root worktree)
 
 Owner tagged there. Schema-affecting ones gate the programs above.
 
