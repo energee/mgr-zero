@@ -4,6 +4,7 @@
 // color only where it carries meaning (a status dot, not a filled row).
 // Target sizing under a coarse pointer lives in app/globals.css, so nothing
 // here sets heights. Screen authors use only these and never components/ui.
+import { Palette, type PaletteGroup } from "@/components/mgr/palette";
 import * as React from "react";
 import { Children, Fragment, isValidElement, type ReactNode } from "react";
 import { Alert02Icon, ArrowLeft01Icon, InformationCircleIcon, SquareLock01Icon } from "@hugeicons/core-free-icons";
@@ -82,6 +83,7 @@ const fieldGrid = (fields: React.ReactNode[], className: string) => (
 );
 
 export const E = {
+  palette: (placeholder: string, groups: PaletteGroup[]) => <Palette placeholder={placeholder} groups={groups} />,
   /** Page title. `action` is a list-create button (New order, Add customer):
    *  full-width under the title on the phone, on the title row from md up. */
   hd: (t: React.ReactNode, r: React.ReactNode = "", action?: React.ReactNode) => {
