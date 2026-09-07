@@ -358,7 +358,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Settings", "Locations", E.btn("Add location"))}
       {E.row("Warehouse", "warehouse · 186 inventory units", E.act("Edit"))}
-      {E.row("Taproom", "taproom · 11 taps · 2 bins", E.act("Edit"))}
+      {E.row("Taproom", "taproom · 11 taps · 3 bins", E.act("Edit"))}
     </>),
   },
   {
@@ -375,9 +375,9 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Locations", "Taproom")}
       {E.edit("Location name", "Taproom")}
-      {E.pick("Type", "Taproom", ["Warehouse", "Taproom"])}
+      {E.pick("Type", "Taproom", ["Warehouse", "Taproom", "Storage"])}
       {E.fld("Timezone", "Brewery default · America/New_York")}
-      {E.nav("Location bins", "Default · Walk-in · To-go fridge")}
+      {E.nav("Location bins", "Walk-in · Cold · Dry")}
       {E.btn("Save location")}
     </>),
   },
@@ -762,7 +762,7 @@ export const SCREENS: Screen[] = [
     name: "Record movement",
     to: { "Record movement": "Movement recorded" },
     job: "Enter a positive amount; server derives direction and barrels",
-    reads: "list_skus · list_locations · get_atp",
+    reads: "list_skus · list_locations · list_bins · get_atp",
     writes: "record_movement [existing; one append-only inventory movement]",
     states: [["offline", "Queue with requestId"], ["stale", "ATP changed · preview again", 1], ["permission", "warehouse or brewer required · sales reads Beer only", 1], ["echo", "Committed row · correction waits for schema gate"], ["unregistered destination", "Stout to OH warns and links to the registry · never blocks", 1]],
     spec: "The server derives sign and 0.50000000 bbl; the client never supplies either. Drawn with festival removal selected: sample and festival removal leave the premises and require a destination state (the schema enforces it); destruction, loss and depletion never carry one. An unregistered brand and destination warn here with the same copy the order screens use, because a festival removal leaves the premises exactly as a shipment does and was the one path that crossed a state line without saying so. This frame carries Hazy IPA into PA, which is registered, so the warning is a state rather than drawn copy. Channel stays.",
@@ -771,6 +771,7 @@ export const SCREENS: Screen[] = [
       <div className="hidden md:block">{E.chips(MOVEMENT_KINDS, 4)}</div>
       {E.nav("SKU / package", "Hazy IPA · ½ bbl keg")}
       {E.pick("Location", "Warehouse", ["Warehouse", "Taproom"])}
+      {E.pick("Bin", "Cold", ["Cold", "Dry", "Walk-in"])}
       {E.pick("Channel", "Taproom", CHANNELS)}
       {E.pick("Destination state", "PA · where the beer is poured", ["PA · where the beer is poured", "OH · where the beer is poured"])}
       {E.qty("1", E.tabs(["keg", "case", "bbl"], 0, "w-fit"))}
@@ -2632,18 +2633,19 @@ export const SCREENS: Screen[] = [
     name: "Keg fleet",
     to: { "Record keg return \u00b7 refund $120": "Keg event history" },
     job: "Manage pools and record events without confusing beer returns",
-    reads: "get_keg_fleet [view]",
+    reads: "get_keg_fleet [view] · keg_bin_totals [view]",
     writes: "create_keg_pool · update_keg_pool [design; mutable single rows] · record_keg_event [design; intents acquired / returned / lost / found / retired; returned = one RPC: keg event + standalone credit memo with keg_deposit_refund line]",
     states: [["acquire", "qty into pool · no customer"], ["return empty", "customer required · deposit refund previews"], ["lost / found", "customer balance moves · no money"], ["retire", "out of service · no customer"]],
     spec: "Return empty posts the deposit refund in the same RPC; there is no deposit-only screen. Beer coming back with the keg is Return shipment (beer + deposit). No dirty/clean CIP status.",
     body: (<>
       {E.back("Beer", "Keg fleet")}
-      {E.fld("Selected pool", "Owned ½ bbl · 203 kegs · $30 deposit")}
+      {E.fld("Selected pool", "Microstar ⅙ bbl · 76 kegs · pay per fill")}
       {E.pick("Kind", "Owned", ["Owned", "Leased", "Pay per fill"])}
       {E.fld("Vendor", "none · owned pools have no vendor")}
       {E.edit("Per-fill cost", "$0.00")}
       {E.btns([["Add keg pool", "g"], ["Save keg pool", "g"]])}
-      {E.row("Owned ½ bbl", "142 out · 61 in", "203")}
+      {E.row("Microstar ⅙ bbl · Warehouse", "36 in · Walk-in", "36")}
+      {E.row("Microstar ⅙ bbl · Storage", "40 in · Cold", "40")}
       {E.nav("Customer keg balance", "Ridgeline · 38 out · $1,140")}
       {E.nav("Keg report", "9 unreturned over 90 days")}
       {E.nav("Keg event history", "acquired, returned, lost, found, retired")}
@@ -3354,18 +3356,18 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Location bins",
-    to: { Taproom: "Bin" },
+    to: { "Walk-in": "Bin", Cold: "Bin", Dry: "Bin", "Add bin": "Bin" },
     job: "Subdivide a location without making every query carry an or-null",
-    reads: "list_locations · list_bins [design; §16.6]",
-    writes: "create_bin · update_bin · delete_bin [SCHEMA-GATE: revision 2 §16.6: bins, inventory_movements.bin_id not null, taproom_pars re-keyed on bin]",
-    states: [["permission", "warehouse or admin required", 1], ["default bin", "created with the location · cannot be deleted", 1], ["in use", "a bin holding stock cannot be deleted", 1], ["par on a bin", "keep 4 cases in the to-go fridge"]],
-    spec: "Every location gets a default bin created with it, so the bin is required everywhere it appears (movements, pars, menus) and no on-hand or availability query carries a nullable branch. One setup artifact bought against a whole class of null handling. Bins are physical subdivisions a menu can read; they are explicitly not tap lines (§16.8), which are hand-maintained state nothing downstream validates.",
+    reads: "list_locations · list_bins",
+    writes: "create_bin · update_bin · delete_bin",
+    states: [["permission", "warehouse or admin required", 1], ["last bin", "a location keeps at least one · rename it instead", 1], ["has history", "a bin that ever recorded stock is renamed, not removed", 1], ["par on a bin", "keep 4 cases in the to-go fridge"]],
+    spec: "Every location starts with Walk-in, Cold and Dry. Rename or remove what doesn’t match the building, but a location always keeps one bin, so no on-hand or availability query carries a nullable branch. Bins are physical subdivisions a menu can read; they are explicitly not tap lines (§16.8), which are hand-maintained state nothing downstream validates.",
     body: (<>
       {E.back("Settings", "Taproom · bins")}
-      {E.gated("Taproom", "the default bin · created with the location and cannot be removed")}
       {E.nav("Walk-in", "38 cases · 12 kegs")}
-      {E.nav("To-go fridge", "22 cases · par 4 cases")}
-      {E.gated("Add bin", "isn’t available yet: a location is still one undivided space")}
+      {E.nav("Cold", "22 cases")}
+      {E.nav("Dry", "6 cases")}
+      {E.btn("Add bin", "g")}
     </>),
   },
   {
@@ -3376,17 +3378,14 @@ export const SCREENS: Screen[] = [
     name: "Bin",
     to: { "Save bin": "Location bins" },
     job: "Create or edit one physical subdivision of a location",
-    reads: "get_bin [design; §16.6]",
-    writes: "create_bin · update_bin · delete_bin [SCHEMA-GATE: revision 2 §16.6]",
-    states: [["permission", "warehouse or admin required", 1], ["default", "cannot be removed", 1], ["in use", "delete is refused", 1], ["empty", "safe to remove"]],
+    reads: "list_bins",
+    writes: "create_bin · update_bin · delete_bin",
+    states: [["permission", "warehouse or admin required", 1], ["last bin", "rename it instead of removing it", 1], ["has history", "a bin that ever recorded stock is renamed, not removed", 1], ["empty", "safe to remove"]],
     body: (<>
-      {E.edit("Bin name", "To-go fridge")}
-      {E.pick("Kind", "Packaged storage", ["Packaged storage", "Cold storage", "Dry storage"])}
-      {E.edit("Par", "4", "number")}
-      {E.info("This is the same par Pars and allocation edits. A par belongs to a bin; there is only ever one number.")}
-      {E.info("A brewery that never subdivides sees one bin and ignores it.")}
+      {E.edit("Bin name", "Cold")}
+      {E.info("A location keeps at least one bin. Rename the last one rather than removing it.")}
       {E.note("Tap lines are not bins. The tap board owns those.")}
-      {E.gated("Save bin", "isn’t available yet: a location is still one undivided space")}
+      {E.btn("Save bin")}
     </>),
   },
   {

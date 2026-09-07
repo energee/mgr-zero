@@ -70,6 +70,7 @@ export const TAPS: [string | RegExp, string][] = [
   ["Kegs", "Keg fleet"],
   ["Import CSV", "Import"],
   ["Review history", "Keg event history"],
+  [/^Microstar ⅙ bbl · /, "Keg event history"],
   ["Open balance", "Customer keg balance"],
   ["Open batch", "Brew day"],
   ["Fix registration", "State registration"],
