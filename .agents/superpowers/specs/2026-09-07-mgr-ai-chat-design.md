@@ -49,11 +49,15 @@ command missing one, and a write without a `preview` hook cannot be tagged.
 `preview_command` is an internal registered query, **not** AI-exposed. Input
 `{ command, input }`. It runs `safeParse`, the role check, and the target's
 `preview` hook; it never calls the handler. Output: canonical fields, exact
-effects, warnings, `allowed`, and a **version token** over the rows the
-preview read.
+effects, warnings, `allowed`, and a **version token** over the canonical
+command, its parsed input, its effects, and the rows the preview read — the
+token names the exact proposal the human saw, not only the state it read.
 
 Commit sends the target command, the same `requestId`, and the token.
-`/api/command` re-reads authoritative rows and rejects a stale token. A visual
+`/api/command` re-reads authoritative rows and rejects a stale token, or a
+token minted for a different command or input. A chat-originated commit
+(`origin = 'chat'`, §5) without a token is rejected outright; only forms may
+commit unpreviewed. A visual
 proposal is never evidence that a write is still valid.
 
 The proposal card renders **only** `preview_command` output. Model text is

@@ -12,7 +12,7 @@
 
 **Goal:** QuickBooks Online invoices-out / payments-back, and the AI chat composer that turns typed intent into a previewed, explicitly-confirmed registry command.
 
-**Architecture:** QBO is a thin `lib/qbo.ts` fetch wrapper (plain OAuth2, no Intuit SDK) plus registry commands. OAuth tokens never touch a public table: they are written and read only through `lib/supabase/integration-tokens.ts` (`storeIntegrationTokens` / `readIntegrationTokens`), which authorizes the caller with the RLS-bound client before calling the service-only `store_integration_tokens` / `read_integration_tokens` RPCs over `private.integration_tokens`. Every push must persist its exact payload + the invoice's `qbo_idempotency_key` before POSTing, with durable recovery for the later external result; the blocked tasks below do not yet meet that contract. The composer is a registry query (`compose_command`) that gives the LLM only `aiExposed` command schemas; the server canonicalizes candidates through `preview_command`; the UI commits only on an explicit verb click.
+**Architecture:** QBO is a thin `lib/qbo.ts` fetch wrapper (plain OAuth2, no Intuit SDK) plus registry commands. OAuth tokens never touch a public table: they are written and read only through `lib/supabase/integration-tokens.ts` (`storeIntegrationTokens` / `readIntegrationTokens`), which authorizes the caller with the RLS-bound client before calling the service-only `store_integration_tokens` / `read_integration_tokens` RPCs over `private.integration_tokens`. Every push must persist its exact payload + the invoice's `qbo_idempotency_key` before POSTing, with durable recovery for the later external result; the blocked tasks below do not yet meet that contract. The AI side is superseded: the one-shot composer is replaced by the agent loop in `.agents/superpowers/specs/2026-09-07-mgr-ai-chat-design.md` (plan `2026-09-07-ai-chat.md`); `preview_command` and the explicit verb click survive there unchanged.
 
 **Tech Stack:** Next.js App Router, Supabase (Postgres/RLS), Zod, `@anthropic-ai/sdk` (**new dependency — approving this plan approves adding it**; QBO uses plain `fetch`, no new dep).
 
@@ -37,7 +37,7 @@ the blocked QBO tasks below are not current implementation instructions.
 
 - Every domain operation is a registry command/query dispatched through `app/api/command/route.ts`; no business logic in routes/pages (iron rule 1).
 - Every multi-row write is one plpgsql function (iron rule 5). Edit `supabase/migrations/00001_baseline.sql` in place + `npx supabase db reset`; never a second migration file.
-- Composer contract (UI plan §2): server (`preview_command`), not the model, canonicalizes; previews never invent document numbers ("assigned on commit"); every AI write waits for an explicit click on its verb; no auto-commit setting; composer history is device-local.
+- Composer contract (UI plan §2): server (`preview_command`), not the model, canonicalizes; previews never invent document numbers ("assigned on commit"); every AI write waits for an explicit click on its verb; no auto-commit setting; chat history is server-owned (`2026-09-07-mgr-ai-chat-design.md` §5).
 - `push_invoice_to_qbo` (UI plan): persist exact payload + stable request ID **before** POST; uncertain response reconciles by the same ID before retry; online only.
 - `connect_qbo`: durable OAuth after admin permission check; `get_qbo_connection` returns health only, **never tokens**. Token material crosses exactly one boundary: `lib/supabase/integration-tokens.ts`.
 - Every new SQL writer follows `.agents/ARCHITECTURE.md` iron rule 5 and is pinned by the boundary/schema tests named there.
@@ -236,17 +236,17 @@ a registry-scoped agent loop. Nothing here remains current.
 ### Task 11: Docs + final validation
 
 **Files:**
-- Modify: `.agents/ARCHITECTURE.md` (ownership rows for `lib/qbo.ts`, `lib/commands/{qbo,preview,compose}.ts`, `app/api/qbo/callback`; note the compose→preview→commit contract is now implemented and that `lib/supabase/integration-tokens.ts` stays the only token boundary), `README.md` (env table for every new command), `content/docs/api.mdx` (run `bun run docs:api` after each command names its `reads`/`writes` in `components/mgr/screens.tsx` — never hand-edit between its `ops:` markers), the applicable `public/docs/{staff,portal}-guide.html` files, `.agents/PROGRESS.md`; `components/mgr/screens.tsx` only if the built Integrations/composer screens diverged from their frames (the frames stay in step with the plan).
+- Modify: `.agents/ARCHITECTURE.md` (ownership rows for `lib/qbo.ts`, `lib/commands/qbo.ts`, `app/api/qbo/callback`; `preview.ts` and the chat loop are owned by `2026-09-07-ai-chat.md` Task 9 and that `lib/supabase/integration-tokens.ts` stays the only token boundary), `README.md` (env table for every new command), `content/docs/api.mdx` (run `bun run docs:api` after each command names its `reads`/`writes` in `components/mgr/screens.tsx` — never hand-edit between its `ops:` markers), the applicable `public/docs/{staff,portal}-guide.html` files, `.agents/PROGRESS.md`; `components/mgr/screens.tsx` only if the built Integrations/composer screens diverged from their frames (the frames stay in step with the plan).
 
 - [ ] **Step 1:** Full gate: `npx vitest run && npx tsc --noEmit && npm run lint`; `git diff` review (NUL-byte check); one from-scratch `npx supabase db reset` to prove the baseline replays.
 - [ ] **Step 2:** Update the docs above; verify every new file carries its module-level comment.
-- [ ] **Step 3: Commit** `docs(1c): architecture/progress updates for QBO + composer`
+- [ ] **Step 3: Commit** `docs(1c): architecture/progress updates for QBO`
 
 ---
 
 ## Self-review notes
 
-- Spec coverage: UI-plan rows `connect_qbo` (T3), `set_qbo_customer_mapping`/`set_qbo_item_mapping` (T4), `push_invoice_to_qbo` incl. persist-before-POST + reconcile-by-ID (T5), `get_qbo_connection` health-only (T3), `get_qbo_mapping_candidates` (T4), payments-back from the parent spec (T6), composer contract §2 (T8–T10), Today "QBO failures" row (T7). Deliberately out, per the specs: `connect_square` (slice 7), QBO disconnect commands (`compensation: null` until exact disconnect commands exist), server-owned composer history (device-local until a schema exists), voice transport.
+- Spec coverage: UI-plan rows `connect_qbo` (T3), `set_qbo_customer_mapping`/`set_qbo_item_mapping` (T4), `push_invoice_to_qbo` incl. persist-before-POST + reconcile-by-ID (T5), `get_qbo_connection` health-only (T3), `get_qbo_mapping_candidates` (T4), payments-back from the parent spec (T6), composer contract §2 (T8–T10, superseded by `2026-09-07-ai-chat.md`), Today "QBO failures" row (T7). Deliberately out, per the specs: `connect_square` (slice 7), QBO disconnect commands (`compensation: null` until exact disconnect commands exist), server-owned composer history (device-local until a schema exists), voice transport.
 - `qbo_pushes.status` reuses the `qbo_sync_status` enum — one vocabulary, `pending → pushed | push_failed` matching the invoice column.
-- Type consistency: `start_qbo_push(p_brewery, p_invoice_id, p_payload) → uuid` identical in T1/T5; `listTools({aiOnly})` in T8/T9; `Ctx` unchanged throughout.
+- Type consistency: `start_qbo_push(p_brewery, p_invoice_id, p_payload) → uuid` identical in T1/T5; `Ctx` unchanged throughout.
 - Revised 2026-09-01 on `audit-p1-authz` (see "Audit corrections" above); no 1C code exists on that branch.
