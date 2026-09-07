@@ -44,8 +44,20 @@ const BBL_TO_GALLONS = 31;
  * Clamped at 0: the cubic returns -0.003 at SG 1.000, and negative Plato is
  * not a thing a brewer can read — water is 0 °P.
  */
-function sgToPlato(sg: number): number {
+export function sgToPlato(sg: number): number {
   return Math.max(0, -616.868 + 1111.14 * sg - 630.272 * sg ** 2 + 135.997 * sg ** 3);
+}
+
+/**
+ * Plato back to specific gravity. The ASBC cubic above has no closed-form
+ * inverse, so this is the standard brewing approximation
+ * `sg = 1 + P / (258.6 - (P / 258.2) * 227.1)` rather than an exact reversal:
+ * a Plato -> SG -> Plato round trip lands within 0.001 SG, which is finer than
+ * any hydrometer a brewer reads. Lives here so the two conversions stay one
+ * pair in one file (lib/mgr/gravity-unit.ts formats with it).
+ */
+export function platoToSg(plato: number): number {
+  return 1 + plato / (258.6 - (plato / 258.2) * 227.1);
 }
 
 /** Predicts OG/FG/ABV from a recipe version's mash-stage ingredients. */

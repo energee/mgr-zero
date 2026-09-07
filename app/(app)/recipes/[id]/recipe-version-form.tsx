@@ -3,7 +3,8 @@
 // efficiency, yeast attenuation, optional boil/IBU) and ingredient lines
 // (material, per-bbl quantity, stage, optional timing). The OG/FG/ABV
 // preview below the ingredient table calls the same pure recipeGravity the
-// server uses (lib/recipe-gravity.ts) — never a second formula.
+// server uses (lib/recipe-gravity.ts) — never a second formula — and prints
+// its Plato result in the reader's chosen unit (`unit`, from get_gravity_unit).
 "use client";
 
 import { useMemo, useState } from "react";
@@ -13,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
+import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { recipeGravity } from "@/lib/recipe-gravity";
 
 const STAGES = ["mash", "boil", "whirlpool", "fermentation", "dry_hop", "packaging", "other"] as const;
@@ -22,7 +24,7 @@ type Line = { materialId: string; perBblQty: string; stage: (typeof STAGES)[numb
 
 const emptyLine = (): Line => ({ materialId: "", perBblQty: "", stage: "mash", timingMinutes: "" });
 
-export function NewVersionForm({ recipeId, materials }: { recipeId: string; materials: Material[] }) {
+export function NewVersionForm({ recipeId, materials, unit }: { recipeId: string; materials: Material[]; unit: GravityUnit }) {
   const [mashTempF, setMashTempF] = useState("152");
   const [brewhouseEfficiency, setBrewhouseEfficiency] = useState("0.75");
   const [yeastAttenuation, setYeastAttenuation] = useState("0.78");
@@ -54,7 +56,9 @@ export function NewVersionForm({ recipeId, materials }: { recipeId: string; mate
       mashTempF: temp, brewhouseEfficiency: eff, yeastAttenuation: att,
       ingredients: validLines.map((l) => {
         const m = materials.find((mm) => mm.id === l.materialId);
-        return { perBblQty: Number(l.perBblQty), extractPotential: m?.extract_potential ?? 1, stage: l.stage };
+        // A material with no extract_potential contributes nothing rather than
+        // a made-up default; recipeGravity skips it (lib/recipe-gravity.ts).
+        return { perBblQty: Number(l.perBblQty), extractPotential: m?.extract_potential ?? null, stage: l.stage };
       }),
     });
   }, [mashTempF, brewhouseEfficiency, yeastAttenuation, validLines, materials]);
@@ -109,7 +113,7 @@ export function NewVersionForm({ recipeId, materials }: { recipeId: string; mate
         </div>
         {preview ? (
           <p className="text-sm text-muted-foreground" role="status">
-            Predicted: {preview.ogPlato.toFixed(1)} °P OG · {preview.fgPlato.toFixed(1)} °P FG · {preview.abv.toFixed(1)}% ABV
+            Predicted: {formatGravity(preview.ogPlato, unit)} OG · {formatGravity(preview.fgPlato, unit)} FG · {preview.abv.toFixed(1)}% ABV
           </p>
         ) : null}
         <CommandFormMessage error={form.error} />

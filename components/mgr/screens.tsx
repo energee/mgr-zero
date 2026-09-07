@@ -3434,6 +3434,26 @@ export const SCREENS: Screen[] = [
     step: 8,
     slice: 1,
     tab: "More",
+    name: "Units",
+    job: "Choose the unit gravity is shown and typed in, for the brewery and for yourself",
+    reads: "get_gravity_unit",
+    writes: "set_brewery_gravity_unit · set_my_gravity_unit",
+    states: [["brewery default", "admins only see and set this row", 1], ["personal override", "any staff role sets their own"], ["inherit", "\u201cUse brewery default\u201d clears the override"]],
+    spec: "Gravity is stored in \u00b0Plato everywhere and that never changes: this screen changes only what is printed and how a typed value is read back, so an existing reading cannot move. Two controls over one value because the two audiences differ. An admin sets what the brewery reads by default, and any brewer may override it for themselves without asking anyone. A membership with no unit of its own follows the brewery, which is why the personal control offers a third option rather than an empty one. SG input accepts both spellings a brewer uses, 1.050 and 1050.",
+    body: (<>
+      {E.back("Settings", "Units")}
+      {E.info("Gravity is always stored in \u00b0Plato. This changes only how it is shown and typed.")}
+      {E.ttl("Brewery default")}
+      {E.chips(["Plato", "Specific gravity"], 0)}
+      {E.ttl("Your preference")}
+      {E.chips(["Use brewery default", "Plato", "Specific gravity"], 0)}
+      {E.fld("A 12.5 \u00b0P reading shows as", "12.5 \u00b0P")}
+    </>),
+  },
+  {
+    step: 8,
+    slice: 1,
+    tab: "More",
     name: "Formats",
     job: "Enter volume once on an atomic format and derive every shape above it",
     reads: "list_formats [design; §16.2] · get_format_components [design; §16.2a]",

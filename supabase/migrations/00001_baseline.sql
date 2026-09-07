@@ -79,17 +79,23 @@ create table breweries (
   timezone text not null default 'America/New_York',
   settings jsonb not null default '{}',
   fermentation_reading_due_hours int not null default 24 check (fermentation_reading_due_hours between 1 and 168),
+  gravity_unit text not null default 'plato' check (gravity_unit in ('plato','sg')),
   created_at timestamptz not null default now()
 );
 comment on column breweries.settings is 'staff-only; never store secrets here';
+comment on column breweries.gravity_unit is
+  'display only: how this brewery reads and types gravity by default. Gravity is STORED in degrees Plato everywhere (fermentation_readings.gravity_plato, recipe predictions); this never changes a stored number. A member may override it on brewery_users.gravity_unit.';
 
 create table brewery_users (
   brewery_id uuid not null references breweries(id),
   user_id uuid not null references auth.users(id),
   role staff_role not null,
+  gravity_unit text check (gravity_unit in ('plato','sg')),
   created_at timestamptz not null default now(),
   primary key (brewery_id, user_id)
 );
+comment on column brewery_users.gravity_unit is
+  'display only, and null means "use the brewery default" (breweries.gravity_unit). Storage stays degrees Plato regardless.';
 
 -- Access helpers (security definer so RLS policies can call them cheaply).
 create function my_brewery_ids() returns setof uuid
@@ -2681,6 +2687,44 @@ begin
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
+-- ---------------------------------------------------------------- display preferences
+-- Gravity unit is a *display* choice: every gravity in this database is stored
+-- in degrees Plato and stays that way. The brewery default sits on breweries;
+-- a member may override it for themselves on their own brewery_users row, and
+-- null there means "follow the brewery". Both setters are ordinary
+-- request-ledgered commands so a retried save cannot double-apply.
+create function set_brewery_gravity_unit(
+  p_brewery uuid, p_unit text, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_unit text;
+begin
+  perform private.assert_staff(p_brewery, array['admin']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'set_brewery_gravity_unit', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'unit', p_unit));
+  if v_replay is not null then return v_replay; end if;
+  update public.breweries set gravity_unit = p_unit where id = p_brewery returning gravity_unit into v_unit;
+  return private.complete_command_request(p_request_id, jsonb_build_object('unit', v_unit));
+end $$;
+
+-- p_unit null clears the personal override, dropping the caller back to the
+-- brewery default. Any staff role may set their own; it reaches no one else's
+-- row because the update is keyed on auth.uid().
+create function set_my_gravity_unit(
+  p_brewery uuid, p_unit text, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_rows int;
+begin
+  perform private.assert_staff(p_brewery, array['admin','sales','warehouse','brewer']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'set_my_gravity_unit', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'unit', p_unit));
+  if v_replay is not null then return v_replay; end if;
+  update public.brewery_users set gravity_unit = p_unit
+    where brewery_id = p_brewery and user_id = auth.uid();
+  get diagnostics v_rows = row_count;
+  if v_rows = 0 then raise exception 'membership not found'; end if;
+  return private.complete_command_request(p_request_id, jsonb_build_object('unit', p_unit));
+end $$;
+
 -- p_tax_treatment is the customer's override of its sale channel's default
 -- (§16.3): null means inherit, and every write sets it, so clearing an
 -- override is passing null rather than a second command.
@@ -5153,6 +5197,8 @@ grant execute on function
   upsert_customer(uuid,uuid,text,public.customer_type,text,uuid,text,text,public.tax_treatment,uuid),
   upsert_sale_channel(uuid,uuid,text,public.tax_treatment,uuid),
   delete_sale_channel(uuid,uuid,uuid),
+  set_brewery_gravity_unit(uuid,text,uuid),
+  set_my_gravity_unit(uuid,text,uuid),
   upsert_ship_to(uuid,uuid,uuid,text,text,text,text,text,text,uuid),
   upsert_price_group(uuid,uuid,text,int,int,uuid),
   delete_price_group(uuid,uuid,uuid),

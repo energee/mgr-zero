@@ -296,7 +296,7 @@ Open **Recipes** from the **More** navigation to see every recipe, alphabetical,
 
 A recipe version is the process spec a brewer follows: the mash temperature, brewhouse efficiency and yeast attenuation, an optional boil length and target IBU, and its ingredients — each a material, a quantity per barrel, the stage it enters at (*mash*, *boil*, *whirlpool*, *fermentation*, *dry hop*, *packaging*, or *other*), and an optional timing in minutes. A version cannot be edited once it is saved; select **New version** to write the next one, so what a past batch was brewed from stays true.
 
-Only mash-stage ingredients predict gravity. As you add ingredients, MGR previews the version's predicted OG, FG and ABV live, using the same calculation the record reads back afterward — nothing is stored, so a later edit to a material's typed extract potential can never move an old version's prediction; a new version snapshots the value it saw at the moment it was saved.
+Only mash-stage ingredients predict gravity. As you add ingredients, MGR previews the version's predicted OG, FG and ABV live, using the same calculation the record reads back afterward — nothing is stored, so a later edit to a material's typed extract potential can never move an old version's prediction; a new version snapshots the value it saw at the moment it was saved. Predicted OG and FG are shown in whatever unit you chose under [Gravity units](#gravity-units).
 
 ## Batches [#batches]
 
@@ -324,7 +324,7 @@ Vessels themselves are managed at the bottom of the Batches page: **New vessel**
 
 Open **Cellar** from the **Beer** navigation to see every occupied tank: its vessel, the brand it holds, the barrels in it, and how long it has been there. Select **Transfer** for a **From** occupancy, a **To** vessel, the **Barrels moving**, and an optional **Loss (bbl)**. Moving into an empty vessel opens a new occupancy there; moving into an already-occupied vessel blends into it, keeping that vessel's existing batch identity — a blend is never a new batch. A source occupancy closes automatically once it empties.
 
-Select **Reading** on a tank to open its reading log and record the next one: **Temperature** is required; **Gravity (°Plato)**, **pH**, and a note are each optional, because a quick temperature check is a legitimate reading on its own. Readings never overwrite one another — each is its own row, newest first.
+Select **Reading** on a tank to open its reading log and record the next one: **Temperature** is required; **Gravity**, **pH**, and a note are each optional, because a quick temperature check is a legitimate reading on its own. Readings never overwrite one another — each is its own row, newest first. The gravity field is labelled and read in whatever unit you chose under [Gravity units](#gravity-units); MGR stores degrees Plato either way.
 
 ## Packaging [#packaging]
 
@@ -368,6 +368,18 @@ Two removals are refused, each with the reason shown beside the row:
 
 - Every channel can be renamed: no name is load-bearing, because an order carries its own channel from the moment it is created.
 - A channel a movement, a customer, an order, or a filled price cell references cannot be deleted. Rename it instead, or clear its cells and move those customers first.
+
+## Gravity units [#gravity-units]
+
+<Screen name="Units" />
+
+*Everyone. Only Admin sets the brewery default; the personal preference is yours alone.*
+
+Gravity is always stored in degrees Plato. This setting changes only how gravity is shown to you and how you type it, so switching it never moves a reading you have already recorded.
+
+Open **Units** from the **More** navigation. **Brewery default** (Admin only) is what everyone here sees unless they choose otherwise. **Your preference** is yours: choose **Plato**, **Specific gravity**, or **Use brewery default** to go back to following the brewery. The choice applies wherever MGR shows or asks for a gravity — the fermentation reading form and log, and the predicted OG and FG on a recipe.
+
+In specific gravity you may type either spelling: `1.050` or `1050`.
 
 ## Link your Slack account [#slack]
 

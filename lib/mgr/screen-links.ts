@@ -323,6 +323,7 @@ export const ROUTES: Record<string, string> = {
   "/orders#planning": "Planning",
   "/settings/team#import": "Import",
   "/settings/team": "Settings",
+  "/settings/units": "Units",
   "/portal": "Shop",
   "/portal/orders": "Order history",
   "/portal/invoices": "Invoice history",
