@@ -61,6 +61,23 @@ bound is implicitly the previous group's ceiling. Cost proposes a group, a
 person accepts it. Never auto-assigned: costing lives on desk and does not exist
 yet, and a suggestion degrades to a plain picker until it does.
 
+**D8 — "Tier" is retired vocabulary.** A distributor uses "tier" for the landed
+product type (an IPA); v1 used it for a COGS band; v2's screens use it for a
+customer price list. Three live meanings, none wrong in its own context, so the
+word cannot carry ours. "Price group" is unclaimed. The rename is cheap: "tier"
+appears nowhere in the customer guides, and its four hits in `content/docs/api.mdx`
+are generated screen names that `bun run docs:api` regenerates.
+
+**D9 — Category is not the price group.** The Brand screen already lists an
+optional `category`, gated and undefined elsewhere in the schema spec. It is a
+taxonomy — discrete and declared, someone says "this is an IPA". A price group is
+a cost band — continuous and derived, a cost falls in a range. Confirmed
+2026-09-07: price follows cost, not product type; IPAs cluster in one band
+because they cost alike, which is coincidence rather than mechanism. So the two
+are separate axes, a brand carries both, and only the group prices. This is what
+keeps D7 alive: had price followed category, the ceiling would never be consulted
+and the band mechanism would be dead weight.
+
 ## Resolution chain
 
     SKU → brand → price group → (group × format) UPC
@@ -71,14 +88,33 @@ the Recipe screen already treats predictions.
 Price resolves as drawn today and is unchanged: group format-default, with a
 brand × format override.
 
+## Prior art already on `origin/backend`
+
+The Brand screen's spec already reads: "price group is a label the price tier
+prices by format, not a price on the brand (§16.4)". That is D5 and D3 arriving
+independently — the group is a label carried by the brand, and the price hangs
+off (group × format), never off the brand. This design keeps that sentence true
+and adds the barcode to the same key.
+
+§16.4 supplies the table shape:
+
+    price_lists         + channel_id
+    price_list_formats  (price_list_id, format_id, unit_price_cents)   -- group default
+    price_list_items    (price_list_id, sku_id, unit_price_cents, ...)  -- brand x format override
+
+The UPC of D3 belongs beside `unit_price_cents` in `price_list_formats`, and the
+cost ceiling of D7 on `price_lists`. §16.4's OPEN question — whether format is
+the default and SKU the override, or the reverse — is answered format-default
+here, matching what Price tiers, Menu and POS item already draw.
+
 ## Screens
 
 `components/mgr/screens.tsx`.
 
-**Price group** (was `Price tiers`) — gains `Cost ceiling` and a UPC column in
+**Price group** (was `Price tiers`; the list screen `Price lists` becomes `Price groups`) — gains `Cost ceiling` and a UPC column in
 Format defaults: `[Format, Price, UPC, Source]`. Behind `SCHEMA-GATE`.
 
-**Product** — gains one `Price group` field. This is the binding point.
+**Brand** (named `Product` before `origin/backend`) — gains one `Price group` field. This is the binding point.
 Pre-filled from the recipe parent's default when the brand is created, and
 changeable at any time. Behind `SCHEMA-GATE`.
 
