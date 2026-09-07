@@ -43,7 +43,7 @@ create type keg_container_source as enum ('owned_fleet','per_fill_rental','one_w
 create type location_kind as enum ('warehouse','taproom','storage');
 create type movement_type as enum
   ('opening_balance','production_in','adjustment','sale_removal','taproom_transfer',
-   'depletion','return_in','destruction','loss','sample','festival_removal');
+   'depletion','return_in','destruction','loss','sample','festival_removal','location_transfer');
 create type sale_channel as enum ('wholesale','taproom','dtc','export');
 create type allocation_source as enum ('order_line','taproom_standing');
 create type allocation_status as enum ('open','fulfilled','released');
@@ -55,13 +55,14 @@ create type qbo_sync_status as enum ('pending','pushed','push_failed');
 create type material_category as enum ('malt','hop','yeast','adjunct','chemical','packaging','other');
 create type uom as enum ('lb','kg','oz','g','each','l','gal','ml');
 create type material_movement_type as enum
-  ('opening_balance','receipt','consumption','return_to_stock','loss','adjustment','count_adjustment');
+  ('opening_balance','receipt','consumption','return_to_stock','loss','adjustment','count_adjustment','transfer_out','transfer_in');
 create type po_status as enum ('draft','sent','partially_received','received','cancelled');
 create type ingredient_stage as enum ('mash','boil','whirlpool','fermentation','dry_hop','packaging','other');
 create type vessel_kind as enum ('fermenter','brite','barrel','kettle','other');
 create type volume_adjustment_reason as enum ('loss','dump','gain','measurement');
 create type keg_pool_kind as enum ('owned','leased','pay_per_fill');
-create type keg_event_reason as enum ('acquired','retired','shipped','returned','lost','found');
+create type keg_event_reason as enum ('acquired','retired','shipped','returned','lost','found','transferred_out','transferred_in');
+create type stock_transfer_status as enum ('draft','submitted','picked','in_transit','received','cancelled');
 create type approval_kind as enum ('cola','formula');
 
 -- ---------------------------------------------------------------- core
@@ -104,7 +105,7 @@ create table brewery_counters (
   key text not null,
   next bigint not null default 1,
   primary key (brewery_id, key),
-  check (key in ('batch', 'run', 'po', 'order', 'invoice'))   -- the committed document kinds
+  check (key in ('batch', 'run', 'po', 'order', 'invoice', 'transfer'))   -- the committed document kinds
 );
 create function private.next_no(b uuid, k text) returns bigint
 language sql security definer set search_path = '' as $$
@@ -371,6 +372,7 @@ create table inventory_movements (
       when 'return_in'        then qty > 0 and channel is null and dest_state is null
       when 'adjustment'       then channel is null and dest_state is null
       when 'taproom_transfer' then channel is null and dest_state is null
+      when 'location_transfer' then channel is null and dest_state is null
       else true
     end)
 );
@@ -582,6 +584,8 @@ create table material_movements (   -- ledger
       when 'return_to_stock' then qty > 0
       when 'consumption'     then qty < 0
       when 'loss'            then qty < 0
+      when 'transfer_out'    then qty < 0
+      when 'transfer_in'     then qty > 0
       else true
     end)
 );
@@ -1008,6 +1012,77 @@ create table keg_events (   -- ledger
 create index keg_events_pool_idx on keg_events (brewery_id, pool_id, keg_size, location_id, bin_id);
 create index keg_events_customer_idx on keg_events (customer_id) where customer_id is not null;
 create index keg_events_shipment_idx on keg_events (shipment_id) where shipment_id is not null;
+
+-- Stock transfers: an internal move of stuff between two locations (spec
+-- 2026-09-06 Decision 3), never a third order kind. Lines are polymorphic in
+-- the database: exactly one of sku / material / keg pool. receive_stock_transfer
+-- posts paired, volume-neutral ledger rows. A move inside one location is
+-- move_stock_bin and writes no document (Decision 5).
+create table stock_transfers (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references breweries(id),
+  transfer_no bigint,                                  -- trigger
+  status stock_transfer_status not null default 'draft',
+  from_location_id uuid not null,
+  to_location_id uuid not null,
+  requested_date date,
+  note text,
+  created_by uuid not null references auth.users(id),
+  received_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique (id, brewery_id),
+  unique (brewery_id, transfer_no),
+  foreign key (from_location_id, brewery_id) references locations (id, brewery_id),
+  foreign key (to_location_id, brewery_id) references locations (id, brewery_id),
+  check (to_location_id <> from_location_id)
+);
+create index stock_transfers_brewery_idx on stock_transfers (brewery_id, status, created_at);
+create trigger stock_transfers_no before insert on stock_transfers
+  for each row execute function private.set_doc_no('transfer_no','transfer');
+
+create table stock_transfer_lines (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references breweries(id),
+  transfer_id uuid not null,
+  sku_id uuid,
+  material_id uuid,
+  keg_pool_id uuid,
+  keg_size keg_size,
+  qty numeric(14,4) not null check (qty > 0),
+  qty_picked numeric(14,4) check (qty_picked >= 0),
+  from_bin_id uuid not null,
+  to_bin_id uuid not null,
+  note text,
+  unique (id, brewery_id),
+  foreign key (transfer_id, brewery_id) references stock_transfers (id, brewery_id),
+  foreign key (sku_id, brewery_id) references skus (id, brewery_id),
+  foreign key (material_id, brewery_id) references materials (id, brewery_id),
+  foreign key (keg_pool_id, brewery_id) references keg_pools (id, brewery_id),
+  foreign key (from_bin_id, brewery_id) references bins (id, brewery_id),
+  foreign key (to_bin_id, brewery_id) references bins (id, brewery_id),
+  check (num_nonnulls(sku_id, material_id, keg_pool_id) = 1),
+  check ((keg_pool_id is null) = (keg_size is null))
+);
+create index stock_transfer_lines_transfer_idx on stock_transfer_lines (brewery_id, transfer_id);
+
+-- Bins live on the line and locations on the header, so the invariant "the
+-- from-bin belongs to the source location, the to-bin to the destination" is
+-- a trigger joining the header, not an application if.
+create function private.stock_transfer_line_bins() returns trigger language plpgsql set search_path = '' as $$
+declare loc_from uuid; loc_to uuid;
+begin
+  select from_location_id, to_location_id into loc_from, loc_to
+    from public.stock_transfers where id = new.transfer_id;
+  if not exists (select 1 from public.bins where id = new.from_bin_id and location_id = loc_from) then
+    raise exception 'from_bin does not belong to the source location';
+  end if;
+  if not exists (select 1 from public.bins where id = new.to_bin_id and location_id = loc_to) then
+    raise exception 'to_bin does not belong to the destination location';
+  end if;
+  return new;
+end $$;
+create trigger stock_transfer_lines_bins before insert or update on stock_transfer_lines
+  for each row execute function private.stock_transfer_line_bins();
 
 -- ---------------------------------------------------------------- integrations
 create table qbo_connections (
@@ -2837,7 +2912,7 @@ begin
   -- limited below to the exact RPC path and command roles that own them.
   foreach t in array array[
     'customers','ship_tos','vendors','materials','material_lots','products','keg_pools','skus',
-    'price_lists','price_list_items','sku_bom','locations','bins','allocations','taproom_pars',
+    'price_lists','price_list_items','sku_bom','locations','bins','stock_transfers','stock_transfer_lines','allocations','taproom_pars',
     'recipes','recipe_versions','recipe_ingredients','vessels','batches','vessel_occupancies',
     'fermentation_readings','batch_additions','packaging_runs','lots','packaging_run_outputs',
     'packaging_run_consumptions','material_contracts','purchase_orders','purchase_order_lines',
@@ -3848,7 +3923,7 @@ revoke all on all sequences in schema public from public, anon, authenticated;
 -- material lives in private.integration_tokens behind service-only RPCs.
 grant select on breweries, brewery_users, customer_users,
   customers, ship_tos, vendors, materials, material_lots, products, keg_pools, skus,
-  price_lists, price_list_items, sku_bom, locations, bins, inventory_movements, allocations, taproom_pars,
+  price_lists, price_list_items, sku_bom, locations, bins, stock_transfers, stock_transfer_lines, inventory_movements, allocations, taproom_pars,
   recipes, recipe_versions, recipe_ingredients, vessels, batches, vessel_occupancies, transfers,
   volume_adjustments, fermentation_readings, material_movements, batch_additions, packaging_runs,
   lots, packaging_run_outputs, packaging_run_consumptions, material_contracts, purchase_orders,

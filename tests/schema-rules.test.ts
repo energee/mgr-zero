@@ -127,7 +127,7 @@ describe("schema rules", () => {
     expect(sql(`
       select pg_get_constraintdef(oid) from pg_constraint
       where conrelid = 'public.brewery_counters'::regclass and contype = 'c'
-    `)).toEqual(["CHECK ((key = ANY (ARRAY['batch'::text, 'run'::text, 'po'::text, 'order'::text, 'invoice'::text])))"]);
+    `)).toEqual(["CHECK ((key = ANY (ARRAY['batch'::text, 'run'::text, 'po'::text, 'order'::text, 'invoice'::text, 'transfer'::text])))"]);
   });
 
   it("keeps integration token storage private and token columns out of public metadata", () => {
