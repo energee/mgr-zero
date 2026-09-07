@@ -71,6 +71,17 @@ type BtnBase = "p" | "g" | "ghost" | "irr" | "del";
 type BtnKind = BtnBase | `${BtnBase} disabled`;
 type VolumeUnit = "oz" | "gal" | "bbl" | "mL" | "L";
 
+/** A row is a tap target when its trailing slot is the Open chevron (E.nav) or
+ *  a verb (E.act). A switch or a stepper there is its own control; the row
+ *  around it is not tappable and keeps the plain cursor. */
+const isTap = (n: React.ReactNode) =>
+  isValidElement(n) && (n.type === DirectionIcon || Boolean((n.props as { "data-row-action"?: boolean })["data-row-action"]));
+
+/** A grid of fields, each keyed so React never sees a bare array. */
+const fieldGrid = (fields: React.ReactNode[], className: string, style?: React.CSSProperties) => (
+  <div className={cn("grid gap-2 [&>*]:min-w-0", className)} style={style}>{fields.map((f, i) => <Fragment key={i}>{f}</Fragment>)}</div>
+);
+
 export const E = {
   /** Page title. `action` is a list-create button (New order, Add customer):
    *  full-width under the title on the phone, on the title row from md up. */
@@ -115,9 +126,7 @@ export const E = {
    *  "Citra lot" to a Citra row by name. Item is flex-wrap, so the footer
    *  takes a full line without any layout of its own. */
   row: (t: React.ReactNode, s: React.ReactNode = "", n: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement, foot?: React.ReactNode) => (
-    // A row that carries a chevron or a verb is a tap target, so it says so:
-    // pointer and a hover tint, not the text cursor a static card shows.
-    <Item variant="outline" data-gated={cls === "dis" || undefined} className={cn(cls === "dis" ? "cursor-not-allowed opacity-50" : n && typeof n !== "string" && "cursor-pointer select-none hover:bg-accent/50")}>
+    <Item variant="outline" data-gated={cls === "dis" || undefined} className={cn(cls === "dis" ? "cursor-not-allowed opacity-50" : isTap(n) && "cursor-pointer select-none hover:bg-accent/50")}>
       {(icon || dotColor[cls]) && (
         <ItemMedia className={CENTER_MEDIA}>
           {icon ? <RowMedia icon={icon} cls={cls} /> : <Dot cls={cls} />}
@@ -282,14 +291,11 @@ export const E = {
   },
   /** Short fields side by side on desk, stacked on a phone. The frame is an
    *  iframe, so md: means the desk width, never the docs page around it. */
-  cols: (...fields: React.ReactNode[]) => (
-    <div className="grid gap-2 md:grid-cols-2 md:gap-x-6 [&>*]:min-w-0">{fields.map((f, i) => <Fragment key={i}>{f}</Fragment>)}</div>
-  ),
+  cols: (...fields: React.ReactNode[]) => fieldGrid(fields, "md:grid-cols-2 md:gap-x-6"),
   /** Fields that read as one phrase (a quantity, its unit, and what it is per)
    *  stay on one line at every width; three at most, or the phone can’t. */
-  inline: (...fields: React.ReactNode[]) => (
-    <div className="grid gap-2 [&>*]:min-w-0" style={{ gridTemplateColumns: `repeat(${fields.length}, minmax(0, 1fr))` }}>{fields.map((f, i) => <Fragment key={i}>{f}</Fragment>)}</div>
-  ),
+  inline: (...fields: [React.ReactNode, React.ReactNode, React.ReactNode?]) =>
+    fieldGrid(fields, "", { gridTemplateColumns: `repeat(${fields.length}, minmax(0, 1fr))` }),
   /** A time-of-day window as one two-thumb range: start and end are 24-hour "hh:mm". */
   window: (label: string, start: string, end: string) => <TimeWindowField label={label} start={start} end={end} />,
   /** A picked value: a Select for short fixed lists; long lists (SKU, customer) keep opening Entity picker. */
@@ -377,19 +383,14 @@ export const E = {
       <EmptyDescription>{t}</EmptyDescription>
     </Empty>
   ),
-  /** A blank labeled input. "Label · example" splits into the label and a
-   *  placeholder; a lone word is the label. Label sits over the control like
-   *  every other field (shadcn Field default), never as the placeholder. */
-  inp: (t: string) => {
-    const [raw, hint] = t.split(" · ");
-    const label = raw.charAt(0).toUpperCase() + raw.slice(1);
-    return (
-      <Field>
-        <FieldLabel>{label}</FieldLabel>
-        <Input placeholder={hint} aria-label={label} />
-      </Field>
-    );
-  },
+  /** A blank labeled input. The label sits over the control like every other
+   *  field (shadcn Field default); `hint` is the placeholder, never the label. */
+  inp: (label: string, hint?: string) => (
+    <Field>
+      <FieldLabel>{label}</FieldLabel>
+      <Input placeholder={hint} aria-label={label} />
+    </Field>
+  ),
   /** A search box: the one input whose placeholder is its whole label. */
   search: (t = "Search") => <Input type="search" placeholder={t} aria-label={t} />,
   stq: (v: number, label = "Quantity") => (

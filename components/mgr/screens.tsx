@@ -463,8 +463,8 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.sp()}
       {E.ttl("Sign in")}
-      {E.inp("email")}
-      {E.inp("password")}
+      {E.inp("Email")}
+      {E.inp("Password")}
       {E.btn("Sign in")}
       {E.btn("Email me a link", "g")}
       {E.link("Forgot password?", "Reset password")}
@@ -507,7 +507,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.sp()}
       {E.ttl("Reset password")}
-      {E.inp("email")}
+      {E.inp("Email")}
       {E.btn("Send reset link")}
       {E.sp()}
     </>),
@@ -549,8 +549,8 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.sp()}
       {E.ttl("Sign in to your account")}
-      {E.inp("email")}
-      {E.inp("password")}
+      {E.inp("Email")}
+      {E.inp("Password")}
       {E.btn("Sign in")}
       {E.link("Forgot password?", "Portal forgot password")}
       {E.sp()}
@@ -572,7 +572,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.sp()}
       {E.ttl("Reset password")}
-      {E.inp("email")}
+      {E.inp("Email")}
       {E.btn("Send reset link")}
       {E.info("If that email is on an account, a reset link is on its way.")}
       {E.sp()}
@@ -1053,7 +1053,7 @@ export const SCREENS: Screen[] = [
       {E.row("Pils · 16 oz case", "ordered 10 · picked 10", E.stq(9), "w")}
       {E.nav("Reason", "required", "w")}
       {E.info("Shipping 9 of 10 Pils: the remaining 1 is cancelled and its allocation released. There is no backorder.")}
-      {E.inp("Carrier · tracking · optional")}
+      {E.inp("Carrier", "tracking · optional")}
       {E.chips(["Invoice now", "On delivery"], 0)}
       {E.tape([["−4 Hazy ½ bbl · sale removal · PA", "2.00 bbl"], ["−9 Pils cases · sale removal · PA", "0.87 bbl"], ["1 Pils case released · restock", ""], ["invoice number", "assigned on commit"]])}
       {E.sp()}
@@ -1335,11 +1335,11 @@ export const SCREENS: Screen[] = [
     spec: "Editing an address never rewrites the destination recorded on an existing order.",
     body: (<>
       {E.ttl("Main ship-to")}
-      {E.inp("Label · Main")}
-      {E.inp("Address · 114 Bridge St")}
-      {E.inp("City · Phoenixville")}
-      {E.inp("State · PA")}
-      {E.inp("Postal code · 19460")}
+      {E.inp("Label", "Main")}
+      {E.inp("Address", "114 Bridge St")}
+      {E.inp("City", "Phoenixville")}
+      {E.inp("State", "PA")}
+      {E.inp("Postal code", "19460")}
       {E.row("Default ship-to", "selected first on new orders", E.sw(true, "Default ship-to"), "ok")}
       {E.btn("Save ship-to")}
     </>),
@@ -1583,7 +1583,7 @@ export const SCREENS: Screen[] = [
     reads: "list_skus",
     writes: "none [creation and editing happen on SKU detail]",
     states: [["permission", "sales or admin required", 1], ["active", "available to price and sell"], ["inactive", "history remains", 1], ["empty", "Add SKU is the only action"]],
-    spec: "Product links here instead of showing an arbitrary one of three SKUs inline.",
+    spec: "Brand links here instead of showing an arbitrary one of three SKUs inline.",
     body: (<>
       {E.back("Brand", "Hazy IPA · SKUs", E.btn("Add SKU"))}
       {E.row("½ bbl keg", `${formatVolume("0.50000000")} · active`, E.act("Edit"))}
@@ -1904,7 +1904,7 @@ export const SCREENS: Screen[] = [
       {E.qty("", "prior 4.21", "pH")}
       {E.chips(["SG", "°P"], 0)}
       {E.info("Enter only values taken now; blanks are not rewritten.")}
-      {E.inp("Note · optional")}
+      {E.inp("Note", "optional")}
       {E.pin(<>
         {E.btn("Record reading")}
       </>)}
@@ -2528,8 +2528,8 @@ export const SCREENS: Screen[] = [
     states: [["approved", "orders may proceed"], ["pending", "order confirmation warns", 1]],
     body: (<>
       {E.pick("Brand", "Stout", ["Hazy IPA", "Pils", "Stout"])}
-      {E.inp("COLA number · pending")}
-      {E.inp("Formula number · not required")}
+      {E.inp("COLA number", "pending")}
+      {E.inp("Formula number", "not required")}
       {E.btn("Save approval")}
     </>),
   },
@@ -2547,8 +2547,8 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.pick("Brand", "Hazy IPA", ["Hazy IPA", "Pils", "Stout"])}
       {E.pick("State", "Ohio", ["Pennsylvania", "Ohio"])}
-      {E.inp("Registration number · OH-88214")}
-      {E.inp("Expires · 12/31/2026")}
+      {E.inp("Registration number", "OH-88214")}
+      {E.inp("Expires", "12/31/2026")}
       {E.btn("Save registration")}
     </>),
   },
@@ -2565,8 +2565,8 @@ export const SCREENS: Screen[] = [
     states: [["current", "orders may proceed"], ["expired", "order confirmation warns", 1]],
     body: (<>
       {E.pick("State", "Pennsylvania", ["Pennsylvania", "Ohio"])}
-      {E.inp("License number · G-21884")}
-      {E.inp("Expires · 6/30/2027")}
+      {E.inp("License number", "G-21884")}
+      {E.inp("Expires", "6/30/2027")}
       {E.btn("Save license")}
     </>),
   },
@@ -3339,7 +3339,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.pick("Brand", "Barrel-aged Stout", ["Barrel-aged Stout", "Hazy IPA", "Pils"])}
       {E.pick("Format", "½ bbl keg", ["½ bbl keg", "⅙ bbl keg", "case · 24×16oz"])}
-      {E.inp("Price · $240.00")}
+      {E.inp("Price", "$240.00")}
       {E.info(`Clear this override to use the ${INV.hazyPrice} format default.`)}
       {E.btns([["Clear override", "g"], "Save override"])}
     </>),
