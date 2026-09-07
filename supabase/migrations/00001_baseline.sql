@@ -343,12 +343,14 @@ create index skus_brewery_idx on skus (brewery_id, brand_id);
 create unique index skus_upc_uidx on skus (brewery_id, upc) where upc is not null;
 
 -- Price tiers (§16.4): a tier prices formats by default and overrides per SKU.
--- channel_id is nullable until Program 4 adds sale_channels.
+-- Every list prices for exactly one sale channel; the composite FK is added
+-- below, once sale_channels exists (on delete restrict, so a channel a list
+-- prices for cannot be dropped out from under it).
 create table price_lists (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
   name text not null,
-  channel_id uuid,
+  channel_id uuid not null,
   unique (id, brewery_id),
   unique (brewery_id, name)
 );
@@ -471,6 +473,11 @@ end $$;
 
 create trigger seed_sale_channels_on_brewery
   after insert on breweries for each row execute function private.seed_sale_channels();
+
+-- Deferred from price_lists above: the channel must belong to the list's
+-- brewery, structurally, and cannot be deleted while a list prices for it.
+alter table price_lists add constraint price_lists_channel_fk
+  foreign key (channel_id, brewery_id) references sale_channels (id, brewery_id) on delete restrict;
 
 create table inventory_movements (
   id uuid primary key default private.new_uuid(),
@@ -2590,9 +2597,10 @@ begin
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
--- A channel a movement references is held by the inventory_movements foreign
--- key (on delete restrict), which raises 23503; the command turns that into
--- 'channel is in use'. Wholesale is refused before the delete is attempted.
+-- A channel in use is held by a foreign key with on delete restrict — from
+-- inventory_movements, and from price_lists (every list prices for one
+-- channel) — which raises 23503; the command turns that into 'channel is in
+-- use'. Wholesale is refused before the delete is attempted.
 create function delete_sale_channel(
   p_brewery uuid, p_id uuid, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
@@ -2714,18 +2722,18 @@ begin
     'lines', (select coalesce(jsonb_agg(jsonb_build_object('material_id', material_id, 'qty_per_unit', qty_per_unit, 'on_break', on_break)), '[]'::jsonb) from public.format_bom where format_id = p_format)));
 end $$;
 
-create function upsert_price_list(p_brewery uuid, p_id uuid, p_name text, p_request_id uuid)
+create function upsert_price_list(p_brewery uuid, p_id uuid, p_name text, p_channel uuid, p_request_id uuid)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_replay jsonb; v_row public.price_lists;
 begin
   perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'upsert_price_list', p_request_id,
-    jsonb_build_object('brewery', p_brewery, 'id', p_id, 'name', p_name));
+    jsonb_build_object('brewery', p_brewery, 'id', p_id, 'name', p_name, 'channel', p_channel));
   if v_replay is not null then return v_replay; end if;
   if p_id is null then
-    insert into public.price_lists (brewery_id, name) values (p_brewery, p_name) returning * into v_row;
+    insert into public.price_lists (brewery_id, name, channel_id) values (p_brewery, p_name, p_channel) returning * into v_row;
   else
-    update public.price_lists set name = p_name where id = p_id and brewery_id = p_brewery returning * into v_row;
+    update public.price_lists set name = p_name, channel_id = p_channel where id = p_id and brewery_id = p_brewery returning * into v_row;
     if not found then raise exception 'price list not found'; end if;
   end if;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
@@ -4488,7 +4496,7 @@ grant execute on function
   upsert_sale_channel(uuid,uuid,text,public.tax_treatment,uuid),
   delete_sale_channel(uuid,uuid,uuid),
   upsert_ship_to(uuid,uuid,uuid,text,text,text,text,text,text,uuid),
-  upsert_price_list(uuid,uuid,text,uuid),
+  upsert_price_list(uuid,uuid,text,uuid,uuid),
   set_price(uuid,uuid,uuid,int,uuid),
   set_price_list_format(uuid,uuid,uuid,int,uuid),
   clear_price_list_item(uuid,uuid,uuid,uuid),

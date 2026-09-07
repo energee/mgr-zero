@@ -1,6 +1,6 @@
 // tests/commands-customers.test.ts — customer/ship-to/price-list CRUD commands.
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaffCtx, seedCatalog } from "./helpers";
+import { admin, channelId, makeBrewery, makeStaffCtx, seedCatalog } from "./helpers";
 import { runCommand } from "../lib/commands/registry";
 import "../lib/commands/all";
 
@@ -14,7 +14,7 @@ beforeAll(async () => {
 
 describe("customer CRUD", () => {
   it("creates a price list, prices a sku, creates a customer on it, adds a ship-to", async () => {
-    const pl = await runCommand("upsert_price_list", { name: "2026 wholesale" }, ctx) as { id: string };
+    const pl = await runCommand("upsert_price_list", { name: "2026 wholesale", channelId: await channelId(b.id, "Wholesale") }, ctx) as { id: string };
     await runCommand("set_price_list_item", { priceListId: pl.id, skuId, unitPriceCents: 3400 }, ctx);
     const cust = await runCommand("upsert_customer", {
       name: "Green Bar", type: "retailer", state: "PA", priceListId: pl.id,

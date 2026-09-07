@@ -101,6 +101,7 @@ export async function seedLocation(breweryId: string, opts: { name?: string; kin
 }
 
 // A customer with one ship-to and a price list (created empty unless given).
+// A list prices for exactly one channel, so the default one prices Wholesale.
 export async function seedCustomer(
   breweryId: string,
   opts: { name?: string; state?: string; priceListId?: string } = {},
@@ -108,7 +109,7 @@ export async function seedCustomer(
   let priceListId = opts.priceListId;
   if (!priceListId) {
     const { data, error } = await admin.from("price_lists")
-      .insert({ brewery_id: breweryId, name: "std" }).select("id").single();
+      .insert({ brewery_id: breweryId, name: "std", channel_id: await channelId(breweryId, "Wholesale") }).select("id").single();
     if (error) throw error;
     priceListId = data.id as string;
   }

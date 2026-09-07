@@ -3,7 +3,7 @@
 // live-reason gate that keeps unshipped destinations out of both readers.
 import { beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
-import { admin, asUser, DB, makeBrewery, makeCustomerUser, makeStaff, makeStaffCtx } from "./helpers";
+import { admin, asUser, channelId, DB, makeBrewery, makeCustomerUser, makeStaff, makeStaffCtx } from "./helpers";
 import { runCommand, type Ctx as CommandCtx } from "@/lib/commands/registry";
 import type { TodayItem } from "@/lib/commands/today";
 import "@/lib/commands/all";
@@ -45,7 +45,7 @@ beforeAll(async () => {
   const brand = await ins("brands", { brewery_id: b.id, name: "IPA" });
   const format = await ins("formats", { brewery_id: b.id, name: "1/2 bbl keg", basis: "packaged", package_type: "keg", keg_size: "half_bbl", bbl_per_unit: 0.5 });
   skuId = (await ins("skus", { brewery_id: b.id, brand_id: brand.id, format_id: format.id, name: "IPA 1/2bbl" })).id;
-  const pl = await ins("price_lists", { brewery_id: b.id, name: "std" });
+  const pl = await ins("price_lists", { brewery_id: b.id, name: "std", channel_id: await channelId(b.id, "Wholesale") });
   await ins("price_list_items", { brewery_id: b.id, price_list_id: pl.id, sku_id: skuId, unit_price_cents: 12000 });
   customerId = (await ins("customers", { brewery_id: b.id, name: "Secret Bar LLC", type: "retailer", state: "PA", price_list_id: pl.id })).id;
   shipToId = (await ins("ship_tos", { brewery_id: b.id, customer_id: customerId, label: "m", address1: "1", city: "P", state: "PA", zip: "19100" })).id;

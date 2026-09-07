@@ -1,13 +1,14 @@
 // app/(app)/pricing/page.tsx — price tiers (§16.4): each list prices formats
 // by default and overrides per SKU. Reads through the command registry
-// (list_price_lists, list_skus, list_formats). Failures throw to the (app)
+// (list_price_lists, list_skus, list_formats, list_sale_channels). Every list
+// prices for one sale channel, shown beside its name. Failures throw to the (app)
 // error boundary.
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { money } from "@/lib/mgr/money";
-import { PriceListForm } from "./price-list-form";
+import { PriceListForm, type PriceListChannel } from "./price-list-form";
 import { PriceForm } from "./price-form";
 import { PriceFormatForm } from "./price-format-form";
 import { ClearOverrideButton } from "./clear-override-button";
@@ -15,7 +16,7 @@ import { ClearOverrideButton } from "./clear-override-button";
 type Sku = { id: string; name: string; brands: { name: string } | null };
 type PriceListItem = { sku_id: string; unit_price_cents: number; skus: { name: string } | null };
 type PriceListFormat = { format_id: string; unit_price_cents: number; formats: { name: string } | null };
-type PriceList = { id: string; name: string; price_list_formats: PriceListFormat[]; price_list_items: PriceListItem[] };
+type PriceList = { id: string; name: string; channel_id: string; sale_channels: { name: string } | null; price_list_formats: PriceListFormat[]; price_list_items: PriceListItem[] };
 type Format = { id: string; name: string; basis: string };
 
 function skuLabel(sku: Sku | undefined) {
@@ -27,11 +28,12 @@ function skuLabel(sku: Sku | undefined) {
 export default async function PricingPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [priceLists, skus, formats] = (await Promise.all([
+  const [priceLists, skus, formats, channels] = (await Promise.all([
     runCommand("list_price_lists", {}, ctx),
     runCommand("list_skus", {}, ctx),
     runCommand("list_formats", { basis: "packaged" }, ctx),
-  ])) as [PriceList[], Sku[], Format[]];
+    runCommand("list_sale_channels", {}, ctx),
+  ])) as [PriceList[], Sku[], Format[], PriceListChannel[]];
 
   const skuOptions = skus.map((s) => ({ id: s.id, label: skuLabel(s) }));
 
@@ -39,7 +41,7 @@ export default async function PricingPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Pricing</h1>
-        <PriceListForm />
+        <PriceListForm channels={channels} />
       </div>
 
       {priceLists.length ? (
@@ -47,9 +49,12 @@ export default async function PricingPage() {
           {priceLists.map((list) => (
             <div key={list.id} className="rounded border p-4">
               <div className="flex items-center justify-between">
-                <div className="font-medium">{list.name}</div>
+                <div className="font-medium">
+                  {list.name}
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">{list.sale_channels?.name ?? "—"}</span>
+                </div>
                 <div className="flex items-center gap-2">
-                  <PriceListForm priceList={{ id: list.id, name: list.name }} />
+                  <PriceListForm priceList={{ id: list.id, name: list.name, channelId: list.channel_id }} channels={channels} />
                   <PriceFormatForm priceListId={list.id} formats={formats} />
                   <PriceForm priceListId={list.id} skus={skuOptions} />
                 </div>

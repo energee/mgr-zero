@@ -1,7 +1,7 @@
 // tests/data-api-boundary.test.ts — proves authenticated callers use narrow RPCs, not table DML.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, asUser, makeBrewery, makeStaff } from "./helpers";
+import { admin, asUser, channelId, makeBrewery, makeStaff } from "./helpers";
 
 let breweryId: string;
 let staffDb: SupabaseClient;
@@ -46,7 +46,7 @@ describe("Data API mutation boundary", () => {
       name: "Foreign SKU",
     }).select("id").single();
     const priceList = await admin.from("price_lists")
-      .insert({ brewery_id: foreignBrewery.id, name: "Foreign prices" })
+      .insert({ brewery_id: foreignBrewery.id, name: "Foreign prices", channel_id: await channelId(foreignBrewery.id, "Wholesale") })
       .select("id")
       .single();
     const location = await admin.from("locations").insert({

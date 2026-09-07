@@ -1417,7 +1417,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales
 
-Price lists with their format defaults and per-SKU overrides
+Price lists with the channel they price for, their format defaults and per-SKU overrides
 
 Takes no input.
 
@@ -1524,18 +1524,19 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Create or rename a price list
+Create or edit a price list: its name and the sale channel it prices for
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `name` | string | yes |
+| `channelId` | uuid | yes |
 | `id` | uuid | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_price_list", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_price_list", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "channelId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### upsert_sale_channel [#upsert_sale_channel]

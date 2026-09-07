@@ -1,7 +1,7 @@
 // tests/rls-command-boundary.test.ts — live PostgREST proof that staff writes use only role-scoped RPCs.
 // Every mutation RPC takes a p_request_id (request ledger); direct calls here mint a fresh one.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedCustomer } from "./helpers";
+import { admin, channelId, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedCustomer } from "./helpers";
 import { runCommand, type Ctx } from "../lib/commands/registry";
 import "../lib/commands/all";
 
@@ -370,9 +370,10 @@ describe("registered staff mutation role × RPC matrix", () => {
       command: "upsert_price_list", rpc: "upsert_price_list", allowed: ["admin", "sales"],
       input: async role => {
         const name = unique("matrix price list", role);
+        const channel = await channelId(brewery.id, "Wholesale");
         return {
-          command: { name },
-          rpc: { p_id: null, p_brewery: brewery.id, p_name: name },
+          command: { name, channelId: channel },
+          rpc: { p_id: null, p_brewery: brewery.id, p_name: name, p_channel: channel },
         };
       },
     },

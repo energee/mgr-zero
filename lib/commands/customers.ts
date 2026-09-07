@@ -41,11 +41,11 @@ defineCommand({
 });
 
 defineCommand({
-  name: "upsert_price_list", description: "Create or rename a price list",
+  name: "upsert_price_list", description: "Create or edit a price list: its name and the sale channel it prices for",
   roles: [...roles],
-  input: z.object({ id: z.string().uuid().optional(), name: z.string().min(1) }),
+  input: z.object({ id: z.string().uuid().optional(), name: z.string().min(1), channelId: z.string().uuid() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_price_list", {
-    p_brewery: ctx.breweryId, p_id: i.id ?? null, p_name: i.name, p_request_id: execution.requestId,
+    p_brewery: ctx.breweryId, p_id: i.id ?? null, p_name: i.name, p_channel: i.channelId, p_request_id: execution.requestId,
   })),
 });
 
@@ -105,8 +105,8 @@ defineQuery({
 });
 
 defineQuery({
-  name: "list_price_lists", description: "Price lists with their format defaults and per-SKU overrides",
+  name: "list_price_lists", description: "Price lists with the channel they price for, their format defaults and per-SKU overrides",
   roles: ["admin", "sales"],
   input: z.object({}),
-  handler: (ctx) => unwrap(ctx.db.from("price_lists").select("*, price_list_formats(format_id, unit_price_cents, formats(name)), price_list_items(sku_id, unit_price_cents, skus(name))").eq("brewery_id", ctx.breweryId).order("name")),
+  handler: (ctx) => unwrap(ctx.db.from("price_lists").select("*, sale_channels(name), price_list_formats(format_id, unit_price_cents, formats(name)), price_list_items(sku_id, unit_price_cents, skus(name))").eq("brewery_id", ctx.breweryId).order("name")),
 });
