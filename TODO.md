@@ -3,9 +3,10 @@
 Index written 2026-09-07 against `main` @ `b3f6a91` (Programs 0–4b merged) with
 Program 5 open as PR #194 on `lane-production`. This is the checklist; each
 program's own plan holds the tasks. An item is done when its PR is merged and
-its screens are ungated in `components/mgr/screens.tsx`; move it to Done at the
-bottom with the date and PR, don't tick it. The dreaming workflow does this
-from merged PR descriptions.
+its screens are ungated in `components/mgr/screens.tsx`. It then leaves this
+file: a `TODO: <text>` line in the PR description (any unique substring, e.g.
+`TODO: Program 6`) makes the dreaming workflow move the line to
+`.agents/PROGRESS.md` Done with the date and PR. This file only shrinks.
 
 Counts come from a source read of the 167 MGR (non-venue) inventory screens
 against `app/`: 55 live, 13 partial, 32 missing but ungated, 67 gated.
@@ -100,13 +101,15 @@ Owner tagged there. Schema-affecting ones gate the programs above.
 The 17 venue frames (Slack, QuickBooks, Square) stay in `/docs/integrations`;
 Programs 13, 14, 16 implement the actions they describe.
 
+## Outside the screen inventory
+
+- [ ] Authz backlog (`docs/audits/2026-09-01-authz-audit.md`): D2, A1–A5; re-triage against the definer/request-ledger baseline before picking any up
+- [ ] Adversarial walkthrough baseline (`.agents/superpowers/specs/2026-09-04-adversarial-walkthrough-review.md`): map the `/docs/screens-explore` walkthrough against it per its entry template
+- [ ] Supabase advisors on a hosted project (local `db lint` is clean)
+
 ## Release — no plan owns this yet
 
 - [ ] Hosted Supabase project (ask first)
 - [ ] Vercel project and env (ask first)
 - [ ] README's login → catalog → inventory verification on the hosted project
 - [ ] Database-backed suites green in CI on every merge above
-
-## Done
-
-- 2026-09-07 — Programs 0–4b: harness, ordering pilot, locations/bins/transfers, catalog identity, sale channels, pricing grid (#185)

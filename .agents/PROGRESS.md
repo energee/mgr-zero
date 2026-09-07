@@ -1,16 +1,13 @@
 # PROGRESS
 
-Running log of what's done, in flight, and next. Newest at top. Keep entries to one line each; details belong in commits and docs.
-
-## Now
-- [ ] Roadmap: `TODO.md` at the root indexes everything left to match `/docs/screens-explore` (Programs 5–16, uncalled commands, partial pages, drift, release); tick there, not here.
-- [ ] Program 5 — production and packaging (`.agents/superpowers/plans/2026-09-07-backend-program-5-production-packaging.md`): PR #194 green, awaiting merge.
-- [ ] Chat notifications (`.agents/superpowers/plans/2026-09-01-chat-notifications.md`): Tasks 1–10 of 14 merged; Tasks 11–14 are Program 16.
-- [ ] Authz backlog (`docs/audits/2026-09-01-authz-audit.md`): D2, A1–A5 open; re-triage against the definer/request-ledger baseline before picking any up. Supabase advisors still need a hosted project (release item in `TODO.md`).
-- [ ] Adversarial walkthrough baseline (`.agents/superpowers/specs/2026-09-04-adversarial-walkthrough-review.md`): next is mapping the `/docs/screens-explore` walkthrough against it per its entry template.
+Dated log of finished work, newest first, one line each; details belong in
+commits and owning docs. What is left lives in `TODO.md`; what is in flight is
+the open PR list. The dreaming workflow writes here from merged PR
+descriptions, and `scripts/pr-directives.ts` moves finished `TODO.md` items
+here.
 
 ## Done
-- 2026-09-07 — `PROGRESS.md` Now collapsed to in-flight lines; finished workstreams below, superseded ones now live as programs in `TODO.md`: UI components port (all 94 frames in `screens.tsx`/`venue.tsx`, wireframe retired); Vercel production-readiness foundation (PR #29 merged, Tasks 12/13/17 deferred into the authz backlog); audit P1 remediation (PR #27; P1.1–P1.5, P1.9); locations/bins/transfers design (PR #158) shipped as Program 2 (#185); customizable sale channels plan (PR #42) shipped as Program 4 (#185); purchasing design (PR #173) is Program 6; Slice 1C QBO track is Program 13, its composer tasks Program 15.
+- 2026-09-07 — `PROGRESS.md` is now the log only (Now section dropped; in-flight work is the PR list, remaining scope is `TODO.md`); finished workstreams recorded here: UI components port (all 94 frames in `screens.tsx`/`venue.tsx`, wireframe retired); Vercel production-readiness foundation (PR #29, Tasks 12/13/17 deferred into the authz backlog); audit P1 remediation (PR #27; P1.1–P1.5, P1.9); locations/bins/transfers design (PR #158) shipped as Program 2 (#185); customizable sale channels plan (PR #42) shipped as Program 4 (#185); purchasing design (PR #173) is Program 6; Slice 1C QBO track is Program 13, its composer tasks Program 15.
 - 2026-09-07 — Screens design-refinement pass: `screens.tsx` audited end-to-end against schema/plan/brewing-domain (16 mismatches fixed, e.g. Receive PO now takes a lot code it used to draw read-only; 12 more flagged in DRIFT, PR #159); unit switchers unified into one segmented `Qty`/`TabBar` control and a command form's close now reads as a destructive discard (PR #160); row icons grew to 24px with an accent-ramp, WCAG-labeled corner status dot, and rail tabs (Today/Beer/Work/More) draw alike (PR #164); page actions hug their label on desk with list-create verbs on the title row (PR #174); Wholesale Shop lists packages by brand from each packaging run's wholesale-list designation, and buyers no longer see ATP (PR #175); Search and Entity picker gained keyboard selection via one shared `E.palette`, closing #99 (PR #182); Schedule batch draws Recipe and Brand as optional per the nullable schema and revision-2 intent-vs-commitment design (PR #172).
 - 2026-09-07 — HTTP API reference moved from README to generated `/docs/api`, and its maintenance is now automated: `bun run docs:api` derives available operations from the command registry and designed operations from screens' `reads`/`writes`, generated curl examples are round-tripped through each command's own Zod schema so none fail validation, and the `http-api` agent now runs post-merge (`http-api-agent.yml`) restricted to prose/annotation edits (PRs #165, #166, #167).
 - 2026-09-07 — Claude Code Review's bot-author skip generalized from two hardcoded branch names to any PR whose author `type` is `Bot`, after the old check missed a `mgr-bot`-authored PR and failed CI outright (PRs #169, #170).
