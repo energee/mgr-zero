@@ -12,7 +12,7 @@ const blocked = async (): Promise<never> => { throw new CommandError("Invitation
 
 defineCommand({
   name: "invite_staff",
-  description: "Invite staff — not available in this release",
+  description: "Invite staff (not available in this release)",
   input: z.object({ email: z.string().email(), role: z.enum(["admin", "sales", "warehouse", "brewer"]) }),
   roles: ["admin"],
   handler: blocked,
@@ -20,14 +20,14 @@ defineCommand({
 
 defineCommand({
   name: "invite_customer_user",
-  description: "Invite a customer portal user — not available in this release",
+  description: "Invite a customer portal user (not available in this release)",
   input: z.object({ email: z.string().email(), customerId: z.string().uuid() }),
   roles: ["admin", "sales"],
   handler: blocked,
 });
 
 defineQuery({
-  name: "list_team_members", description: "Staff memberships for the brewery (user id + role; emails live in auth and are not readable under RLS)",
+  name: "list_team_members", description: "Staff memberships for the brewery (user id and role; emails are not returned)",
   input: z.object({}), roles: ["admin", "sales", "warehouse"],
   handler: (ctx) => unwrap(ctx.db.from("brewery_users").select("user_id, role").eq("brewery_id", ctx.breweryId).order("role")),
 });
