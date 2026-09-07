@@ -135,6 +135,12 @@ describe("sale channel commands", () => {
       .rejects.toMatchObject({ code: "permission_denied" });
   });
 
+  it("upsert_sale_channel refuses a rename onto an existing name", async () => {
+    const festival = (await runCommand("upsert_sale_channel", { name: "Festival", taxTreatment: "taxable" }, ctx)) as { id: string };
+    await expect(runCommand("upsert_sale_channel", { id: festival.id, name: "Taproom", taxTreatment: "taxable" }, ctx))
+      .rejects.toMatchObject({ message: expect.stringMatching(/already exists/) });
+  });
+
   it("delete_sale_channel removes an unused channel", async () => {
     const made = (await runCommand("upsert_sale_channel", { name: "Scrap", taxTreatment: "taxable" }, ctx)) as { id: string };
     await runCommand("delete_sale_channel", { channelId: made.id }, ctx);

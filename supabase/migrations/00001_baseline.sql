@@ -1941,7 +1941,7 @@ begin
       left join public.customers c on c.id = o.customer_id
      where sc.brewery_id = o.brewery_id and sc.name = 'Wholesale';
     if v_channel is null then
-      raise exception 'sale channel Wholesale not found' using errcode = 'P0002';
+      raise exception 'sale channel Wholesale not found' using errcode = 'P0001';
     end if;
     -- Empty-invoice guard: only create invoice if at least one line ships qty > 0;
     -- on_delivery defers the invoice to confirm_delivery
@@ -2582,18 +2582,22 @@ begin
   v_replay := private.claim_command_request(p_brewery, 'upsert_sale_channel', p_request_id,
     jsonb_build_object('brewery', p_brewery, 'id', p_id, 'name', p_name, 'tax_treatment', p_tax_treatment));
   if v_replay is not null then return v_replay; end if;
-  if p_id is null then
-    insert into public.sale_channels (brewery_id, name, tax_treatment)
-      values (p_brewery, p_name, p_tax_treatment) returning * into v_row;
-  else
-    select * into v_row from public.sale_channels where id = p_id and brewery_id = p_brewery;
-    if not found then raise exception 'sale channel not found'; end if;
-    if v_row.name = 'Wholesale' and p_name <> 'Wholesale' then
-      raise exception 'Wholesale is the shipping channel' using errcode = 'P0001';
+  begin
+    if p_id is null then
+      insert into public.sale_channels (brewery_id, name, tax_treatment)
+        values (p_brewery, p_name, p_tax_treatment) returning * into v_row;
+    else
+      select * into v_row from public.sale_channels where id = p_id and brewery_id = p_brewery;
+      if not found then raise exception 'sale channel not found'; end if;
+      if v_row.name = 'Wholesale' and p_name <> 'Wholesale' then
+        raise exception 'Wholesale is the shipping channel' using errcode = 'P0001';
+      end if;
+      update public.sale_channels set name = p_name, tax_treatment = p_tax_treatment
+        where id = p_id and brewery_id = p_brewery returning * into v_row;
     end if;
-    update public.sale_channels set name = p_name, tax_treatment = p_tax_treatment
-      where id = p_id and brewery_id = p_brewery returning * into v_row;
-  end if;
+  exception when unique_violation then
+    raise exception 'a channel with that name already exists' using errcode = 'P0001';
+  end;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
