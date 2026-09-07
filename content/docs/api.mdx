@@ -1149,12 +1149,12 @@ The screens need them and the backend has not built them, so calling one returns
 | `delete_sale_channel` | command | Sale channels, Channel |
 | `get_price_list` | query | Price tiers, Override |
 | `get_sku` | query | SKU |
-| `list_brands` | query | Catalog, Product, Schedule batch |
+| `list_brands` | query | Catalog, Brand, Schedule batch |
 | `list_sale_channels` | query | Square locations, Sale channels, Channel |
 | `set_price_list_format` | command | Price tiers |
 | `set_price_list_item` | command | Catalog, Price tiers, Override |
-| `update_sku` | command | Catalog, Product, SKU |
-| `upsert_brand` | command | Catalog, Product |
+| `update_sku` | command | Catalog, Brand, SKU |
+| `upsert_brand` | command | Catalog, Brand |
 | `upsert_sale_channel` | command | Sale channels, Channel |
 
 {/* end ops:catalog */}
@@ -1652,7 +1652,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* team-designed */}
 
-4 of the 10 operations in this area are available today; the 6 below are not.
+4 of the 11 operations in this area are available today; the 7 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
 
@@ -1663,7 +1663,8 @@ The screens need them and the backend has not built them, so calling one returns
 | `revoke_staff` | command | Team, Team member |
 | `set_brewery_operating_defaults` | command | Chat settings |
 | `update_brewery` | command | Settings |
-| `update_staff_role` | command | Team, Team member |
+| `update_staff_role` | command | Team |
+| `update_staff_roles` | command | Team member |
 
 {/* end ops:team */}
 
@@ -1804,7 +1805,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* portal-designed */}
 
-7 of the 9 operations in this area are available today; the 2 below are not.
+7 of the 10 operations in this area are available today; the 3 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed because they are the plan of record — `.agents/superpowers/plans/2026-09-06-api-operations-backlog.md` collects them across every area.
 
@@ -1812,5 +1813,6 @@ The screens need them and the backend has not built them, so calling one returns
 | --- | --- | --- |
 | `get_portal_account` | query | Account |
 | `portal_invoice` | query | Pay invoice, Payment unavailable, Question invoice, Paid invoice |
+| `portal_schedule` | query | Coming up |
 
 {/* end ops:portal */}
