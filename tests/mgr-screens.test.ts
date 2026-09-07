@@ -119,7 +119,7 @@ describe("SCREENS", () => {
       const html = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === name)!.body));
       expect.soft(html, `${name}: inline save`).not.toMatch(/>Save[^<]*<\/button>/);
     }
-    const product = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Product")!.body));
+    const product = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Brand")!.body));
     expect(product).not.toContain("Save SKU");
   });
 
@@ -650,7 +650,7 @@ describe("SCREENS", () => {
     // Sign in: a link, not a card row.
     expect(html("Sign in")).toMatch(/<a [^>]*>Forgot password\?<\/a>/);
     // Product: no one-option chip group.
-    const product = SCREENS.find((s) => s.name === "Product")!;
+    const product = SCREENS.find((s) => s.name === "Brand")!;
     expect(renderToStaticMarkup(createElement("div", null, product.body))).not.toContain("tax class");
     expect(JSON.stringify(product.states)).toMatch(/tax class/);
     // Every date field is the calendar picker; no screen falls back to the OS date input.
@@ -673,7 +673,7 @@ describe("SCREENS", () => {
     // row act can still open the next screen.
     const named = [
       "Today", "Taproom", "Order", "Cellar map", "Tap board", "Swap keg",
-      "Weekly count", "Brew day", "Route", "Settings", "Product", "Vendors",
+      "Weekly count", "Brew day", "Route", "Settings", "Brand", "Vendors",
       "POS mapping", "Planning", "Schedule batch", "Vessel detail", "Kick keg", "Return route",
     ];
     const filled = (html: string) =>

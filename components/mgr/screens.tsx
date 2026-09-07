@@ -666,7 +666,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Today",
     name: "First-run checklist",
-    to: { "Add location": "First-run checklist", "2 \u00b7 Import CSV": "Import", "3 \u00b7 Add a brand": "Product", Add: "Product", "5 \u00b7 Opening inventory": "Record movement" },
+    to: { "Add location": "First-run checklist", "2 \u00b7 Import CSV": "Import", "3 \u00b7 Add a brand": "Brand", Add: "Brand", "5 \u00b7 Opening inventory": "Record movement" },
     job: "Turn an empty brewery into usable truth",
     reads: "get_first_run_state [view]",
     writes: "create_location · invite_staff [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI]",
@@ -1488,7 +1488,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Catalog",
-    to: { "Hazy IPA": "Product", Pils: "Product", Stout: "Product" },
+    to: { "Hazy IPA": "Brand", Pils: "Brand", Stout: "Brand" },
     job: "Define brands, their sellable formats and prices without ledger writes",
     reads: "list_brands · list_skus",
     writes: "upsert_brand · create_sku · update_sku · upsert_price_list · set_price_list_item [existing/design]",
@@ -1525,17 +1525,21 @@ export const SCREENS: Screen[] = [
     step: 5,
     slice: 1,
     tab: "More",
-    name: "Product",
+    name: "Brand",
     job: "Sellable facts without ledger writes, including the TTB fields",
     reads: "list_brands · list_skus",
     writes: "upsert_brand* · create_sku* · update_sku",
-    states: [["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class"], ["new SKU", "choose one existing Format"], ["inactive SKU", "hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"]],
-    spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Package facts live on Formats, while the SKU is the stable brand × format identity used by inventory, orders, pricing and provider mappings. No UPC scan or container source editor here.",
+    states: [["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class; description, category, price group and hops optional"], ["new style", "typing a style no one has used offers Add; saved with the brand", 0], ["new SKU", "choose one existing Format; a poured format (pint, taster) is a SKU that holds no stock"], ["inactive SKU", "hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"]],
+    spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table [SCHEMA-GATE: a per-brewery styles table that the brand references]; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category, price group and hops are optional [SCHEMA-GATE: nullable columns on the brand; price group is a label the price tier prices by format, not a price on the brand (§16.4)]. Package facts live on Formats, while the SKU is the stable brand × format identity used by inventory, orders, pricing and provider mappings; draft pours are SKUs on a poured format (§16.2). No UPC scan or container source editor here.",
     body: (<>
       {E.back("Catalog", "Hazy IPA")}
       {E.edit("Brand name", "Hazy IPA")}
-      {E.edit("Style", "IPA")}
+      {E.pick("Style", "Hazy IPA", ["Hazy IPA", "IPA", "Pils", "Add “Cold IPA”"])}
       {E.edit("ABV", "6.8")}
+      {E.edit("Description", "Juicy, soft, Citra-forward")}
+      {E.pick("Category", "Core", ["Core", "Seasonal", "One-off", "Barrel-aged"])}
+      {E.pick("Price group", "Standard", ["Standard", "Specialty", "Barrel-aged"])}
+      {E.edit("Hops", "Citra, Mosaic")}
       {E.btn("Save brand")}
       {E.nav("SKU list", "3 active packages")}
     </>),
@@ -1571,7 +1575,7 @@ export const SCREENS: Screen[] = [
     states: [["permission", "sales or admin required", 1], ["active", "available to price and sell"], ["inactive", "history remains", 1], ["empty", "Add SKU is the only action"]],
     spec: "Product links here instead of showing an arbitrary one of three SKUs inline.",
     body: (<>
-      {E.back("Product", "Hazy IPA · SKUs", E.btn("Add SKU"))}
+      {E.back("Brand", "Hazy IPA · SKUs", E.btn("Add SKU"))}
       {E.row("½ bbl keg", `${formatVolume("0.50000000")} · active`, E.act("Edit"))}
       {E.row("⅙ bbl keg", `${formatVolume("0.16666667")} · active`, E.act("Edit"))}
       {E.row("case · 24×16 oz", `${formatVolume("0.09677419")} · active`, E.act("Edit"))}
