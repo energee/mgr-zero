@@ -97,17 +97,19 @@ Wholesale Shop lists the packages the brewery has put on the wholesale list — 
 *Admin, Sales, and Warehouse can view inventory. Admin and Warehouse can record movements.*
 
 <Cards>
-  <Card title="On hand">The sum of recorded movements for one SKU at one location.</Card>
+  <Card title="On hand">The sum of recorded movements for one SKU in one bin at one location. ATP stays per SKU.</Card>
   <Card title="ATP">Available to promise: on hand minus open reservations for that SKU. It can go negative.</Card>
   <Card title="Movement log">The 50 newest entries: time, type, SKU, location, signed quantity, and note.</Card>
 </Cards>
+
+**Bins.** A bin is a named place inside a location: a walk-in, a cold room, a dry rack. Every location starts with three, **Cold**, **Dry**, and **Walk-in**, and always keeps at least one; rename or remove the rest to match the building. A bin that has ever recorded stock cannot be removed, even at a zero balance, because the movement history still names it; rename it instead. Beer that ships on an order leaves from the location's first bin alphabetically, so name the bin you pick from so it sorts first.
 
 ### Record a movement
 
 <Screen name="Record movement" />
 
 1. Open **Inventory** and select **Record Movement**.
-2. Choose a **SKU** and **Location**.
+2. Choose a **SKU**, **Location**, and **Bin**. Picking the location preselects its first bin alphabetically; change it if the stock sits elsewhere.
 3. Choose a **Type**. The default is `opening_balance`.
 4. For `depletion`, leave **Channel** as `taproom`. The picker also shows `wholesale`, `dtc`, and `export`; those other choices are rejected for this movement type.
 5. Enter **Qty** in SKU units, to two decimal places if you need them. Positive quantities add stock. Negative quantities remove it. Zero is rejected.
@@ -311,7 +313,7 @@ Do not hunt for hidden controls for these:
 - switching between breweries when a staff account belongs to more than one
 - staff or customer-portal invitations
 - CSV import
-- setting taproom pars or choosing the warehouse that fulfills wholesale-customer portal orders, from the interface
+- adding, renaming or removing bins, setting taproom pars, or choosing the warehouse that fulfills wholesale-customer portal orders, from the interface
 - editing products or SKUs after creation
 - deleting customers, ship-tos, prices, price lists, inventory history, orders, invoices, or credit memos
 - editing staff roles or seeing staff email addresses

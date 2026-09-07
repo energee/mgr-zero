@@ -83,7 +83,7 @@ money cents.
 | `package_type` | `keg, can, bottle` | unchanged |
 | `keg_size` | `half_bbl, quarter_bbl, sixth_bbl, fifty_l, thirty_l, twenty_l` | physical set; safe as enum |
 | `keg_container_source` | `owned_fleet, per_fill_rental, one_way_material` | slice 5 decision |
-| `location_kind` | `warehouse, taproom` | unchanged |
+| `location_kind` | `warehouse, taproom, storage` | `storage` added 2026-09-06 |
 | `movement_type` | `opening_balance, production_in, adjustment, sale_removal, taproom_transfer, depletion, return_in, destruction, loss, sample, festival_removal` | unchanged |
 | `sale_channel` | `wholesale, taproom, dtc, export` | unchanged |
 | `allocation_source` / `allocation_status` | unchanged | |
@@ -167,7 +167,9 @@ material's `base_uom`, per single SKU unit). pk `(sku_id, material_id)`. idx `(m
 
 ## 4. FG ledger
 
-### `locations` — unchanged
+### `locations` — gains a `storage` kind and a `bins` child (2026-09-06)
+
+`bins (id, brewery_id, location_id, name, created_at)`, `unique (location_id, name)`, seeded Walk-in / Cold / Dry by `create_location`; `delete_bin` keeps at least one and refuses a bin with ledger history. Ledgers reference `(bin_id, location_id, brewery_id)` so a bin is structurally one of its location's.
 ### `inventory_movements` — unchanged semantics; `lot_id` becomes a real FK
 All existing columns, `removal_shape` check, `bbl` trigger, revoke, indexes, and
 policies carried forward verbatim. `lot_id → lots` composite FK added after `lots` exists
@@ -358,7 +360,7 @@ date`. unique `(material_id, lot_code)`; `unique (id, material_id, brewery_id)` 
 movement's lot must belong to its material.
 
 ### `material_movements` — ledger
-`material_id, lot_id, qty numeric <> 0` (base uom, signed), `type
+`material_id, location_id → locations not null, bin_id → bins (composite) not null` (2026-09-06), `lot_id, qty numeric <> 0` (base uom, signed), `type
 material_movement_type, unit_cost_cents int` (receipts only), `note, created_by`.
 - FK `(material_id, brewery_id) → materials`; FK `(lot_id, material_id, brewery_id) →
   material_lots (id, material_id, brewery_id)`.
@@ -585,11 +587,12 @@ not null default 0, contract_note text, active bool`. check: `kind = 'owned'` �
 `(brewery_id, name)`.
 
 ### `keg_events` — ledger (counts, not serials)
-`pool_id → keg_pools, keg_size keg_size, qty int > 0, reason keg_event_reason,
+`pool_id → keg_pools, keg_size keg_size, location_id → locations not null, bin_id → bins
+(composite) not null` (2026-09-06), `qty int > 0, reason keg_event_reason,
 customer_id → customers, shipment_id → shipments, at timestamptz, note, created_by`.
 - check: `shipped, returned ⇒ customer_id not null`; `acquired, retired ⇒ customer_id
   null`; `lost, found` either (lost at a customer vs. at the brewery).
-- idx `(brewery_id, pool_id, keg_size)`, `(customer_id) where customer_id is not null`,
+- idx `(brewery_id, pool_id, keg_size, location_id, bin_id)`, `(customer_id) where customer_id is not null`,
   `(shipment_id)`.
 Fill = FG `production_in` of a keg SKU; empty-at-brewery is derived, never stored:
 `fleet_total − at_customers − filled_on_hand`.
@@ -639,8 +642,9 @@ shipment's order.
    allowlist.
 5. **Payments** have no table; `invoices.paid_at / qbo_balance_cents` from QBO is enough
    while QBO is the book of record.
-6. **Materials have no locations**; one store per brewery. `material_movements` gains a
-   `location_id` later if multi-site materials appear.
+6. ~~**Materials have no locations**; one store per brewery. `material_movements` gains a
+   `location_id` later if multi-site materials appear.~~ **Reversed 2026-09-06:** materials
+   are per location and bin; see `2026-09-06-mgr-locations-bins-transfers-design.md`.
 7. **`transfers` and `volume_adjustments` are append-only** like the named ledgers —
    they are volume ledgers in all but name.
 8. **One open occupancy per vessel** (exclusion constraint); blending is a transfer into
@@ -852,6 +856,10 @@ Add `external_variation_id` to the key and let `qty_per_sale` derive from the
 poured format rather than being hand-entered.
 
 ### 16.6 `bins` — new, one per location minimum (decided 2026-09-02)
+
+**Amended 2026-09-06 (implemented in Program 2):** a seeded trio (Walk-in, Cold,
+Dry) with a minimum-of-one rule in `delete_bin`, not an undeletable default row;
+no `kind` column until §16.7 reads one; the `taproom_pars` re-key is deferred.
 
 **Every location gets a default bin**, created with it and named for it. `bin_id`
 is therefore `NOT NULL` everywhere it appears — movements, pars, menus — and
