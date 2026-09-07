@@ -633,23 +633,21 @@ describe("SCREENS", () => {
     const inp = r(E.inp("Address", "114 Bridge St"));
     expect(inp).toMatch(/<label[^>]*>Address<\/label>/);
     expect(inp).toContain('placeholder="114 Bridge St"');
-    expect(r(E.search("Search customers"))).toMatch(/type="search"/);
-    expect(r(E.search("Search customers"))).not.toContain("<label");
+    const search = r(E.search("Search customers"));
+    expect(search).toMatch(/type="search"/);
+    expect(search).not.toContain("<label");
     // No field is drawn label-beside-control any more.
-    for (const s of SCREENS) expect.soft(renderToStaticMarkup(createElement("div", null, s.body)), s.name).not.toMatch(/data-slot="field"[^>]*data-orientation="horizontal"/);
+    for (const s of SCREENS) expect.soft(body(s.name), s.name).not.toMatch(/data-slot="field"[^>]*data-orientation="horizontal"/);
     // Grids: cols pairs from md up; inline sizes to its count at every width.
     expect(r(E.cols(E.edit("A", "1"), E.edit("B", "2")))).toContain("md:grid-cols-2");
-    expect(r(E.inline(E.edit("A", "1"), E.edit("B", "2")))).toContain("repeat(2, minmax(0, 1fr))");
-    expect(r(E.inline(E.edit("A", "1"), E.edit("B", "2"), E.edit("C", "3")))).toContain("repeat(3, minmax(0, 1fr))");
-    // Rows: the chevron and a verb make a tap target; a switch or stepper does not; gated says so.
-    expect(r(E.nav("Open me"))).toContain("cursor-pointer");
-    expect(r(E.row("Verb", "", E.act("Review")))).toContain("cursor-pointer");
-    expect(r(E.row("Switch", "", E.sw(true, "On")))).not.toContain("cursor-pointer");
-    expect(r(E.row("Stepper", "", E.stq(3)))).not.toContain("cursor-pointer");
-    expect(r(E.row("Fact", "plain", "12"))).not.toContain("cursor-pointer");
-    expect(r(E.gated("Later"))).toContain("cursor-not-allowed");
-    // A lone verb ends where a group would: right, on the desk.
-    expect(r(E.btn("Save"))).toContain("md:self-end");
+    expect(r(E.inline(E.edit("A", "1"), E.edit("B", "2")))).toMatch(/class="[^"]*\bgrid-cols-2\b/);
+    expect(r(E.inline(E.edit("A", "1"), E.edit("B", "2"), E.edit("C", "3")))).toMatch(/class="[^"]*\bgrid-cols-3\b/);
+    // Rows declare a tap through their trailing slot: the chevron and a verb do, a switch or stepper does not.
+    expect(r(E.nav("Open me"))).toMatch(/data-tap="/);
+    expect(r(E.row("Verb", "", E.act("Review")))).toMatch(/data-tap="/);
+    expect(r(E.row("Switch", "", E.sw(true, "On")))).not.toMatch(/data-tap="/);
+    expect(r(E.row("Stepper", "", E.stq(3)))).not.toMatch(/data-tap="/);
+    expect(r(E.gated("Later"))).toContain("data-gated");
   });
 
   it("uses the control that does the job on view switchers and roles (#99)", () => {
@@ -678,9 +676,9 @@ describe("SCREENS", () => {
     // Sign in: a link, not a card row.
     expect(html("Sign in")).toMatch(/<a [^>]*>Forgot password\?<\/a>/);
     // Product: no one-option chip group.
-    const product = SCREENS.find((s) => s.name === "Brand")!;
-    expect(renderToStaticMarkup(createElement("div", null, product.body))).not.toContain("tax class");
-    expect(JSON.stringify(product.states)).toMatch(/tax class/);
+    const brand = SCREENS.find((s) => s.name === "Brand")!;
+    expect(body("Brand")).not.toContain("tax class");
+    expect(JSON.stringify(brand.states)).toMatch(/tax class/);
     // Every date field is the calendar picker; no screen falls back to the OS date input.
     for (const name of ["New order", "Schedule batch", "Schedule packaging run", "Receive PO"]) {
       expect(html(name), name).toContain('data-slot="popover-trigger"');

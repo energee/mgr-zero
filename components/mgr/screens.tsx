@@ -20,7 +20,7 @@
 // oz, bbl); an option that is a phrase rather than a term takes sentence case
 // (Empty, About ¼ left, Customer remits). A lowercase list here is the rule,
 // not an oversight.
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-icons";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
@@ -29,6 +29,15 @@ import { formatVolume } from "@/lib/volume";
 import {
   BeerIcon, DeliveryTruck01Icon, Package01Icon, Route01Icon, Tag01Icon, TaskDone01Icon, ThermometerIcon, WifiDisconnected01Icon,
 } from "@hugeicons/core-free-icons";
+
+/** Every staff role with what it opens; Team member draws one switch each. */
+const ROLES: [string, string, boolean][] = [
+  ["Admin", "everything, including team and settings", false],
+  ["Sales", "orders, customers, price lists", true],
+  ["Warehouse", "pick, receive, count, transfer", false],
+  ["Brewer", "batches, cellar, packaging", true],
+  ["Taproom", "taps, pours, menu", false],
+];
 
 export const PORTAL_BUYER = { name: "Jordan Lee", account: "Ridgeline Tap Room", email: "jordan@ridgelinetap.com" };
 
@@ -635,11 +644,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.row("Dave Chen", "dave@demobrewing.com", "", "", E.face({ className: "size-10", src: "/mock/dave.jpg" }))}
       {E.ttl("Roles")}
-      {E.row("Admin", "everything, including team and settings", E.sw(false, "Admin"))}
-      {E.row("Sales", "orders, customers, price lists", E.sw(true, "Sales"))}
-      {E.row("Warehouse", "pick, receive, count, transfer", E.sw(false, "Warehouse"))}
-      {E.row("Brewer", "batches, cellar, packaging", E.sw(true, "Brewer"))}
-      {E.row("Taproom", "taps, pours, menu", E.sw(false, "Taproom"))}
+      {ROLES.map(([name, does, on]) => <Fragment key={name}>{E.row(name, does, E.sw(on, name))}</Fragment>)}
       {E.btn("Save roles")}
       {E.note("Removing Dave ends this brewery membership. Their sign-in account remains.")}
       {E.btn("Remove Dave", "del")}

@@ -71,15 +71,14 @@ type BtnBase = "p" | "g" | "ghost" | "irr" | "del";
 type BtnKind = BtnBase | `${BtnBase} disabled`;
 type VolumeUnit = "oz" | "gal" | "bbl" | "mL" | "L";
 
-/** A row is a tap target when its trailing slot is the Open chevron (E.nav) or
- *  a verb (E.act). A switch or a stepper there is its own control; the row
- *  around it is not tappable and keeps the plain cursor. */
-const isTap = (n: React.ReactNode) =>
-  isValidElement(n) && (n.type === DirectionIcon || Boolean((n.props as { "data-row-action"?: boolean })["data-row-action"]));
+/** A row is a tap target when its trailing slot declares `data-tap`: the Open
+ *  chevron (E.nav) or a verb (E.act). A switch or a stepper there is its own
+ *  control, so the row around it keeps the plain cursor. Read by CSS on the
+ *  row, never by inspecting the child. */
+const TAP_ROW = "has-[[data-tap]]:cursor-pointer has-[[data-tap]]:select-none has-[[data-tap]]:hover:bg-accent/50";
 
-/** A grid of fields, each keyed so React never sees a bare array. */
-const fieldGrid = (fields: React.ReactNode[], className: string, style?: React.CSSProperties) => (
-  <div className={cn("grid gap-2 [&>*]:min-w-0", className)} style={style}>{fields.map((f, i) => <Fragment key={i}>{f}</Fragment>)}</div>
+const fieldGrid = (fields: React.ReactNode[], className: string) => (
+  <div className={cn("grid gap-2 [&>*]:min-w-0", className)}>{Children.toArray(fields)}</div>
 );
 
 export const E = {
@@ -126,7 +125,7 @@ export const E = {
    *  "Citra lot" to a Citra row by name. Item is flex-wrap, so the footer
    *  takes a full line without any layout of its own. */
   row: (t: React.ReactNode, s: React.ReactNode = "", n: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement, foot?: React.ReactNode) => (
-    <Item variant="outline" data-gated={cls === "dis" || undefined} className={cn(cls === "dis" ? "cursor-not-allowed opacity-50" : isTap(n) && "cursor-pointer select-none hover:bg-accent/50")}>
+    <Item variant="outline" data-gated={cls === "dis" || undefined} className={cn(cls === "dis" ? "cursor-not-allowed opacity-50" : TAP_ROW)}>
       {(icon || dotColor[cls]) && (
         <ItemMedia className={CENTER_MEDIA}>
           {icon ? <RowMedia icon={icon} cls={cls} /> : <Dot cls={cls} />}
@@ -142,7 +141,7 @@ export const E = {
   ),
   /** Soft-filled workflow entry. Tone describes the action, independently of row status. */
   act: (t: React.ReactNode, tone: "primary" | "success" | "attention" | "info" | "destructive" = "primary") => (
-    <Button variant="ghost" size="sm" data-row-action className={cn(
+    <Button variant="ghost" size="sm" data-row-action data-tap className={cn(
       tone === "destructive" && "bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive",
       tone === "primary" && "bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary",
       tone === "success" && "bg-success text-success-foreground hover:bg-success/80 hover:text-success-foreground",
@@ -295,7 +294,7 @@ export const E = {
   /** Fields that read as one phrase (a quantity, its unit, and what it is per)
    *  stay on one line at every width; three at most, or the phone can’t. */
   inline: (...fields: [React.ReactNode, React.ReactNode, React.ReactNode?]) =>
-    fieldGrid(fields, "", { gridTemplateColumns: `repeat(${fields.length}, minmax(0, 1fr))` }),
+    fieldGrid(fields, fields.length === 3 ? "grid-cols-3" : "grid-cols-2"),
   /** A time-of-day window as one two-thumb range: start and end are 24-hour "hh:mm". */
   window: (label: string, start: string, end: string) => <TimeWindowField label={label} start={start} end={end} />,
   /** A picked value: a Select for short fixed lists; long lists (SKU, customer) keep opening Entity picker. */
@@ -401,7 +400,7 @@ export const E = {
     </ButtonGroup>
   ),
   gated: (t: React.ReactNode, why: React.ReactNode = "isn’t available yet") => E.row(t, why, "", "dis", SquareLock01Icon),
-  nav: (t: React.ReactNode, s: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement) => E.row(t, s, <DirectionIcon label="Open" />, cls, icon),
+  nav: (t: React.ReactNode, s: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement) => E.row(t, s, <span data-tap><DirectionIcon label="Open" /></span>, cls, icon),
   /** A document line: a material or SKU with its quantity and the fields that
    *  belong to it. No line wants an icon, so this fills that slot rather than
    *  every call site writing the hole. */
