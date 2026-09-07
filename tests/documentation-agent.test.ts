@@ -22,6 +22,25 @@ describe("post-merge documentation maintainer", () => {
     expect(prompt).toContain("success, empty, validation, permission, and failure states");
   });
 
+  // PR #181 rewrote two reconciled sentences back into a formal register and
+  // deleted the "Coming up" section while its screen was still in the
+  // inventory. The prompt described structure but never voice, and told the
+  // agent to remove stale claims without saying how to tell stale from
+  // merely differently worded.
+  it("fixes the guides' voice so a rerun does not drift it back", () => {
+    const prompt = read(".agents/agents/documentation-maintainer.md");
+
+    expect(prompt).toContain("## Voice");
+    expect(prompt).toContain("no em dashes");
+    expect(prompt).toContain("Rewriting a correct sentence into a more formal one is a regression");
+  });
+
+  it("removes a section only when the screen behind it is gone", () => {
+    const prompt = read(".agents/agents/documentation-maintainer.md");
+
+    expect(prompt).toContain("still names a screen in `components/mgr/screens.tsx`");
+  });
+
   it("publishes guide changes through one scoped pull-request branch", () => {
     const workflow = read(".github/workflows/documentation-agent.yml");
 
