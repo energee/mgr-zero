@@ -67,7 +67,10 @@ if (process.argv[1]?.endsWith("pr-directives.ts")) {
     for (const e of errors) console.error(`::error::${e}`);
     process.exit(errors.length ? 1 : 0);
   } else if (mode === "todo" && base && head) {
-    const prs = [...sh("git", ["log", `${base}..${head}`, "--format=%s"]).matchAll(/\(#(\d+)\)$/gm)].map((m) => Number(m[1]));
+    // Squash merges end the subject with "(#N)"; merge commits start it with
+    // "Merge pull request #N". Rebase merges carry no number and are not used here.
+    const subjects = sh("git", ["log", `${base}..${head}`, "--format=%s"]);
+    const prs = [...new Set([...subjects.matchAll(/^Merge pull request #(\d+)|\(#(\d+)\)$/gm)].map((m) => Number(m[1] ?? m[2])))];
     let next = { todo, progress };
     for (const pr of prs) {
       const body = sh("gh", ["pr", "view", String(pr), "--json", "body", "--jq", ".body"]);
