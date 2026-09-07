@@ -235,6 +235,16 @@ describe("registered staff mutation role × RPC matrix", () => {
       },
     },
     {
+      command: "update_location", rpc: "update_location", allowed: ["admin"],
+      input: async role => {
+        const name = unique("matrix renamed", role);
+        return {
+          command: { locationId, name, kind: "warehouse" },
+          rpc: { p_brewery: brewery.id, p_id: locationId, p_name: name, p_kind: "warehouse" },
+        };
+      },
+    },
+    {
       command: "create_location", rpc: "create_location", allowed: ["admin"],
       input: async role => {
         const name = unique("matrix location", role);

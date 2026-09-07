@@ -237,6 +237,12 @@ The Invoices list shows number, kind, customer, total, and paid date. Open an in
 
 MGR creates a separate credit memo at the prices frozen on the invoice lines, never today's price list, records the return-in (and, for damaged, the loss) against that credit memo, and notes the correction on the originating order's timeline. A paid invoice can still be returned; the credit sits as available credit. Credit memos cannot themselves be credited.
 
+## Locations [#locations]
+
+<Screen name="Locations" />
+
+**Locations** (open `/locations`; Settings links here) lists every warehouse and taproom. Admin sees **Add location**: a name and a type, *Warehouse* or *Taproom*. Names are unique within the brewery. Select **Edit** on a row to open the location: its type, the brewery's timezone, and a gated **Location bins** row (bins are not built yet). Admin can rename a location or change its type with **Edit** then **Save location**; movement history stays exactly as recorded.
+
 ## Taproom replenishment [#replenishment]
 
 <Screen name="Pars and allocation" />
@@ -291,7 +297,7 @@ Do not look for hidden controls for these tasks:
 - switching between breweries when a staff account belongs to more than one;
 - staff or customer-portal invitations;
 - CSV import;
-- creating locations, setting taproom pars, or choosing the warehouse that fulfills wholesale-customer portal orders — all in the interface;
+- setting taproom pars or choosing the warehouse that fulfills wholesale-customer portal orders — in the interface;
 - editing products or SKUs after creation;
 - deleting customers, ship-tos, prices, price lists, inventory history, orders, invoices, or credit memos;
 - editing staff roles or seeing staff email addresses;

@@ -45,3 +45,13 @@ describe("catalog commands", () => {
     expect(raw.error).not.toBeNull();
   });
 });
+
+describe("update_location", () => {
+  it("admin renames a location and may change its kind; sales is denied", async () => {
+    const loc = await runCommand("create_location", { name: "Old WH", kind: "warehouse" }, adminCtx) as { id: string };
+    const row = await runCommand("update_location", { locationId: loc.id, name: "Main WH", kind: "taproom" }, adminCtx) as { id: string; name: string; kind: string };
+    expect(row).toMatchObject({ id: loc.id, name: "Main WH", kind: "taproom" });
+    await expect(runCommand("update_location", { locationId: loc.id, name: "Nope", kind: "warehouse" }, salesCtx))
+      .rejects.toMatchObject({ code: "permission_denied" });
+  });
+});

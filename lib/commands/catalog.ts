@@ -35,6 +35,15 @@ defineCommand({
   })),
 });
 
+defineCommand({
+  name: "update_location", description: "Rename a location or change its kind; movement history is untouched",
+  input: z.object({ locationId: z.string().uuid(), name: z.string().trim().min(1), kind: z.enum(["warehouse", "taproom"]) }),
+  roles: ["admin"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_location", {
+    p_brewery: ctx.breweryId, p_id: i.locationId, p_name: i.name, p_kind: i.kind, p_request_id: execution.requestId,
+  })),
+});
+
 defineQuery({
   name: "list_products", description: "Products with their SKUs, alphabetical",
   input: z.object({}), roles: ["admin", "sales", "warehouse"],

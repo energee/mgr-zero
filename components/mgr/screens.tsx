@@ -360,7 +360,7 @@ export const SCREENS: Screen[] = [
     to: { "Save location": "Locations" },
     job: "Edit one location and open its physical bins",
     reads: "list_locations",
-    writes: "update_location [design]",
+    writes: "update_location",
     states: [["permission", "admin only", 1], ["warehouse", "fulfillment source"], ["taproom", "POS and taps may map here"], ["in use", "type changes preserve history"]],
     spec: "Location facts stay separate from bins, which are their own list.",
     body: (<>

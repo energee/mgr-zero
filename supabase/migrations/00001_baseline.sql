@@ -2103,6 +2103,22 @@ begin
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
+-- Edit one location's facts. A kind change is allowed; history stays on
+-- the movements (no rewrite). unique (brewery_id, name) still holds.
+create function update_location(
+  p_brewery uuid, p_id uuid, p_name text, p_kind public.location_kind, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.locations;
+begin
+  perform private.assert_staff(p_brewery, array['admin']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'update_location', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'id', p_id, 'name', p_name, 'kind', p_kind));
+  if v_replay is not null then return v_replay; end if;
+  update public.locations set name = p_name, kind = p_kind where id = p_id and brewery_id = p_brewery returning * into v_row;
+  if v_row.id is null then raise exception 'location not found'; end if;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
 create function create_location(
   p_brewery uuid, p_name text, p_kind public.location_kind, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
@@ -3753,6 +3769,7 @@ grant execute on function
   create_product(uuid,text,text,numeric,uuid),
   create_sku(uuid,uuid,text,public.package_type,int,numeric,uuid),
   create_location(uuid,text,public.location_kind,uuid),
+  update_location(uuid,uuid,text,public.location_kind,uuid),
   upsert_customer(uuid,uuid,text,public.customer_type,text,uuid,text,text,uuid),
   upsert_ship_to(uuid,uuid,uuid,text,text,text,text,text,text,uuid),
   upsert_price_list(uuid,uuid,text,uuid),

@@ -51,6 +51,7 @@ const AUTHENTICATED_RPCS = [
   "today_live_reasons()",
   "unlink_chat_user(uuid)",
   "update_draft_order(uuid,uuid,date,text,text,jsonb,uuid)",
+  "update_location(uuid,uuid,text,location_kind,uuid)",
   "upsert_customer(uuid,uuid,text,customer_type,text,uuid,text,text,uuid)",
   "upsert_price_list(uuid,uuid,text,uuid)",
   "upsert_ship_to(uuid,uuid,uuid,text,text,text,text,text,text,uuid)",
