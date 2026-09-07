@@ -1,7 +1,7 @@
 // app/(app)/pricing/group-form.tsx — a price group: one row of the price grid.
 // CommandForm over upsert_price_group, doubling as create (no `group` prop,
-// position pre-filled with `nextPosition`) and edit (`group` pre-fills and the
-// input carries `id`). Delete calls delete_price_group and shows its refusal
+// position pre-filled with `defaultPosition`) and edit (`group` pre-fills and
+// the input carries `id`). Delete calls delete_price_group and shows its refusal
 // ("price group is in use") inline, the way delete-channel-button.tsx does.
 "use client";
 
@@ -14,10 +14,10 @@ import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-for
 
 export type PriceGroupEditData = { id: string; name: string; position: number; cost_ceiling_cents: number | null };
 
-export function GroupForm({ group, nextPosition }: { group?: PriceGroupEditData; nextPosition: number }) {
+export function GroupForm({ group, defaultPosition = 1 }: { group?: PriceGroupEditData; defaultPosition?: number }) {
   const isEdit = !!group;
   const initialName = group?.name ?? "";
-  const initialPosition = String(group?.position ?? nextPosition);
+  const initialPosition = String(group?.position ?? defaultPosition);
   const initialCeiling = group?.cost_ceiling_cents == null ? "" : (group.cost_ceiling_cents / 100).toFixed(2);
   const [name, setName] = useState(initialName);
   const [position, setPosition] = useState(initialPosition);

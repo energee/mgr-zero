@@ -115,8 +115,12 @@ export async function seedCustomer(breweryId: string, opts: { name?: string; sta
   return { customerId: c.id as string, shipToId: st.id as string, saleChannelId };
 }
 
-// One row of the price grid.
-export async function seedPriceGroup(breweryId: string, name = "1", position = 1) {
+// One row of the price grid; position defaults to the next free one (unique per brewery).
+export async function seedPriceGroup(breweryId: string, name = "1", position?: number) {
+  if (position === undefined) {
+    const { data: top } = await admin.from("price_groups").select("position").eq("brewery_id", breweryId).order("position", { ascending: false }).limit(1).maybeSingle();
+    position = (top?.position ?? 0) + 1;
+  }
   const { data, error } = await admin.from("price_groups").insert({ brewery_id: breweryId, name, position }).select("id").single();
   if (error) throw error;
   return data.id as string;

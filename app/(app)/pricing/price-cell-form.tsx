@@ -17,13 +17,8 @@ export function PriceCellForm({
   saleChannelId: string; priceGroupId: string; formatId: string; cents: number | null; label: string;
 }) {
   const initial = cents === null ? "" : (cents / 100).toFixed(2);
+  // The page keys this form on `cents`, so a save or clear remounts it fresh.
   const [dollars, setDollars] = useState(initial);
-  // A save or a clear refreshes the page, so this row re-renders with a new
-  // `cents`; a useState initializer runs only on mount, and a stale field would
-  // let Save write back the price Clear just removed. Adjust the state during
-  // render when the prop it derives from changes (React's documented pattern).
-  const [lastInitial, setLastInitial] = useState(initial);
-  if (lastInitial !== initial) { setLastInitial(initial); setDollars(initial); }
   const clear = useCommandAction();
   const form = useCommandForm("set_channel_price", {
     build: () => ({ saleChannelId, priceGroupId, formatId, unitPriceCents: Math.round(Number(dollars) * 100) }),

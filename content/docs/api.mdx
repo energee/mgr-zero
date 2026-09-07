@@ -1440,17 +1440,17 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales
 
-The price grid for one sale channel: one cell per price group × format (integer cents)
+The price grid: one cell per sale channel × price group × format (integer cents); saleChannelId narrows it to one channel
 
 | Field | Type | Required |
 | --- | --- | --- |
-| `saleChannelId` | uuid | yes |
+| `saleChannelId` | uuid | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_channel_prices", "input": { "saleChannelId": "00000000-0000-0000-0000-000000000000" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_channel_prices", "input": {} }'
 ```
 
 #### list_price_groups [#list_price_groups]

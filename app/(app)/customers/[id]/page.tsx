@@ -20,7 +20,7 @@ type Customer = {
   sale_channel_id: string;
   license_no: string | null;
   payment_terms: string;
-  sale_channels: { name: string } | null;
+  sale_channels: { name: string };
 };
 type ShipTo = {
   id: string;
@@ -50,7 +50,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           <div className="text-sm text-muted-foreground">
             {customer.type} · {customer.state} · {customer.payment_terms}
             {customer.license_no ? ` · license ${customer.license_no}` : ""}
-            {customer.sale_channels?.name ? ` · sale channel: ${customer.sale_channels.name}` : ""}
+            {` · sale channel: ${customer.sale_channels.name}`}
           </div>
         </div>
         <div className="flex items-center gap-2">

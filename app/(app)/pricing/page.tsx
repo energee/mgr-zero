@@ -1,7 +1,8 @@
 // app/(app)/pricing/page.tsx — Price groups: the price grid, one table per sale
 // channel, price groups down and formats across. Reads list_sale_channels,
-// list_price_groups, list_formats and list_channel_prices; every cell edits
-// through set_channel_price / clear_channel_price (PriceCellForm). Groups are
+// list_price_groups, list_formats and list_channel_prices (the whole grid in one
+// read); every cell edits through set_channel_price / clear_channel_price
+// (PriceCellForm, keyed on its value so a save or clear remounts it). Groups are
 // added, renamed and removed here too (GroupForm). With no groups there is no
 // grid to draw, and with no sale channels the page says so. Failures throw to
 // the (app) error boundary.
@@ -19,22 +20,19 @@ type Cell = { sale_channel_id: string; price_group_id: string; format_id: string
 export default async function PricingPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [channels, groups, formats] = (await Promise.all([
+  const [channels, groups, formats, cells] = (await Promise.all([
     runCommand("list_sale_channels", {}, ctx),
     runCommand("list_price_groups", {}, ctx),
     runCommand("list_formats", {}, ctx),
-  ])) as [Row[], PriceGroupEditData[], Row[]];
-  const cells = (
-    await Promise.all(channels.map((c) => runCommand("list_channel_prices", { saleChannelId: c.id }, ctx)))
-  ).flat() as Cell[];
-  const at = (channelId: string, groupId: string, formatId: string) =>
-    cells.find((c) => c.sale_channel_id === channelId && c.price_group_id === groupId && c.format_id === formatId);
+    runCommand("list_channel_prices", {}, ctx),
+  ])) as [Row[], PriceGroupEditData[], Row[], Cell[]];
+  const byKey = new Map(cells.map((c) => [`${c.sale_channel_id}|${c.price_group_id}|${c.format_id}`, c]));
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Price groups</h1>
-        <GroupForm nextPosition={groups.length + 1} />
+        <GroupForm defaultPosition={groups.length + 1} />
       </div>
 
       {groups.length === 0 && (
@@ -62,13 +60,14 @@ export default async function PricingPage() {
                 {groups.map((group) => (
                   <tr key={group.id} className="border-t">
                     <td className="py-1 pr-4">
-                      <GroupForm group={group} nextPosition={group.position} />
+                      <GroupForm group={group} />
                     </td>
                     {formats.map((f) => {
-                      const cell = at(channel.id, group.id, f.id);
+                      const cell = byKey.get(`${channel.id}|${group.id}|${f.id}`);
                       return (
                         <td key={f.id} className="py-1 pr-4">
                           <PriceCellForm
+                            key={cell?.unit_price_cents ?? "empty"}
                             saleChannelId={channel.id}
                             priceGroupId={group.id}
                             formatId={f.id}

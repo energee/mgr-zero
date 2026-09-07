@@ -73,11 +73,13 @@ defineQuery({
 // sale channel × price group × format. A SKU's price is its brand's group and
 // its format read off its customer's channel — there is no per-SKU exception.
 defineQuery({
-  name: "list_channel_prices", description: "The price grid for one sale channel: one cell per price group × format (integer cents)",
+  name: "list_channel_prices", description: "The price grid: one cell per sale channel × price group × format (integer cents); saleChannelId narrows it to one channel",
   roles: ["admin", "sales"],
-  input: z.object({ saleChannelId: z.string().uuid() }),
-  handler: (ctx, i) => unwrap(ctx.db.from("channel_prices").select("*, price_groups(name, position), formats(name)")
-    .eq("brewery_id", ctx.breweryId).eq("sale_channel_id", i.saleChannelId)),
+  input: z.object({ saleChannelId: z.string().uuid().optional() }),
+  handler: (ctx, i) => {
+    const q = ctx.db.from("channel_prices").select("*, price_groups(name, position), formats(name)").eq("brewery_id", ctx.breweryId);
+    return unwrap(i.saleChannelId ? q.eq("sale_channel_id", i.saleChannelId) : q);
+  },
 });
 
 defineCommand({

@@ -18,7 +18,7 @@ type Customer = {
   sale_channel_id: string;
   license_no: string | null;
   payment_terms: string;
-  sale_channels: { name: string } | null;
+  sale_channels: { name: string };
 };
 
 export default async function CustomersPage() {
@@ -58,7 +58,7 @@ export default async function CustomersPage() {
                 </td>
                 <td className="py-1">{c.type}</td>
                 <td className="py-1">{c.state}</td>
-                <td className="py-1">{c.sale_channels?.name ?? "—"}</td>
+                <td className="py-1">{c.sale_channels.name}</td>
                 <td className="py-1">{c.payment_terms}</td>
                 <td className="py-1 text-right">
                   <CustomerForm
