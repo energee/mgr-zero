@@ -186,8 +186,8 @@ describe("production-readiness workflow contract", () => {
     expect(claudeArgs).not.toContain("show_full_output");
   });
 
-  it("skips bot-maintained documentation branches", () => {
-    expect(review).toContain("github.head_ref != 'documentation/user-guide'");
+  it("skips bot-authored pull requests", () => {
+    expect(review).toContain("github.event.pull_request.user.type != 'Bot'");
   });
 
   it("treats GitHub Actions as trusted workflow context for dreaming", () => {
