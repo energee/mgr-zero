@@ -98,6 +98,15 @@ describe("SCREENS", () => {
     expect(ferm).toContain("Total 18 days");
     expect(ferm).toMatch(/dry hop day 4 falls in Primary/);
     expect(ferm).toContain("Add stage");
+
+  it("names the pricing surfaces price groups, never tiers", () => {
+    expect(SCREENS.map((s) => s.name)).toEqual(
+      expect.arrayContaining(["Price groups", "Price group"]));
+    expect(SCREENS.map((s) => s.name)).not.toEqual(
+      expect.arrayContaining(["Price lists", "Price tiers"]));
+    const drawn = SCREENS.map((s) =>
+      renderToStaticMarkup(createElement("div", null, s.body))).join(" ");
+    expect(drawn).not.toMatch(/\btiers?\b/i);
   });
 
   it("gives Search and Entity picker a labeled command input and grouped results", () => {
@@ -192,7 +201,7 @@ describe("SCREENS", () => {
       expect.soft(screen?.surface, name).toBe(surface);
     }
     const bodyText = (name: string) => renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === name)!.body));
-    for (const destination of ["Vendors", "Sale channels", "Formats", "Price tiers", "Bins", "Chat"]) {
+    for (const destination of ["Vendors", "Sale channels", "Formats", "Price group", "Bins", "Chat"]) {
       expect.soft(bodyText("More"), destination).toContain(destination);
     }
     expect(bodyText("Team")).not.toContain("Remove selected member");
@@ -204,7 +213,7 @@ describe("SCREENS", () => {
     const sheets = ["Invite portal user", "Fix mapping", "Package BOM", "SKU", "Brand approval", "State registration", "License", "Channel", "Format", "Override", "Bin"];
     for (const name of sheets) expect.soft(SCREENS.find((s) => s.name === name)?.surface, name).toBe("sheet");
     expect(SCREENS.find((s) => s.name === "Invoice")?.surface).toBeUndefined();
-    for (const name of ["Customers", "Invoices", "Catalog", "Vendors", "Compliance registry", "Sale channels", "Formats", "Price tiers", "Location bins"]) {
+    for (const name of ["Customers", "Invoices", "Catalog", "Vendors", "Compliance registry", "Sale channels", "Formats", "Price group", "Location bins"]) {
       const html = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === name)!.body));
       expect.soft(html, `${name}: inline save`).not.toMatch(/>Save[^<]*<\/button>/);
     }
@@ -299,7 +308,7 @@ describe("SCREENS", () => {
     const venue = renderToStaticMarkup(VenueFrame({ venue: pushed.venue!, children: pushed.body }));
     expect(venue).toContain("9/3/26");
     expect(venue).not.toContain("9/11/26");
-    const tier = SCREENS.find((s) => s.name === "Price tiers")!;
+    const tier = SCREENS.find((s) => s.name === "Price group")!;
     const tierText = renderToStaticMarkup(createElement("div", null, tier.body)).replace(/<[^>]*>/g, " ");
     expect(tierText).toContain("$150.00");
     expect(tierText).not.toContain("$185.00");
@@ -700,7 +709,7 @@ describe("SCREENS", () => {
       ["Locations", "Add location"], ["Finished goods", "Add SKU"], ["Customers", "Add customer"],
       ["Catalog", "Add brand"], ["SKU list", "Add SKU"], ["Cellar map", "Add vessel"],
       ["Materials on hand", "Add material"], ["Vendors", "Add vendor"], ["Materials", "Add material"],
-      ["Contracts", "Add contract"], ["Recipes", "Create recipe"], ["Price lists", "Create price list"],
+      ["Contracts", "Add contract"], ["Recipes", "Create recipe"], ["Price groups", "Create price group"],
     ] as const) {
       const html = body(name);
       expect(html, name).toMatch(new RegExp(`md:flex-row[^>]*>[\\s\\S]*${action}`));

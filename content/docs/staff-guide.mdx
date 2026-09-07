@@ -47,7 +47,7 @@ The brewery name in the header is the brewery whose records you are looking at. 
 
 - **Beer** holds **Inventory**.
 - **Work** holds **Orders**, **Pick**, and **Replenishment**.
-- **More** holds **Invoices**, **Catalog**, **Customers**, **Price lists**, **Settings** (the team roster), and **Sale channels**.
+- **More** holds **Invoices**, **Catalog**, **Customers**, **Price groups**, **Settings** (the team roster), and **Sale channels**.
 
 Links your role cannot use are simply not shown. Planned areas stay hidden until they are built (Taproom, Taps, Cellar, Materials, Kegs, Batches, Packaging, POs, Deliveries, Menu, Recipes, Compliance, Planning, Import), so a tab with nothing you can open does not appear.
 
@@ -94,7 +94,7 @@ Catalog shows this as **Volume** in brewery units: common keg fractions stay in 
 
 An empty Catalog says **No brands yet.** and an empty Formats section **No formats yet.**
 
-Wholesale Shop lists the packages the brewery has put on the wholesale list — ½ keg, ⅙ keg, case, bottle — grouped under the beer name. Buyers do not see warehouse counts. Staff designate, on the packaging plan, which run outputs land on that list. Prices come from the buyer's assigned [price list](#pricing); a package with no price for that buyer does not appear on Shop.
+Wholesale Shop lists the packages the brewery has put on the wholesale list — ½ keg, ⅙ keg, case, bottle — grouped under the beer name. Buyers do not see warehouse counts. Staff designate, on the packaging plan, which run outputs land on that list. Prices come from the buyer's assigned [price group](#pricing); a package with no price for that buyer does not appear on Shop.
 
 ## Inventory and movement history [#inventory]
 
@@ -147,7 +147,7 @@ Empty sections say **No inventory recorded yet.** or **No movements recorded yet
 
 ## Customers and ship-tos [#customers]
 
-*Admin and Sales can create and edit customers and ship-to addresses. The list shows name, type, home state, assigned price list, and payment terms.*
+*Admin and Sales can create and edit customers and ship-to addresses. The list shows name, type, home state, assigned price group, and payment terms.*
 
 ### Create or edit a customer
 
@@ -157,7 +157,7 @@ Empty sections say **No inventory recorded yet.** or **No movements recorded yet
 2. Enter **Name** (required).
 3. Choose **Type**: `distributor`, `retailer` (default), `brewery`, or `other`.
 4. Enter the required two-letter **State**. MGR uppercases it as you type.
-5. Choose a **Price list**, or **None** (default). Wholesale orders need an assigned list with a price for every ordered SKU.
+5. Choose a **Price group**, or **None** (default). Wholesale orders need an assigned group with a price for every ordered SKU.
 6. Optionally enter **License number** and **Payment terms**, such as `net30`.
 7. Select **Create** or **Save**.
 
@@ -169,21 +169,21 @@ Select the customer name, then **New Ship-To** or **Edit**. Required: **Label**,
 
 Empty lists say **No customers yet.** or **No ship-tos yet.** You cannot delete a customer, and you cannot invite a portal user from this page.
 
-## Price lists [#pricing]
+## Price groups [#pricing]
 
-<Screen name="Price lists" />
+<Screen name="Price groups" />
 
-*Admin and Sales manage price lists. A customer is assigned one list; order lines snapshot their price from it when the order is created.*
+*Admin and Sales manage price groups. A customer is assigned one group; order lines snapshot their price from it when the order is created.*
 
-A price list prices **formats** by default and **SKUs** by exception. "All ½ bbl kegs are $185, except the barrel-aged one" is two entries: a format price and one SKU override.
+A price group prices **formats** by default and **SKUs** by exception. "All ½ bbl kegs are $185, except the barrel-aged one" is two entries: a format price and one SKU override.
 
-A price list belongs to one [sale channel](#channels), chosen when you create it. The channel is shown beside the list's name and can be changed on **Edit**. A channel a price list prices for cannot be deleted.
+A price group belongs to one [sale channel](#channels), chosen when you create it. The channel is shown beside the group's name and can be changed on **Edit**. A channel a price group prices for cannot be deleted.
 
-1. Open **Price lists** (the page heading is **Pricing**) and select **New Price List**. Enter a required name, choose a **Sale channel** (Wholesale is preselected), and select **Create**. The name must be unique within the brewery.
-2. On a list select **Format price**, pick a packaged format, enter the unit price in dollars (stored as whole cents), and **Save**. Every SKU on that format now sells at that price on that list.
+1. Open **Price groups** (the page heading is **Pricing**) and select **New Price Group**. Enter a required name, choose a **Sale channel** (Wholesale is preselected), and select **Create**. The name must be unique within the brewery.
+2. On a group select **Format price**, pick a packaged format, enter the unit price in dollars (stored as whole cents), and **Save**. Every SKU on that format now sells at that price in that group.
 3. To price one SKU differently, select **SKU override**, pick the SKU, enter its price, and **Save**. **Clear** on an override row removes it and the format default applies again.
 
-A SKU with neither a format price nor an override on a customer's list cannot be ordered for that customer, and does not appear in that customer's portal Shop. A list with no format prices says **No format prices yet.** An empty Pricing screen says **No price lists yet.** There is no delete-list control.
+A SKU with neither a format price nor an override in a customer's group cannot be ordered for that customer, and does not appear in that customer's portal Shop. A group with no format prices says **No format prices yet.** An empty Pricing screen says **No price groups yet.** There is no delete-group control.
 
 ## Staff orders [#orders]
 
@@ -205,14 +205,14 @@ An order can become `cancelled` any time before shipping. The Orders screen list
 4. Choose the source in **From location**. Both location selects list every location of the brewery, not just taprooms or warehouses, so you pick a warehouse source and a taproom destination yourself.
 5. Optionally choose **Requested ship date** and enter **PO number**.
 6. Add one or more lines. Each needs a SKU and a quantity greater than zero. **Add line** adds a row. **Remove** takes one away, but at least one row stays.
-7. Select **Create**. The button stays disabled until the required fields are chosen: for wholesale, a customer, a ship-to, a from location, and at least one line with a SKU and a quantity above zero; for a transfer, a destination instead of the customer and ship-to. The result is a draft. Wholesale line prices are captured from the customer's current price list. Later price-list changes do not rewrite those lines.
+7. Select **Create**. The button stays disabled until the required fields are chosen: for wholesale, a customer, a ship-to, a from location, and at least one line with a SKU and a quantity above zero; for a transfer, a destination instead of the customer and ship-to. The result is a draft. Wholesale line prices are captured from the customer's current price group. Later price changes do not rewrite those lines.
 
 <Callout type="info">
 On a new brewery with nothing to choose yet, the form says **Before creating an order, add a customer, a location and a SKU.** with links to **Customers** and **Catalog**, and **Create** stays disabled until those exist.
 </Callout>
 
 <Callout type="warn">
-A wholesale order fails if the customer has no price list, or if an ordered SKU has no price on that list.
+A wholesale order fails if the customer has no price group, or if an ordered SKU has no price in that group.
 </Callout>
 
 ### Move an order through fulfillment
@@ -260,7 +260,7 @@ The list shows number, kind, customer, total, and paid date. Open an invoice num
 3. Choose **Return to location** and the **Reason**: *Unsold* and *Wrong item* put the beer back as sellable stock at that location; *Damaged* puts it back and writes the same quantity to loss in the same step, so broken beer never lands on a pick list.
 4. Select **Return shipment**.
 
-MGR creates a separate credit memo at the prices frozen on the invoice lines, never today's price list, records the return-in (and, for damaged, the loss) against that credit memo, and notes the correction on the originating order's timeline. A paid invoice can still be returned; the credit sits as available credit. Credit memos cannot themselves be credited.
+MGR creates a separate credit memo at the prices frozen on the invoice lines, never today's price group, records the return-in (and, for damaged, the loss) against that credit memo, and notes the correction on the originating order's timeline. A paid invoice can still be returned; the credit sits as available credit. Credit memos cannot themselves be credited.
 
 ## Locations [#locations]
 
@@ -357,7 +357,7 @@ Do not hunt for hidden controls for these:
 - CSV import
 - adding, renaming or removing bins, setting taproom pars, or choosing the warehouse that fulfills wholesale-customer portal orders, from the interface
 - editing brands, formats, or SKUs after creation
-- deleting customers, ship-tos, prices, price lists, inventory history, orders, invoices, or credit memos
+- deleting customers, ship-tos, prices, price groups, inventory history, orders, invoices, or credit memos
 - editing staff roles or seeing staff email addresses
 - recording payments
 - Slack installation, notification settings, or unlinking from a visible MGR settings page
