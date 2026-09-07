@@ -104,7 +104,7 @@ export function CreditMemoForm({
               </SelectContent>
             </Select>
           </div>
-          <p className="text-sm text-muted-foreground">Credited at the price on this invoice, not today’s price list.</p>
+          <p className="text-sm text-muted-foreground">Credited at the price on this invoice, not today’s price group.</p>
           <CommandFormMessage error={form.error} />
           <CommandFormFooter>
             <Button type="submit" disabled={form.submitting || !reason || !locationId}>

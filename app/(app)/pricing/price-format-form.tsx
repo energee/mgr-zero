@@ -1,5 +1,5 @@
 // app/(app)/pricing/price-format-form.tsx — CommandForm for set_price_list_format:
-// the tier's default price for one format (every SKU on that format sells at
+// the group's default price for one format (every SKU on that format sells at
 // it unless overridden). Dollars in, integer cents out.
 "use client";
 

@@ -43,7 +43,7 @@ export default async function CustomersPage() {
               <th className="py-1 font-normal">Name</th>
               <th className="py-1 font-normal">Type</th>
               <th className="py-1 font-normal">State</th>
-              <th className="py-1 font-normal">Price list</th>
+              <th className="py-1 font-normal">Price group</th>
               <th className="py-1 font-normal">Terms</th>
               <th className="py-1 font-normal" />
             </tr>

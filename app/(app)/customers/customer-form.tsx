@@ -98,7 +98,7 @@ export function CustomerForm({
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="customer-price-list">Price list</Label>
+            <Label htmlFor="customer-price-list">Price group</Label>
             <Select value={priceListId} onValueChange={setPriceListId}>
               <SelectTrigger id="customer-price-list">
                 <SelectValue placeholder="None" />

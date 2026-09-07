@@ -1,4 +1,4 @@
-// app/(app)/pricing/page.tsx — price tiers (§16.4): each list prices formats
+// app/(app)/pricing/page.tsx — price groups (§16.4): each group prices formats
 // by default and overrides per SKU. Reads through the command registry
 // (list_price_lists, list_skus, list_formats, list_sale_channels). Every list
 // prices for one sale channel, shown beside its name. Failures throw to the (app)
@@ -104,7 +104,7 @@ export default async function PricingPage() {
           ))}
         </div>
       ) : (
-        <p className="text-sm text-muted-foreground">No price lists yet.</p>
+        <p className="text-sm text-muted-foreground">No price groups yet.</p>
       )}
     </div>
   );

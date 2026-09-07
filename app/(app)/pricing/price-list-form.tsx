@@ -32,8 +32,8 @@ export function PriceListForm({ priceList, channels }: { priceList?: PriceListEd
   });
 
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title={isEdit ? "Edit Price List" : "New Price List"} trigger={<Button variant={isEdit ? "outline" : "default"} size={isEdit ? "sm" : "default"}>
-          {isEdit ? "Edit" : "New Price List"}
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title={isEdit ? "Edit Price Group" : "New Price Group"} trigger={<Button variant={isEdit ? "outline" : "default"} size={isEdit ? "sm" : "default"}>
+          {isEdit ? "Edit" : "New Price Group"}
         </Button>}>
         <form onSubmit={form.submit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
