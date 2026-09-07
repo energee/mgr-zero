@@ -1,6 +1,6 @@
 // app/(app)/customers/[id]/page.tsx — single customer: profile and ship-tos
 // (portal-user invites are not available in this release). Reads through the
-// command registry (get_customer) with a brewery-scoped Ctx. An unknown or
+// command registry (get_customer, list_sale_channels) with a brewery-scoped Ctx. An unknown or
 // malformed id renders not-found.tsx; other failures throw to the (app) error
 // boundary.
 import { getActiveBrewery } from "@/lib/brewery";
@@ -17,10 +17,10 @@ type Customer = {
   name: string;
   type: CustomerType;
   state: string;
-  price_list_id: string | null;
+  sale_channel_id: string;
   license_no: string | null;
   payment_terms: string;
-  price_lists: { name: string } | null;
+  sale_channels: { name: string };
 };
 type ShipTo = {
   id: string;
@@ -31,16 +31,16 @@ type ShipTo = {
   state: string;
   zip: string;
 };
-type PriceList = { id: string; name: string };
+type SaleChannel = { id: string; name: string };
 
 export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [{ customer, shipTos }, priceLists] = (await Promise.all([
+  const [{ customer, shipTos }, channels] = (await Promise.all([
     orNotFound(runCommand("get_customer", { customerId: id }, ctx)),
-    runCommand("list_price_lists", {}, ctx),
-  ])) as [{ customer: Customer; shipTos: ShipTo[] }, PriceList[]];
+    runCommand("list_sale_channels", {}, ctx),
+  ])) as [{ customer: Customer; shipTos: ShipTo[] }, SaleChannel[]];
 
   return (
     <div className="flex flex-col gap-6">
@@ -50,15 +50,15 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           <div className="text-sm text-muted-foreground">
             {customer.type} · {customer.state} · {customer.payment_terms}
             {customer.license_no ? ` · license ${customer.license_no}` : ""}
-            {customer.price_lists?.name ? ` · price list: ${customer.price_lists.name}` : ""}
+            {` · sale channel: ${customer.sale_channels.name}`}
           </div>
         </div>
         <div className="flex items-center gap-2">
           <CustomerForm
-            priceLists={priceLists.map((p) => ({ id: p.id, name: p.name }))}
+            channels={channels.map((c) => ({ id: c.id, name: c.name }))}
             customer={{
               id: customer.id, name: customer.name, type: customer.type, state: customer.state,
-              priceListId: customer.price_list_id, licenseNumber: customer.license_no, paymentTerms: customer.payment_terms,
+              saleChannelId: customer.sale_channel_id, licenseNumber: customer.license_no, paymentTerms: customer.payment_terms,
             }}
           />
         </div>

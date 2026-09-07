@@ -53,18 +53,18 @@ defineQuery({
   input: z.object({}),
   handler: async (ctx) => {
     const customerId = requireCustomer(ctx);
-    // RLS limits price_list_items to the caller's list and skus to active.
+    // RLS limits channel prices to the caller's own sale channel and skus to
+    // active ones; sku_prices already resolves the grid lookup (the cell where
+    // the caller's sale channel meets the brand's price group and the SKU's
+    // format), so a SKU with no group or an empty cell simply has no row.
     const [prices, avail] = await Promise.all([
-      unwrap(ctx.db.from("price_list_items").select("sku_id, unit_price_cents, skus(id, name, products(name))")),
+      unwrap(ctx.db.from("sku_prices").select("sku_id, sku_name, brand_name, unit_price_cents")),
       unwrap(ctx.db.rpc("portal_availability", { p_customer: customerId })),
     ]);
     const badges = new Map((avail as { sku_id: string; badge: string }[]).map(a => [a.sku_id, a.badge]));
-    // postgrest-js infers embedded resources as arrays without generated DB
-    // types; both sku_id->skus and product_id->products are many-to-one, so
-    // the real JSON shape at runtime is a single nested object per row.
-    const priceRows = prices as unknown as { sku_id: string; unit_price_cents: number; skus: { name: string; products: { name: string } } }[];
+    const priceRows = prices as { sku_id: string; sku_name: string; brand_name: string; unit_price_cents: number }[];
     return priceRows.map(p => ({
-      skuId: p.sku_id, name: p.skus.name, product: p.skus.products.name,
+      skuId: p.sku_id, name: p.sku_name, product: p.brand_name,
       unitPriceCents: p.unit_price_cents, badge: badges.get(p.sku_id) ?? "out",
     }));
   },
@@ -97,4 +97,40 @@ defineQuery({
   roles: "customer",
   input: z.object({}),
   handler: (ctx) => unwrap(ctx.db.from("invoices").select("*, invoice_lines(*, skus(name))").eq("customer_id", requireCustomer(ctx)).order("created_at", { ascending: false })),
+});
+
+defineQuery({
+  name: "get_portal_account", description: "Portal: the caller's customer, ship-tos, this login's membership, and keg deposits held; peer portal users are never listed",
+  roles: "customer",
+  input: z.object({}),
+  handler: async (ctx) => {
+    const customerId = requireCustomer(ctx);
+    const [customer, shipTos, deposits] = await Promise.all([
+      unwrap(ctx.db.from("customers").select("id, name").eq("id", customerId).single()),
+      unwrap(ctx.db.from("ship_tos").select("id, label, address1, city, state, zip").eq("customer_id", customerId).order("label")),
+      unwrap(ctx.db.from("keg_deposit_balances").select("keg_size, kegs_on_deposit, deposit_cents").eq("customer_id", customerId)),
+    ]);
+    return {
+      customer, shipTos, membership: { userId: ctx.userId },
+      deposits: (deposits as { keg_size: string | null; kegs_on_deposit: number; deposit_cents: number }[])
+        .filter((d) => d.kegs_on_deposit !== 0)
+        .map((d) => ({ kegSize: d.keg_size, kegsOnDeposit: d.kegs_on_deposit, depositCents: d.deposit_cents })),
+    };
+  },
+});
+
+defineQuery({
+  name: "portal_invoice", description: "Portal: one of the caller's invoices or credit memos with its lines and total; another customer's id is not found",
+  roles: "customer",
+  input: z.object({ invoiceId: z.string().uuid() }),
+  handler: async (ctx, i) => {
+    const customerId = requireCustomer(ctx);
+    // RLS already scopes to the caller's customer; the customer_id filter makes a foreign id a plain not_found
+    const [invoice, lines] = await Promise.all([
+      unwrap(ctx.db.from("invoices").select("id, invoice_no, kind, issued_on, due_on, paid_at").eq("id", i.invoiceId).eq("customer_id", customerId).single()),
+      unwrap(ctx.db.from("invoice_lines").select("id, kind, qty, unit_price_cents, amount_cents, description, skus(name)").eq("invoice_id", i.invoiceId)),
+    ]);
+    const total_cents = (lines as { amount_cents: number }[]).reduce((n, l) => n + l.amount_cents, 0);
+    return { invoice: { ...invoice, total_cents }, lines };
+  },
 });

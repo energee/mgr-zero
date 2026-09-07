@@ -1,44 +1,52 @@
 // app/(app)/inventory/page.tsx — on-hand/ATP inventory + movement log. All
 // reads go through the command registry with a brewery-scoped Ctx (one
 // implementation of each read, shared with the future AI surface). Failures
-// throw to the (app) error boundary.
+// throw to the (app) error boundary. On hand is shown per bin (get_bin_on_hand);
+// ATP stays per SKU.
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { MovementForm } from "./movement-form";
 
-type Sku = { id: string; name: string; products: { name: string } | null };
+type Sku = { id: string; name: string; brands: { name: string } | null };
 type Location = { id: string; name: string; kind: string };
-type OnHandRow = { sku_id: string; location_id: string; qty: string };
+type Bin = { id: string; location_id: string; name: string };
+type SaleChannel = { id: string; name: string; tax_treatment: string };
+type BinOnHandRow = { sku_id: string; location_id: string; bin_id: string; qty: string };
 type AtpRow = { sku_id: string; qty: string };
 type Movement = { id: string; created_at: string; type: string; qty: string; sku_id: string; location_id: string; note: string | null };
 
 function skuLabel(sku: Sku | undefined) {
   if (!sku) return "—";
-  return sku.products?.name ? `${sku.products.name} — ${sku.name}` : sku.name;
+  return sku.brands?.name ? `${sku.brands.name} — ${sku.name}` : sku.name;
 }
 
 export default async function InventoryPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [skus, locations, onHand, atp, movements] = (await Promise.all([
+  const [skus, locations, bins, channels, onHand, atp, movements] = (await Promise.all([
     runCommand("list_skus", {}, ctx),
     runCommand("list_locations", {}, ctx),
-    runCommand("get_on_hand", {}, ctx),
+    runCommand("list_bins", {}, ctx),
+    runCommand("list_sale_channels", {}, ctx),
+    runCommand("get_bin_on_hand", {}, ctx),
     runCommand("get_atp", {}, ctx),
     runCommand("list_movements", { limit: 50 }, ctx),
-  ])) as [Sku[], Location[], OnHandRow[], AtpRow[], Movement[]];
+  ])) as [Sku[], Location[], Bin[], SaleChannel[], BinOnHandRow[], AtpRow[], Movement[]];
 
   const skuById = new Map(skus.map((s) => [s.id, s]));
-  const locationName = (id: string) => locations.find((l) => l.id === id)?.name ?? "—";
+  const locationById = new Map(locations.map((l) => [l.id, l.name]));
+  const binById = new Map(bins.map((b) => [b.id, b.name]));
+  const locationName = (id: string) => locationById.get(id) ?? "—";
+  const binName = (id: string) => binById.get(id) ?? "—";
   const atpBySku = new Map(atp.map((a) => [a.sku_id, a.qty]));
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Inventory</h1>
-        <MovementForm skus={skus.map((s) => ({ id: s.id, label: skuLabel(s) }))} locations={locations} />
+        <MovementForm skus={skus.map((s) => ({ id: s.id, label: skuLabel(s) }))} locations={locations} bins={bins} channels={channels} />
       </div>
 
       <section className="flex flex-col gap-2">
@@ -49,15 +57,17 @@ export default async function InventoryPage() {
               <tr className="text-left text-muted-foreground">
                 <th className="py-1 font-normal">SKU</th>
                 <th className="py-1 font-normal">Location</th>
+                <th className="py-1 font-normal">Bin</th>
                 <th className="py-1 font-normal">On hand</th>
                 <th className="py-1 font-normal">ATP</th>
               </tr>
             </thead>
             <tbody>
               {onHand.map((row) => (
-                <tr key={`${row.sku_id}-${row.location_id}`} className="border-t">
+                <tr key={`${row.sku_id}-${row.bin_id}`} className="border-t">
                   <td className="py-1">{skuLabel(skuById.get(row.sku_id))}</td>
                   <td className="py-1">{locationName(row.location_id)}</td>
+                  <td className="py-1">{binName(row.bin_id)}</td>
                   <td className="py-1">{row.qty}</td>
                   <td className="py-1">{atpBySku.get(row.sku_id) ?? "—"}</td>
                 </tr>

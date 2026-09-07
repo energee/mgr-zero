@@ -1,6 +1,6 @@
 // tests/rls-ledger.test.ts
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaff, asUser } from "./helpers";
+import { admin, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation, channelId } from "./helpers";
 import "../lib/commands/all";
 
 describe("ledger integrity + RLS", () => {
@@ -8,14 +8,13 @@ describe("ledger integrity + RLS", () => {
   beforeAll(async () => {
     b = await makeBrewery();
     staff = await makeStaff(b.id, "warehouse");
-    const { data: p } = await admin.from("products").insert({ brewery_id: b.id, name: "Hazy IPA" }).select().single();
-    ({ data: sku } = await admin.from("skus").insert({ brewery_id: b.id, product_id: p!.id, name: "1/2 bbl keg", package_type: "keg", bbl_per_unit: 0.5 }).select().single());
-    ({ data: loc } = await admin.from("locations").insert({ brewery_id: b.id, name: "Main WH", kind: "warehouse" }).select().single());
+    sku = { id: (await seedCatalog(b.id, { product: "Hazy IPA", sku: "1/2 bbl keg", packageType: "keg", bblPerUnit: 0.5 })).skuId };
+    loc = await seedLocation(b.id, { name: "Main WH" });
   });
 
   it("staff cannot write the ledger directly; it is append-only even for service_role", async () => {
     const db = await asUser(staff.email);
-    const row = { brewery_id: b.id, sku_id: sku.id, location_id: loc.id, qty: 10, bbl: 5, type: "opening_balance", created_by: staff.id } as const;
+    const row = { brewery_id: b.id, sku_id: sku.id, location_id: loc.id, bin_id: loc.binId, qty: 10, bbl: 5, type: "opening_balance", created_by: staff.id } as const;
     // No INSERT/UPDATE/DELETE grants for app roles: writes go through record_inventory_movement().
     const direct = await db.from("inventory_movements").insert(row).select().single();
     expect(direct.error?.code).toBe("42501");
@@ -31,8 +30,9 @@ describe("ledger integrity + RLS", () => {
 
   it("sale_removal without dest_state is rejected by CHECK", async () => {
     const { error } = await admin.from("inventory_movements").insert({
-      brewery_id: b.id, sku_id: sku.id, location_id: loc.id,
-      qty: -1, bbl: -0.5, type: "sale_removal", channel: "wholesale", created_by: staff.id,
+      brewery_id: b.id, sku_id: sku.id, location_id: loc.id, bin_id: loc.binId,
+      qty: -1, bbl: -0.5, type: "sale_removal", sale_channel_id: await channelId(b.id, "Wholesale"),
+      tax_treatment: "taxable", created_by: staff.id,
     });
     expect(error).not.toBeNull();
   });
@@ -49,7 +49,7 @@ describe("ledger integrity + RLS", () => {
   it("trigger overwrites bbl: client-supplied value is ignored, computed from qty * bbl_per_unit", async () => {
     // Insert with deliberately wrong bbl (should be 2 * 0.5 = 1, not 999)
     const { data: m, error } = await admin.from("inventory_movements").insert({
-      brewery_id: b.id, sku_id: sku.id, location_id: loc.id,
+      brewery_id: b.id, sku_id: sku.id, location_id: loc.id, bin_id: loc.binId,
       qty: 2, bbl: 999, type: "production_in", created_by: staff.id,
     }).select().single();
     expect(error).toBeNull();
@@ -59,7 +59,7 @@ describe("ledger integrity + RLS", () => {
   });
 });
 
-describe("removal_shape CHECK: channel/dest_state required on removals, null otherwise", () => {
+describe("removal_shape CHECK: channel/tax_treatment/dest_state required on removals, null otherwise", () => {
   // Uses its own brewery/sku/location (rather than the shared fixtures above)
   // so accepted inserts here don't pollute the on_hand/atp sums asserted
   // elsewhere in this file.
@@ -67,20 +67,19 @@ describe("removal_shape CHECK: channel/dest_state required on removals, null oth
   beforeAll(async () => {
     b = await makeBrewery();
     staff = await makeStaff(b.id, "warehouse");
-    const { data: p } = await admin.from("products").insert({ brewery_id: b.id, name: "Check Test IPA" }).select().single();
-    ({ data: sku } = await admin.from("skus").insert({ brewery_id: b.id, product_id: p!.id, name: "Check Sku", package_type: "keg", bbl_per_unit: 0.5 }).select().single());
-    ({ data: loc } = await admin.from("locations").insert({ brewery_id: b.id, name: "Check WH", kind: "warehouse" }).select().single());
+    sku = { id: (await seedCatalog(b.id, { product: "Check Test IPA", sku: "Check Sku", packageType: "keg", bblPerUnit: 0.5 })).skuId };
+    loc = await seedLocation(b.id, { name: "Check WH" });
   });
 
   it("festival_removal and sample require dest_state, just like sale_removal", async () => {
     for (const type of ["festival_removal", "sample"] as const) {
       const { error } = await admin.from("inventory_movements").insert({
-        brewery_id: b.id, sku_id: sku.id, location_id: loc.id,
+        brewery_id: b.id, sku_id: sku.id, location_id: loc.id, bin_id: loc.binId,
         qty: -1, bbl: -0.5, type, created_by: staff.id,
       });
       expect(error, `${type} without dest_state should be rejected`).not.toBeNull();
       const ok = await admin.from("inventory_movements").insert({
-        brewery_id: b.id, sku_id: sku.id, location_id: loc.id,
+        brewery_id: b.id, sku_id: sku.id, location_id: loc.id, bin_id: loc.binId,
         qty: -1, bbl: -0.5, type, dest_state: "PA", created_by: staff.id,
       });
       expect(ok.error, `${type} with dest_state should be accepted`).toBeNull();
@@ -97,19 +96,31 @@ describe("removal_shape CHECK: channel/dest_state required on removals, null oth
     ];
     for (const { type, qty } of nonRemovals) {
       const { error } = await admin.from("inventory_movements").insert({
-        brewery_id: b.id, sku_id: sku.id, location_id: loc.id,
-        qty, bbl: qty * 0.5, type, channel: "wholesale", created_by: staff.id,
+        brewery_id: b.id, sku_id: sku.id, location_id: loc.id, bin_id: loc.binId,
+        qty, bbl: qty * 0.5, type, sale_channel_id: await channelId(b.id, "Wholesale"),
+        tax_treatment: "taxable", created_by: staff.id,
       });
       expect(error, `${type} with a channel should be rejected`).not.toBeNull();
     }
   });
 
-  it("depletion requires channel=taproom and rejects a dest_state", async () => {
-    const { error } = await admin.from("inventory_movements").insert({
-      brewery_id: b.id, sku_id: sku.id, location_id: loc.id,
-      qty: -1, bbl: -0.5, type: "depletion", channel: "taproom", dest_state: "PA", created_by: staff.id,
-    });
-    expect(error, "depletion with a dest_state should be rejected").not.toBeNull();
+  // Since #42 the depletion CHECK no longer pins the channel to Taproom: a
+  // brewery names its own channels, and dest_state discipline comes from the
+  // movement type, not the channel.
+  it("depletion requires a channel, accepts any channel, and rejects a dest_state", async () => {
+    const dtc = await channelId(b.id, "DTC");
+    const row = {
+      brewery_id: b.id, sku_id: sku.id, location_id: loc.id, bin_id: loc.binId,
+      qty: -1, bbl: -0.5, type: "depletion", created_by: staff.id,
+    } as const;
+    const noChannel = await admin.from("inventory_movements").insert({ ...row, tax_treatment: "taxable" });
+    expect(noChannel.error, "depletion without a channel should be rejected").not.toBeNull();
+    const withState = await admin.from("inventory_movements")
+      .insert({ ...row, sale_channel_id: dtc, tax_treatment: "taxable", dest_state: "PA" });
+    expect(withState.error, "depletion with a dest_state should be rejected").not.toBeNull();
+    const ok = await admin.from("inventory_movements")
+      .insert({ ...row, sale_channel_id: dtc, tax_treatment: "taxable" });
+    expect(ok.error, "depletion on any channel should be accepted").toBeNull();
   });
 });
 
@@ -120,23 +131,23 @@ describe("cross-brewery tenant consistency (composite FKs)", () => {
   // brewery B — a cross-tenant write RLS never caught. The composite FKs
   // added in the baseline migration make that combination impossible at the database level.
   let bA: any, bB: any, staffA: any;
-  let skuA: any, skuB: any, locA: any, locB: any, productA: any, productB: any;
+  let skuA: any, skuB: any, locA: any, locB: any, brandB: any, formatA: any;
 
   beforeAll(async () => {
     bA = await makeBrewery();
     bB = await makeBrewery();
     staffA = await makeStaff(bA.id, "warehouse");
-    ({ data: productA } = await admin.from("products").insert({ brewery_id: bA.id, name: "A Product" }).select().single());
-    ({ data: productB } = await admin.from("products").insert({ brewery_id: bB.id, name: "B Product" }).select().single());
-    ({ data: skuA } = await admin.from("skus").insert({ brewery_id: bA.id, product_id: productA!.id, name: "A Sku", package_type: "keg", bbl_per_unit: 0.5 }).select().single());
-    ({ data: skuB } = await admin.from("skus").insert({ brewery_id: bB.id, product_id: productB!.id, name: "B Sku", package_type: "keg", bbl_per_unit: 0.5 }).select().single());
-    ({ data: locA } = await admin.from("locations").insert({ brewery_id: bA.id, name: "A WH", kind: "warehouse" }).select().single());
-    ({ data: locB } = await admin.from("locations").insert({ brewery_id: bB.id, name: "B WH", kind: "warehouse" }).select().single());
+    const catA = await seedCatalog(bA.id, { product: "A Product", sku: "A Sku", packageType: "keg", bblPerUnit: 0.5 });
+    const catB = await seedCatalog(bB.id, { product: "B Product", sku: "B Sku", packageType: "keg", bblPerUnit: 0.5 });
+    skuA = { id: catA.skuId }; formatA = { id: catA.formatId };
+    brandB = { id: catB.brandId }; skuB = { id: catB.skuId };
+    locA = await seedLocation(bA.id, { name: "A WH" });
+    locB = await seedLocation(bB.id, { name: "B WH" });
   });
 
   it("rejects an inventory_movement whose sku_id belongs to a different brewery than brewery_id", async () => {
     const { error } = await admin.from("inventory_movements").insert({
-      brewery_id: bA.id, sku_id: skuB.id, location_id: locA.id,
+      brewery_id: bA.id, sku_id: skuB.id, location_id: locA.id, bin_id: locA.binId,
       qty: 1, bbl: 0.5, type: "opening_balance", created_by: staffA.id,
     });
     expect(error).not.toBeNull();
@@ -144,17 +155,17 @@ describe("cross-brewery tenant consistency (composite FKs)", () => {
 
   it("rejects an inventory_movement whose location_id belongs to a different brewery than brewery_id", async () => {
     const { error } = await admin.from("inventory_movements").insert({
-      brewery_id: bA.id, sku_id: skuA.id, location_id: locB.id,
+      brewery_id: bA.id, sku_id: skuA.id, location_id: locB.id, bin_id: locB.binId,
       qty: 1, bbl: 0.5, type: "opening_balance", created_by: staffA.id,
     });
     expect(error).not.toBeNull();
   });
 
-  it("rejects a sku whose product_id belongs to a different brewery than brewery_id", async () => {
+  it("rejects a sku whose brand_id belongs to a different brewery than brewery_id", async () => {
     // Admin client bypasses RLS but not FK constraints — this proves the DB
     // rejects the combination regardless of who is issuing the write.
     const { error } = await admin.from("skus").insert({
-      brewery_id: bA.id, product_id: productB.id, name: "Sneaky Sku", package_type: "keg", bbl_per_unit: 0.5,
+      brewery_id: bA.id, brand_id: brandB.id, format_id: formatA.id, name: "Sneaky Sku",
     });
     expect(error).not.toBeNull();
   });

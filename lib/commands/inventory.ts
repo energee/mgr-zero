@@ -1,31 +1,33 @@
 import { z } from "zod";
 import { defineCommand, defineQuery, unwrap, Ctx, CommandExecution } from "./registry";
+import { stockLine } from "./stock-line";
 
 const movementInput = z.object({
-  skuId: z.string().uuid(), locationId: z.string().uuid(),
+  skuId: z.string().uuid(), locationId: z.string().uuid(), binId: z.string().uuid(),
   qty: z.number().refine(n => n !== 0, "qty cannot be 0"),
   type: z.enum(["opening_balance", "production_in", "adjustment", "sale_removal", "taproom_transfer",
                 "depletion", "return_in", "destruction", "loss", "sample", "festival_removal"]),
-  channel: z.enum(["wholesale", "taproom", "dtc", "export"]).optional(),
+  saleChannelId: z.string().uuid().optional(),
   destState: z.string().length(2).optional(),
   note: z.string().optional(),
 });
 
 /**
- * Appends an inventory movement through its security-invoker RPC. `bbl` is
- * not supplied: the DB trigger (enforce_bbl_integrity, 00001_baseline.sql)
+ * Appends an inventory movement through its security-definer RPC. `binId` is
+ * required: every ledger row names a bin and there is no default bin. `bbl`
+ * is not supplied: the DB trigger (enforce_bbl_integrity, 00001_baseline.sql)
  * computes it from `qty * skus.bbl_per_unit`.
  */
 export function insertMovement(ctx: Ctx, input: z.infer<typeof movementInput>, execution: CommandExecution) {
   return unwrap(ctx.db.rpc("record_inventory_movement", {
-    p_brewery: ctx.breweryId, p_sku: input.skuId, p_location: input.locationId, p_qty: input.qty,
-    p_type: input.type, p_channel: input.channel ?? null, p_dest_state: input.destState ?? null,
+    p_brewery: ctx.breweryId, p_sku: input.skuId, p_location: input.locationId, p_bin: input.binId, p_qty: input.qty,
+    p_type: input.type, p_sale_channel: input.saleChannelId ?? null, p_dest_state: input.destState ?? null,
     p_note: input.note ?? null, p_request_id: execution.requestId,
   }));
 }
 
 defineCommand({
-  name: "record_movement", description: "Append an inventory movement (immutable; corrections are reversals)",
+  name: "record_movement", description: "Append an inventory movement (immutable; corrections are reversals); sale_removal and depletion each name a saleChannelId, which no other type may carry",
   input: movementInput, roles: ["admin", "warehouse"],
   handler: (ctx, input, execution) => insertMovement(ctx, input, execution),
 });
@@ -69,6 +71,29 @@ defineQuery({
   },
 });
 
+// A bin move inside one location: paired ledger rows, no document (spec
+// 2026-09-06 Decision 5). Two locations is create_stock_transfer; the RPC says so.
+defineCommand({
+  name: "move_stock_bin", description: "Move stock between two bins of one location: paired ledger rows, no transfer document; a cross-location pair is refused",
+  roles: ["admin", "warehouse"],
+  input: stockLine,
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("move_stock_bin", {
+    p_brewery: ctx.breweryId, p_sku: i.skuId ?? null, p_material: i.materialId ?? null, p_keg_pool: i.kegPoolId ?? null, p_keg_size: i.kegSize ?? null,
+    p_qty: i.qty, p_from_bin: i.fromBinId, p_to_bin: i.toBinId, p_note: i.note ?? null, p_request_id: execution.requestId,
+  })),
+});
+
+defineQuery({
+  name: "get_bin_on_hand", description: "On-hand quantity per SKU/location/bin",
+  input: z.object({ skuId: z.string().uuid().optional(), locationId: z.string().uuid().optional() }), roles: [...readRoles],
+  handler: (ctx, i) => {
+    let q = ctx.db.from("bin_on_hand").select().eq("brewery_id", ctx.breweryId);
+    if (i.skuId) q = q.eq("sku_id", i.skuId);
+    if (i.locationId) q = q.eq("location_id", i.locationId);
+    return unwrap(q);
+  },
+});
+
 defineQuery({
   name: "get_atp", description: "Available-to-promise (on-hand minus open allocations) per SKU",
   input: bySku, roles: [...readRoles],
@@ -92,9 +117,9 @@ defineQuery({
 });
 
 defineQuery({
-  name: "list_skus", description: "SKUs with their product name, alphabetical",
+  name: "list_skus", description: "SKUs with their brand and format, alphabetical",
   input: z.object({}), roles: [...readRoles],
-  handler: (ctx) => unwrap(ctx.db.from("skus").select("id, name, products(name)").eq("brewery_id", ctx.breweryId).order("name")),
+  handler: (ctx) => unwrap(ctx.db.from("skus").select("id, name, active, brand_id, format_id, brands(name), formats(name, bbl_per_unit, package_type)").eq("brewery_id", ctx.breweryId).order("name")),
 });
 
 defineQuery({

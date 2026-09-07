@@ -6,6 +6,7 @@
 // here sets heights. Screen authors use only these and never components/ui.
 import { Palette, type PaletteGroup } from "@/components/mgr/palette";
 import * as React from "react";
+import Link from "next/link";
 import { Children, Fragment, isValidElement, type ReactNode } from "react";
 import { Alert02Icon, ArrowLeft01Icon, InformationCircleIcon, SquareLock01Icon } from "@hugeicons/core-free-icons";
 import { DatePicker } from "@/components/mgr/date-picker";
@@ -102,11 +103,12 @@ export const E = {
     );
   },
   /** A detail screen's header: an arrow link to the parent area above the title.
-   *  `action` is the same list-create slot `hd` takes. */
-  back: (to: React.ReactNode, title: React.ReactNode, action?: React.ReactNode) => {
+   *  `action` is the same list-create slot `hd` takes; `href` is where the
+   *  arrow goes on a live page (fixtures leave it "#"). */
+  back: (to: React.ReactNode, title: React.ReactNode, action?: React.ReactNode, href = "#") => {
     const head = (
       <div className="flex flex-col gap-1">
-        <a href="#" className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Icon icon={ArrowLeft01Icon} />{to}</a>
+        <Link href={href} className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Icon icon={ArrowLeft01Icon} />{to}</Link>
         <h1 className="text-lg font-semibold">{title}</h1>
       </div>
     );
@@ -141,15 +143,16 @@ export const E = {
       {foot ? <ItemFooter className="mt-3 flex-col items-stretch gap-2 border-t pt-3">{foot}</ItemFooter> : null}
     </Item>
   ),
-  /** Soft-filled workflow entry. Tone describes the action, independently of row status. */
-  act: (t: React.ReactNode, tone: "primary" | "success" | "attention" | "info" | "destructive" = "primary") => (
-    <Button variant="ghost" size="sm" data-row-action data-tap className={cn(
+  /** Soft-filled workflow entry. Tone describes the action, independently of row status.
+   *  `href` makes it a link on a live page; fixtures leave it out. */
+  act: (t: React.ReactNode, tone: "primary" | "success" | "attention" | "info" | "destructive" = "primary", href?: string) => (
+    <Button variant="ghost" size="sm" data-row-action data-tap asChild={Boolean(href)} className={cn(
       tone === "destructive" && "bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive",
       tone === "primary" && "bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary",
       tone === "success" && "bg-success text-success-foreground hover:bg-success/80 hover:text-success-foreground",
       tone === "attention" && "bg-attention text-attention-foreground hover:bg-attention/80 hover:text-attention-foreground",
       tone === "info" && "bg-info text-info-foreground hover:bg-info/80 hover:text-info-foreground",
-    )}>{t}</Button>
+    )}>{href ? <Link href={href}>{t}</Link> : t}</Button>
   ),
   /** A status word. Never clickable. */
   status: (t: React.ReactNode, tone: "ok" | "w" | "" = "") => (
@@ -162,12 +165,13 @@ export const E = {
   /** Fills the phone column; hugs the label from md up (`w-fit`, not `w-auto`:
    *  a column flex item with width:auto still stretches). Entry cards override
    *  back to full-width because they stay a phone-width column on the desk. */
-  btn: (t: React.ReactNode, k: BtnKind = "p") => {
+  btn: (t: React.ReactNode, k: BtnKind = "p", href?: string) => {
     const [kind, disabled] = k.split(" ") as [BtnBase, string?];
     return (
       <Button
         variant={kind === "g" ? "outline" : kind === "ghost" ? "ghost" : kind === "del" ? "destructive" : "default"}
         disabled={Boolean(disabled)}
+        asChild={Boolean(href) && !disabled}
         className={cn(
           // A lone verb sits where a group would end: right, on the desk.
           "w-full md:w-fit md:self-end",
@@ -178,7 +182,7 @@ export const E = {
         )}
         {...(kind === "irr" ? { "data-variant": "irreversible" } : {})}
       >
-        {t}
+        {href && !disabled ? <Link href={href}>{t}</Link> : t}
       </Button>
     );
   },

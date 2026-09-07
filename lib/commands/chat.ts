@@ -7,7 +7,7 @@ import { defineCommand, defineQuery, unwrap, type StaffRole } from "./registry";
 import { sha256 } from "@/lib/chat/linking";
 
 const STAFF: StaffRole[] = ["admin", "sales", "warehouse", "brewer"];
-const REASONS = ["submitted_order", "pick_due", "delivery_next", "fermentation_reading_overdue", "operations_digest"] as const;
+const REASONS = ["submitted_order", "pick_due", "restock_due", "delivery_next", "fermentation_reading_overdue", "operations_digest"] as const;
 const hhmm = z.string().regex(/^\d{2}:\d{2}$/, "HH:MM");
 const quietHours = z.object({ start: hhmm, end: hhmm, timezone: z.string().min(1).optional() }).nullable().optional();
 

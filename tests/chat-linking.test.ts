@@ -3,7 +3,7 @@
 // rejection, replay, unlink, and per-callback actor revalidation (live DB).
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { admin, asUser, makeBrewery, makeCustomerUser, makeStaff, makeStaffCtx } from "./helpers";
+import { admin, asUser, makeBrewery, makeCustomerUser, makeStaff, makeStaffCtx, seedCustomer } from "./helpers";
 import { issueChatLinkProof, resolveChatActor } from "@/lib/chat/linking";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
@@ -80,9 +80,9 @@ describe("staff linking", () => {
     await admin.from("chat_user_links").update({ proof_expires_at: new Date(Date.now() - 1000).toISOString() }).eq("id", expired.linkId);
     await expect(runCommand("consume_chat_link_proof", { proof: expired.proof }, staff)).rejects.toThrow(/invalid|expired/i);
 
-    const { data: customer } = await admin.from("customers").insert({ brewery_id: b.id, name: "Cust", state: "PA" }).select().single();
-    const customerUser = await makeCustomerUser(customer!.id);
-    const customerCtx = { db: await asUser(customerUser.email), userId: customerUser.id, breweryId: b.id, role: "customer" as const, customerId: customer!.id };
+    const customer = { id: (await seedCustomer(b.id, { name: "Cust" })).customerId };
+    const customerUser = await makeCustomerUser(customer.id);
+    const customerCtx = { db: await asUser(customerUser.email), userId: customerUser.id, breweryId: b.id, role: "customer" as const, customerId: customer.id };
     const forCustomer = await issueChatLinkProof(admin, inst.id, "U301");
     await expect(runCommand("consume_chat_link_proof", { proof: forCustomer.proof }, customerCtx)).rejects.toThrow(/permission/i);
     expect((await linkRow(forCustomer.linkId)).state).toBe("pending");

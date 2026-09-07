@@ -2,14 +2,14 @@
 // submitted-order transition, catch-up scan idempotence, semantic keys,
 // recipient fan-out (roles, mutes, links), and resolved suppression (live DB).
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, makeBrewery, makeStaffCtx } from "./helpers";
+import { admin, channelId, makeBrewery, makeStaffCtx, priceSku } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
 type Ctx = Awaited<ReturnType<typeof makeStaffCtx>>;
 let b: { id: string }, adminCtx: Ctx, sales: Ctx, mutedSales: Ctx, warehouse: Ctx, unlinkedSales: Ctx;
 let inst: { id: string };
-let customerId: string, shipToId: string, whId: string, skuId: string;
+let customerId: string, shipToId: string, whId: string, whBinId: string, skuId: string;
 
 async function ins<T = { id: string }>(table: string, row: Record<string, unknown>): Promise<T> {
   const { data, error } = await admin.from(table).insert(row).select().single();
@@ -52,13 +52,14 @@ beforeAll(async () => {
   await Promise.all([linkWithDm(adminCtx), linkWithDm(sales), linkWithDm(mutedSales), linkWithDm(warehouse)]);
   await runCommand("set_notification_preference", { reason: "submitted_order", enabled: false }, mutedSales);
   whId = (await ins("locations", { brewery_id: b.id, name: "WH", kind: "warehouse" })).id;
-  const product = await ins("products", { brewery_id: b.id, name: "IPA" });
-  skuId = (await ins("skus", { brewery_id: b.id, product_id: product.id, name: "IPA 1/2bbl", package_type: "keg", bbl_per_unit: 0.5 })).id;
-  const pl = await ins("price_lists", { brewery_id: b.id, name: "std" });
-  await ins("price_list_items", { brewery_id: b.id, price_list_id: pl.id, sku_id: skuId, unit_price_cents: 12000 });
-  customerId = (await ins("customers", { brewery_id: b.id, name: "Bar", type: "retailer", state: "PA", price_list_id: pl.id })).id;
+  whBinId = (await ins("bins", { brewery_id: b.id, location_id: whId, name: "Cold" })).id;
+  const brand = await ins("brands", { brewery_id: b.id, name: "IPA" });
+  const format = await ins("formats", { brewery_id: b.id, name: "1/2 bbl keg", basis: "packaged", package_type: "keg", keg_size: "half_bbl", bbl_per_unit: 0.5 });
+  skuId = (await ins("skus", { brewery_id: b.id, brand_id: brand.id, format_id: format.id, name: "IPA 1/2bbl" })).id;
+  customerId = (await ins("customers", { brewery_id: b.id, name: "Bar", type: "retailer", state: "PA", sale_channel_id: await channelId(b.id, "Wholesale") })).id;
+  await priceSku(b.id, { saleChannelId: await channelId(b.id, "Wholesale"), brandId: brand.id, formatId: format.id, cents: 12000 });
   shipToId = (await ins("ship_tos", { brewery_id: b.id, customer_id: customerId, label: "m", address1: "1", city: "P", state: "PA", zip: "19100" })).id;
-  await ins("inventory_movements", { brewery_id: b.id, sku_id: skuId, location_id: whId, qty: 100, type: "opening_balance", created_by: adminCtx.userId });
+  await ins("inventory_movements", { brewery_id: b.id, sku_id: skuId, location_id: whId, bin_id: whBinId, qty: 100, type: "opening_balance", created_by: adminCtx.userId });
 });
 
 describe("notification occurrences", () => {

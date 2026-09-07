@@ -1,6 +1,6 @@
 // tests/commands-orders.test.ts — registry wiring for order commands: roles, validation, rpc passthrough.
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaffCtx } from "./helpers";
+import { admin, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedCustomer, priceSku } from "./helpers";
 import { runCommand } from "../lib/commands/registry";
 import "../lib/commands/all";
 
@@ -11,17 +11,12 @@ beforeAll(async () => {
   b = await makeBrewery();
   adminCtx = await makeStaffCtx(b.id, "admin");
   brewerCtx = await makeStaffCtx(b.id, "brewer");
-  const { data: wh } = await admin.from("locations").insert({ brewery_id: b.id, name: "WH", kind: "warehouse" }).select().single();
-  whId = wh!.id;
-  const { data: p } = await admin.from("products").insert({ brewery_id: b.id, name: "IPA" }).select().single();
-  const { data: s } = await admin.from("skus").insert({ brewery_id: b.id, product_id: p!.id, name: "IPA case", package_type: "can", bbl_per_unit: 0.0645 }).select().single();
-  skuId = s!.id;
-  const { data: pl } = await admin.from("price_lists").insert({ brewery_id: b.id, name: "std" }).select().single();
-  await admin.from("price_list_items").insert({ brewery_id: b.id, price_list_id: pl!.id, sku_id: skuId, unit_price_cents: 3600 });
-  const { data: c } = await admin.from("customers").insert({ brewery_id: b.id, name: "Bar", type: "retailer", state: "PA", price_list_id: pl!.id }).select().single();
-  customerId = c!.id;
-  const { data: st } = await admin.from("ship_tos").insert({ brewery_id: b.id, customer_id: customerId, label: "m", address1: "1", city: "P", state: "PA", zip: "19100" }).select().single();
-  shipToId = st!.id;
+  whId = (await seedLocation(b.id)).id;
+  const cat = await seedCatalog(b.id);
+  skuId = cat.skuId;
+  const cust = await seedCustomer(b.id);
+  ({ customerId, shipToId } = cust);
+  await priceSku(b.id, { saleChannelId: cust.saleChannelId, brandId: cat.brandId, formatId: cat.formatId, cents: 3600 });
 });
 
 describe("order commands", () => {
@@ -56,21 +51,21 @@ describe("order commands", () => {
 
 describe("standing taproom allocations", () => {
   it("concurrent sets for the same (location, sku) leave exactly one open allocation", async () => {
-    const { data: tap } = await admin.from("locations").insert({ brewery_id: b.id, name: "Tap race", kind: "taproom" }).select().single();
+    const tap = await seedLocation(b.id, { name: "Tap race", kind: "taproom" });
     await Promise.all([
-      runCommand("set_standing_allocation", { locationId: tap!.id, skuId, qty: 3 }, adminCtx),
-      runCommand("set_standing_allocation", { locationId: tap!.id, skuId, qty: 5 }, adminCtx),
+      runCommand("set_standing_allocation", { locationId: tap.id, skuId, qty: 3 }, adminCtx),
+      runCommand("set_standing_allocation", { locationId: tap.id, skuId, qty: 5 }, adminCtx),
     ]);
     const { data: open } = await admin.from("allocations").select("id")
-      .eq("source", "taproom_standing").eq("ref", tap!.id).eq("sku_id", skuId).eq("status", "open");
+      .eq("source", "taproom_standing").eq("ref", tap.id).eq("sku_id", skuId).eq("status", "open");
     expect(open!.length).toBe(1);
   });
 
   it("set creates an open allocation, shows in list, and reduces ATP; qty 0 releases it", async () => {
-    const { data: tap } = await admin.from("locations").insert({ brewery_id: b.id, name: "Tap", kind: "taproom" }).select().single();
-    const tapId = tap!.id;
+    const tap = await seedLocation(b.id, { name: "Tap", kind: "taproom" });
+    const tapId = tap.id;
     await admin.from("inventory_movements").insert({
-      brewery_id: b.id, sku_id: skuId, location_id: tapId, qty: 20, type: "opening_balance", created_by: adminCtx.userId,
+      brewery_id: b.id, sku_id: skuId, location_id: tapId, bin_id: tap.binId, qty: 20, type: "opening_balance", created_by: adminCtx.userId,
     });
     const atpBefore = await runCommand("get_atp", { skuId }, adminCtx) as { sku_id: string; qty: number }[];
     const before = atpBefore.find(r => r.sku_id === skuId)!.qty;
@@ -99,7 +94,7 @@ describe("standing taproom allocations", () => {
   });
 
   it("brewer role cannot set standing allocations", async () => {
-    const { data: tap } = await admin.from("locations").insert({ brewery_id: b.id, name: "Tap2", kind: "taproom" }).select().single();
-    await expect(runCommand("set_standing_allocation", { locationId: tap!.id, skuId, qty: 1 }, brewerCtx)).rejects.toThrow(/permission denied/);
+    const tap = await seedLocation(b.id, { name: "Tap2", kind: "taproom" });
+    await expect(runCommand("set_standing_allocation", { locationId: tap.id, skuId, qty: 1 }, brewerCtx)).rejects.toThrow(/permission denied/);
   });
 });

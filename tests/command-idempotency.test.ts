@@ -1,13 +1,14 @@
 // tests/command-idempotency.test.ts — verifies durable request replay at the database API boundary.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, asUser, makeBrewery, makeStaff } from "./helpers";
+import { admin, asUser, makeBrewery, makeStaff, seedCatalog, seedLocation } from "./helpers";
 
 let breweryId: string;
 let staffUserId: string;
 let staffDb: SupabaseClient;
 let skuId: string;
 let locationId: string;
+let binId: string;
 
 beforeAll(async () => {
   const brewery = await makeBrewery();
@@ -15,32 +16,17 @@ beforeAll(async () => {
   const staff = await makeStaff(breweryId, "admin");
   staffUserId = staff.id;
   staffDb = await asUser(staff.email);
-  const product = await admin.from("products")
-    .insert({ brewery_id: breweryId, name: "Idempotency product" })
-    .select("id")
-    .single();
-  const sku = await admin.from("skus").insert({
-    brewery_id: breweryId,
-    product_id: product.data!.id,
-    name: "Idempotency SKU",
-    package_type: "keg",
-    bbl_per_unit: 0.5,
-  }).select("id").single();
-  const location = await admin.from("locations")
-    .insert({ brewery_id: breweryId, name: "Idempotency warehouse", kind: "warehouse" })
-    .select("id")
-    .single();
-  skuId = sku.data!.id;
-  locationId = location.data!.id;
+  ({ skuId } = await seedCatalog(breweryId, { product: "Idempotency product", sku: "Idempotency SKU", packageType: "keg", bblPerUnit: 0.5 }));
+  ({ id: locationId, binId } = await seedLocation(breweryId, { name: "Idempotency warehouse" }));
 });
 
 describe("command request idempotency", () => {
   it("returns the original mutation result for an identical request id", async () => {
     const requestId = crypto.randomUUID();
-    const payload = { p_brewery: breweryId, p_name: "Replay IPA", p_style: "IPA", p_abv: 6.5, p_request_id: requestId };
+    const payload = { p_brewery: breweryId, p_id: null, p_name: "Replay IPA", p_style: "IPA", p_abv: 6.5, p_description: null, p_category: null, p_price_group: null, p_hops: null, p_request_id: requestId };
 
-    const first = await staffDb.rpc("create_product", payload);
-    const replay = await staffDb.rpc("create_product", payload);
+    const first = await staffDb.rpc("upsert_brand", payload);
+    const replay = await staffDb.rpc("upsert_brand", payload);
 
     expect(first.error).toBeNull();
     expect(replay.error).toBeNull();
@@ -49,11 +35,11 @@ describe("command request idempotency", () => {
 
   it("rejects reuse of a request id with a different payload", async () => {
     const requestId = crypto.randomUUID();
-    const first = await staffDb.rpc("create_product", {
-      p_brewery: breweryId, p_name: "Original", p_style: null, p_abv: null, p_request_id: requestId,
+    const first = await staffDb.rpc("upsert_brand", {
+      p_brewery: breweryId, p_name: "Original", p_id: null, p_style: null, p_abv: null, p_description: null, p_category: null, p_price_group: null, p_hops: null, p_request_id: requestId,
     });
-    const mismatch = await staffDb.rpc("create_product", {
-      p_brewery: breweryId, p_name: "Different", p_style: null, p_abv: null, p_request_id: requestId,
+    const mismatch = await staffDb.rpc("upsert_brand", {
+      p_brewery: breweryId, p_name: "Different", p_id: null, p_style: null, p_abv: null, p_description: null, p_category: null, p_price_group: null, p_hops: null, p_request_id: requestId,
     });
 
     expect(first.error).toBeNull();
@@ -63,11 +49,16 @@ describe("command request idempotency", () => {
 
   it("rejects request reuse across command names and breweries", async () => {
     const requestId = crypto.randomUUID();
-    const first = await staffDb.rpc("create_product", {
+    const first = await staffDb.rpc("upsert_brand", {
       p_brewery: breweryId,
       p_name: "Bound request",
+      p_id: null,
       p_style: null,
       p_abv: null,
+      p_description: null,
+      p_category: null,
+      p_price_group: null,
+      p_hops: null,
       p_request_id: requestId,
     });
     expect(first.error).toBeNull();
@@ -86,11 +77,16 @@ describe("command request idempotency", () => {
       user_id: staffUserId,
       role: "admin",
     });
-    const breweryMismatch = await staffDb.rpc("create_product", {
+    const breweryMismatch = await staffDb.rpc("upsert_brand", {
       p_brewery: otherBrewery.id,
       p_name: "Wrong brewery",
+      p_id: null,
       p_style: null,
       p_abv: null,
+      p_description: null,
+      p_category: null,
+      p_price_group: null,
+      p_hops: null,
       p_request_id: requestId,
     });
     expect(breweryMismatch.error?.message).toMatch(/request id.*different payload/i);
@@ -103,9 +99,10 @@ describe("command request idempotency", () => {
       p_brewery: breweryId,
       p_sku: skuId,
       p_location: locationId,
+      p_bin: binId,
       p_qty: 2,
       p_type: "opening_balance",
-      p_channel: null,
+      p_sale_channel: null,
       p_dest_state: null,
       p_note: note,
       p_request_id: requestId,

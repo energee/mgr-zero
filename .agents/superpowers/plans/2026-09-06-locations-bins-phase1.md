@@ -12,8 +12,8 @@
 
 ## Global Constraints
 
-- Worktree `.agents/worktrees/docs/locations-bins`, branch `docs/locations-bins`. Run `pwd && git branch --show-current` before the first edit of every task.
-- `bunx supabase start` must be running. After any baseline edit: `bunx supabase db reset` (from the worktree root) before running tests.
+- Worktree `.agents/worktrees/backend`, branch `backend` (retargeted 2026-09-07 by Program 2 Task 1; tests run on the `mgr_test` stack via `scripts/test-db.sh`, not `supabase db reset`). Run `pwd && git branch --show-current` before the first edit of every task.
+- `bunx supabase start` must be running. After any baseline edit: `bash scripts/test-db.sh` before running tests.
 - Edit `supabase/migrations/00001_baseline.sql` **in place**. Do not add a second migration file.
 - Every mutation is one idempotent `security definer` RPC with `set search_path = ''`, `private.assert_staff`, `private.claim_command_request` / `complete_command_request` (ARCHITECTURE.md iron rules 1 and 5). Mirror `create_location` at baseline `:2089`.
 - Ledgers stay append-only: `bins` is config and gets `staff_read`; the three ledgers keep their `revoke update, delete`.

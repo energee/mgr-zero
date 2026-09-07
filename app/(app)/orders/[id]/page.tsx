@@ -42,7 +42,7 @@ type OrderEvent = {
   created_at: string;
 };
 type Atp = { sku_id: string; qty: number };
-type SkuRow = { id: string; name: string; products: { name: string } | null };
+type SkuRow = { id: string; name: string; brands: { name: string } | null };
 
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
@@ -98,7 +98,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
   const atpMap = new Map(atp.map((a) => [a.sku_id, a.qty]));
   const skuNames = new Map(lines.map((l) => [l.sku_id, l.skus?.name ?? l.sku_id.slice(0, 8)]));
-  const skus = skuRows.map((s) => ({ id: s.id, label: s.products ? `${s.products.name} — ${s.name}` : s.name }));
+  const skus = skuRows.map((s) => ({ id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name }));
 
   return (
     <div className="flex flex-col gap-6">

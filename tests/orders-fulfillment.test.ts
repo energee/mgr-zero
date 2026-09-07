@@ -1,29 +1,25 @@
 // tests/orders-fulfillment.test.ts — pick → ship → movements + invoice; credit memo; replenishment; needs_restock.
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaff, asUser } from "./helpers";
+import { admin, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation, seedCustomer, channelId, priceSku } from "./helpers";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { runCommand } from "@/lib/commands/registry";
+import "@/lib/commands/all";
 
 let b: { id: string }, staffDb: SupabaseClient, staffId: string;
-let customerId: string, shipToId: string, whId: string, tapId: string, skuId: string;
+let customerId: string, shipToId: string, whId: string, whBinId: string, tapId: string, skuId: string, saleChannelId: string;
 
 beforeAll(async () => {
   // identical seed to tests/orders-lifecycle.test.ts, plus a taproom location:
   b = await makeBrewery();
   const staff = await makeStaff(b.id); staffId = staff.id; staffDb = await asUser(staff.email);
-  const { data: wh } = await admin.from("locations").insert({ brewery_id: b.id, name: "WH", kind: "warehouse" }).select().single();
-  whId = wh!.id;
-  const { data: tap } = await admin.from("locations").insert({ brewery_id: b.id, name: "Taproom", kind: "taproom" }).select().single();
-  tapId = tap!.id;
-  const { data: p } = await admin.from("products").insert({ brewery_id: b.id, name: "IPA" }).select().single();
-  const { data: s } = await admin.from("skus").insert({ brewery_id: b.id, product_id: p!.id, name: "IPA 1/2bbl", package_type: "keg", bbl_per_unit: 0.5 }).select().single();
-  skuId = s!.id;
-  const { data: pl } = await admin.from("price_lists").insert({ brewery_id: b.id, name: "std" }).select().single();
-  await admin.from("price_list_items").insert({ brewery_id: b.id, price_list_id: pl!.id, sku_id: skuId, unit_price_cents: 12000 });
-  const { data: c } = await admin.from("customers").insert({ brewery_id: b.id, name: "Bar", type: "retailer", state: "PA", price_list_id: pl!.id }).select().single();
-  customerId = c!.id;
-  const { data: st } = await admin.from("ship_tos").insert({ brewery_id: b.id, customer_id: customerId, label: "m", address1: "1", city: "P", state: "PA", zip: "19100" }).select().single();
-  shipToId = st!.id;
-  await admin.from("inventory_movements").insert({ brewery_id: b.id, sku_id: skuId, location_id: whId, qty: 100, type: "opening_balance", created_by: staffId });
+  ({ id: whId, binId: whBinId } = await seedLocation(b.id));
+  tapId = (await seedLocation(b.id, { name: "Taproom", kind: "taproom" })).id;
+  const cat = await seedCatalog(b.id, { sku: "IPA 1/2bbl", packageType: "keg", bblPerUnit: 0.5 });
+  skuId = cat.skuId;
+  const cust = await seedCustomer(b.id);
+  ({ customerId, shipToId, saleChannelId } = cust);
+  await priceSku(b.id, { saleChannelId, brandId: cat.brandId, formatId: cat.formatId, cents: 12000 });
+  await admin.from("inventory_movements").insert({ brewery_id: b.id, sku_id: skuId, location_id: whId, bin_id: whBinId, qty: 100, type: "opening_balance", created_by: staffId });
 });
 
 async function confirmedOrder(qty = 10) {
@@ -57,6 +53,12 @@ describe("pick and ship", () => {
     expect(Number(mv![0].qty)).toBe(-8);
     expect(mv![0].type).toBe("sale_removal");
     expect(mv![0].dest_state).toBe("PA");
+    // The removal is classified by the brewery's Wholesale channel, and the
+    // channel's tax treatment is frozen onto the row (§16.3).
+    const { data: ch } = await admin.from("sale_channels").select("name,tax_treatment").eq("id", mv![0].sale_channel_id).single();
+    expect(ch!.name).toBe("Wholesale");
+    expect(ch!.tax_treatment).toBe("taxable");
+    expect(mv![0].tax_treatment).toBe("taxable");
     const { data: il } = await admin.from("invoice_lines").select().eq("invoice_id", inv);
     expect(Number(il![0].qty)).toBe(8);
     expect(il![0].unit_price_cents).toBe(12000);
@@ -178,5 +180,253 @@ describe("replenishment", () => {
     const { data: mv } = await admin.from("inventory_movements").select().eq("ref", id).eq("type", "taproom_transfer");
     expect(mv!.length).toBe(2);
     expect(Number(mv!.find(m => m.location_id === tapId)!.qty)).toBe(3);
+  });
+});
+
+describe("confirm_restock", () => {
+  it("clears needs_restock and writes an order event; no movement", async () => {
+    const id = await confirmedOrder(4);
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 4 }], p_request_id: crypto.randomUUID() });
+    await staffDb.rpc("adjust_order_lines", { p_order: id, p_lines: [{ sku_id: skuId, qty: 2 }], p_reason: "cut", p_request_id: crypto.randomUUID() });
+    const before = await admin.from("inventory_movements").select("id").eq("ref", id);
+    const { data, error } = await staffDb.rpc("confirm_restock", { p_order: id, p_request_id: crypto.randomUUID() });
+    expect(error).toBeNull();
+    expect((data as { order_id: string }).order_id).toBe(id);
+    const { data: o } = await admin.from("orders").select("needs_restock").eq("id", id).single();
+    expect(o!.needs_restock).toBe(false);
+    const { data: ev } = await admin.from("order_events").select("event").eq("order_id", id).eq("event", "restocked");
+    expect(ev!.length).toBe(1);
+    const after = await admin.from("inventory_movements").select("id").eq("ref", id);
+    expect(after.data!.length).toBe(before.data!.length);
+  });
+
+  it("is a conflict when the flag is already clear", async () => {
+    const id = await confirmedOrder(2);
+    const { error } = await staffDb.rpc("confirm_restock", { p_order: id, p_request_id: crypto.randomUUID() });
+    expect(error).not.toBeNull();
+    expect(error!.message).toMatch(/not waiting for restock/);
+  });
+});
+
+describe("resolve_short_pick", () => {
+  it("adjust_down shrinks the line and allocation to the counted qty", async () => {
+    const id = await confirmedOrder(10);
+    const line = await lineOf(id);
+    const { error } = await staffDb.rpc("resolve_short_pick", {
+      p_order: id, p_line: line.id, p_qty_picked: 7, p_reason: "short in pick face",
+      p_resolution: "adjust_down", p_request_id: crypto.randomUUID(),
+    });
+    expect(error).toBeNull();
+    const after = await lineOf(id);
+    expect(Number(after.qty_ordered)).toBe(7);
+    expect(Number(after.qty_picked)).toBe(7);
+    expect(after.short_reason).toBe("short in pick face");
+    const { data: alloc } = await admin.from("allocations").select("qty,status").eq("ref", line.id).single();
+    expect(Number(alloc!.qty)).toBe(7);
+    expect(alloc!.status).toBe("open");
+  });
+
+  it("keep_owed records the count and leaves the order picked but still owed", async () => {
+    const id = await confirmedOrder(10);
+    const line = await lineOf(id);
+    const { error } = await staffDb.rpc("resolve_short_pick", {
+      p_order: id, p_line: line.id, p_qty_picked: 7, p_reason: "will finish tomorrow",
+      p_resolution: "keep_owed", p_request_id: crypto.randomUUID(),
+    });
+    expect(error).toBeNull();
+    const after = await lineOf(id);
+    expect(Number(after.qty_ordered)).toBe(10);
+    expect(Number(after.qty_picked)).toBe(7);
+    const { data: o } = await admin.from("orders").select("status").eq("id", id).single();
+    expect(o!.status).toBe("picked");
+    const { data: ev } = await admin.from("order_events").select("payload").eq("order_id", id).eq("event", "short_pick").single();
+    expect(ev!.payload).toMatchObject({ resolution: "keep_owed", qty_picked: 7 });
+  });
+
+  it("rejects a count that is not short, and an empty reason", async () => {
+    const id = await confirmedOrder(3);
+    const line = await lineOf(id);
+    const full = await staffDb.rpc("resolve_short_pick", { p_order: id, p_line: line.id, p_qty_picked: 3, p_reason: "x", p_resolution: "keep_owed", p_request_id: crypto.randomUUID() });
+    expect(full.error?.message).toMatch(/not short/);
+    const blank = await staffDb.rpc("resolve_short_pick", { p_order: id, p_line: line.id, p_qty_picked: 1, p_reason: " ", p_resolution: "keep_owed", p_request_id: crypto.randomUUID() });
+    expect(blank.error?.message).toMatch(/reason/);
+  });
+});
+
+describe("ship invoice timing", () => {
+  it("on_delivery ship posts movements and no invoice", async () => {
+    const id = await confirmedOrder(4);
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 4 }], p_request_id: crypto.randomUUID() });
+    const { data, error } = await staffDb.rpc("ship_order", {
+      p_order: id, p_ship: [{ line_id: line.id, qty_shipped: 4 }],
+      p_carrier: null, p_tracking: null, p_invoice_timing: "on_delivery",
+      p_request_id: crypto.randomUUID(),
+    });
+    expect(error).toBeNull();
+    expect((data as { invoice_id: string | null }).invoice_id).toBeNull();
+    const { data: sh } = await admin.from("shipments").select("id, invoice_timing").eq("order_id", id).single();
+    expect(sh!.invoice_timing).toBe("on_delivery");
+    const { data: invs } = await admin.from("invoices").select("id").eq("shipment_id", sh!.id);
+    expect(invs!.length).toBe(0);
+    const { data: mv } = await admin.from("inventory_movements").select("type").eq("ref", id);
+    expect(mv!.map((m) => m.type)).toEqual(["sale_removal"]);
+  });
+
+  it("short ship below picked sets needs_restock", async () => {
+    const id = await confirmedOrder(10);
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 10 }], p_request_id: crypto.randomUUID() });
+    const { error } = await staffDb.rpc("ship_order", {
+      p_order: id, p_ship: [{ line_id: line.id, qty_shipped: 9 }],
+      p_carrier: null, p_tracking: null, p_invoice_timing: "now",
+      p_request_id: crypto.randomUUID(),
+    });
+    expect(error).toBeNull();
+    const { data: o } = await admin.from("orders").select("needs_restock").eq("id", id).single();
+    expect(o!.needs_restock).toBe(true);
+  });
+});
+
+describe("confirm_delivery", () => {
+  it("invoices an on_delivery shipment once, signs the stop, and moves nothing", async () => {
+    const id = await confirmedOrder(3);
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 3 }], p_request_id: crypto.randomUUID() });
+    await staffDb.rpc("ship_order", {
+      p_order: id, p_ship: [{ line_id: line.id, qty_shipped: 3 }],
+      p_carrier: null, p_tracking: null, p_invoice_timing: "on_delivery", p_request_id: crypto.randomUUID(),
+    });
+    const { data: sh } = await admin.from("shipments").select("id").eq("order_id", id).single();
+    const { data: route } = await admin.from("routes").insert({ brewery_id: b.id, delivery_date: "2026-09-08", driver_user_id: staffId, name: "A" }).select().single();
+    const { data: del } = await admin.from("deliveries").insert({ brewery_id: b.id, route_id: route!.id, shipment_id: sh!.id, stop_no: 1 }).select().single();
+    const mvBefore = await admin.from("inventory_movements").select("id").eq("ref", id);
+    const { data, error } = await staffDb.rpc("confirm_delivery", { p_delivery: del!.id, p_signed_by: "Dana", p_request_id: crypto.randomUUID() });
+    expect(error).toBeNull();
+    const invoiceId = (data as { invoice_id: string }).invoice_id;
+    expect(invoiceId).toMatch(/^[0-9a-f-]{36}$/i);
+    const { data: d2 } = await admin.from("deliveries").select("signed_by,delivered_at").eq("id", del!.id).single();
+    expect(d2!.signed_by).toBe("Dana");
+    expect(d2!.delivered_at).not.toBeNull();
+    const { data: il } = await admin.from("invoice_lines").select("qty, unit_price_cents").eq("invoice_id", invoiceId);
+    expect(il).toEqual([{ qty: 3, unit_price_cents: 12000 }]);
+    const mvAfter = await admin.from("inventory_movements").select("id").eq("ref", id);
+    expect(mvAfter.data!.length).toBe(mvBefore.data!.length);
+    const again = await staffDb.rpc("confirm_delivery", { p_delivery: del!.id, p_signed_by: "Dana", p_request_id: crypto.randomUUID() });
+    expect(again.error?.message).toMatch(/already delivered/);
+    const stop = await runCommand("get_delivery_stop", { deliveryId: del!.id }, { db: staffDb, userId: staffId, breweryId: b.id, role: "admin" }) as
+      { delivery: { signed_by: string; shipments: { invoice_timing: string } }; lines: { qty_shipped: number }[]; invoice: { id: string } | null };
+    expect(stop.delivery.signed_by).toBe("Dana");
+    expect(stop.delivery.shipments.invoice_timing).toBe("on_delivery");
+    expect(stop.lines.map((l) => Number(l.qty_shipped))).toEqual([3]);
+    expect(stop.invoice?.id).toBe(invoiceId);
+  });
+});
+
+describe("return_shipment", () => {
+  it("unsold return credits at the invoiced price and restocks; damaged also posts loss", async () => {
+    const id = await confirmedOrder(5);
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 5 }], p_request_id: crypto.randomUUID() });
+    const shipped = await staffDb.rpc("ship_order", {
+      p_order: id, p_ship: [{ line_id: line.id, qty_shipped: 5 }],
+      p_carrier: null, p_tracking: null, p_invoice_timing: "now", p_request_id: crypto.randomUUID(),
+    });
+    const invId = (shipped.data as { invoice_id: string }).invoice_id;
+    const { data: il } = await admin.from("invoice_lines").select().eq("invoice_id", invId).single();
+
+    const unsold = await staffDb.rpc("return_shipment", {
+      p_invoice: invId, p_location: whId, p_reason: "unsold",
+      p_lines: [{ invoice_line_id: il!.id, qty: 1 }], p_request_id: crypto.randomUUID(),
+    });
+    expect(unsold.error).toBeNull();
+    const memoId = (unsold.data as { credit_memo_id: string }).credit_memo_id;
+    const { data: memoLines } = await admin.from("invoice_lines").select("qty, unit_price_cents").eq("invoice_id", memoId);
+    expect(memoLines).toEqual([{ qty: -1, unit_price_cents: 12000 }]); // credited at the invoiced price
+    const { data: back } = await admin.from("inventory_movements").select("type,qty,location_id").eq("ref", memoId);
+    expect(back).toEqual([{ type: "return_in", qty: 1, location_id: whId }]);
+
+    const damaged = await staffDb.rpc("return_shipment", {
+      p_invoice: invId, p_location: whId, p_reason: "damaged",
+      p_lines: [{ invoice_line_id: il!.id, qty: 1 }], p_request_id: crypto.randomUUID(),
+    });
+    expect(damaged.error).toBeNull();
+    const memo2 = (damaged.data as { credit_memo_id: string }).credit_memo_id;
+    const { data: mvs } = await admin.from("inventory_movements").select("type,qty").eq("ref", memo2);
+    expect(mvs!.sort((a, b) => a.type.localeCompare(b.type))).toEqual([{ type: "loss", qty: -1 }, { type: "return_in", qty: 1 }]);
+  });
+});
+
+describe("release_allocation and get_shortfalls", () => {
+  it("get_shortfalls lists negative-ATP skus; release_allocation frees the reservation", async () => {
+    const ctx = { db: staffDb, userId: staffId, breweryId: b.id, role: "admin" as const };
+    const id = await confirmedOrder(1000); // opening balance is 100
+    const line = await lineOf(id);
+    const { data: alloc } = await admin.from("allocations").select("id").eq("ref", line.id).single();
+    const short = await runCommand("get_shortfalls", {}, ctx) as { skuId: string; skuName: string; atp: number }[];
+    const row = short.find((s) => s.skuId === skuId);
+    expect(row).toBeDefined();
+    expect(row!.atp).toBeLessThan(0);
+    expect(row!.skuName).toBe("IPA 1/2bbl");
+    await runCommand("release_allocation", { allocationId: alloc!.id }, ctx);
+    const { data: a2 } = await admin.from("allocations").select("status").eq("id", alloc!.id).single();
+    expect(a2!.status).toBe("released");
+    const after = await runCommand("get_shortfalls", {}, ctx) as { skuId: string }[];
+    expect(after.some((s) => s.skuId === skuId)).toBe(false);
+    await expect(runCommand("release_allocation", { allocationId: alloc!.id }, ctx)).rejects.toThrow(/not open/);
+  });
+});
+
+describe("frozen tax treatment on a wholesale ship", () => {
+  it("a customer's tax_treatment overrides the channel default on the movement", async () => {
+    const { customerId: exporterId, shipToId: exporterShipTo } = await seedCustomer(b.id, { name: "Exporter", saleChannelId });
+    await admin.from("customers").update({ tax_treatment: "export" }).eq("id", exporterId);
+    const { data, error } = await staffDb.rpc("create_order", {
+      p_brewery: b.id, p_kind: "wholesale", p_customer: exporterId, p_ship_to: exporterShipTo,
+      p_from_location: whId, p_to_location: null, p_requested: null, p_po: null, p_note: null,
+      p_lines: [{ sku_id: skuId, qty: 2 }], p_request_id: crypto.randomUUID(),
+    });
+    expect(error).toBeNull();
+    const id = (data as { order_id: string }).order_id;
+    await staffDb.rpc("submit_order", { p_order: id, p_request_id: crypto.randomUUID() });
+    await staffDb.rpc("confirm_order", { p_order: id, p_request_id: crypto.randomUUID() });
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 2 }], p_request_id: crypto.randomUUID() });
+    const ship = await staffDb.rpc("ship_order", { p_order: id, p_ship: [{ line_id: line.id, qty_shipped: 2 }], p_carrier: null, p_tracking: null, p_request_id: crypto.randomUUID() });
+    expect(ship.error).toBeNull();
+    const { data: mv } = await admin.from("inventory_movements").select("sale_channel_id, tax_treatment").eq("ref", id).single();
+    expect(mv!.sale_channel_id).toBe(await channelId(b.id, "Wholesale"));
+    expect(mv!.tax_treatment).toBe("export");
+  });
+
+  it("a DTC customer's ship posts the removal to DTC, with DTC's tax treatment", async () => {
+    // The removal follows orders.sale_channel_id (copied from the customer),
+    // not the brewery's Wholesale default: same brewery, same sku, other channel.
+    const dtc = await channelId(b.id, "DTC");
+    // Both channels seed as 'taxable', so give DTC a distinct treatment: the
+    // assertion below then can only pass if the movement read the DTC channel.
+    await admin.from("sale_channels").update({ tax_treatment: "vessel_supplies" }).eq("id", dtc);
+    const { customerId: dtcId, shipToId: dtcShipTo } = await seedCustomer(b.id, { name: "Taproom Fan", saleChannelId: dtc });
+    const { data: brandRow } = await admin.from("skus").select("brand_id").eq("id", skuId).single();
+    await priceSku(b.id, { saleChannelId: dtc, brandId: brandRow!.brand_id, formatId: (await admin.from("skus").select("format_id").eq("id", skuId).single()).data!.format_id, cents: 900 });
+    const { data, error } = await staffDb.rpc("create_order", {
+      p_brewery: b.id, p_kind: "wholesale", p_customer: dtcId, p_ship_to: dtcShipTo,
+      p_from_location: whId, p_to_location: null, p_requested: null, p_po: null, p_note: null,
+      p_lines: [{ sku_id: skuId, qty: 3 }], p_request_id: crypto.randomUUID(),
+    });
+    expect(error).toBeNull();
+    const id = (data as { order_id: string }).order_id;
+    await staffDb.rpc("submit_order", { p_order: id, p_request_id: crypto.randomUUID() });
+    await staffDb.rpc("confirm_order", { p_order: id, p_request_id: crypto.randomUUID() });
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 3 }], p_request_id: crypto.randomUUID() });
+    const ship = await staffDb.rpc("ship_order", { p_order: id, p_ship: [{ line_id: line.id, qty_shipped: 3 }], p_carrier: null, p_tracking: null, p_request_id: crypto.randomUUID() });
+    expect(ship.error).toBeNull();
+    const { data: mv } = await admin.from("inventory_movements").select("sale_channel_id, tax_treatment").eq("ref", id).single();
+    expect(mv!.sale_channel_id).toBe(dtc);
+    expect(mv!.tax_treatment).toBe("vessel_supplies");
+    const { data: ws } = await admin.from("sale_channels").select("tax_treatment").eq("id", saleChannelId).single();
+    expect(ws!.tax_treatment).toBe("taxable");
   });
 });

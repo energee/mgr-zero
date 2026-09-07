@@ -7,7 +7,7 @@
 //
 // Two things this file deliberately does not draw. A create surface is the
 // edit surface with empty values (Create brewery is the pattern), so Add
-// customer, Add location, New PO, Add keg pool and Create price list open the
+// customer, Add location, New PO, Add keg pool and Create price group open the
 // records already here rather than earning frames of their own. And the
 // composer strip is shell chrome — screen-frame.tsx passes E.comp() to both
 // shells — so it is present under every staff and portal frame without any
@@ -26,14 +26,31 @@ import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-ic
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
 import { formatVolume } from "@/lib/volume";
+import { saccharificationRest, type Step, totalDuration } from "@/lib/mgr/recipe-schedule";
 import {
   BeerIcon, DeliveryTruck01Icon, Package01Icon, Route01Icon, Tag01Icon, TaskDone01Icon, ThermometerIcon, WifiDisconnected01Icon,
 } from "@hugeicons/core-free-icons";
 
+/** The drawn mash schedule. Rows and footer both read it, so the total and the
+ *  conversion rest can never disagree with the steps above them. */
+const MASH_STEPS: Step[] = [
+  { name: "Mash-in", kind: "infusion", tempF: 104, duration: 15 },
+  { name: "Saccharification", kind: "infusion", tempF: 152, duration: 60 },
+  { name: "Mash-out", kind: "direct heat", tempF: 168, duration: 10 },
+];
+
+/** The drawn fermentation schedule; `duration` is days. Same rule as MASH_STEPS. */
+const FERM_STAGES: Step[] = [
+  { name: "Primary", kind: "primary", tempF: 68, duration: 4 },
+  { name: "Diacetyl rest", kind: "diacetyl rest", tempF: 72, duration: 2 },
+  { name: "Cold crash", kind: "cold crash", tempF: 34, duration: 2 },
+  { name: "Conditioning", kind: "conditioning", tempF: 34, duration: 10 },
+];
+
 /** Every staff role with what it opens; Team member draws one switch each. */
 const ROLES: [string, string, boolean][] = [
   ["Admin", "everything, including team and settings", false],
-  ["Sales", "orders, customers, price lists", true],
+  ["Sales", "orders, customers, price groups", true],
   ["Warehouse", "pick, receive, count, transfer", false],
   ["Brewer", "batches, cellar, packaging", true],
   ["Taproom", "taps, pours, menu", false],
@@ -86,8 +103,11 @@ const today = (rows: ReactNode) => (
 // One invoice threaded through the AR list, the portal and the QuickBooks
 // venue frames, plus its named siblings. Every invoice number in this file
 // comes from here, so one order cannot end up with two of them.
-const INV = {
+export const INV = {
   no: "INV-1042",
+  /** The Standard group's case code: the SKU frame reads what the group owns,
+   *  so both frames must show one number or the feature contradicts itself. */
+  upc: "00810123450127",
   order: "ORD-0231",
   paid: "INV-1037",
   failed: "INV-1039",
@@ -270,7 +290,6 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 1, slice: "all", tab: "More", name: "More", job: "Setup and desk review, never standing work",
-    to: { "Price tiers": "Price lists" },
     reads: "none [role navigation manifest]", writes: "none",
     states: DEFAULT_STATES,
     spec: "Role-filtered; hidden entries leave no gaps. Standing work remains in Today, Beer or Work.",
@@ -278,7 +297,7 @@ export const SCREENS: Screen[] = [
       {E.hd("More")}
       {E.nav("Invoices", "QuickBooks Online mapping and push", "", QuickBooksMark)}
       {E.nav("Catalog", "brands and SKUs")}
-      {E.nav("Price tiers", "customer price lists")}
+      {E.nav("Price groups", "rows of the price grid")}
       {E.nav("Customers", "accounts and ship-tos")}
       {E.nav("Recipes", "formulas and versions")}
       {E.nav("Compliance months", "reports and filing status")}
@@ -323,6 +342,7 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 1, slice: "all", tab: "More", name: "Settings", job: "Edit brewery/location basics and route to rare setup",
+    to: { "Source water · Municipal · Denver": "Water profiles" },
     reads: "list_locations · list_team_members", writes: "update_brewery · update_location [design; mutable single rows]",
     states: permitted("admin only"),
     spec: "Invoices remains a first-class More and desk-rail destination. TTB registry number and PA license are brewery columns and feed the compliance report header. The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. Deployment mode is read-only. Team opens the Team frame.",
@@ -336,6 +356,7 @@ export const SCREENS: Screen[] = [
       {E.edit("Reading overdue after (hours)", OVERDUE_HOURS, "number")}
       {E.fld("Deployment", "dedicated · read-only")}
       {E.btn("Save brewery")}
+      {E.nav("Source water · Municipal · Denver", "every recipe starts here unless it overrides")}
       {E.nav("Locations", "Warehouse · Taproom")}
       {E.nav("Team", "3 members · 1 pending invite")}
       {E.nav("Accounting", "QuickBooks · connection and push defaults", "", QuickBooksMark)}
@@ -358,7 +379,7 @@ export const SCREENS: Screen[] = [
     body: (<>
       {E.back("Settings", "Locations", E.btn("Add location"))}
       {E.row("Warehouse", "warehouse · 186 inventory units", E.act("Edit"))}
-      {E.row("Taproom", "taproom · 11 taps · 2 bins", E.act("Edit"))}
+      {E.row("Taproom", "taproom · 11 taps · 3 bins", E.act("Edit"))}
     </>),
   },
   {
@@ -369,15 +390,15 @@ export const SCREENS: Screen[] = [
     to: { "Save location": "Locations" },
     job: "Edit one location and open its physical bins",
     reads: "list_locations",
-    writes: "update_location [design]",
+    writes: "update_location",
     states: [["permission", "admin only", 1], ["warehouse", "fulfillment source"], ["taproom", "POS and taps may map here"], ["in use", "type changes preserve history"]],
     spec: "Location facts stay separate from bins, which are their own list.",
     body: (<>
       {E.back("Locations", "Taproom")}
       {E.edit("Location name", "Taproom")}
-      {E.pick("Type", "Taproom", ["Warehouse", "Taproom"])}
+      {E.pick("Type", "Taproom", ["Warehouse", "Taproom", "Storage"])}
       {E.fld("Timezone", "Brewery default · America/New_York")}
-      {E.nav("Location bins", "Default · Walk-in · To-go fridge")}
+      {E.nav("Location bins", "Walk-in · Cold · Dry")}
       {E.btn("Save location")}
     </>),
   },
@@ -762,7 +783,7 @@ export const SCREENS: Screen[] = [
     name: "Record movement",
     to: { "Record movement": "Movement recorded" },
     job: "Enter a positive amount; server derives direction and barrels",
-    reads: "list_skus · list_locations · get_atp",
+    reads: "list_skus · list_locations · list_bins · get_atp",
     writes: "record_movement [existing; one append-only inventory movement]",
     states: [["offline", "Queue with requestId"], ["stale", "ATP changed · preview again", 1], ["permission", "warehouse or brewer required · sales reads Beer only", 1], ["echo", "Committed row · correction waits for schema gate"], ["unregistered destination", "Stout to OH warns and links to the registry · never blocks", 1]],
     spec: "The server derives sign and 0.50000000 bbl; the client never supplies either. Drawn with festival removal selected: sample and festival removal leave the premises and require a destination state (the schema enforces it); destruction, loss and depletion never carry one. An unregistered brand and destination warn here with the same copy the order screens use, because a festival removal leaves the premises exactly as a shipment does and was the one path that crossed a state line without saying so. This frame carries Hazy IPA into PA, which is registered, so the warning is a state rather than drawn copy. Channel stays.",
@@ -771,6 +792,7 @@ export const SCREENS: Screen[] = [
       <div className="hidden md:block">{E.chips(MOVEMENT_KINDS, 4)}</div>
       {E.nav("SKU / package", "Hazy IPA · ½ bbl keg")}
       {E.pick("Location", "Warehouse", ["Warehouse", "Taproom"])}
+      {E.pick("Bin", "Cold", ["Cold", "Dry", "Walk-in"])}
       {E.pick("Channel", "Taproom", CHANNELS)}
       {E.pick("Destination state", "PA · where the beer is poured", ["PA · where the beer is poured", "OH · where the beer is poured"])}
       {E.qty("1", E.tabs(["keg", "case", "bbl"], 0, "w-fit"))}
@@ -985,7 +1007,7 @@ export const SCREENS: Screen[] = [
     to: { Pick: "Pick", "Adjust order to 7 cases": "Pick" },
     job: "Resolve one short line before the pick can finish",
     reads: "get_order",
-    writes: "resolve_short_pick [design; one RPC: short_reason + chosen resolution (line qty + allocation) + order_events row]",
+    writes: "resolve_short_pick [one RPC: short_reason + chosen resolution (line qty + allocation) + order_events row]",
     states: [["permission", "warehouse or admin required", 1], ["adjust down", "ordered 10 → 7 · allocation shrinks · ATP recovers"], ["keep staged", "7 staged · 3 remain owed · the order keeps its Pick action"], ["resumed", "Pick reopens showing 7 already picked · only the owed 3 need counting"], ["stale", "another picker changed this line · recheck", 1], ["offline", "resolution waits for live ATP", 1]],
     spec: "Opens from a Pick line whose count is below ordered. Reason is required; exactly one resolution is chosen and the verb names it: adjusting the order is green (mutable order edit); keeping the remainder staged is also green. Keeping the remainder owed does not finish the pick: the order stays picked with a line below ordered and keeps its Pick row in Work and Today until every line reaches its ordered quantity, and reopening Pick shows what is already counted. The restock implication is copy in the preview, never a status column. Done picking completes afterward on the Pick frame.",
     body: (<>
@@ -1007,7 +1029,7 @@ export const SCREENS: Screen[] = [
     name: "Pick",
     job: "Default lines to ordered; touch only exceptions",
     reads: "get_order",
-    writes: "record_pick · resolve_short_pick [design; one RPC]",
+    writes: "record_pick · resolve_short_pick",
     states: [["permission", "warehouse or admin required", 1], ["short pick", "a line below ordered opens the Short pick frame", 1], ["partly picked", "reopened after a kept-owed line · counted lines start at what was picked"], ["concurrent", "another picker changed qty"], ["cancelled", "staged · restock now", 1], ["offline", "queue whole pick set once"]],
     spec: "2 taps from Today: Pick → Done picking (all-as-ordered only). Shortage is not a chip here: entering a count below ordered opens Short pick.",
     body: (<>
@@ -1029,7 +1051,7 @@ export const SCREENS: Screen[] = [
     to: { "Put back 3 cases": "Today" },
     job: "Confirm staged quantities were re-shelved after a restock",
     reads: "get_order [restock flag and staged qtys]",
-    writes: "confirm_restock [design; one RPC: clears needs_restock + order_events row]",
+    writes: "confirm_restock [one RPC: clears needs_restock + order_events row]",
     states: [["permission", "warehouse or admin required", 1], ["pending", "Today Put back is the standing row"], ["done", "flag cleared · row leaves Today"], ["cancelled order", "the flag survives cancel · this is the only way back"], ["stale", "someone re-picked · the flag is already clear", 1]],
     spec: "Today’s Put back row opens this. Staged 3 Pils cases after ORD-0229 was adjusted down. The verb writes: it clears the restock flag and appends the order event, because a cancelled order can never be re-picked or shipped and would otherwise leave its row standing on Today forever. Inventory already sits in Warehouse as staged, so nothing moves in the ledger.",
     body: (<>
@@ -1090,7 +1112,7 @@ export const SCREENS: Screen[] = [
     to: { "Ship order": "Shipment done" },
     job: "The On delivery state of Ship and invoice",
     reads: "get_order",
-    writes: "ship_order [SCHEMA-GATE: persist explicit on-delivery invoice timing on the shipment; then the same one RPC without the invoice; confirm_delivery invoices later]",
+    writes: "ship_order [invoice_timing = on_delivery persisted on the shipment; the same one RPC without the invoice; confirm_delivery invoices later]",
     states: [["stale", "picked qty changed · preview", 1], ["offline", "wait for live recheck", 1], ["permission", "warehouse or admin required", 1], ["schema gate", "deferred mode cannot persist yet", 1]],
     spec: "Folded into Ship and invoice as the On delivery chip. Same fields as Invoice now; the commit stays disabled until invoice timing can be saved. Two screens both titled Ship was confusing.",
     body: (<>
@@ -1223,16 +1245,16 @@ export const SCREENS: Screen[] = [
     to: { "Return shipment": "Order" },
     job: "Return beer and correct money atomically",
     reads: "get_order",
-    writes: "return_shipment [design; one RPC: return_in movements at explicit destination + loss movement for a damaged return + credit memo at the invoiced price + owned-fleet keg_events linked to shipment when slice 9 is enabled]",
+    writes: "return_shipment [one RPC: return_in movements at explicit destination + loss movement for a damaged return + credit memo at the invoiced price; owned-fleet keg_events linked to shipment when slice 9 is enabled]",
     states: [["permission", "sales or warehouse required", 1], ["unsold", "returns as sellable stock at the chosen destination"], ["damaged", "returns, then posts loss in the same RPC · never re-sold", 1], ["wrong item", "sellable · the mis-picked SKU goes back on the shelf"], ["invoice paid", "the credit memo sits unapplied as available credit", 1], ["partial", "only the returned units credit back"]],
-    spec: "Reason decides the beer, never the money. Unsold and wrong item return as sellable stock at the destination; damaged returns and is written to loss in the same RPC, because beer that came back broken is not inventory and pretending otherwise puts it back on a pick list. The credit is the price frozen on the original invoice line and the deposit is the one recorded on the original shipment, never today's price list, on the same principle that freezes a channel onto a movement at write time. A paid invoice can still be returned: the credit memo lands unapplied and sits as available credit, which is the state the QuickBooks credit-memo frame already draws.",
+    spec: "Reason decides the beer, never the money. Unsold and wrong item return as sellable stock at the destination; damaged returns and is written to loss in the same RPC, because beer that came back broken is not inventory and pretending otherwise puts it back on a pick list. The credit is the price frozen on the original invoice line and the deposit is the one recorded on the original shipment, never today's price group, on the same principle that freezes a channel onto a movement at write time. A paid invoice can still be returned: the credit memo lands unapplied and sits as available credit, which is the state the QuickBooks credit-memo frame already draws.",
     body: (<>
       {E.back("ORD-0231", "Beer return")}
       {E.row("Hazy IPA · ½ bbl keg", "shipped 4 · returning", E.stq(1))}
       {E.chips(["damaged", "wrong item", "unsold"])}
       {E.pick("Return to", "Warehouse · original fulfillment source", ["Warehouse · original fulfillment source", "Taproom"])}
       {E.row("Deposit refund", "½ bbl pool · 1 · as deposited", "−$30.00")}
-      {E.info(`Credited at the price on ${INV.no}, not today’s price list.`)}
+      {E.info(`Credited at the price on ${INV.no}, not today’s price group.`)}
       {E.tape([["+1 Hazy ½ bbl · return in", "Warehouse"], ["−1 Hazy ½ bbl · loss · damaged", "not sellable"], ["credit memo number · on commit", "−$180.00"]])}
       {E.note("Empty-keg asset returns are a different Keg fleet command.")}
       {E.sp()}
@@ -1300,7 +1322,7 @@ export const SCREENS: Screen[] = [
       {E.pick("Type", "Retailer", ["Retailer", "Distributor"])}
       {E.edit("License number", "PA R-55821")}
       {E.edit("Terms", "Net 30")}
-      {E.pick("Price list", "Wholesale · standard", ["Wholesale · standard", "Wholesale · distributor", "Taproom"])}
+      {E.pick("Sale channel", "Wholesale", CHANNELS)}
       {E.pick("Tax treatment", "Inherit from channel", ["Inherit from channel", ...TAX_TREATMENTS])}
       {E.nav("Ship-tos", "Main · Dock")}
       {E.row("Portal users", "2 active", E.act("Invite"))}
@@ -1441,7 +1463,7 @@ export const SCREENS: Screen[] = [
     to: { Review: "Invoice", Open: "Invoice" , "Write off": "Invoice" },
     job: "The AR list: what is due, what QuickBooks changed underneath it, and the drill-in for one invoice",
     reads: "list_invoices [qbo_sync_token + qbo_remote_state] · get_qbo_connection · get_qbo_mapping_candidates [design]",
-    writes: "connect_qbo · set_qbo_customer_mapping · set_qbo_item_mapping [design] · push_invoice_to_qbo [same requestId, except a deleted remote invoice, which pushes under a new one] · write_off_invoice [design; MGR status only, never touches QuickBooks]",
+    writes: "connect_qbo · set_qbo_customer_mapping · set_qbo_item_mapping [design] · push_invoice_to_qbo [design; same requestId, except a deleted remote invoice, which pushes under a new one] · write_off_invoice [design; MGR status only, never touches QuickBooks]",
     states: [["connection health", "QuickBooks · token healthy · company 9341"], ["expired", "Reconnect before mapping or push", 1], ["live", "the ordinary case; no badge at all"], ["edited there", "SyncToken changed since MGR pushed", 1], ["voided", "amounts zeroed; this is not payment", 1], ["deleted", "the id points at nothing; sync gets a 404", 1], ["not sent", "pushed but never delivered; only a fault if MGR is not the channel"], ["paid", "the paid date arrives from the QuickBooks Online sync · no user verb"], ["push failed", "the drill-in resolves each mapping", 1]],
     spec: <>QuickBooks has no read-only invoice. Once pushed, the accountant can edit, void or delete it from the Sales transactions sidebar and no API setting prevents that, so MGR detects rather than prevents. QuickBooks hands us the detector free: SyncToken increments on every modification and already rides the response the sync job reads for balance, so drift costs one column and no extra call. The rule this frame protects: <b>a voided invoice is not a paid invoice.</b> Voiding zeroes the amounts, so any logic inferring paid from a QuickBooks balance of zero books cancelled revenue as collected; collected revenue is a read-side rule, remote state live and balance zero, expressed once in the reporting view; no CHECK refuses a paid date, because paid-then-voided is a real history the row must be able to hold. MGR surfaces drift and stops: no re-push that overwrites an accountant’s correction, no field-level merge UI. The one exception is the deleted invoice, where the remote id points at nothing: dedupe on the original requestId would return the first result and create nothing, so that push carries a new requestId and produces a second QuickBooks invoice under the same MGR number. Ordinary retries keep the old requestId and stay protected. ASSUMPTION: a drifted invoice stays in AR at QuickBooks’ numbers, because QuickBooks owns the invoice after push. Drift is not a place, it is what some of these rows are doing, which is why it lives in the states of one list rather than a second one. Rows also carry the due date, push failure and credit-memo status; payments come back through the sync job and are read-only. A failed row opens the drill-in, where connection, each mapping and push are four independent commands, and push persists its exact payload and deterministic requestId before the remote POST. Creating a credit memo stays Return shipment.</>,
     body: (<>
@@ -1503,7 +1525,7 @@ export const SCREENS: Screen[] = [
     to: { "Hazy IPA": "Brand", Pils: "Brand", Stout: "Brand" },
     job: "Define brands, their sellable formats and prices without ledger writes",
     reads: "list_brands · list_skus",
-    writes: "upsert_brand · create_sku · update_sku · upsert_price_list · set_price_list_item [existing/design]",
+    writes: "upsert_brand · create_sku · update_sku [design]",
     states: DEFAULT_STATES,
     spec: "Brand facts (ABV and tax class) edit on Brand; SKU associates the brand with a Format. Volume and packaging stay on the Format. This page remains a list with simple pricing, never the v1 price matrix.",
     body: (<>
@@ -1511,7 +1533,8 @@ export const SCREENS: Screen[] = [
       {E.nav("Hazy IPA", "IPA · 6.8% · 3 SKUs")}
       {E.nav("Pils", "Lager · 4.9% · 2 SKUs")}
       {E.nav("Stout", "Stout · 7.2% · 1 SKU")}
-      {E.nav("Price lists", "3 tiers")}
+      {E.nav("Price groups", "3 channels · 8 groups")}
+      {E.nav("Water profiles", "3 profiles")}
     </>),
   },
   {
@@ -1540,9 +1563,9 @@ export const SCREENS: Screen[] = [
     name: "Brand",
     job: "Sellable facts without ledger writes, including the TTB fields",
     reads: "list_brands · list_skus",
-    writes: "upsert_brand* · create_sku* · update_sku",
+    writes: "upsert_brand · update_sku [design; the products to brands rename] · create_sku",
     states: [["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class; description, category, price group and hops optional"], ["new style", "typing a style no one has used offers Add; saved with the brand", 0], ["new SKU", "choose one existing Format; a poured format (pint, taster) is a SKU that holds no stock"], ["inactive SKU", "hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"]],
-    spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table [SCHEMA-GATE: a per-brewery styles table that the brand references]; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category, price group and hops are optional [SCHEMA-GATE: nullable columns on the brand; price group is a label the price tier prices by format, not a price on the brand (§16.4)]. Package facts live on Formats, while the SKU is the stable brand × format identity used by inventory, orders, pricing and provider mappings; draft pours are SKUs on a poured format (§16.2). No UPC scan or container source editor here.",
+    spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table [SCHEMA-GATE: a per-brewery styles table that the brand references]; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category and hops are optional nullable columns; price group is the row of the price grid the brand sits on, so the price of any of its SKUs is the cell where the customer's sale channel meets that group and the SKU's format. The brand carries no price of its own, and a brand on no group is unpriced everywhere. Package facts live on Formats, while the SKU is the stable brand × format identity used by inventory, orders, pricing and provider mappings; draft pours are SKUs on a poured format (§16.2). No UPC scan or container source editor here.",
     body: (<>
       {E.back("Catalog", "Hazy IPA")}
       {E.edit("Brand name", "Hazy IPA")}
@@ -1550,7 +1573,7 @@ export const SCREENS: Screen[] = [
         E.pick("Style", "Hazy IPA", ["Hazy IPA", "IPA", "Pils", "Add “Cold IPA”"]),
         E.edit("ABV", "6.8"),
         E.pick("Category", "Core", ["Core", "Seasonal", "One-off", "Barrel-aged"]),
-        E.pick("Price group", "Standard", ["Standard", "Specialty", "Barrel-aged"]),
+        E.pick("Price group", "3", ["1", "2", "3", "4", "5", "6", "7", "8"]),
       )}
       {E.ttl("Sell sheet")}
       {E.edit("Description", "Juicy, soft, Citra-forward")}
@@ -1570,10 +1593,11 @@ export const SCREENS: Screen[] = [
     reads: "get_sku · list_formats [design; §16.2]",
     writes: "create_sku · update_sku [SCHEMA-GATE: revision 2 §16.2, SKU becomes brand × format]",
     states: [["permission", "sales or admin required", 1], ["active", "available to price and sell"], ["inactive", "history remains", 1], ["in use", "format cannot change; create another SKU", 1]],
-    spec: "A SKU owns the stable sellable identity, active state, UPC/provider mappings and any price exception. Its name, volume and packaging derive from the selected Format. There are no SKU packaging overrides: a different volume or BOM is a different Format.",
+    spec: "A SKU owns the stable sellable identity, active state, provider mappings and any price exception. Its barcode is not its own: it resolves through the brand's price group for this format, so every brand in a group scans alike and there is no SKU override to drift. Its name, volume and packaging derive from the selected Format. There are no SKU packaging overrides: a different volume or BOM is a different Format.",
     body: (<>
       {E.pick("Format", "½ bbl keg", ["½ bbl keg", "⅙ bbl keg", "case · 24×16 oz"])}
       {E.row("Active", "available to price and sell", E.sw(true, "Active"))}
+      {E.fld("Barcode", `${INV.upc} · Standard group`)}
       {E.info("Volume and packaging come from the Format. Create another Format when either differs.")}
       {E.btn("Save SKU")}
     </>),
@@ -1814,7 +1838,7 @@ export const SCREENS: Screen[] = [
     portal: "Account",
     name: "Account",
     job: "Read own ship-to, signed-in membership and deposit details",
-    reads: "get_portal_account [design]",
+    reads: "get_portal_account",
     writes: "none",
     states: DEFAULT_STATES,
     spec: "Peer portal users are not listed; the composer exposes only account-safe reads and order commands.",
@@ -1984,18 +2008,19 @@ export const SCREENS: Screen[] = [
     slice: 4,
     tab: "Work",
     name: "Brew day",
-    to: { "2-row": "Entity picker", "Citra \u00b7 boil": "Entity picker", "Yeast": "Entity picker" },
+    to: { "2-row": "Entity picker", "Citra \u00b7 boil": "Entity picker", "Yeast": "Entity picker", "Brew sheet · Hazy IPA v4": "Mash schedule" },
     job: "Consume actual lots and set knockout baseline",
     reads: "get_brew_day [design]",
     writes: "record_brew_day [design; one RPC: additions + material movements + occupancy]",
     states: permitted("brewer or admin required"),
-    spec: "Brew-day mode: actual lots and knockout vessel. Planned recipe/date/barrels live on Schedule batch so this page has one primary. Record brew day posts immutable material consumption for mash/boil/whirlpool stages only; the 18 lb Citra dry hop is posted later from Cellar addition. Yeast is consumed as a material lot, not a culture generation (plan §8).",
+    spec: "The brew sheet row is a read-out of the version’s process spec, opened frozen; brew day captures actuals, and fermentation reality arrives through Fermentation reading, so there is no mash-actuals form here. Brew-day mode: actual lots and knockout vessel. Planned recipe/date/barrels live on Schedule batch so this page has one primary. Record brew day posts immutable material consumption for mash/boil/whirlpool stages only; the 18 lb Citra dry hop is posted later from Cellar addition. Yeast is consumed as a material lot, not a culture generation (plan §8).",
     body: (<>
       {E.back("Batches", "B-0416 · Hazy")}
       {E.nav("2-row", "lot L-0821 · 660 lb")}
       {E.nav("Citra · boil", "lot L-0790 · 6 lb")}
       {E.nav("Yeast", "WLP066 · lot Y-0312 · 1 brink")}
       {E.fld("Knockout baseline", <>14.6 bbl {E.arrow()} FV2</>)}
+      {E.nav("Brew sheet · Hazy IPA v4", "mash 3 steps · whirlpool 20 min · read only")}
       {E.tape([["Start B-0416 · Hazy IPA v4", ""], ["Consume additions", "named material lots"], [<>Knockout 14.6 bbl {E.arrow()} FV2</>, "loss baseline"]])}
       {E.sp()}
       {E.btn("Record brew day", "irr")}
@@ -2330,7 +2355,7 @@ export const SCREENS: Screen[] = [
     to: { "Save material": "Materials" },
     job: "Create or edit one material definition",
     reads: "list_materials",
-    writes: "upsert_material",
+    writes: "upsert_material [design]",
     states: [["permission", "warehouse or brewer required", 1], ["new", "name, kind and unit required"], ["in use", "unit change refused", 1], ["lot-tracked", "every receipt and consumption names a lot; off means none may"]],
     spec: "Inventory quantities and lots are not edited on the definition, and neither is lead time: the wait is a property of who fulfils an order, so it lives on the vendor. The purchase-unit factor does live here, because a hop box and a can pallet from one supplier are different numbers, and the factor is what turns counted bags into base units on Receive PO.",
     body: (<>
@@ -2435,27 +2460,180 @@ export const SCREENS: Screen[] = [
     slice: 3,
     tab: "More",
     name: "Recipe",
-    to: { Create: "Recipe", "Recipe parent \u00b7 Hazy IPA \u00b7 IPA": "Recipe" },
+    to: { Create: "Recipe", "Recipe parent \u00b7 Hazy IPA \u00b7 IPA": "Recipe", "Mash schedule · 3 steps": "Mash schedule", "Fermentation schedule · 4 stages": "Fermentation schedule", "Water · Municipal Denver to Hazy target": "Water" },
     job: "Author immutable versions from assumptions; actuals keep predictions honest",
     reads: "list_recipes · get_recipe [design] · get_recipe_outcomes [design; per-batch actual OG/FG/ABV + realized efficiency/attenuation, derived from fermentation readings, never stored]",
-    writes: "create_recipe [design; mutable parent row] · create_recipe_version [design; one RPC: immutable version + ingredients; SCHEMA-GATE: assumption columns on recipe_versions + per-ingredient extract snapshot + extract potential on materials; typed target_og/fg/abv columns drop]",
-    states: permitted("brewer or admin required"),
-    spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. Versioning is disabled behind its schema gate. A new parent takes name and style only; versions append, and history is never edited. Costing lives on desk.",
+    writes: "create_recipe [design; mutable parent row] · create_recipe_version [design; one RPC: immutable version + ingredients; SCHEMA-GATE: assumption and process-spec columns on recipe_versions (pre-boil volume, boil, whirlpool min/temp/rest, knockout temp, notes) + per-ingredient extract snapshot + extract potential on materials; typed target_og/fg/abv columns drop]",
+    states: [...permitted("brewer or admin required"), ["no group yet", "the brand picks one at packaging · nothing is blocked"]],
+    spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. Versioning is disabled behind its schema gate. A new parent takes name and style only; versions append, and history is never edited. Costing lives on desk. A version is the executable process spec, not only the prediction inputs: volumes, boil, whirlpool and knockout are scalars here, while the mash and fermentation schedules and water open as their own screens because they repeat and carry add, reorder and delete. The mash temperature is gone from this page, because every mash step carries one and a scalar beside them is a second answer to one question. Batch size and knockout volume are gone too: the scale chips already state the batch size and Brew day already records knockout volume as its baseline. Three note fields become one.",
     body: (<>
       {E.back("Recipes", "Hazy IPA v4")}
       {E.row("Recipe parent · Hazy IPA · IPA", "name and style only", E.act("Create"))}
+      {E.pick("Default price group · optional", "3", ["Not decided", "1", "2", "3", "4", "5", "6", "7", "8"])}
+      {E.info("A pre-fill for the brand a batch packages into, nothing more. The version carries no price and no group; changing this cuts no new version.")}
       {E.chips(["per bbl", "15 bbl", "30 bbl"], 1)}
       {E.row("2-row", "mash · 44 lb / bbl", "660 lb")}
       {E.row("Citra", "boil · 10 min · 0.4 lb / bbl", "6 lb")}
       {E.row("Citra", "dry hop · day 4 · 1.2 lb / bbl", "18 lb")}
       {E.row("+ add ingredient", "material · stage · timing", "")}
-      {E.fld("Mash temp", "152 °F")}
-      {E.fld("Brewhouse efficiency", "72 %")}
-      {E.fld("Yeast attenuation", "78 % · WLP066")}
+      {E.cols(
+        E.edit("Pre-boil volume bbl", "16.8", "number"),
+        E.edit("Boil time min", "60", "number"),
+      )}
+      {E.cols(
+        E.edit("Whirlpool min", "20", "number"),
+        E.edit("Whirlpool temp °F", "180", "number"),
+      )}
+      {E.cols(
+        E.edit("Whirlpool rest min", "10", "number"),
+        E.edit("Knockout temp °F", "65", "number"),
+      )}
+      {E.cols(
+        E.edit("Brewhouse efficiency %", "72", "number"),
+        E.edit("Yeast attenuation %", "78", "number"),
+      )}
+      {E.nav("Mash schedule · 3 steps", "152 °F saccharification rest")}
+      {E.nav("Fermentation schedule · 4 stages", "18 days · dry hop day 4 in Primary")}
+      {E.nav("Water · Municipal Denver to Hazy target", "3 salts and acids")}
+      {E.edit("Notes", "Whirlpool hard, knock out cold.")}
       {E.info("Predicted: OG 15.2 °P · FG 3.3 °P · ABV 6.5%")}
       {E.tape([["B-0413 · OG 14.8 · FG 3.5 · ABV 6.0%", "eff 68% · att 76%"], ["B-0398 · OG 15.1 · FG 3.4 · ABV 6.3%", "eff 71% · att 77%"]])}
       {E.note("Actuals run −0.4 °P OG vs predicted (eff 68–71% vs 72% assumed). Lower the assumption on v5?")}
       {E.gated("Create recipe version", "isn’t available yet: assumptions have no columns to live in. A brewery with no version cannot schedule a batch, so brew day waits on this too")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 3,
+    tab: "More",
+    name: "Mash schedule",
+    to: { Edit: "Mash step", "Add step": "Mash step", "Mash-in": "Mash step", Saccharification: "Mash step", "Mash-out": "Mash step" },
+    job: "Order the rests a brewer actually holds on the day",
+    reads: "get_recipe [design; the version’s mash schedule]",
+    writes: "create_recipe_version [design; the steps are written with their version, never alone; SCHEMA-GATE: recipe process spec]",
+    states: [["permission", "brewer or admin required", 1], ["draft", "steps add, reorder and delete"], ["frozen", "a cut version reads only · create the next version to change it", 1], ["empty", "no steps yet: Add step is the only action"]],
+    spec: "Its own screen because it repeats: add, reorder and delete are verbs a scalar field never needs, and inlining them on Recipe would give that page a second primary. A version is immutable, so this surface is an editor on a draft and a read-out once cut: one whole-screen mode rather than a toggle threaded through a long page. The footer names the conversion rest because Recipe no longer carries a mash temperature of its own; without it the number the prediction reads would have no visible home.",
+    body: (<>
+      {E.back("Recipe", "Hazy IPA v4 · Mash schedule", E.btn("Add step"))}
+      {MASH_STEPS.map((s) => (
+        <Fragment key={s.name}>{E.row(s.name, `${s.kind} · ${s.tempF} °F · ${s.duration} min`, E.act("Edit"))}</Fragment>
+      ))}
+      {E.info(`Total ${totalDuration(MASH_STEPS)} min · the ${saccharificationRest(MASH_STEPS)!.tempF} °F rest feeds the prediction.`)}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 3,
+    tab: "More",
+    surface: "sheet",
+    name: "Mash step",
+    to: { "Save step": "Mash schedule", "Delete step": "Mash schedule" },
+    job: "One rest: what the brewer does, at what temperature, for how long",
+    reads: "get_recipe [design]",
+    writes: "create_recipe_version [design; SCHEMA-GATE: recipe process spec]",
+    states: [["permission", "brewer or admin required", 1], ["draft", "editable until the version is cut"], ["frozen", "a cut version reads only", 1]],
+    spec: "Type and name both stay: they look redundant until a recipe has two infusion steps, where the type says what the brewer does and the name says which one it is. Position comes from list order, never a typed number.",
+    body: (<>
+      {E.edit("Step name", "Saccharification")}
+      {E.pick("Type", "infusion", ["infusion", "decoction", "direct heat", "rest"])}
+      {E.cols(
+        E.edit("Temp °F", "152", "number"),
+        E.edit("Duration min", "60", "number"),
+      )}
+      {E.edit("Notes · optional", "")}
+      {E.btns([["Delete step", "g"], "Save step"])}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 3,
+    tab: "More",
+    name: "Fermentation schedule",
+    to: { Edit: "Fermentation stage", "Add stage": "Fermentation stage", Primary: "Fermentation stage", "Diacetyl rest": "Fermentation stage", "Cold crash": "Fermentation stage", Conditioning: "Fermentation stage" },
+    job: "State the temperatures and days a batch is meant to hold",
+    reads: "get_recipe [design; the version’s fermentation schedule]",
+    writes: "create_recipe_version [design; written with their version, never alone; SCHEMA-GATE: recipe process spec]",
+    states: [["permission", "brewer or admin required", 1], ["draft", "stages add, reorder and delete"], ["frozen", "a cut version reads only · create the next version to change it", 1], ["empty", "no stages yet: Add stage is the only action"]],
+    spec: "The same shape as Mash schedule and for the same reason. The footer places the dry hop because Recipe draws a dry hop on a day number, and a day number means nothing without this list: day 4 is the last day of Primary, which is why a brewer chose it. The separate fermentation-days and conditioning-days fields v1 kept beside this list are dropped, because the list sums to them and two sources for one number is the failure this design keeps removing.",
+    body: (<>
+      {E.back("Recipe", "Hazy IPA v4 · Fermentation", E.btn("Add stage"))}
+      {FERM_STAGES.map((s) => (
+        <Fragment key={s.name}>{E.row(s.name, `${s.tempF} °F · ${s.duration} days`, E.act("Edit"))}</Fragment>
+      ))}
+      {E.info(`Total ${totalDuration(FERM_STAGES)} days · dry hop day 4 falls in Primary.`)}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 3,
+    tab: "More",
+    surface: "sheet",
+    name: "Fermentation stage",
+    to: { "Save stage": "Fermentation schedule", "Delete stage": "Fermentation schedule" },
+    job: "One stage: a temperature held for a number of days",
+    reads: "get_recipe [design]",
+    writes: "create_recipe_version [design; SCHEMA-GATE: recipe process spec]",
+    states: [["permission", "brewer or admin required", 1], ["draft", "editable until the version is cut"], ["frozen", "a cut version reads only", 1]],
+    spec: "Stage type and name both stay, as on Mash step: two custom stages need the type to say what happens and the name to say which one. Position comes from list order.",
+    body: (<>
+      {E.edit("Stage name", "Diacetyl rest")}
+      {E.pick("Stage", "diacetyl rest", ["primary", "secondary", "diacetyl rest", "cold crash", "conditioning", "lagering", "custom"])}
+      {E.cols(
+        E.edit("Temp °F", "72", "number"),
+        E.edit("Duration days", "2", "number"),
+      )}
+      {E.edit("Notes · optional", "")}
+      {E.btns([["Delete stage", "g"], "Save stage"])}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 3,
+    tab: "More",
+    name: "Water",
+    to: { Add: "Water addition", Edit: "Water addition", "Add addition": "Water addition", Gypsum: "Water addition", "Calcium chloride": "Water addition", "Lactic acid": "Water addition" },
+    job: "State the water a version starts from, aims at, and what goes in it",
+    reads: "get_recipe [design] · list_water_profiles [design]",
+    writes: "create_recipe_version [design; water values and the water additions are written with the version; SCHEMA-GATE: recipe process spec]",
+    states: [["permission", "brewer or admin required", 1], ["brewery source", "the source profile comes from Settings unless this version overrides it"], ["overridden source", "an osmosis blend or a second supply"], ["draft", "additions add, reorder and delete"], ["frozen", "a cut version reads only", 1]],
+    spec: "Source water is what comes out of the tap, so it is a Settings value and this screen shows it as the brewery default; a version overrides it only for the case that genuinely varies, an osmosis blend or a second supply. v1 stored it per recipe, so every recipe repeated the same municipal profile and a new water report meant editing all of them. Each addition carries one stage, not v1’s pair of timing and target: for water chemistry those are one axis wearing two hats, since a salt added at mash time goes into the mash by definition. The sulfate to chloride line is example text; ion deltas, salt contribution and pH prediction are calculations this slice does not build, and if they arrive they go through the same shared formula rule Recipe sets for gravity and strength.",
+    body: (<>
+      {E.back("Recipe", "Hazy IPA v4 · Water")}
+      {E.fld("Source profile", "Municipal · Denver · brewery default")}
+      {E.pick("Target profile", "Hazy target", ["Hazy target", "Burton", "Municipal · Denver"])}
+      {E.cols(
+        E.edit("Mash water gal", "9.5", "number"),
+        E.edit("Sparge water gal", "12.0", "number"),
+      )}
+      {E.edit("Target mash pH", "5.35")}
+      {E.ttl("Salts and acids")}
+      {E.row("Gypsum", "4.0 g · mash", E.act("Edit"))}
+      {E.row("Calcium chloride", "6.0 g · mash", E.act("Edit"))}
+      {E.row("Lactic acid", "3.0 mL · sparge", E.act("Edit"))}
+      {E.row("Add addition", "material · amount · stage", E.act("Add"))}
+      {E.info("Sulfate to chloride 0.9 · chloride forward, as the target says.")}
+    </>),
+  },
+  {
+    step: 7,
+    slice: 3,
+    tab: "More",
+    surface: "sheet",
+    name: "Water addition",
+    to: { "Save addition": "Water", "Delete addition": "Water" },
+    job: "One salt or acid, its amount, and where it goes",
+    reads: "get_recipe [design] · list_materials",
+    writes: "create_recipe_version [design; SCHEMA-GATE: recipe process spec]",
+    states: [["permission", "brewer or admin required", 1], ["draft", "editable until the version is cut"], ["frozen", "a cut version reads only", 1]],
+    spec: "One stage field, never a timing and a target both. The material comes from the materials catalog that already exists, so a salt is bought, stocked and consumed like any other input.",
+    body: (<>
+      {E.pick("Material", "Gypsum", ["Gypsum", "Calcium chloride", "Epsom salt", "Lactic acid", "Phosphoric acid"])}
+      {E.inline(
+        E.edit("Amount", "4.0", "number"),
+        E.pick("Unit", "g", ["g", "mL", "oz"]),
+      )}
+      {E.pick("Stage", "mash", ["mash", "sparge", "kettle"])}
+      {E.btns([["Delete addition", "g"], "Save addition"])}
     </>),
   },
   {
@@ -2632,18 +2810,19 @@ export const SCREENS: Screen[] = [
     name: "Keg fleet",
     to: { "Record keg return \u00b7 refund $120": "Keg event history" },
     job: "Manage pools and record events without confusing beer returns",
-    reads: "get_keg_fleet [view]",
+    reads: "get_keg_fleet [view] · keg_bin_totals [view]",
     writes: "create_keg_pool · update_keg_pool [design; mutable single rows] · record_keg_event [design; intents acquired / returned / lost / found / retired; returned = one RPC: keg event + standalone credit memo with keg_deposit_refund line]",
     states: [["acquire", "qty into pool · no customer"], ["return empty", "customer required · deposit refund previews"], ["lost / found", "customer balance moves · no money"], ["retire", "out of service · no customer"]],
     spec: "Return empty posts the deposit refund in the same RPC; there is no deposit-only screen. Beer coming back with the keg is Return shipment (beer + deposit). No dirty/clean CIP status.",
     body: (<>
       {E.back("Beer", "Keg fleet")}
-      {E.fld("Selected pool", "Owned ½ bbl · 203 kegs · $30 deposit")}
+      {E.fld("Selected pool", "Microstar ⅙ bbl · 76 kegs · pay per fill")}
       {E.pick("Kind", "Owned", ["Owned", "Leased", "Pay per fill"])}
       {E.fld("Vendor", "none · owned pools have no vendor")}
       {E.edit("Per-fill cost", "$0.00")}
       {E.btns([["Add keg pool", "g"], ["Save keg pool", "g"]])}
-      {E.row("Owned ½ bbl", "142 out · 61 in", "203")}
+      {E.row("Microstar ⅙ bbl · Warehouse", "36 in · Walk-in", "36")}
+      {E.row("Microstar ⅙ bbl · Storage", "40 in · Cold", "40")}
       {E.nav("Customer keg balance", "Ridgeline · 38 out · $1,140")}
       {E.nav("Keg report", "9 unreturned over 90 days")}
       {E.nav("Keg event history", "acquired, returned, lost, found, retired")}
@@ -2881,8 +3060,8 @@ export const SCREENS: Screen[] = [
     tab: "Work",
     name: "Confirm delivery",
     job: "Name receiving contact, then commit delivery and invoice",
-    reads: "get_delivery_stop [design; require persisted on-delivery invoice timing]",
-    writes: "confirm_delivery [design; one RPC: delivered_at + signed_by + invoice only when persisted mode is on-delivery; never ships]",
+    reads: "get_delivery_stop",
+    writes: "confirm_delivery [one RPC: delivered_at + signed_by + invoice only when persisted mode is on-delivery; never ships]",
     states: [["offline", "keep stop open; commit waits", 1], ["response lost", "same requestId returns result"], ["permission", "warehouse membership and being the route’s assigned driver, or admin", 1], ["success", "INV number after commit"]],
     spec: "2 taps: receiving-contact chip from the ship-to → Delivered. Back goes to Driver route. The receiving name is stored as text; the UI never implies a signature image is retained.",
     body: (<>
@@ -3207,28 +3386,29 @@ export const SCREENS: Screen[] = [
       {E.btn("Save override")}
     </>),
   },
-  // Revision 2 (schema §16, designed 2026-09-02, not migrated). Every commit
-  // here is drawn gated — the frames exist so the interface can settle before
-  // the one-pass migration, per §16's own build order — and each names its
-  // gate in `writes`, which is where every other gate in this file is found.
+  // Revision 2 (schema §16, designed 2026-09-02). Most commits here are still
+  // drawn gated — the frames exist so the interface can settle before the
+  // one-pass migration, per §16's own build order — and each names its gate in
+  // `writes`, which is where every other gate in this file is found. §16.3
+  // (sale channels) has shipped: its two frames below are ungated and live at
+  // /settings/channels.
   {
     step: 8,
     slice: 1,
     tab: "More",
     name: "Sale channels",
-    to: { Taproom: "Channel", Wholesale: "Channel", DTC: "Channel", Export: "Channel" },
+    to: { Taproom: "Channel", Wholesale: "Channel", DTC: "Channel", Export: "Channel", "Add channel": "Channel" },
     job: "Name the channels this brewery sells through and what each one is taxed as",
-    reads: "list_sale_channels [design; §16.3 + PR #42]",
-    writes: "upsert_sale_channel · delete_sale_channel [SCHEMA-GATE: revision 2 §16.3, sale_channels replaces the sale_channel enum]",
-    states: [["permission", "sales or admin required", 1], ["in use", "delete refused by on delete restrict · human copy, not a 23503", 1], ["seeded", "four defaults arrive with the brewery"], ["inherit", "a customer with no override takes the channel default"]],
+    reads: "list_sale_channels",
+    writes: "upsert_sale_channel · delete_sale_channel",
+    states: [["permission", "admin required", 1], ["in use", "delete refused by on delete restrict · human copy, not a 23503", 1], ["seeded", "four defaults arrive with the brewery"], ["inherit", "a customer with no override takes the channel default"]],
     spec: "The channel carries a name and a default tax treatment and nothing else: removal classification stays on the movement type, which is why #42 rejected giving the channel a removal flag or a required-destination-state flag. Resolution order is customer override → channel default, and the resolved value is frozen onto the movement at write time so editing a customer in March never restates January.",
     body: (<>
-      {E.back("Settings", "Sale channels")}
+      {E.back("Settings", "Sale channels", E.btn("Add channel"))}
       {E.nav("Wholesale", "taxable · 118 movements")}
       {E.nav("Taproom", "taxable · 402 movements")}
       {E.nav("DTC", "taxable · 34 movements")}
       {E.nav("Export", "export · 6 movements")}
-      {E.gated("Add channel", "isn’t available yet: channels are still a fixed list")}
     </>),
   },
   {
@@ -3239,15 +3419,15 @@ export const SCREENS: Screen[] = [
     name: "Channel",
     to: { "Save channel": "Sale channels" },
     job: "Create or edit one sale channel and its default tax treatment",
-    reads: "list_sale_channels [design; §16.3]",
-    writes: "upsert_sale_channel · delete_sale_channel [SCHEMA-GATE: revision 2 §16.3]",
-    states: [["permission", "sales or admin required", 1], ["new", "name and tax treatment required"], ["in use", "delete is refused", 1]],
+    reads: "list_sale_channels",
+    writes: "upsert_sale_channel · delete_sale_channel",
+    states: [["permission", "admin required", 1], ["new", "name and tax treatment required"], ["in use", "delete is refused", 1]],
     body: (<>
       {E.edit("Channel name", "Export")}
       {E.chips(TAX_TREATMENTS, 1)}
       {E.info("Customers may override this. Sales without a customer take the channel default.")}
       {E.note("A channel with movements cannot be deleted.")}
-      {E.gated("Save channel", "isn’t available yet: channels are still a fixed list")}
+      {E.btn("Save channel")}
     </>),
   },
   {
@@ -3257,7 +3437,7 @@ export const SCREENS: Screen[] = [
     name: "Formats",
     job: "Enter volume once on an atomic format and derive every shape above it",
     reads: "list_formats [design; §16.2] · get_format_components [design; §16.2a]",
-    writes: "upsert_format · replace_format_components [design; one RPC replaces the child set] · replace_format_bom [SCHEMA-GATE: revision 2 §16.2/16.2a/16.12: formats, format_components and format_bom supersede skus.bbl_per_unit and sku_bom]",
+    writes: "upsert_format · replace_format_components [one RPC replaces the child set] · replace_format_bom [one RPC replaces the bill; formats, format_components and format_bom superseded skus.bbl_per_unit and sku_bom]",
     states: [["permission", "sales or admin required", 1], ["atomic", "owns one volume entered in an allowed unit"], ["children missing", "a composed format cannot be created before its children", 1], ["poured", "never holds stock · a ratio back to the keg"], ["in use", "editing a format never moves frozen movement bbl"]],
     spec: "Volume is the basis of all TTB math, so exactly one atomic Format owns it. The input receives its allowed units per instance: US beer packages offer oz, gal and bbl; metric formats may offer mL and L. The server converts the entry to canonical bbl. Composed formats compute volume from their children, which is also what makes repack (§16.10) validated rather than asserted. The basis says only whether the shape holds stock. Each BOM line's on-break disposition is what the repack sheet reads.",
     body: (<>
@@ -3275,7 +3455,7 @@ export const SCREENS: Screen[] = [
     to: { "Save format": "Formats" },
     job: "Create or edit one atomic or composed package format",
     reads: "list_formats [design; §16.2] · get_format_components [design; §16.2a]",
-    writes: "upsert_format · replace_format_components · replace_format_bom [SCHEMA-GATE: revision 2 §16.2/16.2a/16.12]",
+    writes: "upsert_format · replace_format_components · replace_format_bom",
     states: [["permission", "sales or admin required", 1], ["atomic", "volume unit choices are set by this input"], ["composed", "volume derives from child formats"]],
     body: (<>
       {E.edit("Format name", "16 oz can")}
@@ -3290,63 +3470,93 @@ export const SCREENS: Screen[] = [
     </>),
   },
   {
-    step: 8,
+    step: 5,
     slice: 1,
     tab: "More",
-    name: "Price lists",
-    to: { Taproom: "Price tiers" },
-    job: "See customer price tiers and open the prices each tier owns",
-    reads: "list_price_lists",
-    writes: "none [creation and pricing happen on Price tiers]",
-    states: [["unused", "a tier with no customers can still be edited"], ["empty", "no price lists yet: Create price list is the only action"]],
-    spec: "Reached from Catalog. Each row names its next action and opens Price tiers; Create price list opens the same surface for a new tier.",
+    name: "Water profiles",
+    to: { Edit: "Water profile", "Add profile": "Water profile", "Municipal · Denver": "Water profile", Burton: "Water profile", "Hazy target": "Water profile" },
+    job: "Keep the water a brewery starts from and the waters it aims at",
+    reads: "list_water_profiles [design]",
+    writes: "none [creation and editing happen on Water profile]",
+    states: [["permission", "brewer or admin required", 1], ["source", "the brewery’s own supply · set once in Settings"], ["empty", "no profiles yet: Add profile is the only action"]],
+    spec: "A catalog entity beside Formats and price groups, because a profile is referenced by many recipes and edited in one place: a new water report is one edit, not fifty. No quick-create dialog, which v1 needed only because profiles were buried inside the recipe form; reached from Catalog, Add profile is already one tap away.",
     body: (<>
-      {E.back("Catalog", "Price lists", E.btn("Create price list"))}
-      {E.row("Wholesale · standard", "18 customers · 12 priced formats", E.act("Edit prices"))}
-      {E.row("Wholesale · distributor", "3 customers · 12 priced formats", E.act("Edit prices"))}
-      {E.row("Taproom", "no customers · 8 priced formats", E.act("Edit prices"))}
+      {E.back("Catalog", "Water profiles", E.btn("Add profile"))}
+      {E.row("Municipal · Denver", "Calcium 42 · Magnesium 8 · Sodium 22 · Sulfate 65 · Chloride 30 · Bicarbonate 110", E.act("Edit"))}
+      {E.row("Burton", "Calcium 275 · Magnesium 40 · Sodium 25 · Sulfate 610 · Chloride 35 · Bicarbonate 270", E.act("Edit"))}
+      {E.row("Hazy target", "Calcium 110 · Magnesium 10 · Sodium 15 · Sulfate 90 · Chloride 180 · Bicarbonate 40", E.act("Edit"))}
     </>),
   },
   {
-    step: 8,
-    slice: 1,
-    tab: "More",
-    name: "Price tiers",
-    to: { Edit: "Override", Add: "Override" },
-    job: "Price a format once per tier and override only the exceptions",
-    reads: "list_price_lists [+ channel_id §16.4] · get_price_list [design; formats and SKU overrides]",
-    writes: "upsert_price_list · set_price_list_format · set_price_list_item · clear_price_list_item [SCHEMA-GATE: revision 2 §16.4: price_lists.channel_id and price_list_formats]",
-    states: [["permission", "sales or admin required", 1], ["inherited", "the format price is what the customer sees"], ["overridden", "one brand × format priced away from the tier", 1], ["poured", "a pour is priceable here and is not a SKU"], ["no price", "neither a format default nor an override · the line cannot be sold", 1]],
-    spec: "Price lists are already tiers and the customer's assigned price list already assigns them; revision 2 adds the channel and makes a format priceable, so a taproom pour (which is not a SKU) can be priced at all. Drawn format-default with a per-SKU override, matching Menu and POS item, which already read “format default” and offer Reset to format price. §16.16 q1 leaves the direction open; drawing it the other way would make those two shipped frames inconsistent.",
-    body: (<>
-      {E.back("Price lists", "Wholesale tier")}
-      {E.edit("Tier name", "Wholesale · standard")}
-      {E.pick("Channel", "Wholesale", CHANNELS)}
-      {E.ttl("Format defaults")}
-      {E.tbl(["Format", "Price", "Source"], [["½ bbl keg", INV.hazyPrice, "tier default"], ["sixtel", "$95.00", "tier default"], ["case · 24×16oz", INV.pilsPrice, "tier default"]])}
-      {E.ttl("Brand × format overrides")}
-      {E.row("Barrel-aged Stout · ½ bbl keg", `$240.00 · against a ${INV.hazyPrice} default`, E.act("Edit"), "w")}
-      {E.row("Add override", "brand · format · price", E.act("Add"))}
-      {E.info(`All halves are ${INV.hazyPrice}, except the barrel-aged one. Clear an override and the row rejoins the tier.`)}
-    </>),
-  },
-  {
-    step: 8,
+    step: 5,
     slice: 1,
     tab: "More",
     surface: "sheet",
-    name: "Override",
-    to: { "Save override": "Price tiers", "Clear override": "Price tiers" },
-    job: "Price one brand and format away from its tier default",
-    reads: "get_price_list [design; §16.4]",
-    writes: "set_price_list_item · clear_price_list_item [SCHEMA-GATE: revision 2 §16.4]",
-    states: [["permission", "sales or admin required", 1], ["overridden", "customer sees this price"], ["cleared", "format default applies"]],
+    name: "Water profile",
+    to: { "Save profile": "Water profiles" },
+    job: "Name a water and its six ions",
+    reads: "get_water_profile [design]",
+    writes: "upsert_water_profile [design; SCHEMA-GATE: a water profiles table]",
+    states: [["permission", "brewer or admin required", 1], ["in use", "a profile a recipe references cannot be deleted", 1]],
+    spec: "Six ions in parts per million, the set every brewing water calculation reads. No ion arithmetic here: this screen records a measurement or a target, and any delta between two profiles is a calculation this slice does not build.",
     body: (<>
-      {E.pick("Brand", "Barrel-aged Stout", ["Barrel-aged Stout", "Hazy IPA", "Pils"])}
-      {E.pick("Format", "½ bbl keg", ["½ bbl keg", "⅙ bbl keg", "case · 24×16oz"])}
-      {E.inp("Price", "$240.00")}
-      {E.info(`Clear this override to use the ${INV.hazyPrice} format default.`)}
-      {E.btns([["Clear override", "g"], "Save override"])}
+      {E.edit("Profile name", "Hazy target")}
+      {E.cols(
+        E.edit("Calcium ppm", "110", "number"),
+        E.edit("Magnesium ppm", "10", "number"),
+      )}
+      {E.cols(
+        E.edit("Sodium ppm", "15", "number"),
+        E.edit("Sulfate ppm", "90", "number"),
+      )}
+      {E.cols(
+        E.edit("Chloride ppm", "180", "number"),
+        E.edit("Bicarbonate ppm", "40", "number"),
+      )}
+      {E.btn("Save profile")}
+    </>),
+  },
+  {
+    step: 8,
+    slice: 1,
+    tab: "More",
+    name: "Price groups",
+    to: { "1": "Price group", "2": "Price group", "3": "Price group" },
+    job: "Price every beer from one grid: groups down, formats across, a table per sale channel",
+    reads: "list_sale_channels · list_price_groups · list_formats · list_channel_prices",
+    writes: "set_channel_price · clear_channel_price · upsert_price_group · delete_price_group",
+    states: [["permission", "sales or admin required", 1], ["empty cell", "unpriced · an order for a SKU on that group and format is refused on that channel", 1], ["empty", "no price groups yet: Create price group is the only action"], ["in use", "a group a brand sits on, or a cell prices, cannot be removed", 1]],
+    spec: "Reached from Catalog. The brewery's price sheet is one grid: rows are price groups, columns are formats, and each sale channel gets its own table. A beer sits on one group (Catalog → Brand → Price group) and a customer sits on one channel, so the price of any SKU for any customer is the single cell where the two meet. Nothing else prices anything: no per-customer list, no per-SKU exception (the barrel-aged one is simply a higher group), no brewery default. Tapping a cell edits that one price; clearing it makes those SKUs unpriced on that channel. A group's name opens Price group, where its position and cost ceiling live.",
+    body: (<>
+      {E.back("Catalog", "Price groups", E.btn("Create price group"))}
+      {E.info("Rows are price groups and columns are formats, one table per sale channel. A beer sits on one group and a customer on one channel; the cell where they meet is the price.")}
+      {E.ttl("Wholesale")}
+      <div className="min-w-0 overflow-x-auto">{E.tbl(["Group", "½ bbl keg", "sixtel", "case · 24×16oz"], [[E.link("1", "Price group"), "$132.00", "$53.00", "$46.00"], [E.link("2", "Price group"), INV.hazyPrice, "$95.00", INV.pilsPrice], [E.link("3", "Price group"), "$240.00", "$140.00", "not priced"]])}</div>
+      {E.ttl("Taproom")}
+      <div className="min-w-0 overflow-x-auto">{E.tbl(["Group", "pint", "crowler"], [[E.link("1", "Price group"), "$7.00", "$14.00"], [E.link("2", "Price group"), "$8.00", "$16.00"], [E.link("3", "Price group"), "$11.00", "not priced"]])}</div>
+      {E.info("An empty cell is unpriced: those SKUs cannot be ordered on that channel. Clear a cell to unprice it again.")}
+    </>),
+  },
+  {
+    step: 8,
+    slice: 1,
+    tab: "More",
+    name: "Price group",
+    to: { Remove: "Price groups", "Remove price group": "Price groups" },
+    job: "Name one row of the price grid, place it, and give it an optional cost ceiling",
+    reads: "list_price_groups",
+    writes: "upsert_price_group · delete_price_group",
+    states: [["permission", "sales or admin required", 1], ["no ceiling", "the group is chosen by hand · nothing is suggested"], ["suggested", "a cost inside the band proposes this group · a person confirms", 0], ["in use", "a brand sits on it or a cell prices it · Remove is refused", 1]],
+    spec: "A price group is one row of the grid and holds no prices of its own: the prices are the cells on Price groups. What lives here is the row itself: its name, its position in the sheet, and the optional cost ceiling that sorts the rows and suggests a group for a beer whose cost lands in the band. Nobody is moved automatically, and costing does not exist yet, so nothing reads the ceiling today. Removal is refused while a brand sits on the group or any cell prices it, in product words rather than a foreign-key error.",
+    body: (<>
+      {E.back("Price groups", "2")}
+      {E.edit("Group name", "2")}
+      {E.edit("Position", "2", "number")}
+      {E.edit("Cost ceiling", "$1.85")}
+      {E.info("Groups sort by position, and the lower bound of a ceiling is the previous group’s. A cost inside this band suggests the group; nobody is moved automatically. Leave it empty and it reads none.")}
+      {E.fld("Cost ceiling · group 1", "none")}
+      {E.fld("Prices", `${INV.hazyPrice} on Wholesale · ½ bbl keg, and 5 more cells`)}
+      {E.row("Remove price group", "refused while a brand sits on it or a cell prices it", E.act("Remove", "destructive"), "w")}
     </>),
   },
   {
@@ -3354,18 +3564,18 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Location bins",
-    to: { Taproom: "Bin" },
+    to: { "Walk-in": "Bin", Cold: "Bin", Dry: "Bin", "Add bin": "Bin" },
     job: "Subdivide a location without making every query carry an or-null",
-    reads: "list_locations · list_bins [design; §16.6]",
-    writes: "create_bin · update_bin · delete_bin [SCHEMA-GATE: revision 2 §16.6: bins, inventory_movements.bin_id not null, taproom_pars re-keyed on bin]",
-    states: [["permission", "warehouse or admin required", 1], ["default bin", "created with the location · cannot be deleted", 1], ["in use", "a bin holding stock cannot be deleted", 1], ["par on a bin", "keep 4 cases in the to-go fridge"]],
-    spec: "Every location gets a default bin created with it, so the bin is required everywhere it appears (movements, pars, menus) and no on-hand or availability query carries a nullable branch. One setup artifact bought against a whole class of null handling. Bins are physical subdivisions a menu can read; they are explicitly not tap lines (§16.8), which are hand-maintained state nothing downstream validates.",
+    reads: "list_locations · list_bins",
+    writes: "create_bin · update_bin · delete_bin",
+    states: [["permission", "warehouse or admin required", 1], ["last bin", "a location keeps at least one · rename it instead", 1], ["has history", "a bin that ever recorded stock is renamed, not removed", 1], ["par on a bin", "keep 4 cases in the to-go fridge"]],
+    spec: "Every location starts with Walk-in, Cold and Dry. Rename or remove what doesn’t match the building, but a location always keeps one bin, so no on-hand or availability query carries a nullable branch. Bins are physical subdivisions a menu can read; they are explicitly not tap lines (§16.8), which are hand-maintained state nothing downstream validates.",
     body: (<>
       {E.back("Settings", "Taproom · bins")}
-      {E.gated("Taproom", "the default bin · created with the location and cannot be removed")}
       {E.nav("Walk-in", "38 cases · 12 kegs")}
-      {E.nav("To-go fridge", "22 cases · par 4 cases")}
-      {E.gated("Add bin", "isn’t available yet: a location is still one undivided space")}
+      {E.nav("Cold", "22 cases")}
+      {E.nav("Dry", "6 cases")}
+      {E.btn("Add bin", "g")}
     </>),
   },
   {
@@ -3376,17 +3586,14 @@ export const SCREENS: Screen[] = [
     name: "Bin",
     to: { "Save bin": "Location bins" },
     job: "Create or edit one physical subdivision of a location",
-    reads: "get_bin [design; §16.6]",
-    writes: "create_bin · update_bin · delete_bin [SCHEMA-GATE: revision 2 §16.6]",
-    states: [["permission", "warehouse or admin required", 1], ["default", "cannot be removed", 1], ["in use", "delete is refused", 1], ["empty", "safe to remove"]],
+    reads: "list_bins",
+    writes: "create_bin · update_bin · delete_bin",
+    states: [["permission", "warehouse or admin required", 1], ["last bin", "rename it instead of removing it", 1], ["has history", "a bin that ever recorded stock is renamed, not removed", 1], ["empty", "safe to remove"]],
     body: (<>
-      {E.edit("Bin name", "To-go fridge")}
-      {E.pick("Kind", "Packaged storage", ["Packaged storage", "Cold storage", "Dry storage"])}
-      {E.edit("Par", "4", "number")}
-      {E.info("This is the same par Pars and allocation edits. A par belongs to a bin; there is only ever one number.")}
-      {E.info("A brewery that never subdivides sees one bin and ignores it.")}
+      {E.edit("Bin name", "Cold")}
+      {E.info("A location keeps at least one bin. Rename the last one rather than removing it.")}
       {E.note("Tap lines are not bins. The tap board owns those.")}
-      {E.gated("Save bin", "isn’t available yet: a location is still one undivided space")}
+      {E.btn("Save bin")}
     </>),
   },
   {
@@ -3606,7 +3813,7 @@ export const SCREENS: Screen[] = [
     name: "Link identity",
     job: "Link one Slack user to one current brewery staff membership",
     reads: "get_chat_link_status",
-    writes: "issue_chat_link_proof · consume_chat_link_proof [single-use, authenticated MGR completion]",
+    writes: "issue_chat_link_proof · consume_chat_link_proof [design; single-use, authenticated MGR completion]",
     states: [["expired", "link expired · create a new one", 1], ["not staff", "customer and removed membership rejected", 1], ["linked", "show personal queue"]],
     spec: "Slack profile email and display name are never identity. The deep link requires normal MGR authentication.",
     body: (<>
@@ -3638,7 +3845,7 @@ export const SCREENS: Screen[] = [
     name: "Personal DM",
     job: "Notify once when linked work becomes assigned, due or overdue",
     reads: "get_notification_occurrence [design] · owning Today query revalidation",
-    writes: "snooze_notification · set_notification_preference [integration state only]",
+    writes: "snooze_notification · set_notification_preference [design; integration state only]",
     states: [["quiet hours", "queued until personal window opens"], ["resolved", "same message updates to Resolved"], ["retry", "same semantic delivery; no second message"], ["unauthorized", "suppress and unlink if membership ended", 1]],
     spec: "The provider message is a projection. Deleting it does not change MGR. Deep links contain no trusted actor or tenant claims.",
     body: (<>
@@ -3685,7 +3892,7 @@ export const SCREENS: Screen[] = [
     name: "Fermentation reading form",
     job: "Preview the first eligible operational modal without enabling it early",
     reads: "get_fermentation_reading_preview [view; gated; current occupancy/version]",
-    writes: "record_fermentation_reading [gated; request replay + version + correction contract]",
+    writes: "record_fermentation_reading [IMPLEMENTATION-GATE: request replay + version + correction contract]",
     states: [["not yet eligible", "open the MGR reading flow instead", 1], ["stale", "occupancy changed · refresh", 1], ["response lost", "the same request returns the first result"]],
     spec: "Future phase only. Personal destination, canonical preview and explicit Record reading confirmation. A new reading corrects history; prior rows never edit.",
     body: (<>

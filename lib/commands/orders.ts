@@ -70,6 +70,50 @@ defineCommand({
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("cancel_order", { p_order: i.orderId, p_reason: i.reason, p_request_id: execution.requestId })),
 });
 
+defineCommand({
+  name: "confirm_restock", description: "Confirm staged quantities were put back; clears needs_restock; no ledger movement",
+  roles: [...warehouseRoles],
+  input: z.object({ orderId: z.string().uuid() }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("confirm_restock", { p_order: i.orderId, p_request_id: execution.requestId })),
+});
+
+defineCommand({
+  name: "resolve_short_pick", description: "Resolve one line counted below ordered: adjust the order down to the count, or keep the remainder owed",
+  roles: [...warehouseRoles],
+  input: z.object({
+    orderId: z.string().uuid(), lineId: z.string().uuid(), qtyPicked: z.number().nonnegative(),
+    reason: z.string().trim().min(1), resolution: z.enum(["adjust_down", "keep_owed"]),
+  }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("resolve_short_pick", {
+    p_order: i.orderId, p_line: i.lineId, p_qty_picked: i.qtyPicked, p_reason: i.reason, p_resolution: i.resolution, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "confirm_delivery", description: "Sign a delivery stop; an on-delivery shipment gets its invoice now (shipped quantities, order prices); never moves stock",
+  roles: [...warehouseRoles], requiresConfirmation: true,
+  input: z.object({ deliveryId: z.string().uuid(), signedBy: z.string().trim().min(1) }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("confirm_delivery", { p_delivery: i.deliveryId, p_signed_by: i.signedBy, p_request_id: execution.requestId })),
+});
+
+defineQuery({
+  name: "get_delivery_stop", description: "One delivery stop: route, ship-to, shipped lines, invoice timing, and whether it is signed",
+  roles: [...readRoles],
+  input: z.object({ deliveryId: z.string().uuid() }),
+  handler: async (ctx, i) => {
+    const delivery = await unwrap(ctx.db.from("deliveries")
+      .select("id, stop_no, delivered_at, signed_by, routes(id, name, delivery_date, driver_user_id), shipments(id, invoice_timing, orders(id, order_no, customers(name), ship_tos(label, city, state)))")
+      .eq("id", i.deliveryId).single());
+    // to-one embeds come back as objects; without generated types supabase-js says array
+    const { shipments } = delivery as unknown as { shipments: { id: string; orders: { id: string } } };
+    const [lines, invoice] = await Promise.all([
+      unwrap(ctx.db.from("order_lines").select("id, qty_shipped, skus(name)").eq("order_id", shipments.orders.id).gt("qty_shipped", 0)),
+      unwrap(ctx.db.from("invoices").select("id, invoice_no").eq("shipment_id", shipments.id).eq("kind", "invoice").maybeSingle()),
+    ]);
+    return { delivery, lines, invoice };
+  },
+});
+
 const pickLines = z.array(z.object({ lineId: z.string().uuid(), qty: z.number().nonnegative() })).min(1);
 
 defineCommand({
@@ -82,15 +126,55 @@ defineCommand({
 });
 
 defineCommand({
-  name: "ship_order", description: "Ship a picked order: movements + allocation fulfillment + invoice, one transaction",
+  name: "ship_order", description: "Ship a picked order: movements + allocation fulfillment + invoice (now, or deferred to confirm_delivery), one transaction; anything held back below picked flags a restock",
   roles: [...warehouseRoles], requiresConfirmation: true,
   input: z.object({
     orderId: z.string().uuid(), carrier: z.string().optional(), tracking: z.string().optional(),
-    ship: pickLines,
+    ship: pickLines, invoiceTiming: z.enum(["now", "on_delivery"]).default("now"),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("ship_order", {
     p_order: i.orderId, p_ship: i.ship.map(s => ({ line_id: s.lineId, qty_shipped: s.qty })),
-    p_carrier: i.carrier ?? null, p_tracking: i.tracking ?? null, p_request_id: execution.requestId,
+    p_carrier: i.carrier ?? null, p_tracking: i.tracking ?? null, p_invoice_timing: i.invoiceTiming, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "release_allocation", description: "Release one open reservation so its quantity returns to ATP",
+  roles: [...salesRoles],
+  input: z.object({ allocationId: z.string().uuid() }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("release_allocation", { p_allocation: i.allocationId, p_request_id: execution.requestId })),
+});
+
+defineQuery({
+  name: "get_shortfalls", description: "SKUs whose available-to-promise is negative, with on-hand and open reservations",
+  roles: [...readRoles],
+  input: z.object({}),
+  handler: async (ctx) => {
+    const [atp, onHand, allocs] = await Promise.all([
+      unwrap(ctx.db.from("atp").select("sku_id, qty, skus(name)").eq("brewery_id", ctx.breweryId).lt("qty", 0)),
+      unwrap(ctx.db.from("on_hand").select("sku_id, qty").eq("brewery_id", ctx.breweryId)),
+      unwrap(ctx.db.from("allocations").select("sku_id, qty").eq("brewery_id", ctx.breweryId).eq("status", "open")),
+    ]);
+    const sum = (rows: { sku_id: string; qty: number }[]) => rows.reduce((m, r) => m.set(r.sku_id, (m.get(r.sku_id) ?? 0) + Number(r.qty)), new Map<string, number>());
+    const onHandBySku = sum(onHand as { sku_id: string; qty: number }[]);
+    const allocatedBySku = sum(allocs as { sku_id: string; qty: number }[]);
+    return (atp as unknown as { sku_id: string; qty: number; skus: { name: string } | null }[]).map((r) => ({
+      skuId: r.sku_id, skuName: r.skus?.name ?? r.sku_id, atp: Number(r.qty),
+      onHand: onHandBySku.get(r.sku_id) ?? 0, allocated: allocatedBySku.get(r.sku_id) ?? 0,
+    }));
+  },
+});
+
+defineCommand({
+  name: "return_shipment", description: "Return shipped beer: credit memo at the invoiced price + return_in at the destination; a damaged return is also written to loss in the same transaction",
+  roles: [...salesRoles], requiresConfirmation: true,
+  input: z.object({
+    invoiceId: z.string().uuid(), locationId: z.string().uuid(), reason: z.enum(["damaged", "wrong_item", "unsold"]),
+    lines: z.array(z.object({ invoiceLineId: z.string().uuid(), qty: z.number().positive() })).min(1),
+  }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("return_shipment", {
+    p_invoice: i.invoiceId, p_lines: i.lines.map(l => ({ invoice_line_id: l.invoiceLineId, qty: l.qty })),
+    p_location: i.locationId, p_reason: i.reason, p_request_id: execution.requestId,
   })),
 });
 

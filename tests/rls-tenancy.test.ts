@@ -1,14 +1,14 @@
 // tests/rls-tenancy.test.ts
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaff, makeCustomerUser, asUser } from "./helpers";
+import { admin, channelId, makeBrewery, makeStaff, makeCustomerUser, asUser, seedCustomer } from "./helpers";
 
 describe("tenancy RLS", () => {
   let bA: any, bB: any, staffA: any, custB: any;
   beforeAll(async () => {
     bA = await makeBrewery(); bB = await makeBrewery();
     staffA = await makeStaff(bA.id, "admin");
-    const { data: c } = await admin.from("customers").insert({ brewery_id: bB.id, name: "Bar X", state: "PA" }).select().single();
-    custB = { customer: c, user: await makeCustomerUser(c!.id) };
+    const c = { id: (await seedCustomer(bB.id, { name: "Bar X" })).customerId };
+    custB = { customer: c, user: await makeCustomerUser(c.id) };
   });
 
   it("staff of A cannot see brewery B", async () => {
@@ -20,13 +20,13 @@ describe("tenancy RLS", () => {
 
   it("staff of A cannot insert customers into B", async () => {
     const db = await asUser(staffA.email);
-    const { error } = await db.from("customers").insert({ brewery_id: bB.id, name: "sneaky", state: "PA" });
+    const { error } = await db.from("customers").insert({ brewery_id: bB.id, name: "sneaky", state: "PA", sale_channel_id: await channelId(bB.id, "Wholesale") });
     expect(error).not.toBeNull();
   });
 
   it("staff of A cannot directly insert customers into their own brewery", async () => {
     const db = await asUser(staffA.email);
-    const { error } = await db.from("customers").insert({ brewery_id: bA.id, name: "raw own brewery customer", state: "PA" });
+    const { error } = await db.from("customers").insert({ brewery_id: bA.id, name: "raw own brewery customer", state: "PA", sale_channel_id: await channelId(bA.id, "Wholesale") });
     expect(error?.code).toBe("42501");
   });
 
@@ -61,7 +61,7 @@ describe("brewery column exposure", () => {
     staff = await makeStaff(brewery.id, "admin");
     const { data: c, error: customerError } = await admin
       .from("customers")
-      .insert({ brewery_id: brewery.id, name: "Portal Bar", state: "PA" })
+      .insert({ brewery_id: brewery.id, name: "Portal Bar", state: "PA", sale_channel_id: await channelId(brewery.id, "Wholesale") })
       .select()
       .single();
     if (customerError) throw customerError;
@@ -71,7 +71,7 @@ describe("brewery column exposure", () => {
     // "has some customer" (dropping my_customer_ids) would leak it.
     const { error: otherCustomerError } = await admin
       .from("customers")
-      .insert({ brewery_id: otherBrewery.id, name: "Other Portal Bar", state: "NY" });
+      .insert({ brewery_id: otherBrewery.id, name: "Other Portal Bar", state: "NY", sale_channel_id: await channelId(otherBrewery.id, "Wholesale") });
     if (otherCustomerError) throw otherCustomerError;
   });
 

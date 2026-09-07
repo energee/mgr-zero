@@ -38,13 +38,18 @@ $$;
 create type staff_role as enum ('admin','sales','warehouse','brewer');
 create type customer_type as enum ('distributor','retailer','brewery','other');
 create type package_type as enum ('keg','can','bottle');
+create type format_basis as enum ('packaged','poured');
 create type keg_size as enum ('half_bbl','quarter_bbl','sixth_bbl','fifty_l','thirty_l','twenty_l');
 create type keg_container_source as enum ('owned_fleet','per_fill_rental','one_way_material');
-create type location_kind as enum ('warehouse','taproom');
+create type location_kind as enum ('warehouse','taproom','storage');
 create type movement_type as enum
   ('opening_balance','production_in','adjustment','sale_removal','taproom_transfer',
-   'depletion','return_in','destruction','loss','sample','festival_removal');
-create type sale_channel as enum ('wholesale','taproom','dtc','export');
+   'depletion','return_in','destruction','loss','sample','festival_removal','location_transfer');
+-- TTB removal tax treatment (§16.3). `taxable` is a taxpaid removal; the rest
+-- are the removals-without-payment-of-tax vocabulary. A sale channel carries a
+-- default, a customer may override it, and the resolved value is frozen onto
+-- the movement so a filed month is never restated by a later edit.
+create type tax_treatment as enum ('taxable','export','vessel_supplies','research','transfer_in_bond');
 create type allocation_source as enum ('order_line','taproom_standing');
 create type allocation_status as enum ('open','fulfilled','released');
 create type order_kind as enum ('wholesale','taproom_transfer');
@@ -55,13 +60,14 @@ create type qbo_sync_status as enum ('pending','pushed','push_failed');
 create type material_category as enum ('malt','hop','yeast','adjunct','chemical','packaging','other');
 create type uom as enum ('lb','kg','oz','g','each','l','gal','ml');
 create type material_movement_type as enum
-  ('opening_balance','receipt','consumption','return_to_stock','loss','adjustment','count_adjustment');
+  ('opening_balance','receipt','consumption','return_to_stock','loss','adjustment','count_adjustment','transfer_out','transfer_in');
 create type po_status as enum ('draft','sent','partially_received','received','cancelled');
 create type ingredient_stage as enum ('mash','boil','whirlpool','fermentation','dry_hop','packaging','other');
 create type vessel_kind as enum ('fermenter','brite','barrel','kettle','other');
 create type volume_adjustment_reason as enum ('loss','dump','gain','measurement');
 create type keg_pool_kind as enum ('owned','leased','pay_per_fill');
-create type keg_event_reason as enum ('acquired','retired','shipped','returned','lost','found');
+create type keg_event_reason as enum ('acquired','retired','shipped','returned','lost','found','transferred_out','transferred_in');
+create type stock_transfer_status as enum ('draft','submitted','picked','in_transit','received','cancelled');
 create type approval_kind as enum ('cola','formula');
 
 -- ---------------------------------------------------------------- core
@@ -104,7 +110,7 @@ create table brewery_counters (
   key text not null,
   next bigint not null default 1,
   primary key (brewery_id, key),
-  check (key in ('batch', 'run', 'po', 'order', 'invoice'))   -- the committed document kinds
+  check (key in ('batch', 'run', 'po', 'order', 'invoice', 'transfer'))   -- the committed document kinds
 );
 create function private.next_no(b uuid, k text) returns bigint
 language sql security definer set search_path = '' as $$
@@ -130,9 +136,11 @@ create table customers (
   type customer_type not null default 'retailer',
   license_no text,
   state text not null check (state ~ '^[A-Z]{2}$'),   -- home state
-  price_list_id uuid,                                  -- FK added after price_lists
+  sale_channel_id uuid not null,                       -- FK added after sale_channels
   qbo_customer_id text,
   payment_terms text not null default 'net30',
+  -- null = inherit the sale channel's default tax treatment (§16.3).
+  tax_treatment tax_treatment,
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
   unique (brewery_id, name)
@@ -214,17 +222,97 @@ create table material_lots (
 );
 
 -- ---------------------------------------------------------------- catalog
-create table products (
+-- The brewery's own style list (Brand screen: a picker; typing a new one
+-- offers Add and the brand save creates it). No separate styles screen.
+create table styles (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
   name text not null,
-  style text,
-  abv numeric(4,2),
-  ttb_tax_class text not null default 'beer',
-  created_at timestamptz not null default now(),
   unique (id, brewery_id),
   unique (brewery_id, name)
 );
+
+-- A row of the price grid (specs/2026-09-07-mgr-pricing-grid-naming.md): the
+-- brands that sit on it all price alike, cell by cell, in channel_prices below.
+create table price_groups (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references breweries(id),
+  name text not null,
+  position int not null,
+  cost_ceiling_cents int check (cost_ceiling_cents >= 0),   -- suggests a group once costing exists (#189 D7); never assigns
+  created_at timestamptz not null default now(),
+  unique (id, brewery_id),
+  unique (brewery_id, name),
+  unique (brewery_id, position)
+);
+create index price_groups_brewery_idx on price_groups (brewery_id, position);
+
+-- A brand is the sellable identity (§16.1); a batch is a production instance.
+-- description, category and hops are optional facts drawn on the Brand screen.
+-- price_group_id is the row of the price grid this beer sits on
+-- (specs/2026-09-07-mgr-pricing-grid-naming.md); null means unpriced everywhere.
+create table brands (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references breweries(id),
+  name text not null,
+  style_id uuid,
+  abv numeric(4,2),
+  ttb_tax_class text not null default 'beer',
+  description text,
+  category text,
+  price_group_id uuid,
+  hops text,
+  created_at timestamptz not null default now(),
+  unique (id, brewery_id),
+  unique (brewery_id, name),
+  foreign key (style_id, brewery_id) references styles (id, brewery_id),
+  foreign key (price_group_id, brewery_id) references price_groups (id, brewery_id)
+);
+
+-- The sellable shape (§16.2): the only place bbl_per_unit is typed. packaged
+-- holds stock (what a bin holds, what a SKU is); poured never does, it is a
+-- ratio back to the keg it is drawn from. Atomic formats carry a volume;
+-- composed ones derive it from format_components (§16.2a).
+create table formats (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references breweries(id),
+  name text not null,
+  basis format_basis not null,
+  package_type package_type,                -- container; null for poured
+  keg_size keg_size,
+  units_per_case int check (units_per_case > 0),
+  bbl_per_unit numeric(12,8) check (bbl_per_unit > 0),   -- atomic packaged only
+  created_at timestamptz not null default now(),
+  unique (id, brewery_id),
+  unique (brewery_id, name),
+  check (basis = 'packaged' or (bbl_per_unit is null and package_type is null and keg_size is null and units_per_case is null)),
+  check (package_type = 'keg' or keg_size is null)
+);
+create index formats_brewery_idx on formats (brewery_id, basis);
+
+-- Formats compose one level (§16.2a): a case is six four-packs. Only atomic
+-- formats carry a typed volume; a composed one derives it (format_volumes).
+create table format_components (
+  brewery_id uuid not null references breweries(id),
+  parent_format_id uuid not null,
+  child_format_id uuid not null,
+  qty numeric(12,6) not null check (qty > 0),
+  primary key (parent_format_id, child_format_id),
+  foreign key (parent_format_id, brewery_id) references formats (id, brewery_id),
+  foreign key (child_format_id, brewery_id) references formats (id, brewery_id),
+  check (parent_format_id <> child_format_id)
+);
+create index format_components_brewery_idx on format_components (brewery_id, parent_format_id);
+
+-- bbl_per_unit for every format: typed on an atomic one, summed from the
+-- children of a composed one. Null means the format cannot yet hold stock.
+create view format_volumes with (security_invoker = true) as
+  select f.id, f.brewery_id, f.name, f.basis,
+         coalesce(f.bbl_per_unit,
+                  (select sum(c.qty * cf.bbl_per_unit) from format_components c join formats cf on cf.id = c.child_format_id
+                    where c.parent_format_id = f.id)) as bbl_per_unit,
+         exists (select 1 from format_components c where c.parent_format_id = f.id) as composed
+  from formats f;
 
 create table keg_pools (
   id uuid primary key default private.new_uuid(),
@@ -244,64 +332,48 @@ create table keg_pools (
   check (kind <> 'pay_per_fill' or per_fill_cents is not null)
 );
 
+-- A SKU is exactly one brand × one packaged format (§16.2): the stable id
+-- inventory, orders, pricing and provider mappings hang off. Package facts and
+-- bbl_per_unit live on the format. ponytail: name is stored, filled by
+-- create_sku from brand and format; a rename of either does not rewrite it.
 create table skus (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
-  product_id uuid not null,
-  name text not null,                    -- "1/2 bbl keg", "16oz 4-pack"
-  package_type package_type not null,
-  units_per_case int,
-  bbl_per_unit numeric(12,8) not null check (bbl_per_unit > 0),   -- exact fraction; basis of all TTB math
+  brand_id uuid not null,
+  format_id uuid not null,
+  name text not null,
   upc text,
-  keg_size keg_size,
   container_source keg_container_source,
   keg_pool_id uuid,
   qbo_item_id text,
   active boolean not null default true,
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
-  unique (product_id, name),
-  foreign key (product_id, brewery_id) references products (id, brewery_id),
+  unique (brand_id, format_id),
+  foreign key (brand_id, brewery_id) references brands (id, brewery_id),
+  foreign key (format_id, brewery_id) references formats (id, brewery_id),
   foreign key (keg_pool_id, brewery_id) references keg_pools (id, brewery_id),
-  -- keg fields are only meaningful on kegs; kegs may leave them unset (slice 5 fills them in)
-  check (package_type = 'keg' or (keg_size is null and container_source is null)),
   check ((coalesce(container_source in ('owned_fleet','per_fill_rental'), false)) = (keg_pool_id is not null))
 );
-create index skus_brewery_idx on skus (brewery_id, product_id);
+create index skus_brewery_idx on skus (brewery_id, brand_id);
 create unique index skus_upc_uidx on skus (brewery_id, upc) where upc is not null;
 
-create table price_lists (
-  id uuid primary key default private.new_uuid(),
-  brewery_id uuid not null references breweries(id),
-  name text not null,
-  unique (id, brewery_id),
-  unique (brewery_id, name)
-);
-
-create table price_list_items (
-  price_list_id uuid not null,
-  sku_id uuid not null,
-  brewery_id uuid not null references breweries(id),
-  unit_price_cents int not null check (unit_price_cents >= 0),
-  srp_cents int check (srp_cents >= 0),                -- suggested retail
-  primary key (price_list_id, sku_id),
-  foreign key (price_list_id, brewery_id) references price_lists (id, brewery_id),
-  foreign key (sku_id, brewery_id) references skus (id, brewery_id)
-);
-alter table customers add constraint customers_price_list_fk
-  foreign key (price_list_id, brewery_id) references price_lists (id, brewery_id);
-
 -- Packaging BOM: materials consumed per single SKU unit (incl. one-way kegs).
-create table sku_bom (
+-- Packaging BOM belongs to the format, not the SKU (§16.12): a case tray is
+-- the same for every brand packed in that case. on_break says what happens
+-- to the material when a composed unit is broken open (§16.10).
+create type format_material_disposition as enum ('consumed','return_to_stock');
+create table format_bom (
   brewery_id uuid not null references breweries(id),
-  sku_id uuid not null,
+  format_id uuid not null,
   material_id uuid not null,
   qty_per_unit numeric(14,6) not null check (qty_per_unit > 0),   -- material base uom
-  primary key (sku_id, material_id),
-  foreign key (sku_id, brewery_id) references skus (id, brewery_id),
+  on_break format_material_disposition not null default 'consumed',
+  primary key (format_id, material_id),
+  foreign key (format_id, brewery_id) references formats (id, brewery_id),
   foreign key (material_id, brewery_id) references materials (id, brewery_id)
 );
-create index sku_bom_material_idx on sku_bom (material_id);
+create index format_bom_material_idx on format_bom (material_id);
 
 -- ---------------------------------------------------------------- FG ledger
 create table locations (
@@ -319,15 +391,96 @@ alter table breweries add column portal_fulfillment_location_id uuid;
 alter table breweries add foreign key (portal_fulfillment_location_id, id)
   references locations (id, brewery_id);
 
+-- Physical subdivisions of a location (spec 2026-09-06 Decision 1; §16.6). Every
+-- location is seeded with three inside create_location and can never drop below
+-- one (delete_bin). Ledger rows reach a bin through (bin_id, location_id,
+-- brewery_id) so a bin can only ever be filed under its own location.
+create table bins (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references breweries(id),
+  location_id uuid not null,
+  name text not null,
+  created_at timestamptz not null default now(),
+  unique (id, brewery_id),
+  unique (location_id, name),
+  unique (id, location_id, brewery_id),
+  foreign key (location_id, brewery_id) references locations (id, brewery_id)
+);
+create index bins_brewery_idx on bins (brewery_id, location_id);
+
+-- Sale channels (§16.3, docs/plans/sale-channels-customizable.md): a per-brewery
+-- lookup modelled on `locations`, replacing the old `sale_channel` enum so a
+-- brewery names its own channels. `tax_treatment` is the channel default; a
+-- customer may override it. Movements reference a channel with `on delete
+-- restrict`, so "removable only if unused" is enforced by Postgres.
+create table sale_channels (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references breweries(id),
+  name text not null,
+  tax_treatment tax_treatment not null default 'taxable',
+  unique (id, brewery_id),
+  unique (brewery_id, name)
+);
+create index sale_channels_brewery_idx on sale_channels (brewery_id);
+
+-- Every brewery is born with the four defaults. A trigger rather than a
+-- creation path because rows arrive from seed scripts, onboarding and every
+-- test fixture; one trigger covers all of them.
+create function private.seed_sale_channels() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  insert into public.sale_channels (brewery_id, name, tax_treatment) values
+    (new.id, 'Wholesale', 'taxable'),
+    (new.id, 'Taproom',   'taxable'),
+    (new.id, 'DTC',       'taxable'),
+    (new.id, 'Export',    'export');
+  return new;
+end $$;
+
+create trigger seed_sale_channels_on_brewery
+  after insert on breweries for each row execute function private.seed_sale_channels();
+
+-- Deferred from customers above: the channel must belong to the customer's
+-- brewery, structurally, and cannot be deleted while a customer sits on it.
+-- (Customers are created before channels in this file; the seed trigger above
+-- guarantees every brewery has a Wholesale row before any customer exists.)
+alter table customers add constraint customers_sale_channel_fk
+  foreign key (sale_channel_id, brewery_id) references sale_channels (id, brewery_id) on delete restrict;
+
+-- The price grid (specs/2026-09-07-mgr-pricing-grid-naming.md): one cell per
+-- sale channel × price group × format. A SKU's price on a channel is the cell at
+-- its brand's group and its format; no other table prices anything.
+create table channel_prices (
+  brewery_id uuid not null references breweries(id),
+  sale_channel_id uuid not null,
+  price_group_id uuid not null,
+  format_id uuid not null,
+  unit_price_cents int not null check (unit_price_cents >= 0),
+  primary key (sale_channel_id, price_group_id, format_id),
+  foreign key (sale_channel_id, brewery_id) references sale_channels (id, brewery_id) on delete restrict,
+  foreign key (price_group_id, brewery_id) references price_groups (id, brewery_id) on delete restrict,
+  foreign key (format_id, brewery_id) references formats (id, brewery_id) on delete restrict
+);
+create index channel_prices_brewery_idx on channel_prices (brewery_id, sale_channel_id);
+
+create view sku_prices with (security_invoker = true) as
+  select s.brewery_id, cp.sale_channel_id, s.id as sku_id, s.name as sku_name, b.name as brand_name, s.active, cp.unit_price_cents
+  from skus s
+  join brands b on b.id = s.brand_id
+  join channel_prices cp on cp.brewery_id = s.brewery_id and cp.price_group_id = b.price_group_id and cp.format_id = s.format_id;
+
 create table inventory_movements (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
   sku_id uuid not null,
   location_id uuid not null,
+  bin_id uuid not null,
   qty numeric(12,2) not null check (qty <> 0),   -- signed units
   bbl numeric(14,8) not null,                    -- qty * bbl_per_unit, frozen at write time (trigger)
   type movement_type not null,
-  channel sale_channel,
+  sale_channel_id uuid,
+  -- resolved at write time (customer override -> channel default) and frozen.
+  tax_treatment tax_treatment,
   dest_state text,
   lot_id uuid,                                   -- FK to lots added below
   ref uuid,                                      -- order_id / pos_sale id / run id
@@ -337,30 +490,38 @@ create table inventory_movements (
   unique (id, brewery_id),
   foreign key (sku_id, brewery_id) references skus (id, brewery_id),
   foreign key (location_id, brewery_id) references locations (id, brewery_id),
+  -- the bin must be one of this location's bins, structurally (spec 2026-09-06 Decision 1)
+  foreign key (bin_id, location_id, brewery_id) references bins (id, location_id, brewery_id),
+  -- the channel must belong to this movement's brewery, structurally; restrict
+  -- so a referenced channel cannot be deleted out from under the ledger.
+  foreign key (sale_channel_id, brewery_id) references sale_channels (id, brewery_id) on delete restrict,
   -- removals must be negative and classified; inflows positive.
   constraint removal_shape check (
     case type
-      when 'sale_removal'     then qty < 0 and channel is not null and dest_state is not null
-      when 'depletion'        then qty < 0 and channel = 'taproom' and dest_state is null
-      when 'destruction'      then qty < 0 and channel is null and dest_state is null
-      when 'loss'             then qty < 0 and channel is null and dest_state is null
+      when 'sale_removal' then qty < 0 and sale_channel_id is not null and dest_state is not null and tax_treatment is not null
+      when 'depletion'    then qty < 0 and sale_channel_id is not null and dest_state is null and tax_treatment is not null
+      when 'destruction'      then qty < 0 and sale_channel_id is null and dest_state is null and tax_treatment is null
+      when 'loss'             then qty < 0 and sale_channel_id is null and dest_state is null and tax_treatment is null
       when 'sample'           then qty < 0 and dest_state is not null
       when 'festival_removal' then qty < 0 and dest_state is not null
-      when 'opening_balance'  then qty > 0 and channel is null and dest_state is null
-      when 'production_in'    then qty > 0 and channel is null and dest_state is null
-      when 'return_in'        then qty > 0 and channel is null and dest_state is null
-      when 'adjustment'       then channel is null and dest_state is null
-      when 'taproom_transfer' then channel is null and dest_state is null
+      when 'opening_balance'  then qty > 0 and sale_channel_id is null and dest_state is null and tax_treatment is null
+      when 'production_in'    then qty > 0 and sale_channel_id is null and dest_state is null and tax_treatment is null
+      when 'return_in'        then qty > 0 and sale_channel_id is null and dest_state is null and tax_treatment is null
+      when 'adjustment'       then sale_channel_id is null and dest_state is null and tax_treatment is null
+      when 'taproom_transfer' then sale_channel_id is null and dest_state is null and tax_treatment is null
+      when 'location_transfer' then sale_channel_id is null and dest_state is null and tax_treatment is null
       else true
     end)
 );
-create index movements_onhand_idx on inventory_movements (brewery_id, sku_id, location_id);
+create index movements_onhand_idx on inventory_movements (brewery_id, sku_id, location_id, bin_id);
 create index movements_created_idx on inventory_movements (brewery_id, created_at);
 create index movements_lot_idx on inventory_movements (lot_id) where lot_id is not null;
 
 create function enforce_bbl_integrity() returns trigger language plpgsql set search_path = '' as $$
 begin
-  select (new.qty * s.bbl_per_unit) into new.bbl from public.skus s where s.id = new.sku_id;
+  select (new.qty * f.bbl_per_unit) into new.bbl
+    from public.skus s join public.format_volumes f on f.id = s.format_id where s.id = new.sku_id;
+  if new.bbl is null then raise exception 'format has no bbl_per_unit'; end if;
   return new;
 end $$;
 create trigger inventory_movements_bbl_trigger before insert on inventory_movements
@@ -398,13 +559,13 @@ create table taproom_pars (
 create table recipes (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
-  product_id uuid,
+  brand_id uuid,
   name text not null,
   note text,
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
   unique (brewery_id, name),
-  foreign key (product_id, brewery_id) references products (id, brewery_id)
+  foreign key (brand_id, brewery_id) references brands (id, brewery_id)
 );
 
 create table recipe_versions (
@@ -457,7 +618,7 @@ create table batches (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
   batch_no bigint,                                     -- trigger
-  product_id uuid not null,
+  intended_brand_id uuid,                              -- intent, not a commitment (§16.9): identity is required at packaging
   recipe_version_id uuid,
   planned_on date not null,
   planned_bbl numeric(10,3) not null check (planned_bbl > 0),
@@ -468,11 +629,11 @@ create table batches (
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
   unique (brewery_id, batch_no),
-  foreign key (product_id, brewery_id) references products (id, brewery_id),
+  foreign key (intended_brand_id, brewery_id) references brands (id, brewery_id),
   foreign key (recipe_version_id, brewery_id) references recipe_versions (id, brewery_id)
 );
 create index batches_planned_idx on batches (brewery_id, planned_on);
-create index batches_product_idx on batches (product_id);
+create index batches_brand_idx on batches (brewery_id, intended_brand_id);
 create trigger batches_no before insert on batches for each row execute function private.set_doc_no('batch_no','batch');
 
 create table vessel_occupancies (
@@ -541,6 +702,8 @@ create table material_movements (   -- ledger
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
   material_id uuid not null,
+  location_id uuid not null,                           -- materials are per site (spec 2026-09-06 Decision 2)
+  bin_id uuid not null,
   lot_id uuid,                                         -- required iff materials.lot_tracked (trigger)
   qty numeric(14,4) not null check (qty <> 0),         -- base uom, signed
   type material_movement_type not null,
@@ -551,6 +714,8 @@ create table material_movements (   -- ledger
   unique (id, brewery_id),
   foreign key (material_id, brewery_id) references materials (id, brewery_id),
   foreign key (lot_id, material_id, brewery_id) references material_lots (id, material_id, brewery_id),
+  foreign key (location_id, brewery_id) references locations (id, brewery_id),
+  foreign key (bin_id, location_id, brewery_id) references bins (id, location_id, brewery_id),
   constraint material_sign check (
     case type
       when 'receipt'         then qty > 0
@@ -558,12 +723,15 @@ create table material_movements (   -- ledger
       when 'return_to_stock' then qty > 0
       when 'consumption'     then qty < 0
       when 'loss'            then qty < 0
+      when 'transfer_out'    then qty < 0
+      when 'transfer_in'     then qty > 0
       else true
     end)
 );
 create index material_movements_material_idx on material_movements (brewery_id, material_id);
 create index material_movements_lot_idx on material_movements (brewery_id, material_id, lot_id) where lot_id is not null;
 create index material_movements_created_idx on material_movements (brewery_id, created_at);
+create index material_movements_onhand_idx on material_movements (brewery_id, material_id, location_id, bin_id);
 
 create function enforce_material_lot() returns trigger language plpgsql set search_path = '' as $$
 declare tracked boolean;
@@ -634,7 +802,7 @@ create table lots (   -- 1:1 with packaging runs
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
   packaging_run_id uuid not null unique,
-  product_id uuid not null,
+  brand_id uuid not null,
   code text not null,
   packaged_on date not null,
   best_by date,
@@ -642,7 +810,7 @@ create table lots (   -- 1:1 with packaging runs
   unique (id, brewery_id),
   unique (brewery_id, code),
   foreign key (packaging_run_id, brewery_id) references packaging_runs (id, brewery_id),
-  foreign key (product_id, brewery_id) references products (id, brewery_id)
+  foreign key (brand_id, brewery_id) references brands (id, brewery_id)
 );
 alter table inventory_movements add constraint inventory_movements_lot_fk
   foreign key (lot_id, brewery_id) references lots (id, brewery_id);
@@ -811,7 +979,7 @@ create table orders (
   ship_to_id uuid,
   from_location_id uuid not null,                      -- where removals post
   to_location_id uuid,                                 -- taproom transfers
-  price_list_id uuid,                                  -- list used for line snapshots
+  sale_channel_id uuid not null,                       -- copied from the customer at creation; removals post to it
   requested_ship_date date,
   po_number text,
   note text,
@@ -825,7 +993,7 @@ create table orders (
   foreign key (ship_to_id, customer_id, brewery_id) references ship_tos (id, customer_id, brewery_id),
   foreign key (from_location_id, brewery_id) references locations (id, brewery_id),
   foreign key (to_location_id, brewery_id) references locations (id, brewery_id),
-  foreign key (price_list_id, brewery_id) references price_lists (id, brewery_id),
+  foreign key (sale_channel_id, brewery_id) references sale_channels (id, brewery_id) on delete restrict,
   check (case kind
     when 'wholesale'        then customer_id is not null and ship_to_id is not null and to_location_id is null
     when 'taproom_transfer' then to_location_id is not null and customer_id is null and ship_to_id is null
@@ -889,6 +1057,8 @@ create table shipments (
   order_id uuid not null unique,                       -- one shipment per order; remainder is cancelled
   shipped_at timestamptz not null default now(),
   carrier text, tracking text,
+  -- 'now' invoices at ship; 'on_delivery' waits for confirm_delivery
+  invoice_timing text not null default 'now' check (invoice_timing in ('now','on_delivery')),
   created_by uuid not null references auth.users(id),
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
@@ -956,6 +1126,8 @@ create table keg_events (   -- ledger
   brewery_id uuid not null references breweries(id),
   pool_id uuid not null,
   keg_size keg_size not null,
+  location_id uuid not null,   -- for shipped: where they left from; for returned: where they came back into
+  bin_id uuid not null,
   qty int not null check (qty > 0),
   reason keg_event_reason not null,
   customer_id uuid,
@@ -965,6 +1137,8 @@ create table keg_events (   -- ledger
   created_by uuid not null references auth.users(id),
   created_at timestamptz not null default now(),
   foreign key (pool_id, brewery_id) references keg_pools (id, brewery_id),
+  foreign key (location_id, brewery_id) references locations (id, brewery_id),
+  foreign key (bin_id, location_id, brewery_id) references bins (id, location_id, brewery_id),
   foreign key (customer_id, brewery_id) references customers (id, brewery_id),
   foreign key (shipment_id, brewery_id) references shipments (id, brewery_id),
   check (case reason
@@ -974,9 +1148,80 @@ create table keg_events (   -- ledger
     when 'retired'  then customer_id is null
     else true end)
 );
-create index keg_events_pool_idx on keg_events (brewery_id, pool_id, keg_size);
+create index keg_events_pool_idx on keg_events (brewery_id, pool_id, keg_size, location_id, bin_id);
 create index keg_events_customer_idx on keg_events (customer_id) where customer_id is not null;
 create index keg_events_shipment_idx on keg_events (shipment_id) where shipment_id is not null;
+
+-- Stock transfers: an internal move of stuff between two locations (spec
+-- 2026-09-06 Decision 3), never a third order kind. Lines are polymorphic in
+-- the database: exactly one of sku / material / keg pool. receive_stock_transfer
+-- posts paired, volume-neutral ledger rows. A move inside one location is
+-- move_stock_bin and writes no document (Decision 5).
+create table stock_transfers (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references breweries(id),
+  transfer_no bigint,                                  -- trigger
+  status stock_transfer_status not null default 'draft',
+  from_location_id uuid not null,
+  to_location_id uuid not null,
+  requested_date date,
+  note text,
+  created_by uuid not null references auth.users(id),
+  received_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique (id, brewery_id),
+  unique (brewery_id, transfer_no),
+  foreign key (from_location_id, brewery_id) references locations (id, brewery_id),
+  foreign key (to_location_id, brewery_id) references locations (id, brewery_id),
+  check (to_location_id <> from_location_id)
+);
+create index stock_transfers_brewery_idx on stock_transfers (brewery_id, status, created_at);
+create trigger stock_transfers_no before insert on stock_transfers
+  for each row execute function private.set_doc_no('transfer_no','transfer');
+
+create table stock_transfer_lines (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references breweries(id),
+  transfer_id uuid not null,
+  sku_id uuid,
+  material_id uuid,
+  keg_pool_id uuid,
+  keg_size keg_size,
+  qty numeric(14,4) not null check (qty > 0),
+  qty_picked numeric(14,4) check (qty_picked >= 0),
+  from_bin_id uuid not null,
+  to_bin_id uuid not null,
+  note text,
+  unique (id, brewery_id),
+  foreign key (transfer_id, brewery_id) references stock_transfers (id, brewery_id),
+  foreign key (sku_id, brewery_id) references skus (id, brewery_id),
+  foreign key (material_id, brewery_id) references materials (id, brewery_id),
+  foreign key (keg_pool_id, brewery_id) references keg_pools (id, brewery_id),
+  foreign key (from_bin_id, brewery_id) references bins (id, brewery_id),
+  foreign key (to_bin_id, brewery_id) references bins (id, brewery_id),
+  check (num_nonnulls(sku_id, material_id, keg_pool_id) = 1),
+  check ((keg_pool_id is null) = (keg_size is null))
+);
+create index stock_transfer_lines_transfer_idx on stock_transfer_lines (brewery_id, transfer_id);
+
+-- Bins live on the line and locations on the header, so the invariant "the
+-- from-bin belongs to the source location, the to-bin to the destination" is
+-- a trigger joining the header, not an application if.
+create function private.stock_transfer_line_bins() returns trigger language plpgsql set search_path = '' as $$
+declare loc_from uuid; loc_to uuid;
+begin
+  select from_location_id, to_location_id into loc_from, loc_to
+    from public.stock_transfers where id = new.transfer_id;
+  if not exists (select 1 from public.bins where id = new.from_bin_id and location_id = loc_from) then
+    raise exception 'from_bin does not belong to the source location';
+  end if;
+  if not exists (select 1 from public.bins where id = new.to_bin_id and location_id = loc_to) then
+    raise exception 'to_bin does not belong to the destination location';
+  end if;
+  return new;
+end $$;
+create trigger stock_transfer_lines_bins before insert or update on stock_transfer_lines
+  for each row execute function private.stock_transfer_line_bins();
 
 -- ---------------------------------------------------------------- integrations
 create table qbo_connections (
@@ -1178,27 +1423,27 @@ create index pos_sales_sold_idx on pos_sales (brewery_id, sold_at);
 create index pos_sales_unposted_idx on pos_sales (brewery_id) where movement_id is null;
 
 -- ---------------------------------------------------------------- compliance
-create table product_approvals (
+create table brand_approvals (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
-  product_id uuid not null,
+  brand_id uuid not null,
   kind approval_kind not null,
   ttb_id text not null,
   approved_on date, expires_on date,
   note text,
-  unique (product_id, kind, ttb_id),
-  foreign key (product_id, brewery_id) references products (id, brewery_id)
+  unique (brand_id, kind, ttb_id),
+  foreign key (brand_id, brewery_id) references brands (id, brewery_id)
 );
 
 create table state_registrations (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
-  product_id uuid not null,
+  brand_id uuid not null,
   state text not null check (state ~ '^[A-Z]{2}$'),
   registration_no text,
   approved_on date, expires_on date,
-  unique (product_id, state),
-  foreign key (product_id, brewery_id) references products (id, brewery_id)
+  unique (brand_id, state),
+  foreign key (brand_id, brewery_id) references brands (id, brewery_id)
 );
 
 create table brewery_state_licenses (
@@ -1294,6 +1539,12 @@ create view atp with (security_invoker = true) as
              where a.status = 'open' and a.brewery_id = o.brewery_id and a.sku_id = o.sku_id), 0) as qty
   from on_hand o group by o.brewery_id, o.sku_id;
 
+-- Bin grain, beside on_hand rather than replacing it: atp and taproom_replenishment
+-- keep their location-grain join. Spec 2026-09-06 Decision 2.
+create view bin_on_hand with (security_invoker = true) as
+  select brewery_id, sku_id, location_id, bin_id, sum(qty) as qty
+  from inventory_movements group by 1,2,3,4;
+
 create view lot_on_hand with (security_invoker = true) as
   select brewery_id, lot_id, sku_id, location_id, sum(qty) as qty
   from inventory_movements where lot_id is not null group by 1,2,3,4;
@@ -1328,6 +1579,10 @@ create view pos_unmapped_items with (security_invoker = true) as
 create view material_on_hand with (security_invoker = true) as
   select brewery_id, material_id, sum(qty) as qty from material_movements group by 1,2;
 
+create view material_bin_on_hand with (security_invoker = true) as
+  select brewery_id, material_id, location_id, bin_id, sum(qty) as qty
+  from material_movements group by 1,2,3,4;
+
 create view material_lot_on_hand with (security_invoker = true) as
   select m.brewery_id, m.material_id, m.lot_id, l.received_on, sum(m.qty) as qty
   from material_movements m join material_lots l on l.id = m.lot_id
@@ -1361,7 +1616,8 @@ create view material_requirements with (security_invoker = true) as
     union all
     select r.brewery_id, bom.material_id, sum(o.qty_planned * bom.qty_per_unit)
     from packaging_runs r join packaging_run_outputs o on o.run_id = r.id
-    join sku_bom bom on bom.sku_id = o.sku_id
+    join skus s on s.id = o.sku_id
+    join format_bom bom on bom.format_id = s.format_id
     where r.closed_at is null group by 1,2)
   select req.brewery_id, req.material_id, sum(req.required) as required,
          coalesce(oh.qty, 0) as on_hand, coalesce(oo.qty, 0) as on_order,
@@ -1402,7 +1658,8 @@ create view packaging_run_requirements with (security_invoker = true) as
          sum(o.qty_planned * bom.qty_per_unit) - coalesce(oh.qty, 0) - coalesce(oo.qty, 0) as short
   from packaging_runs r
   join packaging_run_outputs o on o.run_id = r.id
-  join sku_bom bom on bom.sku_id = o.sku_id
+  join skus s on s.id = o.sku_id
+  join format_bom bom on bom.format_id = s.format_id
   left join material_on_hand oh on oh.material_id = bom.material_id
   left join material_on_order oo on oo.material_id = bom.material_id
   where r.closed_at is null
@@ -1410,13 +1667,22 @@ create view packaging_run_requirements with (security_invoker = true) as
 
 create view packaging_run_yields with (security_invoker = true) as
   select r.id as run_id, r.brewery_id, r.bbl_drawn,
-         coalesce(sum(o.qty_actual * s.bbl_per_unit), 0) as bbl_packaged,
-         r.bbl_drawn - coalesce(sum(o.qty_actual * s.bbl_per_unit), 0) as loss_bbl
+         coalesce(sum(o.qty_actual * f.bbl_per_unit), 0) as bbl_packaged,
+         r.bbl_drawn - coalesce(sum(o.qty_actual * f.bbl_per_unit), 0) as loss_bbl
   from packaging_runs r
   left join packaging_run_outputs o on o.run_id = r.id
   left join skus s on s.id = o.sku_id
+  left join format_volumes f on f.id = s.format_id
   where r.closed_at is not null
   group by r.id;
+
+-- transferred_in/out move kegs between bins and net to zero across the pair, so
+-- keg_fleet_totals (no location) ignores them and stays the fleet.
+create view keg_bin_totals with (security_invoker = true) as
+  select brewery_id, pool_id, keg_size, location_id, bin_id,
+         sum(case reason when 'acquired' then qty when 'found' then qty when 'transferred_in' then qty
+                         when 'retired' then -qty when 'lost' then -qty when 'transferred_out' then -qty else 0 end)::int as qty
+  from keg_events group by 1,2,3,4,5;
 
 create view keg_fleet_totals with (security_invoker = true) as
   select brewery_id, pool_id, keg_size,
@@ -1449,17 +1715,15 @@ create view route_loads with (security_invoker = true) as
 -- tenancy; each starts by locking the order row. p_lines is a full
 -- replacement: [{"sku_id": uuid, "qty": n}].
 
--- Resolves the unit price for an *active* sku from a price list; raises
+-- Resolves the unit price for an *active* sku on a sale channel; raises
 -- otherwise. Shared by every order create/update path so an inactive or
 -- unpriced sku is rejected at the RPC boundary, not only in the TS layer.
-create function private.order_line_price(p_brewery uuid, p_price_list uuid, p_sku uuid) returns int
+create function private.order_line_price(p_brewery uuid, p_sale_channel uuid, p_sku uuid) returns int
 language plpgsql stable set search_path = '' as $$
 declare v int;
 begin
-  select pli.unit_price_cents into v
-  from public.price_list_items pli
-  join public.skus s on s.id = pli.sku_id and s.brewery_id = pli.brewery_id
-  where pli.brewery_id = p_brewery and pli.price_list_id = p_price_list and pli.sku_id = p_sku and s.active;
+  select p.unit_price_cents into v from public.sku_prices p
+  where p.brewery_id = p_brewery and p.sale_channel_id = p_sale_channel and p.sku_id = p_sku and p.active;
   if v is null then raise exception 'sku % is not active and priced for this customer', p_sku; end if;
   return v;
 end $$;
@@ -1473,26 +1737,39 @@ begin
     raise exception 'order requires at least one line';
   end if;
 end $$;
+-- Order-driven movements have no bin on the order (a later phase may add one),
+-- so they post to the location's alphabetically first bin ('Cold' for a fresh
+-- location). Name, not created_at: the seeded trio shares one transaction
+-- timestamp. The brewery names the bin it wants order stock to land in so it
+-- sorts first.
+create function private.first_bin(p_location uuid) returns uuid
+language sql stable set search_path = '' as $$
+  select id from public.bins where location_id = p_location order by name limit 1
+$$;
+
 create function private.create_order_impl(
   p_brewery uuid, p_kind public.order_kind, p_customer uuid, p_ship_to uuid,
   p_from_location uuid, p_to_location uuid, p_requested date, p_po text, p_note text, p_lines jsonb
 ) returns jsonb language plpgsql set search_path = '' as $$
-declare v_order uuid; v_pl uuid; l record;
+declare v_order uuid; v_channel uuid; l record;
 begin
   perform private.assert_order_lines(p_lines);
   if p_kind = 'wholesale' then
-    select price_list_id into v_pl from public.customers where id = p_customer and brewery_id = p_brewery;
-    if v_pl is null then raise exception 'customer has no price list'; end if;
+    select sale_channel_id into v_channel from public.customers where id = p_customer and brewery_id = p_brewery;
+    if v_channel is null then raise exception 'customer not found'; end if;
+  else
+    -- a transfer has no customer: the channel named Taproom, else the first by name
+    select id into v_channel from public.sale_channels where brewery_id = p_brewery order by (name = 'Taproom') desc, name limit 1;
   end if;
   insert into public.orders (brewery_id, kind, customer_id, ship_to_id, from_location_id, to_location_id,
-                             price_list_id, requested_ship_date, po_number, note, created_by)
+                             sale_channel_id, requested_ship_date, po_number, note, created_by)
   values (p_brewery, p_kind, p_customer, p_ship_to, p_from_location, p_to_location,
-          v_pl, p_requested, p_po, p_note, auth.uid())
+          v_channel, p_requested, p_po, p_note, auth.uid())
   returning id into v_order;
   for l in select (e->>'sku_id')::uuid as sku_id, (e->>'qty')::numeric as qty from jsonb_array_elements(p_lines) e loop
     insert into public.order_lines (brewery_id, order_id, sku_id, qty_ordered, unit_price_cents)
     values (p_brewery, v_order, l.sku_id, l.qty,
-            case when p_kind = 'wholesale' then private.order_line_price(p_brewery, v_pl, l.sku_id) else 0 end);
+            case when p_kind = 'wholesale' then private.order_line_price(p_brewery, v_channel, l.sku_id) else 0 end);
   end loop;
   insert into public.order_events (brewery_id, order_id, actor, event, payload)
   values (p_brewery, v_order, auth.uid(), 'created', jsonb_build_object('lines', p_lines));
@@ -1525,7 +1802,7 @@ begin
   for l in select (e->>'sku_id')::uuid as sku_id, (e->>'qty')::numeric as qty from jsonb_array_elements(p_lines) e loop
     insert into public.order_lines (brewery_id, order_id, sku_id, qty_ordered, unit_price_cents)
     values (o.brewery_id, p_order, l.sku_id, l.qty,
-            case when o.kind = 'wholesale' then private.order_line_price(o.brewery_id, o.price_list_id, l.sku_id) else 0 end);
+            case when o.kind = 'wholesale' then private.order_line_price(o.brewery_id, o.sale_channel_id, l.sku_id) else 0 end);
   end loop;
   insert into public.order_events (brewery_id, order_id, actor, event, payload)
   values (o.brewery_id, p_order, auth.uid(), 'updated', jsonb_build_object('lines', p_lines));
@@ -1579,7 +1856,7 @@ begin
   for l in select (e->>'sku_id')::uuid as sku_id, (e->>'qty')::numeric as qty from jsonb_array_elements(p_lines) e loop
     insert into public.order_lines (brewery_id, order_id, sku_id, qty_ordered, unit_price_cents)
     values (o.brewery_id, p_order, l.sku_id, l.qty,
-            case when o.kind = 'wholesale' then private.order_line_price(o.brewery_id, o.price_list_id, l.sku_id) else 0 end)
+            case when o.kind = 'wholesale' then private.order_line_price(o.brewery_id, o.sale_channel_id, l.sku_id) else 0 end)
     on conflict (order_id, sku_id) do update set qty_ordered = excluded.qty_ordered
     returning id into v_line;
     update public.allocations set qty = l.qty
@@ -1623,9 +1900,11 @@ begin
   return jsonb_build_object('order_id', p_order);
 end $$;
 
-create function private.ship_order_impl(p_order uuid, p_ship jsonb, p_carrier text, p_tracking text) returns jsonb
+create function private.ship_order_impl(p_order uuid, p_ship jsonb, p_carrier text, p_tracking text, p_invoice_timing text default 'now') returns jsonb
 language plpgsql set search_path = '' as $$
-declare o public.orders; sp record; v_state text; v_invoice uuid; v_shipment uuid;
+declare
+  o public.orders; sp record; v_state text; v_invoice uuid; v_shipment uuid;
+  v_channel uuid; v_tax public.tax_treatment;
 begin
   o := private.lock_order(p_order, array['picked']::public.order_status[]);
   -- Full-coverage guard: ensure p_ship covers every order line. Runs after the
@@ -1640,12 +1919,23 @@ begin
   ) then
     raise exception 'ship list must cover every order line';
   end if;
-  insert into public.shipments (brewery_id, order_id, carrier, tracking, created_by)
-  values (o.brewery_id, p_order, p_carrier, p_tracking, auth.uid()) returning id into v_shipment;
+  insert into public.shipments (brewery_id, order_id, carrier, tracking, invoice_timing, created_by)
+  values (o.brewery_id, p_order, p_carrier, p_tracking, coalesce(p_invoice_timing, 'now'), auth.uid()) returning id into v_shipment;
   if o.kind = 'wholesale' then
     select state into v_state from public.ship_tos where id = o.ship_to_id;
-    -- Empty-invoice guard: only create invoice if at least one line ships qty > 0
-    if exists (select 1 from jsonb_array_elements(p_ship) e where (e->>'qty_shipped')::numeric > 0) then
+    -- One lookup for the whole shipment: the channel a wholesale ship removes
+    -- under, and the tax treatment frozen onto every movement it writes
+    -- (customer override -> channel default, §16.3).
+    -- orders.sale_channel_id is not null and FK-backed, so no null guard here.
+    select o.sale_channel_id, coalesce(c.tax_treatment, sc.tax_treatment)
+      into v_channel, v_tax
+      from public.sale_channels sc
+      left join public.customers c on c.id = o.customer_id
+     where sc.id = o.sale_channel_id;
+    -- Empty-invoice guard: only create invoice if at least one line ships qty > 0;
+    -- on_delivery defers the invoice to confirm_delivery
+    if coalesce(p_invoice_timing, 'now') = 'now'
+       and exists (select 1 from jsonb_array_elements(p_ship) e where (e->>'qty_shipped')::numeric > 0) then
     insert into public.invoices (brewery_id, kind, customer_id, shipment_id, issued_on)
     values (o.brewery_id, 'invoice', o.customer_id, v_shipment, current_date)
     returning id into v_invoice;
@@ -1655,18 +1945,20 @@ begin
     update public.order_lines set qty_shipped = sp.qty where id = sp.line_id and order_id = p_order;
     if sp.qty > 0 then
       if o.kind = 'wholesale' then
-        insert into public.inventory_movements (brewery_id, sku_id, location_id, qty, type, channel, dest_state, ref, created_by)
-        select o.brewery_id, ol.sku_id, o.from_location_id, -sp.qty, 'sale_removal', 'wholesale', v_state, p_order, auth.uid()
+        insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, sale_channel_id, tax_treatment, dest_state, ref, created_by)
+        select o.brewery_id, ol.sku_id, o.from_location_id, private.first_bin(o.from_location_id), -sp.qty, 'sale_removal', v_channel, v_tax, v_state, p_order, auth.uid()
         from public.order_lines ol where ol.id = sp.line_id;
-        insert into public.invoice_lines (brewery_id, invoice_id, kind, sku_id, qty, unit_price_cents, description)
-        select o.brewery_id, v_invoice, 'sku', ol.sku_id, sp.qty, ol.unit_price_cents, s.name
-        from public.order_lines ol join public.skus s on s.id = ol.sku_id where ol.id = sp.line_id;
+        if v_invoice is not null then
+          insert into public.invoice_lines (brewery_id, invoice_id, kind, sku_id, qty, unit_price_cents, description)
+          select o.brewery_id, v_invoice, 'sku', ol.sku_id, sp.qty, ol.unit_price_cents, s.name
+          from public.order_lines ol join public.skus s on s.id = ol.sku_id where ol.id = sp.line_id;
+        end if;
       else
-        insert into public.inventory_movements (brewery_id, sku_id, location_id, qty, type, ref, created_by)
-        select o.brewery_id, ol.sku_id, o.from_location_id, -sp.qty, 'taproom_transfer', p_order, auth.uid()
+        insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, ref, created_by)
+        select o.brewery_id, ol.sku_id, o.from_location_id, private.first_bin(o.from_location_id), -sp.qty, 'taproom_transfer', p_order, auth.uid()
         from public.order_lines ol where ol.id = sp.line_id;
-        insert into public.inventory_movements (brewery_id, sku_id, location_id, qty, type, ref, created_by)
-        select o.brewery_id, ol.sku_id, o.to_location_id, sp.qty, 'taproom_transfer', p_order, auth.uid()
+        insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, ref, created_by)
+        select o.brewery_id, ol.sku_id, o.to_location_id, private.first_bin(o.to_location_id), sp.qty, 'taproom_transfer', p_order, auth.uid()
         from public.order_lines ol where ol.id = sp.line_id;
       end if;
       update public.allocations set status = 'fulfilled'
@@ -1676,7 +1968,14 @@ begin
         where source = 'order_line' and ref = sp.line_id and status = 'open';
     end if;
   end loop;
-  update public.orders set status = 'shipped', shipped_at = now(), needs_restock = false where id = p_order;
+  -- anything picked but held back is staged on the floor: put it back
+  update public.orders
+     set status = 'shipped', shipped_at = now(),
+         needs_restock = exists (
+           select 1 from jsonb_array_elements(p_ship) e
+           join public.order_lines ol on ol.id = (e->>'line_id')::uuid
+           where (e->>'qty_shipped')::numeric < coalesce(ol.qty_picked, ol.qty_ordered))
+   where id = p_order;
   insert into public.order_events (brewery_id, order_id, actor, event, payload)
   values (o.brewery_id, p_order, auth.uid(), 'shipped',
           jsonb_build_object('ship', p_ship, 'carrier', p_carrier, 'invoice_id', v_invoice));
@@ -1708,8 +2007,8 @@ begin
     insert into public.invoice_lines (brewery_id, invoice_id, kind, sku_id, qty, unit_price_cents, description, credited_invoice_line_id)
     select v_inv.brewery_id, v_cm, 'sku', il.sku_id, -cl.qty, il.unit_price_cents, il.description, il.id
     from public.invoice_lines il where il.id = cl.line_id and il.invoice_id = p_invoice;
-    insert into public.inventory_movements (brewery_id, sku_id, location_id, qty, type, note, created_by)
-    select v_inv.brewery_id, il.sku_id, p_location, cl.qty, 'return_in', p_reason, auth.uid()
+    insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, ref, note, created_by)
+    select v_inv.brewery_id, il.sku_id, p_location, private.first_bin(p_location), cl.qty, 'return_in', v_cm, p_reason, auth.uid()
     from public.invoice_lines il where il.id = cl.line_id and il.invoice_id = p_invoice;
   end loop;
   -- Append to the originating order's event log, if this invoice came from a
@@ -2062,31 +2361,126 @@ begin
   return p_result;
 end $$;
 
-create function create_product(
-  p_brewery uuid, p_name text, p_style text, p_abv numeric, p_request_id uuid
+create function upsert_format(
+  p_brewery uuid, p_id uuid, p_name text, p_basis public.format_basis, p_package_type public.package_type,
+  p_keg_size public.keg_size, p_units_per_case int, p_bbl_per_unit numeric, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_replay jsonb; v_row public.products;
+declare v_replay jsonb; v_row public.formats;
 begin
   perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
-  v_replay := private.claim_command_request(p_brewery, 'create_product', p_request_id,
-    jsonb_build_object('brewery', p_brewery, 'name', p_name, 'style', p_style, 'abv', p_abv));
+  v_replay := private.claim_command_request(p_brewery, 'upsert_format', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'id', p_id, 'name', p_name, 'basis', p_basis, 'package_type', p_package_type,
+                       'keg_size', p_keg_size, 'units_per_case', p_units_per_case, 'bbl_per_unit', p_bbl_per_unit));
   if v_replay is not null then return v_replay; end if;
-  insert into public.products (brewery_id, name, style, abv) values (p_brewery, p_name, p_style, p_abv) returning * into v_row;
+  if p_id is null then
+    insert into public.formats (brewery_id, name, basis, package_type, keg_size, units_per_case, bbl_per_unit)
+    values (p_brewery, p_name, p_basis, p_package_type, p_keg_size, p_units_per_case, p_bbl_per_unit) returning * into v_row;
+  else
+    update public.formats set name = p_name, basis = p_basis, package_type = p_package_type, keg_size = p_keg_size,
+      units_per_case = p_units_per_case, bbl_per_unit = p_bbl_per_unit
+    where id = p_id and brewery_id = p_brewery returning * into v_row;
+    if v_row.id is null then raise exception 'format not found'; end if;
+  end if;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
-create function create_sku(
-  p_brewery uuid, p_product uuid, p_name text, p_package_type public.package_type,
-  p_units_per_case int, p_bbl_per_unit numeric, p_request_id uuid
+-- One RPC replaces a composed format's children. One level only: children
+-- must be atomic packaged formats (typed volume, no components of their own),
+-- and the parent carries no typed volume, so the derived one is the only one.
+create function replace_format_components(p_brewery uuid, p_format uuid, p_components jsonb, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_parent public.formats; c record; v_child public.formats;
+begin
+  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'replace_format_components', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'format', p_format, 'components', p_components));
+  if v_replay is not null then return v_replay; end if;
+  select * into v_parent from public.formats where id = p_format and brewery_id = p_brewery for update;
+  if v_parent.id is null then raise exception 'format not found'; end if;
+  if v_parent.basis <> 'packaged' then raise exception 'only a packaged format composes'; end if;
+  if v_parent.bbl_per_unit is not null then raise exception 'a composed format derives its volume: clear bbl_per_unit first'; end if;
+  if exists (select 1 from public.format_components where child_format_id = p_format) then
+    raise exception 'one level only: this format is already a component of another';
+  end if;
+  delete from public.format_components where parent_format_id = p_format;
+  for c in select (e->>'child_format_id')::uuid as child, (e->>'qty')::numeric as qty from jsonb_array_elements(coalesce(p_components, '[]'::jsonb)) e loop
+    select * into v_child from public.formats where id = c.child and brewery_id = p_brewery;
+    if v_child.id is null then raise exception 'child format not found'; end if;
+    if v_child.id = p_format then raise exception 'a format cannot contain itself (cycle)'; end if;
+    if v_child.basis <> 'packaged' or v_child.bbl_per_unit is null
+       or exists (select 1 from public.format_components where parent_format_id = v_child.id) then
+      raise exception 'one level only: children must be atomic packaged formats (a cycle or a composed child is refused)';
+    end if;
+    insert into public.format_components (brewery_id, parent_format_id, child_format_id, qty) values (p_brewery, p_format, c.child, c.qty);
+  end loop;
+  return private.complete_command_request(p_request_id,
+    (select to_jsonb(v) from public.format_volumes v where v.id = p_format));
+end $$;
+
+-- upsert_brand: name, optional style (found or created in the brewery's own
+-- styles list), ABV, and the optional Brand-screen facts.
+create function upsert_brand(
+  p_brewery uuid, p_id uuid, p_name text, p_style text, p_abv numeric,
+  p_description text, p_category text, p_price_group uuid, p_hops text, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_replay jsonb; v_row public.skus;
+declare v_replay jsonb; v_row public.brands; v_style uuid;
+begin
+  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'upsert_brand', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'id', p_id, 'name', p_name, 'style', p_style, 'abv', p_abv,
+                       'description', p_description, 'category', p_category, 'price_group', p_price_group, 'hops', p_hops));
+  if v_replay is not null then return v_replay; end if;
+  if nullif(trim(p_style), '') is not null then
+    insert into public.styles (brewery_id, name) values (p_brewery, trim(p_style))
+      on conflict (brewery_id, name) do update set name = excluded.name returning id into v_style;
+  end if;
+  if p_id is null then
+    insert into public.brands (brewery_id, name, style_id, abv, description, category, price_group_id, hops)
+    values (p_brewery, p_name, v_style, p_abv, p_description, p_category, p_price_group, p_hops) returning * into v_row;
+  else
+    update public.brands set name = p_name, style_id = v_style, abv = p_abv, description = p_description,
+      category = p_category, price_group_id = p_price_group, hops = p_hops
+    where id = p_id and brewery_id = p_brewery returning * into v_row;
+    if v_row.id is null then raise exception 'brand not found'; end if;
+  end if;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- create_sku: one brand × one packaged format. The display name is filled
+-- from both unless given.
+create function create_sku(
+  p_brewery uuid, p_brand uuid, p_format uuid, p_name text, p_upc text, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.skus; v_brand public.brands; v_format public.formats;
 begin
   perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'create_sku', p_request_id,
-    jsonb_build_object('brewery', p_brewery, 'product', p_product, 'name', p_name, 'package_type', p_package_type, 'units_per_case', p_units_per_case, 'bbl_per_unit', p_bbl_per_unit));
+    jsonb_build_object('brewery', p_brewery, 'brand', p_brand, 'format', p_format, 'name', p_name, 'upc', p_upc));
   if v_replay is not null then return v_replay; end if;
-  insert into public.skus (brewery_id, product_id, name, package_type, units_per_case, bbl_per_unit)
-    values (p_brewery, p_product, p_name, p_package_type, p_units_per_case, p_bbl_per_unit) returning * into v_row;
+  select * into v_brand from public.brands where id = p_brand and brewery_id = p_brewery;
+  select * into v_format from public.formats where id = p_format and brewery_id = p_brewery;
+  if v_brand.id is null then raise exception 'brand not found'; end if;
+  if v_format.id is null then raise exception 'format not found'; end if;
+  if v_format.basis <> 'packaged' then raise exception 'a sku needs a packaged format; a poured format is never stock'; end if;
+  if (select bbl_per_unit from public.format_volumes where id = p_format) is null then raise exception 'format has no volume yet: type bbl_per_unit or add components'; end if;
+  insert into public.skus (brewery_id, brand_id, format_id, name, upc)
+    values (p_brewery, p_brand, p_format, coalesce(nullif(trim(p_name), ''), v_brand.name || ' · ' || v_format.name), p_upc) returning * into v_row;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- Edit one location's facts. A kind change is allowed; history stays on
+-- the movements (no rewrite). unique (brewery_id, name) still holds.
+create function update_location(
+  p_brewery uuid, p_id uuid, p_name text, p_kind public.location_kind, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.locations;
+begin
+  perform private.assert_staff(p_brewery, array['admin']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'update_location', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'id', p_id, 'name', p_name, 'kind', p_kind));
+  if v_replay is not null then return v_replay; end if;
+  update public.locations set name = p_name, kind = p_kind where id = p_id and brewery_id = p_brewery returning * into v_row;
+  if v_row.id is null then raise exception 'location not found'; end if;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
@@ -2100,25 +2494,135 @@ begin
     jsonb_build_object('brewery', p_brewery, 'name', p_name, 'kind', p_kind));
   if v_replay is not null then return v_replay; end if;
   insert into public.locations (brewery_id, name, kind) values (p_brewery, p_name, p_kind) returning * into v_row;
+  -- A location always has at least one bin; the trio is a starting point the
+  -- brewery renames or trims (never to zero: delete_bin refuses the last one).
+  insert into public.bins (brewery_id, location_id, name)
+    values (p_brewery, v_row.id, 'Walk-in'), (p_brewery, v_row.id, 'Cold'), (p_brewery, v_row.id, 'Dry');
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
+create function create_bin(
+  p_brewery uuid, p_location uuid, p_name text, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.bins;
+begin
+  perform private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'create_bin', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'location', p_location, 'name', p_name));
+  if v_replay is not null then return v_replay; end if;
+  insert into public.bins (brewery_id, location_id, name) values (p_brewery, p_location, p_name) returning * into v_row;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+create function update_bin(
+  p_brewery uuid, p_bin uuid, p_name text, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.bins;
+begin
+  perform private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'update_bin', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'bin', p_bin, 'name', p_name));
+  if v_replay is not null then return v_replay; end if;
+  update public.bins set name = p_name where id = p_bin and brewery_id = p_brewery returning * into v_row;
+  if not found then raise exception 'bin not found'; end if;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- Two guards, both under a row lock on the location so concurrent deletes
+-- cannot empty it between them: a location keeps at least one bin, and a bin
+-- that has ever recorded stock is never removed. The ledgers are append-only
+-- and reference the bin, so "move the stock out first" cannot make it
+-- deletable — a net-zero balance still leaves rows behind. Rename it instead.
+create function delete_bin(
+  p_brewery uuid, p_bin uuid, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.bins; v_used boolean;
+begin
+  perform private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'delete_bin', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'bin', p_bin));
+  if v_replay is not null then return v_replay; end if;
+  select b.* into v_row from public.bins b where b.id = p_bin and b.brewery_id = p_brewery;
+  if not found then raise exception 'bin not found'; end if;
+  perform 1 from public.locations where id = v_row.location_id for update;
+  if (select count(*) from public.bins where location_id = v_row.location_id) <= 1 then
+    raise exception 'a location keeps at least one bin; rename it instead';
+  end if;
+  v_used := exists (select 1 from public.inventory_movements where bin_id = p_bin)
+         or exists (select 1 from public.material_movements  where bin_id = p_bin)
+         or exists (select 1 from public.keg_events          where bin_id = p_bin);
+  if v_used then
+    raise exception 'bin has recorded stock and cannot be removed; rename it instead';
+  end if;
+  delete from public.bins where id = p_bin;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- Sale channels are brewery-owned rows; no name is load-bearing (an order
+-- carries its own channel, so shipping no longer looks one up by name).
+create function upsert_sale_channel(
+  p_brewery uuid, p_id uuid, p_name text, p_tax_treatment public.tax_treatment, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.sale_channels;
+begin
+  perform private.assert_staff(p_brewery, array['admin']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'upsert_sale_channel', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'id', p_id, 'name', p_name, 'tax_treatment', p_tax_treatment));
+  if v_replay is not null then return v_replay; end if;
+  begin
+    if p_id is null then
+      insert into public.sale_channels (brewery_id, name, tax_treatment)
+        values (p_brewery, p_name, p_tax_treatment) returning * into v_row;
+    else
+      select * into v_row from public.sale_channels where id = p_id and brewery_id = p_brewery;
+      if not found then raise exception 'sale channel not found'; end if;
+      update public.sale_channels set name = p_name, tax_treatment = p_tax_treatment
+        where id = p_id and brewery_id = p_brewery returning * into v_row;
+    end if;
+  exception when unique_violation then
+    raise exception 'a channel with that name already exists' using errcode = 'P0001';
+  end;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- A channel in use is held by a foreign key with on delete restrict — from
+-- inventory_movements, customers, orders and channel_prices — which raises
+-- 23503; the command turns that into 'channel is in use'.
+create function delete_sale_channel(
+  p_brewery uuid, p_id uuid, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.sale_channels;
+begin
+  perform private.assert_staff(p_brewery, array['admin']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'delete_sale_channel', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'id', p_id));
+  if v_replay is not null then return v_replay; end if;
+  select * into v_row from public.sale_channels where id = p_id and brewery_id = p_brewery;
+  if not found then raise exception 'sale channel not found'; end if;
+  delete from public.sale_channels where id = p_id and brewery_id = p_brewery;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- p_tax_treatment is the customer's override of its sale channel's default
+-- (§16.3): null means inherit, and every write sets it, so clearing an
+-- override is passing null rather than a second command.
 create function upsert_customer(
   p_brewery uuid, p_id uuid, p_name text, p_type public.customer_type, p_state text,
-  p_price_list uuid, p_license_no text, p_payment_terms text, p_request_id uuid
+  p_sale_channel uuid, p_license_no text, p_payment_terms text, p_tax_treatment public.tax_treatment, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_replay jsonb; v_row public.customers;
 begin
   perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'upsert_customer', p_request_id,
-    jsonb_build_object('brewery', p_brewery, 'id', p_id, 'name', p_name, 'type', p_type, 'state', p_state, 'price_list', p_price_list, 'license_no', p_license_no, 'payment_terms', p_payment_terms));
+    jsonb_build_object('brewery', p_brewery, 'id', p_id, 'name', p_name, 'type', p_type, 'state', p_state, 'sale_channel', p_sale_channel, 'license_no', p_license_no, 'payment_terms', p_payment_terms, 'tax_treatment', p_tax_treatment));
   if v_replay is not null then return v_replay; end if;
+  if p_sale_channel is null then raise exception 'customer needs a sale channel' using errcode = 'P0001'; end if;
   if p_id is null then
-    insert into public.customers (brewery_id, name, type, state, price_list_id, license_no, payment_terms)
-      values (p_brewery, p_name, p_type, p_state, p_price_list, p_license_no, coalesce(p_payment_terms, 'net30')) returning * into v_row;
+    insert into public.customers (brewery_id, name, type, state, sale_channel_id, license_no, payment_terms, tax_treatment)
+      values (p_brewery, p_name, p_type, p_state, p_sale_channel, p_license_no, coalesce(p_payment_terms, 'net30'), p_tax_treatment) returning * into v_row;
   else
-    update public.customers set name = p_name, type = p_type, state = p_state, price_list_id = p_price_list,
-      license_no = p_license_no, payment_terms = coalesce(p_payment_terms, payment_terms)
+    update public.customers set name = p_name, type = p_type, state = p_state, sale_channel_id = p_sale_channel,
+      license_no = p_license_no, payment_terms = coalesce(p_payment_terms, payment_terms), tax_treatment = p_tax_treatment
       where id = p_id and brewery_id = p_brewery returning * into v_row;
     if not found then raise exception 'customer not found'; end if;
   end if;
@@ -2147,62 +2651,115 @@ begin
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
-create function upsert_price_list(p_brewery uuid, p_id uuid, p_name text, p_request_id uuid)
+create function upsert_price_group(p_brewery uuid, p_id uuid, p_name text, p_position int, p_cost_ceiling_cents int, p_request_id uuid)
 returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_replay jsonb; v_row public.price_lists;
+declare v_replay jsonb; v_row public.price_groups;
 begin
   perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
-  v_replay := private.claim_command_request(p_brewery, 'upsert_price_list', p_request_id,
-    jsonb_build_object('brewery', p_brewery, 'id', p_id, 'name', p_name));
+  v_replay := private.claim_command_request(p_brewery, 'upsert_price_group', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'id', p_id, 'name', p_name, 'position', p_position, 'cost_ceiling_cents', p_cost_ceiling_cents));
   if v_replay is not null then return v_replay; end if;
-  if p_id is null then
-    insert into public.price_lists (brewery_id, name) values (p_brewery, p_name) returning * into v_row;
-  else
-    update public.price_lists set name = p_name where id = p_id and brewery_id = p_brewery returning * into v_row;
-    if not found then raise exception 'price list not found'; end if;
-  end if;
+  begin
+    if p_id is null then
+      insert into public.price_groups (brewery_id, name, position, cost_ceiling_cents) values (p_brewery, p_name, p_position, p_cost_ceiling_cents) returning * into v_row;
+    else
+      update public.price_groups set name = p_name, position = p_position, cost_ceiling_cents = p_cost_ceiling_cents where id = p_id and brewery_id = p_brewery returning * into v_row;
+      if not found then raise exception 'price group not found' using errcode = 'P0001'; end if;
+    end if;
+  exception when unique_violation then
+    raise exception 'a price group with that name or position already exists' using errcode = 'P0001';
+  end;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
-create function set_price(
-  p_brewery uuid, p_price_list uuid, p_sku uuid, p_unit_price_cents int, p_request_id uuid
-) returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_replay jsonb; v_row public.price_list_items;
+create function delete_price_group(p_brewery uuid, p_id uuid, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb;
 begin
   perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
-  if not exists (
-    select 1
-    from public.price_lists pl
-    join public.skus s on s.brewery_id = pl.brewery_id
-    where pl.id = p_price_list and s.id = p_sku and pl.brewery_id = p_brewery
-  ) then
-    raise exception 'permission denied' using errcode = '42501';
-  end if;
-  v_replay := private.claim_command_request(p_brewery, 'set_price', p_request_id,
-    jsonb_build_object('brewery', p_brewery, 'price_list', p_price_list, 'sku', p_sku, 'unit_price_cents', p_unit_price_cents));
+  v_replay := private.claim_command_request(p_brewery, 'delete_price_group', p_request_id, jsonb_build_object('brewery', p_brewery, 'id', p_id));
   if v_replay is not null then return v_replay; end if;
-  insert into public.price_list_items (brewery_id, price_list_id, sku_id, unit_price_cents)
-    values (p_brewery, p_price_list, p_sku, p_unit_price_cents)
-    on conflict (price_list_id, sku_id) do update
+  delete from public.price_groups where id = p_id and brewery_id = p_brewery;   -- 23503 when a brand or cell references it
+  if not found then raise exception 'price group not found' using errcode = 'P0001'; end if;
+  return private.complete_command_request(p_request_id, jsonb_build_object('id', p_id, 'deleted', true));
+end $$;
+
+-- One cell of the price grid: what a format costs on a channel for a group.
+create function set_channel_price(
+  p_brewery uuid, p_sale_channel uuid, p_price_group uuid, p_format uuid, p_unit_price_cents int, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.channel_prices;
+begin
+  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'set_channel_price', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'sale_channel', p_sale_channel, 'price_group', p_price_group, 'format', p_format, 'unit_price_cents', p_unit_price_cents));
+  if v_replay is not null then return v_replay; end if;
+  insert into public.channel_prices (brewery_id, sale_channel_id, price_group_id, format_id, unit_price_cents)
+    values (p_brewery, p_sale_channel, p_price_group, p_format, p_unit_price_cents)
+    on conflict (sale_channel_id, price_group_id, format_id) do update
       set unit_price_cents = excluded.unit_price_cents
-      where public.price_list_items.brewery_id = excluded.brewery_id
+      where public.channel_prices.brewery_id = excluded.brewery_id
     returning * into v_row;
+  -- The unique key excludes brewery_id, so the conflict target can match another
+  -- brewery's cell before any FK is checked: the where-guard skips that update
+  -- and the not-found below turns the silent no-op into a refusal
+  -- (tests/data-api-boundary.test.ts).
   if not found then raise exception 'permission denied' using errcode = '42501'; end if;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
+-- Empty a cell: every SKU of that group is unpriced on that channel again.
+create function clear_channel_price(p_brewery uuid, p_sale_channel uuid, p_price_group uuid, p_format uuid, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_n int;
+begin
+  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'clear_channel_price', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'sale_channel', p_sale_channel, 'price_group', p_price_group, 'format', p_format));
+  if v_replay is not null then return v_replay; end if;
+  delete from public.channel_prices where brewery_id = p_brewery and sale_channel_id = p_sale_channel and price_group_id = p_price_group and format_id = p_format;
+  get diagnostics v_n = row_count;
+  return private.complete_command_request(p_request_id, jsonb_build_object('cleared', v_n > 0));
+end $$;
+
+-- One RPC replaces a format's packaging bill of materials (§16.12).
+create function replace_format_bom(p_brewery uuid, p_format uuid, p_lines jsonb, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; l record;
+begin
+  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'replace_format_bom', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'format', p_format, 'lines', p_lines));
+  if v_replay is not null then return v_replay; end if;
+  if not exists (select 1 from public.formats where id = p_format and brewery_id = p_brewery) then raise exception 'format not found'; end if;
+  delete from public.format_bom where format_id = p_format;
+  for l in select (e->>'material_id')::uuid as material_id, (e->>'qty_per_unit')::numeric as qty,
+                  coalesce(e->>'on_break', 'consumed')::public.format_material_disposition as on_break
+           from jsonb_array_elements(coalesce(p_lines, '[]'::jsonb)) e loop
+    insert into public.format_bom (brewery_id, format_id, material_id, qty_per_unit, on_break) values (p_brewery, p_format, l.material_id, l.qty, l.on_break);
+  end loop;
+  return private.complete_command_request(p_request_id, jsonb_build_object('format_id', p_format,
+    'lines', (select coalesce(jsonb_agg(jsonb_build_object('material_id', material_id, 'qty_per_unit', qty_per_unit, 'on_break', on_break)), '[]'::jsonb) from public.format_bom where format_id = p_format)));
+end $$;
+
 create function record_inventory_movement(
-  p_brewery uuid, p_sku uuid, p_location uuid, p_qty numeric, p_type public.movement_type,
-  p_channel public.sale_channel, p_dest_state text, p_note text, p_request_id uuid
+  p_brewery uuid, p_sku uuid, p_location uuid, p_bin uuid, p_qty numeric, p_type public.movement_type,
+  p_sale_channel uuid, p_dest_state text, p_note text, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_replay jsonb; v_row public.inventory_movements;
+declare v_replay jsonb; v_row public.inventory_movements; v_tax public.tax_treatment;
 begin
   perform private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'record_inventory_movement', p_request_id,
-    jsonb_build_object('brewery', p_brewery, 'sku', p_sku, 'location', p_location, 'qty', p_qty, 'type', p_type, 'channel', p_channel, 'dest_state', p_dest_state, 'note', p_note));
+    jsonb_build_object('brewery', p_brewery, 'sku', p_sku, 'location', p_location, 'bin', p_bin, 'qty', p_qty, 'type', p_type, 'sale_channel', p_sale_channel, 'dest_state', p_dest_state, 'note', p_note));
   if v_replay is not null then return v_replay; end if;
-  insert into public.inventory_movements (brewery_id, sku_id, location_id, qty, type, channel, dest_state, note, created_by)
-    values (p_brewery, p_sku, p_location, p_qty, p_type, p_channel, p_dest_state, p_note, auth.uid()) returning * into v_row;
+  -- A staff-entered movement has no customer, so the channel default is the
+  -- resolved treatment; the composite FK below rejects another brewery's channel.
+  if p_sale_channel is not null then
+    select tax_treatment into v_tax from public.sale_channels
+     where id = p_sale_channel and brewery_id = p_brewery;
+  end if;
+  insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, sale_channel_id, tax_treatment, dest_state, note, created_by)
+    values (p_brewery, p_sku, p_location, p_bin, p_qty, p_type, p_sale_channel, v_tax, p_dest_state, p_note, auth.uid()) returning * into v_row;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
@@ -2307,9 +2864,9 @@ begin
     select 1 from jsonb_array_elements(p_lines) e
     where not exists (
       select 1 from public.customers c
-      join public.price_list_items pli on pli.price_list_id = c.price_list_id and pli.brewery_id = c.brewery_id
-      join public.skus s on s.id = pli.sku_id and s.brewery_id = pli.brewery_id
-      where c.id = p_customer and pli.sku_id = (e->>'sku_id')::uuid and s.active
+      join public.sku_prices p on p.brewery_id = c.brewery_id and p.sale_channel_id = c.sale_channel_id
+        and p.sku_id = (e->>'sku_id')::uuid and p.active
+      where c.id = p_customer
     )
   ) then raise exception 'sku is not active and priced for this customer'; end if;
   -- The admin-configured source only (audit P1.4): no first-warehouse inference.
@@ -2435,6 +2992,110 @@ begin
   v_result := private.cancel_order_impl(p_order,p_reason); return private.complete_command_request(p_request_id,v_result);
 end $$;
 
+-- Put back: staged beer after an adjust-after-pick or cancel-when-picked was
+-- re-shelved. Clears the flag and records it; the ledger never moved.
+create function private.confirm_restock_impl(p_order uuid) returns jsonb
+language plpgsql set search_path = '' as $$
+declare o public.orders;
+begin
+  select * into o from public.orders where id = p_order for update;
+  if not found then raise exception 'order not found'; end if;
+  if o.needs_restock is not true then raise exception 'order is not waiting for restock'; end if;
+  update public.orders set needs_restock = false where id = p_order;
+  insert into public.order_events (brewery_id, order_id, actor, event, payload)
+  values (o.brewery_id, p_order, auth.uid(), 'restocked', '{}'::jsonb);
+  return jsonb_build_object('order_id', p_order);
+end $$;
+
+create function confirm_restock(p_order uuid,p_request_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_brewery uuid; v_replay jsonb; v_result jsonb;
+begin
+  v_brewery := private.assert_order_staff(p_order,array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(v_brewery,'confirm_restock',p_request_id,jsonb_build_object('order',p_order));
+  if v_replay is not null then return v_replay; end if;
+  v_result := private.confirm_restock_impl(p_order); return private.complete_command_request(p_request_id,v_result);
+end $$;
+
+-- Short pick: one line counted below ordered. adjust_down makes the count the
+-- order (allocation shrinks, ATP recovers); keep_owed records the count and
+-- leaves the remainder owed, so the order stays on pick_due.
+create function private.resolve_short_pick_impl(p_order uuid, p_line uuid, p_qty numeric, p_reason text, p_resolution text)
+returns jsonb language plpgsql set search_path = '' as $$
+declare o public.orders; l public.order_lines;
+begin
+  if p_reason is null or length(trim(p_reason)) = 0 then raise exception 'reason is required'; end if;
+  if p_qty < 0 then raise exception 'qty_picked cannot be negative'; end if;
+  o := private.lock_order(p_order, array['confirmed','picked']::public.order_status[]);
+  select * into l from public.order_lines where id = p_line and order_id = p_order for update;
+  if not found then raise exception 'order line not found'; end if;
+  if p_qty >= l.qty_ordered then raise exception 'line is not short'; end if;
+  if p_resolution = 'adjust_down' then
+    if p_qty = 0 then raise exception 'adjust the order lines to drop a line entirely'; end if;
+    update public.order_lines set qty_ordered = p_qty, qty_picked = p_qty, short_reason = p_reason where id = p_line;
+    update public.allocations set qty = p_qty where source = 'order_line' and ref = p_line and status = 'open';
+  elsif p_resolution = 'keep_owed' then
+    update public.order_lines set qty_picked = p_qty, short_reason = p_reason where id = p_line;
+  else
+    raise exception 'unknown resolution';
+  end if;
+  update public.orders set status = 'picked' where id = p_order;
+  insert into public.order_events (brewery_id, order_id, actor, event, payload)
+  values (o.brewery_id, p_order, auth.uid(), 'short_pick',
+          jsonb_build_object('line_id', p_line, 'qty_picked', p_qty, 'reason', p_reason, 'resolution', p_resolution));
+  return jsonb_build_object('order_id', p_order);
+end $$;
+
+create function resolve_short_pick(p_order uuid,p_line uuid,p_qty_picked numeric,p_reason text,p_resolution text,p_request_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_brewery uuid; v_replay jsonb; v_result jsonb;
+begin
+  v_brewery := private.assert_order_staff(p_order,array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(v_brewery,'resolve_short_pick',p_request_id,
+    jsonb_build_object('order',p_order,'line',p_line,'qty_picked',p_qty_picked,'reason',p_reason,'resolution',p_resolution));
+  if v_replay is not null then return v_replay; end if;
+  v_result := private.resolve_short_pick_impl(p_order,p_line,p_qty_picked,p_reason,p_resolution); return private.complete_command_request(p_request_id,v_result);
+end $$;
+
+-- Confirm delivery: the stop is signed; an on_delivery shipment gets its
+-- invoice now, at the shipped quantities and order prices. Never moves stock.
+create function private.confirm_delivery_impl(p_delivery uuid, p_signed_by text) returns jsonb
+language plpgsql set search_path = '' as $$
+declare d public.deliveries; sh public.shipments; o public.orders; v_invoice uuid;
+begin
+  select * into d from public.deliveries where id = p_delivery for update;
+  if not found then raise exception 'delivery not found'; end if;
+  if d.delivered_at is not null then raise exception 'already delivered'; end if;
+  select * into sh from public.shipments where id = d.shipment_id;
+  select * into o from public.orders where id = sh.order_id;
+  update public.deliveries set delivered_at = now(), signed_by = nullif(trim(p_signed_by), '') where id = p_delivery;
+  select id into v_invoice from public.invoices where shipment_id = sh.id and kind = 'invoice' limit 1;
+  if v_invoice is null and sh.invoice_timing = 'on_delivery' and o.kind = 'wholesale'
+     and exists (select 1 from public.order_lines ol where ol.order_id = o.id and coalesce(ol.qty_shipped, 0) > 0) then
+    insert into public.invoices (brewery_id, kind, customer_id, shipment_id, issued_on)
+    values (o.brewery_id, 'invoice', o.customer_id, sh.id, current_date) returning id into v_invoice;
+    insert into public.invoice_lines (brewery_id, invoice_id, kind, sku_id, qty, unit_price_cents, description)
+    select o.brewery_id, v_invoice, 'sku', ol.sku_id, ol.qty_shipped, ol.unit_price_cents, s.name
+    from public.order_lines ol join public.skus s on s.id = ol.sku_id
+    where ol.order_id = o.id and coalesce(ol.qty_shipped, 0) > 0;
+  end if;
+  insert into public.order_events (brewery_id, order_id, actor, event, payload)
+  values (o.brewery_id, o.id, auth.uid(), 'delivered', jsonb_build_object('delivery_id', p_delivery, 'signed_by', p_signed_by, 'invoice_id', v_invoice));
+  return jsonb_build_object('delivery_id', p_delivery, 'invoice_id', v_invoice);
+end $$;
+
+create function confirm_delivery(p_delivery uuid,p_signed_by text,p_request_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_brewery uuid; v_replay jsonb; v_result jsonb;
+begin
+  select brewery_id into v_brewery from public.deliveries where id = p_delivery;
+  if v_brewery is null then raise exception 'permission denied' using errcode = '42501'; end if;
+  perform private.assert_staff(v_brewery,array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(v_brewery,'confirm_delivery',p_request_id,jsonb_build_object('delivery',p_delivery,'signed_by',p_signed_by));
+  if v_replay is not null then return v_replay; end if;
+  v_result := private.confirm_delivery_impl(p_delivery,p_signed_by); return private.complete_command_request(p_request_id,v_result);
+end $$;
+
 create function record_pick(p_order uuid,p_picks jsonb,p_request_id uuid) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare v_brewery uuid; v_replay jsonb; v_result jsonb;
@@ -2445,14 +3106,218 @@ begin
   v_result := private.record_pick_impl(p_order,p_picks); return private.complete_command_request(p_request_id,v_result);
 end $$;
 
-create function ship_order(p_order uuid,p_ship jsonb,p_carrier text,p_tracking text,p_request_id uuid) returns jsonb
+create function ship_order(p_order uuid,p_ship jsonb,p_carrier text,p_tracking text,p_request_id uuid,p_invoice_timing text default 'now') returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare v_brewery uuid; v_replay jsonb; v_result jsonb;
 begin
+  if p_invoice_timing not in ('now','on_delivery') then raise exception 'unknown invoice timing'; end if;
   v_brewery := private.assert_order_staff(p_order,array['admin','warehouse']::public.staff_role[]);
-  v_replay := private.claim_command_request(v_brewery,'ship_order',p_request_id,jsonb_build_object('order',p_order,'ship',p_ship,'carrier',p_carrier,'tracking',p_tracking));
+  v_replay := private.claim_command_request(v_brewery,'ship_order',p_request_id,jsonb_build_object('order',p_order,'ship',p_ship,'carrier',p_carrier,'tracking',p_tracking,'invoice_timing',p_invoice_timing));
   if v_replay is not null then return v_replay; end if;
-  v_result := private.ship_order_impl(p_order,p_ship,p_carrier,p_tracking); return private.complete_command_request(p_request_id,v_result);
+  v_result := private.ship_order_impl(p_order,p_ship,p_carrier,p_tracking,p_invoice_timing); return private.complete_command_request(p_request_id,v_result);
+end $$;
+
+-- Return shipment: the credit memo above, then the beer. Reason decides the
+-- beer, never the money: unsold and wrong_item come back sellable at the
+-- destination; damaged comes back and is written to loss in the same call.
+create function private.return_shipment_impl(p_invoice uuid, p_lines jsonb, p_location uuid, p_reason text) returns jsonb
+language plpgsql set search_path = '' as $$
+declare v_memo uuid; v_brewery uuid;
+begin
+  if p_reason not in ('damaged','wrong_item','unsold') then raise exception 'unknown return reason'; end if;
+  v_memo := (private.create_credit_memo_impl(p_invoice, p_lines, p_location, p_reason)->>'invoice_id')::uuid;
+  if p_reason = 'damaged' then
+    select brewery_id into v_brewery from public.invoices where id = p_invoice;
+    insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, ref, note, created_by)
+    select v_brewery, m.sku_id, m.location_id, m.bin_id, -m.qty, 'loss', v_memo, 'damaged return', auth.uid()
+    from public.inventory_movements m where m.ref = v_memo and m.type = 'return_in';
+  end if;
+  return jsonb_build_object('credit_memo_id', v_memo);
+end $$;
+
+create function return_shipment(p_invoice uuid,p_lines jsonb,p_location uuid,p_reason text,p_request_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_brewery uuid; v_replay jsonb; v_result jsonb;
+begin
+  v_brewery := private.assert_invoice_staff(p_invoice,array['admin','sales']::public.staff_role[]);
+  v_replay := private.claim_command_request(v_brewery,'return_shipment',p_request_id,jsonb_build_object('invoice',p_invoice,'lines',p_lines,'location',p_location,'reason',p_reason));
+  if v_replay is not null then return v_replay; end if;
+  v_result := private.return_shipment_impl(p_invoice,p_lines,p_location,p_reason); return private.complete_command_request(p_request_id,v_result);
+end $$;
+
+-- ---------------------------------------------------------------- Stock transfers
+-- Internal moves of stuff between two locations (spec 2026-09-06 Decision 3).
+create function private.lock_transfer(p_transfer uuid, p_allowed public.stock_transfer_status[]) returns public.stock_transfers
+language plpgsql set search_path = '' as $$
+declare t public.stock_transfers;
+begin
+  select * into t from public.stock_transfers where id = p_transfer for update;
+  if not found then raise exception 'transfer not found'; end if;
+  if not (t.status = any(p_allowed)) then raise exception 'transfer is %', t.status; end if;
+  return t;
+end $$;
+
+create function private.create_stock_transfer_impl(
+  p_brewery uuid, p_from uuid, p_to uuid, p_requested date, p_note text, p_lines jsonb
+) returns jsonb language plpgsql set search_path = '' as $$
+declare v_id uuid; l record;
+begin
+  if p_from = p_to then raise exception 'same location: use move_stock_bin'; end if;
+  if p_lines is null or jsonb_array_length(p_lines) = 0 then raise exception 'a transfer needs at least one line'; end if;
+  insert into public.stock_transfers (brewery_id, from_location_id, to_location_id, requested_date, note, created_by)
+  values (p_brewery, p_from, p_to, p_requested, p_note, auth.uid()) returning id into v_id;
+  for l in select
+      (e->>'sku_id')::uuid as sku_id, (e->>'material_id')::uuid as material_id,
+      (e->>'keg_pool_id')::uuid as keg_pool_id, (e->>'keg_size')::public.keg_size as keg_size,
+      (e->>'qty')::numeric as qty, (e->>'from_bin_id')::uuid as from_bin, (e->>'to_bin_id')::uuid as to_bin, e->>'note' as note
+    from jsonb_array_elements(p_lines) e loop
+    insert into public.stock_transfer_lines (brewery_id, transfer_id, sku_id, material_id, keg_pool_id, keg_size, qty, from_bin_id, to_bin_id, note)
+    values (p_brewery, v_id, l.sku_id, l.material_id, l.keg_pool_id, l.keg_size, l.qty, l.from_bin, l.to_bin, l.note);
+  end loop;
+  return jsonb_build_object('transfer_id', v_id);
+end $$;
+
+create function create_stock_transfer(
+  p_brewery uuid, p_from uuid, p_to uuid, p_requested date, p_note text, p_lines jsonb, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_result jsonb;
+begin
+  perform private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'create_stock_transfer', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'from', p_from, 'to', p_to, 'requested', p_requested, 'note', p_note, 'lines', p_lines));
+  if v_replay is not null then return v_replay; end if;
+  v_result := private.create_stock_transfer_impl(p_brewery, p_from, p_to, p_requested, p_note, p_lines);
+  return private.complete_command_request(p_request_id, v_result);
+end $$;
+
+create function submit_stock_transfer(p_transfer uuid, p_request_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_brewery uuid; v_replay jsonb; t public.stock_transfers;
+begin
+  select brewery_id into v_brewery from public.stock_transfers where id = p_transfer;
+  if v_brewery is null then raise exception 'permission denied' using errcode = '42501'; end if;
+  perform private.assert_staff(v_brewery, array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(v_brewery, 'submit_stock_transfer', p_request_id, jsonb_build_object('transfer', p_transfer));
+  if v_replay is not null then return v_replay; end if;
+  t := private.lock_transfer(p_transfer, array['draft']::public.stock_transfer_status[]);
+  update public.stock_transfers set status = 'submitted' where id = p_transfer;
+  return private.complete_command_request(p_request_id, jsonb_build_object('transfer_id', p_transfer));
+end $$;
+
+create function record_stock_transfer_pick(p_transfer uuid, p_picks jsonb, p_request_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_brewery uuid; v_replay jsonb; t public.stock_transfers; pk record;
+begin
+  select brewery_id into v_brewery from public.stock_transfers where id = p_transfer;
+  if v_brewery is null then raise exception 'permission denied' using errcode = '42501'; end if;
+  perform private.assert_staff(v_brewery, array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(v_brewery, 'record_stock_transfer_pick', p_request_id, jsonb_build_object('transfer', p_transfer, 'picks', p_picks));
+  if v_replay is not null then return v_replay; end if;
+  t := private.lock_transfer(p_transfer, array['submitted','picked']::public.stock_transfer_status[]);
+  for pk in select (e->>'line_id')::uuid as line_id, (e->>'qty')::numeric as qty from jsonb_array_elements(p_picks) e loop
+    update public.stock_transfer_lines set qty_picked = pk.qty where id = pk.line_id and transfer_id = p_transfer;
+    if not found then raise exception 'transfer line % not found', pk.line_id; end if;
+  end loop;
+  update public.stock_transfers set status = 'picked' where id = p_transfer;
+  return private.complete_command_request(p_request_id, jsonb_build_object('transfer_id', p_transfer));
+end $$;
+
+-- Receive: the stock arrives. Paired, volume-neutral ledger rows per line —
+-- negative at the source bin, positive at the destination bin — into whichever
+-- ledger the line addresses, all in this one RPC; the fleet total and the TTB
+-- removal figures never move.
+create function private.receive_stock_transfer_impl(p_transfer uuid, p_lines jsonb) returns jsonb
+language plpgsql set search_path = '' as $$
+declare t public.stock_transfers; l public.stock_transfer_lines; rq record; v_qty numeric;
+begin
+  t := private.lock_transfer(p_transfer, array['picked','in_transit']::public.stock_transfer_status[]);
+  for l in select * from public.stock_transfer_lines where transfer_id = p_transfer loop
+    select (e->>'qty')::numeric into v_qty from jsonb_array_elements(coalesce(p_lines, '[]'::jsonb)) e where (e->>'line_id')::uuid = l.id;
+    v_qty := coalesce(v_qty, l.qty_picked, l.qty);
+    if v_qty <= 0 then continue; end if;
+    if l.sku_id is not null then
+      insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, ref, created_by)
+      values (t.brewery_id, l.sku_id, t.from_location_id, l.from_bin_id, -v_qty, 'location_transfer', t.id, auth.uid()),
+             (t.brewery_id, l.sku_id, t.to_location_id,   l.to_bin_id,    v_qty, 'location_transfer', t.id, auth.uid());
+    elsif l.material_id is not null then
+      insert into public.material_movements (brewery_id, material_id, location_id, bin_id, qty, type, note, created_by)
+      values (t.brewery_id, l.material_id, t.from_location_id, l.from_bin_id, -v_qty, 'transfer_out', 'transfer ' || t.id, auth.uid()),
+             (t.brewery_id, l.material_id, t.to_location_id,   l.to_bin_id,    v_qty, 'transfer_in',  'transfer ' || t.id, auth.uid());
+    else
+      insert into public.keg_events (brewery_id, pool_id, keg_size, location_id, bin_id, qty, reason, note, created_by)
+      values (t.brewery_id, l.keg_pool_id, l.keg_size, t.from_location_id, l.from_bin_id, v_qty::int, 'transferred_out', 'transfer ' || t.id, auth.uid()),
+             (t.brewery_id, l.keg_pool_id, l.keg_size, t.to_location_id,   l.to_bin_id,   v_qty::int, 'transferred_in',  'transfer ' || t.id, auth.uid());
+    end if;
+  end loop;
+  update public.stock_transfers set status = 'received', received_at = now() where id = p_transfer;
+  return jsonb_build_object('transfer_id', p_transfer);
+end $$;
+
+create function receive_stock_transfer(p_transfer uuid, p_lines jsonb, p_request_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_brewery uuid; v_replay jsonb; v_result jsonb;
+begin
+  select brewery_id into v_brewery from public.stock_transfers where id = p_transfer;
+  if v_brewery is null then raise exception 'permission denied' using errcode = '42501'; end if;
+  perform private.assert_staff(v_brewery, array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(v_brewery, 'receive_stock_transfer', p_request_id, jsonb_build_object('transfer', p_transfer, 'lines', p_lines));
+  if v_replay is not null then return v_replay; end if;
+  v_result := private.receive_stock_transfer_impl(p_transfer, p_lines);
+  return private.complete_command_request(p_request_id, v_result);
+end $$;
+
+-- Bin move: stock changes bin inside one location. No document, no status,
+-- just the paired ledger rows (spec 2026-09-06 Decision 5). Two locations is a
+-- stock transfer.
+create function move_stock_bin(
+  p_brewery uuid, p_sku uuid, p_material uuid, p_keg_pool uuid, p_keg_size public.keg_size,
+  p_qty numeric, p_from_bin uuid, p_to_bin uuid, p_note text, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_from public.bins; v_to public.bins;
+begin
+  perform private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'move_stock_bin', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'sku', p_sku, 'material', p_material, 'keg_pool', p_keg_pool, 'keg_size', p_keg_size,
+                       'qty', p_qty, 'from_bin', p_from_bin, 'to_bin', p_to_bin, 'note', p_note));
+  if v_replay is not null then return v_replay; end if;
+  if p_qty <= 0 then raise exception 'qty must be positive'; end if;
+  if num_nonnulls(p_sku, p_material, p_keg_pool) <> 1 then raise exception 'exactly one of sku, material, keg pool'; end if;
+  if p_from_bin = p_to_bin then raise exception 'from and to bin are the same'; end if;
+  select * into v_from from public.bins where id = p_from_bin and brewery_id = p_brewery;
+  select * into v_to   from public.bins where id = p_to_bin   and brewery_id = p_brewery;
+  if v_from.id is null or v_to.id is null then raise exception 'bin not found'; end if;
+  if v_from.location_id <> v_to.location_id then raise exception 'bins are in different locations: use create_stock_transfer'; end if;
+  if p_sku is not null then
+    insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, note, created_by)
+    values (p_brewery, p_sku, v_from.location_id, p_from_bin, -p_qty, 'location_transfer', p_note, auth.uid()),
+           (p_brewery, p_sku, v_to.location_id,   p_to_bin,    p_qty, 'location_transfer', p_note, auth.uid());
+  elsif p_material is not null then
+    insert into public.material_movements (brewery_id, material_id, location_id, bin_id, qty, type, note, created_by)
+    values (p_brewery, p_material, v_from.location_id, p_from_bin, -p_qty, 'transfer_out', p_note, auth.uid()),
+           (p_brewery, p_material, v_to.location_id,   p_to_bin,    p_qty, 'transfer_in',  p_note, auth.uid());
+  else
+    if p_keg_size is null then raise exception 'keg_size is required with a keg pool'; end if;
+    insert into public.keg_events (brewery_id, pool_id, keg_size, location_id, bin_id, qty, reason, note, created_by)
+    values (p_brewery, p_keg_pool, p_keg_size, v_from.location_id, p_from_bin, p_qty::int, 'transferred_out', p_note, auth.uid()),
+           (p_brewery, p_keg_pool, p_keg_size, v_to.location_id,   p_to_bin,   p_qty::int, 'transferred_in',  p_note, auth.uid());
+  end if;
+  return private.complete_command_request(p_request_id, jsonb_build_object('from_bin_id', p_from_bin, 'to_bin_id', p_to_bin, 'qty', p_qty));
+end $$;
+
+-- Release one open reservation so its quantity returns to ATP (Pars and
+-- allocation screen). Only an open allocation can be released.
+create function release_allocation(p_allocation uuid,p_request_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_brewery uuid; v_replay jsonb; v_status text;
+begin
+  select brewery_id, status into v_brewery, v_status from public.allocations where id = p_allocation;
+  if v_brewery is null then raise exception 'permission denied' using errcode = '42501'; end if;
+  perform private.assert_staff(v_brewery,array['admin','sales']::public.staff_role[]);
+  v_replay := private.claim_command_request(v_brewery,'release_allocation',p_request_id,jsonb_build_object('allocation',p_allocation));
+  if v_replay is not null then return v_replay; end if;
+  if v_status <> 'open' then raise exception 'allocation is not open'; end if;
+  update public.allocations set status = 'released' where id = p_allocation and status = 'open';
+  return private.complete_command_request(p_request_id, jsonb_build_object('allocation_id', p_allocation));
 end $$;
 
 create function create_credit_memo(p_invoice uuid,p_lines jsonb,p_location uuid,p_reason text,p_request_id uuid) returns jsonb
@@ -2521,8 +3386,7 @@ create index packaging_run_consumptions_brewery_idx on packaging_run_consumption
 create index packaging_run_outputs_brewery_idx on packaging_run_outputs (brewery_id);
 create index pos_item_mappings_brewery_idx on pos_item_mappings (brewery_id);
 create index pos_locations_brewery_idx on pos_locations (brewery_id);
-create index price_list_items_brewery_idx on price_list_items (brewery_id);
-create index product_approvals_brewery_idx on product_approvals (brewery_id);
+create index brand_approvals_brewery_idx on brand_approvals (brewery_id);
 create index purchase_order_lines_brewery_idx on purchase_order_lines (brewery_id);
 create index receipt_lines_brewery_idx on receipt_lines (brewery_id);
 create index receipts_brewery_idx on receipts (brewery_id);
@@ -2530,7 +3394,7 @@ create index recipe_ingredients_brewery_idx on recipe_ingredients (brewery_id);
 create index recipe_versions_brewery_idx on recipe_versions (brewery_id);
 create index ship_tos_brewery_idx on ship_tos (brewery_id);
 create index shipments_brewery_idx on shipments (brewery_id);
-create index sku_bom_brewery_idx on sku_bom (brewery_id);
+create index format_bom_brewery_idx on format_bom (brewery_id);
 create index state_registrations_brewery_idx on state_registrations (brewery_id);
 create index taproom_pars_brewery_idx on taproom_pars (brewery_id);
 create index transfers_brewery_idx on transfers (brewery_id);
@@ -2542,14 +3406,14 @@ begin
   -- Staff read their tenant's registered query surface. Writes are explicitly
   -- limited below to the exact RPC path and command roles that own them.
   foreach t in array array[
-    'customers','ship_tos','vendors','materials','material_lots','products','keg_pools','skus',
-    'price_lists','price_list_items','sku_bom','locations','allocations','taproom_pars',
+    'customers','ship_tos','vendors','materials','material_lots','styles','brands','keg_pools','skus',
+    'formats','format_components','format_bom','price_groups','channel_prices','locations','bins','sale_channels','stock_transfers','stock_transfer_lines','allocations','taproom_pars',
     'recipes','recipe_versions','recipe_ingredients','vessels','batches','vessel_occupancies',
     'fermentation_readings','batch_additions','packaging_runs','lots','packaging_run_outputs',
     'packaging_run_consumptions','material_contracts','purchase_orders','purchase_order_lines',
     'receipts','receipt_lines','material_counts','material_count_lines','orders','order_lines',
     'shipments','invoices','invoice_lines','pos_locations','pos_item_mappings','pos_sales',
-    'product_approvals','state_registrations','brewery_state_licenses','report_filings',
+    'brand_approvals','state_registrations','brewery_state_licenses','report_filings',
     'routes','deliveries']
   loop
     execute format('alter table %I enable row level security', t);
@@ -2588,12 +3452,14 @@ create policy self_read on customer_users for select using (user_id = (select au
 -- Portal customers
 create policy customer_read_own on customers for select using (id in (select my_customer_ids()));
 create policy customer_own on ship_tos for select using (customer_id in (select my_customer_ids()));
-create policy customer_read on products for select
+create policy customer_read on brands for select
+  using (brewery_id in (select c.brewery_id from customers c where c.id in (select my_customer_ids())));
+create policy customer_read on formats for select
   using (brewery_id in (select c.brewery_id from customers c where c.id in (select my_customer_ids())));
 create policy customer_read on skus for select
   using (active and brewery_id in (select c.brewery_id from customers c where c.id in (select my_customer_ids())));
-create policy customer_own_prices on price_list_items for select
-  using (price_list_id in (select c.price_list_id from customers c where c.id in (select my_customer_ids())));
+create policy customer_own_prices on channel_prices for select
+  using (sale_channel_id in (select c.sale_channel_id from customers c where c.id in (select my_customer_ids())));
 create policy customer_read_portal_source on locations for select
   using (
     id in (
@@ -2996,7 +3862,22 @@ create view private.today_candidates with (security_invoker = true) as
          array['admin','warehouse']::text[],
          null::uuid
     from orders o join breweries b on b.id = o.brewery_id
-    where o.status = 'confirmed' and o.requested_ship_date is not null
+    where (o.status = 'confirmed' and o.requested_ship_date is not null)
+       -- a picked order with a line still owed keeps its pick
+       or (o.status = 'picked' and exists (
+             select 1 from order_lines ol where ol.order_id = o.id and coalesce(ol.qty_picked, 0) < ol.qty_ordered))
+  union all
+  -- standing work, not date-due: staged beer to put back while the flag is set
+  select o.brewery_id, 'restock_due', 'order', o.id::text,
+         md5(concat_ws('|', o.status, o.needs_restock)),
+         'ORD-' || lpad(o.order_no::text, 4, '0'),
+         'restock staged beer',
+         null::timestamptz,
+         '/orders/' || o.id || '/restock',
+         array['admin','warehouse']::text[],
+         null::uuid
+    from orders o
+    where o.needs_restock = true
   union all
   -- only the lowest undelivered stop of an open route is "next"
   select r.brewery_id, 'delivery_next', 'delivery', d.id::text,
@@ -3033,7 +3914,7 @@ grant select on private.today_candidates to service_role;
 -- ponytail: delivery_next and fermentation_reading_overdue join this list when
 -- their MGR pages/commands ship (slice 4 cellar reading, slice 10 delivery stop).
 create function today_live_reasons() returns text[]
-language sql immutable set search_path = '' as $$ select array['submitted_order','pick_due'] $$;
+language sql immutable set search_path = '' as $$ select array['submitted_order','pick_due','restock_due'] $$;
 
 create function get_today_items(p_brewery uuid, p_now timestamptz default now())
 returns setof private.today_candidates
@@ -3045,7 +3926,7 @@ language sql stable security definer set search_path = '' as $$
     join public.brewery_users bu on bu.brewery_id = c.brewery_id and bu.user_id = auth.uid()
     where c.brewery_id = p_brewery
       and c.reason = any (public.today_live_reasons())
-      and (c.reason = 'submitted_order' or c.due_at <= p_now)
+      and (c.reason = 'submitted_order' or c.due_at is null or c.due_at <= p_now)
       and (bu.role = 'admin'
            or (bu.role::text = any (c.recipient_roles) and (c.assigned_user_id is null or c.assigned_user_id = auth.uid())))
     order by c.due_at nulls last, c.safe_label
@@ -3058,7 +3939,7 @@ language sql stable security definer set search_path = '' as $$
     from private.today_candidates c
     where c.brewery_id = p_brewery_id
       and c.reason = any (public.today_live_reasons())
-      and (c.reason = 'submitted_order' or c.due_at <= p_now)
+      and (c.reason = 'submitted_order' or c.due_at is null or c.due_at <= p_now)
 $$;
 
 revoke execute on function today_live_reasons(), get_today_items(uuid, timestamptz), scan_chat_today_candidates(uuid, timestamptz)
@@ -3538,19 +4419,19 @@ revoke all on all sequences in schema public from public, anon, authenticated;
 -- qbo_connections and pos_connections hold connection metadata only; token
 -- material lives in private.integration_tokens behind service-only RPCs.
 grant select on breweries, brewery_users, customer_users,
-  customers, ship_tos, vendors, materials, material_lots, products, keg_pools, skus,
-  price_lists, price_list_items, sku_bom, locations, inventory_movements, allocations, taproom_pars,
+  customers, ship_tos, vendors, materials, material_lots, styles, brands, keg_pools, skus,
+  formats, format_components, format_bom, price_groups, channel_prices, locations, bins, sale_channels, stock_transfers, stock_transfer_lines, inventory_movements, allocations, taproom_pars,
   recipes, recipe_versions, recipe_ingredients, vessels, batches, vessel_occupancies, transfers,
   volume_adjustments, fermentation_readings, material_movements, batch_additions, packaging_runs,
   lots, packaging_run_outputs, packaging_run_consumptions, material_contracts, purchase_orders,
   purchase_order_lines, receipts, receipt_lines, material_counts, material_count_lines, orders,
   order_lines, order_events, shipments, invoices, invoice_lines, keg_events,
-  pos_locations, pos_item_mappings, pos_sales, product_approvals, state_registrations,
+  pos_locations, pos_item_mappings, pos_sales, brand_approvals, state_registrations,
   brewery_state_licenses, report_filings, routes, deliveries, qbo_connections, pos_connections
   to authenticated;
 -- Security-invoker views retain the underlying tables' RLS predicates; expose
 -- only the derived reads consumed by registered commands.
-grant select on on_hand, atp, invoice_totals, portal_brewery to authenticated;
+grant select on on_hand, bin_on_hand, atp, invoice_totals, keg_deposit_balances, portal_brewery, sku_prices to authenticated;
 grant all on all tables in schema public to service_role;
 grant all on all sequences in schema public to service_role;
 
@@ -3573,14 +4454,25 @@ revoke all on all functions in schema private from public, anon, authenticated;
 grant execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), portal_availability(uuid), portal_brewery_rows()
   to authenticated;
 grant execute on function
-  create_product(uuid,text,text,numeric,uuid),
-  create_sku(uuid,uuid,text,public.package_type,int,numeric,uuid),
+  create_sku(uuid,uuid,uuid,text,text,uuid),
+  upsert_brand(uuid,uuid,text,text,numeric,text,text,uuid,text,uuid),
+  upsert_format(uuid,uuid,text,public.format_basis,public.package_type,public.keg_size,int,numeric,uuid),
+  replace_format_components(uuid,uuid,jsonb,uuid),
   create_location(uuid,text,public.location_kind,uuid),
-  upsert_customer(uuid,uuid,text,public.customer_type,text,uuid,text,text,uuid),
+  update_location(uuid,uuid,text,public.location_kind,uuid),
+  create_bin(uuid,uuid,text,uuid),
+  update_bin(uuid,uuid,text,uuid),
+  delete_bin(uuid,uuid,uuid),
+  upsert_customer(uuid,uuid,text,public.customer_type,text,uuid,text,text,public.tax_treatment,uuid),
+  upsert_sale_channel(uuid,uuid,text,public.tax_treatment,uuid),
+  delete_sale_channel(uuid,uuid,uuid),
   upsert_ship_to(uuid,uuid,uuid,text,text,text,text,text,text,uuid),
-  upsert_price_list(uuid,uuid,text,uuid),
-  set_price(uuid,uuid,uuid,int,uuid),
-  record_inventory_movement(uuid,uuid,uuid,numeric,public.movement_type,public.sale_channel,text,text,uuid),
+  upsert_price_group(uuid,uuid,text,int,int,uuid),
+  delete_price_group(uuid,uuid,uuid),
+  set_channel_price(uuid,uuid,uuid,uuid,int,uuid),
+  clear_channel_price(uuid,uuid,uuid,uuid,uuid),
+  replace_format_bom(uuid,uuid,jsonb,uuid),
+  record_inventory_movement(uuid,uuid,uuid,uuid,numeric,public.movement_type,uuid,text,text,uuid),
   set_taproom_par(uuid,uuid,uuid,numeric,uuid),
   set_portal_fulfillment_source(uuid,uuid,uuid),
   create_order(uuid,public.order_kind,uuid,uuid,uuid,uuid,date,text,text,jsonb,uuid),
@@ -3591,8 +4483,18 @@ grant execute on function
   adjust_order_lines(uuid,jsonb,text,uuid),
   cancel_order(uuid,text,uuid),
   record_pick(uuid,jsonb,uuid),
-  ship_order(uuid,jsonb,text,text,uuid),
+  confirm_restock(uuid,uuid),
+  confirm_delivery(uuid,text,uuid),
+  resolve_short_pick(uuid,uuid,numeric,text,text,uuid),
+  ship_order(uuid,jsonb,text,text,uuid,text),
   create_credit_memo(uuid,jsonb,uuid,text,uuid),
+  return_shipment(uuid,jsonb,uuid,text,uuid),
+  release_allocation(uuid,uuid),
+  create_stock_transfer(uuid,uuid,uuid,date,text,jsonb,uuid),
+  submit_stock_transfer(uuid,uuid),
+  record_stock_transfer_pick(uuid,jsonb,uuid),
+  receive_stock_transfer(uuid,jsonb,uuid),
+  move_stock_bin(uuid,uuid,uuid,uuid,public.keg_size,numeric,uuid,uuid,text,uuid),
   set_standing_allocation(uuid,uuid,numeric,uuid),
   create_replenishment_order(uuid,uuid,jsonb,uuid)
   to authenticated;

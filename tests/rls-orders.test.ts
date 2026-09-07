@@ -1,23 +1,24 @@
 // tests/rls-orders.test.ts — order_events RLS + append-only; customer scoping for 1B tables.
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaff, makeCustomerUser, asUser } from "./helpers";
+import { admin, makeBrewery, makeStaff, makeCustomerUser, asUser, seedCatalog, seedLocation, seedCustomer } from "./helpers";
 
 let b1: { id: string }, b2: { id: string };
 let staff1: { id: string; email: string }, staff2: { id: string; email: string };
 let customer: { id: string }, custUser: { id: string; email: string };
+// An order carries its customer's sale channel (not null since the price grid).
+let saleChannelId: string;
 let order: { id: string; ship_to_id: string };
 let whId: string;
 
 beforeAll(async () => {
   b1 = await makeBrewery(); b2 = await makeBrewery();
   staff1 = await makeStaff(b1.id); staff2 = await makeStaff(b2.id);
-  const { data: c } = await admin.from("customers").insert({ brewery_id: b1.id, name: "Bar X", type: "retailer", state: "PA" }).select().single();
-  customer = c!;
+  const cust = await seedCustomer(b1.id, { name: "Bar X" });
+  customer = { id: cust.customerId };
+  saleChannelId = cust.saleChannelId;
   custUser = await makeCustomerUser(customer.id);
-  const { data: loc } = await admin.from("locations").insert({ brewery_id: b1.id, name: "WH", kind: "warehouse" }).select().single();
-  whId = loc!.id;
-  const { data: st } = await admin.from("ship_tos").insert({ brewery_id: b1.id, customer_id: customer.id, label: "main", address1: "1 St", city: "Phila", state: "PA", zip: "19100" }).select().single();
-  const { data: o } = await admin.from("orders").insert({ brewery_id: b1.id, kind: "wholesale", customer_id: customer.id, ship_to_id: st!.id, from_location_id: whId, created_by: staff1.id }).select().single();
+  whId = (await seedLocation(b1.id)).id;
+  const { data: o } = await admin.from("orders").insert({ brewery_id: b1.id, kind: "wholesale", customer_id: customer.id, ship_to_id: cust.shipToId, sale_channel_id: cust.saleChannelId, from_location_id: whId, created_by: staff1.id }).select().single();
   order = o!;
   await admin.from("order_events").insert({ brewery_id: b1.id, order_id: order.id, actor: staff1.id, event: "created" });
 });
@@ -69,11 +70,10 @@ describe("order_events", () => {
 
 describe("customer raw draft order-line mutations are denied", () => {
   it("insert, update, and delete on a draft order's lines all affect nothing", async () => {
-    const { data: p } = await admin.from("products").insert({ brewery_id: b1.id, name: "Draft Pale" }).select().single();
-    const { data: s } = await admin.from("skus").insert({ brewery_id: b1.id, product_id: p!.id, name: "case", package_type: "can", bbl_per_unit: 0.0645 }).select().single();
-    const { data: line } = await admin.from("order_lines").insert({ brewery_id: b1.id, order_id: order.id, sku_id: s!.id, qty_ordered: 1, unit_price_cents: 100 }).select().single();
+    const { skuId } = await seedCatalog(b1.id, { product: "Draft Pale", sku: "case" });
+    const { data: line } = await admin.from("order_lines").insert({ brewery_id: b1.id, order_id: order.id, sku_id: skuId, qty_ordered: 1, unit_price_cents: 100 }).select().single();
     const db = await asUser(custUser.email);
-    const { error: ins } = await db.from("order_lines").insert({ brewery_id: b1.id, order_id: order.id, sku_id: s!.id, qty_ordered: 5, unit_price_cents: 1 });
+    const { error: ins } = await db.from("order_lines").insert({ brewery_id: b1.id, order_id: order.id, sku_id: skuId, qty_ordered: 5, unit_price_cents: 1 });
     expect(ins?.code).toBe("42501");
     const { error: updErr } = await db.from("order_lines").update({ qty_ordered: 99 }).eq("id", line!.id).select();
     expect(updErr?.code).toBe("42501");
@@ -98,7 +98,7 @@ describe("customer writes are locked once an order leaves draft", () => {
 
   it("a direct update on a submitted order's note is denied (42501)", async () => {
     const { data: st } = await admin.from("ship_tos").insert({ brewery_id: b1.id, customer_id: customer.id, label: "s2", address1: "2 St", city: "Phila", state: "PA", zip: "19100" }).select().single();
-    const { data: o } = await admin.from("orders").insert({ brewery_id: b1.id, kind: "wholesale", customer_id: customer.id, ship_to_id: st!.id, from_location_id: whId, status: "submitted", created_by: staff1.id }).select().single();
+    const { data: o } = await admin.from("orders").insert({ brewery_id: b1.id, kind: "wholesale", customer_id: customer.id, ship_to_id: st!.id, sale_channel_id: saleChannelId, from_location_id: whId, status: "submitted", created_by: staff1.id }).select().single();
     const db = await asUser(custUser.email);
     const { error } = await db.from("orders").update({ note: "x" }).eq("id", o!.id).select();
     expect(error?.code).toBe("42501"); // no direct DML grant: writes go through the command RPCs
@@ -106,10 +106,9 @@ describe("customer writes are locked once an order leaves draft", () => {
 
   it("a direct write to a submitted order's lines is denied (42501)", async () => {
     const { data: st } = await admin.from("ship_tos").insert({ brewery_id: b1.id, customer_id: customer.id, label: "s3", address1: "3 St", city: "Phila", state: "PA", zip: "19100" }).select().single();
-    const { data: o } = await admin.from("orders").insert({ brewery_id: b1.id, kind: "wholesale", customer_id: customer.id, ship_to_id: st!.id, from_location_id: whId, status: "submitted", created_by: staff1.id }).select().single();
-    const { data: p } = await admin.from("products").insert({ brewery_id: b1.id, name: "IPA" }).select().single();
-    const { data: s } = await admin.from("skus").insert({ brewery_id: b1.id, product_id: p!.id, name: "IPA case", package_type: "can", bbl_per_unit: 0.0645 }).select().single();
-    const { data: line } = await admin.from("order_lines").insert({ brewery_id: b1.id, order_id: o!.id, sku_id: s!.id, qty_ordered: 1, unit_price_cents: 100 }).select().single();
+    const { data: o } = await admin.from("orders").insert({ brewery_id: b1.id, kind: "wholesale", customer_id: customer.id, ship_to_id: st!.id, sale_channel_id: saleChannelId, from_location_id: whId, status: "submitted", created_by: staff1.id }).select().single();
+    const { skuId } = await seedCatalog(b1.id, { product: "Locked Pale", format: "Locked can" });
+    const { data: line } = await admin.from("order_lines").insert({ brewery_id: b1.id, order_id: o!.id, sku_id: skuId, qty_ordered: 1, unit_price_cents: 100 }).select().single();
     const db = await asUser(custUser.email);
     const { error } = await db.from("order_lines").update({ qty_ordered: 99 }).eq("id", line!.id).select();
     expect(error?.code).toBe("42501"); // no direct DML grant: writes go through the command RPCs

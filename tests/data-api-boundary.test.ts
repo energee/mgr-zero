@@ -1,7 +1,7 @@
 // tests/data-api-boundary.test.ts — proves authenticated callers use narrow RPCs, not table DML.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, asUser, makeBrewery, makeStaff } from "./helpers";
+import { admin, asUser, channelId, makeBrewery, makeStaff, seedPriceGroup } from "./helpers";
 
 let breweryId: string;
 let staffDb: SupabaseClient;
@@ -15,47 +15,49 @@ beforeAll(async () => {
 
 describe("Data API mutation boundary", () => {
   it("denies authenticated table insert, update, and delete", async () => {
-    const { error: insertError } = await staffDb.from("products").insert({
+    const { error: insertError } = await staffDb.from("brands").insert({
       brewery_id: breweryId,
       name: "Forbidden direct write",
     });
     expect(insertError).not.toBeNull();
 
-    const product = await admin.from("products").insert({ brewery_id: breweryId, name: "Admin seed" }).select("id").single();
+    const product = await admin.from("brands").insert({ brewery_id: breweryId, name: "Admin seed" }).select("id").single();
     expect(product.error).toBeNull();
 
-    const { error: updateError } = await staffDb.from("products").update({ name: "Forbidden update" }).eq("id", product.data!.id);
-    const { error: deleteError } = await staffDb.from("products").delete().eq("id", product.data!.id);
+    const { error: updateError } = await staffDb.from("brands").update({ name: "Forbidden update" }).eq("id", product.data!.id);
+    const { error: deleteError } = await staffDb.from("brands").delete().eq("id", product.data!.id);
     expect(updateError).not.toBeNull();
     expect(deleteError).not.toBeNull();
   });
 
   it("blocks cross-tenant conflict updates and normalizes location lookup failures", async () => {
     const foreignBrewery = await makeBrewery();
-    const product = await admin.from("products")
+    const product = await admin.from("brands")
       .insert({ brewery_id: foreignBrewery.id, name: "Foreign product" })
       .select("id")
       .single();
+    const format = await admin.from("formats").insert({
+      brewery_id: foreignBrewery.id, name: "1/2 bbl keg", basis: "packaged", package_type: "keg", keg_size: "half_bbl", bbl_per_unit: 0.5,
+    }).select("id").single();
     const sku = await admin.from("skus").insert({
       brewery_id: foreignBrewery.id,
-      product_id: product.data!.id,
+      brand_id: product.data!.id,
+      format_id: format.data!.id,
       name: "Foreign SKU",
-      package_type: "keg",
-      bbl_per_unit: 0.5,
     }).select("id").single();
-    const priceList = await admin.from("price_lists")
-      .insert({ brewery_id: foreignBrewery.id, name: "Foreign prices" })
-      .select("id")
-      .single();
+    const foreignChannel = await channelId(foreignBrewery.id, "Wholesale");
+    const foreignGroup = await seedPriceGroup(foreignBrewery.id);
+    await admin.from("brands").update({ price_group_id: foreignGroup }).eq("id", product.data!.id);
     const location = await admin.from("locations").insert({
       brewery_id: foreignBrewery.id,
       name: "Foreign taproom",
       kind: "taproom",
     }).select("id").single();
-    await admin.from("price_list_items").insert({
+    await admin.from("channel_prices").insert({
       brewery_id: foreignBrewery.id,
-      price_list_id: priceList.data!.id,
-      sku_id: sku.data!.id,
+      sale_channel_id: foreignChannel,
+      price_group_id: foreignGroup,
+      format_id: format.data!.id,
       unit_price_cents: 1000,
     });
     await admin.from("taproom_pars").insert({
@@ -65,10 +67,11 @@ describe("Data API mutation boundary", () => {
       par_qty: 5,
     });
 
-    const priceAttempt = await staffDb.rpc("set_price", {
+    const priceAttempt = await staffDb.rpc("set_channel_price", {
       p_brewery: breweryId,
-      p_price_list: priceList.data!.id,
-      p_sku: sku.data!.id,
+      p_sale_channel: foreignChannel,
+      p_price_group: foreignGroup,
+      p_format: format.data!.id,
       p_unit_price_cents: 9999,
       p_request_id: crypto.randomUUID(),
     });
@@ -82,10 +85,11 @@ describe("Data API mutation boundary", () => {
     expect(priceAttempt.error).not.toBeNull();
     expect(parAttempt.error).not.toBeNull();
 
-    const foreignPrice = await admin.from("price_list_items")
+    const foreignPrice = await admin.from("channel_prices")
       .select("unit_price_cents")
-      .eq("price_list_id", priceList.data!.id)
-      .eq("sku_id", sku.data!.id)
+      .eq("sale_channel_id", foreignChannel)
+      .eq("price_group_id", foreignGroup)
+      .eq("format_id", format.data!.id)
       .single();
     const foreignPar = await admin.from("taproom_pars")
       .select("par_qty")
@@ -118,22 +122,32 @@ describe("Data API mutation boundary", () => {
 
   it("denies anonymous and private helper calls while allowing named writes", async () => {
     const anon = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, { auth: { persistSession: false } });
-    const { error: anonymousError } = await anon.rpc("create_product", {
+    const { error: anonymousError } = await anon.rpc("upsert_brand", {
       p_brewery: breweryId,
       p_name: "Anonymous",
+      p_id: null,
       p_style: null,
       p_abv: null,
+      p_description: null,
+      p_category: null,
+      p_price_group: null,
+      p_hops: null,
       p_request_id: crypto.randomUUID(),
     });
     const { error: privateError } = await staffDb.rpc("claim_command_request", {
       p_request_id: crypto.randomUUID(),
       p_payload: {},
     });
-    const { data, error } = await staffDb.rpc("create_product", {
+    const { data, error } = await staffDb.rpc("upsert_brand", {
       p_brewery: breweryId,
       p_name: "Via RPC",
+      p_id: null,
       p_style: null,
       p_abv: null,
+      p_description: null,
+      p_category: null,
+      p_price_group: null,
+      p_hops: null,
       p_request_id: crypto.randomUUID(),
     });
 

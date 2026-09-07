@@ -1,4 +1,5 @@
 // app/(app)/inventory/movement-form.tsx — CommandForm (bottom sheet on phone, dialog on desk) for the record_movement command.
+// Picking a location preselects its first bin (list_bins is alphabetical), so the common case is one tap.
 "use client";
 
 import { useState } from "react";
@@ -6,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
@@ -17,33 +19,39 @@ const MOVEMENT_TYPES = [
 ] as const;
 type MovementType = (typeof MOVEMENT_TYPES)[number];
 
-const CHANNELS = ["wholesale", "taproom", "dtc", "export"] as const;
-
-// Mirrors the DB CHECK (removal_shape): only depletion requires a channel
-// (fixed to taproom) among the staff-facing types above.
+// Mirrors the DB CHECK (removal_shape): sale_removal and depletion each name a
+// channel, and only depletion is staff-facing here (sale_removal comes from
+// shipping). The channels are the brewery's own rows, read by list_sale_channels.
 const requiresChannel = (type: MovementType) => type === "depletion";
 
 export function MovementForm({
   skus,
   locations,
+  bins,
+  channels,
 }: {
   skus: { id: string; label: string }[];
   locations: { id: string; name: string; kind: string }[];
+  bins: { id: string; location_id: string; name: string }[];
+  channels: { id: string; name: string }[];
 }) {
   const [skuId, setSkuId] = useState("");
   const [locationId, setLocationId] = useState("");
+  const [binId, setBinId] = useState("");
   const [qty, setQty] = useState("");
   const [type, setType] = useState<MovementType>("opening_balance");
-  const [channel, setChannel] = useState<(typeof CHANNELS)[number]>("taproom");
+  // A hand-entered movement is a taproom event far more often than not, so
+  // Taproom is preselected when the brewery still has that seeded channel.
+  const defaultChannelId = (channels.find((c) => c.name === "Taproom") ?? channels[0])?.id ?? "";
+  const [saleChannelId, setSaleChannelId] = useState(defaultChannelId);
   const [note, setNote] = useState("");
   const form = useCommandForm("record_movement", {
-    build: () => ({ skuId, locationId, qty: Number(qty), type, channel: requiresChannel(type) ? channel : undefined, note: note || undefined }),
-    reset: () => { setSkuId(""); setLocationId(""); setQty(""); setType("opening_balance"); setChannel("taproom"); setNote(""); },
+    build: () => ({ skuId, locationId, binId, qty: Number(qty), type, saleChannelId: requiresChannel(type) ? saleChannelId : undefined, note: note || undefined }),
+    reset: () => { setSkuId(""); setLocationId(""); setBinId(""); setQty(""); setType("opening_balance"); setSaleChannelId(defaultChannelId); setNote(""); },
   });
 
   function onTypeChange(next: MovementType) {
     setType(next);
-    if (next === "depletion") setChannel("taproom");
   }
 
   return (
@@ -68,7 +76,7 @@ export function MovementForm({
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="movement-location">Location</Label>
-            <Select value={locationId} onValueChange={setLocationId}>
+            <Select value={locationId} onValueChange={(v) => { setLocationId(v); setBinId(bins.filter((b) => b.location_id === v)[0]?.id ?? ""); }}>
               <SelectTrigger id="movement-location">
                 <SelectValue placeholder="Select a location" />
               </SelectTrigger>
@@ -82,6 +90,21 @@ export function MovementForm({
                 </SelectGroup>
               </SelectContent>
             </Select>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="movement-bin">Bin</Label>
+            <NativeSelect
+              id="movement-bin"
+              className="w-fit"
+              value={binId}
+              onChange={(e) => setBinId(e.target.value)}
+              disabled={!locationId}
+            >
+              <option value="">Select a bin</option>
+              {bins.filter((b) => b.location_id === locationId).map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </NativeSelect>
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="movement-type">Type</Label>
@@ -103,20 +126,16 @@ export function MovementForm({
           {requiresChannel(type) && (
             <div className="flex flex-col gap-2">
               <Label htmlFor="movement-channel">Channel</Label>
-              <Select value={channel} onValueChange={(v) => setChannel(v as (typeof CHANNELS)[number])}>
-                <SelectTrigger id="movement-channel">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {CHANNELS.map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+              <NativeSelect
+                id="movement-channel"
+                value={saleChannelId}
+                onChange={(e) => setSaleChannelId(e.target.value)}
+                required
+              >
+                {channels.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </NativeSelect>
             </div>
           )}
           <div className="flex flex-col gap-2">
@@ -131,7 +150,7 @@ export function MovementForm({
           </div>
           <CommandFormMessage error={form.error} />
           <CommandFormFooter>
-            <Button type="submit" disabled={form.submitting || !skuId || !locationId}>
+            <Button type="submit" disabled={form.submitting || !skuId || !locationId || !binId}>
               {form.submitting ? "Recording…" : "Record"}
             </Button>
           </CommandFormFooter>

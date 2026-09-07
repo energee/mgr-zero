@@ -1,82 +1,89 @@
-// app/(app)/pricing/page.tsx — price lists + their per-SKU prices. Reads
-// through the command registry (list_price_lists, list_skus) with a
-// brewery-scoped Ctx. Failures throw to the (app) error boundary.
+// app/(app)/pricing/page.tsx — Price groups: the price grid, one table per sale
+// channel, price groups down and formats across. Reads list_sale_channels,
+// list_price_groups, list_formats and list_channel_prices (the whole grid in one
+// read); every cell edits through set_channel_price / clear_channel_price
+// (PriceCellForm, keyed on its value so a save or clear remounts it). Groups are
+// added, renamed and removed here too (GroupForm). With no groups there is no
+// grid to draw, and with no sale channels the page says so. Failures throw to
+// the (app) error boundary.
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
-import { PriceListForm } from "./price-list-form";
-import { PriceForm } from "./price-form";
+import { money } from "@/lib/mgr/money";
+import { PriceCellForm } from "./price-cell-form";
+import { GroupForm, type PriceGroupEditData } from "./group-form";
 
-type Sku = { id: string; name: string; products: { name: string } | null };
-type PriceListItem = { sku_id: string; unit_price_cents: number; skus: { name: string } | null };
-type PriceList = { id: string; name: string; price_list_items: PriceListItem[] };
-
-function skuLabel(sku: Sku | undefined) {
-  if (!sku) return "—";
-  return sku.products?.name ? `${sku.products.name} — ${sku.name}` : sku.name;
-}
-
-function formatCents(cents: number) {
-  return `$${(cents / 100).toFixed(2)}`;
-}
+type Row = { id: string; name: string };
+type Cell = { sale_channel_id: string; price_group_id: string; format_id: string; unit_price_cents: number };
 
 export default async function PricingPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [priceLists, skus] = (await Promise.all([
-    runCommand("list_price_lists", {}, ctx),
-    runCommand("list_skus", {}, ctx),
-  ])) as [PriceList[], Sku[]];
-
-  const skuById = new Map(skus.map((s) => [s.id, s]));
-  const skuOptions = skus.map((s) => ({ id: s.id, label: skuLabel(s) }));
+  const [channels, groups, formats, cells] = (await Promise.all([
+    runCommand("list_sale_channels", {}, ctx),
+    runCommand("list_price_groups", {}, ctx),
+    runCommand("list_formats", {}, ctx),
+    runCommand("list_channel_prices", {}, ctx),
+  ])) as [Row[], PriceGroupEditData[], Row[], Cell[]];
+  const byKey = new Map(cells.map((c) => [`${c.sale_channel_id}|${c.price_group_id}|${c.format_id}`, c]));
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Pricing</h1>
-        <PriceListForm />
+        <h1 className="text-xl font-semibold">Price groups</h1>
+        <GroupForm defaultPosition={groups.length + 1} />
       </div>
 
-      {priceLists.length ? (
-        <div className="flex flex-col gap-4">
-          {priceLists.map((list) => (
-            <div key={list.id} className="rounded border p-4">
-              <div className="flex items-center justify-between">
-                <div className="font-medium">{list.name}</div>
-                <div className="flex items-center gap-2">
-                  <PriceListForm priceList={{ id: list.id, name: list.name }} />
-                  <PriceForm priceListId={list.id} skus={skuOptions} />
-                </div>
-              </div>
-
-              {list.price_list_items?.length ? (
-                <table className="mt-3 w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-muted-foreground">
-                      <th className="py-1 font-normal">SKU</th>
-                      <th className="py-1 font-normal">Unit price</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {list.price_list_items.map((item) => (
-                      <tr key={item.sku_id} className="border-t">
-                        <td className="py-1">{item.skus?.name ?? skuLabel(skuById.get(item.sku_id))}</td>
-                        <td className="py-1">{formatCents(item.unit_price_cents)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <p className="mt-3 text-sm text-muted-foreground">No prices set yet.</p>
-              )}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-sm text-muted-foreground">No price lists yet.</p>
+      {groups.length === 0 && (
+        <p className="text-sm text-muted-foreground">Add a price group, then put each brand on one from Catalog.</p>
       )}
+
+      {channels.length === 0 && (
+        <p className="text-sm text-muted-foreground">No sale channels yet.</p>
+      )}
+
+      {groups.length > 0 && channels.map((channel) => (
+        <section key={channel.id} className="flex flex-col gap-2">
+          <h2 className="font-medium">{channel.name}</h2>
+          <div className="overflow-x-auto">
+            <table className="text-sm">
+              <thead>
+                <tr className="text-left text-muted-foreground">
+                  <th className="py-1 pr-4 font-normal">Group</th>
+                  {formats.map((f) => (
+                    <th key={f.id} className="py-1 pr-4 font-normal">{f.name}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {groups.map((group) => (
+                  <tr key={group.id} className="border-t">
+                    <td className="py-1 pr-4">
+                      <GroupForm group={group} />
+                    </td>
+                    {formats.map((f) => {
+                      const cell = byKey.get(`${channel.id}|${group.id}|${f.id}`);
+                      return (
+                        <td key={f.id} className="py-1 pr-4">
+                          <PriceCellForm
+                            key={cell?.unit_price_cents ?? "empty"}
+                            saleChannelId={channel.id}
+                            priceGroupId={group.id}
+                            formatId={f.id}
+                            cents={cell?.unit_price_cents ?? null}
+                            label={cell ? money(cell.unit_price_cents) : "—"}
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ))}
     </div>
   );
 }

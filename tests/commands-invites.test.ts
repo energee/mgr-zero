@@ -2,7 +2,7 @@
 // registered but fail closed (audit P1.9): no auth-admin call and no
 // membership row may result. Role and input checks still run first.
 import { describe, it, expect, beforeAll } from "vitest";
-import { makeBrewery, makeStaffCtx, admin } from "./helpers";
+import { makeBrewery, makeStaffCtx, admin, seedCustomer } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -27,9 +27,7 @@ describe("invitations (blocked)", () => {
   });
 
   it("invite_customer_user fails closed even for the brewery's own customer", async () => {
-    const { data: c, error } = await admin.from("customers")
-      .insert({ brewery_id: b.id, name: "Own Co", state: "PA" }).select().single();
-    if (error) throw error;
+    const c = { id: (await seedCustomer(b.id, { name: "Own Co" })).customerId };
     await expect(runCommand("invite_customer_user", { email: `${crypto.randomUUID()}@test.local`, customerId: c.id }, adminCtx))
       .rejects.toThrow(/not available/i);
     const { data } = await admin.from("customer_users").select("user_id").eq("customer_id", c.id);
