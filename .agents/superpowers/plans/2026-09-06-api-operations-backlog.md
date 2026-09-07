@@ -36,11 +36,11 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `create_purchase_order` | command | New PO |
 | `draft_purchase_order_from_requirements` | command | Planning |
 | `get_material_on_hand` | query | Materials on hand, Cycle count, Repack |
-| `get_material_requirements` | query | New PO |
+| `get_material_requirements` | query | New PO, Planning |
 | `get_purchase_order` | query | Receive PO, Receipt |
 | `list_materials` | query | Package BOM, New PO, Materials, Material, Contract |
 | `list_purchase_orders` | query | Purchase orders |
-| `list_vendors_and_contracts` | query | New PO, Vendors, Vendor, Contracts, Contract |
+| `list_vendors_and_contracts` | query | New PO, Vendors, Vendor, Contracts, Contract, Planning |
 | `receive_purchase_order` | command | Receive PO |
 | `record_material_count` | command | Cycle count |
 | `send_purchase_order` | command | Receive PO |
