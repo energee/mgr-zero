@@ -2304,7 +2304,7 @@ export const SCREENS: Screen[] = [
     reads: "list_materials",
     writes: "upsert_material",
     states: [["permission", "warehouse or brewer required", 1], ["new", "name, kind and unit required"], ["in use", "unit change refused", 1], ["lot-tracked", "every receipt and consumption names a lot; off means none may"]],
-    spec: "Inventory quantities and lots are not edited on the definition. Lead time and the purchase-unit factor live here, not on the vendor: a hop box and a can pallet from one supplier are different numbers, and the factor is what turns counted bags into base units on Receive PO.",
+    spec: "Inventory quantities and lots are not edited on the definition, and neither is lead time: the wait is a property of who fulfils an order, so it lives on the vendor. The purchase-unit factor does live here, because a hop box and a can pallet from one supplier are different numbers, and the factor is what turns counted bags into base units on Receive PO.",
     body: (<>
       {E.edit("Material name", "Citra")}
       {E.pick("Kind", "Hop", ["Malt", "Hop", "Yeast", "Adjunct", "Chemical", "Packaging", "Other"])}
@@ -2312,7 +2312,6 @@ export const SCREENS: Screen[] = [
       {E.pick("Purchase unit", "each", ["each", "lb", "kg", "oz", "g", "l", "gal", "ml"])}
       {E.edit("Base units per purchase unit", "44", "number")}
       {E.info("A 44 lb box is purchase unit each with 44 base units, not a “box” unit: the schema has one unit vocabulary and packaging is the factor.")}
-      {E.edit("Lead time (days)", "10", "number")}
       {E.row("Lot-tracked", "receipts name a lot · consumption picks one", E.sw(true, "Lot-tracked"), "ok")}
       {E.row("Active", "available to recipes and purchase orders", E.sw(true, "Material active"), "ok")}
       {E.btn("Save material")}
@@ -2327,13 +2326,15 @@ export const SCREENS: Screen[] = [
     to: { "Save vendor": "Vendors" },
     job: "Create or edit one supplier and its purchase terms",
     reads: "list_vendors_and_contracts [design]",
-    writes: "upsert_vendor [design]",
+    writes: "upsert_vendor [design; SCHEMA-GATE: lead time has no vendors column yet; materials.lead_time_days is what exists today]",
     states: [["permission", "warehouse or brewer required", 1], ["new", "name required"], ["active", "available for purchase orders"]],
-    spec: "Contracts remain separate records because a vendor may supply many materials.",
+    spec: "Contracts remain separate records because a vendor may supply many materials. Lead time lives here rather than on the material: every observation of it is an ordered-to-received span keyed by the vendor, so the estimate sits where the evidence is. Planning reads it to date the buy-by of the slowest supplier a bill of materials resolves to.",
     body: (<>
       {E.edit("Vendor name", "YCH")}
       {E.edit("Email", "orders@ych.example", "email")}
       {E.pick("Terms", "Net 30", ["Due on receipt", "Net 15", "Net 30"])}
+      {E.edit("Lead time (days)", "7", "number")}
+      {E.info("The typed figure is what Planning dates a buy-by from. Received orders give an observed average that is read, never stored.")}
       {E.btn("Save vendor")}
     </>),
   },
@@ -2874,7 +2875,7 @@ export const SCREENS: Screen[] = [
     to: { "Hazy ATP negative 9/9": "Pars and allocation", "Draft 1 purchase order": "New PO", "Lindenmeyr Munroe": "Vendor", "Blue Label": "Vendor" },
     job: "See demand gaps and draft one purchase order per vendor, without priority state",
     reads: "get_planning_shortfalls [view; demand, supply and gap by week; supply must net open purchase orders] · get_material_requirements [design] · list_vendors_and_contracts [design]",
-    writes: "draft_purchase_order_from_requirements [design; one RPC per resolved vendor: draft PO + lines]",
+    writes: "draft_purchase_order_from_requirements [design; one RPC per resolved vendor: draft PO + lines; SCHEMA-GATE: the buy-by date needs lead time on vendors, which is still a materials column]",
     states: [["gap", "demand exceeds supply in that week · the only actionable row"], ["covered", "supply meets demand · shown so the horizon reads continuously"], ["one vendor", "the whole shortfall resolves to a single supplier · the verb is singular"], ["several vendors", "a bill of materials spans suppliers · one draft each, named before the verb commits"], ["partly unbuyable", "the slowest supplier is already past its buy-by date · its lines are drawn out of reach, the rest still draft", 1], ["no vendor", "no contract and no default supplier on the material · the row cannot draft", 1], ["empty", "nothing planned and nothing ordered"]],
     spec: "The three columns are defined so the gap is arithmetic rather than judgement. Demand is confirmed and submitted order lines by requested ship week, plus taproom pars; supply is on-hand availability plus the planned outputs of packaging runs already scheduled into that week, less anything already on an open purchase order. That last term is what stops a gap being ordered twice, and it is the mirror of the rule that an unreceived order never inflates what a packaging run believes it has. The horizon runs as far ahead as the slowest supplier behind the shortfall can still be acted on: a gap nobody can still buy for is a report, not a plan. A shortfall is summed per material first and resolved to a supplier second, so a material whose supplier changes mid-horizon does not fragment into two half-orders. Resolution is the active contract for that material, then the material’s default supplier, and otherwise the row cannot draft. Because an order carries one supplier, one shortfall becomes one draft per supplier, and the verb says how many before it commits. Quantities are the gap rounded up to the purchase unit, since nobody buys part of a bag. Lead time belongs to the supplier, not the material, so the buy-by date is the slowest of the suppliers a bill of materials resolves to: cans at three days stay orderable on a run whose labels at seven days no longer are. Nothing here ranks or prioritises, in keeping with Pars and allocation: every change stays a named quantity.",
     body: (<>
