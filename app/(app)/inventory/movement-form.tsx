@@ -91,7 +91,8 @@ export function MovementForm({
             <Label htmlFor="movement-bin">Bin</Label>
             <Select value={binId} onValueChange={setBinId} disabled={!locationId}>
               <SelectTrigger id="movement-bin">
-                <SelectValue placeholder="Select a bin" />
+                {/* explicit label: Radix shows nothing for a value whose item has not mounted yet */}
+                <SelectValue placeholder="Select a bin">{bins.find((b) => b.id === binId)?.name}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
