@@ -19,6 +19,8 @@ const AUTHENTICATED_RPCS = [
   "create_credit_memo(uuid,jsonb,uuid,text,uuid)",
   "create_location(uuid,text,location_kind,uuid)",
   "create_order(uuid,order_kind,uuid,uuid,uuid,uuid,date,text,text,jsonb,uuid)",
+  "create_recipe(uuid,uuid,text,text,uuid)",
+  "create_recipe_version(uuid,uuid,numeric,numeric,numeric,integer,numeric,text,jsonb,uuid)",
   "create_replenishment_order(uuid,uuid,jsonb,uuid)",
   "create_sku(uuid,uuid,uuid,text,text,uuid)",
   "create_stock_transfer(uuid,uuid,uuid,date,text,jsonb,uuid)",

@@ -3151,6 +3151,68 @@ begin
   v_result := private.return_shipment_impl(p_invoice,p_lines,p_location,p_reason); return private.complete_command_request(p_request_id,v_result);
 end $$;
 
+-- ---------------------------------------------------------------- recipes
+-- A recipe is a name; every fact about how it is brewed lives on a version,
+-- and a version is immutable — there is deliberately no update RPC. Editing a
+-- recipe means adding the next version, so a batch that points at version 1
+-- still reads exactly what was brewed. `version` is max+1 under a lock on the
+-- recipe row, so two concurrent saves queue rather than collide on the
+-- (recipe_id, version) unique index.
+create function create_recipe(p_brewery uuid, p_brand uuid, p_name text, p_note text, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.recipes;
+begin
+  perform private.assert_staff(p_brewery, array['admin','brewer']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'create_recipe', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'brand', p_brand, 'name', p_name, 'note', p_note));
+  if v_replay is not null then return v_replay; end if;
+  insert into public.recipes (brewery_id, brand_id, name, note)
+  values (p_brewery, p_brand, p_name, p_note) returning * into v_row;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- One call writes the version and its ingredients, so a version never exists
+-- without the lines it was costed and predicted from. Each line snapshots
+-- materials.extract_potential into extract_snapshot: the material may be
+-- retyped tomorrow, but this version's predicted gravity (lib/recipe-gravity.ts,
+-- which reads the snapshot) must not move. Gravity itself is never computed or
+-- stored here — get_recipe predicts it in TypeScript.
+create function create_recipe_version(
+  p_brewery uuid, p_recipe uuid, p_mash_temp_f numeric, p_brewhouse_efficiency numeric,
+  p_yeast_attenuation numeric, p_boil_minutes int, p_target_ibu numeric, p_note text,
+  p_ingredients jsonb, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid; v_replay jsonb; v_recipe public.recipes; v_row public.recipe_versions;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin','brewer']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'create_recipe_version', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'recipe', p_recipe, 'mash_temp_f', p_mash_temp_f,
+      'brewhouse_efficiency', p_brewhouse_efficiency, 'yeast_attenuation', p_yeast_attenuation,
+      'boil_minutes', p_boil_minutes, 'target_ibu', p_target_ibu, 'note', p_note, 'ingredients', p_ingredients));
+  if v_replay is not null then return v_replay; end if;
+  -- The lock serializes concurrent saves of the same recipe; max+1 is read under it.
+  select * into v_recipe from public.recipes where id = p_recipe and brewery_id = p_brewery for update;
+  if v_recipe.id is null then raise exception 'recipe not found'; end if;
+  if jsonb_array_length(p_ingredients) = 0 then raise exception 'a recipe version needs at least one ingredient'; end if;
+
+  insert into public.recipe_versions (brewery_id, recipe_id, version, mash_temp_f, brewhouse_efficiency,
+    yeast_attenuation, boil_minutes, target_ibu, note, created_by)
+  select p_brewery, p_recipe, coalesce(max(rv.version), 0) + 1, p_mash_temp_f, p_brewhouse_efficiency,
+    p_yeast_attenuation, p_boil_minutes, p_target_ibu, p_note, v_actor
+  from public.recipe_versions rv where rv.recipe_id = p_recipe
+  returning * into v_row;
+
+  insert into public.recipe_ingredients (brewery_id, recipe_version_id, material_id, per_bbl_qty, stage,
+    timing_minutes, sort, extract_snapshot)
+  select p_brewery, v_row.id, (line->>'material_id')::uuid, (line->>'per_bbl_qty')::numeric,
+    (line->>'stage')::public.ingredient_stage, (line->>'timing_minutes')::int, (ord - 1)::int,
+    (select m.extract_potential from public.materials m
+      where m.id = (line->>'material_id')::uuid and m.brewery_id = p_brewery)
+  from jsonb_array_elements(p_ingredients) with ordinality as t(line, ord);
+
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
 -- ---------------------------------------------------------------- Stock transfers
 -- Internal moves of stuff between two locations (spec 2026-09-06 Decision 3).
 create function private.lock_transfer(p_transfer uuid, p_allowed public.stock_transfer_status[]) returns public.stock_transfers
@@ -4502,7 +4564,9 @@ grant execute on function
   receive_stock_transfer(uuid,jsonb,uuid),
   move_stock_bin(uuid,uuid,uuid,uuid,public.keg_size,numeric,uuid,uuid,text,uuid),
   set_standing_allocation(uuid,uuid,numeric,uuid),
-  create_replenishment_order(uuid,uuid,jsonb,uuid)
+  create_replenishment_order(uuid,uuid,jsonb,uuid),
+  create_recipe(uuid,uuid,text,text,uuid),
+  create_recipe_version(uuid,uuid,numeric,numeric,numeric,int,numeric,text,jsonb,uuid)
   to authenticated;
 grant usage on schema private, extensions to service_role;
 -- service_role reaches `private` only for the UUID default its seed inserts
