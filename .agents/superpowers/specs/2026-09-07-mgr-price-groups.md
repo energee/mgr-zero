@@ -42,7 +42,9 @@ and SCC labels, not retail scans.
 `no price` blocking state ("neither a format default nor an override · the line
 cannot be sold"). Barcode gets no equivalent. Two nullable columns side by side
 invite one empty-state treatment; that would nag forever about a keg that is
-correct as drawn.
+correct as drawn. The empty cell reads "none", not a blank and not an em dash:
+blank reads as not-yet-filled-in, and the inventory forbids em dashes in
+customer copy (tests/mgr-screens.test.ts).
 
 **D5 — The group binds on the brand, not the SKU.** The group is a cost band,
 and cost is a property of the beer, not the package. Per-SKU binding would make

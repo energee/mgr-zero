@@ -3537,14 +3537,17 @@ export const SCREENS: Screen[] = [
     job: "Price a format once per group and override only the exceptions",
     reads: "list_price_lists [+ channel_id §16.4] · get_price_list [design; formats and SKU overrides]",
     writes: "upsert_price_list · set_price_list_format · set_price_list_item · clear_price_list_item [price_list_formats is the group default, price_list_items the SKU override; channel_id waits for sale channels]",
-    states: [["permission", "sales or admin required", 1], ["inherited", "the format price is what the customer sees"], ["overridden", "one brand × format priced away from the group", 1], ["poured", "a pour is priceable here and is not a SKU"], ["no price", "neither a format default nor an override · the line cannot be sold", 1]],
+    states: [["permission", "sales or admin required", 1], ["inherited", "the format price is what the customer sees"], ["overridden", "one brand × format priced away from the group", 1], ["poured", "a pour is priceable here and is not a SKU"], ["no price", "neither a format default nor an override · the line cannot be sold", 1], ["no ceiling", "the group is chosen by hand · nothing is suggested"], ["suggested", "a cost inside the band proposes this group · a person confirms", 0]],
     spec: "A price group is what the shipped price list already was, and the customer's assigned one already assigns it; revision 2 adds the channel and makes a format priceable, so a taproom pour (which is not a SKU) can be priced at all. Drawn format-default with a per-SKU override, matching Menu and POS item, which already read “format default” and offer Reset to format price. §16.16 q1 leaves the direction open; drawing it the other way would make those two shipped frames inconsistent.",
     body: (<>
       {E.back("Price groups", "Wholesale · standard")}
       {E.edit("Group name", "Wholesale · standard")}
       {E.pick("Channel", "Wholesale", CHANNELS)}
+      {E.edit("Cost ceiling", "$1.85")}
+      {E.info("Groups sort by ceiling and the lower bound is the previous group’s. A cost inside this band suggests the group; nobody is moved automatically.")}
       {E.ttl("Format defaults")}
-      {E.tbl(["Format", "Price", "Source"], [["½ bbl keg", INV.hazyPrice, "group default"], ["sixtel", "$95.00", "group default"], ["case · 24×16oz", INV.pilsPrice, "group default"]])}
+      {E.tbl(["Format", "Price", "UPC", "Source"], [["½ bbl keg", INV.hazyPrice, "none", "group default"], ["sixtel", "$95.00", "none", "group default"], ["case · 24×16oz", INV.pilsPrice, "00810123450127", "group default"]])}
+      {E.info("Every brand in this group scans as the group’s code for that format. Kegs carry no retail code: they move on lot numbers, so a blank UPC is finished, not unfinished.")}
       {E.ttl("Brand × format overrides")}
       {E.row("Barrel-aged Stout · ½ bbl keg", `$240.00 · against a ${INV.hazyPrice} default`, E.act("Edit"), "w")}
       {E.row("Add override", "brand · format · price", E.act("Add"))}

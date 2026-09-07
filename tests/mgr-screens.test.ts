@@ -98,6 +98,25 @@ describe("SCREENS", () => {
     expect(ferm).toContain("Total 18 days");
     expect(ferm).toMatch(/dry hop day 4 falls in Primary/);
     expect(ferm).toContain("Add stage");
+  });
+
+  it("gives a price group a cost ceiling that only suggests", () => {
+    const group = SCREENS.find((s) => s.name === "Price group")!;
+    const text = renderToStaticMarkup(createElement("div", null, group.body))
+      .replace(/<[^>]*>/g, " ");
+    expect(text).toContain("Cost ceiling");
+    expect(text).toMatch(/suggest/i);
+  });
+
+  it("barcodes a price group per format, and stays quiet when there is none", () => {
+    const group = SCREENS.find((s) => s.name === "Price group")!;
+    const text = renderToStaticMarkup(createElement("div", null, group.body))
+      .replace(/<[^>]*>/g, " ");
+    expect(text).toContain("UPC");
+    expect(text).toContain("00810123450127");
+    expect(text).toContain("none");
+    expect((group.states ?? []).map(([name]) => name)).not.toContain("no barcode");
+  });
 
   it("names the pricing surfaces price groups, never tiers", () => {
     expect(SCREENS.map((s) => s.name)).toEqual(
