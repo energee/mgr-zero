@@ -1,5 +1,6 @@
 // app/(portal)/portal/cart.tsx — client cart for the catalog page. Qty state
-// keyed by skuId; "out" badge rows are disabled (qty forced to 0). Submit
+// keyed by skuId. Listed packages stay orderable; warehouse ATP is not shown.
+// Submit
 // chains portal_create_order then portal_submit_order — the draft it creates
 // along the way is an implementation detail, never shown to the customer, as
 // long as both calls succeed. If portal_create_order succeeds but
@@ -13,7 +14,7 @@
 // to the saved draft so the customer isn't left wondering if anything happened.
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -29,15 +30,8 @@ export type CatalogItem = {
   name: string;
   product: string;
   unitPriceCents: number;
-  badge: "in" | "low" | "out";
 };
 export type ShipToOption = { id: string; label: string };
-
-const BADGE_STYLE: Record<CatalogItem["badge"], string> = {
-  in: "bg-success text-success-foreground",
-  low: "bg-warning text-warning-foreground",
-  out: "bg-muted text-muted-foreground",
-};
 
 export function submissionFailureMessage(message: string, draftId: string | null) {
   return draftId
@@ -57,9 +51,14 @@ export function Cart({ items, shipTos }: { items: CatalogItem[]; shipTos: ShipTo
   const [draftId, setDraftId] = useState<string | null>(null);
 
   const lines = items
-    .filter((i) => i.badge !== "out")
     .map((i) => ({ skuId: i.skuId, qty: Number(qty[i.skuId] || 0) }))
     .filter((l) => l.qty > 0);
+  const groups: { product: string; items: CatalogItem[] }[] = [];
+  for (const i of items) {
+    const g = groups.find((x) => x.product === i.product);
+    if (g) g.items.push(i);
+    else groups.push({ product: i.product, items: [i] });
+  }
 
   const subtotalCents = lines.reduce((sum, l) => {
     const item = items.find((i) => i.skuId === l.skuId);
@@ -131,40 +130,35 @@ export function Cart({ items, shipTos }: { items: CatalogItem[]; shipTos: ShipTo
       <table className="w-full text-sm">
         <thead>
           <tr className="text-left text-muted-foreground">
-            <th className="py-1 font-normal">Product</th>
-            <th className="py-1 font-normal">SKU</th>
+            <th className="py-1 font-normal">Package</th>
             <th className="py-1 font-normal">Price</th>
-            <th className="py-1 font-normal" />
             <th className="py-1 font-normal">Qty</th>
           </tr>
         </thead>
         <tbody>
-          {items.map((i) => {
-            const out = i.badge === "out";
-            return (
-              <tr key={i.skuId} className="border-t">
-                <td className="py-1">{i.product}</td>
-                <td className="py-1">{i.name}</td>
-                <td className="py-1">${(i.unitPriceCents / 100).toFixed(2)}</td>
-                <td className="py-1">
-                  <span className={`rounded-full px-2 py-0.5 text-xs ${BADGE_STYLE[i.badge]}`}>
-                    {i.badge === "in" ? "in stock" : i.badge === "low" ? "low stock" : "out of stock"}
-                  </span>
-                </td>
-                <td className="py-1">
-                  <Input
-                    type="number"
-                    min={0}
-                    step={1}
-                    className="w-20"
-                    disabled={out}
-                    value={qty[i.skuId] ?? ""}
-                    onChange={(e) => setQty((prev) => ({ ...prev, [i.skuId]: e.target.value }))}
-                  />
-                </td>
+          {groups.map((g) => (
+            <Fragment key={g.product}>
+              <tr>
+                <td colSpan={3} className="pt-3 pb-1 font-medium">{g.product}</td>
               </tr>
-            );
-          })}
+              {g.items.map((i) => (
+                <tr key={i.skuId} className="border-t">
+                  <td className="py-1">{i.name}</td>
+                  <td className="py-1">${(i.unitPriceCents / 100).toFixed(2)}</td>
+                  <td className="py-1">
+                    <Input
+                      type="number"
+                      min={0}
+                      step={1}
+                      className="w-20"
+                      value={qty[i.skuId] ?? ""}
+                      onChange={(e) => setQty((prev) => ({ ...prev, [i.skuId]: e.target.value }))}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </Fragment>
+          ))}
         </tbody>
       </table>
 

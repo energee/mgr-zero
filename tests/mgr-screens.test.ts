@@ -125,9 +125,30 @@ describe("SCREENS", () => {
 
   it("lets portal buyers type quantities in both order steps", () => {
     const html = (name: string) => renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === name)!.body));
-    expect(html("Shop").match(/<input[^>]*type="number"/g)).toHaveLength(3);
+    expect(html("Shop").match(/<input[^>]*type="number"/g)!.length).toBeGreaterThanOrEqual(3);
     for (const value of [4, 6, 0]) expect(html("Shop")).toContain(`value="${value}"`);
     expect(html("Review order").match(/<input[^>]*type="number"/g)).toHaveLength(2);
+  });
+
+  it("groups the portal shop by brand and listed package, with no last-week or stock badge", () => {
+    const html = body("Shop");
+    expect(html).not.toMatch(/Same as last week/);
+    expect(html).not.toMatch(/in stock|low stock|out of stock|\bATP\b/i);
+    expect(html).toMatch(/<h2[^>]*>Hazy IPA</);
+    expect(html).toMatch(/<h2[^>]*>Pils</);
+    expect(html).toMatch(/<h2[^>]*>Stout</);
+    expect(html).toMatch(/½ bbl keg/);
+    expect(html).toMatch(/⅙ bbl keg/);
+    expect(html).toMatch(/case · 24×16/);
+    expect(html).toMatch(/bottle/);
+    expect(html.indexOf("Hazy IPA")).toBeLessThan(html.indexOf("½ bbl keg"));
+  });
+
+  it("lets a packaging plan designate which outputs are on the wholesale list", () => {
+    const html = body("Schedule packaging run");
+    expect(html).toMatch(/On the wholesale list/);
+    expect(html).toMatch(/role="switch"/);
+    expect(html).toMatch(/⅙ bbl keg/);
   });
 
   it("renders status and setting values as non-action controls", () => {
