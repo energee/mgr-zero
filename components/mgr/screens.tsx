@@ -1192,7 +1192,7 @@ export const SCREENS: Screen[] = [
     to: { Release: "Order", Adjust: "Order", "Edit par": "Bin", "Taproom par": "Bin" },
     job: "Change named quantities; never invent priority",
     reads: "get_shortfalls · list_standing_allocations",
-    writes: "adjust_order_lines · release_allocation · set_taproom_par · set_standing_allocation",
+    writes: "adjust_order_lines · release_allocation [design; Program 1 ships it] · set_taproom_par · set_standing_allocation",
     states: DEFAULT_STATES,
     spec: "There is no ranking command or priority column; every change is a named quantity edit. Taproom par edits the bin's par (§16.6 keys pars on bins), the same row the Bin sheet shows.",
     body: (<>
@@ -1429,7 +1429,7 @@ export const SCREENS: Screen[] = [
     to: { Review: "Invoice", Open: "Invoice" , "Write off": "Invoice" },
     job: "The AR list: what is due, what QuickBooks changed underneath it, and the drill-in for one invoice",
     reads: "list_invoices [qbo_sync_token + qbo_remote_state] · get_qbo_connection · get_qbo_mapping_candidates [design]",
-    writes: "connect_qbo · set_qbo_customer_mapping · set_qbo_item_mapping [design] · push_invoice_to_qbo [same requestId, except a deleted remote invoice, which pushes under a new one] · write_off_invoice [design; MGR status only, never touches QuickBooks]",
+    writes: "connect_qbo · set_qbo_customer_mapping · set_qbo_item_mapping [design] · push_invoice_to_qbo [design; same requestId, except a deleted remote invoice, which pushes under a new one] · write_off_invoice [design; MGR status only, never touches QuickBooks]",
     states: [["connection health", "QuickBooks · token healthy · company 9341"], ["expired", "Reconnect before mapping or push", 1], ["live", "the ordinary case; no badge at all"], ["edited there", "SyncToken changed since MGR pushed", 1], ["voided", "amounts zeroed; this is not payment", 1], ["deleted", "the id points at nothing; sync gets a 404", 1], ["not sent", "pushed but never delivered; only a fault if MGR is not the channel"], ["paid", "the paid date arrives from the QuickBooks Online sync · no user verb"], ["push failed", "the drill-in resolves each mapping", 1]],
     spec: <>QuickBooks has no read-only invoice. Once pushed, the accountant can edit, void or delete it from the Sales transactions sidebar and no API setting prevents that, so MGR detects rather than prevents. QuickBooks hands us the detector free: SyncToken increments on every modification and already rides the response the sync job reads for balance, so drift costs one column and no extra call. The rule this frame protects: <b>a voided invoice is not a paid invoice.</b> Voiding zeroes the amounts, so any logic inferring paid from a QuickBooks balance of zero books cancelled revenue as collected; collected revenue is a read-side rule, remote state live and balance zero, expressed once in the reporting view; no CHECK refuses a paid date, because paid-then-voided is a real history the row must be able to hold. MGR surfaces drift and stops: no re-push that overwrites an accountant’s correction, no field-level merge UI. The one exception is the deleted invoice, where the remote id points at nothing: dedupe on the original requestId would return the first result and create nothing, so that push carries a new requestId and produces a second QuickBooks invoice under the same MGR number. Ordinary retries keep the old requestId and stay protected. ASSUMPTION: a drifted invoice stays in AR at QuickBooks’ numbers, because QuickBooks owns the invoice after push. Drift is not a place, it is what some of these rows are doing, which is why it lives in the states of one list rather than a second one. Rows also carry the due date, push failure and credit-memo status; payments come back through the sync job and are read-only. A failed row opens the drill-in, where connection, each mapping and push are four independent commands, and push persists its exact payload and deterministic requestId before the remote POST. Creating a credit memo stays Return shipment.</>,
     body: (<>
@@ -1528,7 +1528,7 @@ export const SCREENS: Screen[] = [
     name: "Product",
     job: "Sellable facts without ledger writes, including the TTB fields",
     reads: "list_brands · list_skus",
-    writes: "upsert_brand* · create_sku* · update_sku",
+    writes: "upsert_brand* · create_sku* · update_sku [design]",
     states: [["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class"], ["new SKU", "choose one existing Format"], ["inactive SKU", "hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"]],
     spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Package facts live on Formats, while the SKU is the stable brand × format identity used by inventory, orders, pricing and provider mappings. No UPC scan or container source editor here.",
     body: (<>
@@ -2291,7 +2291,7 @@ export const SCREENS: Screen[] = [
     to: { "Save material": "Materials" },
     job: "Create or edit one material definition",
     reads: "list_materials",
-    writes: "upsert_material",
+    writes: "upsert_material [design]",
     states: [["permission", "warehouse or brewer required", 1], ["new", "name, kind and unit required"], ["in use", "unit change refused", 1], ["lot-tracked", "every receipt and consumption names a lot; off means none may"]],
     spec: "Inventory quantities and lots are not edited on the definition, and neither is lead time: the wait is a property of who fulfils an order, so it lives on the vendor. The purchase-unit factor does live here, because a hop box and a can pallet from one supplier are different numbers, and the factor is what turns counted bags into base units on Receive PO.",
     body: (<>
@@ -3563,7 +3563,7 @@ export const SCREENS: Screen[] = [
     name: "Link identity",
     job: "Link one Slack user to one current brewery staff membership",
     reads: "get_chat_link_status",
-    writes: "issue_chat_link_proof · consume_chat_link_proof [single-use, authenticated MGR completion]",
+    writes: "issue_chat_link_proof · consume_chat_link_proof [design; single-use, authenticated MGR completion]",
     states: [["expired", "link expired · create a new one", 1], ["not staff", "customer and removed membership rejected", 1], ["linked", "show personal queue"]],
     spec: "Slack profile email and display name are never identity. The deep link requires normal MGR authentication.",
     body: (<>
@@ -3595,7 +3595,7 @@ export const SCREENS: Screen[] = [
     name: "Personal DM",
     job: "Notify once when linked work becomes assigned, due or overdue",
     reads: "get_notification_occurrence [design] · owning Today query revalidation",
-    writes: "snooze_notification · set_notification_preference [integration state only]",
+    writes: "snooze_notification · set_notification_preference [design; integration state only]",
     states: [["quiet hours", "queued until personal window opens"], ["resolved", "same message updates to Resolved"], ["retry", "same semantic delivery; no second message"], ["unauthorized", "suppress and unlink if membership ended", 1]],
     spec: "The provider message is a projection. Deleting it does not change MGR. Deep links contain no trusted actor or tenant claims.",
     body: (<>
@@ -3642,7 +3642,7 @@ export const SCREENS: Screen[] = [
     name: "Fermentation reading form",
     job: "Preview the first eligible operational modal without enabling it early",
     reads: "get_fermentation_reading_preview [view; gated; current occupancy/version]",
-    writes: "record_fermentation_reading [gated; request replay + version + correction contract]",
+    writes: "record_fermentation_reading [IMPLEMENTATION-GATE: request replay + version + correction contract]",
     states: [["not yet eligible", "open the MGR reading flow instead", 1], ["stale", "occupancy changed · refresh", 1], ["response lost", "the same request returns the first result"]],
     spec: "Future phase only. Personal destination, canonical preview and explicit Record reading confirmation. A new reading corrects history; prior rows never edit.",
     body: (<>
