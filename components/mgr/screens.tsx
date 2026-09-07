@@ -3209,28 +3209,29 @@ export const SCREENS: Screen[] = [
       {E.btn("Save override")}
     </>),
   },
-  // Revision 2 (schema §16, designed 2026-09-02, not migrated). Every commit
-  // here is drawn gated — the frames exist so the interface can settle before
-  // the one-pass migration, per §16's own build order — and each names its
-  // gate in `writes`, which is where every other gate in this file is found.
+  // Revision 2 (schema §16, designed 2026-09-02). Most commits here are still
+  // drawn gated — the frames exist so the interface can settle before the
+  // one-pass migration, per §16's own build order — and each names its gate in
+  // `writes`, which is where every other gate in this file is found. §16.3
+  // (sale channels) has shipped: its two frames below are ungated and live at
+  // /settings/channels.
   {
     step: 8,
     slice: 1,
     tab: "More",
     name: "Sale channels",
-    to: { Taproom: "Channel", Wholesale: "Channel", DTC: "Channel", Export: "Channel" },
+    to: { Taproom: "Channel", Wholesale: "Channel", DTC: "Channel", Export: "Channel", "Add channel": "Channel" },
     job: "Name the channels this brewery sells through and what each one is taxed as",
-    reads: "list_sale_channels [design; §16.3 + PR #42]",
-    writes: "upsert_sale_channel · delete_sale_channel [SCHEMA-GATE: revision 2 §16.3, sale_channels replaces the sale_channel enum]",
-    states: [["permission", "sales or admin required", 1], ["in use", "delete refused by on delete restrict · human copy, not a 23503", 1], ["seeded", "four defaults arrive with the brewery"], ["inherit", "a customer with no override takes the channel default"]],
+    reads: "list_sale_channels",
+    writes: "upsert_sale_channel · delete_sale_channel",
+    states: [["permission", "admin required", 1], ["in use", "delete refused by on delete restrict · human copy, not a 23503", 1], ["seeded", "four defaults arrive with the brewery"], ["inherit", "a customer with no override takes the channel default"]],
     spec: "The channel carries a name and a default tax treatment and nothing else: removal classification stays on the movement type, which is why #42 rejected giving the channel a removal flag or a required-destination-state flag. Resolution order is customer override → channel default, and the resolved value is frozen onto the movement at write time so editing a customer in March never restates January.",
     body: (<>
-      {E.back("Settings", "Sale channels")}
+      {E.back("Settings", "Sale channels", E.btn("Add channel"))}
       {E.nav("Wholesale", "taxable · 118 movements")}
       {E.nav("Taproom", "taxable · 402 movements")}
       {E.nav("DTC", "taxable · 34 movements")}
       {E.nav("Export", "export · 6 movements")}
-      {E.gated("Add channel", "isn’t available yet: channels are still a fixed list")}
     </>),
   },
   {
@@ -3241,15 +3242,15 @@ export const SCREENS: Screen[] = [
     name: "Channel",
     to: { "Save channel": "Sale channels" },
     job: "Create or edit one sale channel and its default tax treatment",
-    reads: "list_sale_channels [design; §16.3]",
-    writes: "upsert_sale_channel · delete_sale_channel [SCHEMA-GATE: revision 2 §16.3]",
-    states: [["permission", "sales or admin required", 1], ["new", "name and tax treatment required"], ["in use", "delete is refused", 1]],
+    reads: "list_sale_channels",
+    writes: "upsert_sale_channel · delete_sale_channel",
+    states: [["permission", "admin required", 1], ["new", "name and tax treatment required"], ["in use", "delete is refused", 1]],
     body: (<>
       {E.edit("Channel name", "Export")}
       {E.chips(TAX_TREATMENTS, 1)}
       {E.info("Customers may override this. Sales without a customer take the channel default.")}
       {E.note("A channel with movements cannot be deleted.")}
-      {E.gated("Save channel", "isn’t available yet: channels are still a fixed list")}
+      {E.btn("Save channel")}
     </>),
   },
   {

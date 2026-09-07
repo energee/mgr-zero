@@ -47,7 +47,7 @@ The brewery name in the header is the brewery whose records you are looking at. 
 
 - **Beer** holds **Inventory**.
 - **Work** holds **Orders**, **Pick**, and **Replenishment**.
-- **More** holds **Invoices**, **Catalog**, **Customers**, **Price lists**, and **Settings** (the team roster).
+- **More** holds **Invoices**, **Catalog**, **Customers**, **Price lists**, **Settings** (the team roster), and **Sale channels**.
 
 Links your role cannot use are simply not shown. Planned areas stay hidden until they are built (Taproom, Taps, Cellar, Materials, Kegs, Batches, Packaging, POs, Deliveries, Menu, Recipes, Compliance, Planning, Import), so a tab with nothing you can open does not appear.
 
@@ -117,7 +117,7 @@ Wholesale Shop lists the packages the brewery has put on the wholesale list — 
 1. Open **Inventory** and select **Record Movement**.
 2. Choose a **SKU**, **Location**, and **Bin**. Picking the location preselects its first bin alphabetically; change it if the stock sits elsewhere.
 3. Choose a **Type**. The default is `opening_balance`.
-4. For `depletion`, pick a **Channel**. The list is your brewery's own — every brewery starts with **Wholesale**, **Taproom**, **DTC**, and **Export**, and you edit that list under **Settings → Sale channels**. **Taproom** is preselected. The channel decides how the removal is taxed, and that treatment is frozen onto the entry: editing the channel later never rewrites what is already recorded. `sale_removal` takes a channel too, but shipping sets it, not this form.
+4. For `depletion`, pick a **Channel**. The list is your brewery's own — every brewery starts with **Wholesale**, **Taproom**, **DTC**, and **Export**, and you edit that list under [**Sale channels**](#channels). **Taproom** is preselected. The channel decides how the removal is taxed, and that treatment is frozen onto the entry: editing the channel later never rewrites what is already recorded. `sale_removal` takes a channel too, but shipping sets it, not this form.
 5. Enter **Qty** in SKU units, to two decimal places if you need them. Positive quantities add stock. Negative quantities remove it. Zero is rejected.
 6. Add an optional **Note**, then select **Record**.
 
@@ -177,7 +177,7 @@ Empty lists say **No customers yet.** or **No ship-tos yet.** You cannot delete 
 
 A price list prices **formats** by default and **SKUs** by exception. "All ½ bbl kegs are $185, except the barrel-aged one" is two entries: a format price and one SKU override.
 
-A price list belongs to one sale channel, chosen when you create it. The channel is shown beside the list's name and can be changed on **Edit**. A channel a price list prices for cannot be deleted.
+A price list belongs to one [sale channel](#channels), chosen when you create it. The channel is shown beside the list's name and can be changed on **Edit**. A channel a price list prices for cannot be deleted.
 
 1. Open **Price lists** (the page heading is **Pricing**) and select **New Price List**. Enter a required name, choose a **Sale channel** (Wholesale is preselected), and select **Create**. The name must be unique within the brewery.
 2. On a list select **Format price**, pick a packaged format, enter the unit price in dollars (stored as whole cents), and **Save**. Every SKU on that format now sells at that price on that list.
@@ -291,6 +291,27 @@ The page says **No taprooms configured.** when none exist, or **No pars set for 
 <Screen name="Team" />
 
 Admin can open **Team** from **Settings** to see current staff memberships. The page also opens for Sales and Warehouse when the address is entered directly, but it is not linked in their navigation. Each row shows a **User ID** and **Role**. Email addresses are not displayed. The page is read-only: no invitation, role-change, or removal controls. An empty roster says **No staff members yet.**
+
+## Sale channels [#channels]
+
+<Screen name="Sale channels" />
+
+<Screen name="Channel" />
+
+*Admin only. Everyone who records or reads a movement sees the channel names; only Admin can add, rename, or remove one.*
+
+A sale channel is a named way your brewery sells beer. Every brewery starts with four: **Wholesale**, **Taproom**, **DTC**, and **Export**. Open **Sale channels** from the **More** navigation to see each channel and its tax treatment.
+
+1. Select **Add channel**, enter a **Channel name**, choose a **Tax treatment**, and select **Save channel**.
+2. To rename a channel or change its treatment, select **Edit** on its row, change the fields, and select **Save channel**.
+3. To remove a channel, select **Delete** on its row.
+
+The tax treatment — *taxable*, *export*, *vessel supplies*, *research*, or *transfer in bond* — is the default for removals recorded on that channel. A customer may override it on their own record, and the treatment that applies is frozen onto each movement the moment it is recorded. Editing a channel later never restates a month you have already filed.
+
+Two removals are refused, each with the reason shown beside the row:
+
+- **Wholesale** can be neither renamed nor deleted. Shipped orders post to it by name, so it has to stay where fulfillment can find it.
+- A channel already used by a movement or priced for by a price list cannot be deleted. Rename it instead, or point the price list at another channel first.
 
 ## Link your Slack account [#slack]
 
