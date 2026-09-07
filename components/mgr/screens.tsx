@@ -1582,7 +1582,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     portal: "Order",
     name: "Shop",
-    to: { Change: "Account", "½ bbl keg": "Shop", "⅙ bbl keg": "Shop", "case · 24×16 oz": "Shop", "12 oz bottle": "Shop" },
+    to: { Change: "Account", "½ bbl keg": "Shop", "⅙ bbl keg": "Shop", "case · 24×16 oz": "Shop", "12 oz bottle": "Shop", "Coming up": "Coming up" },
     job: "A buyer catalog: listed packages by brand, quantity, Place order",
     reads: "portal_catalog [SCHEMA/RLS-GATE: return customer-allowed fulfillment source and filter to packages the brewery has listed for wholesale]",
     writes: "submit_order [SCHEMA/RLS-GATE: validate allowed from_location_id; one RPC: order + lines + submitted status]",
@@ -1598,12 +1598,32 @@ export const SCREENS: Screen[] = [
       {E.row("12 oz bottle", "$18.00", E.stq(0))}
       {E.ttl("Stout")}
       {E.row("⅙ bbl keg", "$62.00", E.stq(0))}
+      {E.nav("Coming up", "what’s brewing next")}
       {E.row("Ships from", "Warehouse")}
       {E.row("Ship-to · requested date", "Main · Wed 9/9", E.act("Change"))}
       {E.sp()}
       {E.info("Kegs add a $30.00 refundable deposit each, shown on review.")}
       {E.btn("Review order · $828.00", "p disabled")}
       {E.info("Review is unavailable until the brewery sets where your orders ship from. Until then the portal shows your catalog, orders and invoices, and orders are placed by calling the brewery.")}
+    </>),
+  },
+  {
+    step: 6,
+    slice: 1,
+    portal: "Order",
+    name: "Coming up",
+    to: { "Hazy IPA": "Shop", "Pils": "Shop", "Saison": "Shop" },
+    job: "See what the brewery plans to brew next and jump to that brand on Shop",
+    reads: "portal_schedule [SCHEMA/RLS-GATE: view over planned batches exposing brand + planned week only; no customer policy on batches]",
+    writes: "none",
+    states: [["nothing planned", "check back; the brewery has not scheduled a batch"], ["brand not listed", "row shows the brand with no package to order; ask the brewery", 1]],
+    spec: "Planned batches (not yet brewed) as one row per brand and expected week, soonest first. A brand row opens Shop scrolled to that brand; a brand with nothing listed for wholesale still appears so the buyer can ask. Nothing else about the batch is shown: no volume, recipe, tank, lot, or exact day. Reached from Shop; not a nav tab.",
+    body: (<>
+      {E.hd("Coming up", "Ridgeline")}
+      {E.nav("Hazy IPA", "week of Sep 14")}
+      {E.nav("Pils", "week of Sep 21")}
+      {E.nav("Saison", "week of Oct 5 · not yet listed", "w")}
+      {E.info("Dates are the brewery’s plan and can move. Ask Demo Brewing to be notified when a batch is packaged.")}
     </>),
   },
   {

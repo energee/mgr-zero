@@ -115,7 +115,14 @@ a risky blank; the server derives sign, delta, and units.
 ## 7. Surfaces
 
 - Staff shell: composer at the bottom of Today, ⌘K on desk.
-- Portal: the same component; role filtering does the rest.
+- Portal: the same component; role filtering does the rest. Buyers also get
+  the brewery's upcoming schedule: `portal_schedule` (query, `customer`,
+  `aiExposed`) lists planned batches as brand + expected week and nothing
+  else — no volume, recipe, tank, or lot — so "what's brewing next" is
+  answerable in chat and on the **Coming up** screen, where each brand taps
+  through to Shop. Gated until customers can read that projection
+  (`SCHEMA/RLS-GATE`: a `portal_schedule` view over `batches` with
+  `brewed_on is null`, not a customer policy on the base table).
 - Slack: deferred. When it ships, a Slack confirm button carries the same
   preview token to the same commit path — no second write path.
 - Voice: future transport.
