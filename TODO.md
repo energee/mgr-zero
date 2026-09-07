@@ -27,11 +27,11 @@ the same job, fields, verbs, and states as its `SCREENS` record; the record's
 | 8 | Delivery and routes (save / depart / return, driver) | `.agents/superpowers/plans/2026-09-07-backend-program-8-delivery-routes.md` | 13 |
 | 9 | Compliance (report, filing, registry, COLA) | `.agents/superpowers/plans/2026-09-07-backend-program-9-compliance.md` | 17 |
 
-- [ ] 5 merged
-- [ ] 6 merged
-- [ ] 7 merged (needs 2)
-- [ ] 8 merged (needs 2 phase 3)
-- [ ] 9 merged
+- [ ] Program 5 — production and packaging merged
+- [ ] Program 6 — purchasing merged
+- [ ] Program 7 — taproom and kegs merged (needs 2)
+- [ ] Program 8 — delivery and routes merged (needs 2 phase 3)
+- [ ] Program 9 — compliance merged
 
 ## Phase 2 — explorer remainder (`.agents/superpowers/plans/2026-09-07-backend-explorer-remainder.md`)
 
@@ -49,14 +49,14 @@ tests.
 | 15 | Composer | `.agents/superpowers/plans/2026-09-07-backend-program-15-composer.md` | 18 | Composer proposal / question / answer, Offline outbox |
 | 16 | Chat settings | `.agents/superpowers/plans/2026-09-07-backend-program-16-chat-settings.md` | 9 | Chat disconnected / settings, Linked people, Disconnect Slack, Reauthorization |
 
-- [ ] 10 parity test committed red
-- [ ] 10 merged
-- [ ] 11 merged
-- [ ] 16 merged
-- [ ] 12 merged (confirm the four §16.16 defaults in the remainder plan first)
-- [ ] 13 merged
-- [ ] 15 merged
-- [ ] 14 merged
+- [ ] Program 10 — explorer parity parity test committed red
+- [ ] Program 10 — explorer parity merged
+- [ ] Program 11 — access and import merged
+- [ ] Program 16 — chat settings merged
+- [ ] Program 12 — taproom truth merged (confirm the four §16.16 defaults in the remainder plan first)
+- [ ] Program 13 — QuickBooks merged
+- [ ] Program 15 — composer merged
+- [ ] Program 14 — Square and menu merged
 
 ## Quick wins — registered commands with no caller in `app/`
 

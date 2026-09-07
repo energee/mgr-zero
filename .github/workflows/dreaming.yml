@@ -100,6 +100,17 @@ jobs:
             echo "email=${id}+${login}@users.noreply.github.com"
           } >> "$GITHUB_OUTPUT"
 
+      # Mechanical first: PRs merged in the window that carry `TODO: <item>` move
+      # that item out of TODO.md and onto PROGRESS.md's Done log here, so the roadmap advances even
+      # when the model has nothing to dream about. scripts/pr-directives.ts.
+      - uses: oven-sh/setup-bun@v2
+        if: steps.window.outputs.new == 'true'
+      - name: Move finished TODO items to Done
+        if: steps.window.outputs.new == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun scripts/pr-directives.ts todo "${{ steps.window.outputs.base }}" "${{ steps.window.outputs.head }}"
+
       - name: Run dream
         if: steps.window.outputs.new == 'true'
         uses: anthropics/claude-code-action@v1

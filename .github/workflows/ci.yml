@@ -35,6 +35,13 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
       - uses: oven-sh/setup-bun@v2
+      # PR-description directives (TODO: / DOCS:) must be well-formed so the
+      # dreaming and documentation workflows can act on them without a model.
+      - name: PR directives are well-formed
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: bun scripts/pr-directives.ts check
         with: { bun-version-file: ".bun-version" }
       - run: bun install --frozen-lockfile
       - uses: supabase/setup-cli@v1

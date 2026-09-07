@@ -81,7 +81,11 @@ database (as CI already has) and stop touching the dev one.
    in a feature PR — every PR inserting at the top of the same log conflicts
    with every other. Put the one-line progress note (and any durable decision)
    in the PR description; the dreaming workflow reads merged PRs and writes the
-   logs serially on its own `dreaming/main` PR.
+   logs serially on its own `dreaming/main` PR. Two lines in the description
+   are read by scripts, not the model: `TODO: <text>` names the open `TODO.md`
+   item this PR finishes (the dreaming workflow moves it into `PROGRESS.md` Done), and `DOCS: none` tells
+   the documentation agent to skip the PR. CI rejects a `TODO:` that matches
+   no single open item.
 
 CI (`.github/workflows/ci.yml`) runs the same checks plus `next build` on every
 push; it is the merge gate.
