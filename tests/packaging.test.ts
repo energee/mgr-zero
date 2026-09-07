@@ -74,6 +74,13 @@ describe("planning a packaging run before a tank exists", () => {
     expect(got.outputs).toEqual([]);
   });
 
+  it("refuses the same package listed twice instead of leaking a constraint name", async () => {
+    await expect(runCommand("schedule_packaging_run", {
+      brandId: stout.brandId, plannedOn: "2026-11-29",
+      outputs: [{ skuId: stout.skuId, qtyPlanned: 10 }, { skuId: stout.skuId, qtyPlanned: 5 }],
+    }, ctx)).rejects.toThrow(/listed twice; give it one line with the total/);
+  });
+
   it("refuses an output whose sku belongs to another brand", async () => {
     await expect(runCommand("schedule_packaging_run", {
       brandId: stout.brandId, plannedOn: "2026-11-22",
@@ -102,6 +109,41 @@ describe("picking the tank", () => {
     const listed = (await runCommand("list_packaging_runs", {}, ctx)) as
       { id: string; vessel_name: string | null }[];
     expect(listed.find((r) => r.id === run.id)?.vessel_name).toBe("FV-STOUT");
+  });
+
+  it("checks the brand on the way in too, not only on a later update", async () => {
+    // Every other test attaches the tank by update; this one hands it to
+    // schedule_packaging_run, which is the trigger's insert path.
+    const mismatch = await brewInto("FV-PILS-IN", pils.brandId, 12, "2026-11-05");
+    await expect(runCommand("schedule_packaging_run", {
+      brandId: stout.brandId, plannedOn: "2026-11-27",
+      occupancyId: mismatch.occupancyId, outputs: [],
+    }, ctx)).rejects.toThrow(/does not match the tank's batch brand/);
+
+    const match = await brewInto("FV-STOUT-IN", stout.brandId, 12, "2026-11-06");
+    const run = (await runCommand("schedule_packaging_run", {
+      brandId: stout.brandId, plannedOn: "2026-11-27",
+      occupancyId: match.occupancyId, outputs: [{ skuId: stout.skuId, qtyPlanned: 30 }],
+    }, ctx)) as { id: string; occupancy_id: string };
+    expect(run.occupancy_id).toBe(match.occupancyId);
+  });
+
+  it("refuses to start a run whose picked tank has since been emptied", async () => {
+    const run = (await runCommand("schedule_packaging_run", {
+      brandId: stout.brandId, plannedOn: "2026-11-28", outputs: [],
+    }, ctx)) as { id: string };
+    const { occupancyId } = await brewInto("FV-GONE", stout.brandId, 8, "2026-11-07");
+    await runCommand("update_packaging_run", { runId: run.id, occupancyId }, ctx);
+
+    // The tank is emptied after the run picked it. Neither the trigger (which
+    // fires only when occupancy_id is written) nor the check constraint (which
+    // only asks that it be non-null) would notice.
+    // ended_at = started_at, not now(): the brew day is dated ahead of today,
+    // and the occupancy's tstzrange rejects an end below its own start.
+    sql(`update vessel_occupancies set ended_at = started_at where id = '${occupancyId}'`, true);
+
+    await expect(runCommand("update_packaging_run",
+      { runId: run.id, startedAt: "2026-11-28T14:00:00Z" }, ctx)).rejects.toThrow(/occupancy is closed/);
   });
 
   it("refuses a tank whose batch is promised to a different brand", async () => {

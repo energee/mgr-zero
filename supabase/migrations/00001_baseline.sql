@@ -3482,9 +3482,17 @@ end $$;
 create function private.replace_packaging_run_outputs(
   p_brewery uuid, p_run uuid, p_brand uuid, p_outputs jsonb
 ) returns void language plpgsql set search_path = '' as $$
-declare v_line jsonb; v_sku_brand uuid;
+declare v_line jsonb; v_sku_brand uuid; v_dupe uuid;
 begin
   if p_outputs is null then return; end if;
+  -- unique (run_id, sku_id) would catch this, but as a constraint name. One
+  -- line per package is the rule; say so before the insert does.
+  select (value->>'sku_id')::uuid into v_dupe
+  from jsonb_array_elements(coalesce(p_outputs, '[]'::jsonb))
+  group by 1 having count(*) > 1 limit 1;
+  if v_dupe is not null then
+    raise exception 'package % is listed twice; give it one line with the total', v_dupe;
+  end if;
   delete from public.packaging_run_outputs where run_id = p_run;
   for v_line in select * from jsonb_array_elements(coalesce(p_outputs, '[]'::jsonb)) loop
     select s.brand_id into v_sku_brand from public.skus s
@@ -3556,6 +3564,14 @@ begin
   -- constraint still stands behind this for anything that writes directly.
   if p_started_at is not null and v_run.occupancy_id is null then
     raise exception 'pick the tank this run draws from before starting it';
+  end if;
+  if p_started_at is not null then
+    -- Re-check the tank that is actually attached, not just one passed in now:
+    -- a run may have picked its occupancy days ago and that occupancy may have
+    -- been emptied since. Nothing else would catch it -- the trigger only fires
+    -- when occupancy_id itself is written, and the check constraint asks only
+    -- that the column be non-null.
+    perform private.assert_open_occupancy(p_brewery, coalesce(p_occupancy, v_run.occupancy_id));
   end if;
   if p_started_at is not null then
     update public.packaging_runs set started_at = p_started_at where id = p_run returning * into v_run;
