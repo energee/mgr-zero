@@ -34,6 +34,7 @@ const AUTHENTICATED_RPCS = [
   "record_inventory_movement(uuid,uuid,uuid,numeric,movement_type,sale_channel,text,text,uuid)",
   "record_pick(uuid,jsonb,uuid)",
   "record_submitted_order_occurrence(uuid)",
+  "resolve_short_pick(uuid,uuid,numeric,text,text,uuid)",
   "set_brewery_quiet_hours(uuid,time without time zone,time without time zone)",
   "set_notification_destination(uuid,text)",
   "set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text)",

@@ -390,6 +390,17 @@ describe("registered staff mutation role × RPC matrix", () => {
       },
     },
     {
+      command: "resolve_short_pick", rpc: "resolve_short_pick", allowed: ["admin", "warehouse"],
+      input: async () => {
+        const orderId = await confirmedOrder();
+        const lineId = await orderLine(orderId);
+        return {
+          command: { orderId, lineId, qtyPicked: 0, reason: "short", resolution: "keep_owed" },
+          rpc: { p_order: orderId, p_line: lineId, p_qty_picked: 0, p_reason: "short", p_resolution: "keep_owed" },
+        };
+      },
+    },
+    {
       command: "ship_order", rpc: "ship_order", allowed: ["admin", "warehouse"],
       input: async () => {
         const { orderId, lineId } = await pickedOrder();

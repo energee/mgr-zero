@@ -1,6 +1,8 @@
 // app/(app)/orders/[id]/pick-form.tsx — CommandForm (bottom sheet on phone, dialog on desk) for the record_pick
 // command. Pre-fills each line's picked qty with its current qty_picked (or
 // qty_ordered if not yet picked); submitting sets the order to "picked".
+// A count below ordered offers Short, which hands the line to the short-pick
+// sheet (short-pick-form.tsx) instead of saving it silently.
 "use client";
 
 import { useId, useState } from "react";
@@ -16,7 +18,7 @@ function initialQtys(lines: PickLine[]) {
   return Object.fromEntries(lines.map((l) => [l.id, String(l.qtyPicked ?? l.qtyOrdered)]));
 }
 
-export function PickForm({ orderId, lines }: { orderId: string; lines: PickLine[] }) {
+export function PickForm({ orderId, lines, onShort }: { orderId: string; lines: PickLine[]; onShort?: (line: PickLine, qty: number) => void }) {
   const [qtys, setQtys] = useState<Record<string, string>>(() => initialQtys(lines));
   // Per-line qty inputs need real ids so each Label is programmatically linked (audit 2026-09-05, a11y #5).
   const idBase = useId();
@@ -47,6 +49,11 @@ export function PickForm({ orderId, lines }: { orderId: string; lines: PickLine[
                   value={qtys[l.id] ?? ""}
                   onChange={(e) => setQtys((prev) => ({ ...prev, [l.id]: e.target.value }))}
                 />
+                {onShort && qtys[l.id] !== "" && Number(qtys[l.id]) < l.qtyOrdered && (
+                  <Button type="button" size="sm" variant="outline" onClick={() => { form.setOpen(false); onShort(l, Number(qtys[l.id])); }}>
+                    Short
+                  </Button>
+                )}
               </div>
             ))}
           </div>

@@ -199,3 +199,48 @@ describe("confirm_restock", () => {
     expect(error!.message).toMatch(/not waiting for restock/);
   });
 });
+
+describe("resolve_short_pick", () => {
+  it("adjust_down shrinks the line and allocation to the counted qty", async () => {
+    const id = await confirmedOrder(10);
+    const line = await lineOf(id);
+    const { error } = await staffDb.rpc("resolve_short_pick", {
+      p_order: id, p_line: line.id, p_qty_picked: 7, p_reason: "short in pick face",
+      p_resolution: "adjust_down", p_request_id: crypto.randomUUID(),
+    });
+    expect(error).toBeNull();
+    const after = await lineOf(id);
+    expect(Number(after.qty_ordered)).toBe(7);
+    expect(Number(after.qty_picked)).toBe(7);
+    expect(after.short_reason).toBe("short in pick face");
+    const { data: alloc } = await admin.from("allocations").select("qty,status").eq("ref", line.id).single();
+    expect(Number(alloc!.qty)).toBe(7);
+    expect(alloc!.status).toBe("open");
+  });
+
+  it("keep_owed records the count and leaves the order picked but still owed", async () => {
+    const id = await confirmedOrder(10);
+    const line = await lineOf(id);
+    const { error } = await staffDb.rpc("resolve_short_pick", {
+      p_order: id, p_line: line.id, p_qty_picked: 7, p_reason: "will finish tomorrow",
+      p_resolution: "keep_owed", p_request_id: crypto.randomUUID(),
+    });
+    expect(error).toBeNull();
+    const after = await lineOf(id);
+    expect(Number(after.qty_ordered)).toBe(10);
+    expect(Number(after.qty_picked)).toBe(7);
+    const { data: o } = await admin.from("orders").select("status").eq("id", id).single();
+    expect(o!.status).toBe("picked");
+    const { data: ev } = await admin.from("order_events").select("payload").eq("order_id", id).eq("event", "short_pick").single();
+    expect(ev!.payload).toMatchObject({ resolution: "keep_owed", qty_picked: 7 });
+  });
+
+  it("rejects a count that is not short, and an empty reason", async () => {
+    const id = await confirmedOrder(3);
+    const line = await lineOf(id);
+    const full = await staffDb.rpc("resolve_short_pick", { p_order: id, p_line: line.id, p_qty_picked: 3, p_reason: "x", p_resolution: "keep_owed", p_request_id: crypto.randomUUID() });
+    expect(full.error?.message).toMatch(/not short/);
+    const blank = await staffDb.rpc("resolve_short_pick", { p_order: id, p_line: line.id, p_qty_picked: 1, p_reason: " ", p_resolution: "keep_owed", p_request_id: crypto.randomUUID() });
+    expect(blank.error?.message).toMatch(/reason/);
+  });
+});

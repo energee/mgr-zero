@@ -2460,6 +2460,46 @@ begin
   v_result := private.confirm_restock_impl(p_order); return private.complete_command_request(p_request_id,v_result);
 end $$;
 
+-- Short pick: one line counted below ordered. adjust_down makes the count the
+-- order (allocation shrinks, ATP recovers); keep_owed records the count and
+-- leaves the remainder owed, so the order stays on pick_due.
+create function private.resolve_short_pick_impl(p_order uuid, p_line uuid, p_qty numeric, p_reason text, p_resolution text)
+returns jsonb language plpgsql set search_path = '' as $$
+declare o public.orders; l public.order_lines;
+begin
+  if p_reason is null or length(trim(p_reason)) = 0 then raise exception 'reason is required'; end if;
+  if p_qty < 0 then raise exception 'qty_picked cannot be negative'; end if;
+  o := private.lock_order(p_order, array['confirmed','picked']::public.order_status[]);
+  select * into l from public.order_lines where id = p_line and order_id = p_order for update;
+  if not found then raise exception 'order line not found'; end if;
+  if p_qty >= l.qty_ordered then raise exception 'line is not short'; end if;
+  if p_resolution = 'adjust_down' then
+    if p_qty = 0 then raise exception 'adjust the order lines to drop a line entirely'; end if;
+    update public.order_lines set qty_ordered = p_qty, qty_picked = p_qty, short_reason = p_reason where id = p_line;
+    update public.allocations set qty = p_qty where source = 'order_line' and ref = p_line and status = 'open';
+  elsif p_resolution = 'keep_owed' then
+    update public.order_lines set qty_picked = p_qty, short_reason = p_reason where id = p_line;
+  else
+    raise exception 'unknown resolution';
+  end if;
+  update public.orders set status = 'picked' where id = p_order;
+  insert into public.order_events (brewery_id, order_id, actor, event, payload)
+  values (o.brewery_id, p_order, auth.uid(), 'short_pick',
+          jsonb_build_object('line_id', p_line, 'qty_picked', p_qty, 'reason', p_reason, 'resolution', p_resolution));
+  return jsonb_build_object('order_id', p_order);
+end $$;
+
+create function resolve_short_pick(p_order uuid,p_line uuid,p_qty_picked numeric,p_reason text,p_resolution text,p_request_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_brewery uuid; v_replay jsonb; v_result jsonb;
+begin
+  v_brewery := private.assert_order_staff(p_order,array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(v_brewery,'resolve_short_pick',p_request_id,
+    jsonb_build_object('order',p_order,'line',p_line,'qty_picked',p_qty_picked,'reason',p_reason,'resolution',p_resolution));
+  if v_replay is not null then return v_replay; end if;
+  v_result := private.resolve_short_pick_impl(p_order,p_line,p_qty_picked,p_reason,p_resolution); return private.complete_command_request(p_request_id,v_result);
+end $$;
+
 create function record_pick(p_order uuid,p_picks jsonb,p_request_id uuid) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare v_brewery uuid; v_replay jsonb; v_result jsonb;
@@ -3021,7 +3061,10 @@ create view private.today_candidates with (security_invoker = true) as
          array['admin','warehouse']::text[],
          null::uuid
     from orders o join breweries b on b.id = o.brewery_id
-    where o.status = 'confirmed' and o.requested_ship_date is not null
+    where (o.status = 'confirmed' and o.requested_ship_date is not null)
+       -- a picked order with a line still owed keeps its pick
+       or (o.status = 'picked' and exists (
+             select 1 from order_lines ol where ol.order_id = o.id and coalesce(ol.qty_picked, 0) < ol.qty_ordered))
   union all
   -- standing work, not date-due: staged beer to put back while the flag is set
   select o.brewery_id, 'restock_due', 'order', o.id::text,
@@ -3629,6 +3672,7 @@ grant execute on function
   cancel_order(uuid,text,uuid),
   record_pick(uuid,jsonb,uuid),
   confirm_restock(uuid,uuid),
+  resolve_short_pick(uuid,uuid,numeric,text,text,uuid),
   ship_order(uuid,jsonb,text,text,uuid),
   create_credit_memo(uuid,jsonb,uuid,text,uuid),
   set_standing_allocation(uuid,uuid,numeric,uuid),

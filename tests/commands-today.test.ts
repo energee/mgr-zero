@@ -110,6 +110,16 @@ describe("get_today (registered reader)", () => {
     );
   });
 
+  it("keeps a picked order on pick_due while any line is still owed", async () => {
+    const id = await createOrder("2026-09-07", true, true);
+    const { data: line } = await admin.from("order_lines").select("id").eq("order_id", id).single();
+    await adminCtx.db.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line!.id, qty_picked: 0 }], p_request_id: crypto.randomUUID() });
+    const owed = (await today(warehouse, "2026-09-07T12:00:00Z")).find((i) => i.reason === "pick_due" && i.subjectId === id);
+    expect(owed).toBeDefined();
+    await adminCtx.db.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line!.id, qty_picked: 1 }], p_request_id: crypto.randomUUID() });
+    expect((await today(warehouse, "2026-09-07T12:00:00Z")).find((i) => i.reason === "pick_due" && i.subjectId === id)).toBeUndefined();
+  });
+
   it("rejects customers", async () => {
     const customerUser = await makeCustomerUser(customerId);
     const ctx = { db: await asUser(customerUser.email), userId: customerUser.id, breweryId: b.id, role: "customer" as const, customerId };
