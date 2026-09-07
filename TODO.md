@@ -27,7 +27,6 @@ the same job, fields, verbs, and states as its `SCREENS` record; the record's
 | 8 | Delivery and routes (save / depart / return, driver) | `.agents/superpowers/plans/2026-09-07-backend-program-8-delivery-routes.md` | 13 |
 | 9 | Compliance (report, filing, registry, COLA) | `.agents/superpowers/plans/2026-09-07-backend-program-9-compliance.md` | 17 |
 
-- [ ] Program 5 — production and packaging merged
 - [ ] Program 6 — purchasing merged
 - [ ] Program 7 — taproom and kegs merged (needs 2)
 - [ ] Program 8 — delivery and routes merged (needs 2 phase 3)
