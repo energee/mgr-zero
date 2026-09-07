@@ -8,9 +8,10 @@ on:
 
 jobs:
   claude-review:
-    # Skip drafts (ready_for_review retriggers) and bot-maintained docs branches.
-    # Claude rejects non-human PR authors, and reviewing its own output adds no value.
-    if: github.event.pull_request.draft == false && github.head_ref != 'dreaming/main' && github.head_ref != 'documentation/user-guide'
+    # Skip drafts (ready_for_review retriggers) and every bot-authored PR:
+    # the action hard-fails on non-human actors, and reviewing its own output
+    # adds no value. Covers dreaming/main, documentation/user-guide, mgr[bot].
+    if: github.event.pull_request.draft == false && github.event.pull_request.user.type != 'Bot'
     runs-on: ubuntu-latest
     permissions:
       contents: read
