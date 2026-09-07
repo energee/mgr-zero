@@ -40,7 +40,7 @@ export function GroupForm({ group, nextPosition }: { group?: PriceGroupEditData;
       title={isEdit ? "Edit price group" : "New price group"}
       trigger={
         <Button variant={isEdit ? "ghost" : "default"} size={isEdit ? "sm" : "default"}>
-          {isEdit ? group.name : "Add price group"}
+          {isEdit ? group.name : "Create price group"}
         </Button>
       }
     >

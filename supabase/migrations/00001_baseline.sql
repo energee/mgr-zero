@@ -1926,6 +1926,7 @@ begin
     -- One lookup for the whole shipment: the channel a wholesale ship removes
     -- under, and the tax treatment frozen onto every movement it writes
     -- (customer override -> channel default, §16.3).
+    -- orders.sale_channel_id is not null and FK-backed, so no null guard here.
     select o.sale_channel_id, coalesce(c.tax_treatment, sc.tax_treatment)
       into v_channel, v_tax
       from public.sale_channels sc
@@ -2698,7 +2699,11 @@ begin
     on conflict (sale_channel_id, price_group_id, format_id) do update
       set unit_price_cents = excluded.unit_price_cents
       where public.channel_prices.brewery_id = excluded.brewery_id
-    returning * into v_row;   -- the composite FKs refuse another brewery's channel, group or format
+    returning * into v_row;
+  -- The unique key excludes brewery_id, so the conflict target can match another
+  -- brewery's cell before any FK is checked: the where-guard skips that update
+  -- and the not-found below turns the silent no-op into a refusal
+  -- (tests/data-api-boundary.test.ts).
   if not found then raise exception 'permission denied' using errcode = '42501'; end if;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;

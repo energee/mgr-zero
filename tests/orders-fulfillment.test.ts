@@ -399,4 +399,34 @@ describe("frozen tax treatment on a wholesale ship", () => {
     expect(mv!.sale_channel_id).toBe(await channelId(b.id, "Wholesale"));
     expect(mv!.tax_treatment).toBe("export");
   });
+
+  it("a DTC customer's ship posts the removal to DTC, with DTC's tax treatment", async () => {
+    // The removal follows orders.sale_channel_id (copied from the customer),
+    // not the brewery's Wholesale default: same brewery, same sku, other channel.
+    const dtc = await channelId(b.id, "DTC");
+    // Both channels seed as 'taxable', so give DTC a distinct treatment: the
+    // assertion below then can only pass if the movement read the DTC channel.
+    await admin.from("sale_channels").update({ tax_treatment: "vessel_supplies" }).eq("id", dtc);
+    const { customerId: dtcId, shipToId: dtcShipTo } = await seedCustomer(b.id, { name: "Taproom Fan", saleChannelId: dtc });
+    const { data: brandRow } = await admin.from("skus").select("brand_id").eq("id", skuId).single();
+    await priceSku(b.id, { saleChannelId: dtc, brandId: brandRow!.brand_id, formatId: (await admin.from("skus").select("format_id").eq("id", skuId).single()).data!.format_id, cents: 900 });
+    const { data, error } = await staffDb.rpc("create_order", {
+      p_brewery: b.id, p_kind: "wholesale", p_customer: dtcId, p_ship_to: dtcShipTo,
+      p_from_location: whId, p_to_location: null, p_requested: null, p_po: null, p_note: null,
+      p_lines: [{ sku_id: skuId, qty: 3 }], p_request_id: crypto.randomUUID(),
+    });
+    expect(error).toBeNull();
+    const id = (data as { order_id: string }).order_id;
+    await staffDb.rpc("submit_order", { p_order: id, p_request_id: crypto.randomUUID() });
+    await staffDb.rpc("confirm_order", { p_order: id, p_request_id: crypto.randomUUID() });
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: line.id, qty_picked: 3 }], p_request_id: crypto.randomUUID() });
+    const ship = await staffDb.rpc("ship_order", { p_order: id, p_ship: [{ line_id: line.id, qty_shipped: 3 }], p_carrier: null, p_tracking: null, p_request_id: crypto.randomUUID() });
+    expect(ship.error).toBeNull();
+    const { data: mv } = await admin.from("inventory_movements").select("sale_channel_id, tax_treatment").eq("ref", id).single();
+    expect(mv!.sale_channel_id).toBe(dtc);
+    expect(mv!.tax_treatment).toBe("vessel_supplies");
+    const { data: ws } = await admin.from("sale_channels").select("tax_treatment").eq("id", saleChannelId).single();
+    expect(ws!.tax_treatment).toBe("taxable");
+  });
 });

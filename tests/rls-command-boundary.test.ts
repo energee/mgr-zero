@@ -327,10 +327,10 @@ describe("registered staff mutation role × RPC matrix", () => {
       command: "upsert_price_group", rpc: "upsert_price_group", allowed: ["admin", "sales"],
       input: async role => {
         const name = unique("matrix group", role);
-        const position = nextPosition();
+        const pos = nextPosition();
         return {
-          command: { name, position },
-          rpc: { p_brewery: brewery.id, p_id: null, p_name: name, p_position: position, p_cost_ceiling_cents: null },
+          command: { name, position: pos },
+          rpc: { p_brewery: brewery.id, p_id: null, p_name: name, p_position: pos, p_cost_ceiling_cents: null },
         };
       },
     },

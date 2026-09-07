@@ -183,7 +183,7 @@ defineQuery({
 defineCommand({
   name: "upsert_price_group", description: "Create or rename a price group (a row of the price grid), set its position and optional cost ceiling",
   roles: ["admin", "sales"],
-  input: z.object({ id: z.string().uuid().optional(), name: z.string().min(1), position: z.number().int().positive(), costCeilingCents: z.number().int().nonnegative().optional() }),
+  input: z.object({ id: z.string().uuid().optional(), name: z.string().trim().min(1), position: z.number().int().positive(), costCeilingCents: z.number().int().nonnegative().optional() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_price_group", {
     p_brewery: ctx.breweryId, p_id: i.id ?? null, p_name: i.name, p_position: i.position, p_cost_ceiling_cents: i.costCeilingCents ?? null, p_request_id: execution.requestId,
   })),

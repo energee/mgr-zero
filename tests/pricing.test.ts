@@ -188,3 +188,42 @@ describe("pricing commands", () => {
     await expect(runCommand("set_channel_price", { saleChannelId: cWholesale, priceGroupId: pg, formatId: ccat.formatId, unitPriceCents: 1 }, wh)).rejects.toThrow();
   });
 });
+
+// An order carries the channel it was created on, and every later line price
+// is resolved from that channel's cells — not from the brewery's Wholesale row.
+describe("order lines reprice from orders.sale_channel_id", () => {
+  it("a line added by adjust_order_lines takes the order channel's current cell price", async () => {
+    const rb = await makeBrewery();
+    const rctx = await makeStaffCtx(rb.id, "admin");
+    const a = await seedCatalog(rb.id, { product: "Alpha", sku: "Alpha case" });
+    const bb = await seedCatalog(rb.id, { product: "Beta", sku: "Beta case" });
+    const rgroup = await seedPriceGroup(rb.id, "1", 1);
+    await admin.from("brands").update({ price_group_id: rgroup }).in("id", [a.brandId, bb.brandId]);
+    const rDtc = await channelId(rb.id, "DTC");
+    const rWholesale = await channelId(rb.id, "Wholesale");
+    const cell = (channel: string, cents: number) => rctx.db.rpc("set_channel_price", {
+      p_brewery: rb.id, p_sale_channel: channel, p_price_group: rgroup, p_format: a.formatId,
+      p_unit_price_cents: cents, p_request_id: crypto.randomUUID(),
+    });
+    await cell(rDtc, 2000);
+    await cell(rWholesale, 999);
+
+    const cust = await seedCustomer(rb.id, { name: "DTC Repricer", saleChannelId: rDtc });
+    const loc = await seedLocation(rb.id);
+    const created = await runCommand("create_order", { kind: "wholesale", customerId: cust.customerId, shipToId: cust.shipToId, fromLocationId: loc.id, lines: [{ skuId: a.skuId, qty: 1 }] }, rctx) as { order_id: string };
+    expect((await admin.from("orders").select("sale_channel_id").eq("id", created.order_id).single()).data!.sale_channel_id).toBe(rDtc);
+    await rctx.db.rpc("submit_order", { p_order: created.order_id, p_request_id: crypto.randomUUID() });
+    const confirmed = await rctx.db.rpc("confirm_order", { p_order: created.order_id, p_request_id: crypto.randomUUID() });
+    expect(confirmed.error).toBeNull();
+
+    // Move the DTC cell after the order exists; the adjust must read the new one.
+    await cell(rDtc, 2500);
+    const adjusted = await rctx.db.rpc("adjust_order_lines", {
+      p_order: created.order_id, p_lines: [{ sku_id: a.skuId, qty: 1 }, { sku_id: bb.skuId, qty: 2 }],
+      p_reason: "customer added a brand", p_request_id: crypto.randomUUID(),
+    });
+    expect(adjusted.error).toBeNull();
+    const lines = await admin.from("order_lines").select("sku_id, unit_price_cents").eq("order_id", created.order_id);
+    expect(lines.data!.find((l) => l.sku_id === bb.skuId)!.unit_price_cents).toBe(2500);
+  });
+});

@@ -2,8 +2,9 @@
 // channel, price groups down and formats across. Reads list_sale_channels,
 // list_price_groups, list_formats and list_channel_prices; every cell edits
 // through set_channel_price / clear_channel_price (PriceCellForm). Groups are
-// added, renamed and removed here too (GroupForm). Failures throw to the (app)
-// error boundary.
+// added, renamed and removed here too (GroupForm). With no groups there is no
+// grid to draw, and with no sale channels the page says so. Failures throw to
+// the (app) error boundary.
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
@@ -40,7 +41,11 @@ export default async function PricingPage() {
         <p className="text-sm text-muted-foreground">Add a price group, then put each brand on one from Catalog.</p>
       )}
 
-      {channels.map((channel) => (
+      {channels.length === 0 && (
+        <p className="text-sm text-muted-foreground">No sale channels yet.</p>
+      )}
+
+      {groups.length > 0 && channels.map((channel) => (
         <section key={channel.id} className="flex flex-col gap-2">
           <h2 className="font-medium">{channel.name}</h2>
           <div className="overflow-x-auto">
