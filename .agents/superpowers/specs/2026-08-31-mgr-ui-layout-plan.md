@@ -93,25 +93,10 @@ the same Zod-backed command contract:
 
 ### Proposal safety
 
-The language model emits only `{ name, input }` candidates. `preview_command` is an
-internal registered query, not an AI-exposed tool. It runs the target command's
-server-side preview/canonicalization hook and returns canonical fields, exact effects,
-warnings, and a current-version token. Commit sends the target command, stable
-`requestId`, and token; the command re-reads authoritative rows and rejects a stale
-proposal. A visual proposal is never evidence that a write is still valid.
-
-Ambiguity asks a short question and produces no Commit button:
-
-- “Blew a half of Hazy” must resolve exact product + package SKU and taproom location;
-  “half” may mean a half-barrel keg, half a keg, or 0.5 bbl.
-- “We're out of Pils” must distinguish counted on-hand zero from subtracting one keg.
-- “Return a keg” must distinguish beer return + credit, empty-fleet keg return, and
-  deposit refund.
-- “Received 40 bags of 2-row” must resolve PO/vendor, purchase-unit factor, counted
-  quantity, and required lot.
-- “Gravity 1.012 FV3” must resolve the open occupancy and show SG → °Plato conversion.
-- “Ship it” and “same as last week” must re-check order identity, ship-to, price, active
-  SKU/package, permission, and current order state.
+Moved to `.agents/superpowers/specs/2026-09-07-mgr-ai-chat-design.md` §3–4:
+the model emits only `{ name, input }`; `preview_command` (internal, not
+AI-exposed) canonicalizes and issues a version token; commit revalidates and
+rejects stale state; ambiguity asks a question and produces no Commit button.
 
 People enter positive amounts. Movement type and explicit Increase/Decrease or From/To
 give direction; the server derives stored sign. Count commands accept an observed
@@ -126,8 +111,8 @@ tape. There is no generic **Undo**. When a lawful, schema-backed correction exis
 **Record inventory correction**, **Return shipment**, **Record a new count**, or **Create
 recipe version**. Mutable saves use the same verb in the button and success feedback.
 
-Composer history is device-local until a server-owned history schema exists and opens
-through a visible **History** button. Swipe-up may enhance it but is never the only path.
+Composer history is server-owned (AI chat design §5) and opens through a visible
+**History** button. Swipe-up may enhance it but is never the only path.
 Voice remains a future transport as the product spec states.
 
 ### Registry, risk, confirmation, compensation, and replay contract

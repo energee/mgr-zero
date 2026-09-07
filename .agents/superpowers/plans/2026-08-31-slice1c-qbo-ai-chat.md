@@ -52,8 +52,7 @@ Slice 1B is merged (#15). `invoices`, `qbo_connections`, the mapping columns, th
 ## Parallelism
 
 - Track A (QBO): Tasks 1 → 2 → 3 → 4 → 5 → 6 → 7 (sequential within track).
-- Track B (Composer): Tasks 8 → 9 → 10 (sequential within track).
-- Tracks A and B are fully independent of each other. Task 11 (docs/validation) last.
+- Track B (Composer): moved to `2026-09-07-ai-chat.md`. Task 11 (docs/validation) last.
 
 ---
 
@@ -228,52 +227,11 @@ Handler order (the ordering is the spec's durability requirement — payload per
 - [ ] **Step 4: Commit** `feat(1c): QBO integrations screen + Today failure row`
 - [ ] **Step 5:** Add the same **Push to QuickBooks** button (with the confirmation dialog) to `app/(app)/invoices/[id]/page.tsx`; update `public/docs/staff-guide.html` (Integrations screen, push action, failure row, corrections) in the same commit.
 
-### Task 8: Registry — `aiExposed` flag + `preview_command`
+### Tasks 8–10: AI composer — superseded
 
-**Files:**
-- Modify: `lib/commands/registry.ts`, existing `lib/commands/{catalog,inventory}.ts` (tag safe defs), `lib/commands/all.ts`
-- Create: `lib/commands/preview.ts`
-- Test: `tests/registry.test.ts` (extend), `tests/commands-preview.test.ts`
-
-**Interfaces:**
-- Produces: `Def` gains `aiExposed?: boolean` (default false) and optional `preview?: (ctx: Ctx, input: In) => Promise<Record<string, unknown>>`; `listTools(opts?: { aiOnly?: boolean })` filters to tagged defs; exported `getCommand(name: string)`; query `preview_command` (roles `"any"`, input `{ command: z.string(), input: z.unknown() }`, **not aiExposed**) → `{ name, description, requiresConfirmation, valid: boolean, errors: string[] | null, canonical: unknown, preview: Record<string, unknown> | null, allowed: boolean }`. It runs `safeParse`, the role check, and the optional `preview` hook; it **never** calls `handler`.
-- Consumes: nothing new.
-
-- [ ] **Step 1: Failing tests**: `listTools({aiOnly:true})` excludes untagged commands and `preview_command` itself; valid `create_product` input → `valid:true`, `canonical` = Zod-parsed input, `requiresConfirmation` echoed; invalid input → `valid:false` with messages and nothing written to the DB; a command the ctx role can't run → `allowed:false`; `preview` is null when the def has no hook (previews never invent document numbers — numbers only exist post-commit).
-- [ ] **Step 2:** run — FAIL. **Step 3:** implement; tag `aiExposed: true` on the hop-green set only: catalog CRUD commands/queries, `record_movement`, `get_on_hand`, `get_atp`, `list_movements`. Leave `import_csv`, `invite_staff`, `invite_customer_user` (fail-closed, P1.9) and everything copper/gated untagged; tag the merged 1B read queries (`list_orders`, `get_order`, `list_invoices`, …) only after confirming each is hop-green in the UI plan.
-- [ ] **Step 4:** run — PASS. **Step 5: Commit** `feat(1c): aiExposed registry flag + preview_command canonical preview`
-
-### Task 9: `compose_command` — LLM intent → candidate
-
-**Files:**
-- Create: `lib/commands/compose.ts`
-- Modify: `lib/commands/all.ts`, `package.json` (add `@anthropic-ai/sdk`), `.env.example` (+`ANTHROPIC_API_KEY`), README env table
-- Test: `tests/commands-compose.test.ts`
-
-**Interfaces:**
-- Produces: query `compose_command` (roles `"any"`, input `{ text: z.string().min(1) }`) → `{ candidate: { command: string, input: unknown } | null, message: string }`; test hook `_setModelClient(fake)` mirroring the `_clearRegistry` convention.
-- Consumes: `listTools({aiOnly:true})` (Task 8), filtered again to the ctx role's runnable set; Zod → JSON Schema via Zod 4's built-in `z.toJSONSchema`.
-- Model call: one Anthropic Messages request, model `claude-sonnet-5`, `tool_choice: {type:"auto"}`, system prompt: "Propose exactly one registered command for the user's intent, or reply asking for the missing field. Never invent quantities, sources, or destinations." A returned `tool_use` block becomes `candidate` verbatim — the server does not trust it; the UI must run it through `preview_command` before showing a proposal.
-
-- [ ] **Step 1: Failing tests** (stubbed client only — never the network): stub returns `tool_use` for `create_product` → `candidate` carries it; stub returns plain text → `candidate:null`, `message` set; a `customer`-role ctx's captured request contains no staff-only tools; `compose_command` and `preview_command` are absent from the tool list.
-- [ ] **Step 2:** run — FAIL. **Step 3:** `npm i @anthropic-ai/sdk` (approved via this plan), implement. **Step 4:** run — PASS, plus `npx tsc --noEmit`. **Step 5: Commit** `feat(1c): compose_command LLM intent-to-candidate with role-filtered tools`
-
-### Task 10: Composer UI (staff shell)
-
-**Files:**
-- Create: `app/(app)/composer.tsx`
-- Modify: `app/(app)/page.tsx` (mount at bottom of Today), `app/(app)/layout.tsx` (⌘K on desktop)
-- Test: rendered-page check (manual).
-
-**Interfaces:**
-- Consumes: `compose_command` → `preview_command` → normal client `runCommand` call on explicit confirm.
-
-Flow (UI plan §2 verbatim requirements): text → `compose_command`; if candidate, `preview_command`; proposal card shows every field that will be written plus warnings, with any document number labelled "assigned on commit"; primary button is the command's verb (e.g. **Create product**), plus **Open as form** (deep-link to the owning form prefilled via query params where the form exists; omit otherwise) and **Dismiss**; `requiresConfirmation` commands additionally get the `AlertDialog`. No auto-commit code path exists. History: last 20 entries in `localStorage` behind a visible **History** button (device-local per the plan), reads/writes wrapped in try/catch.
-
-- [ ] **Step 1:** Build it.
-- [ ] **Step 2:** Look at the rendered flow against local Supabase with `ANTHROPIC_API_KEY` set: type "new product called Haze King, 6.8%", confirm the write happens only on the verb click, and an ambiguous intent shows the model's clarifying message. `npx tsc --noEmit && npm run lint`.
-- [ ] **Step 3: Commit** `feat(1c): chat composer — compose → preview → explicit-verb commit`
-- [ ] **Step 4:** Mount the same component in `app/(portal)/layout.tsx` for customers (UI plan §3); Tasks 8–9's role filtering already restricts a `customer` ctx to portal commands — add one test in `tests/commands-compose.test.ts` proving a customer ctx's tool list contains only `portal_*` names.
+Moved to `.agents/superpowers/plans/2026-09-07-ai-chat.md` (spec
+`2026-09-07-mgr-ai-chat-design.md`), which replaces the one-shot composer with
+a registry-scoped agent loop. Nothing here remains current.
 
 ### Task 11: Docs + final validation
 
