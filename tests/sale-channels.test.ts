@@ -105,7 +105,7 @@ describe("frozen tax treatment on movements", () => {
 
 // Program 4 Task 2: the commands a brewery edits its own channel list with.
 // upsert/delete are admin-only; the list is readable by everyone who records a
-// movement. Wholesale is pinned because ship_order_impl finds it by name.
+// movement. No name is pinned: an order carries its own sale channel.
 describe("sale channel commands", () => {
   let ctx: Awaited<ReturnType<typeof makeStaffCtx>>;
   let breweryId: string;
@@ -146,18 +146,6 @@ describe("sale channel commands", () => {
     await runCommand("delete_sale_channel", { channelId: made.id }, ctx);
     const rows = (await runCommand("list_sale_channels", {}, ctx)) as { name: string }[];
     expect(rows.map((r) => r.name)).not.toContain("Scrap");
-  });
-
-  it("Wholesale is the shipping channel: it cannot be renamed or deleted", async () => {
-    const wholesale = await channelId(breweryId, "Wholesale");
-    await expect(runCommand("upsert_sale_channel", { id: wholesale, name: "Trade", taxTreatment: "taxable" }, ctx))
-      .rejects.toMatchObject({ message: expect.stringMatching(/shipping channel/i) });
-    await expect(runCommand("delete_sale_channel", { channelId: wholesale }, ctx))
-      .rejects.toMatchObject({ message: expect.stringMatching(/shipping channel/i) });
-    // Its tax treatment is still editable under its own name.
-    const same = (await runCommand("upsert_sale_channel", { id: wholesale, name: "Wholesale", taxTreatment: "transfer_in_bond" }, ctx)) as { tax_treatment: string };
-    expect(same.tax_treatment).toBe("transfer_in_bond");
-    await runCommand("upsert_sale_channel", { id: wholesale, name: "Wholesale", taxTreatment: "taxable" }, ctx);
   });
 
   it("delete_sale_channel refuses a channel a movement references", async () => {

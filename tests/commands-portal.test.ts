@@ -2,21 +2,22 @@
 // scoping to the caller's own customer, availability badges never leak raw ATP,
 // and staff-only commands reject a customer ctx.
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaffCtx, makeCustomerUser, asUser, seedCatalog, seedLocation, seedCustomer } from "./helpers";
+import { admin, makeBrewery, makeStaffCtx, makeCustomerUser, asUser, seedCatalog, seedLocation, seedCustomer, priceSku } from "./helpers";
 import { runCommand } from "../lib/commands/registry";
 import "../lib/commands/all";
 
 let b: { id: string }, adminCtx: Awaited<ReturnType<typeof makeStaffCtx>>;
-let customerId: string, shipToId: string, priceListId: string, skuId: string, warehouseId: string, warehouseBinId: string;
+let customerId: string, shipToId: string, saleChannelId: string, skuId: string, warehouseId: string, warehouseBinId: string;
 let custCtx: { db: Awaited<ReturnType<typeof asUser>>; userId: string; breweryId: string; role: "customer"; customerId: string };
 
 beforeAll(async () => {
   b = await makeBrewery();
   adminCtx = await makeStaffCtx(b.id, "admin");
   ({ id: warehouseId, binId: warehouseBinId } = await seedLocation(b.id));
-  ({ skuId } = await seedCatalog(b.id));
-  ({ customerId, shipToId, priceListId } = await seedCustomer(b.id));
-  await admin.from("price_list_items").insert({ brewery_id: b.id, price_list_id: priceListId, sku_id: skuId, unit_price_cents: 3600 });
+  const cat = await seedCatalog(b.id);
+  skuId = cat.skuId;
+  ({ customerId, shipToId, saleChannelId } = await seedCustomer(b.id));
+  await priceSku(b.id, { saleChannelId, brandId: cat.brandId, formatId: cat.formatId, cents: 3600 });
   // Put stock on hand so the "in" badge tier is reachable.
   const { data: loc } = await admin.from("locations").select("id").eq("id", warehouseId).single();
   await admin.from("inventory_movements").insert({
@@ -36,7 +37,7 @@ describe("portal commands", () => {
       shipToId, poNumber: "PO-1", note: "dock after 9", lines: [{ skuId, qty: 3 }],
     }, custCtx) as { order_id: string };
     const { data: order } = await admin.from("orders")
-      .select("brewery_id, customer_id, ship_to_id, from_location_id, price_list_id, created_by, kind, status, po_number, note")
+      .select("brewery_id, customer_id, ship_to_id, from_location_id, sale_channel_id, created_by, kind, status, po_number, note")
       .eq("id", created.order_id).single();
     const { data: line } = await admin.from("order_lines").select("unit_price_cents").eq("order_id", created.order_id).single();
     const { data: event } = await admin.from("order_events").select("actor, event").eq("order_id", created.order_id).eq("event", "created").single();
@@ -44,7 +45,7 @@ describe("portal commands", () => {
       brewery_id: b.id, customer_id: customerId, ship_to_id: shipToId, from_location_id: configured.id,
       created_by: custCtx.userId, kind: "wholesale", status: "draft", po_number: "PO-1", note: "dock after 9",
     });
-    expect(order!.price_list_id).not.toBeNull();
+    expect(order!.sale_channel_id).not.toBeNull();
     expect(line!.unit_price_cents).toBe(3600);
     expect(event).toEqual({ actor: custCtx.userId, event: "created" });
 
@@ -74,7 +75,7 @@ describe("portal commands", () => {
   });
 
   it("rejects a ship-to that belongs to another customer", async () => {
-    const other = await seedCustomer(b.id, { name: "Foreign Bar", priceListId });
+    const other = await seedCustomer(b.id, { name: "Foreign Bar", saleChannelId });
     await expect(runCommand("portal_create_order", { shipToId: other.shipToId, lines: [{ skuId, qty: 1 }] }, custCtx))
       .rejects.toThrow(/ship-to not found/);
   });
@@ -136,7 +137,7 @@ describe("portal commands", () => {
   });
 
   it("portal_orders lists only the caller's own orders; portal_invoices only their invoices", async () => {
-    const otherCustomer = await seedCustomer(b.id, { name: "Other Bar", priceListId });
+    const otherCustomer = await seedCustomer(b.id, { name: "Other Bar", saleChannelId });
     await admin.from("orders").insert({ brewery_id: b.id, kind: "wholesale", customer_id: otherCustomer.customerId, ship_to_id: otherCustomer.shipToId, created_by: adminCtx.userId });
 
     const orders = await runCommand("portal_orders", {}, custCtx) as { customer_id: string }[];
@@ -206,7 +207,7 @@ describe("account and invoice reads", () => {
   it("portal_invoice returns the caller's own invoice with lines, and not_found for another customer's", async () => {
     const { data: inv } = await admin.from("invoices").insert({ brewery_id: b.id, customer_id: customerId, kind: "invoice" }).select().single();
     await admin.from("invoice_lines").insert({ brewery_id: b.id, invoice_id: inv!.id, kind: "sku", sku_id: skuId, qty: 2, unit_price_cents: 3600, description: "IPA case" });
-    const other = await seedCustomer(b.id, { name: "Not mine", priceListId });
+    const other = await seedCustomer(b.id, { name: "Not mine", saleChannelId });
     const { data: foreign } = await admin.from("invoices").insert({ brewery_id: b.id, customer_id: other.customerId, kind: "invoice" }).select().single();
     const one = await runCommand("portal_invoice", { invoiceId: inv!.id }, custCtx) as { invoice: { id: string; total_cents: number }; lines: { qty: number }[] };
     expect(one.invoice.id).toBe(inv!.id);

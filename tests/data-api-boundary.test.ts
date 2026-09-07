@@ -1,7 +1,7 @@
 // tests/data-api-boundary.test.ts — proves authenticated callers use narrow RPCs, not table DML.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, asUser, channelId, makeBrewery, makeStaff } from "./helpers";
+import { admin, asUser, channelId, makeBrewery, makeStaff, seedPriceGroup } from "./helpers";
 
 let breweryId: string;
 let staffDb: SupabaseClient;
@@ -45,19 +45,19 @@ describe("Data API mutation boundary", () => {
       format_id: format.data!.id,
       name: "Foreign SKU",
     }).select("id").single();
-    const priceList = await admin.from("price_lists")
-      .insert({ brewery_id: foreignBrewery.id, name: "Foreign prices", channel_id: await channelId(foreignBrewery.id, "Wholesale") })
-      .select("id")
-      .single();
+    const foreignChannel = await channelId(foreignBrewery.id, "Wholesale");
+    const foreignGroup = await seedPriceGroup(foreignBrewery.id);
+    await admin.from("brands").update({ price_group_id: foreignGroup }).eq("id", product.data!.id);
     const location = await admin.from("locations").insert({
       brewery_id: foreignBrewery.id,
       name: "Foreign taproom",
       kind: "taproom",
     }).select("id").single();
-    await admin.from("price_list_items").insert({
+    await admin.from("channel_prices").insert({
       brewery_id: foreignBrewery.id,
-      price_list_id: priceList.data!.id,
-      sku_id: sku.data!.id,
+      sale_channel_id: foreignChannel,
+      price_group_id: foreignGroup,
+      format_id: format.data!.id,
       unit_price_cents: 1000,
     });
     await admin.from("taproom_pars").insert({
@@ -67,10 +67,11 @@ describe("Data API mutation boundary", () => {
       par_qty: 5,
     });
 
-    const priceAttempt = await staffDb.rpc("set_price_list_item", {
+    const priceAttempt = await staffDb.rpc("set_channel_price", {
       p_brewery: breweryId,
-      p_price_list: priceList.data!.id,
-      p_sku: sku.data!.id,
+      p_sale_channel: foreignChannel,
+      p_price_group: foreignGroup,
+      p_format: format.data!.id,
       p_unit_price_cents: 9999,
       p_request_id: crypto.randomUUID(),
     });
@@ -84,10 +85,11 @@ describe("Data API mutation boundary", () => {
     expect(priceAttempt.error).not.toBeNull();
     expect(parAttempt.error).not.toBeNull();
 
-    const foreignPrice = await admin.from("price_list_items")
+    const foreignPrice = await admin.from("channel_prices")
       .select("unit_price_cents")
-      .eq("price_list_id", priceList.data!.id)
-      .eq("sku_id", sku.data!.id)
+      .eq("sale_channel_id", foreignChannel)
+      .eq("price_group_id", foreignGroup)
+      .eq("format_id", format.data!.id)
       .single();
     const foreignPar = await admin.from("taproom_pars")
       .select("par_qty")

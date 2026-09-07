@@ -35,9 +35,9 @@ describe("seed helpers", () => {
     const loc = await seedLocation(b.id, { kind: "taproom" });
     expect(loc.kind).toBe("taproom");
 
-    const { customerId, shipToId, priceListId } = await seedCustomer(b.id);
+    const { customerId, shipToId, saleChannelId } = await seedCustomer(b.id);
     const rows = sql(`select customer_id, brewery_id from ship_tos where id = '${shipToId}'`, true)[0].split("|");
     expect(rows).toEqual([customerId, b.id]);
-    expect(sql(`select price_list_id from customers where id = '${customerId}'`)[0]).toBe(priceListId);
+    expect(sql(`select sale_channel_id from customers where id = '${customerId}'`)[0]).toBe(saleChannelId);
   });
 });

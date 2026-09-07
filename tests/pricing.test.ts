@@ -1,74 +1,91 @@
-// tests/pricing.test.ts — price groups price formats by default and override per
-// SKU (schema §16.4, unification plan D5A). Orders snapshot the override when
-// present, else the format default; a SKU with neither is not priced.
+// tests/pricing.test.ts — the price grid: channel × group × format (spec 2026-09-07-mgr-pricing-grid-naming).
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, channelId, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, seedLocation } from "./helpers";
+import { admin, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, seedLocation, seedPriceGroup, channelId, makeCustomerUser, asUser } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
-type Ctx = Awaited<ReturnType<typeof makeStaffCtx>>;
-let ctx: Ctx; let skuId: string; let formatId: string; let priceListId: string; let customerId: string; let shipToId: string; let whId: string; let breweryId: string;
-
+let b: { id: string }; let ctx: Awaited<ReturnType<typeof makeStaffCtx>>;
+let cat: Awaited<ReturnType<typeof seedCatalog>>; let wholesale: string; let taproom: string;
 beforeAll(async () => {
-  const b = await makeBrewery();
-  breweryId = b.id;
-  ctx = await makeStaffCtx(b.id, "admin");
-  ({ skuId, formatId } = await seedCatalog(b.id));
-  ({ customerId, shipToId, priceListId } = await seedCustomer(b.id));
-  whId = (await seedLocation(b.id)).id;
+  b = await makeBrewery(); ctx = await makeStaffCtx(b.id, "sales"); cat = await seedCatalog(b.id);
+  wholesale = await channelId(b.id, "Wholesale"); taproom = await channelId(b.id, "Taproom");
 });
 
-const draftPrice = async () => {
-  const { order_id } = await runCommand("create_order", { kind: "wholesale", customerId, shipToId, fromLocationId: whId, lines: [{ skuId, qty: 1 }] }, ctx) as { order_id: string };
-  const { data } = await admin.from("order_lines").select("unit_price_cents").eq("order_id", order_id).single();
-  return data!.unit_price_cents;
-};
+// The grid RPCs run as staff: assert_staff reads auth.uid(), which the service
+// key does not carry, so these go through the sales user's client.
+async function setCell(channel: string, group: string, cents: number) {
+  return ctx.db.rpc("set_channel_price", { p_brewery: b.id, p_sale_channel: channel, p_price_group: group, p_format: cat.formatId, p_unit_price_cents: cents, p_request_id: crypto.randomUUID() });
+}
 
 describe("price groups", () => {
-  it("unpriced sku is refused; format default prices it; sku override wins; clearing the override falls back", async () => {
-    await expect(draftPrice()).rejects.toThrow(/priced/);
-    await runCommand("set_price_list_format", { priceListId, formatId, unitPriceCents: 18000 }, ctx);
-    expect(await draftPrice()).toBe(18000);
-    await runCommand("set_price_list_item", { priceListId, skuId, unitPriceCents: 18500 }, ctx);
-    expect(await draftPrice()).toBe(18500);
-    const cleared = await runCommand("clear_price_list_item", { priceListId, skuId }, ctx) as { cleared: boolean };
-    expect(cleared.cleared).toBe(true);
-    expect(await draftPrice()).toBe(18000);
-    const lists = await runCommand("list_price_lists", {}, ctx) as { id: string; price_list_formats: { format_id: string; unit_price_cents: number }[]; price_list_items: unknown[] }[];
-    const pl = lists.find((l) => l.id === priceListId)!;
-    expect(pl.price_list_formats).toEqual([{ format_id: formatId, unit_price_cents: 18000, formats: { name: expect.any(String) } }]);
-    expect(pl.price_list_items).toEqual([]);
-    const { data: prices } = await admin.from("sku_prices").select("sku_id, unit_price_cents, source").eq("price_list_id", priceListId);
-    expect(prices).toEqual([{ sku_id: skuId, unit_price_cents: 18000, source: "format" }]);
+  it("a group is unique by name and by position within a brewery", async () => {
+    const t = await seedPriceGroup(b.id, "1", 1);
+    const dupName = await admin.from("price_groups").insert({ brewery_id: b.id, name: "1", position: 9 });
+    const dupPos = await admin.from("price_groups").insert({ brewery_id: b.id, name: "9", position: 1 });
+    expect(dupName.error?.code).toBe("23505"); expect(dupPos.error?.code).toBe("23505");
+    expect(t).toBeTruthy();
+  });
+  it("a brand on another brewery's group is rejected by the composite FK", async () => {
+    const other = await makeBrewery(); const foreign = await seedPriceGroup(other.id, "1", 1);
+    const { error } = await admin.from("brands").update({ price_group_id: foreign }).eq("id", cat.brandId);
+    expect(error?.code).toBe("23503");
   });
 });
 
-// Program 4 Task 3: a price list belongs to exactly one sale channel, so the
-// channel a list prices for is structural rather than convention.
-describe("a price list belongs to a channel", () => {
-  it("upsert_price_list without a channel is refused", async () => {
-    await expect(runCommand("upsert_price_list", { name: "channelless" }, ctx)).rejects.toBeTruthy();
+describe("channel prices resolve one cell per channel × group × format", () => {
+  let group: string;
+  beforeAll(async () => {
+    group = (await admin.from("price_groups").select("id").eq("brewery_id", b.id).eq("name", "1").single()).data!.id;
+    await admin.from("brands").update({ price_group_id: group }).eq("id", cat.brandId);
   });
-
-  it("upsert_price_list carries the channel, and changing it on edit sticks", async () => {
-    const wholesale = await channelId(breweryId, "Wholesale");
-    const taproom = await channelId(breweryId, "Taproom");
-    const made = (await runCommand("upsert_price_list", { name: "channelled", channelId: wholesale }, ctx)) as { id: string; channel_id: string };
-    expect(made.channel_id).toBe(wholesale);
-    const edited = (await runCommand("upsert_price_list", { id: made.id, name: "channelled", channelId: taproom }, ctx)) as { channel_id: string };
-    expect(edited.channel_id).toBe(taproom);
-    const lists = (await runCommand("list_price_lists", {}, ctx)) as { id: string; channel_id: string; sale_channels: { name: string } | null }[];
-    const row = lists.find((l) => l.id === made.id)!;
-    expect(row.channel_id).toBe(taproom);
-    expect(row.sale_channels?.name).toBe("Taproom");
+  it("an unpriced sku is not in sku_prices; a cell prices every sku of that brand's group on that channel", async () => {
+    const before = await admin.from("sku_prices").select("sku_id").eq("brewery_id", b.id);
+    expect(before.data).toEqual([]);
+    const { error } = await setCell(wholesale, group, 13200); expect(error).toBeNull();
+    const rows = await admin.from("sku_prices").select("sale_channel_id, sku_id, unit_price_cents").eq("brewery_id", b.id);
+    expect(rows.data).toEqual([{ sale_channel_id: wholesale, sku_id: cat.skuId, unit_price_cents: 13200 }]);
   });
+  it("the same sku prices differently per channel and repricing a cell replaces it", async () => {
+    await setCell(taproom, group, 700);
+    await setCell(wholesale, group, 13500);
+    const rows = await admin.from("sku_prices").select("sale_channel_id, unit_price_cents").eq("sku_id", cat.skuId).order("unit_price_cents");
+    expect(rows.data).toEqual([{ sale_channel_id: taproom, unit_price_cents: 700 }, { sale_channel_id: wholesale, unit_price_cents: 13500 }]);
+  });
+  it("clearing a cell unprices the sku on that channel only", async () => {
+    const { error } = await ctx.db.rpc("clear_channel_price", { p_brewery: b.id, p_sale_channel: taproom, p_price_group: group, p_format: cat.formatId, p_request_id: crypto.randomUUID() });
+    expect(error).toBeNull();
+    const rows = await admin.from("sku_prices").select("sale_channel_id").eq("sku_id", cat.skuId);
+    expect(rows.data).toEqual([{ sale_channel_id: wholesale }]);
+  });
+  it("a channel, group or format with a cell cannot be deleted", async () => {
+    const t = await admin.from("price_groups").delete().eq("id", group); expect(t.error?.code).toBe("23503");
+    const f = await admin.from("formats").delete().eq("id", cat.formatId); expect(f.error?.code).toBe("23503");
+    const c = await admin.from("sale_channels").delete().eq("id", wholesale); expect(c.error?.code).toBe("23503");
+  });
+});
 
-  it("a channel a price list prices for cannot be deleted", async () => {
-    const b = await makeBrewery();
-    const c = await makeStaffCtx(b.id, "admin");
-    const dtc = await channelId(b.id, "DTC");
-    await runCommand("upsert_price_list", { name: "dtc list", channelId: dtc }, c);
-    await expect(runCommand("delete_sale_channel", { channelId: dtc }, c))
-      .rejects.toMatchObject({ message: "channel is in use" });
+describe("customers and orders carry the channel", () => {
+  it("a customer needs a sale channel", async () => {
+    const { error } = await admin.from("customers").insert({ brewery_id: b.id, name: "NoChan", type: "retailer", state: "PA" });
+    expect(error?.code).toBe("23502");
+  });
+  it("create_order copies the customer's channel and prices lines from it; an unpriced sku is refused", async () => {
+    const cust = await seedCustomer(b.id, { name: "Grid Bar" });
+    const loc = await seedLocation(b.id);
+    const created = await runCommand("create_order", { kind: "wholesale", customerId: cust.customerId, shipToId: cust.shipToId, fromLocationId: loc.id, lines: [{ skuId: cat.skuId, qty: 2 }] }, ctx) as { order_id: string };
+    const o = await admin.from("orders").select("sale_channel_id, order_lines(unit_price_cents)").eq("id", created.order_id).single();
+    expect(o.data!.sale_channel_id).toBe(wholesale);
+    expect(o.data!.order_lines).toEqual([{ unit_price_cents: 13500 }]);
+    const dtc = await seedCustomer(b.id, { name: "DTC Buyer", saleChannelId: await channelId(b.id, "DTC") });
+    await expect(runCommand("create_order", { kind: "wholesale", customerId: dtc.customerId, shipToId: dtc.shipToId, fromLocationId: loc.id, lines: [{ skuId: cat.skuId, qty: 1 }] }, ctx))
+      .rejects.toThrow(/not active and priced/);
+  });
+  it("a portal customer reads only its own channel's cells", async () => {
+    const cust = await seedCustomer(b.id, { name: "Portal Co" });
+    const email = (await makeCustomerUser(cust.customerId)).email; const db = await asUser(email);
+    const cells = await db.from("channel_prices").select("sale_channel_id");
+    expect(cells.data!.every((r) => r.sale_channel_id === wholesale)).toBe(true);
+    expect(cells.data!.length).toBeGreaterThan(0);
+    const chans = await db.from("sale_channels").select("id"); expect(chans.data).toEqual([]);
   });
 });

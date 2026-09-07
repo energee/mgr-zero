@@ -1,6 +1,6 @@
 // tests/orders-lifecycle.test.ts — create → submit → confirm → adjust → cancel via rpc.
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation, seedCustomer } from "./helpers";
+import { admin, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation, seedCustomer, priceSku } from "./helpers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 let b: { id: string }, staffDb: SupabaseClient, staffId: string;
@@ -10,11 +10,11 @@ beforeAll(async () => {
   b = await makeBrewery();
   const staff = await makeStaff(b.id); staffId = staff.id; staffDb = await asUser(staff.email);
   ({ id: whId, binId: whBinId } = await seedLocation(b.id));
-  ({ skuId } = await seedCatalog(b.id, { sku: "IPA 1/2bbl", packageType: "keg", bblPerUnit: 0.5 }));
+  const cat = await seedCatalog(b.id, { sku: "IPA 1/2bbl", packageType: "keg", bblPerUnit: 0.5 });
+  skuId = cat.skuId;
   const cust = await seedCustomer(b.id);
   ({ customerId, shipToId } = cust);
-  const { error: pliErr } = await admin.from("price_list_items").insert({ brewery_id: b.id, price_list_id: cust.priceListId, sku_id: skuId, unit_price_cents: 12000 });
-  if (pliErr) throw new Error(`Failed to create price list item: ${pliErr.message}`);
+  await priceSku(b.id, { saleChannelId: cust.saleChannelId, brandId: cat.brandId, formatId: cat.formatId, cents: 12000 });
   // on-hand: 100 units
   const { error: imErr } = await admin.from("inventory_movements").insert({ brewery_id: b.id, sku_id: skuId, location_id: whId, bin_id: whBinId, qty: 100, type: "opening_balance", created_by: staffId });
   if (imErr) throw new Error(`Failed to create inventory movement: ${imErr.message}`);

@@ -1,12 +1,12 @@
 // tests/orders-fulfillment.test.ts — pick → ship → movements + invoice; credit memo; replenishment; needs_restock.
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation, seedCustomer, channelId } from "./helpers";
+import { admin, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation, seedCustomer, channelId, priceSku } from "./helpers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
 let b: { id: string }, staffDb: SupabaseClient, staffId: string;
-let customerId: string, shipToId: string, whId: string, whBinId: string, tapId: string, skuId: string, priceListId: string;
+let customerId: string, shipToId: string, whId: string, whBinId: string, tapId: string, skuId: string, saleChannelId: string;
 
 beforeAll(async () => {
   // identical seed to tests/orders-lifecycle.test.ts, plus a taproom location:
@@ -14,10 +14,11 @@ beforeAll(async () => {
   const staff = await makeStaff(b.id); staffId = staff.id; staffDb = await asUser(staff.email);
   ({ id: whId, binId: whBinId } = await seedLocation(b.id));
   tapId = (await seedLocation(b.id, { name: "Taproom", kind: "taproom" })).id;
-  ({ skuId } = await seedCatalog(b.id, { sku: "IPA 1/2bbl", packageType: "keg", bblPerUnit: 0.5 }));
+  const cat = await seedCatalog(b.id, { sku: "IPA 1/2bbl", packageType: "keg", bblPerUnit: 0.5 });
+  skuId = cat.skuId;
   const cust = await seedCustomer(b.id);
-  ({ customerId, shipToId, priceListId } = cust);
-  await admin.from("price_list_items").insert({ brewery_id: b.id, price_list_id: cust.priceListId, sku_id: skuId, unit_price_cents: 12000 });
+  ({ customerId, shipToId, saleChannelId } = cust);
+  await priceSku(b.id, { saleChannelId, brandId: cat.brandId, formatId: cat.formatId, cents: 12000 });
   await admin.from("inventory_movements").insert({ brewery_id: b.id, sku_id: skuId, location_id: whId, bin_id: whBinId, qty: 100, type: "opening_balance", created_by: staffId });
 });
 
@@ -379,7 +380,7 @@ describe("release_allocation and get_shortfalls", () => {
 
 describe("frozen tax treatment on a wholesale ship", () => {
   it("a customer's tax_treatment overrides the channel default on the movement", async () => {
-    const { customerId: exporterId, shipToId: exporterShipTo } = await seedCustomer(b.id, { name: "Exporter", priceListId });
+    const { customerId: exporterId, shipToId: exporterShipTo } = await seedCustomer(b.id, { name: "Exporter", saleChannelId });
     await admin.from("customers").update({ tax_treatment: "export" }).eq("id", exporterId);
     const { data, error } = await staffDb.rpc("create_order", {
       p_brewery: b.id, p_kind: "wholesale", p_customer: exporterId, p_ship_to: exporterShipTo,

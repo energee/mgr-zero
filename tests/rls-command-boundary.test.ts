@@ -1,7 +1,7 @@
 // tests/rls-command-boundary.test.ts — live PostgREST proof that staff writes use only role-scoped RPCs.
 // Every mutation RPC takes a p_request_id (request ledger); direct calls here mint a fresh one.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, channelId, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedCustomer } from "./helpers";
+import { admin, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedCustomer, priceSku } from "./helpers";
 import { runCommand, type Ctx } from "../lib/commands/registry";
 import "../lib/commands/all";
 
@@ -17,7 +17,7 @@ let skuId: string;
 let locationId: string;
 let binId: string;
 let taproomId: string;
-let priceListId: string;
+let saleChannelId: string;
 let customerId: string;
 let shipToId: string;
 
@@ -28,13 +28,12 @@ beforeAll(async () => {
   warehouseCtx = await makeStaffCtx(brewery.id, "warehouse");
   brewerCtx = await makeStaffCtx(brewery.id, "brewer");
 
-  ({ formatId, skuId } = await seedCatalog(brewery.id, { product: "Boundary IPA", sku: "Boundary case" }));
+  const cat = await seedCatalog(brewery.id, { product: "Boundary IPA", sku: "Boundary case" });
+  ({ formatId, skuId } = cat);
   ({ id: locationId, binId } = await seedLocation(brewery.id, { name: "Boundary warehouse" }));
   taproomId = (await seedLocation(brewery.id, { name: "Boundary taproom", kind: "taproom" })).id;
-  ({ customerId, shipToId, priceListId } = await seedCustomer(brewery.id, { name: "Boundary customer" }));
-  const { error: priceError } = await admin.from("price_list_items")
-    .insert({ brewery_id: brewery.id, price_list_id: priceListId, sku_id: skuId, unit_price_cents: 1200 });
-  if (priceError) throw priceError;
+  ({ customerId, shipToId, saleChannelId } = await seedCustomer(brewery.id, { name: "Boundary customer" }));
+  await priceSku(brewery.id, { saleChannelId, brandId: cat.brandId, formatId, cents: 1200 });
 });
 
 describe("staff command database boundary", () => {
@@ -76,11 +75,11 @@ describe("staff command database boundary", () => {
     });
     const customer = await salesCtx.db.rpc("upsert_customer", { p_request_id: crypto.randomUUID(),
       p_id: null, p_brewery: brewery.id, p_name: "sales rpc customer", p_type: "retailer", p_state: "PA",
-      p_price_list: null, p_license_no: null, p_payment_terms: null, p_tax_treatment: null,
+      p_sale_channel: saleChannelId, p_license_no: null, p_payment_terms: null, p_tax_treatment: null,
     });
     const warehouseCustomer = await warehouseCtx.db.rpc("upsert_customer", { p_request_id: crypto.randomUUID(),
       p_id: null, p_brewery: brewery.id, p_name: "warehouse rpc customer", p_type: "retailer", p_state: "PA",
-      p_price_list: null, p_license_no: null, p_payment_terms: null, p_tax_treatment: null,
+      p_sale_channel: saleChannelId, p_license_no: null, p_payment_terms: null, p_tax_treatment: null,
     });
 
     expect(location.error).toBeNull();
@@ -253,17 +252,6 @@ describe("registered staff mutation role × RPC matrix", () => {
       input: async () => ({ command: { formatId, lines: [] }, rpc: { p_brewery: brewery.id, p_format: formatId, p_lines: [] } }),
     },
     {
-      command: "set_price_list_format", rpc: "set_price_list_format", allowed: ["admin", "sales"],
-      input: async () => ({
-        command: { priceListId, formatId, unitPriceCents: 1800 },
-        rpc: { p_brewery: brewery.id, p_price_list: priceListId, p_format: formatId, p_unit_price_cents: 1800 },
-      }),
-    },
-    {
-      command: "clear_price_list_item", rpc: "clear_price_list_item", allowed: ["admin", "sales"],
-      input: async () => ({ command: { priceListId, skuId }, rpc: { p_brewery: brewery.id, p_price_list: priceListId, p_sku: skuId } }),
-    },
-    {
       command: "create_location", rpc: "create_location", allowed: ["admin"],
       input: async role => {
         const name = unique("matrix location", role);
@@ -327,7 +315,7 @@ describe("registered staff mutation role × RPC matrix", () => {
           command: { name, type: "retailer", state: "PA" },
           rpc: {
             p_id: null, p_brewery: brewery.id, p_name: name, p_type: "retailer", p_state: "PA",
-            p_price_list: null, p_license_no: null, p_payment_terms: null, p_tax_treatment: null,
+            p_sale_channel: saleChannelId, p_license_no: null, p_payment_terms: null, p_tax_treatment: null,
           },
         };
       },
@@ -365,24 +353,6 @@ describe("registered staff mutation role × RPC matrix", () => {
           },
         };
       },
-    },
-    {
-      command: "upsert_price_list", rpc: "upsert_price_list", allowed: ["admin", "sales"],
-      input: async role => {
-        const name = unique("matrix price list", role);
-        const channel = await channelId(brewery.id, "Wholesale");
-        return {
-          command: { name, channelId: channel },
-          rpc: { p_id: null, p_brewery: brewery.id, p_name: name, p_channel: channel },
-        };
-      },
-    },
-    {
-      command: "set_price_list_item", rpc: "set_price", allowed: ["admin", "sales"],
-      input: async () => ({
-        command: { priceListId: priceListId, skuId, unitPriceCents: 1300 },
-        rpc: { p_brewery: brewery.id, p_price_list: priceListId, p_sku: skuId, p_unit_price_cents: 1300 },
-      }),
     },
     {
       command: "record_movement", rpc: "record_inventory_movement", allowed: ["admin", "warehouse"],

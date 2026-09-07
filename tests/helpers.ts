@@ -100,29 +100,37 @@ export async function seedLocation(breweryId: string, opts: { name?: string; kin
   return { ...(data as { id: string; name: string; kind: string }), binId };
 }
 
-// A customer with one ship-to and a price list (created empty unless given).
-// A list prices for exactly one channel, so the default one prices Wholesale.
-export async function seedCustomer(
-  breweryId: string,
-  opts: { name?: string; state?: string; priceListId?: string } = {},
-) {
-  let priceListId = opts.priceListId;
-  if (!priceListId) {
-    const { data, error } = await admin.from("price_lists")
-      .insert({ brewery_id: breweryId, name: "std", channel_id: await channelId(breweryId, "Wholesale") }).select("id").single();
-    if (error) throw error;
-    priceListId = data.id as string;
-  }
+// A customer with one ship-to on a sale channel (Wholesale unless given).
+export async function seedCustomer(breweryId: string, opts: { name?: string; state?: string; saleChannelId?: string } = {}) {
+  const saleChannelId = opts.saleChannelId ?? await channelId(breweryId, "Wholesale");
   const state = opts.state ?? "PA";
   const { data: c, error: ce } = await admin.from("customers").insert({
-    brewery_id: breweryId, name: opts.name ?? "Bar", type: "retailer", state, price_list_id: priceListId,
+    brewery_id: breweryId, name: opts.name ?? "Bar", type: "retailer", state, sale_channel_id: saleChannelId,
   }).select("id").single();
   if (ce) throw ce;
   const { data: st, error: se } = await admin.from("ship_tos").insert({
     brewery_id: breweryId, customer_id: c.id, label: "main", address1: "1 Main St", city: "Town", state, zip: "19100",
   }).select("id").single();
   if (se) throw se;
-  return { customerId: c.id as string, shipToId: st.id as string, priceListId };
+  return { customerId: c.id as string, shipToId: st.id as string, saleChannelId };
+}
+
+// One row of the price grid.
+export async function seedPriceGroup(breweryId: string, name = "1", position = 1) {
+  const { data, error } = await admin.from("price_groups").insert({ brewery_id: breweryId, name, position }).select("id").single();
+  if (error) throw error;
+  return data.id as string;
+}
+
+// Price every SKU of a brand on one channel and format: put the brand on group "1"
+// (created if missing) and fill that cell. Replaces the old set_price seeding.
+export async function priceSku(breweryId: string, o: { saleChannelId: string; brandId: string; formatId: string; cents: number }) {
+  let group = (await admin.from("price_groups").select("id").eq("brewery_id", breweryId).eq("name", "1").maybeSingle()).data?.id as string | undefined;
+  if (!group) group = await seedPriceGroup(breweryId);
+  await admin.from("brands").update({ price_group_id: group }).eq("id", o.brandId);
+  const { error } = await admin.from("channel_prices").upsert({ brewery_id: breweryId, sale_channel_id: o.saleChannelId, price_group_id: group, format_id: o.formatId, unit_price_cents: o.cents });
+  if (error) throw error;
+  return group;
 }
 
 // A brewery's seeded sale channel by name (Wholesale, Taproom, DTC, Export —

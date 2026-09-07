@@ -1,6 +1,6 @@
 // tests/commands-orders.test.ts — registry wiring for order commands: roles, validation, rpc passthrough.
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedCustomer } from "./helpers";
+import { admin, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedCustomer, priceSku } from "./helpers";
 import { runCommand } from "../lib/commands/registry";
 import "../lib/commands/all";
 
@@ -12,10 +12,11 @@ beforeAll(async () => {
   adminCtx = await makeStaffCtx(b.id, "admin");
   brewerCtx = await makeStaffCtx(b.id, "brewer");
   whId = (await seedLocation(b.id)).id;
-  ({ skuId } = await seedCatalog(b.id));
+  const cat = await seedCatalog(b.id);
+  skuId = cat.skuId;
   const cust = await seedCustomer(b.id);
   ({ customerId, shipToId } = cust);
-  await admin.from("price_list_items").insert({ brewery_id: b.id, price_list_id: cust.priceListId, sku_id: skuId, unit_price_cents: 3600 });
+  await priceSku(b.id, { saleChannelId: cust.saleChannelId, brandId: cat.brandId, formatId: cat.formatId, cents: 3600 });
 });
 
 describe("order commands", () => {

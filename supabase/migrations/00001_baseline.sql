@@ -136,7 +136,7 @@ create table customers (
   type customer_type not null default 'retailer',
   license_no text,
   state text not null check (state ~ '^[A-Z]{2}$'),   -- home state
-  price_list_id uuid,                                  -- FK added after price_lists
+  sale_channel_id uuid not null,                       -- FK added after sale_channels
   qbo_customer_id text,
   payment_terms text not null default 'net30',
   -- null = inherit the sale channel's default tax treatment (§16.3).
@@ -233,9 +233,22 @@ create table styles (
 );
 
 -- A brand is the sellable identity (§16.1); a batch is a production instance.
--- description, category, price_group and hops are optional facts drawn on the
--- Brand screen; price_group is a label price tiers may price by (§16.4), never
--- a price on the brand.
+-- description, category and hops are optional facts drawn on the Brand screen.
+-- price_group_id is the row of the price grid this beer sits on
+-- (specs/2026-09-07-mgr-pricing-grid-naming.md); null means unpriced everywhere.
+create table price_groups (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references breweries(id),
+  name text not null,
+  position int not null,
+  cost_ceiling_cents int check (cost_ceiling_cents >= 0),   -- suggests a group once costing exists (#189 D7); never assigns
+  created_at timestamptz not null default now(),
+  unique (id, brewery_id),
+  unique (brewery_id, name),
+  unique (brewery_id, position)
+);
+create index price_groups_brewery_idx on price_groups (brewery_id, position);
+
 create table brands (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
@@ -245,12 +258,13 @@ create table brands (
   ttb_tax_class text not null default 'beer',
   description text,
   category text,
-  price_group text,
+  price_group_id uuid,
   hops text,
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
   unique (brewery_id, name),
-  foreign key (style_id, brewery_id) references styles (id, brewery_id)
+  foreign key (style_id, brewery_id) references styles (id, brewery_id),
+  foreign key (price_group_id, brewery_id) references price_groups (id, brewery_id)
 );
 
 -- The sellable shape (§16.2): the only place bbl_per_unit is typed. packaged
@@ -342,56 +356,6 @@ create table skus (
 create index skus_brewery_idx on skus (brewery_id, brand_id);
 create unique index skus_upc_uidx on skus (brewery_id, upc) where upc is not null;
 
--- Price tiers (§16.4): a tier prices formats by default and overrides per SKU.
--- Every list prices for exactly one sale channel; the composite FK is added
--- below, once sale_channels exists (on delete restrict, so a channel a list
--- prices for cannot be dropped out from under it).
-create table price_lists (
-  id uuid primary key default private.new_uuid(),
-  brewery_id uuid not null references breweries(id),
-  name text not null,
-  channel_id uuid not null,
-  unique (id, brewery_id),
-  unique (brewery_id, name)
-);
-
-create table price_list_formats (
-  price_list_id uuid not null,
-  format_id uuid not null,
-  brewery_id uuid not null references breweries(id),
-  unit_price_cents int not null check (unit_price_cents >= 0),
-  primary key (price_list_id, format_id),
-  foreign key (price_list_id, brewery_id) references price_lists (id, brewery_id),
-  foreign key (format_id, brewery_id) references formats (id, brewery_id)
-);
-create index price_list_formats_brewery_idx on price_list_formats (brewery_id, price_list_id);
-
-create table price_list_items (
-  price_list_id uuid not null,
-  sku_id uuid not null,
-  brewery_id uuid not null references breweries(id),
-  unit_price_cents int not null check (unit_price_cents >= 0),
-  srp_cents int check (srp_cents >= 0),                -- suggested retail
-  primary key (price_list_id, sku_id),
-  foreign key (price_list_id, brewery_id) references price_lists (id, brewery_id),
-  foreign key (sku_id, brewery_id) references skus (id, brewery_id)
-);
-alter table customers add constraint customers_price_list_fk
-  foreign key (price_list_id, brewery_id) references price_lists (id, brewery_id);
-
--- The price of every SKU on every tier: the SKU override when present, else
--- the tier's default for the SKU's format. Orders snapshot from here.
-create view sku_prices with (security_invoker = true) as
-  select s.brewery_id, pl.id as price_list_id, s.id as sku_id, s.name as sku_name, b.name as brand_name, s.active,
-         coalesce(pli.unit_price_cents, plf.unit_price_cents) as unit_price_cents,
-         case when pli.sku_id is not null then 'override' else 'format' end as source
-  from skus s
-  join brands b on b.id = s.brand_id
-  join price_lists pl on pl.brewery_id = s.brewery_id
-  left join price_list_items pli on pli.price_list_id = pl.id and pli.sku_id = s.id
-  left join price_list_formats plf on plf.price_list_id = pl.id and plf.format_id = s.format_id
-  where pli.sku_id is not null or plf.format_id is not null;
-
 -- Packaging BOM: materials consumed per single SKU unit (incl. one-way kegs).
 -- Packaging BOM belongs to the format, not the SKU (§16.12): a case tray is
 -- the same for every brand packed in that case. on_break says what happens
@@ -474,10 +438,34 @@ end $$;
 create trigger seed_sale_channels_on_brewery
   after insert on breweries for each row execute function private.seed_sale_channels();
 
--- Deferred from price_lists above: the channel must belong to the list's
--- brewery, structurally, and cannot be deleted while a list prices for it.
-alter table price_lists add constraint price_lists_channel_fk
-  foreign key (channel_id, brewery_id) references sale_channels (id, brewery_id) on delete restrict;
+-- Deferred from customers above: the channel must belong to the customer's
+-- brewery, structurally, and cannot be deleted while a customer sits on it.
+-- (Customers are created before channels in this file; the seed trigger above
+-- guarantees every brewery has a Wholesale row before any customer exists.)
+alter table customers add constraint customers_sale_channel_fk
+  foreign key (sale_channel_id, brewery_id) references sale_channels (id, brewery_id) on delete restrict;
+
+-- The price grid (specs/2026-09-07-mgr-pricing-grid-naming.md): one cell per
+-- sale channel × price group × format. A SKU's price on a channel is the cell at
+-- its brand's group and its format; no other table prices anything.
+create table channel_prices (
+  brewery_id uuid not null references breweries(id),
+  sale_channel_id uuid not null,
+  price_group_id uuid not null,
+  format_id uuid not null,
+  unit_price_cents int not null check (unit_price_cents >= 0),
+  primary key (sale_channel_id, price_group_id, format_id),
+  foreign key (sale_channel_id, brewery_id) references sale_channels (id, brewery_id) on delete restrict,
+  foreign key (price_group_id, brewery_id) references price_groups (id, brewery_id) on delete restrict,
+  foreign key (format_id, brewery_id) references formats (id, brewery_id) on delete restrict
+);
+create index channel_prices_brewery_idx on channel_prices (brewery_id, sale_channel_id);
+
+create view sku_prices with (security_invoker = true) as
+  select s.brewery_id, cp.sale_channel_id, s.id as sku_id, s.name as sku_name, b.name as brand_name, s.active, cp.unit_price_cents
+  from skus s
+  join brands b on b.id = s.brand_id
+  join channel_prices cp on cp.brewery_id = s.brewery_id and cp.price_group_id = b.price_group_id and cp.format_id = s.format_id;
 
 create table inventory_movements (
   id uuid primary key default private.new_uuid(),
@@ -989,7 +977,7 @@ create table orders (
   ship_to_id uuid,
   from_location_id uuid not null,                      -- where removals post
   to_location_id uuid,                                 -- taproom transfers
-  price_list_id uuid,                                  -- list used for line snapshots
+  sale_channel_id uuid not null,                       -- copied from the customer at creation; removals post to it
   requested_ship_date date,
   po_number text,
   note text,
@@ -1003,7 +991,7 @@ create table orders (
   foreign key (ship_to_id, customer_id, brewery_id) references ship_tos (id, customer_id, brewery_id),
   foreign key (from_location_id, brewery_id) references locations (id, brewery_id),
   foreign key (to_location_id, brewery_id) references locations (id, brewery_id),
-  foreign key (price_list_id, brewery_id) references price_lists (id, brewery_id),
+  foreign key (sale_channel_id, brewery_id) references sale_channels (id, brewery_id) on delete restrict,
   check (case kind
     when 'wholesale'        then customer_id is not null and ship_to_id is not null and to_location_id is null
     when 'taproom_transfer' then to_location_id is not null and customer_id is null and ship_to_id is null
@@ -1725,17 +1713,15 @@ create view route_loads with (security_invoker = true) as
 -- tenancy; each starts by locking the order row. p_lines is a full
 -- replacement: [{"sku_id": uuid, "qty": n}].
 
--- Resolves the unit price for an *active* sku from a price list; raises
+-- Resolves the unit price for an *active* sku on a sale channel; raises
 -- otherwise. Shared by every order create/update path so an inactive or
 -- unpriced sku is rejected at the RPC boundary, not only in the TS layer.
-create function private.order_line_price(p_brewery uuid, p_price_list uuid, p_sku uuid) returns int
+create function private.order_line_price(p_brewery uuid, p_sale_channel uuid, p_sku uuid) returns int
 language plpgsql stable set search_path = '' as $$
 declare v int;
 begin
-  -- SKU override if present, else the tier's format default (§16.4)
-  select p.unit_price_cents into v
-  from public.sku_prices p join public.skus s on s.id = p.sku_id
-  where p.brewery_id = p_brewery and p.price_list_id = p_price_list and p.sku_id = p_sku and s.active;
+  select p.unit_price_cents into v from public.sku_prices p
+  where p.brewery_id = p_brewery and p.sale_channel_id = p_sale_channel and p.sku_id = p_sku and p.active;
   if v is null then raise exception 'sku % is not active and priced for this customer', p_sku; end if;
   return v;
 end $$;
@@ -1763,22 +1749,25 @@ create function private.create_order_impl(
   p_brewery uuid, p_kind public.order_kind, p_customer uuid, p_ship_to uuid,
   p_from_location uuid, p_to_location uuid, p_requested date, p_po text, p_note text, p_lines jsonb
 ) returns jsonb language plpgsql set search_path = '' as $$
-declare v_order uuid; v_pl uuid; l record;
+declare v_order uuid; v_channel uuid; l record;
 begin
   perform private.assert_order_lines(p_lines);
   if p_kind = 'wholesale' then
-    select price_list_id into v_pl from public.customers where id = p_customer and brewery_id = p_brewery;
-    if v_pl is null then raise exception 'customer has no price list'; end if;
+    select sale_channel_id into v_channel from public.customers where id = p_customer and brewery_id = p_brewery;
+    if v_channel is null then raise exception 'customer not found'; end if;
+  else
+    -- a transfer has no customer: the channel named Taproom, else the first by name
+    select id into v_channel from public.sale_channels where brewery_id = p_brewery order by (name = 'Taproom') desc, name limit 1;
   end if;
   insert into public.orders (brewery_id, kind, customer_id, ship_to_id, from_location_id, to_location_id,
-                             price_list_id, requested_ship_date, po_number, note, created_by)
+                             sale_channel_id, requested_ship_date, po_number, note, created_by)
   values (p_brewery, p_kind, p_customer, p_ship_to, p_from_location, p_to_location,
-          v_pl, p_requested, p_po, p_note, auth.uid())
+          v_channel, p_requested, p_po, p_note, auth.uid())
   returning id into v_order;
   for l in select (e->>'sku_id')::uuid as sku_id, (e->>'qty')::numeric as qty from jsonb_array_elements(p_lines) e loop
     insert into public.order_lines (brewery_id, order_id, sku_id, qty_ordered, unit_price_cents)
     values (p_brewery, v_order, l.sku_id, l.qty,
-            case when p_kind = 'wholesale' then private.order_line_price(p_brewery, v_pl, l.sku_id) else 0 end);
+            case when p_kind = 'wholesale' then private.order_line_price(p_brewery, v_channel, l.sku_id) else 0 end);
   end loop;
   insert into public.order_events (brewery_id, order_id, actor, event, payload)
   values (p_brewery, v_order, auth.uid(), 'created', jsonb_build_object('lines', p_lines));
@@ -1811,7 +1800,7 @@ begin
   for l in select (e->>'sku_id')::uuid as sku_id, (e->>'qty')::numeric as qty from jsonb_array_elements(p_lines) e loop
     insert into public.order_lines (brewery_id, order_id, sku_id, qty_ordered, unit_price_cents)
     values (o.brewery_id, p_order, l.sku_id, l.qty,
-            case when o.kind = 'wholesale' then private.order_line_price(o.brewery_id, o.price_list_id, l.sku_id) else 0 end);
+            case when o.kind = 'wholesale' then private.order_line_price(o.brewery_id, o.sale_channel_id, l.sku_id) else 0 end);
   end loop;
   insert into public.order_events (brewery_id, order_id, actor, event, payload)
   values (o.brewery_id, p_order, auth.uid(), 'updated', jsonb_build_object('lines', p_lines));
@@ -1865,7 +1854,7 @@ begin
   for l in select (e->>'sku_id')::uuid as sku_id, (e->>'qty')::numeric as qty from jsonb_array_elements(p_lines) e loop
     insert into public.order_lines (brewery_id, order_id, sku_id, qty_ordered, unit_price_cents)
     values (o.brewery_id, p_order, l.sku_id, l.qty,
-            case when o.kind = 'wholesale' then private.order_line_price(o.brewery_id, o.price_list_id, l.sku_id) else 0 end)
+            case when o.kind = 'wholesale' then private.order_line_price(o.brewery_id, o.sale_channel_id, l.sku_id) else 0 end)
     on conflict (order_id, sku_id) do update set qty_ordered = excluded.qty_ordered
     returning id into v_line;
     update public.allocations set qty = l.qty
@@ -1935,14 +1924,11 @@ begin
     -- One lookup for the whole shipment: the channel a wholesale ship removes
     -- under, and the tax treatment frozen onto every movement it writes
     -- (customer override -> channel default, §16.3).
-    select sc.id, coalesce(c.tax_treatment, sc.tax_treatment)
+    select o.sale_channel_id, coalesce(c.tax_treatment, sc.tax_treatment)
       into v_channel, v_tax
       from public.sale_channels sc
       left join public.customers c on c.id = o.customer_id
-     where sc.brewery_id = o.brewery_id and sc.name = 'Wholesale';
-    if v_channel is null then
-      raise exception 'sale channel Wholesale not found' using errcode = 'P0001';
-    end if;
+     where sc.id = o.sale_channel_id;
     -- Empty-invoice guard: only create invoice if at least one line ships qty > 0;
     -- on_delivery defers the invoice to confirm_delivery
     if coalesce(p_invoice_timing, 'now') = 'now'
@@ -2432,7 +2418,7 @@ end $$;
 -- styles list), ABV, and the optional Brand-screen facts.
 create function upsert_brand(
   p_brewery uuid, p_id uuid, p_name text, p_style text, p_abv numeric,
-  p_description text, p_category text, p_price_group text, p_hops text, p_request_id uuid
+  p_description text, p_category text, p_price_group uuid, p_hops text, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_replay jsonb; v_row public.brands; v_style uuid;
 begin
@@ -2446,11 +2432,11 @@ begin
       on conflict (brewery_id, name) do update set name = excluded.name returning id into v_style;
   end if;
   if p_id is null then
-    insert into public.brands (brewery_id, name, style_id, abv, description, category, price_group, hops)
+    insert into public.brands (brewery_id, name, style_id, abv, description, category, price_group_id, hops)
     values (p_brewery, p_name, v_style, p_abv, p_description, p_category, p_price_group, p_hops) returning * into v_row;
   else
     update public.brands set name = p_name, style_id = v_style, abv = p_abv, description = p_description,
-      category = p_category, price_group = p_price_group, hops = p_hops
+      category = p_category, price_group_id = p_price_group, hops = p_hops
     where id = p_id and brewery_id = p_brewery returning * into v_row;
     if v_row.id is null then raise exception 'brand not found'; end if;
   end if;
@@ -2569,10 +2555,8 @@ begin
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
--- Sale channels are brewery-owned rows, but one name is load-bearing:
--- private.ship_order_impl finds the wholesale channel by the literal name
--- 'Wholesale'. Renaming or deleting that row would break shipping, so both
--- RPCs refuse it. Everything else about it (its tax treatment) stays editable.
+-- Sale channels are brewery-owned rows; no name is load-bearing (an order
+-- carries its own channel, so shipping no longer looks one up by name).
 create function upsert_sale_channel(
   p_brewery uuid, p_id uuid, p_name text, p_tax_treatment public.tax_treatment, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
@@ -2589,9 +2573,6 @@ begin
     else
       select * into v_row from public.sale_channels where id = p_id and brewery_id = p_brewery;
       if not found then raise exception 'sale channel not found'; end if;
-      if v_row.name = 'Wholesale' and p_name <> 'Wholesale' then
-        raise exception 'Wholesale is the shipping channel' using errcode = 'P0001';
-      end if;
       update public.sale_channels set name = p_name, tax_treatment = p_tax_treatment
         where id = p_id and brewery_id = p_brewery returning * into v_row;
     end if;
@@ -2602,9 +2583,8 @@ begin
 end $$;
 
 -- A channel in use is held by a foreign key with on delete restrict — from
--- inventory_movements, and from price_lists (every list prices for one
--- channel) — which raises 23503; the command turns that into 'channel is in
--- use'. Wholesale is refused before the delete is attempted.
+-- inventory_movements, customers, orders and channel_prices — which raises
+-- 23503; the command turns that into 'channel is in use'.
 create function delete_sale_channel(
   p_brewery uuid, p_id uuid, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
@@ -2616,9 +2596,6 @@ begin
   if v_replay is not null then return v_replay; end if;
   select * into v_row from public.sale_channels where id = p_id and brewery_id = p_brewery;
   if not found then raise exception 'sale channel not found'; end if;
-  if v_row.name = 'Wholesale' then
-    raise exception 'Wholesale is the shipping channel' using errcode = 'P0001';
-  end if;
   delete from public.sale_channels where id = p_id and brewery_id = p_brewery;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
@@ -2628,19 +2605,20 @@ end $$;
 -- override is passing null rather than a second command.
 create function upsert_customer(
   p_brewery uuid, p_id uuid, p_name text, p_type public.customer_type, p_state text,
-  p_price_list uuid, p_license_no text, p_payment_terms text, p_tax_treatment public.tax_treatment, p_request_id uuid
+  p_sale_channel uuid, p_license_no text, p_payment_terms text, p_tax_treatment public.tax_treatment, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_replay jsonb; v_row public.customers;
 begin
   perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'upsert_customer', p_request_id,
-    jsonb_build_object('brewery', p_brewery, 'id', p_id, 'name', p_name, 'type', p_type, 'state', p_state, 'price_list', p_price_list, 'license_no', p_license_no, 'payment_terms', p_payment_terms, 'tax_treatment', p_tax_treatment));
+    jsonb_build_object('brewery', p_brewery, 'id', p_id, 'name', p_name, 'type', p_type, 'state', p_state, 'sale_channel', p_sale_channel, 'license_no', p_license_no, 'payment_terms', p_payment_terms, 'tax_treatment', p_tax_treatment));
   if v_replay is not null then return v_replay; end if;
+  if p_sale_channel is null then raise exception 'customer needs a sale channel' using errcode = 'P0001'; end if;
   if p_id is null then
-    insert into public.customers (brewery_id, name, type, state, price_list_id, license_no, payment_terms, tax_treatment)
-      values (p_brewery, p_name, p_type, p_state, p_price_list, p_license_no, coalesce(p_payment_terms, 'net30'), p_tax_treatment) returning * into v_row;
+    insert into public.customers (brewery_id, name, type, state, sale_channel_id, license_no, payment_terms, tax_treatment)
+      values (p_brewery, p_name, p_type, p_state, p_sale_channel, p_license_no, coalesce(p_payment_terms, 'net30'), p_tax_treatment) returning * into v_row;
   else
-    update public.customers set name = p_name, type = p_type, state = p_state, price_list_id = p_price_list,
+    update public.customers set name = p_name, type = p_type, state = p_state, sale_channel_id = p_sale_channel,
       license_no = p_license_no, payment_terms = coalesce(p_payment_terms, payment_terms), tax_treatment = p_tax_treatment
       where id = p_id and brewery_id = p_brewery returning * into v_row;
     if not found then raise exception 'customer not found'; end if;
@@ -2670,40 +2648,71 @@ begin
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
--- A tier's default price for a format; every SKU on that format sells at it
--- unless set_price overrides the SKU.
-create function set_price_list_format(
-  p_brewery uuid, p_price_list uuid, p_format uuid, p_unit_price_cents int, p_request_id uuid
-) returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_replay jsonb; v_row public.price_list_formats;
+create function upsert_price_group(p_brewery uuid, p_id uuid, p_name text, p_position int, p_cost_ceiling_cents int, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.price_groups;
 begin
   perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
-  if not exists (select 1 from public.price_lists pl join public.formats f on f.brewery_id = pl.brewery_id
-                 where pl.id = p_price_list and f.id = p_format and pl.brewery_id = p_brewery) then
-    raise exception 'permission denied' using errcode = '42501';
-  end if;
-  v_replay := private.claim_command_request(p_brewery, 'set_price_list_format', p_request_id,
-    jsonb_build_object('brewery', p_brewery, 'price_list', p_price_list, 'format', p_format, 'unit_price_cents', p_unit_price_cents));
+  v_replay := private.claim_command_request(p_brewery, 'upsert_price_group', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'id', p_id, 'name', p_name, 'position', p_position, 'cost_ceiling_cents', p_cost_ceiling_cents));
   if v_replay is not null then return v_replay; end if;
-  insert into public.price_list_formats (brewery_id, price_list_id, format_id, unit_price_cents)
-    values (p_brewery, p_price_list, p_format, p_unit_price_cents)
-    on conflict (price_list_id, format_id) do update set unit_price_cents = excluded.unit_price_cents
-    returning * into v_row;
+  begin
+    if p_id is null then
+      insert into public.price_groups (brewery_id, name, position, cost_ceiling_cents) values (p_brewery, p_name, p_position, p_cost_ceiling_cents) returning * into v_row;
+    else
+      update public.price_groups set name = p_name, position = p_position, cost_ceiling_cents = p_cost_ceiling_cents where id = p_id and brewery_id = p_brewery returning * into v_row;
+      if not found then raise exception 'price group not found' using errcode = 'P0001'; end if;
+    end if;
+  exception when unique_violation then
+    raise exception 'a price group with that name or position already exists' using errcode = 'P0001';
+  end;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
--- Drop a SKU override so the format default applies again.
-create function clear_price_list_item(p_brewery uuid, p_price_list uuid, p_sku uuid, p_request_id uuid)
+create function delete_price_group(p_brewery uuid, p_id uuid, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb;
+begin
+  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'delete_price_group', p_request_id, jsonb_build_object('brewery', p_brewery, 'id', p_id));
+  if v_replay is not null then return v_replay; end if;
+  delete from public.price_groups where id = p_id and brewery_id = p_brewery;   -- 23503 when a brand or cell references it
+  if not found then raise exception 'price group not found' using errcode = 'P0001'; end if;
+  return private.complete_command_request(p_request_id, jsonb_build_object('id', p_id, 'deleted', true));
+end $$;
+
+-- One cell of the price grid: what a format costs on a channel for a group.
+create function set_channel_price(
+  p_brewery uuid, p_sale_channel uuid, p_price_group uuid, p_format uuid, p_unit_price_cents int, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.channel_prices;
+begin
+  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'set_channel_price', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'sale_channel', p_sale_channel, 'price_group', p_price_group, 'format', p_format, 'unit_price_cents', p_unit_price_cents));
+  if v_replay is not null then return v_replay; end if;
+  insert into public.channel_prices (brewery_id, sale_channel_id, price_group_id, format_id, unit_price_cents)
+    values (p_brewery, p_sale_channel, p_price_group, p_format, p_unit_price_cents)
+    on conflict (sale_channel_id, price_group_id, format_id) do update
+      set unit_price_cents = excluded.unit_price_cents
+      where public.channel_prices.brewery_id = excluded.brewery_id
+    returning * into v_row;   -- the composite FKs refuse another brewery's channel, group or format
+  if not found then raise exception 'permission denied' using errcode = '42501'; end if;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- Empty a cell: every SKU of that group is unpriced on that channel again.
+create function clear_channel_price(p_brewery uuid, p_sale_channel uuid, p_price_group uuid, p_format uuid, p_request_id uuid)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_replay jsonb; v_n int;
 begin
   perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
-  v_replay := private.claim_command_request(p_brewery, 'clear_price_list_item', p_request_id,
-    jsonb_build_object('brewery', p_brewery, 'price_list', p_price_list, 'sku', p_sku));
+  v_replay := private.claim_command_request(p_brewery, 'clear_channel_price', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'sale_channel', p_sale_channel, 'price_group', p_price_group, 'format', p_format));
   if v_replay is not null then return v_replay; end if;
-  delete from public.price_list_items where brewery_id = p_brewery and price_list_id = p_price_list and sku_id = p_sku;
+  delete from public.channel_prices where brewery_id = p_brewery and sale_channel_id = p_sale_channel and price_group_id = p_price_group and format_id = p_format;
   get diagnostics v_n = row_count;
-  return private.complete_command_request(p_request_id, jsonb_build_object('price_list_id', p_price_list, 'sku_id', p_sku, 'cleared', v_n > 0));
+  return private.complete_command_request(p_request_id, jsonb_build_object('cleared', v_n > 0));
 end $$;
 
 -- One RPC replaces a format's packaging bill of materials (§16.12).
@@ -2724,50 +2733,6 @@ begin
   end loop;
   return private.complete_command_request(p_request_id, jsonb_build_object('format_id', p_format,
     'lines', (select coalesce(jsonb_agg(jsonb_build_object('material_id', material_id, 'qty_per_unit', qty_per_unit, 'on_break', on_break)), '[]'::jsonb) from public.format_bom where format_id = p_format)));
-end $$;
-
-create function upsert_price_list(p_brewery uuid, p_id uuid, p_name text, p_channel uuid, p_request_id uuid)
-returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_replay jsonb; v_row public.price_lists;
-begin
-  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
-  v_replay := private.claim_command_request(p_brewery, 'upsert_price_list', p_request_id,
-    jsonb_build_object('brewery', p_brewery, 'id', p_id, 'name', p_name, 'channel', p_channel));
-  if v_replay is not null then return v_replay; end if;
-  if p_id is null then
-    insert into public.price_lists (brewery_id, name, channel_id) values (p_brewery, p_name, p_channel) returning * into v_row;
-  else
-    update public.price_lists set name = p_name, channel_id = p_channel where id = p_id and brewery_id = p_brewery returning * into v_row;
-    if not found then raise exception 'price list not found'; end if;
-  end if;
-  return private.complete_command_request(p_request_id, to_jsonb(v_row));
-end $$;
-
-create function set_price(
-  p_brewery uuid, p_price_list uuid, p_sku uuid, p_unit_price_cents int, p_request_id uuid
-) returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_replay jsonb; v_row public.price_list_items;
-begin
-  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
-  if not exists (
-    select 1
-    from public.price_lists pl
-    join public.skus s on s.brewery_id = pl.brewery_id
-    where pl.id = p_price_list and s.id = p_sku and pl.brewery_id = p_brewery
-  ) then
-    raise exception 'permission denied' using errcode = '42501';
-  end if;
-  v_replay := private.claim_command_request(p_brewery, 'set_price', p_request_id,
-    jsonb_build_object('brewery', p_brewery, 'price_list', p_price_list, 'sku', p_sku, 'unit_price_cents', p_unit_price_cents));
-  if v_replay is not null then return v_replay; end if;
-  insert into public.price_list_items (brewery_id, price_list_id, sku_id, unit_price_cents)
-    values (p_brewery, p_price_list, p_sku, p_unit_price_cents)
-    on conflict (price_list_id, sku_id) do update
-      set unit_price_cents = excluded.unit_price_cents
-      where public.price_list_items.brewery_id = excluded.brewery_id
-    returning * into v_row;
-  if not found then raise exception 'permission denied' using errcode = '42501'; end if;
-  return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
 create function record_inventory_movement(
@@ -2892,9 +2857,9 @@ begin
     select 1 from jsonb_array_elements(p_lines) e
     where not exists (
       select 1 from public.customers c
-      join public.price_list_items pli on pli.price_list_id = c.price_list_id and pli.brewery_id = c.brewery_id
-      join public.skus s on s.id = pli.sku_id and s.brewery_id = pli.brewery_id
-      where c.id = p_customer and pli.sku_id = (e->>'sku_id')::uuid and s.active
+      join public.sku_prices p on p.brewery_id = c.brewery_id and p.sale_channel_id = c.sale_channel_id
+        and p.sku_id = (e->>'sku_id')::uuid and p.active
+      where c.id = p_customer
     )
   ) then raise exception 'sku is not active and priced for this customer'; end if;
   -- The admin-configured source only (audit P1.4): no first-warehouse inference.
@@ -3414,7 +3379,6 @@ create index packaging_run_consumptions_brewery_idx on packaging_run_consumption
 create index packaging_run_outputs_brewery_idx on packaging_run_outputs (brewery_id);
 create index pos_item_mappings_brewery_idx on pos_item_mappings (brewery_id);
 create index pos_locations_brewery_idx on pos_locations (brewery_id);
-create index price_list_items_brewery_idx on price_list_items (brewery_id);
 create index brand_approvals_brewery_idx on brand_approvals (brewery_id);
 create index purchase_order_lines_brewery_idx on purchase_order_lines (brewery_id);
 create index receipt_lines_brewery_idx on receipt_lines (brewery_id);
@@ -3436,7 +3400,7 @@ begin
   -- limited below to the exact RPC path and command roles that own them.
   foreach t in array array[
     'customers','ship_tos','vendors','materials','material_lots','styles','brands','keg_pools','skus',
-    'formats','format_components','format_bom','price_lists','price_list_formats','price_list_items','locations','bins','sale_channels','stock_transfers','stock_transfer_lines','allocations','taproom_pars',
+    'formats','format_components','format_bom','price_groups','channel_prices','locations','bins','sale_channels','stock_transfers','stock_transfer_lines','allocations','taproom_pars',
     'recipes','recipe_versions','recipe_ingredients','vessels','batches','vessel_occupancies',
     'fermentation_readings','batch_additions','packaging_runs','lots','packaging_run_outputs',
     'packaging_run_consumptions','material_contracts','purchase_orders','purchase_order_lines',
@@ -3487,12 +3451,8 @@ create policy customer_read on formats for select
   using (brewery_id in (select c.brewery_id from customers c where c.id in (select my_customer_ids())));
 create policy customer_read on skus for select
   using (active and brewery_id in (select c.brewery_id from customers c where c.id in (select my_customer_ids())));
-create policy customer_own_prices on price_list_items for select
-  using (price_list_id in (select c.price_list_id from customers c where c.id in (select my_customer_ids())));
-create policy customer_own_price_list on price_lists for select
-  using (id in (select c.price_list_id from customers c where c.id in (select my_customer_ids())));
-create policy customer_own_prices on price_list_formats for select
-  using (price_list_id in (select c.price_list_id from customers c where c.id in (select my_customer_ids())));
+create policy customer_own_prices on channel_prices for select
+  using (sale_channel_id in (select c.sale_channel_id from customers c where c.id in (select my_customer_ids())));
 create policy customer_read_portal_source on locations for select
   using (
     id in (
@@ -4453,7 +4413,7 @@ revoke all on all sequences in schema public from public, anon, authenticated;
 -- material lives in private.integration_tokens behind service-only RPCs.
 grant select on breweries, brewery_users, customer_users,
   customers, ship_tos, vendors, materials, material_lots, styles, brands, keg_pools, skus,
-  formats, format_components, format_bom, price_lists, price_list_formats, price_list_items, locations, bins, sale_channels, stock_transfers, stock_transfer_lines, inventory_movements, allocations, taproom_pars,
+  formats, format_components, format_bom, price_groups, channel_prices, locations, bins, sale_channels, stock_transfers, stock_transfer_lines, inventory_movements, allocations, taproom_pars,
   recipes, recipe_versions, recipe_ingredients, vessels, batches, vessel_occupancies, transfers,
   volume_adjustments, fermentation_readings, material_movements, batch_additions, packaging_runs,
   lots, packaging_run_outputs, packaging_run_consumptions, material_contracts, purchase_orders,
@@ -4488,7 +4448,7 @@ grant execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid)
   to authenticated;
 grant execute on function
   create_sku(uuid,uuid,uuid,text,text,uuid),
-  upsert_brand(uuid,uuid,text,text,numeric,text,text,text,text,uuid),
+  upsert_brand(uuid,uuid,text,text,numeric,text,text,uuid,text,uuid),
   upsert_format(uuid,uuid,text,public.format_basis,public.package_type,public.keg_size,int,numeric,uuid),
   replace_format_components(uuid,uuid,jsonb,uuid),
   create_location(uuid,text,public.location_kind,uuid),
@@ -4500,10 +4460,10 @@ grant execute on function
   upsert_sale_channel(uuid,uuid,text,public.tax_treatment,uuid),
   delete_sale_channel(uuid,uuid,uuid),
   upsert_ship_to(uuid,uuid,uuid,text,text,text,text,text,text,uuid),
-  upsert_price_list(uuid,uuid,text,uuid,uuid),
-  set_price(uuid,uuid,uuid,int,uuid),
-  set_price_list_format(uuid,uuid,uuid,int,uuid),
-  clear_price_list_item(uuid,uuid,uuid,uuid),
+  upsert_price_group(uuid,uuid,text,int,int,uuid),
+  delete_price_group(uuid,uuid,uuid),
+  set_channel_price(uuid,uuid,uuid,uuid,int,uuid),
+  clear_channel_price(uuid,uuid,uuid,uuid,uuid),
   replace_format_bom(uuid,uuid,jsonb,uuid),
   record_inventory_movement(uuid,uuid,uuid,uuid,numeric,public.movement_type,uuid,text,text,uuid),
   set_taproom_par(uuid,uuid,uuid,numeric,uuid),
