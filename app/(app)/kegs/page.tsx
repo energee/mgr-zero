@@ -45,7 +45,7 @@ export default async function KegsPage() {
               <PoolForm key={`${p.id}-${p.name}-${p.vendor_id}-${p.per_fill_cents}-${p.deposit_cents}-${p.active}`} pool={p} vendors={vendors} />)}
             {rows.map((r) => (
               <div key={`${r.keg_size}-${r.location_name}-${r.bin_name}`}>
-                {E.row(`${p.name} ${SIZE_LABEL[r.keg_size] ?? r.keg_size} · ${r.location_name}`, `${r.qty} in · ${r.bin_name}`, String(r.qty))}
+                {E.row(`${p.name} ${SIZE_LABEL[r.keg_size] ?? r.keg_size} · ${r.location_name}`, `${r.qty} on hand · ${r.bin_name}`, String(r.qty))}
               </div>
             ))}
           </div>
