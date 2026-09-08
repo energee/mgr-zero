@@ -9,6 +9,14 @@ import { getCommandDefinition } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
 export const SCREEN_ROUTES: { name: string; file: string }[] = [
+  { name: "Invite staff", file: "app/(app)/settings/team/invite-form.tsx" },
+  { name: "Team member", file: "app/(app)/settings/team/member-form.tsx" },
+  { name: "Invite portal user", file: "app/(app)/customers/[id]/page.tsx" },
+  { name: "Import", file: "app/(app)/settings/import/page.tsx" },
+  { name: "Create brewery", file: "app/(auth)/create-brewery/page.tsx" },
+  { name: "Accept invite", file: "app/(auth)/accept/page.tsx" },
+  { name: "Expired invite", file: "app/(auth)/invite-expired/page.tsx" },
+  { name: "Expired reset", file: "app/(auth)/reset/page.tsx" },
   { name: "Today", file: "app/(app)/page.tsx" },
   { name: "First-run checklist", file: "app/(app)/page.tsx" },
   { name: "Beer", file: "app/(app)/beer/page.tsx" },
@@ -164,8 +172,7 @@ const liveCommands = (text: unknown) =>
  * or unregistered without a `[design]` tag (a `[view]` the page cannot exist
  * without); a `[design]` read another program owns (Invoice's QuickBooks reads)
  * leaves the rest of the page drawable. A screen with mixed live and gated
- * writes (Team, with invite still gated) is in; one whose only writes wait on a
- * gate (Import) is out until it lifts. */
+ * writes is in; one whose only writes wait on a gate is out until it lifts. */
 export function isUngated(s: Screen): boolean {
   if (s.venue || s.gatedBy) return false;
   const writes = liveCommands(s.writes);

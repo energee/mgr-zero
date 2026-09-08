@@ -16,6 +16,11 @@ const validServer = {
 };
 
 describe("environment validation", () => {
+  it("enables dedicated entry gating only for MGR_DEDICATED=1", () => {
+    expect(readServerEnv(validServer).dedicated).toBe(false);
+    expect(readServerEnv({ ...validServer, MGR_DEDICATED: "1" }).dedicated).toBe(true);
+    expect(readServerEnv({ ...validServer, MGR_DEDICATED: "true" }).dedicated).toBe(false);
+  });
   it("fails fast when a required public value is missing or malformed", () => {
     expect(() => readPublicEnv({ NEXT_PUBLIC_SUPABASE_URL: "not-a-url" })).toThrow(
       "NEXT_PUBLIC_SUPABASE_URL"

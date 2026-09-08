@@ -20,13 +20,13 @@ export function useCommandAction() {
   const pending = useRef<{ key: string; requestId: string } | null>(null);
 
   // Resolves true on success, so a caller that navigates away can wait for it.
-  async function run(name: string, input: unknown, onSuccess?: (data: unknown) => void) {
+  async function run(name: string, input: unknown, onSuccess?: (data: unknown) => void, requestId?: string) {
     setBusy(true);
     setError(null);
     try {
       const key = JSON.stringify([breweryId, name, input]);
       if (pending.current?.key !== key) pending.current = { key, requestId: crypto.randomUUID() };
-      const data = await command(breweryId, name, input, pending.current.requestId);
+      const data = await command(breweryId, name, input, requestId ?? pending.current.requestId);
       pending.current = null;
       onSuccess?.(data);
       router.refresh();

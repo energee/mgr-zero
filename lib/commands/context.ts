@@ -9,7 +9,7 @@ import {
 import { z } from "zod";
 import { publicEnv } from "@/lib/env/public";
 import { CommandError, unwrap } from "./registry";
-import type { Ctx } from "./registry";
+import type { Ctx, PreTenantCtx, OperationCtx } from "./registry";
 
 const uuid = z.uuid();
 /** True for a canonical UUID string; shared by the command route and the bearer context. */
@@ -45,11 +45,12 @@ export async function ctxForBearer(db: SupabaseClient, userId: string, breweryId
   throw new CommandError("not a member of this brewery", 403, "not_member");
 }
 
-async function buildCookieContext(breweryId: string, request: RequestAuthContext): Promise<Ctx> {
+async function buildCookieContext(breweryId: string | undefined, request: RequestAuthContext): Promise<OperationCtx> {
   const identity = await request.getIdentity();
   if (!identity) throw new CommandError("unauthenticated", 401, "unauthenticated");
 
   const db = await request.getSupabaseClient();
+  if (breweryId === undefined) return { db, userId: identity.userId, breweryId: null, role: null };
   const staff = await request.getStaffMembership(breweryId);
   if (staff) return { db, userId: identity.userId, breweryId, role: staff.role };
 
@@ -68,18 +69,21 @@ async function buildCookieContext(breweryId: string, request: RequestAuthContext
 }
 
 // Server Components share React's request cache through the RSC composition.
-export const buildContext = cache(async (breweryId: string): Promise<Ctx> =>
-  buildCookieContext(breweryId, getRequestAuthContext())
-);
+function cookieContext(breweryId: string): Promise<Ctx>;
+function cookieContext(breweryId?: undefined): Promise<PreTenantCtx>;
+function cookieContext(breweryId?: string): Promise<OperationCtx> {
+  return buildCookieContext(breweryId, getRequestAuthContext());
+}
+export const buildContext = cache(cookieContext);
 
 // Route handlers have no React Server Component cache, so compose explicitly.
-export async function buildRouteContext(breweryId: string): Promise<Ctx> {
+export async function buildRouteContext(breweryId?: string): Promise<OperationCtx> {
   return buildCookieContext(breweryId, createRequestAuthContext());
 }
 
 // API clients supply a bearer token. Its validation and RLS-bound client are
 // intentionally explicit rather than sharing cookie-scoped request state.
-export async function buildContextFromBearer(breweryId: string, accessToken: string): Promise<Ctx> {
+export async function buildContextFromBearer(breweryId: string | undefined, accessToken: string): Promise<OperationCtx> {
   if (!accessToken) throw new CommandError("unauthenticated", 401, "unauthenticated");
 
   const verifier = createClient(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
@@ -95,5 +99,6 @@ export async function buildContextFromBearer(breweryId: string, accessToken: str
     auth: { persistSession: false, autoRefreshToken: false },
     accessToken: async () => accessToken,
   });
+  if (breweryId === undefined) return { db, userId, breweryId: null, role: null };
   return ctxForBearer(db, userId, breweryId);
 }

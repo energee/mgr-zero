@@ -1,7 +1,4 @@
-// app/(app)/settings/page.tsx — Settings (screen record): edit brewery basics
-// (get_brewery → update_brewery) and route to rare setup. Locations and Team
-// are live; source water, accounting, point of sale, chat and import stay
-// gated until their programs ship. Deployment mode is read-only.
+import { serverEnv } from "@/lib/env/server";
 import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -25,14 +22,14 @@ export default async function SettingsPage() {
     <>
       {E.back("More", "Settings", undefined, "/more")}
       <SettingsForm brewery={row} />
-      {E.fld("Deployment", "dedicated · read-only")}
+      {E.fld("Deployment", `${serverEnv.dedicated ? "dedicated" : "hosted"} · read-only`)}
       {E.gated("Source water", "water profiles aren’t available yet")}
       {E.nav("Locations", locations.map((l) => l.name).join(" · ") || "none yet", "", undefined, "/locations")}
       {E.nav("Team", plural(team.length, "member"), "", undefined, "/settings/team")}
       {E.gated("Accounting", "QuickBooks isn’t connected yet")}
       {E.gated("Point of sale", "Square isn’t connected yet")}
       {E.nav("Chat", "Slack notifications and preferences", "", undefined, "/settings/chat")}
-      {E.gated("Import", "CSV import isn’t available yet")}
+      {E.nav("Import", "upload, map and commit CSV rows", "", undefined, "/settings/import")}
     </>
   );
 }

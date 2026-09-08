@@ -47,15 +47,6 @@ const FERM_STAGES: Step[] = [
   { name: "Conditioning", kind: "conditioning", tempF: 34, duration: 10 },
 ];
 
-/** Every staff role with what it opens; Team member draws one switch each. */
-const ROLES: [string, string, boolean][] = [
-  ["Admin", "everything, including team and settings", false],
-  ["Sales", "orders, customers, price groups", true],
-  ["Warehouse", "pick, receive, count, transfer", false],
-  ["Brewer", "batches, cellar, packaging", true],
-  ["Taproom", "taps, pours, menu", false],
-];
-
 export const PORTAL_BUYER = { name: "Jordan Lee", account: "Ridgeline Tap Room", email: "jordan@ridgelinetap.com" };
 
 export type Tab = "Today" | "Beer" | "Work" | "More";
@@ -159,7 +150,6 @@ const FILL_CHIPS = ["Empty", "About ¼ left", "About ½ left"];
 
 // Gate copy shared by the frames naming one gate. Two frames drifting apart is
 // the failure this prevents: the copy is the promise, so it lives once.
-const INVITE_GATE = "isn’t available yet; invitations are being made retry-safe. Until it closes a brewery is whoever created it, alone";
 const REVERSAL_GATE = "isn’t available yet: a reversal needs an auditable link and TTB semantics. Until it closes no movement anywhere in MGR can be corrected, and a mistyped removal reaches the report";
 
 // The Work list chips, in the order every Work list draws them.
@@ -426,36 +416,38 @@ export const SCREENS: Screen[] = [
     step: 2, slice: 1, group: "Entry", surface: "entry", name: "No membership",
     job: "Signed in, but this account is not on any brewery or customer",
     reads: "none", writes: "none",
-    states: [["no brewery", "ask an admin for an invite"], ["no customer", "the brewery invites portal buyers"]],
+    states: [["no brewery", "create a brewery on hosted MGR"], ["dedicated", "creation is hidden"], ["no customer", "contact the brewery"]],
     spec: "After sign-in with no brewery and no customer account. The queue is empty because nothing was writable.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
     body: (<>
       {E.sp()}
       {E.ttl("No brewery yet")}
       {E.note("This login is not on a brewery or a customer account.")}
-      {E.info("Ask an admin to send an invite.")}
+      {E.info("Contact your brewery administrator about access.")}
+      {E.btn("Create brewery")}
       {E.btn("Sign out", "g")}
       {E.sp()}
     </>),
   },
   {
-    step: 2, slice: 1, group: "Entry", surface: "entry", name: "Expired invite", gatedBy: "Program 11",
+    step: 2, slice: 1, group: "Entry", surface: "entry", name: "Expired invite",
     job: "The invite link is no longer valid",
     reads: "none", writes: "none",
-    states: [["expired", "ask for a new invite"], ["wrong audience", "a customer link used on staff, or the reverse", 1], ["already a member", "sign in instead"]],
+    states: [["expired", "sign in or recover your password"], ["wrong audience", "a customer link used on staff, or the reverse", 1], ["already a member", "sign in instead"]],
     spec: "Plan §5b. A used or timed-out token never opens Accept invite.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
     body: (<>
       {E.sp()}
       {E.ttl("Invite expired")}
       {E.note("This invite is no longer valid.")}
-      {E.info("Ask an admin to send a new one.")}
+      {E.info("Sign in or reset your password. Contact the brewery if access is still missing.")}
+      {E.btn("Reset password")}
       {E.btn("Back to sign in")}
       {E.sp()}
     </>),
   },
   {
-    step: 2, slice: 1, group: "Entry", surface: "entry", name: "Expired reset", gatedBy: "Program 11",
+    step: 2, slice: 1, group: "Entry", surface: "entry", name: "Expired reset",
     job: "The password reset link is no longer valid",
     reads: "none", writes: "none",
     states: [["expired", "request a new reset link"]],
@@ -510,12 +502,12 @@ export const SCREENS: Screen[] = [
     slice: 1,
     group: "Entry",
     surface: "entry",
-    name: "Accept invite", gatedBy: "Program 11",
+    name: "Accept invite",
     job: "Set a password and land in the correct shell",
     reads: "supabase_auth_get_session [platform]",
     writes: "supabase_auth_update_user [platform; membership already exists]",
     states: DEFAULT_STATES,
-    spec: "Staff lands on Today; a customer lands on portal Order. The token decides; the person never chooses a shell. Name is collected here. Expired, wrong-audience and already-a-member are their own landings.",
+    spec: "Staff lands on Today; a customer lands on portal Order. The verified membership decides; the person never chooses a shell. Name is collected here. Expired, wrong-audience and already-a-member are their own landings.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
     body: (<>
       {E.sp()}
@@ -639,19 +631,31 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Team",
-    job: "Roster, roles, pending invites and revocation",
+    job: "Roster, single staff role, invitations and membership removal",
     reads: "list_team_members",
-    writes: "invite_staff [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI] · the taproom role [SCHEMA-GATE: revision 2 §16.13/§16.16 q3: staff_role gains taproom, but P-staff is role-agnostic, so the narrow per-role policies are undesigned] · update_staff_role · revoke_staff",
-    states: [["last admin", "role change refused · keep one admin", 1], ["pending", "invite sent · not yet accepted"], ["permission", "admin only", 1]],
-    spec: "A person shows as @handle, the local part of their email; it is derived, not a stored column. A pending invite has no account yet, so it shows the full address it was sent to. From Settings. A member row opens the Team member sheet, where the role changes in one write and Remove ends the membership (Auth user untouched; re-invite is the compensation). The invite stays disabled with the same human copy as first run until its gate closes.",
+    writes: "invite_staff [existing] · the taproom role [SCHEMA-GATE: revision 2 §16.13/§16.16 q3: staff_role gains taproom, but P-staff is role-agnostic, so the narrow per-role policies are undesigned] · update_staff_role · revoke_staff",
+    states: [["last admin", "role change refused · keep one admin", 1], ["permission", "admin only", 1]],
+    spec: "A person shows as @handle, derived from their email. Admin invites one staff role and changes or removes other memberships. The roster does not distinguish pending acceptance. Existing accounts cannot be attached or reinvited; removing membership leaves the Auth account.",
     body: (<>
       {E.back("Settings", "Team")}
       {E.row("Maria Alvarez", "@maria · admin", "you", "", E.face())}
-      {E.nav("Dave Chen", "@dave · brewer · sales", "", E.face({ src: "/mock/dave.jpg" }))}
+      {E.nav("Dave Chen", "@dave · brewer", "", E.face({ src: "/mock/dave.jpg" }))}
       {E.nav("Ted", "@ted · sales", "", E.face({ src: "/mock/ted.jpg" }))}
       {E.nav("Sam Ortiz", "@sam · warehouse", "", E.face({ src: "/mock/sam.jpg" }))}
-      {E.row("wes@demobrewing.com", "invited Tue · pending", "", "w", E.face({ name: "wes@demobrewing.com" }))}
-      {E.gated("Invite staff", INVITE_GATE)}
+      {E.btn("Invite staff")}
+    </>),
+  },
+  {
+    step: 2, slice: 1, tab: "More", surface: "sheet", name: "Invite staff",
+    to: { "Send invite": "Team" },
+    job: "Invite one new staff account with one role",
+    reads: "none", writes: "invite_staff",
+    states: [["permission", "admin only", 1], ["retry", "unchanged input keeps request identity"], ["existing account", "cannot attach existing accounts", 1]],
+    body: (<>
+      {E.edit("Email", "", "email")}
+      {E.pick("Role", "Warehouse", ["Warehouse", "Sales", "Brewer", "Admin"])}
+      {E.note("Sending an invite emails the recipient. Keep this page open to retry after an error.")}
+      {E.btn("Send invite")}
     </>),
   },
   {
@@ -660,17 +664,16 @@ export const SCREENS: Screen[] = [
     tab: "More",
     surface: "sheet",
     name: "Team member",
-    to: { "Save roles": "Team", "Remove Dave": "Team" },
-    job: "Change one member's roles or remove that membership",
+    to: { "Save role": "Team", "Remove Dave": "Team" },
+    job: "Change one member's role or remove that membership",
     reads: "list_team_members",
-    writes: "update_staff_roles · revoke_staff [design; SCHEMA-GATE: roles is an array on the membership row]",
-    states: [["permission", "admin only", 1], ["member", "any set of roles; at least one"], ["no role", "Save refused until one is on", 1], ["last admin", "remove and turning off Admin refused", 1], ["self", "remove refused", 1]],
-    spec: "A member holds a set of roles, not one: a person who sells and brews is both, and sees the union of each role's navigation and actions. Every role is a switch; at least one must stay on. The destructive action belongs to the named member, so there is no ambiguous selected-member state. Drawn for another member, never the signed-in one: opening your own row is the self state, where Remove is refused. Until the roles column becomes an array, the live sheet changes the one role the row holds.",
+    writes: "update_staff_role · revoke_staff",
+    states: [["permission", "admin only", 1], ["last admin", "keep at least one admin", 1], ["self", "remove refused", 1]],
+    spec: "Membership holds one role. Multiple simultaneous staff roles are unsupported. The live form opens only for another member; removing membership leaves their sign-in account.",
     body: (<>
       {E.row("Dave Chen", "dave@demobrewing.com", "", "", E.face({ className: "size-10", src: "/mock/dave.jpg" }))}
-      {E.ttl("Roles")}
-      {ROLES.map(([name, does, on]) => <Fragment key={name}>{E.row(name, does, E.sw(on, name))}</Fragment>)}
-      {E.btn("Save roles")}
+      {E.pick("Role", "Brewer", ["Warehouse", "Sales", "Brewer", "Admin"])}
+      {E.btn("Save role")}
       {E.note("Removing Dave ends this brewery membership. Their sign-in account remains.")}
       {E.btn("Remove Dave", "del")}
     </>),
@@ -684,7 +687,7 @@ export const SCREENS: Screen[] = [
     to: { "Create brewery": "First-run checklist" },
     job: "Provision tenant and first owner atomically",
     reads: "none [deployment mode gate]",
-    writes: "provision_brewery [design; one RPC: brewery + owner membership]",
+    writes: "provision_brewery [existing; authenticated pre-tenant; one RPC: brewery + first admin membership]",
     states: DEFAULT_STATES,
     spec: "Hidden in dedicated mode; this is the pre-brewery provisioning boundary.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
@@ -704,22 +707,18 @@ export const SCREENS: Screen[] = [
     to: { "Add location": "First-run checklist", "2 \u00b7 Import CSV": "Import", "3 \u00b7 Add a brand": "Brand", Add: "Brand", "5 \u00b7 Opening inventory": "Record movement" },
     job: "Turn an empty brewery into usable truth",
     reads: "get_first_run_state",
-    writes: "invite_staff [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI] · create_location",
+    writes: "invite_staff [existing] · create_location",
     states: permitted("admin only"),
-    spec: "Replaces Today until complete; app and portal shells already exist. Each step is one command and all five are drawn: add a location, import a CSV, add a brand, invite staff, record a movement. The brand step was named here and never drawn, which stranded anyone not importing: a brewery with locations and no brand has nothing to record a movement against. The invite is drawn disabled with the same human copy as the Team frame until the invite workflow gate closes; the step can be skipped.",
+    spec: "Admin sees this only while neither a location nor a brand exists; adding either ends the checklist. Import and staff invitation are optional and do not block onboarding. Team and first-run use the same staff invitation form with one role.",
     body: (<>
       {E.hd("Set up Demo Brewing", "5 steps")}
       {E.row("1 · Add locations", "inline form expanded", "in progress", "ok")}
       {E.fld("Location name", "Warehouse")}
       {E.chips(["Warehouse", "Taproom"])}
       {E.btn("Add location")}
-      {E.row("2 · Import CSV", "customers, catalog and opening balances at once", E.act("Import CSV"))}
+      {E.row("2 · Import CSV", "customers, catalog or opening balances", E.act("Import CSV"))}
       {E.row("3 · Add a brand", "or let the import create them", E.act("Add"))}
-      {E.row("4 · Invite the team", "email and role", E.act("Skip"))}
-      {E.edit("Email", "", "email")}
-      {E.chips(["Warehouse", "Sales", "Brewer", "Admin"])}
-      {E.note("Sending an invite emails the recipient and cannot be recalled.")}
-      {E.gated("Send staff invite", INVITE_GATE)}
+      {E.row("4 · Invite the team", "optional · email and one role", E.act("Invite staff"))}
       {E.row("5 · Opening inventory", "count what’s on hand today", E.act("Record opening count", "info"))}
     </>),
   },
@@ -729,16 +728,17 @@ export const SCREENS: Screen[] = [
     group: "Desk",
     name: "Import",
     job: "Upload, map, preview and independently commit valid rows",
-    reads: "list_skus · list_locations · list_customers",
-    writes: "import_csv [existing ID; IMPLEMENTATION-GATE: one RPC per dependent logical row + durable requestId/result]",
-    states: [["upload error", "the file did not parse · nothing staged", 1], ["all invalid", "Commit disabled · fix mapping", 1], ["mixed", "2 ready · 1 blocked"], ["handoff", "phone inspects; mapping continues at a desk"], ["rerun target", "After gate, same requestId returns result"], ["permission", "Import requires admin", 1]],
-    spec: "Commit controls stay disabled until dependent rows are atomic and opening balances cannot duplicate on rerun. Ship colors: customer/catalog rows green; append-only opening balances copper.",
+    reads: "list_skus · list_locations · list_bins · list_customers · list_formats · list_price_groups · list_sale_channels",
+    writes: "import_csv",
+    states: [["upload error", "the file did not parse · nothing staged", 1], ["all invalid", "Commit disabled · fix mapping", 1], ["mixed", "2 ready · 1 blocked"], ["rerun target", "same requestId returns original committed and blocked results"], ["permission", "Import requires admin", 1]],
+    spec: "One logical row is atomic; siblings commit independently. Preview is editable on phone and desk. All-invalid batches cannot commit. Same-batch retry returns original results; correction starts only blocked rows with a new identity. Keep the page open for retry recovery; reopening has no automatic batch recovery.",
     body: (<>
       {E.back("Settings", "Import")}
       {E.stp(["upload", "map", "preview", "commit"], 2)}
-      {E.chips(["customers", "catalog", "opening balances"], 0)}
-      {E.tbl(["row", "record", "match", "state"], [["1", "Ridgeline + Main", "new", "ready"], ["2", "Al’s Bar", "ship-to missing", <><span className="text-warning-foreground">blocked</span></>], ["3", "Teresa’s", "existing", "skip"]])}
-      {E.btns([["Import 2 customer rows", "p disabled"], ["Post opening balances", "irr disabled"]])}
+      {E.chips(["customers", "ship-tos", "products", "channel prices", "opening balances"], 0)}
+      {E.tbl(["row", "record", "match", "state"], [["1", "Ridgeline + Main", "new", "ready"], ["2", "Al’s Bar", "sale channel missing", <><span className="text-warning-foreground">blocked</span></>], ["3", "Teresa’s", "new", "ready"]])}
+      {E.btn("Import 2 customer rows")}
+      {E.note("Retry returns original results. Correct only blocked rows in a new batch.")}
     </>),
   },
   {
@@ -1384,12 +1384,12 @@ export const SCREENS: Screen[] = [
     to: { Open: "Customer detail" },
     job: "Manage accounts, addresses and portal users",
     reads: "list_customers · get_customer",
-    writes: "invite_customer_user [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI] · upsert_customer · upsert_ship_to",
+    writes: "invite_customer_user [existing] · upsert_customer · upsert_ship_to",
     states: DEFAULT_STATES,
     body: (<>
       {E.back("More", "Customers", E.btn("Add customer"))}
       {E.search("Search customers")}
-      {E.row("Ridgeline Tap Room", "retailer · PA · 2 portal users", E.act("Open"))}
+      {E.row("Ridgeline Tap Room", "retailer · PA", E.act("Open"))}
       {E.row("Al’s Bar", "retailer · OH · brewery remits", E.act("Open"), "w")}
     </>),
   },
@@ -1400,7 +1400,7 @@ export const SCREENS: Screen[] = [
     name: "Customer detail",
     job: "Edit one customer and reach its ship-tos, prices, orders and keg balance",
     reads: "get_customer",
-    writes: "upsert_customer",
+    writes: "upsert_customer · invite_customer_user",
     states: [["permission", "sales or admin required", 1], ["active", "may place orders"], ["inactive", "history remains"], ["license warning", "renewal needs review", 1]],
     spec: "The list opens a named account; related operational records remain links rather than inline editors.",
     body: (<>
@@ -1412,7 +1412,7 @@ export const SCREENS: Screen[] = [
       {E.pick("Sale channel", "Wholesale", CHANNELS)}
       {E.pick("Tax treatment", "Inherit from channel", ["Inherit from channel", ...TAX_TREATMENTS])}
       {E.nav("Ship-tos", "Main · Dock")}
-      {E.row("Portal users", "2 active", E.act("Invite"))}
+      {E.row("Portal users", "buyer access", E.act("Invite portal user"))}
       {E.nav("Customer keg balance", "38 out · $1,140 deposits held")}
       {E.nav("Orders", "3 open · 42 total")}
       {E.btn("Save customer")}
@@ -1427,13 +1427,13 @@ export const SCREENS: Screen[] = [
     to: { "Send invite": "Customer detail" },
     job: "Invite one buyer to a customer account",
     reads: "get_customer",
-    writes: "invite_customer_user [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI]",
-    states: [["permission", "sales or admin required", 1], ["ready", "email is valid"], ["sent", "recipient receives a sign-in link"], ["existing member", "show the existing access instead", 1]],
+    writes: "invite_customer_user [existing]",
+    states: [["permission", "sales or admin required", 1], ["ready", "email is valid"], ["sent", "recipient receives a sign-in link"], ["existing account", "attachment is unsupported; contact the admin", 1]],
     body: (<>
       {E.edit("Email", PORTAL_BUYER.email, "email")}
-      {E.chips(["Buyer", "Account admin"])}
+      {E.fld("Role", "Buyer")}
       {E.note("Sending an invite emails the recipient and cannot be recalled.")}
-      {E.gated("Send invite", "isn’t available yet: customer membership hardening comes first, and until it does nobody can sign in to the portal at all")}
+      {E.btn("Send invite")}
     </>),
   },
   {
