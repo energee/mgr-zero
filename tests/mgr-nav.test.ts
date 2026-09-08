@@ -21,10 +21,11 @@ describe("navFor", () => {
   it("keeps only groups with a permitted child", () => {
     const warehouse = navFor(STAFF_NAV, "warehouse");
     expect(warehouse.map((t) => t.label)).toEqual(["Today", "Beer", "Work", "More"]);
-    // Menu and Planning are still planned; Units is shipped and open to every
-    // staff role, since a gravity display unit is a personal preference rather
-    // than a permission (set_my_gravity_unit admits all four roles).
-    expect(warehouse.find((t) => t.label === "More")!.children!.map((c) => c.label)).toEqual(["Menu", "Planning", "Units"]);
+    // Menu is still planned; Vendors and Planning shipped with purchasing;
+    // Units is shipped and open to every staff role, since a gravity display
+    // unit is a personal preference rather than a permission
+    // (set_my_gravity_unit admits all four roles).
+    expect(warehouse.find((t) => t.label === "More")!.children!.map((c) => c.label)).toEqual(["Menu", "Vendors", "Planning", "Units"]);
   });
 });
 
