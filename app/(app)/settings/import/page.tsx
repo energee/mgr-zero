@@ -2,7 +2,7 @@ import { E } from "@/components/mgr/e";
 import { redirect } from "next/navigation";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
-import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
+import { runCommand } from "@/lib/commands/registry";
 import { deniedHref } from "@/lib/mgr/denied";
 import type { ImportLookups } from "@/lib/import-csv";
 import "@/lib/commands/all";

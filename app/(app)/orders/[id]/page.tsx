@@ -32,7 +32,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   ])) as [{ order: Order; lines: OrderLine[]; events: OrderEvent[]; atp: Atp[] }, SkuRow[], { id: string; name: string }[]];
   const canSell = canRun(ctx, "confirm_order"), canFulfill = canRun(ctx, "record_pick");
   const skus = skuRows.map((s) => ({ id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name }));
-  const model = toOrderViewProps({ order, lines, events, atp, locations });
+  const model = toOrderViewProps({ order, lines, events, atp, locations, backHref: "/orders" });
   if (!canSell) model.confirmHref = undefined;
   if (!canFulfill) { model.putBackHref = undefined; model.completeHref = undefined; }
   return (

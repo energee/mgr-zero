@@ -133,8 +133,7 @@ Wholesale Shop shows the packages the brewery has designated for wholesale — �
 <Cards>
   <Card title="On hand">The sum of recorded movements for one SKU in one bin at one location. ATP stays per SKU.</Card>
   <Card title="ATP">Available to promise: on hand minus open reservations for that SKU. It can go negative.</Card>
-  <Card title="Movement log">Entries show time, type, SKU, location and bin, signed quantity, frozen barrel volume, destination state or channel when present, and the movement/source references. **Older movements** and **Newer movements** page through the history.</Card>
-</Cards>
+  <Card title="Movement log">Entries show time, type, SKU, location and bin, signed quantity, frozen barrel volume, destination state or channel when present, and the movement/source references. **Older movements** and **Newer movements** page through the history.</Card></Cards>
 
 **Bins.** A bin is a named place inside a location: a walk-in, a cold room, a dry rack. Every location starts with three, **Cold**, **Dry**, and **Walk-in**, and always keeps at least one; add, rename, or remove them from [Locations](#locations). A bin that has ever recorded stock cannot be removed, even at a zero balance, because the movement history still names it; rename it instead. When shipping, choose the actual source bin and lot for each quantity; tracked lots stay identified through shipment and returns.
 
@@ -265,7 +264,7 @@ A picked taproom transfer shows **Complete transfer** on its order page: the sam
 | **Confirm delivery** | Shipped, on a route stop | Opens from Today's delivery row or the route's **Resume** (the route's assigned driver, or Admin) at the stop's own page: customer, ship-to, shipped lines, and the invoice timing saved at ship. Type the receiving name and press **Delivered**: the stop is stamped delivered and, when the shipment was **Invoice on delivery**, the invoice is raised now from the shipped quantities at the order's prices. Nothing moves in stock; shipping already did that. A delivered stop shows the name and the invoice number instead of the button, and confirming it again is refused as already delivered. |
 | **Put back** | Any order flagged for restocking | Opened from Today's **Put back** row (Warehouse or Admin). The page lists each line's staged quantity: everything picked on a cancelled order, or the picked excess on an order adjusted down. **Put back N** clears the flag and records a *restocked* event; nothing moves in the ledger, because the beer never left the warehouse. An order whose flag is already clear says so instead of offering the button. |
 
-The order detail shows customer and ship-to for wholesale orders, PO, requested date, ordered/picked/shipped quantity, captured price, current ATP, and a time-stamped event history. The current detail page does not display a taproom transfer's destination, and it does not show the order note. A note entered by a portal customer is visible only on the portal's own order detail. An empty order list says **No orders yet.** An empty timeline says **No events yet.** A shipped or cancelled order has no further action controls.
+The order detail shows the fulfillment source, customer and ship-to for wholesale orders, PO, requested date, the order note when one was entered, ordered/picked/shipped quantity, captured price, current ATP, and a time-stamped event history. When restock is pending it names what to put back and marks current state as needing attention. The current detail page does not display a taproom transfer's destination. An empty order list says **No orders yet.** An empty timeline says **No events yet.** A shipped or cancelled order has no further action controls.
 
 Shipping asks for each line's actual **source bin and lot**. Select **Add source** for every bin/lot used and enter its quantity; the sources must sum to the shipped quantity, and zero lines have no sources. Untracked legacy stock is labeled explicitly. A selected source must have enough stock when the shipment commits. An internal transfer also requires its destination bin and preserves the same lot on both legs. Shipping keeps one invoice line per order line even when several sources supplied it. On-delivery shipping moves the beer once; delivery confirmation creates only the invoice.
 
@@ -275,8 +274,7 @@ Shipping asks for each line's actual **source bin and lot**. Select **Add source
 
 *Admin and Warehouse can open Pick from the Work tab. The page also opens for Sales when the address is entered directly, but it is not linked in Sales navigation.*
 
-Open **Pick** to see confirmed and picked orders grouped by requested ship date. Orders without a date sit under **Unscheduled**. Each card names its confirmed or picked status and line count, including on the printed sheet, and links to the order detail where picking is recorded. Group totals summarize ordered quantities.
-
+Open **Pick** to see confirmed and picked orders grouped by requested ship date. Orders without a date sit under **Unscheduled**. Each row shows the line count and status; **Pick** opens a confirmed order and **Open** opens a picked one, where picking is recorded.
 Select **Print** to open the browser print dialog. MGR hides the staff navigation in the printed copy. If nothing is ready, the page says **Nothing confirmed to pick**.
 
 ## Invoices and credit memos [#invoices]
@@ -403,18 +401,18 @@ Each pool row shows the kegs each bin holds per size, so 36 in the taproom and 4
 
 *Admin, Sales, and Warehouse can open Replenishment. Admin and Sales can set pars, reserve or release standing stock, and create replenishment orders.*
 
-1. Open **Replenishment** and choose a taproom. The first taproom is selected by default.
-2. Review each SKU's par, on-hand amount, and suggested quantity. Suggested quantity is the par shortfall, never less than zero.
-3. Choose **From warehouse**. The first warehouse is selected by default when one exists.
-4. Edit **Transfer qty** as needed. Only positive lines are included.
-5. Select **Create replenishment order**. MGR creates it already confirmed, ready for warehouse picking.
+1. Open **Replenishment** and choose a taproom. The first taproom is selected by default. The title is **Pars and allocation**.
+2. Standing allocations for that taproom list quantity only. Edit and Edit par are not on this page; par lives in the replenish table below. A brewery-wide shortfall for one of this taproom's SKUs shows as ATP in units, never a made-up barrel volume.
+3. Review each SKU's par, on-hand amount, and suggested quantity. Suggested quantity is the par shortfall, never less than zero.
+4. Choose **From warehouse**. The first warehouse is selected by default when one exists.
+5. Edit **Transfer qty** as needed. Only positive lines are included.
+6. Select **Create replenishment order**. MGR creates it already confirmed, ready for warehouse picking.
 
 Use **Set taproom par** to choose any SKU and set its target stock at the selected taproom, including a SKU with no existing par. A zero par removes its replenishment target. Suggestions refresh after saving.
 
 Use **Set standing allocation** to reserve a named quantity against available-to-promise without an order. Selecting an existing SKU loads its current reserved quantity. Zero releases the standing reservation. Under **Standing allocations**, **Release** opens a confirmation showing the SKU and quantity; confirming returns that reservation to available-to-promise without moving stock or changing its par. Failures appear in the form and keep your inputs available to correct or retry.
 
 The page says **No taprooms yet: add one under Locations** when none exist, or **No pars set for this taproom.** when there are no suggestions. Admin and Sales can follow **Add SKU** from Inventory to Catalog before setting quantities. **Shortfall** keeps the selected SKU and shows its global on-hand, reserved and ATP quantities. Each competing order links to its order; a standing allocation links to its taproom section. **All shortfalls** clears the SKU filter.
-
 ## Recipes [#recipes]
 
 <Screen name="Recipes" />
@@ -566,10 +564,9 @@ Every staff member can open **Settings → Chat** to set personal notification r
 
 To link, open MGR's private App Home in Slack and choose **Link MGR account**. Sign in to MGR if asked. Before anything changes, MGR shows the brewery, your current MGR name and email, and the Slack workspace and user identity. Choose **Link these accounts** only when both identities are yours. MGR never links by matching email, profile name, or workspace domain. A missing, expired, used, or wrong-brewery link must be restarted from App Home.
 
-Linked App Home shows a role-filtered **Today** queue with up to 20 current items. Admin sees all live items; Sales sees submitted orders to review; Warehouse sees confirmed orders whose requested ship date is due and orders with staged beer to put back. Select **Open** on an item to view its order in MGR. With no current work, App Home says **You’re caught up**.
+Linked App Home shows a role-filtered **Today** queue with up to 20 current items, the same work your MGR Today tab shows for your role. Admin sees all live items; Sales sees submitted orders to review and buyer questions about invoices; Warehouse sees confirmed orders whose requested ship date is due, orders with staged beer to put back, and their own next stop when they're a route's assigned driver; Brewer sees overdue fermentation readings. Select **Open** on an item to view its order in MGR. With no current work, App Home says **You’re caught up**.
 
 Linked eligible staff receive private Slack messages when assigned work first becomes due. **Snooze 1 hour** delays that Slack reminder, and muting a reason stops that class of Slack message; neither changes what is due on MGR Today. Quiet hours delay personal messages, including snoozed reminders and retries, using your current personal override or the brewery window. App Home stays current. When work resolves, its message becomes **Resolved**. MGR never posts customer contacts, prices, or notes to Slack.
-
 The brewery digest goes only to one admin-approved private, non-shared Slack channel where MGR is already a member. Public, archived, and Slack Connect channels cannot be selected. It runs on the brewery's local morning and midday windows; the default fermentation reading cadence is 24 hours. Personal mutes, snoozes, and quiet hours affect Slack delivery only, not Today or the shared digest.
 
 Slack is a view of current MGR work. Operational forms such as fermentation readings and order confirmation show **Open in MGR** and do not submit the domain change from Slack. MGR rechecks the current item, assignment, role, and channel before sending or updating a message.

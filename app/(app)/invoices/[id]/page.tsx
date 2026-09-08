@@ -33,7 +33,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
     : undefined;
   return (
     <InvoiceView
-      model={toInvoiceViewProps({ invoice, lines, questions })}
+      model={toInvoiceViewProps({ invoice, lines, questions, backHref: "/invoices" })}
       headerAction={memo}
       questionAction={(q) => <MarkAnswered questionId={q.id} />}
       qboGate="mapping and push aren’t connected yet"

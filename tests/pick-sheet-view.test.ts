@@ -59,7 +59,7 @@ describe("Pick sheet view loop", () => {
     expect(markup).toMatch(/3 lines/);
     expect(markup).toMatch(/>Totals</);
     expect(markup).toMatch(/Hazy IPA · ½ bbl keg 9 · Pils · 16 oz case 22/);
-    expect(markup).toContain('data-direction="forward"');
+    expect(markup).toContain(">Pick<");
     expect(markup).toMatch(/Thu 9\/3/);
   });
 

@@ -2,7 +2,7 @@
 import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
-import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
+import { runCommand } from "@/lib/commands/registry";
 import type { ChatLinkIntent } from "@/lib/commands/chat";
 import "@/lib/commands/all";
 import { ChatLinkConsent } from "../chat-settings-client";

@@ -2372,8 +2372,8 @@ create table chat_installations (
 );
 create unique index chat_installations_brewery_provider_live_key
   on chat_installations (brewery_id, provider) where state <> 'disconnected';
-create unique index chat_installations_provider_external_active_key
-  on chat_installations (provider, external_installation_id) where state = 'active';
+create unique index chat_installations_provider_external_live_key
+  on chat_installations (provider, external_installation_id) where state <> 'disconnected';
 create index chat_installations_brewery_health_idx
   on chat_installations (brewery_id, state, last_health_checked_at desc);
 create index chat_installations_installer_user_idx on chat_installations (installer_user_id);
@@ -2644,6 +2644,38 @@ begin
   return p_result;
 end $$;
 
+-- Service-role jobs pass the verified actor; auth.uid() is null for service_role.
+create function private.claim_command_request_for(
+  p_actor uuid, p_brewery uuid, p_command text, p_request_id uuid, p_payload jsonb
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_request private.command_requests;
+begin
+  if p_actor is null then raise exception 'permission denied' using errcode = '42501'; end if;
+  insert into private.command_requests (actor_id, brewery_id, request_id, command_name, payload_hash)
+  values (p_actor, p_brewery, p_request_id, p_command, extensions.digest(p_payload::text, 'sha256'))
+  on conflict (actor_id, request_id) do nothing;
+  if found then return null; end if;
+  select * into v_request from private.command_requests
+    where actor_id = p_actor and request_id = p_request_id for update;
+  if v_request.brewery_id <> p_brewery or v_request.command_name <> p_command
+     or v_request.payload_hash <> extensions.digest(p_payload::text, 'sha256') then
+    raise exception 'request id was already used with a different payload' using errcode = 'MG409';
+  end if;
+  if v_request.result is null then raise exception 'request is incomplete'; end if;
+  return v_request.result;
+end $$;
+
+create function private.complete_command_request_for(p_actor uuid, p_request_id uuid, p_result jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+begin
+  update private.command_requests set result = p_result
+    where actor_id = p_actor and request_id = p_request_id;
+  if not found then raise exception 'command request not claimed'; end if;
+  return p_result;
+end $$;
+revoke all on function private.claim_command_request_for(uuid, uuid, text, uuid, jsonb),
+  private.complete_command_request_for(uuid, uuid, jsonb)
+  from public, anon, authenticated, service_role;
 -- Bootstrap is authenticated but deliberately has no tenant identity yet.
 create function provision_brewery(p_name text, p_timezone text, p_ttb text, p_request_id uuid)
 returns uuid language plpgsql security definer set search_path = '' as $$
@@ -5661,14 +5693,18 @@ begin
   return jsonb_build_object('installation_id', r.id, 'expires_at', v_exp);
 end $$;
 
--- Callback lookup before any token exchange. Null for forged state and for
--- callers who are no longer an admin of the owning brewery.
-create function find_chat_oauth_intent(p_state_hash text) returns jsonb
+-- Callback lookup before any token exchange. Service-role only; p_actor must
+-- still be a current admin of the owning brewery. Null for forged state.
+create function find_chat_oauth_intent(p_state_hash text, p_actor uuid) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 declare r public.chat_installations;
 begin
+  if auth.role() is distinct from 'service_role' then return null; end if;
   select * into r from public.chat_installations where oauth_intent_hash = p_state_hash;
-  if not found or coalesce(public.staff_role(r.brewery_id)::text, '') <> 'admin' then return null; end if;
+  if not found or not exists (
+    select 1 from public.brewery_users
+    where brewery_id = r.brewery_id and user_id = p_actor and role = 'admin'
+  ) then return null; end if;
   return jsonb_build_object(
     'installation_id', r.id, 'brewery_id', r.brewery_id, 'state', r.state, 'kind', r.oauth_intent_kind,
     'redirect_uri', r.oauth_redirect_uri, 'expires_at', r.oauth_expires_at, 'consumed_at', r.oauth_consumed_at,
@@ -5677,18 +5713,27 @@ end $$;
 
 -- Consumes the intent and activates the mapping. Replaying a consumed intent
 -- for the same workspace is a no-op success; anything else fails closed.
+-- token_store_key is always slack:installation:<team id>; the caller key is ignored.
 create function activate_chat_installation(
   p_installation uuid, p_state_hash text, p_redirect_uri text, p_external_installation_id text,
-  p_external_enterprise_id text, p_display_label text, p_token_store_key text, p_granted_capabilities jsonb
+  p_external_enterprise_id text, p_display_label text, p_token_store_key text, p_granted_capabilities jsonb,
+  p_actor uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
-declare r public.chat_installations;
+declare r public.chat_installations; v_key text := 'slack:installation:' || p_external_installation_id;
 begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'permission denied: internal job only' using errcode = '42501';
+  end if;
   select * into r from public.chat_installations where id = p_installation for update;
   if not found then raise exception 'installation not found'; end if;
-  perform public.assert_chat_admin(r.brewery_id);
+  if not exists (
+    select 1 from public.brewery_users
+    where brewery_id = r.brewery_id and user_id = p_actor and role = 'admin'
+  ) then raise exception 'permission denied: brewery admin required' using errcode = '42501'; end if;
   if r.oauth_intent_hash is distinct from p_state_hash then raise exception 'oauth state mismatch'; end if;
   if r.oauth_consumed_at is not null then
-    if r.state = 'active' and r.external_installation_id = p_external_installation_id then
+    if r.state = 'active' and r.external_installation_id = p_external_installation_id
+       and r.token_store_key = v_key then
       return jsonb_build_object('installation_id', r.id, 'replayed', true);
     end if;
     raise exception 'oauth state already used';
@@ -5700,27 +5745,29 @@ begin
   end if;
   if exists (select 1 from public.chat_installations
              where provider = r.provider and external_installation_id = p_external_installation_id
-               and state = 'active' and id <> r.id) then
+               and state <> 'disconnected' and id <> r.id) then
     raise exception 'workspace is already connected to another brewery';
   end if;
   update public.chat_installations
     set state = 'active', external_installation_id = p_external_installation_id,
         external_enterprise_id = p_external_enterprise_id, display_label = p_display_label,
-        token_store_key = p_token_store_key, granted_capabilities = coalesce(p_granted_capabilities, '{}'),
+        token_store_key = v_key, granted_capabilities = coalesce(p_granted_capabilities, '{}'),
         oauth_consumed_at = now(), installed_at = coalesce(installed_at, now()), disabled_at = null,
         last_failure_code = null, last_healthy_at = now(), last_health_checked_at = now(), updated_at = now()
     where id = r.id;
   return jsonb_build_object('installation_id', r.id, 'replayed', false);
 end $$;
 
--- Health path (jobs run as service_role; admins may also call it).
+-- Health path (jobs run as service_role).
 create function mark_chat_installation_reauthorization(p_installation uuid, p_failure_code text) returns void
 language plpgsql security definer set search_path = '' as $$
 declare r public.chat_installations;
 begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'permission denied: internal job only' using errcode = '42501';
+  end if;
   select * into r from public.chat_installations where id = p_installation for update;
   if not found then raise exception 'installation not found'; end if;
-  if auth.role() is distinct from 'service_role' then perform public.assert_chat_admin(r.brewery_id); end if;
   if r.state in ('active', 'needs_reauthorization') then
     update public.chat_installations
       set state = 'needs_reauthorization', last_failure_code = p_failure_code,
@@ -5778,9 +5825,11 @@ create function reconcile_chat_installation(p_installation uuid, p_credential_de
 returns void language plpgsql security definer set search_path = '' as $$
 declare r public.chat_installations;
 begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'permission denied: internal job only' using errcode = '42501';
+  end if;
   select * into r from public.chat_installations where id = p_installation for update;
   if not found then raise exception 'installation not found'; end if;
-  if auth.role() is distinct from 'service_role' then perform public.assert_chat_admin(r.brewery_id); end if;
   update public.chat_installations
     set oauth_reconciled_at = case when p_credential_deleted then now() else null end,
         last_failure_code = p_failure_code, updated_at = now()
@@ -5789,19 +5838,19 @@ end $$;
 
 revoke execute on function assert_chat_admin(uuid),
   begin_chat_installation(uuid, text, text, text), begin_chat_reauthorization(uuid, text, text),
-  find_chat_oauth_intent(text),
-  activate_chat_installation(uuid, text, text, text, text, text, text, jsonb),
+  find_chat_oauth_intent(text, uuid),
+  activate_chat_installation(uuid, text, text, text, text, text, text, jsonb, uuid),
   mark_chat_installation_reauthorization(uuid, text), disable_chat_installation(uuid),
   disconnect_chat_installation(uuid), reconcile_chat_installation(uuid, boolean, text)
-  from public, anon;
+  from public, anon, authenticated;
 grant execute on function
   begin_chat_installation(uuid, text, text, text), begin_chat_reauthorization(uuid, text, text),
-  find_chat_oauth_intent(text),
-  activate_chat_installation(uuid, text, text, text, text, text, text, jsonb),
-  mark_chat_installation_reauthorization(uuid, text), disable_chat_installation(uuid),
-  disconnect_chat_installation(uuid), reconcile_chat_installation(uuid, boolean, text)
+  disable_chat_installation(uuid), disconnect_chat_installation(uuid)
   to authenticated;
-grant execute on function mark_chat_installation_reauthorization(uuid, text), reconcile_chat_installation(uuid, boolean, text)
+grant execute on function
+  find_chat_oauth_intent(text, uuid),
+  activate_chat_installation(uuid, text, text, text, text, text, text, jsonb, uuid),
+  mark_chat_installation_reauthorization(uuid, text), reconcile_chat_installation(uuid, boolean, text)
   to service_role;
 
 -- ---------------------------------------------------------------- chat staff linking
@@ -6305,7 +6354,6 @@ declare i public.chat_installations; v_id uuid;
 begin
   select * into i from public.chat_installations where id = p_installation for update;
   if not found then raise exception 'installation not found'; end if;
-  perform public.assert_chat_admin(i.brewery_id);
   update public.notification_destinations
     set state = 'blocked', blocked_reason = 'replaced', updated_at = now()
     where installation_id = i.id and kind = 'private_channel' and state = 'active'
@@ -6693,19 +6741,14 @@ grant select on chat_user_links, notification_destinations, notification_prefere
 grant execute on function
   begin_chat_installation(uuid, text, text, text),
   begin_chat_reauthorization(uuid, text, text),
-  find_chat_oauth_intent(text),
-  activate_chat_installation(uuid, text, text, text, text, text, text, jsonb),
-  mark_chat_installation_reauthorization(uuid, text),
   disable_chat_installation(uuid),
   disconnect_chat_installation(uuid),
-  reconcile_chat_installation(uuid, boolean, text),
   consume_chat_link_proof(text),
   unlink_chat_user(uuid, uuid, uuid),
   today_live_reasons(),
   get_today_items(uuid, timestamptz),
   record_submitted_order_occurrence(uuid),
   set_notification_preference(uuid, text, boolean, time, time, text, boolean, uuid),
-  set_notification_destination(uuid, text),
   set_brewery_quiet_hours(uuid, time, time)
   to authenticated;
 
@@ -7106,7 +7149,28 @@ end $$;
 revoke all on function record_chat_destination_check(uuid,uuid,uuid,text,timestamptz,uuid),set_notification_destination(uuid,uuid,text,uuid) from public,anon,authenticated,service_role;
 grant execute on function record_chat_destination_check(uuid,uuid,uuid,text,timestamptz,uuid) to service_role;
 grant execute on function set_notification_destination(uuid,uuid,text,uuid) to authenticated;
-
+-- Slack HTTP stays in TypeScript. This is the one durable tenant write after
+-- validateDestination: claim request, upsert the operations channel, store result.
+create function set_notification_destination(p_brewery uuid,p_installation uuid,p_external_destination_id text,p_request_id uuid,p_actor uuid,p_version timestamptz) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_result jsonb; i public.chat_installations;
+begin
+  if auth.role() is distinct from 'service_role' then raise exception 'permission denied' using errcode='42501'; end if;
+  if not exists(select 1 from public.brewery_users where brewery_id=p_brewery and user_id=p_actor and role='admin') then
+    raise exception 'permission denied: brewery admin required' using errcode='42501';
+  end if;
+  v_replay:=private.claim_command_request_for(p_actor,p_brewery,'set_notification_destination',p_request_id,jsonb_build_object('installation',p_installation,'channel',p_external_destination_id));
+  if v_replay is not null then return v_replay; end if;
+  select * into i from public.chat_installations where id=p_installation and brewery_id=p_brewery for update;
+  if not found then raise exception 'permission denied' using errcode='42501'; end if;
+  if i.state <> 'active' or i.updated_at is distinct from p_version then
+    raise exception 'installation changed; reload Chat settings';
+  end if;
+  v_result:=private.set_notification_destination(p_installation,p_external_destination_id);
+  return private.complete_command_request_for(p_actor,p_request_id,v_result);
+end $$;
+revoke all on function set_notification_destination(uuid,uuid,text,uuid,uuid,timestamptz) from public,anon,authenticated,service_role;
+grant execute on function set_notification_destination(uuid,uuid,text,uuid,uuid,timestamptz) to service_role;
 create function get_chat_link_intent(p_brewery uuid,p_proof_hash text) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 declare v_result jsonb;
@@ -7184,3 +7248,92 @@ begin
 end $$;
 revoke all on function chat_settings_request_completed(uuid,uuid,uuid) from public,anon,authenticated,service_role;
 grant execute on function chat_settings_request_completed(uuid,uuid,uuid) to service_role;
+
+-- Named service-only reads. Recheck current admin membership in-statement;
+-- jobs.ts must not select chat_installations through the service client.
+create function get_chat_settings_installation(p_brewery uuid, p_installation uuid, p_actor uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare i public.chat_installations;
+begin
+  if auth.role() is distinct from 'service_role' or not exists (
+    select 1 from public.brewery_users where brewery_id = p_brewery and user_id = p_actor and role = 'admin'
+  ) then raise exception 'permission denied' using errcode = '42501'; end if;
+  select * into i from public.chat_installations where id = p_installation and brewery_id = p_brewery;
+  if not found then raise exception 'installation not found'; end if;
+  return jsonb_build_object(
+    'id', i.id, 'state', i.state, 'external_installation_id', i.external_installation_id, 'updated_at', i.updated_at);
+end $$;
+
+create function chat_credential_has_canonical_owner(p_external_installation_id text) returns boolean
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'permission denied: internal job only' using errcode = '42501';
+  end if;
+  return exists (
+    select 1 from public.chat_installations
+    where provider = 'slack' and external_installation_id = p_external_installation_id
+      and token_store_key = 'slack:installation:' || p_external_installation_id
+  );
+end $$;
+
+create function has_active_canonical_chat_installation(p_external_installation_id text) returns boolean
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'permission denied: internal job only' using errcode = '42501';
+  end if;
+  return exists (
+    select 1 from public.chat_installations
+    where provider = 'slack' and external_installation_id = p_external_installation_id
+      and state = 'active'
+      and token_store_key = 'slack:installation:' || p_external_installation_id
+  );
+end $$;
+
+create function get_chat_installation_lifecycle(p_installation uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare i public.chat_installations;
+begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'permission denied: internal job only' using errcode = '42501';
+  end if;
+  select * into i from public.chat_installations where id = p_installation;
+  if not found then return null; end if;
+  return jsonb_build_object('state', i.state, 'external_installation_id', i.external_installation_id);
+end $$;
+
+-- No hosted scheduler. Call before hosted traffic (v1 90-day log prune).
+create function prune_chat_integration_logs(p_older_than interval default interval '90 days') returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_receipts int; v_intents int; v_deliveries int;
+begin
+  if auth.role() is distinct from 'service_role' then
+    raise exception 'permission denied: internal job only' using errcode = '42501';
+  end if;
+  delete from public.chat_callback_receipts
+    where received_at < now() - p_older_than and disposition in ('processed','ignored','failed');
+  get diagnostics v_receipts = row_count;
+  delete from public.chat_action_intents
+    where created_at < now() - p_older_than and (consumed_at is not null or expires_at < now());
+  get diagnostics v_intents = row_count;
+  delete from public.notification_deliveries
+    where created_at < now() - p_older_than and state in ('suppressed','terminal');
+  get diagnostics v_deliveries = row_count;
+  return jsonb_build_object('receipts', v_receipts, 'intents', v_intents, 'deliveries', v_deliveries);
+end $$;
+
+revoke all on function
+  get_chat_settings_installation(uuid, uuid, uuid),
+  chat_credential_has_canonical_owner(text),
+  has_active_canonical_chat_installation(text),
+  get_chat_installation_lifecycle(uuid),
+  prune_chat_integration_logs(interval)
+  from public, anon, authenticated, service_role;
+grant execute on function
+  get_chat_settings_installation(uuid, uuid, uuid),
+  chat_credential_has_canonical_owner(text),
+  has_active_canonical_chat_installation(text),
+  get_chat_installation_lifecycle(uuid),
+  prune_chat_integration_logs(interval)
+  to service_role;

@@ -86,6 +86,23 @@ describe("chat schema (live DB)", () => {
     expect(error?.code).toBe("23505");
   });
 
+  it("prevents a second brewery from claiming a workspace that is disabled or pending reauthorization", async () => {
+    const first = await makeBrewery();
+    const second = await makeBrewery();
+    const firstStaff = await makeStaff(first.id);
+    const secondStaff = await makeStaff(second.id);
+    const workspace = `workspace-${crypto.randomUUID()}`;
+    const current = await installation(first.id, firstStaff.id, workspace);
+    expect((await admin.from("chat_installations").update({ state: "disabled" }).eq("id", current.id)).error).toBeNull();
+    const disabledDup = await admin.from("chat_installations").insert({
+      brewery_id: second.id, provider, external_installation_id: workspace, display_label: "Takeover",
+      state: "active", installer_user_id: secondStaff.id, token_store_key: `chat-sdk/${crypto.randomUUID()}`,
+    });
+    expect(disabledDup.error?.code).toBe("23505");
+    expect((await admin.from("chat_installations").update({ state: "disconnected", token_store_key: `disconnected:${current.id}` }).eq("id", current.id)).error).toBeNull();
+    await expect(installation(second.id, secondStaff.id, workspace)).resolves.toBeDefined();
+  });
+
   it("blocks cross-brewery reads for installations, links, destinations and preferences", async () => {
     const first = await makeBrewery();
     const second = await makeBrewery();

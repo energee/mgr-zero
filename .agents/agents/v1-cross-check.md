@@ -31,6 +31,7 @@ entity/concept names in the v2 input; follow references from there.
    - **LEARNING** — v1 hit an edge case, TTB/brewing-domain rule, or Supabase/RLS gotcha that v2's plan doesn't mention.
    - **DIVERGENCE-OK** — v2 differs, but the v1 review doc already explains why. Say so in one line; do not relitigate.
 4. Check v2's own `.agents/ARCHITECTURE.md` iron rules and `.agents/superpowers/specs/brewing-domain.md` before flagging — if v2 already covers it, it is not a finding.
+5. For any OAuth, webhook, or redirect URL: v1 IN-16 / SEC-1 — never build `redirect_uri` or post-install URLs from `request.url` / `Host`. Require `APP_URL`. Flag a Host fallback even if APP_URL is usually set.
 
 ## Report
 

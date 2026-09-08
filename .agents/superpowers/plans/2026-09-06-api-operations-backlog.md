@@ -34,7 +34,7 @@ Nothing here is a schema decision. An operation appears because a screen named i
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
-| `get_format_components` | query | Repack |
+| `get_format_components` | query | Formats, Format, Repack |
 ## Taproom & kegs: 5 to build, 10 built
 
 | Operation | Kind | Needed by |

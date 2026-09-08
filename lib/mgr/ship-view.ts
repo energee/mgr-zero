@@ -21,6 +21,7 @@ export type ShipViewModel = {
 };
 
 export type ShipSnapshot = {
+  backHref?: string;
   order: {
     id: string;
     order_no: number | null;
@@ -56,7 +57,7 @@ function saleVolume(qty: number, bblPerUnit: number | undefined) {
 }
 
 /** Map get_order plus proposed ship qtys (qty_shipped, else qty_picked). */
-export function toShipViewProps({ order, lines, locations, invoiceTiming = "now" }: ShipSnapshot): ShipViewModel {
+export function toShipViewProps({ order, lines, locations, invoiceTiming = "now", backHref }: ShipSnapshot): ShipViewModel {
   const source = locations.find((l) => l.id === order.from_location_id)?.name ?? "—";
   const dest = order.ship_tos?.state ?? "";
   const anyShort = lines.some((l) => shipOf(l) < pickedOf(l));
@@ -78,7 +79,7 @@ export function toShipViewProps({ order, lines, locations, invoiceTiming = "now"
   const shortNameWord = (short?.skus?.name ?? "line").split("·")[0]?.trim() ?? "line";
   return {
     backTo: docNo("ORD", order.order_no, "Order"),
-    backHref: `/orders/${order.id}`,
+    backHref,
     title: "Ship",
     fulfillmentSource: source,
     lines: lines.map((l) => {

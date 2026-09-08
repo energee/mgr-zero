@@ -198,11 +198,15 @@ it("validates channel privacy on the server and binds durable proofs to actor, g
     expect((await ctx.db.rpc("chat_settings_request_completed", { p_brewery: ctx.breweryId, p_user: ctx.userId, p_request_id: execution.requestId })).error).not.toBeNull();
     const version = (await admin.from("chat_installations").select("updated_at").eq("id", installation).single()).data!.updated_at;
     const request = crypto.randomUUID();
-    await rpc("record_chat_destination_check", { p_brewery: ctx.breweryId, p_installation: installation, p_user: ctx.userId, p_channel: "C-STALE", p_version: version, p_request_id: request });
     await runCommand("set_brewery_quiet_hours", { installationId: installation, start: "20:00", end: "06:00" }, ctx);
-    const stale = await ctx.db.rpc("set_notification_destination", { p_brewery: ctx.breweryId, p_installation: installation, p_external_destination_id: "C-STALE", p_request_id: request });
-    expect(stale.error?.message).toMatch(/validated/);
-    expect((await ctx.db.rpc("record_chat_destination_check", { p_brewery: ctx.breweryId, p_installation: installation, p_user: ctx.userId, p_channel: "C-STALE", p_version: version, p_request_id: request })).error).not.toBeNull();
+    const stale = await admin.rpc("set_notification_destination", {
+      p_brewery: ctx.breweryId, p_installation: installation, p_external_destination_id: "C-STALE",
+      p_request_id: request, p_actor: ctx.userId, p_version: version,
+    });
+    expect(stale.error?.message).toMatch(/changed|validated/);
+    expect((await ctx.db.rpc("set_notification_destination", {
+      p_brewery: ctx.breweryId, p_installation: installation, p_external_destination_id: "C-STALE", p_request_id: request,
+    })).error).not.toBeNull();
     expect((await admin.from("notification_destinations").select("external_destination_id").eq("installation_id", installation).eq("kind", "private_channel").eq("state", "active").single()).data?.external_destination_id).toBe("C-VALIDATED");
   } finally { read.mockRestore(); }
 });

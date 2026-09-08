@@ -1,8 +1,8 @@
 // app/(app)/customers/page.tsx — Customers (screen record): every account
 // with its type, state and channel, each opening Customer detail; Add
-// customer opens customer-form.tsx. Portal-user invites stay gated until
-// Program 11.
-import { E } from "@/components/mgr/e";
+// customer opens customer-form.tsx. Customer detail owns portal-user invites.
+import { CustomersView } from "@/components/mgr/views/customers";
+import { toCustomersViewProps } from "@/lib/mgr/customers-view";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
@@ -17,14 +17,11 @@ export default async function CustomersPage() {
   const ctx = await buildContext(brewery.id);
   const [customers, channels] = (await Promise.all([runCommand("list_customers", {}, ctx), runCommand("list_sale_channels", {}, ctx)])) as [Customer[], SaleChannel[]];
   const canWrite = brewery.role === "admin" || brewery.role === "sales";
-  return (
-    <>
-      {E.back("More", "Customers", canWrite ? <CustomerForm channels={channels.map((c) => ({ id: c.id, name: c.name }))} /> : undefined, "/more")}
-      {customers.length === 0
-        ? E.blank("No customers yet")
-        : customers.map((c) => (
-            <div key={c.id}>{E.row(c.name, `${c.type} · ${c.state} · ${c.sale_channels.name} · ${c.payment_terms}`, E.act("Open", "primary", `/customers/${c.id}`))}</div>
-          ))}
-    </>
-  );
+  return <CustomersView
+    model={toCustomersViewProps({ customers })}
+    createAction={canWrite ? <CustomerForm channels={channels} /> : null}
+    search={null}
+    linkRows
+    backHref="/more"
+  />;
 }

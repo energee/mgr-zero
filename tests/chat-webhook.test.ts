@@ -100,6 +100,28 @@ describe("Slack webhook", () => {
     await admin.from("chat_installations").update({ state: "active", disabled_at: null }).eq("id", installationId);
     expect((await receipts()).length).toBe(before);
   });
+
+  it("records a durable event receipt before SDK dispatch and answers 503 when that insert fails", async () => {
+    const { chat } = await import("@/lib/chat/slack-adapter");
+    const dispatch = vi.spyOn(chat().webhooks, "slack");
+    try {
+      await admin.from("chat_callback_receipts").insert({
+        brewery_id: breweryId, installation_id: installationId, provider: "slack", callback_id: "Ev-conflict",
+        callback_kind: "app_home_opened", disposition: "pending", payload_hash: "not-the-body-hash",
+        external_user_id: "U100", received_at: new Date().toISOString(),
+      });
+      const res = await POST(signed(homeOpened("Ev-conflict")));
+      expect(res.status).toBe(503);
+      expect(dispatch).not.toHaveBeenCalled();
+      const ok = await POST(signed(homeOpened("Ev-before-dispatch")));
+      expect(ok.status).toBe(200);
+      expect(dispatch).toHaveBeenCalledOnce();
+      const stored = (await receipts()).find((r) => r.callback_id === "Ev-before-dispatch");
+      expect(stored).toMatchObject({ disposition: "pending", callback_kind: "app_home_opened" });
+    } finally {
+      dispatch.mockRestore();
+    }
+  });
 });
 
 

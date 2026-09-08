@@ -21,7 +21,7 @@ describe("Order view loop", () => {
     expect(model.next).toBe("Next: put back");
     expect(model.customerPo).toBe("4471");
     expect(model.fulfillmentSource).toBe("Warehouse");
-    expect(model.putBackHref).toMatch(/\/restock$/);
+    expect(model.putBackHref).toBe("#");
     expect(model.lines[0]?.detail).toContain("ordered 4");
     expect(model.lines[0]?.detail).toContain("ATP 11");
     expect(model.lines[1]?.tone).toBe("w");

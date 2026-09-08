@@ -27,6 +27,7 @@ export type PortalInvoiceViewModel = {
 };
 
 export type PortalInvoiceSnapshot = {
+  backHref?: string;
   invoice: {
     id: string;
     invoice_no: number | null;
@@ -52,10 +53,10 @@ function day(iso: string): string {
 }
 
 /** Map a portal_invoice payload onto PortalInvoiceView. */
-export function toPortalInvoiceViewProps({ invoice, lines, brewery }: PortalInvoiceSnapshot): PortalInvoiceViewModel {
+export function toPortalInvoiceViewProps({ invoice, lines, brewery, backHref }: PortalInvoiceSnapshot): PortalInvoiceViewModel {
   const credit = invoice.kind === "credit_memo";
   return {
-    backHref: "/portal/invoices",
+    backHref,
     title: docNo(credit ? "CM" : "INV", invoice.invoice_no, credit ? "Credit memo" : "Invoice"),
     total: money(invoice.total_cents),
     due: invoice.due_on ?? undefined,

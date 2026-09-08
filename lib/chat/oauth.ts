@@ -5,7 +5,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
-import { chatCredentialHasOtherOwner, cleanupChatInstallation, failChatCredentialStore, withChatLifecycleLock } from "./jobs";
+import { chatCredentialHasOtherOwner, cleanupChatInstallation, failChatCredentialStore, serviceClient, withChatLifecycleLock } from "./jobs";
 
 export const PROVIDER = "slack";
 export const REQUIRED_SLACK_SCOPES = ["chat:write", "im:write", "groups:read"] as const;
@@ -91,8 +91,15 @@ async function completeSlackInstallLocked(db: SupabaseClient, request: Request, 
   if (params.get("error")) throw new CommandError("oauth cancelled", 400);
   const state = params.get("state");
   if (!state) throw new CommandError("oauth state missing", 400);
-  const intent = await unwrap<Intent | null>(db.rpc("find_chat_oauth_intent", { p_state_hash: sha256(state) }));
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) throw new CommandError("oauth state invalid", 400);
+  const jobs = serviceClient();
+  const intent = await unwrap<Intent | null>(jobs.rpc("find_chat_oauth_intent", { p_state_hash: sha256(state), p_actor: user.id }));
   if (!intent) throw new CommandError("oauth state invalid", 400);
+  const membership = await unwrap<{ role: string } | null>(
+    db.from("brewery_users").select("role").eq("brewery_id", intent.brewery_id).eq("user_id", user.id).maybeSingle(),
+  );
+  if (membership?.role !== "admin") throw new CommandError("oauth state invalid", 400);
   if (intent.consumed_at && intent.state === "active") {
     if (!await port.getInstallation(intent.external_installation_id)) {
       return failChatCredentialStore(intent.installation_id);
@@ -106,15 +113,16 @@ async function completeSlackInstallLocked(db: SupabaseClient, request: Request, 
   const granted = await port.handleOAuthCallback(request, { redirectUri });
   const externalId = granted.teamId;
   if (!sameScopes(granted.scopes)) throw new CommandError("oauth scope mismatch", 400);
-  const result = await rpc<{ installation_id: string; replayed: boolean }>(db, "activate_chat_installation", {
+  const result = await rpc<{ installation_id: string; replayed: boolean }>(jobs, "activate_chat_installation", {
     p_installation: intent.installation_id,
     p_state_hash: sha256(state),
     p_redirect_uri: redirectUri,
     p_external_installation_id: externalId,
     p_external_enterprise_id: granted.enterpriseId ?? null,
     p_display_label: granted.teamName ?? externalId,
-    p_token_store_key: `slack:installation:${externalId}`,
+    p_token_store_key: `ignored:${externalId}`,
     p_granted_capabilities: { scopes: [...granted.scopes], enterprise: granted.isEnterpriseInstall },
+    p_actor: user.id,
   });
   try {
     await granted.persist();
@@ -130,21 +138,19 @@ export async function reconcileSlackInstall(db: SupabaseClient, installationId: 
   return withChatLifecycleLock(() => reconcileSlackInstallLocked(db, installationId, port));
 }
 
-async function reconcileSlackInstallLocked(db: SupabaseClient, installationId: string, port: SlackOAuthPort) {
-  const { data: r } = await db
-    .from("chat_installations")
-    .select("state, external_installation_id")
-    .eq("id", installationId)
-    .single();
+async function reconcileSlackInstallLocked(_db: SupabaseClient, installationId: string, port: SlackOAuthPort) {
+  const r = await unwrap<{ state: string; external_installation_id: string } | null>(
+    serviceClient().rpc("get_chat_installation_lifecycle", { p_installation: installationId }),
+  );
   if (!r) throw new CommandError("installation not found", 404);
-  if (await chatCredentialHasOtherOwner(db, r.external_installation_id)) return { credentialDeleted: false };
+  if (await chatCredentialHasOtherOwner(r.external_installation_id)) return { credentialDeleted: false };
   let credentialDeleted = false;
   if (r.state !== "active" && !r.external_installation_id.startsWith("pending:")) {
     credentialDeleted = await port
       .deleteInstallation(r.external_installation_id)
       .then(() => true, () => false);
   }
-  await unwrap(db.rpc("reconcile_chat_installation", {
+  await unwrap(serviceClient().rpc("reconcile_chat_installation", {
     p_installation: installationId,
     p_credential_deleted: credentialDeleted,
     p_failure_code: credentialDeleted ? null : "credential_delete_failed",
