@@ -1,14 +1,14 @@
 import { z } from "zod";
 import { defineCommand, defineQuery, unwrap, STAFF_ROLES } from "./registry";
 
-import { inviteStaff, inviteCustomerUser } from "@/lib/supabase/invites";
+// Metadata is also read by docs tooling; load the server-only Auth boundary only on execution.
 
 defineCommand({
   name: "invite_staff",
   description: "Invite staff",
   input: z.object({ email: z.string().email(), role: z.enum(["admin", "sales", "warehouse", "brewer"]) }),
   roles: ["admin"],
-  handler: inviteStaff,
+  handler: async (ctx, input, execution) => (await import("@/lib/supabase/invites")).inviteStaff(ctx, input, execution),
 });
 
 defineCommand({
@@ -16,7 +16,7 @@ defineCommand({
   description: "Invite a customer portal user",
   input: z.object({ email: z.string().email(), customerId: z.string().uuid() }),
   roles: ["admin", "sales"],
-  handler: inviteCustomerUser,
+  handler: async (ctx, input, execution) => (await import("@/lib/supabase/invites")).inviteCustomerUser(ctx, input, execution),
 });
 
 export type TeamMember = { userId: string; email: string; handle: string; role: string; createdAt: string };

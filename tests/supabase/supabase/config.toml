@@ -43,6 +43,12 @@ enabled = false
 [auth]
 enabled = true
 site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = [
+  "http://localhost:3000/auth/confirm**",
+  "http://localhost:3002/auth/confirm**",
+  "http://127.0.0.1:3000/auth/confirm**",
+  "http://127.0.0.1:3002/auth/confirm**",
+]
 jwt_expiry = 3600
 enable_signup = true
 minimum_password_length = 6

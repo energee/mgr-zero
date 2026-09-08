@@ -12,6 +12,7 @@ defineCommand({
     await unwrap(ctx.db.rpc("begin_csv_import", { p_brewery: ctx.breweryId, p_kind: input.kind, p_rows: input.rows, p_request_id: execution.requestId }));
     const outcomes: ImportOutcome[] = [];
     // atomic-exempt: independent CSV rows; every dependent write within a row shares one RPC transaction.
+    // ponytail: up to 5000 sequential row RPCs; use a background worker if latency needs it.
     for (let row = 0; row < input.rows.length; row++) {
       const outcome = await unwrap(ctx.db.rpc("import_csv_row", { p_brewery: ctx.breweryId, p_request_id: execution.requestId, p_row_n: row })) as ImportOutcome;
       const errors = validateImportRow(input.kind, input.rows[row]);

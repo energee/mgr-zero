@@ -215,7 +215,7 @@ describe("SCREENS", () => {
     // uniqueness check below catches duplicates, nothing else catches a loss.
     // Bump it deliberately when a frame lands or leaves; the venue split is
     // derived rather than counted by hand in a comment that kept growing.
-    expect(SCREENS).toHaveLength(184);
+    expect(SCREENS).toHaveLength(185);
     expect(SCREENS.filter((s) => s.venue)).toHaveLength(17);
     expect(new Set(SCREENS.map((s) => s.name)).size).toBe(SCREENS.length);
   });
@@ -326,7 +326,7 @@ describe("SCREENS", () => {
       "Disconnect", "Discard", "Edit", "Edit par", "Edit prices", "Finish", "Fix", "Invite", "Kick", "Map", "Mark answered", "Open", "Open balance", "Open batch", "Open count",
       "Open in QuickBooks", "Open mapping", "Pay", "Pick", "Pick source", "Put back", "Reading", "Receive", "Record opening count", "Release", "Reload", "Remove", "Reorder", "Re-push",
       "Resolve", "Resume", "Retry", "Review", "Review history", "Review sales", "Select", "Send", "Send PO", "Shortfall", "Skip", "Start", "Swap", "Switch", "Tap",
-      "Unlink", "Use", "Write off", "Fix registration", "Forgot password?", "Import CSV",
+      "Unlink", "Use", "Write off", "Fix registration", "Forgot password?", "Import CSV", "Invite staff", "Invite portal user",
     ]);
     for (const screen of SCREENS) {
       const html = renderToStaticMarkup(createElement("div", null, screen.body));
@@ -446,8 +446,8 @@ describe("SCREENS", () => {
       expect.soft(html, `${s.name}: elided address`).not.toMatch(/[a-z0-9]@(?![a-z0-9.])/i);
     }
     expect(body("Team")).toContain("@maria");
-    // An invite goes to an address, and its recipient has no account to have a handle.
-    expect(body("Team")).toContain("wes@demobrewing.com");
+    // Pending acceptance is not exposed by the live roster.
+    expect(body("Team")).not.toContain("pending");
   });
 
   it("renders a date field with no value, and names it", () => {
@@ -489,15 +489,12 @@ describe("SCREENS", () => {
       ["/mock/dave.jpg", /Dave/],
       ["/mock/ted.jpg", /Ted/],
       ["/mock/sam.jpg", /Sam/],
-      // No wes.jpg: a pending invite has no account yet, so the Team spec has it
-      // showing the address it was sent to, and the avatar falls back to initials.
     ];
     for (const [src] of faces) {
       expect(existsSync(resolve("public", src.slice(1))), src).toBe(true);
     }
     const team = body("Team");
     for (const [src] of faces) expect(team, src).toContain(`src="${src}"`);
-    expect(team, "the pending invite is initials, not a portrait").toContain(">W<");
     expect(body("Me")).toContain('src="/mock/maria.jpg"');
     expect(body("Me")).not.toContain("/mock/dave.jpg");
     expect(body("Team member")).toContain('src="/mock/dave.jpg"');
@@ -829,11 +826,11 @@ describe("SCREENS", () => {
     expect(move).toContain("hidden md:block");
     // Team: no selection-less bulk remove; the role editor lives on the
     // Team member sheet since #72 split editors out of list pages. Roles are
-    // a set (2026-09-07: roles staff_role[]), so it is one switch per role.
+    // a single supported choice; role arrays remain unsupported.
     expect(html("Team")).not.toMatch(/Remove selected member/);
     const member = html("Team member");
-    expect(member).not.toContain("data-slot=\"select-trigger\"");
-    expect(member.match(/role="switch"/g)?.length).toBe(5);
+    expect(member).toContain("data-slot=\"select-trigger\"");
+    expect(member).not.toContain('role="switch"');
     // Sign in: a link, not a card row.
     expect(html("Sign in")).toMatch(/<a [^>]*>Forgot password\?<\/a>/);
     // Product: no one-option chip group.

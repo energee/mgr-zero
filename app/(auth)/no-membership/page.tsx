@@ -18,7 +18,7 @@ export default async function NoMembershipPage() {
   return (
     <Entry title="No brewery yet">
       {E.note("This login is not on a brewery or a customer account.")}
-      {E.info("Ask an admin to send an invite.")}
+      {E.info("Contact your brewery administrator about access.")}
       {!serverEnv.dedicated && <Link href="/create-brewery" className="text-sm underline">Create brewery</Link>}
       <form action={logout}><Button type="submit" variant="outline" className="w-full">Sign out</Button></form>
     </Entry>

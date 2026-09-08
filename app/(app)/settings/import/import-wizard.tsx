@@ -11,6 +11,7 @@ export function ImportWizard({ breweryId, lookups }: { breweryId: string; lookup
   const [csv, setCsv] = useState<ReturnType<typeof parseCsv> | null>(null);
   const [mapping, setMapping] = useState<Record<string, number>>({});
   const [step, setStep] = useState(0);
+  // ponytail: batch state lasts while this page stays open; persist it for reload recovery.
   const [batch, setBatch] = useState<{ requestId: string; kind: ImportKind; rows: Record<string, string>[] } | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +39,6 @@ export function ImportWizard({ breweryId, lookups }: { breweryId: string; lookup
     setBatch(null); setResult(null); setStep(2);
   }
   return <>
-    {E.back("Settings", "Import", undefined, "/settings")}
     {E.stp(["upload", "map", "preview", "commit"], step)}
     <div className="flex flex-col gap-4 p-4">
       {error && <p role="alert" className="text-destructive">{error}</p>}

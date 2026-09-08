@@ -10,7 +10,7 @@ never copy it into a second place.
 | --- | --- |
 | `supabase/migrations/*.sql` | Schema, RLS policies, triggers, grants, and the transactional command-request ledger. The only source of truth for data rules. Pre-deploy, the baseline is edited in place (see `.agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md`). Application roles have read-only table access; every mutation enters through an explicitly granted, idempotent `security definer` RPC with `search_path = ''`, database-derived actor/tenant/role checks, and a canonical request hash. Private helpers and implementation functions are not executable by application roles. |
 | `lib/commands/registry.ts` | `defineCommand` / `defineQuery`, `Ctx`, role checks, `CommandError`. Every domain operation the app performs is registered here. |
-| `lib/commands/<area>.ts` | Business logic per area (catalog, inventory, orders, customers, portal; `import.ts` is a registered fail-closed stub). Handlers read through the RLS-bound `ctx.db`; public-schema writes call the narrow RPC boundary and forward `CommandExecution.requestId`. `orders.ts` owns order lifecycle (create/submit/confirm/adjust/cancel), allocations, pick/ship, per-shipment invoices, credit memos, and replenishment. `customers.ts` owns customer/ship-to/price-list CRUD and the portal fulfillment source. `catalog.ts` owns products, SKUs, locations and their bins (`list_bins`, `create_bin`, `update_bin`, `delete_bin`); `inventory.ts` owns the movement ledger at bin grain (`record_movement` needs a `binId`; `get_bin_on_hand`). `portal.ts` owns the customer-role commands (`portal_create_order`, `portal_update_draft_order`, `portal_submit_order`, `portal_catalog`, `portal_orders`, `portal_order`, `portal_invoices`) — the only commands a `customer` role may call. |
+| `lib/commands/<area>.ts` | Business logic per area (catalog, inventory, orders, customers, portal; `import.ts` owns independent, atomic CSV rows with durable batch and row outcomes). Handlers read through the RLS-bound `ctx.db`; public-schema writes call the narrow RPC boundary and forward `CommandExecution.requestId`. `orders.ts` owns order lifecycle (create/submit/confirm/adjust/cancel), allocations, pick/ship, per-shipment invoices, credit memos, and replenishment. `customers.ts` owns customer/ship-to/price-list CRUD and the portal fulfillment source. `catalog.ts` owns products, SKUs, locations and their bins (`list_bins`, `create_bin`, `update_bin`, `delete_bin`); `inventory.ts` owns the movement ledger at bin grain (`record_movement` needs a `binId`; `get_bin_on_hand`). `portal.ts` owns the customer-role commands (`portal_create_order`, `portal_update_draft_order`, `portal_submit_order`, `portal_catalog`, `portal_orders`, `portal_order`, `portal_invoices`) — the only commands a `customer` role may call. |
 | `lib/commands/all.ts` | The one side-effecting import that registers every command module. |
 | `app/api/command/route.ts` | The single HTTP entry point. Dispatches to the registry; contains no business logic. Cookie session or `Authorization: Bearer <supabase access_token>`. |
 | `lib/commands/client.ts`, `use-command-form.ts` | How the UI calls commands. |
@@ -73,8 +73,8 @@ a gap to close, not a convention to trust.
    logged server-side. Supabase Auth session primitives (sign-up, sign-in/out, magic-link
    exchange, password reset/update, session refresh) are the sole non-domain
    exception; they never authorize direct public-schema access. SaaS tenant
-   provisioning is domain work: `provision_brewery` remains blocked until the
-   registry has an explicit pre-tenant context, then invokes one
+   provisioning is domain work: `provision_brewery` uses the registry’s explicit
+   authenticated pre-tenant context and invokes one
    narrow `security definer` RPC for the brewery + first admin membership — never a fake
    `breweryId` or an RLS bypass. AI write tools only propose registered commands;
    an explicit user confirmation is required before execution. *Enforced by:*
@@ -126,7 +126,7 @@ a gap to close, not a convention to trust.
    before commit. An identical replay returns that result; changed command,
    brewery, or payload conflicts. Private implementation helpers retain the
    multi-row transaction rule and are not application-callable. Per-row
-   independent bulk work (CSV import, currently fail-closed) and the durable
+   independent bulk work (CSV import) and the durable
    Auth invitation workflow are the exemptions; each says so
    with an `// atomic-exempt:` comment. MGR v1
    learned this after real data loss
@@ -168,13 +168,17 @@ a gap to close, not a convention to trust.
   complete. Tests force both lost Auth responses and real membership failures
   for staff and customers. Completed retries return the original user id without
   restoring revoked access. Existing Auth emails are refused; attaching existing
-  accounts needs a separate consent workflow. UI acceptance remains separately gated.
+  accounts needs a separate consent workflow. Team, first-run, and customer detail
+  share invitation forms that retain request identity for an unchanged failed
+  submission while the page remains open.
 - **CSV exemption stops between logical rows.** `import_csv` may continue after
   one independent CSV row fails, but dependent writes inside a logical row still
-  require one Postgres function. The implemented importer currently sequences
-  some parent/child writes and has no durable per-row request/result identity;
-  opening-balance reruns can append twice. The import UI remains blocked until
-  each logical row is atomic and reruns return its first durable result.
+  require one Postgres function. `begin_csv_import` binds the complete batch
+  manifest to its request;
+  `import_csv_row` commits each logical row and its durable committed or blocked
+  outcome. Exact reruns return original results, including opening movement IDs.
+  Corrected batches contain only blocked rows. Proven by `tests/commands-import.test.ts`;
+  the wizard preserves batch identity while its page stays open.
 
 ## Schema conventions
 

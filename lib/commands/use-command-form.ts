@@ -18,11 +18,11 @@ export function useCommandAction() {
   const [busy, setBusy] = useState(false);
 
   // Resolves true on success, so a caller that navigates away can wait for it.
-  async function run(name: string, input: unknown, onSuccess?: () => void) {
+  async function run(name: string, input: unknown, onSuccess?: () => void, requestId?: string) {
     setBusy(true);
     setError(null);
     try {
-      await command(breweryId, name, input);
+      await command(breweryId, name, input, requestId);
       onSuccess?.();
       router.refresh();
       return true;

@@ -67,6 +67,19 @@ describe("durable invitations", () => {
       expect((await admin.from(table).select("user_id").eq("user_id", result.userId)).data).toHaveLength(1);
     });
   }
+  it("refuses completion when the inviter loses admin after Auth succeeds", async () => {
+    const local = await makeStaffCtx((await makeBrewery()).id);
+    const address = email(), ex = execution();
+    const hook = { afterAuth: async () => {
+      await admin.from("brewery_users").update({ role: "warehouse" }).eq("brewery_id", local.breweryId).eq("user_id", local.userId);
+    } };
+    await expect(inviteStaff(local, { email: address, role: "sales" }, ex, hook)).rejects.toMatchObject({ code: "permission_denied" });
+    const userId = sql(`select id from auth.users where email = '${address}'`)[0];
+    expect(userId).toBeTruthy();
+    expect((await local.db.rpc("complete_invite_membership", { p_request_id: ex.requestId })).error?.code).toBe("42501");
+    expect((await admin.from("brewery_users").select("user_id").eq("user_id", userId)).data).toEqual([]);
+    expect(sql(`select state from private.invite_requests where request_id = '${ex.requestId}'`)).toEqual(["pending_membership"]);
+  });
   it("binds request identity to payload, kind, actor and brewery", async () => {
     const ex = execution(), input = { email: email(), role: "sales" };
     await runCommand("invite_staff", input, ctx, ex);
