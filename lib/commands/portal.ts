@@ -45,6 +45,7 @@ defineCommand({
   handler: (ctx, i, execution) => {
     assertExpectedIdentity(ctx, i.expectedIdentity);
     return unwrap(ctx.db.rpc("update_draft_order", {
+      p_expected_brewery: ctx.breweryId, p_expected_customer: requireCustomer(ctx),
       p_order: i.orderId, p_ship_to: i.shipToId ?? null, p_requested: i.requestedShipDate ?? null, p_clear_requested: i.requestedShipDate === null,
       p_po: i.poNumber ?? null, p_note: i.note ?? null,
       p_lines: i.lines.map(l => ({ sku_id: l.skuId, qty: l.qty })), p_request_id: execution.requestId,
@@ -58,7 +59,7 @@ defineCommand({
   input: z.object({ orderId: z.string().uuid(), expectedIdentity }),
   handler: (ctx, i, execution) => {
     assertExpectedIdentity(ctx, i.expectedIdentity);
-    return unwrap(ctx.db.rpc("submit_order", { p_order: i.orderId, p_request_id: execution.requestId }));
+    return unwrap(ctx.db.rpc("submit_order", { p_order: i.orderId, p_request_id: execution.requestId, p_expected_brewery: ctx.breweryId, p_expected_customer: requireCustomer(ctx) }));
   },
 });
 

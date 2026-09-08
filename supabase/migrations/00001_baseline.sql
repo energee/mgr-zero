@@ -3516,13 +3516,15 @@ begin
 end $$;
 
 create function update_draft_order(
-  p_order uuid, p_ship_to uuid, p_requested date, p_po text, p_note text, p_lines jsonb, p_request_id uuid, p_clear_requested boolean default false
+  p_order uuid, p_ship_to uuid, p_requested date, p_po text, p_note text, p_lines jsonb, p_request_id uuid, p_clear_requested boolean default false, p_expected_brewery uuid default null, p_expected_customer uuid default null
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_brewery uuid; v_replay jsonb; v_result jsonb;
 begin
   select o.brewery_id into v_brewery
   from public.orders o
   where o.id = p_order
+    and (p_expected_brewery is null or o.brewery_id = p_expected_brewery)
+    and (p_expected_customer is null or o.customer_id = p_expected_customer)
     and (
       exists (
         select 1 from public.brewery_users bu
@@ -3536,14 +3538,22 @@ begin
       )
     );
   if v_brewery is null then raise exception 'permission denied' using errcode = '42501'; end if;
-  v_replay := private.claim_command_request(v_brewery,'update_draft_order',p_request_id,jsonb_build_object('order',p_order,'ship_to',p_ship_to,'requested',p_requested,'po',p_po,'note',p_note,'lines',p_lines,'clear_requested',p_clear_requested));
+  v_replay := private.claim_command_request(v_brewery,'update_draft_order',p_request_id,jsonb_build_object('order',p_order,'ship_to',p_ship_to,'requested',p_requested,'po',p_po,'note',p_note,'lines',p_lines,'clear_requested',p_clear_requested,'expected_brewery',p_expected_brewery,'expected_customer',p_expected_customer));
   if v_replay is not null then return v_replay; end if;
+  -- Keep the shared claim-before-order-lock ordering. The first scope check
+  -- rejects a wrong active account without claiming; this locked check prevents
+  -- target scope changing between that read and the transactional write.
+  perform 1 from public.orders o where o.id = p_order
+    and (p_expected_brewery is null or o.brewery_id = p_expected_brewery)
+    and (p_expected_customer is null or o.customer_id = p_expected_customer)
+    for update of o;
+  if not found then raise exception 'permission denied' using errcode = '42501'; end if;
   v_result := private.update_draft_order_impl(p_order,p_ship_to,p_requested,p_po,p_note,p_lines);
   if p_clear_requested then update public.orders set requested_ship_date = null where id = p_order; end if;
   return private.complete_command_request(p_request_id,v_result);
 end $$;
 
-create function submit_order(p_order uuid, p_request_id uuid) returns jsonb
+create function submit_order(p_order uuid, p_request_id uuid, p_expected_brewery uuid default null, p_expected_customer uuid default null) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare v_brewery uuid; v_replay jsonb; v_result jsonb; v_is_staff boolean;
 begin
@@ -3557,6 +3567,8 @@ begin
     into v_brewery, v_is_staff
   from public.orders o
   where o.id = p_order
+    and (p_expected_brewery is null or o.brewery_id = p_expected_brewery)
+    and (p_expected_customer is null or o.customer_id = p_expected_customer)
     and (
       exists (
         select 1 from public.brewery_users bu
@@ -3570,8 +3582,16 @@ begin
       )
     );
   if v_brewery is null then raise exception 'permission denied' using errcode = '42501'; end if;
-  v_replay := private.claim_command_request(v_brewery,'submit_order',p_request_id,jsonb_build_object('order',p_order));
+  v_replay := private.claim_command_request(v_brewery,'submit_order',p_request_id,jsonb_build_object('order',p_order,'expected_brewery',p_expected_brewery,'expected_customer',p_expected_customer));
   if v_replay is not null then return v_replay; end if;
+  -- Keep the shared claim-before-order-lock ordering. The first scope check
+  -- rejects a wrong active account without claiming; this locked check prevents
+  -- target scope changing between that read and the transactional write.
+  perform 1 from public.orders o where o.id = p_order
+    and (p_expected_brewery is null or o.brewery_id = p_expected_brewery)
+    and (p_expected_customer is null or o.customer_id = p_expected_customer)
+    for update of o;
+  if not found then raise exception 'permission denied' using errcode = '42501'; end if;
   if not v_is_staff and not exists (
     select 1 from public.orders where id=p_order and status='draft'
   ) then
@@ -6480,8 +6500,8 @@ grant execute on function
   set_portal_fulfillment_source(uuid,uuid,uuid),
   create_order(uuid,public.order_kind,uuid,uuid,uuid,uuid,date,text,text,jsonb,uuid),
   portal_create_order(uuid,uuid,uuid,text,text,jsonb,uuid,date),
-  update_draft_order(uuid,uuid,date,text,text,jsonb,uuid,boolean),
-  submit_order(uuid,uuid),
+  update_draft_order(uuid,uuid,date,text,text,jsonb,uuid,boolean,uuid,uuid),
+  submit_order(uuid,uuid,uuid,uuid),
   confirm_order(uuid,uuid),
   adjust_order_lines(uuid,jsonb,text,uuid),
   cancel_order(uuid,text,uuid),
