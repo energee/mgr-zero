@@ -46,7 +46,7 @@ Counts are `SCREEN_ROUTES` rows (live or parity-mapped). Order is 1 of ~110. Gat
 | --- | --- | --- | --- | --- |
 | 0 | **Order (done)** | `components/mgr/views/order.tsx` | Order | Proof |
 | 1 | **Orders family** | `views/orders/` | Orders, New order, Confirm order, Complete transfer, Adjust lines, Short pick, Pick, Ship and invoice, Shipment done, Ship on delivery, Return and credit, Put back, Pick sheet, Pars and allocation, Invoice | Same owner as Order; closes the leftover seams (Adjust / Add line / Ship in the view vs `LifecycleButtons`) |
-| 2 | **Portal** | `views/portal/` | Shop, Review order, Order history, Order detail, Invoice history, Pay invoice, Question invoice, Payment unavailable, Paid invoice, Account, Portal Me | Shares `INV` and order identity; customer-role commands only |
+| 2 | **Portal (done)** | `views/` | Shop, Review order, Order history, Order detail, Invoice history, Pay invoice, Question invoice, Payment unavailable, Paid invoice, Account, Portal Me | Shares `INV` and order identity; customer-role commands only. Live Cart / QuestionForm / MeSheet stay wrappers. |
 | 3 | **Customers** | `views/customers/` | Customers, Customer detail, Ship-to form | Feeds orders; small |
 | 4 | **Catalog + locations + pricing** | `views/catalog/` | Catalog, Brand, SKU, SKU list, Formats, Format, Package BOM; Locations, Location detail, Location bins, Bin; Price groups, Price group; Sale channels, Channel; Units | One command-module family (`catalog.ts` + pricing) |
 | 5 | **Inventory + transfers** | `views/inventory/` | Finished goods, Record movement, Movement recorded; Transfers, New transfer, Transfer detail | Ledger grain; keep append-only copy in the view |

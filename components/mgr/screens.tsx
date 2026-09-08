@@ -32,10 +32,19 @@ import { OrdersView } from "@/components/mgr/views/orders-list";
 import { ParsView } from "@/components/mgr/views/pars";
 import { PickView } from "@/components/mgr/views/pick";
 import { PickSheetView } from "@/components/mgr/views/pick-sheet";
+import { PortalAccountView } from "@/components/mgr/views/portal-account";
+import { PortalInvoiceView } from "@/components/mgr/views/portal-invoice";
+import { PortalInvoicesView } from "@/components/mgr/views/portal-invoices";
+import { PortalMeView } from "@/components/mgr/views/portal-me";
+import { PortalOrderView } from "@/components/mgr/views/portal-order";
+import { PortalOrdersView } from "@/components/mgr/views/portal-orders";
 import { PutBackView } from "@/components/mgr/views/put-back";
+import { QuestionInvoiceView } from "@/components/mgr/views/question-invoice";
 import { ReturnCreditView } from "@/components/mgr/views/return-credit";
+import { ReviewOrderView } from "@/components/mgr/views/review-order";
 import { ShipView } from "@/components/mgr/views/ship";
 import { ShipmentDoneView } from "@/components/mgr/views/shipment-done";
+import { ShopView } from "@/components/mgr/views/shop";
 import { ShortPickView } from "@/components/mgr/views/short-pick";
 import { OHIO_STOUT_NOTE, LOC_TAPROOM, LOC_WAREHOUSE } from "@/lib/mgr/fixtures/demo";
 import { invoiceFailedAls } from "@/lib/mgr/fixtures/invoice";
@@ -43,6 +52,10 @@ import { completeTransferTape, newOrderDraft, orderPickedRestock, orderPickedRes
 import { orderAdjustLines, orderPick, orderReturnCredit, orderShipInvoice, orderShipOnDelivery, orderShipmentDone, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
 import { parsPils } from "@/lib/mgr/fixtures/pars";
 import { pickSheet } from "@/lib/mgr/fixtures/pick-sheet";
+import { ridgelineReviewOrder, ridgelineShop } from "@/lib/mgr/fixtures/portal";
+import { portalAccountRidgeline, portalMeRidgeline } from "@/lib/mgr/fixtures/portal-account";
+import { portalInvoicePaid, portalInvoiceUnpaid, portalInvoicesRidgeline } from "@/lib/mgr/fixtures/portal-invoices";
+import { portalOrderShipped, portalOrdersList } from "@/lib/mgr/fixtures/portal-orders";
 import { toAdjustLinesViewProps } from "@/lib/mgr/adjust-lines-view";
 import { toCompleteTransferViewProps } from "@/lib/mgr/complete-transfer-view";
 import { toConfirmOrderViewProps } from "@/lib/mgr/confirm-order-view";
@@ -53,10 +66,19 @@ import { toOrdersListViewProps } from "@/lib/mgr/orders-list-view";
 import { toParsViewProps } from "@/lib/mgr/pars-view";
 import { toPickViewProps } from "@/lib/mgr/pick-view";
 import { toPickSheetViewProps } from "@/lib/mgr/pick-sheet-view";
+import { toPortalAccountViewProps } from "@/lib/mgr/portal-account-view";
+import { toPortalInvoiceViewProps } from "@/lib/mgr/portal-invoice-view";
+import { toPortalInvoicesViewProps } from "@/lib/mgr/portal-invoices-view";
+import { toPortalMeViewProps } from "@/lib/mgr/portal-me-view";
+import { toPortalOrderViewProps } from "@/lib/mgr/portal-order-view";
+import { toPortalOrdersViewProps } from "@/lib/mgr/portal-orders-view";
 import { toPutBackViewProps } from "@/lib/mgr/put-back-view";
+import { toQuestionInvoiceViewProps } from "@/lib/mgr/question-invoice-view";
+import { toReviewOrderViewProps } from "@/lib/mgr/review-order-view";
 import { toReturnCreditViewProps } from "@/lib/mgr/return-credit-view";
 import { toShipViewProps } from "@/lib/mgr/ship-view";
 import { toShipmentDoneViewProps } from "@/lib/mgr/shipment-done-view";
+import { toShopViewProps } from "@/lib/mgr/shop-view";
 import { toShortPickViewProps } from "@/lib/mgr/short-pick-view";
 import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-icons";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
@@ -1600,23 +1622,7 @@ export const SCREENS: Screen[] = [
     writes: "portal_create_order · portal_submit_order",
     states: [["empty catalog", "call brewery; nothing orderable"], ["missing price", "item cannot enter cart", 1], ["no ship-to", "contact brewery; choose an existing ship-to", 1], ["no source", "Review stays off until the brewery sets where orders ship from", 1], ["unlisted package", "a format not on the wholesale list is absent", 1], ["receipt", "ORD number after commit"]],
     spec: "Grouped by brand; each row is a package the brewery listed for wholesale (½ keg, ⅙ keg, case, bottle). The list is the offer, not warehouse ATP: no in/low/out badges, no counts. Unlisted packages are absent, not greyed. Schedule packaging run is where staff designate the list. Drawn with a fulfillment source already set; the no-source state keeps Review off and never silently chooses Warehouse. Stepper − and + each ship as 48×48 targets. No staff vocabulary (ATP, gates, fulfillment engineering) anywhere in the portal. No persistent cart: leaving the page keeps nothing. Reorder on a shipped order still prefills Review.",
-    body: (<>
-      {E.hd("Order", "Ridgeline")}
-      {E.ttl("Hazy IPA")}
-      {E.row("½ bbl keg", INV.hazyPrice, E.stq(4))}
-      {E.row("case · 24×16 oz", "$42.00", E.stq(0))}
-      {E.ttl("Pils")}
-      {E.row("case · 24×16 oz", INV.pilsPrice, E.stq(6))}
-      {E.row("12 oz bottle", "$18.00", E.stq(0))}
-      {E.ttl("Stout")}
-      {E.row("⅙ bbl keg", "$62.00", E.stq(0))}
-      {E.nav("Coming up", "what’s brewing next")}
-      {E.row("Ships from", "Warehouse")}
-      {E.row("Ship-to · requested date", "Main · Wed 9/9", E.act("Change"))}
-      {E.sp()}
-      {E.info("Kegs add a $30.00 refundable deposit each, shown on review.")}
-      {E.btn("Review order · $828.00", "p")}
-    </>),
+    body: <ShopView model={toShopViewProps(ridgelineShop)} />,
   },
   {
     step: 6,
@@ -1643,26 +1649,13 @@ export const SCREENS: Screen[] = [
     portal: "Order",
     surface: "sheet",
     name: "Review order",
-    to: { "Hazy IPA · ½ bbl keg": "Review order", "Pils · 16 oz case": "Review order" },
+    to: { "Hazy IPA · ½ bbl keg": "Review order", "Pils · case · 24×16 oz": "Review order" },
     job: "Confirm quantities, ship-to and fulfillment line, then place the order",
     reads: "portal_catalog · get_portal_account",
     writes: "portal_create_order · portal_submit_order",
     states: [["price changed", "revalidated price shown before Place order", 1], ["inactive SKU", "line removed · told plainly", 1], ["no source", "Place order stays off until the brewery sets where orders ship from", 1], ["submit error", "keep quantities · Retry safe", 1], ["duplicate", "same request returns the same ORD number"]],
     spec: "The confirm step for the shop steppers and for Reorder from a shipped order. Buyer copy only: price, package, quantity, “Ships from Warehouse”, Place order. No ATP, no gate names. Drawn with a fulfillment source already set. After submit the portal is read-only; changes go through the brewery.",
-    body: (<>
-      {E.row("Hazy IPA · ½ bbl keg", INV.hazyPrice, E.stq(4, "Hazy IPA quantity"))}
-      {E.row("Pils · 16 oz case", INV.pilsPrice, E.stq(6, "Pils quantity"))}
-      {E.row("Keg deposit", "4 × $30.00", INV.depositAmount)}
-      {E.fld("Subtotal", INV.total)}
-      {E.fld("Tax", "$0.00 · sale for resale")}
-      {E.fld("Ship-to", "Main · Phoenixville, PA")}
-      {E.fld("Requested date", "Wed 9/9")}
-      {E.row("Ships from", "Warehouse")}
-      {E.fld("Your PO number", "optional")}
-      {E.info("Order number is assigned when you place the order.")}
-      {E.sp()}
-      {E.btn(`Place order · ${INV.total}`, "p")}
-    </>),
+    body: <ReviewOrderView model={toReviewOrderViewProps(ridgelineReviewOrder)} />,
   },
   {
     step: 6,
@@ -1675,13 +1668,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["expanded row", "lines with ordered vs shipped and plain adjusted copy"], ["no orders", "Start one from Order"]],
     spec: "A row opens Order detail. Shipped rows offer Reorder. Adjusted quantities are stated in buyer copy. No cancel: the portal is read-only after submit, and the row says whom to call.",
-    body: (<>
-      {E.hd("Orders", "Ridgeline")}
-      {E.nav(INV.order, `confirmed · ships Thu · ${INV.total}`)}
-      {E.row("ORD-0225", "shipped 8/27 · $980", E.act("Reorder"))}
-      {E.nav("ORD-0221", "adjusted · 2 cases short · $528", "w")}
-      {E.info("Need a change? Call Demo Brewing. Orders can’t be edited here after they’re placed.")}
-    </>),
+    body: <PortalOrdersView model={toPortalOrdersViewProps(portalOrdersList)} />,
   },
   {
     step: 6,
@@ -1694,15 +1681,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["confirmed", "ships date · no invoice yet"], ["adjusted", "lines show ordered vs shipped"], ["shipped", "invoice link · Reorder"], ["delivered", "invoice link · Reorder"]],
     spec: "Opened from Order history. Status is the buyer-facing state. Reorder is on shipped and delivered. The invoice link is absent until the brewery has billed.",
-    body: (<>
-      {E.back("Orders", "ORD-0225")}
-      {E.fld("Status", "Shipped 8/27")}
-      {E.fld("Ship-to", "Main · Phoenixville, PA")}
-      {E.row("Hazy IPA · ½ bbl keg", "ordered 2 · shipped 2", "$300.00")}
-      {E.row("Pils · 16 oz case", "ordered 6 · shipped 6", "$228.00")}
-      {E.nav(INV.paid, "paid 8/29 · $980")}
-      {E.btn("Reorder", "g")}
-    </>),
+    body: <PortalOrderView model={toPortalOrderViewProps(portalOrderShipped)} />,
   },
   {
     step: 6,
@@ -1714,17 +1693,7 @@ export const SCREENS: Screen[] = [
     writes: "none [Intuit takes the payment; paid_at returns through the sync job]",
     states: [["payable", "Pay opens QuickBooks in a new tab"], ["no payments account", "the button never renders; brewery has no QuickBooks Payments", 1], ["not pushed yet", "no QuickBooks invoice id yet; Pay is absent, not disabled"], ["link unavailable", "Intuit returned none: the unavailable page, never a 500", 1], ["already paid", "Pay is gone; the paid date came back from the sync"]],
     spec: "The whole design is one rule: MGR owns the link, Intuit owns the destination. What is shared (this row, the emailed reminder, the PDF footer) is always /portal/invoices/:id/pay, an MGR URL that is permanent because it resolves late. Intuit’s InvoiceLink is read-only, is generated only for a pay-enabled invoice with a customer email, has no documented expiry, and is intermittently absent; fetching it seconds before the redirect makes every one of those someone else’s problem. It is never stored in a column, never serialised to the client, never put in an email. It is a bearer URL (anyone holding it can pay), so authorization runs on every click before any Intuit call is made, and the 404 for a customer requesting somebody else’s invoice must land before the fetch, not after.",
-    body: (<>
-      {E.back("Invoices", INV.no)}
-      {E.ttl(INV.total)}
-      {E.row("Due", INV.due)}
-      {E.row("Status", "Unpaid", "", "w")}
-      {E.tbl(["Item", "Qty", "Amount"], [["Hazy IPA · ½ bbl", "4", INV.hazyAmount], ["Pils · 16 oz case", "6", INV.pilsAmount], ["Keg deposit · NON", "4", INV.depositAmount]])}
-      {E.info("Pay by card or bank transfer through QuickBooks. You will not need an account.")}
-      {E.btns([["Pay invoice", "p"], ["Download PDF", "g"]])}
-      {E.nav("Question this invoice", "sends a note to Demo Brewing")}
-      {E.info("Opens QuickBooks in a new tab. This link keeps working; it is re-checked each time you open it.")}
-    </>),
+    body: <PortalInvoiceView model={toPortalInvoiceViewProps(portalInvoiceUnpaid)} variant="pay" />,
   },
   {
     step: 6,
@@ -1736,16 +1705,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["no link", "Intuit generated none for this invoice", 1], ["no customer email", "the cause push should have caught first", 1], ["payments off", "brewery has no QuickBooks Payments account"], ["reason logged", "the customer sees one page; the brewery sees why"]],
     spec: "Exists so that “works every time” is honest rather than aspirational. Every precondition is checked before the share (push refuses an invoice whose customer has no email, and the Payments capability is cached on the connection), but InvoiceLink can still come back empty, so the click path needs a designed floor. The customer gets one coherent page with the invoice still readable and a way to reach a human; MGR logs the distinguishing reason. Never a stack trace, never a dead redirect, never a Pay button that throws.",
-    body: (<>
-      {E.back("Invoices", INV.no)}
-      {E.ttl(INV.total)}
-      {E.info("Online payment isn’t available for this invoice right now.")}
-      {E.row("Due", INV.due)}
-      {E.tbl(["Item", "Qty", "Amount"], [["Hazy IPA · ½ bbl", "4", INV.hazyAmount], ["Pils · 16 oz case", "6", INV.pilsAmount], ["Keg deposit · NON", "4", INV.depositAmount]])}
-      {E.note("Contact Demo Brewing to arrange payment. The invoice above is unchanged and still due.")}
-      {E.nav("Demo Brewing", "(610) 555-0142")}
-      {E.nav("Question this invoice", "sends a note to Demo Brewing")}
-    </>),
+    body: <PortalInvoiceView model={toPortalInvoiceViewProps(portalInvoiceUnpaid)} variant="unavailable" />,
   },
   {
     step: 6,
@@ -1759,11 +1719,7 @@ export const SCREENS: Screen[] = [
     writes: "raise_invoice_question",
     states: [["sent", "the buyer sees it went · nothing on the invoice changes"], ["received", "a sales Today row names the invoice and the buyer"], ["no chat provider", "the Today row is the whole delivery · no email is sent", 1], ["answered", "Mark answered on the Invoice frame clears the sales row"]],
     spec: "Off Pay invoice and Payment unavailable. The buyer writes a note and it has to land somewhere a person will see: it writes a question row that appears on the sales Today list, and rides the chat integration as a personal message when one is connected. Nothing on the invoice changes.",
-    body: (<>
-      {E.fld("Invoice", `${INV.no} · ${INV.total}`)}
-      {E.inp("What’s wrong with this invoice?")}
-      {E.btn("Send to Demo Brewing")}
-    </>),
+    body: <QuestionInvoiceView model={toQuestionInvoiceViewProps(portalInvoiceUnpaid)} />,
   },
   {
     step: 6,
@@ -1775,13 +1731,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: DEFAULT_STATES,
     spec: "The paid date arrived from QuickBooks. Pay is gone. Download PDF is the one action.",
-    body: (<>
-      {E.back("Invoices", INV.paid)}
-      {E.ttl("$980.00")}
-      {E.row("Paid", "8/29/2026", "", "ok")}
-      {E.tbl(["Item", "Qty", "Amount"], [["Hazy IPA · ½ bbl", "2", "300.00"], ["Pils · 16 oz case", "6", "228.00"]])}
-      {E.btn("Download PDF", "g")}
-    </>),
+    body: <PortalInvoiceView model={toPortalInvoiceViewProps(portalInvoicePaid)} variant="paid" />,
   },
   {
     step: 6,
@@ -1793,11 +1743,7 @@ export const SCREENS: Screen[] = [
     reads: "portal_invoices",
     writes: "none",
     states: DEFAULT_STATES,
-    body: (<>
-      {E.hd("Invoices", "Ridgeline")}
-      {E.row(INV.no, `due ${INV.dueShort} · ${INV.total}`, E.act("Pay", "info"))}
-      {E.row(INV.paid, "paid 8/29", "$980", "ok")}
-    </>),
+    body: <PortalInvoicesView model={toPortalInvoicesViewProps(portalInvoicesRidgeline)} />,
   },
   {
     step: 6,
@@ -1809,14 +1755,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: DEFAULT_STATES,
     spec: "Peer portal users are not listed; the composer exposes only account-safe reads and order commands.",
-    body: (<>
-      {E.hd("Account", "Ridgeline")}
-      {E.row("Main ship-to", "Phoenixville, PA")}
-      {E.row("Dock ship-to", "Royersford, PA")}
-      {E.row("You · buyer", "this login", "active")}
-      {E.row("Keg deposits held", "38 × ½ bbl", "$1,140")}
-      {E.info("Contact the brewery to change account details.")}
-    </>),
+    body: <PortalAccountView model={toPortalAccountViewProps(portalAccountRidgeline)} />,
   },
   {
     step: 6,
@@ -1830,11 +1769,7 @@ export const SCREENS: Screen[] = [
     writes: "supabase_auth_sign_out [platform]",
     states: DEFAULT_STATES,
     spec: "Opened from the portal header Me control. No brewery switcher. Change password opens Portal set password. Sign out is outline here; the destructive accent is a staff Me follow-up.",
-    body: (<>
-      {E.fld("Signed in as", PORTAL_BUYER.email)}
-      {E.fld("Account", PORTAL_BUYER.account)}
-      {E.btns([["Change password", "g"], ["Sign out", "g"]])}
-    </>),
+    body: <PortalMeView model={toPortalMeViewProps(portalMeRidgeline)} />,
   },
   {
     step: 7,
