@@ -471,7 +471,7 @@ Admin opens **Team** from **Settings**. Each member shows as an **@handle** (the
 
 <Screen name="Settings" />
 
-Admin opens **Settings** from **More** to edit the brewery's basics in one form: **Brewery name**, **Timezone** (a zone name MGR knows, such as America/New_York), **TTB registry number**, **PA license**, the **Customer-facing phone** the portal prints when online payment is unavailable, and **Reading overdue after (hours)**, which sets when a fermentation reading counts as overdue on Today. **Save brewery** writes them together. Below the form, rows open **Locations** and **Team**; Source water, Accounting, Point of sale, and Import stay locked until their areas are built, and **Chat** opens the Slack account link.
+Admin opens **Settings** from **More** to edit the brewery's basics in one form: **Brewery name**, **Timezone** (a zone name MGR knows, such as America/New_York), **TTB registry number**, **PA license**, the **Customer-facing phone** the portal prints when online payment is unavailable, and **Reading overdue after (hours)**, which sets when a fermentation reading counts as overdue on Today. **Save brewery** writes them together. Below the form, rows open **Locations**, **Team**, and **Chat**. Source water, Accounting, Point of sale, and Import stay locked until their areas are built.
 
 ## No access [#no-access]
 
@@ -516,13 +516,19 @@ In specific gravity you may type either spelling: `1.050` or `1050`.
 
 <Screen name="Link your Slack" />
 
-When your brewery's Slack connection is available, open its MGR App Home and choose **Link MGR account**. Sign in to MGR if asked. A valid link confirms that Slack is linked.
+Every staff member can open **Settings → Chat** to set personal notification reasons and quiet hours, even before linking Slack. Those choices remain available after unlinking. An admin also manages the brewery connection, its private operations channel, brewery quiet hours, reading cadence, linked people, and health from this page.
+
+To link, open MGR's private App Home in Slack and choose **Link MGR account**. Sign in to MGR if asked. Before anything changes, MGR shows the brewery, your current MGR name and email, and the Slack workspace and user identity. Choose **Link these accounts** only when both identities are yours. MGR never links by matching email, profile name, or workspace domain. A missing, expired, used, or wrong-brewery link must be restarted from App Home.
 
 Linked App Home shows a role-filtered **Today** queue with up to 20 current items. Admin sees all live items; Sales sees submitted orders to review; Warehouse sees confirmed orders whose requested ship date is due and orders with staged beer to put back. Select **Open** on an item to view its order in MGR. With no current work, App Home says **You’re caught up**.
 
-Linked eligible staff also receive private Slack messages for newly submitted orders and picks that become due. The message contains a safe order label, requested-date detail, and **Open in MGR**. When the work resolves, that same message changes to **Resolved**. MGR never posts customer contacts, prices, or notes to Slack.
+Linked eligible staff receive private Slack messages when assigned work first becomes due. **Snooze 1 hour** delays that Slack reminder, and muting a reason stops that class of Slack message; neither changes what is due on MGR Today. Quiet hours delay personal messages while App Home stays current. When work resolves, its message becomes **Resolved**. MGR never posts customer contacts, prices, or notes to Slack.
 
-If the link is missing, expired, already used, or belongs to another account, go back to Slack and request a fresh link. Notification settings and unlink controls are not in the MGR interface yet.
+The brewery digest goes only to one admin-approved private, non-shared Slack channel where MGR is already a member. Public, archived, and Slack Connect channels cannot be selected. It runs on the brewery's local morning and midday windows; the default fermentation reading cadence is 24 hours. Personal mutes, snoozes, and quiet hours affect Slack delivery only, not Today or the shared digest.
+
+Slack is a view of current MGR work. Operational forms such as fermentation readings and order confirmation show **Open in MGR** and do not submit the domain change from Slack. MGR rechecks the current item, assignment, role, and channel before sending or updating a message.
+
+Admins can inspect the workspace, granted permissions, destination, queue state, recent callback/delivery times, and a safe error code on **Chat health**. **Disable** stops delivery but keeps the connection for later. **Disconnect** stops delivery and unlinks people immediately, then removes the stored Slack credential; if that cleanup fails, the page offers **Retry cleanup**. Reauthorization and cleanup are serialized so an old cleanup cannot remove replacement credentials. Staff can unlink their own account; an admin can unlink any linked person.
 
 ## Errors and corrections [#errors-corrections]
 
@@ -553,7 +559,6 @@ Do not hunt for hidden controls for these:
 - reviewing or reattributing auto-reconciled losses before a filing, a printed lot trace packet, and the customers who received a lot
 - an order-confirmation warning from the compliance registry, or deleting an approval, registration, or license
 - filing a state or other non-TTB report, or a period other than a calendar month, from the interface (the API accepts any jurisdiction and range)
-- Slack installation, notification settings, or unlinking from a visible MGR settings page
 
 Ask the person who configures your brewery when one of these is required.
 

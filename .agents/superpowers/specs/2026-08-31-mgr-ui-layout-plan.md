@@ -25,6 +25,10 @@ different in-device body.
 The 10 build-step-8 Chat frames add the production Settings preview gallery, Slack link,
 App Home, DM, private digest, preferences, gated operational forms, and health recovery.
 They use committed fixture data and never imply that a gated provider action is active.
+The live `/settings/chat` routes now cover admin connection/health/people controls,
+explicit identity consent, disconnect cleanup, and personal preferences for every staff
+role. Slack operational forms remain **Open in MGR** projections; venue frames remain
+documentation previews rather than MGR routes.
 Registry note: the open slice-1B branch (PR #15) implements several §2 commands under
 other names (`adjust_order_lines`, `create_credit_memo`, `create_replenishment_order`,
 `set_price`, no `resolve_short_pick`). §2 remains the contract; that branch reconciles its

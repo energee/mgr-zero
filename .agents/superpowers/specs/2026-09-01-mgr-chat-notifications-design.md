@@ -53,8 +53,11 @@ This integration must preserve the five iron rules in `.agents/ARCHITECTURE.md`:
 
 Additional current gates:
 
-- The command endpoint does not yet carry a stable `requestId` or durably replay the first result.
-- Registry metadata does not yet implement canonical preview/version/compensation contracts.
+- Authenticated commands carry a stable `requestId` through the endpoint and
+  replay their first durable result from the actor-bound command ledger.
+- Registry metadata describes current command risk and replay behavior;
+  operational Slack forms remain gated until delegated actor, preview/version,
+  and correction contracts are designed and implemented together.
 - Current request contexts come from a browser cookie or Supabase Bearer token; a signed Slack callback cannot create an RLS-bound MGR actor.
 - Notification history has no current schema/query owner.
 - Weekly taproom counts, invitation recovery, CSV replay, some shipment invoice timing, and inventory correction remain gated in the application design.
@@ -251,14 +254,16 @@ Store normalized identifiers, installation, provider, received time, disposition
 
 ### 7.8 `chat_action_intents`
 
-Used only when interactive MGR commands become eligible.
+Used for opaque, short-lived Slack integration controls. The current actions change
+only chat state (preferences, snooze, refresh, link, and unlink); no domain command is
+executed from Slack.
 
 An opaque, expiring intent binds:
 
 - installation, brewery, linked MGR actor, provider action origin;
-- command name and canonical input hash;
+- integration action name and canonical input hash;
 - target subject/version;
-- request ID and preview token;
+- stable action request ID and preview token;
 - allowed action, expiry, consumption, and first-result reference.
 
 Provider metadata contains only the opaque intent identifier.
@@ -411,13 +416,13 @@ Only an authenticated brewery admin may start an installation.
 5. A registered operation activates the MGR installation mapping.
 6. Health checks confirm token lookup and minimum capabilities before notifications become active.
 
-Token storage and MGR activation cannot share a transaction. The durable intent therefore records each step. Callback retries are idempotent. A reconciler completes safe partial installations or deletes orphaned provider credentials.
+Token storage and MGR activation cannot share a transaction. The durable intent therefore records each step. Callback retries return their recorded disposition. A reconciler completes safe partial installations or deletes orphaned provider credentials.
 
 Disconnect behavior:
 
-1. mark the MGR installation disabled first;
+1. mark the MGR installation disconnected locally first;
 2. stop queued sends and invalidate action intents;
-3. revoke/delete provider credentials;
+3. revoke/delete provider credentials, recording retryable cleanup failure without restarting delivery;
 4. unlink destinations and users;
 5. retain a non-secret audit tombstone.
 
@@ -431,7 +436,7 @@ An emergency MGR kill switch works independently of the provider.
 4. A registered command verifies current membership in the installation's brewery and records the link.
 5. Every callback re-reads installation state, link state, brewery membership, and current role.
 
-Never auto-link by email, Slack profile, display name, or workspace domain. Customer identities are rejected. Demotion, membership removal, explicit unlink, provider deactivation, token revocation, uninstall, or brewery disconnect disables the link.
+Never auto-link by email, Slack profile, display name, or workspace domain. The authenticated page previews both identities and requires explicit consent. Customer identities are rejected. Demotion, membership removal, explicit unlink, provider deactivation, token revocation, uninstall, or brewery disconnect disables the link. Personal preferences remain readable and editable before linking and after unlinking.
 
 ## 13. Authorization and trust invariants
 
@@ -525,7 +530,7 @@ Provider event/action dedupe and MGR command request dedupe remain separate:
 
 - callback receipt dedupe prevents repeated handling of one provider callback;
 - occurrence/delivery dedupe prevents repeated notifications;
-- future command request dedupe prevents repeated domain writes.
+- ordinary browser command-request dedupe prevents repeated settings writes; Slack action intents separately replay their recorded integration result and never execute domain writes.
 
 ### 16.3 Resolution
 
@@ -739,7 +744,7 @@ No domain writes from Slack.
 
 ### Stage 2 — daily operations projection
 
-Enable the four initial reasons through App Home, state-change DMs, and twice-daily private operations summaries. Add quiet hours, message update/resolution, and integration health.
+Enable the seven current reasons through App Home, state-change DMs, and twice-daily private operations summaries. Add quiet hours, message update/resolution, and integration health.
 
 ### Stage 3 — integration-owned forms
 
@@ -768,11 +773,11 @@ Implementation updates all affected owners in the same logical changes:
 - `.agents/ARCHITECTURE.md`;
 - schema design and schema decisions;
 - UI layout plan and wireframes;
-- `public/docs/user-guide.html`;
+- `content/docs/index.mdx` and the applicable staff or portal guide;
 - `README.md` environment, setup, OAuth, and local Slack testing;
 - Slack app manifest and scope rationale;
 - HTTP/command documentation for every registered integration operation;
-- `.agents/PROGRESS.md`;
+- the pull request description, from which the documentation workflow updates progress;
 - inline module comments and stale comments in modified files.
 
 ## 25. Non-goals

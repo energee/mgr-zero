@@ -187,3 +187,21 @@ failure in a new place. Two human acts instead: archive it in Square, through
 the same Catalog write that retires a SKU out of inventory — Square owns its own
 catalog, so MGR reads that state rather than mirroring it — or mark it ignored
 by hand. `ignored` then means someone looked, never that something was inferred.
+
+**Chat is a projection, with a narrow service exception.** Provider credentials
+and Chat SDK coordination state cannot be exposed through tenant RLS, so they
+live in the isolated `chat_sdk` schema under a dedicated login. The service role
+may resolve installations and linked identities, scan current Today owners,
+lease and finish deliveries, record callback dispositions, validate private
+destinations, and change integration-owned preferences, snoozes, or links. It
+may not manufacture an MGR user session or execute an operational domain
+command. Slack operational forms therefore remain **Open in MGR**.
+
+**Notification retries have three identities because they solve three different
+problems.** Callback IDs dedupe provider delivery, semantic occurrence and
+destination keys dedupe projection work, and the normal actor/request ledger
+dedupes authenticated settings writes. Collapsing them would either trust a
+provider callback as an MGR actor or make ordinary commands depend on provider
+transport state. Disconnect stops local delivery first; credential deletion may
+retry later, and serialization prevents that cleanup from deleting a newer
+reauthorized credential.
