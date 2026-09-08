@@ -1,7 +1,8 @@
 // lib/commands/today.ts — registered `get_today`: the role-filtered Today
 // projection over one typed Postgres reader (get_today_items). The due rules
 // live in private.today_candidates; this layer only maps columns and rechecks
-// role visibility. No provider code enters the command layer.
+// role visibility. No provider code enters the command layer. Also
+// get_first_run_state, the four facts the First-run checklist reads.
 import { z } from "zod";
 import { defineQuery, unwrap, type StaffRole, STAFF_ROLES } from "./registry";
 
@@ -37,5 +38,21 @@ defineQuery({
         assignedUserId: r.assigned_user_id,
       }))
       .filter((it) => ctx.role === "admin" || (it.recipientRoles.includes(ctx.role as StaffRole) && (!it.assignedUserId || it.assignedUserId === ctx.userId)));
+  },
+});
+
+/** What the First-run checklist has left to do (Program 10 task 6). */
+defineQuery({
+  name: "get_first_run_state",
+  description: "Whether the brewery has a location, a brand, any inventory movement, and staff besides the owner; Today shows the First-run checklist until a location and a brand exist",
+  input: z.object({}), roles: STAFF_ROLES,
+  handler: async (ctx) => {
+    const has = async (table: string, min = 1) => {
+      const { count, error } = await ctx.db.from(table).select("*", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId);
+      if (error) throw error;
+      return (count ?? 0) >= min;
+    };
+    const [hasLocation, hasBrand, hasMovement, hasStaff] = await Promise.all([has("locations"), has("brands"), has("inventory_movements"), has("brewery_users", 2)]);
+    return { hasLocation, hasBrand, hasMovement, hasStaff };
   },
 });

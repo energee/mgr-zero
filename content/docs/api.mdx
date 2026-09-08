@@ -197,6 +197,7 @@ omitted. They have no roles until they are built.
 | `get_customer` | Customers | ✓ | ✓ | ✓ |  |  |
 | `get_customer_keg_balance` | Taproom & kegs | ✓ |  | ✓ |  |  |
 | `get_delivery_stop` | Delivery & routes | ✓ | ✓ | ✓ |  |  |
+| `get_first_run_state` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ |  |
 | `get_gravity_unit` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ |  |
 | `get_invoice` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `get_keg_fleet` | Taproom & kegs | ✓ |  | ✓ |  |  |
@@ -3255,6 +3256,21 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_brewery", "input": {} }'
 ```
 
+#### get_first_run_state [#get_first_run_state]
+
+`query` · admin, sales, warehouse, brewer
+
+Whether the brewery has a location, a brand, any inventory movement, and staff besides the owner; Today shows the First-run checklist until a location and a brand exist
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_first_run_state", "input": {} }'
+```
+
 #### get_gravity_unit [#get_gravity_unit]
 
 `query` · admin, sales, warehouse, brewer
@@ -3435,7 +3451,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* team-designed */}
 
-11 of the 15 operations in this area are available today; the 4 below are not.
+12 of the 16 operations in this area are available today; the 4 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 

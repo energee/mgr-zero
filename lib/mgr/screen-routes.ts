@@ -10,11 +10,13 @@ import "@/lib/commands/all";
 
 export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Today", file: "app/(app)/page.tsx" },
+  { name: "First-run checklist", file: "app/(app)/page.tsx" },
   { name: "Beer", file: "app/(app)/beer/page.tsx" },
   { name: "Work", file: "app/(app)/work/page.tsx" },
   { name: "More", file: "app/(app)/more/page.tsx" },
   { name: "Search", file: "app/(app)/search/page.tsx" },
   { name: "Entity picker", file: "components/mgr/search-palette.tsx" },
+  { name: "Me", file: "components/mgr/me-sheet.tsx" },
   { name: "Settings", file: "app/(app)/settings/page.tsx" },
   { name: "Team", file: "app/(app)/settings/team/page.tsx" },
   { name: "Permission denied", file: "app/(app)/denied/page.tsx" },

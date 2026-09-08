@@ -327,7 +327,7 @@ export const SCREENS: Screen[] = [
   {
     step: 1, slice: "all", group: "Global", surface: "sheet", name: "Me", job: "Who I am, which brewery, leave",
     to: { "Maria Alvarez": "Me" },
-    reads: "supabase_auth_get_session [platform] · get_first_run_state [view; membership list]", writes: "supabase_auth_sign_out [platform]",
+    reads: "supabase_auth_get_session [platform] · get_first_run_state", writes: "supabase_auth_sign_out [platform]",
     states: [["dedicated mode", "switcher hidden · one brewery"], ["single membership", "switcher hidden"]],
     spec: "Opened from the header Me control. Brewery switcher renders only in SaaS mode with more than one membership. Change password opens Set new password, as portal Me opens Portal set password: a signed-in person should not have to sign out and use the recovery flow. No notification history, no settings; those live under More.",
     body: (<>
@@ -699,8 +699,8 @@ export const SCREENS: Screen[] = [
     name: "First-run checklist",
     to: { "Add location": "First-run checklist", "2 \u00b7 Import CSV": "Import", "3 \u00b7 Add a brand": "Brand", Add: "Brand", "5 \u00b7 Opening inventory": "Record movement" },
     job: "Turn an empty brewery into usable truth",
-    reads: "get_first_run_state [view]",
-    writes: "create_location · invite_staff [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI]",
+    reads: "get_first_run_state",
+    writes: "invite_staff [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI] · create_location",
     states: permitted("admin only"),
     spec: "Replaces Today until complete; app and portal shells already exist. Each step is one command and all five are drawn: add a location, import a CSV, add a brand, invite staff, record a movement. The brand step was named here and never drawn, which stranded anyone not importing: a brewery with locations and no brand has nothing to record a movement against. The invite is drawn disabled with the same human copy as the Team frame until the invite workflow gate closes; the step can be skipped.",
     body: (<>

@@ -55,3 +55,14 @@ describe("list_work", () => {
     expect(all.every((r) => typeof r.label === "string" && typeof r.verb === "string")).toBe(true);
   });
 });
+
+describe("get_first_run_state", () => {
+  it("is all false on a new brewery and flips as setup lands", async () => {
+    const fresh = await makeBrewery();
+    const owner = await makeStaffCtx(fresh.id, "admin");
+    expect(await runCommand("get_first_run_state", {}, owner)).toEqual({ hasLocation: false, hasBrand: false, hasMovement: false, hasStaff: false });
+    await runCommand("create_location", { name: "WH", kind: "warehouse" }, owner);
+    await makeStaffCtx(fresh.id, "sales");
+    expect(await runCommand("get_first_run_state", {}, owner)).toMatchObject({ hasLocation: true, hasBrand: false, hasStaff: true });
+  });
+});
