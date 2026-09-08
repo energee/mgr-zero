@@ -16,10 +16,10 @@ describe("explorer parity", () => {
   });
 
   it("every live page draws in the E vocabulary, not raw markup", () => {
-    // Shell chrome (components/) and the sign-in cards (app/(auth)) draw with the ui kit; every page under a shell draws with E.
+    // Shell chrome (components/) and the sign-in cards (app/(auth)) draw with the ui kit; every page under a shell draws with E, CommandForm, or a shared screen view.
     const files = [...new Set(SCREEN_ROUTES.map((r) => r.file))].filter((f) => existsSync(f) && !f.startsWith("components/") && !f.startsWith("app/(auth)/"));
-    const raw = files.filter((f) => !/from "@\/components\/mgr\/(e|command-form)"/.test(readFileSync(f, "utf8")));
-    expect(raw, "rewrite the page with E.* or CommandForm (Program 10 task 7)").toEqual([]);
+    const raw = files.filter((f) => !/from "@\/components\/mgr\/(e|command-form|views\/[^"]+)"/.test(readFileSync(f, "utf8")));
+    expect(raw, "rewrite the page with E.*, CommandForm, or a screen view (Program 10 task 7)").toEqual([]);
   });
 
   it("every SCREEN_ROUTES row names an existing screen and file", () => {
