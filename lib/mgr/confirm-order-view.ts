@@ -14,11 +14,8 @@ export type ConfirmOrderViewModel = {
   where: string;
   state: string;
   fulfillmentSource?: string;
-  fulfillmentOptions?: string[];
   lines: ConfirmOrderLineView[];
   oversellNotes: string[];
-  complianceNote?: string;
-  showFixtureButtons?: boolean;
 };
 
 export type ConfirmOrderSnapshot = {

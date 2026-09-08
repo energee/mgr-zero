@@ -600,7 +600,7 @@ describe("SCREENS", () => {
     expect(html("Order")).not.toMatch(/Adjust line/);
     expect(html("Order")).toMatch(/>Add line</);
     expect(html("Order").match(/data-row-action[^>]*>Adjust</g)).toHaveLength(3);
-    expect(html("Confirm order")).toMatch(/Submitted · ships Thu/);
+    expect(html("Confirm order")).toMatch(/Submitted · ships 2026-09-10/);
     expect(html("Confirm order")).not.toMatch(/Next: confirm/);
     expect(html("Confirm order")).toMatch(/>Confirm order</);
     const empty = html("Today empty");

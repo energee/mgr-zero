@@ -28,11 +28,6 @@ export type OrderViewModel = {
   putBackHref?: string;
   confirmHref?: string;
   completeHref?: string;
-  complianceNote?: string;
-  adjustLines?: boolean;
-  showAddLine?: boolean;
-  showShipCancel?: boolean;
-  footerInfo?: string;
   lines: OrderLineView[];
   events: [ReactNode, ReactNode?][];
 };
@@ -47,9 +42,11 @@ export type OrderSnapshot = {
     requested_ship_date: string | null;
     note: string | null;
     needs_restock: boolean;
+    from_location_id?: string;
     customers: { name: string } | null;
     ship_tos: { label: string; city: string; state: string } | null;
   };
+  locations?: { id: string; name: string }[];
   lines: {
     id: string;
     sku_id: string;
@@ -101,9 +98,19 @@ function lineDetail(
   return bits.join(" · ");
 }
 
-/** Map a get_order payload onto OrderView's model. Fixture mocks are literals
- *  of the same type; they do not go through this function. */
-export function toOrderViewProps({ order, lines, events, atp }: OrderSnapshot): OrderViewModel {
+function restockNoteFor(order: OrderSnapshot["order"], lines: OrderSnapshot["lines"]): string | undefined {
+  if (!order.needs_restock) return undefined;
+  const bits = lines.flatMap((l) => {
+    const extra = Number(l.qty_picked ?? 0) - Number(l.qty_ordered);
+    return extra > 0 ? [`${extra} ${l.skus?.name ?? "line"}`] : [];
+  });
+  if (!bits.length) return "Staged beer stayed on the floor after this order changed.";
+  return `Put back ${bits.join(", ")}. They stayed staged after the line was adjusted.`;
+}
+
+/** Map a get_order payload onto OrderView's model. Inventory frames pass a
+ *  fixture snapshot through this same function. */
+export function toOrderViewProps({ order, lines, events, atp, locations }: OrderSnapshot): OrderViewModel {
   const atpMap = new Map(atp.map((a) => [a.sku_id, Number(a.qty)]));
   const skuNames = new Map(lines.map((l) => [l.sku_id, l.skus?.name ?? "line"]));
   const where = order.customers
@@ -115,10 +122,14 @@ export function toOrderViewProps({ order, lines, events, atp }: OrderSnapshot): 
     where,
     currentState: `${titled(order.status)}${order.needs_restock ? " · restock pending" : ""}`,
     next: `Next: ${nextState(order.status, order.needs_restock)}`,
+    fulfillmentSource: order.from_location_id
+      ? locations?.find((l) => l.id === order.from_location_id)?.name
+      : undefined,
     shipTo: order.ship_tos?.label,
     customerPo: order.po_number ?? undefined,
     requested: order.requested_ship_date ?? undefined,
     note: order.note ?? undefined,
+    restockNote: restockNoteFor(order, lines),
     putBackHref: order.status === "picked" && order.needs_restock ? `/orders/${order.id}/restock` : undefined,
     confirmHref: order.status === "submitted" ? `/orders/${order.id}/confirm` : undefined,
     completeHref: order.status === "picked" && order.kind === "taproom_transfer" ? `/orders/${order.id}/complete` : undefined,
@@ -137,7 +148,7 @@ export function toOrderViewProps({ order, lines, events, atp }: OrderSnapshot): 
     events: events.map((e) => [
       `${new Date(e.created_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" })} · ${e.event.replace(/_/g, " ")}`,
       e.event === "lines_adjusted"
-        ? `${lineChange(e.payload.before, skuNames)} → ${lineChange(e.payload.lines, skuNames)}${typeof e.payload.reason === "string" ? ` (${e.payload.reason})` : ""}`
+        ? `${lineChange(e.payload.before, skuNames)} to ${lineChange(e.payload.lines, skuNames)}${typeof e.payload.reason === "string" ? ` (${e.payload.reason})` : ""}`
         : typeof e.payload.reason === "string" ? e.payload.reason : "",
     ]),
   };

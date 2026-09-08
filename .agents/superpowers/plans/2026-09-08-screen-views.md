@@ -15,9 +15,9 @@ Program 10 still says live pages must not import inventory **bodies**. That stay
 Proven on Order. Each later screen is the same eight steps, one screen (or one sheet) per commit inside a pack PR.
 
 1. **Red.** In `tests/<pack>-view.test.ts`: the named record's `body` is `<XView model={MOCK} />`; the live file imports that view and has no `E.*` tree of its own.
-2. **Mock.** Lift the current inventory JSX into `MOCK` literals (same strings, so tap-coverage and mgr-screens stay green).
-3. **View.** `components/mgr/views/<pack>/<name>.tsx` draws only `E.*`. Optional fields hide when absent. Fixture verbs (labels tap-coverage needs) live in the view; live CommandForm verbs arrive as slots (`footer`, `lineAction`, or a fields-only body for sheets).
-4. **Adapter.** `lib/mgr/<pack>-view.ts` (or next to the view if there is no command mapping) turns the live query/command result into the same view-model type. TypeScript is the mock/live contract.
+2. **Fixture.** Add a get_order-shaped (or matching command) snapshot under `lib/mgr/fixtures/`, reusing `lib/mgr/fixtures/demo.ts` identities. Do not put sample data on the view.
+3. **View.** `components/mgr/views/<name>.tsx` draws only `E.*` from the view-model. Fixture verbs draw when `footer` / `lineAction` are omitted. Inventory-only chrome (compliance note, movement preview tape, a fulfillment pick) is a view prop, not domain data.
+4. **Adapter.** `toXViewProps(snapshot)` paints both the inventory frame (`body: <XView model={toXViewProps(fixture)} />`) and the live page. Never hand-write a view-model literal.
 5. **Page.** Fetch, `toXViewProps(...)`, fill slots, return `<XView />`. No `E.` in the page.
 6. **Reconcile.** If inventory and live disagree on a field, pick one owner (a `lib/mgr/` helper like `nextState`, else the inventory drawing) and put it in the view. Do not leave two copies.
 7. **Green.** Pack tests + `tests/mgr-screens.test.ts` + `tests/tap-coverage.test.ts` + `tests/app-screen-parity.test.ts` + `bunx tsc --noEmit`.

@@ -1,5 +1,4 @@
 // lib/mgr/complete-transfer-view.ts — view-model for Complete transfer.
-import type { ReactNode } from "react";
 import { docNo } from "./doc-no";
 
 export type CompleteTransferLineView = {
@@ -15,8 +14,6 @@ export type CompleteTransferViewModel = {
   fromLabel: string;
   toLabel: string;
   lines: CompleteTransferLineView[];
-  tape?: [ReactNode, ReactNode?][];
-  showFixtureButton?: boolean;
 };
 
 export type CompleteTransferSnapshot = {

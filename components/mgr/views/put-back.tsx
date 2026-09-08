@@ -5,14 +5,6 @@ import type { PutBackViewModel } from "@/lib/mgr/put-back-view";
 
 export type { PutBackViewModel };
 
-export const PUT_BACK_EXEMPLAR: PutBackViewModel = {
-  title: "ORD-0229 · put back",
-  note: "3 Pils cases stayed staged after the line was adjusted. Put them back on the Warehouse shelf.",
-  lines: [{ key: "pils", name: "Pils · 16 oz case", staged: "3" }],
-  verb: "Put back 3 cases",
-  showFixtureButton: true,
-};
-
 export function PutBackView({ model, footer }: { model: PutBackViewModel; footer?: ReactNode }) {
   return (
     <>
@@ -24,7 +16,7 @@ export function PutBackView({ model, footer }: { model: PutBackViewModel; footer
             <Fragment key={line.key}>{E.row(line.name, "staged after pick", line.staged, "w")}</Fragment>
           ))}
           {E.sp()}
-          {footer ?? (model.showFixtureButton && model.verb ? E.btn(model.verb) : null)}
+          {footer ?? (model.verb ? E.btn(model.verb) : null)}
         </>
       )}
     </>

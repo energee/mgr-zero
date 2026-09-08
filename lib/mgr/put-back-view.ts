@@ -10,7 +10,6 @@ export type PutBackViewModel = {
   lines: PutBackLineView[];
   verb?: string;
   empty?: boolean;
-  showFixtureButton?: boolean;
 };
 
 export type PutBackSnapshot = {

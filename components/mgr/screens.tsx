@@ -22,10 +22,16 @@
 // not an oversight.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
-import { COMPLETE_TRANSFER_EXEMPLAR, CompleteTransferView } from "@/components/mgr/views/complete-transfer";
-import { CONFIRM_ORDER_EXEMPLAR, ConfirmOrderView } from "@/components/mgr/views/confirm-order";
-import { ORDER_PICKED_RESTOCK, OrderView } from "@/components/mgr/views/order";
-import { PUT_BACK_EXEMPLAR, PutBackView } from "@/components/mgr/views/put-back";
+import { CompleteTransferView } from "@/components/mgr/views/complete-transfer";
+import { ConfirmOrderView } from "@/components/mgr/views/confirm-order";
+import { OrderView } from "@/components/mgr/views/order";
+import { PutBackView } from "@/components/mgr/views/put-back";
+import { OHIO_STOUT_NOTE, LOC_TAPROOM, LOC_WAREHOUSE } from "@/lib/mgr/fixtures/demo";
+import { completeTransferTape, orderPickedRestock, orderPickedRestockPutBack, orderSubmittedRidgeline, orderTransferComplete } from "@/lib/mgr/fixtures/orders";
+import { toCompleteTransferViewProps } from "@/lib/mgr/complete-transfer-view";
+import { toConfirmOrderViewProps } from "@/lib/mgr/confirm-order-view";
+import { toOrderViewProps } from "@/lib/mgr/order-view";
+import { toPutBackViewProps } from "@/lib/mgr/put-back-view";
 import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-icons";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
@@ -965,7 +971,7 @@ export const SCREENS: Screen[] = [
     writes: "confirm_order · cancel_order",
     states: [["loading", "order-shaped skeleton"], ["stale", "line changed · refresh", 1], ["permission", "sales or admin required", 1], ["cancelled", "staged quantities become restock work · Put back clears it"]],
     spec: "2 taps from Today: Confirm → Confirm order, only when no blocking review exists. The registration warning is the same one the Order screen shows; it links to the Compliance registry and never blocks.",
-    body: <ConfirmOrderView model={CONFIRM_ORDER_EXEMPLAR} />,
+    body: <ConfirmOrderView model={toConfirmOrderViewProps(orderSubmittedRidgeline)} fulfillmentOptions={[LOC_WAREHOUSE.name, LOC_TAPROOM.name]} complianceNote={OHIO_STOUT_NOTE} />,
   },
   {
     step: 5,
@@ -978,7 +984,7 @@ export const SCREENS: Screen[] = [
     writes: "submit_order · adjust_order_lines [sets needs_restock on a picked order] · confirm_order · cancel_order [needs_restock while quantities are staged]",
     states: [["draft", "Submit is the one active verb"], ["confirmed / picked", "lines adjust; restock rows appear when picked qty exceeds ordered"], ["shipped", "read-only tape · Return shipment is the correction"], ["delivered", "the route stamped it · read-only, Return shipment still corrects"], ["stale", "another user changed a line · refresh", 1], ["permission", "sales or admin to adjust; warehouse reads", 1]],
     spec: "Drawn as picked after a line was adjusted down: staged 3 Pils cases must go back to Warehouse. Adjusting down, shipping short and cancelling all set the restock flag; Put back is what clears it. Delivered is the last lifecycle state and arrives from Confirm delivery on the route, not from a verb here. Ship opens Ship and invoice rather than committing here. Cancel is destructive and asks for confirm. Every transition appends an order event row in the same RPC. Confirm still has its own two-tap Today frame.",
-    body: <OrderView model={ORDER_PICKED_RESTOCK} />,
+    body: <OrderView model={toOrderViewProps(orderPickedRestock)} adjustLines showAddLine complianceNote={OHIO_STOUT_NOTE} />,
   },
   {
     step: 5,
@@ -1050,13 +1056,13 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Work",
     name: "Put back",
-    to: { "Put back 3 cases": "Today" },
+    to: { "Put back 3": "Today" },
     job: "Confirm staged quantities were re-shelved after a restock",
     reads: "get_order [restock flag and staged qtys]",
     writes: "confirm_restock [one RPC: clears needs_restock + order_events row]",
     states: [["permission", "warehouse or admin required", 1], ["pending", "Today Put back is the standing row"], ["done", "flag cleared · row leaves Today"], ["cancelled order", "the flag survives cancel · this is the only way back"], ["stale", "someone re-picked · the flag is already clear", 1]],
     spec: "Today’s Put back row opens this. Staged 3 Pils cases after ORD-0229 was adjusted down. The verb writes: it clears the restock flag and appends the order event, because a cancelled order can never be re-picked or shipped and would otherwise leave its row standing on Today forever. Inventory already sits in Warehouse as staged, so nothing moves in the ledger.",
-    body: <PutBackView model={PUT_BACK_EXEMPLAR} />,
+    body: <PutBackView model={toPutBackViewProps(orderPickedRestockPutBack)} />,
   },
   {
     step: 5,
@@ -1127,13 +1133,13 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Work",
     name: "Complete transfer",
-    to: { "TRF-0088": "Order" },
+    to: { "TRF-0088": "Order", "ORD-0088": "Order" },
     job: "Finish a taproom transfer order: same movements, no invoice",
     reads: "get_order",
     writes: "ship_order [taproom_transfer kind: paired taproom_transfer movements (−source, +destination); no invoice]",
     states: [["stale", "picked qty changed · preview again", 1], ["short", "qty below picked releases the remainder"], ["permission", "warehouse or admin required", 1], ["accepted", "taproom on-hand rises immediately"]],
     spec: "No invoice-timing chip and no destination state: beer moves between the brewery’s own locations. Copper because the paired movements are append-only. Requested from Taproom · Needs replenishment.",
-    body: <CompleteTransferView model={COMPLETE_TRANSFER_EXEMPLAR} />,
+    body: <CompleteTransferView model={toCompleteTransferViewProps(orderTransferComplete)} tape={completeTransferTape} />,
   },
   {
     step: 5,
