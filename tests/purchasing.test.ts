@@ -82,7 +82,7 @@ describe("purchase orders: draft, mark sent, receive", () => {
     expect(po.po_no).toBeGreaterThan(0);
 
     // Receiving a draft is refused: sent is the state that means awaiting receipt.
-    await expect(runCommand("receive_purchase_order", { poId: po.id, locationId: wh.id, binId: wh.binId, lines: [] }, ctx)).rejects.toThrow(/draft/);
+    await expect(runCommand("receive_purchase_order", { poId: po.id, locationId: wh.id, binId: wh.binId, lines: [{ poLineId: crypto.randomUUID(), qtyCounted: 1 }] }, ctx)).rejects.toThrow(/draft/);
 
     const sent = (await runCommand("send_purchase_order", { poId: po.id, sentVia: "mailto" }, ctx)) as { status: string; sent_via: string; sent_by: string; ordered_on: string };
     expect(sent).toMatchObject({ status: "sent", sent_via: "mailto", sent_by: ctx.userId });
@@ -137,6 +137,28 @@ describe("purchase orders: draft, mark sent, receive", () => {
     expect(list.map((p) => p.id)).not.toContain(po.id);            // received POs leave the open list
     const all = (await runCommand("list_purchase_orders", { includeClosed: true }, ctx)) as { id: string; vendor_name: string; status: string }[];
     expect(all.find((p) => p.id === po.id)).toMatchObject({ vendor_name: "Country Malt", status: "received" });
+  });
+
+  it("a contracted line must be the PO vendor's contract for that material; a receipt needs a counted line; a cancelled draft is legal", async () => {
+    const a = (await runCommand("upsert_vendor", { name: "Vendor A" }, ctx)) as { id: string };
+    const bVendor = (await runCommand("upsert_vendor", { name: "Vendor B" }, ctx)) as { id: string };
+    const hop = (await runCommand("upsert_material", { name: "Idaho 7", category: "hop", baseUom: "lb", purchaseUom: "lb" }, ctx)) as { id: string };
+    const bContract = (await runCommand("upsert_material_contract", { vendorId: bVendor.id, materialId: hop.id, qtyCommitted: 100, unitCostCents: 900 }, ctx)) as { id: string };
+    await expect(runCommand("create_purchase_order", { vendorId: a.id, lines: [{ materialId: hop.id, qtyOrdered: 5, contractId: bContract.id }] }, ctx)).rejects.toThrow(/contract/);
+    const po = (await runCommand("create_purchase_order", { vendorId: bVendor.id, lines: [{ materialId: hop.id, qtyOrdered: 5, contractId: bContract.id }] }, ctx)) as { id: string };
+    expect((await admin.from("purchase_order_lines").select("unit_cost_cents").eq("po_id", po.id)).data).toEqual([{ unit_cost_cents: 900 }]);   // contract price by default
+    // An unsent PO can be cancelled without ever having a transport.
+    expect((await admin.from("purchase_orders").update({ status: "cancelled" }).eq("id", po.id).select("status")).data).toEqual([{ status: "cancelled" }]);
+    const wh = await seedLocation(b.id, { name: "Dock" });
+    const sentPo = (await runCommand("create_purchase_order", { vendorId: bVendor.id, lines: [{ materialId: hop.id, qtyOrdered: 5 }] }, ctx)) as { id: string };
+    await runCommand("send_purchase_order", { poId: sentPo.id, sentVia: "external" }, ctx);
+    await expect(runCommand("receive_purchase_order", { poId: sentPo.id, locationId: wh.id, binId: wh.binId, lines: [] }, ctx)).rejects.toThrow();
+  });
+
+  it("editing a material without a reorder point keeps the one it had", async () => {
+    const m = (await runCommand("upsert_material", { name: "Caramel 60", category: "malt", baseUom: "lb", purchaseUom: "lb", reorderPoint: 200 }, ctx)) as { id: string; reorder_point: number };
+    const edited = (await runCommand("upsert_material", { id: m.id, name: "Caramel 60L", category: "malt", baseUom: "lb", purchaseUom: "lb" }, ctx)) as { reorder_point: number };
+    expect(Number(edited.reorder_point)).toBe(200);
   });
 
   it("a PO needs at least one line, and a contract never gates ordering", async () => {

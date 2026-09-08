@@ -102,7 +102,8 @@ defineQuery({
       // Observed, never stored: n says how weak the evidence is ("14 days (n=3)").
       observed: (observed ?? []).filter((o) => o.vendor_id === v.id).map((o) => ({
         sent_via: o.sent_via as string, n: o.n as number, avg_lead_days: Number(o.avg_lead_days),
-        avg_first_lead_days: Number(o.avg_first_lead_days), avg_late_days: Number(o.avg_late_days),
+        avg_first_lead_days: Number(o.avg_first_lead_days),
+        avg_late_days: o.avg_late_days == null ? null : Number(o.avg_late_days),   // no promise on record is not "on time"
       })),
       contracts: (contracts ?? []).filter((c) => c.vendor_id === v.id).map((c) => {
         const b = balance.get(c.id as string);
@@ -185,7 +186,7 @@ defineCommand({
     lines: z.array(z.object({
       poLineId: z.string().uuid(), qtyCounted: z.number().nonnegative(),
       lotCode: z.string().trim().optional(), bestBy: isoDate.optional(),
-    })),
+    })).min(1),
   }),
   roles: [...PO_ROLES],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("receive_purchase_order", {

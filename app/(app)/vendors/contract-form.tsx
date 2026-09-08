@@ -32,7 +32,7 @@ export function ContractForm({ contract, vendors, materials }: { contract?: Cont
       unitCostCents: cost === "" ? undefined : Math.round(Number(cost) * 100),
       startsOn: startsOn || undefined, endsOn: endsOn || undefined, contractNo: contractNo || undefined,
     }),
-    reset: () => { setVendorId(contract?.vendor_id ?? ""); setMaterialId(contract?.material_id ?? ""); setQty(contract?.qty_committed?.toString() ?? ""); setCost(""); setStartsOn(contract?.starts_on ?? ""); setEndsOn(contract?.ends_on ?? ""); setContractNo(contract?.contract_no ?? ""); },
+    reset: () => { setVendorId(contract?.vendor_id ?? ""); setMaterialId(contract?.material_id ?? ""); setQty(contract?.qty_committed?.toString() ?? ""); setCost(contract?.unit_cost_cents == null ? "" : (contract.unit_cost_cents / 100).toFixed(2)); setStartsOn(contract?.starts_on ?? ""); setEndsOn(contract?.ends_on ?? ""); setContractNo(contract?.contract_no ?? ""); },
   });
   const ready = vendorId && materialId && Number(qty) > 0;
   const trigger = contract ? <Button variant="ghost" size="sm">Edit</Button> : <Button size="sm" variant="outline">Add contract</Button>;

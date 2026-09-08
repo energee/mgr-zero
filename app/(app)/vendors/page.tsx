@@ -11,7 +11,7 @@ import "@/lib/commands/all";
 import { VendorForm, type Vendor } from "./vendor-form";
 import { ContractForm, type Contract } from "./contract-form";
 
-type Observed = { sent_via: string; n: number; avg_lead_days: number; avg_late_days: number };
+type Observed = { sent_via: string; n: number; avg_lead_days: number; avg_late_days: number | null };
 type VendorRow = Vendor & {
   observed: Observed[];
   contracts: (Contract & { material_name: string | null; qty_received: number; qty_on_order: number; qty_available: number })[];

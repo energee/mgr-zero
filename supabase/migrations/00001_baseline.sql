@@ -920,7 +920,8 @@ create table purchase_orders (
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
   unique (brewery_id, po_no),
-  check ((status = 'draft') = (sent_via is null)),
+  check (status <> 'draft' or sent_via is null),                              -- a draft was never sent
+  check (status not in ('sent','partially_received','received') or sent_via is not null),  -- a sent PO says how
   foreign key (vendor_id, brewery_id) references vendors (id, brewery_id)
 );
 create index purchase_orders_status_idx on purchase_orders (brewery_id, status, expected_on);
@@ -4012,7 +4013,7 @@ begin
     end if;
     update public.materials set name = p_name, category = p_category, base_uom = p_base_uom, purchase_uom = p_purchase_uom,
       purchase_uom_factor = coalesce(p_purchase_uom_factor, 1), lot_tracked = coalesce(p_lot_tracked, lot_tracked),
-      default_vendor_id = p_default_vendor, reorder_point = p_reorder_point, active = coalesce(p_active, active)
+      default_vendor_id = p_default_vendor, reorder_point = coalesce(p_reorder_point, reorder_point), active = coalesce(p_active, active)
     where id = p_material returning * into v_row;
   end if;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
@@ -4057,6 +4058,11 @@ begin
   insert into public.purchase_orders (brewery_id, vendor_id, expected_on, note, created_by)
   values (p_brewery, p_vendor, p_expected_on, p_note, v_actor) returning * into v_po;
   for l in select * from jsonb_array_elements(p_lines) loop
+    -- The composite FK only proves the brewery; a contract drawn down here must be this vendor's, for this material.
+    if l->>'contract_id' is not null and not exists (
+      select 1 from public.material_contracts where id = (l->>'contract_id')::uuid and brewery_id = p_brewery
+        and vendor_id = p_vendor and material_id = (l->>'material_id')::uuid)
+    then raise exception 'contract % is not this vendor''s contract for that material', l->>'contract_id'; end if;
     insert into public.purchase_order_lines (brewery_id, po_id, material_id, qty_ordered, unit_cost_cents, contract_id, expected_lot_code)
     values (p_brewery, v_po.id, (l->>'material_id')::uuid, (l->>'qty_ordered')::numeric,
       coalesce((l->>'unit_cost_cents')::int, (select unit_cost_cents from public.material_contracts where id = (l->>'contract_id')::uuid and brewery_id = p_brewery)),
@@ -4106,6 +4112,7 @@ begin
   if v_po.status not in ('sent','partially_received') then
     raise exception 'purchase order is %: receiving needs a sent purchase order', v_po.status using errcode = 'MG409';
   end if;
+  if jsonb_array_length(p_lines) = 0 then raise exception 'a receipt needs at least one counted line'; end if;
   insert into public.receipts (brewery_id, po_id, received_on, received_by)
   values (p_brewery, p_po, coalesce(p_received_on, current_date), v_actor) returning id into v_receipt_id;
   for l in select * from jsonb_array_elements(p_lines) loop
@@ -4120,6 +4127,7 @@ begin
       if nullif(trim(l->>'lot_code'), '') is null then raise exception '% is lot-tracked: a lot code is required', v_mat.name; end if;
       insert into public.material_lots (brewery_id, material_id, lot_code, vendor_id, received_on, best_by)
       values (p_brewery, v_mat.id, trim(l->>'lot_code'), v_po.vendor_id, coalesce(p_received_on, current_date), (l->>'best_by')::date)
+      -- ponytail: exact (trimmed) lot-code match; case/punctuation normalization needs a generated column carrying the unique
       on conflict (material_id, lot_code) do update set best_by = coalesce(excluded.best_by, public.material_lots.best_by)
       returning id into v_lot;
     end if;
@@ -4171,7 +4179,7 @@ begin
     v_units := r.purchase_units_short;
     v_contracted := 0;
     if r.contract_id is not null then
-      select least(v_units, floor(cb.qty_available)), mc.unit_cost_cents into v_contracted, v_price
+      select greatest(least(v_units, floor(cb.qty_available)), 0), mc.unit_cost_cents into v_contracted, v_price
       from public.contract_balances cb join public.material_contracts mc on mc.id = cb.contract_id where cb.contract_id = r.contract_id;
       if v_contracted > 0 then
         insert into public.purchase_order_lines (brewery_id, po_id, material_id, qty_ordered, unit_cost_cents, contract_id)

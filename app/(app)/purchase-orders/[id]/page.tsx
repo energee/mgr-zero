@@ -64,7 +64,8 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
       )}
       {E.sp()}
       {po.status === "draft" && <MarkSentForm poId={po.id} />}
-      {receiving && <ReceiveForm poId={po.id} lines={po.lines} locations={locations} bins={bins} />}
+      {/* keyed on receipt count: router.refresh() re-renders but does not remount, so the counts reseed from the new remainder */}
+      {receiving && <ReceiveForm key={po.receipts.length} poId={po.id} lines={po.lines} locations={locations} bins={bins} />}
     </>
   );
 }
