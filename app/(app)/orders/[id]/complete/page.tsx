@@ -27,7 +27,7 @@ export default async function CompleteTransferPage({ params }: { params: Promise
   if (order.kind !== "taproom_transfer" || order.status !== "picked") redirect(`/orders/${order.id}`);
   return (
     <CompleteTransferView
-      model={toCompleteTransferViewProps({ order, lines, locations })}
+      model={toCompleteTransferViewProps({ order, lines, locations, backHref: `/orders/${order.id}` })}
       footer={<CompleteButton orderId={order.id} ship={lines.map((l) => ({ lineId: l.id, qty: Number(l.qty_picked ?? 0) }))} />}
     />
   );

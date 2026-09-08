@@ -644,7 +644,7 @@ describe("SCREENS", () => {
     }
     expect(SCREENS.some((s) => s.name === "Confirm shipment")).toBe(false);
     const pickSheet = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Pick sheet")!.body));
-    expect(pickSheet).toContain('data-direction="forward"');
+    expect(pickSheet).toMatch(/>Pick</);
     expect(pickSheet).toMatch(/Thu/);
     const pick = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Pick")!.body));
     expect(pick).toMatch(/Print/);
@@ -689,7 +689,19 @@ describe("SCREENS", () => {
     expect(shopHtml).toMatch(/Review order/);
     const history = SCREENS.find((s) => s.name === "Order history")!;
     const historyHtml = renderToStaticMarkup(createElement("div", null, history.body));
-    expect(historyHtml).toMatch(/Reorder/);
+    expect(historyHtml).toMatch(/ORD-0225/);
+    expect(historyHtml).not.toMatch(/Reorder/);
+    const detailHtml = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Order detail")!.body));
+    expect(detailHtml).toMatch(/Reorder/);
+  });
+
+  it("inventory drawings do not leak live back/list hrefs", () => {
+    const banned = /href="\/(orders|portal|customers|invoices)(\/|"|\?)/;
+    for (const s of SCREENS) {
+      if (s.venue) continue;
+      const html = renderToStaticMarkup(createElement("div", null, s.body));
+      expect(html, s.name).not.toMatch(banned);
+    }
   });
 
   it("puts a stepper on quantity rows and leaves reason unchosen", () => {

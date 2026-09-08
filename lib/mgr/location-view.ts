@@ -34,7 +34,7 @@ export function toLocationViewProps({
   backHref,
 }: LocationSnapshot): LocationViewModel {
   return {
-    backHref: backHref ?? "/locations",
+    backHref,
     name: location.name,
     type: titleKind(location.kind),
     typeOptions: TYPES,

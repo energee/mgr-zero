@@ -23,6 +23,7 @@ export default async function CustomersPage() {
       createAction={<CustomerForm channels={channels.map((c) => ({ id: c.id, name: c.name }))} />}
       search={null}
       linkRows
+      backHref="/more"
     />
   );
 }

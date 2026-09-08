@@ -73,7 +73,7 @@ import { binCold, locationBinsTaproom, locationTaproom, locationsList } from "@/
 import { completeTransferTape, newOrderDraft, orderPickedRestock, orderPickedRestockPutBack, orderSubmittedRidgeline, orderTransferComplete, ordersWorkList } from "@/lib/mgr/fixtures/orders";
 import { orderAdjustLines, orderPick, orderReturnCredit, orderShipInvoice, orderShipOnDelivery, orderShipmentDone, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
 import { parsPils } from "@/lib/mgr/fixtures/pars";
-import { pickSheet } from "@/lib/mgr/fixtures/pick-sheet";
+import { PICK_SHEET_DATE_CHIPS, pickSheet } from "@/lib/mgr/fixtures/pick-sheet";
 import { ridgelineReviewOrder, ridgelineShop } from "@/lib/mgr/fixtures/portal";
 import { portalAccountRidgeline, portalMeRidgeline } from "@/lib/mgr/fixtures/portal-account";
 import { portalInvoicePaid, portalInvoiceUnpaid, portalInvoicesRidgeline } from "@/lib/mgr/fixtures/portal-invoices";
@@ -1220,12 +1220,13 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Work",
     name: "Pick sheet",
+    to: { Pick: "Pick", Open: "Order" },
     job: "Group confirmed demand by ship date",
     reads: "daily_pick_sheet [confirmed orders by requested ship date, one fulfillment source]",
     writes: "none",
     states: [["day chosen", "confirmed orders requesting that ship date"], ["totals", "read-only · what to bring to the floor in one trip"], ["empty", "nothing confirmed for that day"], ["mixed sources", "one source at a time · a Taproom order is not on the Warehouse sheet", 1]],
     spec: "A staging aid, not a command surface: nothing here writes, and a row opens that order's Pick, which is where counting happens. Totals sum the day so a picker carries one load out instead of walking back per order; they are read-only because a total spans orders and picking is per-order. Scoped to one fulfillment source, since a sheet mixing Warehouse and Taproom lines would send someone to the wrong room.",
-    body: <PickSheetView model={toPickSheetViewProps(pickSheet)} />,
+    body: <PickSheetView model={toPickSheetViewProps(pickSheet)} filters={E.chips(PICK_SHEET_DATE_CHIPS, 1)} />,
   },
   {
     step: 5,
@@ -1629,7 +1630,7 @@ export const SCREENS: Screen[] = [
     reads: "portal_orders",
     writes: "none",
     states: [["expanded row", "lines with ordered vs shipped and plain adjusted copy"], ["no orders", "Start one from Order"]],
-    spec: "A row opens Order detail. Shipped rows offer Reorder. Adjusted quantities are stated in buyer copy. No cancel: the portal is read-only after submit, and the row says whom to call.",
+    spec: "A row opens Order detail. Reorder is on the shipped Order detail, not this list. Adjusted quantities are stated in buyer copy. No cancel: the portal is read-only after submit, and the row says whom to call.",
     body: <PortalOrdersView model={toPortalOrdersViewProps(portalOrdersList)} />,
   },
   {

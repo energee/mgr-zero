@@ -239,7 +239,7 @@ A picked taproom transfer shows **Complete transfer** on its order page: the sam
 | **Confirm delivery** | Shipped, on a route stop | Opens from Today's delivery row or the route's **Resume** (the route's assigned driver, or Admin) at the stop's own page: customer, ship-to, shipped lines, and the invoice timing saved at ship. Type the receiving name and press **Delivered**: the stop is stamped delivered and, when the shipment was **Invoice on delivery**, the invoice is raised now from the shipped quantities at the order's prices. Nothing moves in stock; shipping already did that. A delivered stop shows the name and the invoice number instead of the button, and confirming it again is refused as already delivered. |
 | **Put back** | Any order flagged for restocking | Opened from Today's **Put back** row (Warehouse or Admin). The page lists each line's staged quantity: everything picked on a cancelled order, or the picked excess on an order adjusted down. **Put back N** clears the flag and records a *restocked* event; nothing moves in the ledger, because the beer never left the warehouse. An order whose flag is already clear says so instead of offering the button. |
 
-The order detail shows the fulfillment source, customer and ship-to for wholesale orders, PO, requested date, ordered/picked/shipped quantity, captured price, current ATP, and a time-stamped event history. When restock is pending it names what to put back. The current detail page does not display a taproom transfer's destination, and it does not show the order note. A note entered by a portal customer is visible only on the portal's own order detail. An empty order list says **No orders yet.** An empty timeline says **No events yet.** A shipped or cancelled order has no further action controls.
+The order detail shows the fulfillment source, customer and ship-to for wholesale orders, PO, requested date, the order note when one was entered, ordered/picked/shipped quantity, captured price, current ATP, and a time-stamped event history. When restock is pending it names what to put back and marks current state as needing attention. The current detail page does not display a taproom transfer's destination. An empty order list says **No orders yet.** An empty timeline says **No events yet.** A shipped or cancelled order has no further action controls.
 
 ## Pick sheet [#pick-sheet]
 
@@ -247,9 +247,9 @@ The order detail shows the fulfillment source, customer and ship-to for wholesal
 
 *Admin and Warehouse can open Pick from the Work tab. The page also opens for Sales when the address is entered directly, but it is not linked in Sales navigation.*
 
-Open **Pick** to see confirmed and picked orders grouped by requested ship date. Orders without a date sit under **Unscheduled**. Each card shows ordered and previously picked amounts and links to the order detail, where picking is recorded.
+Open **Pick** to see confirmed and picked orders grouped by requested ship date. Orders without a date sit under **Unscheduled**. Each row shows the line count and status; **Pick** opens a confirmed order and **Open** opens a picked one, where picking is recorded.
 
-Select **Print** to open the browser print dialog. MGR hides the staff navigation in the printed copy. If nothing is ready, the page says **No confirmed orders to pick**.
+Select **Print** to open the browser print dialog. MGR hides the staff navigation in the printed copy. If nothing is ready, the page says **Nothing confirmed to pick**.
 
 ## Invoices and credit memos [#invoices]
 
@@ -361,13 +361,14 @@ Each pool row shows the kegs each bin holds per size, so 36 in the taproom and 4
 
 *Admin, Sales, and Warehouse can open Replenishment. Admin and Sales can create a replenishment order. **Create replenishment order** also appears for Warehouse, but submitting it returns a permission error.*
 
-1. Open **Replenishment** and choose a taproom. The first taproom is selected by default.
-2. Review each SKU's par, on-hand amount, and suggested quantity. Suggested quantity is the par shortfall, never less than zero.
-3. Choose **From warehouse**. The first warehouse is selected by default when one exists.
-4. Edit **Transfer qty** as needed. Only positive lines are included.
-5. Select **Create replenishment order**. MGR creates it already confirmed, ready for warehouse picking.
+1. Open **Replenishment** and choose a taproom. The first taproom is selected by default. The title is **Pars and allocation**.
+2. Standing allocations for that taproom list quantity only. Edit and Edit par are not on this page; par lives in the replenish table below. A brewery-wide shortfall for one of this taproom's SKUs shows as ATP in units, never a made-up barrel volume.
+3. Review each SKU's par, on-hand amount, and suggested quantity. Suggested quantity is the par shortfall, never less than zero.
+4. Choose **From warehouse**. The first warehouse is selected by default when one exists.
+5. Edit **Transfer qty** as needed. Only positive lines are included.
+6. Select **Create replenishment order**. MGR creates it already confirmed, ready for warehouse picking.
 
-The page says **No taprooms configured.** when none exist, or **No pars set for this taproom.** when there are no suggestions. The current interface has no controls to create locations or set par levels.
+The page says **No taprooms yet: add one under Locations** when none exist. The replenish table is empty when there are no suggestions. The current interface has no controls to create locations or set par levels.
 
 ## Recipes [#recipes]
 

@@ -1,5 +1,6 @@
-// components/mgr/views/short-pick.tsx — Short pick drawing. Inventory and the
-// live sheet both pass toShortPickViewProps(get_order + the short line).
+// components/mgr/views/short-pick.tsx — Short pick drawing. Inventory mounts
+// this view. Live create/edit stays short-pick-form.tsx (CommandForm; E.stq is
+// not a controlled input).
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { ShortPickViewModel } from "@/lib/mgr/short-pick-view";

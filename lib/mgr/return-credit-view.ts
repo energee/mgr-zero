@@ -41,6 +41,7 @@ export type ReturnCreditSnapshot = {
   deposit?: { label: string; cents: number };
   locations: { id: string; name: string }[];
   reason?: "damaged" | "wrong_item" | "unsold";
+  backHref?: string;
 };
 
 const REASONS = ["damaged", "wrong item", "unsold"];
@@ -53,7 +54,7 @@ function shortName(name: string) {
 
 /** Map get_order / get_invoice plus the return qty onto ReturnCreditView. */
 export function toReturnCreditViewProps({
-  order, invoice, lines, deposit, locations, reason = "damaged",
+  order, invoice, lines, deposit, locations, reason = "damaged", backHref,
 }: ReturnCreditSnapshot): ReturnCreditViewModel {
   const from = locations.find((l) => l.id === order.from_location_id);
   const returnToOptions = locations.map((l) => (
@@ -74,7 +75,7 @@ export function toReturnCreditViewProps({
   tape.push(["credit memo number · on commit", money(-creditCents)]);
   return {
     backTo: docNo("ORD", order.order_no, "Order"),
-    backHref: `/orders/${order.id}`,
+    backHref,
     title: "Beer return",
     lines: lines.map((l) => ({
       key: l.id,

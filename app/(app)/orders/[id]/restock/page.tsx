@@ -19,7 +19,7 @@ export default async function RestockPage({ params }: { params: Promise<{ id: st
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const { order, lines } = await orNotFound(runCommand("get_order", { orderId: id }, ctx) as Promise<{ order: Order; lines: Line[] }>);
-  const model = toPutBackViewProps({ order, lines });
+  const model = toPutBackViewProps({ order, lines, backHref: "/" });
   return (
     <PutBackView
       model={model}

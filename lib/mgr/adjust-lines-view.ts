@@ -18,6 +18,7 @@ export type AdjustLinesViewModel = {
 
 export type AdjustLinesSnapshot = {
   order: { id: string; order_no: number | null; customers?: { name: string } | null };
+  backHref?: string;
   lines: {
     id: string;
     sku_id: string;
@@ -28,10 +29,10 @@ export type AdjustLinesSnapshot = {
 };
 
 /** Map a get_order payload onto AdjustLinesView. qty_ordered is the edit value. */
-export function toAdjustLinesViewProps({ order, lines }: AdjustLinesSnapshot): AdjustLinesViewModel {
+export function toAdjustLinesViewProps({ order, lines, backHref }: AdjustLinesSnapshot): AdjustLinesViewModel {
   return {
     backTo: docNo("ORD", order.order_no, "Order"),
-    backHref: `/orders/${order.id}`,
+    backHref,
     title: "Adjust lines",
     lines: lines.map((l) => {
       const ordered = Number(l.qty_ordered);

@@ -1,5 +1,6 @@
 // components/mgr/views/ship.tsx — Ship drawing for Invoice now and On delivery.
-// Inventory and the live form both pass toShipViewProps(get_order-shaped data).
+// Inventory mounts this view. Live create/edit stays ship-form.tsx (CommandForm;
+// E.stq / E.pick are not controlled inputs).
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { ShipViewModel } from "@/lib/mgr/ship-view";

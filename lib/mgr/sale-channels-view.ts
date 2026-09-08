@@ -16,6 +16,7 @@ export type SaleChannelsViewModel = {
 };
 
 export type SaleChannelsSnapshot = {
+  backHref?: string;
   channels: {
     id: string;
     name: string;
@@ -34,9 +35,9 @@ function detail(c: SaleChannelsSnapshot["channels"][number]): string {
 }
 
 /** Map a list_sale_channels payload onto SaleChannelsView. */
-export function toSaleChannelsViewProps({ channels }: SaleChannelsSnapshot): SaleChannelsViewModel {
+export function toSaleChannelsViewProps({ channels, backHref }: SaleChannelsSnapshot): SaleChannelsViewModel {
   return {
-    backHref: "/settings",
+    backHref,
     empty: channels.length === 0 ? "No sale channels yet" : undefined,
     rows: channels.map((c) => ({
       key: c.id,

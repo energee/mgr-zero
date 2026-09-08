@@ -46,6 +46,13 @@ describe("Order view loop", () => {
     expect(html).toMatch(/Picked · restock pending/);
     expect(html).toMatch(/Cancel order/);
     expect(html).toMatch(/>Put back</);
+    expect(html).toMatch(/Needs attention/);
+    const state = html.indexOf("Current state");
+    const ship = html.indexOf(">Ship<");
+    const line = html.indexOf("Hazy IPA");
+    expect(state).toBeGreaterThan(-1);
+    expect(ship).toBeGreaterThan(state);
+    expect(line).toBeGreaterThan(ship);
   });
 
   it("the inventory Order drawing never emits a live /orders href", () => {

@@ -37,6 +37,7 @@ export type BrandSnapshot = {
   categories?: string[];
   /** list_price_groups. */
   priceGroups: { id: string; name: string }[];
+  backHref?: string;
 };
 
 export function toBrandViewProps({
@@ -44,13 +45,14 @@ export function toBrandViewProps({
   styles,
   categories = CATEGORIES,
   priceGroups,
+  backHref,
 }: BrandSnapshot): BrandViewModel {
   const group = priceGroups.find((g) => g.id === brand.price_group_id);
   const active = brand.skus.filter((s) => s.active).length;
   const style = brand.styles?.name ?? "";
   const styleOptions = style && !styles.includes(style) ? [style, ...styles] : styles;
   return {
-    backHref: "/catalog",
+    backHref,
     name: brand.name,
     style,
     styleOptions,

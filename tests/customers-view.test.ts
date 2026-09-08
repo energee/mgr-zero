@@ -1,7 +1,7 @@
 // tests/customers-view.test.ts — Customers list, Customer detail, and
 // Ship-to form share adapters with list_customers / get_customer snapshots.
 import { readFileSync } from "node:fs";
-import { isValidElement } from "react";
+import { createElement, isValidElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
@@ -43,6 +43,7 @@ describe("Customers list", () => {
     expect(src).toMatch(/<CustomersView\b/);
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
     expect(src).toMatch(/<CustomerForm\b/);
+    expect(src).toMatch(/backHref="/);
   });
 });
 
@@ -74,7 +75,22 @@ describe("Customer detail", () => {
     const src = readFileSync("app/(app)/customers/[id]/page.tsx", "utf8");
     expect(src).toMatch(/<CustomerView\b/);
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
-    expect(src).toMatch(/readOnly/);
+    expect(src).toMatch(/detail=\{/);
+    expect(src).not.toMatch(/readOnly/);
+    expect(src).toMatch(/backHref: "\/customers"/);
+  });
+
+  it("a detail slot paints flds and ship-tos instead of the edit tree", () => {
+    const markup = html(createElement(CustomerView, {
+      model: toCustomerViewProps(customerRidgeline),
+      detail: { shipTos: [{ key: "s1", title: "Main", detail: "dock" }], kegHref: "/kegs/x" },
+    }));
+    expect(markup).toMatch(/Type/);
+    expect(markup).toMatch(/Retailer/);
+    expect(markup).toMatch(/Main/);
+    expect(markup).toMatch(/>Open</);
+    expect(markup).not.toMatch(/>Save customer</);
+    expect(markup).not.toMatch(/Customer name/);
   });
 });
 

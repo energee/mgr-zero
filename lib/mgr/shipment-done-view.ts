@@ -23,6 +23,7 @@ export type ShipmentDoneSnapshot = {
     bbl_per_unit?: number;
     skus: { name: string } | null;
   }[];
+  backHref?: string;
 };
 
 function shortName(name: string, qty: number) {
@@ -36,7 +37,7 @@ function saleVolume(qty: number, bblPerUnit: number | undefined) {
 }
 
 /** Map get_order + get_invoice onto ShipmentDoneView. */
-export function toShipmentDoneViewProps({ order, invoice, lines }: ShipmentDoneSnapshot): ShipmentDoneViewModel {
+export function toShipmentDoneViewProps({ order, invoice, lines, backHref }: ShipmentDoneSnapshot): ShipmentDoneViewModel {
   const dest = order.ship_tos?.state ?? "";
   const inv = docNo("INV", invoice?.invoice_no ?? null, "Invoice");
   const tape: [string, string][] = [];
@@ -49,7 +50,7 @@ export function toShipmentDoneViewProps({ order, invoice, lines }: ShipmentDoneS
   tape.push([inv, "invoiced now"]);
   return {
     backTo: docNo("ORD", order.order_no, "Order"),
-    backHref: `/orders/${order.id}`,
+    backHref,
     title: "Shipped",
     invoice: `${inv} · assigned`,
     tape,

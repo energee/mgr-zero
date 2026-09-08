@@ -24,7 +24,7 @@ export default async function LocationBinsPage({ params }: { params: Promise<{ i
   const canWrite = brewery.role === "admin" || brewery.role === "warehouse";
   return (
     <LocationBinsView
-      model={toLocationBinsViewProps({ location, bins })}
+      model={toLocationBinsViewProps({ location, bins, backHref: `/locations/${id}` })}
       createAction={canWrite ? <BinForm locationId={id} /> : null}
       bins={bins.map((b) => ({
         key: b.id,

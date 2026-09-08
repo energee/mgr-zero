@@ -23,7 +23,7 @@ export default async function LocationPage({ params }: { params: Promise<{ id: s
   const bins = (await runCommand("list_bins", { locationId: id }, ctx)) as { name: string }[];
   return (
     <LocationView
-      model={toLocationViewProps({ location, bins })}
+      model={toLocationViewProps({ location, bins, backHref: "/locations" })}
       readOnly
       headerAction={brewery.role === "admin" ? <LocationForm location={location} /> : undefined}
     />

@@ -19,6 +19,9 @@ const line = (
   skus: { name: sku.name },
 });
 
+/** Inventory weekday chips. Live passes filters={null}. */
+export const PICK_SHEET_DATE_CHIPS = ["Wed 9/2", "Thu 9/3", "Fri 9/4"];
+
 /** Confirmed demand for Thu 2026-09-03: three orders, Hazy 9 + Pils 22. */
 export const pickSheet: PickSheetSnapshot = {
   orders: [

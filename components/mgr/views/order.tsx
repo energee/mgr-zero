@@ -32,7 +32,7 @@ export function OrderView({
     <>
       {E.back("Orders", model.title, undefined, backHref)}
       {E.ttl(model.where)}
-      {E.row("Current state", model.currentState, E.status(model.next))}
+      {E.row("Current state", model.currentState, E.status(model.next), model.restockNote ? "w" : "")}
       {model.canPutBack ? E.act("Put back", "attention", putBackHref) : null}
       {model.canConfirm ? E.act("Review and confirm", "success", confirmHref) : null}
       {model.canComplete ? E.act("Complete transfer", "success", completeHref) : null}
@@ -42,6 +42,8 @@ export function OrderView({
       {model.requested ? E.fld("Requested", model.requested) : null}
       {model.note ? E.fld("Note", model.note) : null}
       {model.restockNote ? E.note(model.restockNote) : null}
+      {footer ?? E.btns([["Ship", "p"], ["Cancel order", "del"]])}
+      {!footer ? E.info("Cancel asks you to confirm. Allocations release.") : null}
       {model.lines.map((line) => (
         <Fragment key={line.key}>
           {E.row(line.name, line.detail, adjustLines ? E.act("Adjust", "attention") : "", line.tone ?? "")}
@@ -50,8 +52,6 @@ export function OrderView({
       {showAddLine ? E.btn("Add line", "g") : null}
       {complianceNote ? E.note(complianceNote) : null}
       {model.events.length === 0 ? E.blank("No events yet") : E.tape(model.events)}
-      {footer ?? E.btns([["Ship", "p"], ["Cancel order", "del"]])}
-      {!footer ? E.info("Cancel asks you to confirm. Allocations release.") : null}
     </>
   );
 }

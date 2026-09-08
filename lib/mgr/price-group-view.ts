@@ -6,6 +6,7 @@ import { plural } from "./plural";
 import type { PriceGroupsSnapshot } from "./price-groups-view";
 
 export type PriceGroupViewModel = {
+  backHref?: string;
   name: string;
   position: string;
   costCeiling: string;
@@ -46,6 +47,7 @@ export function toPriceGroupViewProps(snapshot: PriceGroupSnapshot): PriceGroupV
   if (!group) throw new Error("price group not found");
   const previous = index > 0 ? ordered[index - 1] : undefined;
   return {
+    backHref: snapshot.backHref,
     name: group.name,
     position: String(group.position),
     costCeiling: group.cost_ceiling_cents == null ? "" : money(group.cost_ceiling_cents),

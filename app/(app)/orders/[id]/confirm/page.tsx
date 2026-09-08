@@ -27,7 +27,7 @@ export default async function ConfirmOrderPage({ params }: { params: Promise<{ i
   if (order.status !== "submitted") redirect(`/orders/${order.id}`);
   return (
     <ConfirmOrderView
-      model={toConfirmOrderViewProps({ order, lines, atp, locations })}
+      model={toConfirmOrderViewProps({ order, lines, atp, locations, backHref: "/orders" })}
       footer={<ConfirmButtons orderId={order.id} />}
     />
   );

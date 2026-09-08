@@ -24,7 +24,7 @@ export default async function ChannelsPage() {
   const channels = (await runCommand("list_sale_channels", {}, await buildContext(brewery.id))) as SaleChannel[];
   return (
     <SaleChannelsView
-      model={toSaleChannelsViewProps({ channels })}
+      model={toSaleChannelsViewProps({ channels, backHref: "/settings" })}
       createAction={<ChannelForm />}
       info={TAX_INFO}
       rowTrailing={(id) => {

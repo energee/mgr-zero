@@ -8,7 +8,7 @@ export type { PriceGroupViewModel };
 export function PriceGroupView({ model }: { model: PriceGroupViewModel }) {
   return (
     <>
-      {E.back("Price groups", model.name, undefined, "/pricing")}
+      {E.back("Price groups", model.name, undefined, model.backHref)}
       {E.edit("Group name", model.name)}
       {E.edit("Position", model.position, "number")}
       {E.edit("Cost ceiling", model.costCeiling)}

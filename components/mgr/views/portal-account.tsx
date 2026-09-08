@@ -1,6 +1,5 @@
 // components/mgr/views/portal-account.tsx — portal Account drawing. Inventory
-// paints from toPortalAccountViewProps(get_portal_account); live still has
-// its own E.* tree until wired.
+// and the live page both mount this view from toPortalAccountViewProps.
 import { Fragment } from "react";
 import { E } from "@/components/mgr/e";
 import type { PortalAccountViewModel } from "@/lib/mgr/portal-account-view";

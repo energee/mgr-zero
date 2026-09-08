@@ -29,13 +29,13 @@ export function ParsView({
       {empty ? E.blank(empty) : (
         <>
           {filters}
-          {E.num(model.atp, model.atpDetail)}
+          {model.atp ? E.num(model.atp, model.atpDetail) : null}
           {model.rows.map((row) => (
             <Fragment key={row.key}>
-              {E.row(row.title, row.detail, E.act(row.verb, row.tone, linkRows ? row.href : undefined))}
+              {E.row(row.title, row.detail, row.verb ? E.act(row.verb, row.tone, linkRows ? row.href : undefined) : "")}
             </Fragment>
           ))}
-          {footer ?? E.btns([["Adjust selected", "p"], ["Edit par", "g"]])}
+          {footer === undefined ? E.btns([["Adjust selected", "p"], ["Edit par", "g"]]) : footer}
         </>
       )}
     </>

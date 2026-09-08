@@ -1,13 +1,11 @@
 // components/mgr/views/pick-sheet.tsx — Work → Pick sheet. Live passes
-// PrintButton as printAction and its own filters (or null to hide chips);
-// inventory uses the weekday chips. Rows and totals come from the adapter.
+// PrintButton as printAction and filters={null}; inventory passes weekday
+// chips from the fixture. Rows and totals come from the adapter.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { PickSheetViewModel } from "@/lib/mgr/pick-sheet-view";
 
 export type { PickSheetViewModel };
-
-const DATE_CHIPS = ["Wed 9/2", "Thu 9/3", "Fri 9/4"];
 
 export function PickSheetView({
   model,
@@ -18,16 +16,16 @@ export function PickSheetView({
 }: {
   model: PickSheetViewModel;
   printAction?: ReactNode;
-  /** Omit for the inventory chips. Pass `null` on the live page, which has none. */
+  /** Inventory weekday chips. Live passes `null`. */
   filters?: ReactNode;
-  /** Live list: the whole row is the order link. Inventory leaves taps unlabeled. */
+  /** Live list: the verb is the order link. Inventory leaves taps unlabeled. */
   linkRows?: boolean;
   backHref?: string;
 }) {
   return (
     <>
       {E.back("Work", "Pick sheet", printAction, backHref)}
-      {filters !== undefined ? filters : E.chips(DATE_CHIPS, 1)}
+      {filters}
       {model.empty
         ? E.blank(model.empty)
         : model.groups.map((group) => (
@@ -35,7 +33,7 @@ export function PickSheetView({
             {E.ttl(group.title)}
             {group.rows.map((row) => (
               <Fragment key={row.key}>
-                {E.nav(row.title, row.detail, "", undefined, linkRows ? row.href : undefined)}
+                {E.row(row.title, row.detail, E.act(row.verb, "info", linkRows ? row.href : undefined))}
               </Fragment>
             ))}
             {E.row("Totals", group.totals)}

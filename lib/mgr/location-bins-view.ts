@@ -28,7 +28,7 @@ export function toLocationBinsViewProps({
 }: LocationBinsSnapshot): LocationBinsViewModel {
   return {
     backLabel: backLabel ?? location.name,
-    backHref: backHref ?? `/locations/${location.id}`,
+    backHref,
     rows: bins.map((b) => ({
       key: b.id,
       title: b.name,

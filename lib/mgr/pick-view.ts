@@ -27,14 +27,15 @@ export type PickSnapshot = {
     skus: { name: string } | null;
   }[];
   locations: { id: string; name: string }[];
+  backHref?: string;
 };
 
 /** Map get_order onto PickView. Count defaults to qty_picked, else qty_ordered. */
-export function toPickViewProps({ order, lines, locations }: PickSnapshot): PickViewModel {
+export function toPickViewProps({ order, lines, locations, backHref }: PickSnapshot): PickViewModel {
   const source = locations.find((l) => l.id === order.from_location_id)?.name ?? "—";
   return {
     backTo: docNo("ORD", order.order_no, "Order"),
-    backHref: `/orders/${order.id}`,
+    backHref,
     title: `Pick · ${source}`,
     info: `From ${source} · lines start at ordered; touch only exceptions.`,
     lines: lines.map((l) => {

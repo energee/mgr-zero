@@ -16,15 +16,16 @@ export type UnitsSnapshot = {
   brewery: GravityUnit;
   mine: GravityUnit | null;
   effective: GravityUnit;
+  backHref?: string;
 };
 
 const breweryOptions = GRAVITY_UNITS.map(gravityUnitLabel);
 const mineOptions = ["Use brewery default", ...breweryOptions];
 
 /** Map a get_gravity_unit payload onto UnitsView. */
-export function toUnitsViewProps({ brewery, mine, effective }: UnitsSnapshot): UnitsViewModel {
+export function toUnitsViewProps({ brewery, mine, effective, backHref }: UnitsSnapshot): UnitsViewModel {
   return {
-    backHref: "/settings",
+    backHref,
     breweryOptions,
     breweryIndex: GRAVITY_UNITS.indexOf(brewery),
     mineOptions,

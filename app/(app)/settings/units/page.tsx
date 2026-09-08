@@ -22,7 +22,7 @@ export default async function UnitsPage() {
   const units = (await runCommand("get_gravity_unit", {}, ctx)) as Effective;
   return (
     <UnitsView
-      model={toUnitsViewProps(units)}
+      model={toUnitsViewProps({ ...units, backHref: "/settings" })}
       controls={<GravityUnitForm brewery={units.brewery} mine={units.mine} canSetBrewery={ctx.role === "admin"} />}
     />
   );

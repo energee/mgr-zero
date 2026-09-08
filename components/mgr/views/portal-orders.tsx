@@ -1,5 +1,6 @@
 // components/mgr/views/portal-orders.tsx — portal Order history. Live passes
-// linkRows so verbs/nav are real links; inventory leaves taps unlabeled.
+// linkRows so nav rows are real links; inventory leaves taps unlabeled.
+// Reorder is on Order detail, not these rows.
 import { Fragment } from "react";
 import { E } from "@/components/mgr/e";
 import type { PortalOrdersViewModel } from "@/lib/mgr/portal-orders-view";
@@ -11,7 +12,7 @@ export function PortalOrdersView({
   linkRows,
 }: {
   model: PortalOrdersViewModel;
-  /** Live list: Reorder and nav rows are links. Inventory leaves them unlabeled. */
+  /** Live list: each row is the order-detail link. Inventory leaves them unlabeled. */
   linkRows?: boolean;
 }) {
   return (
@@ -21,9 +22,7 @@ export function PortalOrdersView({
         ? E.blank(model.empty)
         : model.rows.map((row) => (
           <Fragment key={row.key}>
-            {row.verb === "Reorder"
-              ? E.row(row.title, row.detail, E.act("Reorder", "primary", linkRows ? row.href : undefined), row.warning ? "w" : "")
-              : E.nav(row.title, row.detail, row.warning ? "w" : "", undefined, linkRows ? row.href : undefined)}
+            {E.nav(row.title, row.detail, row.warning ? "w" : "", undefined, linkRows ? row.href : undefined)}
           </Fragment>
         ))}
       {E.info(model.info)}

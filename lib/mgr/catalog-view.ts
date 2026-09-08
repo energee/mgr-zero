@@ -37,6 +37,7 @@ export type CatalogSnapshot = {
   channels?: { id: string; name: string }[];
   /** Inventory-only until list_water_profiles exists. */
   waterProfileCount?: number;
+  backHref?: string;
 };
 
 function brandDetail(b: CatalogBrandRow): string {
@@ -51,10 +52,11 @@ export function toCatalogViewProps({
   priceGroups,
   channels,
   waterProfileCount,
+  backHref,
 }: CatalogSnapshot): CatalogViewModel {
   const groupCopy = plural(priceGroups.length, "group");
   return {
-    backHref: "/more",
+    backHref,
     empty: brands.length === 0 ? "No brands yet" : undefined,
     brands: brands.map((b) => ({
       key: b.id,

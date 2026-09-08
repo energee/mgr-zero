@@ -22,6 +22,27 @@ describe("Pars view", () => {
     expect(model.rows[1]?.tone).toBe("destructive");
     expect(model.rows[2]?.title).toBe("Taproom standing");
     expect(model.rows[3]?.title).toBe("Taproom par");
+    expect(model.backHref).toBeUndefined();
+  });
+
+  it("omits ATP and inert Edit verbs when there is no SKU-scoped shortfall", () => {
+    const model = toParsViewProps({
+      standing: parsPils.standing,
+      orderAllocations: [],
+      par: null,
+    });
+    expect(model.title).toBe("Pars and allocation");
+    expect(model.atp).toBeUndefined();
+    expect(model.rows).toHaveLength(1);
+    expect(model.rows[0]?.title).toBe("Taproom standing");
+    expect(model.rows[0]?.detail).toBe("6");
+    expect(model.rows[0]?.verb).toBeUndefined();
+    const html = renderToStaticMarkup(createElement(ParsView, { model, footer: null }));
+    expect(html).toMatch(/Taproom standing/);
+    expect(html).not.toMatch(/ATP/);
+    expect(html).not.toMatch(/0\.00 bbl/);
+    expect(html).not.toMatch(/>Edit</);
+    expect(html).not.toMatch(/>Edit par</);
   });
 
   it("renders those verbs from the view", () => {
@@ -47,5 +68,11 @@ describe("Pars view", () => {
     expect(src).toMatch(/<ParsView\b/);
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
     expect(src).toMatch(/<ReplenishForm\b/);
+    expect(src).toMatch(/backHref: "\/inventory"/);
+    expect(src).not.toMatch(/get_shortfalls/);
+    expect(src).not.toMatch(/shortfalls\[0\]/);
+    expect(src).not.toMatch(/bblPerUnit: 0/);
+    expect(src).not.toMatch(/unit: "case"/);
+    expect(src).not.toMatch(/atp: 0/);
   });
 });

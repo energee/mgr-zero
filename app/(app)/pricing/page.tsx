@@ -28,6 +28,7 @@ export default async function PricingPage() {
   return (
     <PriceGroupsView
       model={toPriceGroupsViewProps({ channels, groups, formats, cells })}
+      backHref="/catalog"
       createAction={<GroupForm defaultPosition={groups.length + 1} />}
       tables={
         <>

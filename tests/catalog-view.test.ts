@@ -48,7 +48,7 @@ describe("Catalog view", () => {
     expect(model.brands[2]?.detail).toBe("Stout · 7.2% · 1 SKU");
     expect(model.priceGroups).toBe("3 channels · 8 groups");
     expect(model.waterProfiles).toBe("3 profiles");
-    expect(model.backHref).toBe("/more");
+    expect(model.backHref).toBeUndefined();
   });
 
   it("omits water profiles when the snapshot has no count", () => {
@@ -120,6 +120,7 @@ describe("Catalog view", () => {
     expect(src).toMatch(/<BrandForm\b/);
     expect(src).not.toMatch(/from "@\/components\/mgr\/views\/formats"/);
     expect(src).not.toMatch(/waterProfileCount/);
+    expect(src).toMatch(/backHref: "\/more"/);
   });
 });
 

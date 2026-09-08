@@ -31,17 +31,18 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   );
   return (
     <CustomerView
-      model={toCustomerViewProps({ customer, shipTos })}
+      model={toCustomerViewProps({ customer, shipTos, backHref: "/customers" })}
       headerAction={edit}
-      readOnly
-      kegHref={`/kegs/customers/${customer.id}`}
-      addShipTo={<ShipToForm customerId={customer.id} />}
-      shipTos={shipTos.map((s) => ({
-        key: s.id,
-        title: s.label,
-        detail: `${s.address1}${s.address2 ? `, ${s.address2}` : ""} · ${s.city}, ${s.state} ${s.zip}`,
-        action: <ShipToForm customerId={customer.id} shipTo={s} />,
-      }))}
+      detail={{
+        kegHref: `/kegs/customers/${customer.id}`,
+        addShipTo: <ShipToForm customerId={customer.id} />,
+        shipTos: shipTos.map((s) => ({
+          key: s.id,
+          title: s.label,
+          detail: `${s.address1}${s.address2 ? `, ${s.address2}` : ""} · ${s.city}, ${s.state} ${s.zip}`,
+          action: <ShipToForm customerId={customer.id} shipTo={s} />,
+        })),
+      }}
     />
   );
 }

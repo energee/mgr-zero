@@ -15,6 +15,7 @@ export type PriceGroupsViewModel = {
 };
 
 export type PriceGroupsSnapshot = {
+  backHref?: string;
   channels: { id: string; name: string }[];
   groups: { id: string; name: string; position: number; cost_ceiling_cents: number | null }[];
   formats: { id: string; name: string }[];

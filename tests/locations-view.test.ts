@@ -113,7 +113,7 @@ describe("Location detail", () => {
     expect(model.timezone).toBe("Brewery default · America/New_York");
     expect(model.bins).toBe("Walk-in · Cold · Dry");
     expect(model.binsHref).toBe(`/locations/${LOC_TAPROOM.id}/bins`);
-    expect(model.backHref).toBe("/locations");
+    expect(model.backHref).toBeUndefined();
   });
 
   it("timezone without an IANA extra is the brewery default", () => {
@@ -179,6 +179,7 @@ describe("Location detail", () => {
     expect(src).toMatch(/<LocationView\b/);
     expect(src).toMatch(/readOnly/);
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
+    expect(src).toMatch(/backHref: "\/locations"/);
   });
 });
 
@@ -186,7 +187,7 @@ describe("Location bins", () => {
   it("maps list_bins with optional qty copy and the parent back label", () => {
     const model = toLocationBinsViewProps(locationBinsTaproom);
     expect(model.backLabel).toBe("Location detail");
-    expect(model.backHref).toBe(`/locations/${LOC_TAPROOM.id}`);
+    expect(model.backHref).toBeUndefined();
     expect(model.rows.map((r) => [r.title, r.detail])).toEqual([
       ["Walk-in", "38 cases · 12 kegs"],
       ["Cold", "22 cases"],
@@ -249,6 +250,7 @@ describe("Location bins", () => {
     expect(src).toMatch(/from "@\/components\/mgr\/views\/location-bins"/);
     expect(src).toMatch(/<LocationBinsView\b/);
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
+    expect(src).toMatch(/backHref:/);
   });
 });
 

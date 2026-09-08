@@ -16,10 +16,11 @@ export default async function PortalInvoicePage({ params }: { params: Promise<{ 
   const customer = await getActiveCustomer();
   const ctx = await buildContext(customer.breweryId);
   const snapshot = await orNotFound(runCommand("portal_invoice", { invoiceId: id }, ctx) as Promise<PortalInvoiceSnapshot>);
-  const model = toPortalInvoiceViewProps(snapshot);
+  const model = toPortalInvoiceViewProps({ ...snapshot, backHref: "/portal/invoices" });
   return (
     <PortalInvoiceView
       model={model}
+      footer={null}
       question={<QuestionForm invoiceId={snapshot.invoice.id} label={`${model.title} · ${model.total}`} />}
     />
   );

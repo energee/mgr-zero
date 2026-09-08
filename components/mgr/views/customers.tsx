@@ -12,16 +12,18 @@ export function CustomersView({
   createAction,
   search,
   linkRows,
+  backHref,
 }: {
   model: CustomersViewModel;
   createAction?: ReactNode;
   /** Live has no search yet; pass null to hide. Inventory draws E.search. */
   search?: ReactNode;
   linkRows?: boolean;
+  backHref?: string;
 }) {
   return (
     <>
-      {E.back("More", "Customers", createAction ?? E.btn("Add customer"), "/more")}
+      {E.back("More", "Customers", createAction ?? E.btn("Add customer"), backHref)}
       {search !== undefined ? search : E.search("Search customers")}
       {model.empty
         ? E.blank(model.empty)

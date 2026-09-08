@@ -11,15 +11,17 @@ export function PriceGroupsView({
   model,
   createAction,
   tables,
+  backHref,
 }: {
   model: PriceGroupsViewModel;
   createAction?: ReactNode;
   /** Live: E.tbl with GroupForm / PriceCellForm. Inventory omits this. */
   tables?: ReactNode;
+  backHref?: string;
 }) {
   return (
     <>
-      {E.back("Catalog", "Price groups", createAction ?? E.btn("Create price group"), "/catalog")}
+      {E.back("Catalog", "Price groups", createAction ?? E.btn("Create price group"), backHref)}
       {E.info("Rows are price groups and columns are formats, one table per sale channel. A beer sits on one group and a customer on one channel; the cell where they meet is the price.")}
       {tables ?? model.channels.map((channel) => (
         <Fragment key={channel.name}>

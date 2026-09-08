@@ -1,5 +1,6 @@
-// components/mgr/views/adjust-lines.tsx — Adjust lines sheet. Inventory and
-// the live form both pass toAdjustLinesViewProps(get_order-shaped data).
+// components/mgr/views/adjust-lines.tsx — Adjust lines sheet. Inventory
+// mounts this view. Live create/edit stays adjust-lines-form.tsx (CommandForm;
+// E.stq is not a controlled input).
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { AdjustLinesViewModel } from "@/lib/mgr/adjust-lines-view";

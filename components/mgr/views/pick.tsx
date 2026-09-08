@@ -1,5 +1,6 @@
-// components/mgr/views/pick.tsx — Pick drawing. Inventory and the live form
-// both pass toPickViewProps(get_order-shaped data).
+// components/mgr/views/pick.tsx — Pick drawing. Inventory mounts this view.
+// Live create/edit stays pick-form.tsx (CommandForm; E.stq is not a controlled
+// input).
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { PickViewModel } from "@/lib/mgr/pick-view";

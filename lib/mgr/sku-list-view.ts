@@ -25,11 +25,12 @@ export type SkuListSnapshot = {
     format_id: string;
     formats: { name: string; bbl_per_unit: string | number | null } | null;
   }[];
+  backHref?: string;
 };
 
-export function toSkuListViewProps({ brand, skus }: SkuListSnapshot): SkuListViewModel {
+export function toSkuListViewProps({ brand, skus, backHref }: SkuListSnapshot): SkuListViewModel {
   return {
-    backHref: "/catalog",
+    backHref,
     title: `${brand.name} · SKUs`,
     empty: skus.length === 0 ? "No SKUs yet" : undefined,
     rows: skus.map((s) => {

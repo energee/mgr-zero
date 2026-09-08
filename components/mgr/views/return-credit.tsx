@@ -1,5 +1,6 @@
 // components/mgr/views/return-credit.tsx — Return and credit drawing. Inventory
-// and the live form both pass toReturnCreditViewProps(get_order + get_invoice).
+// mounts this view. Live create/edit stays credit-memo-form.tsx (CommandForm;
+// E.stq / E.pick are not controlled inputs).
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { ReturnCreditViewModel } from "@/lib/mgr/return-credit-view";

@@ -17,7 +17,7 @@ describe("Invoice view", () => {
   it("maps get_invoice + questions through the adapter", () => {
     const model = toInvoiceViewProps(invoiceFailedAls);
     expect(model.title).toBe("INV-1039");
-    expect(model.backHref).toBe("/invoices");
+    expect(model.backHref).toBeUndefined();
     expect(model.customer).toBe(ALS.name);
     expect(model.summary).toBe("due 10/03 · 3 lines");
     expect(model.total).toBe("$540.00");
@@ -78,5 +78,6 @@ describe("Invoice view", () => {
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
     expect(src).toMatch(/qboGate=/);
     expect(src).toMatch(/<MarkAnswered\b/);
+    expect(src).toMatch(/backHref: "\/invoices"/);
   });
 });

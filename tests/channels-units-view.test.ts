@@ -20,7 +20,7 @@ const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 describe("Sale channels view", () => {
   it("maps list_sale_channels through treatment labels and optional movements", () => {
     const model = toSaleChannelsViewProps(saleChannelsList);
-    expect(model.backHref).toBe("/settings");
+    expect(model.backHref).toBeUndefined();
     expect(model.empty).toBeUndefined();
     expect(model.rows.map((r) => [r.title, r.detail])).toEqual([
       ["Wholesale", "taxable · 118 movements"],
@@ -101,6 +101,7 @@ describe("Sale channels view", () => {
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
     expect(src).toMatch(/<ChannelForm\b/);
     expect(src).toMatch(/<DeleteChannelButton\b/);
+    expect(src).toMatch(/backHref: "\/settings"/);
   });
 });
 
@@ -147,7 +148,7 @@ describe("Channel view", () => {
 describe("Units view", () => {
   it("maps get_gravity_unit Plato default onto chip indices and formatGravity", () => {
     const model = toUnitsViewProps(unitsPlato);
-    expect(model.backHref).toBe("/settings");
+    expect(model.backHref).toBeUndefined();
     expect(model.breweryOptions).toEqual(["Plato", "Specific gravity"]);
     expect(model.breweryIndex).toBe(0);
     expect(model.mineOptions).toEqual(["Use brewery default", "Plato", "Specific gravity"]);
@@ -201,5 +202,6 @@ describe("Units view", () => {
     expect(src).toMatch(/<UnitsView\b/);
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
     expect(src).toMatch(/<GravityUnitForm\b/);
+    expect(src).toMatch(/backHref: "\/settings"/);
   });
 });

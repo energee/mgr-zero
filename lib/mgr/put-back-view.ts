@@ -15,12 +15,13 @@ export type PutBackViewModel = {
 export type PutBackSnapshot = {
   order: { id: string; order_no: number | null; status: string; needs_restock: boolean };
   lines: { id: string; qty_ordered: number; qty_picked: number | null; skus: { name: string } | null }[];
+  backHref?: string;
 };
 
-export function toPutBackViewProps({ order, lines }: PutBackSnapshot): PutBackViewModel {
+export function toPutBackViewProps({ order, lines, backHref }: PutBackSnapshot): PutBackViewModel {
   const title = `${docNo("ORD", order.order_no, "Order")} · put back`;
   if (!order.needs_restock) {
-    return { backHref: "/", title, lines: [], empty: true };
+    return { backHref, title, lines: [], empty: true };
   }
   const staged = lines
     .map((l) => ({
@@ -30,7 +31,7 @@ export function toPutBackViewProps({ order, lines }: PutBackSnapshot): PutBackVi
     .filter((l) => l.staged > 0);
   const total = staged.reduce((n, l) => n + l.staged, 0);
   return {
-    backHref: "/",
+    backHref,
     title,
     note: "Staged beer stayed on the floor after this order changed. Put it back on the shelf.",
     lines: staged.map((l) => ({ key: l.id, name: l.skus?.name ?? "Line", staged: String(l.staged) })),

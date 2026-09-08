@@ -25,13 +25,14 @@ export type CompleteTransferSnapshot = {
   };
   lines: { id: string; qty_ordered: number; qty_picked: number | null; skus: { name: string } | null }[];
   locations: { id: string; name: string }[];
+  backHref?: string;
 };
 
-export function toCompleteTransferViewProps({ order, lines, locations }: CompleteTransferSnapshot): CompleteTransferViewModel {
+export function toCompleteTransferViewProps({ order, lines, locations, backHref }: CompleteTransferSnapshot): CompleteTransferViewModel {
   const name = (lid: string | null) => locations.find((l) => l.id === lid)?.name ?? "—";
   return {
     backTo: docNo("ORD", order.order_no, "Transfer"),
-    backHref: `/orders/${order.id}`,
+    backHref,
     fromLabel: name(order.from_location_id),
     toLabel: name(order.to_location_id),
     lines: lines.map((l) => {

@@ -32,6 +32,7 @@ export type FormatsSnapshot = {
   formats: FormatsFormatRow[];
   /** get_format_components [design]; inventory supplies the child set. */
   components?: FormatsComponentRow[];
+  backHref?: string;
 };
 
 function childLabel(child: FormatsFormatRow, composed: boolean): string {
@@ -66,9 +67,9 @@ function fromOf(
   return parts.join(" · ");
 }
 
-export function toFormatsViewProps({ formats, components = [] }: FormatsSnapshot): FormatsViewModel {
+export function toFormatsViewProps({ formats, components = [], backHref }: FormatsSnapshot): FormatsViewModel {
   return {
-    backHref: "/settings",
+    backHref,
     headers: ["Format", "Basis", "Volume", "From"],
     empty: formats.length === 0 ? "No formats yet" : undefined,
     rows: formats.map((f) => ({

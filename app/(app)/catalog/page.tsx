@@ -33,7 +33,7 @@ export default async function CatalogPage() {
   const packaged: FormatOption[] = formats.filter((f) => f.basis === "packaged").map((f) => ({ id: f.id, name: f.name }));
   return (
     <CatalogView
-      model={toCatalogViewProps({ brands, priceGroups: groups })}
+      model={toCatalogViewProps({ brands, priceGroups: groups, backHref: "/more" })}
       createAction={<BrandForm groups={groups.map((g) => ({ id: g.id, name: g.name }))} />}
       linkRows
       brands={brands.length === 0 ? E.blank("No brands yet") : brands.map((brand) => (

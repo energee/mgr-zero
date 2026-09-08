@@ -44,6 +44,7 @@ export type CustomerSnapshot = {
   portalUserCount?: number;
   kegs?: { out: number; depositCents: number };
   orders?: { open: number; total: number };
+  backHref?: string;
 };
 
 export function toCustomerViewProps({
@@ -52,12 +53,13 @@ export function toCustomerViewProps({
   portalUserCount,
   kegs,
   orders,
+  backHref,
 }: CustomerSnapshot): CustomerViewModel {
   const tax = customer.tax_treatment
     ? customer.tax_treatment.replaceAll("_", " ")
     : "Inherit from channel";
   return {
-    backHref: "/customers",
+    backHref,
     name: customer.name,
     state: customer.state,
     type: titleType(customer.type),
