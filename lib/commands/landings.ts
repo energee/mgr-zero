@@ -41,6 +41,17 @@ defineQuery({
   input: z.object({}), roles: STAFF_ROLES,
   handler: async (ctx) => {
     const b = ctx.breweryId;
+    if (ctx.role === "taproom") {
+      const [stock, skus, locations] = await Promise.all([
+        unwrap(ctx.db.from("on_hand").select("sku_id, location_id, qty").eq("brewery_id", b)),
+        unwrap(ctx.db.from("skus").select("id, name").eq("brewery_id", b)),
+        unwrap(ctx.db.from("locations").select("id, name").eq("brewery_id", b)),
+      ]);
+      const skuNames = new Map((skus ?? []).map(s => [s.id, s.name]));
+      const locationNames = new Map((locations ?? []).map(l => [l.id, l.name]));
+      return { taproomStock: (stock ?? []).map(s => ({ skuId: s.sku_id, locationId: s.location_id,
+        sku: skuNames.get(s.sku_id) ?? "", location: locationNames.get(s.location_id) ?? "", qty: Number(s.qty) })) };
+    }
     const [fgShortages, pars, onHand, openOccupancies, materialShortages, kegs] = await Promise.all([
       count(ctx.db.from("atp").select("sku_id", { count: "exact", head: true }).eq("brewery_id", b).lt("qty", 0)),
       unwrap(ctx.db.from("taproom_pars").select("location_id, sku_id, par_qty").eq("brewery_id", b)),
@@ -67,7 +78,7 @@ defineQuery({
 defineQuery({
   name: "list_work",
   description: "Everything in motion for the Work landing: Today's rows plus the open purchase orders and routes the caller may open, each tagged with its Work chip and sorted by due date",
-  input: z.object({}), roles: STAFF_ROLES,
+  input: z.object({}), roles: ["admin", "sales", "warehouse", "brewer"],
   handler: async (ctx): Promise<WorkRow[]> => {
     // ponytail: transfers, batches and runs ride on Today's rows only; their list pages are one tap away
     const [today, pos, routes] = await Promise.all([

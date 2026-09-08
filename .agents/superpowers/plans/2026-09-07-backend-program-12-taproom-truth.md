@@ -16,8 +16,8 @@
 - Count posts `depletion` movements (negative qty, channel = Taproom, dest_state null). POS does not post.
 - Zero-variance: header+lines persist, **zero** movement rows.
 - Swap closes interval A and opens B in one RPC; carries `open_interval_id` and requires `closed_at is null` (compare-and-swap).
-- Remaining fill: chips only (`empty` | `quarter` | `half` | `full`). Stored as `closing_fill numeric` 0, 0.25, 0.5, 1.
-- Reverse: new movement with `compensates_id` FK to original; original unchanged. TTB reports use net of uncompensated rows. Sign must be exact opposite qty and same type/channel/dest_state.
+- Remaining fill: chips only (`empty` | `quarter` | `half`). Stored as `closing_fill numeric` 0, 0.25, 0.5.
+- Reverse: new movement with `compensates_id` FK to original; original unchanged. TTB reports include originals and compensations with signed net amounts. Sign must be exact opposite qty and same type/channel/dest_state.
 - complete_batch / reattribute_loss: included here as Task 6 because Cellar map and Monthly compliance still show them gated after 5 and 9.
 - TDD, docs:api, staff-guide, nav Taps + Taproom `planned` off.
 
@@ -98,7 +98,7 @@ create table tap_intervals (
   label text,                      -- guest name; null when sku_id set
   nominal_bbl numeric,
   opening_fill numeric not null default 1 check (opening_fill in (0.25,0.5,0.6,1)),
-  closing_fill numeric check (closing_fill in (0,0.25,0.5,1)),
+  closing_fill numeric check (closing_fill in (0,0.25,0.5)),
   not_in_inventory boolean not null default false,
   opened_at timestamptz not null default now(),
   closed_at timestamptz,
@@ -113,7 +113,7 @@ create table tap_intervals (
 - `kick_keg({ openIntervalId, closeFill, reason })` close only.
 - `tap_keg({ skuId, locationId, tapNumber?, openingFill })` open on empty tap.
 - `list_open_taps({ locationId })`
-- Guest create (`not_in_inventory` + label + nominal_bbl) **stays gated**; kick of an existing guest interval is allowed.
+- Guest create (`not_in_inventory` + label + nominal_bbl) ungates when label and nominal size are stored; kick of an existing guest interval is allowed.
 
 - [ ] **Step 1:** Swap twice with the same `openIntervalId` — second raises already swapped. Kick leaves remaining open stock (no ledger). list_open_taps returns B not A.
 
@@ -139,7 +139,7 @@ SKU detail writes `reverse_inventory_movement [SCHEMA-GATE…]` — ungate for a
 
 ### Task 5: Tap board + weekly count pages, ungate, docs
 
-Live Weekly count, Variance, Tap board, Kick, Swap. Nav Taproom + Taps. Ungate writes except guest create. `bun run docs:api`. Browse.
+Live Weekly count, Variance, Tap board, Kick, Swap. Nav Taproom + Taps. Guest create ungates with label and nominal size. `bun run docs:api`. Browse.
 
 Commit `docs: taproom count and tap board live`
 
@@ -172,7 +172,7 @@ bunx tsc --noEmit && bun run lint
 
 | Risk | Likelihood | Mitigation |
 | --- | --- | --- |
-| Shipping taproom role with P-staff | High | Enum value not added |
+| Shipping taproom role with P-staff | High | Role ships atomically with narrow RLS |
 | Guest keg create without identity columns | High | Stay gated; DRIFT item |
 | Count posting POS sales | High | Test: POS rows exist, count still posts from on-hand vs counted, not from POS |
 | Inventing loss reattribution | Medium | Task 6 may stop |
@@ -182,5 +182,5 @@ bunx tsc --noEmit && bun run lint
 - [ ] Zero-variance count is durable
 - [ ] Depletion is the only taproom FG write from the count
 - [ ] Swap cannot leave an interval open
-- [ ] Taproom role still absent
+- [ ] Taproom role ships with the approved authorization matrix
 - [ ] q2/q4 defaults used unless Ted overrode

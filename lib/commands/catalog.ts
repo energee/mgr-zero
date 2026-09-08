@@ -73,7 +73,7 @@ defineCommand({
 
 defineQuery({
   name: "list_formats", description: "Formats, alphabetical, packaged and poured",
-  input: z.object({ basis: z.enum(["packaged", "poured"]).optional() }), roles: ["admin", "sales", "warehouse"],
+  input: z.object({ basis: z.enum(["packaged", "poured"]).optional() }), roles: ["admin", "sales", "warehouse", "taproom"],
   handler: (ctx, i) => {
     let q = ctx.db.from("formats").select().eq("brewery_id", ctx.breweryId).order("name");
     if (i.basis) q = q.eq("basis", i.basis);

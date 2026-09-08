@@ -31,7 +31,7 @@ export default async function TodayPage() {
       {items.length === 0 ? (
         <>
           {E.blank("Nothing waiting")}
-          {E.btn("Record movement", "g", "/inventory")}
+          {brewery.role === "taproom" ? E.btn("Taproom stock", "g", "/beer") : E.btn("Record movement", "g", "/inventory")}
         </>
       ) : items.map((it) => {
         const [verb, tone] = TODAY_VERB[it.reason];

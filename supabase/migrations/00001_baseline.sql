@@ -35,7 +35,7 @@ language sql volatile set search_path = '' as $$
 $$;
 
 -- ---------------------------------------------------------------- enums
-create type staff_role as enum ('admin','sales','warehouse','brewer');
+create type staff_role as enum ('admin','sales','warehouse','brewer','taproom');
 create type customer_type as enum ('distributor','retailer','brewery','other');
 create type package_type as enum ('keg','can','bottle');
 create type format_basis as enum ('packaged','poured');
@@ -106,11 +106,33 @@ $$ select brewery_id from public.brewery_users where user_id = auth.uid() $$;
 
 create function is_staff_of(b uuid) returns boolean
 language sql stable security definer set search_path = '' as
-$$ select exists(select 1 from public.brewery_users where user_id = auth.uid() and brewery_id = b) $$;
+$$ select exists(select 1 from public.brewery_users where user_id = auth.uid() and brewery_id = b and role in ('admin','sales','warehouse','brewer')) $$;
 
 create function staff_role(b uuid) returns staff_role
 language sql stable security definer set search_path = '' as
 $$ select role from public.brewery_users where user_id = auth.uid() and brewery_id = b $$;
+
+-- Explicit taproom vocabulary; location scope remains in the policies below.
+create function taproom_can(b uuid, t text) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select public.staff_role(b) = 'taproom' and t = any(array[
+    'locations','bins','inventory_movements','taproom_pars',
+    'brands','formats','format_components','skus','keg_pools',
+    'pos_locations','pos_item_mappings','pos_sales']);
+$$;
+
+-- Own account display/defaults without private brewery settings.
+create function staff_brewery_rows()
+returns table (id uuid, name text, timezone text, gravity_unit text)
+language sql stable security definer set search_path = '' as $$
+  select b.id, b.name, b.timezone, b.gravity_unit from public.breweries b
+  join public.brewery_users u on u.brewery_id = b.id
+  where u.user_id = auth.uid();
+$$;
+create view staff_brewery with (security_invoker = true) as
+  select id, name, timezone, gravity_unit from public.staff_brewery_rows();
+comment on function staff_brewery_rows() is
+  'Own staff account projection only; never add private settings or license identifiers.';
 
 -- Per-brewery document numbers (orders, invoices, POs, batches, runs).
 create table brewery_counters (
@@ -1911,11 +1933,22 @@ create view keg_bin_totals with (security_invoker = true) as
 
 -- What a bin physically holds: shipped kegs have left it, returned ones are
 -- back. record_keg_event refuses to take out more than this.
+create function keg_bin_on_hand_rows()
+returns table (brewery_id uuid, pool_id uuid, keg_size public.keg_size, location_id uuid, bin_id uuid, qty integer)
+language sql stable security definer set search_path = '' as $$
+  select e.brewery_id, e.pool_id, e.keg_size, e.location_id, e.bin_id,
+         sum(case e.reason when 'acquired' then e.qty when 'found' then e.qty when 'transferred_in' then e.qty when 'returned' then e.qty
+                         when 'retired' then -e.qty when 'lost' then -e.qty when 'transferred_out' then -e.qty when 'shipped' then -e.qty else 0 end)::int
+  from public.keg_events e
+  join public.locations l on l.id = e.location_id and l.brewery_id = e.brewery_id
+  where public.is_staff_of(e.brewery_id)
+    or (public.staff_role(e.brewery_id) = 'taproom' and l.kind = 'taproom')
+  group by 1,2,3,4,5;
+$$;
+comment on function keg_bin_on_hand_rows() is
+  'Authorized bin balances only; no raw keg event history. Membership is derived from auth.uid even inside write RPCs.';
 create view keg_bin_on_hand with (security_invoker = true) as
-  select brewery_id, pool_id, keg_size, location_id, bin_id,
-         sum(case reason when 'acquired' then qty when 'found' then qty when 'transferred_in' then qty when 'returned' then qty
-                         when 'retired' then -qty when 'lost' then -qty when 'transferred_out' then -qty when 'shipped' then -qty else 0 end)::int as qty
-  from keg_events group by 1,2,3,4,5;
+  select brewery_id, pool_id, keg_size, location_id, bin_id, qty from public.keg_bin_on_hand_rows();
 
 create view keg_fleet_totals with (security_invoker = true) as
   select brewery_id, pool_id, keg_size,
@@ -3171,7 +3204,7 @@ create function set_my_gravity_unit(
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_replay jsonb; v_rows int;
 begin
-  perform private.assert_staff(p_brewery, array['admin','sales','warehouse','brewer']::public.staff_role[]);
+  perform private.assert_staff(p_brewery, array['admin','sales','warehouse','brewer','taproom']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'set_my_gravity_unit', p_request_id,
     jsonb_build_object('brewery', p_brewery, 'unit', p_unit));
   if v_replay is not null then return v_replay; end if;
@@ -5493,14 +5526,14 @@ begin
     'routes','deliveries','invoice_questions']
   loop
     execute format('alter table %I enable row level security', t);
-    execute format('create policy staff_read on %I for select using (public.is_staff_of(brewery_id))', t);
+    execute format('create policy staff_read on %I for select using (public.is_staff_of(brewery_id) or public.taproom_can(brewery_id, %L))', t, t);
   end loop;
   -- Append-only ledgers retain staff reads. Only the inventory command paths
   -- below may append inventory movements; the other ledgers have no staff DML.
   foreach t in array array['inventory_movements','material_movements','keg_events','transfers','volume_adjustments']
   loop
     execute format('alter table %I enable row level security', t);
-    execute format('create policy staff_read on %I for select using (public.is_staff_of(brewery_id))', t);
+    execute format('create policy staff_read on %I for select using (public.is_staff_of(brewery_id) or public.taproom_can(brewery_id, %L))', t, t);
     execute format('revoke update, delete on %I from authenticated, anon', t);
   end loop;
   -- order_events is append-only but has custom staff + customer policies below.
@@ -5512,6 +5545,17 @@ begin
   loop
     execute format('alter table %I enable row level security', t);
     execute format('create policy integration_operator_read on %I for select using (public.staff_role(brewery_id) in (''admin'', ''sales''))', t);
+  end loop;
+end $$;
+
+-- Only taproom-location rows join the bartender's read surface.
+drop policy staff_read on locations;
+create policy staff_read on locations for select using (
+  public.is_staff_of(brewery_id) or (public.taproom_can(brewery_id, 'locations') and kind = 'taproom'));
+do $$ declare t text; begin
+  foreach t in array array['bins','inventory_movements','taproom_pars'] loop
+    execute format('drop policy staff_read on %I', t);
+    execute format('create policy staff_read on %I for select using (public.is_staff_of(brewery_id) or (public.taproom_can(brewery_id, %L) and location_id in (select id from public.locations where kind = ''taproom'')))', t, t);
   end loop;
 end $$;
 
@@ -5574,7 +5618,7 @@ create policy chat_user_links_self_read on chat_user_links for select to authent
   using (
     user_id = (select auth.uid())
     and state = 'active'
-    and (select is_staff_of(brewery_id))
+    and (select staff_role(brewery_id)) is not null
   );
 create policy notification_destinations_admin_shared_read on notification_destinations for select to authenticated
   using (kind = 'private_channel' and (select staff_role(brewery_id)) = 'admin');
@@ -5582,7 +5626,7 @@ create policy notification_destinations_personal_read on notification_destinatio
   using (
     kind = 'personal'
     and user_id = (select auth.uid())
-    and (select is_staff_of(brewery_id))
+    and (select staff_role(brewery_id)) is not null
     and exists (
       select 1
       from chat_user_links l
@@ -5593,7 +5637,7 @@ create policy notification_destinations_personal_read on notification_destinatio
   );
 -- Preferences belong to current staff even before linking or after unlinking.
 create policy notification_preferences_self_read on notification_preferences for select to authenticated
-  using (user_id = (select auth.uid()) and (select is_staff_of(brewery_id)));
+  using (user_id = (select auth.uid()) and (select staff_role(brewery_id)) is not null);
 
 revoke all on chat_installations, chat_user_links, notification_destinations, notification_preferences,
   notification_occurrences, notification_deliveries, chat_callback_receipts, chat_action_intents
@@ -5847,7 +5891,7 @@ begin
   end if;
   select state into v_state from public.chat_installations where id = l.installation_id;
   if v_state <> 'active' then raise exception 'installation is not active'; end if;
-  if not public.is_staff_of(l.brewery_id) then
+  if public.staff_role(l.brewery_id) is null then
     raise exception 'not a member of this brewery' using errcode = '42501';
   end if;
   if exists (select 1 from public.chat_user_links
@@ -5864,7 +5908,7 @@ create function unlink_chat_user(p_brewery uuid, p_link uuid, p_request_id uuid)
 language plpgsql security definer set search_path = '' as $$
 declare l public.chat_user_links; v_replay jsonb;
 begin
-  perform private.assert_staff(p_brewery, enum_range(null::public.staff_role));
+  perform private.assert_staff(p_brewery, array['admin','sales','warehouse','brewer','taproom']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'unlink_chat_user', p_request_id, jsonb_build_object('link',p_link));
   if v_replay is not null then return v_replay; end if;
   select * into l from public.chat_user_links where id = p_link and brewery_id = p_brewery for update;
@@ -6104,6 +6148,7 @@ begin
     where o.brewery_id = p_brewery and o.state = 'active' and o.reason <> 'operations_digest'
       and (p_occurrence is null or o.id = p_occurrence)
       and coalesce(p.enabled, true)
+      and (p.personal_destination_id is null or p.personal_destination_id = d.id)
   on conflict (brewery_id, semantic_key) do nothing;
   get diagnostics n = row_count;
   return n;
@@ -6286,7 +6331,10 @@ create function set_notification_preference(p_brewery uuid, p_reason text, p_ena
 language plpgsql security definer set search_path = '' as $$
 declare v_replay jsonb;
 begin
-  perform private.assert_staff(p_brewery, enum_range(null::public.staff_role));
+  perform private.assert_staff(p_brewery, array['admin','sales','warehouse','brewer','taproom']::public.staff_role[]);
+  if p_set_quiet and public.staff_role(p_brewery) = 'taproom' then
+    raise exception 'permission denied' using errcode = '42501';
+  end if;
   v_replay := private.claim_command_request(p_brewery, 'set_notification_preference', p_request_id,
     jsonb_build_object('reason',p_reason,'enabled',p_enabled,'start',p_quiet_start,'end',p_quiet_end,'timezone',p_quiet_tz,'set_quiet',p_set_quiet));
   if v_replay is not null then return v_replay; end if;
@@ -6802,6 +6850,10 @@ end $$;
 create function private.set_chat_quiet_hours(p_brewery uuid, p_user uuid, p_start time, p_end time, p_timezone text) returns void
 language plpgsql security definer set search_path = '' as $$
 begin
+  if not exists(select 1 from public.brewery_users where brewery_id=p_brewery and user_id=p_user
+    and role in ('admin','sales','warehouse','brewer')) then
+    raise exception 'permission denied' using errcode='42501';
+  end if;
   if (p_start is null) <> (p_end is null) or p_start = p_end or p_start >= time '24:00' or p_end >= time '24:00'
     or (p_timezone is not null and not exists (select 1 from pg_catalog.pg_timezone_names where name=p_timezone)) then
     raise exception 'invalid quiet hours' using errcode = '22023';
@@ -6823,6 +6875,10 @@ end $$;
 create function private.snooze_chat_delivery(p_brewery uuid, p_user uuid, p_delivery uuid, p_until timestamptz) returns void
 language plpgsql security definer set search_path = '' as $$
 begin
+  if not exists(select 1 from public.brewery_users where brewery_id=p_brewery and user_id=p_user
+    and role in ('admin','sales','warehouse','brewer')) then
+    raise exception 'permission denied' using errcode='42501';
+  end if;
   if p_until is null or p_until <= now() or p_until > now() + interval '7 days' then
     raise exception 'snooze must be within the next seven days' using errcode='22023';
   end if;
@@ -6856,7 +6912,7 @@ create function set_personal_quiet_hours(p_brewery uuid, p_start time, p_end tim
 language plpgsql security definer set search_path = '' as $$
 declare replay jsonb;
 begin
-  perform private.assert_staff(p_brewery,enum_range(null::public.staff_role));
+  perform private.assert_staff(p_brewery,array['admin','sales','warehouse','brewer']::public.staff_role[]);
   replay := private.claim_command_request(p_brewery,'set_personal_quiet_hours',p_request_id,jsonb_build_object('start',p_start,'end',p_end,'timezone',p_timezone));
   if replay is not null then return replay; end if;
   perform private.set_chat_quiet_hours(p_brewery,auth.uid(),p_start,p_end,p_timezone);
@@ -6867,7 +6923,7 @@ create function snooze_notification(p_brewery uuid, p_delivery uuid, p_until tim
 language plpgsql security definer set search_path = '' as $$
 declare replay jsonb;
 begin
-  perform private.assert_staff(p_brewery,enum_range(null::public.staff_role));
+  perform private.assert_staff(p_brewery,array['admin','sales','warehouse','brewer']::public.staff_role[]);
   replay := private.claim_command_request(p_brewery,'snooze_notification',p_request_id,jsonb_build_object('delivery',p_delivery,'until',p_until));
   if replay is not null then return replay; end if;
   perform private.snooze_chat_delivery(p_brewery,auth.uid(),p_delivery,p_until);
@@ -6882,6 +6938,7 @@ begin
   select * into i from public.chat_installations where id=p_installation;
   actor := public.resolve_chat_actor(i.provider,i.external_installation_id,p_external_user_id);
   if actor is null then return null; end if;
+  if actor->>'role' = 'taproom' and p_action in ('mgr_preferences','mgr_save_preferences','mgr_snooze') then return null; end if;
   if p_action not in ('mgr_open','mgr_snooze','mgr_mute_reason','mgr_preferences','mgr_save_preferences','mgr_refresh','mgr_unlink') then
     raise exception 'unsupported chat action' using errcode='22023'; end if;
   if p_action in ('mgr_snooze','mgr_mute_reason') then
@@ -7052,7 +7109,7 @@ create function public.consume_chat_link_proof(p_brewery uuid,p_proof_hash text,
 language plpgsql security definer set search_path = '' as $$
 declare v_replay jsonb; v_result jsonb;
 begin
-  perform private.assert_staff(p_brewery, enum_range(null::public.staff_role));
+  perform private.assert_staff(p_brewery, array['admin','sales','warehouse','brewer','taproom']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery,'consume_chat_link_proof',p_request_id,jsonb_build_object('proof',p_proof_hash));
   if v_replay is not null then return v_replay; end if;
   if exists(select 1 from public.chat_user_links where proof_hash=p_proof_hash and brewery_id<>p_brewery) then raise exception 'not a member of this brewery' using errcode='42501'; end if;
@@ -7111,7 +7168,7 @@ create function get_chat_link_intent(p_brewery uuid,p_proof_hash text) returns j
 language plpgsql stable security definer set search_path = '' as $$
 declare v_result jsonb;
 begin
-  perform private.assert_staff(p_brewery,enum_range(null::public.staff_role));
+  perform private.assert_staff(p_brewery,array['admin','sales','warehouse','brewer','taproom']::public.staff_role[]);
   select jsonb_build_object('brewery',b.name,'mgrIdentity',coalesce(nullif(u.raw_user_meta_data->>'full_name',''),u.email,u.id::text),
     'slackIdentity',l.external_user_id,'workspace',i.display_label,'expiresAt',l.proof_expires_at) into v_result
     from public.chat_user_links l join public.chat_installations i on i.id=l.installation_id
@@ -7184,3 +7241,34 @@ begin
 end $$;
 revoke all on function chat_settings_request_completed(uuid,uuid,uuid) from public,anon,authenticated,service_role;
 grant execute on function chat_settings_request_completed(uuid,uuid,uuid) to service_role;
+
+revoke all on function taproom_can(uuid,text), staff_brewery_rows(), keg_bin_on_hand_rows() from public, anon, authenticated, service_role;
+grant execute on function taproom_can(uuid,text), staff_brewery_rows(), keg_bin_on_hand_rows() to authenticated;
+grant select on staff_brewery to authenticated;
+
+-- Select an already verified personal destination; provider identities are never supplied here.
+create function set_notification_destination(p_brewery uuid, p_reason text, p_personal_destination uuid, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare replay jsonb;
+begin
+  perform private.assert_staff(p_brewery, array['admin','sales','warehouse','brewer','taproom']::public.staff_role[]);
+  replay := private.claim_command_request(p_brewery, 'set_notification_destination', p_request_id,
+    jsonb_build_object('reason',p_reason,'personal_destination',p_personal_destination));
+  if replay is not null then return replay; end if;
+  if not exists (
+    select 1 from public.notification_destinations d
+    join public.chat_installations i on i.id=d.installation_id and i.brewery_id=d.brewery_id and i.state='active'
+    join public.chat_user_links l on l.installation_id=i.id and l.brewery_id=d.brewery_id and l.user_id=d.user_id and l.state='active'
+    where d.id=p_personal_destination and d.brewery_id=p_brewery and d.user_id=auth.uid()
+      and d.kind='personal' and d.privacy_class='direct' and d.state='active' and d.validated_at is not null
+  ) then raise exception 'permission denied' using errcode='42501'; end if;
+  if p_reason is null or p_reason not in ('submitted_order','pick_due','restock_due','delivery_next','fermentation_reading_overdue','invoice_question','operations_digest') then
+    raise exception 'invalid notification reason'; end if;
+  insert into public.notification_preferences(brewery_id,user_id,reason,personal_destination_id)
+    values(p_brewery,auth.uid(),p_reason,p_personal_destination)
+    on conflict(brewery_id,user_id,reason) do update
+    set personal_destination_id=excluded.personal_destination_id, updated_at=now();
+  return private.complete_command_request(p_request_id,jsonb_build_object('id',p_personal_destination));
+end $$;
+revoke all on function set_notification_destination(uuid,text,uuid,uuid) from public,anon,authenticated,service_role;
+grant execute on function set_notification_destination(uuid,text,uuid,uuid) to authenticated;

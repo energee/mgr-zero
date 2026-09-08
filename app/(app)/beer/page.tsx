@@ -13,7 +13,16 @@ import { plural } from "@/lib/mgr/plural";
 
 export default async function BeerPage() {
   const brewery = await getActiveBrewery();
-  const o = (await runCommand("get_beer_overview", {}, await buildContext(brewery.id))) as Overview;
+  const o = (await runCommand("get_beer_overview", {}, await buildContext(brewery.id))) as Overview | { taproomStock: { skuId: string; locationId: string; sku: string; location: string; qty: number }[] };
+  if ("taproomStock" in o) return <>
+    {E.hd("Beer")}
+    <section id="taproom">
+      <h2 className="text-lg font-semibold">Taproom stock</h2>
+      {o.taproomStock.length ? o.taproomStock.map(s => (
+        <div key={`${s.skuId}:${s.locationId}`}>{E.row(s.sku, s.location, String(s.qty))}</div>
+      )) : E.blank("No taproom stock recorded")}
+    </section>
+  </>;
   return (
     <>
       {E.hd("Beer")}

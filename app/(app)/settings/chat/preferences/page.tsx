@@ -10,5 +10,5 @@ export default async function ChatPreferencesPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const preferences = await runCommand("get_notification_preferences", {}, ctx) as ChatPreferences;
-  return <>{E.back(brewery.role === "admin" ? "Chat" : "More", "My notification preferences", undefined, brewery.role === "admin" ? "/settings/chat" : "/more")}<ChatPersonalPreferences key={brewery.id} preferences={preferences} /></>;
+  return <>{E.back(brewery.role === "admin" ? "Chat" : "More", "My notification preferences", undefined, brewery.role === "admin" ? "/settings/chat" : "/more")}<ChatPersonalPreferences key={brewery.id} preferences={preferences} canSetQuietHours={brewery.role !== "taproom"} /></>;
 }

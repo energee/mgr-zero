@@ -18,7 +18,7 @@ defineQuery({
   roles: STAFF_ROLES,
   handler: async (ctx) => {
     const [brewery, membership] = await Promise.all([
-      unwrap(ctx.db.from("breweries").select("gravity_unit").eq("id", ctx.breweryId).single()),
+      unwrap(ctx.db.from("staff_brewery").select("gravity_unit").eq("id", ctx.breweryId).single()),
       unwrap(ctx.db.from("brewery_users").select("gravity_unit")
         .eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId).single()),
     ]);
@@ -54,7 +54,7 @@ const BREWERY_COLUMNS = "id, name, timezone, ttb_registry_no, pa_license_no, cus
 defineQuery({
   name: "get_brewery",
   description: "The current brewery's basics: name, timezone, TTB registry number, PA license, customer-facing phone, reading-overdue hours, gravity unit and portal fulfillment warehouse",
-  input: z.object({}), roles: STAFF_ROLES,
+  input: z.object({}), roles: ["admin", "sales", "warehouse", "brewer"],
   handler: (ctx) => unwrap(ctx.db.from("breweries").select(BREWERY_COLUMNS).eq("id", ctx.breweryId).single()),
 });
 

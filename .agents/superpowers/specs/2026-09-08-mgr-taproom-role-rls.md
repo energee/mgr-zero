@@ -29,7 +29,7 @@ in the cooler, count it, and change kegs. Nothing else.
 | Taproom bins and on-hand: `locations`, `bins`, `inventory_movements`, `taproom_pars`, and the `on_hand` / `bin_on_hand` / `keg_bin_on_hand` views | yes | none | rows whose location is `kind = 'taproom'` |
 | Catalog vocabulary: `brands`, `formats`, `format_components`, `skus`, `keg_pools` | yes | none | whole brewery |
 | Menu and POS mapping: `pos_locations`, `pos_item_mappings`, `pos_sales`, and `pos_menus` when Program 14 lands it | yes | none | whole brewery |
-| Own account: `breweries`, `brewery_users`, `chat_user_links`, `notification_preferences`, `notification_destinations` (personal) | yes | `set_my_gravity_unit`, `consume_chat_link_proof`, `unlink_chat_user`, `set_notification_preference`, `set_notification_destination` (personal) | own row only, as the existing self policies already say |
+| Own account: `staff_brewery` (id, name, timezone, gravity unit), `brewery_users`, `chat_user_links`, `notification_preferences`, `notification_destinations` (personal) | yes | `set_my_gravity_unit`, `consume_chat_link_proof`, `unlink_chat_user`, `set_notification_preference`, `set_notification_destination` (personal) | own row only, as the existing self policies already say |
 | Everything else | no | no | — |
 
 "Everything else" is literal: customers, ship-tos, orders, order lines,
@@ -37,12 +37,12 @@ shipments, invoices, credit memos, price groups, channel prices, sale
 channels, allocations, stock transfers, routes, deliveries, vendors,
 materials, purchasing, counts of materials, recipes, batches, vessels,
 occupancies, packaging runs, lots, fermentation, compliance, integration
-connections, and every RPC that writes them. A taproom user calling any of
-those RPCs gets `42501`, and a direct `select` returns no rows (RLS filters;
-it does not raise).
+connections, and every RPC that writes them. A taproom user calling a forbidden tenant RPC gets `42501`; direct SELECT
+is empty under RLS, or receives `42501` where table SELECT itself is revoked.
+Authenticated pre-tenant `provision_brewery` remains separately authorized.
 
 Movements are read, never written directly: the weekly count posts its own
-`adjustment` rows through `record_taproom_count`, and tapping a keg posts
+`depletion` rows through `record_taproom_count`, and tapping a keg posts
 nothing (§16.15). `taproom_transfer` rows into the taproom are visible because
 their destination location is a taproom; the warehouse leg of the same pair
 is not.
@@ -76,7 +76,6 @@ One baseline edit, four parts, in `supabase/migrations/00001_baseline.sql`.
    $$ select exists(select 1 from public.brewery_users
                     where user_id = auth.uid() and brewery_id = b and role = 'taproom')
         and t = any (array[
-          'breweries',
           'tap_intervals','taproom_counts','taproom_count_lines',
           'locations','bins','inventory_movements','taproom_pars',
           'brands','formats','format_components','skus','keg_pools',
@@ -106,23 +105,29 @@ One baseline edit, four parts, in `supabase/migrations/00001_baseline.sql`.
    ```
 
    The same shape on `bins` and `taproom_pars` (both by `location_id`);
-   `locations` itself tests `kind = 'taproom'` directly. The `on_hand`,
-   `bin_on_hand` and `keg_bin_on_hand` views are `security_invoker`, so they
-   inherit the scoped rows without their own policy. `breweries` adds
-   `or taproom_can(id, 'breweries')`; `brewery_users` needs nothing, because
-   its existing `user_id = auth.uid()` branch already admits the bartender's
-   own membership, which is all `getActiveBrewery` reads.
+   `locations` itself tests `kind = 'taproom'` directly. The `on_hand` and `bin_on_hand` invoker views inherit movement row scope.
+   `keg_bin_on_hand` instead wraps a narrow auth-derived definer aggregate:
+   original staff see their own tenant, taproom sees only taproom locations,
+   with the same six columns and arithmetic. Raw keg events stay denied.
+   Raw `breweries` stays denied too. `staff_brewery_rows()` and its invoker
+   view expose only own membership id, name, timezone and gravity unit.
+   Request membership resolution joins that projection without a private
+   breweries inner embed. Own `brewery_users` membership remains readable.
 
-   The self-row chat and notification policies are unchanged: they test
-   `user_id = auth.uid()`, not role.
+   The self-row chat and notification policies retain their own-user predicates;
+   their membership conjunct uses `staff_role(brewery_id) is not null`.
 
 4. **RPCs.** `private.assert_staff` is unchanged. The write column of the
    matrix is the set of RPCs whose role array gains `'taproom'`: the four
    Program 12 commands (`tap_keg`, `swap_keg`, `kick_keg`,
    `record_taproom_count`) are created with it; `set_my_gravity_unit`,
    `consume_chat_link_proof`, `unlink_chat_user`, `set_notification_preference`
-   and the personal branch of `set_notification_destination` add it. No other
-   grant or role array changes.
+   and the personal branch of `set_notification_destination` add it. The personal destination branch selects a previously verified active own
+   destination per reason using `notification_preferences.personal_destination_id`;
+   it cannot provision an external identity or change an admin shared channel.
+   Fanout honors that selection; NULL keeps existing routing. Personal quiet
+   hours and snoozes remain original-four only, including callback helpers and
+   the optional quiet-hours input on `set_notification_preference`.
 
 On the application side, `StaffRole` in `lib/commands/registry.ts` gains
 `"taproom"`, `tests/helpers.ts` `makeStaff` / `makeStaffCtx` accept it, the
@@ -151,10 +156,9 @@ ships (Program 12's docs task), not in this PR.
   warehouse-location rows of `inventory_movements`, `bins`, `taproom_pars` and
   `locations` are absent while the taproom rows are present.
 - `it("writes only through its RPCs")` calls every RPC in
-  `tests/rpc-allowlist.test.ts`'s list as the taproom user with throwaway
+  `tests/rpc-allowlist.test.ts`'s list as the taproom user with valid existing owned resources and correctly typed
   arguments and expects `42501` from all but the nine named above, which are
-  expected to reach their own domain checks (any error other than `42501`, or
-  success). `tests/rls-command-boundary.test.ts` gains a `taproom` column in
+  proven with actual effects and replay; own/foreign identity boundaries are tested. `tests/rls-command-boundary.test.ts` gains a `taproom` column in
   its role matrix for the same nine.
 - `it("the four existing roles are unchanged")` runs the admin assertions of
   `tests/rls-tenancy.test.ts` against the narrowed `is_staff_of`, so the

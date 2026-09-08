@@ -21,7 +21,7 @@ export default async function UnitsPage() {
   const units = (await runCommand("get_gravity_unit", {}, ctx)) as Effective;
   return (
     <>
-      {E.back("Settings", "Units", undefined, "/settings")}
+      {E.back(ctx.role === "taproom" ? "More" : "Settings", "Units", undefined, ctx.role === "taproom" ? "/more" : "/settings")}
       {E.info("Gravity is always stored in °Plato. This changes only how it is shown and typed.")}
       <GravityUnitForm brewery={units.brewery} mine={units.mine} canSetBrewery={ctx.role === "admin"} />
       {E.fld("A 12.5 °P reading shows as", formatGravity(12.5, units.effective))}

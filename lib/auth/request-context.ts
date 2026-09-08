@@ -1,4 +1,5 @@
 // lib/auth/request-context.ts — request-scoped Supabase identity and membership lookups shared by layouts and commands.
+import type { StaffRole } from "@/lib/commands/registry";
 import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServerClient } from "@/lib/supabase/server";
@@ -12,7 +13,7 @@ export interface RequestIdentity {
 export interface StaffMembership {
   breweryId: string;
   breweryName: string;
-  role: "admin" | "sales" | "warehouse" | "brewer";
+  role: StaffRole;
 }
 
 export interface CustomerMembership {
@@ -25,7 +26,6 @@ export interface CustomerMembership {
 type StaffMembershipRow = {
   brewery_id: string;
   role: StaffMembership["role"];
-  breweries: { name: string };
 };
 
 type CustomerMembershipRow = {
@@ -70,16 +70,22 @@ export function createRequestAuthContext(createClient: RequestClientFactory = cr
     const db = await getSupabaseClient();
     const { data, error } = await db
       .from("brewery_users")
-      .select("brewery_id, role, breweries!inner(name)")
+      .select("brewery_id, role")
       .eq("user_id", requestIdentity.userId)
       .returns<StaffMembershipRow[]>();
     if (error) throw error;
 
-    return (data ?? []).map(({ brewery_id, role, breweries }) => ({
-      breweryId: brewery_id,
-      breweryName: breweries.name,
-      role,
-    }));
+    const breweryIds = (data ?? []).map((row) => row.brewery_id);
+    const { data: breweries, error: breweryError } = breweryIds.length
+      ? await db.from("staff_brewery").select("id, name").in("id", breweryIds)
+      : { data: [], error: null };
+    if (breweryError) throw breweryError;
+    const breweryNames = new Map((breweries ?? []).map((brewery) => [brewery.id, brewery.name]));
+    return (data ?? []).map(({ brewery_id, role }) => {
+      const breweryName = breweryNames.get(brewery_id);
+      if (!breweryName) throw new Error("staff membership brewery is unavailable");
+      return { breweryId: brewery_id, breweryName, role };
+    });
   })());
   const getCustomerMemberships = () => (customerMemberships ??= (async () => {
     const requestIdentity = await getIdentity();

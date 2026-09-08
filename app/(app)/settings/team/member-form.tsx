@@ -11,12 +11,13 @@ import { E } from "@/components/mgr/e";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
+import type { StaffRole } from "@/lib/commands/registry";
 import type { TeamMember } from "@/lib/commands/invites";
 
-/** Every staff role with what it opens; the taproom role waits on Program 12. */
-const ROLES: [string, string][] = [
+/** Every staff role with what it opens; including taproom stock and own settings. */
+const ROLES: [StaffRole, string][] = [
   ["admin", "everything, including team and settings"], ["sales", "orders, customers, price groups"],
-  ["warehouse", "pick, receive, count, transfer"], ["brewer", "batches, cellar, packaging"],
+  ["taproom", "taproom stock and personal preferences"], ["warehouse", "pick, receive, count, transfer"], ["brewer", "batches, cellar, packaging"],
 ];
 
 export function MemberForm({ member }: { member: TeamMember }) {

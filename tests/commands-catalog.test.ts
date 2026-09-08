@@ -5,8 +5,8 @@ import { makeBrewery, makeStaffCtx, seedPriceGroup } from "./helpers";
 import { runCommand } from "../lib/commands/registry";
 import "../lib/commands/all";
 
-let adminCtx: { db: SupabaseClient; userId: string; breweryId: string; role: "admin" | "sales" | "warehouse" | "brewer" };
-let salesCtx: { db: SupabaseClient; userId: string; breweryId: string; role: "admin" | "sales" | "warehouse" | "brewer" };
+let adminCtx: { db: SupabaseClient; userId: string; breweryId: string; role: import("@/lib/commands/registry").StaffRole };
+let salesCtx: { db: SupabaseClient; userId: string; breweryId: string; role: import("@/lib/commands/registry").StaffRole };
 
 beforeAll(async () => {
   const brewery = await makeBrewery();
