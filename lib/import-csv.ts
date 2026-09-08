@@ -1,4 +1,5 @@
 // The CSV map and its preview/command validation use the same field contract.
+import { z } from "zod";
 export const IMPORT_ROW_CAP = 5000;
 export const IMPORT_KINDS = ["customers", "ship_tos", "products_skus", "channel_prices", "opening_balances"] as const;
 export type ImportKind = typeof IMPORT_KINDS[number];
@@ -20,7 +21,7 @@ export function validateImportRow(kind: ImportKind, row: Record<string, string>,
     const value = row[f.name]?.trim() ?? "";
     if (!value) { if (f.required) errors.push(`${f.name} is required`); continue; }
     if (f.values && !f.values.includes(value)) errors.push(`${f.name}: choose ${f.values.join(", ")}`);
-    if (f.type === "uuid" && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) errors.push(`${f.name} must be a UUID`);
+    if (f.type === "uuid" && !z.uuid().safeParse(value).success) errors.push(`${f.name} must be a UUID`);
     if (f.type === "state" && !/^[A-Z]{2}$/.test(value)) errors.push(`${f.name} must be two uppercase letters`);
     if (["number", "positive", "cents"].includes(f.type ?? "")) {
       if (!/^[+-]?[0-9]+(\.[0-9]+)?$/.test(value) || !Number.isFinite(Number(value)) || (f.type === "positive" && Number(value) <= 0) || (f.type === "cents" && (!/^[0-9]+$/.test(value) || Number(value) > 2147483647))) errors.push(`${f.name} must be ${f.type === "positive" ? "a positive decimal" : f.type === "cents" ? "whole cents (0–2147483647)" : "a decimal"}`);
