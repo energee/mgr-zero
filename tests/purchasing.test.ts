@@ -56,6 +56,9 @@ describe("vendors, materials, contracts", () => {
 
     const materials = (await runCommand("list_materials", {}, ctx)) as { id: string; default_vendor_id: string; purchase_uom_factor: number; lot_tracked: boolean }[];
     expect(materials.find((m) => m.id === citra.id)).toMatchObject({ default_vendor_id: ych.id, purchase_uom_factor: 44, lot_tracked: true });
+
+    // Pickers read the thin list, not the contract report.
+    expect(await runCommand("list_vendors", {}, ctx)).toEqual([{ id: ych.id, name: "YCH Hops", active: true, lead_time_days: 10 }]);
   });
 
   it("a sales user may not edit vendors", async () => {
@@ -177,6 +180,9 @@ describe("planning: draft purchase orders from material gaps", () => {
     const pale = (await runCommand("upsert_material", { name: "Pale malt", category: "malt", baseUom: "lb", purchaseUom: "each", purchaseUomFactor: 55, defaultVendorId: cm.id }, ctx)) as { id: string };
     const wheat = (await runCommand("upsert_material", { name: "Wheat malt", category: "malt", baseUom: "lb", purchaseUom: "each", purchaseUomFactor: 55, defaultVendorId: cm.id }, ctx)) as { id: string };
     const orphan = (await runCommand("upsert_material", { name: "Mystery yeast", category: "yeast", baseUom: "each", purchaseUom: "each" }, ctx)) as { id: string };
+    // 90 days out on a 2026-10-01 need: buy-by is already past, so it is out of reach.
+    const slow = (await runCommand("upsert_vendor", { name: "Slow Boat Rice", leadTimeDays: 90 }, ctx)) as { id: string };
+    const hulls = (await runCommand("upsert_material", { name: "Slow-boat rice hulls", category: "adjunct", baseUom: "lb", purchaseUom: "lb", defaultVendorId: slow.id }, ctx)) as { id: string };
 
     // A 10 bbl unbrewed batch needs 600 lb pale, 100 lb wheat, 2 yeast; 130 lb pale is on hand.
     const recipe = (await runCommand("create_recipe", { name: "Wheat Ale" }, brewer)) as { id: string };
@@ -186,6 +192,7 @@ describe("planning: draft purchase orders from material gaps", () => {
         { materialId: pale.id, perBblQty: 60, stage: "mash" },
         { materialId: wheat.id, perBblQty: 10, stage: "mash" },
         { materialId: orphan.id, perBblQty: 0.2, stage: "fermentation" },
+        { materialId: hulls.id, perBblQty: 1, stage: "mash" },
       ],
     }, brewer)) as { id: string };
     await runCommand("schedule_batch", { recipeVersionId: version.id, plannedOn: "2026-10-01", plannedBbl: 10 }, brewer);
@@ -195,15 +202,18 @@ describe("planning: draft purchase orders from material gaps", () => {
     const reqs = (await runCommand("get_material_requirements", {}, ctx)) as {
       material_id: string; required: number; on_hand: number; on_order: number; short: number; needed_by: string;
       vendor_id: string | null; vendor_name: string | null; lead_time_days: number | null; contract_id: string | null; purchase_units_short: number;
+      buy_by: string | null; out_of_reach: boolean;
     }[];
-    expect(reqs.find((r) => r.material_id === pale.id)).toMatchObject({ required: 600, on_hand: 130, on_order: 0, short: 470, needed_by: "2026-10-01", vendor_id: cm.id, vendor_name: "Country Malt Group", lead_time_days: 5, purchase_units_short: 9 });
-    expect(reqs.find((r) => r.material_id === orphan.id)).toMatchObject({ short: 2, vendor_id: null });
+    expect(reqs.find((r) => r.material_id === pale.id)).toMatchObject({ required: 600, on_hand: 130, on_order: 0, short: 470, needed_by: "2026-10-01", vendor_id: cm.id, vendor_name: "Country Malt Group", lead_time_days: 5, purchase_units_short: 9, buy_by: "2026-09-26", out_of_reach: false });
+    expect(reqs.find((r) => r.material_id === orphan.id)).toMatchObject({ short: 2, vendor_id: null, buy_by: null, out_of_reach: false });
+    expect(reqs.find((r) => r.material_id === hulls.id)).toMatchObject({ vendor_id: slow.id, buy_by: "2026-07-03", out_of_reach: true });
 
-    const drafted = (await runCommand("draft_purchase_order_from_requirements", { materialIds: [pale.id, wheat.id, orphan.id] }, ctx)) as {
+    // Out of reach and no vendor are both reported, never drafted (the RPC owns the rule, not the page).
+    const drafted = (await runCommand("draft_purchase_order_from_requirements", { materialIds: [pale.id, wheat.id, orphan.id, hulls.id] }, ctx)) as {
       purchaseOrderIds: string[]; skipped: { materialId: string; reason: string }[];
     };
     expect(drafted.purchaseOrderIds).toHaveLength(1);
-    expect(drafted.skipped).toEqual([{ materialId: orphan.id, reason: "no_vendor" }]);
+    expect(drafted.skipped.sort((x, y) => x.reason.localeCompare(y.reason))).toEqual([{ materialId: orphan.id, reason: "no_vendor" }, { materialId: hulls.id, reason: "out_of_reach" }]);
     const po = (await runCommand("get_purchase_order", { poId: drafted.purchaseOrderIds[0] }, ctx)) as { status: string; vendor_id: string; lines: { material_id: string; qty_ordered: number }[] };
     expect(po).toMatchObject({ status: "draft", vendor_id: cm.id });
     expect(po.lines.map((l) => [l.material_id, l.qty_ordered]).sort()).toEqual([[pale.id, 9], [wheat.id, 2]].sort());

@@ -227,6 +227,7 @@ omitted. They have no roles until they are built.
 | `list_standing_allocations` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
 | `list_stock_transfers` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `list_team_members` | Team & brewery settings | ✓ | ✓ | ✓ |  |  |
+| `list_vendors` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |
 | `list_vendors_and_contracts` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |
 | `list_vessels` | Production | ✓ |  |  | ✓ |  |
 | `move_stock_bin` | Inventory & locations | ✓ |  | ✓ |  |  |
@@ -1907,7 +1908,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse
 
-Draft one purchase order per vendor for the chosen material gaps, quantities rounded up to whole purchase units, contract price up to the available commitment; materials with no vendor are skipped and named
+Draft one purchase order per vendor for the chosen material gaps, quantities rounded up to whole purchase units, contract price up to the available commitment; materials with no vendor or past their buy-by are skipped and named with the reason
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -1941,7 +1942,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, warehouse, brewer
 
-Material gaps for Planning: required, on hand, on order, short (base units), whole purchase units short, needed-by date, and the vendor and contract each gap resolves to; a null vendor cannot draft
+Material gaps for Planning: required, on hand, on order, short (base units), whole purchase units short, needed-by and buy-by dates, and the vendor and contract each gap resolves to; a null vendor or an out-of-reach buy-by cannot draft
 
 Takes no input.
 
@@ -2001,6 +2002,21 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_purchase_orders", "input": {} }'
+```
+
+#### list_vendors [#list_vendors]
+
+`query` · admin, warehouse, brewer
+
+Vendors, alphabetical, with active flag and typed lead time
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_vendors", "input": {} }'
 ```
 
 #### list_vendors_and_contracts [#list_vendors_and_contracts]

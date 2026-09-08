@@ -1719,8 +1719,10 @@ create view vendor_lead_times with (security_invoker = true) as
 -- runs through the format BOM. Supply nets on hand and open POs so a gap is
 -- never ordered twice. Summed per material first, resolved to a vendor second
 -- (§3): the contract with commitment still available, else the material's
--- default vendor, else no vendor and the row cannot draft. Base uom;
--- purchase_units_short is the gap rounded up to whole purchase units.
+-- default vendor, else no vendor and the row cannot draft. Buy-by is needed-by
+-- less the vendor's typed lead time; a gap past it is out of reach and the
+-- drafting RPC leaves it out. Base uom; purchase_units_short is the gap
+-- rounded up to whole purchase units.
 create view material_requirements with (security_invoker = true) as
   with req as (
     select b.brewery_id, ri.material_id, sum(ri.per_bbl_qty * b.planned_bbl) as required, min(b.planned_on) as needed_by
@@ -1743,6 +1745,8 @@ create view material_requirements with (security_invoker = true) as
   select gap.*, m.name as material_name, m.base_uom, m.purchase_uom, m.purchase_uom_factor,
          ceil(greatest(gap.short, 0) / m.purchase_uom_factor) as purchase_units_short,
          coalesce(c.vendor_id, m.default_vendor_id) as vendor_id, v.name as vendor_name, v.lead_time_days,
+         gap.needed_by - v.lead_time_days as buy_by,
+         coalesce(gap.needed_by - v.lead_time_days < current_date, false) as out_of_reach,
          c.contract_id, c.qty_available as contract_qty_available, c.unit_cost_cents as contract_unit_cost_cents
   from gap join materials m on m.id = gap.material_id
   left join lateral (
@@ -4154,8 +4158,9 @@ end $$;
 -- Quantities are whole purchase units. A contracted material takes the
 -- contract's price up to its available commitment and a spot line (no
 -- contract, no price) beyond it — a draft that priced everything at contract
--- rate would be wrong money (§4). Materials with no vendor are reported, not
--- drafted. Drafts are not supply: the gap stands until the PO is marked sent.
+-- rate would be wrong money (§4). Materials with no vendor, and gaps already
+-- past their buy-by date, are reported, not drafted. Drafts are not supply:
+-- the gap stands until the PO is marked sent.
 create function draft_purchase_order_from_requirements(p_brewery uuid, p_materials uuid[], p_request_id uuid)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare
@@ -4173,6 +4178,10 @@ begin
   loop
     if r.vendor_id is null then
       v_skipped := v_skipped || jsonb_build_object('materialId', r.material_id, 'reason', 'no_vendor');
+      continue;
+    end if;
+    if r.out_of_reach then
+      v_skipped := v_skipped || jsonb_build_object('materialId', r.material_id, 'reason', 'out_of_reach');
       continue;
     end if;
     if r.vendor_id is distinct from v_last_vendor then   -- rows arrive grouped by vendor

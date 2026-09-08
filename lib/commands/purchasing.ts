@@ -81,6 +81,13 @@ defineCommand({
   })),
 });
 
+// The picker's list: PO and material forms need a name, not the contract report.
+defineQuery({
+  name: "list_vendors", description: "Vendors, alphabetical, with active flag and typed lead time",
+  input: z.object({}), roles: [...PURCHASING],
+  handler: (ctx) => unwrap(ctx.db.from("vendors").select("id, name, active, lead_time_days").eq("brewery_id", ctx.breweryId).order("name")),
+});
+
 // Vendors with their contracts nested, each contract carrying the four
 // drawdown numbers from contract_balances (committed, received, on order,
 // available) so Contracts and Contract read the same figures.
@@ -244,15 +251,15 @@ defineQuery({
 });
 
 // Planning's material gaps: the material_requirements view (demand, supply,
-// gap, needed-by, resolved vendor and contract, names, and the vendor's typed
-// lead time), so the page can date a buy-by and name the drafts.
+// gap, needed-by, buy-by and whether it is already out of reach, resolved
+// vendor and contract, names, and the vendor's typed lead time).
 defineQuery({
   name: "get_material_requirements",
-  description: "Material gaps for Planning: required, on hand, on order, short (base units), whole purchase units short, needed-by date, and the vendor and contract each gap resolves to; a null vendor cannot draft",
+  description: "Material gaps for Planning: required, on hand, on order, short (base units), whole purchase units short, needed-by and buy-by dates, and the vendor and contract each gap resolves to; a null vendor or an out-of-reach buy-by cannot draft",
   input: z.object({}), roles: [...PURCHASING],
   handler: async (ctx) => {
     const rows = await unwrap(ctx.db.from("material_requirements")
-      .select("material_id, material_name, base_uom, purchase_uom, required, on_hand, on_order, short, needed_by, purchase_units_short, vendor_id, vendor_name, lead_time_days, contract_id")
+      .select("material_id, material_name, base_uom, purchase_uom, required, on_hand, on_order, short, needed_by, buy_by, out_of_reach, purchase_units_short, vendor_id, vendor_name, lead_time_days, contract_id")
       .eq("brewery_id", ctx.breweryId).order("needed_by").order("material_name"));
     return (rows ?? []).map((r) => ({
       ...r, required: Number(r.required), on_hand: Number(r.on_hand), on_order: Number(r.on_order), short: Number(r.short),
@@ -263,7 +270,7 @@ defineQuery({
 
 defineCommand({
   name: "draft_purchase_order_from_requirements",
-  description: "Draft one purchase order per vendor for the chosen material gaps, quantities rounded up to whole purchase units, contract price up to the available commitment; materials with no vendor are skipped and named",
+  description: "Draft one purchase order per vendor for the chosen material gaps, quantities rounded up to whole purchase units, contract price up to the available commitment; materials with no vendor or past their buy-by are skipped and named with the reason",
   input: z.object({ materialIds: z.array(z.string().uuid()).min(1) }),
   roles: [...PO_ROLES],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("draft_purchase_order_from_requirements", {

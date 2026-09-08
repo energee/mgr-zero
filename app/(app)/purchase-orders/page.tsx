@@ -33,7 +33,7 @@ export default async function PurchaseOrdersPage({ searchParams }: { searchParam
   const ctx = await buildContext(brewery.id);
   const [pos, vendors, materials] = (await Promise.all([
     runCommand("list_purchase_orders", { includeClosed: all === "1" }, ctx),
-    runCommand("list_vendors_and_contracts", {}, ctx), runCommand("list_materials", {}, ctx),
+    runCommand("list_vendors", {}, ctx), runCommand("list_materials", {}, ctx),
   ])) as [Po[], Vendor[], Material[]];
 
   return (

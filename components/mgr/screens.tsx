@@ -2276,7 +2276,7 @@ export const SCREENS: Screen[] = [
     name: "New PO",
     to: { Vendor: "Entity picker", "Add line": "New PO", "Save draft": "Purchase orders" },
     job: "Draft a vendor order: lines, cost, and the lot the vendor named",
-    reads: "list_vendors_and_contracts · list_materials · get_material_requirements",
+    reads: "list_vendors · list_materials · get_material_requirements",
     writes: "create_purchase_order [one RPC: draft PO + all lines]",
     states: [["permission", "warehouse or admin required", 1], ["new", "vendor and one line required"], ["from requirements", "Planning drafts the lines; the shortfall is the quantity"], ["contracted lot", "the vendor named a lot on the contract · it prefills receiving"], ["no lot named", "the ordinary case · receiving captures it off the package"]],
     spec: "Expected lot is what the vendor named when the order was placed, which for a hop contract is often a crop-year lot. It is advisory: it creates no lot record and posts nothing, and it is offered only on a lot-tracked material. Receiving prefills its lot from it, and what the receiver reads off the arriving package is what creates the lot. That is the same principle as counted quantity: the promise is compared and the count is what posts. Rice hulls is not lot-tracked, so it is never asked.",
