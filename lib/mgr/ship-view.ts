@@ -59,8 +59,8 @@ function saleVolume(qty: number, bblPerUnit: number | undefined) {
 export function toShipViewProps({ order, lines, locations, invoiceTiming = "now" }: ShipSnapshot): ShipViewModel {
   const source = locations.find((l) => l.id === order.from_location_id)?.name ?? "—";
   const dest = order.ship_tos?.state ?? "";
-  const anyShort = lines.some((l) => shipOf(l) < pickedOf(l));
   const short = lines.find((l) => shipOf(l) < pickedOf(l));
+  const anyShort = Boolean(short);
   const tape: [string, string][] = [];
   for (const l of lines) {
     const qty = shipOf(l);

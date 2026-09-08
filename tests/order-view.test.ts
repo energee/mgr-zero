@@ -21,7 +21,9 @@ describe("Order view loop", () => {
     expect(model.next).toBe("Next: put back");
     expect(model.customerPo).toBe("4471");
     expect(model.fulfillmentSource).toBe("Warehouse");
-    expect(model.putBackHref).toMatch(/\/restock$/);
+    expect(model.canPutBack).toBe(true);
+    expect(model.canConfirm).toBe(false);
+    expect(model.canComplete).toBe(false);
     expect(model.lines[0]?.detail).toContain("ordered 4");
     expect(model.lines[0]?.detail).toContain("ATP 11");
     expect(model.lines[1]?.tone).toBe("w");
@@ -43,6 +45,12 @@ describe("Order view loop", () => {
     expect(html).toMatch(/ORD-0229/);
     expect(html).toMatch(/Picked · restock pending/);
     expect(html).toMatch(/Cancel order/);
+    expect(html).toMatch(/>Put back</);
+  });
+
+  it("the inventory Order drawing never emits a live /orders href", () => {
+    const html = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Order")!.body));
+    expect(html).not.toMatch(/href="\/orders/);
   });
 
   it("the live Order page mounts OrderView via the adapter, with no second E.* tree", () => {
@@ -50,6 +58,7 @@ describe("Order view loop", () => {
     expect(src).toMatch(/from "@\/components\/mgr\/views\/order"/);
     expect(src).toMatch(/from "@\/lib\/mgr\/order-view"/);
     expect(src).toMatch(/<OrderView\b/);
+    expect(src).toMatch(/orderId=\{order\.id\}/);
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
     expect(src).not.toMatch(/\bE\.(back|row|ttl|fld|act|tape|btn)\b/);
   });

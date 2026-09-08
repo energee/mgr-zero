@@ -14,7 +14,6 @@ export type OrderLineView = {
 };
 
 export type OrderViewModel = {
-  backHref?: string;
   title: string;
   where: string;
   currentState: string;
@@ -25,9 +24,9 @@ export type OrderViewModel = {
   requested?: string;
   note?: string;
   restockNote?: string;
-  putBackHref?: string;
-  confirmHref?: string;
-  completeHref?: string;
+  canPutBack: boolean;
+  canConfirm: boolean;
+  canComplete: boolean;
   lines: OrderLineView[];
   events: [ReactNode, ReactNode?][];
 };
@@ -117,7 +116,6 @@ export function toOrderViewProps({ order, lines, events, atp, locations }: Order
     ? `${order.customers.name}${order.ship_tos ? ` · ${order.ship_tos.city}, ${order.ship_tos.state}` : ""}`
     : "Taproom transfer";
   return {
-    backHref: "/orders",
     title: docNo("ORD", order.order_no, "Order"),
     where,
     currentState: `${titled(order.status)}${order.needs_restock ? " · restock pending" : ""}`,
@@ -130,9 +128,9 @@ export function toOrderViewProps({ order, lines, events, atp, locations }: Order
     requested: order.requested_ship_date ?? undefined,
     note: order.note ?? undefined,
     restockNote: restockNoteFor(order, lines),
-    putBackHref: order.status === "picked" && order.needs_restock ? `/orders/${order.id}/restock` : undefined,
-    confirmHref: order.status === "submitted" ? `/orders/${order.id}/confirm` : undefined,
-    completeHref: order.status === "picked" && order.kind === "taproom_transfer" ? `/orders/${order.id}/complete` : undefined,
+    canPutBack: order.status === "picked" && order.needs_restock,
+    canConfirm: order.status === "submitted",
+    canComplete: order.status === "picked" && order.kind === "taproom_transfer",
     lines: lines.map((l) => {
       const ordered = Number(l.qty_ordered);
       const picked = l.qty_picked === null ? null : Number(l.qty_picked);

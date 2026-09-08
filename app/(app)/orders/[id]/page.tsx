@@ -33,6 +33,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   return (
     <OrderView
       model={toOrderViewProps({ order, lines, events, atp, locations })}
+      orderId={order.id}
       footer={(
         <LifecycleButtons orderId={order.id} status={order.status}
           lines={lines.map((l) => ({ skuId: l.sku_id, skuName: l.skus?.name ?? l.sku_id, qty: Number(l.qty_ordered) }))} skus={skus}

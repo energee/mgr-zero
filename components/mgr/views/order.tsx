@@ -14,21 +14,28 @@ export function OrderView({
   adjustLines,
   showAddLine,
   complianceNote,
+  orderId,
 }: {
   model: OrderViewModel;
   footer?: ReactNode;
   adjustLines?: boolean;
   showAddLine?: boolean;
   complianceNote?: string;
+  /** Live page only. The inventory frame omits it so verbs stay inert. */
+  orderId?: string;
 }) {
+  const backHref = orderId ? "/orders" : undefined;
+  const putBackHref = orderId && model.canPutBack ? `/orders/${orderId}/restock` : undefined;
+  const confirmHref = orderId && model.canConfirm ? `/orders/${orderId}/confirm` : undefined;
+  const completeHref = orderId && model.canComplete ? `/orders/${orderId}/complete` : undefined;
   return (
     <>
-      {E.back("Orders", model.title, undefined, model.backHref)}
+      {E.back("Orders", model.title, undefined, backHref)}
       {E.ttl(model.where)}
       {E.row("Current state", model.currentState, E.status(model.next))}
-      {model.putBackHref ? E.act("Put back", "attention", model.putBackHref) : null}
-      {model.confirmHref ? E.act("Review and confirm", "success", model.confirmHref) : null}
-      {model.completeHref ? E.act("Complete transfer", "success", model.completeHref) : null}
+      {model.canPutBack ? E.act("Put back", "attention", putBackHref) : null}
+      {model.canConfirm ? E.act("Review and confirm", "success", confirmHref) : null}
+      {model.canComplete ? E.act("Complete transfer", "success", completeHref) : null}
       {model.fulfillmentSource ? E.fld("Fulfillment source", model.fulfillmentSource) : null}
       {model.shipTo ? E.fld("Ship-to", model.shipTo) : null}
       {model.customerPo ? E.fld("Customer PO", model.customerPo) : null}
