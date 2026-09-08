@@ -3,6 +3,10 @@ import { makeBrewery, makeStaffCtx, admin, seedCustomer, sql } from "./helpers";
 import { runCommand, type Ctx } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { inviteStaff, inviteCustomerUser } from "@/lib/supabase/invites";
+import { createClient } from "@supabase/supabase-js";
+import { publicEnv } from "@/lib/env/public";
+import { createRequestAuthContext } from "@/lib/auth/request-context";
+import { inviteLanding } from "@/lib/auth/invite";
 
 const execution = () => ({ requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() });
 const email = () => `${crypto.randomUUID()}@test.local`;
@@ -83,9 +87,10 @@ describe("durable invitations", () => {
     await runCommand("set_my_gravity_unit", { unit: "plato" }, ctx, second);
     await expect(runCommand("invite_staff", { email: email(), role: "sales" }, ctx, second)).rejects.toMatchObject({ code: "conflict" });
   });
-  it("delivers the invitation to local Mailpit", async () => {
+  it.each(["staff", "customer"] as const)("%s: the delivered SSR link consumes once and rejects the wrong audience", async (kind) => {
     const address = email();
-    await runCommand("invite_staff", { email: address, role: "sales" }, ctx);
+    if (kind === "staff") await runCommand("invite_staff", { email: address, role: "sales" }, ctx);
+    else await runCommand("invite_customer_user", { email: address, customerId }, ctx);
     const url = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!);
     expect(["127.0.0.1", "localhost"]).toContain(url.hostname);
     url.port = String(Number(url.port) + 3); // Both committed stacks put Mailpit three ports after Auth's API.
@@ -95,7 +100,23 @@ describe("durable invitations", () => {
     expect(response.ok).toBe(true);
     const mail = await response.json();
     expect(mail.messages).toHaveLength(1);
-    expect(mail.messages[0].Subject).toMatch(/invited/i);
+    expect(mail.messages[0].Subject).toBe("You have been invited");
+    const message = await fetch(`${url.origin}/api/v1/message/${mail.messages[0].ID}`).then((r) => r.json());
+    const link = new URL(message.HTML.match(/href="([^"]+)"/)?.[1].replaceAll("&amp;", "&"));
+    expect(link.pathname).toBe("/auth/confirm");
+    expect(link.searchParams.get("type")).toBe("invite");
+    expect(link.searchParams.get("audience")).toBe(kind);
+
+    const token_hash = link.searchParams.get("token_hash")!;
+    const recipient = createClient(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, { auth: { persistSession: false } });
+    const verified = await recipient.auth.verifyOtp({ token_hash, type: "invite" });
+    expect(verified.error).toBeNull();
+    const auth = createRequestAuthContext(() => Promise.resolve(recipient));
+    expect(await inviteLanding(auth, kind)).toMatchObject({ audience: kind });
+    expect(await inviteLanding(auth, kind === "staff" ? "customer" : "staff")).toBeFalsy();
+
+    const reused = createClient(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, { auth: { persistSession: false } });
+    expect((await reused.auth.verifyOtp({ token_hash, type: "invite" })).error).not.toBeNull();
   });
   it("concurrent first attempts produce one account and membership", async () => {
     const ex = execution(), input = { email: email(), role: "brewer" };

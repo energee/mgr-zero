@@ -17,6 +17,7 @@ export interface StaffMembership {
 
 export interface CustomerMembership {
   breweryId: string;
+  breweryName: string;
   customerId: string;
   customerName: string;
 }
@@ -92,11 +93,18 @@ export function createRequestAuthContext(createClient: RequestClientFactory = cr
       .returns<CustomerMembershipRow[]>();
     if (error) throw error;
 
-    return (data ?? []).map(({ customer_id, customers }) => ({
-      customerId: customer_id,
-      breweryId: customers.brewery_id,
-      customerName: customers.name,
-    }));
+    const breweryIds = [...new Set((data ?? []).map(({ customers }) => customers.brewery_id))];
+    const { data: breweries, error: breweryError } = breweryIds.length
+      ? await db.from("portal_brewery").select("id, name").in("id", breweryIds)
+      : { data: [], error: null };
+    if (breweryError) throw breweryError;
+    const breweryNames = new Map((breweries ?? []).map((brewery) => [brewery.id, brewery.name]));
+
+    return (data ?? []).map(({ customer_id, customers }) => {
+      const breweryName = breweryNames.get(customers.brewery_id);
+      if (!breweryName) throw new Error("customer membership brewery is unavailable");
+      return { customerId: customer_id, breweryId: customers.brewery_id, breweryName, customerName: customers.name };
+    });
   })());
 
   return {
