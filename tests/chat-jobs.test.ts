@@ -196,10 +196,13 @@ describe("delivery batch", () => {
     }
   });
 
-  it("rejects the old driver after reassignment without rescanning", async () => {
+  it.each(["warehouse", "admin"] as const)("rejects the old %s driver after reassignment without rescanning", async (role) => {
     await drain();
-    const driver=await makeStaffCtx(b.id,"warehouse");const replacement=await makeStaffCtx(b.id,"warehouse");
-    const destination=await linkWithDm(driver,"U-driver");
+    const driver=role === "admin" ? adminCtx : await makeStaffCtx(b.id,"warehouse");
+    const replacement=await makeStaffCtx(b.id,"warehouse");
+    const destination=role === "admin"
+      ? (await admin.from("notification_destinations").select("id").eq("installation_id",inst.id).eq("user_id",driver.userId).single()).data!
+      : await linkWithDm(driver,"U-driver");
     const order=await submittedOrder();
     const shipment=await ins("shipments",{brewery_id:b.id,order_id:order,created_by:adminCtx.userId});
     const route=await ins("routes",{brewery_id:b.id,name:"Reassign",delivery_date:"2026-09-05",driver_user_id:driver.userId,departed_at:"2026-09-05T12:00:00Z"});

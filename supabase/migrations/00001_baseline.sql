@@ -6069,9 +6069,9 @@ language sql stable security definer set search_path = '' as $$
     'source_current', o.reason='operations_digest' or coalesce(c.source_version=o.source_version,false),
     -- A removed/changed-role user gets no provider write. When the source has
     -- resolved, only a still-eligible prior recipient may get a resolved update.
-    'recipient_eligible', bu.user_id is not null and (bu.role='admin' or
-      case when c.subject_id is not null then bu.role::text=any(c.recipient_roles) and (c.assigned_user_id is null or c.assigned_user_id=dest.user_id)
-        else o.payload->'recipient_roles' ? bu.role::text and (o.payload->>'assigned_user_id' is null or o.payload->>'assigned_user_id'=dest.user_id::text) end),
+    'recipient_eligible', bu.user_id is not null and
+      case when c.subject_id is not null then (bu.role='admin' or bu.role::text=any(c.recipient_roles)) and (c.assigned_user_id is null or c.assigned_user_id=dest.user_id)
+        else (bu.role='admin' or o.payload->'recipient_roles' ? bu.role::text) and (o.payload->>'assigned_user_id' is null or o.payload->>'assigned_user_id'=dest.user_id::text) end,
     'link_active', exists (select 1 from public.chat_user_links l
       where l.installation_id = i.id and l.user_id = dest.user_id and l.state = 'active'),
     'preference_enabled', coalesce((select p.enabled from public.notification_preferences p
