@@ -1286,17 +1286,14 @@ shared channels are excluded: the sole shared destination is a currently
 private, internal, active channel where the bot is a member.
 
 Chat SDK subscriptions, locks, cache, lists, and queues live in the separate
-`chat_sdk` schema owned by `mgr_chat_sdk`. A dedicated `mgr_chat_runtime` login
-inherits only that role and uses `search_path = chat_sdk`; it has no public
-tenant-data grants. Scheduled service RPCs may maintain integration metadata,
-lease delivery work, and rebuild current projections. They cannot impersonate
-a user or execute an MGR domain command. Authenticated settings writes use the
-same actor-bound `private.command_requests` ledger as all normal commands;
-provider callback, semantic notification, and SDK-state dedupe remain separate.
+`chat_sdk` schema. Its tables are owned by `mgr_chat_sdk`; the schema grants
+that role `USAGE` and `CREATE`. A dedicated `mgr_chat_runtime` login inherits
+only that role and uses `search_path = chat_sdk`; it has no public tenant-data
+grants. Scheduled service RPCs may maintain integration metadata, lease delivery
+work, and rebuild current projections. They cannot impersonate a user or execute
+an MGR domain command. Authenticated settings writes use the same actor-bound
+`private.command_requests` ledger as all normal commands; provider callback,
+semantic notification, and SDK-state dedupe remain separate.
 
-**Verification note:** at the time of writing, `npx supabase start` fails
-locally on `staff_role already exists` and the test suite dies at import from
-`.env.local` key drift (`ANON_KEY`/`SERVICE_ROLE_KEY` vs the
-`PUBLISHABLE_KEY`/`SECRET_KEY` the code now reads). CI is green on the same
-commit, so both are local. None of §16 should be migrated until the database
-runs locally and `npx vitest run` passes.
+The chat tables and grants in §17 are implemented in the baseline migration and
+covered by the isolated Postgres schema, RLS, allowlist, and chat contract tests.
