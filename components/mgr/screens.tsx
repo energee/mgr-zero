@@ -22,7 +22,10 @@
 // not an oversight.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
+import { COMPLETE_TRANSFER_EXEMPLAR, CompleteTransferView } from "@/components/mgr/views/complete-transfer";
+import { CONFIRM_ORDER_EXEMPLAR, ConfirmOrderView } from "@/components/mgr/views/confirm-order";
 import { ORDER_PICKED_RESTOCK, OrderView } from "@/components/mgr/views/order";
+import { PUT_BACK_EXEMPLAR, PutBackView } from "@/components/mgr/views/put-back";
 import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-icons";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
@@ -962,19 +965,7 @@ export const SCREENS: Screen[] = [
     writes: "confirm_order · cancel_order",
     states: [["loading", "order-shaped skeleton"], ["stale", "line changed · refresh", 1], ["permission", "sales or admin required", 1], ["cancelled", "staged quantities become restock work · Put back clears it"]],
     spec: "2 taps from Today: Confirm → Confirm order, only when no blocking review exists. The registration warning is the same one the Order screen shows; it links to the Compliance registry and never blocks.",
-    body: (<>
-      {E.back("Orders", "ORD-0231")}
-      {E.ttl("Ridgeline Tap Room")}
-      {E.fld("State", "Submitted · ships Thu")}
-      {E.pick("Fulfillment source", "Warehouse", ["Warehouse", "Taproom"])}
-      {E.info(<>Lifecycle: submitted {E.arrow()} confirmed {E.arrow()} picked {E.arrow()} shipped {E.arrow()} delivered. Only the valid next action is active.</>)}
-      {E.row("Hazy IPA · ½ bbl keg", "", "4 · ATP 11")}
-      {E.row("Pils · 16 oz case", "", "10 · ATP −6", "w")}
-      {E.note("ATP is −6. Confirming oversells; that stays your call.")}
-      {E.note("Stout isn’t registered for Ohio. Check the Compliance registry.")}
-      {E.sp()}
-      {E.btns([["Confirm order", "p"], ["Cancel order", "del"]])}
-    </>),
+    body: <ConfirmOrderView model={CONFIRM_ORDER_EXEMPLAR} />,
   },
   {
     step: 5,
@@ -1065,13 +1056,7 @@ export const SCREENS: Screen[] = [
     writes: "confirm_restock [one RPC: clears needs_restock + order_events row]",
     states: [["permission", "warehouse or admin required", 1], ["pending", "Today Put back is the standing row"], ["done", "flag cleared · row leaves Today"], ["cancelled order", "the flag survives cancel · this is the only way back"], ["stale", "someone re-picked · the flag is already clear", 1]],
     spec: "Today’s Put back row opens this. Staged 3 Pils cases after ORD-0229 was adjusted down. The verb writes: it clears the restock flag and appends the order event, because a cancelled order can never be re-picked or shipped and would otherwise leave its row standing on Today forever. Inventory already sits in Warehouse as staged, so nothing moves in the ledger.",
-    body: (<>
-      {E.back("Today", "ORD-0229 · put back")}
-      {E.note("3 Pils cases stayed staged after the line was adjusted. Put them back on the Warehouse shelf.")}
-      {E.row("Pils · 16 oz case", "staged after pick", "3", "w")}
-      {E.sp()}
-      {E.btn("Put back 3 cases")}
-    </>),
+    body: <PutBackView model={PUT_BACK_EXEMPLAR} />,
   },
   {
     step: 5,
@@ -1148,16 +1133,7 @@ export const SCREENS: Screen[] = [
     writes: "ship_order [taproom_transfer kind: paired taproom_transfer movements (−source, +destination); no invoice]",
     states: [["stale", "picked qty changed · preview again", 1], ["short", "qty below picked releases the remainder"], ["permission", "warehouse or admin required", 1], ["accepted", "taproom on-hand rises immediately"]],
     spec: "No invoice-timing chip and no destination state: beer moves between the brewery’s own locations. Copper because the paired movements are append-only. Requested from Taproom · Needs replenishment.",
-    body: (<>
-      {E.back("TRF-0088", "Complete transfer")}
-      {E.fld(<>From {E.arrow(null)} to</>, <>Warehouse {E.arrow()} Taproom</>)}
-      {E.row("Pils · 16 oz case", "move / picked", "4 / 4", "ok")}
-      {E.row("Hazy IPA · ½ bbl keg", "move / picked", "2 / 2", "ok")}
-      {E.tape([["−4 Pils cases · taproom transfer · Warehouse", formatVolume("0.39")], ["+4 Pils cases · taproom transfer · Taproom", formatVolume("0.39")], ["−2 / +2 Hazy ½ bbl · taproom transfer", formatVolume("1.00")]])}
-      {E.info("No invoice: this is an internal move.")}
-      {E.sp()}
-      {E.btn("Complete transfer", "irr")}
-    </>),
+    body: <CompleteTransferView model={COMPLETE_TRANSFER_EXEMPLAR} />,
   },
   {
     step: 5,

@@ -4,11 +4,11 @@
 // the registry warning (a brand not registered for the ship-to state) waits
 // on Program 9's registry check on confirm, ruled out of scope there.
 import { redirect } from "next/navigation";
-import { E } from "@/components/mgr/e";
+import { ConfirmOrderView } from "@/components/mgr/views/confirm-order";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
-import { docNo } from "@/lib/mgr/doc-no";
+import { toConfirmOrderViewProps } from "@/lib/mgr/confirm-order-view";
 import { orNotFound } from "@/lib/mgr/not-found";
 import "@/lib/commands/all";
 import { ConfirmButtons } from "./confirm-buttons";
@@ -25,22 +25,10 @@ export default async function ConfirmOrderPage({ params }: { params: Promise<{ i
     runCommand("list_locations", {}, ctx) as Promise<{ id: string; name: string }[]>,
   ]);
   if (order.status !== "submitted") redirect(`/orders/${order.id}`);
-  const atpMap = new Map(atp.map((a) => [a.sku_id, Number(a.qty)]));
-  const short = lines.filter((l) => (atpMap.get(l.sku_id) ?? 0) < 0);
   return (
-    <>
-      {E.back("Orders", docNo("ORD", order.order_no, "Order"), undefined, "/orders")}
-      {E.ttl(order.customers?.name ?? "Taproom transfer")}
-      {E.fld("State", `Submitted${order.requested_ship_date ? ` · ships ${order.requested_ship_date}` : ""}`)}
-      {E.fld("Fulfillment source", locations.find((l) => l.id === order.from_location_id)?.name ?? "—")}
-      {E.info("Lifecycle: submitted → confirmed → picked → shipped → delivered. Only the valid next action is active.")}
-      {lines.map((l) => {
-        const a = atpMap.get(l.sku_id);
-        return <div key={l.id}>{E.row(l.skus?.name ?? "Line", "", `${l.qty_ordered}${a === undefined ? "" : ` · ATP ${a}`}`, a !== undefined && a < 0 ? "w" : "")}</div>;
-      })}
-      {short.map((l) => <div key={l.id}>{E.note(`ATP for ${l.skus?.name ?? "a line"} is ${atpMap.get(l.sku_id)}. Confirming oversells; that stays your call.`)}</div>)}
-      {E.sp()}
-      <ConfirmButtons orderId={order.id} />
-    </>
+    <ConfirmOrderView
+      model={toConfirmOrderViewProps({ order, lines, atp, locations })}
+      footer={<ConfirmButtons orderId={order.id} />}
+    />
   );
 }

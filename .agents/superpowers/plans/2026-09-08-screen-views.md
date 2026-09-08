@@ -81,8 +81,8 @@ Do not pre-extract these. When that program ships the live page, the page **is**
 Close the seams Order left:
 
 1. Move `views/order.tsx` to `views/orders/order.tsx` (re-export if you want a stable import) only if the rest of the pack lands in `views/orders/`. Otherwise leave Order where it is and add siblings under `views/orders/`.
-2. **Confirm order** and **Complete transfer** — already own pages; easiest after Order.
-3. **Put back** — own page.
+2. **Confirm order** and **Complete transfer** — done (own pages).
+3. **Put back** — done (own page).
 4. **Orders** list + **New order** sheet (fields view inside CommandForm).
 5. **Adjust lines**, **Pick**, **Short pick**, **Ship and invoice** / **Ship on delivery** / **Shipment done**, **Return and credit** — today they hang off `orders/[id]/page.tsx` via `LifecycleButtons`. Each becomes a view; the live form files become slot wrappers. Inventory labels (**Adjust**, **Ship**, **Cancel order**) should come from the view so docs and app stop forking verbs.
 6. **Pick sheet**, **Pars and allocation**, **Invoice**.
