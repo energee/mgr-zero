@@ -90,9 +90,15 @@ defineCommand({
 });
 
 defineQuery({
-  name: "list_compliance_reports", description: "Every filed snapshot, newest period first",
+  name: "list_compliance_reports", description: "Every filed snapshot, newest period first, and the brewery's today for the month list",
   roles: [...ROLES], input: z.object({}),
-  handler: (ctx) => rows<Filing>(ctx.db.from("report_filings").select("*").eq("brewery_id", ctx.breweryId).order("period_start", { ascending: false }).order("jurisdiction")),
+  handler: async (ctx) => {
+    const [filings, brewery] = await Promise.all([
+      rows<Filing>(ctx.db.from("report_filings").select("*").eq("brewery_id", ctx.breweryId).order("period_start", { ascending: false }).order("jurisdiction")),
+      unwrap(ctx.db.from("breweries").select("timezone").eq("id", ctx.breweryId).single()) as Promise<{ timezone: string }>,
+    ]);
+    return { filings, today: new Date().toLocaleDateString("en-CA", { timeZone: brewery.timezone }) };
+  },
 });
 
 type LotRow = {
@@ -123,4 +129,12 @@ defineQuery({
       movements: movements.map((m) => ({ id: m.id, type: m.type, qty: Number(m.qty), ref: m.ref, created_at: m.created_at, sku: m.skus?.name ?? "", location: m.locations?.name ?? "" })),
     };
   },
+});
+
+export type LotRowOut = { id: string; code: string; packaged_on: string; brands: { name: string } | null };
+
+defineQuery({
+  name: "list_lots", description: "Finished-goods lots, newest packaged first, as the entry to a lot trace",
+  roles: [...ROLES, "warehouse", "brewer"], input: z.object({}),
+  handler: (ctx) => rows<LotRowOut>(ctx.db.from("lots").select("id, code, packaged_on, brands(name)").eq("brewery_id", ctx.breweryId).order("packaged_on", { ascending: false }).limit(50)),
 });

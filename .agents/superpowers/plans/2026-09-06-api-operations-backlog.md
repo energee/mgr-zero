@@ -4,7 +4,7 @@
 
 # API operations backlog
 
-40 operations the screens declare they need that the command registry does not yet answer, against 136 that it does.
+32 operations the screens declare they need that the command registry does not yet answer, against 145 that it does.
 
 This is the backend push, scoped. Each row names the operation a screen asked for and the screens waiting on it, so an area can be built and shipped whole rather than a command at a time. `/docs/api` publishes the same list per area, marked designed, so an integrator sees the roadmap without being told a date.
 
@@ -15,19 +15,11 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | Operation | Kind | Needed by |
 | --- | --- | --- |
 | `portal_schedule` | query | Coming up |
-## Compliance: 9 to build, 0 built
+## Compliance: 1 to build, 9 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
-| `file_compliance_report` | command | Monthly compliance |
-| `generate_compliance_report` | query | Monthly compliance |
-| `get_compliance_registry` | query | Compliance registry, Brand approval, State registration, License |
-| `list_compliance_reports` | query | Compliance months |
 | `reattribute_loss` | command | Monthly compliance |
-| `trace_lot` | query | Lot trace |
-| `upsert_brand_approval` | command | Compliance registry, Brand approval |
-| `upsert_brewery_state_license` | command | Compliance registry, License |
-| `upsert_state_registration` | command | Compliance registry, State registration |
 ## Production: 6 to build, 13 built
 
 | Operation | Kind | Needed by |

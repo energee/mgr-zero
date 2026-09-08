@@ -136,9 +136,10 @@ describe("file_compliance_report", () => {
     const { data: after } = await admin.from("report_filings").select("figures").eq("id", filedRow!.id).single();
     expect(after!.figures).toEqual(filedRow!.figures);
     expect(live.figures).not.toEqual(filedRow!.figures);
-    const list = await runCommand("list_compliance_reports", {}, sales) as { id: string; jurisdiction: string; period_start: string; filed_at: string | null; figures: Report["figures"] }[];
-    expect(list.map((f) => f.period_start)).toEqual(["2026-09-01"]);
-    expect(list[0].filed_at).toBeTruthy();
+    const { filings, today } = await runCommand("list_compliance_reports", {}, sales) as { filings: { period_start: string; filed_at: string | null }[]; today: string };
+    expect(filings.map((f) => f.period_start)).toEqual(["2026-09-01"]);
+    expect(filings[0].filed_at).toBeTruthy();
+    expect(today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
   it("an empty brewery files zeros: a report with nothing in it still balances", async () => {
