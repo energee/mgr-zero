@@ -2986,7 +2986,9 @@ where a beer may be sold, and loss is attributed to a cause rather than left as
 an unexplained gap between what was brewed and what was sold.
 
 Reports are generated from that history and then filed; generating one never
-changes the underlying records.
+changes the underlying records. Filing refuses not only an exact repeat of a
+period already on file but any period whose dates overlap one, in the same
+jurisdiction — the guard is a date range, not an equality check.
 
 {/* ops:compliance */}
 
