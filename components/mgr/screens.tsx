@@ -22,6 +22,7 @@
 // not an oversight.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
+import { ORDER_PICKED_RESTOCK, OrderView } from "@/components/mgr/views/order";
 import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-icons";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
@@ -986,22 +987,7 @@ export const SCREENS: Screen[] = [
     writes: "submit_order · adjust_order_lines [sets needs_restock on a picked order] · confirm_order · cancel_order [needs_restock while quantities are staged]",
     states: [["draft", "Submit is the one active verb"], ["confirmed / picked", "lines adjust; restock rows appear when picked qty exceeds ordered"], ["shipped", "read-only tape · Return shipment is the correction"], ["delivered", "the route stamped it · read-only, Return shipment still corrects"], ["stale", "another user changed a line · refresh", 1], ["permission", "sales or admin to adjust; warehouse reads", 1]],
     spec: "Drawn as picked after a line was adjusted down: staged 3 Pils cases must go back to Warehouse. Adjusting down, shipping short and cancelling all set the restock flag; Put back is what clears it. Delivered is the last lifecycle state and arrives from Confirm delivery on the route, not from a verb here. Ship opens Ship and invoice rather than committing here. Cancel is destructive and asks for confirm. Every transition appends an order event row in the same RPC. Confirm still has its own two-tap Today frame.",
-    body: (<>
-      {E.back("Orders", "ORD-0229")}
-      {E.ttl("Al’s Bar · Columbus, OH")}
-      {E.row("Current state", "Picked · restock pending", E.status("Next: ship"))}
-      {E.fld("Fulfillment source", "Warehouse")}
-      {E.fld("Customer PO", "4471")}
-      {E.note("Put back 3 Pils cases to Warehouse. They stayed staged after the line was adjusted.")}
-      {E.row("Hazy IPA · ½ bbl keg", "ordered 4 · picked 4 · ATP 11", E.act("Adjust", "attention"), "ok")}
-      {E.row("Pils · 16 oz case", "ordered 7 · picked 10", E.act("Adjust", "attention"), "w")}
-      {E.row("Stout · ⅙ bbl keg", "ordered 2 · picked 2 · ATP 7", E.act("Adjust", "attention"), "ok")}
-      {E.btn("Add line", "g")}
-      {E.note("Stout isn’t registered for Ohio. Check the Compliance registry.")}
-      {E.tape([["created · Ted", "Mon 9:02"], ["submitted · Ted", "Mon 9:05"], ["confirmed · Maria", "Mon 14:10"], ["picked · Dave · 4 / 10 / 2", "Tue 8:40"], [<>line adjusted · Pils 10 {E.arrow()} 7 · customer cut</>, "Tue 9:15"], ["restock pending · 3 Pils staged", "Tue 9:15"]])}
-      {E.btns([["Ship", "p"], ["Cancel order", "del"]])}
-      {E.info("Cancel asks you to confirm. Allocations release.")}
-    </>),
+    body: <OrderView model={ORDER_PICKED_RESTOCK} />,
   },
   {
     step: 5,
