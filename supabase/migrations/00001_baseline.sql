@@ -1545,7 +1545,9 @@ create table report_filings (   -- the snapshot that was actually filed; the led
   filed_by uuid references auth.users(id),
   note text,
   created_at timestamptz not null default now(),
-  unique (brewery_id, jurisdiction, period_start, period_end)
+  unique (brewery_id, jurisdiction, period_start, period_end),
+  -- one filing covers a stretch of days: a second period overlapping it is a second filing of the same beer
+  exclude using gist (brewery_id with =, jurisdiction with =, daterange(period_start, period_end, '[]') with &&)
 );
 
 -- ---------------------------------------------------------------- deliveries
@@ -3545,7 +3547,8 @@ begin
       coalesce(sum(bbl), 0) as e
     from unnest(enum_range(null::public.package_type)) as c(class) left join r on r.class = c.class group by c.class)
   select
-    (select jsonb_agg(jsonb_build_object('class', class, 'begin', round(b, 2), 'in', round(i, 2), 'out', round(o, 2), 'end', round(e, 2)) order by class) from per_class),
+    -- the printed cells must foot as printed: end is derived from the rounded cells, the identity is checked unrounded below
+    (select jsonb_agg(jsonb_build_object('class', class, 'begin', round(b, 2), 'in', round(i, 2), 'out', round(o, 2), 'end', round(b, 2) + round(i, 2) - round(o, 2)) order by class) from per_class),
     coalesce((select array_agg(class::text || ' does not balance' order by class) from per_class where b + i - o <> e), '{}')
       || coalesce((select array_agg(distinct 'unclassified movement type ' || type::text) from r where d >= p_start and side is null), '{}'),
     (select coalesce(jsonb_object_agg(k, round(v, 2)), '{}'::jsonb) from (
@@ -3579,7 +3582,7 @@ begin
   begin
     insert into public.report_filings (brewery_id, jurisdiction, period_start, period_end, figures, filed_at, filed_by, note)
       values (p_brewery, p_jurisdiction, p_start, p_end, v_report->'figures', now(), auth.uid(), p_note) returning * into v_row;
-  exception when unique_violation then
+  exception when unique_violation or exclusion_violation then
     raise exception 'this period is already filed' using errcode = 'MG409';
   end;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));

@@ -102,6 +102,33 @@ describe("generate_compliance_report", () => {
     await admin.from("sale_channels").update({ tax_treatment: "export" }).eq("id", exportCh);
   });
 
+  it("prints cells that foot as printed, and a repack across package classes is the one thing that breaks the balance", async () => {
+    // 107 + 3 units of 0.0645 bbl: rounded independently, 6.45 + 0.19 ≠ 6.65; the printed end is derived from the printed cells
+    const other = await makeBrewery();
+    const ctx = await makeStaffCtx(other.id, "admin");
+    const { skuId } = await seedCatalog(other.id, { sku: "Foot case", packageType: "can", bblPerUnit: 0.0645 });
+    const kegSkuId = (await seedCatalog(other.id, { product: "Foot Keg", sku: "Foot keg", packageType: "keg", bblPerUnit: 0.5 })).skuId;
+    const l = await seedLocation(other.id);
+    const base = { brewery_id: other.id, location_id: l.id, bin_id: l.binId, created_by: ctx.userId };
+    await admin.from("inventory_movements").insert([
+      { ...base, sku_id: skuId, qty: 107, type: "opening_balance", created_at: "2026-08-15T12:00:00Z" },
+      { ...base, sku_id: skuId, qty: 3, type: "production_in", created_at: "2026-09-03T12:00:00Z" },
+    ]);
+    const r = await runCommand("generate_compliance_report", PERIOD, ctx) as Report;
+    for (const line of r.figures.lines) expect(line.begin + line.in - line.out).toBeCloseTo(line.end, 10);
+    expect(r.figures.balances).toBe(true);
+    // a keg repacked into cans moves beer between classes without a removal: the identity breaks and the month says which class
+    await admin.from("inventory_movements").insert([
+      { ...base, sku_id: kegSkuId, qty: 1, type: "opening_balance", created_at: "2026-08-15T12:00:00Z" },
+      { ...base, sku_id: kegSkuId, qty: -1, type: "repack", created_at: "2026-09-04T12:00:00Z" },
+      { ...base, sku_id: skuId, qty: 7, type: "repack", created_at: "2026-09-04T12:00:00Z" },
+    ]);
+    const broken = await runCommand("generate_compliance_report", PERIOD, ctx) as Report;
+    expect(broken.figures.balances).toBe(false);
+    expect(broken.warnings).toEqual(["keg does not balance", "can does not balance"]);
+    await expect(runCommand("file_compliance_report", PERIOD, ctx)).rejects.toThrow(/does not balance: keg does not balance; can does not balance/);
+  });
+
   it("warehouse cannot generate", async () => {
     const warehouse = await makeStaffCtx(b.id, "warehouse");
     await expect(runCommand("generate_compliance_report", PERIOD, warehouse)).rejects.toMatchObject({ status: 403 });
@@ -124,8 +151,9 @@ describe("file_compliance_report", () => {
     // the same request id returns the same filing
     const again = await runCommand("file_compliance_report", { ...PERIOD, note: "filed on pay.gov" }, sales, exec(requestId)) as { id: string };
     expect(again.id).toBe(filed.id);
-    // a new request for the same period is a second filing: refused
+    // a new request for the same period is a second filing: refused; so is a period overlapping it
     await expect(runCommand("file_compliance_report", PERIOD, sales, exec(crypto.randomUUID()))).rejects.toMatchObject({ status: 409 });
+    await expect(runCommand("file_compliance_report", { ...PERIOD, periodStart: "2026-09-15", periodEnd: "2026-10-15" }, sales)).rejects.toMatchObject({ status: 409 });
   });
 
   it("a movement added after filing does not change the snapshot, and the list shows the filing", async () => {
@@ -150,6 +178,7 @@ describe("file_compliance_report", () => {
   it("an empty brewery files zeros: a report with nothing in it still balances", async () => {
     const empty = await makeBrewery();
     const ctx = await makeStaffCtx(empty.id, "admin");
+    // a different jurisdiction may cover the same days as a TTB month
     const filed = await runCommand("file_compliance_report", { jurisdiction: "US-PA", periodStart: "2026-08-01", periodEnd: "2026-08-31" }, ctx) as { figures: Report["figures"] };
     expect(filed.figures.lines.map((l) => l.end)).toEqual([0, 0, 0]);
   });

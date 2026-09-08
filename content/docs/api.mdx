@@ -224,7 +224,7 @@ omitted. They have no roles until they are built.
 | `list_keg_events` | Taproom & kegs | ✓ |  | ✓ |  |  |
 | `list_keg_pools` | Taproom & kegs | ✓ |  | ✓ |  |  |
 | `list_locations` | Inventory & locations | ✓ | ✓ | ✓ | ✓ |  |
-| `list_lots` | Compliance | ✓ | ✓ | ✓ | ✓ |  |
+| `list_lots` | Compliance | ✓ | ✓ |  |  |  |
 | `list_materials` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |
 | `list_movements` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `list_occupancies` | Packaging | ✓ |  | ✓ | ✓ |  |
@@ -285,7 +285,7 @@ omitted. They have no roles until they are built.
 | `ship_order` | Orders & invoicing | ✓ |  | ✓ |  |  |
 | `submit_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `submit_stock_transfer` | Inventory & locations | ✓ |  | ✓ |  |  |
-| `trace_lot` | Compliance | ✓ | ✓ | ✓ | ✓ |  |
+| `trace_lot` | Compliance | ✓ | ✓ |  |  |  |
 | `unlink_chat_user` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
 | `update_bin` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `update_draft_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
@@ -3065,7 +3065,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 #### list_lots [#list_lots]
 
-`query` · admin, sales, warehouse, brewer
+`query` · admin, sales
 
 Finished-goods lots, newest packaged first, as the entry to a lot trace
 
@@ -3080,7 +3080,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 #### trace_lot [#trace_lot]
 
-`query` · admin, sales, warehouse, brewer
+`query` · admin, sales
 
 One finished-goods lot: its packaging run, the tank and batch it came from, every ledger movement that names the lot, and the units still on hand
 

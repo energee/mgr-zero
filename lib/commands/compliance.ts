@@ -105,7 +105,7 @@ export type LotRowOut = { id: string; code: string; packaged_on: string; brands:
 
 defineQuery({
   name: "list_lots", description: "Finished-goods lots, newest packaged first, as the entry to a lot trace",
-  roles: [...ROLES, "warehouse", "brewer"], input: z.object({}),
+  roles: [...ROLES], input: z.object({}),
   handler: (ctx) => rows<LotRowOut>(ctx.db.from("lots").select("id, code, packaged_on, brands(name)").eq("brewery_id", ctx.breweryId).order("packaged_on", { ascending: false }).limit(50)),
 });
 
@@ -117,7 +117,7 @@ type LotMovement = { id: string; type: string; qty: number; created_at: string; 
 
 defineQuery({
   name: "trace_lot", description: "One finished-goods lot: its packaging run, the tank and batch it came from, every ledger movement that names the lot, and the units still on hand",
-  roles: [...ROLES, "warehouse", "brewer"],
+  roles: [...ROLES],
   input: z.object({ lotId: z.string().uuid() }),
   handler: async (ctx, i) => {
     // ponytail: ship_order records no lot on its sale removals, so a shipment

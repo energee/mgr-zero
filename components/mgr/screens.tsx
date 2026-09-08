@@ -2741,7 +2741,7 @@ export const SCREENS: Screen[] = [
     name: "Monthly compliance",
     to: { Confirm: "Monthly compliance" },
     job: "Generate from ledgers, review, then record the external filing",
-    reads: "generate_compliance_report · get_loss_review [view; SCHEMA-GATE for typed completion-loss identity]",
+    reads: "list_compliance_reports · generate_compliance_report · get_loss_review [view; SCHEMA-GATE for typed completion-loss identity]",
     writes: "file_compliance_report · reattribute_loss [SCHEMA-GATE; requires typed origin/classification + atomic compensation]",
     states: [["current", "generated from the ledger now"], ["does not balance", "a movement type the report cannot classify is named · Save stays off", 1], ["filed", "the snapshot is shown, not regenerated"], ["permission", "sales or admin required", 1]],
     spec: "Reattribution waits for schema that identifies completion rows and cellar removal class; correction must be atomic append-only compensation, never free-text note matching. The identity checks are v1 lessons drawn in user copy: balance per class, cellar as in-process, 0.00 never blank, no transmission. Beer in process is the tanks now, not at period end, and says so. Removals are keyed by the tax treatment frozen on each movement, so editing a channel later does not move a past month; taxable removals also break down by destination state for the states that remit.",

@@ -9,7 +9,7 @@ import { buildContext } from "@/lib/commands/context";
 import type { Filing, LotRowOut } from "@/lib/commands/compliance";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
-import { JURISDICTION, monthLabel, recentMonths } from "./period";
+import { bbl, JURISDICTION, monthLabel, recentMonths } from "./period";
 
 export default async function CompliancePage() {
   const brewery = await getActiveBrewery();
@@ -24,7 +24,7 @@ export default async function CompliancePage() {
         const f = filed.get(m);
         return (
           <Link key={m} href={`/compliance/${m}`}>
-            {f ? E.nav(monthLabel(m), `filed ${f.filed_at?.slice(0, 10)} · ${f.figures.removals.taxable ?? 0} bbl taxable`, "ok") : E.nav(monthLabel(m), "not filed · ready to review", "w")}
+            {f ? E.nav(monthLabel(m), `filed ${f.filed_at?.slice(0, 10)} · ${bbl(f.figures.removals.taxable ?? 0)} bbl taxable`, "ok") : E.nav(monthLabel(m), "not filed · ready to review", "w")}
           </Link>
         );
       })}

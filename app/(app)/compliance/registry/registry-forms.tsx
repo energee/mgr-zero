@@ -14,16 +14,17 @@ import type { Approval, License, Registration } from "@/lib/commands/compliance"
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
 type Brand = { id: string; name: string };
-const field = (id: string, label: string, value: string, set: (v: string) => void, type = "text", required = false) => (
+const field = (id: string, label: string, value: string, set: (v: string) => void, type = "text", required = false, locked = false) => (
   <div className="flex flex-col gap-2">
     <Label htmlFor={id}>{label}</Label>
-    <Input id={id} type={type} value={value} onChange={(e) => set(e.target.value)} required={required} />
+    <Input id={id} type={type} value={value} onChange={(e) => set(e.target.value)} required={required} disabled={locked} />
   </div>
 );
-const brandPick = (id: string, brands: Brand[], value: string, set: (v: string) => void) => (
+// key fields are locked when editing: registrations and licenses are addressed by them, so changing one would add a row, not move it
+const brandPick = (id: string, brands: Brand[], value: string, set: (v: string) => void, locked = false) => (
   <div className="flex flex-col gap-2">
     <Label htmlFor={id}>Brand</Label>
-    <Select value={value} onValueChange={set}>
+    <Select value={value} onValueChange={set} disabled={locked}>
       <SelectTrigger id={id}><SelectValue placeholder="Choose a brand" /></SelectTrigger>
       <SelectContent>{brands.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
     </Select>
@@ -77,9 +78,9 @@ export function RegistrationForm({ brands, registration }: { brands: Brand[]; re
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title={registration ? "State registration" : "New state registration"} trigger={trigger(!!registration, "Add registration")}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
-        {brandPick("sr-brand", brands, v.brandId, set("brandId"))}
+        {brandPick("sr-brand", brands, v.brandId, set("brandId"), !!registration)}
         <div className="grid grid-cols-2 gap-2">
-          {field("sr-state", "State (two letters)", v.state, set("state"), "text", true)}
+          {field("sr-state", "State (two letters)", v.state, set("state"), "text", true, !!registration)}
           {field("sr-no", "Registration number · optional", v.registrationNo, set("registrationNo"))}
         </div>
         {field("sr-expires", "Expires · optional", v.expiresOn, set("expiresOn"), "date")}
@@ -101,8 +102,8 @@ export function LicenseForm({ license }: { license?: License }) {
     <CommandForm open={form.open} onOpenChange={form.setOpen} title={license ? "License" : "New license"} trigger={trigger(!!license, "Add license")}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <div className="grid grid-cols-2 gap-2">
-          {field("li-state", "State (two letters)", v.state, set("state"), "text", true)}
-          {field("li-kind", "Kind", v.kind, set("kind"), "text", true)}
+          {field("li-state", "State (two letters)", v.state, set("state"), "text", true, !!license)}
+          {field("li-kind", "Kind", v.kind, set("kind"), "text", true, !!license)}
         </div>
         <div className="grid grid-cols-2 gap-2">
           {field("li-no", "License number · optional", v.licenseNo, set("licenseNo"))}
