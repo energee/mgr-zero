@@ -59,3 +59,33 @@ describe("format_bom", () => {
     expect(error?.code).toBe("PGRST205");
   });
 });
+
+describe("format editing detail", () => {
+  it("loads complete replacement sets and minimal material options for Sales, with tenant and role boundaries", async () => {
+    const child = await runCommand("upsert_format", { name: "Detail can", basis: "packaged", packageType: "can", bblPerUnit: 0.004 }, ctx) as { id: string };
+    const parent = await runCommand("upsert_format", { name: "Detail case", basis: "packaged", packageType: "can" }, ctx) as { id: string };
+    const { data: material, error } = await admin.from("materials").insert({ brewery_id: ctx.breweryId, name: "Detail tray", category: "packaging", base_uom: "each", purchase_uom: "each", lot_tracked: false, active: false }).select("id").single();
+    expect(error).toBeNull();
+    await runCommand("replace_format_components", { formatId: parent.id, components: [{ childFormatId: child.id, qty: 24 }] }, ctx);
+    await runCommand("replace_format_bom", { formatId: parent.id, lines: [{ materialId: material!.id, qtyPerUnit: 1, onBreak: "return_to_stock" }] }, ctx);
+    const sales = await makeStaffCtx(ctx.breweryId, "sales");
+    const detail = await runCommand("get_format_composition", { formatId: parent.id }, sales) as { format: { id: string }; components: { child_format_id: string; qty: number }[]; lines: { material_id: string; qty_per_unit: number; on_break: string }[]; materials: Record<string, unknown>[]; usedAsChild: boolean };
+    expect(detail.format.id).toBe(parent.id);
+    expect(detail.components).toEqual([{ child_format_id: child.id, qty: 24 }]);
+    expect(detail.lines).toEqual([{ material_id: material!.id, qty_per_unit: 1, on_break: "return_to_stock" }]);
+    expect(detail.materials.find((m) => m.id === material!.id)).toEqual({ id: material!.id, name: "Detail tray", base_uom: "each", active: false });
+    expect(detail.usedAsChild).toBe(false);
+    expect(await runCommand("get_format_composition", { formatId: child.id }, sales)).toMatchObject({ usedAsChild: true });
+    await expect(runCommand("list_materials", {}, sales)).rejects.toMatchObject({ code: "permission_denied" });
+    const warehouse = await makeStaffCtx(ctx.breweryId, "warehouse");
+    await expect(runCommand("get_format_composition", { formatId: parent.id }, warehouse)).resolves.toMatchObject({ format: { id: parent.id } });
+    const outsider = await makeStaffCtx((await makeBrewery()).id, "admin");
+    await expect(runCommand("get_format_composition", { formatId: parent.id }, outsider)).rejects.toMatchObject({ code: "not_found" });
+    await expect(runCommand("get_format_composition", { formatId: parent.id }, { ...sales, role: "brewer" })).rejects.toMatchObject({ code: "permission_denied" });
+    await expect(runCommand("get_format_composition", { formatId: parent.id }, { ...sales, role: "customer" })).rejects.toMatchObject({ code: "permission_denied" });
+    await expect(runCommand("get_format_composition", { formatId: "bad" }, sales)).rejects.toMatchObject({ code: "invalid_input" });
+    await runCommand("replace_format_components", { formatId: parent.id, components: [] }, sales);
+    await runCommand("replace_format_bom", { formatId: parent.id, lines: [] }, sales);
+    await expect(runCommand("get_format_composition", { formatId: parent.id }, sales)).resolves.toMatchObject({ components: [], lines: [] });
+  });
+});

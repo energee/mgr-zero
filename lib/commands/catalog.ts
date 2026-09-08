@@ -210,3 +210,21 @@ defineQuery({
   input: z.object({}), roles: STAFF_ROLES,
   handler: (ctx) => unwrap(ctx.db.from("brands").select("*, styles(name), skus(id, name, format_id, active)").eq("brewery_id", ctx.breweryId).order("name")),
 });
+
+// Format editing needs only material identity/unit, not purchasing details.
+defineQuery({
+  name: "get_format_composition", description: "One format with its components, packaging BOM, atomic child options, and material names and base units",
+  input: z.object({ formatId: z.string().uuid() }), roles: ["admin", "sales", "warehouse"],
+  handler: async (ctx, i) => {
+    const format = await unwrap(ctx.db.from("formats").select().eq("brewery_id", ctx.breweryId).eq("id", i.formatId).maybeSingle());
+    if (!format) throw new CommandError("Format not found", 404, "not_found");
+    const [components, lines, formats, materials, parents] = await Promise.all([
+      unwrap(ctx.db.from("format_components").select("child_format_id, qty").eq("brewery_id", ctx.breweryId).eq("parent_format_id", i.formatId).order("child_format_id")),
+      unwrap(ctx.db.from("format_bom").select("material_id, qty_per_unit, on_break").eq("brewery_id", ctx.breweryId).eq("format_id", i.formatId).order("material_id")),
+      unwrap(ctx.db.from("format_volumes").select("id, name, basis, bbl_per_unit, composed").eq("brewery_id", ctx.breweryId).order("name")),
+      unwrap(ctx.db.from("materials").select("id, name, base_uom, active").eq("brewery_id", ctx.breweryId).order("name")),
+      unwrap(ctx.db.from("format_components").select("parent_format_id").eq("brewery_id", ctx.breweryId).eq("child_format_id", i.formatId).limit(1)),
+    ]);
+    return { format, components, lines, formats, materials, usedAsChild: (parents ?? []).length > 0 };
+  },
+});

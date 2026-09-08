@@ -84,6 +84,12 @@ CSV import has no screen yet, so there is no **Import** link. See [Actions not y
 3. For a packaged format choose **Package type** (`keg`, `can`, or `bottle`), the **Keg size** for kegs, and optionally **Units per case** and **BBL per unit**.
 4. Select **Create**. Format names must be unique within the brewery.
 
+Select **Open format** on a format row to see its components and **Package BOM**. Admin and Sales can **Replace components** or **Replace BOM**; Warehouse can read them. Each save replaces that entire list. Add rows, choose distinct items, enter positive quantities, and remove rows you no longer need. An empty list requires checking the explicit clear confirmation before saving.
+
+Components must be other atomic packaged formats with a typed volume. To create a composed format, leave **BBL per unit** blank when creating it, then open it and add components. A format with a typed volume, a poured format, or a format already used as a child cannot have its components replaced here. Clearing components leaves no volume, so the format cannot hold stock until components are added again.
+
+For packaging materials, quantities use the material’s displayed base unit. Choose **Consumed** or **Return to stock** for what happens when the package is broken open. Existing inactive materials remain visible. Changes apply to this format’s complete list; if a different package needs its own list, create a separate format.
+
 ### Create a SKU
 
 1. Find the brand and select **New SKU**.

@@ -1,7 +1,7 @@
 // app/(app)/catalog/page.tsx — Catalog (screen record): brands with their
 // SKUs, then formats. Add brand opens brand-form.tsx (Brand), Add SKU on a
-// brand opens sku-form.tsx (SKU), Add format opens format-form.tsx (Format,
-// with its components and Package BOM). A SKU is one brand × one packaged
+// brand opens sku-form.tsx (SKU), Add format opens format-form.tsx. Open format
+// links to its components and Package BOM. A SKU is one brand × one packaged
 // format; bbl per unit lives on the format.
 import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -43,7 +43,7 @@ export default async function CatalogPage() {
       {E.row("Price groups", plural(groups.length, "group"), E.act("Open", "primary", "/pricing"))}
       {E.hd("Formats", "package composition", <FormatForm />)}
       {formats.length === 0 ? E.blank("No formats yet") : formats.map((f) => (
-        <div key={f.id}>{E.row(f.name, `${f.basis}${f.package_type ? ` · ${f.package_type}${f.keg_size ? ` (${f.keg_size.replace(/_/g, " ")})` : ""}` : ""}${f.units_per_case ? ` · ${f.units_per_case} per case` : ""}`, f.bbl_per_unit ? formatVolume(f.bbl_per_unit) : "")}</div>
+        <div key={f.id}>{E.row(f.name, `${f.basis}${f.package_type ? ` · ${f.package_type}${f.keg_size ? ` (${f.keg_size.replace(/_/g, " ")})` : ""}` : ""}${f.units_per_case ? ` · ${f.units_per_case} per case` : ""}${f.bbl_per_unit ? ` · ${formatVolume(f.bbl_per_unit)}` : ""}`, E.act("Open format", "primary", `/catalog/formats/${f.id}`))}</div>
       ))}
     </>
   );
