@@ -13,4 +13,5 @@ import "./production";
 import "./packaging";
 import "./purchasing";
 import "./settings";
+import "./taproom";
 export {};
