@@ -23,7 +23,8 @@ export default async function MaterialsPage() {
     runCommand("list_vendors_and_contracts", {}, ctx), runCommand("list_locations", {}, ctx), runCommand("list_bins", {}, ctx),
   ])) as [Material[], OnHand[], Vendor[], Location[], Bin[]];
   const options = vendors.map((v) => ({ id: v.id, name: v.name }));
-  const total = (id: string) => onHand.filter((o) => o.material_id === id).reduce((a, o) => a + Number(o.qty), 0);
+  const onHandBy = Map.groupBy(onHand, (o) => o.material_id);
+  const total = (id: string) => (onHandBy.get(id) ?? []).reduce((a, o) => a + Number(o.qty), 0);
 
   return (
     <>
@@ -35,7 +36,7 @@ export default async function MaterialsPage() {
               {E.row(m.name,
                 `${m.category} · ${m.base_uom} · ${total(m.id).toLocaleString("en-US", { maximumFractionDigits: 2 })} ${m.base_uom} on hand${m.lot_tracked ? " · lot-tracked" : ""}${m.active ? "" : " · inactive"}`,
                 <span className="flex gap-1">
-                  <CountForm materialId={m.id} materialName={m.name} uom={m.base_uom} locations={locations} bins={bins} onHand={onHand.filter((o) => o.material_id === m.id)} />
+                  <CountForm materialId={m.id} materialName={m.name} uom={m.base_uom} locations={locations} bins={bins} onHand={onHandBy.get(m.id) ?? []} />
                   <MaterialForm material={m} vendors={options} />
                 </span>,
                 m.active ? "" : "dis")}

@@ -22,8 +22,8 @@ const fmt = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 2 
 
 function leadLine(v: VendorRow) {
   const typed = v.lead_time_days === null ? "no lead time typed" : `${v.lead_time_days} day lead`;
-  const obs = v.observed.reduce((a, o) => a + o.n, 0) ? v.observed.map((o) => `observed ${fmt(o.avg_lead_days)} days (n=${o.n}, ${o.sent_via})`).join(" · ") : null;
-  return [typed, obs, `${v.contracts.length} ${v.contracts.length === 1 ? "contract" : "contracts"}`].filter(Boolean).join(" · ");
+  const obs = v.observed.map((o) => `observed ${fmt(o.avg_lead_days)} days (n=${o.n}, ${o.sent_via})`);
+  return [typed, ...obs, `${v.contracts.length} ${v.contracts.length === 1 ? "contract" : "contracts"}`].join(" · ");
 }
 
 export default async function VendorsPage() {
@@ -33,7 +33,7 @@ export default async function VendorsPage() {
     runCommand("list_vendors_and_contracts", {}, ctx), runCommand("list_materials", {}, ctx),
   ])) as [VendorRow[], Material[]];
   const options = vendors.map((v) => ({ id: v.id, name: v.name }));
-  const contracts = vendors.flatMap((v) => v.contracts.map((c) => ({ ...c, vendor_id: v.id, vendor_name: v.name })));
+  const contracts = vendors.flatMap((v) => v.contracts.map((c) => ({ ...c, vendor_name: v.name })));
 
   return (
     <>

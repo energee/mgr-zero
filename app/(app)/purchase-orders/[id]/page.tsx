@@ -35,11 +35,10 @@ export default async function PurchaseOrderPage({ params }: { params: Promise<{ 
   const { id } = await params;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const po = (await orNotFound(runCommand("get_purchase_order", { poId: id }, ctx))) as Po;
+  const [po, locations, bins] = (await Promise.all([
+    orNotFound(runCommand("get_purchase_order", { poId: id }, ctx)), runCommand("list_locations", {}, ctx), runCommand("list_bins", {}, ctx),
+  ])) as [Po, Location[], Bin[]];
   const receiving = po.status === "sent" || po.status === "partially_received";
-  const [locations, bins] = (await Promise.all([
-    receiving ? runCommand("list_locations", {}, ctx) : [], receiving ? runCommand("list_bins", {}, ctx) : [],
-  ])) as [Location[], Bin[]];
 
   return (
     <>

@@ -22,11 +22,13 @@ const addDays = (iso: string, days: number) => { const d = new Date(`${iso}T00:0
 export default async function PlanningPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const gaps = ((await runCommand("get_material_requirements", {}, ctx)) as Gap[]).filter((g) => g.short > 0);
   const today = new Date().toISOString().slice(0, 10);
-  const buyBy = (g: Gap) => (g.needed_by && g.lead_time_days !== null ? addDays(g.needed_by, -g.lead_time_days) : null);
-  const reach = (g: Gap): "no vendor" | "out of reach" | "buyable" => (!g.vendor_id ? "no vendor" : (buyBy(g) ?? today) < today ? "out of reach" : "buyable");
-  const buyable = gaps.filter((g) => reach(g) === "buyable");
+  const gaps = ((await runCommand("get_material_requirements", {}, ctx)) as Gap[]).filter((g) => g.short > 0).map((g) => {
+    const buyBy = g.needed_by && g.lead_time_days !== null ? addDays(g.needed_by, -g.lead_time_days) : null;
+    const reach: "no vendor" | "out of reach" | "buyable" = !g.vendor_id ? "no vendor" : (buyBy ?? today) < today ? "out of reach" : "buyable";
+    return { ...g, buyBy, reach };
+  });
+  const buyable = gaps.filter((g) => g.reach === "buyable");
   const vendors = new Set(buyable.map((g) => g.vendor_id));
   const canDraft = brewery.role === "admin" || brewery.role === "warehouse";
 
@@ -36,14 +38,13 @@ export default async function PlanningPage() {
       {gaps.length === 0
         ? E.blank("Nothing short: every committed batch and packaging run is covered by on hand and open orders")
         : gaps.map((g) => {
-            const r = reach(g);
             const sub = [
               `need ${fmt(g.required)} · on hand ${fmt(g.on_hand)} · on order ${fmt(g.on_order)} ${g.base_uom ?? ""}`,
               g.needed_by ? `needed by ${g.needed_by}` : null,
-              g.vendor_name ? `${g.vendor_name}${g.lead_time_days !== null ? ` · ${g.lead_time_days} day lead · buy by ${buyBy(g)}` : " · no lead time typed"}` : "no contract and no default vendor",
-              r === "out of reach" ? "past the buy-by date · left out of the draft" : null,
+              g.vendor_name ? `${g.vendor_name}${g.lead_time_days !== null ? ` · ${g.lead_time_days} day lead · buy by ${g.buyBy}` : " · no lead time typed"}` : "no contract and no default vendor",
+              g.reach === "out of reach" ? "past the buy-by date · left out of the draft" : null,
             ].filter(Boolean).join(" · ");
-            return <div key={g.material_id}>{E.row(g.material_name ?? g.material_id, sub, `${fmt(g.purchase_units_short)} ${g.purchase_uom ?? ""}`, r === "buyable" ? "" : "w")}</div>;
+            return <div key={g.material_id}>{E.row(g.material_name ?? g.material_id, sub, `${fmt(g.purchase_units_short)} ${g.purchase_uom ?? ""}`, g.reach === "buyable" ? "" : "w")}</div>;
           })}
       {E.sp()}
       {canDraft && <DraftButton materialIds={buyable.map((g) => g.material_id)} vendorCount={vendors.size} />}

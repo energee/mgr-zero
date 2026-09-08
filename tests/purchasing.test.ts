@@ -50,7 +50,7 @@ describe("vendors, materials, contracts", () => {
     }[];
     expect(vendors.map((v) => v.name)).toEqual(["YCH Hops"]);
     expect(vendors[0].contracts).toEqual([{
-      id: contract.id, material_id: citra.id, material_name: "Citra", contract_no: "Citra 2026", unit_cost_cents: 1250,
+      id: contract.id, vendor_id: ych.id, material_id: citra.id, material_name: "Citra", contract_no: "Citra 2026", unit_cost_cents: 1250,
       starts_on: null, ends_on: null, qty_committed: 400, qty_received: 0, qty_on_order: 0, qty_available: 400,
     }]);
 

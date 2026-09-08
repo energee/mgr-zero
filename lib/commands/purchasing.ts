@@ -69,8 +69,8 @@ defineCommand({
     materialId: z.string().uuid(),
     qtyCommitted: z.number().positive(),
     unitCostCents: z.number().int().nonnegative().optional(),
-    startsOn: z.string().date().optional(),
-    endsOn: z.string().date().optional(),
+    startsOn: isoDate.optional(),
+    endsOn: isoDate.optional(),
     contractNo: z.string().trim().optional(),
   }),
   roles: [...PURCHASING],
@@ -88,28 +88,27 @@ defineQuery({
   name: "list_vendors_and_contracts", description: "Vendors, alphabetical, with typed and observed lead time and each one's contracts and their drawdown (committed, received, on order, available)",
   input: z.object({}), roles: [...PURCHASING],
   handler: async (ctx) => {
-    const [vendors, contracts, balances, materials, observed] = await Promise.all([
+    const [vendors, contracts, balances, observed] = await Promise.all([
       unwrap(ctx.db.from("vendors").select("id, name, email, phone, payment_terms, lead_time_days, active").eq("brewery_id", ctx.breweryId).order("name")),
-      unwrap(ctx.db.from("material_contracts").select("id, vendor_id, material_id, contract_no, unit_cost_cents, starts_on, ends_on").eq("brewery_id", ctx.breweryId).order("created_at")),
+      unwrap(ctx.db.from("material_contracts").select("id, vendor_id, material_id, contract_no, unit_cost_cents, starts_on, ends_on, materials(name)").eq("brewery_id", ctx.breweryId).order("created_at")),
       unwrap(ctx.db.from("contract_balances").select("contract_id, qty_committed, qty_received, qty_on_order, qty_available").eq("brewery_id", ctx.breweryId)),
-      unwrap(ctx.db.from("materials").select("id, name").eq("brewery_id", ctx.breweryId)),
       unwrap(ctx.db.from("vendor_lead_times").select("vendor_id, sent_via, n, avg_lead_days, avg_first_lead_days, avg_late_days").eq("brewery_id", ctx.breweryId)),
     ]);
     const balance = new Map((balances ?? []).map((b) => [b.contract_id as string, b]));
-    const materialName = new Map((materials ?? []).map((m) => [m.id as string, m.name as string]));
+    const observedBy = Map.groupBy(observed ?? [], (o) => o.vendor_id as string);
+    const contractsBy = Map.groupBy(contracts ?? [], (c) => c.vendor_id as string);
     return (vendors ?? []).map((v) => ({
       ...v,
       // Observed, never stored: n says how weak the evidence is ("14 days (n=3)").
-      observed: (observed ?? []).filter((o) => o.vendor_id === v.id).map((o) => ({
+      observed: (observedBy.get(v.id as string) ?? []).map((o) => ({
         sent_via: o.sent_via as string, n: o.n as number, avg_lead_days: Number(o.avg_lead_days),
         avg_first_lead_days: Number(o.avg_first_lead_days),
         avg_late_days: o.avg_late_days == null ? null : Number(o.avg_late_days),   // no promise on record is not "on time"
       })),
-      contracts: (contracts ?? []).filter((c) => c.vendor_id === v.id).map((c) => {
+      contracts: (contractsBy.get(v.id as string) ?? []).map(({ materials, ...c }) => {
         const b = balance.get(c.id as string);
         return {
-          id: c.id, material_id: c.material_id, contract_no: c.contract_no, unit_cost_cents: c.unit_cost_cents,
-          starts_on: c.starts_on, ends_on: c.ends_on, material_name: materialName.get(c.material_id as string) ?? null,
+          ...c, material_name: (materials as unknown as { name: string } | null)?.name ?? null,
           qty_committed: Number(b?.qty_committed ?? 0), qty_received: Number(b?.qty_received ?? 0),
           qty_on_order: Number(b?.qty_on_order ?? 0), qty_available: Number(b?.qty_available ?? 0),
         };
@@ -207,11 +206,12 @@ defineQuery({
     if (!i.includeClosed) q = q.in("status", OPEN_STATUSES);
     const [pos, open] = await Promise.all([
       unwrap(q),
-      unwrap(ctx.db.from("po_open_balances").select("po_id, qty_open").eq("brewery_id", ctx.breweryId)),
+      unwrap(ctx.db.from("po_open_balances").select("po_id").eq("brewery_id", ctx.breweryId).gt("qty_open", 0)),
     ]);
+    const linesOpen = Map.groupBy(open ?? [], (o) => o.po_id as string);
     return (pos ?? []).map(({ vendors, ...po }) => ({
       ...po, vendor_name: (vendors as unknown as { name: string } | null)?.name ?? null,
-      lines_open: (open ?? []).filter((o) => o.po_id === po.id && Number(o.qty_open) > 0).length,
+      lines_open: linesOpen.get(po.id as string)?.length ?? 0,
     }));
   },
 });
@@ -244,30 +244,20 @@ defineQuery({
 });
 
 // Planning's material gaps: the material_requirements view (demand, supply,
-// gap, needed-by, resolved vendor and contract) with names and the vendor's
-// typed lead time, so the page can date a buy-by and name the drafts.
+// gap, needed-by, resolved vendor and contract, names, and the vendor's typed
+// lead time), so the page can date a buy-by and name the drafts.
 defineQuery({
   name: "get_material_requirements",
   description: "Material gaps for Planning: required, on hand, on order, short (base units), whole purchase units short, needed-by date, and the vendor and contract each gap resolves to; a null vendor cannot draft",
   input: z.object({}), roles: [...PURCHASING],
   handler: async (ctx) => {
-    const [rows, materials, vendors] = await Promise.all([
-      unwrap(ctx.db.from("material_requirements").select("material_id, required, on_hand, on_order, short, needed_by, purchase_units_short, vendor_id, contract_id").eq("brewery_id", ctx.breweryId)),
-      unwrap(ctx.db.from("materials").select("id, name, base_uom, purchase_uom, purchase_uom_factor").eq("brewery_id", ctx.breweryId)),
-      unwrap(ctx.db.from("vendors").select("id, name, lead_time_days").eq("brewery_id", ctx.breweryId)),
-    ]);
-    const material = new Map((materials ?? []).map((m) => [m.id as string, m]));
-    const vendor = new Map((vendors ?? []).map((v) => [v.id as string, v]));
-    return (rows ?? []).map((r) => {
-      const m = material.get(r.material_id as string);
-      const v = r.vendor_id ? vendor.get(r.vendor_id as string) : undefined;
-      return {
-        material_id: r.material_id, material_name: m?.name ?? null, base_uom: m?.base_uom ?? null, purchase_uom: m?.purchase_uom ?? null,
-        required: Number(r.required), on_hand: Number(r.on_hand), on_order: Number(r.on_order), short: Number(r.short),
-        purchase_units_short: Number(r.purchase_units_short), needed_by: r.needed_by,
-        vendor_id: r.vendor_id ?? null, vendor_name: v?.name ?? null, lead_time_days: v?.lead_time_days ?? null, contract_id: r.contract_id ?? null,
-      };
-    }).sort((a, b) => (a.needed_by ?? "").localeCompare(b.needed_by ?? "") || (a.material_name ?? "").localeCompare(b.material_name ?? ""));
+    const rows = await unwrap(ctx.db.from("material_requirements")
+      .select("material_id, material_name, base_uom, purchase_uom, required, on_hand, on_order, short, needed_by, purchase_units_short, vendor_id, vendor_name, lead_time_days, contract_id")
+      .eq("brewery_id", ctx.breweryId).order("needed_by").order("material_name"));
+    return (rows ?? []).map((r) => ({
+      ...r, required: Number(r.required), on_hand: Number(r.on_hand), on_order: Number(r.on_order), short: Number(r.short),
+      purchase_units_short: Number(r.purchase_units_short),
+    }));
   },
 });
 
