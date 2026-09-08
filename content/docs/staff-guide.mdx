@@ -58,6 +58,14 @@ SKU fields in **New Order** use the same search, narrowed to SKUs. They show rec
 A permission error is the end of that attempt. Ask an administrator. Hitting submit again will not change your access.
 </Callout>
 
+## Taproom variance [#taproom-variance]
+
+Admin, Warehouse, and Taproom can read brand variance through the [command API](/docs/api#taproom); the variance page is not available yet. Choose a taproom location and 4 or 12 weeks. The report compares whole completed count periods whose ending dates fall in that brewery-local window, with exact starting and ending times shown. The first count has no starting observation, so its actual depletion is shown without a comparison. A period may begin before the selected window.
+
+Actual is the saved count's depletion. Expected is reconciled POS quantity times its frozen serving size; editing today's pour or package size never changes an existing expectation. A later reconciled sale can update a closed period's expected amount and variance, but cannot change counts or stock. Variance is expected minus actual.
+
+Without usable POS observations, comparison rows are empty and expected stays blank. Zero means a complete observation found no beer sales. Mapped lines still contribute when other items need mapping, with coverage and mapping gaps shown. Overlapping taps split each sale equally as an estimate; shares assigned to kegs outside inventory are excluded while count-derived actual stays intact. Sales without a matching open interval remain explicitly unattributed. Guest names do not identify POS sales, so guest yield is unavailable. POS connection and synchronization are not available yet.
+
 ## Taproom physical counts [#taproom-counts]
 
 Admin, Warehouse, and Taproom can prepare, record, and read physical counts through the [command API](/docs/api#taproom). The count page is not available yet. A count records remaining whole packaged units for every displayed bin, SKU, and lot identity, including zero quantities. A partially full keg counts as one until it is gone; estimated fill levels never change the inventory ledger.

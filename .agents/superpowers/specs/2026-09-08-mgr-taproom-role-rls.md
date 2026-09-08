@@ -28,7 +28,7 @@ in the cooler, count it, and change kegs. Nothing else.
 | Weekly count: `taproom_counts`, `taproom_count_lines` | yes | `record_taproom_count` | whole brewery |
 | Taproom bins and on-hand: `locations`, `bins`, `inventory_movements`, `taproom_pars`, and the `on_hand` / `bin_on_hand` / `keg_bin_on_hand` views | yes | none | rows whose location is `kind = 'taproom'` |
 | Catalog vocabulary: `brands`, `formats`, `format_components`, `skus`, `keg_pools` | yes | none | whole brewery |
-| Menu and POS mapping: `pos_locations`, `pos_item_mappings`, `pos_sales`, and `pos_menus` when Program 14 lands it | yes | none | whole brewery |
+| Menu and POS mapping: `pos_locations`, `pos_item_mappings`, `pos_sales`, `pos_sale_expectations`, `pos_sales_coverage`, and `pos_menus` when Program 14 lands it | yes | none | whole brewery |
 | Own account: `staff_brewery` (id, name, timezone, gravity unit), `brewery_users`, `chat_user_links`, `notification_preferences`, `notification_destinations` (personal) | yes | `set_my_gravity_unit`, `consume_chat_link_proof`, `unlink_chat_user`, `set_notification_preference`, `set_notification_destination` (personal) | own row only, as the existing self policies already say |
 | Everything else | no | no | — |
 
@@ -79,7 +79,7 @@ One baseline edit, four parts, in `supabase/migrations/00001_baseline.sql`.
           'tap_intervals','taproom_counts','taproom_count_lines',
           'locations','bins','inventory_movements','taproom_pars',
           'brands','formats','format_components','skus','keg_pools',
-          'pos_locations','pos_item_mappings','pos_sales','pos_menus']) $$;
+          'pos_locations','pos_item_mappings','pos_sales','pos_sale_expectations','pos_sales_coverage','pos_menus']) $$;
    ```
 
    The table list lives in one place. Adding a table to the bartender's

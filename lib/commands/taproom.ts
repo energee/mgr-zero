@@ -188,3 +188,10 @@ defineQuery({
   input: z.object({ locationId: z.string().uuid() }), roles: [...COUNT_ROLES],
   handler: (ctx,i) => unwrap(ctx.db.rpc("list_tap_history", { p_brewery: ctx.breweryId, p_location: i.locationId })),
 });
+
+
+defineQuery({
+  name: "get_taproom_variance", description: "Current brand comparison over completed count pairs ending in the last 4 or 12 brewery-local calendar weeks. Whole periods use (prior created_at, current created_at]; first counts lack a baseline. Actual is frozen count depletion, expected is frozen POS serving volume. Missing coverage stays null; explicitly complete empty observations permit zero. Mapped lines contribute despite mapping gaps. Timestamp-active equal-share tap estimates retain excluded out-of-stock shares; guest identity is never inferred. Late reconciled sales may change expected, never inventory. Returns bounds, as_of, coverage, mapping gaps and unattributed volume",
+  input: z.object({ locationId: z.string().uuid(), weeks: z.union([z.literal(4), z.literal(12)]) }), roles: [...COUNT_ROLES],
+  handler: (ctx,i) => unwrap(ctx.db.rpc("get_taproom_variance", { p_brewery: ctx.breweryId, p_location: i.locationId, p_weeks: i.weeks })),
+});

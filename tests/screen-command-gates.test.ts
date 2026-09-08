@@ -37,3 +37,8 @@ it("keeps interval pages gated while their command API is available", () => {
   for (const name of ["tap_keg", "kick_keg", "swap_keg", "list_open_taps"]) expect(getCommandDefinition(name)).toBeDefined();
   for (const name of ["Tap board", "Kick keg", "Swap keg"]) expect(isUngated(SCREENS.find(s => s.name === name)!)).toBe(false);
 });
+
+it("keeps variance page gated while the read API is available", () => {
+  expect(getCommandDefinition("get_taproom_variance")).toBeDefined();
+  expect(isUngated(SCREENS.find(s => s.name === "Variance by brand")!)).toBe(false);
+});

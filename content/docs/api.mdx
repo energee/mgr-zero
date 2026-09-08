@@ -232,6 +232,7 @@ omitted. They have no roles until they are built.
 | `get_stock_transfer` | Inventory & locations | ✓ | ✓ | ✓ |  |  |  |
 | `get_taproom_count` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
 | `get_taproom_count_snapshot` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
+| `get_taproom_variance` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
 | `get_today` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `import_csv` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `invite_customer_user` | Customers | ✓ | ✓ |  |  |  |  |
@@ -2326,6 +2327,24 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_taproom_count_snapshot", "input": { "locationId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+#### get_taproom_variance [#get_taproom_variance]
+
+`query` · admin, warehouse, taproom
+
+Current brand comparison over completed count pairs ending in the last 4 or 12 brewery-local calendar weeks. Whole periods use (prior created_at, current created_at]; first counts lack a baseline. Actual is frozen count depletion, expected is frozen POS serving volume. Missing coverage stays null; explicitly complete empty observations permit zero. Mapped lines contribute despite mapping gaps. Timestamp-active equal-share tap estimates retain excluded out-of-stock shares; guest identity is never inferred. Late reconciled sales may change expected, never inventory. Returns bounds, as_of, coverage, mapping gaps and unattributed volume
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+| `weeks` | 4 or 12 | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_taproom_variance", "input": { "locationId": "00000000-0000-0000-0000-000000000000", "weeks": 4 } }'
 ```
 
 #### kick_keg [#kick_keg]

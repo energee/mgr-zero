@@ -68,7 +68,19 @@ second format identity table (§16.16 decision 2).
 
 ### Task 2: Variance report
 
-**Files:** view `taproom_variance` + query `get_taproom_variance`
+**Files:** baseline read RPC + registered `get_taproom_variance`, existing POS
+raw/mapping owners with frozen expectations and explicit coverage windows,
+`tests/taproom-variance.test.ts`.
+
+Implemented API/data contract: whole completed `(prior.created_at,current.created_at]`
+periods ending in the selected brewery-local 4/12-week date window; first count
+is unpaired. Immutable raw connection/order/line facts reconcile once to frozen
+serving interpretation. Complete observed coverage distinguishes zero from
+absence; mapped lines contribute with visible gaps. Timestamp-active equal
+shares retain excluded absent-stock shares in the denominator, and actual
+stays count-owned. Guest numeric yield lacks POS identity and remains absent.
+The helper is private and ungranted; Program 14 owns its future provider caller,
+revisions/returns and coverage completion. The page remains gated for Task 5.
 
 **Interfaces:**
 - Per brand, window 4 or 12 weeks: POS serving-volume expectations remain a separate projection/snapshot from physical count `qty_before` and `qty_counted`. Actual consumption comes from count-owned depletion, not summing remaining stock. Exclude guest/untracked intervals as specified by Task 3. Variance is expected consumption minus actual consumption (§16.15). Never writes movements. Without POS, the variance report is empty and the count's expected-consumption column is empty; physical counts still post depletion.

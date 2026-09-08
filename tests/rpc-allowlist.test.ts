@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { sql } from "./helpers";
 
 const AUTHENTICATED_RPCS = [
+  "get_taproom_variance(uuid,uuid,integer)",
   "tap_keg(uuid,uuid,uuid,text,numeric,text,numeric,uuid)",
   "kick_keg(uuid,uuid,numeric,text,uuid)",
   "swap_keg(uuid,uuid,numeric,text,uuid,text,numeric,text,numeric,uuid)",
