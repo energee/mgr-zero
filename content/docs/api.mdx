@@ -1113,10 +1113,11 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Orders newest-first, optionally by status
+Orders newest-first, optionally by status and customer
 
 | Field | Type | Required |
 | --- | --- | --- |
+| `customerId` | uuid | no |
 | `status` | draft or submitted or confirmed or picked or shipped or cancelled | no |
 | `limit` | integer | no |
 
@@ -2109,7 +2110,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Create or update a ship-to address (state drives excise dest_state)
+Create or update a ship-to address; isDefault switches the customer default, omission preserves it on edit; addresses cannot change customer
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -2121,6 +2122,7 @@ Create or update a ship-to address (state drives excise dest_state)
 | `zip` | string | yes |
 | `id` | uuid | no |
 | `address2` | string | no |
+| `isDefault` | boolean | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -3577,7 +3579,7 @@ location. Prices are nonnegative integer cents, at most 2147483647.
 
 `query` · admin, sales, warehouse, brewer
 
-The current brewery's basics: name, timezone, TTB registry number, PA license, customer-facing phone, reading-overdue hours and gravity unit
+The current brewery's basics: name, timezone, TTB registry number, PA license, customer-facing phone, reading-overdue hours, gravity unit and portal fulfillment warehouse
 
 Takes no input.
 

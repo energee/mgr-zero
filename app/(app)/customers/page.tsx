@@ -16,9 +16,10 @@ export default async function CustomersPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const [customers, channels] = (await Promise.all([runCommand("list_customers", {}, ctx), runCommand("list_sale_channels", {}, ctx)])) as [Customer[], SaleChannel[]];
+  const canWrite = brewery.role === "admin" || brewery.role === "sales";
   return (
     <>
-      {E.back("More", "Customers", <CustomerForm channels={channels.map((c) => ({ id: c.id, name: c.name }))} />, "/more")}
+      {E.back("More", "Customers", canWrite ? <CustomerForm channels={channels.map((c) => ({ id: c.id, name: c.name }))} /> : undefined, "/more")}
       {customers.length === 0
         ? E.blank("No customers yet")
         : customers.map((c) => (

@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useBrewery } from "@/app/(app)/brewery-provider";
 import { command } from "@/lib/commands/client";
+import { defaultShipToId } from "@/lib/order-form-rules";
 import { cartActionsDisabled, planDraftSync } from "@/lib/portal-cart";
 
 export type CatalogItem = {
@@ -31,7 +32,7 @@ export type CatalogItem = {
   product: string;
   unitPriceCents: number;
 };
-export type ShipToOption = { id: string; label: string };
+export type ShipToOption = { id: string; label: string; is_default?: boolean };
 
 export function submissionFailureMessage(message: string, draftId: string | null) {
   return draftId
@@ -43,7 +44,7 @@ export function Cart({ items, shipTos }: { items: CatalogItem[]; shipTos: ShipTo
   const breweryId = useBrewery();
   const router = useRouter();
   const [qty, setQty] = useState<Record<string, string>>({});
-  const [shipToId, setShipToId] = useState(shipTos[0]?.id ?? "");
+  const [shipToId, setShipToId] = useState(defaultShipToId(shipTos));
   const [poNumber, setPoNumber] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState<"submit" | "draft" | null>(null);

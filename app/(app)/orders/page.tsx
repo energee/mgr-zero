@@ -15,30 +15,38 @@ import { OrderForm, type CustomerOption, type LocationOption, type SkuOption } f
 
 type Order = { id: string; order_no: number | null; status: OrderStatus; requested_ship_date: string | null; needs_restock: boolean; customers: { name: string } | null };
 type CustomerRow = { id: string; name: string };
-type ShipTo = { id: string; label: string };
+type ShipTo = { id: string; label: string; is_default: boolean };
 type LocationRow = { id: string; name: string; kind: "warehouse" | "taproom" };
 type SkuRow = { id: string; name: string; brands: { name: string } | null };
 
 const STATUSES: OrderStatus[] = ["draft", "submitted", "confirmed", "picked", "shipped", "cancelled"];
 
-export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
-  const { status } = await searchParams;
+export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ status?: string; customerId?: string }> }) {
+  const { status, customerId } = await searchParams;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
+  const canWrite = brewery.role === "admin" || brewery.role === "sales";
   const [orders, customerRows, locationRows, skuRows] = (await Promise.all([
-    runCommand("list_orders", status ? { status } : {}, ctx), runCommand("list_customers", {}, ctx), runCommand("list_locations", {}, ctx), runCommand("list_skus", {}, ctx),
+    runCommand("list_orders", { status, customerId }, ctx), runCommand("list_customers", {}, ctx), runCommand("list_locations", {}, ctx), runCommand("list_skus", {}, ctx),
   ])) as [Order[], CustomerRow[], LocationRow[], SkuRow[]];
   const shipTosByCustomer = await Promise.all(customerRows.map((c) => runCommand("get_customer", { customerId: c.id }, ctx) as Promise<{ shipTos: ShipTo[] }>));
-  const customers: CustomerOption[] = customerRows.map((c, i) => ({ id: c.id, name: c.name, shipTos: shipTosByCustomer[i].shipTos.map((s) => ({ id: s.id, label: s.label })) }));
+  const customers: CustomerOption[] = customerRows.map((c, i) => ({ id: c.id, name: c.name, shipTos: shipTosByCustomer[i].shipTos.map((s) => ({ id: s.id, label: s.label, is_default: s.is_default })) }));
   const locations: LocationOption[] = locationRows.map((l) => ({ id: l.id, name: l.name, kind: l.kind }));
   const skus: SkuOption[] = skuRows.map((s) => ({ id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name }));
+  const orderHref = (nextStatus?: string) => {
+    const query = new URLSearchParams();
+    if (customerId) query.set("customerId", customerId);
+    if (nextStatus) query.set("status", nextStatus);
+    return `/orders${query.size ? `?${query}` : ""}`;
+  };
   return (
     <>
-      {E.hd("Work", `${brewery.role} default`, <OrderForm customers={customers} locations={locations} skus={skus} />)}
+      {E.hd("Work", `${brewery.role} default`, canWrite ? <OrderForm customers={customers} locations={locations} skus={skus} /> : undefined)}
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <LinkTabs items={WORK_CHIPS} current="orders" className="w-full md:w-fit" />
-        <LinkTabs items={[["all", "/orders"], ...STATUSES.map((s): [string, string] => [s, `/orders?status=${s}`])]} current={status ?? "all"} className="w-full justify-start overflow-x-auto md:w-fit" />
+        <LinkTabs items={[["all", orderHref()], ...STATUSES.map((s): [string, string] => [s, orderHref(s)])]} current={status ?? "all"} className="w-full justify-start overflow-x-auto md:w-fit" />
       </div>
+      {customerId && E.row("Customer filter", customerRows.find((c) => c.id === customerId)?.name ?? "Customer", E.act("Clear", undefined, status ? `/orders?status=${status}` : "/orders"))}
       {orders.length === 0
         ? E.blank(status ? `No ${status} orders` : "No orders yet")
         : orders.map((o) => {

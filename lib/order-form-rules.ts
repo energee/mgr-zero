@@ -38,3 +38,8 @@ export function orderFormReadiness(i: OrderFormReadinessInput): OrderFormReadine
 
   return { submittable, hint };
 }
+
+/** Initial destination only; a caller's explicit draft selection stays authoritative. */
+export function defaultShipToId(shipTos: { id: string; is_default?: boolean }[]): string {
+  return shipTos.find((s) => s.is_default)?.id ?? shipTos[0]?.id ?? "";
+}

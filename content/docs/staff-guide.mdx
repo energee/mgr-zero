@@ -167,7 +167,7 @@ Empty sections say **No inventory recorded yet.** or **No movements recorded yet
 
 ## Customers and ship-tos [#customers]
 
-*Admin and Sales can create and edit customers and ship-to addresses. Warehouse has no link here, but the page is readable at its address: **New Customer** and **Edit** still appear, but submitting either returns a permission error. The list shows name, type, home state, sale channel, and payment terms.*
+*Admin and Sales can create and edit customers and ship-to addresses. Warehouse can read these pages at their addresses; customer, ship-to, and invitation controls are hidden. The list shows name, type, home state, sale channel, and payment terms.*
 
 ### Create or edit a customer
 
@@ -181,11 +181,13 @@ Empty sections say **No inventory recorded yet.** or **No movements recorded yet
 6. Optionally enter **License number** and **Payment terms**, such as `net30`.
 7. Select **Create** or **Save**.
 
+Customer detail shows **Tax treatment**. Choose **Inherit sale channel** to use the channel default, or select a customer override; editing another field preserves the selected treatment. **Orders** opens only this customer’s orders, and status filters keep that customer selected. **Clear** returns to all customers.
+
 ### Create or edit a ship-to
 
 <Screen name="Ship-to form" />
 
-Select the customer name, then **New Ship-To** or **Edit**. Required: **Label**, **Address 1**, **City**, **State** (two letters, uppercased), and **Zip**. **Address 2** is optional. Ship-to state is the destination used when a wholesale shipment leaves inventory.
+Select the customer name, then **New Ship-To** or **Edit**. Required: **Label**, **Address 1**, **City**, **State** (two letters, uppercased), and **Zip**. **Address 2** is optional. **Default ship-to for new orders** selects this address for new staff and portal orders. Setting it replaces the previous default for this customer; clearing it leaves no designated default, so new orders start with the first address. Existing orders keep their chosen destination. Ship-to state is the destination used when a wholesale shipment leaves inventory.
 
 Empty lists say **No customers yet.** or **No ship-tos yet.** You cannot delete a customer. Admin and Sales can select **Invite portal user**, enter an email, and **Send invite**. This creates buyer access for this customer only; there is no Account admin choice. The recipient chooses their name and password from the email. After an error, keep the page open and retry unchanged details; changing the email starts a new invitation. Existing sign-in accounts cannot be attached with this form.
 
@@ -219,7 +221,7 @@ An order can become `cancelled` any time before shipping. The Orders screen list
 
 1. Open **Orders** and select **New Order**.
 2. Choose **Kind**: **Wholesale** (default) or **Taproom transfer**.
-3. For wholesale, choose the **Customer** and one of that customer's **Ship-to**s. For a transfer, choose the destination in **To location**.
+3. For wholesale, choose the **Customer**; its default **Ship-to** is selected automatically (the first address if no default is set), and you can choose another. For a transfer, choose the destination in **To location**.
 4. Choose the source in **From location**. Both location selects list every location of the brewery, not just taprooms or warehouses, so you pick a warehouse source and a taproom destination yourself.
 5. Optionally choose **Requested ship date** and enter **PO number**.
 6. Add one or more lines. Each needs a SKU and a quantity greater than zero. **Add line** adds a row. **Remove** takes one away, but at least one row stays.
@@ -610,3 +612,7 @@ This manual describes controls that exist now. If the application and this guide
 ## Screen walkthrough [#walkthrough]
 
 The [screen explorer](/docs/screens-explore) is a drawing of MGR, including screens that are not wired up yet. Settings links to Accounting, Point of sale, and Chat for administrators. Connection and disconnection actions show their resulting screens. Chat preview tabs switch only the preview, and keep connection and delivery controls visible. Menu location tabs keep you on Menu, and each published item links to its price override sheet. Browser Back and Forward restore the selected screen and its walkthrough trail, including the page behind an open sheet. These frames do not change connected services.
+
+### Portal fulfillment warehouse
+
+In **Settings**, Admin can see the current **Portal fulfillment warehouse**, select **Change warehouse**, choose a warehouse, and **Save warehouse**. Only warehouse locations are offered. If none exist, follow **Locations** to add one. This source is used for new portal orders; other brewery settings do not change it.

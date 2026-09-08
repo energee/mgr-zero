@@ -12,6 +12,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
+const TAX_TREATMENTS = ["taxable", "export", "vessel_supplies", "research", "transfer_in_bond"] as const;
+export type TaxTreatment = (typeof TAX_TREATMENTS)[number];
+
 const CUSTOMER_TYPES = ["distributor", "retailer", "brewery", "other"] as const;
 type CustomerType = (typeof CUSTOMER_TYPES)[number];
 
@@ -28,6 +31,7 @@ export type CustomerEditData = {
   saleChannelId: string;
   licenseNumber: string | null;
   paymentTerms: string;
+  taxTreatment: TaxTreatment | null;
 };
 
 export function CustomerForm({
@@ -45,6 +49,7 @@ export function CustomerForm({
   const [saleChannelId, setSaleChannelId] = useState(initialChannel);
   const [licenseNumber, setLicenseNumber] = useState(customer?.licenseNumber ?? "");
   const [paymentTerms, setPaymentTerms] = useState(customer?.paymentTerms ?? "");
+  const [taxTreatment, setTaxTreatment] = useState<TaxTreatment | "">(customer?.taxTreatment ?? "");
   const form = useCommandForm("upsert_customer", {
     build: () => ({
       ...(isEdit ? { id: customer.id } : {}),
@@ -54,6 +59,7 @@ export function CustomerForm({
       saleChannelId,
       licenseNumber: licenseNumber || undefined,
       paymentTerms: paymentTerms || undefined,
+      taxTreatment: taxTreatment || undefined,
     }),
     reset: () => {
       setName(customer?.name ?? "");
@@ -62,6 +68,7 @@ export function CustomerForm({
       setSaleChannelId(initialChannel);
       setLicenseNumber(customer?.licenseNumber ?? "");
       setPaymentTerms(customer?.paymentTerms ?? "");
+      setTaxTreatment(customer?.taxTreatment ?? "");
     },
   });
 
@@ -116,6 +123,13 @@ export function CustomerForm({
           <div className="flex flex-col gap-2">
             <Label htmlFor="customer-terms">Payment terms</Label>
             <Input id="customer-terms" value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} placeholder="net30" />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="customer-tax">Tax treatment</Label>
+            <select id="customer-tax" className="rounded-md border p-2" value={taxTreatment} onChange={(e) => setTaxTreatment(e.target.value as TaxTreatment | "")}>
+              <option value="">Inherit sale channel</option>
+              {TAX_TREATMENTS.map((t) => <option key={t} value={t}>{t.replaceAll("_", " ")}</option>)}
+            </select>
           </div>
           <CommandFormMessage error={form.error} />
           <CommandFormFooter>

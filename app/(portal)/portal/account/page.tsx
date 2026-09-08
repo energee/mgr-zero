@@ -10,7 +10,7 @@ import { money } from "@/lib/mgr/money";
 
 type Account = {
   customer: { id: string; name: string };
-  shipTos: { id: string; label: string; city: string; state: string }[];
+  shipTos: { id: string; label: string; city: string; state: string; is_default: boolean }[];
   membership: { userId: string };
   deposits: { kegSize: string | null; kegsOnDeposit: number; depositCents: number }[];
 };
@@ -22,7 +22,7 @@ export default async function PortalAccountPage() {
   return (
     <>
       {E.hd("Account", acct.customer.name)}
-      {acct.shipTos.map((s) => <div key={s.id}>{E.row(`${s.label} ship-to`, `${s.city}, ${s.state}`)}</div>)}
+      {acct.shipTos.map((s) => <div key={s.id}>{E.row(`${s.label} ship-to${s.is_default ? " · default" : ""}`, `${s.city}, ${s.state}`)}</div>)}
       {E.row("You · buyer", "this login", "active")}
       {acct.deposits.map((d) => (
         <div key={d.kegSize ?? "all"}>

@@ -18,6 +18,7 @@ export type ShipToEditData = {
   city: string;
   state: string;
   zip: string;
+  is_default: boolean;
 };
 
 export function ShipToForm({ customerId, shipTo }: { customerId: string; shipTo?: ShipToEditData }) {
@@ -28,11 +29,12 @@ export function ShipToForm({ customerId, shipTo }: { customerId: string; shipTo?
   const [city, setCity] = useState(shipTo?.city ?? "");
   const [state, setState] = useState(shipTo?.state ?? "");
   const [zip, setZip] = useState(shipTo?.zip ?? "");
+  const [isDefault, setIsDefault] = useState(shipTo?.is_default ?? false);
   const form = useCommandForm("upsert_ship_to", {
     build: () => ({
       ...(isEdit ? { id: shipTo.id } : {}),
       customerId, label, address1, address2: address2 || undefined,
-      city, state: state.toUpperCase(), zip,
+      city, state: state.toUpperCase(), zip, isDefault,
     }),
     reset: () => {
       setLabel(shipTo?.label ?? "");
@@ -41,6 +43,7 @@ export function ShipToForm({ customerId, shipTo }: { customerId: string; shipTo?
       setCity(shipTo?.city ?? "");
       setState(shipTo?.state ?? "");
       setZip(shipTo?.zip ?? "");
+      setIsDefault(shipTo?.is_default ?? false);
     },
   });
 
@@ -80,6 +83,7 @@ export function ShipToForm({ customerId, shipTo }: { customerId: string; shipTo?
             <Label htmlFor="ship-to-zip">Zip</Label>
             <Input id="ship-to-zip" value={zip} onChange={(e) => setZip(e.target.value)} required />
           </div>
+          <Label className="flex items-center gap-2"><input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} />Default ship-to for new orders</Label>
           <CommandFormMessage error={form.error} />
           <CommandFormFooter>
             <Button type="submit" disabled={form.submitting}>

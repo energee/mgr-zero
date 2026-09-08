@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { isCompleteLine, orderFormReadiness } from "@/lib/order-form-rules";
+import { defaultShipToId, isCompleteLine, orderFormReadiness } from "@/lib/order-form-rules";
 import { SkuPicker } from "@/components/mgr/search-palette";
 
 type OrderKind = "wholesale" | "taproom_transfer";
@@ -25,7 +25,7 @@ type OrderKind = "wholesale" | "taproom_transfer";
 export type CustomerOption = {
   id: string;
   name: string;
-  shipTos: { id: string; label: string }[];
+  shipTos: { id: string; label: string; is_default?: boolean }[];
 };
 export type LocationOption = { id: string; name: string; kind: "warehouse" | "taproom" };
 export type SkuOption = { id: string; label: string };
@@ -119,7 +119,7 @@ export function OrderForm({
                   value={customerId}
                   onValueChange={(v) => {
                     setCustomerId(v);
-                    setShipToId("");
+                    setShipToId(defaultShipToId(customers.find((c) => c.id === v)?.shipTos ?? []));
                   }}
                 >
                   <SelectTrigger id="order-customer">

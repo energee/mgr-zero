@@ -108,7 +108,7 @@ defineQuery({
     const customerId = requireCustomer(ctx);
     const [customer, shipTos, deposits] = await Promise.all([
       unwrap(ctx.db.from("customers").select("id, name").eq("id", customerId).single()),
-      unwrap(ctx.db.from("ship_tos").select("id, label, address1, city, state, zip").eq("customer_id", customerId).order("label")),
+      unwrap(ctx.db.from("ship_tos").select("id, label, address1, city, state, zip, is_default").eq("customer_id", customerId).order("label")),
       unwrap(ctx.db.from("keg_deposit_balances").select("keg_size, kegs_on_deposit, deposit_cents").eq("customer_id", customerId)),
     ]);
     return {

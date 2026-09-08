@@ -117,7 +117,7 @@ const AUTHENTICATED_RPCS = [
   "upsert_material_contract(uuid,uuid,uuid,uuid,numeric,integer,date,date,text,uuid)",
   "upsert_price_group(uuid,uuid,text,integer,integer,uuid)",
   "upsert_sale_channel(uuid,uuid,text,tax_treatment,uuid)",
-  "upsert_ship_to(uuid,uuid,uuid,text,text,text,text,text,text,uuid)",
+  "upsert_ship_to(uuid,uuid,uuid,text,text,text,text,text,text,uuid,boolean)",
   "upsert_state_registration(uuid,uuid,text,text,date,date,uuid)",
   "upsert_vendor(uuid,uuid,text,text,text,integer,text,boolean,uuid)",
   "upsert_vessel(uuid,uuid,text,vessel_kind,numeric,uuid)",

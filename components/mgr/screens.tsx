@@ -337,7 +337,7 @@ export const SCREENS: Screen[] = [
   {
     step: 1, slice: "all", tab: "More", name: "Settings", job: "Edit brewery/location basics and route to rare setup",
     to: { "Source water · Municipal · Denver": "Water profiles" },
-    reads: "get_brewery · list_locations · list_team_members", writes: "update_brewery · update_location",
+    reads: "get_brewery · list_locations · list_team_members", writes: "update_brewery · update_location · set_portal_fulfillment_source",
     states: permitted("admin only"),
     spec: "Invoices remains a first-class More and desk-rail destination. TTB registry number and PA license are brewery columns and feed the compliance report header. The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. Deployment mode is read-only. Team opens the Team frame.",
     body: (<>
@@ -350,6 +350,8 @@ export const SCREENS: Screen[] = [
       {E.edit("Reading overdue after (hours)", OVERDUE_HOURS, "number")}
       {E.fld("Deployment", "dedicated · read-only")}
       {E.btn("Save brewery")}
+      {E.pick("Portal fulfillment warehouse", "Warehouse", ["Warehouse"])}
+      {E.btn("Save warehouse", "g")}
       {E.nav("Source water · Municipal · Denver", "every recipe starts here unless it overrides")}
       {E.nav("Locations", "Warehouse · Taproom")}
       {E.nav("Team", "3 members · 1 pending invite")}

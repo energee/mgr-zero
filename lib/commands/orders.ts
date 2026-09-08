@@ -185,13 +185,14 @@ defineCommand({
 // ---- queries ----
 
 defineQuery({
-  name: "list_orders", description: "Orders newest-first, optionally by status",
+  name: "list_orders", description: "Orders newest-first, optionally by status and customer",
   roles: [...readRoles],
-  input: z.object({ status: z.enum(["draft", "submitted", "confirmed", "picked", "shipped", "cancelled"]).optional(), limit: z.number().int().max(200).default(50) }),
+  input: z.object({ customerId: z.string().uuid().optional(), status: z.enum(["draft", "submitted", "confirmed", "picked", "shipped", "cancelled"]).optional(), limit: z.number().int().max(200).default(50) }),
   handler: (ctx, i) => {
     let q = ctx.db.from("orders").select("*, customers(name)")
       .eq("brewery_id", ctx.breweryId).order("created_at", { ascending: false }).limit(i.limit);
     if (i.status) q = q.eq("status", i.status);
+    if (i.customerId) q = q.eq("customer_id", i.customerId);
     return unwrap(q);
   },
 });

@@ -134,6 +134,11 @@ Adds `unique (id, brewery_id)`; `price_list_id` composite FK → `price_lists` (
 ### `ship_tos` — unchanged, but `customer_id` becomes composite → `customers`
 `state` check 2-letter. Adds `unique (id, customer_id, brewery_id)` so orders can pin a
 ship-to to its customer. idx `(customer_id)`. RLS: `staff_all`, `customer_own` select.
+`is_default boolean not null default false`; a partial unique index on
+`(brewery_id, customer_id) where is_default` permits at most one default.
+`upsert_ship_to` locks the customer before switching defaults and rejects address
+reassignment. Omitted default choice preserves an existing address; new addresses
+default to false. Defaults initialize new order forms only.
 
 ### `brewery_counters` — new (see §0)
 RLS enabled, no policies for `authenticated` — only touched through `next_no()`

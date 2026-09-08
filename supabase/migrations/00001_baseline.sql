@@ -173,12 +173,14 @@ create table ship_tos (
   address1 text not null, address2 text, city text not null,
   state text not null check (state ~ '^[A-Z]{2}$'),   -- drives dest_state on removals
   zip text not null,
+  is_default boolean not null default false,
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
   unique (id, customer_id, brewery_id),                -- lets orders pin a ship-to to its customer
   foreign key (customer_id, brewery_id) references customers (id, brewery_id)
 );
 create index ship_tos_customer_idx on ship_tos (customer_id);
+create unique index ship_tos_one_default on ship_tos (brewery_id, customer_id) where is_default;
 
 -- ---------------------------------------------------------------- materials (definitions)
 create table vendors (
@@ -3106,20 +3108,30 @@ end $$;
 
 create function upsert_ship_to(
   p_brewery uuid, p_id uuid, p_customer uuid, p_label text, p_address1 text, p_address2 text,
-  p_city text, p_state text, p_zip text, p_request_id uuid
+  p_city text, p_state text, p_zip text, p_request_id uuid, p_is_default boolean default null
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_replay jsonb; v_row public.ship_tos;
 begin
   perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'upsert_ship_to', p_request_id,
-    jsonb_build_object('brewery', p_brewery, 'id', p_id, 'customer', p_customer, 'label', p_label, 'address1', p_address1, 'address2', p_address2, 'city', p_city, 'state', p_state, 'zip', p_zip));
+    jsonb_build_object('brewery', p_brewery, 'id', p_id, 'customer', p_customer, 'label', p_label, 'address1', p_address1, 'address2', p_address2, 'city', p_city, 'state', p_state, 'zip', p_zip, 'is_default', p_is_default));
   if v_replay is not null then return v_replay; end if;
+  -- Serialize all address edits for this customer, including default switches.
+  perform 1 from public.customers where id = p_customer and brewery_id = p_brewery for update;
+  if not found then raise exception 'customer not found'; end if;
+  if p_id is not null and not exists (
+    select 1 from public.ship_tos where id = p_id and brewery_id = p_brewery and customer_id = p_customer
+  ) then raise exception 'ship-to not found for this customer'; end if;
+  if p_is_default is true then
+    update public.ship_tos set is_default = false
+      where brewery_id = p_brewery and customer_id = p_customer and is_default and id is distinct from p_id;
+  end if;
   if p_id is null then
-    insert into public.ship_tos (brewery_id, customer_id, label, address1, address2, city, state, zip)
-      values (p_brewery, p_customer, p_label, p_address1, p_address2, p_city, p_state, p_zip) returning * into v_row;
+    insert into public.ship_tos (brewery_id, customer_id, label, address1, address2, city, state, zip, is_default)
+      values (p_brewery, p_customer, p_label, p_address1, p_address2, p_city, p_state, p_zip, coalesce(p_is_default, false)) returning * into v_row;
   else
-    update public.ship_tos set customer_id = p_customer, label = p_label, address1 = p_address1,
-      address2 = p_address2, city = p_city, state = p_state, zip = p_zip
+    update public.ship_tos set label = p_label, address1 = p_address1,
+      address2 = p_address2, city = p_city, state = p_state, zip = p_zip, is_default = coalesce(p_is_default, is_default)
       where id = p_id and brewery_id = p_brewery returning * into v_row;
     if not found then raise exception 'ship-to not found'; end if;
   end if;
@@ -6425,7 +6437,7 @@ grant execute on function
   delete_sale_channel(uuid,uuid,uuid),
   set_brewery_gravity_unit(uuid,text,uuid),
   set_my_gravity_unit(uuid,text,uuid),
-  upsert_ship_to(uuid,uuid,uuid,text,text,text,text,text,text,uuid),
+  upsert_ship_to(uuid,uuid,uuid,text,text,text,text,text,text,uuid,boolean),
   upsert_price_group(uuid,uuid,text,int,int,uuid),
   delete_price_group(uuid,uuid,uuid),
   set_channel_price(uuid,uuid,uuid,uuid,int,uuid),
