@@ -5178,18 +5178,9 @@ create policy notification_destinations_personal_read on notification_destinatio
         and l.state = 'active'
     )
   );
+-- Preferences belong to current staff even before linking or after unlinking.
 create policy notification_preferences_self_read on notification_preferences for select to authenticated
-  using (
-    user_id = (select auth.uid())
-    and (select is_staff_of(brewery_id))
-    and exists (
-      select 1
-      from chat_user_links l
-      where l.brewery_id = notification_preferences.brewery_id
-        and l.user_id = (select auth.uid())
-        and l.state = 'active'
-    )
-  );
+  using (user_id = (select auth.uid()) and (select is_staff_of(brewery_id)));
 
 revoke all on chat_installations, chat_user_links, notification_destinations, notification_preferences,
   notification_occurrences, notification_deliveries, chat_callback_receipts, chat_action_intents

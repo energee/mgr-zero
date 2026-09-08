@@ -259,3 +259,28 @@ it("orders a delayed credential delete before a concurrent OAuth store and activ
   await disconnectSlackInstallation(ctx, initial.installationId, first.port);
   expect(first.stored.has(first.teamId)).toBe(true);
 });
+
+it.each([
+  ["disabled", "disconnect"], ["needs_reauthorization", "disconnect"],
+  ["disabled", "reconcile"], ["needs_reauthorization", "reconcile"],
+] as const)("preserves replacement workspace credentials in %s during old %s cleanup", async (state, cleanup) => {
+  const breweryA = await makeBrewery(), ownerA = await makeStaffCtx(breweryA.id);
+  const { port, teamId, stored } = fakePort();
+  const first = await beginSlackInstall(ownerA, REDIRECT);
+  await completeSlackInstall(ownerA.db, callback(first.authorizeUrl), port, REDIRECT);
+  await disconnectSlackInstallation(ownerA, first.installationId, port);
+  const breweryB = await makeBrewery(), ownerB = await makeStaffCtx(breweryB.id);
+  const replacement = await beginSlackInstall(ownerB, REDIRECT);
+  await completeSlackInstall(ownerB.db, callback(replacement.authorizeUrl), port, REDIRECT);
+  stored.set(teamId, { botToken: "xoxb-replacement" });
+  const changed = await admin.from("chat_installations").update({ state }).eq("id", replacement.installationId);
+  expect(changed.error).toBeNull();
+  const calls = vi.mocked(port.deleteInstallation).mock.calls.length;
+  const result = cleanup === "disconnect"
+    ? await disconnectSlackInstallation(ownerA, first.installationId, port)
+    : await reconcileSlackInstall(admin, first.installationId, port);
+  expect(result).toEqual({ credentialDeleted: false });
+  expect(port.deleteInstallation).toHaveBeenCalledTimes(calls);
+  expect(stored.get(teamId)).toEqual({ botToken: "xoxb-replacement" });
+  expect((await row(replacement.installationId)).state).toBe(state);
+});

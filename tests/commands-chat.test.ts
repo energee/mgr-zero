@@ -236,3 +236,20 @@ it("admits only current admins for disable and preserves completed lifecycle rep
   await ins("brewery_users", { brewery_id: ctx.breweryId, user_id: owner.userId, role: "admin" });
   await expect(runCommand("disable_chat_installation", input, other)).rejects.toMatchObject({ status: 403 });
 });
+
+it("reads own saved preferences before linking and after unlinking without exposing another staff member’s rows", async () => {
+  process.env.APP_URL = "https://mgr.test";
+  const person = await makeStaffCtx(ctx.breweryId, "sales");
+  await runCommand("set_notification_preference", { reason: "submitted_order", enabled: false }, person);
+  await runCommand("set_personal_quiet_hours", { start: "22:00", end: "07:00", timezone: "America/New_York" }, person);
+  const saved = { preferences: expect.arrayContaining([{ reason: "submitted_order", enabled: false }]), quietStart: "22:00:00", quietEnd: "07:00:00", timezone: "America/New_York", link: null };
+  expect(await runCommand("get_notification_preferences", {}, person)).toMatchObject(saved);
+  const proof = await issueChatLinkProof(admin, installation, "U-PRESERVED-PREFS");
+  await runCommand("consume_chat_link_proof", { proof: proof.proof }, person);
+  await runCommand("unlink_chat_user", { linkId: proof.linkId }, person);
+  expect(await runCommand("get_notification_preferences", {}, person)).toMatchObject(saved);
+  const other = await makeStaffCtx(ctx.breweryId, "sales");
+  expect((await other.db.from("notification_preferences").select("reason").eq("user_id", person.userId)).data).toEqual([]);
+  await admin.from("brewery_users").delete().eq("brewery_id", ctx.breweryId).eq("user_id", person.userId);
+  expect((await person.db.from("notification_preferences").select("reason")).data).toEqual([]);
+});

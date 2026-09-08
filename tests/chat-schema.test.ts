@@ -321,7 +321,7 @@ describe("chat schema (live DB)", () => {
     }
   });
 
-  it("requires current membership and an active same-brewery link for personal reads", async () => {
+  it("requires current membership for own preferences and active links for delivery identity reads", async () => {
     const removed = await makeBrewery();
     const removedCtx = await makeStaffCtx(removed.id);
     const removedInstallation = await installation(removed.id, removedCtx.userId);
@@ -395,7 +395,6 @@ describe("chat schema (live DB)", () => {
     for (const [table, id] of [
       ["chat_user_links", disabledLink.id],
       ["notification_destinations", disabledDestination.id],
-      ["notification_preferences", disabledPreference.id],
     ] as const) {
       const { data } = await disabledCtx.db.from(table).select("id").eq("id", id);
       expect(data, `${table} after link disable`).toEqual([]);
@@ -404,6 +403,7 @@ describe("chat schema (live DB)", () => {
     await admin.from("chat_user_links").update({ state: "unlinked" }).eq("id", disabledLink.id);
     const { data: unlinked } = await disabledCtx.db.from("chat_user_links").select("id").eq("id", disabledLink.id);
     expect(unlinked, "chat_user_links after unlink").toEqual([]);
+    expect((await disabledCtx.db.from("notification_preferences").select("id").eq("id", disabledPreference.id)).data).toEqual([{ id: disabledPreference.id }]);
   });
 
   it("requires preferences to name the same user's personal direct destination", async () => {

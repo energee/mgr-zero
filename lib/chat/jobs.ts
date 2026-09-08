@@ -331,10 +331,11 @@ export async function cleanupChatInstallation(ctx: Ctx, installationId: string, 
 async function cleanupChatInstallationLocked(ctx: Ctx, installationId: string, port: Pick<import("./oauth").SlackOAuthPort, "deleteInstallation">) {
   const installation = await settingsInstallation(ctx, installationId);
   if (installation.state !== "disconnected") return { credentialDeleted: false };
-  // A delayed retry must never delete a new installation's workspace token.
-  const active = await unwrap(serviceClient().from("chat_installations").select("id").eq("external_installation_id", installation.external_installation_id)
-    .eq("provider", "slack").eq("state", "active").limit(1));
-  if (active?.length) return { credentialDeleted: false };
+  // Credential ownership survives disable/reauthorization; disconnected rows
+  // release this unique store reference to their per-row tombstone.
+  const credentialOwner = await unwrap(serviceClient().from("chat_installations").select("id").eq("external_installation_id", installation.external_installation_id)
+    .eq("provider", "slack").eq("token_store_key", `slack:installation:${installation.external_installation_id}`).limit(1));
+  if (credentialOwner?.length) return { credentialDeleted: false };
   const credentialDeleted = installation.external_installation_id.startsWith("pending:") || await port.deleteInstallation(installation.external_installation_id).then(() => true, () => false);
   await unwrap(serviceClient().rpc("reconcile_chat_installation", { p_installation: installationId, p_credential_deleted: credentialDeleted,
     p_failure_code: credentialDeleted ? null : "credential_delete_failed" }));

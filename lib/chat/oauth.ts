@@ -132,9 +132,9 @@ async function reconcileSlackInstallLocked(db: SupabaseClient, installationId: s
     .eq("id", installationId)
     .single();
   if (!r) throw new CommandError("installation not found", 404);
-  const active = await unwrap(db.from("chat_installations").select("id").eq("provider", "slack")
-    .eq("external_installation_id", r.external_installation_id).eq("state", "active").limit(1));
-  if (active?.length) return { credentialDeleted: false };
+  const credentialOwner = await unwrap(db.from("chat_installations").select("id").eq("provider", "slack")
+    .eq("external_installation_id", r.external_installation_id).eq("token_store_key", `slack:installation:${r.external_installation_id}`).limit(1));
+  if (credentialOwner?.length) return { credentialDeleted: false };
   let credentialDeleted = false;
   if (r.state !== "active" && !r.external_installation_id.startsWith("pending:")) {
     credentialDeleted = await port
