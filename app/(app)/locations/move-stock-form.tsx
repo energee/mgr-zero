@@ -1,5 +1,6 @@
 "use client";
 
+import { binStockKey, selectedBinStock } from "@/lib/movement-form";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +15,7 @@ export function MoveStockForm({ bins, stock }: { bins: { id: string; name: strin
   const [toBinId, setToBinId] = useState("");
   const [qty, setQty] = useState("");
   const [note, setNote] = useState("");
-  const selected = source === "" ? undefined : stock[Number(source)];
+  const selected = selectedBinStock(stock, source);
   const amount = Number(qty);
   const valid = selected && toBinId && toBinId !== selected.bin_id && amount > 0 && Number.isFinite(amount) && (selected.kind !== "keg" || Number.isInteger(amount));
   const form = useCommandForm("move_stock_bin", {
@@ -36,7 +37,7 @@ export function MoveStockForm({ bins, stock }: { bins: { id: string; name: strin
         <Label htmlFor="bin-stock">Stock and source bin</Label>
         <Select value={source} onValueChange={v => { setSource(v); setToBinId(""); setQty(""); }}>
           <SelectTrigger id="bin-stock"><SelectValue placeholder="Choose stock" /></SelectTrigger>
-          <SelectContent>{stock.map((s, index) => <SelectItem key={index} value={String(index)}>{s.name} · {binName(s.bin_id)} · {s.kind === "keg" ? s.keg_size?.replace(/_/g, " ") : s.lot_code ? `Lot ${s.lot_code}` : "Untracked stock"} · {s.qty} {s.unit}</SelectItem>)}</SelectContent>
+          <SelectContent>{stock.map(s => <SelectItem key={binStockKey(s)} value={binStockKey(s)}>{s.name} · {binName(s.bin_id)} · {s.kind === "keg" ? s.keg_size?.replace(/_/g, " ") : s.lot_code ? `Lot ${s.lot_code}` : "Untracked stock"} · {s.qty} {s.unit}</SelectItem>)}</SelectContent>
         </Select>
       </div>
       <div className="flex flex-col gap-2">
