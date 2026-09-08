@@ -60,9 +60,9 @@
 **Files:** view `taproom_variance` + query `get_taproom_variance`
 
 **Interfaces:**
-- Per brand, window 4 or 12 weeks: POS serving-volume expectations remain a separate projection/snapshot from physical count `qty_before` and `qty_counted`. Actual consumption comes from count-owned depletion, not summing remaining stock. Exclude guest/untracked intervals as specified by Task 3. Never writes movements; the report sign and no-POS presentation are resolved in this task.
+- Per brand, window 4 or 12 weeks: POS serving-volume expectations remain a separate projection/snapshot from physical count `qty_before` and `qty_counted`. Actual consumption comes from count-owned depletion, not summing remaining stock. Exclude guest/untracked intervals as specified by Task 3. Variance is expected consumption minus actual consumption (§16.15). Never writes movements. Without POS, the variance report is empty and the count's expected-consumption column is empty; physical counts still post depletion.
 
-- [ ] **Step 1:** Two weeks Hazy expected consumption 3 and count-derived actual consumption 2 each → variance −2 over 4 weeks. No POS → expected 0, report still returns count-derived consumption (spec: empty expected column / empty report when no POS — **follow the screen state "no POS": report is empty, counts still post**). Test both.
+- [ ] **Step 1:** Two weeks Hazy expected consumption 3 and count-derived actual consumption 2 each → variance +2 over 4 weeks (6 expected − 4 actual). No POS → empty expected-consumption column and empty variance report; counts still post depletion. Test both.
 
 - [ ] **Step 2–5:** Commit `feat(taproom): variance by brand is reported, never posted`
 
