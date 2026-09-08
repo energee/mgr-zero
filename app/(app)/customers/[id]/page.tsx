@@ -1,8 +1,9 @@
-// app/(app)/customers/[id]/page.tsx — single customer: profile and ship-tos
-// (portal-user invites are not available in this release). Reads through the
-// command registry (get_customer, list_sale_channels) with a brewery-scoped Ctx. An unknown or
-// malformed id renders not-found.tsx; other failures throw to the (app) error
-// boundary.
+// app/(app)/customers/[id]/page.tsx — Customer detail (screen record): one
+// account's facts with Edit → customer-form.tsx, its ship-tos with
+// ship-to-form.tsx, and links to its keg balance and orders. Portal-user
+// invites stay gated until Program 11. An unknown or malformed id renders
+// not-found.tsx.
+import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
@@ -12,25 +13,8 @@ import { CustomerForm } from "../customer-form";
 import { ShipToForm } from "../ship-to-form";
 
 type CustomerType = "distributor" | "retailer" | "brewery" | "other";
-type Customer = {
-  id: string;
-  name: string;
-  type: CustomerType;
-  state: string;
-  sale_channel_id: string;
-  license_no: string | null;
-  payment_terms: string;
-  sale_channels: { name: string };
-};
-type ShipTo = {
-  id: string;
-  label: string;
-  address1: string;
-  address2: string | null;
-  city: string;
-  state: string;
-  zip: string;
-};
+type Customer = { id: string; name: string; type: CustomerType; state: string; sale_channel_id: string; license_no: string | null; payment_terms: string; sale_channels: { name: string } };
+type ShipTo = { id: string; label: string; address1: string; address2: string | null; city: string; state: string; zip: string };
 type SaleChannel = { id: string; name: string };
 
 export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -38,71 +22,27 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const [{ customer, shipTos }, channels] = (await Promise.all([
-    orNotFound(runCommand("get_customer", { customerId: id }, ctx)),
-    runCommand("list_sale_channels", {}, ctx),
+    orNotFound(runCommand("get_customer", { customerId: id }, ctx)), runCommand("list_sale_channels", {}, ctx),
   ])) as [{ customer: Customer; shipTos: ShipTo[] }, SaleChannel[]];
-
+  const edit = (
+    <CustomerForm channels={channels.map((c) => ({ id: c.id, name: c.name }))}
+      customer={{ id: customer.id, name: customer.name, type: customer.type, state: customer.state, saleChannelId: customer.sale_channel_id, licenseNumber: customer.license_no, paymentTerms: customer.payment_terms }} />
+  );
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">{customer.name}</h1>
-          <div className="text-sm text-muted-foreground">
-            {customer.type} · {customer.state} · {customer.payment_terms}
-            {customer.license_no ? ` · license ${customer.license_no}` : ""}
-            {` · sale channel: ${customer.sale_channels.name}`}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <CustomerForm
-            channels={channels.map((c) => ({ id: c.id, name: c.name }))}
-            customer={{
-              id: customer.id, name: customer.name, type: customer.type, state: customer.state,
-              saleChannelId: customer.sale_channel_id, licenseNumber: customer.license_no, paymentTerms: customer.payment_terms,
-            }}
-          />
-        </div>
-      </div>
-
-      <section className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium text-muted-foreground">Ship-tos</h2>
-          <ShipToForm customerId={customer.id} />
-        </div>
-        {shipTos.length ? (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-muted-foreground">
-                <th className="py-1 font-normal">Label</th>
-                <th className="py-1 font-normal">Address</th>
-                <th className="py-1 font-normal">City</th>
-                <th className="py-1 font-normal">State</th>
-                <th className="py-1 font-normal">Zip</th>
-                <th className="py-1 font-normal" />
-              </tr>
-            </thead>
-            <tbody>
-              {shipTos.map((s) => (
-                <tr key={s.id} className="border-t">
-                  <td className="py-1">{s.label}</td>
-                  <td className="py-1">
-                    {s.address1}
-                    {s.address2 ? `, ${s.address2}` : ""}
-                  </td>
-                  <td className="py-1">{s.city}</td>
-                  <td className="py-1">{s.state}</td>
-                  <td className="py-1">{s.zip}</td>
-                  <td className="py-1 text-right">
-                    <ShipToForm customerId={customer.id} shipTo={s} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <p className="text-sm text-muted-foreground">No ship-tos yet.</p>
-        )}
-      </section>
-    </div>
+    <>
+      {E.back("Customers", customer.name, edit, "/customers")}
+      {E.fld("Type", customer.type)}
+      {E.fld("State", customer.state)}
+      {E.fld("License number", customer.license_no ?? "none")}
+      {E.fld("Terms", customer.payment_terms)}
+      {E.fld("Sale channel", customer.sale_channels.name)}
+      {E.ttl("Ship-tos")}
+      {shipTos.map((s) => (
+        <div key={s.id}>{E.row(s.label, `${s.address1}${s.address2 ? `, ${s.address2}` : ""} · ${s.city}, ${s.state} ${s.zip}`, <ShipToForm customerId={customer.id} shipTo={s} />)}</div>
+      ))}
+      <ShipToForm customerId={customer.id} />
+      {E.gated("Portal users", "invitations aren’t available yet")}
+      {E.row("Customer keg balance", "kegs out and deposits held", E.act("Open", "primary", `/kegs/customers/${customer.id}`))}
+    </>
   );
 }

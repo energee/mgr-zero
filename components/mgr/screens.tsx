@@ -75,6 +75,10 @@ export type Screen = {
   writes: ReactNode;
   states?: [string, string, (0 | 1)?][];
   spec?: ReactNode;
+  /** The program that still owns shipping this screen, when no reads/writes tag
+   *  can say so — the record names no command, or another program owns the whole
+   *  surface. lib/mgr/screen-routes.ts keeps these out of the parity set. */
+  gatedBy?: string;
   /** The drawing replaced an earlier one and `spec` explains why; the docs fold it. */
   redrawn?: true;
   /** Drawn inside another product (QuickBooks, Square, Slack) in that product's
@@ -261,7 +265,7 @@ export const SCREENS: Screen[] = [
   {
     step: 1, slice: "all", tab: "Beer", name: "Beer", job: "Inventory, cellar, materials and kegs",
     to: { Taproom: "Weekly count", Materials: "Materials on hand" },
-    reads: "get_beer_overview [view; one read across slices]", writes: "none",
+    reads: "get_beer_overview", writes: "none",
     states: DEFAULT_STATES,
     body: (<>
       {E.hd("Beer")}
@@ -276,7 +280,7 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 1, slice: "all", tab: "Work", name: "Work", job: "Everything currently in motion, ordered by next due action",
-    reads: "list_work [view; role default + remembered explicit filter]", writes: "none",
+    reads: "list_work", writes: "none",
     states: DEFAULT_STATES,
     spec: "Warehouse default rows shown; the chips are the kinds the role may open (a brewer has no POs or routes) and an explicit chip choice is remembered. Rows sort by urgency/due time, not newest activity.",
     body: (<>
@@ -313,7 +317,7 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 1, slice: "all", group: "Global", surface: "sheet", name: "Search", job: "Search every permitted entity kind",
-    reads: "search_entities [design]", writes: "none",
+    reads: "search_entities", writes: "none",
     states: [["empty", "No matches · change the term"], ["loading", "row-shaped skeletons"], ["offline", "cached matches only", 1], ["permission", "Results honor row access"], ["document number", "ORD-0231 matches exactly and sorts first"]],
     spec: "One registered search across the entity kinds the caller's role can read; results are grouped by kind and arrow keys move between matches; filtering never widens what is permitted, and RLS decides the rows either way, so a term matching a customer the caller cannot see returns nothing rather than a redacted row. A document number (ORD-0231, INV-1042, L-240831-HZ) matches exactly and sorts above name matches, because someone typing one is holding it in their hand; names match on prefix. This is also where history lives: a run closed months ago leaves the Work list and is found here.",
     body: (<>
@@ -327,7 +331,7 @@ export const SCREENS: Screen[] = [
   {
     step: 1, slice: "all", group: "Global", surface: "sheet", name: "Me", job: "Who I am, which brewery, leave",
     to: { "Maria Alvarez": "Me" },
-    reads: "supabase_auth_get_session [platform] · get_first_run_state [view; membership list]", writes: "supabase_auth_sign_out [platform]",
+    reads: "supabase_auth_get_session [platform] · get_first_run_state", writes: "supabase_auth_sign_out [platform]",
     states: [["dedicated mode", "switcher hidden · one brewery"], ["single membership", "switcher hidden"]],
     spec: "Opened from the header Me control. Brewery switcher renders only in SaaS mode with more than one membership. Change password opens Set new password, as portal Me opens Portal set password: a signed-in person should not have to sign out and use the recovery flow. No notification history, no settings; those live under More.",
     body: (<>
@@ -343,7 +347,7 @@ export const SCREENS: Screen[] = [
   {
     step: 1, slice: "all", tab: "More", name: "Settings", job: "Edit brewery/location basics and route to rare setup",
     to: { "Source water · Municipal · Denver": "Water profiles" },
-    reads: "list_locations · list_team_members", writes: "update_brewery · update_location [design; mutable single rows]",
+    reads: "get_brewery · list_locations · list_team_members", writes: "update_brewery · update_location",
     states: permitted("admin only"),
     spec: "Invoices remains a first-class More and desk-rail destination. TTB registry number and PA license are brewery columns and feed the compliance report header. The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. Deployment mode is read-only. Team opens the Team frame.",
     body: (<>
@@ -435,7 +439,7 @@ export const SCREENS: Screen[] = [
     </>),
   },
   {
-    step: 2, slice: 1, group: "Entry", surface: "entry", name: "Expired invite",
+    step: 2, slice: 1, group: "Entry", surface: "entry", name: "Expired invite", gatedBy: "Program 11",
     job: "The invite link is no longer valid",
     reads: "none", writes: "none",
     states: [["expired", "ask for a new invite"], ["wrong audience", "a customer link used on staff, or the reverse", 1], ["already a member", "sign in instead"]],
@@ -451,7 +455,7 @@ export const SCREENS: Screen[] = [
     </>),
   },
   {
-    step: 2, slice: 1, group: "Entry", surface: "entry", name: "Expired reset",
+    step: 2, slice: 1, group: "Entry", surface: "entry", name: "Expired reset", gatedBy: "Program 11",
     job: "The password reset link is no longer valid",
     reads: "none", writes: "none",
     states: [["expired", "request a new reset link"]],
@@ -506,7 +510,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     group: "Entry",
     surface: "entry",
-    name: "Accept invite",
+    name: "Accept invite", gatedBy: "Program 11",
     job: "Set a password and land in the correct shell",
     reads: "supabase_auth_get_session [platform]",
     writes: "supabase_auth_update_user [platform; membership already exists]",
@@ -637,7 +641,7 @@ export const SCREENS: Screen[] = [
     name: "Team",
     job: "Roster, roles, pending invites and revocation",
     reads: "list_team_members",
-    writes: "update_staff_roles [design; single row, roles array] · revoke_staff [design; single membership row ends] · invite_staff [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI] · the taproom role [SCHEMA-GATE: revision 2 §16.13/§16.16 q3: staff_role gains taproom, but P-staff is role-agnostic, so the narrow per-role policies are undesigned]",
+    writes: "invite_staff [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI] · the taproom role [SCHEMA-GATE: revision 2 §16.13/§16.16 q3: staff_role gains taproom, but P-staff is role-agnostic, so the narrow per-role policies are undesigned] · update_staff_role · revoke_staff",
     states: [["last admin", "role change refused · keep one admin", 1], ["pending", "invite sent · not yet accepted"], ["permission", "admin only", 1]],
     spec: "A person shows as @handle, the local part of their email; it is derived, not a stored column. A pending invite has no account yet, so it shows the full address it was sent to. From Settings. A member row opens the Team member sheet, where the role changes in one write and Remove ends the membership (Auth user untouched; re-invite is the compensation). The invite stays disabled with the same human copy as first run until its gate closes.",
     body: (<>
@@ -661,7 +665,7 @@ export const SCREENS: Screen[] = [
     reads: "list_team_members",
     writes: "update_staff_roles · revoke_staff [design; SCHEMA-GATE: roles is an array on the membership row]",
     states: [["permission", "admin only", 1], ["member", "any set of roles; at least one"], ["no role", "Save refused until one is on", 1], ["last admin", "remove and turning off Admin refused", 1], ["self", "remove refused", 1]],
-    spec: "A member holds a set of roles, not one: a person who sells and brews is both, and sees the union of each role's navigation and actions. Every role is a switch; at least one must stay on. The destructive action belongs to the named member, so there is no ambiguous selected-member state. Drawn for another member, never the signed-in one: opening your own row is the self state, where Remove is refused.",
+    spec: "A member holds a set of roles, not one: a person who sells and brews is both, and sees the union of each role's navigation and actions. Every role is a switch; at least one must stay on. The destructive action belongs to the named member, so there is no ambiguous selected-member state. Drawn for another member, never the signed-in one: opening your own row is the self state, where Remove is refused. Until the roles column becomes an array, the live sheet changes the one role the row holds.",
     body: (<>
       {E.row("Dave Chen", "dave@demobrewing.com", "", "", E.face({ className: "size-10", src: "/mock/dave.jpg" }))}
       {E.ttl("Roles")}
@@ -699,8 +703,8 @@ export const SCREENS: Screen[] = [
     name: "First-run checklist",
     to: { "Add location": "First-run checklist", "2 \u00b7 Import CSV": "Import", "3 \u00b7 Add a brand": "Brand", Add: "Brand", "5 \u00b7 Opening inventory": "Record movement" },
     job: "Turn an empty brewery into usable truth",
-    reads: "get_first_run_state [view]",
-    writes: "create_location · invite_staff [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI]",
+    reads: "get_first_run_state",
+    writes: "invite_staff [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI] · create_location",
     states: permitted("admin only"),
     spec: "Replaces Today until complete; app and portal shells already exist. Each step is one command and all five are drawn: add a location, import a CSV, add a brand, invite staff, record a movement. The brand step was named here and never drawn, which stranded anyone not importing: a brewery with locations and no brand has nothing to record a movement against. The invite is drawn disabled with the same human copy as the Team frame until the invite workflow gate closes; the step can be skipped.",
     body: (<>
@@ -888,7 +892,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Today",
     group: "Global",
-    name: "Composer answer",
+    name: "Composer answer", gatedBy: "Program 15",
     to: { "Shortfall detail": "Pars and allocation", Review: "Pars and allocation" },
     job: "Questions use named registered queries",
     reads: "get_atp · get_shortfalls [design]",
@@ -907,7 +911,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     group: "Global",
     surface: "sheet",
-    name: "Offline outbox",
+    name: "Offline outbox", gatedBy: "Program 15",
     to: { Fix: "Cellar transfer", Discard: "Offline outbox", "Record movement · Hazy": "Record movement", "Record fermentation reading · FV3": "Fermentation reading", "Record cellar transfer · FV2": "Cellar transfer", "Record pick · ORD-0229": "Pick" },
     job: "Retry safely; separate response loss from permanent rejection",
     reads: "local_outbox [client state]",
@@ -1380,7 +1384,7 @@ export const SCREENS: Screen[] = [
     to: { Open: "Customer detail" },
     job: "Manage accounts, addresses and portal users",
     reads: "list_customers · get_customer",
-    writes: "upsert_customer · upsert_ship_to · invite_customer_user [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI]",
+    writes: "invite_customer_user [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI] · upsert_customer · upsert_ship_to",
     states: DEFAULT_STATES,
     body: (<>
       {E.back("More", "Customers", E.btn("Add customer"))}
@@ -1570,8 +1574,8 @@ export const SCREENS: Screen[] = [
     name: "Invoice",
     to: { "Customer mapping": "Mapping conflict", "Pils · case": "Fix mapping" },
     job: "Review one invoice, resolve its mappings and push it",
-    reads: "get_invoice · get_qbo_connection · get_qbo_mapping_candidates [design]",
-    writes: "push_invoice_to_qbo · resolve_invoice_question [design; clears the sales Today row]",
+    reads: "get_qbo_connection · get_qbo_mapping_candidates [design] · get_invoice · list_invoice_questions",
+    writes: "push_invoice_to_qbo [design] · resolve_invoice_question",
     states: [["permission", "sales or admin required", 1], ["unmapped", "push stays unavailable", 1], ["ready", "every customer and item is mapped"], ["pushed", "QuickBooks owns later accounting edits"], ["buyer question", "the note is read here, and answered off-system", 1]],
     spec: "The drill-in for one invoice, and where a buyer's question lands: the portal writes it, the sales Today row points here, and marking it answered is what clears that row. Nothing about the invoice changes; the reply happens in a phone call or an email, which is why the verb says answered rather than replied.",
     body: (<>
@@ -1869,8 +1873,8 @@ export const SCREENS: Screen[] = [
     name: "Question invoice",
     to: { "Send to Demo Brewing": "Pay invoice" },
     job: "Ask the brewery about a line, a total or a payment",
-    reads: "portal_invoice [design]",
-    writes: "raise_invoice_question [design; one RPC: question row + Today row for sales; chat notification when a provider is connected]",
+    reads: "portal_invoice",
+    writes: "raise_invoice_question",
     states: [["sent", "the buyer sees it went · nothing on the invoice changes"], ["received", "a sales Today row names the invoice and the buyer"], ["no chat provider", "the Today row is the whole delivery · no email is sent", 1], ["answered", "Mark answered on the Invoice frame clears the sales row"]],
     spec: "Off Pay invoice and Payment unavailable. The buyer writes a note and it has to land somewhere a person will see: it writes a question row that appears on the sales Today list, and rides the chat integration as a personal message when one is connected. Nothing on the invoice changes.",
     body: (<>
@@ -2878,7 +2882,7 @@ export const SCREENS: Screen[] = [
     slice: 7,
     tab: "More",
     group: "POS",
-    name: "POS sale detail",
+    name: "POS sale detail", gatedBy: "Program 14",
     to: { "Hazy 16 oz draft \u00d7 1": "POS mapping" },
     job: "Trace one Square sale through mapping, expected barrels and reconciliation",
     reads: "get_pos_sale [design]",
@@ -3249,7 +3253,7 @@ export const SCREENS: Screen[] = [
     slice: "chat",
     tab: "More",
     group: "Chat",
-    name: "Linked people",
+    name: "Linked people", gatedBy: "Program 16",
     job: "See which MGR users linked Slack and remove a stale link",
     reads: "list_chat_user_links [design]",
     writes: "unlink_chat_user",
@@ -3269,7 +3273,7 @@ export const SCREENS: Screen[] = [
     tab: "More",
     group: "Chat",
     surface: "entry",
-    name: "Link your Slack",
+    name: "Link your Slack", gatedBy: "Program 16",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
     job: "Link the signed-in Slack identity to the signed-in MGR user",
     reads: "get_chat_link_intent [design]",
@@ -3589,7 +3593,7 @@ export const SCREENS: Screen[] = [
     step: 5,
     slice: 1,
     tab: "More",
-    name: "Water profiles",
+    name: "Water profiles", gatedBy: "water profiles",
     to: { Edit: "Water profile", "Add profile": "Water profile", "Municipal · Denver": "Water profile", Burton: "Water profile", "Hazy target": "Water profile" },
     job: "Keep the water a brewery starts from and the waters it aims at",
     reads: "list_water_profiles [design]",

@@ -7,7 +7,7 @@ export async function getActiveBrewery() {
   if (!(await getRequestIdentity())) redirect("/login");
 
   const memberships = await getStaffMemberships();
-  if (!memberships.length) redirect("/login?error=no-membership");
+  if (!memberships.length) redirect("/no-membership");
 
   const picked = (await cookies()).get("brewery")?.value;
   const membership = memberships.find(({ breweryId }) => breweryId === picked) ?? memberships[0];

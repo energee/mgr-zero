@@ -103,6 +103,7 @@ describe("brewery column exposure", () => {
       id: brewery.id,
       name: brewery.name,
       timezone: "America/Chicago",
+      customer_phone: null,
       portal_fulfillment_location_id: null,
     };
     const { data, error } = await db.from("portal_brewery").select("*").eq("id", brewery.id).single();

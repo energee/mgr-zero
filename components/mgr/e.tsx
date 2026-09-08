@@ -406,7 +406,13 @@ export const E = {
     </ButtonGroup>
   ),
   gated: (t: React.ReactNode, why: React.ReactNode = "isn’t available yet") => E.row(t, why, "", "dis", SquareLock01Icon),
-  nav: (t: React.ReactNode, s: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement) => E.row(t, s, <span data-tap><DirectionIcon label="Open" /></span>, cls, icon),
+  /** A row that opens something. `href` makes the whole row the link, as E.act
+   *  and E.btn already do; fixtures leave it out and the explorer resolves the
+   *  label instead. */
+  nav: (t: React.ReactNode, s: React.ReactNode = "", cls: RowClass = "", icon?: IconSvgElement | React.ReactElement, href?: string) => {
+    const row = E.row(t, s, <span data-tap><DirectionIcon label="Open" /></span>, cls, icon);
+    return href ? <Link href={href} className="block">{row}</Link> : row;
+  },
   /** A document line: a material or SKU with its quantity and the fields that
    *  belong to it. No line wants an icon, so this fills that slot rather than
    *  every call site writing the hole. */

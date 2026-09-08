@@ -185,7 +185,7 @@ describe("today candidates (shared projection) and internal scan", () => {
     await ins("deliveries", { brewery_id: b.id, route_id: gateRoute.id, shipment_id: ship.id, stop_no: 1 });  // delivery_next
 
     const live = (await sql.query("select public.today_live_reasons() as r")).rows[0].r;
-    expect(live).toEqual(["submitted_order", "pick_due", "restock_due", "delivery_next", "fermentation_reading_overdue"]);
+    expect(live).toEqual(["submitted_order", "pick_due", "restock_due", "delivery_next", "fermentation_reading_overdue", "invoice_question"]);
     const scanned = (await sql.query("select distinct reason from public.scan_chat_today_candidates($1, $2)", [b.id, "2026-09-10T12:00:00Z"])).rows.map((r) => r.reason).sort();
     expect(scanned).toEqual(["delivery_next", "fermentation_reading_overdue", "pick_due", "restock_due", "submitted_order"]);
     const reasons = new Set((await today(adminCtx, "2026-09-10T12:00:00Z")).map((i) => i.reason));

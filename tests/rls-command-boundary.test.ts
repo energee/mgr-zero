@@ -1,7 +1,7 @@
 // tests/rls-command-boundary.test.ts — live PostgREST proof that staff writes use only role-scoped RPCs.
 // Every mutation RPC takes a p_request_id (request ledger); direct calls here mint a fresh one.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedCustomer, seedPriceGroup, priceSku } from "./helpers";
+import { admin, makeBrewery, makeStaff, makeStaffCtx, seedCatalog, seedLocation, seedCustomer, seedPriceGroup, priceSku } from "./helpers";
 import { runCommand, type Ctx } from "../lib/commands/registry";
 import "../lib/commands/all";
 
@@ -263,6 +263,47 @@ describe("registered staff mutation role × RPC matrix", () => {
         return {
           command: { name, kind: "taproom" },
           rpc: { p_brewery: brewery.id, p_name: name, p_kind: "taproom" },
+        };
+      },
+    },
+    {
+      command: "resolve_invoice_question", rpc: "resolve_invoice_question", allowed: ["admin", "sales"],
+      input: async () => {
+        const { data: inv } = await admin.from("invoices").insert({ brewery_id: brewery.id, customer_id: customerId, kind: "invoice" }).select("id").single();
+        const { data: q } = await admin.from("invoice_questions").insert({ brewery_id: brewery.id, invoice_id: inv!.id, customer_id: customerId, body: "matrix", created_by: adminCtx.userId }).select("id").single();
+        return {
+          command: { questionId: q!.id },
+          rpc: { p_brewery: brewery.id, p_question: q!.id },
+        };
+      },
+    },
+    {
+      command: "update_staff_role", rpc: "update_staff_role", allowed: ["admin"],
+      input: async () => {
+        const member = await makeStaff(brewery.id, "brewer");
+        return {
+          command: { userId: member.id, role: "warehouse" },
+          rpc: { p_brewery: brewery.id, p_user: member.id, p_role: "warehouse" },
+        };
+      },
+    },
+    {
+      command: "revoke_staff", rpc: "revoke_staff", allowed: ["admin"],
+      input: async () => {
+        const member = await makeStaff(brewery.id, "brewer");
+        return {
+          command: { userId: member.id },
+          rpc: { p_brewery: brewery.id, p_user: member.id },
+        };
+      },
+    },
+    {
+      command: "update_brewery", rpc: "update_brewery", allowed: ["admin"],
+      input: async role => {
+        const name = unique("matrix brewery", role);
+        return {
+          command: { name, timezone: "America/New_York", readingDueHours: 24 },
+          rpc: { p_brewery: brewery.id, p_name: name, p_timezone: "America/New_York", p_ttb_registry_no: null, p_pa_license_no: null, p_customer_phone: null, p_reading_due_hours: 24 },
         };
       },
     },

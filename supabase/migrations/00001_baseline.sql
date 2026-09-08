@@ -79,6 +79,8 @@ create table breweries (
   timezone text not null default 'America/New_York',
   settings jsonb not null default '{}',
   fermentation_reading_due_hours int not null default 24 check (fermentation_reading_due_hours between 1 and 168),
+  -- the number the portal prints when online payment is unavailable (Program 10 task 4)
+  customer_phone text,
   gravity_unit text not null default 'plato' check (gravity_unit in ('plato','sg')),
   created_at timestamptz not null default now()
 );
@@ -1167,6 +1169,25 @@ create index invoices_customer_idx on invoices (customer_id, issued_on desc);
 create index invoices_unsynced_idx on invoices (brewery_id, qbo_sync_status) where qbo_sync_status <> 'pushed';
 create trigger invoices_no before insert on invoices for each row execute function private.set_doc_no('invoice_no','invoice');
 
+-- A buyer's question about one invoice (Program 10 task 8). Nothing on the
+-- invoice changes; the row is what a sales Today row points at, and
+-- answered_at is what clears that row. The reply itself happens off-system.
+create table invoice_questions (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references breweries(id),
+  invoice_id uuid not null,
+  customer_id uuid not null,
+  body text not null check (length(body) between 1 and 2000),
+  created_by uuid not null references auth.users(id),
+  created_at timestamptz not null default now(),
+  answered_at timestamptz,
+  answered_by uuid references auth.users(id),
+  foreign key (invoice_id, brewery_id) references invoices (id, brewery_id),
+  foreign key (customer_id, brewery_id) references customers (id, brewery_id)
+);
+create index invoice_questions_open_idx on invoice_questions (brewery_id, answered_at, created_at);
+create index invoice_questions_invoice_idx on invoice_questions (invoice_id);
+
 create table invoice_lines (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
@@ -1596,10 +1617,11 @@ returns table (
   id uuid,
   name text,
   timezone text,
+  customer_phone text,
   portal_fulfillment_location_id uuid
 )
 language sql stable security definer set search_path = '' as $$
-  select b.id, b.name, b.timezone, b.portal_fulfillment_location_id
+  select b.id, b.name, b.timezone, b.customer_phone, b.portal_fulfillment_location_id
   from public.breweries b
   where b.id in (
     select c.brewery_id from public.customers c
@@ -1608,7 +1630,7 @@ language sql stable security definer set search_path = '' as $$
 $$;
 
 create view portal_brewery with (security_invoker = true) as
-  select id, name, timezone, portal_fulfillment_location_id
+  select id, name, timezone, customer_phone, portal_fulfillment_location_id
   from public.portal_brewery_rows();
 comment on function portal_brewery_rows() is
   'portal brewery projection; never add staff-only columns';
@@ -2663,6 +2685,115 @@ begin
   if v_replay is not null then return v_replay; end if;
   update public.locations set name = p_name, kind = p_kind where id = p_id and brewery_id = p_brewery returning * into v_row;
   if v_row.id is null then raise exception 'location not found'; end if;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- Invoice questions (Program 10 task 8): the buyer writes, sales marks answered.
+create function raise_invoice_question(p_brewery uuid, p_invoice uuid, p_body text, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_customer uuid; v_actor uuid; v_row public.invoice_questions;
+begin
+  select customer_id into v_customer from public.invoices where id = p_invoice and brewery_id = p_brewery;
+  -- a missing invoice and someone else's answer the same way, so a buyer cannot
+  -- learn which ids are real
+  if v_customer is null then raise exception 'permission denied' using errcode = '42501'; end if;
+  v_actor := private.assert_customer(p_brewery, v_customer);
+  v_replay := private.claim_command_request(p_brewery, 'raise_invoice_question', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'invoice', p_invoice, 'body', p_body));
+  if v_replay is not null then return v_replay; end if;
+  insert into public.invoice_questions (brewery_id, invoice_id, customer_id, body, created_by)
+    values (p_brewery, p_invoice, v_customer, p_body, v_actor) returning * into v_row;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+create function resolve_invoice_question(p_brewery uuid, p_question uuid, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_actor uuid; v_row public.invoice_questions;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'resolve_invoice_question', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'question', p_question));
+  if v_replay is not null then return v_replay; end if;
+  update public.invoice_questions set answered_at = coalesce(answered_at, now()), answered_by = coalesce(answered_by, v_actor)
+    where id = p_question and brewery_id = p_brewery returning * into v_row;
+  if v_row.id is null then raise exception 'question not found' using errcode = 'P0001'; end if;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- Team (Program 10 task 5). Roster with emails: definer only to reach
+-- auth.users; the caller must be staff of the brewery, and only that
+-- brewery's rows return. Role change and revoke are single-row writes that
+-- keep at least one admin; a revoke ends the membership and leaves the Auth
+-- user alone (re-invite is the compensation).
+create function list_team_members(p_brewery uuid)
+returns table (user_id uuid, email text, role public.staff_role, created_at timestamptz)
+language sql stable security definer set search_path = '' as $$
+  select bu.user_id, u.email::text, bu.role, bu.created_at
+    from public.brewery_users bu
+    join auth.users u on u.id = bu.user_id
+    where bu.brewery_id = p_brewery
+      and exists (select 1 from public.brewery_users me where me.brewery_id = p_brewery and me.user_id = auth.uid()
+                    and me.role = any (array['admin','sales','warehouse']::public.staff_role[]))
+    order by bu.role, u.email;
+$$;
+
+create function private.assert_not_last_admin(p_brewery uuid, p_user uuid) returns void
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if exists (select 1 from public.brewery_users where brewery_id = p_brewery and user_id = p_user and role = 'admin')
+     and (select count(*) from public.brewery_users where brewery_id = p_brewery and role = 'admin') = 1 then
+    raise exception 'keep at least one admin' using errcode = 'P0001';
+  end if;
+end $$;
+
+create function update_staff_role(p_brewery uuid, p_user uuid, p_role public.staff_role, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.brewery_users;
+begin
+  perform private.assert_staff(p_brewery, array['admin']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'update_staff_role', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'user', p_user, 'role', p_role));
+  if v_replay is not null then return v_replay; end if;
+  if p_role <> 'admin' then perform private.assert_not_last_admin(p_brewery, p_user); end if;
+  update public.brewery_users set role = p_role where brewery_id = p_brewery and user_id = p_user returning * into v_row;
+  if v_row.user_id is null then raise exception 'member not found'; end if;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+create function revoke_staff(p_brewery uuid, p_user uuid, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_actor uuid; v_row public.brewery_users;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'revoke_staff', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'user', p_user));
+  if v_replay is not null then return v_replay; end if;
+  if p_user = v_actor then raise exception 'you cannot remove yourself' using errcode = 'P0001'; end if;
+  perform private.assert_not_last_admin(p_brewery, p_user);
+  delete from public.brewery_users where brewery_id = p_brewery and user_id = p_user returning * into v_row;
+  if v_row.user_id is null then raise exception 'member not found'; end if;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- Brewery basics from Settings: one mutable row, admin only. The timezone
+-- must name a zone Postgres knows, so a typo never breaks every due date.
+create function update_brewery(
+  p_brewery uuid, p_name text, p_timezone text, p_ttb_registry_no text, p_pa_license_no text,
+  p_customer_phone text, p_reading_due_hours int, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.breweries;
+begin
+  perform private.assert_staff(p_brewery, array['admin']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'update_brewery', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'name', p_name, 'timezone', p_timezone, 'ttb', p_ttb_registry_no,
+      'pa', p_pa_license_no, 'phone', p_customer_phone, 'hours', p_reading_due_hours));
+  if v_replay is not null then return v_replay; end if;
+  if not exists (select 1 from pg_catalog.pg_timezone_names where name = p_timezone) then
+    raise exception 'unknown timezone %', p_timezone using errcode = 'P0001';
+  end if;
+  update public.breweries set name = p_name, timezone = p_timezone, ttb_registry_no = p_ttb_registry_no,
+    pa_license_no = p_pa_license_no, customer_phone = p_customer_phone, fermentation_reading_due_hours = p_reading_due_hours
+    where id = p_brewery returning * into v_row;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
@@ -4943,7 +5074,7 @@ begin
     'receipts','receipt_lines','material_counts','material_count_lines','orders','order_lines',
     'shipments','invoices','invoice_lines','pos_locations','pos_item_mappings','pos_sales',
     'brand_approvals','state_registrations','brewery_state_licenses','report_filings',
-    'routes','deliveries']
+    'routes','deliveries','invoice_questions']
   loop
     execute format('alter table %I enable row level security', t);
     execute format('create policy staff_read on %I for select using (public.is_staff_of(brewery_id))', t);
@@ -5004,6 +5135,7 @@ create policy customer_read on shipments for select
 create policy customer_read on invoices for select using (customer_id in (select my_customer_ids()));
 create policy customer_read on invoice_lines for select
   using (invoice_id in (select id from invoices where customer_id in (select my_customer_ids())));
+create policy customer_read on invoice_questions for select using (customer_id in (select my_customer_ids()));
 create policy customer_read on deliveries for select
   using (shipment_id in (select s.id from shipments s join orders o on o.id = s.order_id where o.customer_id in (select my_customer_ids())));
 create policy staff_read on order_events for select using (public.is_staff_of(brewery_id));
@@ -5437,13 +5569,29 @@ create view private.today_candidates with (security_invoker = true) as
     join vessels v on v.id = vo.vessel_id
     join breweries b on b.id = vo.brewery_id
     left join lateral (select max(fr.at) as at from fermentation_readings fr where fr.occupancy_id = vo.id) last on true
-    where vo.ended_at is null;
+    where vo.ended_at is null
+  union all
+  -- a buyer's open question about an invoice; Mark answered clears it
+  -- the row is one question: two open questions on one invoice are two rows,
+  -- so the subject is the question and only the href points at the invoice
+  select q.brewery_id, 'invoice_question', 'invoice', q.id::text,
+         md5(concat_ws('|', q.id, q.answered_at)),
+         'INV-' || lpad(i.invoice_no::text, 4, '0') || ' · ' || c.name,
+         'buyer asked: ' || left(q.body, 60),
+         null::timestamptz,
+         '/invoices/' || q.invoice_id,
+         array['admin','sales']::text[],
+         null::uuid
+    from invoice_questions q
+    join invoices i on i.id = q.invoice_id
+    join customers c on c.id = q.customer_id
+    where q.answered_at is null;
 grant select on private.today_candidates to service_role;
 
 -- Every reason has a live MGR page: /work/deliveries/<stop> (Program 8) and
 -- /cellar/<occupancy>/reading.
 create function today_live_reasons() returns text[]
-language sql immutable set search_path = '' as $$ select array['submitted_order','pick_due','restock_due','delivery_next','fermentation_reading_overdue'] $$;
+language sql immutable set search_path = '' as $$ select array['submitted_order','pick_due','restock_due','delivery_next','fermentation_reading_overdue','invoice_question'] $$;
 
 create function get_today_items(p_brewery uuid, p_now timestamptz default now())
 returns setof private.today_candidates
@@ -5954,7 +6102,7 @@ grant select on breweries, brewery_users, customer_users,
   volume_adjustments, fermentation_readings, material_movements, batch_additions, packaging_runs,
   lots, packaging_run_outputs, packaging_run_consumptions, material_contracts, purchase_orders,
   purchase_order_lines, receipts, receipt_lines, material_counts, material_count_lines, orders,
-  order_lines, order_events, shipments, invoices, invoice_lines, keg_events,
+  order_lines, order_events, shipments, invoices, invoice_lines, invoice_questions, keg_events,
   pos_locations, pos_item_mappings, pos_sales, brand_approvals, state_registrations,
   brewery_state_licenses, report_filings, routes, deliveries, qbo_connections, pos_connections
   to authenticated;
@@ -5993,6 +6141,12 @@ grant execute on function
   replace_format_components(uuid,uuid,jsonb,uuid),
   create_location(uuid,text,public.location_kind,uuid),
   update_location(uuid,uuid,text,public.location_kind,uuid),
+  update_brewery(uuid,text,text,text,text,text,int,uuid),
+  list_team_members(uuid),
+  update_staff_role(uuid,uuid,public.staff_role,uuid),
+  revoke_staff(uuid,uuid,uuid),
+  raise_invoice_question(uuid,uuid,text,uuid),
+  resolve_invoice_question(uuid,uuid,uuid),
   create_bin(uuid,uuid,text,uuid),
   update_bin(uuid,uuid,text,uuid),
   delete_bin(uuid,uuid,uuid),

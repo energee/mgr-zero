@@ -97,15 +97,17 @@ describe("schema rules", () => {
     // Table-level SELECT on breweries is shared by staff and customers
     // (both are `authenticated`); the customer path is a view projection
     // plus no customer SELECT policy on the base table.
+    // customer_phone joins the projection deliberately: it is the number the
+    // portal prints when online payment is unavailable (Program 10).
     expect(sql(`
       select attname from pg_attribute
       where attrelid = 'public.portal_brewery'::regclass
         and attnum > 0 and not attisdropped
       order by attnum
-    `)).toEqual(["id", "name", "timezone", "portal_fulfillment_location_id"]);
+    `)).toEqual(["id", "name", "timezone", "customer_phone", "portal_fulfillment_location_id"]);
     expect(sql(`
       select pg_get_function_result('public.portal_brewery_rows()'::regprocedure)
-    `)).toEqual(["TABLE(id uuid, name text, timezone text, portal_fulfillment_location_id uuid)"]);
+    `)).toEqual(["TABLE(id uuid, name text, timezone text, customer_phone text, portal_fulfillment_location_id uuid)"]);
     expect(sql(`
       select polname from pg_policy
       where polrelid = 'public.breweries'::regclass

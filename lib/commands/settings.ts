@@ -1,5 +1,6 @@
 // lib/commands/settings.ts — brewery-wide and per-person display preferences.
-// Today that is one setting: the unit a brewer reads and types gravity in.
+// The gravity unit a brewer reads and types in, and (Program 10) the
+// brewery basics Settings edits: get_brewery / update_brewery.
 // Gravity is STORED in degrees Plato everywhere and nothing here changes that
 // (Ted's ruling, 2026-09-07); these commands only decide what the screens
 // print and how a typed value is read back (lib/mgr/gravity-unit.ts does that
@@ -44,5 +45,30 @@ defineCommand({
   roles: STAFF_ROLES,
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_my_gravity_unit", {
     p_brewery: ctx.breweryId, p_unit: i.unit, p_request_id: execution.requestId,
+  })),
+});
+
+const BREWERY_COLUMNS = "id, name, timezone, ttb_registry_no, pa_license_no, customer_phone, fermentation_reading_due_hours, gravity_unit";
+
+defineQuery({
+  name: "get_brewery",
+  description: "The current brewery's basics: name, timezone, TTB registry number, PA license, customer-facing phone, reading-overdue hours and gravity unit",
+  input: z.object({}), roles: STAFF_ROLES,
+  handler: (ctx) => unwrap(ctx.db.from("breweries").select(BREWERY_COLUMNS).eq("id", ctx.breweryId).single()),
+});
+
+defineCommand({
+  name: "update_brewery",
+  description: "Edit the brewery's basics from Settings (admin): name, timezone, TTB registry number, PA license, the customer-facing phone the portal prints, and how many hours until a fermentation reading is overdue",
+  roles: ["admin"],
+  input: z.object({
+    name: z.string().trim().min(1), timezone: z.string().trim().min(1),
+    ttbRegistryNo: z.string().trim().optional(), paLicenseNo: z.string().trim().optional(), customerPhone: z.string().trim().optional(),
+    readingDueHours: z.number().int().min(1).max(168),
+  }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_brewery", {
+    p_brewery: ctx.breweryId, p_name: i.name, p_timezone: i.timezone, p_ttb_registry_no: i.ttbRegistryNo || null,
+    p_pa_license_no: i.paLicenseNo || null, p_customer_phone: i.customerPhone || null, p_reading_due_hours: i.readingDueHours,
+    p_request_id: execution.requestId,
   })),
 });

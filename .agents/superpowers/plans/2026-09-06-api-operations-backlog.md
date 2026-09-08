@@ -4,7 +4,7 @@
 
 # API operations backlog
 
-32 operations the screens declare they need that the command registry does not yet answer, against 145 that it does.
+26 operations the screens declare they need that the command registry does not yet answer, against 156 that it does.
 
 This is the backend push, scoped. Each row names the operation a screen asked for and the screens waiting on it, so an area can be built and shipped whole rather than a command at a time. `/docs/api` publishes the same list per area, marked designed, so an integrator sees the roadmap without being told a date.
 
@@ -49,30 +49,25 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `record_taproom_count` | command | Weekly count |
 | `swap_keg` | command | Tap board, Swap keg |
 | `tap_keg` | command | Tap board |
-## Orders & invoicing: 4 to build, 20 built
+## Orders & invoicing: 1 to build, 23 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
-| `list_invoice_questions` | query | Sales |
-| `raise_invoice_question` | command | Question invoice |
-| `resolve_invoice_question` | command | Invoice |
 | `write_off_invoice` | command | Invoices |
 ## Inventory & locations: 1 to build, 18 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
 | `reverse_inventory_movement` | command | SKU detail |
-## Team & brewery settings: 6 to build, 7 built
+## Team & brewery settings: 4 to build, 12 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
 | `get_brewery_operating_defaults` | query | Chat settings |
 | `provision_brewery` | command | Create brewery |
-| `revoke_staff` | command | Team, Team member |
 | `set_brewery_operating_defaults` | command | Chat settings |
-| `update_brewery` | command | Settings |
-| `update_staff_roles` | command | Team, Team member |
-## Today & notifications: 6 to build, 7 built
+| `update_staff_roles` | command | Team member |
+## Today & notifications: 5 to build, 10 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
@@ -80,5 +75,4 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `get_notification_occurrence` | query | Personal DM |
 | `get_notification_preferences` | query | Chat settings, Notification preferences |
 | `issue_chat_link_proof` | command | Link identity |
-| `search_entities` | query | Search, Entity picker |
 | `snooze_notification` | command | Personal DM, Notification preferences |

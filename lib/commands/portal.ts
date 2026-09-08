@@ -78,17 +78,18 @@ defineQuery({
 });
 
 defineQuery({
-  name: "portal_order", description: "Portal: one order with lines and its event history",
+  name: "portal_order", description: "Portal: one order with lines, its event history, and its shipment with that shipment's invoice once billed",
   roles: "customer",
   input: z.object({ orderId: z.string().uuid() }),
   handler: async (ctx, i) => {
     requireCustomer(ctx);
     const order = await unwrap(ctx.db.from("orders").select("*, ship_tos(label, city, state)").eq("id", i.orderId).single());
-    const [ln, events] = await Promise.all([
+    const [ln, events, shipment] = await Promise.all([
       unwrap(ctx.db.from("order_lines").select("*, skus(name)").eq("order_id", i.orderId)),
       unwrap(ctx.db.from("order_events").select().eq("order_id", i.orderId).order("created_at")),
+      unwrap(ctx.db.from("shipments").select("id, invoices(id, invoice_no, kind, paid_at, invoice_lines(amount_cents))").eq("order_id", i.orderId).maybeSingle()),
     ]);
-    return { order, lines: ln, events };
+    return { order, lines: ln, events, shipment };
   },
 });
 
@@ -119,18 +120,26 @@ defineQuery({
   },
 });
 
+defineCommand({
+  name: "raise_invoice_question", description: "Portal: ask the brewery about one of the caller's invoices; the question lands on the sales Today list and nothing on the invoice changes",
+  roles: "customer",
+  input: z.object({ invoiceId: z.string().uuid(), body: z.string().trim().min(1).max(2000) }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("raise_invoice_question", { p_brewery: ctx.breweryId, p_invoice: i.invoiceId, p_body: i.body, p_request_id: execution.requestId })),
+});
+
 defineQuery({
-  name: "portal_invoice", description: "Portal: one of the caller's invoices or credit memos with its lines and total; another customer's id is not found",
+  name: "portal_invoice", description: "Portal: one of the caller's invoices or credit memos with its lines, total, and the brewery's customer-facing phone for paying it; another customer's id is not found",
   roles: "customer",
   input: z.object({ invoiceId: z.string().uuid() }),
   handler: async (ctx, i) => {
     const customerId = requireCustomer(ctx);
     // RLS already scopes to the caller's customer; the customer_id filter makes a foreign id a plain not_found
-    const [invoice, lines] = await Promise.all([
+    const [invoice, lines, brewery] = await Promise.all([
       unwrap(ctx.db.from("invoices").select("id, invoice_no, kind, issued_on, due_on, paid_at").eq("id", i.invoiceId).eq("customer_id", customerId).single()),
       unwrap(ctx.db.from("invoice_lines").select("id, kind, qty, unit_price_cents, amount_cents, description, skus(name)").eq("invoice_id", i.invoiceId)),
+      unwrap(ctx.db.from("portal_brewery").select("name, customer_phone").eq("id", ctx.breweryId).single()),
     ]);
     const total_cents = (lines as { amount_cents: number }[]).reduce((n, l) => n + l.amount_cents, 0);
-    return { invoice: { ...invoice, total_cents }, lines };
+    return { invoice: { ...invoice, total_cents }, lines, brewery };
   },
 });

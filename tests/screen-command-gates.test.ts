@@ -4,25 +4,16 @@
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "@/components/mgr/screens";
 import { getCommandDefinition } from "@/lib/commands/registry";
+import { taggedOperations } from "@/lib/mgr/screen-routes";
 import "@/lib/commands/all";
 
 const TAGGED = /\[(SCHEMA-GATE|IMPLEMENTATION-GATE|client state|platform|view|[^\]]*design)/i;
 
-// The inventory tags a list once at its end ("create_bin · update_bin ·
-// delete_bin [SCHEMA-GATE …]"), so a part inherits the next tagged part's tag.
-function writeNames(writes: unknown): string[] {
-  if (typeof writes !== "string") return [];
-  const parts = writes.split("·").map((p) => p.trim());
-  const names: string[] = [];
-  let covered = false;
-  for (const part of [...parts].reverse()) {
-    if (/\[/.test(part)) covered = TAGGED.test(part);
-    if (covered) continue;
-    const name = part.match(/^([a-z_]+)/)?.[1];
-    if (name && name.includes("_")) names.push(name);
-  }
-  return names;
-}
+// The tag-inheritance rule (a list tagged once at its end covers every part
+// before it) lives in lib/mgr/screen-routes.ts, which the parity set needs it
+// for too; this file only decides which tags excuse a name from the registry.
+const writeNames = (writes: unknown) =>
+  taggedOperations(writes).filter((t) => !TAGGED.test(t.tag)).map((t) => t.name);
 
 describe("ungated screen writes", () => {
   it("are registered commands", () => {

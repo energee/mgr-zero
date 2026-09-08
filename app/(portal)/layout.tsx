@@ -6,20 +6,21 @@
 // rail's collapsed state round-trips through the sidebar_state cookie exactly
 // as in the staff layout.
 import { getActiveCustomer } from "@/lib/portal";
+import { getRequestIdentity } from "@/lib/auth/request-context";
 import { sidebarOpenFromCookie } from "@/lib/mgr/sidebar-state";
 import { BreweryProvider } from "@/app/(app)/brewery-provider";
 import { PortalShell } from "@/components/mgr/app-shell";
 import { MeSheet } from "@/components/mgr/me-sheet";
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
-  const [customer, sidebarOpen] = await Promise.all([getActiveCustomer(), sidebarOpenFromCookie()]);
+  const [customer, sidebarOpen, identity] = await Promise.all([getActiveCustomer(), sidebarOpenFromCookie(), getRequestIdentity()]);
   return (
     <BreweryProvider id={customer.breweryId}>
       <PortalShell
         brand={customer.customerName}
         sidebarOpen={sidebarOpen}
         headerRight={
-          <MeSheet fields={[["Account", customer.customerName]]} />
+          <MeSheet fields={[["Signed in as", identity?.email ?? ""], ["Account", customer.customerName]]} signOut="outline" />
         }
       >
         {children}

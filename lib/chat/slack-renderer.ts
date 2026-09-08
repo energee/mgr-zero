@@ -41,7 +41,7 @@ const openPathFor = (n: PortableNotification) =>
 
 const REASON_LABEL: Record<PortableNotification["reason"], string> = {
   submitted_order: "Review submitted order", pick_due: "Pick due", restock_due: "Put back staged beer", delivery_next: "Next stop",
-  fermentation_reading_overdue: "Reading overdue", operations_digest: "Operations",
+  fermentation_reading_overdue: "Reading overdue", invoice_question: "Buyer asked about an invoice", operations_digest: "Operations",
 };
 
 type MessageOptions = { mgrBaseUrl: string; intentId: string; resolved?: boolean };

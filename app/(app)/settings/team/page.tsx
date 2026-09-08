@@ -1,49 +1,29 @@
-// app/(app)/settings/team/page.tsx — staff roster (read-only; invitations are
-// not available in this release — audit P1.9). Reads
-// through the command registry (list_team_members) with a brewery-scoped Ctx.
-// auth.users is not readable under RLS, so rows show role + user_id only; full
-// member management (remove, change role) is out of scope for this pass.
+// app/(app)/settings/team/page.tsx — Team (screen record): the roster as
+// @handles from list_team_members, your own row marked "you", every other row
+// opening the Team member sheet (member-form.tsx). Invite staff stays gated
+// until Program 11 closes the invitation workflow gate (ARCHITECTURE.md).
+import { redirect } from "next/navigation";
+import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
+import type { TeamMember } from "@/lib/commands/invites";
 import { runCommand } from "@/lib/commands/registry";
+import { getRequestIdentity } from "@/lib/auth/request-context";
+import { deniedHref } from "@/lib/mgr/denied";
 import "@/lib/commands/all";
-
-type Membership = { user_id: string; role: string };
+import { MemberForm } from "./member-form";
 
 export default async function TeamPage() {
-  const brewery = await getActiveBrewery();
-  const ctx = await buildContext(brewery.id);
-  const members = (await runCommand("list_team_members", {}, ctx)) as Membership[];
-
+  const [brewery, identity] = await Promise.all([getActiveBrewery(), getRequestIdentity()]);
+  if (brewery.role !== "admin") redirect(deniedHref("Team", ["admin"]));
+  const members = (await runCommand("list_team_members", {}, await buildContext(brewery.id))) as TeamMember[];
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-xl font-semibold">Team</h1>
-
-      <p className="text-sm text-muted-foreground">
-        Emails aren&apos;t shown here — Supabase auth data isn&apos;t readable under
-        row-level security, so each row below is identified by user id and role only.
-      </p>
-
-      {members.length ? (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-muted-foreground">
-              <th className="py-1 font-normal">User ID</th>
-              <th className="py-1 font-normal">Role</th>
-            </tr>
-          </thead>
-          <tbody>
-            {members.map((m) => (
-              <tr key={m.user_id} className="border-t">
-                <td className="py-1 font-mono text-xs">{m.user_id}</td>
-                <td className="py-1">{m.role}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <p className="text-sm text-muted-foreground">No staff members yet.</p>
-      )}
-    </div>
+    <>
+      {E.back("Settings", "Team", undefined, "/settings")}
+      {members.map((m) => m.userId === identity?.userId
+        ? <div key={m.userId}>{E.row(m.handle, `${m.email} · ${m.role}`, "you")}</div>
+        : <MemberForm key={m.userId} member={m} />)}
+      {E.gated("Invite staff", "invitations aren’t available yet")}
+    </>
   );
 }

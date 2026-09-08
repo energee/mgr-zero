@@ -5,6 +5,8 @@ import { createServerClient } from "@/lib/supabase/server";
 
 export interface RequestIdentity {
   userId: string;
+  /** From the session claims; the Me sheet prints it. */
+  email: string | null;
 }
 
 export interface StaffMembership {
@@ -57,7 +59,8 @@ export function createRequestAuthContext(createClient: RequestClientFactory = cr
     const { data, error } = await db.auth.getClaims();
     const userId = data?.claims.sub;
     if (error || typeof userId !== "string") return null;
-    return { userId };
+    const email = data?.claims.email;
+    return { userId, email: typeof email === "string" ? email : null };
   })());
   const getStaffMemberships = () => (staffMemberships ??= (async () => {
     const requestIdentity = await getIdentity();

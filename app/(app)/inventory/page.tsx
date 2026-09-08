@@ -1,8 +1,9 @@
-// app/(app)/inventory/page.tsx — on-hand/ATP inventory + movement log. All
-// reads go through the command registry with a brewery-scoped Ctx (one
-// implementation of each read, shared with the future AI surface). Failures
-// throw to the (app) error boundary. On hand is shown per bin (get_bin_on_hand);
-// ATP stays per SKU.
+// app/(app)/inventory/page.tsx — Finished goods (screen record): sellable
+// beer by SKU with on hand, allocated and ATP together on each row, then the
+// movement ledger (Movement recorded). Record movement opens
+// movement-form.tsx, the one append-only inventory write; on hand is read at
+// bin grain (get_bin_on_hand) and summed per SKU here.
+import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
@@ -17,103 +18,37 @@ type BinOnHandRow = { sku_id: string; location_id: string; bin_id: string; qty: 
 type AtpRow = { sku_id: string; qty: string };
 type Movement = { id: string; created_at: string; type: string; qty: string; sku_id: string; location_id: string; note: string | null };
 
-function skuLabel(sku: Sku | undefined) {
-  if (!sku) return "—";
-  return sku.brands?.name ? `${sku.brands.name} — ${sku.name}` : sku.name;
-}
+const skuLabel = (sku: Sku | undefined) => (!sku ? "—" : sku.brands?.name ? `${sku.brands.name} · ${sku.name}` : sku.name);
+const sum = (rows: { sku_id: string; qty: string }[]) => rows.reduce((m, r) => m.set(r.sku_id, (m.get(r.sku_id) ?? 0) + Number(r.qty)), new Map<string, number>());
 
 export default async function InventoryPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const [skus, locations, bins, channels, onHand, atp, movements] = (await Promise.all([
-    runCommand("list_skus", {}, ctx),
-    runCommand("list_locations", {}, ctx),
-    runCommand("list_bins", {}, ctx),
-    runCommand("list_sale_channels", {}, ctx),
-    runCommand("get_bin_on_hand", {}, ctx),
-    runCommand("get_atp", {}, ctx),
-    runCommand("list_movements", { limit: 50 }, ctx),
+    runCommand("list_skus", {}, ctx), runCommand("list_locations", {}, ctx), runCommand("list_bins", {}, ctx), runCommand("list_sale_channels", {}, ctx),
+    runCommand("get_bin_on_hand", {}, ctx), runCommand("get_atp", {}, ctx), runCommand("list_movements", { limit: 50 }, ctx),
   ])) as [Sku[], Location[], Bin[], SaleChannel[], BinOnHandRow[], AtpRow[], Movement[]];
-
   const skuById = new Map(skus.map((s) => [s.id, s]));
   const locationById = new Map(locations.map((l) => [l.id, l.name]));
-  const binById = new Map(bins.map((b) => [b.id, b.name]));
   const locationName = (id: string) => locationById.get(id) ?? "—";
-  const binName = (id: string) => binById.get(id) ?? "—";
-  const atpBySku = new Map(atp.map((a) => [a.sku_id, a.qty]));
-
+  const have = sum(onHand);
+  const atpBySku = new Map(atp.map((a) => [a.sku_id, Number(a.qty)]));
+  const stocked = skus.filter((s) => have.has(s.id) || atpBySku.has(s.id));
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Inventory</h1>
-        <MovementForm skus={skus.map((s) => ({ id: s.id, label: skuLabel(s) }))} locations={locations} bins={bins} channels={channels} />
-      </div>
-
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium text-muted-foreground">On hand</h2>
-        {onHand.length ? (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-muted-foreground">
-                <th className="py-1 font-normal">SKU</th>
-                <th className="py-1 font-normal">Location</th>
-                <th className="py-1 font-normal">Bin</th>
-                <th className="py-1 font-normal">On hand</th>
-                <th className="py-1 font-normal">ATP</th>
-              </tr>
-            </thead>
-            <tbody>
-              {onHand.map((row) => (
-                <tr key={`${row.sku_id}-${row.bin_id}`} className="border-t">
-                  <td className="py-1">{skuLabel(skuById.get(row.sku_id))}</td>
-                  <td className="py-1">{locationName(row.location_id)}</td>
-                  <td className="py-1">{binName(row.bin_id)}</td>
-                  <td className="py-1">{row.qty}</td>
-                  <td className="py-1">{atpBySku.get(row.sku_id) ?? "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <p className="text-sm text-muted-foreground">No inventory recorded yet.</p>
-        )}
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium text-muted-foreground">Movement log</h2>
-        {movements.length ? (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-muted-foreground">
-                <th className="py-1 font-normal">When</th>
-                <th className="py-1 font-normal">Type</th>
-                <th className="py-1 font-normal">SKU</th>
-                <th className="py-1 font-normal">Location</th>
-                <th className="py-1 font-normal">Qty</th>
-                <th className="py-1 font-normal">Note</th>
-              </tr>
-            </thead>
-            <tbody>
-              {movements.map((m) => (
-                <tr key={m.id} className="border-t">
-                  <td className="py-1">{new Date(m.created_at).toLocaleString()}</td>
-                  <td className="py-1">
-                    <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium">{m.type}</span>
-                  </td>
-                  <td className="py-1">{skuLabel(skuById.get(m.sku_id))}</td>
-                  <td className="py-1">{locationName(m.location_id)}</td>
-                  <td className={`py-1 ${Number(m.qty) < 0 ? "text-red-600" : "text-green-700"}`}>
-                    {Number(m.qty) > 0 ? `+${m.qty}` : m.qty}
-                  </td>
-                  <td className="py-1 text-muted-foreground">{m.note ?? "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <p className="text-sm text-muted-foreground">No movements recorded yet.</p>
-        )}
-      </section>
-    </div>
+    <>
+      {E.back("Beer", "Finished goods", <MovementForm skus={skus.map((s) => ({ id: s.id, label: skuLabel(s) }))} locations={locations} bins={bins} channels={channels} />, "/beer")}
+      {stocked.length === 0
+        ? E.blank("No finished goods yet")
+        : stocked.map((s) => {
+            const on = have.get(s.id) ?? 0, a = atpBySku.get(s.id) ?? on, allocated = on - a;
+            return <div key={s.id}>{E.row(skuLabel(s), `${on} on hand · ${allocated} allocated · ATP ${a}`, a < 0 ? E.act("Shortfall", "attention", "/replenishment") : "", a < 0 ? "w" : "")}</div>;
+          })}
+      {E.ttl("Movements")}
+      {movements.length === 0
+        ? E.blank("No movements recorded yet")
+        : movements.map((m) => (
+            <div key={m.id}>{E.row(`${Number(m.qty) > 0 ? "+" : ""}${m.qty} ${skuLabel(skuById.get(m.sku_id))}`, `${m.type.replace(/_/g, " ")} · ${locationName(m.location_id)}${m.note ? ` · ${m.note}` : ""}`, new Date(m.created_at).toLocaleDateString(), Number(m.qty) < 0 ? "w" : "ok")}</div>
+          ))}
+    </>
   );
 }
