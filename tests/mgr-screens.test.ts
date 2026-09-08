@@ -527,7 +527,8 @@ describe("SCREENS", () => {
     const format = body("Format");
     expect(format).toContain('aria-label="Volume"');
     expect(format).toMatch(/data-slot="input-group"[\s\S]*aria-label="Volume"[\s\S]*role="tablist"/);
-    expect(format).toMatch(/role="radiogroup"[^>]*>[\s\S]*packaged[\s\S]*poured/);
+    expect(format).toContain(">packaged</dd>");
+    expect(format).toContain("New pour beside its brand in Catalog");
     expect(format).toMatch(/role="tablist"[^>]*>[\s\S]*oz[\s\S]*gal[\s\S]*bbl/);
     for (const unit of ["oz", "gal", "bbl"]) expect.soft(format, unit).toContain(`>${unit}</button>`);
     for (const unit of ["mL", "L"]) expect.soft(format, unit).not.toContain(`>${unit}</button>`);

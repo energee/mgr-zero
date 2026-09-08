@@ -40,16 +40,21 @@ defineCommand({
 // typed. A poured format holds no stock and carries no package facts.
 const KEG_SIZES = ["half_bbl", "quarter_bbl", "sixth_bbl", "fifty_l", "thirty_l", "twenty_l"] as const;
 defineCommand({
-  name: "upsert_format", description: "Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) or poured (a glass, never stock)",
+  name: "upsert_format", description: "Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) or poured (brandId and positive finite ounces required; no package facts, never stock)",
   input: z.object({
     id: z.string().uuid().optional(), name: z.string().trim().min(1), basis: z.enum(["packaged", "poured"]),
     packageType: z.enum(["keg", "can", "bottle"]).optional(), kegSize: z.enum(KEG_SIZES).optional(),
     unitsPerCase: z.number().int().positive().optional(), bblPerUnit: z.number().positive().optional(),
-  }),
+    brandId: z.string().uuid().optional(), ounces: z.number().finite().positive().optional(),
+  }).refine((i) => i.basis === "poured"
+    ? i.brandId !== undefined && i.ounces !== undefined && [i.packageType, i.kegSize, i.unitsPerCase, i.bblPerUnit].every((v) => v === undefined)
+    : i.brandId === undefined && i.ounces === undefined,
+  { message: "Pours require a brand and positive ounces, with no package facts; packaged formats cannot have a brand or ounces" }),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_format", {
     p_brewery: ctx.breweryId, p_id: i.id ?? null, p_name: i.name, p_basis: i.basis, p_package_type: i.packageType ?? null,
     p_keg_size: i.kegSize ?? null, p_units_per_case: i.unitsPerCase ?? null, p_bbl_per_unit: i.bblPerUnit ?? null, p_request_id: execution.requestId,
+    ...(i.basis === "poured" ? { p_brand: i.brandId, p_ounces: i.ounces } : {}),
   })),
 });
 
@@ -72,12 +77,15 @@ defineCommand({
 });
 
 defineQuery({
-  name: "list_formats", description: "Formats, alphabetical, packaged and poured",
-  input: z.object({ basis: z.enum(["packaged", "poured"]).optional() }), roles: ["admin", "sales", "warehouse", "taproom"],
+  name: "list_formats", description: "Formats with brand context, alphabetical; brandId filters a complete brand-owned pour list",
+  input: z.object({ basis: z.enum(["packaged", "poured"]).optional(), brandId: z.string().uuid().optional() }), roles: ["admin", "sales", "warehouse", "taproom"],
   handler: (ctx, i) => {
-    let q = ctx.db.from("formats").select().eq("brewery_id", ctx.breweryId).order("name");
-    if (i.basis) q = q.eq("basis", i.basis);
-    return unwrap(q);
+    return completeFormatRows((start) => {
+      let q = ctx.db.from("formats").select("*, brands(name)", { count: "exact" }).eq("brewery_id", ctx.breweryId).order("name").order("id");
+      if (i.basis) q = q.eq("basis", i.basis);
+      if (i.brandId) q = q.eq("brand_id", i.brandId);
+      return q.range(start, start + 499);
+    });
   },
 });
 
@@ -244,7 +252,7 @@ defineQuery({
   name: "get_format_composition", description: "One format with its components, packaging BOM, atomic child options, and material names and base units",
   input: z.object({ formatId: z.string().uuid() }), roles: ["admin", "sales", "warehouse"],
   handler: async (ctx, i) => {
-    const format = await unwrap(ctx.db.from("formats").select().eq("brewery_id", ctx.breweryId).eq("id", i.formatId).maybeSingle());
+    const format = await unwrap(ctx.db.from("formats").select("*, brands(name)").eq("brewery_id", ctx.breweryId).eq("id", i.formatId).maybeSingle());
     if (!format) throw new CommandError("Format not found", 404, "not_found");
     const [components, lines, formats, materials, parents] = await Promise.all([
       completeFormatRows((start) => ctx.db.from("format_components").select("child_format_id, qty", { count: "exact" }).eq("brewery_id", ctx.breweryId).eq("parent_format_id", i.formatId).order("child_format_id").range(start, start + 499)),

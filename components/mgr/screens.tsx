@@ -3382,11 +3382,11 @@ export const SCREENS: Screen[] = [
     job: "Enter volume once on an atomic format and derive every shape above it",
     reads: "list_formats · get_format_composition",
     writes: "upsert_format · replace_format_components [one RPC replaces the child set] · replace_format_bom [one RPC replaces the bill; formats, format_components and format_bom superseded skus.bbl_per_unit and sku_bom]",
-    states: [["permission", "sales or admin required", 1], ["atomic", "owns one volume entered in an allowed unit"], ["children missing", "a composed format cannot be created before its children", 1], ["poured", "never holds stock · a ratio back to the keg"], ["in use", "editing a format never moves frozen movement bbl"]],
-    spec: "Volume is the basis of all TTB math, so exactly one atomic Format owns it. The input receives its allowed units per instance: US beer packages offer oz, gal and bbl; metric formats may offer mL and L. The server converts the entry to canonical bbl. Composed formats compute volume from their children, which is also what makes repack (§16.10) validated rather than asserted. The basis says only whether the shape holds stock. Each BOM line's on-break disposition is what the repack sheet reads.",
+    states: [["permission", "sales or admin required", 1], ["atomic", "owns one volume entered in an allowed unit"], ["children missing", "a composed format cannot be created before its children", 1], ["poured", "brand-owned name and positive ounces · never holds stock"], ["in use", "editing a format never moves frozen movement bbl"]],
+    spec: "Volume is the basis of all TTB math, so exactly one atomic Format owns it. The input receives its allowed units per instance: US beer packages offer oz, gal and bbl; metric formats may offer mL and L. The server converts the entry to canonical bbl. Composed formats compute volume from their children, which is also what makes repack (§16.10) validated rather than asserted. Poured formats belong to a brand with a name and positive ounces; they have no package facts, components or BOM. Create and edit them under the brand in Catalog. Packaged names are unique per brewery; poured names per brand. Each BOM line's on-break disposition is what the repack sheet reads.",
     body: (<>
       {E.back("Settings", "Formats", E.btn("Add format"))}
-      {E.tbl(["Format", "Basis", "Volume", "From"], [["16 oz can", "packaged", formatVolume("0.00403226"), "unit"], ["four-pack", "packaged", formatVolume("0.01612903"), "4 × can"], ["case · 24×16oz", "packaged", formatVolume("0.09677419"), "6 × four-pack"], ["½ bbl keg", "packaged", formatVolume("0.50000000"), "unit"], ["pint", "poured", formatVolume("0.00403226"), "1/124 × ½ bbl"]])}
+      {E.tbl(["Format", "Basis", "Volume", "From"], [["16 oz can", "packaged", formatVolume("0.00403226"), "unit"], ["four-pack", "packaged", formatVolume("0.01612903"), "4 × can"], ["case · 24×16oz", "packaged", formatVolume("0.09677419"), "6 × four-pack"], ["½ bbl keg", "packaged", formatVolume("0.50000000"), "unit"], ["Hazy IPA · Pint", "poured", "16 oz", "Hazy IPA"]])}
     </>),
   },
   {
@@ -3402,7 +3402,8 @@ export const SCREENS: Screen[] = [
     states: [["permission", "sales or admin required", 1], ["atomic", "volume unit choices are set by this input"], ["composed", "volume derives from child formats"]],
     body: (<>
       {E.edit("Format name", "16 oz can")}
-      {E.chips(["packaged", "poured"], 0, true)}
+      {E.fld("Basis", "packaged")}
+      {E.info("Create a brand-owned glass using New pour beside its brand in Catalog.")}
       {E.pick("Package", "can", ["can", "bottle", "keg"])}
       {E.volume("16", ["oz", "gal", "bbl"])}
       {E.info("Composed formats show a derived, read-only Volume instead.")}

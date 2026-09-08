@@ -13,7 +13,7 @@ import { money } from "@/lib/mgr/money";
 import { PriceCellForm } from "./price-cell-form";
 import { GroupForm, type PriceGroupEditData } from "./group-form";
 
-type Row = { id: string; name: string };
+type Row = { id: string; name: string; brands?: { name: string } | null };
 type Cell = { sale_channel_id: string; price_group_id: string; format_id: string; unit_price_cents: number };
 
 export default async function PricingPage() {
@@ -33,7 +33,7 @@ export default async function PricingPage() {
         <div key={channel.id}>
           {E.ttl(channel.name)}
           <div className="min-w-0 overflow-x-auto">
-            {E.tbl(["Group", ...formats.map((f) => f.name)], groups.map((group) => [
+            {E.tbl(["Group", ...formats.map((f) => f.brands ? `${f.brands.name} · ${f.name}` : f.name)], groups.map((group) => [
               <GroupForm key={group.id} group={group} />,
               ...formats.map((f) => {
                 const cell = byKey.get(`${channel.id}|${group.id}|${f.id}`);

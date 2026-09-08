@@ -55,6 +55,17 @@
 
 ---
 
+### Brand-owned pours (before tap intervals)
+
+Use existing `formats`, `upsert_format`, `list_formats`, and Catalog forms.
+Poured rows require same-tenant `brand_id`, name and positive finite ounces;
+all package facts are null. Names are unique per brand, while packaged names
+remain unique per brewery. Pours cannot be SKUs, components or BOMs. Brand
+filtering returns the complete pour vocabulary under RLS. Admin/Sales keep
+catalog writes; Taproom only reads. Catalog creates/edits pours under their
+brand; global New Format creates packages. No fixed keg-format ratio or
+second format identity table (§16.16 decision 2).
+
 ### Task 2: Variance report
 
 **Files:** view `taproom_variance` + query `get_taproom_variance`

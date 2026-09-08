@@ -3119,11 +3119,12 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, taproom
 
-Formats, alphabetical, packaged and poured
+Formats with brand context, alphabetical; brandId filters a complete brand-owned pour list
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `basis` | packaged or poured | no |
+| `brandId` | uuid | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -3264,7 +3265,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) or poured (a glass, never stock)
+Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) or poured (brandId and positive finite ounces required; no package facts, never stock)
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -3275,6 +3276,8 @@ Create or edit a format: packaged (holds stock; atomic ones carry bbl_per_unit) 
 | `kegSize` | half_bbl or quarter_bbl or sixth_bbl or fifty_l or thirty_l or twenty_l | no |
 | `unitsPerCase` | integer | no |
 | `bblPerUnit` | number | no |
+| `brandId` | uuid | no |
+| `ounces` | number | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

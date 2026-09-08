@@ -93,7 +93,7 @@ export async function seedCatalog(
     .insert({ brewery_id: breweryId, name: opts.product ?? "IPA" }).select("id").single();
   if (be) throw be;
   const formatName = opts.format ?? `${opts.packageType ?? "can"} ${opts.bblPerUnit ?? 0.0645} bbl`;
-  const existing = await admin.from("formats").select("id").eq("brewery_id", breweryId).eq("name", formatName).maybeSingle();
+  const existing = await admin.from("formats").select("id").eq("brewery_id", breweryId).eq("name", formatName).eq("basis", "packaged").maybeSingle();
   const { data: f, error: fe } = existing.data ? { data: existing.data, error: null } : await admin.from("formats").insert({
     brewery_id: breweryId, name: formatName, basis: "packaged",
     package_type: opts.packageType ?? "can", keg_size: opts.packageType === "keg" ? "half_bbl" : null, bbl_per_unit: opts.bblPerUnit ?? 0.0645,

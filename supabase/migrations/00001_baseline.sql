@@ -309,18 +309,25 @@ create table brands (
 create table formats (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
-  name text not null,
+  name text not null check (length(btrim(name)) > 0),
   basis format_basis not null,
+  brand_id uuid,
+  ounces numeric,
   package_type package_type,                -- container; null for poured
   keg_size keg_size,
   units_per_case int check (units_per_case > 0),
   bbl_per_unit numeric(12,8) check (bbl_per_unit > 0),   -- atomic packaged only
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
-  unique (brewery_id, name),
+  foreign key (brand_id, brewery_id) references brands (id, brewery_id),
+  check ((basis = 'poured' and brand_id is not null and ounces is not null
+          and ounces > 0 and ounces < 'Infinity'::numeric)
+      or (basis = 'packaged' and brand_id is null and ounces is null)),
   check (basis = 'packaged' or (bbl_per_unit is null and package_type is null and keg_size is null and units_per_case is null)),
   check (package_type = 'keg' or keg_size is null)
 );
+create unique index formats_packaged_name_idx on formats (brewery_id, name) where basis = 'packaged';
+create unique index formats_poured_name_idx on formats (brewery_id, brand_id, name) where basis = 'poured';
 create index formats_brewery_idx on formats (brewery_id, basis);
 
 -- Formats compose one level (§16.2a): a case is six four-packs. Only atomic
@@ -407,6 +414,46 @@ create table format_bom (
   foreign key (material_id, brewery_id) references materials (id, brewery_id)
 );
 create index format_bom_material_idx on format_bom (material_id);
+
+-- A pour can never acquire stock/package relationships, including direct SQL
+-- and a later basis edit. Lock the referenced formats against concurrent edits.
+create function private.require_packaged_format() returns trigger
+language plpgsql set search_path = '' as $$
+declare v_id uuid; v_ids uuid[]; v_basis public.format_basis;
+begin
+  if tg_table_name = 'format_components' then
+    v_ids := array[new.parent_format_id, new.child_format_id];
+  else
+    v_ids := array[new.format_id];
+  end if;
+  for v_id in select distinct x from unnest(v_ids) x order by x loop
+    select basis into v_basis from public.formats where id = v_id and brewery_id = new.brewery_id for share;
+    if v_basis is distinct from 'packaged'::public.format_basis then
+      raise exception 'only a packaged format can be used by a SKU, component or BOM';
+    end if;
+  end loop;
+  return new;
+end $$;
+create trigger skus_packaged before insert or update of format_id, brewery_id on skus
+  for each row execute function private.require_packaged_format();
+create trigger components_packaged before insert or update on format_components
+  for each row execute function private.require_packaged_format();
+create trigger bom_packaged before insert or update on format_bom
+  for each row execute function private.require_packaged_format();
+
+create function private.guard_format_basis() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if new.basis = 'poured' and old.basis <> new.basis and (
+    exists (select 1 from public.skus where format_id = old.id)
+    or exists (select 1 from public.format_components where parent_format_id = old.id or child_format_id = old.id)
+    or exists (select 1 from public.format_bom where format_id = old.id)) then
+    raise exception 'a format in use by a SKU, component or BOM must stay packaged';
+  end if;
+  return new;
+end $$;
+create trigger formats_basis before update of basis on formats
+  for each row execute function private.guard_format_basis();
 
 -- ---------------------------------------------------------------- FG ledger
 create table locations (
@@ -2834,21 +2881,24 @@ end $$;
 
 create function upsert_format(
   p_brewery uuid, p_id uuid, p_name text, p_basis public.format_basis, p_package_type public.package_type,
-  p_keg_size public.keg_size, p_units_per_case int, p_bbl_per_unit numeric, p_request_id uuid
+  p_keg_size public.keg_size, p_units_per_case int, p_bbl_per_unit numeric, p_request_id uuid,
+  p_brand uuid default null, p_ounces numeric default null
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_replay jsonb; v_row public.formats;
 begin
   perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'upsert_format', p_request_id,
     jsonb_build_object('brewery', p_brewery, 'id', p_id, 'name', p_name, 'basis', p_basis, 'package_type', p_package_type,
-                       'keg_size', p_keg_size, 'units_per_case', p_units_per_case, 'bbl_per_unit', p_bbl_per_unit));
+                       'keg_size', p_keg_size, 'units_per_case', p_units_per_case, 'bbl_per_unit', p_bbl_per_unit)
+      || case when p_basis = 'poured' or p_brand is not null or p_ounces is not null
+           then jsonb_build_object('brand', p_brand, 'ounces', p_ounces) else '{}'::jsonb end);
   if v_replay is not null then return v_replay; end if;
   if p_id is null then
-    insert into public.formats (brewery_id, name, basis, package_type, keg_size, units_per_case, bbl_per_unit)
-    values (p_brewery, p_name, p_basis, p_package_type, p_keg_size, p_units_per_case, p_bbl_per_unit) returning * into v_row;
+    insert into public.formats (brewery_id, name, basis, package_type, keg_size, units_per_case, bbl_per_unit, brand_id, ounces)
+    values (p_brewery, p_name, p_basis, p_package_type, p_keg_size, p_units_per_case, p_bbl_per_unit, p_brand, p_ounces) returning * into v_row;
   else
     update public.formats set name = p_name, basis = p_basis, package_type = p_package_type, keg_size = p_keg_size,
-      units_per_case = p_units_per_case, bbl_per_unit = p_bbl_per_unit
+      units_per_case = p_units_per_case, bbl_per_unit = p_bbl_per_unit, brand_id = p_brand, ounces = p_ounces
     where id = p_id and brewery_id = p_brewery returning * into v_row;
     if v_row.id is null then raise exception 'format not found'; end if;
   end if;
@@ -3391,6 +3441,9 @@ begin
   if v_replay is not null then return v_replay; end if;
   perform 1 from public.formats where id = p_format and brewery_id = p_brewery for update;
   if not found then raise exception 'format not found'; end if;
+  if exists (select 1 from public.formats where id = p_format and basis <> 'packaged') then
+    raise exception 'only a packaged format has a BOM';
+  end if;
   delete from public.format_bom where format_id = p_format;
   for l in select (e->>'material_id')::uuid as material_id, (e->>'qty_per_unit')::numeric as qty,
                   coalesce(e->>'on_break', 'consumed')::public.format_material_disposition as on_break
@@ -6674,7 +6727,7 @@ grant execute on function
   create_sku(uuid,uuid,uuid,text,text,uuid),
   update_sku(uuid,uuid,boolean,text,uuid),
   upsert_brand(uuid,uuid,text,text,numeric,text,text,uuid,text,uuid),
-  upsert_format(uuid,uuid,text,public.format_basis,public.package_type,public.keg_size,int,numeric,uuid),
+  upsert_format(uuid,uuid,text,public.format_basis,public.package_type,public.keg_size,int,numeric,uuid,uuid,numeric),
   replace_format_components(uuid,uuid,jsonb,uuid),
   create_location(uuid,text,public.location_kind,uuid),
   update_location(uuid,uuid,text,public.location_kind,uuid),
