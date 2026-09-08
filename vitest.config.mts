@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from "node:fs";
+import { resolveTestEnv } from "./scripts/test-env.mjs";
 import { defineConfig } from "vitest/config";
 import { loadEnv } from "vite";
 import { createRequire } from "node:module";
@@ -21,6 +23,7 @@ export default defineConfig({
     fileParallelism: false,
     // Mode "test" layers .env.test.local (written by scripts/test-db.sh: the
     // throwaway stack on 5435x) over .env.local (the app stack next dev uses).
-    env: loadEnv("test", process.cwd(), ""),
+    env: resolveTestEnv(loadEnv("test", projectRoot, ""),
+      existsSync(path.join(projectRoot, ".env.test.local")) ? readFileSync(path.join(projectRoot, ".env.test.local"), "utf8") : undefined),
   },
 });

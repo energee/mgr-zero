@@ -155,12 +155,11 @@ Tests run against a real local Supabase stack (not a mock), but **their own
 throwaway one**: `bash scripts/test-db.sh` starts a second stack (project
 `mgr_test`, config in `tests/supabase/`, API 54351 / DB 54352, same baseline
 via a migrations symlink), resets its database, and writes `.env.test.local`,
-which vitest loads over `.env.local`. Re-run the script after editing
+which vitest pins over inherited Bun/app settings. Local tests fail before setup unless this file names localhost ports 54351/54352 and test credentials. Re-run the script after editing
 `supabase/migrations/00001_baseline.sql`. The app stack (`bunx supabase start`,
 5434x) is never touched by tests, so the brewery you are clicking in `next dev`
 survives a test run and stale test rows (see `chat-jobs`) cannot pile up there.
-Without `.env.test.local`, vitest falls back to the app stack, as CI does with
-its single fresh one.
+Without `.env.test.local`, local vitest refuses to run. CI keeps its separately provisioned disposable configuration.
 
 ## Deployment
 
