@@ -1,21 +1,23 @@
-// lib/commands/import.ts — `import_csv` is registered but fails closed
-// (audit P1.9). The name, role gate, and input contract stay so a direct
-// /api/command post is a controlled CommandError rather than an unknown
-// command; the handler never reaches the database. The per-kind importers
-// that routed rows through the upsert_*/set_channel_price RPCs live in git history
-// (071a0a4) for when bulk import is re-approved.
 import { z } from "zod";
-import { defineCommand, CommandError } from "./registry";
-
-export const IMPORT_ROW_CAP = 5000;
+import { defineCommand, unwrap } from "./registry";
+import { IMPORT_KINDS, IMPORT_ROW_CAP, validateImportRow, type ImportOutcome } from "@/lib/import-csv";
+export { IMPORT_ROW_CAP } from "@/lib/import-csv";
 
 defineCommand({
   name: "import_csv",
-  description: "Bulk CSV import (not available in this release)",
-  input: z.object({
-    kind: z.enum(["customers", "ship_tos", "products_skus", "channel_prices", "opening_balances"]),
-    rows: z.array(z.record(z.string(), z.string())).max(IMPORT_ROW_CAP, `at most ${IMPORT_ROW_CAP} rows per import batch`),
-  }),
+  description: "Import CSV customers, ship-tos, brand/SKUs, channel prices or opening balances; each row commits independently and the same requestId safely replays the exact batch",
+  input: z.object({ kind: z.enum(IMPORT_KINDS), rows: z.array(z.record(z.string(), z.string())).min(1).max(IMPORT_ROW_CAP) }),
   roles: ["admin"],
-  handler: async () => { throw new CommandError("CSV import is not available in this release"); },
+  handler: async (ctx, input, execution) => {
+    await unwrap(ctx.db.rpc("begin_csv_import", { p_brewery: ctx.breweryId, p_kind: input.kind, p_rows: input.rows, p_request_id: execution.requestId }));
+    const outcomes: ImportOutcome[] = [];
+    // atomic-exempt: independent CSV rows; every dependent write within a row shares one RPC transaction.
+    // ponytail: up to 5000 sequential row RPCs; use a background worker if latency needs it.
+    for (let row = 0; row < input.rows.length; row++) {
+      const outcome = await unwrap(ctx.db.rpc("import_csv_row", { p_brewery: ctx.breweryId, p_request_id: execution.requestId, p_row_n: row })) as ImportOutcome;
+      const errors = validateImportRow(input.kind, input.rows[row]);
+      outcomes.push({ ...outcome, row: row + 1, ...(outcome.status === "blocked" && errors.length ? { error: errors.join("; ") } : {}) });
+    }
+    return { committed: outcomes.filter(r => r.status === "committed").length, blocked: outcomes.filter(r => r.status === "blocked").length, outcomes };
+  },
 });

@@ -6,8 +6,8 @@
 export type ApiError = { code: string; status: number; meaning: string; remedy: string };
 
 export const API_ERRORS: ApiError[] = [
-  { code: "invalid_request", status: 400, meaning: "The body was not JSON, or `breweryId`, `name` or `input` was missing.",
-    remedy: "Send all three fields with `content-type: application/json`." },
+  { code: "invalid_request", status: 400, meaning: "The body was not JSON, required envelope fields were missing, or the brewery did not match the operation scope.",
+    remedy: "Send `name` and `input`; include `breweryId` for tenant operations and omit it for `provision_brewery`." },
   { code: "invalid_request_id", status: 400, meaning: "A command arrived without a `requestId`, or with one that is not an RFC 9562/4122 UUID.",
     remedy: "Generate a UUID per write and send it; queries may omit it." },
   { code: "invalid_input", status: 400, meaning: "The `input` failed the operation's schema. The message names each offending field.",
@@ -30,6 +30,8 @@ export const API_ERRORS: ApiError[] = [
     remedy: "Reuse a requestId only to retry the identical write; generate a new one for a new write." },
   { code: "db_error", status: 500, meaning: "The database refused the write for a reason not mapped to a public code. Logged server-side.",
     remedy: "Retry once with the same `requestId`. If it persists, quote the `correlationId` from the response." },
+  { code: "invite_failed", status: 502, meaning: "The invitation was interrupted before membership completion was confirmed.",
+    remedy: "Retry the identical input with the same `requestId`; the saved Auth identity is reused." },
   { code: "missing_execution", status: 500, meaning: "A command reached its handler without execution metadata. A server fault.",
     remedy: "Report it with the `correlationId`." },
   { code: "internal_error", status: 500, meaning: "A handler threw something the endpoint could not map to a public code. A server fault, and the only code whose message carries no detail.",

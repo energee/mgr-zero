@@ -16,6 +16,7 @@ export type ApiOperation = {
   status: ApiStatus;
   /** Roles allowed to call it; registered operations only. */
   roles?: string;
+  scope?: "tenant" | "pretenant";
   /** The registry's own one-line description; registered operations only. */
   description?: string;
   /** Screens that read or write it — the reason a designed operation exists. */
@@ -99,7 +100,8 @@ export function apiOperations(): ApiOperation[] {
       name: tool.name,
       kind: tool.kind,
       status: "available",
-      roles: Array.isArray(roles) ? roles.join(", ") : roles,
+      roles: definition?.scope === "pretenant" ? "authenticated pre-tenant" : Array.isArray(roles) ? roles.join(", ") : roles,
+      scope: definition?.scope,
       description: tool.description,
       screens: fromScreens.get(tool.name)?.screens ?? [],
     });

@@ -6,6 +6,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export type StaffRole = "admin" | "sales" | "warehouse" | "brewer";
 /** Every staff role: the `roles` of a read that all of staff may run. */
 export const STAFF_ROLES: StaffRole[] = ["admin", "sales", "warehouse", "brewer"];
+export type PreTenantCtx = { db: SupabaseClient; userId: string; breweryId: null; role: null };
+export type OperationCtx = Ctx | PreTenantCtx;
 export type Ctx = { db: SupabaseClient; userId: string; breweryId: string; role: StaffRole | "customer"; customerId?: string };
 
 /** Distinguishes side-effect-free reads from write operations that require idempotency metadata. */
@@ -38,7 +40,7 @@ export type CommandFailure = {
 
 /** The JSON body accepted by POST /api/command; only commands require requestId. */
 export type CommandRequest = {
-  breweryId: string;
+  breweryId?: string;
   name: string;
   input: unknown;
   requestId?: string;
@@ -114,10 +116,10 @@ type QueryDefinitionInput<In, Out> = Omit<QueryDefinition<In, Out>, "kind">;
 export type CommandDefinitionMetadata = Pick<
   CommandDefinition<unknown, unknown> | QueryDefinition<unknown, unknown>,
   "name" | "description" | "input" | "roles" | "requiresConfirmation" | "kind"
->;
+> & { scope: "tenant" | "pretenant" };
 
 type StoredDefinition = CommandDefinitionMetadata & {
-  execute: (ctx: Ctx, input: unknown, execution?: CommandExecution) => Promise<unknown>;
+  execute: (ctx: OperationCtx, input: unknown, execution?: CommandExecution) => Promise<unknown>;
 };
 
 const registry = new Map<string, StoredDefinition>();
@@ -131,7 +133,9 @@ export function defineCommand<In, Out>(input: CommandDefinitionInput<In, Out>): 
   const definition: CommandDefinition<In, Out> = { ...input, kind: "command" };
   registry.set(definition.name, {
     ...definition,
+    scope: "tenant",
     execute: (ctx, parsed, execution) => {
+      if (ctx.breweryId === null) throw new CommandError("brewery context required", 403, "permission_denied");
       const typedInput = parsed as In; // Parsed by this definition's Zod schema immediately before execution.
       if (!execution) throw new CommandError("command execution metadata is required", 500, "missing_execution");
       return definition.handler(ctx, typedInput, execution);
@@ -145,12 +149,32 @@ export function defineQuery<In, Out>(input: QueryDefinitionInput<In, Out>): Quer
   const definition: QueryDefinition<In, Out> = { ...input, kind: "query" };
   registry.set(definition.name, {
     ...definition,
+    scope: "tenant",
     execute: (ctx, parsed) => {
+      if (ctx.breweryId === null) throw new CommandError("brewery context required", 403, "permission_denied");
       const typedInput = parsed as In; // Parsed by this definition's Zod schema immediately before execution.
       return definition.handler(ctx, typedInput);
     },
   });
   return definition;
+}
+
+/** The sole bootstrap operation accepts authenticated identity without a tenant role. */
+export function definePreTenantCommand<In, Out>(definition: {
+  name: "provision_brewery";
+  description: string;
+  input: ZodType<In>;
+  handler: (ctx: PreTenantCtx, input: In, execution: CommandExecution) => Promise<Out>;
+}) {
+  requireUnusedName(definition.name);
+  registry.set(definition.name, {
+    ...definition, kind: "command", scope: "pretenant", roles: "any",
+    execute: (ctx, parsed, execution) => {
+      if (ctx.breweryId !== null) throw new CommandError("pre-tenant context required", 403, "permission_denied");
+      if (!execution) throw new CommandError("command execution metadata is required", 500, "missing_execution");
+      return definition.handler(ctx, parsed as In, execution);
+    },
+  });
 }
 
 /** Returns registration metadata without parsing input or invoking the operation handler. */
@@ -164,6 +188,7 @@ export function getCommandDefinition(name: string): CommandDefinitionMetadata | 
     roles: definition.roles,
     requiresConfirmation: definition.requiresConfirmation,
     kind: definition.kind,
+    scope: definition.scope,
   };
 }
 
@@ -176,16 +201,19 @@ function createExecution(): CommandExecution {
  * for a handler that composes optional reads (the Work landing skips the areas
  * its caller may not open) instead of refusing outright. One rule, one place.
  */
-export function canRun(ctx: Ctx, name: string): boolean {
+export function canRun(ctx: OperationCtx, name: string): boolean {
   const def = registry.get(name);
-  return Boolean(def && (def.roles === "any" || (def.roles === "customer" ? ctx.role === "customer" : def.roles.includes(ctx.role as StaffRole))));
+  if (!def) return false;
+  if (def.scope === "pretenant") return ctx.breweryId === null;
+  if (ctx.breweryId === null) return false;
+  return def.roles === "any" || (def.roles === "customer" ? ctx.role === "customer" : def.roles.includes(ctx.role as StaffRole));
 }
 
 // Output is unknown: a string name cannot carry the handler's type; callers narrow.
-export async function runCommand(name: string, rawInput: unknown, ctx: Ctx, execution?: CommandExecution): Promise<unknown> {
+export async function runCommand(name: string, rawInput: unknown, ctx: OperationCtx, execution?: CommandExecution): Promise<unknown> {
   const def = registry.get(name);
   if (!def) throw new CommandError(`unknown command: ${name}`, 404, "unknown_command");
-  const allowed = def.roles === "any" || (def.roles === "customer" ? ctx.role === "customer" : def.roles.includes(ctx.role as StaffRole));
+  const allowed = canRun(ctx, name);
   if (!allowed) throw new CommandError(`permission denied: ${name} requires ${JSON.stringify(def.roles)}`, 403, "permission_denied");
   const parsed = def.input.safeParse(rawInput);
   // prettifyError gives one readable line per issue ("✖ Invalid UUID → at
@@ -208,6 +236,7 @@ export function listTools() {
     description: d.description ?? "",
     inputSchema: d.input,
     kind: d.kind,
+    scope: d.scope,
     requiresConfirmation: !!d.requiresConfirmation,
   }));
 }

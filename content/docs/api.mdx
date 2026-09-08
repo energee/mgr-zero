@@ -28,7 +28,9 @@ content-type: application/json
 }
 ```
 
-`breweryId`, `name` and `input` are always required. `requestId` is required for
+`name` and `input` are always required. `breweryId` is required for tenant
+operations and must be omitted for `provision_brewery`, the sole authenticated
+pre-tenant command. `requestId` is required for
 every command and optional for queries. See [idempotency](#idempotency) for why
 it exists and what reusing one does.
 
@@ -58,7 +60,8 @@ Status codes and every `error.code` are on the [errors page](#errors).
 
 Every example in this section uses two variables: `MGR_URL` is the origin the app
 is served from (`http://localhost:3000` in development), and `MGR_TOKEN` is a
-Supabase access token for a member of the brewery.
+Supabase access token for a member of the brewery (or any authenticated account
+for `provision_brewery`).
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -118,7 +121,7 @@ coming, and which screen is waiting on it. No dates.
 
 ## Authentication & roles [#authentication]
 
-Every request identifies a caller and a brewery. The caller proves who they are
+Every request identifies a caller. Tenant operations also identify a brewery. The caller proves who they are
 with either the Supabase cookie session the app's login flow establishes, or an
 access token:
 
@@ -128,6 +131,10 @@ curl -X POST "$MGR_URL/api/command" \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "…", "name": "list_brands", "input": {} }'
 ```
+
+`provision_brewery` requires authentication but no existing membership; omit
+`breweryId`. Its blank tenant-role cells below mean roles do not apply, not that
+access is anonymous. All other operations use the following membership checks.
 
 The `breweryId` in the body then decides *which* brewery the caller is acting
 in. Being signed in is not enough. The caller must be a member of that brewery:
@@ -267,6 +274,7 @@ omitted. They have no roles until they are built.
 | `portal_orders` | Customer portal |  |  |  |  | ✓ |
 | `portal_submit_order` | Customer portal |  |  |  |  | ✓ |
 | `portal_update_draft_order` | Customer portal |  |  |  |  | ✓ |
+| `provision_brewery` | Team & brewery settings |  |  |  |  |  |
 | `raise_invoice_question` | Orders & invoicing |  |  |  |  | ✓ |
 | `receive_purchase_order` | Purchasing & materials | ✓ |  | ✓ |  |  |
 | `receive_stock_transfer` | Inventory & locations | ✓ |  | ✓ |  |  |
@@ -412,7 +420,7 @@ one value that ties what your client saw to what the server recorded.
 | 400 | `bad_request` | A domain rule refused the write, such as shipping an order that was never picked. | Read the message: it is the rule, written for a person. Change the state or the input. |
 | 400 | `duplicate_command` | Two operations tried to register the same name. A server fault, not a caller one. | Report it; no request will succeed until it is fixed. |
 | 400 | `invalid_input` | The `input` failed the operation's schema. The message names each offending field. | Fix the fields the message names. The operation's field table lists types and which are required. |
-| 400 | `invalid_request` | The body was not JSON, or `breweryId`, `name` or `input` was missing. | Send all three fields with `content-type: application/json`. |
+| 400 | `invalid_request` | The body was not JSON, required envelope fields were missing, or the brewery did not match the operation scope. | Send `name` and `input`; include `breweryId` for tenant operations and omit it for `provision_brewery`. |
 | 400 | `invalid_request_id` | A command arrived without a `requestId`, or with one that is not an RFC 9562/4122 UUID. | Generate a UUID per write and send it; queries may omit it. |
 | 401 | `unauthenticated` | No usable session cookie or bearer token. | Send `authorization: Bearer <supabase access_token>`, or call from a logged-in browser session. |
 | 403 | `not_member` | Authenticated, but not a member of the brewery named by `breweryId`. | Check the `breweryId`. Membership is staff (`brewery_users`) or a portal user (`customer_users`). |
@@ -423,6 +431,7 @@ one value that ties what your client saw to what the server recorded.
 | 500 | `db_error` | The database refused the write for a reason not mapped to a public code. Logged server-side. | Retry once with the same `requestId`. If it persists, quote the `correlationId` from the response. |
 | 500 | `internal_error` | A handler threw something the endpoint could not map to a public code. A server fault, and the only code whose message carries no detail. | Retry once with the same `requestId`; a write may or may not have landed, so read the record back before retrying with a new one. Report it with the `correlationId`. |
 | 500 | `missing_execution` | A command reached its handler without execution metadata. A server fault. | Report it with the `correlationId`. |
+| 502 | `invite_failed` | The invitation was interrupted before membership completion was confirmed. | Retry the identical input with the same `requestId`; the saved Auth identity is reused. |
 {/* end ops:errors */}
 
 ### Validation failures name their fields [#validation]
@@ -1976,10 +1985,12 @@ destination reporting, so an address is a compliance record, not just a label.
 Portal orders ship from one warehouse per brewery, set with
 `set_portal_fulfillment_source`. Portal ordering fails until that is set.
 
-`invite_customer_user` is registered but fails closed in this release, like the
-staff invitations it belongs with: it validates its input and then raises,
-writing nothing. Its example below is well-formed and will still return
-`400 bad_request`.
+`invite_customer_user` is available to Admin and Sales. It emails a new Auth
+account and attaches buyer membership to the specified customer. Existing
+Auth emails conflict; there is no existing-account attachment or resend flow.
+Keep the same request ID and input after an interrupted invitation; completion
+reuses the saved user identity. Replaying a completed invite never restores
+revoked membership.
 
 {/* ops:customers */}
 
@@ -2004,7 +2015,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Invite a customer portal user (not available in this release)
+Invite a customer portal user
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -3500,8 +3511,45 @@ in this reference lists the roles allowed to call it. A membership is what ties 
 user to a brewery. Revoking one ends access without deleting the history that
 member wrote.
 
-Invitations and CSV import are registered but fail closed in this release: they
-validate their input and then raise, writing nothing.
+`invite_staff` assigns one role and returns `{ userId }`. Invitation requests
+retain their Auth identity through interrupted completion; retry unchanged
+requests with the same ID. Changing the email, role, customer, actor, or brewery
+is different intent. Existing accounts cannot be attached, and completed replay
+does not restore revoked membership. The inviter must still have permission
+when membership is completed.
+
+`provision_brewery` omits `breweryId`; authenticated callers send name, a valid
+timezone, and optional `ttb`. One transaction creates the brewery and first
+admin membership and returns the brewery UUID. Replay returns that UUID without
+restoring revoked membership. `MGR_DEDICATED=1` disables web creation only;
+authenticated API provisioning remains available.
+
+`import_csv` accepts 1–5000 string-field rows and returns
+`{ committed, blocked, outcomes }`. Each outcome names its 1-based `row`,
+`status` (`committed` or `blocked`), and its original `result` or `error`.
+Dependent writes within one row commit together; independent rows may succeed
+when another fails. Both successful and blocked outcomes are durable: resend
+the identical kind and complete rows array with the same request ID to recover
+the original results. Changed, appended, or removed rows conflict. Start a new
+request containing only corrected blocked rows; posting committed opening
+balances with a new ID adds stock again.
+
+All import values are strings. Required fields precede the semicolon:
+
+| Kind | Fields |
+| --- | --- |
+| `customers` | `name`, `type`, `state`, `saleChannelId`; `licenseNumber`, `paymentTerms` |
+| `ship_tos` | `customerId`, `label`, `address1`, `city`, `zip`, `state`; `address2` |
+| `products_skus` | `product`, `formatId`; `sku_name`, `style`, `abv`, `upc` |
+| `channel_prices` | `saleChannelId`, `priceGroupId`, `formatId`, `unitPriceCents` |
+| `opening_balances` | `skuId`, `locationId`, `binId`, `qty`; `note` |
+
+Unknown row fields are rejected. References use explicit UUIDs; create missing
+formats before importing. Product imports reuse an existing brand without
+changing its metadata and create the SKU in the same row transaction. Duplicate
+customer/SKU creation is blocked; channel-price rows set the existing grid cell.
+Opening quantities are positive SKU-unit counts with a bin belonging to the
+location. Prices are nonnegative integer cents, at most 2147483647.
 
 {/* ops:team */}
 
@@ -3569,7 +3617,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin
 
-Bulk CSV import (not available in this release)
+Import CSV customers, ship-tos, brand/SKUs, channel prices or opening balances; each row commits independently and the same requestId safely replays the exact batch
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -3587,7 +3635,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin
 
-Invite staff (not available in this release)
+Invite staff
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -3614,6 +3662,25 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_team_members", "input": {} }'
+```
+
+#### provision_brewery [#provision_brewery]
+
+`command` · authenticated pre-tenant
+
+Create a brewery and join it as its first admin.
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `name` | string | yes |
+| `timezone` | string | yes |
+| `ttb` | string or null | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "name": "provision_brewery", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "timezone": "America/New_York" } }'
 ```
 
 #### revoke_staff [#revoke_staff]
@@ -3742,19 +3809,6 @@ curl -X POST "$MGR_URL/api/command" \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "update_staff_role", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "userId": "00000000-0000-0000-0000-000000000000", "role": "admin" } }'
 ```
-
----
-
-**Designed, not yet available** {/* team-designed */}
-
-14 of the 16 operations in this area are available today; the 2 below are not.
-
-The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
-
-| Operation | Kind | Needed by |
-| --- | --- | --- |
-| `provision_brewery` | command | Create brewery |
-| `update_staff_roles` | command | Team member |
 
 {/* end ops:team */}
 

@@ -1,5 +1,6 @@
 // lib/commands/all.ts — imports all command definitions (side-effect: registers every command).
 import "./catalog";
+import "./tenancy";
 import "./inventory";
 import "./transfers";
 import "./import";

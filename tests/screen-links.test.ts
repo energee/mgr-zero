@@ -12,6 +12,14 @@ const by = (name: string) => SCREENS.find((s) => s.name === name)!;
 const names = new Set(SCREENS.map((s) => s.name));
 
 describe("resolveTap", () => {
+  it("opens the live invitation sheet and import route", () => {
+    for (const name of ["Team", "First-run checklist"]) {
+      expect(isInertOn(by(name), "Invite staff")).toBe(false);
+      expect(resolveTap(by(name), "Invite staff")).toBe("Invite staff");
+    }
+    expect(resolveTap(by("Settings"), "Open", "/settings/import")).toBe("Import");
+  });
+
   it("prefers the record's own map, then global rules, then the exact name", () => {
     expect(resolveTap(by("Order"), "Adjust")).toBe("Adjust lines");
     expect(resolveTap(by("Orders"), "Confirm")).toBe("Confirm order");

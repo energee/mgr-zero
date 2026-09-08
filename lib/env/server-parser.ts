@@ -6,6 +6,7 @@ import { readPublicEnv, type PublicEnv } from "./public";
 
 export interface ServerEnv extends PublicEnv {
   supabaseSecretKey: string;
+  dedicated: boolean;
   vercelEnv?: "production" | "preview" | "development";
 }
 
@@ -28,6 +29,7 @@ export function readServerEnv(env: Environment = process.env): ServerEnv {
   return {
     ...readPublicEnv(env),
     supabaseSecretKey,
+    dedicated: env.MGR_DEDICATED === "1",
     vercelEnv: vercelEnv as ServerEnv["vercelEnv"],
   };
 }

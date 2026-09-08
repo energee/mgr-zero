@@ -10,11 +10,12 @@ never copy it into a second place.
 | --- | --- |
 | `supabase/migrations/*.sql` | Schema, RLS policies, triggers, grants, and the transactional command-request ledger. The only source of truth for data rules. Pre-deploy, the baseline is edited in place (see `.agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md`). Application roles have read-only table access; every mutation enters through an explicitly granted, idempotent `security definer` RPC with `search_path = ''`, database-derived actor/tenant/role checks, and a canonical request hash. Private helpers and implementation functions are not executable by application roles. |
 | `lib/commands/registry.ts` | `defineCommand` / `defineQuery`, `Ctx`, role checks, `CommandError`. Every domain operation the app performs is registered here. |
-| `lib/commands/<area>.ts` | Business logic per area (catalog, inventory, orders, customers, portal; `import.ts` and `invites.ts` are registered fail-closed stubs). Handlers read through the RLS-bound `ctx.db`; public-schema writes call the narrow RPC boundary and forward `CommandExecution.requestId`. `orders.ts` owns order lifecycle (create/submit/confirm/adjust/cancel), allocations, pick/ship, per-shipment invoices, credit memos, and replenishment. `customers.ts` owns customer/ship-to/price-list CRUD and the portal fulfillment source. `catalog.ts` owns products, SKUs, locations and their bins (`list_bins`, `create_bin`, `update_bin`, `delete_bin`); `inventory.ts` owns the movement ledger at bin grain (`record_movement` needs a `binId`; `get_bin_on_hand`). `portal.ts` owns the customer-role commands (`portal_create_order`, `portal_update_draft_order`, `portal_submit_order`, `portal_catalog`, `portal_orders`, `portal_order`, `portal_invoices`) — the only commands a `customer` role may call. |
+| `lib/commands/<area>.ts` | Business logic per area (catalog, inventory, orders, customers, portal; `import.ts` owns independent, atomic CSV rows with durable batch and row outcomes). Handlers read through the RLS-bound `ctx.db`; public-schema writes call the narrow RPC boundary and forward `CommandExecution.requestId`. `orders.ts` owns order lifecycle (create/submit/confirm/adjust/cancel), allocations, pick/ship, per-shipment invoices, credit memos, and replenishment. `customers.ts` owns customer/ship-to/price-list CRUD and the portal fulfillment source. `catalog.ts` owns products, SKUs, locations and their bins (`list_bins`, `create_bin`, `update_bin`, `delete_bin`); `inventory.ts` owns the movement ledger at bin grain (`record_movement` needs a `binId`; `get_bin_on_hand`). `portal.ts` owns the customer-role commands (`portal_create_order`, `portal_update_draft_order`, `portal_submit_order`, `portal_catalog`, `portal_orders`, `portal_order`, `portal_invoices`) — the only commands a `customer` role may call. |
 | `lib/commands/all.ts` | The one side-effecting import that registers every command module. |
 | `app/api/command/route.ts` | The single HTTP entry point. Dispatches to the registry; contains no business logic. Cookie session or `Authorization: Bearer <supabase access_token>`. |
 | `lib/commands/client.ts`, `use-command-form.ts` | How the UI calls commands. |
 | `lib/supabase/server.ts` | RLS-bound client for request paths. |
+| `lib/supabase/invites.ts` | Durable staff/customer invitations: RLS-bound claim and membership RPCs surround the sole Auth admin invite call. `private.invite_requests` and an Auth-transaction trigger preserve identity across lost responses; replay never regrants revoked membership. |
 | `lib/supabase/admin.ts` | Service-role client. Import restricted by eslint (see rule 4). |
 | `lib/brewery.ts`, `app/(app)/brewery-provider.tsx` | Current-brewery resolution and switching across the signed-in user's memberships. |
 | `lib/portal.ts` | `getActiveCustomer()`: resolves which customer account the session operates as from `customer_users`, mirroring `lib/brewery.ts`. Redirects to `/login` with no membership. |
@@ -95,8 +96,8 @@ a gap to close, not a convention to trust.
    logged server-side. Supabase Auth session primitives (sign-up, sign-in/out, magic-link
    exchange, password reset/update, session refresh) are the sole non-domain
    exception; they never authorize direct public-schema access. SaaS tenant
-   provisioning is domain work: `provision_brewery` remains blocked until the
-   registry has an explicit pre-tenant context, then invokes one
+   provisioning is domain work: `provision_brewery` uses the registry’s explicit
+   authenticated pre-tenant context and invokes one
    narrow `security definer` RPC for the brewery + first admin membership — never a fake
    `breweryId` or an RLS bypass. AI write tools only propose registered commands;
    an explicit user confirmation is required before execution. *Enforced by:*
@@ -122,16 +123,17 @@ a gap to close, not a convention to trust.
    to assert RLS on every table, `security_invoker` on every view,
    `search_path` on every function, and an `RLS-EXCEPTION:` comment on any
    permissive policy.
-4. **`createAdminClient()` is restricted to `lib/supabase/integration-tokens.ts`
-   and `lib/chat/jobs.ts`.**
+4. **`createAdminClient()` is restricted to `lib/supabase/integration-tokens.ts`,
+   `lib/supabase/invites.ts`, and `lib/chat/jobs.ts`.**
    The token boundary is the sole credential path: it admits only `admin`/`sales`,
    proves the concrete connection is visible through `ctx.db`, then passes the
    verified actor to a service-only RPC that rechecks current membership and role
    in the same token read/write statement. Integration modules must use this
    boundary; they never receive a service-client allowlist. `invite_staff` and
-   `invite_customer_user` (which needed `auth.admin.inviteUserByEmail` plus a
-   membership insert) are registered but fail closed until the external-write
-   gate below is implemented; their working handlers are in git history.
+   `invite_customer_user` use `lib/supabase/invites.ts`: the RLS-bound claim RPC
+   verifies the current actor and role before Auth, and the completion RPC
+   rechecks them. Auth identity is bound by a private trigger in Auth's own
+   transaction; no client-supplied user id can create membership.
    `lib/chat/jobs.ts` is the one internal-job owner: it serves chat provider
    webhooks and scheduled jobs where no user exists, may call only the named
    `service_role` chat RPCs (`scan_chat_*`, `lease_chat_deliveries`,
@@ -148,8 +150,9 @@ a gap to close, not a convention to trust.
    before commit. An identical replay returns that result; changed command,
    brewery, or payload conflicts. Private implementation helpers retain the
    multi-row transaction rule and are not application-callable. Per-row
-   independent bulk work (CSV import, currently fail-closed) is the one
-   exemption and says so with an `// atomic-exempt:` comment. MGR v1
+   independent bulk work (CSV import) and the durable
+   Auth invitation workflow are the exemptions; each says so
+   with an `// atomic-exempt:` comment. MGR v1
    learned this after real data loss
    (`.agents/superpowers/specs/2026-08-31-mgr-v1-review.md`). *Enforced
    by:* `tests/data-api-boundary.test.ts`,
@@ -181,20 +184,25 @@ a gap to close, not a convention to trust.
   count would disappear entirely. Before either UI ships, the baseline must add
   auditable correction identity and a durable taproom count occurrence/snapshot,
   and their registered one-RPC commands must have real-Postgres/report proofs.
-- **Auth invitations need a durable external-write workflow.** The former
-  invite handlers called Supabase Auth before inserting membership, so a failed
-  DB write could leave an invited Auth user without the intended access; they
-  now fail closed (audit P1.9) and no invite UI exists.
-  Before either invite ships again, retries must reuse one durable request identity
-  and an incomplete second step must be recoverable or compensate the created
-  Auth account. Tests must force failure after Auth success for staff and customer
-  invites; an implemented registry name alone is not evidence that this gate is met.
+- **Auth invitations use a durable external-write workflow.** One canonical
+  command request claims a private invitation. Auth's first `invited_at` write
+  binds its user id in that same transaction using an invitation token and
+  matching email; mutable user metadata alone cannot create membership.
+  Completion locks the invitation and atomically creates membership and marks
+  complete. Tests force both lost Auth responses and real membership failures
+  for staff and customers. Completed retries return the original user id without
+  restoring revoked access. Existing Auth emails are refused; attaching existing
+  accounts needs a separate consent workflow. Team, first-run, and customer detail
+  share invitation forms that retain request identity for an unchanged failed
+  submission while the page remains open.
 - **CSV exemption stops between logical rows.** `import_csv` may continue after
   one independent CSV row fails, but dependent writes inside a logical row still
-  require one Postgres function. The implemented importer currently sequences
-  some parent/child writes and has no durable per-row request/result identity;
-  opening-balance reruns can append twice. The import UI remains blocked until
-  each logical row is atomic and reruns return its first durable result.
+  require one Postgres function. `begin_csv_import` binds the complete batch
+  manifest to its request;
+  `import_csv_row` commits each logical row and its durable committed or blocked
+  outcome. Exact reruns return original results, including opening movement IDs.
+  Corrected batches contain only blocked rows. Proven by `tests/commands-import.test.ts`;
+  the wizard preserves batch identity while its page stays open.
 
 ## Schema conventions
 

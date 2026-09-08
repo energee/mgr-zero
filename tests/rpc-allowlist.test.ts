@@ -9,6 +9,13 @@ const AUTHENTICATED_RPCS = [
   "get_chat_link_intent(uuid,text)",
   "list_chat_user_links(uuid)",
   "set_brewery_operating_defaults(uuid,integer,uuid)",
+
+  "begin_csv_import(uuid,text,jsonb,uuid)",
+  "import_csv_row(uuid,uuid,integer)",
+  "claim_invite_request(uuid,text,text,staff_role,uuid,uuid)",
+  "complete_invite_membership(uuid)",
+  "record_invite_failure(uuid)",
+  "provision_brewery(text,text,text,uuid)",
   "record_keg_event(uuid,uuid,keg_size,integer,keg_event_reason,uuid,uuid,uuid,text,uuid)",
   "save_route(uuid,uuid,text,date,uuid,text,text,jsonb,uuid)",
   "depart_route(uuid,uuid)",
