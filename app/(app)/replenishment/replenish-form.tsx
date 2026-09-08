@@ -45,10 +45,13 @@ export function ReplenishForm({
   });
 
   return (
-    <form onSubmit={form.submit} className="flex flex-col gap-4">
+    <form onSubmit={(e) => {
+      if (!canCreate) { e.preventDefault(); return; }
+      void form.submit(e);
+    }} className="flex flex-col gap-4">
       <div className="flex max-w-xs flex-col gap-2">
         <Label htmlFor="replen-from">From warehouse</Label>
-        <Select value={fromLocationId} onValueChange={setFromLocationId}>
+        <Select disabled={!canCreate} value={fromLocationId} onValueChange={setFromLocationId}>
           <SelectTrigger id="replen-from">
             <SelectValue placeholder="Select warehouse" />
           </SelectTrigger>
@@ -84,6 +87,8 @@ export function ReplenishForm({
                 <td className="py-1">{s.suggested}</td>
                 <td className="py-1">
                   <Input
+                    disabled={!canCreate}
+                    aria-label={`${s.sku} transfer quantity`}
                     type="number"
                     min="0"
                     step="any"
