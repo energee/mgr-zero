@@ -41,10 +41,10 @@ export function NewTransferForm({ locations, bins, skus }: { locations: Location
               <SelectTrigger id="trf-from"><SelectValue placeholder="Location" /></SelectTrigger>
               <SelectContent>{locations.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent>
             </Select>
-            <Select value={fromBin} onValueChange={setFromBin} disabled={!fromId}>
-              <SelectTrigger aria-label="From bin"><SelectValue placeholder="Bin" /></SelectTrigger>
-              <SelectContent>{bins.filter((b) => b.location_id === fromId).map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
-            </Select>
+            <select aria-label="From bin" className="rounded-md border p-2" value={fromBin} onChange={e => setFromBin(e.target.value)} disabled={!fromId}>
+              <option value="">Bin</option>
+              {bins.filter(b => b.location_id === fromId).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="trf-to">To</Label>
@@ -52,10 +52,10 @@ export function NewTransferForm({ locations, bins, skus }: { locations: Location
               <SelectTrigger id="trf-to"><SelectValue placeholder="Location" /></SelectTrigger>
               <SelectContent>{locations.filter((l) => l.id !== fromId).map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent>
             </Select>
-            <Select value={toBin} onValueChange={setToBin} disabled={!toId}>
-              <SelectTrigger aria-label="To bin"><SelectValue placeholder="Bin" /></SelectTrigger>
-              <SelectContent>{bins.filter((b) => b.location_id === toId).map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
-            </Select>
+            <select aria-label="To bin" className="rounded-md border p-2" value={toBin} onChange={e => setToBin(e.target.value)} disabled={!toId}>
+              <option value="">Bin</option>
+              {bins.filter(b => b.location_id === toId).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
           </div>
         </div>
         <div className="flex flex-col gap-2">

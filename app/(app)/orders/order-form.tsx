@@ -138,20 +138,11 @@ export function OrderForm({
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="order-ship-to">Ship-to</Label>
-                <Select value={shipToId} onValueChange={setShipToId}>
-                  <SelectTrigger id="order-ship-to">
-                    <SelectValue placeholder={customerId ? "Select ship-to" : "Select a customer first"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {shipTos.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                {/* Native options and value commit together; Radix hidden options can emit an empty change during this cascade. */}
+                <select id="order-ship-to" className="rounded-md border p-2" value={shipToId} onChange={e => setShipToId(e.target.value)} disabled={!customerId}>
+                  <option value="">{customerId ? "Select ship-to" : "Select a customer first"}</option>
+                  {shipTos.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                </select>
               </div>
             </>
           ) : (

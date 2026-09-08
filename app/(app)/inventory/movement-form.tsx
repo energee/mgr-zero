@@ -117,14 +117,10 @@ export function MovementForm({
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="movement-bin">Bin</Label>
-            <Select value={binId} onValueChange={v => { setBinId(v); setLotId(""); }} disabled={!locationId}>
-              <SelectTrigger id="movement-bin"><SelectValue placeholder="Select a bin" /></SelectTrigger>
-              <SelectContent>
-                {bins.filter((b) => b.location_id === locationId).map((b) => (
-                  <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <select id="movement-bin" className="rounded-md border p-2" value={binId} onChange={e => { setBinId(e.target.value); setLotId(""); }} disabled={!locationId}>
+              <option value="">Select a bin</option>
+              {bins.filter(b => b.location_id === locationId).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="movement-type">Type</Label>
