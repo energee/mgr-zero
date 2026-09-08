@@ -8,6 +8,7 @@ import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
 import { docNo } from "@/lib/mgr/doc-no";
+import { plural } from "@/lib/mgr/plural";
 import "@/lib/commands/all";
 import { PrintButton } from "./print-button";
 
@@ -31,7 +32,7 @@ export default async function PickSheetPage({ searchParams }: { searchParams: Pr
           <div key={shipDate}>
             {E.ttl(shipDate)}
             {group.map((o) => (
-              <div key={o.id}>{E.row(`${o.customers?.name ?? "Transfer"} · ${docNo("ORD", o.order_no, "Order")}`, `${o.order_lines.length} line${o.order_lines.length === 1 ? "" : "s"} · ${o.status}`, E.act(o.status === "picked" ? "Open" : "Pick", "info", `/orders/${o.id}`))}</div>
+              <div key={o.id}>{E.row(`${o.customers?.name ?? "Transfer"} · ${docNo("ORD", o.order_no, "Order")}`, `${plural(o.order_lines.length, "line")} · ${o.status}`, E.act(o.status === "picked" ? "Open" : "Pick", "info", `/orders/${o.id}`))}</div>
             ))}
             {E.row("Totals", [...totals].map(([name, qty]) => `${name} ${qty}`).join(" · "))}
           </div>

@@ -10,6 +10,7 @@ import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
 import { docNo } from "@/lib/mgr/doc-no";
 import { money } from "@/lib/mgr/money";
+import { plural } from "@/lib/mgr/plural";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { CreditMemoForm } from "./credit-memo-form";
@@ -37,7 +38,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   return (
     <>
       {E.back("Invoices", no, memo, "/invoices")}
-      {E.row(invoice.customers?.name ?? "—", `${invoice.due_on ? `due ${invoice.due_on}` : `issued ${invoice.issued_on}`} · ${lines.length} line${lines.length === 1 ? "" : "s"}${invoice.paid_at ? ` · paid ${new Date(invoice.paid_at).toLocaleDateString()}` : ""}`, money(total), invoice.paid_at || credit ? "ok" : "")}
+      {E.row(invoice.customers?.name ?? "—", `${invoice.due_on ? `due ${invoice.due_on}` : `issued ${invoice.issued_on}`} · ${plural(lines.length, "line")}${invoice.paid_at ? ` · paid ${new Date(invoice.paid_at).toLocaleDateString()}` : ""}`, money(total), invoice.paid_at || credit ? "ok" : "")}
       {lines.map((l) => <div key={l.id}>{E.row(l.skus?.name ?? l.description, `${Number(l.qty)} × ${money(l.unit_price_cents)}`, money(l.amount_cents))}</div>)}
       {E.gated("QuickBooks", "mapping and push aren’t connected yet")}
       {questions.map((q) => (

@@ -8,6 +8,7 @@ import { getActiveCustomer } from "@/lib/portal";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
 import { docNo } from "@/lib/mgr/doc-no";
+import { buyerStatus } from "@/lib/mgr/order-status";
 import { money } from "@/lib/mgr/money";
 import { orNotFound } from "@/lib/mgr/not-found";
 import "@/lib/commands/all";
@@ -15,20 +16,18 @@ import "@/lib/commands/all";
 type Order = { id: string; order_no: number | null; status: string; po_number: string | null; requested_ship_date: string | null; note: string | null; ship_tos: { label: string; city: string; state: string } | null };
 type OrderLine = { id: string; sku_id: string; qty_ordered: number; qty_shipped: number | null; unit_price_cents: number; skus: { name: string } | null };
 type OrderEvent = { id: string; event: string; payload: Record<string, unknown>; created_at: string };
-type Invoice = { id: string; invoice_no: number | null; kind: string; paid_at: string | null; shipment_id: string | null; invoice_lines: { amount_cents: number }[] };
-const STATUS: Record<string, string> = { draft: "Draft", submitted: "Placed", confirmed: "Confirmed", picked: "Being picked", shipped: "Shipped", cancelled: "Cancelled" };
+type Shipment = { id: string; invoices: { id: string; invoice_no: number | null; kind: string; paid_at: string | null; invoice_lines: { amount_cents: number }[] }[] };
 
 export default async function PortalOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const customer = await getActiveCustomer();
   const ctx = await buildContext(customer.breweryId);
-  const [{ order, lines, events, shipment }, invoices] = await Promise.all([
-    orNotFound(runCommand("portal_order", { orderId: id }, ctx) as Promise<{ order: Order; lines: OrderLine[]; events: OrderEvent[]; shipment: { id: string } | null }>),
-    runCommand("portal_invoices", {}, ctx) as Promise<Invoice[]>,
-  ]);
-  const invoice = shipment ? invoices.find((i) => i.shipment_id === shipment.id && i.kind === "invoice") : undefined;
+  const { order, lines, events, shipment } = await orNotFound(
+    runCommand("portal_order", { orderId: id }, ctx) as Promise<{ order: Order; lines: OrderLine[]; events: OrderEvent[]; shipment: Shipment | null }>,
+  );
+  const invoice = shipment?.invoices.find((v) => v.kind === "invoice");
   const adjusted = events.some((e) => e.event === "lines_adjusted");
-  const status = `${STATUS[order.status] ?? order.status}${order.requested_ship_date ? ` · ships ${order.requested_ship_date}` : ""}`;
+  const status = buyerStatus(order.status, order.requested_ship_date);
   return (
     <>
       {E.back("Orders", docNo("ORD", order.order_no, "Order"), undefined, "/portal/orders")}

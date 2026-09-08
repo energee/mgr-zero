@@ -20,6 +20,8 @@ export type NavItem = {
   href: string;
   /** Omitted = every role. Admin always sees everything. */
   roles?: readonly StaffRole[];
+  /** One line of what this area is for; the More landing prints it. */
+  about?: string;
   /** Not built yet: shown in the design inventory, hidden by shippedNav(). */
   planned?: true;
   /** Desktop rail sub-entries; the tab itself is the phone target. */
@@ -64,20 +66,20 @@ export const STAFF_NAV: readonly NavItem[] = [
     href: "/more",
     icon: Settings01Icon,
     children: [
-      { label: "Invoices", href: "/invoices", roles: ["sales"] },
-      { label: "Catalog", href: "/catalog", roles: ["sales"] },
+      { label: "Invoices", href: "/invoices", roles: ["sales"], about: "QuickBooks Online mapping and push" },
+      { label: "Catalog", href: "/catalog", roles: ["sales"], about: "brands and SKUs" },
       { label: "Menu", href: "/catalog#menu", planned: true, roles: ["warehouse"] },
-      { label: "Customers", href: "/customers", roles: ["sales"] },
-      { label: "Price groups", href: "/pricing", roles: ["sales"] },
-      { label: "Recipes", href: "/recipes", roles: ["brewer"] },
-      { label: "Vendors", href: "/vendors", roles: ["brewer", "warehouse"] },
-      { label: "Compliance", href: "/compliance", roles: ["sales"] },
+      { label: "Customers", href: "/customers", roles: ["sales"], about: "accounts and ship-tos" },
+      { label: "Price groups", href: "/pricing", roles: ["sales"], about: "rows of the price grid" },
+      { label: "Recipes", href: "/recipes", roles: ["brewer"], about: "formulas and versions" },
+      { label: "Vendors", href: "/vendors", roles: ["brewer", "warehouse"], about: "suppliers" },
+      { label: "Compliance", href: "/compliance", roles: ["sales"], about: "reports and filing status" },
       { label: "Planning", href: "/planning", roles: ["brewer", "warehouse"] },
       { label: "Import", href: "/settings/team#import", planned: true, roles: ["admin"] },
-      { label: "Settings", href: "/settings", roles: ["admin"] },
-      { label: "Sale channels", href: "/settings/channels", roles: ["admin"] },
-      { label: "Locations", href: "/locations", roles: ["admin"] },
-      { label: "Units", href: "/settings/units" },
+      { label: "Settings", href: "/settings", roles: ["admin"], about: "brewery and integrations" },
+      { label: "Sale channels", href: "/settings/channels", roles: ["admin"], about: "tax treatment" },
+      { label: "Locations", href: "/locations", roles: ["admin"], about: "warehouses, taprooms and bins" },
+      { label: "Units", href: "/settings/units", about: "gravity display" },
     ],
   },
 ];

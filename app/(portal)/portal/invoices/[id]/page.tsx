@@ -35,7 +35,7 @@ export default async function PortalInvoicePage({ params }: { params: Promise<{ 
       {invoice.kind === "invoice" ? E.row("Status", paid ? `Paid ${new Date(invoice.paid_at!).toLocaleDateString()}` : "Unpaid", "", paid ? "ok" : "w") : E.row("Status", "Credit", "", "ok")}
       {E.tbl(["Item", "Qty", "Amount"], lines.map((l) => [l.skus?.name ?? l.description ?? l.kind, String(Number(l.qty)), money(l.amount_cents)]))}
       {invoice.kind === "invoice" && !paid ? E.info("Contact the brewery to pay this invoice.") : null}
-      <QuestionForm invoiceId={invoice.id} label={`${no} · ${money(invoice.total_cents)}`} brewery="the brewery" />
+      <QuestionForm invoiceId={invoice.id} label={`${no} · ${money(invoice.total_cents)}`} />
     </>
   );
 }

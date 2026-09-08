@@ -7,6 +7,7 @@ import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
+import { plural } from "@/lib/mgr/plural";
 import { formatVolume } from "@/lib/volume";
 import "@/lib/commands/all";
 import { BrandForm } from "./brand-form";
@@ -31,7 +32,7 @@ export default async function CatalogPage() {
       {E.back("More", "Catalog", <BrandForm groups={groups.map((g) => ({ id: g.id, name: g.name }))} />, "/more")}
       {brands.length === 0 ? E.blank("No brands yet") : brands.map((brand) => (
         <div key={brand.id}>
-          {E.row(brand.name, `${brand.styles?.name ?? "style not set"}${brand.abv != null ? ` · ${brand.abv}% ABV` : ""} · ${brand.skus.length} SKU${brand.skus.length === 1 ? "" : "s"}`,
+          {E.row(brand.name, `${brand.styles?.name ?? "style not set"}${brand.abv != null ? ` · ${brand.abv}% ABV` : ""} · ${plural(brand.skus.length, "SKU")}`,
             <SkuForm brandId={brand.id} formats={packaged} />, "", undefined,
             brand.skus.length ? brand.skus.map((sku) => {
               const f = formatById.get(sku.format_id);
@@ -39,7 +40,7 @@ export default async function CatalogPage() {
             }) : undefined)}
         </div>
       ))}
-      {E.row("Price groups", `${groups.length} group${groups.length === 1 ? "" : "s"}`, E.act("Open", "primary", "/pricing"))}
+      {E.row("Price groups", plural(groups.length, "group"), E.act("Open", "primary", "/pricing"))}
       {E.hd("Formats", "package composition", <FormatForm />)}
       {formats.length === 0 ? E.blank("No formats yet") : formats.map((f) => (
         <div key={f.id}>{E.row(f.name, `${f.basis}${f.package_type ? ` · ${f.package_type}${f.keg_size ? ` (${f.keg_size.replace(/_/g, " ")})` : ""}` : ""}${f.units_per_case ? ` · ${f.units_per_case} per case` : ""}`, f.bbl_per_unit ? formatVolume(f.bbl_per_unit) : "")}</div>

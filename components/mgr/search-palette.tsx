@@ -21,16 +21,19 @@ export function SearchPalette({ placeholder = "Search", kinds, onPick }: { place
   // The answer remembers the term it answered; a newer term still loading keeps the last rows on screen.
   const [res, setRes] = useState<{ term: string; hits: SearchHit[] }>({ term: "", hits: [] });
   const term = q.trim();
+  // kinds is compared by identity, so an inline array from a caller would re-fire
+  // the debounce every render; the effect depends on its content instead.
+  const kindKey = kinds?.join(",") ?? "";
   useEffect(() => {
     if (!term) return;
     let live = true;
     const t = setTimeout(() => {
-      command(breweryId, "search_entities", { q: term, kinds })
+      command(breweryId, "search_entities", { q: term, kinds: kindKey ? kindKey.split(",") : undefined })
         .then((data) => { if (live) setRes({ term, hits: data as SearchHit[] }); })
         .catch(() => { if (live) setRes({ term, hits: [] }); });
     }, 200);
     return () => { live = false; clearTimeout(t); };
-  }, [term, kinds, breweryId]);
+  }, [term, kindKey, breweryId]);
   const hits = term ? res.hits : [];
   const loading = term !== res.term;
   const open = (hit: SearchHit) => (onPick ? onPick(hit) : router.push(hit.href));

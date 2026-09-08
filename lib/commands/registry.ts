@@ -171,6 +171,16 @@ function createExecution(): CommandExecution {
   return { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
 }
 
+/**
+ * Whether `ctx`'s role may run `name` at all — the same check runCommand makes,
+ * for a handler that composes optional reads (the Work landing skips the areas
+ * its caller may not open) instead of refusing outright. One rule, one place.
+ */
+export function canRun(ctx: Ctx, name: string): boolean {
+  const def = registry.get(name);
+  return Boolean(def && (def.roles === "any" || (def.roles === "customer" ? ctx.role === "customer" : def.roles.includes(ctx.role as StaffRole))));
+}
+
 // Output is unknown: a string name cannot carry the handler's type; callers narrow.
 export async function runCommand(name: string, rawInput: unknown, ctx: Ctx, execution?: CommandExecution): Promise<unknown> {
   const def = registry.get(name);

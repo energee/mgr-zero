@@ -78,7 +78,7 @@ defineQuery({
 });
 
 defineQuery({
-  name: "portal_order", description: "Portal: one order with lines, its event history and its shipment once shipped",
+  name: "portal_order", description: "Portal: one order with lines, its event history, and its shipment with that shipment's invoice once billed",
   roles: "customer",
   input: z.object({ orderId: z.string().uuid() }),
   handler: async (ctx, i) => {
@@ -87,7 +87,7 @@ defineQuery({
     const [ln, events, shipment] = await Promise.all([
       unwrap(ctx.db.from("order_lines").select("*, skus(name)").eq("order_id", i.orderId)),
       unwrap(ctx.db.from("order_events").select().eq("order_id", i.orderId).order("created_at")),
-      unwrap(ctx.db.from("shipments").select("id").eq("order_id", i.orderId).maybeSingle()),
+      unwrap(ctx.db.from("shipments").select("id, invoices(id, invoice_no, kind, paid_at, invoice_lines(amount_cents))").eq("order_id", i.orderId).maybeSingle()),
     ]);
     return { order, lines: ln, events, shipment };
   },

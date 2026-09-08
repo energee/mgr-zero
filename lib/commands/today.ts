@@ -47,10 +47,13 @@ defineQuery({
   description: "Whether the brewery has a location, a brand, any inventory movement, and staff besides the owner; Today shows the First-run checklist until a location and a brand exist",
   input: z.object({}), roles: STAFF_ROLES,
   handler: async (ctx) => {
+    // Existence, not arithmetic: an exact count scans every row of a table that
+    // grows without bound (inventory_movements), and this runs on every Today
+    // render until setup finishes. LIMIT stops the planner at the first row or two.
     const has = async (table: string, min = 1) => {
-      const { count, error } = await ctx.db.from(table).select("*", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId);
+      const { data, error } = await ctx.db.from(table).select("brewery_id").eq("brewery_id", ctx.breweryId).limit(min);
       if (error) throw error;
-      return (count ?? 0) >= min;
+      return (data?.length ?? 0) >= min;
     };
     const [hasLocation, hasBrand, hasMovement, hasStaff] = await Promise.all([has("locations"), has("brands"), has("inventory_movements"), has("brewery_users", 2)]);
     return { hasLocation, hasBrand, hasMovement, hasStaff };

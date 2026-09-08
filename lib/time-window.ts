@@ -3,6 +3,8 @@
 // 24-hour `hh:mm`, matching set_brewery_quiet_hours (lib/commands/chat.ts) and
 // the personal quiet-hours override beside it. The Slack previews in
 // lib/chat/preview-fixtures.ts still spell their own window out by hand.
+import { plural } from "@/lib/mgr/plural";
+
 export const MINUTES_PER_DAY = 1440;
 export const NOON = MINUTES_PER_DAY / 2;
 
@@ -55,7 +57,6 @@ export function formatWindow(start: number, end: number) {
   return `${formatClock(start)} – ${formatClock(end)} · ${formatDuration(windowMinutes(start, end))}`;
 }
 
-const plural = (n: number, unit: string) => `${n} ${unit}${n === 1 ? "" : "s"}`;
 
 function formatDuration(total: number) {
   const hours = Math.floor(total / 60);

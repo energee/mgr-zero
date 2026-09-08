@@ -9,10 +9,10 @@ import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
 import { docNo } from "@/lib/mgr/doc-no";
+import { nextAction, type OrderStatus } from "@/lib/mgr/order-status";
 import "@/lib/commands/all";
 import { OrderForm, type CustomerOption, type LocationOption, type SkuOption } from "./order-form";
 
-type OrderStatus = "draft" | "submitted" | "confirmed" | "picked" | "shipped" | "cancelled";
 type Order = { id: string; order_no: number | null; status: OrderStatus; requested_ship_date: string | null; needs_restock: boolean; customers: { name: string } | null };
 type CustomerRow = { id: string; name: string };
 type ShipTo = { id: string; label: string };
@@ -20,12 +20,6 @@ type LocationRow = { id: string; name: string; kind: "warehouse" | "taproom" };
 type SkuRow = { id: string; name: string; brands: { name: string } | null };
 
 const STATUSES: OrderStatus[] = ["draft", "submitted", "confirmed", "picked", "shipped", "cancelled"];
-/** The next valid action per state; a picked order with staged quantities wants Put back first. */
-const NEXT: Record<OrderStatus, [string, "primary" | "success" | "info" | "attention", (id: string) => string]> = {
-  draft: ["Finish", "primary", (id) => `/orders/${id}`], submitted: ["Confirm", "success", (id) => `/orders/${id}/confirm`],
-  confirmed: ["Pick", "info", (id) => `/orders/${id}`], picked: ["Ship", "info", (id) => `/orders/${id}`],
-  shipped: ["Open", "primary", (id) => `/orders/${id}`], cancelled: ["Open", "primary", (id) => `/orders/${id}`],
-};
 
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const { status } = await searchParams;
@@ -48,12 +42,12 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       {orders.length === 0
         ? E.blank(status ? `No ${status} orders` : "No orders yet")
         : orders.map((o) => {
-            const [verb, tone, href] = o.status === "picked" && o.needs_restock ? ["Put back", "attention", (id: string) => `/orders/${id}/restock`] as const : NEXT[o.status];
+            const { verb, tone, href } = nextAction(o.status, o.needs_restock, o.id);
             return (
               <div key={o.id}>
                 {E.row(`${docNo("ORD", o.order_no, "Order")} · ${o.customers?.name ?? "transfer"}`,
                   `${o.status}${o.requested_ship_date ? ` · ships ${o.requested_ship_date}` : ""}${o.needs_restock ? " · restock staged" : ""}`,
-                  E.act(verb, tone, href(o.id)), o.needs_restock ? "w" : "")}
+                  E.act(verb, tone, href), o.needs_restock ? "w" : "")}
               </div>
             );
           })}

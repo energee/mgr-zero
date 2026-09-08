@@ -29,7 +29,8 @@ export default async function InventoryPage() {
     runCommand("get_bin_on_hand", {}, ctx), runCommand("get_atp", {}, ctx), runCommand("list_movements", { limit: 50 }, ctx),
   ])) as [Sku[], Location[], Bin[], SaleChannel[], BinOnHandRow[], AtpRow[], Movement[]];
   const skuById = new Map(skus.map((s) => [s.id, s]));
-  const locationName = (id: string) => locations.find((l) => l.id === id)?.name ?? "—";
+  const locationById = new Map(locations.map((l) => [l.id, l.name]));
+  const locationName = (id: string) => locationById.get(id) ?? "—";
   const have = sum(onHand);
   const atpBySku = new Map(atp.map((a) => [a.sku_id, Number(a.qty)]));
   const stocked = skus.filter((s) => have.has(s.id) || atpBySku.has(s.id));

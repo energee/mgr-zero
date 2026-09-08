@@ -9,15 +9,11 @@ import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
+import { TODAY_VERB } from "@/lib/commands/landings";
 import type { TodayItem } from "@/lib/commands/today";
 import "@/lib/commands/all";
 import { FirstRunChecklist, type FirstRun } from "./first-run";
 
-type Reason = TodayItem["reason"];
-const VERB: Record<Reason, [string, "info" | "attention"]> = {
-  submitted_order: ["Confirm", "info"], pick_due: ["Pick", "info"], restock_due: ["Put back", "attention"],
-  delivery_next: ["Resume", "info"], fermentation_reading_overdue: ["Record", "info"], invoice_question: ["Answer", "info"],
-};
 const ICON: Record<TodayItem["subjectType"], typeof Package01Icon> = { order: Package01Icon, delivery: Route01Icon, occupancy: ThermometerIcon, invoice: Invoice01Icon };
 
 export default async function TodayPage() {
@@ -38,7 +34,7 @@ export default async function TodayPage() {
           {E.btn("Record movement", "g", "/inventory")}
         </>
       ) : items.map((it) => {
-        const [verb, tone] = VERB[it.reason];
+        const [verb, tone] = TODAY_VERB[it.reason];
         return (
           <div key={`${it.reason}:${it.subjectId}`}>
             {E.row(it.safeLabel, it.detail, E.act(verb, tone, it.href), tone === "attention" || it.reason === "pick_due" ? "w" : "", ICON[it.subjectType])}

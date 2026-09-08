@@ -75,6 +75,10 @@ export type Screen = {
   writes: ReactNode;
   states?: [string, string, (0 | 1)?][];
   spec?: ReactNode;
+  /** The program that still owns shipping this screen, when no reads/writes tag
+   *  can say so — the record names no command, or another program owns the whole
+   *  surface. lib/mgr/screen-routes.ts keeps these out of the parity set. */
+  gatedBy?: string;
   /** The drawing replaced an earlier one and `spec` explains why; the docs fold it. */
   redrawn?: true;
   /** Drawn inside another product (QuickBooks, Square, Slack) in that product's
@@ -435,7 +439,7 @@ export const SCREENS: Screen[] = [
     </>),
   },
   {
-    step: 2, slice: 1, group: "Entry", surface: "entry", name: "Expired invite",
+    step: 2, slice: 1, group: "Entry", surface: "entry", name: "Expired invite", gatedBy: "Program 11",
     job: "The invite link is no longer valid",
     reads: "none", writes: "none",
     states: [["expired", "ask for a new invite"], ["wrong audience", "a customer link used on staff, or the reverse", 1], ["already a member", "sign in instead"]],
@@ -451,7 +455,7 @@ export const SCREENS: Screen[] = [
     </>),
   },
   {
-    step: 2, slice: 1, group: "Entry", surface: "entry", name: "Expired reset",
+    step: 2, slice: 1, group: "Entry", surface: "entry", name: "Expired reset", gatedBy: "Program 11",
     job: "The password reset link is no longer valid",
     reads: "none", writes: "none",
     states: [["expired", "request a new reset link"]],
@@ -506,7 +510,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     group: "Entry",
     surface: "entry",
-    name: "Accept invite",
+    name: "Accept invite", gatedBy: "Program 11",
     job: "Set a password and land in the correct shell",
     reads: "supabase_auth_get_session [platform]",
     writes: "supabase_auth_update_user [platform; membership already exists]",
@@ -888,7 +892,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Today",
     group: "Global",
-    name: "Composer answer",
+    name: "Composer answer", gatedBy: "Program 15",
     to: { "Shortfall detail": "Pars and allocation", Review: "Pars and allocation" },
     job: "Questions use named registered queries",
     reads: "get_atp · get_shortfalls [design]",
@@ -907,7 +911,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     group: "Global",
     surface: "sheet",
-    name: "Offline outbox",
+    name: "Offline outbox", gatedBy: "Program 15",
     to: { Fix: "Cellar transfer", Discard: "Offline outbox", "Record movement · Hazy": "Record movement", "Record fermentation reading · FV3": "Fermentation reading", "Record cellar transfer · FV2": "Cellar transfer", "Record pick · ORD-0229": "Pick" },
     job: "Retry safely; separate response loss from permanent rejection",
     reads: "local_outbox [client state]",
@@ -2878,7 +2882,7 @@ export const SCREENS: Screen[] = [
     slice: 7,
     tab: "More",
     group: "POS",
-    name: "POS sale detail",
+    name: "POS sale detail", gatedBy: "Program 14",
     to: { "Hazy 16 oz draft \u00d7 1": "POS mapping" },
     job: "Trace one Square sale through mapping, expected barrels and reconciliation",
     reads: "get_pos_sale [design]",
@@ -3249,7 +3253,7 @@ export const SCREENS: Screen[] = [
     slice: "chat",
     tab: "More",
     group: "Chat",
-    name: "Linked people",
+    name: "Linked people", gatedBy: "Program 16",
     job: "See which MGR users linked Slack and remove a stale link",
     reads: "list_chat_user_links [design]",
     writes: "unlink_chat_user",
@@ -3269,7 +3273,7 @@ export const SCREENS: Screen[] = [
     tab: "More",
     group: "Chat",
     surface: "entry",
-    name: "Link your Slack",
+    name: "Link your Slack", gatedBy: "Program 16",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
     job: "Link the signed-in Slack identity to the signed-in MGR user",
     reads: "get_chat_link_intent [design]",
@@ -3589,7 +3593,7 @@ export const SCREENS: Screen[] = [
     step: 5,
     slice: 1,
     tab: "More",
-    name: "Water profiles",
+    name: "Water profiles", gatedBy: "water profiles",
     to: { Edit: "Water profile", "Add profile": "Water profile", "Municipal · Denver": "Water profile", Burton: "Water profile", "Hazy target": "Water profile" },
     job: "Keep the water a brewery starts from and the waters it aims at",
     reads: "list_water_profiles [design]",

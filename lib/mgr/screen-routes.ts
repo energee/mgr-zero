@@ -126,40 +126,46 @@ const GATE = /(SCHEMA\/RLS-GATE|SCHEMA-GATE|IMPLEMENTATION-GATE)/;
 /** Tokens that are not registry commands: auth platform calls and client state. */
 const NOT_A_COMMAND = /\[(platform|client state)/;
 
-/** The command names a `writes` or `reads` string lists, each with whether it
- * is live: registered and not gate-tagged. Tags close a list ("a · b [design]"),
- * so a part inherits the tag of the next tagged part, as
- * tests/screen-command-gates.test.ts reads it. A `[design]` tag on a command
- * that has since shipped is stale prose; the registry is the fact. */
-function commandTokens(text: unknown): { name: string; live: boolean; designed: boolean }[] {
+/**
+ * Every operation a `reads`/`writes` string names, with the tag covering it.
+ * The inventory tags a list once at its end ("create_bin · update_bin ·
+ * delete_bin [SCHEMA-GATE …]"), so a part inherits the tag of the next tagged
+ * part. That inheritance rule is subtle and tests/screen-command-gates.test.ts
+ * needs it too, so it is written once here; each caller brings its own
+ * predicate for which tags disqualify a name.
+ */
+export function taggedOperations(text: unknown): { name: string; tag: string }[] {
   if (typeof text !== "string") return [];
-  const out: { name: string; live: boolean; designed: boolean }[] = [];
-  let skip = false, gated = false, designed = false;
+  const out: { name: string; tag: string }[] = [];
+  let tag = "";
   for (const part of text.split("·").map((p) => p.trim()).reverse()) {
-    if (/\[/.test(part)) { skip = NOT_A_COMMAND.test(part); gated = GATE.test(part); designed = /\[design/.test(part); }
-    if (skip) continue;
+    if (/\[/.test(part)) tag = part.slice(part.indexOf("["));
     const name = part.match(/^([a-z_]+)/)?.[1];
-    if (name && name.includes("_")) out.push({ name, live: !gated && Boolean(getCommandDefinition(name)), designed });
+    if (name && name.includes("_")) out.push({ name, tag });
   }
   return out;
 }
 
-/** Whether the live app can draw this record today: no read is blocked and,
- * when the record writes anything, at least one write is live. A read blocks
- * when it is gate-tagged, or unregistered without a `[design]` tag (a `[view]`
- * the page cannot exist without); a `[design]` read another program owns
- * (Invoice's QuickBooks reads) leaves the rest of the page drawable. A screen
- * with mixed live and gated writes (Team, with invite still gated) is in; a
- * screen whose only writes wait on a gate (Import) is out until it lifts. */
+/** The commands a record names, each with whether the live app can call it. */
+const liveCommands = (text: unknown) =>
+  taggedOperations(text)
+    .filter((t) => !NOT_A_COMMAND.test(t.tag))
+    .map((t) => ({ name: t.name, live: !GATE.test(t.tag) && Boolean(getCommandDefinition(t.name)), designed: /\[design/.test(t.tag) }));
+
+/** Whether the live app can draw this record today: another program does not
+ * own it outright (`gatedBy`), no read is blocked, and — when the record writes
+ * anything — at least one write is live. A read blocks when it is gate-tagged,
+ * or unregistered without a `[design]` tag (a `[view]` the page cannot exist
+ * without); a `[design]` read another program owns (Invoice's QuickBooks reads)
+ * leaves the rest of the page drawable. A screen with mixed live and gated
+ * writes (Team, with invite still gated) is in; one whose only writes wait on a
+ * gate (Import) is out until it lifts. */
 export function isUngated(s: Screen): boolean {
-  if (s.venue) return false;
-  const writes = commandTokens(s.writes);
-  const blocked = commandTokens(s.reads).some((t) => !t.live && !t.designed);
+  if (s.venue || s.gatedBy) return false;
+  const writes = liveCommands(s.writes);
+  const blocked = liveCommands(s.reads).some((t) => !t.live && !t.designed);
   return !blocked && (writes.length === 0 || writes.some((t) => t.live));
 }
 
-/** Programs 5, 11, 14, 15 and 16 own these; their records carry no tag a rule could gate on. */
-const DEFERRED = new Set(["Accept invite", "Expired invite", "Expired reset", "Composer answer", "Offline outbox", "Linked people", "POS sale detail", "Water profiles", "Link your Slack"]);
-
 /** The MGR screens the parity test holds the app to. */
-export const ungatedMgrScreens = (): Screen[] => SCREENS.filter((s) => isUngated(s) && !DEFERRED.has(s.name));
+export const ungatedMgrScreens = (): Screen[] => SCREENS.filter(isUngated);

@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useCommandAction } from "@/lib/commands/use-command-form";
 
-export function QuestionForm({ invoiceId, label, brewery }: { invoiceId: string; label: string; brewery: string }) {
+export function QuestionForm({ invoiceId, label }: { invoiceId: string; label: string }) {
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState("");
   const [sent, setSent] = useState(false);
@@ -23,7 +23,7 @@ export function QuestionForm({ invoiceId, label, brewery }: { invoiceId: string;
       {E.fld("Invoice", label)}
       {sent ? (
         <>
-          {E.info(`Sent to ${brewery}. Someone will get back to you; nothing on the invoice changes.`)}
+          {E.info("Sent to the brewery. Someone will get back to you; nothing on the invoice changes.")}
           <CommandFormFooter><Button onClick={() => setOpen(false)}>Close</Button></CommandFormFooter>
         </>
       ) : (
@@ -33,7 +33,7 @@ export function QuestionForm({ invoiceId, label, brewery }: { invoiceId: string;
             <Textarea id="question-body" value={body} onChange={(e) => setBody(e.target.value)} maxLength={2000} required />
           </div>
           <CommandFormMessage error={action.error} />
-          <CommandFormFooter><Button type="submit" disabled={action.busy || !body.trim()}>{action.busy ? "Sending…" : `Send to ${brewery}`}</Button></CommandFormFooter>
+          <CommandFormFooter><Button type="submit" disabled={action.busy || !body.trim()}>{action.busy ? "Sending…" : "Send to the brewery"}</Button></CommandFormFooter>
         </form>
       )}
     </CommandForm>

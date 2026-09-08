@@ -1,6 +1,6 @@
 // app/(app)/denied/page.tsx — Permission denied (screen record): a forbidden
-// route says what was refused and offers one way back. Reached only through
-// lib/mgr/denied.ts orDenied() from a page whose first read was refused.
+// route says what was refused and offers one way back. Reached from a page
+// whose role check refused the visitor, via lib/mgr/denied.ts deniedHref().
 import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { deniedCopy } from "@/lib/mgr/denied";

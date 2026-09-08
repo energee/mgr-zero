@@ -10,19 +10,18 @@ import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
 import { docNo } from "@/lib/mgr/doc-no";
+import { nextState, type OrderStatus } from "@/lib/mgr/order-status";
 import { money } from "@/lib/mgr/money";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { LifecycleButtons } from "./lifecycle-buttons";
 
-type OrderStatus = "draft" | "submitted" | "confirmed" | "picked" | "shipped" | "cancelled";
 type Order = { id: string; order_no: number | null; kind: "wholesale" | "taproom_transfer"; status: OrderStatus; po_number: string | null; requested_ship_date: string | null; note: string | null; needs_restock: boolean; customers: { name: string } | null; ship_tos: { label: string; city: string; state: string } | null };
 type OrderLine = { id: string; sku_id: string; qty_ordered: number; qty_picked: number | null; qty_shipped: number | null; unit_price_cents: number; skus: { name: string } | null };
 type OrderEvent = { id: string; event: string; actor: string; payload: Record<string, unknown>; created_at: string };
 type Atp = { sku_id: string; qty: number };
 type SkuRow = { id: string; name: string; brands: { name: string } | null };
 
-const NEXT: Record<OrderStatus, string> = { draft: "submit", submitted: "confirm", confirmed: "pick", picked: "ship", shipped: "delivered or returned", cancelled: "none" };
 
 function lineChange(entries: unknown, skuNames: Map<string, string>): string {
   if (!entries) return "—";
@@ -46,7 +45,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     <>
       {E.back("Orders", label, undefined, "/orders")}
       {E.ttl(where)}
-      {E.row("Current state", `${order.status}${order.needs_restock ? " · restock pending" : ""}`, E.status(`Next: ${order.status === "picked" && order.needs_restock ? "put back" : NEXT[order.status]}`), order.needs_restock ? "w" : "")}
+      {E.row("Current state", `${order.status}${order.needs_restock ? " · restock pending" : ""}`, E.status(`Next: ${nextState(order.status, order.needs_restock)}`), order.needs_restock ? "w" : "")}
       {order.status === "picked" && order.needs_restock && E.act("Put back", "attention", `/orders/${order.id}/restock`)}
       {order.status === "submitted" && E.act("Review and confirm", "success", `/orders/${order.id}/confirm`)}
       {order.status === "picked" && order.kind === "taproom_transfer" && E.act("Complete transfer", "success", `/orders/${order.id}/complete`)}
