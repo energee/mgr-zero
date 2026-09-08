@@ -64,3 +64,17 @@ defineQuery({
     };
   },
 });
+
+export type ReportLine = { class: "keg" | "can" | "bottle"; begin: number; in: number; out: number; end: number };
+export type Report = {
+  figures: { jurisdiction: string; periodStart: string; periodEnd: string; lines: ReportLine[]; removals: Record<string, number>; byState: Record<string, number>; packaged: number; inProcess: number; balances: boolean };
+  warnings: string[];
+};
+
+const period = z.object({ jurisdiction: z.string().regex(/^[A-Z-]+$/, "TTB or US-XX"), periodStart: z.string().date(), periodEnd: z.string().date() });
+
+defineQuery({
+  name: "generate_compliance_report", description: "Compute a period report from the movement ledger: per package class begin + in − out = end in bbl, removals by frozen tax treatment and destination state, packaged volume, and beer in process; nothing is stored",
+  roles: [...ROLES], input: period,
+  handler: (ctx, i) => unwrap(ctx.db.rpc("generate_compliance_report", { p_brewery: ctx.breweryId, p_jurisdiction: i.jurisdiction, p_start: i.periodStart, p_end: i.periodEnd })) as Promise<Report>,
+});
