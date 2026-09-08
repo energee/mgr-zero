@@ -134,6 +134,11 @@ Adds `unique (id, brewery_id)`; `price_list_id` composite FK → `price_lists` (
 ### `ship_tos` — unchanged, but `customer_id` becomes composite → `customers`
 `state` check 2-letter. Adds `unique (id, customer_id, brewery_id)` so orders can pin a
 ship-to to its customer. idx `(customer_id)`. RLS: `staff_all`, `customer_own` select.
+`is_default boolean not null default false`; a partial unique index on
+`(brewery_id, customer_id) where is_default` permits at most one default.
+`upsert_ship_to` locks the customer before switching defaults and rejects address
+reassignment. Omitted default choice preserves an existing address; new addresses
+default to false. Defaults initialize new order forms only.
 
 ### `brewery_counters` — new (see §0)
 RLS enabled, no policies for `authenticated` — only touched through `next_no()`
@@ -209,7 +214,8 @@ security-invoker function. The exact table shape remains a baseline-migration
 decision; no status column or mutable inventory quantity is required.
 
 ### Views
-- `on_hand`, `atp` — unchanged definitions.
+- `on_hand` sums the ledger by SKU/location. `atp` subtracts all open reservations
+  from global SKU on-hand, including reserved SKUs with no movement history (zero on-hand).
 - `taproom_replenishment` — taproom on-hand vs `taproom_pars`, `suggested_qty = greatest(par − on_hand, 0)`.
 - `lot_on_hand` — `sum(qty)` by `(brewery_id, lot_id, sku_id, location_id)`.
 
@@ -257,14 +263,11 @@ transaction. Ordinary shipping also creates the invoice. Self-delivery defers th
 invoice until `confirm_delivery`; it does not defer or repeat shipment/removal effects. Route
 stops reference shipments (§13). RLS: `staff_all`; `P-customer` select via the order.
 
-**SCHEMA-GATE — invoice timing:** the implemented shipment shape has no durable
-fact that distinguishes ordinary invoice-at-ship from self-delivery
-invoice-at-delivery, and route assignment happens later. Before either branch
-ships, add explicit immutable-at-ship intent (for example
-`invoice_on_delivery boolean not null`) and require `ship_order` to persist it.
-`confirm_delivery` may create an invoice only for a shipment carrying that intent;
-never infer it from `carrier`, `tracking`, or later route membership. This is a
-fulfillment mode, not a workflow status.
+**Implemented invoice timing:** `shipments.invoice_timing` persists the reviewed
+`now` or `on_delivery` intent at ship time. `confirm_delivery` creates an invoice
+only for a shipment carrying `on_delivery`; it never repeats stock movements.
+Never infer timing from `carrier`, `tracking`, or later route membership.
+This is a fulfillment mode, not a workflow status.
 
 ### `invoices`
 `invoice_no bigint` (trigger), `kind invoice_kind`, `customer_id → customers`,
@@ -556,8 +559,9 @@ movement's `type` says consumed / `return_to_stock` / `loss`. idx `(run_id)`.
 ### Views
 - `packaging_run_requirements` — per open run × `sku_bom`: `required, on_hand, on_order,
   short`. The pre-run checklist.
-- `packaging_run_yields` — `bbl_packaged = sum(qty_actual × bbl_per_unit)`, `loss_bbl =
-  bbl_drawn − bbl_packaged`.
+- `packaging_run_yields` — `bbl_packaged = sum(linked output inventory movements.bbl)` for closed runs only,
+  `loss_bbl = bbl_drawn − bbl_packaged`. These committed movement volumes stay frozen
+  when a format changes; open-run requirements still use the current plan.
 
 ## 11. Compliance
 
@@ -731,7 +735,9 @@ from the brand and format; it retains its stable ID, active state, UPC and provi
 mappings, but stops carrying its own package facts or `bbl_per_unit`. The trigger
 `enforce_bbl_integrity()` reads it through the format. **Safe for history** —
 `inventory_movements.bbl` is frozen at write time, so correcting a format later
-cannot move past movements.
+cannot move past movements. Closed packaging yield reads those linked frozen output
+movements, not today’s format volume. Correcting a definition affects future
+calculations and open plans; recorded material consumption is likewise unchanged.
 
 Atomic-format volume entry accepts a per-instance subset of `oz`, `gal`, `bbl`, `mL`
 and `L`; the command converts the entered value to canonical bbl before writing.

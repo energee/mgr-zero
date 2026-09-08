@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import type { License, RegistryBrand } from "@/lib/commands/compliance";
-import { runCommand } from "@/lib/commands/registry";
+import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { ApprovalForm, LicenseForm, RegistrationForm } from "./registry-forms";
 

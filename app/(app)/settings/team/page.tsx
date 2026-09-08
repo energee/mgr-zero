@@ -3,7 +3,7 @@ import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import type { TeamMember } from "@/lib/commands/invites";
-import { runCommand } from "@/lib/commands/registry";
+import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { getRequestIdentity } from "@/lib/auth/request-context";
 import { deniedHref } from "@/lib/mgr/denied";
 import "@/lib/commands/all";

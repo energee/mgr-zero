@@ -5,7 +5,7 @@ import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { DEFAULT_WORK_KINDS, type WorkRow } from "@/lib/commands/landings";
-import { runCommand } from "@/lib/commands/registry";
+import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { WorkList } from "./work-list";
 

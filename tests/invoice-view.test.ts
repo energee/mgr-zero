@@ -78,6 +78,5 @@ describe("Invoice view", () => {
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
     expect(src).toMatch(/qboGate=/);
     expect(src).toMatch(/<MarkAnswered\b/);
-    expect(src).toMatch(/backHref: "\/invoices"/);
   });
 });

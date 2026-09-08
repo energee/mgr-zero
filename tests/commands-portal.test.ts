@@ -74,6 +74,104 @@ describe("portal commands", () => {
     expect(submittedLines).toEqual([{ sku_id: skuId, qty_ordered: 5 }]);
   });
 
+  it("persists, preserves when omitted, and explicitly clears the requested date", async () => {
+    const made = await runCommand("portal_create_order", { shipToId, requestedShipDate: "2026-10-01", lines: [{ skuId, qty: 2 }] }, custCtx) as { order_id: string };
+    const read = async () => (await runCommand("portal_order", { orderId: made.order_id }, custCtx) as any).order.requested_ship_date;
+    expect(await read()).toBe("2026-10-01");
+    await runCommand("portal_update_draft_order", { orderId: made.order_id, lines: [{ skuId, qty: 3 }] }, custCtx);
+    expect(await read()).toBe("2026-10-01");
+    await runCommand("portal_update_draft_order", { orderId: made.order_id, requestedShipDate: "2026-10-02", lines: [{ skuId, qty: 3 }] }, custCtx);
+    expect(await read()).toBe("2026-10-02");
+    const oldCaller = await adminCtx.db.rpc("update_draft_order", { p_order: made.order_id, p_ship_to: null, p_requested: null, p_po: null, p_note: null, p_lines: [{ sku_id: skuId, qty: 3 }], p_request_id: crypto.randomUUID() });
+    expect(oldCaller.error).toBeNull();
+    expect(await read()).toBe("2026-10-02");
+    await runCommand("portal_update_draft_order", { orderId: made.order_id, requestedShipDate: null, lines: [{ skuId, qty: 3 }] }, custCtx);
+    expect(await read()).toBeNull();
+  });
+
+  it("recovers lost create and submit responses with exact request replay, without another update", async () => {
+    const input = { shipToId, lines: [{ skuId, qty: 2 }] };
+    const create = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+    await runCommand("portal_create_order", input, custCtx, create); // committed response lost
+    const recovered = await runCommand("portal_create_order", input, custCtx, create) as { order_id: string };
+    const submit = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+    await runCommand("portal_submit_order", { orderId: recovered.order_id }, custCtx, submit); // response lost
+    await runCommand("portal_submit_order", { orderId: recovered.order_id }, custCtx, submit);
+    const events = await admin.from("order_events").select("event").eq("order_id", recovered.order_id);
+    expect(events.data?.map(e => e.event).sort()).toEqual(["created", "submitted"]);
+  });
+
+  it("refuses other-customer and cross-tenant draft reads and writes", async () => {
+    for (const brewery of [b, await makeBrewery()]) {
+      const other = await seedCustomer(brewery.id, { name: `Other-${crypto.randomUUID()}` });
+      const location = await seedLocation(brewery.id, { name: `Foreign WH-${crypto.randomUUID()}` });
+      const { data: order, error } = await admin.from("orders").insert({ sale_channel_id: other.saleChannelId, from_location_id: location.id, brewery_id: brewery.id, kind: "wholesale", customer_id: other.customerId, ship_to_id: other.shipToId, created_by: adminCtx.userId }).select("id").single();
+      expect(error).toBeNull();
+      await expect(runCommand("portal_order", { orderId: order!.id }, custCtx)).rejects.toMatchObject({ code: "not_found" });
+      await expect(runCommand("portal_update_draft_order", { orderId: order!.id, lines: [{ skuId, qty: 1 }] }, custCtx)).rejects.toThrow();
+      await expect(runCommand("portal_submit_order", { orderId: order!.id }, custCtx)).rejects.toThrow();
+    }
+  });
+
+  it("binds an uncertain request to the original actor at verified dispatch", async () => {
+    const secondUser = await makeCustomerUser(customerId);
+    const second = { ...custCtx, db: await asUser(secondUser.email), userId: secondUser.id };
+    const input = { shipToId, lines: [{ skuId, qty: 1 }], expectedIdentity: { actorId: custCtx.userId, customerId } };
+    const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+    const made = await runCommand("portal_create_order", input, custCtx, execution) as { order_id: string }; // response lost
+    await expect(runCommand("portal_create_order", input, second, execution)).rejects.toThrow(/account changed/);
+    const replay = await runCommand("portal_create_order", input, custCtx, execution);
+    expect(replay).toEqual(made);
+    const madeByB = await admin.from("orders").select("id").eq("created_by", second.userId);
+    expect(madeByB.data).toEqual([]);
+    // Same request ID under B is still unclaimed after the rejection.
+    const other = await runCommand("portal_create_order", { ...input, expectedIdentity: { actorId: second.userId, customerId } }, second, execution) as { order_id: string };
+    expect(other.order_id).not.toBe(made.order_id);
+    for (const name of ["portal_update_draft_order", "portal_submit_order"]) {
+      await expect(runCommand(name, { ...input, orderId: made.order_id }, second)).rejects.toThrow(/account changed/);
+    }
+  });
+
+  it("exposes only the configured customer-facing fulfillment source", async () => {
+    const account = await runCommand("get_portal_account", {}, custCtx) as any;
+    expect(account.fulfillmentSource).toMatchObject({ name: "Configured WH" });
+    const previous = account.fulfillmentSource.id;
+    await admin.from("breweries").update({ portal_fulfillment_location_id: null }).eq("id", b.id);
+    try { expect((await runCommand("get_portal_account", {}, custCtx) as any).fulfillmentSource).toBeNull(); }
+    finally { await admin.from("breweries").update({ portal_fulfillment_location_id: previous }).eq("id", b.id); }
+  });
+
+  it("checks the active customer and brewery inside update/submit even when the actor owns both accounts", async () => {
+    for (const brewery of [b, await makeBrewery()]) {
+      const target = await seedCustomer(brewery.id, { name: `Owned-${crypto.randomUUID()}` });
+      await admin.from("customer_users").insert({ customer_id: target.customerId, user_id: custCtx.userId });
+      const targetCtx = { ...custCtx, breweryId: brewery.id, customerId: target.customerId };
+      const catalog = await seedCatalog(brewery.id, { product: `Target-${crypto.randomUUID()}`, format: `Target format-${crypto.randomUUID()}` });
+      await priceSku(brewery.id, { saleChannelId: target.saleChannelId, brandId: catalog.brandId, formatId: catalog.formatId, cents: 2000 });
+      const wh = await seedLocation(brewery.id, { name: `Target WH-${crypto.randomUUID()}` });
+      await admin.from("breweries").update({ portal_fulfillment_location_id: wh.id }).eq("id", brewery.id);
+      const made = await runCommand("portal_create_order", { shipToId: target.shipToId, lines: [{ skuId: catalog.skuId, qty: 1 }] }, targetCtx) as { order_id: string };
+      const update = { orderId: made.order_id, lines: [{ skuId: catalog.skuId, qty: 2 }] };
+      const updateExecution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+      const wrongIdentity = { actorId: custCtx.userId, customerId };
+      await expect(runCommand("portal_update_draft_order", { ...update, expectedIdentity: wrongIdentity }, custCtx, updateExecution)).rejects.toThrow(/permission denied/);
+      const unchanged = await admin.from("order_lines").select("qty_ordered").eq("order_id", made.order_id);
+      expect(unchanged.data).toEqual([{ qty_ordered: 1 }]);
+      // Reuse the refused ID under the proper scope: rejection must not claim it.
+      const changed = await runCommand("portal_update_draft_order", update, targetCtx, updateExecution);
+      expect(await runCommand("portal_update_draft_order", update, targetCtx, updateExecution)).toEqual(changed);
+      const submitExecution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+      await expect(runCommand("portal_submit_order", { orderId: made.order_id, expectedIdentity: wrongIdentity }, custCtx, submitExecution)).rejects.toThrow(/permission denied/);
+      expect((await admin.from("orders").select("status").eq("id", made.order_id).single()).data?.status).toBe("draft");
+      const submitted = await runCommand("portal_submit_order", { orderId: made.order_id }, targetCtx, submitExecution);
+      expect(await runCommand("portal_submit_order", { orderId: made.order_id }, targetCtx, submitExecution)).toEqual(submitted);
+      // A prior update still replays after the order is no longer a draft.
+      expect(await runCommand("portal_update_draft_order", update, targetCtx, updateExecution)).toEqual(changed);
+      const events = await admin.from("order_events").select("event").eq("order_id", made.order_id);
+      expect(events.data?.map(e => e.event).sort()).toEqual(["created", "submitted", "updated"]);
+    }
+  });
+
   it("rejects a ship-to that belongs to another customer", async () => {
     const other = await seedCustomer(b.id, { name: "Foreign Bar", saleChannelId });
     await expect(runCommand("portal_create_order", { shipToId: other.shipToId, lines: [{ skuId, qty: 1 }] }, custCtx))

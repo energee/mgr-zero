@@ -17,6 +17,7 @@ export type CompleteTransferViewModel = {
 };
 
 export type CompleteTransferSnapshot = {
+  backHref?: string;
   order: {
     id: string;
     order_no: number | null;
@@ -25,7 +26,6 @@ export type CompleteTransferSnapshot = {
   };
   lines: { id: string; qty_ordered: number; qty_picked: number | null; skus: { name: string } | null }[];
   locations: { id: string; name: string }[];
-  backHref?: string;
 };
 
 export function toCompleteTransferViewProps({ order, lines, locations, backHref }: CompleteTransferSnapshot): CompleteTransferViewModel {

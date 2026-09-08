@@ -32,7 +32,7 @@ export function ConfirmOrderView({
       {model.oversellNotes.map((note) => <Fragment key={note}>{E.note(note)}</Fragment>)}
       {complianceNote ? E.note(complianceNote) : null}
       {E.sp()}
-      {footer ?? E.btns([["Confirm order", "p"], ["Cancel order", "del"]])}
+      {footer !== undefined ? footer : E.btns([["Confirm order", "p"], ["Cancel order", "del"]])}
     </>
   );
 }

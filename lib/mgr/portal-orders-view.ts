@@ -1,6 +1,5 @@
 // lib/mgr/portal-orders-view.ts — view-model for portal Order history.
-// portal_orders rows plus buyerStatus. Every row opens Order detail; Reorder
-// lives on Order detail, not this list.
+// portal_orders rows plus buyerStatus; drafts continue and shipped rows reorder.
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { buyerStatus } from "./order-status";
@@ -10,6 +9,8 @@ export type PortalOrdersRowView = {
   title: string;
   detail: string;
   href: string;
+  actionHref?: string;
+  verb?: "Reorder" | "Continue / edit";
   warning?: boolean;
 };
 
@@ -63,11 +64,14 @@ export function toPortalOrdersViewProps({ customerName, breweryName, orders }: P
       const adjusted = shortCopy(o.order_lines);
       const status = adjusted ?? buyerStatus(o.status, o.requested_ship_date);
       const total = lineTotal(o.order_lines);
+      const reorder = o.status === "shipped";
       return {
         key: o.id,
         title: docNo("ORD", o.order_no, "Order"),
         detail: total === undefined ? status : `${status} · ${money(total)}`,
         href: `/portal/orders/${o.id}`,
+        actionHref: reorder ? `/portal?reorder=${o.id}` : o.status === "draft" ? `/portal?draft=${o.id}` : undefined,
+        verb: reorder ? "Reorder" : o.status === "draft" ? "Continue / edit" : undefined,
         warning: Boolean(adjusted),
       };
     }),

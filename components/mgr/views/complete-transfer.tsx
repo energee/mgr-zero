@@ -7,9 +7,11 @@ export type { CompleteTransferViewModel };
 
 export function CompleteTransferView({
   model,
+  sources,
   footer,
   tape,
 }: {
+  sources?: ReactNode;
   model: CompleteTransferViewModel;
   footer?: ReactNode;
   tape?: [ReactNode, ReactNode?][];
@@ -23,8 +25,9 @@ export function CompleteTransferView({
       ))}
       {tape ? E.tape(tape) : null}
       {E.info("No invoice: this is an internal move.")}
+      {sources}
       {E.sp()}
-      {footer ?? E.btn("Complete transfer", "irr")}
+      {footer !== undefined ? footer : E.btn("Complete transfer", "irr")}
     </>
   );
 }

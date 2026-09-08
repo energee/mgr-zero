@@ -9,7 +9,7 @@
 import { SaleChannelsView } from "@/components/mgr/views/sale-channels";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
-import { runCommand } from "@/lib/commands/registry";
+import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toSaleChannelsViewProps } from "@/lib/mgr/sale-channels-view";
 import "@/lib/commands/all";
 import { ChannelForm } from "./channel-form";

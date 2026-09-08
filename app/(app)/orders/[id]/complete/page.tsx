@@ -7,19 +7,20 @@ import { redirect } from "next/navigation";
 import { CompleteTransferView } from "@/components/mgr/views/complete-transfer";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
-import { runCommand } from "@/lib/commands/registry";
+import { runPageQuery as runCommand, requirePagePermission } from "@/lib/mgr/page-query";
 import { toCompleteTransferViewProps } from "@/lib/mgr/complete-transfer-view";
 import { orNotFound } from "@/lib/mgr/not-found";
 import "@/lib/commands/all";
-import { CompleteButton } from "./complete-button";
+import { ShipForm } from "../ship-form";
 
 type Order = { id: string; order_no: number | null; kind: string; status: string; from_location_id: string; to_location_id: string | null };
-type Line = { id: string; qty_ordered: number; qty_picked: number | null; skus: { name: string } | null };
+type Line = { id: string; sku_id: string; qty_ordered: number; qty_picked: number | null; skus: { name: string } | null };
 
 export default async function CompleteTransferPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
+  requirePagePermission(ctx, "ship_order");
   const [{ order, lines }, locations] = await Promise.all([
     orNotFound(runCommand("get_order", { orderId: id }, ctx) as Promise<{ order: Order; lines: Line[] }>),
     runCommand("list_locations", {}, ctx) as Promise<{ id: string; name: string }[]>,
@@ -28,7 +29,7 @@ export default async function CompleteTransferPage({ params }: { params: Promise
   return (
     <CompleteTransferView
       model={toCompleteTransferViewProps({ order, lines, locations, backHref: `/orders/${order.id}` })}
-      footer={<CompleteButton orderId={order.id} ship={lines.map((l) => ({ lineId: l.id, qty: Number(l.qty_picked ?? 0) }))} />}
+      footer={<ShipForm transfer orderId={order.id} lines={lines.map(l => ({ id: l.id, skuId: l.sku_id, skuName: l.skus?.name ?? "Line", qtyPicked: Number(l.qty_picked ?? 0) }))} />}
     />
   );
 }

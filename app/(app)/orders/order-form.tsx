@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
-import { isCompleteLine, orderFormReadiness } from "@/lib/order-form-rules";
+import { defaultShipToId, isCompleteLine, orderFormReadiness } from "@/lib/order-form-rules";
 import { SkuPicker } from "@/components/mgr/search-palette";
 
 type OrderKind = "wholesale" | "taproom_transfer";
@@ -25,7 +25,7 @@ type OrderKind = "wholesale" | "taproom_transfer";
 export type CustomerOption = {
   id: string;
   name: string;
-  shipTos: { id: string; label: string }[];
+  shipTos: { id: string; label: string; is_default?: boolean }[];
 };
 export type LocationOption = { id: string; name: string; kind: "warehouse" | "taproom" };
 export type SkuOption = { id: string; label: string };
@@ -119,7 +119,7 @@ export function OrderForm({
                   value={customerId}
                   onValueChange={(v) => {
                     setCustomerId(v);
-                    setShipToId("");
+                    setShipToId(defaultShipToId(customers.find((c) => c.id === v)?.shipTos ?? []));
                   }}
                 >
                   <SelectTrigger id="order-customer">
@@ -138,20 +138,11 @@ export function OrderForm({
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="order-ship-to">Ship-to</Label>
-                <Select value={shipToId} onValueChange={setShipToId}>
-                  <SelectTrigger id="order-ship-to">
-                    <SelectValue placeholder={customerId ? "Select ship-to" : "Select a customer first"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {shipTos.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                {/* Native options and value commit together; Radix hidden options can emit an empty change during this cascade. */}
+                <select id="order-ship-to" className="rounded-md border p-2" value={shipToId} onChange={e => setShipToId(e.target.value)} disabled={!customerId}>
+                  <option value="">{customerId ? "Select ship-to" : "Select a customer first"}</option>
+                  {shipTos.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                </select>
               </div>
             </>
           ) : (

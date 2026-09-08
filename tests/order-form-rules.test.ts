@@ -44,3 +44,10 @@ describe("orderFormReadiness", () => {
     expect(orderFormReadiness({ ...empty, kind: "taproom_transfer", catalog: { customers: 0, locations: 1, skus: 1 } }).hint).toBeNull();
   });
 });
+
+it("new-order destination prefers the default and falls back only when none is designated", async () => {
+  const { defaultShipToId } = await import("../lib/order-form-rules");
+  expect(defaultShipToId([{ id: "first" }, { id: "default", is_default: true }])).toBe("default");
+  expect(defaultShipToId([{ id: "first" }, { id: "second" }])).toBe("first");
+  expect(defaultShipToId([])).toBe("");
+});

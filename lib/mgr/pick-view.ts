@@ -18,6 +18,7 @@ export type PickViewModel = {
 };
 
 export type PickSnapshot = {
+  backHref?: string;
   order: { id: string; order_no: number | null; from_location_id: string };
   lines: {
     id: string;
@@ -27,7 +28,6 @@ export type PickSnapshot = {
     skus: { name: string } | null;
   }[];
   locations: { id: string; name: string }[];
-  backHref?: string;
 };
 
 /** Map get_order onto PickView. Count defaults to qty_picked, else qty_ordered. */

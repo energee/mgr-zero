@@ -12,6 +12,7 @@ export function PortalOrderView({
   footer,
   linkRows,
   reorderHref,
+  continueHref,
 }: {
   model: PortalOrderViewModel;
   /** Live: Reorder with href. Inventory draws E.btn when model.reorder. */
@@ -19,12 +20,14 @@ export function PortalOrderView({
   /** Live: the invoice row is a link. Inventory leaves the tap unlabeled. */
   linkRows?: boolean;
   reorderHref?: string;
+  continueHref?: string;
 }) {
   return (
     <>
       {E.back("Orders", model.title, undefined, model.backHref)}
       {E.fld("Status", model.status)}
       {model.shipTo ? E.fld("Ship-to", model.shipTo) : null}
+      {model.requested ? E.fld("Requested", model.requested) : null}
       {model.po ? E.fld("Your PO", model.po) : null}
       {model.note ? E.fld("Note", model.note) : null}
       {model.lines.map((line) => (
@@ -42,7 +45,7 @@ export function PortalOrderView({
           linkRows ? model.invoice.href : undefined,
         )
         : null}
-      {footer ?? (model.reorder ? E.btn("Reorder", "g", reorderHref) : null)}
+      {footer !== undefined ? footer : (continueHref ? E.btn("Continue / edit", "p", continueHref) : model.reorder ? E.btn("Reorder", "g", reorderHref) : null)}
     </>
   );
 }

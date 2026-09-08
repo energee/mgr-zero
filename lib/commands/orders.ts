@@ -2,7 +2,7 @@
 // to one plpgsql function (00001_baseline.sql, iron rule 5); this layer does
 // zod validation, role gating, and camelCase→p_* argument mapping.
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap } from "./registry";
+import { defineCommand, defineQuery, unwrap, runCommand, CommandError } from "./registry";
 
 const lines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive() })).min(1);
 const salesRoles = ["admin", "sales"] as const;
@@ -112,10 +112,12 @@ defineCommand({
   roles: [...warehouseRoles], requiresConfirmation: true,
   input: z.object({
     orderId: z.string().uuid(), carrier: z.string().optional(), tracking: z.string().optional(),
-    ship: pickLines, invoiceTiming: z.enum(["now", "on_delivery"]).default("now"),
+    ship: z.array(z.object({ lineId: z.string().uuid(), qty: z.number().nonnegative().multipleOf(0.01),
+      sources: z.array(z.object({ binId: z.string().uuid(), lotId: z.string().uuid().nullable(), qty: z.number().positive().multipleOf(0.01), toBinId: z.string().uuid().optional() })).optional(),
+    })).min(1), invoiceTiming: z.enum(["now", "on_delivery"]).default("now"),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("ship_order", {
-    p_order: i.orderId, p_ship: i.ship.map(s => ({ line_id: s.lineId, qty_shipped: s.qty })),
+    p_order: i.orderId, p_ship: i.ship.map(s => ({ line_id: s.lineId, qty_shipped: s.qty, ...(s.sources === undefined ? {} : { sources: s.sources.map(a => ({ bin_id: a.binId, lot_id: a.lotId, qty: a.qty, to_bin_id: a.toBinId ?? null })) }) })),
     p_carrier: i.carrier ?? null, p_tracking: i.tracking ?? null, p_invoice_timing: i.invoiceTiming, p_request_id: execution.requestId,
   })),
 });
@@ -130,19 +132,65 @@ defineCommand({
 defineQuery({
   name: "get_shortfalls", description: "SKUs whose available-to-promise is negative, with on-hand and open reservations",
   roles: [...readRoles],
-  input: z.object({}),
-  handler: async (ctx) => {
+  input: z.object({ skuId: z.string().uuid().optional() }),
+  handler: async (ctx, i) => {
+    // Read all rows being summed, not just PostgREST's first 1,000. Filtering
+    // precedes pagination; deterministic keys keep each page disjoint.
+    async function complete<T>(page: (start: number) => PromiseLike<{ data: T[] | null; error: { message: string; code?: string } | null; count: number | null }>) {
+      const result: T[] = [];
+      let total: number | undefined;
+      do {
+        const response = await page(result.length), rows = await unwrap(Promise.resolve(response));
+        if (response.count === null || (total !== undefined && response.count !== total) || !rows || (!rows.length && result.length < response.count)) {
+          throw new CommandError("Reservations changed while loading. Reload to review them.", 409, "conflict");
+        }
+        total = response.count; result.push(...rows);
+      } while (result.length < total);
+      return result;
+    }
     const [atp, onHand, allocs] = await Promise.all([
-      unwrap(ctx.db.from("atp").select("sku_id, qty, skus(name)").eq("brewery_id", ctx.breweryId).lt("qty", 0)),
-      unwrap(ctx.db.from("on_hand").select("sku_id, qty").eq("brewery_id", ctx.breweryId)),
-      unwrap(ctx.db.from("allocations").select("sku_id, qty").eq("brewery_id", ctx.breweryId).eq("status", "open")),
+      complete(start => {
+        let q = ctx.db.from("atp").select("sku_id, qty", { count: "exact" }).eq("brewery_id", ctx.breweryId).lt("qty", 0);
+        if (i.skuId) q = q.eq("sku_id", i.skuId);
+        return q.order("sku_id").range(start, start + 499);
+      }),
+      complete(start => {
+        let q = ctx.db.from("on_hand").select("sku_id, location_id, qty", { count: "exact" }).eq("brewery_id", ctx.breweryId);
+        if (i.skuId) q = q.eq("sku_id", i.skuId);
+        return q.order("sku_id").order("location_id").range(start, start + 499);
+      }),
+      complete(start => {
+        let q = ctx.db.from("allocations").select("id, sku_id, qty, source, ref", { count: "exact" }).eq("brewery_id", ctx.breweryId).eq("status", "open");
+        if (i.skuId) q = q.eq("sku_id", i.skuId);
+        return q.order("id").range(start, start + 499);
+      }),
     ]);
+    // Aggregate view lineage is not a reliable PostgREST relationship. Read
+    // labels explicitly through the same tenant/RLS boundary in bounded batches.
+    const skuNames = new Map<string, string>();
+    for (let start = 0; start < atp.length; start += 100) {
+      const skus = await unwrap(ctx.db.from("skus").select("id, name").eq("brewery_id", ctx.breweryId).in("id", atp.slice(start, start + 100).map(r => r.sku_id)));
+      for (const sku of skus ?? []) skuNames.set(sku.id, sku.name);
+    }
+    const orderLines = new Map<string, { orderId: string; orderNo: number }>();
+    const refs = [...new Set(allocs.filter(a => a.source === "order_line").map(a => a.ref))];
+    for (let start = 0; start < refs.length; start += 100) {
+      const lines = await unwrap(ctx.db.from("order_lines").select("id, order_id, orders(order_no)").eq("brewery_id", ctx.breweryId).in("id", refs.slice(start, start + 100)));
+      for (const line of lines as unknown as { id: string; order_id: string; orders: { order_no: number } | null }[]) {
+        if (line.orders) orderLines.set(line.id, { orderId: line.order_id, orderNo: line.orders.order_no });
+      }
+    }
     const sum = (rows: { sku_id: string; qty: number }[]) => rows.reduce((m, r) => m.set(r.sku_id, (m.get(r.sku_id) ?? 0) + Number(r.qty)), new Map<string, number>());
-    const onHandBySku = sum(onHand as { sku_id: string; qty: number }[]);
-    const allocatedBySku = sum(allocs as { sku_id: string; qty: number }[]);
-    return (atp as unknown as { sku_id: string; qty: number; skus: { name: string } | null }[]).map((r) => ({
-      skuId: r.sku_id, skuName: r.skus?.name ?? r.sku_id, atp: Number(r.qty),
+    const onHandBySku = sum(onHand), allocatedBySku = sum(allocs);
+    const reservationsBySku = new Map<string, typeof allocs>();
+    for (const allocation of allocs) {
+      const rows = reservationsBySku.get(allocation.sku_id) ?? [];
+      rows.push(allocation); reservationsBySku.set(allocation.sku_id, rows);
+    }
+    return atp.map(r => ({
+      skuId: r.sku_id, skuName: skuNames.get(r.sku_id) ?? r.sku_id, atp: Number(r.qty),
       onHand: onHandBySku.get(r.sku_id) ?? 0, allocated: allocatedBySku.get(r.sku_id) ?? 0,
+      reservations: (reservationsBySku.get(r.sku_id) ?? []).map(a => ({ id: a.id, source: a.source, ref: a.ref, qty: Number(a.qty), ...orderLines.get(a.ref) })),
     }));
   },
 });
@@ -152,10 +200,10 @@ defineCommand({
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({
     invoiceId: z.string().uuid(), locationId: z.string().uuid(), reason: z.enum(["damaged", "wrong_item", "unsold"]),
-    lines: z.array(z.object({ invoiceLineId: z.string().uuid(), qty: z.number().positive() })).min(1),
+    lines: z.array(z.object({ invoiceLineId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01), sources: z.array(z.object({ movementId: z.string().uuid(), binId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01) })).optional() })).min(1),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("return_shipment", {
-    p_invoice: i.invoiceId, p_lines: i.lines.map(l => ({ invoice_line_id: l.invoiceLineId, qty: l.qty })),
+    p_invoice: i.invoiceId, p_lines: i.lines.map(l => ({ invoice_line_id: l.invoiceLineId, qty: l.qty, ...(l.sources === undefined ? {} : { sources: l.sources.map(a => ({ movement_id: a.movementId, bin_id: a.binId, qty: a.qty })) }) })),
     p_location: i.locationId, p_reason: i.reason, p_request_id: execution.requestId,
   })),
 });
@@ -165,10 +213,10 @@ defineCommand({
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({
     invoiceId: z.string().uuid(), locationId: z.string().uuid(), reason: z.string().min(1),
-    lines: z.array(z.object({ invoiceLineId: z.string().uuid(), qty: z.number().positive() })).min(1),
+    lines: z.array(z.object({ invoiceLineId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01), sources: z.array(z.object({ movementId: z.string().uuid(), binId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01) })).optional() })).min(1),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_credit_memo", {
-    p_invoice: i.invoiceId, p_lines: i.lines.map(l => ({ invoice_line_id: l.invoiceLineId, qty: l.qty })),
+    p_invoice: i.invoiceId, p_lines: i.lines.map(l => ({ invoice_line_id: l.invoiceLineId, qty: l.qty, ...(l.sources === undefined ? {} : { sources: l.sources.map(a => ({ movement_id: a.movementId, bin_id: a.binId, qty: a.qty })) }) })),
     p_location: i.locationId, p_reason: i.reason, p_request_id: execution.requestId,
   })),
 });
@@ -185,13 +233,14 @@ defineCommand({
 // ---- queries ----
 
 defineQuery({
-  name: "list_orders", description: "Orders newest-first, optionally by status",
+  name: "list_orders", description: "Orders newest-first, optionally by status and customer",
   roles: [...readRoles],
-  input: z.object({ status: z.enum(["draft", "submitted", "confirmed", "picked", "shipped", "cancelled"]).optional(), limit: z.number().int().max(200).default(50) }),
+  input: z.object({ customerId: z.string().uuid().optional(), status: z.enum(["draft", "submitted", "confirmed", "picked", "shipped", "cancelled"]).optional(), limit: z.number().int().max(200).default(50) }),
   handler: (ctx, i) => {
     let q = ctx.db.from("orders").select("*, customers(name)")
       .eq("brewery_id", ctx.breweryId).order("created_at", { ascending: false }).limit(i.limit);
     if (i.status) q = q.eq("status", i.status);
+    if (i.customerId) q = q.eq("customer_id", i.customerId);
     return unwrap(q);
   },
 });
@@ -288,5 +337,43 @@ defineQuery({
       skuId: p.sku_id, sku: p.skus.name, par: Number(p.par_qty), onHand: oh.get(p.sku_id) ?? 0,
       suggested: Math.max(0, Number(p.par_qty) - (oh.get(p.sku_id) ?? 0)),
     }));
+  },
+});
+
+export type ShipSources = { stock: import("./inventory").BinMoveStock[]; bins: { id: string; name: string; location_id: string }[]; destinationBins: { id: string; name: string; location_id: string }[] };
+defineQuery({
+  name: "get_order_ship_sources", description: "Recorded source bins and lots for a picked order; no customer recall contact data",
+  roles: [...warehouseRoles], input: z.object({ orderId: z.string().uuid() }),
+  handler: async (ctx, i) => {
+    const order = await unwrap(ctx.db.from("orders").select("from_location_id,to_location_id,order_lines(sku_id)").eq("id", i.orderId).eq("brewery_id", ctx.breweryId).single());
+    if (!order) throw new Error("Order not found");
+    const [stock, bins, destinationBins] = await Promise.all([
+      runCommand("get_bin_move_stock", { locationId: order.from_location_id }, ctx) as Promise<ShipSources["stock"]>,
+      runCommand("list_bins", { locationId: order.from_location_id }, ctx) as Promise<ShipSources["bins"]>,
+      order.to_location_id ? runCommand("list_bins", { locationId: order.to_location_id }, ctx) as Promise<ShipSources["bins"]> : [],
+    ]);
+    const skus = new Set(order.order_lines.map((l: { sku_id: string }) => l.sku_id));
+    return { stock: stock.filter(s => s.kind === "sku" && skus.has(s.stock_id)), bins, destinationBins };
+  },
+});
+
+export type ReturnSource = { id: string; sku_id: string; qty: number; lot_id: string | null; lots: { code: string } | null; bins: { name: string } | null };
+defineQuery({
+  name: "get_invoice_return_sources", description: "Original shipped movements available as explicit return identities",
+  roles: [...salesRoles], input: z.object({ invoiceId: z.string().uuid() }),
+  handler: async (ctx, i) => {
+    const invoice = await unwrap(ctx.db.from("invoices").select("shipment_id").eq("id", i.invoiceId).eq("brewery_id", ctx.breweryId).single());
+    if (!invoice?.shipment_id) return [];
+    const shipment = await unwrap(ctx.db.from("shipments").select("order_id").eq("id", invoice.shipment_id).single());
+    if (!shipment) throw new Error("Shipment not found");
+    const sources: ReturnSource[] = [];
+    for (let start = 0; ; start += 500) {
+      const result = await ctx.db.from("inventory_movements").select("id,sku_id,qty,lot_id,lots(code),bins(name)", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).eq("ref", shipment.order_id).eq("type", "sale_removal").order("id").range(start, start + 499);
+      const page = await unwrap(Promise.resolve(result)) as unknown as ReturnSource[];
+      sources.push(...page);
+      if (result.count === null || (!page.length && sources.length < result.count)) throw new Error("Could not read complete shipped sources");
+      if (sources.length >= result.count) return sources;
+    }
   },
 });

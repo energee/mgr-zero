@@ -24,6 +24,7 @@ never copy it into a second place.
 | `app/(portal)/` | Wholesale customer portal route group (own layout, `/portal` shop + cart, `/portal/orders`, `/portal/invoices`, `/portal/account`) — reads/writes only through the `portal.ts` customer-role commands above. |
 | `lib/order-form-rules.ts` | Pure "is the New Order form submittable" rule behind `app/(app)/orders/order-form.tsx` (customer + ship-to or to-location, from-location, one complete line), mirroring `create_order`'s input schema; also supplies the empty-catalog hint. |
 | `lib/portal-cart.ts` | Pure decisions behind the portal cart's Save draft/Submit buttons (`app/(portal)/portal/cart.tsx`): which command syncs the cart's current lines (`portal_create_order` vs `portal_update_draft_order`) and when the buttons are disabled. |
+| `lib/mgr/page-query.ts` | Staff server-page query adapter: checks the registry's actual role permission before reading and redirects denied deep links to the existing No access screen. Dedicated mutation pages call its permission guard without executing a write. API/command authorization stays in the registry/RPC. |
 | `lib/mgr/not-found.ts` | `orNotFound()`: wraps a detail page's registry read so an unknown or malformed id renders the app's `not-found.tsx` instead of the generic error boundary; shared by `(app)` and `(portal)` detail pages. |
 | `lib/chat/` | Provider-neutral chat notification contracts and validation, Chat SDK state, Slack adapter/transport/renderer, OAuth installation and staff linking, job authentication, preview fixtures, and `jobs.ts`, the rule-4 service-role owner. Service access is limited to integration state: OAuth/link lifecycle, callback receipts and action intents, occurrence scan/fan-out, delivery leases/results, App Home reads, destination proofs, and `chat_sdk` cleanup; it never executes domain commands or impersonates staff. |
 | `lib/commands/chat.ts`, `lib/commands/today.ts` | Staff chat linking and notification settings; the role-filtered Today projection. |
@@ -69,8 +70,7 @@ use `get_chat_link_intent`, `get_chat_integration_health`, and
 `token_store_key` (activate always stores `slack:installation:<team id>`).
 The chat service alone may call `find_chat_oauth_intent`,
 `activate_chat_installation`, `mark_chat_installation_reauthorization`,
-`reconcile_chat_installation`, `issue_chat_link_proof`, `resolve_chat_actor`,
-`scan_chat_notification_occurrences`, `list_chat_scan_targets`,
+`reconcile_chat_installation`, `issue_chat_link_proof`, `resolve_chat_actor`,`scan_chat_notification_occurrences`, `list_chat_scan_targets`,
 `lease_chat_deliveries`, `complete_chat_delivery`, `retry_chat_delivery`,
 `suppress_chat_delivery`, `record_chat_callback_receipt`,
 `claim_chat_callback_receipts`, `complete_chat_callback_receipt`,
@@ -87,7 +87,6 @@ service calls above are limited to integration state and current projections.
 Callback receipts, deliveries, and action intents are not pruned
 automatically; call `prune_chat_integration_logs` before hosted traffic
 (v1 90-day log prune). No scheduler is wired.
-
 ## Iron rules
 
 Each rule names what enforces it. If a rule is only enforced by prose, that is
@@ -155,8 +154,7 @@ a gap to close, not a convention to trust.
    `chat_settings_request_completed`, `prune_chat_integration_logs`),
    never `from("chat_installations")`, never ordinary domain commands, and
    never mints a user token. Those activate/find RPCs are not granted to
-   `authenticated` and must not trust a caller `token_store_key`.
-   *Enforced by:* `no-restricted-imports` in `eslint.config.mjs`, run in CI.
+   `authenticated` and must not trust a caller `token_store_key`.   *Enforced by:* `no-restricted-imports` in `eslint.config.mjs`, run in CI.
 5. **Every mutation is one idempotent Postgres transaction.**
    Application roles have no direct table DML. A write handler calls one
    explicitly granted `security definer` RPC (`ctx.db.rpc(...)`) that asserts

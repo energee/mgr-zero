@@ -14,36 +14,27 @@ export function OrderView({
   adjustLines,
   showAddLine,
   complianceNote,
-  orderId,
 }: {
   model: OrderViewModel;
   footer?: ReactNode;
   adjustLines?: boolean;
   showAddLine?: boolean;
   complianceNote?: string;
-  /** Live page only. The inventory frame omits it so verbs stay inert. */
-  orderId?: string;
 }) {
-  const backHref = orderId ? "/orders" : undefined;
-  const putBackHref = orderId && model.canPutBack ? `/orders/${orderId}/restock` : undefined;
-  const confirmHref = orderId && model.canConfirm ? `/orders/${orderId}/confirm` : undefined;
-  const completeHref = orderId && model.canComplete ? `/orders/${orderId}/complete` : undefined;
   return (
     <>
-      {E.back("Orders", model.title, undefined, backHref)}
+      {E.back("Orders", model.title, undefined, model.backHref)}
       {E.ttl(model.where)}
       {E.row("Current state", model.currentState, E.status(model.next), model.restockNote ? "w" : "")}
-      {model.canPutBack ? E.act("Put back", "attention", putBackHref) : null}
-      {model.canConfirm ? E.act("Review and confirm", "success", confirmHref) : null}
-      {model.canComplete ? E.act("Complete transfer", "success", completeHref) : null}
+      {model.putBackHref ? E.act("Put back", "attention", model.putBackHref) : null}
+      {model.confirmHref ? E.act("Review and confirm", "success", model.confirmHref) : null}
+      {model.completeHref ? E.act("Complete transfer", "success", model.completeHref) : null}
       {model.fulfillmentSource ? E.fld("Fulfillment source", model.fulfillmentSource) : null}
       {model.shipTo ? E.fld("Ship-to", model.shipTo) : null}
       {model.customerPo ? E.fld("Customer PO", model.customerPo) : null}
       {model.requested ? E.fld("Requested", model.requested) : null}
       {model.note ? E.fld("Note", model.note) : null}
       {model.restockNote ? E.note(model.restockNote) : null}
-      {footer ?? E.btns([["Ship", "p"], ["Cancel order", "del"]])}
-      {!footer ? E.info("Cancel asks you to confirm. Allocations release.") : null}
       {model.lines.map((line) => (
         <Fragment key={line.key}>
           {E.row(line.name, line.detail, adjustLines ? E.act("Adjust", "attention") : "", line.tone ?? "")}
@@ -52,6 +43,8 @@ export function OrderView({
       {showAddLine ? E.btn("Add line", "g") : null}
       {complianceNote ? E.note(complianceNote) : null}
       {model.events.length === 0 ? E.blank("No events yet") : E.tape(model.events)}
+      {footer !== undefined ? footer : E.btns([["Ship", "p"], ["Cancel order", "del"]])}
+      {footer === undefined ? E.info("Cancel asks you to confirm. Allocations release.") : null}
     </>
   );
 }

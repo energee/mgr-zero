@@ -345,6 +345,31 @@ describe("closing the run", () => {
     return { runId: run.id, occupancyId };
   }
 
+  it("keeps closed yield and consumed materials frozen after a format correction", async () => {
+    const catalog = await seedCatalog(b.id, { product: "Correction", sku: "Correction case", bblPerUnit: 0.1 });
+    const editor = await makeStaffCtx(b.id, "admin");
+    const { occupancyId } = await brewInto("FV-CORRECTION", catalog.brandId, 10, "2026-11-10");
+    const run = await runCommand("schedule_packaging_run", { brandId: catalog.brandId, plannedOn: "2026-12-01", occupancyId, outputs: [{ skuId: catalog.skuId, qtyPlanned: 10 }] }, ctx) as { id: string };
+    await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-12-01T14:00:00Z" }, ctx);
+    await runCommand("replace_format_bom", { formatId: catalog.formatId, lines: [{ materialId: tray, qtyPerUnit: 1 }] }, editor);
+    await runCommand("close_packaging_run", { runId: run.id, bblDrawn: 2, outputs: [{ skuId: catalog.skuId, qtyActual: 10 }], lotCode: "CORRECTION", packagedOn: "2026-12-01", locationId: wh.id, binId: wh.binId }, ctx);
+    const yieldBefore = await admin.from("packaging_run_yields").select("*").eq("run_id", run.id).single();
+    expect(yieldBefore.data).toMatchObject({ bbl_packaged: 1, loss_bbl: 1 });
+    const links = await ctx.db.from("packaging_run_consumptions").select("movement_id").eq("run_id", run.id);
+    expect(links.error).toBeNull();
+    const movementIds = links.data!.map(row => row.movement_id);
+    const materialsBefore = await ctx.db.from("material_movements").select("id,qty").in("id", movementIds);
+    expect(materialsBefore.error).toBeNull();
+    expect(materialsBefore.data).toHaveLength(1);
+    expect(Number(materialsBefore.data![0].qty)).toBe(-10);
+    await runCommand("upsert_format", { id: catalog.formatId, name: "Corrected case", basis: "packaged", packageType: "can", bblPerUnit: 0.2 }, editor);
+    await runCommand("replace_format_bom", { formatId: catalog.formatId, lines: [{ materialId: tray, qtyPerUnit: 2 }] }, editor);
+    expect((await admin.from("packaging_run_yields").select("*").eq("run_id", run.id).single()).data).toEqual(yieldBefore.data);
+    expect((await ctx.db.from("material_movements").select("id,qty").in("id", movementIds)).data).toEqual(materialsBefore.data);
+    const next = await runCommand("record_movement", { skuId: catalog.skuId, locationId: wh.id, binId: wh.binId, qty: 10, type: "opening_balance" }, editor) as { bbl: number };
+    expect(Number(next.bbl)).toBe(2);
+  });
+
   it("writes the lot, a production_in per package filled, the BOM consumptions, and draws the tank down", async () => {
     const { runId, occupancyId } = await startedRun("FV-CLOSE", 30, "2026-12-01");
 

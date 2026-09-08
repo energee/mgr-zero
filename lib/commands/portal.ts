@@ -4,6 +4,13 @@
 import { z } from "zod";
 import { defineCommand, defineQuery, unwrap, CommandError, Ctx } from "./registry";
 
+const expectedIdentity = z.object({ actorId: z.string().uuid(), customerId: z.string().uuid() }).optional();
+function assertExpectedIdentity(ctx: Ctx, expected: z.infer<typeof expectedIdentity>) {
+  if (expected && (expected.actorId !== ctx.userId || expected.customerId !== ctx.customerId)) {
+    throw new CommandError("The signed-in account changed. Sign back in to the original account to retry this order.", 403, "permission_denied");
+  }
+}
+
 const lines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive() })).min(1);
 
 function requireCustomer(ctx: Ctx): string {
@@ -14,15 +21,17 @@ function requireCustomer(ctx: Ctx): string {
 defineCommand({
   name: "portal_create_order", description: "Portal: create a draft order for the caller's account",
   roles: "customer",
-  input: z.object({ shipToId: z.string().uuid(), poNumber: z.string().optional(), note: z.string().optional(), lines }),
+  input: z.object({ shipToId: z.string().uuid(), poNumber: z.string().optional(), note: z.string().optional(), requestedShipDate: z.string().date().nullable().optional(), expectedIdentity, lines }),
   handler: (ctx, i, execution) => {
     const customerId = requireCustomer(ctx);
+    assertExpectedIdentity(ctx, i.expectedIdentity);
     return unwrap(ctx.db.rpc("portal_create_order", {
       p_brewery: ctx.breweryId,
       p_customer: customerId,
       p_ship_to: i.shipToId,
       p_po: i.poNumber ?? null,
       p_note: i.note ?? null,
+      p_requested: i.requestedShipDate ?? null,
       p_lines: i.lines.map(l => ({ sku_id: l.skuId, qty: l.qty })),
       p_request_id: execution.requestId,
     }));
@@ -32,19 +41,26 @@ defineCommand({
 defineCommand({
   name: "portal_update_draft_order", description: "Portal: replace a draft order's lines/fields",
   roles: "customer",
-  input: z.object({ orderId: z.string().uuid(), shipToId: z.string().uuid().optional(), poNumber: z.string().optional(), note: z.string().optional(), lines }),
-  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_draft_order", {
-    p_order: i.orderId, p_ship_to: i.shipToId ?? null, p_requested: null,
-    p_po: i.poNumber ?? null, p_note: i.note ?? null,
-    p_lines: i.lines.map(l => ({ sku_id: l.skuId, qty: l.qty })), p_request_id: execution.requestId,
-  })),
+  input: z.object({ orderId: z.string().uuid(), shipToId: z.string().uuid().optional(), poNumber: z.string().optional(), note: z.string().optional(), requestedShipDate: z.string().date().nullable().optional(), expectedIdentity, lines }),
+  handler: (ctx, i, execution) => {
+    assertExpectedIdentity(ctx, i.expectedIdentity);
+    return unwrap(ctx.db.rpc("update_draft_order", {
+      p_expected_brewery: ctx.breweryId, p_expected_customer: requireCustomer(ctx),
+      p_order: i.orderId, p_ship_to: i.shipToId ?? null, p_requested: i.requestedShipDate ?? null, p_clear_requested: i.requestedShipDate === null,
+      p_po: i.poNumber ?? null, p_note: i.note ?? null,
+      p_lines: i.lines.map(l => ({ sku_id: l.skuId, qty: l.qty })), p_request_id: execution.requestId,
+    }));
+  },
 });
 
 defineCommand({
   name: "portal_submit_order", description: "Portal: submit a draft order",
   roles: "customer",
-  input: z.object({ orderId: z.string().uuid() }),
-  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("submit_order", { p_order: i.orderId, p_request_id: execution.requestId })),
+  input: z.object({ orderId: z.string().uuid(), expectedIdentity }),
+  handler: (ctx, i, execution) => {
+    assertExpectedIdentity(ctx, i.expectedIdentity);
+    return unwrap(ctx.db.rpc("submit_order", { p_order: i.orderId, p_request_id: execution.requestId, p_expected_brewery: ctx.breweryId, p_expected_customer: requireCustomer(ctx) }));
+  },
 });
 
 defineQuery({
@@ -82,8 +98,8 @@ defineQuery({
   roles: "customer",
   input: z.object({ orderId: z.string().uuid() }),
   handler: async (ctx, i) => {
-    requireCustomer(ctx);
-    const order = await unwrap(ctx.db.from("orders").select("*, ship_tos(label, city, state)").eq("id", i.orderId).single());
+    const customerId = requireCustomer(ctx);
+    const order = await unwrap(ctx.db.from("orders").select("*, ship_tos(label, city, state)").eq("id", i.orderId).eq("customer_id", customerId).single());
     const [ln, events, shipment] = await Promise.all([
       unwrap(ctx.db.from("order_lines").select("*, skus(name)").eq("order_id", i.orderId)),
       unwrap(ctx.db.from("order_events").select().eq("order_id", i.orderId).order("created_at")),
@@ -106,13 +122,16 @@ defineQuery({
   input: z.object({}),
   handler: async (ctx) => {
     const customerId = requireCustomer(ctx);
-    const [customer, shipTos, deposits] = await Promise.all([
+    const [customer, shipTos, deposits, fulfillmentSource] = await Promise.all([
       unwrap(ctx.db.from("customers").select("id, name").eq("id", customerId).single()),
-      unwrap(ctx.db.from("ship_tos").select("id, label, address1, city, state, zip").eq("customer_id", customerId).order("label")),
+      unwrap(ctx.db.from("ship_tos").select("id, label, address1, city, state, zip, is_default").eq("customer_id", customerId).order("label")),
       unwrap(ctx.db.from("keg_deposit_balances").select("keg_size, kegs_on_deposit, deposit_cents").eq("customer_id", customerId)),
+      // customer_read_portal_source exposes only this brewery's explicitly
+      // configured warehouse. Never choose an arbitrary/default warehouse.
+      unwrap(ctx.db.from("locations").select("id, name").eq("brewery_id", ctx.breweryId).maybeSingle()),
     ]);
     return {
-      customer, shipTos, membership: { userId: ctx.userId },
+      customer, shipTos, fulfillmentSource, membership: { userId: ctx.userId },
       deposits: (deposits as { keg_size: string | null; kegs_on_deposit: number; deposit_cents: number }[])
         .filter((d) => d.kegs_on_deposit !== 0)
         .map((d) => ({ kegSize: d.keg_size, kegsOnDeposit: d.kegs_on_deposit, depositCents: d.deposit_cents })),

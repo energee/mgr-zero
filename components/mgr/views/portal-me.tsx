@@ -17,7 +17,7 @@ export function PortalMeView({
     <>
       {E.fld("Signed in as", model.email)}
       {E.fld("Account", model.account)}
-      {footer ?? E.btns([["Change password", "g"], ["Sign out", "g"]])}
+      {footer !== undefined ? footer : E.btns([["Change password", "g"], ["Sign out", "g"]])}
     </>
   );
 }

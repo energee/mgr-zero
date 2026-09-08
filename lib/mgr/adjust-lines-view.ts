@@ -17,8 +17,8 @@ export type AdjustLinesViewModel = {
 };
 
 export type AdjustLinesSnapshot = {
-  order: { id: string; order_no: number | null; customers?: { name: string } | null };
   backHref?: string;
+  order: { id: string; order_no: number | null; customers?: { name: string } | null };
   lines: {
     id: string;
     sku_id: string;

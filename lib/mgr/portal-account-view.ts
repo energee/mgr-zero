@@ -32,7 +32,7 @@ export type PortalAccountViewModel = {
 /** get_portal_account payload. */
 export type PortalAccountSnapshot = {
   customer: { id: string; name: string };
-  shipTos: { id: string; label: string; city: string; state: string }[];
+  shipTos: { id: string; label: string; city: string; state: string; is_default?: boolean }[];
   membership: { userId: string };
   deposits: { kegSize: string | null; kegsOnDeposit: number; depositCents: number }[];
 };
@@ -47,7 +47,7 @@ export function toPortalAccountViewProps({
     customer: customer.name,
     shipTos: shipTos.map((s) => ({
       key: s.id,
-      title: `${s.label} ship-to`,
+      title: `${s.label} ship-to${s.is_default ? " · default" : ""}`,
       detail: `${s.city}, ${s.state}`,
     })),
     membership: { title: "You · buyer", detail: "this login", trailing: "active" },

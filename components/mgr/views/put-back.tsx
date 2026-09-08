@@ -16,7 +16,7 @@ export function PutBackView({ model, footer }: { model: PutBackViewModel; footer
             <Fragment key={line.key}>{E.row(line.name, "staged after pick", line.staged, "w")}</Fragment>
           ))}
           {E.sp()}
-          {footer ?? (model.verb ? E.btn(model.verb) : null)}
+          {footer !== undefined ? footer : (model.verb ? E.btn(model.verb) : null)}
         </>
       )}
     </>

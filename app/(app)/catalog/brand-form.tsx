@@ -1,5 +1,5 @@
 // app/(app)/catalog/brand-form.tsx — CommandForm (bottom sheet on phone, dialog
-// on desk) for the upsert_brand command (create only from here). Price group is
+// on desk) for the upsert_brand command (create and edit). Price group is
 // a select over the brewery’s price groups (the rows of the price grid): the
 // brand sits on one, and every SKU of it is priced by that row’s cells.
 "use client";
@@ -13,8 +13,7 @@ import { NONE, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } f
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
 
-const EMPTY = { name: "", style: "", abv: "", description: "", category: "", priceGroupId: "", hops: "" };
-type Fields = typeof EMPTY;
+export type BrandValues = { id: string; name: string; style: string | null; abv: number | null; description: string | null; category: string | null; priceGroupId: string | null; hops: string | null };
 
 // Closes over nothing, so it lives outside the component.
 function field(id: string, label: string, value: string, set: (v: string) => void, props: React.ComponentProps<typeof Input> = {}) {
@@ -26,21 +25,22 @@ function field(id: string, label: string, value: string, set: (v: string) => voi
   );
 }
 
-export function BrandForm({ groups }: { groups: { id: string; name: string }[] }) {
-  const [f, setF] = useState<Fields>(EMPTY);
-  const set = (k: keyof Fields) => (v: string) => setF((prev) => ({ ...prev, [k]: v }));
+export function BrandForm({ groups, brand }: { groups: { id: string; name: string }[]; brand?: BrandValues }) {
+  const initial = { name: brand?.name ?? "", style: brand?.style ?? "", abv: brand?.abv == null ? "" : String(brand.abv), description: brand?.description ?? "", category: brand?.category ?? "", priceGroupId: brand?.priceGroupId ?? "", hops: brand?.hops ?? "" };
+  const [f, setF] = useState(initial);
+  const set = (k: keyof typeof initial) => (v: string) => setF((prev) => ({ ...prev, [k]: v }));
   const form = useCommandForm("upsert_brand", {
     // Every optional field is sent only when filled; ABV is the one number.
     build: () => ({
-      name: f.name, style: f.style || undefined, abv: f.abv ? Number(f.abv) : undefined,
+      id: brand?.id, name: f.name, style: f.style || undefined, abv: f.abv ? Number(f.abv) : undefined,
       description: f.description || undefined, category: f.category || undefined,
       priceGroupId: f.priceGroupId || undefined, hops: f.hops || undefined,
     }),
-    reset: () => setF(EMPTY),
+    reset: () => setF(initial),
   });
 
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title="New Brand" trigger={<Button>New Brand</Button>}>
+    <CommandForm open={form.open} onOpenChange={(open) => { if (open) setF(initial); form.setOpen(open); }} title={brand ? "Edit brand" : "New Brand"} trigger={<Button variant={brand ? "outline" : "default"} size={brand ? "sm" : "default"}>{brand ? "Edit brand" : "New Brand"}</Button>}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         {field("brand-name", "Name", f.name, set("name"), { required: true })}
         {field("brand-style", "Style", f.style, set("style"))}
@@ -61,7 +61,7 @@ export function BrandForm({ groups }: { groups: { id: string; name: string }[] }
         <CommandFormMessage error={form.error} />
         <CommandFormFooter>
           <Button type="submit" disabled={form.submitting}>
-            {form.submitting ? "Creating…" : "Create"}
+            {form.submitting ? "Saving…" : brand ? "Save brand" : "Create"}
           </Button>
         </CommandFormFooter>
       </form>

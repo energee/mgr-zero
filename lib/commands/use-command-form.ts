@@ -42,7 +42,7 @@ export function useCommandAction() {
   return { busy, error, setError, run };
 }
 
-export function useCommandForm(name: string, opts: { build: () => unknown; reset: () => void }) {
+export function useCommandForm(name: string, opts: { build: () => unknown; reset: () => void; onSuccess?: (data: unknown) => void }) {
   const { busy, error, setError, run } = useCommandAction();
   const [open, setOpenState] = useState(false);
 
@@ -53,7 +53,7 @@ export function useCommandForm(name: string, opts: { build: () => unknown; reset
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    await run(name, opts.build(), () => setOpen(false));
+    await run(name, opts.build(), data => { opts.onSuccess?.(data); setOpen(false); });
   }
 
   return { open, setOpen, error, submitting: busy, submit };

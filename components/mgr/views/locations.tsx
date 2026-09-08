@@ -12,6 +12,8 @@ export function LocationsView({
   createAction,
   footer,
   linkRows,
+  backLabel,
+  rowActionLabel,
 }: {
   model: LocationsViewModel;
   createAction?: ReactNode;
@@ -19,15 +21,17 @@ export function LocationsView({
   footer?: ReactNode;
   /** Live list: Edit is a link. Inventory leaves it unlabeled. */
   linkRows?: boolean;
+  backLabel?: string;
+  rowActionLabel?: string;
 }) {
   return (
     <>
-      {E.back("Settings", "Locations", createAction !== undefined ? createAction : E.btn("Add location"), model.backHref)}
+      {E.back(backLabel ?? "Settings", "Locations", createAction !== undefined ? createAction : E.btn("Add location"), model.backHref)}
       {model.empty
         ? E.blank(model.empty)
         : model.rows.map((row) => (
           <Fragment key={row.key}>
-            {E.row(row.title, row.detail, E.act("Edit", "primary", linkRows ? row.href : undefined))}
+            {E.row(row.title, row.detail, E.act(rowActionLabel ?? "Edit", "primary", linkRows ? row.href : undefined))}
           </Fragment>
         ))}
       {footer}

@@ -51,8 +51,8 @@ describe("persona", () => {
     expect(deniedFor("sales", "Pick sheet")).toBe(true);
     expect(deniedFor("brewer", "Cellar map")).toBe(false);
     expect(deniedFor("admin", "Customers")).toBe(false);
-    // A screen with no route and no permission state is never refused here.
-    expect(deniedFor("brewer", "Record movement")).toBe(false);
+    // The movement record explicitly requires Admin or Warehouse.
+    expect(deniedFor("brewer", "Record movement")).toBe(true);
     expect(needsFor("Pick sheet")).toEqual(["admin", "warehouse"]);
     expect(needsFor("Customers")).toEqual(["admin", "sales"]);
   });

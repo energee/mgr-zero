@@ -17,6 +17,7 @@ export type ShortPickViewModel = {
 };
 
 export type ShortPickSnapshot = {
+  backHref?: string;
   order: {
     id: string;
     order_no: number | null;
@@ -31,7 +32,6 @@ export type ShortPickSnapshot = {
     skus: { name: string } | null;
   };
   locations: { id: string; name: string }[];
-  backHref?: string;
 };
 
 function unitWord(name: string) {

@@ -19,6 +19,7 @@ export type ConfirmOrderViewModel = {
 };
 
 export type ConfirmOrderSnapshot = {
+  backHref?: string;
   order: {
     id: string;
     order_no: number | null;
@@ -30,7 +31,6 @@ export type ConfirmOrderSnapshot = {
   lines: { id: string; sku_id: string; qty_ordered: number; skus: { name: string } | null }[];
   atp: { sku_id: string; qty: number }[];
   locations: { id: string; name: string }[];
-  backHref?: string;
 };
 
 export function toConfirmOrderViewProps({ order, lines, atp, locations, backHref }: ConfirmOrderSnapshot): ConfirmOrderViewModel {

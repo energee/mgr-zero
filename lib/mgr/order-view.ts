@@ -14,6 +14,7 @@ export type OrderLineView = {
 };
 
 export type OrderViewModel = {
+  backHref?: string;
   title: string;
   where: string;
   currentState: string;
@@ -24,14 +25,15 @@ export type OrderViewModel = {
   requested?: string;
   note?: string;
   restockNote?: string;
-  canPutBack: boolean;
-  canConfirm: boolean;
-  canComplete: boolean;
+  putBackHref?: string;
+  confirmHref?: string;
+  completeHref?: string;
   lines: OrderLineView[];
   events: [ReactNode, ReactNode?][];
 };
 
 export type OrderSnapshot = {
+  backHref?: string;
   order: {
     id: string;
     order_no: number | null;
@@ -109,13 +111,14 @@ function restockNoteFor(order: OrderSnapshot["order"], lines: OrderSnapshot["lin
 
 /** Map a get_order payload onto OrderView's model. Inventory frames pass a
  *  fixture snapshot through this same function. */
-export function toOrderViewProps({ order, lines, events, atp, locations }: OrderSnapshot): OrderViewModel {
+export function toOrderViewProps({ order, lines, events, atp, locations, backHref }: OrderSnapshot): OrderViewModel {
   const atpMap = new Map(atp.map((a) => [a.sku_id, Number(a.qty)]));
   const skuNames = new Map(lines.map((l) => [l.sku_id, l.skus?.name ?? "line"]));
   const where = order.customers
     ? `${order.customers.name}${order.ship_tos ? ` · ${order.ship_tos.city}, ${order.ship_tos.state}` : ""}`
     : "Taproom transfer";
   return {
+    backHref,
     title: docNo("ORD", order.order_no, "Order"),
     where,
     currentState: `${titled(order.status)}${order.needs_restock ? " · restock pending" : ""}`,
@@ -128,9 +131,9 @@ export function toOrderViewProps({ order, lines, events, atp, locations }: Order
     requested: order.requested_ship_date ?? undefined,
     note: order.note ?? undefined,
     restockNote: restockNoteFor(order, lines),
-    canPutBack: order.status === "picked" && order.needs_restock,
-    canConfirm: order.status === "submitted",
-    canComplete: order.status === "picked" && order.kind === "taproom_transfer",
+    putBackHref: order.status === "picked" && order.needs_restock ? (backHref ? `/orders/${order.id}/restock` : "#") : undefined,
+    confirmHref: order.status === "submitted" ? (backHref ? `/orders/${order.id}/confirm` : "#") : undefined,
+    completeHref: order.status === "picked" && order.kind === "taproom_transfer" ? (backHref ? `/orders/${order.id}/complete` : "#") : undefined,
     lines: lines.map((l) => {
       const ordered = Number(l.qty_ordered);
       const picked = l.qty_picked === null ? null : Number(l.qty_picked);

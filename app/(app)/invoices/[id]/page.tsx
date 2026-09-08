@@ -7,15 +7,15 @@
 import { InvoiceView } from "@/components/mgr/views/invoice";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
-import { runCommand } from "@/lib/commands/registry";
+import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
 import { CreditMemoForm } from "./credit-memo-form";
 import { MarkAnswered } from "./mark-answered";
 
-type Invoice = { id: string; invoice_no: number | null; kind: "invoice" | "credit_memo"; issued_on: string; due_on: string | null; paid_at: string | null; customers: { name: string } | null };
-type InvoiceLine = { id: string; qty: number; unit_price_cents: number; amount_cents: number; description: string; skus: { name: string } | null };
+type Invoice = { id: string; shipment_id: string | null; invoice_no: number | null; kind: "invoice" | "credit_memo"; issued_on: string; due_on: string | null; paid_at: string | null; customers: { name: string } | null };
+type InvoiceLine = { id: string; sku_id: string; qty: number; unit_price_cents: number; amount_cents: number; description: string; skus: { name: string } | null };
 type Question = { id: string; body: string; created_at: string; answered_at: string | null; customers: { name: string } | null };
 type LocationRow = { id: string; name: string };
 
@@ -29,7 +29,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   ])) as [{ invoice: Invoice; lines: InvoiceLine[] }, LocationRow[], Question[]];
   const credit = invoice.kind === "credit_memo";
   const memo = !credit && brewery.role !== "warehouse"
-    ? <CreditMemoForm invoiceId={invoice.id} lines={lines.map((l) => ({ id: l.id, label: l.skus?.name ?? l.description, qty: Number(l.qty) }))} locations={locations.map((l) => ({ id: l.id, name: l.name }))} />
+    ? <CreditMemoForm shipmentId={invoice.shipment_id} invoiceId={invoice.id} lines={lines.map((l) => ({ id: l.id, skuId: l.sku_id, label: l.skus?.name ?? l.description, qty: Number(l.qty) }))} locations={locations.map((l) => ({ id: l.id, name: l.name }))} />
     : undefined;
   return (
     <InvoiceView

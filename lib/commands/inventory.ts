@@ -3,6 +3,7 @@ import { defineCommand, defineQuery, unwrap, Ctx, CommandExecution, STAFF_ROLES 
 import { stockLine } from "./stock-line";
 
 const movementInput = z.object({
+  lotId: z.string().uuid().optional(),
   skuId: z.string().uuid(), locationId: z.string().uuid(), binId: z.string().uuid(),
   qty: z.number().refine(n => n !== 0, "qty cannot be 0"),
   type: z.enum(["opening_balance", "production_in", "adjustment", "sale_removal", "taproom_transfer",
@@ -22,7 +23,7 @@ export function insertMovement(ctx: Ctx, input: z.infer<typeof movementInput>, e
   return unwrap(ctx.db.rpc("record_inventory_movement", {
     p_brewery: ctx.breweryId, p_sku: input.skuId, p_location: input.locationId, p_bin: input.binId, p_qty: input.qty,
     p_type: input.type, p_sale_channel: input.saleChannelId ?? null, p_dest_state: input.destState ?? null,
-    p_note: input.note ?? null, p_request_id: execution.requestId,
+    p_note: input.note ?? null, p_lot: input.lotId ?? null, p_request_id: execution.requestId,
   }));
 }
 
@@ -76,10 +77,10 @@ defineQuery({
 defineCommand({
   name: "move_stock_bin", description: "Move stock between two bins of one location: paired ledger rows, no transfer document; a cross-location pair is refused",
   roles: ["admin", "warehouse"],
-  input: stockLine,
+  input: stockLine.safeExtend({ materialLotId: z.string().uuid().optional(), skuLotId: z.string().uuid().optional() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("move_stock_bin", {
     p_brewery: ctx.breweryId, p_sku: i.skuId ?? null, p_material: i.materialId ?? null, p_keg_pool: i.kegPoolId ?? null, p_keg_size: i.kegSize ?? null,
-    p_qty: i.qty, p_from_bin: i.fromBinId, p_to_bin: i.toBinId, p_note: i.note ?? null, p_request_id: execution.requestId,
+    p_material_lot: i.materialLotId ?? null, p_sku_lot: i.skuLotId ?? null, p_qty: i.qty, p_from_bin: i.fromBinId, p_to_bin: i.toBinId, p_note: i.note ?? null, p_request_id: execution.requestId,
   })),
 });
 
@@ -106,11 +107,11 @@ defineQuery({
 
 defineQuery({
   name: "list_movements", description: "Recent inventory movements",
-  input: z.object({ skuId: z.string().uuid().optional(), limit: z.number().int().max(200).default(50) }),
+  input: z.object({ skuId: z.string().uuid().optional(), limit: z.number().int().min(1).max(200).default(50), offset: z.number().int().nonnegative().default(0) }),
   roles: [...readRoles],
   handler: (ctx, i) => {
     let q = ctx.db.from("inventory_movements").select().eq("brewery_id", ctx.breweryId)
-      .order("created_at", { ascending: false }).limit(i.limit);
+      .order("created_at", { ascending: false }).order("id", { ascending: false }).range(i.offset, i.offset + i.limit - 1);
     if (i.skuId) q = q.eq("sku_id", i.skuId);
     return unwrap(q);
   },
@@ -120,7 +121,7 @@ defineQuery({
   // Brewers read SKUs too: the packaging pages pick the SKU a run fills.
   name: "list_skus", description: "SKUs with their brand and format, alphabetical",
   input: z.object({}), roles: STAFF_ROLES,
-  handler: (ctx) => unwrap(ctx.db.from("skus").select("id, name, active, brand_id, format_id, brands(name), formats(name, bbl_per_unit, package_type)").eq("brewery_id", ctx.breweryId).order("name")),
+  handler: (ctx) => unwrap(ctx.db.from("skus").select("id, name, active, brand_id, format_id, brands(name), formats(name, bbl_per_unit, package_type), format_volume:format_volumes(bbl_per_unit)").eq("brewery_id", ctx.breweryId).order("name")),
 });
 
 defineQuery({
@@ -138,5 +139,27 @@ defineQuery({
       .eq("brewery_id", ctx.breweryId).eq("source", "taproom_standing").eq("status", "open");
     if (i.locationId) q = q.eq("ref", i.locationId);
     return unwrap(q);
+  },
+});
+
+export type BinMoveStock = {
+  bin_id: string; kind: "sku" | "material" | "keg"; stock_id: string; lot_id: string | null;
+  keg_size: string | null; name: string; unit: string; lot_code: string | null; qty: number;
+};
+defineQuery({
+  name: "get_bin_move_stock", description: "Stock by bin and explicit lot identity at one location, including untracked stock and empty keg sizes",
+  input: z.object({ locationId: z.string().uuid() }), roles: ["admin", "warehouse"],
+  handler: async (ctx, i) => {
+    const rows: BinMoveStock[] = [];
+    // Read all grouped sources, not just PostgREST's first 1,000 rows.
+    for (let start = 0; ; start += 500) {
+      const result = await ctx.db.from("bin_move_stock").select("bin_id, kind, stock_id, lot_id, keg_size, name, unit, lot_code, qty", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).eq("location_id", i.locationId).gt("qty", 0)
+        .order("bin_id").order("kind").order("stock_id").order("lot_id").order("keg_size").range(start, start + 499);
+      const page = await unwrap(Promise.resolve(result)) as BinMoveStock[];
+      rows.push(...page);
+      if (result.count === null || (!page.length && rows.length < result.count)) throw new Error("Could not read complete bin stock");
+      if (rows.length >= result.count) return rows;
+    }
   },
 });

@@ -98,7 +98,7 @@ export function toShopViewProps({
     empty: catalog.length === 0 ? "Nothing is listed for wholesale yet. Call the brewery." : undefined,
     source: source.name,
     shipToLine: `${shipTo?.label ?? "Ship-to"} · ${requestedDate}`,
-    depositInfo: `Kegs add a ${money(depositCentsPerKeg)} refundable deposit each, shown on review.`,
+    depositInfo: "Tax and keg deposits are pending and are not included in the merchandise subtotal.",
     reviewVerb: `Review order · ${money(merchandiseCents)}`,
   };
 }

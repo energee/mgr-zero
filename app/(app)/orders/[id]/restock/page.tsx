@@ -5,7 +5,7 @@
 import { PutBackView } from "@/components/mgr/views/put-back";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
-import { runCommand } from "@/lib/commands/registry";
+import { runPageQuery as runCommand, requirePagePermission } from "@/lib/mgr/page-query";
 import { toPutBackViewProps } from "@/lib/mgr/put-back-view";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
@@ -18,6 +18,7 @@ export default async function RestockPage({ params }: { params: Promise<{ id: st
   const { id } = await params;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
+  requirePagePermission(ctx, "confirm_restock");
   const { order, lines } = await orNotFound(runCommand("get_order", { orderId: id }, ctx) as Promise<{ order: Order; lines: Line[] }>);
   const model = toPutBackViewProps({ order, lines, backHref: "/" });
   return (

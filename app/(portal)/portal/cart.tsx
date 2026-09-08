@@ -1,218 +1,124 @@
-// app/(portal)/portal/cart.tsx — client cart for the catalog page. Qty state
-// keyed by skuId. Listed packages stay orderable; warehouse ATP is not shown.
-// Submit
-// chains portal_create_order then portal_submit_order — the draft it creates
-// along the way is an implementation detail, never shown to the customer, as
-// long as both calls succeed. If portal_create_order succeeds but
-// portal_submit_order fails, the created order id is kept in `draftId` so a
-// retry (Save draft or Submit) reuses it rather than calling
-// portal_create_order a second time — that would leave an orphan duplicate
-// draft behind. Once `draftId` exists every save goes through
-// portal_update_draft_order with the cart's current lines/ship-to/PO/note, so
-// edits made after Save draft or a failed submit are never lost to a stale
-// draft (decision in lib/portal-cart.ts). The error shown in that case links
-// to the saved draft so the customer isn't left wondering if anything happened.
 "use client";
 
-import { Fragment, useState } from "react";
+import { useSyncExternalStore, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useBrewery } from "@/app/(app)/brewery-provider";
-import { command } from "@/lib/commands/client";
-import { cartActionsDisabled, planDraftSync } from "@/lib/portal-cart";
+import { E } from "@/components/mgr/e";
+import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
+import { command, CommandResponseError } from "@/lib/commands/client";
+import { defaultShipToId } from "@/lib/order-form-rules";
+import { cartActionsDisabled, canRetirePortalFailure, cartLines, planDraftSync, portalAttemptKey, restorePortalAttempt, executePortalAttempt, type PortalAttempt, type PortalScope, type PortalFields } from "@/lib/portal-cart";
 
-export type CatalogItem = {
-  skuId: string;
-  name: string;
-  product: string;
-  unitPriceCents: number;
-};
-export type ShipToOption = { id: string; label: string };
-
+export type CatalogItem = { skuId: string; name: string; product: string; unitPriceCents: number };
+export type ShipToOption = { id: string; label: string; is_default?: boolean };
 export function submissionFailureMessage(message: string, draftId: string | null) {
-  return draftId
-    ? `Order saved, but submission could not be confirmed (${message}). View the order status before retrying, or contact the brewery.`
-    : message;
+  return draftId ? `Order saved, but submission could not be confirmed (${message}). View the order status before retrying, or contact the brewery.` : message;
 }
 
-export function Cart({ items, shipTos }: { items: CatalogItem[]; shipTos: ShipToOption[] }) {
-  const breweryId = useBrewery();
+type CartProps = {
+  items: CatalogItem[]; shipTos: ShipToOption[]; scope: PortalScope; fulfillmentSource: { id: string; name: string } | null;
+  initial?: { fields: PortalFields; draftId: string | null; removed: string[] };
+};
+const subscribe = () => () => {};
+export function Cart(props: CartProps) {
+  const hydrated = useSyncExternalStore(subscribe, () => true, () => false);
+  return hydrated ? <ReadyCart {...props} /> : E.info("Loading order recovery…");
+}
+function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource }: CartProps) {
   const router = useRouter();
-  const [qty, setQty] = useState<Record<string, string>>({});
-  const [shipToId, setShipToId] = useState(shipTos[0]?.id ?? "");
-  const [poNumber, setPoNumber] = useState("");
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState<"submit" | "draft" | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [draftId, setDraftId] = useState<string | null>(null);
+  const [recovery] = useState(() => {
+    try { return { attempt: restorePortalAttempt(sessionStorage.getItem(portalAttemptKey(scope)), scope), error: null }; }
+    catch { return { attempt: null, error: "Order recovery could not be read. Check existing orders or contact the brewery before starting another order." }; }
+  });
+  const initialFields = recovery.attempt?.fields ?? initial?.fields;
+  const [fields, setFields] = useState<PortalFields>(initialFields ?? { shipToId: defaultShipToId(shipTos), poNumber: "", note: "", requestedShipDate: null, lines: [] });
+  const [qty, setQty] = useState<Record<string, string>>(Object.fromEntries((initialFields?.lines ?? []).map(l => [l.skuId, String(l.qty)])));
+  const [draftId, setDraftId] = useState(recovery.attempt && "orderId" in recovery.attempt.input ? recovery.attempt.input.orderId : initial?.draftId ?? null);
+  const [attempt, setAttempt] = useState<PortalAttempt | null>(recovery.attempt);
+  const ready = !recovery.error;
+  const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
+  const [review, setReview] = useState(false);
+  const [error, setError] = useState<string | null>(recovery.error);
+  const lines = cartLines(qty);
+  const locked = !ready || busy || attempt !== null;
+  const disabled = cartActionsDisabled({ hasSource: fulfillmentSource !== null, busy: locked, shipToId: fields.shipToId, lineCount: lines?.length ?? 0 });
+  const unavailable = (lines ?? []).filter(l => !items.some(i => i.skuId === l.skuId));
+  const subtotal = (lines ?? []).reduce((n, l) => n + (items.find(i => i.skuId === l.skuId)?.unitPriceCents ?? 0) * l.qty, 0);
 
-  const lines = items
-    .map((i) => ({ skuId: i.skuId, qty: Number(qty[i.skuId] || 0) }))
-    .filter((l) => l.qty > 0);
-  const groups: { product: string; items: CatalogItem[] }[] = [];
-  for (const i of items) {
-    const g = groups.find((x) => x.product === i.product);
-    if (g) g.items.push(i);
-    else groups.push({ product: i.product, items: [i] });
-  }
-
-  const subtotalCents = lines.reduce((sum, l) => {
-    const item = items.find((i) => i.skuId === l.skuId);
-    return sum + (item ? item.unitPriceCents * l.qty : 0);
-  }, 0);
-
-  // Writes the cart's current state to the database and returns the order id.
-  // Reuses `draftId` if a previous attempt already created the order — a
-  // retry never calls portal_create_order twice for the same cart — but still
-  // pushes the current lines/fields so the saved draft matches what's on screen.
-  async function syncDraft(): Promise<string> {
-    const plan = planDraftSync(draftId);
-    if (plan.command === "portal_update_draft_order") {
-      // Send PO/note verbatim: update_draft_order treats null as "leave
-      // alone", so an emptied field must arrive as "" to actually clear it.
-      await command(breweryId, plan.command, { orderId: plan.orderId, shipToId, poNumber, note, lines });
-      return plan.orderId;
-    }
-    const fields = { shipToId, poNumber: poNumber || undefined, note: note || undefined, lines };
-    // create_order (the underlying plpgsql fn) returns jsonb keyed
-    // order_id, not id — see lib/commands/portal.ts's portal_create_order.
-    const order = (await command(breweryId, plan.command, fields)) as { order_id: string };
-    setDraftId(order.order_id);
-    return order.order_id;
-  }
-
-  async function saveDraft() {
-    setBusy("draft");
-    setError(null);
+  async function run(purpose: "draft" | "submit") {
+    if (inFlight.current || !ready) return;
+    if (!attempt && disabled) return;
+    inFlight.current = true;
+    setBusy(true); setError(null);
+    let active = attempt;
     try {
-      const id = await syncDraft();
+      if (!active) {
+        const snapshot = { ...fields, lines: lines! };
+        const plan = planDraftSync(draftId);
+        active = { scope, purpose, fields: snapshot, command: plan.command, requestId: crypto.randomUUID(), input: { ...snapshot, expectedIdentity: { actorId: scope.actorId, customerId: scope.customerId }, ...(plan.command === "portal_update_draft_order" ? { orderId: plan.orderId } : {}) } };
+      }
+      const id = await executePortalAttempt(active, sessionStorage, command, next => {
+        active = next; setAttempt(next);
+        if ("orderId" in next.input) setDraftId(next.input.orderId);
+      });
+      setAttempt(null);
       router.push(`/portal/orders/${id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "portal_create_order failed");
-    } finally {
-      setBusy(null);
-    }
+      // Only a definitive first refusal can unlock edits; a later refusal
+      // cannot disprove an earlier uncertain success.
+      if (err instanceof CommandResponseError && canRetirePortalFailure(err.status, active?.requestId === attempt?.requestId)) {
+        try { sessionStorage.removeItem(portalAttemptKey(scope)); setAttempt(null); }
+        catch { /* Keep the exact attempt if storage cannot retire it. */ }
+      }
+      setError(err instanceof Error ? err.message : "Order response could not be confirmed.");
+    } finally { inFlight.current = false; setBusy(false); }
   }
-
-  async function submit() {
-    setBusy("submit");
-    setError(null);
-    let savedId: string;
-    try {
-      savedId = await syncDraft();
-    } catch (err) {
-      // The sync is a plain write; nothing was submitted, so say only that.
-      setError(err instanceof Error ? err.message : "saving the order failed");
-      setBusy(null);
-      return;
-    }
-    try {
-      await command(breweryId, "portal_submit_order", { orderId: savedId });
-      router.push(`/portal/orders/${savedId}`);
-    } catch (err) {
-      // A transport failure does not prove whether portal_submit_order
-      // committed. The saved order id is still available for status recovery.
-      const message = err instanceof Error ? err.message : "order submission failed";
-      setError(submissionFailureMessage(message, savedId));
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  const disabled = cartActionsDisabled({ shipToId, lineCount: lines.length, busy: busy !== null });
-
-  return (
-    <div className="flex flex-col gap-6">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left text-muted-foreground">
-            <th className="py-1 font-normal">Package</th>
-            <th className="py-1 font-normal">Price</th>
-            <th className="py-1 font-normal">Qty</th>
-          </tr>
-        </thead>
-        <tbody>
-          {groups.map((g) => (
-            <Fragment key={g.product}>
-              <tr>
-                <td colSpan={3} className="pt-3 pb-1 font-medium">{g.product}</td>
-              </tr>
-              {g.items.map((i) => (
-                <tr key={i.skuId} className="border-t">
-                  <td className="py-1">{i.name}</td>
-                  <td className="py-1">${(i.unitPriceCents / 100).toFixed(2)}</td>
-                  <td className="py-1">
-                    <Input
-                      type="number"
-                      min={0}
-                      step={1}
-                      className="w-20"
-                      value={qty[i.skuId] ?? ""}
-                      onChange={(e) => setQty((prev) => ({ ...prev, [i.skuId]: e.target.value }))}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </Fragment>
-          ))}
-        </tbody>
-      </table>
-
-      <div className="flex flex-col gap-4 rounded-lg border p-4 max-w-sm">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="ship-to">Ship to</Label>
-          <Select value={shipToId} onValueChange={setShipToId}>
-            <SelectTrigger id="ship-to">
-              <SelectValue placeholder="Select a ship-to" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {shipTos.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="po-number">PO number</Label>
-          <Input id="po-number" value={poNumber} onChange={(e) => setPoNumber(e.target.value)} />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="note">Note</Label>
-          <Input id="note" value={note} onChange={(e) => setNote(e.target.value)} />
-        </div>
-        <div className="text-sm text-muted-foreground">
-          Subtotal: ${(subtotalCents / 100).toFixed(2)}
-        </div>
-        {error && (
-          <p className="text-sm text-red-600">
-            {error}
-            {draftId && (
-              <>
-                {" "}
-                <Link href={`/portal/orders/${draftId}`} className="underline">
-                  View order status
-                </Link>
-              </>
-            )}
-          </p>
-        )}
-        <div className="flex gap-2">
-          <Button type="button" variant="outline" disabled={disabled} onClick={saveDraft}>
-            {busy === "draft" ? "Saving…" : "Save draft"}
-          </Button>
-          <Button type="button" disabled={disabled} onClick={submit}>
-            {busy === "submit" ? "Submitting…" : "Submit order"}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
+  const feedback = <>
+    <CommandFormMessage error={error} />
+    {attempt && E.info("An order request needs confirmation. Fields are locked; Retry reuses that exact request without creating another order.")}
+    {draftId && <Link className="underline" href={`/portal/orders/${draftId}`}>View order status</Link>}
+    {attempt && <Button type="button" disabled={busy} onClick={() => run(attempt.purpose)}>Retry order request</Button>}
+  </>;
+  return <div className="flex flex-col gap-4">
+    {E.fld("Ships from", fulfillmentSource?.name ?? "Not configured")}
+    {!fulfillmentSource && E.info("The brewery has not set where orders ship from. Contact the brewery before starting or submitting a new order. An existing uncertain request can still be retried.")}
+    {!items.length && E.blank("Nothing is listed for wholesale yet. Call the brewery.")}
+    {initial?.removed.length ? E.info(`Removed unavailable or unpriced items: ${initial.removed.join(", ")}. Review the remaining quantities.`) : null}
+    <fieldset disabled={locked} className="flex flex-col gap-3">
+      {items.map(i => <div key={i.skuId}>
+        {E.row(i.product, i.name, `$${(i.unitPriceCents / 100).toFixed(2)}`)}
+        <Label htmlFor={`qty-${i.skuId}`}>Quantity — {i.product} · {i.name}</Label>
+        <Input id={`qty-${i.skuId}`} type="number" min={0} step={1} value={qty[i.skuId] ?? ""} onChange={e => setQty({ ...qty, [i.skuId]: e.target.value })} className="w-24" />
+      </div>)}
+      {!lines && E.info("Enter whole quantities of zero or more.")}
+      <Label htmlFor="ship-to">Ship to</Label>
+      <select id="ship-to" className="rounded-md border p-2" value={fields.shipToId} onChange={e => setFields({ ...fields, shipToId: e.target.value })}>
+        <option value="">Select a ship-to</option>{shipTos.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+      </select>
+      <Label htmlFor="requested-date">Requested date (optional)</Label>
+      <Input id="requested-date" type="date" value={fields.requestedShipDate ?? ""} onChange={e => setFields({ ...fields, requestedShipDate: e.target.value || null })} />
+      <Label htmlFor="po-number">PO number</Label><Input id="po-number" value={fields.poNumber} onChange={e => setFields({ ...fields, poNumber: e.target.value })} />
+      <Label htmlFor="note">Note</Label><Input id="note" value={fields.note} onChange={e => setFields({ ...fields, note: e.target.value })} />
+    </fieldset>
+    {E.fld("Current catalog subtotal", unavailable.length ? "Unavailable for the pending request" : `$${(subtotal / 100).toFixed(2)}`)}
+    {E.info("Taxes and keg deposits are not included. The brewery confirms final invoice amounts and the requested delivery date.")}
+    {unavailable.length > 0 && E.info(`Pending request contains packages no longer in the catalog: ${unavailable.map(l => `${l.skuId} × ${l.qty}`).join(", ")}. Retry retains the original quantities.`)}
+    {feedback}
+    <div className="flex gap-2"><Button variant="outline" disabled={disabled} onClick={() => run("draft")}>Save draft</Button><Button disabled={disabled} onClick={() => setReview(true)}>Review order</Button></div>
+    <CommandForm open={review} onOpenChange={setReview} title="Review order">
+      {E.fld("Ships from", fulfillmentSource?.name ?? "Not configured")}
+      {E.fld("Ship to", shipTos.find(s => s.id === fields.shipToId)?.label ?? "Select a ship-to")}
+      {E.fld("Requested date", fields.requestedShipDate ?? "Not specified")}
+      {fields.poNumber && E.fld("PO number", fields.poNumber)}{fields.note && E.fld("Note", fields.note)}
+      {(lines ?? []).map(l => <div key={l.skuId}>{E.row(items.find(i => i.skuId === l.skuId)?.name ?? "Item", `Quantity ${l.qty}`, `$${((items.find(i => i.skuId === l.skuId)?.unitPriceCents ?? 0) * l.qty / 100).toFixed(2)}`)}</div>)}
+      {E.fld("Current catalog subtotal", unavailable.length ? "Unavailable for the pending request" : `$${(subtotal / 100).toFixed(2)}`)}
+      {E.info("Taxes and keg deposits are pending; this is not a final invoice total.")}
+      {feedback}
+      <div className="flex gap-2 py-3"><Button variant="outline" disabled={busy} onClick={() => setReview(false)}>Back to edit</Button><Button disabled={disabled} onClick={() => run("submit")}>Submit order</Button></div>
+    </CommandForm>
+  </div>;
 }

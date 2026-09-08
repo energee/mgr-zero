@@ -28,17 +28,18 @@ defineCommand({
 });
 
 defineCommand({
-  name: "upsert_ship_to", description: "Create or update a ship-to address (state drives excise dest_state)",
+  name: "upsert_ship_to", description: "Create or update a ship-to address; isDefault switches the customer default, omission preserves it on edit; addresses cannot change customer",
   roles: [...roles],
   input: z.object({
     id: z.string().uuid().optional(), customerId: z.string().uuid(), label: z.string().min(1),
     address1: z.string().min(1), address2: z.string().optional(),
     city: z.string().min(1), state: stateCode, zip: z.string().min(1),
+    isDefault: z.boolean().optional(),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_ship_to", {
     p_brewery: ctx.breweryId, p_id: i.id ?? null, p_customer: i.customerId, p_label: i.label,
     p_address1: i.address1, p_address2: i.address2 ?? null, p_city: i.city, p_state: i.state,
-    p_zip: i.zip, p_request_id: execution.requestId,
+    p_zip: i.zip, p_request_id: execution.requestId, p_is_default: i.isDefault ?? null,
   })),
 });
 

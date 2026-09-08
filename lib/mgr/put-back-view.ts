@@ -13,9 +13,9 @@ export type PutBackViewModel = {
 };
 
 export type PutBackSnapshot = {
+  backHref?: string;
   order: { id: string; order_no: number | null; status: string; needs_restock: boolean };
   lines: { id: string; qty_ordered: number; qty_picked: number | null; skus: { name: string } | null }[];
-  backHref?: string;
 };
 
 export function toPutBackViewProps({ order, lines, backHref }: PutBackSnapshot): PutBackViewModel {

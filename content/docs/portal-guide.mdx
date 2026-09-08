@@ -26,19 +26,23 @@ The header shows your customer account name. Navigation offers **Order**, **Orde
 
 1. Review each beer, its listed packages, and the unit price.
 2. Enter positive whole-unit quantities for the packages you want.
-3. Choose **Ship to**. The first address is selected by default.
-4. Optionally enter **PO number** and **Note**, then check the **Subtotal**.
-5. Select **Submit order** to save the order and send it to the brewery, or **Save draft** to save it without submitting. The brewery reviews submitted orders before they are confirmed.
+3. Choose **Ship to**. Your default address is selected for a new cart.
+4. Optionally enter **Requested date**, **PO number** and **Note**, then check the **Current catalog subtotal**. Clearing the requested date removes it from a saved draft.
+5. Select **Review order**, check the quantities and delivery fields, then **Submit order**. **Back to edit** keeps your entries. Or select **Save draft** without submitting. The brewery reviews submitted orders before they are confirmed. Taxes and keg deposits are pending and excluded from the catalog subtotal; this is not a final invoice total.
 
-Both buttons stay disabled without a ship-to, without a positive line, or while saving. That holds even after a draft has been saved from this cart. With no priced products, Shop says **No products available yet.**
+New carts select your default ship-to, or the first address if none is designated. You can choose another address; saving the cart keeps your explicit choice. Contact brewery staff to change the account default.
+
+Save draft and Review order stay disabled without a ship-to, without a positive line, without a configured shipping source, or while saving. Shop and review show **Ships from** with the brewery’s configured warehouse name. That holds even after a draft has been saved from this cart. With no priced products, Shop asks you to call the brewery.
 
 <Callout type="warn">
-**Before ordering:** if the brewery has not configured its portal fulfillment warehouse, saving fails with **portal fulfillment source is not configured**. Ask brewery staff to set that up.
+**Before ordering:** if **Ships from** says **Not configured**, contact the brewery. Fresh saves and submissions stay disabled until the brewery configures its shipping warehouse. You can still retry an earlier uncertain request to confirm its outcome.
 </Callout>
 
 <Callout type="warn">
-**Draft limitation:** after **Save draft**, MGR opens a read-only order page. You cannot edit or submit that saved draft from the order page. Ask brewery staff to finish or cancel it. If you stay on Shop after saving (or after a submission MGR could not confirm), further edits to quantities, ship-to, PO number, or note replace the saved draft's contents the next time you select **Save draft** or **Submit order**. The same order is reused, so you do not get a duplicate draft. If MGR cannot confirm submission, use **View order status** before retrying: the order may already be submitted. Contact the brewery if the status is still unclear.
+**Saved drafts and retries:** open a draft in Orders and choose **Continue/edit draft** to change or submit that same order. A submitted order can no longer be edited. After an uncertain response, fields stay locked and **Retry order request** reuses the exact request, including after reloading or signing back in on the same browser tab. No request is sent automatically. If another tab signs in to a different account, Retry refuses to send the order under that account; sign back in as the original buyer. Use **View order status** to check progress. Keep this tab open until the outcome is clear; closing it clears its recovery information. If recovery storage is unavailable, MGR does not start a new write. Contact the brewery if the outcome remains unclear.
 </Callout>
+
+From a shipped order, **Reorder** starts a new cart with still-active, currently priced packages and the previous quantities. Removed or unpriced packages are listed explicitly. Prices come from the current catalog, not the previous invoice. A still-valid ship-to is kept; the old PO, note and requested date are not copied. Review the new cart before submitting.
 
 ## Order statuses [#statuses]
 
@@ -58,25 +62,25 @@ Both buttons stay disabled without a ship-to, without a positive line, or while 
 <Screen name="Order history" />
 <Screen name="Order detail" />
 
-**Orders** lists your newest orders first with status, requested date, and any restocking badge. Every row opens that order. Select an order number to see ship-to, PO, note, ordered/picked/shipped quantities, captured unit prices, and the event timeline. **Reorder** is on a shipped order's detail, not the list; it returns you to Shop.
+**Orders** lists your newest orders first with status, requested date, and any restocking badge. Select an order number to see ship-to, PO, note, ordered/picked/shipped quantities, captured unit prices, and the event timeline.
 
-Brewery line adjustments show the quantities before and after, plus the reason. Cancellation reasons show up too. The page is read-only: you cannot edit, submit, or cancel an order from it. With no orders, the page says **No orders yet.** A new draft with no events says **No events yet.**
+Brewery line adjustments show the quantities before and after, plus the reason. Cancellation reasons show up too. Order details remain available from every history row. Drafts also offer **Continue / edit**, and shipped orders offer **Reorder**, including short shipments; these actions open the cart. Submitted orders cannot be edited or cancelled in the portal. With no orders, the page says **No orders yet.** A new draft with no events says **No events yet.**
 
 ## Invoices and credits [#invoices]
 
 <Screen name="Pay invoice" />
 
-**Invoices** lists invoice or credit-memo number, kind, total, and paid date. A credit memo is a separate negative billing record created by the brewery for a correction or return; it shows as **Credit**, not paid. With no billing records, the page says **No invoices yet**. Open a number to see the record: total, issued date, due date when it has one, a paid date only when the brewery has recorded payment, **Credit** on a credit memo, and each line's quantity and amount. An unpaid invoice tells you to contact the brewery to pay; there is no online payment yet. **Ask about this invoice** is on unpaid, paid, and credit records. A number that is not yours shows **Not found**.
+**Invoices** lists invoice or credit-memo number, kind, total, and paid date. A credit memo is a separate negative billing record created by the brewery for a correction or return. With no billing records, the page says **No invoices yet**. Open a number to see the record: total, issue date, invoice due date when applicable, explicit Credit/Paid/Unpaid status, and each line's quantity and amount. An unpaid invoice tells you to contact the brewery to pay; there is no online payment yet. A number that is not yours shows **Not found**.
 
 <Screen name="Question invoice" />
 
-The portal has no payment action. To ask about a line, a total, or a payment, open the invoice (unpaid, paid, or credit) and select **Ask about this invoice**, write your note, and **Send**. The brewery's sales team sees it on their Today list and answers by phone or email; nothing on the invoice changes.
+The portal has no payment action. To ask about a line, a total, or a payment, open the invoice or credit memo—even after an invoice is paid—and select **Ask about this invoice**, write your note, and **Send**. The brewery's sales team sees it on their Today list and answers by phone or email; nothing on the invoice changes.
 
 ## Account [#account]
 
 <Screen name="Account" />
 
-**Account** shows the customer name on this login, each ship-to with its city and state, the line **You · buyer** for this login, and any keg deposits the brewery holds for you. Other people on the account are never listed. Open **Me** to sign out. There is no portal control to add ship-tos or change the account name; contact the brewery.
+**Account** shows the customer name on this login, each ship-to with its city and state and a default label when designated, the line **You · buyer** for this login, and any keg deposits the brewery holds for you. Other people on the account are never listed. Open **Me** to sign out. There is no portal control to add ship-tos or change the account name; contact the brewery.
 
 ## Errors and current limits [#help]
 

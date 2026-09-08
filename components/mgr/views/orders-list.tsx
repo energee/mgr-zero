@@ -28,8 +28,8 @@ export function OrdersView({
 }) {
   return (
     <>
-      {E.hd("Work", model.subtitle, createAction ?? E.btn("New order"))}
-      {filters ?? (
+      {E.hd("Work", model.subtitle, createAction !== undefined ? createAction : E.btn("New order"))}
+      {filters !== undefined ? filters : (
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           {E.tabs(WORK_CHIPS, 1, "w-full md:w-fit", WORK_TABS)}
           {E.tabs(ORDER_STATES, 0, "w-full justify-start overflow-x-auto md:w-fit")}

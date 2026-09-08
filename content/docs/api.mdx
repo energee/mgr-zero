@@ -200,6 +200,7 @@ omitted. They have no roles until they are built.
 | `generate_compliance_report` | Compliance | ✓ | ✓ |  |  |  |
 | `get_atp` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `get_beer_overview` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
+| `get_bin_move_stock` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `get_bin_on_hand` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `get_brew_day` | Production | ✓ |  |  | ✓ |  |
 | `get_brewery` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ |  |
@@ -212,14 +213,17 @@ omitted. They have no roles until they are built.
 | `get_customer_keg_balance` | Taproom & kegs | ✓ |  | ✓ |  |  |
 | `get_delivery_stop` | Delivery & routes | ✓ | ✓ | ✓ |  |  |
 | `get_first_run_state` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ |  |
+| `get_format_composition` | Packaging | ✓ | ✓ | ✓ |  |  |
 | `get_gravity_unit` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ |  |
 | `get_invoice` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
+| `get_invoice_return_sources` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `get_keg_fleet` | Taproom & kegs | ✓ |  | ✓ |  |  |
 | `get_material_on_hand` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |
 | `get_material_requirements` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |
 | `get_notification_preferences` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
 | `get_on_hand` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `get_order` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
+| `get_order_ship_sources` | Orders & invoicing | ✓ |  | ✓ |  |  |
 | `get_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |
 | `get_portal_account` | Customer portal |  |  |  |  | ✓ |
 | `get_purchase_order` | Purchasing & materials | ✓ |  | ✓ |  |  |
@@ -323,6 +327,7 @@ omitted. They have no roles until they are built.
 | `update_keg_pool` | Taproom & kegs | ✓ |  | ✓ |  |  |
 | `update_location` | Inventory & locations | ✓ |  |  |  |  |
 | `update_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |
+| `update_sku` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `update_staff_role` | Team & brewery settings | ✓ |  |  |  |  |
 | `upsert_brand` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `upsert_brand_approval` | Compliance | ✓ | ✓ |  |  |  |
@@ -686,7 +691,9 @@ curl -X POST "$MGR_URL/api/command" \
 
 SKUs whose available-to-promise is negative, with on-hand and open reservations
 
-Takes no input.
+| Field | Type | Required |
+| --- | --- | --- |
+| `skuId` | uuid | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -1056,6 +1063,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_invoice", "input": { "invoiceId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
+#### get_invoice_return_sources [#get_invoice_return_sources]
+
+`query` · admin, sales
+
+Original shipped movements available as explicit return identities
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `invoiceId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_invoice_return_sources", "input": { "invoiceId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 #### get_order [#get_order]
 
 `query` · admin, sales, warehouse
@@ -1071,6 +1095,23 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_order", "input": { "orderId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+#### get_order_ship_sources [#get_order_ship_sources]
+
+`query` · admin, warehouse
+
+Recorded source bins and lots for a picked order; no customer recall contact data
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `orderId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_order_ship_sources", "input": { "orderId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### list_invoice_questions [#list_invoice_questions]
@@ -1112,10 +1153,11 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Orders newest-first, optionally by status
+Orders newest-first, optionally by status and customer
 
 | Field | Type | Required |
 | --- | --- | --- |
+| `customerId` | uuid | no |
 | `status` | draft or submitted or confirmed or picked or shipped or cancelled | no |
 | `limit` | integer | no |
 
@@ -1335,7 +1377,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* orders-designed */}
 
-23 of the 24 operations in this area are available today; the 1 below are not.
+25 of the 26 operations in this area are available today; the 1 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
@@ -1419,7 +1461,7 @@ Draft a stock transfer between two locations: sku, material or keg-pool lines, e
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_stock_transfer", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "fromLocationId": "00000000-0000-0000-0000-000000000000", "toLocationId": "00000000-0000-0000-0000-000000000000", "lines": [ { "qty": 1, "fromBinId": "00000000-0000-0000-0000-000000000000", "toBinId": "00000000-0000-0000-0000-000000000000" } ] } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_stock_transfer", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "fromLocationId": "00000000-0000-0000-0000-000000000000", "toLocationId": "00000000-0000-0000-0000-000000000000", "lines": [ { "qty": 1, "fromBinId": "00000000-0000-0000-0000-000000000000", "toBinId": "00000000-0000-0000-0000-000000000000", "skuId": "00000000-0000-0000-0000-000000000000" } ] } }'
 ```
 
 #### delete_bin [#delete_bin]
@@ -1454,6 +1496,23 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_atp", "input": {} }'
+```
+
+#### get_bin_move_stock [#get_bin_move_stock]
+
+`query` · admin, warehouse
+
+Stock by bin and explicit lot identity at one location, including untracked stock and empty keg sizes
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_bin_move_stock", "input": { "locationId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### get_bin_on_hand [#get_bin_on_hand]
@@ -1550,6 +1609,7 @@ Recent inventory movements
 | --- | --- | --- |
 | `skuId` | uuid | no |
 | `limit` | integer | no |
+| `offset` | integer | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -1591,12 +1651,14 @@ Move stock between two bins of one location: paired ledger rows, no transfer doc
 | `kegPoolId` | uuid | no |
 | `kegSize` | string | no |
 | `note` | string | no |
+| `materialLotId` | uuid | no |
+| `skuLotId` | uuid | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "move_stock_bin", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "qty": 1, "fromBinId": "00000000-0000-0000-0000-000000000000", "toBinId": "00000000-0000-0000-0000-000000000000" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "move_stock_bin", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "qty": 1, "fromBinId": "00000000-0000-0000-0000-000000000000", "toBinId": "00000000-0000-0000-0000-000000000000", "skuId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### receive_stock_transfer [#receive_stock_transfer]
@@ -1630,6 +1692,7 @@ Append an inventory movement (immutable; corrections are reversals); sale_remova
 | `binId` | uuid | yes |
 | `qty` | number | yes |
 | `type` | opening_balance or production_in or adjustment or sale_removal or taproom_transfer or depletion or return_in or destruction or loss or sample or festival_removal | yes |
+| `lotId` | uuid | no |
 | `saleChannelId` | uuid | no |
 | `destState` | string, fixed length | no |
 | `note` | string | no |
@@ -1699,7 +1762,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* inventory-designed */}
 
-18 of the 19 operations in this area are available today; the 1 below are not.
+19 of the 20 operations in this area are available today; the 1 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
@@ -1896,6 +1959,25 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_channel_price", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "saleChannelId": "00000000-0000-0000-0000-000000000000", "priceGroupId": "00000000-0000-0000-0000-000000000000", "formatId": "00000000-0000-0000-0000-000000000000", "unitPriceCents": 1 } }'
 ```
 
+#### update_sku [#update_sku]
+
+`command` · admin, sales
+
+Edit a SKU's active state and optional UPC; brand, format, provider mappings and history stay unchanged
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `skuId` | uuid | yes |
+| `active` | boolean | yes |
+| `upc` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "update_sku", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "skuId": "00000000-0000-0000-0000-000000000000", "active": true } }'
+```
+
 #### upsert_brand [#upsert_brand]
 
 `command` · admin, sales
@@ -1958,18 +2040,6 @@ curl -X POST "$MGR_URL/api/command" \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_sale_channel", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "taxTreatment": "taxable" } }'
 ```
-
----
-
-**Designed, not yet available** {/* catalog-designed */}
-
-13 of the 14 operations in this area are available today; the 1 below are not.
-
-The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
-
-| Operation | Kind | Needed by |
-| --- | --- | --- |
-| `update_sku` | command | Catalog, Brand, SKU |
 
 {/* end ops:catalog */}
 
@@ -2089,7 +2159,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Create or update a ship-to address (state drives excise dest_state)
+Create or update a ship-to address; isDefault switches the customer default, omission preserves it on edit; addresses cannot change customer
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -2101,6 +2171,7 @@ Create or update a ship-to address (state drives excise dest_state)
 | `zip` | string | yes |
 | `id` | uuid | no |
 | `address2` | string | no |
+| `isDefault` | boolean | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -2948,6 +3019,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "close_packaging_run", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "runId": "00000000-0000-0000-0000-000000000000", "bblDrawn": 1, "outputs": [ { "skuId": "00000000-0000-0000-0000-000000000000", "qtyActual": 1 } ], "lotCode": "string", "packagedOn": "2026-01-31", "locationId": "00000000-0000-0000-0000-000000000000", "binId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
+#### get_format_composition [#get_format_composition]
+
+`query` · admin, sales, warehouse
+
+One format with its components, packaging BOM, atomic child options, and material names and base units
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `formatId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_format_composition", "input": { "formatId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 #### get_packaging_run [#get_packaging_run]
 
 `query` · admin, brewer, warehouse
@@ -3137,7 +3225,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* packaging-designed */}
 
-11 of the 12 operations in this area are available today; the 1 below are not.
+12 of the 13 operations in this area are available today; the 1 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
@@ -3540,7 +3628,7 @@ location. Prices are nonnegative integer cents, at most 2147483647.
 
 `query` · admin, sales, warehouse, brewer
 
-The current brewery's basics: name, timezone, TTB registry number, PA license, customer-facing phone, reading-overdue hours and gravity unit
+The current brewery's basics: name, timezone, TTB registry number, PA license, customer-facing phone, reading-overdue hours, gravity unit and portal fulfillment warehouse
 
 Takes no input.
 
@@ -3850,6 +3938,8 @@ Portal: create a draft order for the caller's account
 | `lines` | array of object | yes |
 | `poNumber` | string | no |
 | `note` | string | no |
+| `requestedShipDate` | date (YYYY-MM-DD) or null | no |
+| `expectedIdentity` | object | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -3931,6 +4021,7 @@ Portal: submit a draft order
 | Field | Type | Required |
 | --- | --- | --- |
 | `orderId` | uuid | yes |
+| `expectedIdentity` | object | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -3952,6 +4043,8 @@ Portal: replace a draft order's lines/fields
 | `shipToId` | uuid | no |
 | `poNumber` | string | no |
 | `note` | string | no |
+| `requestedShipDate` | date (YYYY-MM-DD) or null | no |
+| `expectedIdentity` | object | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

@@ -31,7 +31,7 @@ describe("Shop view", () => {
     expect(model.source).toBe("Warehouse");
     expect(model.shipToLine).toBe("Main · 2026-09-09");
     expect(model.reviewVerb).toBe("Review order · $828.00");
-    expect(model.depositInfo).toMatch(/\$30\.00/);
+    expect(model.depositInfo).toMatch(/pending/);
   });
 
   it("renders Review order, Hazy IPA, and the Coming up nav from the adapter", () => {
@@ -73,7 +73,7 @@ describe("Shop view", () => {
 });
 
 describe("Review order view", () => {
-  it("totals the same cart as Shop, adding keg deposits rather than copying INV.total", () => {
+  it("shows current merchandise and keeps unquoted tax and deposits pending", () => {
     const shop = toShopViewProps(ridgelineShop);
     const model = toReviewOrderViewProps(ridgelineReviewOrder);
     expect(shop.reviewVerb).toBe("Review order · $828.00");
@@ -81,11 +81,11 @@ describe("Review order view", () => {
       ["Hazy IPA · ½ bbl keg", "$150.00", 4],
       ["Pils · case · 24×16 oz", "$38.00", 6],
     ]);
-    expect(model.depositDetail).toBe("4 × $30.00");
-    expect(model.depositAmount).toBe("$120.00");
-    expect(model.subtotal).toBe("$948.00");
-    expect(model.placeVerb).toBe("Place order · $948.00");
-    expect(model.tax).toBe("$0.00 · sale for resale");
+    expect(model.depositDetail).toBe("Pending; not included");
+    expect(model.depositAmount).toBe("Pending; not included");
+    expect(model.subtotal).toBe("$828.00");
+    expect(model.placeVerb).toBe("Place order · $828.00");
+    expect(model.tax).toBe("Pending; not included");
     expect(model.shipTo).toBe("Main · Phoenixville, PA");
     expect(model.requestedDate).toBe("2026-09-09");
     expect(model.source).toBe("Warehouse");
@@ -95,9 +95,9 @@ describe("Review order view", () => {
   it("renders Place order and Hazy IPA from the adapter", () => {
     const html = htmlOf(createElement(ReviewOrderView, { model: toReviewOrderViewProps(ridgelineReviewOrder) }));
     expect(html).toMatch(/Hazy IPA/);
-    expect(html).toMatch(/Place order · \$948\.00/);
+    expect(html).toMatch(/Place order · \$828\.00/);
     expect(html).toMatch(/Keg deposit/);
-    expect(html).toMatch(/4 × \$30\.00/);
+    expect(html).toMatch(/Pending; not included/);
     expect(html).toMatch(/2026-09-09/);
     expect(html).not.toMatch(/Wed 9\/9/);
     expect(html).not.toMatch(/→/);

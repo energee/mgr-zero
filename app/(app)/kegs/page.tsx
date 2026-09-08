@@ -7,7 +7,7 @@ import Link from "next/link";
 import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
-import { runCommand } from "@/lib/commands/registry";
+import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { KegEventForm } from "./event-form";
 import { dollars, KIND_LABEL, SIZE_LABEL } from "./keg-labels";

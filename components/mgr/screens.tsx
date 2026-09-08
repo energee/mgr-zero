@@ -1113,7 +1113,7 @@ export const SCREENS: Screen[] = [
     writes: "ship_order [needs_restock when any qty_shipped < qty_picked; invoice timing = now persisted with the shipment]",
     states: [["stale", "picked qty changed · preview again", 1], ["short ship", "qty below picked needs a reason; remainder is released", 1], ["offline", "wait for live recheck", 1], ["permission", "warehouse or admin required", 1], ["accepted", "INV number on commit · restock row if qty short"]],
     spec: <>Ship qty prefills from picked and is editable per line; a shortage reason appears only when qty &lt; picked, and the same condition sets the restock flag, so the case released here becomes a Put back row rather than staying staged with nothing naming it. Carrier/tracking never block the commit. The preview names the destination state from the ship-to and says the invoice number is assigned on commit. On-delivery timing lives on Ship · confirmation; taproom transfers use Complete transfer.</>,
-    body: <ShipView model={toShipViewProps(orderShipInvoice)} fulfillmentOptions={[LOC_WAREHOUSE.name, LOC_TAPROOM.name]} />,
+    body: <ShipView sources={<>{E.pick("Source bin and lot", "Cooler · L-240831-HZ", ["Cooler · L-240831-HZ", "Cooler · Untracked / legacy stock"])}{E.fld("Source quantities", "Every source sums to its shipped line")}</>} model={toShipViewProps(orderShipInvoice)} fulfillmentOptions={[LOC_WAREHOUSE.name, LOC_TAPROOM.name]} />,
   },
   {
     step: 5,
@@ -1151,7 +1151,7 @@ export const SCREENS: Screen[] = [
     writes: "ship_order [taproom_transfer kind: paired taproom_transfer movements (−source, +destination); no invoice]",
     states: [["stale", "picked qty changed · preview again", 1], ["short", "qty below picked releases the remainder"], ["permission", "warehouse or admin required", 1], ["accepted", "taproom on-hand rises immediately"]],
     spec: "No invoice-timing chip and no destination state: beer moves between the brewery’s own locations. Copper because the paired movements are append-only. Requested from Taproom · Needs replenishment.",
-    body: <CompleteTransferView model={toCompleteTransferViewProps(orderTransferComplete)} tape={completeTransferTape} />,
+    body: <CompleteTransferView sources={<>{E.pick("Source bin and lot", "Cooler · L-240831-HZ", ["Cooler · L-240831-HZ", "Cooler · Untracked / legacy stock"])}{E.fld("Source quantities", "Every source sums to its shipped line")}</>} model={toCompleteTransferViewProps(orderTransferComplete)} tape={completeTransferTape} />,
   },
   {
     step: 5,
@@ -1301,7 +1301,7 @@ export const SCREENS: Screen[] = [
     writes: "return_shipment [one RPC: return_in movements at explicit destination + loss movement for a damaged return + credit memo at the invoiced price; owned-fleet keg_events linked to shipment when slice 9 is enabled]",
     states: [["permission", "sales or warehouse required", 1], ["unsold", "returns as sellable stock at the chosen destination"], ["damaged", "returns, then posts loss in the same RPC · never re-sold", 1], ["wrong item", "sellable · the mis-picked SKU goes back on the shelf"], ["invoice paid", "the credit memo sits unapplied as available credit", 1], ["partial", "only the returned units credit back"]],
     spec: "Reason decides the beer, never the money. Unsold and wrong item return as sellable stock at the destination; damaged returns and is written to loss in the same RPC, because beer that came back broken is not inventory and pretending otherwise puts it back on a pick list. The credit is the price frozen on the original invoice line and the deposit is the one recorded on the original shipment, never today's price group, on the same principle that freezes a channel onto a movement at write time. A paid invoice can still be returned: the credit memo lands unapplied and sits as available credit, which is the state the QuickBooks credit-memo frame already draws.",
-    body: <ReturnCreditView model={toReturnCreditViewProps(orderReturnCredit)} />,
+    body: <ReturnCreditView sources={E.pick("Original shipped source", "Cooler · L-240831-HZ", ["Cooler · L-240831-HZ"])} model={toReturnCreditViewProps(orderReturnCredit)} />,
   },
   {
     step: 5,
@@ -1681,7 +1681,7 @@ export const SCREENS: Screen[] = [
     reads: "portal_invoice",
     writes: "raise_invoice_question",
     states: [["sent", "the buyer sees it went · nothing on the invoice changes"], ["received", "a sales Today row names the invoice and the buyer"], ["no chat provider", "the Today row is the whole delivery · no email is sent", 1], ["answered", "Mark answered on the Invoice frame clears the sales row"]],
-    spec: "Off Pay invoice and Payment unavailable. The buyer writes a note and it has to land somewhere a person will see: it writes a question row that appears on the sales Today list, and rides the chat integration as a personal message when one is connected. Nothing on the invoice changes.",
+    spec: "Available on unpaid and paid invoices and credit memos. The buyer writes a note and it has to land somewhere a person will see: it writes a question row that appears on the sales Today list, and rides the chat integration as a personal message when one is connected. Nothing on the invoice changes.",
     body: <QuestionInvoiceView model={toQuestionInvoiceViewProps(portalInvoiceUnpaid)} />,
   },
   {

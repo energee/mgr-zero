@@ -26,6 +26,7 @@ export type PortalOrderViewModel = {
   status: string;
   shipTo?: string;
   po?: string;
+  requested?: string;
   note?: string;
   lines: PortalOrderLineView[];
   adjusted?: string;
@@ -34,6 +35,7 @@ export type PortalOrderViewModel = {
 };
 
 export type PortalOrderSnapshot = {
+  backHref?: string;
   order: {
     id: string;
     order_no: number | null;
@@ -67,7 +69,6 @@ export type PortalOrderSnapshot = {
       invoice_lines: { amount_cents: number }[];
     }[];
   } | null;
-  backHref?: string;
 };
 
 function calendarDay(iso: string): string {
@@ -86,6 +87,7 @@ export function toPortalOrderViewProps({ order, lines, events, shipment, backHre
     status: buyerStatus(order.status, order.requested_ship_date),
     shipTo: ship ? `${ship.label} · ${ship.city}, ${ship.state}` : undefined,
     po: order.po_number ?? undefined,
+    requested: order.requested_ship_date ?? undefined,
     note: order.note ?? undefined,
     lines: lines.map((l) => {
       const ordered = Number(l.qty_ordered);

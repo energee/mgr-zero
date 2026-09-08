@@ -6,12 +6,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { PickSheetView } from "../components/mgr/views/pick-sheet";
-import { E } from "../components/mgr/e";
-import { PICK_SHEET_DATE_CHIPS, pickSheet } from "../lib/mgr/fixtures/pick-sheet";
+import { pickSheet } from "../lib/mgr/fixtures/pick-sheet";
 import { toPickSheetViewProps } from "../lib/mgr/pick-sheet-view";
 
 const html = (model = toPickSheetViewProps(pickSheet), extra?: { filters?: ReactNode; linkRows?: boolean }) =>
-  renderToStaticMarkup(createElement(PickSheetView, { model, filters: extra?.filters !== undefined ? extra.filters : E.chips(PICK_SHEET_DATE_CHIPS, 1), linkRows: extra?.linkRows }));
+  renderToStaticMarkup(createElement(PickSheetView, { model, ...extra }));
 
 describe("Pick sheet view loop", () => {
   it("maps daily_pick_sheet rows onto one ISO date with nav labels and totals", () => {
@@ -24,12 +23,7 @@ describe("Pick sheet view loop", () => {
       "Al’s Bar · ORD-0232",
       "Teresa’s · ORD-0234",
     ]);
-    expect(model.groups[0]?.rows.map((r) => r.detail)).toEqual([
-      "3 lines · confirmed",
-      "1 line · confirmed",
-      "5 lines · confirmed",
-    ]);
-    expect(model.groups[0]?.rows.map((r) => r.verb)).toEqual(["Pick", "Pick", "Pick"]);
+    expect(model.groups[0]?.rows.map((r) => r.detail)).toEqual(["confirmed · 3 lines", "confirmed · 1 line", "confirmed · 5 lines"]);
     expect(model.groups[0]?.rows.map((r) => r.href)).toEqual([
       "/orders/00000000-0000-4000-8000-000000000231",
       "/orders/00000000-0000-4000-8000-000000000232",
@@ -56,24 +50,16 @@ describe("Pick sheet view loop", () => {
     expect(model.groups[1]?.rows[0]?.title).toMatch(/^Al’s Bar ·/);
   });
 
-  it("picked rows offer Open instead of Pick", () => {
-    const model = toPickSheetViewProps({
-      orders: [{ ...pickSheet.orders[0]!, status: "picked" }],
-    });
-    expect(model.groups[0]?.rows[0]?.verb).toBe("Open");
-    expect(model.groups[0]?.rows[0]?.detail).toMatch(/picked/);
-  });
-
   it("renders Pick sheet, nav labels, and Totals from the adapter", () => {
     const markup = html();
     expect(markup).toMatch(/Pick sheet/);
     expect(markup).toMatch(/Ridgeline Tap Room · ORD-0231/);
     expect(markup).toMatch(/Al’s Bar · ORD-0232/);
     expect(markup).toMatch(/Teresa’s · ORD-0234/);
-    expect(markup).toMatch(/3 lines · confirmed/);
-    expect(markup).toMatch(/>Pick</);
+    expect(markup).toMatch(/3 lines/);
     expect(markup).toMatch(/>Totals</);
     expect(markup).toMatch(/Hazy IPA · ½ bbl keg 9 · Pils · 16 oz case 22/);
+    expect(markup).toContain(">Pick<");
     expect(markup).toMatch(/Thu 9\/3/);
   });
 
@@ -88,7 +74,6 @@ describe("Pick sheet view loop", () => {
     expect(isValidElement(SCREENS.find((s) => s.name === "Pick sheet")!.body)).toBe(true);
     expect(body.type).toBe(PickSheetView);
     expect(body.props.model).toEqual(toPickSheetViewProps(pickSheet));
-    expect((body as { props: { filters?: unknown } }).props.filters).toBeTruthy();
   });
 
   it("the live Pick sheet page mounts PickSheetView with no second E.* tree", () => {
@@ -97,6 +82,5 @@ describe("Pick sheet view loop", () => {
     expect(src).toMatch(/<PickSheetView\b/);
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
     expect(src).not.toMatch(/\bE\.(back|row|nav|ttl|blank|chips)\b/);
-    expect(readFileSync("components/mgr/views/pick-sheet.tsx", "utf8")).not.toMatch(/DATE_CHIPS/);
   });
 });

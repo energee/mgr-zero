@@ -50,7 +50,7 @@ SKU fields in **New Order** use the same search, narrowed to SKUs. They show rec
 | --- | --- |
 | **Admin** | Every staff screen and action that exists. |
 | **Sales** | Catalog; customers and pricing; create, submit, confirm, adjust, and cancel orders, plus credits; view inventory; invoices; replenishment suggestions and creating the replenishment order; the compliance registry, the monthly report and its filed snapshot, and lot trace. |
-| **Warehouse** | View inventory and record movements; keg pools and keg events on **Kegs**; view orders, pick, and ship; build delivery routes, and depart, confirm each stop, and return a route you are the assigned driver of; view replenishment suggestions (**Create replenishment order** is on the page but submitting it returns a permission error); schedule, pick a tank for, start, and close packaging runs, and repack; vendors, materials and contracts; purchase orders (draft, mark sent, receive), material counts, and drafting orders from Planning. Catalog, Customers, the Invoices list, and Team open if you type their address, but they are not in Warehouse's navigation. Locations opens the same way; there Warehouse can add, rename, or remove a location's bins, though only Admin can add a location or edit its name and type. |
+| **Warehouse** | View inventory and record movements; keg pools and keg events on **Kegs**; view orders, pick, and ship; build delivery routes, and depart, confirm each stop, and return a route you are the assigned driver of; view replenishment suggestions (write controls are available only to Admin and Sales); schedule, pick a tank for, start, and close packaging runs, and repack; vendors, materials and contracts; purchase orders (draft, mark sent, receive), material counts, and drafting orders from Planning. Catalog, Customers, the Invoices list, and Team open if you type their address, but they are not in Warehouse's navigation. Locations opens the same way; there Warehouse can add, rename, or remove a location's bins, though only Admin can add a location or edit its name and type. |
 | **Brewer** | Today; linking your Slack account from App Home; Recipes and versions; Batches, vessels, and recording brew day; Cellar transfers and fermentation readings; packaging runs (schedule, pick a tank, start, and close) — but not **Repack**, which is Admin and Warehouse only; vendors, materials, contracts and material counts, and reading Planning (drafting the orders is Admin and Warehouse). See [Navigate MGR](#navigation). |
 
 <Callout type="info">
@@ -85,13 +85,15 @@ Admin opens **Import** from **Settings** or the first-run checklist. See [Import
 
 ## Catalog: brands, formats, and SKUs [#catalog]
 
-*A brand is the beer, such as Hazy IPA. A format is the physical shape it ships or pours in, such as a half-barrel keg or a case of 16 oz cans. A SKU is one brand in one packaged format, the thing inventory, pricing, and orders refer to. Admin and Sales can create brands, formats, and SKUs. Warehouse has no link here (the planned **Menu** entry is hidden until built), though the page is readable at its address. **New Brand**, **New Format**, and **New SKU** still appear for Warehouse, but submitting any of them returns a permission error. Catalog is not reachable by Brewer.*
+*A brand is the beer, such as Hazy IPA. A format is the physical shape it ships or pours in, such as a half-barrel keg or a case of 16 oz cans. A SKU is one brand in one packaged format, the thing inventory, pricing, and orders refer to. Admin and Sales can create brands, formats, and SKUs. Warehouse has no link here (the planned **Menu** entry is hidden until built), though the page is readable at its address. Warehouse reads catalog facts without mutation controls. Catalog is not reachable by Brewer.*
 
 ### Create a brand
 
 1. Open **Catalog** and select **New Brand**.
 2. Enter **Name** (required), **Style** (optional; a new style is added to the brewery's list), and **ABV** (optional percentage; type `6.5` for 6.5%). **Description**, **Category**, and **Hops** are optional notes. **Price group** is the row of the [price grid](#pricing) this beer sits on; leave it **Unpriced** and none of its SKUs can be ordered until you choose one.
 3. Select **Create**. Brand names must be unique within the brewery. The brand lands alphabetically and starts as **No SKUs yet**.
+
+Use **Edit brand** beside an existing brand to change its name, style, ABV, description, category, price group, or hops. The editor starts with all saved values; changing one field keeps the others. Select **Save brand**.
 
 ### Create a format
 
@@ -100,11 +102,19 @@ Admin opens **Import** from **Settings** or the first-run checklist. See [Import
 3. For a packaged format choose **Package type** (`keg`, `can`, or `bottle`), the **Keg size** for kegs, and optionally **Units per case** and **BBL per unit**.
 4. Select **Create**. Format names must be unique within the brewery.
 
+Select **Open format** on a format row to see its components and **Package BOM**. Admin and Sales can **Replace components** or **Replace BOM**; Warehouse can read them. Each save replaces that entire list. Add rows, choose distinct items, enter positive quantities, and remove rows you no longer need. An empty list requires checking the explicit clear confirmation before saving.
+
+Components must be other atomic packaged formats with a typed volume. To create a composed format, leave **BBL per unit** blank when creating it, then open it and add components. A format with a typed volume, a poured format, or a format already used as a child cannot have its components replaced here. Clearing components leaves no volume, so the format cannot hold stock until components are added again.
+
+For packaging materials, quantities use the material’s displayed base unit. Choose **Consumed** or **Return to stock** for what happens when the package is broken open. Existing inactive materials remain visible. Changes apply to this format’s complete list; if a different package needs its own list, create a separate format. Correcting an existing definition affects future calculations and open plans. Recorded movement volumes, closed packaging yield, and consumed material quantities stay as recorded.
+
 ### Create a SKU
 
 1. Find the brand and select **New SKU**.
 2. Choose a packaged **Format**. **Name** is optional and defaults to *Brand · Format*; **UPC** is optional.
 3. Select **Create**. A brand has at most one SKU per format. After that, the SKU is available in inventory, pricing, and order forms.
+
+**Edit SKU** beside a SKU changes **Active** and **UPC**. Deactivating it removes it from New Order choices and the portal catalog, and prevents adding it to new orders; recorded inventory and order history remain. Reactivate it to sell it again at its current grid price. UPC is unique within the brewery; clear the field to remove it. The brand and format stay fixed, and provider mappings are preserved.
 
 **BBL per unit** is the barrel volume of one inventory unit and lives on the format, so every SKU in that format shares it. One US beer barrel is 31 gallons (3,968 fl oz). Half-barrel keg = `0.5`. Sixth-barrel keg is about `0.16666667`. A 24 × 16 oz case is `384 ÷ 3968`, about `0.09677419`. Set it on the format before you record inventory.
 
@@ -122,11 +132,10 @@ Wholesale Shop shows the packages the brewery has designated for wholesale — �
 
 <Cards>
   <Card title="On hand">The sum of recorded movements for one SKU in one bin at one location. ATP stays per SKU.</Card>
-  <Card title="ATP">Available to promise: on hand minus open reservations for that SKU. It can go negative. A negative row shows a **Shortfall** button that opens [Replenishment](#replenishment).</Card>
-  <Card title="Movement log">The 50 newest entries: time, type, SKU, location, signed quantity, and note.</Card>
-</Cards>
+  <Card title="ATP">Available to promise: on hand minus open reservations for that SKU. It can go negative.</Card>
+  <Card title="Movement log">Entries show time, type, SKU, location and bin, signed quantity, frozen barrel volume, destination state or channel when present, and the movement/source references. **Older movements** and **Newer movements** page through the history.</Card></Cards>
 
-**Bins.** A bin is a named place inside a location: a walk-in, a cold room, a dry rack. Every location starts with three, **Cold**, **Dry**, and **Walk-in**, and always keeps at least one; add, rename, or remove them from [Locations](#locations). A bin that has ever recorded stock cannot be removed, even at a zero balance, because the movement history still names it; rename it instead. Beer that ships on an order leaves from the location's first bin alphabetically, so name the bin you pick from so it sorts first.
+**Bins.** A bin is a named place inside a location: a walk-in, a cold room, a dry rack. Every location starts with three, **Cold**, **Dry**, and **Walk-in**, and always keeps at least one; add, rename, or remove them from [Locations](#locations). A bin that has ever recorded stock cannot be removed, even at a zero balance, because the movement history still names it; rename it instead. When shipping, choose the actual source bin and lot for each quantity; tracked lots stay identified through shipment and returns.
 
 ### Record a movement
 
@@ -136,7 +145,7 @@ Wholesale Shop shows the packages the brewery has designated for wholesale — �
 2. Choose a **SKU**, **Location**, and **Bin**. Picking the location preselects its first bin alphabetically; change it if the stock sits elsewhere.
 3. Choose a **Type**. The default is `opening_balance`.
 4. For `depletion`, pick a **Channel**. The list is your brewery's own — every brewery starts with **Wholesale**, **Taproom**, **DTC**, and **Export**, and you edit that list under [**Sale channels**](#channels). **Taproom** is preselected. The channel decides how the removal is taxed, and that treatment is frozen onto the entry: editing the channel later never rewrites what is already recorded. `sale_removal` takes a channel too, but shipping sets it, not this form.
-5. Enter **Qty** in SKU units, to two decimal places if you need them. Positive quantities add stock. Negative quantities remove it. Zero is rejected.
+5. Enter a positive **Qty** in SKU units, to two decimal places if needed. The type decides whether stock is added or removed; for `adjustment`, choose **Add stock** or **Remove stock**. Zero is rejected. Samples and festival removals require a two-letter **Destination state**. Check the signed quantity and estimated volume in the preview.
 6. Add an optional **Note**, then select **Record**.
 
 | Type | Use | Normal sign |
@@ -155,9 +164,7 @@ Wholesale Shop shows the packages the brewery has designated for wholesale — �
 
 `sale_removal` and `taproom_transfer` are written by shipping, not by this form.
 
-<Callout type="warn">
-**Samples and festival removals:** these need a destination state, and the form has no destination-state field. Do not fake it with another type. Use your brewery's approved recording procedure.
-</Callout>
+**Movement recorded** appears only after the server confirms the save. It shows the committed quantity, frozen barrel volume, bin, state/channel, note, timestamp and reference. A failed or uncertain response does not show this receipt; retry the unchanged form to recover the same save. **Done** returns to the ledger. Inventory correction remains unavailable; ask your admin before recording another entry to correct a mistake.
 
 MGR calculates and stores barrel volume for every movement from quantity × the BBL per unit of the SKU's format. Movements cannot be edited or deleted. See [Errors and corrections](#errors-corrections) before you try to fix inventory.
 
@@ -165,7 +172,7 @@ Empty sections say **No inventory recorded yet.** or **No movements recorded yet
 
 ## Customers and ship-tos [#customers]
 
-*Admin and Sales can create and edit customers and ship-to addresses. Warehouse has no link here, but the page is readable at its address: **New Customer** and **Edit** still appear, but submitting either returns a permission error. The list shows name, type, home state, sale channel, and payment terms.*
+*Admin and Sales can create and edit customers and ship-to addresses. Warehouse can read these pages at their addresses; customer, ship-to, and invitation controls are hidden. The list shows name, type, home state, sale channel, and payment terms.*
 
 ### Create or edit a customer
 
@@ -179,11 +186,13 @@ Empty sections say **No inventory recorded yet.** or **No movements recorded yet
 6. Optionally enter **License number** and **Payment terms**, such as `net30`.
 7. Select **Create** or **Save**.
 
+Customer detail shows **Tax treatment**. Choose **Inherit sale channel** to use the channel default, or select a customer override; editing another field preserves the selected treatment. **Orders** opens only this customer’s orders, and status filters keep that customer selected. **Clear** returns to all customers.
+
 ### Create or edit a ship-to
 
 <Screen name="Ship-to form" />
 
-Select the customer name, then **New Ship-To** or **Edit**. Required: **Label**, **Address 1**, **City**, **State** (two letters, uppercased), and **Zip**. **Address 2** is optional. Ship-to state is the destination used when a wholesale shipment leaves inventory.
+Select the customer name, then **New Ship-To** or **Edit**. Required: **Label**, **Address 1**, **City**, **State** (two letters, uppercased), and **Zip**. **Address 2** is optional. **Default ship-to for new orders** selects this address for new staff and portal orders. Setting it replaces the previous default for this customer; clearing it leaves no designated default, so new orders start with the first address. Existing orders keep their chosen destination. Ship-to state is the destination used when a wholesale shipment leaves inventory.
 
 Empty lists say **No customers yet.** or **No ship-tos yet.** You cannot delete a customer. Admin and Sales can select **Invite portal user**, enter an email, and **Send invite**. This creates buyer access for this customer only; there is no Account admin choice. The recipient chooses their name and password from the email. After an error, keep the page open and retry unchanged details; changing the email starts a new invitation. Existing sign-in accounts cannot be attached with this form.
 
@@ -217,7 +226,7 @@ An order can become `cancelled` any time before shipping. The Orders screen list
 
 1. Open **Orders** and select **New Order**.
 2. Choose **Kind**: **Wholesale** (default) or **Taproom transfer**.
-3. For wholesale, choose the **Customer** and one of that customer's **Ship-to**s. For a transfer, choose the destination in **To location**.
+3. For wholesale, choose the **Customer**; its default **Ship-to** is selected automatically (the first address if no default is set), and you can choose another. For a transfer, choose the destination in **To location**.
 4. Choose the source in **From location**. Both location selects list every location of the brewery, not just taprooms or warehouses, so you pick a warehouse source and a taproom destination yourself.
 5. Optionally choose **Requested ship date** and enter **PO number**.
 6. Add one or more lines. Each needs a SKU and a quantity greater than zero. **Add line** adds a row. **Remove** takes one away, but at least one row stays.
@@ -257,6 +266,8 @@ A picked taproom transfer shows **Complete transfer** on its order page: the sam
 
 The order detail shows the fulfillment source, customer and ship-to for wholesale orders, PO, requested date, the order note when one was entered, ordered/picked/shipped quantity, captured price, current ATP, and a time-stamped event history. When restock is pending it names what to put back and marks current state as needing attention. The current detail page does not display a taproom transfer's destination. An empty order list says **No orders yet.** An empty timeline says **No events yet.** A shipped or cancelled order has no further action controls.
 
+Shipping asks for each line's actual **source bin and lot**. Select **Add source** for every bin/lot used and enter its quantity; the sources must sum to the shipped quantity, and zero lines have no sources. Untracked legacy stock is labeled explicitly. A selected source must have enough stock when the shipment commits. An internal transfer also requires its destination bin and preserves the same lot on both legs. Shipping keeps one invoice line per order line even when several sources supplied it. On-delivery shipping moves the beer once; delivery confirmation creates only the invoice.
+
 ## Pick sheet [#pick-sheet]
 
 <Screen name="Pick sheet" />
@@ -264,7 +275,6 @@ The order detail shows the fulfillment source, customer and ship-to for wholesal
 *Admin and Warehouse can open Pick from the Work tab. The page also opens for Sales when the address is entered directly, but it is not linked in Sales navigation.*
 
 Open **Pick** to see confirmed and picked orders grouped by requested ship date. Orders without a date sit under **Unscheduled**. Each row shows the line count and status; **Pick** opens a confirmed order and **Open** opens a picked one, where picking is recorded.
-
 Select **Print** to open the browser print dialog. MGR hides the staff navigation in the printed copy. If nothing is ready, the page says **Nothing confirmed to pick**.
 
 ## Invoices and credit memos [#invoices]
@@ -278,14 +288,18 @@ The list shows each invoice or credit memo with its customer, total, and due or 
 
 When a buyer asks about an invoice from the portal, the question appears on the invoice as **Buyer asked about this invoice** with their words, and as an **Answer** row on Today for Admin and Sales. Reply by phone or email, then select **Mark answered**; that clears the Today row and nothing on the invoice changes.
 
+Returns preserve the selected shipment lot and its original recorded volume even if the format definition later changes. A damaged return writes that same volume back out as loss atomically.
+
 ### Return beer and correct the invoice
 
 <Screen name="Return and credit" />
 
 1. Open the invoice and select **Return**.
 2. Enter the quantity coming back for each applicable line. Leave unrelated lines at zero. A return cannot exceed the remaining uncredited quantity.
-3. Choose **Return to location** and the **Reason**: *Unsold* and *Wrong item* put the beer back as sellable stock at that location; *Damaged* puts it back and writes the same quantity to loss in the same step, so broken beer never lands on a pick list.
+3. Split the returned quantity across the original shipped sources shown under the line. Their sum must equal the line quantity; a source cannot be returned more than was shipped. Choose **Return to location**, the destination **bin**, and the **Reason**: *Unsold* and *Wrong item* put the beer back as sellable stock at that location; *Damaged* puts it back and writes the same quantity to loss in the same step, so broken beer never lands on a pick list.
 4. Select **Return shipment**.
+
+For older invoices that have no shipment, choose the return location; MGR records untracked stock in its first bin. Shipment-backed invoices always require the original source selection.
 
 MGR creates a separate credit memo at the prices frozen on the invoice lines, never today's price, records the return-in (and, for damaged, the loss) against that credit memo, and notes the correction on the originating order's timeline. A paid invoice can still be returned; the credit sits as available credit. Credit memos cannot themselves be credited.
 
@@ -293,7 +307,7 @@ MGR creates a separate credit memo at the prices frozen on the invoice lines, ne
 
 <Screen name="Locations" />
 
-**Locations** (open `/locations`; Settings links here; Admin only in navigation, though Warehouse can reach a location directly by its address) lists every warehouse, taproom, and storage location. Admin sees **Add location**: a name and a type, *Warehouse*, *Taproom*, or *Storage*. Names are unique within the brewery. Select **Edit** on a row to open the location: its type, the brewery's timezone, and a **Location bins** row. Only Admin can rename a location or change its type, with **Edit** then **Save location**; movement history stays exactly as recorded.
+**Locations** (open `/locations`; Settings links here) lists every warehouse and taproom. Admin sees **Add location**: a name and a type, *Warehouse* or *Taproom*. Names are unique within the brewery. Admin returns to **Settings**; other staff return to **Beer**. **All finished goods inventory** opens the global inventory, not a location filter. Select **Edit** (Admin) or **Review** (read-only staff) on a row to open the location: its type, the brewery's timezone, and a **Location bins** link. Admin can rename a location or change its type with **Edit** then **Save location**; movement history stays exactly as recorded.
 
 ### Add or rename a bin
 
@@ -305,7 +319,7 @@ Select **Location bins** on a location to see its bins. Admin and Warehouse can 
 
 ## Stock transfers [#transfers]
 
-**Transfers** (Work tab; Warehouse and Admin) move stock between two of the brewery's locations without an order or an invoice. **New transfer** takes a source and destination location, the bin at each end (the first bin is preselected), and SKU lines with quantities. Materials and empty kegs move through the same command from the API. The document is numbered TRF-0001 upward and walks **Submit**, **Record pick** (quantities default to what was requested), and **Receive**. Receiving writes the paired stock movements in one step, out of the source bin and into the destination bin, so on hand changes place and nothing counts as a removal; the fleet total for kegs is unchanged. A same-location pair is refused: moving stock between two bins of one location is a bin move, which writes the paired rows without a document.
+**Transfers** (Work tab; Warehouse and Admin) move stock between two of the brewery's locations without an order or an invoice. **New transfer** takes a source and destination location, the bin at each end (the first bin is preselected), and SKU lines with quantities. Materials and empty kegs move through the same command from the API. The document is numbered TRF-0001 upward and walks **Submit**, **Record pick** (quantities default to what was requested), and **Receive**. Receiving writes the paired stock movements in one step, out of the source bin and into the destination bin, so on hand changes place and nothing counts as a removal; the fleet total for kegs is unchanged. A same-location pair is refused: open **Locations → Location bins → Move stock** instead. Admin and Warehouse choose stock and its source bin, a different destination bin, and a positive quantity. Materials use base units; empty kegs require whole units. Each finished-goods or material lot is listed separately from **Untracked stock**; choose the identity actually being moved. The selected lot is preserved on both entries. A bin move writes paired rows without a document.
 
 ## Delivery routes [#deliveries]
 
@@ -343,9 +357,11 @@ A month is generated from the inventory ledger when you open it, so nothing is s
 
 The registry has two tabs. **Brands** lists each brand with its COLA or formula approvals and its state registrations; a brand with no COLA is flagged *COLA pending*. **Add approval** takes the brand, the approval kind, its TTB number, and optional approved and expiry dates; the same kind and number on the same brand is one record, so saving it twice is refused. **Add registration** takes the brand, the two-letter state, and an optional number and expiry; one record exists per brand and state, so saving again replaces it, and **Edit** keeps the brand and state fixed. **Licenses** lists the brewery's own state licenses by state and kind (brewery, supplier, direct to consumer); **Add license** works the same way, one record per state and kind, with state and kind fixed on **Edit**. **Edit** on any row opens the same sheet filled in. Kind is stored lower-case and trimmed. Order confirmation does not read this registry yet; the planned warning for an unregistered destination state will never block.
 
+Each movement shows its actual bin and recorded barrels. Returns link to the original shipped movement and the credit memo; damaged losses link to their return movement.
+
 <Screen name="Lot trace" />
 
-A lot is one closed packaging run. Its trace shows the brand and package, the run and packaging date, the tank and batch it was drawn from, the barrels drawn, and every ledger movement carrying the lot: the production that made it and any samples, losses, or destructions pulled from it, with what remains on hand. Shipments do not record a lot yet, so the customers who received it are not listed.
+A lot is one closed packaging run. Its trace shows the brand and package, the run and packaging date, the tank and batch it was drawn from, the barrels drawn, and every ledger movement carrying the lot: the production that made it and any samples, losses, or destructions pulled from it, with what remains on hand. Shipping records the source bin and lot for every quantity. The trace lists actual customer recipients, ship-to addresses, orders and invoices, and recorded balances separately for each SKU and bin with total barrels. Historical untracked movements cannot be assigned to a lot; there is no per-pint POS trace.
 
 ## Keg fleet [#kegs]
 
@@ -396,8 +412,7 @@ Use **Set taproom par** to choose any SKU and set its target stock at the select
 
 Use **Set standing allocation** to reserve a named quantity against available-to-promise without an order. Selecting an existing SKU loads its current reserved quantity. Zero releases the standing reservation. Under **Standing allocations**, **Release** opens a confirmation showing the SKU and quantity; confirming returns that reservation to available-to-promise without moving stock or changing its par. Failures appear in the form and keep your inputs available to correct or retry.
 
-The page says **No taprooms yet: add one under Locations** when none exist, or **No pars set for this taproom.** when there are no suggestions. Add SKUs under Catalog before setting quantities.
-
+The page says **No taprooms yet: add one under Locations** when none exist, or **No pars set for this taproom.** when there are no suggestions. Admin and Sales can follow **Add SKU** from Inventory to Catalog before setting quantities. **Shortfall** keeps the selected SKU and shows its global on-hand, reserved and ATP quantities. Each competing order links to its order; a standing allocation links to its taproom section. **All shortfalls** clears the SKU filter.
 ## Recipes [#recipes]
 
 <Screen name="Recipes" />
@@ -552,7 +567,6 @@ To link, open MGR's private App Home in Slack and choose **Link MGR account**. S
 Linked App Home shows a role-filtered **Today** queue with up to 20 current items, the same work your MGR Today tab shows for your role. Admin sees all live items; Sales sees submitted orders to review and buyer questions about invoices; Warehouse sees confirmed orders whose requested ship date is due, orders with staged beer to put back, and their own next stop when they're a route's assigned driver; Brewer sees overdue fermentation readings. Select **Open** on an item to view its order in MGR. With no current work, App Home says **You’re caught up**.
 
 Linked eligible staff receive private Slack messages when assigned work first becomes due. **Snooze 1 hour** delays that Slack reminder, and muting a reason stops that class of Slack message; neither changes what is due on MGR Today. Quiet hours delay personal messages, including snoozed reminders and retries, using your current personal override or the brewery window. App Home stays current. When work resolves, its message becomes **Resolved**. MGR never posts customer contacts, prices, or notes to Slack.
-
 The brewery digest goes only to one admin-approved private, non-shared Slack channel where MGR is already a member. Public, archived, and Slack Connect channels cannot be selected. It runs on the brewery's local morning and midday windows; the default fermentation reading cadence is 24 hours. Personal mutes, snoozes, and quiet hours affect Slack delivery only, not Today or the shared digest.
 
 Slack is a view of current MGR work. Operational forms such as fermentation readings and order confirmation show **Open in MGR** and do not submit the domain change from Slack. MGR rechecks the current item, assignment, role, and channel before sending or updating a message.
@@ -560,6 +574,8 @@ Slack is a view of current MGR work. Operational forms such as fermentation read
 Admins can inspect the workspace, granted permissions, destination, queue state, recent callback/delivery times, and a safe error code on **Chat health**. **Disable** stops delivery but keeps the connection for later. **Disconnect** stops delivery and unlinks people immediately, then removes the stored Slack credential; if that cleanup fails, the page offers **Retry cleanup**. Reauthorization and cleanup are serialized so an old cleanup cannot remove replacement credentials. A rejected connection to an already-owned workspace preserves its existing connection; if saving new credentials fails, reauthorize from Chat settings. Staff can unlink their own account; an admin can unlink any linked person.
 
 ## Errors and corrections [#errors-corrections]
+
+A bookmarked staff page that your role cannot read opens **No access**, names the required roles, and offers **Back to Today**. Order controls follow your role: Sales confirms, adjusts and cancels; Warehouse picks, ships and puts back; Admin can do both.
 
 **A form reports an error.** Read the message, fix the visible fields, and submit again. Your entries stay until the form succeeds or you close it. Permission errors need an administrator.
 
@@ -600,11 +616,8 @@ Keep the page open until results are recovered. If the connection fails, some ro
 Do not hunt for hidden controls for these:
 
 - public account sign-up
-- staff or customer-portal invitations
-- CSV import
-- setting taproom pars, or choosing the warehouse that fulfills wholesale-customer portal orders, from the interface
+- attaching an existing sign-in account, resending or revoking an invitation, or assigning multiple staff roles
 - cancelling a purchase order, editing one after it is saved, or sending one by email from MGR
-- editing brands, formats, or SKUs after creation
 - deleting customers, ship-tos, inventory history, orders, invoices, or credit memos
 - recording payments
 - reviewing or reattributing auto-reconciled losses before a filing, a printed lot trace packet, and the customers who received a lot
@@ -618,3 +631,9 @@ This manual describes controls that exist now. If the application and this guide
 ## Screen walkthrough [#walkthrough]
 
 The [screen explorer](/docs/screens-explore) is a drawing of MGR, including screens that are not wired up yet. Settings links to Accounting, Point of sale, and Chat for administrators. Connection and disconnection actions show their resulting screens. Chat preview tabs switch only the preview, and keep connection and delivery controls visible. Menu location tabs keep you on Menu, and each published item links to its price override sheet. Browser Back and Forward restore the selected screen and its walkthrough trail, including the page behind an open sheet. These frames do not change connected services.
+
+### Portal fulfillment warehouse
+
+In **Settings**, Admin can see the current **Portal fulfillment warehouse**, select **Change warehouse**, choose a warehouse, and **Save warehouse**. Only warehouse locations are offered. If none exist, follow **Locations** to add one. This source is used for new portal orders; other brewery settings do not change it.
+
+For cross-location stock transfers, receiving shows the recorded lots at each source bin. Enter the quantity from each source so it totals the received line; finished goods and material transfers preserve that lot on both legs. Manual inventory movements also offer the recorded lot in the selected SKU/bin. Select it for samples, losses or other lot-specific changes; historical untracked balances stay untracked.

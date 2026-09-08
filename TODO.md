@@ -27,8 +27,6 @@ the same job, fields, verbs, and states as its `SCREENS` record; the record's
 | 8 | Delivery and routes (save / depart / return, driver) | `.agents/superpowers/plans/2026-09-07-backend-program-8-delivery-routes.md` | 13 |
 | 9 | Compliance (report, filing, registry, COLA) | `.agents/superpowers/plans/2026-09-07-backend-program-9-compliance.md` | 17 |
 
-- [ ] Program 9 — compliance merged
-
 ## Phase 2 — explorer remainder (`.agents/superpowers/plans/2026-09-07-backend-explorer-remainder.md`)
 
 Order: 10 (parity test red early) → 11 ∥ 16 → 12 (needs 2 + 7) → 13 ∥ 15
@@ -45,11 +43,9 @@ tests.
 | 15 | Composer | `.agents/superpowers/plans/2026-09-07-backend-program-15-composer.md` | 18 | Composer proposal / question / answer, Offline outbox |
 | 16 | Chat settings | `.agents/superpowers/plans/2026-09-07-backend-program-16-chat-settings.md` | 9 | Chat disconnected / settings, Linked people, Disconnect Slack, Reauthorization |
 
-- [ ] Program 10 — explorer parity parity test committed red
 - [ ] Program 10 — explorer parity merged
 - [ ] Program 11 — access and import merged
 - [ ] Program 16 — chat settings merged
-- [ ] Per-role RLS spec for the `taproom` role — docs PR before Program 12. Matrix approved 2026-09-07: taproom reads and writes tap board, keg taps, weekly count, taproom bins and on-hand; reads brands, formats, SKUs, menu, POS mapping; own rows only on chat links and notification preferences; nothing else. Mechanism: keep `is_staff_of` for the four existing roles, add a `taproom_can(table)` predicate every policy consults, one baseline edit, one test walking every table as a taproom user
 - [ ] Program 12 — taproom truth merged (§16.16 decided 2026-09-07: brand-owned poured formats as name + ounces, three fill chips, guest kegs by label + nominal size)
 - [ ] Program 13 — QuickBooks merged
 - [ ] Program 15 — composer merged
@@ -63,7 +59,6 @@ land early as their own small PRs.
 - [ ] `set_taproom_par`, `set_standing_allocation`, `release_allocation` on `/replenishment` (Pars and allocation)
 - [ ] `replace_format_bom`, `replace_format_components` on Format (Package BOM)
 - [ ] `move_stock_bin` on Location bins
-- [ ] Search trigger in `components/mgr/app-shell.tsx` over `app/api/search`
 - [ ] `set_notification_destination`, `set_notification_preference`, `set_brewery_quiet_hours` (Program 16 page at `/settings/chat`)
 - [ ] `unlink_chat_user` (Linked people)
 - [ ] `set_portal_fulfillment_source` (Settings)

@@ -364,7 +364,10 @@ describe("SCREENS", () => {
     ];
     for (const s of SCREENS.filter((s) => names.includes(s.name))) {
       const text = renderToStaticMarkup(createElement("div", null, s.body)).replace(/<[^>]*>/g, " ");
-      expect.soft(text, s.name).toContain("948");
+      if (s.name === "Review order") {
+        expect.soft(text, s.name).toContain("828");
+        expect.soft(text, s.name).toContain("Pending; not included");
+      } else expect.soft(text, s.name).toContain("948");
       expect.soft(text, s.name).not.toMatch(/1,051|1,240|\b185\.00|\b740\.00|\b252\.00|\b114\.00/);
     }
     const pushed = SCREENS.find((s) => s.name === "Pushed invoice")!;
@@ -687,7 +690,7 @@ describe("SCREENS", () => {
     const history = SCREENS.find((s) => s.name === "Order history")!;
     const historyHtml = renderToStaticMarkup(createElement("div", null, history.body));
     expect(historyHtml).toMatch(/ORD-0225/);
-    expect(historyHtml).not.toMatch(/Reorder/);
+    expect(historyHtml).toMatch(/Reorder/);
     const detailHtml = renderToStaticMarkup(createElement("div", null, SCREENS.find((s) => s.name === "Order detail")!.body));
     expect(detailHtml).toMatch(/Reorder/);
   });

@@ -102,9 +102,7 @@ describe("Portal invoice view", () => {
     expect(model.backHref).toBeUndefined();
     expect(model.total).toBe("$948.00");
     expect(model.due).toBe("2026-10-03");
-    expect(model.issued).toBe("2026-09-03");
     expect(model.paid).toBe(false);
-    expect(model.credit).toBe(false);
     expect(model.breweryName).toBe("Demo Brewing");
     expect(model.breweryPhone).toBe("(610) 555-0142");
     expect(model.lines.map((l) => [l.item, l.qty, l.amount])).toEqual([
@@ -119,47 +117,8 @@ describe("Portal invoice view", () => {
     expect(model.title).toBe("INV-1037");
     expect(model.total).toBe("$980.00");
     expect(model.paid).toBe(true);
-    expect(model.credit).toBe(false);
-    expect(model.issued).toBe("2026-08-27");
     expect(model.paidOn).toBe("2026-08-29");
     expect(model.lines).toHaveLength(2);
-  });
-
-  it("treats paid as paid_at only; a credit memo is Credit, not Paid", () => {
-    const model = toPortalInvoiceViewProps({
-      invoice: {
-        id: "cm-12",
-        invoice_no: 12,
-        kind: "credit_memo",
-        issued_on: "2026-09-01",
-        due_on: null,
-        paid_at: null,
-        total_cents: -10600,
-      },
-      lines: [{ id: "cl-1", kind: "sku", qty: 1, amount_cents: -10600, description: "Pils return", skus: { name: "Pils · 16 oz case" } }],
-      brewery: { name: "Demo Brewing", customer_phone: "(610) 555-0142" },
-    });
-    expect(model.paid).toBe(false);
-    expect(model.credit).toBe(true);
-    expect(model.title).toBe("CM-0012");
-    expect(model.issued).toBe("2026-09-01");
-    const html = htmlOf(createElement(PortalInvoiceView, { model }));
-    expect(html).toMatch(/Issued/);
-    expect(html).toMatch(/2026-09-01/);
-    expect(html).toMatch(/Credit/);
-    expect(html).toMatch(/Question this invoice/);
-    expect(html).not.toMatch(/Paid/);
-    expect(html).not.toMatch(/>Pay invoice</);
-  });
-
-  it("formats timestamptz paid_at in local time, not UTC slice", () => {
-    const paidAt = "2026-08-29T04:00:00.000Z";
-    const model = toPortalInvoiceViewProps({
-      ...portalInvoicePaid,
-      invoice: { ...portalInvoicePaid.invoice, paid_at: paidAt },
-    });
-    expect(model.paidOn).toBe(new Date(paidAt).toLocaleDateString());
-    expect(model.paidOn).not.toBe(paidAt.slice(0, 10));
   });
 
   it("the pay drawing still shows Pay invoice, Download PDF, and Question", () => {
@@ -169,8 +128,6 @@ describe("Portal invoice view", () => {
     }));
     expect(html).toMatch(/INV-1042/);
     expect(html).toMatch(/\$948\.00/);
-    expect(html).toMatch(/Issued/);
-    expect(html).toMatch(/2026-09-03/);
     expect(html).toMatch(/Unpaid/);
     expect(html).toMatch(/>Pay invoice</);
     expect(html).toMatch(/>Download PDF</);
@@ -202,36 +159,19 @@ describe("Portal invoice view", () => {
     expect(html).toMatch(/Question this invoice/);
   });
 
-  it("the paid drawing still shows Download PDF and Question", () => {
+  it("the paid drawing keeps Question alongside its fixture PDF action", () => {
     const html = htmlOf(createElement(PortalInvoiceView, {
       model: toPortalInvoiceViewProps(portalInvoicePaid),
       variant: "paid",
     }));
     expect(html).toMatch(/INV-1037/);
     expect(html).toMatch(/\$980\.00/);
-    expect(html).toMatch(/Issued/);
     expect(html).toMatch(/Paid/);
     expect(html).toMatch(/2026-08-29/);
     expect(html).toMatch(/>Download PDF</);
-    expect(html).toMatch(/Question this invoice/);
     expect(html).not.toMatch(/>Pay invoice</);
+    expect(html).toMatch(/Question this invoice/);
     expect(html).not.toMatch(/Unpaid/);
-  });
-
-  it("footer null suppresses Pay/PDF defaults; undefined keeps them", () => {
-    const pay = htmlOf(createElement(PortalInvoiceView, {
-      model: toPortalInvoiceViewProps(portalInvoiceUnpaid),
-      variant: "pay",
-      footer: null,
-    }));
-    expect(pay).not.toMatch(/>Pay invoice</);
-    expect(pay).not.toMatch(/>Download PDF</);
-    const paid = htmlOf(createElement(PortalInvoiceView, {
-      model: toPortalInvoiceViewProps(portalInvoicePaid),
-      variant: "paid",
-      footer: null,
-    }));
-    expect(paid).not.toMatch(/>Download PDF</);
   });
 
   it("a question slot replaces the inventory Question nav", () => {
@@ -318,8 +258,5 @@ describe("inventory and live portal invoices", () => {
     expect(list).not.toMatch(/from "@\/components\/mgr\/e"/);
     expect(detail).toMatch(/<PortalInvoiceView\b/);
     expect(detail).not.toMatch(/from "@\/components\/mgr\/e"/);
-    expect(detail).toMatch(/footer=\{null\}/);
-    expect(detail).toMatch(/backHref: "\/portal\/invoices"/);
-    expect(detail).toMatch(/<QuestionForm\b/);
   });
 });

@@ -2,7 +2,7 @@
 // locations (spec 2026-09-06 Decision 3), never a third order kind; a move
 // inside one location is move_stock_bin and writes no document.
 import { describe, it, expect } from "vitest";
-import { admin, makeBrewery, makeStaffCtx, seedLocation, seedCatalog } from "./helpers";
+import { admin, makeBrewery, makeStaffCtx, seedLocation, seedCatalog, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -130,4 +130,86 @@ describe("move_stock_bin", () => {
       .rejects.toThrow(/create_stock_transfer/);
     await expect(runCommand("move_stock_bin", { skuId, qty: 1, fromBinId: bins![0].id, toBinId: bins![0].id }, ctx)).rejects.toBeTruthy();
   });
+});
+
+it("direct RPCs reject fractional empty kegs at move, draft, pick and receive boundaries", async () => {
+  const b = await makeBrewery(), ctx = await makeStaffCtx(b.id, "warehouse");
+  const from = await seedLocation(b.id, { name: "WH", kind: "warehouse" });
+  const to = await seedLocation(b.id, { name: "Other", kind: "storage" });
+  const { data: bins } = await admin.from("bins").select("id").eq("location_id", from.id);
+  const { data: pool } = await admin.from("keg_pools").insert({ brewery_id: b.id, name: "Owned", kind: "owned" }).select().single();
+  const move = await ctx.db.rpc("move_stock_bin", { p_brewery: b.id, p_sku: null, p_material: null, p_keg_pool: pool!.id, p_keg_size: "half_bbl", p_qty: 1.5, p_from_bin: bins![0].id, p_to_bin: bins![1].id, p_note: null, p_request_id: crypto.randomUUID() });
+  expect(move.error?.message).toMatch(/whole|integer/);
+  const line = { keg_pool_id: pool!.id, keg_size: "half_bbl", qty: 1.00001, from_bin_id: from.binId, to_bin_id: to.binId };
+  const draft = { p_brewery: b.id, p_from: from.id, p_to: to.id, p_requested: null, p_note: null, p_lines: [line], p_request_id: crypto.randomUUID() };
+  expect((await ctx.db.rpc("create_stock_transfer", draft)).error).not.toBeNull();
+  const created = await ctx.db.rpc("create_stock_transfer", { ...draft, p_lines: [{ ...line, qty: 2 }] });
+  expect(created.error).toBeNull();
+  const transferId = created.data.transfer_id;
+  await runCommand("submit_stock_transfer", { transferId }, ctx);
+  const { data: stored } = await admin.from("stock_transfer_lines").select("id").eq("transfer_id", transferId).single();
+  expect((await ctx.db.rpc("record_stock_transfer_pick", { p_transfer: transferId, p_picks: [{ line_id: stored!.id, qty: 1.00001 }], p_request_id: crypto.randomUUID() })).error).not.toBeNull();
+  await runCommand("record_stock_transfer_pick", { transferId, picks: [{ lineId: stored!.id, qty: 2 }] }, ctx);
+  expect((await ctx.db.rpc("receive_stock_transfer", { p_transfer: transferId, p_lines: [{ line_id: stored!.id, qty: 1.5 }], p_request_id: crypto.randomUUID() })).error?.message).toMatch(/whole|integer/);
+  expect((await admin.from("keg_events").select("id").eq("pool_id", pool!.id)).data).toHaveLength(0);
+});
+
+it("material bin moves retain an explicit lot, replay once, and reject another material's lot atomically", async () => {
+  const b = await makeBrewery(), ctx = await makeStaffCtx(b.id, "warehouse");
+  const from = await seedLocation(b.id, { name: "WH", kind: "warehouse" });
+  const { data: bins } = await admin.from("bins").select("id").eq("location_id", from.id);
+  const { data: material } = await admin.from("materials").insert({ brewery_id: b.id, name: "Hops", category: "hop", base_uom: "lb", purchase_uom: "lb", lot_tracked: true }).select().single();
+  const { data: lot } = await admin.from("material_lots").insert({ brewery_id: b.id, material_id: material!.id, lot_code: "H1" }).select().single();
+  const p = { p_brewery: b.id, p_sku: null, p_material: material!.id, p_keg_pool: null, p_keg_size: null, p_qty: 1.5, p_from_bin: bins![0].id, p_to_bin: bins![1].id, p_note: null, p_material_lot: lot!.id, p_request_id: crypto.randomUUID() };
+  const result = await ctx.db.rpc("move_stock_bin", p);
+  expect(result.error).toBeNull();
+  expect((await ctx.db.rpc("move_stock_bin", p)).data).toEqual(result.data);
+  const { data: rows } = await admin.from("material_movements").select("lot_id,qty").eq("material_id", material!.id);
+  expect(rows).toHaveLength(2);
+  expect(rows!.every(r => r.lot_id === lot!.id)).toBe(true);
+  expect(rows!.reduce((n,r) => n + Number(r.qty), 0)).toBe(0);
+  const { data: other } = await admin.from("materials").insert({ brewery_id: b.id, name: "Other hops", category: "hop", base_uom: "lb", purchase_uom: "lb", lot_tracked: true }).select().single();
+  expect((await ctx.db.rpc("move_stock_bin", { ...p, p_material: other!.id, p_request_id: crypto.randomUUID() })).error).not.toBeNull();
+  expect((await admin.from("material_movements").select("id").eq("material_id", other!.id)).data).toHaveLength(0);
+  const lots = await runCommand("get_bin_move_stock", { locationId: from.id }, ctx) as { lot_id: string }[];
+  expect(lots.map(l => l.lot_id)).toContain(lot!.id);
+  await expect(runCommand("get_bin_move_stock", { locationId: from.id }, await makeStaffCtx(b.id, "sales"))).rejects.toMatchObject({ code: "permission_denied" });
+});
+
+it("FG bin moves preserve the chosen lot separately from untracked stock and tenant sources", async () => {
+  const b = await makeBrewery(), ctx = await makeStaffCtx(b.id, "warehouse");
+  const loc = await seedLocation(b.id, { name: "WH", kind: "warehouse" });
+  const { data: bins } = await admin.from("bins").select("id").eq("location_id", loc.id);
+  const cat = await seedCatalog(b.id);
+  const { data: run, error: runError } = await admin.from("packaging_runs").insert({ brewery_id: b.id, brand_id: cat.brandId, planned_on: "2026-09-01", created_by: ctx.userId }).select().single();
+  expect(runError).toBeNull();
+  const { data: lot, error: lotError } = await admin.from("lots").insert({ brewery_id: b.id, brand_id: cat.brandId, packaging_run_id: run!.id, code: "FG1", packaged_on: "2026-09-01" }).select().single();
+  expect(lotError).toBeNull();
+  expect((await admin.from("inventory_movements").insert([
+    { brewery_id: b.id, sku_id: cat.skuId, location_id: loc.id, bin_id: bins![0].id, qty: 4, type: "production_in", lot_id: lot!.id, created_by: ctx.userId },
+    { brewery_id: b.id, sku_id: cat.skuId, location_id: loc.id, bin_id: bins![0].id, qty: 1, type: "opening_balance", created_by: ctx.userId },
+  ])).error).toBeNull();
+  const skus = await runCommand("list_skus", {}, ctx) as { id: string; format_volume: { bbl_per_unit: number } }[];
+  expect(Number(skus.find(s => s.id === cat.skuId)!.format_volume.bbl_per_unit)).toBeGreaterThan(0);
+  const move = { skuId: cat.skuId, skuLotId: lot!.id, qty: 2, fromBinId: bins![0].id, toBinId: bins![1].id };
+  await runCommand("move_stock_bin", move, ctx);
+  const rows = await runCommand("get_bin_move_stock", { locationId: loc.id }, ctx) as { lot_id: string | null; bin_id: string; qty: number }[];
+  expect(rows).toHaveLength(3);
+  expect(rows.filter(r => r.lot_id === lot!.id).map(r => Number(r.qty))).toEqual([2, 2]);
+  expect(Number(rows.find(r => r.lot_id === null)!.qty)).toBe(1);
+  const outsider = await makeStaffCtx((await makeBrewery()).id, "warehouse");
+  expect(await runCommand("get_bin_move_stock", { locationId: loc.id }, outsider)).toEqual([]);
+  const other = await seedCatalog(b.id, { product: "Other", sku: "Other case" });
+  await expect(runCommand("move_stock_bin", { ...move, skuId: other.skuId }, ctx)).rejects.toThrow(/lot does not belong/);
+});
+
+it("bin stock reads all 1,001 grouped identities beyond the API row cap", async () => {
+  const b = await makeBrewery(), ctx = await makeStaffCtx(b.id, "warehouse");
+  const loc = await seedLocation(b.id, { name: "Many bins", kind: "warehouse" });
+  const { skuId } = await seedCatalog(b.id);
+  sql(`insert into public.bins (brewery_id, location_id, name) select '${b.id}', '${loc.id}', 'QA-' || n from generate_series(1,1001) n;
+    insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, created_by)
+    select '${b.id}', '${skuId}', '${loc.id}', id, 1, 'opening_balance', '${ctx.userId}' from public.bins where location_id = '${loc.id}' and name like 'QA-%';`);
+  const result = await runCommand("get_bin_move_stock", { locationId: loc.id }, ctx) as unknown[];
+  expect(result).toHaveLength(1001);
 });

@@ -8,7 +8,7 @@ import { E } from "@/components/mgr/e";
 import { PriceGroupsView } from "@/components/mgr/views/price-groups";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
-import { runCommand } from "@/lib/commands/registry";
+import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toPriceGroupsViewProps } from "@/lib/mgr/price-groups-view";
 import { money } from "@/lib/mgr/money";
 import "@/lib/commands/all";

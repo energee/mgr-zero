@@ -39,6 +39,7 @@ export type InvoiceViewModel = {
 };
 
 export type InvoiceSnapshot = {
+  backHref?: string;
   invoice: {
     id: string;
     invoice_no: number | null;
@@ -65,7 +66,6 @@ export type InvoiceSnapshot = {
   }[];
   /** Inventory-only QuickBooks mapping rows. Live omits these. */
   mappings?: InvoiceMappingView[];
-  backHref?: string;
 };
 
 /** Map a get_invoice + list_invoice_questions payload onto InvoiceView. */

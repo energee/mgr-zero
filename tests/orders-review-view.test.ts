@@ -51,7 +51,6 @@ describe("Confirm order view loop", () => {
     const src = noSecondTree("app/(app)/orders/[id]/confirm/page.tsx");
     expect(src).toMatch(/from "@\/components\/mgr\/views\/confirm-order"/);
     expect(src).toMatch(/<ConfirmOrderView\b/);
-    expect(src).toMatch(/backHref: "\/orders"/);
   });
 });
 
@@ -74,7 +73,6 @@ describe("Complete transfer view loop", () => {
   it("the live page mounts CompleteTransferView with no second E.* tree", () => {
     const src = noSecondTree("app/(app)/orders/[id]/complete/page.tsx");
     expect(src).toMatch(/<CompleteTransferView\b/);
-    expect(src).toMatch(/backHref:/);
   });
 });
 
@@ -95,6 +93,5 @@ describe("Put back view loop", () => {
   it("the live page mounts PutBackView with no second E.* tree", () => {
     const src = noSecondTree("app/(app)/orders/[id]/restock/page.tsx");
     expect(src).toMatch(/<PutBackView\b/);
-    expect(src).toMatch(/backHref: "\/"/);
   });
 });

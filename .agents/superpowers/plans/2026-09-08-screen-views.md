@@ -33,7 +33,7 @@ Would have caught the dummy Pars adapter, href leaks, dropped Pick/Open, suppres
 
 1. **No invented domain.** Live `toXViewProps` never fabricates a SKU, ATP, unit, or barrel volume the command did not return. Optional fields stay omitted.
 2. **No live href defaults.** Adapters pass `backHref` through only when the caller set it. Inventory `toXViewProps(fixture)` leaves it undefined so `E.back`/`E.act` stay `"#"`. A test renders inventory HTML and forbids `href="/orders`, `href="/portal`, `href="/customers`, `href="/invoices`.
-3. **Live verbs survive.** Diff the pre-extract page against the view: every status-gated verb (Pick vs Open, Reorder on detail not list, Question on every invoice state) still draws. Inert verbs that do not navigate are omitted, not faked.
+3. **Live verbs survive.** Diff the pre-extract page against the view: every status-gated verb (Pick vs Open, separate detail links and Reorder/Continue actions in history, Reorder on detail, Question on every invoice state) still draws. Inert verbs that do not navigate are omitted, not faked.
 4. **Slots, not flags.** `footer === undefined` keeps inventory defaults; `footer={null}` suppresses them. Question/detail/filters slots render in every state the live page uses. No `mode` / `readOnly` boolean that switches trees.
 5. **Guides match what ships.** Staff-guide and portal-guide sections for the converted screens name the fields and verbs the view actually draws (order note, issued date, Credit vs paid, list vs detail Reorder).
 
@@ -58,7 +58,7 @@ Counts are `SCREEN_ROUTES` rows (live or parity-mapped). Order is 1 of ~110. Gat
 | 1 | **Orders family** | `views/orders/` | Orders, New order, Confirm order, Complete transfer, Adjust lines, Short pick, Pick, Ship and invoice, Shipment done, Ship on delivery, Return and credit, Put back, Pick sheet, Pars and allocation, Invoice | Same owner as Order; closes the leftover seams (Adjust / Add line / Ship in the view vs `LifecycleButtons`) |
 | 2 | **Portal (done)** | `views/` | Shop, Review order, Order history, Order detail, Invoice history, Pay invoice, Question invoice, Payment unavailable, Paid invoice, Account, Portal Me | Shares `INV` and order identity; customer-role commands only. Live Cart / QuestionForm / MeSheet stay wrappers. |
 | 3 | **Customers (done)** | `views/` | Customers, Customer detail, Ship-to form | Feeds orders; small. Live CustomerForm / ShipToForm stay wrappers. |
-| 4 | **Catalog + locations + pricing (done)** | `views/catalog/` | Catalog, Brand, SKU, SKU list, Formats, Format, Package BOM; Locations, Location detail, Location bins, Bin; Price groups, Price group; Sale channels, Channel; Units | One command-module family (`catalog.ts` + pricing) |
+| 4 | **Catalog + locations + pricing (drawings extracted)** | `views/catalog/` | Catalog, Brand, SKU, SKU list, Formats, Format, Package BOM; Locations, Location detail, Location bins, Bin; Price groups, Price group; Sale channels, Channel; Units | One command-module family (`catalog.ts` + pricing) |
 | 5 | **Inventory + transfers** | `views/inventory/` | Finished goods, Record movement, Movement recorded; Transfers, New transfer, Transfer detail | Ledger grain; keep append-only copy in the view |
 | 6 | **Shell** | `views/shell/` | Today, Today empty, Sales, Brewer, Driver, Taproom, First-run checklist; Beer, Work, More; Search, Entity picker; Me, Settings, Team; Permission denied; Sign in, Session expired, Reset / Set password, Portal sign in / forgot / set password, No membership | High traffic; several records share `app/(app)/page.tsx` — one view per record name, or one landing view with mocks |
 | 7 | **Production** | `views/production/` | Batches, Schedule batch, Brew day, Vessel detail; Close packaging run, Run closed; Recipes, Recipe | Live pages exist; cellar sheets (reading, addition, transfer, map) convert when they have routes |
@@ -85,6 +85,8 @@ Do not pre-extract these. When that program ships the live page, the page **is**
 
 - QuickBooks / Square / Slack **venue** frames (`s.venue`)
 - Annotation-only `states:` captions that do not change the drawing
+
+The shared catalog/customer/location/pricing wrappers retain the live mutation forms as slots. Field-level form conversion remains separate; extracted fixture sheets are not a claim that those controlled forms have been replaced. Poured formats remain brand-owned, with ounces and no invented keg ratio.
 
 ## Pack 1 — Orders family (done in this PR)
 

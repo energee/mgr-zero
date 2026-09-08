@@ -11,6 +11,7 @@ export type ShipmentDoneViewModel = {
 };
 
 export type ShipmentDoneSnapshot = {
+  backHref?: string;
   order: {
     id: string;
     order_no: number | null;
@@ -23,7 +24,6 @@ export type ShipmentDoneSnapshot = {
     bbl_per_unit?: number;
     skus: { name: string } | null;
   }[];
-  backHref?: string;
 };
 
 function shortName(name: string, qty: number) {

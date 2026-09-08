@@ -18,18 +18,20 @@ const htmlOf = (node: Parameters<typeof renderToStaticMarkup>[0]) =>
   renderToStaticMarkup(createElement("div", null, node));
 
 describe("Order history view", () => {
-  it("maps portal_orders rows through buyerStatus; every row opens Order detail", () => {
+  it("maps portal_orders rows through buyerStatus, Reorder on shipped, nav elsewhere", () => {
     const model = toPortalOrdersViewProps(portalOrdersList);
     expect(model.subtitle).toBe(RIDGELINE.name);
     expect(model.rows.map((r) => r.title)).toEqual(["ORD-0231", "ORD-0225", "ORD-0221"]);
     expect(model.rows[0]?.detail).toMatch(/Confirmed · ships 2026-09-10/);
+    expect(model.rows[0]?.verb).toBeUndefined();
     expect(model.rows[0]?.href).toMatch(/\/portal\/orders\//);
     expect(model.rows[1]?.title).toBe("ORD-0225");
-    expect(model.rows[1]?.href).toBe("/portal/orders/00000000-0000-4000-8000-000000000225");
-    expect(model.rows.every((r) => r.href.startsWith("/portal/orders/"))).toBe(true);
+    expect(model.rows[1]?.verb).toBe("Reorder");
+    expect(model.rows[1]?.actionHref).toBe(`/portal?reorder=${portalOrdersList.orders[1].id}`);
     expect(model.rows[1]?.detail).toMatch(/Shipped/);
     expect(model.rows[2]?.warning).toBe(true);
     expect(model.rows[2]?.detail).toMatch(/adjusted · 2 cases short/);
+    expect(model.rows[2]?.verb).toBe("Reorder");
     expect(model.info).toMatch(/Demo Brewing/);
   });
 
@@ -57,9 +59,9 @@ describe("Order history view", () => {
     expect(model.rows).toEqual([]);
   });
 
-  it("renders ORD-0225 and buyer status from the view, not Reorder", () => {
+  it("renders Reorder, ORD-0225, and buyer status from the view", () => {
     const html = htmlOf(createElement(PortalOrdersView, { model: toPortalOrdersViewProps(portalOrdersList) }));
-    expect(html).not.toMatch(/>Reorder</);
+    expect(html).toMatch(/>Reorder</);
     expect(html).toMatch(/ORD-0225/);
     expect(html).toMatch(/Confirmed · ships 2026-09-10/);
     expect(html).toMatch(/Shipped/);
@@ -68,14 +70,13 @@ describe("Order history view", () => {
     expect(html).not.toMatch(/href="\/portal/);
   });
 
-  it("links every row to Order detail when asked", () => {
+  it("links rows when asked", () => {
     const html = htmlOf(createElement(PortalOrdersView, {
       model: toPortalOrdersViewProps(portalOrdersList),
       linkRows: true,
     }));
-    expect(html).not.toMatch(/href="\/portal"/);
+    expect(html).toMatch(/href="\/portal(?:\?reorder=[^"]*)?"/);
     expect(html).toMatch(/href="\/portal\/orders\//);
-    expect(html).not.toMatch(/>Reorder</);
   });
 });
 
@@ -136,7 +137,7 @@ describe("Order detail view", () => {
       model: toPortalOrderViewProps(portalOrderShipped),
       footer,
     }));
-    expect(html).toMatch(/href="\/portal"/);
+    expect(html).toMatch(/href="\/portal(?:\?reorder=[^"]*)?"/);
     expect(html.match(/>Reorder</g)).toHaveLength(1);
   });
 });
@@ -162,6 +163,5 @@ describe("inventory and live portal orders", () => {
     expect(list).not.toMatch(/from "@\/components\/mgr\/e"/);
     expect(detail).toMatch(/<PortalOrderView\b/);
     expect(detail).not.toMatch(/from "@\/components\/mgr\/e"/);
-    expect(detail).toMatch(/backHref: "\/portal\/orders"/);
   });
 });

@@ -5,7 +5,7 @@
 import { PickSheetView } from "@/components/mgr/views/pick-sheet";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
-import { runCommand } from "@/lib/commands/registry";
+import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { toPickSheetViewProps } from "@/lib/mgr/pick-sheet-view";
 import "@/lib/commands/all";
 import { PrintButton } from "./print-button";

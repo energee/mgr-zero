@@ -1,6 +1,5 @@
-// components/mgr/views/shipment-done.tsx — post-commit of Ship. Inventory mounts
-// this view. Live ship-form.tsx stays a CommandForm wrapper and does not mount
-// the view.
+// components/mgr/views/shipment-done.tsx — post-commit of Ship. Inventory and
+// the live page both pass toShipmentDoneViewProps(get_order + get_invoice).
 import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { ShipmentDoneViewModel } from "@/lib/mgr/shipment-done-view";

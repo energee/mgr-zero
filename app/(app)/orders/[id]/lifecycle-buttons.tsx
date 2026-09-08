@@ -30,7 +30,13 @@ export function LifecycleButtons({
   lines,
   skus,
   pickLines,
+  transfer = false,
+  canSell,
+  canFulfill,
 }: {
+  transfer?: boolean;
+  canSell: boolean;
+  canFulfill: boolean;
   orderId: string;
   status: OrderStatus;
   lines: { skuId: string; skuName: string; qty: number }[];
@@ -78,31 +84,31 @@ export function LifecycleButtons({
     }
   }
 
-  const canCancel = status !== "shipped" && status !== "cancelled";
+  const canCancel = canSell && status !== "shipped" && status !== "cancelled";
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
-        {status === "draft" && (
+        {canSell && status === "draft" && (
           <Button size="sm" disabled={busy} onClick={() => run("submit_order")}>
             Submit
           </Button>
         )}
-        {status === "submitted" && (
+        {canSell && status === "submitted" && (
           <Button size="sm" disabled={busy} onClick={() => run("confirm_order")}>
             Confirm
           </Button>
         )}
-        {(status === "confirmed" || status === "picked") && (
+        {canSell && (status === "confirmed" || status === "picked") && (
           <AdjustLinesForm orderId={orderId} currentLines={lines.map((l) => ({ skuId: l.skuId, qty: l.qty }))} skus={skus} />
         )}
-        {(status === "confirmed" || status === "picked") && (
+        {canFulfill && (status === "confirmed" || status === "picked") && (
           <>
             <PickForm orderId={orderId} lines={pickLines} onShort={(line, qty) => setShort({ line, qty })} />
             <ShortPickForm orderId={orderId} short={short} onOpenChange={(open) => { if (!open) setShort(null); }} />
           </>
         )}
-        {status === "picked" && <ShipForm orderId={orderId} lines={pickLines} />}
+        {canFulfill && status === "picked" && <ShipForm transfer={transfer} orderId={orderId} lines={pickLines} />}
         {canCancel && (
           <CommandForm open={cancelOpen} onOpenChange={(next) => { setCancelOpen(next); if (!next) { setCancelReason(""); setError(null); } }} title="Cancel order" trigger={<Button size="sm" variant="destructive" disabled={busy}>
                 Cancel
