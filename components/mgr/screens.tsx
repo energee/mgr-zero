@@ -1234,7 +1234,7 @@ export const SCREENS: Screen[] = [
     step: 5,
     slice: 1,
     tab: "Beer",
-    name: "Weekly count",
+    name: "Weekly count", gatedBy: "Program 12",
     to: { "Record count": "Weekly count", "Create transfer order": "Order" },
     job: "Target-state count plus active suggested transfer",
     reads: "get_taproom_count_snapshot · replenishment_suggestions · list_locations",
