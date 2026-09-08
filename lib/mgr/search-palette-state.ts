@@ -8,8 +8,10 @@ export function searchLoading(term: string, answeredTerm: string, status: string
   return term !== "" && (status === "loading" || term !== answeredTerm);
 }
 
-export function pickerHits(hits: SearchHit[], options?: SearchHit[], recent: SearchHit[] = []) {
-  return hits.filter((hit) =>
-    (!options || options.some((option) => option.kind === hit.kind && option.id === hit.id)) &&
-    !recent.some((item) => item.kind === hit.kind && item.id === hit.id));
+export function restrictToOptions(hits: SearchHit[], options?: SearchHit[]) {
+  return options ? hits.filter((hit) => options.some((option) => option.kind === hit.kind && option.id === hit.id)) : hits;
+}
+
+export function excludeSeen(hits: SearchHit[], recent: SearchHit[] = []) {
+  return hits.filter((hit) => !recent.some((item) => item.kind === hit.kind && item.id === hit.id));
 }

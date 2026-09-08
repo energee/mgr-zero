@@ -6,16 +6,17 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { Search01Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Skeleton } from "@/components/ui/skeleton";
 import { CommandForm } from "@/components/mgr/command-form";
 import { Icon } from "@/components/mgr/icon";
 import { useBrewery } from "@/app/(app)/brewery-provider";
 import { command } from "@/lib/commands/client";
 import type { SearchHit, SearchKind } from "@/lib/commands/search";
-import { pickerHits, searchCacheKey, searchLoading } from "@/lib/mgr/search-palette-state";
+import { excludeSeen, restrictToOptions, searchCacheKey, searchLoading } from "@/lib/mgr/search-palette-state";
 
 const HEADING: Record<SearchKind, string> = { sku: "SKUs", order: "Orders", invoice: "Invoices", lot: "Lots", customer: "Customers", po: "Purchase orders", batch: "Batches" };
 
@@ -51,8 +52,9 @@ export function SearchPalette({ placeholder = "Search", kinds, onPick, initialHi
     const t = setTimeout(() => {
       setStatus("loading");
       setError("");
-      const cacheKey = searchCacheKey(breweryId, kindKey ? kindKey.split(",") as SearchKind[] : undefined, term);
-      command(breweryId, "search_entities", { q: term, kinds: kindKey ? kindKey.split(",") : undefined })
+      const kinds = kindKey ? kindKey.split(",") as SearchKind[] : undefined;
+      const cacheKey = searchCacheKey(breweryId, kinds, term);
+      command(breweryId, "search_entities", { q: term, kinds })
         .then((data) => {
           if (!live) return;
           const hits = data as SearchHit[];
@@ -72,10 +74,10 @@ export function SearchPalette({ placeholder = "Search", kinds, onPick, initialHi
   }, [term, kindKey, breweryId, cache]);
   const loading = searchLoading(term, res.term, status);
   const currentStatus = !term ? "idle" : loading ? "loading" : status;
-  const visibleRecent = pickerHits(recent, initialHits);
+  const visibleRecent = restrictToOptions(recent, initialHits);
   const hits = loading || currentStatus === "error" ? [] : term
-    ? pickerHits(res.hits, initialHits)
-    : pickerHits(initialHits ?? [], initialHits, visibleRecent);
+    ? restrictToOptions(res.hits, initialHits)
+    : excludeSeen(initialHits ?? [], visibleRecent);
   const open = (hit: SearchHit) => {
     const next = [hit, ...recent.filter((r) => r.kind !== hit.kind || r.id !== hit.id)].slice(0, 5);
     cache.set(recentKey, next);
@@ -93,7 +95,7 @@ export function SearchPalette({ placeholder = "Search", kinds, onPick, initialHi
             {visibleRecent.map((h) => <SearchItem key={`recent:${h.kind}:${h.id}`} hit={h} onSelect={open} />)}
           </CommandGroup>
         )}
-        {loading && <div role="status" aria-label="Loading results" className="space-y-2 p-3">{[1, 2, 3].map((n) => <div key={n} className="h-12 animate-pulse rounded bg-muted" />)}</div>}
+        {loading && <div role="status" aria-label="Loading results" className="space-y-2 p-3">{[1, 2, 3].map((n) => <Skeleton key={n} className="h-12" />)}</div>}
         {currentStatus === "offline" && <p role="status" className="px-3 py-2 text-sm text-muted-foreground">Offline · {hits.length ? "cached matches only" : "no cached matches"}</p>}
         {currentStatus === "error" && <p role="alert" className="px-3 py-2 text-sm text-destructive">Search failed · {error}</p>}
         {term && currentStatus === "ready" && hits.length === 0 && <CommandEmpty>No matches · change the term</CommandEmpty>}
@@ -124,7 +126,10 @@ export function SearchSheet() {
 export function SkuPicker({ value, options, onChange, label = "Select SKU" }: { value: string; options: { id: string; label: string }[]; onChange: (id: string) => void; label?: string }) {
   const [open, setOpen] = useState(false);
   const selected = options.find((option) => option.id === value);
-  const hits: SearchHit[] = options.map((option) => ({ kind: "sku", id: option.id, label: option.label, detail: "SKU", href: "/catalog", exact: false }));
+  const hits = useMemo<SearchHit[]>(
+    () => options.map((option) => ({ kind: "sku", id: option.id, label: option.label, detail: "SKU", href: "/catalog", exact: false })),
+    [options],
+  );
   return (
     <CommandForm open={open} onOpenChange={setOpen} title="Select SKU" trigger={<Button type="button" variant="outline" className="min-h-9 flex-1 justify-start font-normal">{selected?.label ?? label}</Button>}>
       <SearchPalette placeholder="Search SKUs" kinds={["sku"]} initialHits={hits} onPick={(hit) => { onChange(hit.id); setOpen(false); }} />
