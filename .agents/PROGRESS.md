@@ -7,6 +7,7 @@ descriptions, and `scripts/pr-directives.ts` moves finished `TODO.md` items
 here.
 
 ## Done
+- 2026-09-07 — Program 8 — delivery and routes merged (needs 2 phase 3) (#204)
 - 2026-09-07 — Program 7 — taproom and kegs merged (needs 2) (#199)
 - 2026-09-07 — Program 6 — purchasing merged (#198)
 - 2026-09-07 — Program 5 — production and packaging merged (#194)
