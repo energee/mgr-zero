@@ -16,6 +16,7 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Search", file: "app/(app)/search/page.tsx" },
   { name: "Entity picker", file: "components/mgr/search-palette.tsx" },
   { name: "Settings", file: "app/(app)/settings/page.tsx" },
+  { name: "Team", file: "app/(app)/settings/team/page.tsx" },
   { name: "Permission denied", file: "app/(app)/denied/page.tsx" },
   { name: "No membership", file: "app/(auth)/no-membership/page.tsx" },
   { name: "Session expired", file: "app/(auth)/login/page.tsx" },
@@ -54,6 +55,9 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Pars and allocation", file: "app/(app)/replenishment/page.tsx" },
   { name: "Customer detail", file: "app/(app)/customers/[id]/page.tsx" },
   { name: "Ship-to form", file: "app/(app)/customers/[id]/page.tsx" },
+  { name: "Catalog", file: "app/(app)/catalog/page.tsx" },
+  { name: "Brand", file: "app/(app)/catalog/page.tsx" },
+  { name: "SKU", file: "app/(app)/catalog/page.tsx" },
   { name: "Package BOM", file: "app/(app)/catalog/page.tsx" },
   { name: "SKU list", file: "app/(app)/catalog/page.tsx" },
   { name: "Shop", file: "app/(portal)/portal/page.tsx" },
@@ -105,36 +109,37 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Price group", file: "app/(app)/pricing/page.tsx" },
 ];
 
-/** A gate keeps the screen out until the named program lifts it. */
+/** A gate keeps the token out until the named program lifts it. */
 const GATE = /(SCHEMA\/RLS-GATE|SCHEMA-GATE|IMPLEMENTATION-GATE)/;
 /** Tokens that are not registry commands: auth platform calls and client state. */
 const NOT_A_COMMAND = /\[(platform|client state)/;
 
-/** Command names a `writes` or `reads` string names, minus platform and
- * client-state tokens. Tags close a list ("a · b [design]"), so a part inherits
- * the tag of the next tagged part, as tests/screen-command-gates.test.ts reads it. */
-function commandTokens(text: unknown): string[] {
+/** The command names a `writes` or `reads` string lists, each with whether it
+ * is live: registered and not gate-tagged. Tags close a list ("a · b [design]"),
+ * so a part inherits the tag of the next tagged part, as
+ * tests/screen-command-gates.test.ts reads it. A `[design]` tag on a command
+ * that has since shipped is stale prose; the registry is the fact. */
+function commandTokens(text: unknown): { name: string; live: boolean }[] {
   if (typeof text !== "string") return [];
-  const names: string[] = [];
-  let skip = false;
+  const out: { name: string; live: boolean }[] = [];
+  let skip = false, gated = false;
   for (const part of text.split("·").map((p) => p.trim()).reverse()) {
-    if (/\[/.test(part)) skip = NOT_A_COMMAND.test(part);
+    if (/\[/.test(part)) { skip = NOT_A_COMMAND.test(part); gated = GATE.test(part); }
     if (skip) continue;
     const name = part.match(/^([a-z_]+)/)?.[1];
-    if (name && name.includes("_")) names.push(name);
+    if (name && name.includes("_")) out.push({ name, live: !gated && Boolean(getCommandDefinition(name)) });
   }
-  return names;
+  return out;
 }
 
-/** Whether the live app can draw this record today: no gate tag, and every
- * command it reads or writes is registered. A screen still tagged `[design]`
- * on a command that has since shipped counts as live — the tag is stale prose,
- * the registry is the fact. */
+/** Whether the live app can draw this record today: every read is live and,
+ * when the record writes anything, at least one write is. A screen with mixed
+ * live and gated writes (Team, with invite still gated) is in; a screen whose
+ * only writes wait on a gate (Import) is out until the gate lifts. */
 export function isUngated(s: Screen): boolean {
   if (s.venue) return false;
-  const text = [s.writes, s.reads].filter((t): t is string => typeof t === "string");
-  if (text.some((t) => GATE.test(t))) return false;
-  return text.flatMap(commandTokens).every((name) => Boolean(getCommandDefinition(name)));
+  const writes = commandTokens(s.writes);
+  return commandTokens(s.reads).every((t) => t.live) && (writes.length === 0 || writes.some((t) => t.live));
 }
 
 /** Programs 11 and 15 own these; their records name no command a gate could sit on. */

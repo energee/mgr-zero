@@ -1,7 +1,7 @@
 // tests/rls-command-boundary.test.ts — live PostgREST proof that staff writes use only role-scoped RPCs.
 // Every mutation RPC takes a p_request_id (request ledger); direct calls here mint a fresh one.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedCustomer, seedPriceGroup, priceSku } from "./helpers";
+import { admin, makeBrewery, makeStaff, makeStaffCtx, seedCatalog, seedLocation, seedCustomer, seedPriceGroup, priceSku } from "./helpers";
 import { runCommand, type Ctx } from "../lib/commands/registry";
 import "../lib/commands/all";
 
@@ -263,6 +263,26 @@ describe("registered staff mutation role × RPC matrix", () => {
         return {
           command: { name, kind: "taproom" },
           rpc: { p_brewery: brewery.id, p_name: name, p_kind: "taproom" },
+        };
+      },
+    },
+    {
+      command: "update_staff_role", rpc: "update_staff_role", allowed: ["admin"],
+      input: async () => {
+        const member = await makeStaff(brewery.id, "brewer");
+        return {
+          command: { userId: member.id, role: "warehouse" },
+          rpc: { p_brewery: brewery.id, p_user: member.id, p_role: "warehouse" },
+        };
+      },
+    },
+    {
+      command: "revoke_staff", rpc: "revoke_staff", allowed: ["admin"],
+      input: async () => {
+        const member = await makeStaff(brewery.id, "brewer");
+        return {
+          command: { userId: member.id },
+          rpc: { p_brewery: brewery.id, p_user: member.id },
         };
       },
     },

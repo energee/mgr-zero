@@ -2668,6 +2668,60 @@ begin
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
+-- Team (Program 10 task 5). Roster with emails: definer only to reach
+-- auth.users; the caller must be staff of the brewery, and only that
+-- brewery's rows return. Role change and revoke are single-row writes that
+-- keep at least one admin; a revoke ends the membership and leaves the Auth
+-- user alone (re-invite is the compensation).
+create function list_team_members(p_brewery uuid)
+returns table (user_id uuid, email text, role public.staff_role, created_at timestamptz)
+language sql stable security definer set search_path = '' as $$
+  select bu.user_id, u.email::text, bu.role, bu.created_at
+    from public.brewery_users bu
+    join auth.users u on u.id = bu.user_id
+    where bu.brewery_id = p_brewery
+      and exists (select 1 from public.brewery_users me where me.brewery_id = p_brewery and me.user_id = auth.uid())
+    order by bu.role, u.email;
+$$;
+
+create function private.assert_not_last_admin(p_brewery uuid, p_user uuid) returns void
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if exists (select 1 from public.brewery_users where brewery_id = p_brewery and user_id = p_user and role = 'admin')
+     and (select count(*) from public.brewery_users where brewery_id = p_brewery and role = 'admin') = 1 then
+    raise exception 'keep at least one admin' using errcode = 'P0001';
+  end if;
+end $$;
+
+create function update_staff_role(p_brewery uuid, p_user uuid, p_role public.staff_role, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.brewery_users;
+begin
+  perform private.assert_staff(p_brewery, array['admin']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'update_staff_role', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'user', p_user, 'role', p_role));
+  if v_replay is not null then return v_replay; end if;
+  if p_role <> 'admin' then perform private.assert_not_last_admin(p_brewery, p_user); end if;
+  update public.brewery_users set role = p_role where brewery_id = p_brewery and user_id = p_user returning * into v_row;
+  if v_row.user_id is null then raise exception 'member not found'; end if;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+create function revoke_staff(p_brewery uuid, p_user uuid, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_actor uuid; v_row public.brewery_users;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'revoke_staff', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'user', p_user));
+  if v_replay is not null then return v_replay; end if;
+  if p_user = v_actor then raise exception 'you cannot remove yourself' using errcode = 'P0001'; end if;
+  perform private.assert_not_last_admin(p_brewery, p_user);
+  delete from public.brewery_users where brewery_id = p_brewery and user_id = p_user returning * into v_row;
+  if v_row.user_id is null then raise exception 'member not found'; end if;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
 -- Brewery basics from Settings: one mutable row, admin only. The timezone
 -- must name a zone Postgres knows, so a typo never breaks every due date.
 create function update_brewery(
@@ -6018,6 +6072,9 @@ grant execute on function
   create_location(uuid,text,public.location_kind,uuid),
   update_location(uuid,uuid,text,public.location_kind,uuid),
   update_brewery(uuid,text,text,text,text,text,int,uuid),
+  list_team_members(uuid),
+  update_staff_role(uuid,uuid,public.staff_role,uuid),
+  revoke_staff(uuid,uuid,uuid),
   create_bin(uuid,uuid,text,uuid),
   update_bin(uuid,uuid,text,uuid),
   delete_bin(uuid,uuid,uuid),

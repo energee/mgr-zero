@@ -637,7 +637,7 @@ export const SCREENS: Screen[] = [
     name: "Team",
     job: "Roster, roles, pending invites and revocation",
     reads: "list_team_members",
-    writes: "update_staff_roles [design; single row, roles array] · revoke_staff [design; single membership row ends] · invite_staff [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI] · the taproom role [SCHEMA-GATE: revision 2 §16.13/§16.16 q3: staff_role gains taproom, but P-staff is role-agnostic, so the narrow per-role policies are undesigned]",
+    writes: "invite_staff [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI] · the taproom role [SCHEMA-GATE: revision 2 §16.13/§16.16 q3: staff_role gains taproom, but P-staff is role-agnostic, so the narrow per-role policies are undesigned] · update_staff_role · revoke_staff",
     states: [["last admin", "role change refused · keep one admin", 1], ["pending", "invite sent · not yet accepted"], ["permission", "admin only", 1]],
     spec: "A person shows as @handle, the local part of their email; it is derived, not a stored column. A pending invite has no account yet, so it shows the full address it was sent to. From Settings. A member row opens the Team member sheet, where the role changes in one write and Remove ends the membership (Auth user untouched; re-invite is the compensation). The invite stays disabled with the same human copy as first run until its gate closes.",
     body: (<>
@@ -661,7 +661,7 @@ export const SCREENS: Screen[] = [
     reads: "list_team_members",
     writes: "update_staff_roles · revoke_staff [design; SCHEMA-GATE: roles is an array on the membership row]",
     states: [["permission", "admin only", 1], ["member", "any set of roles; at least one"], ["no role", "Save refused until one is on", 1], ["last admin", "remove and turning off Admin refused", 1], ["self", "remove refused", 1]],
-    spec: "A member holds a set of roles, not one: a person who sells and brews is both, and sees the union of each role's navigation and actions. Every role is a switch; at least one must stay on. The destructive action belongs to the named member, so there is no ambiguous selected-member state. Drawn for another member, never the signed-in one: opening your own row is the self state, where Remove is refused.",
+    spec: "A member holds a set of roles, not one: a person who sells and brews is both, and sees the union of each role's navigation and actions. Every role is a switch; at least one must stay on. The destructive action belongs to the named member, so there is no ambiguous selected-member state. Drawn for another member, never the signed-in one: opening your own row is the self state, where Remove is refused. Until the roles column becomes an array, the live sheet changes the one role the row holds.",
     body: (<>
       {E.row("Dave Chen", "dave@demobrewing.com", "", "", E.face({ className: "size-10", src: "/mock/dave.jpg" }))}
       {E.ttl("Roles")}
