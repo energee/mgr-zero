@@ -130,3 +130,53 @@ describe("save_route and list_routes", () => {
     expect(stop.invoice).toBeNull();
   });
 });
+
+describe("depart, confirm, and return a route", () => {
+  it("walks a mixed route: the driver departs, Today names the next stop, a transfer stop confirms without an invoice, return waits for the last stop", async () => {
+    const driver = await makeStaffCtx(b.id, "warehouse");
+    const other = await makeStaffCtx(b.id, "warehouse");
+    const sh = await shipment(2, "on_delivery");
+    const tr = await transfer();
+    const { routeId } = await runCommand("save_route", {
+      name: "Route D", deliveryDate: "2026-09-14", driverUserId: driver.userId,
+      stops: [{ stockTransferId: tr, stopNo: 1 }, { shipmentId: sh, stopNo: 2 }],
+    }, adminCtx) as { routeId: string };
+
+    // only the assigned driver or an admin runs the route
+    await expect(runCommand("depart_route", { routeId }, other)).rejects.toThrow(/permission|driver/i);
+    await expect(runCommand("return_route", { routeId }, driver)).rejects.toThrow(/depart/i);
+    await runCommand("depart_route", { routeId }, driver);
+    const { data: r1 } = await admin.from("routes").select("departed_at").eq("id", routeId).single();
+    expect(r1!.departed_at).not.toBeNull();
+    const { data: t1 } = await admin.from("stock_transfers").select("status").eq("id", tr).single();
+    expect(t1!.status).toBe("in_transit");
+    // a departed route cannot be re-planned
+    await expect(runCommand("save_route", { id: routeId, deliveryDate: "2026-09-14", stops: [{ shipmentId: sh, stopNo: 1 }] }, adminCtx)).rejects.toThrow(/departed/i);
+
+    const { data: stops } = await admin.from("deliveries").select("id, stop_no").eq("route_id", routeId).order("stop_no");
+    const ids = stops!.map((s) => s.id);
+    const today = async (ctx: typeof driver) => (await runCommand("get_today", { now: "2026-09-14T12:00:00Z" }, ctx) as { reason: string; subjectId: string; href: string }[])
+      .filter((t) => t.reason === "delivery_next" && ids.includes(t.subjectId));
+    expect(await today(driver)).toMatchObject([{ subjectId: stops![0].id, href: `/work/deliveries/${stops![0].id}` }]);
+    expect(await today(other)).toEqual([]);
+
+    // the transfer stop is stamped, nothing is invoiced, and stock has not moved (receiving does that)
+    await expect(runCommand("confirm_delivery", { deliveryId: stops![0].id, signedBy: "Sam" }, other)).rejects.toThrow(/permission|driver/i);
+    const c1 = await runCommand("confirm_delivery", { deliveryId: stops![0].id, signedBy: "Sam" }, driver) as { invoice_id: string | null };
+    expect(c1.invoice_id).toBeNull();
+    // the on_delivery shipment on stop 2 is still uninvoiced: stop 1 raised nothing
+    expect((await admin.from("invoices").select("id").eq("shipment_id", sh)).data).toEqual([]);
+    expect((await admin.from("deliveries").select("delivered_at, signed_by").eq("id", stops![0].id).single()).data).toMatchObject({ signed_by: "Sam" });
+    expect(await today(driver)).toMatchObject([{ subjectId: stops![1].id }]);
+
+    await expect(runCommand("return_route", { routeId }, driver)).rejects.toThrow(/stop/i);
+    const c2 = await runCommand("confirm_delivery", { deliveryId: stops![1].id, signedBy: "Dana" }, adminCtx) as { invoice_id: string | null };
+    expect(c2.invoice_id).not.toBeNull();
+    await runCommand("return_route", { routeId }, driver);
+    const { data: r2 } = await admin.from("routes").select("returned_at").eq("id", routeId).single();
+    expect(r2!.returned_at).not.toBeNull();
+    expect(await today(driver)).toEqual([]);
+    await expect(runCommand("return_route", { routeId }, adminCtx)).rejects.toThrow(/returned/i);
+    await expect(runCommand("depart_route", { routeId }, adminCtx)).rejects.toThrow(/departed/i);
+  });
+});

@@ -90,7 +90,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "confirm_delivery", description: "Sign a delivery stop; an on-delivery shipment gets its invoice now (shipped quantities, order prices); never moves stock",
+  name: "confirm_delivery", description: "Sign a delivery stop as the assigned driver or an admin; an on-delivery shipment gets its invoice now (shipped quantities, order prices); a transfer stop is only stamped; never moves stock",
   roles: [...warehouseRoles], requiresConfirmation: true,
   input: z.object({ deliveryId: z.string().uuid(), signedBy: z.string().trim().min(1) }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("confirm_delivery", { p_delivery: i.deliveryId, p_signed_by: i.signedBy, p_request_id: execution.requestId })),

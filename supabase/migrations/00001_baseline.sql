@@ -3284,9 +3284,11 @@ begin
   select * into d from public.deliveries where id = p_delivery for update;
   if not found then raise exception 'delivery not found'; end if;
   if d.delivered_at is not null then raise exception 'already delivered'; end if;
+  update public.deliveries set delivered_at = now(), signed_by = nullif(trim(p_signed_by), '') where id = p_delivery;
+  -- a transfer stop is only stamped: receive_stock_transfer moves the stock, and nothing is invoiced
+  if d.stock_transfer_id is not null then return jsonb_build_object('delivery_id', p_delivery, 'invoice_id', null); end if;
   select * into sh from public.shipments where id = d.shipment_id;
   select * into o from public.orders where id = sh.order_id;
-  update public.deliveries set delivered_at = now(), signed_by = nullif(trim(p_signed_by), '') where id = p_delivery;
   select id into v_invoice from public.invoices where shipment_id = sh.id and kind = 'invoice' limit 1;
   if v_invoice is null and sh.invoice_timing = 'on_delivery' and o.kind = 'wholesale'
      and exists (select 1 from public.order_lines ol where ol.order_id = o.id and coalesce(ol.qty_shipped, 0) > 0) then
@@ -3308,7 +3310,7 @@ declare v_brewery uuid; v_replay jsonb; v_result jsonb;
 begin
   select brewery_id into v_brewery from public.deliveries where id = p_delivery;
   if v_brewery is null then raise exception 'permission denied' using errcode = '42501'; end if;
-  perform private.assert_staff(v_brewery,array['admin','warehouse']::public.staff_role[]);
+  perform private.assert_route_runner((select route_id from public.deliveries where id = p_delivery));
   v_replay := private.claim_command_request(v_brewery,'confirm_delivery',p_request_id,jsonb_build_object('delivery',p_delivery,'signed_by',p_signed_by));
   if v_replay is not null then return v_replay; end if;
   v_result := private.confirm_delivery_impl(p_delivery,p_signed_by); return private.complete_command_request(p_request_id,v_result);
@@ -3373,6 +3375,55 @@ begin
     end if;
   end loop;
   return jsonb_build_object('routeId', v_id);
+end $$;
+
+-- The assigned driver or an admin runs a route; other warehouse members may
+-- plan it but never depart, confirm or return it. Returns the brewery.
+create function private.assert_route_runner(p_route uuid) returns uuid
+language plpgsql stable security definer set search_path = '' as $$
+declare r public.routes;
+begin
+  select * into r from public.routes where id = p_route;
+  if r.id is null then raise exception 'permission denied' using errcode = '42501'; end if;
+  perform private.assert_staff(r.brewery_id, array['admin','warehouse']::public.staff_role[]);
+  if r.driver_user_id is distinct from auth.uid() and public.staff_role(r.brewery_id) <> 'admin' then
+    raise exception 'only the assigned driver or an admin may run this route' using errcode = '42501';
+  end if;
+  return r.brewery_id;
+end $$;
+
+create function depart_route(p_route uuid, p_request_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_brewery uuid; v_replay jsonb; r public.routes;
+begin
+  v_brewery := private.assert_route_runner(p_route);
+  v_replay := private.claim_command_request(v_brewery, 'depart_route', p_request_id, jsonb_build_object('route', p_route));
+  if v_replay is not null then return v_replay; end if;
+  select * into r from public.routes where id = p_route for update;
+  if r.departed_at is not null then raise exception 'route has already departed'; end if;
+  if not exists (select 1 from public.deliveries where route_id = p_route) then raise exception 'a route needs at least one stop'; end if;
+  update public.routes set departed_at = now() where id = p_route;
+  -- the truck now carries the transfer stops
+  update public.stock_transfers set status = 'in_transit'
+    where id in (select stock_transfer_id from public.deliveries where route_id = p_route) and status = 'picked';
+  return private.complete_command_request(p_request_id, jsonb_build_object('routeId', p_route, 'departed_at', now()));
+end $$;
+
+create function return_route(p_route uuid, p_request_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_brewery uuid; v_replay jsonb; r public.routes;
+begin
+  v_brewery := private.assert_route_runner(p_route);
+  v_replay := private.claim_command_request(v_brewery, 'return_route', p_request_id, jsonb_build_object('route', p_route));
+  if v_replay is not null then return v_replay; end if;
+  select * into r from public.routes where id = p_route for update;
+  if r.returned_at is not null then raise exception 'route has already returned'; end if;
+  if r.departed_at is null then raise exception 'route has not departed'; end if;
+  if exists (select 1 from public.deliveries where route_id = p_route and delivered_at is null) then
+    raise exception 'every stop must be delivered before the route returns';
+  end if;
+  update public.routes set returned_at = now() where id = p_route;
+  return private.complete_command_request(p_request_id, jsonb_build_object('routeId', p_route, 'returned_at', now()));
 end $$;
 
 create function save_route(
@@ -5227,10 +5278,10 @@ create view private.today_candidates with (security_invoker = true) as
     where vo.ended_at is null;
 grant select on private.today_candidates to service_role;
 
--- ponytail: delivery_next joins this list when its MGR page ships (slice 10
--- delivery stop). fermentation_reading_overdue is live: /cellar/<occupancy>/reading exists.
+-- Every reason has a live MGR page: /work/deliveries/<stop> (Program 8) and
+-- /cellar/<occupancy>/reading.
 create function today_live_reasons() returns text[]
-language sql immutable set search_path = '' as $$ select array['submitted_order','pick_due','restock_due','fermentation_reading_overdue'] $$;
+language sql immutable set search_path = '' as $$ select array['submitted_order','pick_due','restock_due','delivery_next','fermentation_reading_overdue'] $$;
 
 create function get_today_items(p_brewery uuid, p_now timestamptz default now())
 returns setof private.today_candidates
@@ -5841,7 +5892,9 @@ grant execute on function
   create_keg_pool(uuid,text,public.keg_pool_kind,uuid,int,int,uuid),
   update_keg_pool(uuid,uuid,text,uuid,int,int,boolean,uuid),
   record_keg_event(uuid,uuid,public.keg_size,int,public.keg_event_reason,uuid,uuid,uuid,text,uuid),
-  save_route(uuid,uuid,text,date,uuid,text,text,jsonb,uuid)
+  save_route(uuid,uuid,text,date,uuid,text,text,jsonb,uuid),
+  depart_route(uuid,uuid),
+  return_route(uuid,uuid)
   to authenticated;
 grant usage on schema private, extensions to service_role;
 -- service_role reaches `private` only for the UUID default its seed inserts

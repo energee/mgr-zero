@@ -94,3 +94,17 @@ defineQuery({
     return { delivery, lines, invoice: null };
   },
 });
+
+const routeInput = z.object({ routeId: z.string().uuid() });
+
+defineCommand({
+  name: "depart_route", description: "Stamp the route's departure as its driver or an admin; needs at least one stop, and its transfer stops become in transit",
+  roles: ROLES, input: routeInput,
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("depart_route", { p_route: i.routeId, p_request_id: execution.requestId })),
+});
+
+defineCommand({
+  name: "return_route", description: "Stamp the route's return as its driver or an admin, once it has departed and every stop is delivered",
+  roles: ROLES, input: routeInput,
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("return_route", { p_route: i.routeId, p_request_id: execution.requestId })),
+});
