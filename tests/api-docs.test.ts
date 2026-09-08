@@ -23,6 +23,15 @@ const read = (path: string) => readFileSync(resolve(root, path), "utf8");
 const PAGE = () => read("content/docs/api.mdx");
 
 describe("HTTP API reference", () => {
+  it("documents provisioning as authenticated pre-tenant and omits brewery from its example", () => {
+    const operation = apiOperations().find(o => o.name === "provision_brewery");
+    expect(operation).toMatchObject({ scope: "pretenant", roles: "authenticated pre-tenant" });
+    const block = renderArea("team").split("#### provision_brewery")[1].split("#### ")[0];
+    expect(block).not.toContain('"breweryId"');
+    expect(block).toContain('"timezone": "America/New_York"');
+    expect(block).toContain('"requestId"');
+  });
+
   it("gives every registered operation an area and marks it available", () => {
     const operations = apiOperations();
     for (const { name } of listTools()) {
@@ -162,11 +171,11 @@ describe("HTTP API reference", () => {
   // The errors page is the caller's whole failure contract, so a code raised in
   // the endpoint that it does not explain is a hole a developer falls into.
   it("explains every error code the endpoint can raise", () => {
-    const sources = ["app/api/command/route.ts", "lib/commands/registry.ts", ...readdirSync(resolve(root, "lib/commands")).map((f) => `lib/commands/${f}`)]
+    const sources = ["app/api/command/route.ts", "lib/commands/registry.ts", "lib/supabase/invites.ts", ...readdirSync(resolve(root, "lib/commands")).map((f) => `lib/commands/${f}`)]
       .filter((f) => f.endsWith(".ts"))
       .map(read).join("\n");
     const raised = new Set([
-      ...[...sources.matchAll(/CommandError\([^;]*?,\s*\d{3},\s*"([a-z_]+)"/g)].map((m) => m[1]),
+      ...[...sources.matchAll(/CommandError\((?:"[^"\n]*"|[^;"\n])*?,\s*\d{3},\s*"([a-z_]+)"/g)].map((m) => m[1]),
       // route.ts's last-resort branch builds the failure envelope itself rather
       // than throwing, so a CommandError-only grep missed `internal_error`.
       ...[...sources.matchAll(/\bcode:\s*"([a-z_]+)"/g)].map((m) => m[1]),
@@ -335,12 +344,11 @@ describe("HTTP API reference", () => {
     // set_notification_destination.externalDestinationId is a Slack channel
     // id: z.string().min(1), rendered `string` in its own table 100 lines up.
     expect(page).not.toContain("Every id in every operation, without exception");
-    // invite_customer_user always raises; it renders under Customers while the
-    // sentence explaining that lives in the Team area's prose.
+    // Customer invitations are live and documented in their owning area.
     const customers = page.slice(page.indexOf("{/* ops:customers */}"), page.indexOf("{/* end ops:customers */}"));
     expect(customers, "invite_customer_user is documented here").toContain("invite_customer_user");
     const invite = page.slice(page.indexOf("#### invite_customer_user"));
-    expect(invite.slice(0, 600), "its example must not read as runnable").toMatch(/not available in this release/);
+    expect(invite.slice(0, 600), "its example describes the supported invitation").not.toMatch(/not available in this release/);
   });
 });
 

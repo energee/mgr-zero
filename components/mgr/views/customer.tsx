@@ -11,6 +11,8 @@ export type CustomerDetailSlot = {
   shipTos?: { key: string; title: string; detail: string; action?: ReactNode }[];
   addShipTo?: ReactNode;
   kegHref?: string;
+  /** Live sales/admin: InviteForm. `null` hides the gated placeholder. */
+  portalUsers?: ReactNode;
 };
 
 export function CustomerView({
@@ -40,7 +42,9 @@ export function CustomerView({
             <Fragment key={s.key}>{E.row(s.title, s.detail, s.action)}</Fragment>
           ))}
           {detail.addShipTo}
-          {E.gated("Portal users", "invitations aren’t available yet")}
+          {"portalUsers" in detail
+            ? detail.portalUsers
+            : E.gated("Portal users", "invitations aren’t available yet")}
           {E.row("Customer keg balance", "kegs out and deposits held", E.act("Open", "primary", detail.kegHref))}
         </>
       ) : (

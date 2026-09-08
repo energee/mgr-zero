@@ -1,8 +1,7 @@
 // app/(app)/customers/[id]/page.tsx — Customer detail (screen record): one
 // account's facts with Edit → customer-form.tsx, its ship-tos with
-// ship-to-form.tsx, and links to its keg balance and orders. Portal-user
-// invites stay gated until Program 11. An unknown or malformed id renders
-// not-found.tsx.
+// ship-to-form.tsx, portal InviteForm for sales/admin, and links to keg
+// balance and orders. An unknown or malformed id renders not-found.tsx.
 import { CustomerView } from "@/components/mgr/views/customer";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -10,6 +9,7 @@ import { runCommand } from "@/lib/commands/registry";
 import { toCustomerViewProps } from "@/lib/mgr/customer-view";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
+import { InviteForm } from "../../settings/team/invite-form";
 import { CustomerForm } from "../customer-form";
 import { ShipToForm } from "../ship-to-form";
 
@@ -36,6 +36,9 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       detail={{
         kegHref: `/kegs/customers/${customer.id}`,
         addShipTo: <ShipToForm customerId={customer.id} />,
+        portalUsers: (brewery.role === "admin" || brewery.role === "sales")
+          ? <InviteForm customerId={customer.id} />
+          : null,
         shipTos: shipTos.map((s) => ({
           key: s.id,
           title: s.label,

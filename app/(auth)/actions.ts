@@ -8,6 +8,7 @@
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createRequestAuthContext } from "@/lib/auth/request-context";
+import { acceptInviteErrorPath, inviteAudience, inviteLanding } from "@/lib/auth/invite";
 import { createServerClient } from "@/lib/supabase/server";
 
 /** Where a signed-in account belongs: staff on Today, a buyer in the portal. */
@@ -50,6 +51,23 @@ export async function savePassword(form: FormData) {
   const { error } = await db.auth.updateUser({ password: String(form.get("password")) });
   if (error) redirect(`/password?error=${encodeURIComponent(error.message)}`);
   redirect(await home(db));
+}
+
+export async function acceptInvite(form: FormData) {
+  const audience = inviteAudience(form.get("audience"));
+  const name = String(form.get("name") ?? "").trim();
+  const password = String(form.get("password") ?? "");
+  if (!audience || !name || password.length < 8) redirect(acceptInviteErrorPath(audience, name));
+
+  const db = await createServerClient();
+  const auth = createRequestAuthContext(() => Promise.resolve(db));
+  const { data } = await db.auth.getUser();
+  if (data.user?.user_metadata?.mgr_invite_kind !== audience || data.user.user_metadata.mgr_invite_accepted || !(await inviteLanding(auth, audience))) {
+    redirect("/invite-expired");
+  }
+  const { error } = await db.auth.updateUser({ password, data: { name, mgr_invite_accepted: true } });
+  if (error) redirect(`/accept?audience=${audience}&error=1`);
+  redirect(audience === "staff" ? "/" : "/portal");
 }
 
 /** Me: operate as another of the caller's breweries. lib/brewery.ts reads the cookie. */

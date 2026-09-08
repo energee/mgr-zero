@@ -2502,13 +2502,14 @@ create index chat_action_intents_expiry_idx on chat_action_intents (expires_at) 
 -- The request ledger is private because it contains actor identities and replay payloads.
 create table private.command_requests (
   actor_id uuid not null,
-  brewery_id uuid not null,
+  brewery_id uuid,
   request_id uuid not null,
   command_name text not null,
   payload_hash bytea not null,
   result jsonb,
   created_at timestamptz not null default now(),
-  primary key (actor_id, request_id)
+  primary key (actor_id, request_id),
+  check ((brewery_id is null) = (command_name = 'provision_brewery'))
 );
 
 create function private.assert_staff(p_brewery uuid, p_roles public.staff_role[]) returns uuid
@@ -2546,7 +2547,7 @@ begin
   if found then return null; end if;
   select * into v_request from private.command_requests
     where actor_id = v_actor and request_id = p_request_id for update;
-  if v_request.brewery_id <> p_brewery or v_request.command_name <> p_command
+  if v_request.brewery_id is distinct from p_brewery or v_request.command_name <> p_command
      or v_request.payload_hash <> extensions.digest(p_payload::text, 'sha256') then
     -- Application SQLSTATE (class MG): every unique index raises 23505, so the
     -- replay mismatch gets its own code for the HTTP layer to map to 409.
@@ -2563,6 +2564,125 @@ begin
     where actor_id = auth.uid() and request_id = p_request_id;
   if not found then raise exception 'command request not claimed'; end if;
   return p_result;
+end $$;
+
+-- Bootstrap is authenticated but deliberately has no tenant identity yet.
+create function provision_brewery(p_name text, p_timezone text, p_ttb text, p_request_id uuid)
+returns uuid language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid := auth.uid(); v_result jsonb; v_id uuid;
+begin
+  if v_actor is null then raise exception 'permission denied' using errcode = '42501'; end if;
+  if p_name is null or btrim(p_name) = '' then raise exception 'brewery name is required'; end if;
+  if p_timezone is null or not exists (select 1 from pg_catalog.pg_timezone_names where name = p_timezone)
+    then raise exception 'invalid timezone'; end if;
+  v_result := private.claim_command_request(null, 'provision_brewery', p_request_id,
+    jsonb_build_object('name', btrim(p_name), 'timezone', p_timezone, 'ttb', nullif(btrim(p_ttb), '')));
+  if v_result is not null then return (v_result #>> '{}')::uuid; end if;
+  insert into public.breweries(name, timezone, ttb_registry_no)
+    values (btrim(p_name), p_timezone, nullif(btrim(p_ttb), '')) returning id into v_id;
+  insert into public.brewery_users(brewery_id, user_id, role) values (v_id, v_actor, 'admin');
+  perform private.complete_command_request(p_request_id, to_jsonb(v_id));
+  return v_id;
+end $$;
+
+-- Invitations span Auth and membership transactions. The Auth trigger binds the
+-- identity inside Auth's transaction, so even losing its HTTP response is safe.
+create table private.invite_requests (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references public.breweries(id),
+  actor_id uuid not null,
+  email text not null unique,
+  role public.staff_role,
+  customer_id uuid,
+  kind text not null check (kind in ('staff','customer')),
+  auth_user_id uuid references auth.users(id),
+  state text not null default 'pending_auth' check (state in ('pending_auth','pending_membership','complete','failed')),
+  request_id uuid not null unique,
+  auth_token uuid not null default private.new_uuid(),
+  last_error text,
+  created_at timestamptz not null default now(),
+  foreign key (customer_id, brewery_id) references public.customers(id, brewery_id),
+  check ((kind = 'staff' and role is not null and customer_id is null)
+      or (kind = 'customer' and role is null and customer_id is not null))
+);
+alter table private.invite_requests enable row level security;
+create index invite_requests_brewery_idx on private.invite_requests(brewery_id);
+
+create function claim_invite_request(p_brewery uuid, p_email text, p_kind text,
+  p_role public.staff_role, p_customer uuid, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row private.invite_requests; v_email text := lower(btrim(p_email));
+begin
+  if p_kind is null or p_kind not in ('staff','customer') or
+    (p_kind = 'staff' and (p_role is null or p_customer is not null)) or
+    (p_kind = 'customer' and (p_role is not null or p_customer is null)) or
+    v_email is null or v_email !~ '^[^[:space:]@]+@[^[:space:]@]+[.][^[:space:]@]+$'
+    then raise exception 'invalid invitation'; end if;
+  perform private.assert_staff(p_brewery, case when p_kind = 'staff' then array['admin']::public.staff_role[] else array['admin','sales']::public.staff_role[] end);
+  if p_kind = 'customer' and not exists (select 1 from public.customers where id = p_customer and brewery_id = p_brewery) then
+    raise exception 'permission denied' using errcode = '42501';
+  end if;
+  v_replay := private.claim_command_request(p_brewery,
+    case when p_kind = 'staff' then 'invite_staff' else 'invite_customer_user' end, p_request_id,
+    jsonb_build_object('email', v_email, 'role', p_role, 'customer', p_customer));
+  if v_replay is null then
+    if exists (select 1 from auth.users where lower(email) = v_email) then raise exception 'email already has an account' using errcode = 'MG409'; end if;
+    begin
+      insert into private.invite_requests(brewery_id, actor_id, email, role, customer_id, kind, request_id)
+      values(p_brewery, auth.uid(), v_email, p_role, p_customer, p_kind, p_request_id) returning * into v_row;
+    exception when unique_violation then raise exception 'invitation already requested' using errcode = 'MG409'; end;
+    perform private.complete_command_request(p_request_id, jsonb_build_object('inviteId', v_row.id));
+  else
+    select * into v_row from private.invite_requests where id = (v_replay->>'inviteId')::uuid and actor_id = auth.uid();
+  end if;
+  return jsonb_build_object('id', v_row.id, 'email', v_row.email, 'authToken', v_row.auth_token,
+    'userId', v_row.auth_user_id, 'state', v_row.state);
+end $$;
+
+-- invited_at is Auth-owned, unlike editable user metadata. A signup or metadata
+-- update cannot claim access. GoTrue sets invited_at after INSERT in the same tx.
+create function private.bind_invited_auth_user() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if new.invited_at is not null and (tg_op = 'INSERT' or old.invited_at is null) then
+    update private.invite_requests set auth_user_id = new.id, state = 'pending_membership', last_error = null
+      where auth_token::text = new.raw_user_meta_data->>'mgr_invite_token'
+        and email = lower(new.email) and auth_user_id is null and state in ('pending_auth','failed');
+  end if;
+  return new;
+end $$;
+create trigger bind_invited_auth_user after insert or update of invited_at on auth.users
+for each row execute function private.bind_invited_auth_user();
+
+create function complete_invite_membership(p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_row private.invite_requests;
+begin
+  select * into v_row from private.invite_requests where request_id = p_request_id and actor_id = auth.uid() for update;
+  if not found then raise exception 'permission denied' using errcode = '42501'; end if;
+  perform private.assert_staff(v_row.brewery_id, case when v_row.kind = 'staff' then array['admin']::public.staff_role[] else array['admin','sales']::public.staff_role[] end);
+  if v_row.state = 'complete' then return jsonb_build_object('userId', v_row.auth_user_id); end if;
+  if v_row.auth_user_id is null then raise exception 'invitation is awaiting Auth'; end if;
+  if v_row.kind = 'staff' then
+    insert into public.brewery_users(brewery_id,user_id,role) values(v_row.brewery_id,v_row.auth_user_id,v_row.role);
+  else
+    insert into public.customer_users(customer_id,user_id) values(v_row.customer_id,v_row.auth_user_id);
+  end if;
+  update private.invite_requests set state = 'complete', last_error = null where id = v_row.id;
+  return jsonb_build_object('userId', v_row.auth_user_id);
+exception when unique_violation then raise exception 'membership already exists' using errcode = 'MG409';
+end $$;
+
+create function record_invite_failure(p_request_id uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+declare v_row private.invite_requests;
+begin
+  select * into v_row from private.invite_requests where request_id = p_request_id and actor_id = auth.uid() for update;
+  if not found then raise exception 'permission denied' using errcode = '42501'; end if;
+  perform private.assert_staff(v_row.brewery_id, case when v_row.kind = 'staff' then array['admin']::public.staff_role[] else array['admin','sales']::public.staff_role[] end);
+  update private.invite_requests set last_error = 'Invitation interrupted; retry this request',
+    state = case when auth_user_id is null then 'failed' else 'pending_membership' end
+    where id = v_row.id and state <> 'complete';
 end $$;
 
 create function upsert_format(
@@ -3112,6 +3232,106 @@ begin
   insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, sale_channel_id, tax_treatment, dest_state, note, created_by)
     values (p_brewery, p_sku, p_location, p_bin, p_qty, p_type, p_sale_channel, v_tax, p_dest_state, p_note, auth.uid()) returning * into v_row;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- The manifest binds the entire batch before any row commits. Its result holds
+-- the immutable input so direct row calls cannot substitute data or identities.
+create function begin_csv_import(p_brewery uuid, p_kind text, p_rows jsonb, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_input jsonb := jsonb_build_object('kind', p_kind, 'rows', p_rows);
+begin
+  perform private.assert_staff(p_brewery, array['admin']::public.staff_role[]);
+  if p_kind is null or p_kind not in ('customers','ship_tos','products_skus','channel_prices','opening_balances') then raise exception 'invalid import kind'; end if;
+  if p_rows is null or jsonb_typeof(p_rows) <> 'array' then raise exception 'rows must be an array'; end if;
+  if jsonb_array_length(p_rows) not between 1 and 5000 then raise exception 'import requires 1–5000 rows'; end if;
+  if exists (select 1 from jsonb_array_elements(p_rows) r where jsonb_typeof(r) <> 'object') then raise exception 'rows must be objects'; end if;
+  if exists (select 1 from jsonb_array_elements(p_rows) r, jsonb_each(r) f where jsonb_typeof(f.value) <> 'string') then raise exception 'CSV fields must be strings'; end if;
+  v_replay := private.claim_command_request(p_brewery, 'import_csv', p_request_id, v_input);
+  if v_replay is null then perform private.complete_command_request(p_request_id, v_input); end if;
+  return jsonb_build_object('rows', jsonb_array_length(p_rows));
+end $$;
+
+-- Domain-separated SHA256 UUIDv8s, derived here, never trusted from callers.
+create function private.import_request_id(p_parent uuid, p_part text) returns uuid
+language sql immutable set search_path = '' as $$
+  select (substr(h,1,8)||'-'||substr(h,9,4)||'-8'||substr(h,14,3)||'-a'||substr(h,18,3)||'-'||substr(h,21,12))::uuid
+  from (select encode(extensions.digest('mgr-import:'||p_parent::text||':'||p_part, 'sha256'), 'hex') h) s
+$$;
+
+create function import_csv_row(p_brewery uuid, p_request_id uuid, p_row_n integer)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_manifest jsonb; k text; r jsonb; f record; v_required text[]; v_allowed text[];
+  v_id uuid; v_brand uuid; v_result jsonb; v_replay jsonb; v_request uuid;
+begin
+  perform private.assert_staff(p_brewery, array['admin']::public.staff_role[]);
+  select result into v_manifest from private.command_requests
+    where actor_id = auth.uid() and request_id = p_request_id and brewery_id = p_brewery and command_name = 'import_csv';
+  if v_manifest is null then raise exception 'import manifest not found'; end if;
+  if p_row_n is null or p_row_n < 0 or p_row_n >= jsonb_array_length(v_manifest->'rows') or p_row_n >= 5000 then raise exception 'invalid import row index'; end if;
+  k := v_manifest->>'kind'; r := v_manifest->'rows'->p_row_n;
+  v_request := private.import_request_id(p_request_id, p_row_n::text);
+  v_replay := private.claim_command_request(p_brewery, 'import_csv_row', v_request, jsonb_build_object('parent', p_request_id, 'row_n', p_row_n, 'kind', k, 'row', r));
+  if v_replay is not null then return v_replay; end if;
+  -- Only this inner subtransaction catches row failures: any new brand/style,
+  -- child ledger entry, and SKU are rolled back together. Siblings live in other calls.
+  begin
+    v_required := case k
+      when 'customers' then array['name','type','state','saleChannelId']
+      when 'ship_tos' then array['customerId','label','address1','city','state','zip']
+      when 'products_skus' then array['product','formatId']
+      when 'channel_prices' then array['saleChannelId','priceGroupId','formatId','unitPriceCents']
+      when 'opening_balances' then array['skuId','locationId','binId','qty'] end;
+    if v_required is null then raise exception 'invalid import kind'; end if;
+    v_allowed := v_required || case k
+      when 'customers' then array['licenseNumber','paymentTerms']
+      when 'ship_tos' then array['address2']
+      when 'products_skus' then array['sku_name','style','abv','upc']
+      when 'opening_balances' then array['note'] else array[]::text[] end;
+    for f in select unnest(v_required) as name loop
+      if nullif(btrim(r->>f.name), '') is null then raise exception '% is required', f.name; end if;
+    end loop;
+    for f in select key, btrim(value) as value from jsonb_each_text(r) loop
+      if not f.key = any(v_allowed) then raise exception 'unknown CSV field %', f.key; end if;
+      if f.value = '' then continue; end if;
+      if f.key like '%Id' and f.value !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then raise exception '% must be a UUID', f.key; end if;
+      if f.key = 'state' and f.value !~ '^[A-Z]{2}$' then raise exception 'state must be two uppercase letters'; end if;
+      if f.key in ('qty','abv','unitPriceCents') then
+        if f.value !~ '^[+-]?[0-9]+(\.[0-9]+)?$' then raise exception '% must be a decimal', f.key; end if;
+        if f.key = 'qty' and f.value::numeric <= 0 then raise exception 'qty must be positive'; end if;
+        if f.key = 'unitPriceCents' and (f.value !~ '^[0-9]+$' or f.value::numeric > 2147483647) then raise exception 'unitPriceCents must be whole cents (0–2147483647)'; end if;
+      end if;
+    end loop;
+    select jsonb_object_agg(key, nullif(btrim(value), '')) into r from jsonb_each_text(r);
+    v_id := private.import_request_id(v_request, 'write');
+    case k
+      when 'customers' then
+        v_result := public.upsert_customer(p_brewery, null, r->>'name', (r->>'type')::public.customer_type, r->>'state', (r->>'saleChannelId')::uuid, r->>'licenseNumber', r->>'paymentTerms', null, v_id);
+      when 'ship_tos' then
+        v_result := public.upsert_ship_to(p_brewery, null, (r->>'customerId')::uuid, r->>'label', r->>'address1', r->>'address2', r->>'city', r->>'state', r->>'zip', v_id);
+      when 'products_skus' then
+        -- Existing brands are reused without replacing their metadata. An
+        -- advisory lock serializes same-name creation across simultaneous rows.
+        perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_brewery::text || ':' || (r->>'product'), 0));
+        select id into v_brand from public.brands where brewery_id = p_brewery and name = r->>'product';
+        if v_brand is null then
+          v_result := public.upsert_brand(p_brewery, null, r->>'product', r->>'style', (r->>'abv')::numeric, null, null, null, null, private.import_request_id(v_request, 'brand'));
+          v_brand := (v_result->>'id')::uuid;
+        end if;
+        v_result := public.create_sku(p_brewery, v_brand, (r->>'formatId')::uuid, r->>'sku_name', r->>'upc', v_id);
+      when 'channel_prices' then
+        v_result := public.set_channel_price(p_brewery, (r->>'saleChannelId')::uuid, (r->>'priceGroupId')::uuid, (r->>'formatId')::uuid, (r->>'unitPriceCents')::integer, v_id);
+      when 'opening_balances' then
+        v_result := public.record_inventory_movement(p_brewery, (r->>'skuId')::uuid, (r->>'locationId')::uuid, (r->>'binId')::uuid, (r->>'qty')::numeric, 'opening_balance', null, null, r->>'note', v_id);
+    end case;
+    v_result := jsonb_build_object('status', 'committed', 'result', v_result);
+  -- Nested tenant-reference refusals are row failures too. Actor/admin and
+  -- manifest checks above remain outside this catch and deny the whole call.
+  exception when sqlstate 'P0001' or insufficient_privilege or integrity_constraint_violation or data_exception then
+    v_result := jsonb_build_object('status', 'blocked', 'error', SQLERRM);
+  end;
+  -- Failed rows also have durable results. Corrected input starts a new batch
+  -- containing ONLY blocked rows; transport retries always use the old manifest.
+  return private.complete_command_request(v_request, v_result);
 end $$;
 
 create function set_taproom_par(
@@ -6135,6 +6355,7 @@ revoke all on all functions in schema private from public, anon, authenticated;
 grant execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), portal_availability(uuid), portal_brewery_rows()
   to authenticated;
 grant execute on function
+  provision_brewery(text,text,text,uuid),
   create_sku(uuid,uuid,uuid,text,text,uuid),
   upsert_brand(uuid,uuid,text,text,numeric,text,text,uuid,text,uuid),
   upsert_format(uuid,uuid,text,public.format_basis,public.package_type,public.keg_size,int,numeric,uuid),
@@ -6143,6 +6364,9 @@ grant execute on function
   update_location(uuid,uuid,text,public.location_kind,uuid),
   update_brewery(uuid,text,text,text,text,text,int,uuid),
   list_team_members(uuid),
+  claim_invite_request(uuid,text,text,public.staff_role,uuid,uuid),
+  complete_invite_membership(uuid),
+  record_invite_failure(uuid),
   update_staff_role(uuid,uuid,public.staff_role,uuid),
   revoke_staff(uuid,uuid,uuid),
   raise_invoice_question(uuid,uuid,text,uuid),
@@ -6150,6 +6374,7 @@ grant execute on function
   create_bin(uuid,uuid,text,uuid),
   update_bin(uuid,uuid,text,uuid),
   delete_bin(uuid,uuid,uuid),
+  begin_csv_import(uuid,text,jsonb,uuid), import_csv_row(uuid,uuid,integer),
   upsert_customer(uuid,uuid,text,public.customer_type,text,uuid,text,text,public.tax_treatment,uuid),
   upsert_sale_channel(uuid,uuid,text,public.tax_treatment,uuid),
   delete_sale_channel(uuid,uuid,uuid),

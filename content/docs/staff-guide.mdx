@@ -4,27 +4,43 @@ title: "Staff field manual"
 description: "Every screen and action brewery staff can use in MGR today."
 ---
 
-You're in by invitation. There is no public sign-up and no password-reset button on this screen.
+Join through an invitation, then sign in with your email and the password you chose. There is no public account sign-up.
 
 ## Sign in and sign out [#sign-in]
 
 <Screen name="Sign in" />
 
-1. Enter the **Email** and **Password** from your invitation.
+1. Enter your **Email** and **Password**.
 2. Select **Sign in**.
 3. MGR opens **Today** for the brewery you're a member of.
 
-Wrong credentials show **Incorrect email or password.** Signed in but not on a brewery? MGR shows **No brewery yet** with **Sign out**; ask an admin for an invitation. If your session ends while you work, the next action returns you to Sign in with **Your session ended. Sign in to retry.** Open **Me** in the header when you want **Sign out**.
+Wrong credentials show **Incorrect email or password.** Signed in but not on a brewery? MGR shows **No brewery yet** with **Sign out**; ask an admin for access. On a hosted installation, **Create brewery** is also available to signed-in accounts. If your session ends while you work, the next action returns you to Sign in with **Your session ended. Sign in to retry.** Open **Me** in the header when you want **Sign out**.
 
 <Screen name="Reset password" />
 
 **Forgot password?** on the sign-in card opens **Reset password**. Enter your **Email** and select **Send reset link**; the page always says a link is on its way if that email is on an account, so it never confirms whether one is. The link in the email opens **Set new password**, which shows the account and asks you to **Choose a password** and **Save password**; a used or timed-out link lands back on Reset password saying so. Signed in already? **Change password** in **Me** opens the same page.
 
+## Accept an invitation and create a brewery [#getting-started]
+
+<Screen name="Accept invite" />
+
+Open the invitation email, enter **Your name** and **Choose a password** (at least eight characters), then select **Join**. The page shows the brewery and your assigned role. Staff open Today; buyers open their customer portal. The link is single use. A used, expired, or wrong-audience link opens **Invite expired**; sign in if you have already joined, or use **Reset password** and contact the brewery if access is still missing. There is no resend or existing-account attachment action.
+
+<Screen name="Create brewery" />
+
+On hosted MGR, a signed-in account can open **Create brewery** from **No brewery yet**. Enter **Brewery name**, a valid **Timezone** such as America/New_York, and an optional **TTB registry number**. **Create brewery** creates the brewery and makes you its first admin, then opens Today. Validation errors keep your entries for correction. Dedicated installations hide this entry and refuse its page.
+
+<Screen name="First-run checklist" />
+
+An admin sees **Set up** while the brewery has neither a location nor a brand. Adding either one returns Today to its usual work list. Add locations, optionally open **Import CSV**, add a brand, optionally **Invite staff**, and record opening inventory. Importing and inviting staff are optional; they do not hold the checklist open.
+
 ## Search and pick records [#search]
 
 <Screen name="Search" />
 
-**Search** in the header opens one search across SKUs, orders, invoices, lots, customers, purchase orders, and batches. Type a name to match on its first letters, or a document number (ORD-0231, INV-1042, PO-0142, B-0012, a lot code) to match it exactly; an exact number sorts first. Results group by kind; use the Up and Down arrow keys to move between matches and press Enter or click to open one. You only ever see records your role may read, and if nothing matches, the list says **No matches · change the term**.
+**Search** in the header opens one search across SKUs, orders, invoices, lots, customers, purchase orders, and batches. Type a name to match on its first letters, or a document number (ORD-0231, INV-1042, PO-0142, B-0012, a lot code) to match it exactly; an exact number sorts first. Results group by kind; use the Up and Down arrow keys to move between matches and press Enter or click to open one. You only ever see records your role may read. The sheet distinguishes loading, failed, offline cached, and valid empty results.
+
+SKU fields in **New Order** use the same search, narrowed to SKUs. They show recently selected SKUs first, followed by the current SKU list; successful searches are cached for the current signed-in session, brewery, and term so an offline retry can show those cached matches. Reloading or signing out clears recent choices and cached matches.
 
 ## Know what your role can do [#roles]
 
@@ -34,7 +50,7 @@ Wrong credentials show **Incorrect email or password.** Signed in but not on a b
 | --- | --- |
 | **Admin** | Every staff screen and action that exists. |
 | **Sales** | Catalog; customers and pricing; create, submit, confirm, adjust, and cancel orders, plus credits; view inventory; invoices; replenishment suggestions and creating the replenishment order; the compliance registry, the monthly report and its filed snapshot, and lot trace. |
-| **Warehouse** | View inventory and record movements; keg pools and keg events on **Kegs**; view orders, pick, and ship; build delivery routes, and depart, confirm each stop, and return a route you are the assigned driver of; view replenishment suggestions (**Create replenishment order** is on the page but submitting it returns a permission error); schedule, pick a tank for, start, and close packaging runs, and repack; vendors, materials and contracts; purchase orders (draft, mark sent, receive), material counts, and drafting orders from Planning. Catalog, Customers, the Invoices list, and Team open if you type their address, but they are not in Warehouse's navigation. |
+| **Warehouse** | View inventory and record movements; keg pools and keg events on **Kegs**; view orders, pick, and ship; build delivery routes, and depart, confirm each stop, and return a route you are the assigned driver of; view replenishment suggestions (**Create replenishment order** is on the page but submitting it returns a permission error); schedule, pick a tank for, start, and close packaging runs, and repack; vendors, materials and contracts; purchase orders (draft, mark sent, receive), material counts, and drafting orders from Planning. Catalog, Customers, the Invoices list, and Team open if you type their address, but they are not in Warehouse's navigation. Locations opens the same way; there Warehouse can add, rename, or remove a location's bins, though only Admin can add a location or edit its name and type. |
 | **Brewer** | Today; linking your Slack account from App Home; Recipes and versions; Batches, vessels, and recording brew day; Cellar transfers and fermentation readings; packaging runs (schedule, pick a tank, start, and close) — but not **Repack**, which is Admin and Warehouse only; vendors, materials, contracts and material counts, and reading Planning (drafting the orders is Admin and Warehouse). See [Navigate MGR](#navigation). |
 
 <Callout type="info">
@@ -51,9 +67,9 @@ The brewery name in the header is the brewery whose records you are looking at. 
 - **Work** opens everything in motion: Today's rows plus the open purchase orders and delivery routes your role may open, sorted by due date, with chips (**all**, **orders**, **transfers**, **batches**, **runs**, **POs**, **routes**) that filter it. The chip you pick is remembered on that device. It holds **Orders**, **Pick**, **Replenishment**, **Transfers**, **Batches**, **Packaging**, **POs**, and **Deliveries**.
 - **More** opens the list of your setup and desk pages: **Invoices**, **Catalog**, **Customers**, **Price groups**, **Recipes**, **Vendors**, **Compliance**, **Planning**, **Settings**, **Sale channels**, **Locations**, and **Units**.
 
-Links your role cannot use are simply not shown. Planned areas stay hidden until they are built (Taproom, Taps, Menu, Import), so a tab with nothing you can open does not appear.
+Links your role cannot use are simply not shown. Planned areas stay hidden until they are built (Taproom, Taps, Menu), so a tab with nothing you can open does not appear.
 
-CSV import has no screen yet, so there is no **Import** link. See [Actions not yet available](#unavailable).
+Admin opens **Import** from **Settings** or the first-run checklist. See [Import CSV](#import).
 
 <Callout type="warn">
 **Brewer navigation:** Brewer sees Today, Beer (Cellar, Materials), Work (Batches, Packaging), and More (Recipes, Vendors, Planning). Taps and Taproom are planned and hidden. Repack, on the Packaging page, and the Draft purchase orders button on Planning are Admin and Warehouse only, so Brewer does not see them.
@@ -106,11 +122,11 @@ Wholesale Shop shows the packages the brewery has designated for wholesale — �
 
 <Cards>
   <Card title="On hand">The sum of recorded movements for one SKU in one bin at one location. ATP stays per SKU.</Card>
-  <Card title="ATP">Available to promise: on hand minus open reservations for that SKU. It can go negative.</Card>
+  <Card title="ATP">Available to promise: on hand minus open reservations for that SKU. It can go negative. A negative row shows a **Shortfall** button that opens [Replenishment](#replenishment).</Card>
   <Card title="Movement log">The 50 newest entries: time, type, SKU, location, signed quantity, and note.</Card>
 </Cards>
 
-**Bins.** A bin is a named place inside a location: a walk-in, a cold room, a dry rack. Every location starts with three, **Cold**, **Dry**, and **Walk-in**, and always keeps at least one; rename or remove the rest to match the building. A bin that has ever recorded stock cannot be removed, even at a zero balance, because the movement history still names it; rename it instead. Beer that ships on an order leaves from the location's first bin alphabetically, so name the bin you pick from so it sorts first.
+**Bins.** A bin is a named place inside a location: a walk-in, a cold room, a dry rack. Every location starts with three, **Cold**, **Dry**, and **Walk-in**, and always keeps at least one; add, rename, or remove them from [Locations](#locations). A bin that has ever recorded stock cannot be removed, even at a zero balance, because the movement history still names it; rename it instead. Beer that ships on an order leaves from the location's first bin alphabetically, so name the bin you pick from so it sorts first.
 
 ### Record a movement
 
@@ -169,7 +185,7 @@ Empty sections say **No inventory recorded yet.** or **No movements recorded yet
 
 Select the customer name, then **New Ship-To** or **Edit**. Required: **Label**, **Address 1**, **City**, **State** (two letters, uppercased), and **Zip**. **Address 2** is optional. Ship-to state is the destination used when a wholesale shipment leaves inventory.
 
-Empty lists say **No customers yet.** or **No ship-tos yet.** You cannot delete a customer, and you cannot invite a portal user from this page.
+Empty lists say **No customers yet.** or **No ship-tos yet.** You cannot delete a customer. Admin and Sales can select **Invite portal user**, enter an email, and **Send invite**. This creates buyer access for this customer only; there is no Account admin choice. The recipient chooses their name and password from the email. After an error, keep the page open and retry unchanged details; changing the email starts a new invitation. Existing sign-in accounts cannot be attached with this form.
 
 ## Price groups [#pricing]
 
@@ -277,7 +293,15 @@ MGR creates a separate credit memo at the prices frozen on the invoice lines, ne
 
 <Screen name="Locations" />
 
-**Locations** (open `/locations`; Settings links here) lists every warehouse and taproom. Admin sees **Add location**: a name and a type, *Warehouse* or *Taproom*. Names are unique within the brewery. Select **Edit** on a row to open the location: its type, the brewery's timezone, and a gated **Location bins** row (bins are not built yet). Admin can rename a location or change its type with **Edit** then **Save location**; movement history stays exactly as recorded.
+**Locations** (open `/locations`; Settings links here; Admin only in navigation, though Warehouse can reach a location directly by its address) lists every warehouse, taproom, and storage location. Admin sees **Add location**: a name and a type, *Warehouse*, *Taproom*, or *Storage*. Names are unique within the brewery. Select **Edit** on a row to open the location: its type, the brewery's timezone, and a **Location bins** row. Only Admin can rename a location or change its type, with **Edit** then **Save location**; movement history stays exactly as recorded.
+
+### Add or rename a bin
+
+<Screen name="Location bins" />
+
+<Screen name="Bin" />
+
+Select **Location bins** on a location to see its bins. Admin and Warehouse can select **Add bin**, or **Edit** on a bin, to enter a **Bin name** and **Save bin**. A location always keeps at least one bin, and a bin that has ever recorded stock keeps its name in the movement history, so both are renamed rather than removed; **Remove** takes out any other bin. See [Bins](#inventory) for the three bins every location starts with.
 
 ## Stock transfers [#transfers]
 
@@ -466,13 +490,13 @@ A sent order's page is the receiving form. Choose the location and bin everythin
 
 <Screen name="Team" />
 
-Admin opens **Team** from **Settings**. Each member shows as an **@handle** (the first part of their email) with the email and role; your own row is marked **you**. Open another member's row to change their **Role** and **Save role**, or **Remove** them, which ends their membership at this brewery and leaves their sign-in account alone. MGR keeps at least one admin: the only admin cannot step down or be removed, and nobody can remove themselves. **Invite staff** stays locked until invitations are made retry-safe. Sales and Warehouse are sent to **No access** if they open the address directly.
+Admin opens **Team** from **Settings**. Each member shows as an **@handle** (the first part of their email) with the email and role; your own row is marked **you**. Open another member's row to change their **Role** and **Save role**, or **Remove** them, which ends their membership at this brewery and leaves their sign-in account alone. MGR keeps at least one admin: the only admin cannot step down or be removed, and nobody can remove themselves. **Invite staff** opens the same form as the first-run checklist: enter **Email**, choose one **Role** (Admin, Sales, Warehouse, or Brewer), and **Send invite**. Success says **Invite sent**. The roster shows memberships, without a pending-acceptance status. After an error, keep the page open and retry unchanged details to finish the same invitation. Editing the email or role starts a new request; a successful invite clears the form. Closing and reopening the form on this page preserves a failed attempt, but reloading the page does not recover it. Existing accounts cannot be attached, and there is no resend or invitation-revocation control. Multiple simultaneous staff roles and Taproom are unsupported. Sales and Warehouse are sent to **No access** if they open the address directly.
 
 ## Settings [#settings]
 
 <Screen name="Settings" />
 
-Admin opens **Settings** from **More** to edit the brewery's basics in one form: **Brewery name**, **Timezone** (a zone name MGR knows, such as America/New_York), **TTB registry number**, **PA license**, the **Customer-facing phone** the portal prints when online payment is unavailable, and **Reading overdue after (hours)**, which sets when a fermentation reading counts as overdue on Today. **Save brewery** writes them together. Below the form, rows open **Locations** and **Team**; Source water, Accounting, Point of sale, and Import stay locked until their areas are built, and **Chat** opens the Slack account link.
+Admin opens **Settings** from **More** to edit the brewery's basics in one form: **Brewery name**, **Timezone** (a zone name MGR knows, such as America/New_York), **TTB registry number**, **PA license**, the **Customer-facing phone** the portal prints when online payment is unavailable, and **Reading overdue after (hours)**, which sets when a fermentation reading counts as overdue on Today. **Save brewery** writes them together. Below the form, rows open **Locations**, **Team**, and **Import**; Source water, Accounting, and Point of sale stay locked until their areas are built, and **Chat** opens the Slack account link.
 
 ## No access [#no-access]
 
@@ -519,9 +543,9 @@ In specific gravity you may type either spelling: `1.050` or `1050`.
 
 When your brewery's Slack connection is available, open its MGR App Home and choose **Link MGR account**. Sign in to MGR if asked. A valid link confirms that Slack is linked.
 
-Linked App Home shows a role-filtered **Today** queue with up to 20 current items. Admin sees all live items; Sales sees submitted orders to review; Warehouse sees confirmed orders whose requested ship date is due and orders with staged beer to put back. Select **Open** on an item to view its order in MGR. With no current work, App Home says **You’re caught up**.
+Linked App Home shows a role-filtered **Today** queue with up to 20 current items, the same work your MGR Today tab shows for your role. Admin sees all live items; Sales sees submitted orders to review and buyer questions about invoices; Warehouse sees confirmed orders whose requested ship date is due, orders with staged beer to put back, and their own next stop when they're a route's assigned driver; Brewer sees overdue fermentation readings. Select **Open** on an item to view its order in MGR. With no current work, App Home says **You’re caught up**.
 
-Linked eligible staff also receive private Slack messages for newly submitted orders and picks that become due. The message contains a safe order label, requested-date detail, and **Open in MGR**. When the work resolves, that same message changes to **Resolved**. MGR never posts customer contacts, prices, or notes to Slack.
+Linked eligible staff also receive a private Slack message for each of those same items as it comes due: Sales gets a newly submitted order or a buyer question about an invoice, Warehouse gets a pick due, a restock to put back, or their assigned next delivery stop, and Brewer gets an overdue fermentation reading. The message contains a safe order label, requested-date detail, and **Open in MGR**. When the work resolves, that same message changes to **Resolved**. MGR never posts customer contacts, prices, or notes to Slack.
 
 If the link is missing, expired, already used, or belongs to another account, go back to Slack and request a fresh link. Notification settings and unlink controls are not in the MGR interface yet.
 
@@ -539,6 +563,28 @@ If the link is missing, expired, already used, or belongs to another account, go
 
 **A shipped order or invoice is wrong.** Do not add an unrelated inventory movement. Use **Return** on the invoice so the credit and the returned stock stay linked to the shipment history.
 
+## Import CSV [#import]
+
+<Screen name="Import" />
+
+Admin opens **Settings → Import** or **Import CSV** on the setup checklist. Upload a CSV with a header and 1–5000 data rows, choose the kind, map columns, and review the editable preview. Quoted commas, newlines, escaped quotes, and a leading byte-order mark are supported. Malformed quoting, duplicate or missing headers, unequal row widths, and empty files show an error before anything is staged.
+
+The lookup lists show each existing record's label and ID. Map these exact fields (optional fields follow the semicolon):
+
+| Kind | Fields |
+| --- | --- |
+| Customers | `name`, `type`, `state`, `saleChannelId`; `licenseNumber`, `paymentTerms` |
+| Ship-tos | `customerId`, `label`, `address1`, `city`, `zip`, `state`; `address2` |
+| Products / SKUs | `product`, `formatId`; `sku_name`, `style`, `abv`, `upc` |
+| Channel prices | `saleChannelId`, `priceGroupId`, `formatId`, `unitPriceCents` |
+| Opening balances | `skuId`, `locationId`, `binId`, `qty`; `note` |
+
+Use lookup IDs for references, including the format. Create missing formats first: an import does not infer or create them. Customer `type` is distributor, retailer, brewery, or other; state is two uppercase letters. Prices are nonnegative whole cents. Opening quantity is a positive count of SKU units, and the bin must belong to the location. An existing product is reused without changing its metadata. Duplicate customer or SKU creation is blocked; channel prices update the existing price cell.
+
+The preview marks ready and blocked rows. Fix cells or mapping before committing; **Commit** stays disabled if every row is invalid. On a mixed batch, valid rows commit independently and each blocked row reports its error. A failed product/SKU row leaves none of its new dependent records behind.
+
+Keep the page open until results are recovered. If the connection fails, some rows may have committed: **Retry same batch** returns the original committed and blocked outcomes without posting opening stock twice. **Correct blocked rows in a new batch** carries only blocked rows into a fresh editable preview. Even if lookup data changes, retrying the unchanged old batch returns its original blocked result. Never upload committed opening balances as a new batch; that would add the stock again. Reloading or closing the page loses the wizard's retry state; there is no automatic recovery after reload.
+
 ## Actions not yet available [#unavailable]
 
 Do not hunt for hidden controls for these:
@@ -546,7 +592,7 @@ Do not hunt for hidden controls for these:
 - public account sign-up
 - staff or customer-portal invitations
 - CSV import
-- adding, renaming or removing bins, setting taproom pars, or choosing the warehouse that fulfills wholesale-customer portal orders, from the interface
+- setting taproom pars, or choosing the warehouse that fulfills wholesale-customer portal orders, from the interface
 - cancelling a purchase order, editing one after it is saved, or sending one by email from MGR
 - editing brands, formats, or SKUs after creation
 - deleting customers, ship-tos, inventory history, orders, invoices, or credit memos

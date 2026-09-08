@@ -1,31 +1,22 @@
-// lib/commands/invites.ts — staff and customer-user invitations are
-// registered but fail closed (audit P1.9): both previously used
-// createAdminClient() (service role) in a request path, and that release
-// gate is not yet approved. Names, role gates, and input contracts stay so
-// direct /api/command posts are controlled CommandErrors; no auth-admin call
-// or membership insert can happen. The working handlers are in git history.
-// list_team_members, update_staff_role and revoke_staff (Program 10 task 5)
-// are live: the roster comes from a definer RPC that may read auth.users, a
-// member holds one role, and a revoke ends the membership row only.
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap, CommandError, STAFF_ROLES } from "./registry";
+import { defineCommand, defineQuery, unwrap, STAFF_ROLES } from "./registry";
 
-const blocked = async (): Promise<never> => { throw new CommandError("Invitations are not available in this release"); };
+// Metadata is also read by docs tooling; load the server-only Auth boundary only on execution.
 
 defineCommand({
   name: "invite_staff",
-  description: "Invite staff (not available in this release)",
+  description: "Invite staff",
   input: z.object({ email: z.string().email(), role: z.enum(["admin", "sales", "warehouse", "brewer"]) }),
   roles: ["admin"],
-  handler: blocked,
+  handler: async (ctx, input, execution) => (await import("@/lib/supabase/invites")).inviteStaff(ctx, input, execution),
 });
 
 defineCommand({
   name: "invite_customer_user",
-  description: "Invite a customer portal user (not available in this release)",
+  description: "Invite a customer portal user",
   input: z.object({ email: z.string().email(), customerId: z.string().uuid() }),
   roles: ["admin", "sales"],
-  handler: blocked,
+  handler: async (ctx, input, execution) => (await import("@/lib/supabase/invites")).inviteCustomerUser(ctx, input, execution),
 });
 
 export type TeamMember = { userId: string; email: string; handle: string; role: string; createdAt: string };

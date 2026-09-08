@@ -60,6 +60,20 @@ describe("POST /api/command bearer auth", () => {
     }
   });
 
+  it("forwards the same caller-owned request ID on invitation retries", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ status: 200, json: async () => ({ ok: true, data: { userId: "recipient" } }) });
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const requestId = randomUUID();
+      const input = { email: "recipient@example.com", role: "sales" };
+      await command("brewery-id", "invite_staff", input, requestId);
+      await command("brewery-id", "invite_staff", input, requestId);
+      const bodies = fetchMock.mock.calls.map(([, options]) => JSON.parse(options.body));
+      expect(bodies[0]).toEqual({ breweryId: "brewery-id", name: "invite_staff", input, requestId });
+      expect(bodies[1]).toEqual(bodies[0]);
+    } finally { vi.unstubAllGlobals(); }
+  });
+
   it("rejects a malformed JSON body with 400 invalid_request", async () => {
     const req = new Request("http://localhost/api/command", {
       method: "POST",

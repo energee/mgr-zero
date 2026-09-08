@@ -78,6 +78,7 @@ describe("Customer detail", () => {
     expect(src).toMatch(/detail=\{/);
     expect(src).not.toMatch(/readOnly/);
     expect(src).toMatch(/backHref: "\/customers"/);
+    expect(src).toMatch(/<InviteForm\b/);
   });
 
   it("a detail slot paints flds and ship-tos instead of the edit tree", () => {
