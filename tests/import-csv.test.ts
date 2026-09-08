@@ -12,4 +12,5 @@ it("maps explicit fields and rejects blank, fractional cents and nondecimal numb
   for (const qty of ["", "NaN", "Infinity", "0x10", "1e3", "0", "-2"]) expect(validateImportRow("opening_balances", { ...ids, qty })).not.toEqual([]);
   expect(validateImportRow("opening_balances", { ...ids, qty: "1.25" })).toEqual([]);
   expect(validateImportRow("channel_prices", { saleChannelId: ids.skuId, priceGroupId: ids.skuId, formatId: ids.skuId, unitPriceCents: "1.2" })).not.toEqual([]);
+  expect(validateImportRow("channel_prices", { saleChannelId: "not-a-uuid", priceGroupId: ids.skuId, formatId: ids.skuId, unitPriceCents: "1" })).not.toEqual([]);
 });

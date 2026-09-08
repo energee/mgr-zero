@@ -128,6 +128,10 @@ function requireUnusedName(name: string) {
   if (registry.has(name)) throw new CommandError(`duplicate command: ${name}`, 400, "duplicate_command");
 }
 
+function assertTenantCtx(ctx: OperationCtx): asserts ctx is Ctx {
+  if (ctx.breweryId === null) throw new CommandError("brewery context required", 403, "permission_denied");
+}
+
 export function defineCommand<In, Out>(input: CommandDefinitionInput<In, Out>): CommandDefinition<In, Out> {
   requireUnusedName(input.name);
   const definition: CommandDefinition<In, Out> = { ...input, kind: "command" };
@@ -135,7 +139,7 @@ export function defineCommand<In, Out>(input: CommandDefinitionInput<In, Out>): 
     ...definition,
     scope: "tenant",
     execute: (ctx, parsed, execution) => {
-      if (ctx.breweryId === null) throw new CommandError("brewery context required", 403, "permission_denied");
+      assertTenantCtx(ctx);
       const typedInput = parsed as In; // Parsed by this definition's Zod schema immediately before execution.
       if (!execution) throw new CommandError("command execution metadata is required", 500, "missing_execution");
       return definition.handler(ctx, typedInput, execution);
@@ -151,7 +155,7 @@ export function defineQuery<In, Out>(input: QueryDefinitionInput<In, Out>): Quer
     ...definition,
     scope: "tenant",
     execute: (ctx, parsed) => {
-      if (ctx.breweryId === null) throw new CommandError("brewery context required", 403, "permission_denied");
+      assertTenantCtx(ctx);
       const typedInput = parsed as In; // Parsed by this definition's Zod schema immediately before execution.
       return definition.handler(ctx, typedInput);
     },

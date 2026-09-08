@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { command } from "@/lib/commands/client";
@@ -17,8 +17,8 @@ export function ImportWizard({ breweryId, lookups }: { breweryId: string; lookup
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const fields = IMPORT_FIELDS[kind];
-  const rows = csv ? mapCsvRows(csv.rows, mapping) : [];
-  const validation = rows.map(row => validateImportRow(kind, row, lookups));
+  const rows = useMemo(() => csv ? mapCsvRows(csv.rows, mapping) : [], [csv, mapping]);
+  const validation = useMemo(() => rows.map(row => validateImportRow(kind, row, lookups)), [rows, kind, lookups]);
   const ready = validation.filter(errors => !errors.length).length;
   const control = "rounded-md border border-input bg-background p-2 text-sm";
 
