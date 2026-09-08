@@ -19,9 +19,13 @@ export default async function ReplenishmentPage({ searchParams }: { searchParams
   const warehouses = locationRows.filter((l) => l.kind === "warehouse");
   const toLocationId = taprooms.find((t) => t.id === location)?.id ?? taprooms[0]?.id;
   const canEdit = ctx.role === "admin" || ctx.role === "sales";
-  const skus = canEdit ? await runCommand("list_skus", {}, ctx) as { id: string; name: string }[] : [];
-  const allocations = toLocationId ? await runCommand("list_standing_allocations", { locationId: toLocationId }, ctx) as { id: string; sku_id: string; qty: number; skus: { name: string } | null }[] : [];
-  const suggestions = toLocationId ? ((await runCommand("replenishment_suggestions", { locationId: toLocationId }, ctx)) as Suggestion[]) : [];
+  const [skus, allocations, suggestions] = await Promise.all([
+    canEdit ? runCommand("list_skus", {}, ctx) as Promise<{ id: string; name: string }[]> : Promise.resolve([]),
+    toLocationId ? runCommand("list_standing_allocations", { locationId: toLocationId }, ctx) as Promise<{ id: string; sku_id: string; qty: number; skus: { name: string } | null }[]> : Promise.resolve([]),
+    toLocationId ? runCommand("replenishment_suggestions", { locationId: toLocationId }, ctx) as Promise<Suggestion[]> : Promise.resolve([]),
+  ]);
+  const parValues = Object.fromEntries(suggestions.map((s) => [s.skuId, s.par]));
+  const standingValues = Object.fromEntries(allocations.map((a) => [a.sku_id, Number(a.qty)]));
   return (
     <>
       {E.back("Finished goods", "Pars and allocation", undefined, "/inventory")}
@@ -30,8 +34,8 @@ export default async function ReplenishmentPage({ searchParams }: { searchParams
         : <LinkTabs items={taprooms.map((t): [string, string] => [t.name, `/replenishment?location=${t.id}`])} current={taprooms.find((t) => t.id === toLocationId)?.name ?? ""} className="w-full md:w-fit" />}
       {toLocationId && <>
         {canEdit && <div className="flex flex-wrap gap-2">
-          <QuantityForm key={`par-${toLocationId}-${JSON.stringify(suggestions)}`} locationId={toLocationId} skus={skus} kind="par" values={Object.fromEntries(suggestions.map((s) => [s.skuId, s.par]))} />
-          <QuantityForm key={`standing-${toLocationId}-${JSON.stringify(allocations)}`} locationId={toLocationId} skus={skus} kind="standing" values={Object.fromEntries(allocations.map((a) => [a.sku_id, Number(a.qty)]))} />
+          <QuantityForm key={`par-${toLocationId}-${JSON.stringify(parValues)}`} locationId={toLocationId} skus={skus} kind="par" values={parValues} />
+          <QuantityForm key={`standing-${toLocationId}-${JSON.stringify(standingValues)}`} locationId={toLocationId} skus={skus} kind="standing" values={standingValues} />
         </div>}
         <ReplenishForm key={`${toLocationId}-${JSON.stringify(suggestions)}`} toLocationId={toLocationId} canCreate={canEdit} warehouses={warehouses.map((w) => ({ id: w.id, name: w.name }))} suggestions={suggestions} />
         <h2 className="text-lg font-semibold">Standing allocations</h2>
