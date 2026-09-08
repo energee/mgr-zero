@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { makeBrewery, makeStaffCtx, admin, channelId, seedCatalog, seedLocation } from "./helpers";
+import { makeBrewery, makeStaffCtx, admin, channelId, seedCatalog, seedLocation, seedPriceGroup, ins } from "./helpers";
 import { runCommand, type Ctx } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -65,6 +65,33 @@ describe("import_csv rows", () => {
       const call = await ctx.db.rpc("import_csv_row", { p_brewery: ctx.breweryId, p_request_id: id, p_row_n: n });
       expect(call.error).toBeNull(); expect(call.data.status).toBe("blocked");
     }
+  });
+  it("blocks a foreign existing price cell without aborting either valid sibling or replay", async () => {
+    const other = await makeBrewery();
+    const otherChannel = await channelId(other.id, "Wholesale");
+    const otherGroup = await seedPriceGroup(other.id);
+    const { formatId: otherFormat } = await seedCatalog(other.id);
+    await ins("channel_prices", { brewery_id: other.id, sale_channel_id: otherChannel, price_group_id: otherGroup, format_id: otherFormat, unit_price_cents: 900 });
+    const ownGroup = await seedPriceGroup(ctx.breweryId, "Mixed import", 2);
+    const ownChannel = await channelId(ctx.breweryId, "Taproom");
+    const rows = [
+      { saleChannelId: channel, priceGroupId: ownGroup, formatId: format, unitPriceCents: "100" },
+      { saleChannelId: otherChannel, priceGroupId: otherGroup, formatId: otherFormat, unitPriceCents: "999" },
+      { saleChannelId: ownChannel, priceGroupId: ownGroup, formatId: format, unitPriceCents: "200" },
+    ];
+    const requestId = crypto.randomUUID();
+    const result = await execute("channel_prices", rows, requestId);
+    expect(result).toMatchObject({ committed: 2, blocked: 1, outcomes: [
+      { row: 1, status: "committed" }, { row: 2, status: "blocked", error: "permission denied" }, { row: 3, status: "committed" },
+    ] });
+    expect(await execute("channel_prices", rows, requestId)).toEqual(result);
+    expect((await admin.from("channel_prices").select("unit_price_cents").eq("sale_channel_id", otherChannel).eq("price_group_id", otherGroup).eq("format_id", otherFormat).single()).data?.unit_price_cents).toBe(900);
+    expect((await admin.from("channel_prices").select("unit_price_cents").eq("price_group_id", ownGroup).order("unit_price_cents")).data).toEqual([{ unit_price_cents: 100 }, { unit_price_cents: 200 }]);
+    const direct = (db: Ctx["db"]) => db.rpc("import_csv_row", { p_brewery: ctx.breweryId, p_request_id: requestId, p_row_n: 1 });
+    expect((await direct(sales.db)).error?.code).toBe("42501");
+    await admin.from("brewery_users").update({ role: "sales" }).eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId);
+    try { expect((await direct(ctx.db)).error?.code).toBe("42501"); }
+    finally { await admin.from("brewery_users").update({ role: "admin" }).eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId); }
   });
   it("imports ship-tos and channel price cells and reports duplicate creates explicitly", async () => {
     const customer = await execute("customers", [{ name: "Ship customer", type: "retailer", state: "PA", saleChannelId: channel }]);

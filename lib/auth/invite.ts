@@ -10,8 +10,12 @@ export function safeNextUrl(requestUrl: string, wanted: string | null) {
   const fallback = new URL("/password", requestUrl).href;
   if (!wanted) return fallback;
   const request = new URL(requestUrl);
-  const destination = new URL(wanted, request.origin);
-  return destination.origin === request.origin ? destination.href : fallback;
+  try {
+    const destination = new URL(wanted, request.origin);
+    return destination.origin === request.origin ? destination.href : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 export function acceptInviteErrorPath(audience: InviteAudience | null, name: string) {

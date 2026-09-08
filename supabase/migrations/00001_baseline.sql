@@ -3324,7 +3324,9 @@ begin
         v_result := public.record_inventory_movement(p_brewery, (r->>'skuId')::uuid, (r->>'locationId')::uuid, (r->>'binId')::uuid, (r->>'qty')::numeric, 'opening_balance', null, null, r->>'note', v_id);
     end case;
     v_result := jsonb_build_object('status', 'committed', 'result', v_result);
-  exception when sqlstate 'P0001' or integrity_constraint_violation or data_exception then
+  -- Nested tenant-reference refusals are row failures too. Actor/admin and
+  -- manifest checks above remain outside this catch and deny the whole call.
+  exception when sqlstate 'P0001' or insufficient_privilege or integrity_constraint_violation or data_exception then
     v_result := jsonb_build_object('status', 'blocked', 'error', SQLERRM);
   end;
   -- Failed rows also have durable results. Corrected input starts a new batch

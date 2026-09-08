@@ -21,7 +21,7 @@ describe("invite acceptance", () => {
     const request = "http://localhost:3000/auth/confirm";
     expect(safeNextUrl(request, "/password?from=mail")).toBe("http://localhost:3000/password?from=mail");
     expect(safeNextUrl(request, "password?from=mail")).toBe("http://localhost:3000/password?from=mail");
-    for (const wanted of ["//evil.example/path", "/\t/evil.example", "https://evil.example"]) {
+    for (const wanted of ["//evil.example/path", "/\t/evil.example", "https://evil.example", "http://["]) {
       expect(safeNextUrl(request, wanted)).toBe("http://localhost:3000/password");
     }
     const normalized = safeNextUrl(request, "/.//evil.example");
