@@ -9,6 +9,6 @@ export type Route = {
   id: string; name: string | null; delivery_date: string; driver_user_id: string | null; vehicle: string | null; note: string | null;
   departed_at: string | null; returned_at: string | null; stops: Stop[];
 };
-export type RouteList = { routes: Route[]; unassigned: StopDoc[]; drivers: { user_id: string; role: string }[] };
+export type RouteList = { routes: Route[]; unassigned: StopDoc[]; drivers: { user_id: string; role: string }[]; today: string };
 
 export const driverLabel = (userId: string | null) => (userId ? `driver ${userId.slice(0, 8)}` : "driver not assigned");

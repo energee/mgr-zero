@@ -29,7 +29,7 @@ export default async function RoutePage({ params }: { params: Promise<{ id: stri
     return (
       <>
         {E.back("Deliveries", title, undefined, "/routes")}
-        <RouteForm route={route} candidates={candidates} drivers={list.drivers} />
+        <RouteForm route={route} candidates={candidates} drivers={list.drivers} today={list.today} />
       </>
     );
   }

@@ -17,9 +17,9 @@ import { useCommandAction } from "@/lib/commands/use-command-form";
 import type { StopDoc } from "@/lib/commands/delivery";
 import { driverLabel, type Route } from "./labels";
 
-export function RouteForm({ route, candidates, drivers }: { route: Route | null; candidates: StopDoc[]; drivers: { user_id: string; role: string }[] }) {
+export function RouteForm({ route, candidates, drivers, today }: { route: Route | null; candidates: StopDoc[]; drivers: { user_id: string; role: string }[]; today: string }) {
   const router = useRouter();
-  const [deliveryDate, setDeliveryDate] = useState(route?.delivery_date ?? new Date().toISOString().slice(0, 10));
+  const [deliveryDate, setDeliveryDate] = useState(route?.delivery_date ?? today);
   const [driverUserId, setDriverUserId] = useState(route?.driver_user_id ?? "");
   const [vehicle, setVehicle] = useState(route?.vehicle ?? "");
   const [name, setName] = useState(route?.name ?? "");

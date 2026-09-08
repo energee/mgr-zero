@@ -182,3 +182,44 @@ describe("depart, confirm, and return a route", () => {
     await expect(runCommand("depart_route", { routeId }, adminCtx)).rejects.toThrow(/departed/i);
   });
 });
+
+describe("route edges", () => {
+  it("keeps stop ids across a re-save, refuses removing a delivered stop, a duplicate stop number, and a foreign document", async () => {
+    const driver = await makeStaffCtx(b.id, "warehouse");
+    const [sh1, sh2] = [await shipment(), await shipment()];
+    const { routeId } = await runCommand("save_route", { deliveryDate: "2026-09-15", driverUserId: driver.userId, stops: [{ shipmentId: sh1, stopNo: 1 }] }, adminCtx) as { routeId: string };
+    const { data: before } = await admin.from("deliveries").select("id").eq("route_id", routeId).single();
+    // a stop is not confirmable before the route departs, and is not the driver's next stop yet
+    await expect(runCommand("confirm_delivery", { deliveryId: before!.id, signedBy: "Early" }, driver)).rejects.toThrow(/depart/i);
+    const today = (await runCommand("get_today", { now: "2026-09-15T12:00:00Z" }, driver) as { subjectId: string }[]).map((t) => t.subjectId);
+    expect(today).not.toContain(before!.id);
+    // re-saving with the stop kept leaves its id alone (Today rows and open Confirm pages point at it)
+    await runCommand("save_route", { id: routeId, deliveryDate: "2026-09-15", driverUserId: driver.userId, name: "Renamed", stops: [{ shipmentId: sh2, stopNo: 1 }, { shipmentId: sh1, stopNo: 2 }] }, adminCtx);
+    const { data: after } = await admin.from("deliveries").select("id, stop_no").eq("route_id", routeId).order("stop_no");
+    expect(after!.find((d) => d.id === before!.id)?.stop_no).toBe(2);
+    // two stops cannot share a number
+    await expect(runCommand("save_route", { id: routeId, deliveryDate: "2026-09-15", stops: [{ shipmentId: sh2, stopNo: 1 }, { shipmentId: sh1, stopNo: 1 }] }, adminCtx)).rejects.toThrow(/stop number/i);
+    // another brewery's shipment is not found here, and says nothing about where it is
+    const other = await makeBrewery();
+    const otherCtx = await makeStaffCtx(other.id, "admin");
+    await expect(runCommand("save_route", { deliveryDate: "2026-09-15", stops: [{ shipmentId: sh2, stopNo: 1 }] }, otherCtx)).rejects.toThrow(/shipment not found/i);
+    await expect(runCommand("depart_route", { routeId }, otherCtx)).rejects.toThrow(/permission/i);
+    // a delivered stop stays put
+    await runCommand("depart_route", { routeId }, driver);
+    await runCommand("confirm_delivery", { deliveryId: after![0].id, signedBy: "Pat" }, driver);
+    await expect(runCommand("save_route", { id: routeId, deliveryDate: "2026-09-15", stops: [{ shipmentId: sh1, stopNo: 1 }] }, adminCtx)).rejects.toThrow(/departed|delivered/i);
+  });
+
+  it("replays save_route on the same request id and rejects a changed payload", async () => {
+    const sh = await shipment();
+    const requestId = crypto.randomUUID();
+    const input = { p_brewery: b.id, p_id: null, p_name: "Replay", p_delivery_date: "2026-09-16", p_driver: null, p_vehicle: null, p_note: null, p_stops: [{ shipment_id: sh, stock_transfer_id: null, stop_no: 1 }] };
+    const first = await adminCtx.db.rpc("save_route", { ...input, p_request_id: requestId });
+    expect(first.error).toBeNull();
+    const again = await adminCtx.db.rpc("save_route", { ...input, p_request_id: requestId });
+    expect(again.data).toEqual(first.data);
+    expect((await admin.from("routes").select("id").eq("name", "Replay").eq("brewery_id", b.id)).data!.length).toBe(1);
+    const changed = await adminCtx.db.rpc("save_route", { ...input, p_name: "Other", p_request_id: requestId });
+    expect(changed.error?.code).toBe("MG409");
+  });
+});

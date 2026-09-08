@@ -3284,6 +3284,7 @@ begin
   select * into d from public.deliveries where id = p_delivery for update;
   if not found then raise exception 'delivery not found'; end if;
   if d.delivered_at is not null then raise exception 'already delivered'; end if;
+  if not exists (select 1 from public.routes where id = d.route_id and departed_at is not null) then raise exception 'route has not departed'; end if;
   update public.deliveries set delivered_at = now(), signed_by = nullif(trim(p_signed_by), '') where id = p_delivery;
   -- a transfer stop is only stamped: receive_stock_transfer moves the stock, and nothing is invoiced
   if d.stock_transfer_id is not null then return jsonb_build_object('delivery_id', p_delivery, 'invoice_id', null); end if;
@@ -3324,7 +3325,7 @@ end $$;
 create function private.save_route_impl(
   p_brewery uuid, p_id uuid, p_name text, p_delivery_date date, p_driver uuid, p_vehicle text, p_note text, p_stops jsonb
 ) returns jsonb language plpgsql set search_path = '' as $$
-declare v_id uuid := p_id; r public.routes; s jsonb; v_ship uuid; v_tr uuid; v_doc uuid; v_route uuid; v_seen uuid[] := '{}';
+declare v_id uuid := p_id; r public.routes; s jsonb; v_ship uuid; v_tr uuid; v_doc uuid; v_route uuid; v_seen uuid[] := '{}'; v_no int; v_seen_no int[] := '{}';
 begin
   if jsonb_typeof(p_stops) <> 'array' or jsonb_array_length(p_stops) = 0 then raise exception 'a route needs at least one stop'; end if;
   if p_driver is not null and not exists (
@@ -3348,20 +3349,26 @@ begin
     if num_nonnulls(v_ship, v_tr) <> 1 then raise exception 'a stop is one shipment or one stock transfer'; end if;
     if v_doc = any(v_seen) then raise exception 'the same document is listed twice'; end if;
     v_seen := v_seen || v_doc;
-    select d.route_id into v_route from public.deliveries d where coalesce(d.shipment_id, d.stock_transfer_id) = v_doc;
-    if v_route is not null and v_route <> v_id then raise exception 'document is already on route %', v_route; end if;
+    v_no := (s->>'stop_no')::int;
+    if v_no is null or v_no < 1 then raise exception 'stop number must be positive'; end if;
+    if v_no = any(v_seen_no) then raise exception 'stop number % is used twice', v_no; end if;
+    v_seen_no := v_seen_no || v_no;
+    -- the brewery check comes first so a foreign id learns nothing about where it sits
     if v_ship is not null and not exists (select 1 from public.shipments where id = v_ship and brewery_id = p_brewery) then raise exception 'shipment not found'; end if;
     if v_tr is not null and not exists (
       select 1 from public.stock_transfers where id = v_tr and brewery_id = p_brewery and status in ('picked','in_transit')
     ) then raise exception 'transfer must be picked before it can be delivered'; end if;
+    select d.route_id into v_route from public.deliveries d where d.brewery_id = p_brewery and coalesce(d.shipment_id, d.stock_transfer_id) = v_doc;
+    if v_route is not null and v_route <> v_id then raise exception 'document is already on route %', v_route; end if;
   end loop;
   -- delivered stops stay; replace the rest
   if exists (
     select 1 from public.deliveries d where d.route_id = v_id and d.delivered_at is not null
       and not (coalesce(d.shipment_id, d.stock_transfer_id) = any(v_seen))
   ) then raise exception 'a delivered stop cannot be removed'; end if;
-  delete from public.deliveries where route_id = v_id and delivered_at is null;
-  -- two passes so renumbering never collides with a kept delivered stop
+  -- kept stops keep their id: Today rows, chat subjects and open Confirm pages point at it
+  delete from public.deliveries where route_id = v_id and delivered_at is null and not (coalesce(shipment_id, stock_transfer_id) = any(v_seen));
+  -- two passes so renumbering never collides with a kept stop
   update public.deliveries set stop_no = -stop_no where route_id = v_id;
   for s in select * from jsonb_array_elements(p_stops) loop
     v_ship := (s->>'shipment_id')::uuid; v_tr := (s->>'stock_transfer_id')::uuid;
@@ -5245,7 +5252,7 @@ create view private.today_candidates with (security_invoker = true) as
     from orders o
     where o.needs_restock = true
   union all
-  -- only the lowest undelivered stop of an open route is "next"
+  -- only the lowest undelivered stop of a departed, unreturned route is "next"
   select r.brewery_id, 'delivery_next', 'delivery', d.id::text,
          md5(concat_ws('|', r.driver_user_id, r.delivery_date, d.stop_no, d.delivered_at, r.returned_at)),
          coalesce(r.name, 'Route') || ' · stop ' || d.stop_no,
@@ -5257,7 +5264,7 @@ create view private.today_candidates with (security_invoker = true) as
     from deliveries d
     join routes r on r.id = d.route_id
     join breweries b on b.id = r.brewery_id
-    where d.delivered_at is null and r.returned_at is null
+    where d.delivered_at is null and r.departed_at is not null and r.returned_at is null
       and d.stop_no = (select min(d2.stop_no) from deliveries d2 where d2.route_id = d.route_id and d2.delivered_at is null)
   union all
   -- overdue when the latest reading (or occupancy start when none) plus the

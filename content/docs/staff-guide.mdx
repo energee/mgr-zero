@@ -280,7 +280,7 @@ MGR creates a separate credit memo at the prices frozen on the invoice lines, ne
 
 The builder takes the **Delivery date**, the **Driver** (any Warehouse or Admin member; staff have no display name yet, so a driver shows as the first characters of their id, as on Team), the **Vehicle**, and an optional **Route name**. Under **Stops**, tick the documents this route delivers and give each a stop number; the list holds this route's stops and everything shipped that is on no route. **Save route plan** writes the header and the stops in one step. A document can sit on only one open route: to move a stop, untick it here and tick it on the other route. A stop already delivered cannot be unticked, and a route cannot be saved without at least one stop.
 
-**Depart route** is enabled once a driver is assigned. It stamps the departure, marks every transfer stop *in transit*, and closes the builder; after that the route's stops cannot change. Only the assigned driver or an Admin may depart, confirm, or return a route; another Warehouse member is refused.
+**Depart route** is enabled once a driver is assigned. It stamps the departure, marks every transfer stop *in transit*, and closes the builder; after that the route's stops cannot change. Only the assigned driver or an Admin may depart, confirm, or return a route; another Warehouse member is refused, and the stop page says so instead of offering **Delivered**. A stop cannot be confirmed before its route departs, and it does not appear on Today until then.
 
 <Screen name="Driver route" />
 

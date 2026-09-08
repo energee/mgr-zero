@@ -11,11 +11,11 @@ import { RouteForm } from "../route-form";
 export default async function NewRoutePage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const { unassigned, drivers } = (await runCommand("list_routes", {}, ctx)) as RouteList;
+  const { unassigned, drivers, today } = (await runCommand("list_routes", {}, ctx)) as RouteList;
   return (
     <>
       {E.back("Deliveries", "New route", undefined, "/routes")}
-      <RouteForm route={null} candidates={unassigned} drivers={drivers} />
+      <RouteForm route={null} candidates={unassigned} drivers={drivers} today={today} />
     </>
   );
 }

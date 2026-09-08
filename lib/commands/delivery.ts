@@ -45,15 +45,17 @@ defineQuery({
   handler: async (ctx, i) => {
     let q = ctx.db.from("routes").select("*").eq("brewery_id", ctx.breweryId).order("delivery_date").order("created_at");
     q = i.id ? q.eq("id", i.id) : i.date ? q.eq("delivery_date", i.date) : q.is("returned_at", null);
-    // ponytail: every delivery and shipment of the brewery is read to find the ones on no route;
-    // a view of undelivered documents is the upgrade path once history outgrows one page
-    const [routes, deliveries, shipments, transfers, drivers] = await Promise.all([
+    // ponytail: every delivery and shipment of the brewery is read to find the ones on no route, and a
+    // carrier-shipped order waits there too until someone routes it; a view of undelivered documents with
+    // a shipment-level "handed to carrier" state is the upgrade path once history outgrows one page
+    const [routes, deliveries, shipments, transfers, drivers, brewery] = await Promise.all([
       rows<RouteRow>(q),
       rows<DeliveryRow>(ctx.db.from("deliveries").select("*").eq("brewery_id", ctx.breweryId).order("stop_no")),
       rows<ShipmentRow>(ctx.db.from("shipments").select("id, orders(order_no, customers(name), ship_tos(label))").eq("brewery_id", ctx.breweryId)),
       rows<TransferRow>(ctx.db.from("stock_transfers").select("id, transfer_no, to_location:locations!stock_transfers_to_location_id_brewery_id_fkey(name)")
         .eq("brewery_id", ctx.breweryId).in("status", ["picked", "in_transit"])),
       unwrap(ctx.db.from("brewery_users").select("user_id, role").eq("brewery_id", ctx.breweryId).in("role", ["admin", "warehouse"])),
+      unwrap(ctx.db.from("breweries").select("timezone").eq("id", ctx.breweryId).single()) as Promise<{ timezone: string }>,
     ]);
     const docs = [...shipments.map(shipmentDoc), ...transfers.map(transferDoc)];
     const labelById = new Map(docs.map((d) => [d.id, d.label]));
@@ -65,6 +67,8 @@ defineQuery({
       })),
       unassigned: docs.filter((d) => !onRoute.has(d.id)),
       drivers,
+      // the builder's default date is the brewery's today, not the server's UTC day
+      today: new Date().toLocaleDateString("en-CA", { timeZone: brewery.timezone }),
     };
   },
 });
@@ -75,7 +79,7 @@ defineQuery({
   input: z.object({ deliveryId: z.string().uuid() }),
   handler: async (ctx, i) => {
     const delivery = await unwrap(ctx.db.from("deliveries")
-      .select("id, stop_no, delivered_at, signed_by, routes(id, name, delivery_date, driver_user_id), shipments(id, invoice_timing, orders(id, order_no, customers(name), ship_tos(label, city, state))), stock_transfers(id, transfer_no, to_location:locations!stock_transfers_to_location_id_brewery_id_fkey(name))")
+      .select("id, stop_no, delivered_at, signed_by, routes(id, name, delivery_date, driver_user_id, departed_at), shipments(id, invoice_timing, orders(id, order_no, customers(name), ship_tos(label, city, state))), stock_transfers(id, transfer_no, to_location:locations!stock_transfers_to_location_id_brewery_id_fkey(name))")
       .eq("id", i.deliveryId).single());
     // to-one embeds come back as objects; without generated types supabase-js says array
     const { shipments, stock_transfers } = delivery as unknown as { shipments: { id: string; orders: { id: string } } | null; stock_transfers: { id: string } | null };

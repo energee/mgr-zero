@@ -146,7 +146,7 @@ describe("today candidates (shared projection) and internal scan", () => {
     const orderB = await createOrder("2026-09-05", true, true);
     const shipA = await ins("shipments", { brewery_id: b.id, order_id: orderA, created_by: adminCtx.userId });
     const shipB = await ins("shipments", { brewery_id: b.id, order_id: orderB, created_by: adminCtx.userId });
-    const route = await ins("routes", { brewery_id: b.id, name: "Route A", delivery_date: "2026-09-05", driver_user_id: driver.id });
+    const route = await ins("routes", { brewery_id: b.id, name: "Route A", delivery_date: "2026-09-05", driver_user_id: driver.id, departed_at: "2026-09-05T12:00:00Z" });
     await ins("deliveries", { brewery_id: b.id, route_id: route.id, shipment_id: shipA.id, stop_no: 1, delivered_at: "2026-09-05T13:00:00Z" });
     const stop2 = await ins("deliveries", { brewery_id: b.id, route_id: route.id, shipment_id: shipB.id, stop_no: 2 });
 
@@ -181,7 +181,7 @@ describe("today candidates (shared projection) and internal scan", () => {
     await adminCtx.db.rpc("adjust_order_lines", { p_order: restocked, p_lines: [{ sku_id: skuId, qty: 1 }], p_reason: "cut", p_request_id: crypto.randomUUID() });  // restock_due
     const shipped = await createOrder("2026-09-05", true, true);
     const ship = await ins("shipments", { brewery_id: b.id, order_id: shipped, created_by: adminCtx.userId });
-    const gateRoute = await ins("routes", { brewery_id: b.id, name: "Gate", delivery_date: "2026-09-05" });
+    const gateRoute = await ins("routes", { brewery_id: b.id, name: "Gate", delivery_date: "2026-09-05", departed_at: "2026-09-05T12:00:00Z" });
     await ins("deliveries", { brewery_id: b.id, route_id: gateRoute.id, shipment_id: ship.id, stop_no: 1 });  // delivery_next
 
     const live = (await sql.query("select public.today_live_reasons() as r")).rows[0].r;
