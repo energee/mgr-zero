@@ -29,8 +29,9 @@ function bearerToken(req: Request): string | null {
 function isCommandRequest(body: unknown): body is CommandRequest {
   return typeof body === "object"
     && body !== null
-    && "breweryId" in body
-    && typeof body.breweryId === "string"
+    && (("breweryId" in body && typeof body.breweryId === "string")
+      || (!("breweryId" in body) && "name" in body && typeof body.name === "string"
+        && getCommandDefinition(body.name)?.scope === "pretenant"))
     && "name" in body
     && typeof body.name === "string"
     && "input" in body;
@@ -62,6 +63,9 @@ export async function POST(req: Request) {
       execution = { requestId, correlationId };
     }
 
+    if (definition.scope === "pretenant" && body.breweryId !== undefined) {
+      throw new CommandError("omit breweryId for this command", 400, "invalid_request");
+    }
     const token = bearerToken(req);
     const ctx = token === null
       ? await buildRouteContext(body.breweryId)

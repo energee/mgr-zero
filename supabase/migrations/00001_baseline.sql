@@ -2502,13 +2502,14 @@ create index chat_action_intents_expiry_idx on chat_action_intents (expires_at) 
 -- The request ledger is private because it contains actor identities and replay payloads.
 create table private.command_requests (
   actor_id uuid not null,
-  brewery_id uuid not null,
+  brewery_id uuid,
   request_id uuid not null,
   command_name text not null,
   payload_hash bytea not null,
   result jsonb,
   created_at timestamptz not null default now(),
-  primary key (actor_id, request_id)
+  primary key (actor_id, request_id),
+  check ((brewery_id is null) = (command_name = 'provision_brewery'))
 );
 
 create function private.assert_staff(p_brewery uuid, p_roles public.staff_role[]) returns uuid
@@ -2546,7 +2547,7 @@ begin
   if found then return null; end if;
   select * into v_request from private.command_requests
     where actor_id = v_actor and request_id = p_request_id for update;
-  if v_request.brewery_id <> p_brewery or v_request.command_name <> p_command
+  if v_request.brewery_id is distinct from p_brewery or v_request.command_name <> p_command
      or v_request.payload_hash <> extensions.digest(p_payload::text, 'sha256') then
     -- Application SQLSTATE (class MG): every unique index raises 23505, so the
     -- replay mismatch gets its own code for the HTTP layer to map to 409.
@@ -2563,6 +2564,25 @@ begin
     where actor_id = auth.uid() and request_id = p_request_id;
   if not found then raise exception 'command request not claimed'; end if;
   return p_result;
+end $$;
+
+-- Bootstrap is authenticated but deliberately has no tenant identity yet.
+create function provision_brewery(p_name text, p_timezone text, p_ttb text, p_request_id uuid)
+returns uuid language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid := auth.uid(); v_result jsonb; v_id uuid;
+begin
+  if v_actor is null then raise exception 'permission denied' using errcode = '42501'; end if;
+  if p_name is null or btrim(p_name) = '' then raise exception 'brewery name is required'; end if;
+  if p_timezone is null or not exists (select 1 from pg_catalog.pg_timezone_names where name = p_timezone)
+    then raise exception 'invalid timezone'; end if;
+  v_result := private.claim_command_request(null, 'provision_brewery', p_request_id,
+    jsonb_build_object('name', btrim(p_name), 'timezone', p_timezone, 'ttb', nullif(btrim(p_ttb), '')));
+  if v_result is not null then return (v_result #>> '{}')::uuid; end if;
+  insert into public.breweries(name, timezone, ttb_registry_no)
+    values (btrim(p_name), p_timezone, nullif(btrim(p_ttb), '')) returning id into v_id;
+  insert into public.brewery_users(brewery_id, user_id, role) values (v_id, v_actor, 'admin');
+  perform private.complete_command_request(p_request_id, to_jsonb(v_id));
+  return v_id;
 end $$;
 
 -- Invitations span Auth and membership transactions. The Auth trigger binds the
@@ -6235,6 +6255,7 @@ revoke all on all functions in schema private from public, anon, authenticated;
 grant execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid), staff_role(uuid), portal_availability(uuid), portal_brewery_rows()
   to authenticated;
 grant execute on function
+  provision_brewery(text,text,text,uuid),
   create_sku(uuid,uuid,uuid,text,text,uuid),
   upsert_brand(uuid,uuid,text,text,numeric,text,text,uuid,text,uuid),
   upsert_format(uuid,uuid,text,public.format_basis,public.package_type,public.keg_size,int,numeric,uuid),
