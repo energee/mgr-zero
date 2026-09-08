@@ -749,10 +749,10 @@ different physical volume is a different format.
 
 ### 16.2a `format_components` — composition (decided 2026-09-02)
 
-Formats compose. A four-pack is four cans plus a PakTech; a 16oz case is six
-four-packs plus a case tray. And a 16oz pour is 1/124 of a half bbl — **the same
-relation with a fractional quantity**: a pour is a `format_components` row
-with a fractional `qty`, and `basis` means only "does this hold stock".
+Packaged formats compose. A four-pack is four cans plus a PakTech; a 16oz
+case is six four-packs plus a case tray. Poured formats never participate in
+`format_components`: each brand owns its pour names and ounce sizes (§16.16).
+A pour's ratio derives from whichever keg of that brand is open.
 
 ```
 format_components (parent_format_id, child_format_id, qty numeric(12,6))
@@ -948,8 +948,9 @@ eyeball has no business in a federal filing. A yield derived from a non-default
 fill renders as *estimated*.
 
 Fill fractions and serving sizes are never ledger quantities: only the count
-posts (§16.15), and `format_components.qty` is `numeric(12,6)` so pours sum
-without rounding in a view.
+posts (§16.15). Serving volume derives from each brand-owned pour's numeric
+`ounces`; its ratio to an open keg derives from that keg's nominal volume,
+not from `format_components.qty` (§16.16).
 
 Attribution when two kegs of one SKU are open: split proportionally, and label
 the number as split. `tap_label` does not improve attribution — Square has no
