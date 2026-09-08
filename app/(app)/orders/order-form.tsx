@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { isCompleteLine, orderFormReadiness } from "@/lib/order-form-rules";
+import { SkuPicker } from "@/components/mgr/search-palette";
 
 type OrderKind = "wholesale" | "taproom_transfer";
 
@@ -209,20 +210,7 @@ export function OrderForm({
             <Label>Lines</Label>
             {lines.map((line, i) => (
               <div key={i} className="flex items-center gap-2">
-                <Select value={line.skuId} onValueChange={(v) => updateLine(i, { skuId: v })}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Select SKU" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {skus.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
+                <SkuPicker value={line.skuId} options={skus} onChange={(skuId) => updateLine(i, { skuId })} />
                 <Input
                   type="number"
                   min="0"
