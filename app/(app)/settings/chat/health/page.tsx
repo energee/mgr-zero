@@ -1,21 +1,17 @@
 // app/(app)/settings/chat/health/page.tsx — Redacted connection and delivery health with local disable and OAuth recovery.
-import { redirect } from "next/navigation";
 import { E } from "@/components/mgr/e";
-import { getActiveBrewery } from "@/lib/brewery";
-import { buildContext } from "@/lib/commands/context";
+import { requireAdminContext } from "@/lib/brewery";
+import { isChatConfigured } from "@/lib/chat/oauth";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
-import { deniedHref } from "@/lib/mgr/denied";
 import type { ChatHealth } from "@/lib/commands/chat";
 import "@/lib/commands/all";
 import { ChatConnectionAction, ChatDisable } from "../chat-settings-client";
 
 export default async function ChatHealthPage() {
-  const brewery = await getActiveBrewery();
-  if (brewery.role !== "admin") redirect(deniedHref("Chat health", ["admin"]));
-  const ctx = await buildContext(brewery.id);
+  const { ctx } = await requireAdminContext("Chat health");
   const health = await runCommand("get_chat_integration_health", {}, ctx) as ChatHealth;
   const i = health.installation;
-  const configured = ["APP_URL", "SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SLACK_SIGNING_SECRET", "CHAT_SDK_ENCRYPTION_KEY", "CHAT_STATE_DATABASE_URL"].every((key) => Boolean(process.env[key]));
+  const configured = isChatConfigured();
   return <>
     {E.back("Chat", "Health", undefined, "/settings/chat")}
     {E.info(i?.state === "active" ? "Slack delivery is enabled. Blocked channels do not receive team digests; eligible personal sends continue." : "Slack delivery is stopped. Your MGR work remains available.")}

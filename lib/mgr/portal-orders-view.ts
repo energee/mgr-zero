@@ -1,5 +1,5 @@
 // lib/mgr/portal-orders-view.ts — view-model for portal Order history.
-// portal_orders rows plus buyerStatus; shipped (unadjusted) rows offer Reorder.
+// portal_orders rows plus buyerStatus; drafts continue and shipped rows reorder.
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { buyerStatus } from "./order-status";

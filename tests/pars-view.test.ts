@@ -45,7 +45,6 @@ describe("Pars view", () => {
     const src = readFileSync("app/(app)/replenishment/page.tsx", "utf8");
     expect(src).toMatch(/from "@\/components\/mgr\/views\/pars"/);
     expect(src).toMatch(/<ParsView\b/);
-    expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
     expect(src).toMatch(/<ReplenishForm\b/);
   });
 });

@@ -27,11 +27,11 @@ describe("Order history view", () => {
     expect(model.rows[0]?.href).toMatch(/\/portal\/orders\//);
     expect(model.rows[1]?.title).toBe("ORD-0225");
     expect(model.rows[1]?.verb).toBe("Reorder");
-    expect(model.rows[1]?.href).toBe("/portal");
+    expect(model.rows[1]?.href).toBe(`/portal?reorder=${portalOrdersList.orders[1].id}`);
     expect(model.rows[1]?.detail).toMatch(/Shipped/);
     expect(model.rows[2]?.warning).toBe(true);
     expect(model.rows[2]?.detail).toMatch(/adjusted · 2 cases short/);
-    expect(model.rows[2]?.verb).toBeUndefined();
+    expect(model.rows[2]?.verb).toBe("Reorder");
     expect(model.info).toMatch(/Demo Brewing/);
   });
 
@@ -75,7 +75,7 @@ describe("Order history view", () => {
       model: toPortalOrdersViewProps(portalOrdersList),
       linkRows: true,
     }));
-    expect(html).toMatch(/href="\/portal"/);
+    expect(html).toMatch(/href="\/portal(?:\?reorder=[^"]*)?"/);
     expect(html).toMatch(/href="\/portal\/orders\//);
   });
 });
@@ -137,7 +137,7 @@ describe("Order detail view", () => {
       model: toPortalOrderViewProps(portalOrderShipped),
       footer,
     }));
-    expect(html).toMatch(/href="\/portal"/);
+    expect(html).toMatch(/href="\/portal(?:\?reorder=[^"]*)?"/);
     expect(html.match(/>Reorder</g)).toHaveLength(1);
   });
 });

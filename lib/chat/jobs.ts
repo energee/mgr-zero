@@ -16,7 +16,7 @@ import type { ChatProviderTransport, ProviderMessageRef } from "./provider";
 import { issueChatLinkProof } from "./linking";
 import { chatStatePool, chatLifecycleClient } from "./state";
 import { SlackTransport, classifySlackError } from "./slack-transport";
-import { slackClientFor } from "./slack-adapter";
+import { slackClientFor, slackPrivateChannels } from "./slack-adapter";
 
 let client: SupabaseClient | undefined;
 export function serviceClient(): SupabaseClient {
@@ -189,12 +189,13 @@ export async function runChatDeliveryBatch({ limit = 50, now = new Date(), db = 
     const installationId = ctx.installation.external_installation_id;
     try {
       if (personal && !resolved) {
-        for (const [id, action, label] of [["snooze", "mgr_snooze", "Snooze 1 hour"], ["mute_reason", "mgr_mute_reason", "Mute this reason"]] as const) {
+        const extras = await Promise.all(([["snooze", "mgr_snooze", "Snooze 1 hour"], ["mute_reason", "mgr_mute_reason", "Mute this reason"]] as const).map(async ([id, action, label]) => {
           const intentId = await unwrap(db.rpc("issue_chat_action_intent", {
             p_installation: ctx.installation.id, p_external_user_id: ctx.external_user_id, p_action: action, p_delivery: lease.id,
           })) as string | null;
-          if (intentId) notification.actions = [...notification.actions, { id, label, intentId, enabled: true }];
-        }
+          return intentId ? { id, label, intentId, enabled: true as const } : null;
+        }));
+        notification.actions = [...notification.actions, ...extras.filter((action) => action !== null)];
       }
       if (!personal) {
         const check = await transport.validateDestination({ installationId, destinationId: ctx.destination.external_destination_id });
@@ -285,12 +286,11 @@ export async function consumeSlackInteraction(p: SlackInteraction) {
 }
 
 async function homeIntents(db: SupabaseClient, installationId: string, externalUserId: string) {
-  const actions: Record<string, string> = {};
-  for (const action of ["mgr_preferences", "mgr_refresh", "mgr_unlink"]) {
+  const issued = await Promise.all(["mgr_preferences", "mgr_refresh", "mgr_unlink"].map(async (action) => {
     const id = await unwrap(db.rpc("issue_chat_action_intent", { p_installation: installationId, p_external_user_id: externalUserId, p_action: action, p_delivery: null }));
-    if (id) actions[action] = id as string;
-  }
-  return actions;
+    return [action, id] as const;
+  }));
+  return Object.fromEntries(issued.filter((entry): entry is readonly [string, string] => Boolean(entry[1])));
 }
 
 // Authenticated settings delegate only provider-owned operations here. Recheck
@@ -308,7 +308,7 @@ export async function listChatChannels(ctx: Ctx, installationId: string) {
   const installation = await settingsInstallation(ctx, installationId);
   if (installation.state !== "active") return [];
   try {
-    return await (await import("./slack-adapter")).slackPrivateChannels(installation.external_installation_id);
+    return await slackPrivateChannels(installation.external_installation_id);
   } catch {
     throw new CommandError("Slack channels are unavailable. Check authorization and try again.", 503);
   }
@@ -339,13 +339,17 @@ async function cleanupChatInstallationLocked(ctx: Ctx, installationId: string, p
   if (installation.state !== "disconnected") return { credentialDeleted: false };
   // Credential ownership survives disable/reauthorization; disconnected rows
   // release this unique store reference to their per-row tombstone.
-  const credentialOwner = await unwrap(serviceClient().from("chat_installations").select("id").eq("external_installation_id", installation.external_installation_id)
-    .eq("provider", "slack").eq("token_store_key", `slack:installation:${installation.external_installation_id}`).limit(1));
-  if (credentialOwner?.length) return { credentialDeleted: false };
+  if (await chatCredentialHasOtherOwner(serviceClient(), installation.external_installation_id)) return { credentialDeleted: false };
   const credentialDeleted = installation.external_installation_id.startsWith("pending:") || await port.deleteInstallation(installation.external_installation_id).then(() => true, () => false);
   await unwrap(serviceClient().rpc("reconcile_chat_installation", { p_installation: installationId, p_credential_deleted: credentialDeleted,
     p_failure_code: credentialDeleted ? null : "credential_delete_failed" }));
   return { credentialDeleted };
+}
+
+export async function chatCredentialHasOtherOwner(db: SupabaseClient, externalInstallationId: string) {
+  const rows = await unwrap(db.from("chat_installations").select("id").eq("provider", "slack")
+    .eq("external_installation_id", externalInstallationId).eq("token_store_key", `slack:installation:${externalInstallationId}`).limit(1));
+  return Boolean(rows?.length);
 }
 
 export async function failChatCredentialStore(installationId: string): Promise<never> {
