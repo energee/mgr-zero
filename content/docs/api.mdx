@@ -500,9 +500,10 @@ Today is the one read a member starts from: work assigned to them, due now, or
 overdue, filtered by their role. `get_today` takes an optional offset-aware ISO
 `now`, which is what makes the view testable at a fixed moment.
 
-Notification `reason` is `submitted_order`, `pick_due`, `delivery_next`,
-`fermentation_reading_overdue`, or `operations_digest`. A preference enables or
-mutes one reason for the calling member. Quiet hours use `HH:MM` start and end
+Notification `reason` is `submitted_order`, `pick_due`, `restock_due`,
+`delivery_next`, `fermentation_reading_overdue`, `invoice_question`, or
+`operations_digest`. A preference enables or mutes one reason for the calling
+member. Quiet hours use `HH:MM` start and end
 with an optional timezone. Brewery-wide quiet hours set by an admin apply on
 top of them.
 
