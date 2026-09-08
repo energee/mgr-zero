@@ -14,11 +14,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandAction } from "@/lib/commands/use-command-form";
-import { driverLabel, type Doc, type Route } from "./labels";
+import type { StopDoc } from "@/lib/commands/delivery";
+import { driverLabel, type Route } from "./labels";
 
-type Candidate = Doc & { kind: "shipment" | "transfer" };
-
-export function RouteForm({ route, candidates, drivers }: { route: Route | null; candidates: Candidate[]; drivers: { user_id: string; role: string }[] }) {
+export function RouteForm({ route, candidates, drivers }: { route: Route | null; candidates: StopDoc[]; drivers: { user_id: string; role: string }[] }) {
   const router = useRouter();
   const [deliveryDate, setDeliveryDate] = useState(route?.delivery_date ?? new Date().toISOString().slice(0, 10));
   const [driverUserId, setDriverUserId] = useState(route?.driver_user_id ?? "");
@@ -40,8 +39,7 @@ export function RouteForm({ route, candidates, drivers }: { route: Route | null;
   });
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    const ok = await run("save_route", input(), undefined) as boolean | { routeId: string };
-    if (ok && !route) router.push("/routes");
+    if (await run("save_route", input()) && !route) router.push("/routes");
   }
   const ready = deliveryDate && Object.keys(stops).length > 0;
   return (

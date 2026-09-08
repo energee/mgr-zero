@@ -2876,7 +2876,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, warehouse, sales
 
-One delivery stop: route, ship-to or destination, shipped or picked lines, invoice timing, and whether it is signed
+One delivery stop: route, ship-to or destination, its lines (shipped or picked quantities), invoice timing, and whether it is signed
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -2893,10 +2893,11 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, warehouse, sales
 
-Delivery routes with their stops (one day, or every route not yet returned), the shipped orders and picked transfers on no route, and the members who may drive
+Delivery routes with their stops (one route by id, one day, or every route not yet returned), the shipped orders and picked transfers on no route, and the members who may drive
 
 | Field | Type | Required |
 | --- | --- | --- |
+| `id` | uuid | no |
 | `date` | date (YYYY-MM-DD) | no |
 
 ```bash

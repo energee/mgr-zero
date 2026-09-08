@@ -76,7 +76,7 @@ describe("save_route and list_routes", () => {
 
     const listed = await runCommand("list_routes", { date: "2026-09-11" }, warehouse) as {
       routes: { id: string; name: string; driver_user_id: string; stops: { stop_no: number; shipment_id: string | null; stock_transfer_id: string | null; label: string }[] }[];
-      unassigned: { shipments: { id: string }[]; transfers: { id: string }[] };
+      unassigned: { id: string; kind: string }[];
       drivers: { user_id: string; role: string }[];
     };
     const route = listed.routes.find((r) => r.id === saved.routeId)!;
@@ -85,8 +85,8 @@ describe("save_route and list_routes", () => {
     expect(route.stops[1].stock_transfer_id).toBe(tr);
     expect(route.stops[1].label).toMatch(/TRF-\d{4}/);
     expect(route.stops[0].label).toMatch(/ORD-\d{4}/);
-    expect(listed.unassigned.shipments.map((s) => s.id)).not.toContain(sh1);
-    expect(listed.unassigned.transfers.map((t) => t.id)).not.toContain(tr);
+    expect(listed.unassigned.map((d) => d.id)).not.toContain(sh1);
+    expect(listed.unassigned.map((d) => d.id)).not.toContain(tr);
     expect(listed.drivers.map((d) => d.user_id)).toContain(warehouse.userId);
     // an empty date lists nothing; no date lists every route that has not returned
     expect((await runCommand("list_routes", { date: "2030-01-01" }, warehouse) as { routes: unknown[] }).routes).toEqual([]);
@@ -98,7 +98,9 @@ describe("save_route and list_routes", () => {
     }, adminCtx);
     const again = await runCommand("list_routes", { date: "2026-09-11" }, adminCtx) as typeof listed;
     expect(again.routes.find((r) => r.id === saved.routeId)!.stops.length).toBe(2);
-    expect(again.unassigned.shipments.map((s) => s.id)).toContain(sh2);
+    expect(again.unassigned.map((d) => d.id)).toContain(sh2);
+    // one route by id, returned or not
+    expect((await runCommand("list_routes", { id: saved.routeId }, adminCtx) as typeof listed).routes.map((r) => r.id)).toEqual([saved.routeId]);
 
     // the same shipment cannot sit on a second open route
     await expect(runCommand("save_route", { deliveryDate: "2026-09-12", stops: [{ shipmentId: sh1, stopNo: 1 }] }, adminCtx))
@@ -122,11 +124,11 @@ describe("save_route and list_routes", () => {
     const { data: d } = await admin.from("deliveries").select("id").eq("route_id", routeId).single();
     const stop = await runCommand("get_delivery_stop", { deliveryId: d!.id }, adminCtx) as {
       delivery: { stock_transfers: { transfer_no: number; to_location: { name: string } } | null; shipments: unknown };
-      lines: { qty_shipped: number }[]; invoice: unknown;
+      lines: { qty: number }[]; invoice: unknown;
     };
     expect(stop.delivery.shipments).toBeNull();
     expect(stop.delivery.stock_transfers?.to_location.name).toBe("Storage");
-    expect(stop.lines.map((l) => Number(l.qty_shipped))).toEqual([3]);
+    expect(stop.lines.map((l) => l.qty)).toEqual([3]);
     expect(stop.invoice).toBeNull();
   });
 });

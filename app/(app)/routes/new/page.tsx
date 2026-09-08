@@ -12,14 +12,10 @@ export default async function NewRoutePage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const { unassigned, drivers } = (await runCommand("list_routes", {}, ctx)) as RouteList;
-  const candidates = [
-    ...unassigned.shipments.map((d) => ({ ...d, kind: "shipment" as const })),
-    ...unassigned.transfers.map((d) => ({ ...d, kind: "transfer" as const })),
-  ];
   return (
     <>
       {E.back("Deliveries", "New route", undefined, "/routes")}
-      <RouteForm route={null} candidates={candidates} drivers={drivers} />
+      <RouteForm route={null} candidates={unassigned} drivers={drivers} />
     </>
   );
 }

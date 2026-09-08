@@ -3308,9 +3308,7 @@ create function confirm_delivery(p_delivery uuid,p_signed_by text,p_request_id u
 language plpgsql security definer set search_path = '' as $$
 declare v_brewery uuid; v_replay jsonb; v_result jsonb;
 begin
-  select brewery_id into v_brewery from public.deliveries where id = p_delivery;
-  if v_brewery is null then raise exception 'permission denied' using errcode = '42501'; end if;
-  perform private.assert_route_runner((select route_id from public.deliveries where id = p_delivery));
+  v_brewery := private.assert_route_runner((select route_id from public.deliveries where id = p_delivery));
   v_replay := private.claim_command_request(v_brewery,'confirm_delivery',p_request_id,jsonb_build_object('delivery',p_delivery,'signed_by',p_signed_by));
   if v_replay is not null then return v_replay; end if;
   v_result := private.confirm_delivery_impl(p_delivery,p_signed_by); return private.complete_command_request(p_request_id,v_result);
@@ -3326,7 +3324,7 @@ end $$;
 create function private.save_route_impl(
   p_brewery uuid, p_id uuid, p_name text, p_delivery_date date, p_driver uuid, p_vehicle text, p_note text, p_stops jsonb
 ) returns jsonb language plpgsql set search_path = '' as $$
-declare v_id uuid := p_id; s jsonb; v_ship uuid; v_tr uuid; v_route uuid; v_seen_ship uuid[] := '{}'; v_seen_tr uuid[] := '{}';
+declare v_id uuid := p_id; r public.routes; s jsonb; v_ship uuid; v_tr uuid; v_doc uuid; v_route uuid; v_seen uuid[] := '{}';
 begin
   if jsonb_typeof(p_stops) <> 'array' or jsonb_array_length(p_stops) = 0 then raise exception 'a route needs at least one stop'; end if;
   if p_driver is not null and not exists (
@@ -3337,21 +3335,20 @@ begin
     values (p_brewery, nullif(trim(p_name), ''), p_delivery_date, p_driver, nullif(trim(p_vehicle), ''), nullif(trim(p_note), ''))
     returning id into v_id;
   else
-    perform 1 from public.routes where id = v_id and brewery_id = p_brewery for update;
+    select * into r from public.routes where id = v_id and brewery_id = p_brewery for update;
     if not found then raise exception 'route not found'; end if;
     -- ponytail: a departed route is frozen, so a refused stop blocks the return until it is delivered; a per-stop
     -- "leave for a later route" verb on the run page is the upgrade path
-    if exists (select 1 from public.routes where id = v_id and departed_at is not null) then raise exception 'route has departed'; end if;
+    if r.departed_at is not null then raise exception 'route has departed'; end if;
     update public.routes set name = nullif(trim(p_name), ''), delivery_date = p_delivery_date, driver_user_id = p_driver,
       vehicle = nullif(trim(p_vehicle), ''), note = nullif(trim(p_note), '') where id = v_id;
   end if;
   for s in select * from jsonb_array_elements(p_stops) loop
-    v_ship := (s->>'shipment_id')::uuid; v_tr := (s->>'stock_transfer_id')::uuid;
+    v_ship := (s->>'shipment_id')::uuid; v_tr := (s->>'stock_transfer_id')::uuid; v_doc := coalesce(v_ship, v_tr);
     if num_nonnulls(v_ship, v_tr) <> 1 then raise exception 'a stop is one shipment or one stock transfer'; end if;
-    if v_ship = any(v_seen_ship) or v_tr = any(v_seen_tr) then raise exception 'the same document is listed twice'; end if;
-    v_seen_ship := v_seen_ship || v_ship; v_seen_tr := v_seen_tr || v_tr;
-    select d.route_id into v_route from public.deliveries d join public.routes r on r.id = d.route_id
-      where (v_ship is not null and d.shipment_id = v_ship) or (v_tr is not null and d.stock_transfer_id = v_tr);
+    if v_doc = any(v_seen) then raise exception 'the same document is listed twice'; end if;
+    v_seen := v_seen || v_doc;
+    select d.route_id into v_route from public.deliveries d where coalesce(d.shipment_id, d.stock_transfer_id) = v_doc;
     if v_route is not null and v_route <> v_id then raise exception 'document is already on route %', v_route; end if;
     if v_ship is not null and not exists (select 1 from public.shipments where id = v_ship and brewery_id = p_brewery) then raise exception 'shipment not found'; end if;
     if v_tr is not null and not exists (
@@ -3359,18 +3356,16 @@ begin
     ) then raise exception 'transfer must be picked before it can be delivered'; end if;
   end loop;
   -- delivered stops stay; replace the rest
-  v_seen_ship := array_remove(v_seen_ship, null); v_seen_tr := array_remove(v_seen_tr, null);
   if exists (
     select 1 from public.deliveries d where d.route_id = v_id and d.delivered_at is not null
-      and not (d.shipment_id = any(v_seen_ship) or d.stock_transfer_id = any(v_seen_tr))
+      and not (coalesce(d.shipment_id, d.stock_transfer_id) = any(v_seen))
   ) then raise exception 'a delivered stop cannot be removed'; end if;
   delete from public.deliveries where route_id = v_id and delivered_at is null;
   -- two passes so renumbering never collides with a kept delivered stop
   update public.deliveries set stop_no = -stop_no where route_id = v_id;
   for s in select * from jsonb_array_elements(p_stops) loop
     v_ship := (s->>'shipment_id')::uuid; v_tr := (s->>'stock_transfer_id')::uuid;
-    update public.deliveries set stop_no = (s->>'stop_no')::int where route_id = v_id
-      and ((v_ship is not null and shipment_id = v_ship) or (v_tr is not null and stock_transfer_id = v_tr));
+    update public.deliveries set stop_no = (s->>'stop_no')::int where route_id = v_id and coalesce(shipment_id, stock_transfer_id) = coalesce(v_ship, v_tr);
     if not found then
       insert into public.deliveries (brewery_id, route_id, shipment_id, stock_transfer_id, stop_no)
       values (p_brewery, v_id, v_ship, v_tr, (s->>'stop_no')::int);
@@ -3396,7 +3391,7 @@ end $$;
 
 create function depart_route(p_route uuid, p_request_id uuid) returns jsonb
 language plpgsql security definer set search_path = '' as $$
-declare v_brewery uuid; v_replay jsonb; r public.routes;
+declare v_brewery uuid; v_replay jsonb; r public.routes; v_tr uuid;
 begin
   v_brewery := private.assert_route_runner(p_route);
   v_replay := private.claim_command_request(v_brewery, 'depart_route', p_request_id, jsonb_build_object('route', p_route));
@@ -3404,11 +3399,13 @@ begin
   select * into r from public.routes where id = p_route for update;
   if r.departed_at is not null then raise exception 'route has already departed'; end if;
   if not exists (select 1 from public.deliveries where route_id = p_route) then raise exception 'a route needs at least one stop'; end if;
-  update public.routes set departed_at = now() where id = p_route;
-  -- the truck now carries the transfer stops
-  update public.stock_transfers set status = 'in_transit'
-    where id in (select stock_transfer_id from public.deliveries where route_id = p_route) and status = 'picked';
-  return private.complete_command_request(p_request_id, jsonb_build_object('routeId', p_route, 'departed_at', now()));
+  update public.routes set departed_at = now() where id = p_route returning * into r;
+  -- the truck now carries the transfer stops; the transition rule stays with lock_transfer
+  for v_tr in select stock_transfer_id from public.deliveries where route_id = p_route and stock_transfer_id is not null loop
+    perform private.lock_transfer(v_tr, array['picked','in_transit']::public.stock_transfer_status[]);
+    update public.stock_transfers set status = 'in_transit' where id = v_tr;
+  end loop;
+  return private.complete_command_request(p_request_id, jsonb_build_object('routeId', p_route, 'departed_at', r.departed_at));
 end $$;
 
 create function return_route(p_route uuid, p_request_id uuid) returns jsonb
@@ -3424,8 +3421,8 @@ begin
   if exists (select 1 from public.deliveries where route_id = p_route and delivered_at is null) then
     raise exception 'every stop must be delivered before the route returns';
   end if;
-  update public.routes set returned_at = now() where id = p_route;
-  return private.complete_command_request(p_request_id, jsonb_build_object('routeId', p_route, 'returned_at', now()));
+  update public.routes set returned_at = now() where id = p_route returning * into r;
+  return private.complete_command_request(p_request_id, jsonb_build_object('routeId', p_route, 'returned_at', r.returned_at));
 end $$;
 
 create function save_route(

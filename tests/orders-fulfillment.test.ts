@@ -316,10 +316,10 @@ describe("confirm_delivery", () => {
     const again = await staffDb.rpc("confirm_delivery", { p_delivery: del!.id, p_signed_by: "Dana", p_request_id: crypto.randomUUID() });
     expect(again.error?.message).toMatch(/already delivered/);
     const stop = await runCommand("get_delivery_stop", { deliveryId: del!.id }, { db: staffDb, userId: staffId, breweryId: b.id, role: "admin" }) as
-      { delivery: { signed_by: string; shipments: { invoice_timing: string } }; lines: { qty_shipped: number }[]; invoice: { id: string } | null };
+      { delivery: { signed_by: string; shipments: { invoice_timing: string } }; lines: { qty: number }[]; invoice: { id: string } | null };
     expect(stop.delivery.signed_by).toBe("Dana");
     expect(stop.delivery.shipments.invoice_timing).toBe("on_delivery");
-    expect(stop.lines.map((l) => Number(l.qty_shipped))).toEqual([3]);
+    expect(stop.lines.map((l) => l.qty)).toEqual([3]);
     expect(stop.invoice?.id).toBe(invoiceId);
   });
 });

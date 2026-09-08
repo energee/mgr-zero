@@ -11,6 +11,9 @@ export const NOON = MINUTES_PER_DAY / 2;
 // reports a hydration mismatch.
 const clock = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
 
+/** A timestamp as a wall-clock time ("8:42 AM"); empty when there is none. */
+export const formatTime = (iso: string | null) => (iso ? clock.format(new Date(iso)) : "");
+
 /** A 24-hour `hh:mm` as minutes since midnight. Anything unparseable is midnight, never NaN. */
 export function parseClock(value: string) {
   const [h, m] = value.split(":").map(Number);

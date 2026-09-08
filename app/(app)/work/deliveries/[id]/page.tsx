@@ -19,7 +19,7 @@ type Stop = {
     shipments: { invoice_timing: "now" | "on_delivery"; orders: { order_no: number | null; customers: { name: string } | null; ship_tos: { label: string; city: string; state: string } | null } } | null;
     stock_transfers: { transfer_no: number | null; to_location: { name: string } | null } | null;
   };
-  lines: { id: string; qty_shipped: number; skus: { name: string } | null }[];
+  lines: { id: string; name: string; qty: number }[];
   invoice: { id: string; invoice_no: number | null } | null;
 };
 
@@ -46,7 +46,7 @@ export default async function DeliveryStopPage({ params }: { params: Promise<{ i
           {E.fld("Invoice timing", timing)}
         </>
       )}
-      {lines.map((l) => <div key={l.id}>{E.row(l.skus?.name ?? "Line", "", String(Number(l.qty_shipped)))}</div>)}
+      {lines.map((l) => <div key={l.id}>{E.row(l.name, "", String(l.qty))}</div>)}
       {delivery.delivered_at ? (
         <>
           {E.fld("Received by", delivery.signed_by ?? "")}
