@@ -24,13 +24,17 @@ import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { CompleteTransferView } from "@/components/mgr/views/complete-transfer";
 import { ConfirmOrderView } from "@/components/mgr/views/confirm-order";
+import { NewOrderView } from "@/components/mgr/views/new-order";
 import { OrderView } from "@/components/mgr/views/order";
+import { OrdersView } from "@/components/mgr/views/orders-list";
 import { PutBackView } from "@/components/mgr/views/put-back";
 import { OHIO_STOUT_NOTE, LOC_TAPROOM, LOC_WAREHOUSE } from "@/lib/mgr/fixtures/demo";
-import { completeTransferTape, orderPickedRestock, orderPickedRestockPutBack, orderSubmittedRidgeline, orderTransferComplete } from "@/lib/mgr/fixtures/orders";
+import { completeTransferTape, newOrderDraft, orderPickedRestock, orderPickedRestockPutBack, orderSubmittedRidgeline, orderTransferComplete, ordersWorkList } from "@/lib/mgr/fixtures/orders";
 import { toCompleteTransferViewProps } from "@/lib/mgr/complete-transfer-view";
 import { toConfirmOrderViewProps } from "@/lib/mgr/confirm-order-view";
+import { toNewOrderViewProps } from "@/lib/mgr/new-order-view";
 import { toOrderViewProps } from "@/lib/mgr/order-view";
+import { toOrdersListViewProps } from "@/lib/mgr/orders-list-view";
 import { toPutBackViewProps } from "@/lib/mgr/put-back-view";
 import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-icons";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
@@ -176,7 +180,6 @@ const REVERSAL_GATE = "isn’t available yet: a reversal needs an auditable link
 const WORK_CHIPS = ["all", "orders", "transfers", "batches", "runs", "POs", "routes"];
 /** The screen each Work chip opens: the chips are one bar drawn on the Work lists. */
 export const WORK_TABS: Record<string, string> = { all: "Work", orders: "Orders", transfers: "Transfers", batches: "Batches", runs: "Packaging runs", POs: "Purchase orders", routes: "Routes" };
-const ORDER_STATES = ["all states", "draft", "submitted", "confirmed", "picked", "shipped"];
 
 // The states every screen can reach; a record with designed states lists its own instead.
 const DEFAULT_STATES: NonNullable<Screen["states"]> = [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]];
@@ -949,17 +952,7 @@ export const SCREENS: Screen[] = [
     writes: "none [creation and state changes happen on their own surfaces]",
     states: [["filtered", "one state chip selected"], ["empty", "no orders in this state: New order stays available"]],
     spec: "The Work list with the Orders tab active. Rows cover the active order states and name the next valid action; New order opens the order-entry sheet. Order and Confirm order return here.",
-    body: (<>
-      {E.hd("Work", "sales default", E.btn("New order"))}
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        {E.tabs(WORK_CHIPS, 1, "w-full md:w-fit", WORK_TABS)}
-        {E.tabs(ORDER_STATES, 0, "w-full justify-start overflow-x-auto md:w-fit")}
-      </div>
-      {E.row("ORD-0231 · Ridgeline", "submitted · ships Thu", E.act("Confirm", "success"))}
-      {E.row("ORD-0229 · Al’s Bar", "picked · restock 3 Pils staged", E.act("Put back", "attention"), "w")}
-      {E.row("ORD-0234 · Teresa’s", "confirmed · ships Fri", E.act("Pick", "info"))}
-      {E.row("ORD-0237 · Teresa’s", "draft · ships Fri", E.act("Finish", "primary"))}
-    </>),
+    body: <OrdersView model={toOrdersListViewProps(ordersWorkList)} />,
   },
   {
     step: 5,
@@ -1327,22 +1320,7 @@ export const SCREENS: Screen[] = [
     writes: "create_order",
     states: permitted("sales or admin required"),
     spec: "Source is required and becomes the order's from-location; the app never guesses “Warehouse.” Save draft lands on the Order screen, where Submit lives.",
-    body: (<>
-      {E.back("Orders", "New order")}
-      {E.cols(
-        E.pick("Customer", "Ridgeline Tap Room", ["Ridgeline Tap Room", "Al’s Bar", "Teresa’s"]),
-        E.pick("Ship-to", "Main · Phoenixville, PA", ["Main · Phoenixville, PA", "Dock"]),
-        E.pick("Source location", "Warehouse", ["Warehouse", "Taproom"]),
-        E.edit("Requested ship", "2026-09-03", "date"),
-      )}
-      {E.edit("Customer PO", "4471")}
-      {E.row("Hazy IPA · ½ bbl keg", "ATP 11 at Warehouse", E.stq(4))}
-      {E.row("Pils · 16 oz case", "ATP −6 at Warehouse", E.stq(10), "w")}
-      {E.btn("Add line", "g")}
-      {E.info("Order number is assigned on commit.")}
-      {E.sp()}
-      {E.btn("Save draft")}
-    </>),
+    body: <NewOrderView model={toNewOrderViewProps(newOrderDraft)} />,
   },
   {
     step: 5,

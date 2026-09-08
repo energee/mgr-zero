@@ -10,7 +10,12 @@ export const ALS = {
   shipTo: { label: "Main", city: "Columbus", state: "OH" },
 } as const;
 
-export const RIDGELINE = { name: "Ridgeline Tap Room" } as const;
+export const RIDGELINE = {
+  name: "Ridgeline Tap Room",
+  shipTos: ["Main · Phoenixville, PA", "Dock"],
+} as const;
+
+export const TERESA = { name: "Teresa’s" } as const;
 
 export const SKU_HAZY = {
   sku_id: "00000000-0000-4000-8000-0000000000a1",

@@ -1,15 +1,19 @@
 // lib/mgr/fixtures/orders.ts — get_order-shaped snapshots for inventory
 // frames. Views never own sample data: screens pass toXViewProps(snapshot).
 import { formatVolume } from "@/lib/volume";
-import { ALS, LOC_TAPROOM, LOC_WAREHOUSE, LOCATIONS, RIDGELINE, SKU_HAZY, SKU_PILS, SKU_STOUT } from "./demo";
+import { ALS, LOC_TAPROOM, LOC_WAREHOUSE, LOCATIONS, RIDGELINE, SKU_HAZY, SKU_PILS, SKU_STOUT, TERESA } from "./demo";
 import type { CompleteTransferSnapshot } from "@/lib/mgr/complete-transfer-view";
 import type { ConfirmOrderSnapshot } from "@/lib/mgr/confirm-order-view";
+import type { NewOrderSnapshot } from "@/lib/mgr/new-order-view";
 import type { OrderSnapshot } from "@/lib/mgr/order-view";
+import type { OrdersListSnapshot } from "@/lib/mgr/orders-list-view";
 import type { PutBackSnapshot } from "@/lib/mgr/put-back-view";
 
 const ORDER_229 = "00000000-0000-4000-8000-000000000229";
 const ORDER_231 = "00000000-0000-4000-8000-000000000231";
 const ORDER_088 = "00000000-0000-4000-8000-000000000088";
+const ORDER_234 = "00000000-0000-4000-8000-000000000234";
+const ORDER_237 = "00000000-0000-4000-8000-000000000237";
 
 const line = (
   id: string,
@@ -110,6 +114,61 @@ export const orderTransferComplete: CompleteTransferSnapshot = {
     { id: "l-hazy", qty_ordered: 2, qty_picked: 2, skus: { name: SKU_HAZY.name } },
   ],
   locations: LOCATIONS,
+};
+
+/** Work → Orders list: the four next-action rows the inventory draws. */
+export const ordersWorkList: OrdersListSnapshot = {
+  role: "sales",
+  orders: [
+    {
+      id: ORDER_231,
+      order_no: 231,
+      status: "submitted",
+      requested_ship_date: "2026-09-10",
+      needs_restock: false,
+      customers: { name: RIDGELINE.name },
+    },
+    {
+      id: ORDER_229,
+      order_no: 229,
+      status: "picked",
+      requested_ship_date: null,
+      needs_restock: true,
+      customers: { name: ALS.name },
+    },
+    {
+      id: ORDER_234,
+      order_no: 234,
+      status: "confirmed",
+      requested_ship_date: "2026-09-11",
+      needs_restock: false,
+      customers: { name: TERESA.name },
+    },
+    {
+      id: ORDER_237,
+      order_no: 237,
+      status: "draft",
+      requested_ship_date: "2026-09-11",
+      needs_restock: false,
+      customers: { name: TERESA.name },
+    },
+  ],
+};
+
+/** Staff New order sheet: Ridgeline draft with an oversold Pils line. */
+export const newOrderDraft: NewOrderSnapshot = {
+  customers: [RIDGELINE.name, ALS.name, TERESA.name],
+  customer: RIDGELINE.name,
+  shipTos: [...RIDGELINE.shipTos],
+  shipTo: RIDGELINE.shipTos[0],
+  sources: [LOC_WAREHOUSE.name, LOC_TAPROOM.name],
+  source: LOC_WAREHOUSE.name,
+  requestedShip: "2026-09-03",
+  po: "4471",
+  lines: [
+    { name: SKU_HAZY.name, qty: 4, atp: 11 },
+    { name: SKU_PILS.name, qty: 10, atp: -6 },
+  ],
 };
 
 /** Movement preview the live complete page does not yet compute. */
