@@ -4,7 +4,7 @@
 
 **Goal:** The weekly count is the inventory source (posts depletion); POS is expected-only. A zero-variance count still writes a durable snapshot. The tap board swap is one RPC. Nothing on the board posts to the FG ledger.
 
-**Architecture:** New count header/lines; new `keg_taps` / tap intervals as §16.13; `reverse_inventory_movement` with a structured compensation link. `staff_role = taproom` is **not** added.
+**Architecture:** New count header/lines; new `keg_taps` / tap intervals as §16.13; `reverse_inventory_movement` with a structured compensation link. `staff_role = taproom` is added with its per-role RLS as the first task, per `.agents/superpowers/specs/2026-09-08-mgr-taproom-role-rls.md` (§16.16 item 3): the enum value, a narrowed `is_staff_of`, the `taproom_can(brewery, table)` predicate every `staff_read` policy consults, and `tests/rls-taproom.test.ts` walking every table as a taproom user.
 
 **Tech Stack:** Same as Program 1. `lib/commands/taproom.ts` (already from Program 7).
 
