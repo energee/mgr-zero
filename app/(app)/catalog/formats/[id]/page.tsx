@@ -1,7 +1,7 @@
 import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
-import { runCommand } from "@/lib/commands/registry";
+import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { canComposeFormat, eligibleChildren } from "@/lib/format-edit-rules";
 import "@/lib/commands/all";

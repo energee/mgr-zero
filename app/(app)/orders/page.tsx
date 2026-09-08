@@ -7,7 +7,7 @@ import { E } from "@/components/mgr/e";
 import { LinkTabs, WORK_CHIPS } from "@/components/mgr/work-tabs";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
-import { runCommand } from "@/lib/commands/registry";
+import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { docNo } from "@/lib/mgr/doc-no";
 import { nextAction, type OrderStatus } from "@/lib/mgr/order-status";
 import "@/lib/commands/all";

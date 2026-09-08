@@ -107,11 +107,11 @@ defineQuery({
 
 defineQuery({
   name: "list_movements", description: "Recent inventory movements",
-  input: z.object({ skuId: z.string().uuid().optional(), limit: z.number().int().max(200).default(50) }),
+  input: z.object({ skuId: z.string().uuid().optional(), limit: z.number().int().min(1).max(200).default(50), offset: z.number().int().nonnegative().default(0) }),
   roles: [...readRoles],
   handler: (ctx, i) => {
     let q = ctx.db.from("inventory_movements").select().eq("brewery_id", ctx.breweryId)
-      .order("created_at", { ascending: false }).limit(i.limit);
+      .order("created_at", { ascending: false }).order("id", { ascending: false }).range(i.offset, i.offset + i.limit - 1);
     if (i.skuId) q = q.eq("sku_id", i.skuId);
     return unwrap(q);
   },

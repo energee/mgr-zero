@@ -370,8 +370,8 @@ export const SCREENS: Screen[] = [
     job: "List brewery locations and create the next one",
     reads: "list_locations",
     writes: "create_location",
-    states: [["permission", "admin only", 1], ["active", "inventory and work may use it"], ["empty", "Add location is the only action"]],
-    spec: "Settings links here instead of editing whichever location happened to be selected.",
+    states: [["permission", "admin edits · sales, warehouse and brewer read", 1], ["active", "inventory and work may use it"], ["empty", "Add location is the only action"]],
+    spec: "Settings links here instead of editing whichever location happened to be selected. Admin edits; other staff review locations and return to Beer. All finished goods inventory is the global ledger, not a location filter.",
     body: (<>
       {E.back("Settings", "Locations", E.btn("Add location"))}
       {E.row("Warehouse", "warehouse · 186 inventory units", E.act("Edit"))}
@@ -817,7 +817,7 @@ export const SCREENS: Screen[] = [
     reads: "list_movements",
     writes: "none",
     states: [["echo", "the tape is the record"], ["correction gated", "Record inventory correction waits on its schema"]],
-    spec: "Post-commit of Record movement. A tape means recorded. The named correction is Record inventory correction, not Undo.",
+    spec: "Post-commit of Record movement. A tape means recorded: show the committed movement reference, bin, frozen barrel volume, destination state/channel and timestamp from the RPC result. An uncertain response never shows this receipt. The ledger has Older/Newer paging. The named correction is Record inventory correction, not Undo.",
     body: (<>
       {E.back("Beer", "Hazy IPA · ½ bbl")}
       {E.tape([["−1 keg · festival removal · PA", "½ bbl · just now"]])}

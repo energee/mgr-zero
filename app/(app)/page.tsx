@@ -8,7 +8,7 @@ import { Invoice01Icon, Package01Icon, Route01Icon, ThermometerIcon } from "@hug
 import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
-import { runCommand } from "@/lib/commands/registry";
+import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { TODAY_VERB } from "@/lib/commands/landings";
 import type { TodayItem } from "@/lib/commands/today";
 import "@/lib/commands/all";

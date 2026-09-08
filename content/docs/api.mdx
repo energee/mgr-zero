@@ -690,7 +690,9 @@ curl -X POST "$MGR_URL/api/command" \
 
 SKUs whose available-to-promise is negative, with on-hand and open reservations
 
-Takes no input.
+| Field | Type | Required |
+| --- | --- | --- |
+| `skuId` | uuid | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -1606,6 +1608,7 @@ Recent inventory movements
 | --- | --- | --- |
 | `skuId` | uuid | no |
 | `limit` | integer | no |
+| `offset` | integer | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

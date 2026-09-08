@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, expect, it, vi } from "vitest";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/app/(app)/brewery-provider", () => ({ useBrewery: () => "brewery-a" }));
-import { useCommandAction } from "@/lib/commands/use-command-form";
+import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
 import { command } from "@/lib/commands/client";
 afterEach(() => vi.unstubAllGlobals());
 
@@ -31,4 +31,24 @@ it("retains a failed submission ID, resets changed intent, and resets after succ
   expect(requests[4].requestId).not.toBe(requests[3].requestId);
   await command("brewery-a", "unchanged_three_argument_caller", {});
   expect(requests[5].requestId).toMatch(/^[0-9a-f-]{36}$/);
+});
+
+it("only hands a committed result to the form receipt after success, including exact retry", async () => {
+  const receipt = { id: "movement-id", bbl: 0.129, bin_id: "bin-id", dest_state: "PA" };
+  let fail = true;
+  const ids: string[] = [], received: unknown[] = [];
+  vi.stubGlobal("fetch", vi.fn(async (_url, init) => {
+    ids.push(JSON.parse(init.body).requestId);
+    if (fail) throw new Error("response lost");
+    return { status: 200, json: async () => ({ ok: true, data: receipt }) };
+  }));
+  let form: ReturnType<typeof useCommandForm>;
+  function Harness() { form = useCommandForm("record_movement", { build: () => ({ qty: 2 }), reset: vi.fn(), onSuccess: data => received.push(data) }); return null; }
+  renderToStaticMarkup(createElement(Harness));
+  await form!.submit({ preventDefault() {} } as React.FormEvent);
+  expect(received).toEqual([]);
+  fail = false;
+  await form!.submit({ preventDefault() {} } as React.FormEvent);
+  expect(ids[0]).toBe(ids[1]);
+  expect(received).toEqual([receipt]);
 });

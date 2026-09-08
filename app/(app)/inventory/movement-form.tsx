@@ -21,6 +21,7 @@ const MOVEMENT_TYPES = [
   "opening_balance", "production_in", "adjustment", "depletion",
   "destruction", "loss", "sample", "festival_removal", "return_in",
 ] as const;
+type MovementReceipt = { id: string; created_at: string; sku_id: string; location_id: string; bin_id: string; qty: number; bbl: number; type: string; dest_state: string | null; sale_channel_id: string | null; lot_id: string | null; ref: string | null; note: string | null };
 type MovementType = (typeof MOVEMENT_TYPES)[number];
 
 // Mirrors the DB CHECK (removal_shape): sale_removal and depletion each name a
@@ -40,6 +41,7 @@ export function MovementForm({
   channels: { id: string; name: string }[];
 }) {
   const breweryId = useBrewery();
+  const [receipt, setReceipt] = useState<MovementReceipt | null>(null);
   const [stock, setStock] = useState<BinMoveStock[]>([]);
   const [lotId, setLotId] = useState("");
   const [stockError, setStockError] = useState<string | null>(null);
@@ -56,6 +58,7 @@ export function MovementForm({
   const [saleChannelId, setSaleChannelId] = useState(defaultChannelId);
   const [note, setNote] = useState("");
   const form = useCommandForm("record_movement", {
+    onSuccess: data => setReceipt(data as MovementReceipt),
     build: () => ({ skuId, locationId, binId, lotId: lotId || undefined, ...movementFields(type, qty, direction, destState, saleChannelId), type, note: note || undefined }),
     reset: () => { setLotId(""); setStock([]); setSkuId(""); setLocationId(""); setBinId(""); setQty(""); setType("opening_balance"); setSaleChannelId(defaultChannelId); setNote(""); setDestState(""); setDirection("add"); },
   });
@@ -75,6 +78,7 @@ export function MovementForm({
   }
 
   return (
+    <>
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="Record Movement" trigger={<Button>Record Movement</Button>}>
         <form onSubmit={e => { if (!fields) { e.preventDefault(); return; } void form.submit(e); }} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
@@ -184,5 +188,22 @@ export function MovementForm({
           </CommandFormFooter>
         </form>
       </CommandForm>
+      <CommandForm open={receipt !== null} onOpenChange={open => { if (!open) setReceipt(null); }} title="Movement recorded">
+        {receipt && <div className="space-y-3 text-sm">
+          <p>{receipt.qty > 0 ? "+" : ""}{receipt.qty} {skus.find(s => s.id === receipt.sku_id)?.label ?? receipt.sku_id} · {receipt.type.replace(/_/g, " ")}</p>
+          <p>{locations.find(l => l.id === receipt.location_id)?.name ?? receipt.location_id} · {bins.find(b => b.id === receipt.bin_id)?.name ?? receipt.bin_id}</p>
+          <p>Recorded volume: {receipt.bbl} bbl ({formatVolume(receipt.bbl)})</p>
+          {receipt.sale_channel_id && <p>Channel: {channels.find(c => c.id === receipt.sale_channel_id)?.name ?? receipt.sale_channel_id}</p>}
+          {receipt.dest_state && <p>Destination state: {receipt.dest_state}</p>}
+          {receipt.lot_id && <p className="break-all">Lot: {receipt.lot_id}</p>}
+          {receipt.note && <p>{receipt.note}</p>}
+          <p>{new Date(receipt.created_at).toLocaleString()}</p>
+          <p className="break-all">Movement reference: {receipt.id}</p>
+          {receipt.ref && <p className="break-all">Source reference: {receipt.ref}</p>}
+          <p>This entry cannot be edited or deleted. Record inventory correction is not available yet. Contact your admin before recording another entry to correct it.</p>
+          <Button onClick={() => setReceipt(null)}>Done</Button>
+        </div>}
+      </CommandForm>
+    </>
   );
 }

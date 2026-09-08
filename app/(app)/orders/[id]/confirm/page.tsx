@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
-import { runCommand } from "@/lib/commands/registry";
+import { runPageQuery as runCommand, requirePagePermission } from "@/lib/mgr/page-query";
 import { docNo } from "@/lib/mgr/doc-no";
 import { orNotFound } from "@/lib/mgr/not-found";
 import "@/lib/commands/all";
@@ -20,6 +20,7 @@ export default async function ConfirmOrderPage({ params }: { params: Promise<{ i
   const { id } = await params;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
+  requirePagePermission(ctx, "confirm_order");
   const [{ order, lines, atp }, locations] = await Promise.all([
     orNotFound(runCommand("get_order", { orderId: id }, ctx) as Promise<{ order: Order; lines: Line[]; atp: { sku_id: string; qty: number }[] }>),
     runCommand("list_locations", {}, ctx) as Promise<{ id: string; name: string }[]>,

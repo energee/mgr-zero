@@ -4,7 +4,7 @@ import { E } from "@/components/mgr/e";
 import { SlackMark } from "@/components/mgr/brand-icons";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
-import { runCommand } from "@/lib/commands/registry";
+import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import type { ChatHealth } from "@/lib/commands/chat";
 import "@/lib/commands/all";
 import { ChatConnectionAction, ChatPreviewPanel, ChatSettingsControls } from "./chat-settings-client";

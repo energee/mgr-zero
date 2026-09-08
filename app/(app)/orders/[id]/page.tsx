@@ -5,10 +5,11 @@
 // two-tap review at /orders/[id]/confirm, a taproom transfer completes at
 // /orders/[id]/complete, and Put back at /orders/[id]/restock. An unknown
 // or malformed id renders not-found.tsx.
+import { canRun } from "@/lib/commands/registry";
 import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
-import { runCommand } from "@/lib/commands/registry";
+import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { docNo } from "@/lib/mgr/doc-no";
 import { nextState, type OrderStatus } from "@/lib/mgr/order-status";
 import { money } from "@/lib/mgr/money";
@@ -36,6 +37,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const [{ order, lines, events, atp }, skuRows] = (await Promise.all([
     orNotFound(runCommand("get_order", { orderId: id }, ctx)), runCommand("list_skus", {}, ctx),
   ])) as [{ order: Order; lines: OrderLine[]; events: OrderEvent[]; atp: Atp[] }, SkuRow[]];
+  const canSell = canRun(ctx, "confirm_order"), canFulfill = canRun(ctx, "record_pick");
   const atpMap = new Map(atp.map((a) => [a.sku_id, Number(a.qty)]));
   const skuNames = new Map(lines.map((l) => [l.sku_id, l.skus?.name ?? "line"]));
   const skus = skuRows.map((s) => ({ id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name }));
@@ -46,14 +48,14 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       {E.back("Orders", label, undefined, "/orders")}
       {E.ttl(where)}
       {E.row("Current state", `${order.status}${order.needs_restock ? " · restock pending" : ""}`, E.status(`Next: ${nextState(order.status, order.needs_restock)}`), order.needs_restock ? "w" : "")}
-      {order.status === "picked" && order.needs_restock && E.act("Put back", "attention", `/orders/${order.id}/restock`)}
-      {order.status === "submitted" && E.act("Review and confirm", "success", `/orders/${order.id}/confirm`)}
-      {order.status === "picked" && order.kind === "taproom_transfer" && E.act("Complete transfer", "success", `/orders/${order.id}/complete`)}
+      {canFulfill && order.status === "picked" && order.needs_restock && E.act("Put back", "attention", `/orders/${order.id}/restock`)}
+      {canSell && order.status === "submitted" && E.act("Review and confirm", "success", `/orders/${order.id}/confirm`)}
+      {canFulfill && order.status === "picked" && order.kind === "taproom_transfer" && E.act("Complete transfer", "success", `/orders/${order.id}/complete`)}
       {order.ship_tos && E.fld("Ship-to", order.ship_tos.label)}
       {order.po_number && E.fld("Customer PO", order.po_number)}
       {order.requested_ship_date && E.fld("Requested", order.requested_ship_date)}
       {order.note && E.fld("Note", order.note)}
-      <LifecycleButtons transfer={order.kind === "taproom_transfer"} orderId={order.id} status={order.status}
+      <LifecycleButtons canSell={canSell} canFulfill={canFulfill} transfer={order.kind === "taproom_transfer"} orderId={order.id} status={order.status}
         lines={lines.map((l) => ({ skuId: l.sku_id, skuName: l.skus?.name ?? l.sku_id, qty: Number(l.qty_ordered) }))} skus={skus}
         pickLines={lines.map((l) => ({ id: l.id, skuId: l.sku_id, skuName: l.skus?.name ?? l.sku_id, qtyOrdered: Number(l.qty_ordered), qtyPicked: l.qty_picked === null ? null : Number(l.qty_picked) }))} />
       {E.ttl("Lines")}

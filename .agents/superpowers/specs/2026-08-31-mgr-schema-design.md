@@ -214,7 +214,8 @@ security-invoker function. The exact table shape remains a baseline-migration
 decision; no status column or mutable inventory quantity is required.
 
 ### Views
-- `on_hand`, `atp` — unchanged definitions.
+- `on_hand` sums the ledger by SKU/location. `atp` subtracts all open reservations
+  from global SKU on-hand, including reserved SKUs with no movement history (zero on-hand).
 - `taproom_replenishment` — taproom on-hand vs `taproom_pars`, `suggested_qty = greatest(par − on_hand, 0)`.
 - `lot_on_hand` — `sum(qty)` by `(brewery_id, lot_id, sku_id, location_id)`.
 
@@ -262,14 +263,11 @@ transaction. Ordinary shipping also creates the invoice. Self-delivery defers th
 invoice until `confirm_delivery`; it does not defer or repeat shipment/removal effects. Route
 stops reference shipments (§13). RLS: `staff_all`; `P-customer` select via the order.
 
-**SCHEMA-GATE — invoice timing:** the implemented shipment shape has no durable
-fact that distinguishes ordinary invoice-at-ship from self-delivery
-invoice-at-delivery, and route assignment happens later. Before either branch
-ships, add explicit immutable-at-ship intent (for example
-`invoice_on_delivery boolean not null`) and require `ship_order` to persist it.
-`confirm_delivery` may create an invoice only for a shipment carrying that intent;
-never infer it from `carrier`, `tracking`, or later route membership. This is a
-fulfillment mode, not a workflow status.
+**Implemented invoice timing:** `shipments.invoice_timing` persists the reviewed
+`now` or `on_delivery` intent at ship time. `confirm_delivery` creates an invoice
+only for a shipment carrying `on_delivery`; it never repeats stock movements.
+Never infer timing from `carrier`, `tracking`, or later route membership.
+This is a fulfillment mode, not a workflow status.
 
 ### `invoices`
 `invoice_no bigint` (trigger), `kind invoice_kind`, `customer_id → customers`,
@@ -561,8 +559,9 @@ movement's `type` says consumed / `return_to_stock` / `loss`. idx `(run_id)`.
 ### Views
 - `packaging_run_requirements` — per open run × `sku_bom`: `required, on_hand, on_order,
   short`. The pre-run checklist.
-- `packaging_run_yields` — `bbl_packaged = sum(qty_actual × bbl_per_unit)`, `loss_bbl =
-  bbl_drawn − bbl_packaged`.
+- `packaging_run_yields` — `bbl_packaged = sum(linked output inventory movements.bbl)` for closed runs only,
+  `loss_bbl = bbl_drawn − bbl_packaged`. These committed movement volumes stay frozen
+  when a format changes; open-run requirements still use the current plan.
 
 ## 11. Compliance
 

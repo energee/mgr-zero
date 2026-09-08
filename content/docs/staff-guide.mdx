@@ -133,7 +133,7 @@ Wholesale Shop shows the packages the brewery has designated for wholesale â€” Â
 <Cards>
   <Card title="On hand">The sum of recorded movements for one SKU in one bin at one location. ATP stays per SKU.</Card>
   <Card title="ATP">Available to promise: on hand minus open reservations for that SKU. It can go negative.</Card>
-  <Card title="Movement log">The 50 newest entries: time, type, SKU, location, signed quantity, and note.</Card>
+  <Card title="Movement log">Entries show time, type, SKU, location and bin, signed quantity, frozen barrel volume, destination state or channel when present, and the movement/source references. **Older movements** and **Newer movements** page through the history.</Card>
 </Cards>
 
 **Bins.** A bin is a named place inside a location: a walk-in, a cold room, a dry rack. Every location starts with three, **Cold**, **Dry**, and **Walk-in**, and always keeps at least one; rename or remove the rest to match the building. A bin that has ever recorded stock cannot be removed, even at a zero balance, because the movement history still names it; rename it instead. Beer that ships on an order leaves from the location's first bin alphabetically, so name the bin you pick from so it sorts first.
@@ -164,6 +164,8 @@ Wholesale Shop shows the packages the brewery has designated for wholesale â€” Â
 | `taproom_transfer` | Transfer shipment: a negative source entry paired with a positive destination entry | Negative and positive pair |
 
 `sale_removal` and `taproom_transfer` are written by shipping, not by this form.
+
+**Movement recorded** appears only after the server confirms the save. It shows the committed quantity, frozen barrel volume, bin, state/channel, note, timestamp and reference. A failed or uncertain response does not show this receipt; retry the unchanged form to recover the same save. **Done** returns to the ledger. Inventory correction remains unavailable; ask your admin before recording another entry to correct a mistake.
 
 MGR calculates and stores barrel volume for every movement from quantity Ã— the BBL per unit of the SKU's format. Movements cannot be edited or deleted. See [Errors and corrections](#errors-corrections) before you try to fix inventory.
 
@@ -307,7 +309,7 @@ MGR creates a separate credit memo at the prices frozen on the invoice lines, ne
 
 <Screen name="Locations" />
 
-**Locations** (open `/locations`; Settings links here) lists every warehouse and taproom. Admin sees **Add location**: a name and a type, *Warehouse* or *Taproom*. Names are unique within the brewery. Select **Edit** on a row to open the location: its type, the brewery's timezone, and a **Location bins** link. Admin can rename a location or change its type with **Edit** then **Save location**; movement history stays exactly as recorded.
+**Locations** (open `/locations`; Settings links here) lists every warehouse and taproom. Admin sees **Add location**: a name and a type, *Warehouse* or *Taproom*. Names are unique within the brewery. Admin returns to **Settings**; other staff return to **Beer**. **All finished goods inventory** opens the global inventory, not a location filter. Select **Edit** (Admin) or **Review** (read-only staff) on a row to open the location: its type, the brewery's timezone, and a **Location bins** link. Admin can rename a location or change its type with **Edit** then **Save location**; movement history stays exactly as recorded.
 
 ## Stock transfers [#transfers]
 
@@ -403,7 +405,7 @@ Use **Set taproom par** to choose any SKU and set its target stock at the select
 
 Use **Set standing allocation** to reserve a named quantity against available-to-promise without an order. Selecting an existing SKU loads its current reserved quantity. Zero releases the standing reservation. Under **Standing allocations**, **Release** opens a confirmation showing the SKU and quantity; confirming returns that reservation to available-to-promise without moving stock or changing its par. Failures appear in the form and keep your inputs available to correct or retry.
 
-The page says **No taprooms yet: add one under Locations** when none exist, or **No pars set for this taproom.** when there are no suggestions. Add SKUs under Catalog before setting quantities.
+The page says **No taprooms yet: add one under Locations** when none exist, or **No pars set for this taproom.** when there are no suggestions. Admin and Sales can follow **Add SKU** from Inventory to Catalog before setting quantities. **Shortfall** keeps the selected SKU and shows its global on-hand, reserved and ATP quantities. Each competing order links to its order; a standing allocation links to its taproom section. **All shortfalls** clears the SKU filter.
 
 ## Recipes [#recipes]
 
@@ -567,6 +569,8 @@ Slack is a view of current MGR work. Operational forms such as fermentation read
 Admins can inspect the workspace, granted permissions, destination, queue state, recent callback/delivery times, and a safe error code on **Chat health**. **Disable** stops delivery but keeps the connection for later. **Disconnect** stops delivery and unlinks people immediately, then removes the stored Slack credential; if that cleanup fails, the page offers **Retry cleanup**. Reauthorization and cleanup are serialized so an old cleanup cannot remove replacement credentials. A rejected connection to an already-owned workspace preserves its existing connection; if saving new credentials fails, reauthorize from Chat settings. Staff can unlink their own account; an admin can unlink any linked person.
 
 ## Errors and corrections [#errors-corrections]
+
+A bookmarked staff page that your role cannot read opens **No access**, names the required roles, and offers **Back to Today**. Order controls follow your role: Sales confirms, adjusts and cancels; Warehouse picks, ships and puts back; Admin can do both.
 
 **A form reports an error.** Read the message, fix the visible fields, and submit again. Your entries stay until the form succeeds or you close it. Permission errors need an administrator.
 

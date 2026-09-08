@@ -8,7 +8,7 @@ import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import type { Filing, Report, ReportLine } from "@/lib/commands/compliance";
-import { runCommand } from "@/lib/commands/registry";
+import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
 import { notFound } from "next/navigation";
 import { treatmentLabel } from "@/app/(app)/settings/channels/tax-treatments";

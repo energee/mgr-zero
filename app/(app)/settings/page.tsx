@@ -2,7 +2,7 @@ import { serverEnv } from "@/lib/env/server";
 import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
-import { runCommand } from "@/lib/commands/registry";
+import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { redirect } from "next/navigation";
 import { deniedHref } from "@/lib/mgr/denied";
 import { plural } from "@/lib/mgr/plural";

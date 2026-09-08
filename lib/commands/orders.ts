@@ -2,7 +2,7 @@
 // to one plpgsql function (00001_baseline.sql, iron rule 5); this layer does
 // zod validation, role gating, and camelCase→p_* argument mapping.
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap, runCommand } from "./registry";
+import { defineCommand, defineQuery, unwrap, runCommand, CommandError } from "./registry";
 
 const lines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive() })).min(1);
 const salesRoles = ["admin", "sales"] as const;
@@ -132,19 +132,65 @@ defineCommand({
 defineQuery({
   name: "get_shortfalls", description: "SKUs whose available-to-promise is negative, with on-hand and open reservations",
   roles: [...readRoles],
-  input: z.object({}),
-  handler: async (ctx) => {
+  input: z.object({ skuId: z.string().uuid().optional() }),
+  handler: async (ctx, i) => {
+    // Read all rows being summed, not just PostgREST's first 1,000. Filtering
+    // precedes pagination; deterministic keys keep each page disjoint.
+    async function complete<T>(page: (start: number) => PromiseLike<{ data: T[] | null; error: { message: string; code?: string } | null; count: number | null }>) {
+      const result: T[] = [];
+      let total: number | undefined;
+      do {
+        const response = await page(result.length), rows = await unwrap(Promise.resolve(response));
+        if (response.count === null || (total !== undefined && response.count !== total) || !rows || (!rows.length && result.length < response.count)) {
+          throw new CommandError("Reservations changed while loading. Reload to review them.", 409, "conflict");
+        }
+        total = response.count; result.push(...rows);
+      } while (result.length < total);
+      return result;
+    }
     const [atp, onHand, allocs] = await Promise.all([
-      unwrap(ctx.db.from("atp").select("sku_id, qty, skus(name)").eq("brewery_id", ctx.breweryId).lt("qty", 0)),
-      unwrap(ctx.db.from("on_hand").select("sku_id, qty").eq("brewery_id", ctx.breweryId)),
-      unwrap(ctx.db.from("allocations").select("sku_id, qty").eq("brewery_id", ctx.breweryId).eq("status", "open")),
+      complete(start => {
+        let q = ctx.db.from("atp").select("sku_id, qty", { count: "exact" }).eq("brewery_id", ctx.breweryId).lt("qty", 0);
+        if (i.skuId) q = q.eq("sku_id", i.skuId);
+        return q.order("sku_id").range(start, start + 499);
+      }),
+      complete(start => {
+        let q = ctx.db.from("on_hand").select("sku_id, location_id, qty", { count: "exact" }).eq("brewery_id", ctx.breweryId);
+        if (i.skuId) q = q.eq("sku_id", i.skuId);
+        return q.order("sku_id").order("location_id").range(start, start + 499);
+      }),
+      complete(start => {
+        let q = ctx.db.from("allocations").select("id, sku_id, qty, source, ref", { count: "exact" }).eq("brewery_id", ctx.breweryId).eq("status", "open");
+        if (i.skuId) q = q.eq("sku_id", i.skuId);
+        return q.order("id").range(start, start + 499);
+      }),
     ]);
+    // Aggregate view lineage is not a reliable PostgREST relationship. Read
+    // labels explicitly through the same tenant/RLS boundary in bounded batches.
+    const skuNames = new Map<string, string>();
+    for (let start = 0; start < atp.length; start += 100) {
+      const skus = await unwrap(ctx.db.from("skus").select("id, name").eq("brewery_id", ctx.breweryId).in("id", atp.slice(start, start + 100).map(r => r.sku_id)));
+      for (const sku of skus ?? []) skuNames.set(sku.id, sku.name);
+    }
+    const orderLines = new Map<string, { orderId: string; orderNo: number }>();
+    const refs = [...new Set(allocs.filter(a => a.source === "order_line").map(a => a.ref))];
+    for (let start = 0; start < refs.length; start += 100) {
+      const lines = await unwrap(ctx.db.from("order_lines").select("id, order_id, orders(order_no)").eq("brewery_id", ctx.breweryId).in("id", refs.slice(start, start + 100)));
+      for (const line of lines as unknown as { id: string; order_id: string; orders: { order_no: number } | null }[]) {
+        if (line.orders) orderLines.set(line.id, { orderId: line.order_id, orderNo: line.orders.order_no });
+      }
+    }
     const sum = (rows: { sku_id: string; qty: number }[]) => rows.reduce((m, r) => m.set(r.sku_id, (m.get(r.sku_id) ?? 0) + Number(r.qty)), new Map<string, number>());
-    const onHandBySku = sum(onHand as { sku_id: string; qty: number }[]);
-    const allocatedBySku = sum(allocs as { sku_id: string; qty: number }[]);
-    return (atp as unknown as { sku_id: string; qty: number; skus: { name: string } | null }[]).map((r) => ({
-      skuId: r.sku_id, skuName: r.skus?.name ?? r.sku_id, atp: Number(r.qty),
+    const onHandBySku = sum(onHand), allocatedBySku = sum(allocs);
+    const reservationsBySku = new Map<string, typeof allocs>();
+    for (const allocation of allocs) {
+      const rows = reservationsBySku.get(allocation.sku_id) ?? [];
+      rows.push(allocation); reservationsBySku.set(allocation.sku_id, rows);
+    }
+    return atp.map(r => ({
+      skuId: r.sku_id, skuName: skuNames.get(r.sku_id) ?? r.sku_id, atp: Number(r.qty),
       onHand: onHandBySku.get(r.sku_id) ?? 0, allocated: allocatedBySku.get(r.sku_id) ?? 0,
+      reservations: (reservationsBySku.get(r.sku_id) ?? []).map(a => ({ id: a.id, source: a.source, ref: a.ref, qty: Number(a.qty), ...orderLines.get(a.ref) })),
     }));
   },
 });

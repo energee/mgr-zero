@@ -1665,10 +1665,15 @@ create view on_hand with (security_invoker = true) as
   from inventory_movements group by 1,2,3;
 
 create view atp with (security_invoker = true) as
-  select o.brewery_id, o.sku_id,
-         sum(o.qty) - coalesce((select sum(a.qty) from allocations a
-             where a.status = 'open' and a.brewery_id = o.brewery_id and a.sku_id = o.sku_id), 0) as qty
-  from on_hand o group by o.brewery_id, o.sku_id;
+  -- Reservations can precede the first receipt/production movement. Include
+  -- those SKUs with zero on hand; ATP remains global across all locations.
+  select s.brewery_id, s.id as sku_id, coalesce(o.qty, 0) - coalesce(a.qty, 0) as qty
+  from skus s
+  left join (select brewery_id, sku_id, sum(qty) as qty from on_hand group by brewery_id, sku_id) o
+    on o.brewery_id = s.brewery_id and o.sku_id = s.id
+  left join (select brewery_id, sku_id, sum(qty) as qty from allocations where status = 'open' group by brewery_id, sku_id) a
+    on a.brewery_id = s.brewery_id and a.sku_id = s.id
+  where o.sku_id is not null or a.sku_id is not null;
 
 -- Bin grain, beside on_hand rather than replacing it: atp and taproom_replenishment
 -- keep their location-grain join. Spec 2026-09-06 Decision 2.

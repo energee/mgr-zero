@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
-import { runCommand } from "@/lib/commands/registry";
+import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { deniedHref } from "@/lib/mgr/denied";
 import type { ChatLinkedPerson } from "@/lib/commands/chat";
 import "@/lib/commands/all";
