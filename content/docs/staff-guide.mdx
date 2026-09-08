@@ -31,7 +31,7 @@ change the search term.
 | Role | What you can do |
 | --- | --- |
 | **Admin** | Every staff screen and action that exists. |
-| **Sales** | Catalog; customers and pricing; create, submit, confirm, adjust, and cancel orders, plus credits; view inventory; invoices; replenishment suggestions and creating the replenishment order. |
+| **Sales** | Catalog; customers and pricing; create, submit, confirm, adjust, and cancel orders, plus credits; view inventory; invoices; replenishment suggestions and creating the replenishment order; the compliance registry, the monthly report and its filed snapshot, and lot trace. |
 | **Warehouse** | View inventory and record movements; keg pools and keg events on **Kegs**; view orders, pick, and ship; build delivery routes, and depart, confirm each stop, and return a route you are the assigned driver of; view replenishment suggestions (**Create replenishment order** is on the page but submitting it returns a permission error); schedule, pick a tank for, start, and close packaging runs, and repack; vendors, materials and contracts; purchase orders (draft, mark sent, receive), material counts, and drafting orders from Planning. Catalog, Customers, the Invoices list, and Team open if you type their address, but they are not in Warehouse's navigation. |
 | **Brewer** | Today; linking your Slack account from App Home; Recipes and versions; Batches, vessels, and recording brew day; Cellar transfers and fermentation readings; packaging runs (schedule, pick a tank, start, and close) — but not **Repack**, which is Admin and Warehouse only; vendors, materials, contracts and material counts, and reading Planning (drafting the orders is Admin and Warehouse). See [Navigate MGR](#navigation). |
 
@@ -47,9 +47,9 @@ The brewery name in the header is the brewery whose records you are looking at. 
 
 - **Beer** holds **Inventory**, **Cellar**, **Materials**, and **Kegs**.
 - **Work** holds **Orders**, **Pick**, **Replenishment**, **Transfers**, **Batches**, **Packaging**, **POs**, and **Deliveries**.
-- **More** holds **Invoices**, **Catalog**, **Customers**, **Price groups**, **Recipes**, **Vendors**, **Planning**, **Settings** (the team roster), **Sale channels**, **Locations**, and **Units**.
+- **More** holds **Invoices**, **Catalog**, **Customers**, **Price groups**, **Recipes**, **Vendors**, **Compliance**, **Planning**, **Settings** (the team roster), **Sale channels**, **Locations**, and **Units**.
 
-Links your role cannot use are simply not shown. Planned areas stay hidden until they are built (Taproom, Taps, Menu, Compliance, Import), so a tab with nothing you can open does not appear.
+Links your role cannot use are simply not shown. Planned areas stay hidden until they are built (Taproom, Taps, Menu, Import), so a tab with nothing you can open does not appear.
 
 CSV import has no screen yet, so there is no **Import** link. See [Actions not yet available](#unavailable).
 
@@ -290,6 +290,26 @@ A departed route lists its stops with their delivered times. The lowest undelive
 
 **Return route** is enabled once every stop is delivered and stamps the return; the route then leaves the Deliveries list, and the return time replaces the button. A refused delivery has no screen yet: a departed route cannot change its stops or return with one open, so a stop that cannot be delivered on the day is confirmed when it is delivered later. Before departing, untick a stop to move it to another route.
 
+## Compliance [#compliance]
+
+<Screen name="Compliance months" />
+
+**Compliance** (More; Sales and Admin) lists the last three months and every month already filed. A month marked *not filed* opens for review; a filed month shows its filing date and taxpaid barrels. Below the months sit the **Compliance registry** link and, under **Lot trace**, every packaged lot. MGR reports the TTB month here; other jurisdictions and date ranges are available through the API.
+
+<Screen name="Monthly compliance" />
+
+A month is generated from the inventory ledger when you open it, so nothing is stored until you file. The table shows each package class (kegs, cans, bottles) in barrels: begin + in − out = end, and every class must balance. Zeros print 0.00. Beer in process is what the tanks hold now, not at the period end. Below the table, **Packaged** is production into finished goods, then each removal class (taxpaid, export, samples, losses, and so on) by the tax treatment recorded when the beer moved, so editing a sale channel later does not change a past month, and taxpaid removals by destination state. **Review auto-reconciled losses** is not available yet.
+
+**Save filed snapshot** stores the figures as they stand, with an optional note, and marks the month filed; reopening it shows the snapshot rather than regenerating. MGR does not transmit anything: file with the TTB or the state yourself and record it here. The button stays off while a class does not balance; the month names the class, and today the only cause is a repack across package classes. A month can be filed once, and a period overlapping a filed one is refused. The report itself is a fixed shape, so a movement recorded later into a filed month appears in the next generation of a *different* month, never in the snapshot.
+
+<Screen name="Compliance registry" />
+
+The registry has two tabs. **Brands** lists each brand with its COLA or formula approvals and its state registrations; a brand with no COLA is flagged *COLA pending*. **Add approval** takes the brand, the approval kind, its TTB number, and optional approved and expiry dates; the same number on the same brand is one record, so saving it twice is refused. **Add registration** takes the brand, the two-letter state, and an optional number and expiry; one record exists per brand and state, so saving again replaces it, and **Edit** keeps the brand and state fixed. **Licenses** lists the brewery's own state licenses by state and kind (brewery, supplier, direct to consumer); **Add license** works the same way, one record per state and kind, with state and kind fixed on **Edit**. **Edit** on any row opens the same sheet filled in. Kind is stored lower-case and trimmed. Order confirmation does not read this registry yet; the planned warning for an unregistered destination state will never block.
+
+<Screen name="Lot trace" />
+
+A lot is one closed packaging run. Its trace shows the brand and package, the run and packaging date, the tank and batch it was drawn from, the barrels drawn, and every ledger movement carrying the lot: the production that made it and any samples, losses, or destructions pulled from it, with what remains on hand. Shipments do not record a lot yet, so the customers who received it are not listed.
+
 ## Keg fleet [#kegs]
 
 <Screen name="Keg fleet" />
@@ -507,6 +527,9 @@ Do not hunt for hidden controls for these:
 - deleting customers, ship-tos, inventory history, orders, invoices, or credit memos
 - editing staff roles or seeing staff email addresses
 - recording payments
+- reviewing or reattributing auto-reconciled losses before a filing, a printed lot trace packet, and the customers who received a lot
+- an order-confirmation warning from the compliance registry, or deleting an approval, registration, or license
+- filing a state or other non-TTB report, or a period other than a calendar month, from the interface (the API accepts any jurisdiction and range)
 - Slack installation, notification settings, or unlinking from a visible MGR settings page
 
 Ask the person who configures your brewery when one of these is required.

@@ -5,11 +5,10 @@
 // orders.ts (Program 1) and stamps transfer stops without invoicing.
 import { z } from "zod";
 import { docNo, trfNo } from "@/lib/mgr/doc-no";
-import { defineCommand, defineQuery, unwrap } from "./registry";
+import { breweryToday, defineCommand, defineQuery, rows, unwrap } from "./registry";
 
 const ROLES = ["admin", "warehouse"] as const;
 const READ = ["admin", "warehouse", "sales"] as const;
-const rows = <T,>(q: Parameters<typeof unwrap>[0]) => unwrap(q) as unknown as Promise<T[]>;
 
 const stop = z.object({ shipmentId: z.string().uuid().optional(), stockTransferId: z.string().uuid().optional(), stopNo: z.number().int().positive() });
 
@@ -48,14 +47,14 @@ defineQuery({
     // ponytail: every delivery and shipment of the brewery is read to find the ones on no route, and a
     // carrier-shipped order waits there too until someone routes it; a view of undelivered documents with
     // a shipment-level "handed to carrier" state is the upgrade path once history outgrows one page
-    const [routes, deliveries, shipments, transfers, drivers, brewery] = await Promise.all([
+    const [routes, deliveries, shipments, transfers, drivers, today] = await Promise.all([
       rows<RouteRow>(q),
       rows<DeliveryRow>(ctx.db.from("deliveries").select("*").eq("brewery_id", ctx.breweryId).order("stop_no")),
       rows<ShipmentRow>(ctx.db.from("shipments").select("id, orders(order_no, customers(name), ship_tos(label))").eq("brewery_id", ctx.breweryId)),
       rows<TransferRow>(ctx.db.from("stock_transfers").select("id, transfer_no, to_location:locations!stock_transfers_to_location_id_brewery_id_fkey(name)")
         .eq("brewery_id", ctx.breweryId).in("status", ["picked", "in_transit"])),
       unwrap(ctx.db.from("brewery_users").select("user_id, role").eq("brewery_id", ctx.breweryId).in("role", ["admin", "warehouse"])),
-      unwrap(ctx.db.from("breweries").select("timezone").eq("id", ctx.breweryId).single()) as Promise<{ timezone: string }>,
+      breweryToday(ctx),
     ]);
     const docs = [...shipments.map(shipmentDoc), ...transfers.map(transferDoc)];
     const labelById = new Map(docs.map((d) => [d.id, d.label]));
@@ -67,8 +66,7 @@ defineQuery({
       })),
       unassigned: docs.filter((d) => !onRoute.has(d.id)),
       drivers,
-      // the builder's default date is the brewery's today, not the server's UTC day
-      today: new Date().toLocaleDateString("en-CA", { timeZone: brewery.timezone }),
+      today,
     };
   },
 });

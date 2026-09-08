@@ -2234,20 +2234,18 @@ export const SCREENS: Screen[] = [
     tab: "Beer",
     group: "Global",
     name: "Lot trace",
-    job: "Trace a lot globally from material to customer",
-    reads: "trace_lot [design]",
+    job: "Trace a lot from its tank and batch through every ledger movement that names it",
+    reads: "trace_lot",
     writes: "none",
-    states: [["shipped out", "every customer that received the lot, with its contact"], ["taproom", "transfers follow to the count that depleted them"], ["no contact", "the ship-to carries none · the customer record is the fallback", 1], ["still on hand", "unsold units are the part a recall can actually stop"]],
-    spec: "A recall contact is the person on the ship-to that received the lot, falling back to the customer record when that address carries none: the account's billing contact is rarely who is standing next to the keg. The trace follows a taproom transfer to the count that depleted it and stops there. It does not descend into POS sale lines, because a sale posts nothing to the ledger and would imply a per-pint traceability MGR does not have. Print trace is the packet handed to a regulator or a customer, which is why contacts and materials sit on the same page as the movements.",
+    states: [["still on hand", "unsold units are the part a recall can actually stop"], ["no shipments", "pick and ship record no lot yet, so no customer is listed", 1], ["unknown lot", "not found"]],
+    spec: "The lot is one packaging run, so the trace follows lot → run → tank → batch and lists every movement carrying the lot: the production that made it, samples and losses pulled from it. Shipments record no lot until pick/ship takes one per line (drift: pick/ship lots), so recall contacts cannot come from the ledger yet and the page says so instead of drawing an empty contact list. It does not descend into POS sale lines, because a sale posts nothing to the ledger and would imply a per-pint traceability MGR does not have.",
     body: (<>
-      {E.back("Search", "L-240831-HZ")}
-      {E.row("Hazy IPA · 16 oz case", "RUN-0028 · packaged 8/31", "118 cases")}
-      {E.tape([["−40 · ORD-0225 · Ridgeline", "8/27"], ["−24 · ORD-0229 · Teresa’s", "8/29"], ["−6 · taproom transfer", "8/30"], ["−2 · sample", "8/30"]])}
-      {E.nav("Materials in", "2-row L-0821 · Citra L-0790")}
-      {E.ttl("Recall contacts")}
-      {E.row("Ridgeline Tap Room", "Dana · 610-555-0140")}
-      {E.row("Teresa’s", "Teresa · 215-555-0199")}
-      {E.btn("Print trace", "g")}
+      {E.back("Compliance months", "L-240831-HZ")}
+      {E.row("Hazy IPA · 16 oz case", "run 28 · packaged 8/31 · best by 2/27", "118 on hand")}
+      {E.fld("Tank · batch", "FV-3 · batch 41 · brewed 8/10")}
+      {E.fld("Drawn", "25.00 bbl")}
+      {E.tape([["+120 · production in · Hazy IPA 16 oz case · Warehouse", "8/31"], ["−2 · sample · Hazy IPA 16 oz case · Warehouse", "9/02"]])}
+      {E.note("Shipments do not record a lot yet, so a customer who received this lot is not listed. Unsold units are the part a recall can still stop.")}
     </>),
   },
   {
@@ -2722,16 +2720,18 @@ export const SCREENS: Screen[] = [
     tab: "More",
     name: "Compliance months",
     job: "Choose a reporting month and see whether its snapshot was filed",
-    reads: "list_compliance_reports [design]",
+    reads: "list_compliance_reports · list_lots",
     writes: "none",
-    states: [["current", "ready for review"], ["filed", "immutable snapshot saved"], ["blocked", "report does not balance", 1]],
-    spec: "This is the shared destination for the registry back link and the report month picker.",
+    states: [["not filed", "ready to review", 1], ["filed", "immutable snapshot saved"], ["lots", "every packaged lot opens its trace"]],
+    spec: "This is the shared destination for the registry back link, the month rows, and the lot trace. The last three months always show, plus every filed period; a month is TTB, the API takes other jurisdictions and ranges.",
     body: (<>
-      {E.back("More", "Compliance")}
-      {E.nav("September 2026", "current · ready to review", "w")}
-      {E.nav("August 2026", "filed 9/02/2026 · $1,508 excise", "ok")}
-      {E.nav("July 2026", "filed 8/04/2026 · $1,442 excise", "ok")}
+      {E.hd("Compliance", "months")}
+      {E.nav("September 2026", "not filed · ready to review", "w")}
+      {E.nav("August 2026", "filed 2026-09-02 · 41.20 bbl taxable", "ok")}
+      {E.nav("July 2026", "filed 2026-08-04 · 38.75 bbl taxable", "ok")}
       {E.nav("Compliance registry", "brands, states and licenses")}
+      {E.ttl("Lot trace")}
+      {E.nav("L-240831-HZ", "Hazy IPA · packaged 2026-08-31")}
     </>),
   },
   {
@@ -2741,20 +2741,25 @@ export const SCREENS: Screen[] = [
     name: "Monthly compliance",
     to: { Confirm: "Monthly compliance" },
     job: "Generate from ledgers, review, then record the external filing",
-    reads: "generate_compliance_report · get_loss_review [view; SCHEMA-GATE for typed completion-loss identity]",
-    writes: "file_compliance_report [design; immutable snapshot] · reattribute_loss [SCHEMA-GATE; requires typed origin/classification + atomic compensation]",
-    states: permitted("sales or admin required"),
-    spec: "Reattribution waits for schema that identifies completion rows and cellar removal class; correction must be atomic append-only compensation, never free-text note matching. The identity checks are v1 lessons drawn in user copy: balance per class, cellar as in-process, 0.00 never blank, no transmission.",
+    reads: "list_compliance_reports · generate_compliance_report · get_loss_review [view; SCHEMA-GATE for typed completion-loss identity]",
+    writes: "file_compliance_report · reattribute_loss [SCHEMA-GATE; requires typed origin/classification + atomic compensation]",
+    states: [["current", "generated from the ledger now"], ["does not balance", "a movement type the report cannot classify is named · Save stays off", 1], ["filed", "the snapshot is shown, not regenerated"], ["permission", "sales or admin required", 1]],
+    spec: "Reattribution waits for schema that identifies completion rows and cellar removal class; correction must be atomic append-only compensation, never free-text note matching. The identity checks are v1 lessons drawn in user copy: balance per class, cellar as in-process, 0.00 never blank, no transmission. Beer in process is the tanks now, not at period end, and says so. Removals are keyed by the tax treatment frozen on each movement, so editing a channel later does not move a past month; taxable removals also break down by destination state for the states that remit.",
     body: (<>
       {E.back("Compliance months", "August 2026")}
-      {E.pick("Month", "August 2026", ["July 2026", "August 2026", "September 2026"])}
-      {E.row("1 · Review auto-reconciled losses", "review isn’t available yet", "3", "w")}
+      {E.gated("1 · Review auto-reconciled losses", "review isn’t available yet")}
       {E.row("2 · Review generated figures", "", E.status("Current", "ok"))}
-      {E.tbl(["class", "begin", "+", "−", "end"], [["cellar · in-process", "120.40", "62.00", "58.10", "124.30"], ["kegs", "41.00", "30.50", "33.20", "38.30"], ["cans", "12.60", "18.00", "14.90", "15.70"], ["bottles", "0.00", "0.00", "0.00", "0.00"]])}
-      {E.info("Every class balances: begin + in − out = end. Cellar leaves by packaging, not as a removal. Zeros print 0.00.")}
-      {E.row("PA / OH excise", "generated", "$1,508")}
-      {E.row("3 · Confirm filed outside MGR", "", E.act("Confirm", "success"))}
+      {E.tbl(["class", "begin", "+", "−", "end"], [["kegs", "41.00", "30.50", "33.20", "38.30"], ["cans", "12.60", "18.00", "14.90", "15.70"], ["bottles", "0.00", "0.00", "0.00", "0.00"]])}
+      {E.info("Every class balances: begin + in − out = end, in barrels. Cellar leaves by packaging, not as a removal. Zeros print 0.00.")}
+      {E.row("Beer in process", "tanks now, not at period end", "120.40 bbl")}
+      {E.row("Packaged", "production into finished goods", "48.50 bbl")}
+      {E.row("Taxpaid removals", "", "41.20 bbl")}
+      {E.row("Export", "", "6.90 bbl")}
+      {E.row("Taxpaid to PA", "destination state", "38.10 bbl")}
+      {E.row("Taxpaid to OH", "destination state", "3.10 bbl")}
+      {E.row("3 · Confirm filed outside MGR", "", "")}
       {E.info("MGR saves the immutable snapshot; it does not transmit the filing. Save stays off until the report balances.")}
+      {E.edit("Note · optional", "filed on pay.gov")}
       {E.btn("Save filed snapshot", "irr")}
     </>),
   },
@@ -2765,17 +2770,23 @@ export const SCREENS: Screen[] = [
     name: "Compliance registry",
     to: { Edit: "Brand approval", "Hazy IPA": "Brand approval", Stout: "Brand approval" },
     job: "Maintain brand and state permissions used by order warnings",
-    reads: "get_compliance_registry [design]",
-    writes: "upsert_brand_approval · upsert_state_registration · upsert_brewery_state_license [design]",
-    states: permitted("sales or admin required"),
-    spec: "Unregistered destination/brand combinations warn during order confirm and link here.",
+    reads: "get_compliance_registry",
+    writes: "upsert_brand_approval · upsert_state_registration · upsert_brewery_state_license",
+    states: [["pending", "a brand with no COLA is flagged", 1], ["empty", "no brands yet: nothing to register"], ["permission", "sales or admin required", 1]],
+    spec: "Unregistered destination/brand combinations are meant to warn during order confirm and link here; that read is not built yet (drift: order warning). One page, two lists: each brand with its approvals and state registrations under it, then the brewery's licenses; the three sheets add or edit a row.",
     body: (<>
       {E.back("Compliance months", "Registry")}
-      {E.tabs(["brands", "states", "licenses"])}
-      {E.row("Hazy IPA", "COLA approved · formula n/a", E.act("Edit"))}
-      {E.row("Stout", "COLA pending", E.act("Edit"), "w")}
-      {E.row("Ohio", "supplier registered · expires 12/31", E.act("Edit"))}
-      {E.row("Pennsylvania brewery license", "expires 6/30/2027", E.act("Edit"))}
+      {E.tabs(["brands", "licenses"])}
+      {E.ttl("Brands")}
+      {E.row("Hazy IPA", "COLA 23001001000123 · expires 2031-01-15")}
+      {E.row("COLA 23001001000123", "approved 2026-01-15 · expires 2031-01-15", E.act("Edit"))}
+      {E.row("OH registration", "OH-88214 · expires 2026-12-31", E.act("Edit"))}
+      {E.row("Stout", "COLA pending", "", "w")}
+      {E.btns(["Add approval", "Add registration"])}
+      {E.ttl("Licenses")}
+      {E.row("PA brewery", "G-21884 · expires 2027-06-30", E.act("Edit"))}
+      {E.btn("Add license", "g")}
+      {E.note("Order confirmation does not read this registry yet; a warning for an unregistered destination state is planned and will never block.")}
     </>),
   },
   {
@@ -2786,13 +2797,14 @@ export const SCREENS: Screen[] = [
     name: "Brand approval",
     to: { "Save approval": "Compliance registry" },
     job: "Record one brand’s federal approval status",
-    reads: "get_compliance_registry [design]",
-    writes: "upsert_brand_approval [design]",
-    states: [["approved", "orders may proceed"], ["pending", "order confirmation warns", 1]],
+    reads: "get_compliance_registry",
+    writes: "upsert_brand_approval",
+    states: [["approved", "orders may proceed"], ["duplicate", "the same number on the same brand is one record · conflict", 1]],
     body: (<>
       {E.pick("Brand", "Stout", ["Hazy IPA", "Pils", "Stout"])}
-      {E.inp("COLA number", "pending")}
-      {E.inp("Formula number", "not required")}
+      {E.pick("Approval", "COLA", ["COLA", "Formula"])}
+      {E.inp("COLA number")}
+      {E.cols(E.edit("Approved on · optional", "2026-01-15", "date"), E.edit("Expires · optional", "2031-01-15", "date"))}
       {E.btn("Save approval")}
     </>),
   },
@@ -2804,14 +2816,14 @@ export const SCREENS: Screen[] = [
     name: "State registration",
     to: { "Save registration": "Compliance registry" },
     job: "Record permission to sell one brand in one state",
-    reads: "get_compliance_registry [design]",
-    writes: "upsert_state_registration [design]",
-    states: [["registered", "brand may ship to the state"], ["missing", "order confirmation warns", 1]],
+    reads: "get_compliance_registry",
+    writes: "upsert_state_registration",
+    states: [["registered", "brand may ship to the state"], ["missing", "order confirmation warns", 1], ["saved again", "one record per brand and state: saving replaces it"]],
     body: (<>
       {E.pick("Brand", "Hazy IPA", ["Hazy IPA", "Pils", "Stout"])}
-      {E.pick("State", "Ohio", ["Pennsylvania", "Ohio"])}
-      {E.inp("Registration number", "OH-88214")}
-      {E.inp("Expires", "12/31/2026")}
+      {E.cols(E.edit("State (two letters)", "OH"), E.edit("Registration number · optional", "OH-88214"))}
+      {E.edit("Expires · optional", "2026-12-31", "date")}
+      {E.note("One record per brand and state: saving again replaces it.")}
       {E.btn("Save registration")}
     </>),
   },
@@ -2823,13 +2835,13 @@ export const SCREENS: Screen[] = [
     name: "License",
     to: { "Save license": "Compliance registry" },
     job: "Record one brewery state license",
-    reads: "get_compliance_registry [design]",
-    writes: "upsert_brewery_state_license [design]",
-    states: [["current", "orders may proceed"], ["expired", "order confirmation warns", 1]],
+    reads: "get_compliance_registry",
+    writes: "upsert_brewery_state_license",
+    states: [["current", "orders may proceed"], ["expired", "order confirmation warns", 1], ["saved again", "one record per state and kind: saving replaces it"]],
     body: (<>
-      {E.pick("State", "Pennsylvania", ["Pennsylvania", "Ohio"])}
-      {E.inp("License number", "G-21884")}
-      {E.inp("Expires", "6/30/2027")}
+      {E.cols(E.edit("State (two letters)", "PA"), E.edit("Kind", "brewery"))}
+      {E.cols(E.edit("License number · optional", "G-21884"), E.edit("Expires · optional", "2027-06-30", "date"))}
+      {E.note("Kind is the license class the state uses: brewery, supplier, direct to consumer. One record per state and kind.")}
       {E.btn("Save license")}
     </>),
   },

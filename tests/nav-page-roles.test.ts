@@ -26,6 +26,7 @@ const PAGE_QUERIES: Record<string, readonly string[]> = {
   "/purchase-orders": ["list_purchase_orders", "list_vendors", "list_materials", "get_purchase_order", "list_locations", "list_bins"],
   "/planning": ["get_material_requirements"],
   "/routes": ["list_routes"],
+  "/compliance": ["list_compliance_reports", "list_lots", "generate_compliance_report", "get_compliance_registry", "trace_lot"],
   "/kegs": ["get_keg_fleet", "list_locations", "list_bins", "list_customers", "list_vendors", "list_keg_events", "list_keg_pools", "get_customer_keg_balance"],
 };
 
