@@ -15,4 +15,5 @@ import "./purchasing";
 import "./settings";
 import "./taproom";
 import "./delivery";
+import "./compliance";
 export {};

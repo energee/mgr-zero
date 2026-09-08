@@ -624,6 +624,34 @@ describe("registered staff mutation role × RPC matrix", () => {
         rpc: { p_from: locationId, p_to: taproomId, p_lines: [{ sku_id: skuId, qty: 1 }] },
       }),
     },
+    {
+      command: "upsert_brand_approval", rpc: "upsert_brand_approval", allowed: ["admin", "sales"],
+      input: async role => {
+        const { data: brand } = await admin.from("skus").select("brand_id").eq("id", skuId).single();
+        const ttbId = unique("cola", role);
+        return {
+          command: { brandId: brand!.brand_id, kind: "cola", ttbId },
+          rpc: { p_brewery: brewery.id, p_id: null, p_brand: brand!.brand_id, p_kind: "cola", p_ttb_id: ttbId, p_approved_on: null, p_expires_on: null, p_note: null },
+        };
+      },
+    },
+    {
+      command: "upsert_state_registration", rpc: "upsert_state_registration", allowed: ["admin", "sales"],
+      input: async () => {
+        const { data: brand } = await admin.from("skus").select("brand_id").eq("id", skuId).single();
+        return {
+          command: { brandId: brand!.brand_id, state: "OH" },
+          rpc: { p_brewery: brewery.id, p_brand: brand!.brand_id, p_state: "OH", p_registration_no: null, p_approved_on: null, p_expires_on: null },
+        };
+      },
+    },
+    {
+      command: "upsert_brewery_state_license", rpc: "upsert_brewery_state_license", allowed: ["admin", "sales"],
+      input: async () => ({
+        command: { state: "PA", kind: "brewery" },
+        rpc: { p_brewery: brewery.id, p_state: "PA", p_kind: "brewery", p_license_no: null, p_expires_on: null, p_note: null },
+      }),
+    },
   ];
 
   for (const entry of matrix) {

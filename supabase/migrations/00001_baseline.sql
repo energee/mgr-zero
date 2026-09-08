@@ -3432,6 +3432,69 @@ begin
   return private.complete_command_request(p_request_id, jsonb_build_object('routeId', p_route, 'returned_at', r.returned_at));
 end $$;
 
+-- ---------------------------------------------------------------- compliance registry (Program 9)
+-- Three upserts on the registry tables. Each row is either edited by id or
+-- matched on its natural key (unique constraint); a second row with a taken
+-- key is the same record, so it returns MG409 rather than a duplicate.
+create function upsert_brand_approval(
+  p_brewery uuid, p_id uuid, p_brand uuid, p_kind public.approval_kind, p_ttb_id text, p_approved_on date, p_expires_on date, p_note text, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.brand_approvals;
+begin
+  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'upsert_brand_approval', p_request_id,
+    jsonb_build_object('id', p_id, 'brand', p_brand, 'kind', p_kind, 'ttb_id', p_ttb_id, 'approved_on', p_approved_on, 'expires_on', p_expires_on, 'note', p_note));
+  if v_replay is not null then return v_replay; end if;
+  begin
+    if p_id is null then
+      insert into public.brand_approvals (brewery_id, brand_id, kind, ttb_id, approved_on, expires_on, note)
+        values (p_brewery, p_brand, p_kind, p_ttb_id, p_approved_on, p_expires_on, p_note) returning * into v_row;
+    else
+      update public.brand_approvals set brand_id = p_brand, kind = p_kind, ttb_id = p_ttb_id, approved_on = p_approved_on, expires_on = p_expires_on, note = p_note
+        where id = p_id and brewery_id = p_brewery returning * into v_row;
+      if not found then raise exception 'approval not found'; end if;
+    end if;
+  exception when unique_violation then
+    raise exception 'that approval is already recorded for this brand' using errcode = 'MG409';
+  end;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+create function upsert_state_registration(
+  p_brewery uuid, p_brand uuid, p_state text, p_registration_no text, p_approved_on date, p_expires_on date, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.state_registrations;
+begin
+  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'upsert_state_registration', p_request_id,
+    jsonb_build_object('brand', p_brand, 'state', p_state, 'registration_no', p_registration_no, 'approved_on', p_approved_on, 'expires_on', p_expires_on));
+  if v_replay is not null then return v_replay; end if;
+  -- the composite FK pins the brand to this brewery, and the conflict key is the brand, so the row hit is this brewery's
+  insert into public.state_registrations (brewery_id, brand_id, state, registration_no, approved_on, expires_on)
+    values (p_brewery, p_brand, p_state, p_registration_no, p_approved_on, p_expires_on)
+    on conflict (brand_id, state) do update
+      set registration_no = excluded.registration_no, approved_on = excluded.approved_on, expires_on = excluded.expires_on
+    returning * into v_row;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+create function upsert_brewery_state_license(
+  p_brewery uuid, p_state text, p_kind text, p_license_no text, p_expires_on date, p_note text, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.brewery_state_licenses;
+begin
+  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'upsert_brewery_state_license', p_request_id,
+    jsonb_build_object('state', p_state, 'kind', p_kind, 'license_no', p_license_no, 'expires_on', p_expires_on, 'note', p_note));
+  if v_replay is not null then return v_replay; end if;
+  insert into public.brewery_state_licenses (brewery_id, state, kind, license_no, expires_on, note)
+    values (p_brewery, p_state, p_kind, p_license_no, p_expires_on, p_note)
+    on conflict (brewery_id, state, kind) do update
+      set license_no = excluded.license_no, expires_on = excluded.expires_on, note = excluded.note
+    returning * into v_row;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
 create function save_route(
   p_brewery uuid, p_id uuid, p_name text, p_delivery_date date, p_driver uuid, p_vehicle text, p_note text, p_stops jsonb, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
@@ -5900,7 +5963,10 @@ grant execute on function
   record_keg_event(uuid,uuid,public.keg_size,int,public.keg_event_reason,uuid,uuid,uuid,text,uuid),
   save_route(uuid,uuid,text,date,uuid,text,text,jsonb,uuid),
   depart_route(uuid,uuid),
-  return_route(uuid,uuid)
+  return_route(uuid,uuid),
+  upsert_brand_approval(uuid,uuid,uuid,public.approval_kind,text,date,date,text,uuid),
+  upsert_state_registration(uuid,uuid,text,text,date,date,uuid),
+  upsert_brewery_state_license(uuid,text,text,text,date,text,uuid)
   to authenticated;
 grant usage on schema private, extensions to service_role;
 -- service_role reaches `private` only for the UUID default its seed inserts
