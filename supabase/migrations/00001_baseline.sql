@@ -1298,7 +1298,8 @@ create table stock_transfer_lines (
   foreign key (from_bin_id, brewery_id) references bins (id, brewery_id),
   foreign key (to_bin_id, brewery_id) references bins (id, brewery_id),
   check (num_nonnulls(sku_id, material_id, keg_pool_id) = 1),
-  check ((keg_pool_id is null) = (keg_size is null))
+  check ((keg_pool_id is null) = (keg_size is null)),
+  check (keg_pool_id is null or (qty = trunc(qty) and (qty_picked is null or qty_picked = trunc(qty_picked))))
 );
 create index stock_transfer_lines_transfer_idx on stock_transfer_lines (brewery_id, transfer_id);
 
@@ -4970,6 +4971,7 @@ begin
       (e->>'keg_pool_id')::uuid as keg_pool_id, (e->>'keg_size')::public.keg_size as keg_size,
       (e->>'qty')::numeric as qty, (e->>'from_bin_id')::uuid as from_bin, (e->>'to_bin_id')::uuid as to_bin, e->>'note' as note
     from jsonb_array_elements(p_lines) e loop
+    if l.keg_pool_id is not null and l.qty <> trunc(l.qty) then raise exception 'empty kegs must be whole units'; end if;
     insert into public.stock_transfer_lines (brewery_id, transfer_id, sku_id, material_id, keg_pool_id, keg_size, qty, from_bin_id, to_bin_id, note)
     values (p_brewery, v_id, l.sku_id, l.material_id, l.keg_pool_id, l.keg_size, l.qty, l.from_bin, l.to_bin, l.note);
   end loop;
@@ -5014,6 +5016,7 @@ begin
   if v_replay is not null then return v_replay; end if;
   t := private.lock_transfer(p_transfer, array['submitted','picked']::public.stock_transfer_status[]);
   for pk in select (e->>'line_id')::uuid as line_id, (e->>'qty')::numeric as qty from jsonb_array_elements(p_picks) e loop
+    if pk.qty <> trunc(pk.qty) and exists (select 1 from public.stock_transfer_lines where id = pk.line_id and transfer_id = p_transfer and keg_pool_id is not null) then raise exception 'empty kegs must be whole units'; end if;
     update public.stock_transfer_lines set qty_picked = pk.qty where id = pk.line_id and transfer_id = p_transfer;
     if not found then raise exception 'transfer line % not found', pk.line_id; end if;
   end loop;
@@ -5033,6 +5036,7 @@ begin
   for l in select * from public.stock_transfer_lines where transfer_id = p_transfer loop
     select (e->>'qty')::numeric into v_qty from jsonb_array_elements(coalesce(p_lines, '[]'::jsonb)) e where (e->>'line_id')::uuid = l.id;
     v_qty := coalesce(v_qty, l.qty_picked, l.qty);
+    if l.keg_pool_id is not null and v_qty <> trunc(v_qty) then raise exception 'empty kegs must be whole units'; end if;
     if v_qty <= 0 then continue; end if;
     if l.sku_id is not null then
       insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, ref, created_by)
@@ -5070,30 +5074,34 @@ end $$;
 -- stock transfer.
 create function move_stock_bin(
   p_brewery uuid, p_sku uuid, p_material uuid, p_keg_pool uuid, p_keg_size public.keg_size,
-  p_qty numeric, p_from_bin uuid, p_to_bin uuid, p_note text, p_request_id uuid
+  p_qty numeric, p_from_bin uuid, p_to_bin uuid, p_note text, p_request_id uuid, p_material_lot uuid default null, p_sku_lot uuid default null
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_replay jsonb; v_from public.bins; v_to public.bins;
 begin
   perform private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'move_stock_bin', p_request_id,
     jsonb_build_object('brewery', p_brewery, 'sku', p_sku, 'material', p_material, 'keg_pool', p_keg_pool, 'keg_size', p_keg_size,
-                       'qty', p_qty, 'from_bin', p_from_bin, 'to_bin', p_to_bin, 'note', p_note));
+                       'qty', p_qty, 'from_bin', p_from_bin, 'to_bin', p_to_bin, 'note', p_note, 'material_lot', p_material_lot, 'sku_lot', p_sku_lot));
   if v_replay is not null then return v_replay; end if;
-  if p_qty <= 0 then raise exception 'qty must be positive'; end if;
+  if p_qty is null or p_qty <= 0 or p_qty::text in ('NaN','Infinity','-Infinity') then raise exception 'qty must be positive'; end if;
   if num_nonnulls(p_sku, p_material, p_keg_pool) <> 1 then raise exception 'exactly one of sku, material, keg pool'; end if;
+  if p_material_lot is not null and p_material is null then raise exception 'material lot requires material'; end if;
+  if p_sku_lot is not null and (p_sku is null or not exists (select 1 from public.inventory_movements where brewery_id = p_brewery and sku_id = p_sku and lot_id = p_sku_lot)) then raise exception 'lot does not belong to SKU'; end if;
+  if p_keg_pool is not null and p_qty <> trunc(p_qty) then raise exception 'empty kegs must be whole units'; end if;
+  if (p_keg_pool is null) <> (p_keg_size is null) then raise exception 'keg size is required only for empty kegs'; end if;
   if p_from_bin = p_to_bin then raise exception 'from and to bin are the same'; end if;
   select * into v_from from public.bins where id = p_from_bin and brewery_id = p_brewery;
   select * into v_to   from public.bins where id = p_to_bin   and brewery_id = p_brewery;
   if v_from.id is null or v_to.id is null then raise exception 'bin not found'; end if;
   if v_from.location_id <> v_to.location_id then raise exception 'bins are in different locations: use create_stock_transfer'; end if;
   if p_sku is not null then
-    insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, note, created_by)
-    values (p_brewery, p_sku, v_from.location_id, p_from_bin, -p_qty, 'location_transfer', p_note, auth.uid()),
-           (p_brewery, p_sku, v_to.location_id,   p_to_bin,    p_qty, 'location_transfer', p_note, auth.uid());
+    insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, lot_id, note, created_by)
+    values (p_brewery, p_sku, v_from.location_id, p_from_bin, -p_qty, 'location_transfer', p_sku_lot, p_note, auth.uid()),
+           (p_brewery, p_sku, v_to.location_id,   p_to_bin,    p_qty, 'location_transfer', p_sku_lot, p_note, auth.uid());
   elsif p_material is not null then
-    insert into public.material_movements (brewery_id, material_id, location_id, bin_id, qty, type, note, created_by)
-    values (p_brewery, p_material, v_from.location_id, p_from_bin, -p_qty, 'transfer_out', p_note, auth.uid()),
-           (p_brewery, p_material, v_to.location_id,   p_to_bin,    p_qty, 'transfer_in',  p_note, auth.uid());
+    insert into public.material_movements (brewery_id, material_id, location_id, bin_id, qty, type, lot_id, note, created_by)
+    values (p_brewery, p_material, v_from.location_id, p_from_bin, -p_qty, 'transfer_out', p_material_lot, p_note, auth.uid()),
+           (p_brewery, p_material, v_to.location_id,   p_to_bin,    p_qty, 'transfer_in',  p_material_lot, p_note, auth.uid());
   else
     if p_keg_size is null then raise exception 'keg_size is required with a keg pool'; end if;
     insert into public.keg_events (brewery_id, pool_id, keg_size, location_id, bin_id, qty, reason, note, created_by)
@@ -6331,6 +6339,22 @@ grant execute on function list_chat_scan_targets(), claim_chat_callback_receipts
 -- Table writes are deliberately unavailable to application roles. All state
 -- changes enter through the narrow, request-ledger-backed RPC list below.
 revoke all on schema public, private, extensions from public, anon, authenticated;
+-- Bin-grain stock identities for explicit moves; null lot means untracked stock.
+create view bin_move_stock with (security_invoker = true) as
+select m.brewery_id, m.location_id, m.bin_id, 'sku'::text as kind, m.sku_id as stock_id,
+  m.lot_id, null::text as keg_size, s.name, 'SKU units'::text as unit, l.code as lot_code, sum(m.qty) as qty
+from inventory_movements m join skus s on s.id = m.sku_id left join lots l on l.id = m.lot_id
+ group by m.brewery_id, m.location_id, m.bin_id, m.sku_id, m.lot_id, s.name, l.code
+union all
+select m.brewery_id, m.location_id, m.bin_id, 'material', m.material_id,
+  m.lot_id, null::text, s.name, s.base_uom::text, l.lot_code, sum(m.qty)
+from material_movements m join materials s on s.id = m.material_id left join material_lots l on l.id = m.lot_id
+ group by m.brewery_id, m.location_id, m.bin_id, m.material_id, m.lot_id, s.name, s.base_uom, l.lot_code
+union all
+select m.brewery_id, m.location_id, m.bin_id, 'keg', m.pool_id,
+  null::uuid, m.keg_size::text, p.name, 'empty kegs', null::text, m.qty
+from keg_bin_on_hand m join keg_pools p on p.id = m.pool_id;
+
 grant usage on schema public to anon, authenticated, service_role;
 revoke all on all tables in schema public from public, anon, authenticated;
 revoke all on all sequences in schema public from public, anon, authenticated;
@@ -6349,7 +6373,7 @@ grant select on breweries, brewery_users, customer_users,
   to authenticated;
 -- Security-invoker views retain the underlying tables' RLS predicates; expose
 -- only the derived reads consumed by registered commands.
-grant select on on_hand, bin_on_hand, atp, invoice_totals, keg_deposit_balances, portal_brewery, sku_prices,
+grant select on bin_move_stock, on_hand, bin_on_hand, atp, invoice_totals, keg_deposit_balances, portal_brewery, sku_prices,
   format_volumes, occupancy_volumes, product_volume_requirements,
   material_on_hand, material_bin_on_hand, material_lot_on_hand, material_on_order, material_last_cost,
   contract_balances, material_requirements, po_open_balances, vendor_lead_times,
@@ -6429,7 +6453,7 @@ grant execute on function
   submit_stock_transfer(uuid,uuid),
   record_stock_transfer_pick(uuid,jsonb,uuid),
   receive_stock_transfer(uuid,jsonb,uuid),
-  move_stock_bin(uuid,uuid,uuid,uuid,public.keg_size,numeric,uuid,uuid,text,uuid),
+  move_stock_bin(uuid,uuid,uuid,uuid,public.keg_size,numeric,uuid,uuid,text,uuid,uuid,uuid),
   set_standing_allocation(uuid,uuid,numeric,uuid),
   create_replenishment_order(uuid,uuid,jsonb,uuid),
   create_recipe(uuid,uuid,text,text,uuid),

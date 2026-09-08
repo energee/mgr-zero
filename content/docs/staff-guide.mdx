@@ -142,7 +142,7 @@ Wholesale Shop shows the packages the brewery has designated for wholesale — �
 2. Choose a **SKU**, **Location**, and **Bin**. Picking the location preselects its first bin alphabetically; change it if the stock sits elsewhere.
 3. Choose a **Type**. The default is `opening_balance`.
 4. For `depletion`, pick a **Channel**. The list is your brewery's own — every brewery starts with **Wholesale**, **Taproom**, **DTC**, and **Export**, and you edit that list under [**Sale channels**](#channels). **Taproom** is preselected. The channel decides how the removal is taxed, and that treatment is frozen onto the entry: editing the channel later never rewrites what is already recorded. `sale_removal` takes a channel too, but shipping sets it, not this form.
-5. Enter **Qty** in SKU units, to two decimal places if you need them. Positive quantities add stock. Negative quantities remove it. Zero is rejected.
+5. Enter a positive **Qty** in SKU units, to two decimal places if needed. The type decides whether stock is added or removed; for `adjustment`, choose **Add stock** or **Remove stock**. Zero is rejected. Samples and festival removals require a two-letter **Destination state**. Check the signed quantity and estimated volume in the preview.
 6. Add an optional **Note**, then select **Record**.
 
 | Type | Use | Normal sign |
@@ -160,10 +160,6 @@ Wholesale Shop shows the packages the brewery has designated for wholesale — �
 | `taproom_transfer` | Transfer shipment: a negative source entry paired with a positive destination entry | Negative and positive pair |
 
 `sale_removal` and `taproom_transfer` are written by shipping, not by this form.
-
-<Callout type="warn">
-**Samples and festival removals:** these need a destination state, and the form has no destination-state field. Do not fake it with another type. Use your brewery's approved recording procedure.
-</Callout>
 
 MGR calculates and stores barrel volume for every movement from quantity × the BBL per unit of the SKU's format. Movements cannot be edited or deleted. See [Errors and corrections](#errors-corrections) before you try to fix inventory.
 
@@ -299,11 +295,11 @@ MGR creates a separate credit memo at the prices frozen on the invoice lines, ne
 
 <Screen name="Locations" />
 
-**Locations** (open `/locations`; Settings links here) lists every warehouse and taproom. Admin sees **Add location**: a name and a type, *Warehouse* or *Taproom*. Names are unique within the brewery. Select **Edit** on a row to open the location: its type, the brewery's timezone, and a gated **Location bins** row (bins are not built yet). Admin can rename a location or change its type with **Edit** then **Save location**; movement history stays exactly as recorded.
+**Locations** (open `/locations`; Settings links here) lists every warehouse and taproom. Admin sees **Add location**: a name and a type, *Warehouse* or *Taproom*. Names are unique within the brewery. Select **Edit** on a row to open the location: its type, the brewery's timezone, and a **Location bins** link. Admin can rename a location or change its type with **Edit** then **Save location**; movement history stays exactly as recorded.
 
 ## Stock transfers [#transfers]
 
-**Transfers** (Work tab; Warehouse and Admin) move stock between two of the brewery's locations without an order or an invoice. **New transfer** takes a source and destination location, the bin at each end (the first bin is preselected), and SKU lines with quantities. Materials and empty kegs move through the same command from the API. The document is numbered TRF-0001 upward and walks **Submit**, **Record pick** (quantities default to what was requested), and **Receive**. Receiving writes the paired stock movements in one step, out of the source bin and into the destination bin, so on hand changes place and nothing counts as a removal; the fleet total for kegs is unchanged. A same-location pair is refused: moving stock between two bins of one location is a bin move, which writes the paired rows without a document.
+**Transfers** (Work tab; Warehouse and Admin) move stock between two of the brewery's locations without an order or an invoice. **New transfer** takes a source and destination location, the bin at each end (the first bin is preselected), and SKU lines with quantities. Materials and empty kegs move through the same command from the API. The document is numbered TRF-0001 upward and walks **Submit**, **Record pick** (quantities default to what was requested), and **Receive**. Receiving writes the paired stock movements in one step, out of the source bin and into the destination bin, so on hand changes place and nothing counts as a removal; the fleet total for kegs is unchanged. A same-location pair is refused: open **Locations → Location bins → Move stock** instead. Admin and Warehouse choose stock and its source bin, a different destination bin, and a positive quantity. Materials use base units; empty kegs require whole units. Each finished-goods or material lot is listed separately from **Untracked stock**; choose the identity actually being moved. The selected lot is preserved on both entries. A bin move writes paired rows without a document.
 
 ## Delivery routes [#deliveries]
 
@@ -598,7 +594,7 @@ Do not hunt for hidden controls for these:
 
 - public account sign-up
 - attaching an existing sign-in account, resending or revoking an invitation, or assigning multiple staff roles
-- adding, renaming or removing bins, setting taproom pars, or choosing the warehouse that fulfills wholesale-customer portal orders, from the interface
+- choosing the warehouse that fulfills wholesale-customer portal orders from the interface
 - cancelling a purchase order, editing one after it is saved, or sending one by email from MGR
 - editing brands, formats, or SKUs after creation
 - deleting customers, ship-tos, inventory history, orders, invoices, or credit memos

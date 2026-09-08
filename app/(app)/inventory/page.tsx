@@ -10,7 +10,7 @@ import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { MovementForm } from "./movement-form";
 
-type Sku = { id: string; name: string; brands: { name: string } | null };
+type Sku = { id: string; name: string; format_volume: { bbl_per_unit: number | null } | null; brands: { name: string } | null };
 type Location = { id: string; name: string; kind: string };
 type Bin = { id: string; location_id: string; name: string };
 type SaleChannel = { id: string; name: string; tax_treatment: string };
@@ -36,7 +36,7 @@ export default async function InventoryPage() {
   const stocked = skus.filter((s) => have.has(s.id) || atpBySku.has(s.id));
   return (
     <>
-      {E.back("Beer", "Finished goods", <MovementForm skus={skus.map((s) => ({ id: s.id, label: skuLabel(s) }))} locations={locations} bins={bins} channels={channels} />, "/beer")}
+      {E.back("Beer", "Finished goods", (brewery.role === "admin" || brewery.role === "warehouse") ? <MovementForm skus={skus.map((s) => ({ id: s.id, label: skuLabel(s), bblPerUnit: s.format_volume?.bbl_per_unit == null ? null : Number(s.format_volume.bbl_per_unit) }))} locations={locations} bins={bins} channels={channels} /> : undefined, "/beer")}
       {stocked.length === 0
         ? E.blank("No finished goods yet")
         : stocked.map((s) => {

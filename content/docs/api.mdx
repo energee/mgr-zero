@@ -200,6 +200,7 @@ omitted. They have no roles until they are built.
 | `generate_compliance_report` | Compliance | ✓ | ✓ |  |  |  |
 | `get_atp` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `get_beer_overview` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
+| `get_bin_move_stock` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `get_bin_on_hand` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `get_brew_day` | Production | ✓ |  |  | ✓ |  |
 | `get_brewery` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ |  |
@@ -1419,7 +1420,7 @@ Draft a stock transfer between two locations: sku, material or keg-pool lines, e
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_stock_transfer", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "fromLocationId": "00000000-0000-0000-0000-000000000000", "toLocationId": "00000000-0000-0000-0000-000000000000", "lines": [ { "qty": 1, "fromBinId": "00000000-0000-0000-0000-000000000000", "toBinId": "00000000-0000-0000-0000-000000000000" } ] } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_stock_transfer", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "fromLocationId": "00000000-0000-0000-0000-000000000000", "toLocationId": "00000000-0000-0000-0000-000000000000", "lines": [ { "qty": 1, "fromBinId": "00000000-0000-0000-0000-000000000000", "toBinId": "00000000-0000-0000-0000-000000000000", "skuId": "00000000-0000-0000-0000-000000000000" } ] } }'
 ```
 
 #### delete_bin [#delete_bin]
@@ -1454,6 +1455,23 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_atp", "input": {} }'
+```
+
+#### get_bin_move_stock [#get_bin_move_stock]
+
+`query` · admin, warehouse
+
+Stock by bin and explicit lot identity at one location, including untracked stock and empty keg sizes
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_bin_move_stock", "input": { "locationId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### get_bin_on_hand [#get_bin_on_hand]
@@ -1591,12 +1609,14 @@ Move stock between two bins of one location: paired ledger rows, no transfer doc
 | `kegPoolId` | uuid | no |
 | `kegSize` | string | no |
 | `note` | string | no |
+| `materialLotId` | uuid | no |
+| `skuLotId` | uuid | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "move_stock_bin", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "qty": 1, "fromBinId": "00000000-0000-0000-0000-000000000000", "toBinId": "00000000-0000-0000-0000-000000000000" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "move_stock_bin", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "qty": 1, "fromBinId": "00000000-0000-0000-0000-000000000000", "toBinId": "00000000-0000-0000-0000-000000000000", "skuId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### receive_stock_transfer [#receive_stock_transfer]
@@ -1699,7 +1719,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* inventory-designed */}
 
-18 of the 19 operations in this area are available today; the 1 below are not.
+19 of the 20 operations in this area are available today; the 1 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 

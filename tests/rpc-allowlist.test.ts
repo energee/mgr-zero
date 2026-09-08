@@ -55,7 +55,7 @@ const AUTHENTICATED_RPCS = [
   "get_today_items(uuid,timestamp with time zone)",
   "is_staff_of(uuid)",
   "mark_chat_installation_reauthorization(uuid,text)",
-  "move_stock_bin(uuid,uuid,uuid,uuid,keg_size,numeric,uuid,uuid,text,uuid)",
+  "move_stock_bin(uuid,uuid,uuid,uuid,keg_size,numeric,uuid,uuid,text,uuid,uuid,uuid)",
   "my_brewery_ids()",
   "my_customer_ids()",
   "portal_availability(uuid)",

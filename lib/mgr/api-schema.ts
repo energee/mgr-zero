@@ -129,7 +129,7 @@ export function fieldsOf(schema: ZodType): ApiField[] {
     .sort((a, b) => (a.required === b.required ? 0 : a.required ? -1 : 1));
 }
 
-/** An example `input` object: every required field, no optional ones. */
+/** An example input: required fields, plus one optional field when a cross-field rule requires it. */
 export function sampleInput(schema: ZodType): Record<string, unknown> {
   const shape = (schema as any).def?.shape;
   if (!shape) return {};
@@ -137,6 +137,13 @@ export function sampleInput(schema: ZodType): Record<string, unknown> {
   for (const [name, node] of Object.entries<any>(shape)) {
     if (isOptional(node)) continue;
     sample[name] = sampleValue(node);
+  }
+  if (!schema.safeParse(sample).success) {
+    for (const [name, node] of Object.entries<any>(shape)) {
+      if (!isOptional(node)) continue;
+      const candidate = { ...sample, [name]: sampleValue(node) };
+      if (schema.safeParse(candidate).success) return candidate;
+    }
   }
   return sample;
 }

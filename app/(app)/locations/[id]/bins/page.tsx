@@ -7,6 +7,8 @@ import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { isUuid } from "@/lib/commands/context";
 import { notFound } from "next/navigation";
+import { MoveStockForm } from "../../move-stock-form";
+import type { BinMoveStock } from "@/lib/commands/inventory";
 import { BinForm } from "../../bin-form";
 
 type LocationRow = { id: string; name: string };
@@ -21,9 +23,11 @@ export default async function LocationBinsPage({ params }: { params: Promise<{ i
   if (!location) notFound();
   const bins = (await runCommand("list_bins", { locationId: id }, ctx)) as BinRow[];
   const canWrite = brewery.role === "admin" || brewery.role === "warehouse";
+  const stock = canWrite ? await runCommand("get_bin_move_stock", { locationId: id }, ctx) as BinMoveStock[] : [];
   return (
     <>
       {E.back(location.name, "Bins", canWrite ? <BinForm locationId={id} /> : undefined, `/locations/${id}`)}
+      {canWrite && <MoveStockForm bins={bins} stock={stock} />}
       {bins.map((b) => (
         <div key={b.id}>{E.row(b.name, "", canWrite ? <BinForm locationId={id} bin={b} /> : undefined)}</div>
       ))}
