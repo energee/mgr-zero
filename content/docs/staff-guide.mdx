@@ -274,7 +274,7 @@ MGR creates a separate credit memo at the prices frozen on the invoice lines, ne
 
 <Screen name="Keg fleet" />
 
-**Kegs** (Beer tab; Warehouse and Admin) is the brewery's returnable keg fleet: pools and where their kegs are. One-way kegs are materials and do not appear here.
+**Kegs** (Beer tab; Warehouse and Admin) is the brewery's returnable keg fleet: pools and where their kegs are. One-way kegs are materials and do not appear here. The page shows **No keg pools yet** until you add one.
 
 ### Keg pools
 
@@ -288,17 +288,19 @@ A pool is one group of kegs you count together: **Owned**, **Leased**, or **Pay 
 - **Shipped** and **Returned** move empty kegs to or from a customer; the customer is required. Shipped names the bin they left from, Returned the bin they came back into. The fleet total does not change.
 - **Lost** removes kegs from that bin; name the customer when they were lost out at a customer, which also reduces that customer's balance. **Found** adds kegs back to a bin and never names a customer: a keg found at a customer is a shipped keg.
 
-The quantity is always positive; the reason is the direction. Retired, shipped, and lost cannot exceed what the bin holds, so a typo is refused rather than driving a bin negative. Kegs moving between bins or locations are recorded through **Transfers** or a bin move, not here. Empty kegs only: beer coming back with a keg, and its credit, is [Return shipment](#invoices). A keg deposit refund is a separate credit memo.
+The quantity is always positive; the reason is the direction. Retired, shipped, and lost cannot exceed what the bin holds, so a typo is refused rather than driving a bin negative. A **Note** is optional and shows next to the event in Keg event history. Kegs moving between bins or locations are recorded through **Transfers** or a bin move, not here. Empty kegs only: beer coming back with a keg, and its credit, is [Return shipment](#invoices). A keg deposit refund is a separate credit memo.
+
+**Record keg event** only appears once the brewery has at least one location and one pool in service; retire every pool and it disappears until you add one back or reactivate one.
 
 Each pool row shows the kegs each bin holds per size, so 36 in the taproom and 40 in storage read as two rows; kegs out at customers have left their bin and are listed under **Customer keg balance** for each customer holding some.
 
 <Screen name="Customer keg balance" />
 
-**Customer keg balance** lists, for one customer, the kegs out per pool and size and the deposit invoiced for them (zero when no deposit was ever invoiced). Kegs out is shipped minus returned minus lost.
+**Customer keg balance** lists, for one customer, the kegs out per pool and size and the deposit invoiced for them (zero when no deposit was ever invoiced). Kegs out is shipped minus returned minus lost. It shows **No kegs currently out** once everything is back.
 
 <Screen name="Keg event history" />
 
-**Keg event history** is the ledger newest first. The pool and customer filters combine. Nothing here can be edited; a wrong entry is corrected by recording the opposite event.
+**Keg event history** is the ledger newest first. The pool and customer filters combine, and show **No matching events** when a combination finds nothing. Nothing here can be edited; a wrong entry is corrected by recording the opposite event.
 
 ## Taproom replenishment [#replenishment]
 
