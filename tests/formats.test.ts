@@ -89,3 +89,29 @@ describe("format editing detail", () => {
     await expect(runCommand("get_format_composition", { formatId: parent.id }, sales)).resolves.toMatchObject({ components: [], lines: [] });
   });
 });
+
+describe("large format replacement sets", () => {
+  it("loads and saves every component, BOM line, and option beyond the API row cap", async () => {
+    const large = await makeStaffCtx((await makeBrewery()).id, "admin");
+    const parent = await runCommand("upsert_format", { name: "Large case", basis: "packaged", packageType: "can" }, large) as { id: string };
+    const children = Array.from({ length: 1001 }, (_, n) => ({ id: crypto.randomUUID(), brewery_id: large.breweryId, name: `Child ${n.toString().padStart(4, "0")}`, basis: "packaged", package_type: "can", bbl_per_unit: 0.001 }));
+    const materials = children.map((_, n) => ({ id: crypto.randomUUID(), brewery_id: large.breweryId, name: `Material ${n.toString().padStart(4, "0")}`, category: "packaging", base_uom: "each", purchase_uom: "each", lot_tracked: false }));
+    expect((await admin.from("formats").insert(children)).error).toBeNull();
+    expect((await admin.from("materials").insert(materials)).error).toBeNull();
+    expect((await admin.from("format_components").insert(children.map((c) => ({ brewery_id: large.breweryId, parent_format_id: parent.id, child_format_id: c.id, qty: 1 })))).error).toBeNull();
+    expect((await admin.from("format_bom").insert(materials.map((m) => ({ brewery_id: large.breweryId, format_id: parent.id, material_id: m.id, qty_per_unit: 1, on_break: "return_to_stock" })))).error).toBeNull();
+    type LargeDetail = { components: { child_format_id: string; qty: number }[]; lines: { material_id: string; qty_per_unit: number; on_break: string }[]; formats: { id: string }[]; materials: { id: string }[] };
+    const detail = await runCommand("get_format_composition", { formatId: parent.id }, large) as LargeDetail;
+    expect(detail.components).toHaveLength(1001);
+    expect(detail.lines).toHaveLength(1001);
+    expect(detail.formats).toHaveLength(1002);
+    expect(detail.materials).toHaveLength(1001);
+    expect(new Set(detail.formats.map((f) => f.id))).toEqual(new Set([parent.id, ...children.map((c) => c.id)]));
+    expect(new Set(detail.materials.map((m) => m.id))).toEqual(new Set(materials.map((m) => m.id)));
+    await runCommand("replace_format_components", { formatId: parent.id, components: detail.components.map((c) => ({ childFormatId: c.child_format_id, qty: c.qty })) }, large);
+    await runCommand("replace_format_bom", { formatId: parent.id, lines: detail.lines.map((l) => ({ materialId: l.material_id, qtyPerUnit: l.qty_per_unit, onBreak: l.on_break })) }, large);
+    const reloaded = await runCommand("get_format_composition", { formatId: parent.id }, large) as LargeDetail;
+    expect(reloaded.components).toEqual(detail.components);
+    expect(reloaded.lines).toEqual(detail.lines);
+  });
+});
