@@ -92,7 +92,14 @@ describe("Slack installation lifecycle", () => {
     const r = await row(installationId);
     expect(r.state).toBe("active");
     expect(r.external_installation_id).toBe(teamId);
+    expect(r.token_store_key).toBe(`slack:installation:${teamId}`);
     expect(r.oauth_consumed_at).not.toBeNull();
+    const stolen = await ctx.db.rpc("activate_chat_installation", {
+      p_installation: installationId, p_state_hash: r.oauth_intent_hash, p_redirect_uri: REDIRECT,
+      p_external_installation_id: teamId, p_external_enterprise_id: null, p_display_label: "Stolen",
+      p_granted_capabilities: {}, p_actor: ctx.userId,
+    });
+    expect(stolen.error).not.toBeNull();
     const second = await completeSlackInstall(ctx.db, req, port, REDIRECT);
     expect(second.replayed).toBe(true);
     expect(port.handleOAuthCallback).toHaveBeenCalledTimes(1);
@@ -400,4 +407,59 @@ it("does not replay success after activation lost its credential before persiste
   await expect(completeSlackInstall(ctx.db, callback(initial.authorizeUrl), port, REDIRECT)).rejects.toThrow(/Reauthorize/);
   expect(await row(initial.installationId)).toMatchObject({ state: "needs_reauthorization", last_failure_code: "credential_store_failed" });
   expect(port.handleOAuthCallback).toHaveBeenCalledTimes(1);
+});
+
+it("forces the canonical store key and refuses a second brewery while a disabled row still owns the workspace", async () => {
+  const ctx = await makeStaffCtx((await makeBrewery()).id);
+  const started = await beginSlackInstall(ctx, REDIRECT);
+  const teamId = `T${crypto.randomUUID().slice(0, 8)}`;
+  const activated = await admin.rpc("activate_chat_installation", {
+    p_installation: started.installationId,
+    p_state_hash: createHash("sha256").update(new URL(started.authorizeUrl).searchParams.get("state")!).digest("hex"),
+    p_redirect_uri: REDIRECT,
+    p_external_installation_id: teamId,
+    p_external_enterprise_id: null,
+    p_display_label: "Demo",
+    p_token_store_key: `attacker:${crypto.randomUUID()}`,
+    p_granted_capabilities: {},
+    p_actor: ctx.userId,
+  });
+  expect(activated.error).toBeNull();
+  expect((await row(started.installationId)).token_store_key).toBe(`slack:installation:${teamId}`);
+  await admin.from("chat_installations").update({ state: "disabled", disabled_at: new Date().toISOString() }).eq("id", started.installationId);
+  const attacker = await makeStaffCtx((await makeBrewery()).id);
+  const { port } = fakePort({}, teamId);
+  const pending = await beginSlackInstall(attacker, REDIRECT);
+  await expect(completeSlackInstall(attacker.db, callback(pending.authorizeUrl), port, REDIRECT)).rejects.toThrow(/already connected|another brewery/i);
+  expect((await row(pending.installationId)).state).toBe("pending");
+});
+
+it("does not read Slack credentials for an active row with a non-canonical store key", async () => {
+  const brewery = await makeBrewery();
+  const ctx = await makeStaffCtx(brewery.id);
+  const teamId = `T${crypto.randomUUID().slice(0, 8)}`;
+  await admin.from("chat_installations").insert({
+    brewery_id: brewery.id, provider: "slack", external_installation_id: teamId, display_label: "Noncanonical",
+    state: "active", installer_user_id: ctx.userId, token_store_key: `pending:${crypto.randomUUID()}`,
+  });
+  const { withActiveChatInstallation } = await import("@/lib/chat/jobs");
+  const read = vi.fn(async () => "secret");
+  expect(await withActiveChatInstallation(teamId, read)).toBeNull();
+  expect(read).not.toHaveBeenCalled();
+});
+
+it("refuses to build a Slack redirect from the request Host", async () => {
+  const prev = process.env.APP_URL;
+  delete process.env.APP_URL;
+  try {
+    const { slackRedirectUri } = await import("@/app/api/chat/slack/install/route");
+    expect(() => slackRedirectUri()).toThrow(/APP_URL/);
+    const { GET } = await import("@/app/api/chat/slack/oauth/route");
+    const res = await GET(new Request("https://evil.example/api/chat/slack/oauth?code=x&state=y"));
+    expect(res.status).toBe(500);
+    expect(res.headers.get("location")).toBeNull();
+  } finally {
+    if (prev === undefined) delete process.env.APP_URL;
+    else process.env.APP_URL = prev;
+  }
 });

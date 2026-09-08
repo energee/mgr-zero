@@ -386,7 +386,9 @@ Chat SDK verifies raw request and timestamp
   -> personal response, stale result, or authenticated MGR link is rendered
 ```
 
-If the durable receipt cannot be recorded, return a retryable failure rather than process an untracked callback.
+If the durable receipt cannot be recorded, return a retryable failure rather than process an untracked callback. Events record that receipt before any SDK App Home work.
+
+Callback receipts, deliveries, and action intents need a prune before hosted traffic (v1 90-day log prune). `prune_chat_integration_logs` is service-role only; no scheduler is wired.
 
 ### 10.4 Delivery worker
 
@@ -412,8 +414,8 @@ Only an authenticated brewery admin may start an installation.
 1. A registered operation creates a single-use intent bound to admin, brewery, provider, exact redirect URI, random nonce, and ten-minute expiry.
 2. The browser redirects to provider OAuth.
 3. Chat SDK completes OAuth and stores the provider installation token encrypted in its private state.
-4. The callback validates the original intent, returned provider app/workspace identity, exact granted scopes, and installation cardinality.
-5. A registered operation activates the MGR installation mapping.
+4. The callback validates the original intent, returned provider app/workspace identity, exact granted scopes, and installation cardinality. Team id comes from Slack `oauth.v2.access`, never from a Data API argument. `APP_URL` is a required https origin (no request-Host fallback).
+5. A service-role-only operation activates the MGR installation mapping. `activate_chat_installation` and `find_chat_oauth_intent` are not granted to `authenticated`. The store key is always `slack:installation:<team id>`; a caller key is ignored. A non-disconnected row already holding that workspace blocks another brewery.
 6. Health checks confirm token lookup and minimum capabilities before notifications become active.
 
 Token storage and MGR activation cannot share a transaction. The durable intent therefore records each step. Callback retries return their recorded disposition. A reconciler completes safe partial installations or deletes orphaned provider credentials.
@@ -447,7 +449,7 @@ Never auto-link by email, Slack profile, display name, or workspace domain. The 
 - A current MGR link and brewery membership are required on every personal action.
 - Shared-channel membership never grants MGR authorization.
 - Registry Zod validation, role checks, and RLS remain mandatory.
-- The service role may maintain private integration metadata only through a documented narrow exception; it must not impersonate a staff member or execute ordinary tenant work.
+- The service role may maintain private integration metadata only through a documented narrow exception; it must not impersonate a staff member or execute ordinary tenant work. Agents must not grant `activate_chat_installation` or `find_chat_oauth_intent` to `authenticated`, and must not trust a caller `token_store_key`.
 - Slack metadata never carries trusted command input.
 - Raw Postgres, stack, OAuth, or provider errors are never echoed to chat.
 - Privilege grants, bulk writes, append-only corrections, financial/compliance operations, and other high-risk actions require authenticated MGR review.

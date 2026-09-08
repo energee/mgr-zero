@@ -1,6 +1,6 @@
-// Slack events hand off to the App Home worker. Interactive callbacks record
-// a receipt before SDK dispatch and commit integration state before ACK;
-// pending receipts return 503 so provider retries cannot lose an action.
+// Slack events and interactive callbacks record a durable receipt before SDK
+// dispatch. If the receipt insert fails, return 503 so the provider retries
+// instead of processing an untracked callback.
 import { after } from "next/server";
 import { chat, validSlackSignature } from "@/lib/chat/slack-adapter";
 import { recordSlackCallback, recordSlackInteraction, slackInteraction } from "@/lib/chat/jobs";
@@ -29,8 +29,8 @@ export async function POST(request: Request) {
       return finished?.disposition === "pending" || finished?.disposition === "processing" ? retry() : response;
     } catch { return retry(); }
   }
-  const response = await chat().webhooks.slack(request, { waitUntil });
-  if (!response.ok) return response;
+  if (!validSlackSignature(request, raw)) return new Response("Invalid signature", { status: 401 });
   try { await recordSlackCallback(raw); } catch { return retry(); }
+  const response = await chat().webhooks.slack(request, { waitUntil });
   return response;
 }

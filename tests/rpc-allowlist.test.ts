@@ -15,7 +15,6 @@ const AUTHENTICATED_RPCS = [
   "return_route(uuid,uuid)",
   "update_keg_pool(uuid,uuid,text,uuid,integer,integer,boolean,uuid)",
   "create_keg_pool(uuid,text,keg_pool_kind,uuid,integer,integer,uuid)",
-  "activate_chat_installation(uuid,text,text,text,text,text,text,jsonb)",
   "adjust_order_lines(uuid,jsonb,text,uuid)",
   "begin_chat_installation(uuid,text,text,text,uuid)",
   "begin_chat_reauthorization(uuid,uuid,text,text,uuid)",
@@ -43,11 +42,9 @@ const AUTHENTICATED_RPCS = [
   "disconnect_chat_installation(uuid,uuid,uuid)",
   "draft_purchase_order_from_requirements(uuid,uuid[],uuid)",
   "file_compliance_report(uuid,text,date,date,text,uuid)",
-  "find_chat_oauth_intent(text)",
   "generate_compliance_report(uuid,text,date,date)",
   "get_today_items(uuid,timestamp with time zone)",
   "is_staff_of(uuid)",
-  "mark_chat_installation_reauthorization(uuid,text)",
   "move_stock_bin(uuid,uuid,uuid,uuid,keg_size,numeric,uuid,uuid,text,uuid)",
   "my_brewery_ids()",
   "my_customer_ids()",
@@ -56,7 +53,6 @@ const AUTHENTICATED_RPCS = [
   "portal_create_order(uuid,uuid,uuid,text,text,jsonb,uuid)",
   "receive_purchase_order(uuid,uuid,uuid,uuid,date,jsonb,uuid)",
   "receive_stock_transfer(uuid,jsonb,uuid)",
-  "reconcile_chat_installation(uuid,boolean,text)",
   "record_brew_day(uuid,uuid,uuid,numeric,date,uuid)",
   "record_cellar_transfer(uuid,uuid,uuid,numeric,numeric,uuid)",
   "record_fermentation_reading(uuid,uuid,timestamp with time zone,numeric,numeric,numeric,text,uuid)",
@@ -77,7 +73,6 @@ const AUTHENTICATED_RPCS = [
   "set_brewery_gravity_unit(uuid,text,uuid)",
   "set_brewery_quiet_hours(uuid,uuid,time without time zone,time without time zone,uuid)",
   "set_my_gravity_unit(uuid,text,uuid)",
-  "set_notification_destination(uuid,uuid,text,uuid)",
   "set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text,boolean,uuid)",
   "set_portal_fulfillment_source(uuid,uuid,uuid)",
   "set_channel_price(uuid,uuid,uuid,uuid,integer,uuid)",
@@ -136,5 +131,27 @@ it("grants action issuance and receipt consumption only to the service owner", (
     where p.pronamespace='public'::regnamespace and p.proname in ('issue_chat_action_intent','consume_chat_action_intent')
       and has_function_privilege(r.role,p.oid,'execute') order by 1`)).toEqual([
     "consume_chat_action_intent:service_role", "issue_chat_action_intent:service_role",
+  ]);
+});
+
+it("grants chat oauth activation and job RPCs only to the service owner", () => {
+  expect(sql(`select p.proname || ':' || r.role from pg_proc p
+    cross join (values ('anon'),('authenticated'),('service_role')) r(role)
+    where p.pronamespace='public'::regnamespace and p.proname in (
+      'activate_chat_installation','find_chat_oauth_intent',
+      'mark_chat_installation_reauthorization','reconcile_chat_installation',
+      'set_notification_destination','get_chat_settings_installation',
+      'chat_credential_has_canonical_owner','has_active_canonical_chat_installation',
+      'get_chat_installation_lifecycle')
+      and has_function_privilege(r.role,p.oid,'execute') order by 1`)).toEqual([
+    "activate_chat_installation:service_role",
+    "chat_credential_has_canonical_owner:service_role",
+    "find_chat_oauth_intent:service_role",
+    "get_chat_installation_lifecycle:service_role",
+    "get_chat_settings_installation:service_role",
+    "has_active_canonical_chat_installation:service_role",
+    "mark_chat_installation_reauthorization:service_role",
+    "reconcile_chat_installation:service_role",
+    "set_notification_destination:service_role",
   ]);
 });

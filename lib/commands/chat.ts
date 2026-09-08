@@ -42,10 +42,8 @@ defineCommand({
   input: z.object({ installationId: z.string().uuid(), externalDestinationId: z.string().min(1) }),
   roles: ["admin"],
   handler: async (ctx, i, execution) => {
-    const { validateChatDestination } = await import("@/lib/chat/jobs");
-    await validateChatDestination(ctx, i.installationId, i.externalDestinationId, execution.requestId);
-    return await unwrap(ctx.db.rpc("set_notification_destination", { p_brewery: ctx.breweryId, p_request_id: execution.requestId,
-      p_installation: i.installationId, p_external_destination_id: i.externalDestinationId })) as { id: string };
+    const { saveChatNotificationDestination } = await import("@/lib/chat/jobs");
+    return saveChatNotificationDestination(ctx, i.installationId, i.externalDestinationId, execution.requestId);
   },
 });
 
@@ -157,7 +155,7 @@ defineCommand({ name: "disconnect_chat_installation", description: "Stop Slack d
   handler: async (ctx, i, execution) => {
     const { disconnectSlackInstallation } = await import("@/lib/chat/oauth");
     const { slackOAuthPort } = await import("@/lib/chat/slack-adapter");
-    // Construct the provider lazily: local disconnect succeeds even without provider setup.
+    // atomic-exempt: Slack credential delete is provider HTTP after the disconnect RPC and cannot share that transaction.
     return disconnectSlackInstallation(ctx, i.installationId, { deleteInstallation: async (id) => slackOAuthPort().deleteInstallation(id) }, execution.requestId);
   },
 });

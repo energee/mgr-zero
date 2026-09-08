@@ -59,25 +59,33 @@ never copy it into a second place.
 The chat RPC boundary is explicit. Authenticated commands use
 `begin_chat_installation`, `begin_chat_reauthorization`,
 `disable_chat_installation`, `disconnect_chat_installation`,
-`set_brewery_quiet_hours`, `set_notification_destination`,
-`set_notification_preference`, `set_personal_quiet_hours`,
-`snooze_notification`, `consume_chat_link_proof`, `unlink_chat_user`, and
-`set_brewery_operating_defaults`; authenticated reads use
-`get_chat_link_intent`, `get_chat_integration_health`, and
-`list_chat_user_links`. The chat service alone may call
-`find_chat_oauth_intent`, `activate_chat_installation`,
-`mark_chat_installation_reauthorization`, `reconcile_chat_installation`,
-`issue_chat_link_proof`, `resolve_chat_actor`,
+`set_brewery_quiet_hours`, `set_notification_preference`,
+`set_personal_quiet_hours`, `snooze_notification`, `consume_chat_link_proof`,
+`unlink_chat_user`, and `set_brewery_operating_defaults`; authenticated reads
+use `get_chat_link_intent`, `get_chat_integration_health`, and
+`list_chat_user_links`. Never grant `activate_chat_installation` or
+`find_chat_oauth_intent` to `authenticated`; never trust a caller
+`token_store_key` (activate always stores `slack:installation:<team id>`).
+The chat service alone may call `find_chat_oauth_intent`,
+`activate_chat_installation`, `mark_chat_installation_reauthorization`,
+`reconcile_chat_installation`, `issue_chat_link_proof`, `resolve_chat_actor`,
 `scan_chat_notification_occurrences`, `list_chat_scan_targets`,
 `lease_chat_deliveries`, `complete_chat_delivery`, `retry_chat_delivery`,
 `suppress_chat_delivery`, `record_chat_callback_receipt`,
 `claim_chat_callback_receipts`, `complete_chat_callback_receipt`,
 `get_chat_home_items`, `get_chat_delivery_context`,
 `block_notification_destination`, `issue_chat_action_intent`,
-`consume_chat_action_intent`, `record_chat_destination_check`, and
-`chat_settings_request_completed`. Private helpers and trigger functions stay
+`consume_chat_action_intent`, `set_notification_destination`,
+`get_chat_settings_installation`, `chat_credential_has_canonical_owner`,
+`has_active_canonical_chat_installation`, `get_chat_installation_lifecycle`,
+`chat_settings_request_completed`, and `prune_chat_integration_logs`.
+`lib/chat/jobs.ts` calls only those named RPCs — never
+`from("chat_installations")`. Private helpers and trigger functions stay
 ungranted. Every browser write carries the existing command `requestId`; the
 service calls above are limited to integration state and current projections.
+Callback receipts, deliveries, and action intents are not pruned
+automatically; call `prune_chat_integration_logs` before hosted traffic
+(v1 90-day log prune). No scheduler is wired.
 
 ## Iron rules
 
@@ -137,8 +145,15 @@ a gap to close, not a convention to trust.
    `service_role` chat RPCs (`scan_chat_*`, `lease_chat_deliveries`,
    `complete/retry/suppress_chat_delivery`, `claim/complete_chat_callback_receipt`,
    `issue_chat_link_proof`, `resolve_chat_actor`, `reconcile_chat_installation`,
-   `issue_chat_action_intent`, `consume_chat_action_intent`, `record_chat_destination_check`, `chat_settings_request_completed`),
-   never ordinary domain commands, and never mints a user token.
+   `activate_chat_installation`, `find_chat_oauth_intent`,
+   `mark_chat_installation_reauthorization`, `issue_chat_action_intent`,
+   `consume_chat_action_intent`, `set_notification_destination`,
+   `get_chat_settings_installation`, `chat_credential_has_canonical_owner`,
+   `has_active_canonical_chat_installation`, `get_chat_installation_lifecycle`,
+   `chat_settings_request_completed`, `prune_chat_integration_logs`),
+   never `from("chat_installations")`, never ordinary domain commands, and
+   never mints a user token. Those activate/find RPCs are not granted to
+   `authenticated` and must not trust a caller `token_store_key`.
    *Enforced by:* `no-restricted-imports` in `eslint.config.mjs`, run in CI.
 5. **Every mutation is one idempotent Postgres transaction.**
    Application roles have no direct table DML. A write handler calls one
