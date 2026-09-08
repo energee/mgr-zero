@@ -2,6 +2,10 @@
 // Callers may retain a request ID for an unchanged failed submission; ordinary
 // three-argument calls still generate one UUID per invocation.
 
+export class CommandResponseError extends Error {
+  constructor(message: string, readonly status: number) { super(message); }
+}
+
 export async function command(breweryId: string, name: string, input: unknown, requestId: string = crypto.randomUUID()) {
   const res = await fetch("/api/command", {
     method: "POST",
@@ -19,6 +23,6 @@ export async function command(breweryId: string, name: string, input: unknown, r
     throw new Error("session expired");
   }
   if (typeof json?.ok !== "boolean") throw new Error(`malformed response (${res.status})`);
-  if (!json.ok) throw new Error(json.error?.message ?? `request failed (${res.status})`);
+  if (!json.ok) throw new CommandResponseError(json.error?.message ?? `request failed (${res.status})`, res.status);
   return json.data;
 }

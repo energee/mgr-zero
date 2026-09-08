@@ -1,8 +1,8 @@
 // app/(portal)/portal/orders/[id]/page.tsx — Order detail (screen record):
 // one order's buyer-facing status, ship-to, lines (ordered vs shipped) and
 // the invoice once the brewery has billed (portal_order + portal_invoices).
-// Read-only: the portal has no lifecycle actions beyond the cart's
-// create+submit. Staff edits after confirmation show as plain adjusted copy.
+// Drafts reopen the cart with their identity; shipped orders seed a new cart.
+// Staff edits after confirmation show as plain adjusted copy.
 import { E } from "@/components/mgr/e";
 import { getActiveCustomer } from "@/lib/portal";
 import { buildContext } from "@/lib/commands/context";
@@ -40,7 +40,8 @@ export default async function PortalOrderDetailPage({ params }: { params: Promis
       ))}
       {adjusted && E.info("The brewery adjusted this order. Quantities above are what ships.")}
       {invoice && E.row(docNo("INV", invoice.invoice_no, "Invoice"), invoice.paid_at ? `paid ${new Date(invoice.paid_at).toLocaleDateString()}` : "unpaid", E.act(money(invoice.invoice_lines.reduce((n, x) => n + x.amount_cents, 0)), "info", `/portal/invoices/${invoice.id}`), invoice.paid_at ? "ok" : "")}
-      {(order.status === "shipped") && E.btn("Reorder", "g", "/portal")}
+      {order.status === "draft" && E.btn("Continue/edit draft", "g", `/portal?draft=${id}`)}
+      {(order.status === "shipped") && E.btn("Reorder", "g", `/portal?reorder=${id}`)}
     </>
   );
 }

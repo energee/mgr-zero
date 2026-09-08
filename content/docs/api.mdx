@@ -3897,6 +3897,7 @@ Portal: create a draft order for the caller's account
 | `lines` | array of object | yes |
 | `poNumber` | string | no |
 | `note` | string | no |
+| `requestedShipDate` | date (YYYY-MM-DD) or null | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -3999,6 +4000,7 @@ Portal: replace a draft order's lines/fields
 | `shipToId` | uuid | no |
 | `poNumber` | string | no |
 | `note` | string | no |
+| `requestedShipDate` | date (YYYY-MM-DD) or null | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \

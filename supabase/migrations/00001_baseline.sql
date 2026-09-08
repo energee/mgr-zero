@@ -3461,13 +3461,13 @@ end $$;
 
 create function portal_create_order(
   p_brewery uuid, p_customer uuid, p_ship_to uuid, p_po text, p_note text,
-  p_lines jsonb, p_request_id uuid
+  p_lines jsonb, p_request_id uuid, p_requested date default null
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_replay jsonb; v_result jsonb; v_from_location uuid;
 begin
   perform private.assert_customer(p_brewery, p_customer);
   v_replay := private.claim_command_request(p_brewery, 'portal_create_order', p_request_id,
-    jsonb_build_object('brewery',p_brewery,'customer',p_customer,'ship_to',p_ship_to,'po',p_po,'note',p_note,'lines',p_lines));
+    jsonb_build_object('brewery',p_brewery,'customer',p_customer,'ship_to',p_ship_to,'po',p_po,'note',p_note,'lines',p_lines,'requested',p_requested));
   if v_replay is not null then return v_replay; end if;
   -- Customers supply only ship-to, PO, note, and lines; everything else is
   -- derived here (audit P1.4). Validate the customer-editable inputs first.
@@ -3490,7 +3490,7 @@ begin
   select portal_fulfillment_location_id into v_from_location from public.breweries where id = p_brewery;
   if v_from_location is null then raise exception 'portal fulfillment source is not configured'; end if;
   v_result := private.create_order_impl(
-    p_brewery,'wholesale',p_customer,p_ship_to,v_from_location,null,null,p_po,p_note,p_lines
+    p_brewery,'wholesale',p_customer,p_ship_to,v_from_location,null,p_requested,p_po,p_note,p_lines
   );
   return private.complete_command_request(p_request_id,v_result);
 end $$;
@@ -3516,7 +3516,7 @@ begin
 end $$;
 
 create function update_draft_order(
-  p_order uuid, p_ship_to uuid, p_requested date, p_po text, p_note text, p_lines jsonb, p_request_id uuid
+  p_order uuid, p_ship_to uuid, p_requested date, p_po text, p_note text, p_lines jsonb, p_request_id uuid, p_clear_requested boolean default false
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_brewery uuid; v_replay jsonb; v_result jsonb;
 begin
@@ -3536,9 +3536,10 @@ begin
       )
     );
   if v_brewery is null then raise exception 'permission denied' using errcode = '42501'; end if;
-  v_replay := private.claim_command_request(v_brewery,'update_draft_order',p_request_id,jsonb_build_object('order',p_order,'ship_to',p_ship_to,'requested',p_requested,'po',p_po,'note',p_note,'lines',p_lines));
+  v_replay := private.claim_command_request(v_brewery,'update_draft_order',p_request_id,jsonb_build_object('order',p_order,'ship_to',p_ship_to,'requested',p_requested,'po',p_po,'note',p_note,'lines',p_lines,'clear_requested',p_clear_requested));
   if v_replay is not null then return v_replay; end if;
   v_result := private.update_draft_order_impl(p_order,p_ship_to,p_requested,p_po,p_note,p_lines);
+  if p_clear_requested then update public.orders set requested_ship_date = null where id = p_order; end if;
   return private.complete_command_request(p_request_id,v_result);
 end $$;
 
@@ -6478,8 +6479,8 @@ grant execute on function
   set_taproom_par(uuid,uuid,uuid,numeric,uuid),
   set_portal_fulfillment_source(uuid,uuid,uuid),
   create_order(uuid,public.order_kind,uuid,uuid,uuid,uuid,date,text,text,jsonb,uuid),
-  portal_create_order(uuid,uuid,uuid,text,text,jsonb,uuid),
-  update_draft_order(uuid,uuid,date,text,text,jsonb,uuid),
+  portal_create_order(uuid,uuid,uuid,text,text,jsonb,uuid,date),
+  update_draft_order(uuid,uuid,date,text,text,jsonb,uuid,boolean),
   submit_order(uuid,uuid),
   confirm_order(uuid,uuid),
   adjust_order_lines(uuid,jsonb,text,uuid),

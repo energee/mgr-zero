@@ -26,21 +26,23 @@ The header shows your customer account name. Navigation offers **Order**, **Orde
 
 1. Review each beer, its listed packages, and the unit price.
 2. Enter positive whole-unit quantities for the packages you want.
-3. Choose **Ship to**. The first address is selected by default.
-4. Optionally enter **PO number** and **Note**, then check the **Subtotal**.
-5. Select **Submit order** to save the order and send it to the brewery, or **Save draft** to save it without submitting. The brewery reviews submitted orders before they are confirmed.
+3. Choose **Ship to**. Your default address is selected for a new cart.
+4. Optionally enter **Requested date**, **PO number** and **Note**, then check the **Current catalog subtotal**. Clearing the requested date removes it from a saved draft.
+5. Select **Review order**, check the quantities and delivery fields, then **Submit order**. **Back to edit** keeps your entries. Or select **Save draft** without submitting. The brewery reviews submitted orders before they are confirmed. Taxes and keg deposits are pending and excluded from the catalog subtotal; this is not a final invoice total.
 
 New carts select your default ship-to, or the first address if none is designated. You can choose another address; saving the cart keeps your explicit choice. Contact brewery staff to change the account default.
 
-Both buttons stay disabled without a ship-to, without a positive line, or while saving. That holds even after a draft has been saved from this cart. With no priced products, Shop says **No products available yet.**
+Both buttons stay disabled without a ship-to, without a positive line, or while saving. That holds even after a draft has been saved from this cart. With no priced products, Shop asks you to call the brewery.
 
 <Callout type="warn">
 **Before ordering:** if the brewery has not configured its portal fulfillment warehouse, saving fails with **portal fulfillment source is not configured**. Ask brewery staff to set that up.
 </Callout>
 
 <Callout type="warn">
-**Draft limitation:** after **Save draft**, MGR opens a read-only order page. You cannot edit or submit that saved draft from the order page. Ask brewery staff to finish or cancel it. If you stay on Shop after saving (or after a submission MGR could not confirm), further edits to quantities, ship-to, PO number, or note replace the saved draft's contents the next time you select **Save draft** or **Submit order**. The same order is reused, so you do not get a duplicate draft. If MGR cannot confirm submission, use **View order status** before retrying: the order may already be submitted. Contact the brewery if the status is still unclear.
+**Saved drafts and retries:** open a draft in Orders and choose **Continue/edit draft** to change or submit that same order. A submitted order can no longer be edited. After an uncertain response, fields stay locked and **Retry order request** reuses the exact request, including after reloading or signing back in on the same browser tab. No request is sent automatically. Use **View order status** to check progress. Keep this tab open until the outcome is clear; closing it clears its recovery information. If recovery storage is unavailable, MGR does not start a new write. Contact the brewery if the outcome remains unclear.
 </Callout>
+
+From a shipped order, **Reorder** starts a new cart with still-active, currently priced packages and the previous quantities. Removed or unpriced packages are listed explicitly. Prices come from the current catalog, not the previous invoice. A still-valid ship-to is kept; the old PO, note and requested date are not copied. Review the new cart before submitting.
 
 ## Order statuses [#statuses]
 

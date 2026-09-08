@@ -1716,10 +1716,10 @@ export const SCREENS: Screen[] = [
     name: "Shop",
     to: { Change: "Account", "½ bbl keg": "Shop", "⅙ bbl keg": "Shop", "case · 24×16 oz": "Shop", "12 oz bottle": "Shop", "Coming up": "Coming up" },
     job: "A buyer catalog: listed packages by brand, quantity, Place order",
-    reads: "portal_catalog · get_portal_account",
-    writes: "portal_create_order · portal_submit_order",
+    reads: "portal_catalog · get_portal_account · portal_order",
+    writes: "portal_create_order · portal_update_draft_order · portal_submit_order",
     states: [["empty catalog", "call brewery; nothing orderable"], ["missing price", "item cannot enter cart", 1], ["no ship-to", "contact brewery; choose an existing ship-to", 1], ["no source", "Review stays off until the brewery sets where orders ship from", 1], ["unlisted package", "a format not on the wholesale list is absent", 1], ["receipt", "ORD number after commit"]],
-    spec: "Grouped by brand; each row is a package the brewery listed for wholesale (½ keg, ⅙ keg, case, bottle). The list is the offer, not warehouse ATP: no in/low/out badges, no counts. Unlisted packages are absent, not greyed. Schedule packaging run is where staff designate the list. Drawn with a fulfillment source already set; the no-source state keeps Review off and never silently chooses Warehouse. Stepper − and + each ship as 48×48 targets. No staff vocabulary (ATP, gates, fulfillment engineering) anywhere in the portal. No persistent cart: leaving the page keeps nothing. Reorder on a shipped order still prefills Review.",
+    spec: "Grouped by brand; each row is a package the brewery listed for wholesale (½ keg, ⅙ keg, case, bottle). The list is the offer, not warehouse ATP: no in/low/out badges, no counts. Unlisted packages are absent, not greyed. Schedule packaging run is where staff designate the list. Drawn with a fulfillment source already set; the no-source state keeps Review off and never silently chooses Warehouse. Stepper − and + each ship as 48×48 targets. No staff vocabulary (ATP, gates, fulfillment engineering) anywhere in the portal. Unsent cart edits are local to the page. Started exact write attempts survive reload in account-scoped session storage and require explicit Retry; uncertain attempts lock editing. Saved drafts reopen for editing. Reorder prefills eligible current catalog packages, reports removed items, preserves a valid ship-to, and clears the old PO, note and requested date.",
     body: (<>
       {E.hd("Order", "Ridgeline")}
       {E.ttl("Hazy IPA")}
@@ -1734,7 +1734,7 @@ export const SCREENS: Screen[] = [
       {E.row("Ships from", "Warehouse")}
       {E.row("Ship-to · requested date", "Main · Wed 9/9", E.act("Change"))}
       {E.sp()}
-      {E.info("Kegs add a $30.00 refundable deposit each, shown on review.")}
+      {E.info("Taxes and keg deposits are pending and excluded from the catalog subtotal.")}
       {E.btn("Review order · $828.00", "p")}
     </>),
   },
@@ -1763,25 +1763,25 @@ export const SCREENS: Screen[] = [
     portal: "Order",
     surface: "sheet",
     name: "Review order",
-    to: { "Hazy IPA · ½ bbl keg": "Review order", "Pils · 16 oz case": "Review order" },
+    to: { "Hazy IPA · ½ bbl keg": "Review order", "Pils · 16 oz case": "Review order", "Submit order": "Order detail" },
     job: "Confirm quantities, ship-to and fulfillment line, then place the order",
-    reads: "portal_catalog · get_portal_account",
-    writes: "portal_create_order · portal_submit_order",
+    reads: "portal_catalog · get_portal_account · portal_order",
+    writes: "portal_create_order · portal_update_draft_order · portal_submit_order",
     states: [["price changed", "revalidated price shown before Place order", 1], ["inactive SKU", "line removed · told plainly", 1], ["no source", "Place order stays off until the brewery sets where orders ship from", 1], ["submit error", "keep quantities · Retry safe", 1], ["duplicate", "same request returns the same ORD number"]],
-    spec: "The confirm step for the shop steppers and for Reorder from a shipped order. Buyer copy only: price, package, quantity, “Ships from Warehouse”, Place order. No ATP, no gate names. Drawn with a fulfillment source already set. After submit the portal is read-only; changes go through the brewery.",
+    spec: "The confirm step for the shop steppers and for Reorder from a shipped order. Buyer copy only: price, package, quantity, “Ships from Warehouse”, Place order. No ATP, no gate names. Drawn with a fulfillment source already set. Back to edit preserves entries. Current catalog subtotal excludes pending taxes and keg deposits; authoritative final amounts are a Program 13 follow-up. After submit the portal is read-only; changes go through the brewery.",
     body: (<>
       {E.row("Hazy IPA · ½ bbl keg", INV.hazyPrice, E.stq(4, "Hazy IPA quantity"))}
       {E.row("Pils · 16 oz case", INV.pilsPrice, E.stq(6, "Pils quantity"))}
-      {E.row("Keg deposit", "4 × $30.00", INV.depositAmount)}
-      {E.fld("Subtotal", INV.total)}
-      {E.fld("Tax", "$0.00 · sale for resale")}
+      {E.fld("Keg deposits", "Pending; not included")}
+      {E.fld("Current catalog subtotal", "$828.00")}
+      {E.fld("Taxes", "Pending; not included")}
       {E.fld("Ship-to", "Main · Phoenixville, PA")}
       {E.fld("Requested date", "Wed 9/9")}
       {E.row("Ships from", "Warehouse")}
       {E.fld("Your PO number", "optional")}
       {E.info("Order number is assigned when you place the order.")}
       {E.sp()}
-      {E.btn(`Place order · ${INV.total}`, "p")}
+      {E.btn("Submit order", "p")}
     </>),
   },
   {

@@ -14,7 +14,7 @@ function requireCustomer(ctx: Ctx): string {
 defineCommand({
   name: "portal_create_order", description: "Portal: create a draft order for the caller's account",
   roles: "customer",
-  input: z.object({ shipToId: z.string().uuid(), poNumber: z.string().optional(), note: z.string().optional(), lines }),
+  input: z.object({ shipToId: z.string().uuid(), poNumber: z.string().optional(), note: z.string().optional(), requestedShipDate: z.string().date().nullable().optional(), lines }),
   handler: (ctx, i, execution) => {
     const customerId = requireCustomer(ctx);
     return unwrap(ctx.db.rpc("portal_create_order", {
@@ -23,6 +23,7 @@ defineCommand({
       p_ship_to: i.shipToId,
       p_po: i.poNumber ?? null,
       p_note: i.note ?? null,
+      p_requested: i.requestedShipDate ?? null,
       p_lines: i.lines.map(l => ({ sku_id: l.skuId, qty: l.qty })),
       p_request_id: execution.requestId,
     }));
@@ -32,9 +33,9 @@ defineCommand({
 defineCommand({
   name: "portal_update_draft_order", description: "Portal: replace a draft order's lines/fields",
   roles: "customer",
-  input: z.object({ orderId: z.string().uuid(), shipToId: z.string().uuid().optional(), poNumber: z.string().optional(), note: z.string().optional(), lines }),
+  input: z.object({ orderId: z.string().uuid(), shipToId: z.string().uuid().optional(), poNumber: z.string().optional(), note: z.string().optional(), requestedShipDate: z.string().date().nullable().optional(), lines }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_draft_order", {
-    p_order: i.orderId, p_ship_to: i.shipToId ?? null, p_requested: null,
+    p_order: i.orderId, p_ship_to: i.shipToId ?? null, p_requested: i.requestedShipDate ?? null, p_clear_requested: i.requestedShipDate === null,
     p_po: i.poNumber ?? null, p_note: i.note ?? null,
     p_lines: i.lines.map(l => ({ sku_id: l.skuId, qty: l.qty })), p_request_id: execution.requestId,
   })),
@@ -82,8 +83,8 @@ defineQuery({
   roles: "customer",
   input: z.object({ orderId: z.string().uuid() }),
   handler: async (ctx, i) => {
-    requireCustomer(ctx);
-    const order = await unwrap(ctx.db.from("orders").select("*, ship_tos(label, city, state)").eq("id", i.orderId).single());
+    const customerId = requireCustomer(ctx);
+    const order = await unwrap(ctx.db.from("orders").select("*, ship_tos(label, city, state)").eq("id", i.orderId).eq("customer_id", customerId).single());
     const [ln, events, shipment] = await Promise.all([
       unwrap(ctx.db.from("order_lines").select("*, skus(name)").eq("order_id", i.orderId)),
       unwrap(ctx.db.from("order_events").select().eq("order_id", i.orderId).order("created_at")),

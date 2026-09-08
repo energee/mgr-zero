@@ -74,6 +74,45 @@ describe("portal commands", () => {
     expect(submittedLines).toEqual([{ sku_id: skuId, qty_ordered: 5 }]);
   });
 
+  it("persists, preserves when omitted, and explicitly clears the requested date", async () => {
+    const made = await runCommand("portal_create_order", { shipToId, requestedShipDate: "2026-10-01", lines: [{ skuId, qty: 2 }] }, custCtx) as { order_id: string };
+    const read = async () => (await runCommand("portal_order", { orderId: made.order_id }, custCtx) as any).order.requested_ship_date;
+    expect(await read()).toBe("2026-10-01");
+    await runCommand("portal_update_draft_order", { orderId: made.order_id, lines: [{ skuId, qty: 3 }] }, custCtx);
+    expect(await read()).toBe("2026-10-01");
+    await runCommand("portal_update_draft_order", { orderId: made.order_id, requestedShipDate: "2026-10-02", lines: [{ skuId, qty: 3 }] }, custCtx);
+    expect(await read()).toBe("2026-10-02");
+    const oldCaller = await adminCtx.db.rpc("update_draft_order", { p_order: made.order_id, p_ship_to: null, p_requested: null, p_po: null, p_note: null, p_lines: [{ sku_id: skuId, qty: 3 }], p_request_id: crypto.randomUUID() });
+    expect(oldCaller.error).toBeNull();
+    expect(await read()).toBe("2026-10-02");
+    await runCommand("portal_update_draft_order", { orderId: made.order_id, requestedShipDate: null, lines: [{ skuId, qty: 3 }] }, custCtx);
+    expect(await read()).toBeNull();
+  });
+
+  it("recovers lost create and submit responses with exact request replay, without another update", async () => {
+    const input = { shipToId, lines: [{ skuId, qty: 2 }] };
+    const create = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+    await runCommand("portal_create_order", input, custCtx, create); // committed response lost
+    const recovered = await runCommand("portal_create_order", input, custCtx, create) as { order_id: string };
+    const submit = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+    await runCommand("portal_submit_order", { orderId: recovered.order_id }, custCtx, submit); // response lost
+    await runCommand("portal_submit_order", { orderId: recovered.order_id }, custCtx, submit);
+    const events = await admin.from("order_events").select("event").eq("order_id", recovered.order_id);
+    expect(events.data?.map(e => e.event).sort()).toEqual(["created", "submitted"]);
+  });
+
+  it("refuses other-customer and cross-tenant draft reads and writes", async () => {
+    for (const brewery of [b, await makeBrewery()]) {
+      const other = await seedCustomer(brewery.id, { name: `Other-${crypto.randomUUID()}` });
+      const location = await seedLocation(brewery.id, { name: `Foreign WH-${crypto.randomUUID()}` });
+      const { data: order, error } = await admin.from("orders").insert({ sale_channel_id: other.saleChannelId, from_location_id: location.id, brewery_id: brewery.id, kind: "wholesale", customer_id: other.customerId, ship_to_id: other.shipToId, created_by: adminCtx.userId }).select("id").single();
+      expect(error).toBeNull();
+      await expect(runCommand("portal_order", { orderId: order!.id }, custCtx)).rejects.toMatchObject({ code: "not_found" });
+      await expect(runCommand("portal_update_draft_order", { orderId: order!.id, lines: [{ skuId, qty: 1 }] }, custCtx)).rejects.toThrow();
+      await expect(runCommand("portal_submit_order", { orderId: order!.id }, custCtx)).rejects.toThrow();
+    }
+  });
+
   it("rejects a ship-to that belongs to another customer", async () => {
     const other = await seedCustomer(b.id, { name: "Foreign Bar", saleChannelId });
     await expect(runCommand("portal_create_order", { shipToId: other.shipToId, lines: [{ skuId, qty: 1 }] }, custCtx))
