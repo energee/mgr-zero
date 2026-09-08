@@ -2888,11 +2888,11 @@ export const SCREENS: Screen[] = [
     slice: 9,
     tab: "Beer",
     name: "Keg fleet",
-    to: { "Record keg return \u00b7 refund $120": "Keg event history" },
+    to: { "Record keg return": "Keg event history" },
     job: "Manage pools and record events without confusing beer returns",
-    reads: "get_keg_fleet · list_customers",
+    reads: "get_keg_fleet · list_customers · list_locations · list_bins · list_vendors",
     writes: "create_keg_pool · update_keg_pool · record_keg_event",
-    states: [["acquire", "qty into pool · no customer"], ["return empty", "customer required · deposit refund previews"], ["lost / found", "customer balance moves · no money"], ["retire", "out of service · no customer"]],
+    states: [["acquire", "qty into pool · no customer"], ["return empty", "customer required · deposit refund is a separate credit memo"], ["lost / found", "lost at a customer moves their balance · found never has a customer · no money"], ["retire", "cannot exceed what the bin holds · no customer"]],
     spec: "Return empty is a keg event only; the deposit refund is a separate credit memo (no refund line is posted with the keg event yet). Beer coming back with the keg is Return shipment (beer + deposit). No dirty/clean CIP status.",
     body: (<>
       {E.back("Beer", "Keg fleet")}
@@ -2901,17 +2901,17 @@ export const SCREENS: Screen[] = [
       {E.fld("Vendor", "none · owned pools have no vendor")}
       {E.edit("Per-fill cost", "$0.00")}
       {E.btns([["Add keg pool", "g"], ["Save keg pool", "g"]])}
-      {E.row("Microstar ⅙ bbl · Warehouse", "36 in · Walk-in", "36")}
-      {E.row("Microstar ⅙ bbl · Storage", "40 in · Cold", "40")}
+      {E.row("Microstar ⅙ bbl · Warehouse", "36 on hand · Walk-in", "36")}
+      {E.row("Microstar ⅙ bbl · Storage", "40 on hand · Cold", "40")}
       {E.nav("Customer keg balance", "Ridgeline · 38 out · $1,140")}
       {E.nav("Keg report", "9 unreturned over 90 days")}
       {E.nav("Keg event history", "acquired, returned, lost, found, retired")}
       {E.chips(["acquire", "return empty", "lost / found", "retire"], 1)}
       {E.pick("Customer", "Ridgeline Tap Room", ["Ridgeline Tap Room", "Al’s Bar"])}
       {E.stq(4, "Kegs")}
-      {E.info(<>Preview: +4 returned · Ridgeline 38 {E.arrow()} 34 out · credit memo −$120.00 deposit refund</>)}
-      {E.note("Empty kegs only; beer return/credit is Return shipment.")}
-      {E.btn("Record keg return · refund $120", "irr")}
+      {E.info(<>Preview: +4 returned · Ridgeline 38 {E.arrow()} 34 out</>)}
+      {E.note("Empty kegs only; beer return/credit is Return shipment. The deposit refund is a separate credit memo.")}
+      {E.btn("Record keg return", "irr")}
     </>),
   },
   {

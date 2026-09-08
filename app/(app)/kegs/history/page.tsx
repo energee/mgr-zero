@@ -18,11 +18,14 @@ export default async function KegHistoryPage({ searchParams }: { searchParams: P
   const customerId = isUuid(sp.customer ?? "") ? sp.customer : undefined;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
-  const [events, pools, customers] = (await Promise.all([
+  const [events, pools, allCustomers] = (await Promise.all([
     runCommand("list_keg_events", { poolId, customerId }, ctx),
     runCommand("list_keg_pools", {}, ctx),
     runCommand("list_customers", {}, ctx),
   ])) as [Event[], Named[], Named[]];
+  // Chips only for customers who appear in the ledger, not the whole book.
+  const seen = new Set((await runCommand("list_keg_events", {}, ctx) as Event[]).map((e) => e.customer_id).filter(Boolean));
+  const customers = allCustomers.filter((c) => seen.has(c.id) || c.id === customerId);
   const name = (list: Named[], id: string | null) => list.find((x) => x.id === id)?.name;
   const filter = (label: string, href: string, on: boolean) => (
     <Link key={href} href={href} className={`rounded-full border px-3 py-1 text-xs ${on ? "bg-primary text-primary-foreground" : ""}`}>{label}</Link>

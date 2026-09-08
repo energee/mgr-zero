@@ -1,6 +1,7 @@
 // app/(app)/kegs/pool-form.tsx — one CommandForm for create_keg_pool (no
-// pool) and update_keg_pool (with pool). Vendor is API-only until the
-// vendors list ships with purchasing (Program 6).
+// pool) and update_keg_pool (with pool). A leased or pay-per-fill pool names
+// its vendor; a pay-per-fill pool needs its per-fill cost. Kind is fixed
+// after creation.
 "use client";
 
 import { useState } from "react";
@@ -19,17 +20,18 @@ export type Pool = { id: string; name: string; kind: Kind; per_fill_cents: numbe
 const toDollars = (cents: number | null | undefined) => (cents == null ? "" : (cents / 100).toFixed(2));
 const toCents = (s: string) => (s === "" ? undefined : Math.round(Number(s) * 100));
 
-export function PoolForm({ pool }: { pool?: Pool }) {
+export function PoolForm({ pool, vendors }: { pool?: Pool & { vendor_id: string | null }; vendors: { id: string; name: string }[] }) {
   const [name, setName] = useState(pool?.name ?? "");
   const [kind, setKind] = useState<Kind>(pool?.kind ?? "owned");
+  const [vendorId, setVendorId] = useState(pool?.vendor_id ?? "");
   const [perFill, setPerFill] = useState(toDollars(pool?.per_fill_cents));
   const [deposit, setDeposit] = useState(toDollars(pool?.deposit_cents ?? 0));
   const [active, setActive] = useState(pool?.active ?? true);
-  const reset = () => { setName(pool?.name ?? ""); setKind(pool?.kind ?? "owned"); setPerFill(toDollars(pool?.per_fill_cents)); setDeposit(toDollars(pool?.deposit_cents ?? 0)); setActive(pool?.active ?? true); };
+  const reset = () => { setName(pool?.name ?? ""); setKind(pool?.kind ?? "owned"); setVendorId(pool?.vendor_id ?? ""); setPerFill(toDollars(pool?.per_fill_cents)); setDeposit(toDollars(pool?.deposit_cents ?? 0)); setActive(pool?.active ?? true); };
   const form = useCommandForm(pool ? "update_keg_pool" : "create_keg_pool", {
     build: () => (pool
-      ? { poolId: pool.id, name, perFillCents: toCents(perFill), depositCents: toCents(deposit), active }
-      : { name, kind, perFillCents: toCents(perFill), depositCents: toCents(deposit) }),
+      ? { poolId: pool.id, name, vendorId: vendorId || undefined, perFillCents: toCents(perFill), depositCents: toCents(deposit), active }
+      : { name, kind, vendorId: kind === "owned" ? undefined : vendorId || undefined, perFillCents: toCents(perFill), depositCents: toCents(deposit) }),
     reset,
   });
   return (
@@ -49,9 +51,18 @@ export function PoolForm({ pool }: { pool?: Pool }) {
             </Select>
           </div>
         )}
+        {kind !== "owned" && (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="pool-vendor">Vendor</Label>
+            <Select value={vendorId} onValueChange={setVendorId}>
+              <SelectTrigger id="pool-vendor"><SelectValue placeholder="Select a vendor" /></SelectTrigger>
+              <SelectContent>{vendors.map((v) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+        )}
         <div className="flex flex-col gap-2">
           <Label htmlFor="pool-per-fill">Per-fill cost ($)</Label>
-          <Input id="pool-per-fill" type="number" min="0" step="0.01" value={perFill} onChange={(e) => setPerFill(e.target.value)} />
+          <Input id="pool-per-fill" type="number" min="0" step="0.01" value={perFill} onChange={(e) => setPerFill(e.target.value)} required={kind === "pay_per_fill"} />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="pool-deposit">Deposit per keg ($)</Label>
@@ -64,7 +75,7 @@ export function PoolForm({ pool }: { pool?: Pool }) {
         )}
         <CommandFormMessage error={form.error} />
         <CommandFormFooter>
-          <Button type="submit" disabled={form.submitting || !name.trim()}>{form.submitting ? "Saving…" : pool ? "Save keg pool" : "Add keg pool"}</Button>
+          <Button type="submit" disabled={form.submitting || !name.trim() || (kind !== "owned" && !vendorId) || (kind === "pay_per_fill" && perFill === "")}>{form.submitting ? "Saving…" : pool ? "Save keg pool" : "Add keg pool"}</Button>
         </CommandFormFooter>
       </form>
     </CommandForm>

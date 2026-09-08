@@ -1,10 +1,11 @@
 // lib/commands/taproom.ts — keg pools and the keg event ledger (Program 7).
 // A pool is a mutable row (name, kind, vendor, deposit); everything else is
 // keg_events, an append-only count ledger where qty is always positive and
-// `reason` is the direction. Balances are read at location × bin grain from
-// keg_bin_totals ("36 in the taproom, 40 in storage" is two rows), the fleet
-// total from keg_fleet_totals, and what a customer holds from
-// keg_customer_balances plus keg_deposit_balances. Tap board writes
+// `reason` is the direction. What a bin physically holds is keg_bin_on_hand
+// ("36 in the taproom, 40 in storage" is two rows; shipped kegs have left),
+// the fleet total is keg_fleet_totals (shipped kegs are still the fleet),
+// and what a customer holds is keg_customer_balances plus
+// keg_deposit_balances. Tap board writes
 // (tap/kick/swap) and the weekly count are parked until Program 12.
 import { z } from "zod";
 import { defineCommand, defineQuery, unwrap, type Ctx } from "./registry";
@@ -46,17 +47,16 @@ defineCommand({
 
 defineCommand({
   name: "record_keg_event",
-  description: "Record kegs acquired, retired, shipped to or returned from a customer, lost or found, at a location and bin; shipped and returned need the customer",
+  description: "Record kegs acquired, retired, shipped to or returned from a customer, lost or found, at a location and bin; shipped and returned need the customer, found never has one, and retired, shipped or lost cannot exceed what the bin holds",
   input: z.object({
     poolId: z.string().uuid(), kegSize: z.enum(KEG_SIZES), qty: z.number().int().positive(), reason: z.enum(KEG_EVENT_REASONS),
-    locationId: z.string().uuid(), binId: z.string().uuid(), customerId: z.string().uuid().optional(),
-    shipmentId: z.string().uuid().optional(), note: z.string().optional(),
+    locationId: z.string().uuid(), binId: z.string().uuid(), customerId: z.string().uuid().optional(), note: z.string().optional(),
   }),
   roles: ROLES,
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_keg_event", {
     p_brewery: ctx.breweryId, p_pool: i.poolId, p_keg_size: i.kegSize, p_qty: i.qty, p_reason: i.reason,
-    p_location: i.locationId, p_bin: i.binId, p_customer: i.customerId ?? null, p_shipment: i.shipmentId ?? null,
-    p_note: i.note ?? null, p_request_id: execution.requestId,
+    p_location: i.locationId, p_bin: i.binId, p_customer: i.customerId ?? null, p_note: i.note ?? null,
+    p_request_id: execution.requestId,
   })),
 });
 
@@ -68,21 +68,28 @@ defineQuery({
   handler: (ctx) => listPools(ctx),
 });
 
-// The Keg fleet page: every pool, and the on-hand count per pool × size ×
-// location × bin. Zero rows are kept so a bin that emptied still shows.
+// The Keg fleet page: every pool, what each bin physically holds per pool ×
+// size, and the customers holding kegs. Zero rows are kept so a bin that
+// emptied still shows; a customer with nothing out is not listed.
 defineQuery({
-  name: "get_keg_fleet", description: "Keg pools with on-hand kegs per pool, size, location and bin", input: z.object({}), roles: ROLES,
+  name: "get_keg_fleet", description: "Keg pools, kegs on hand per pool, size, location and bin, and customers with kegs out", input: z.object({}), roles: ROLES,
   handler: async (ctx) => {
-    const [pools, rows, locations, bins] = await Promise.all([
+    const [pools, rows, locations, bins, out, customers] = await Promise.all([
       listPools(ctx),
-      unwrap(ctx.db.from("keg_bin_totals").select("pool_id, keg_size, location_id, bin_id, qty").eq("brewery_id", ctx.breweryId)),
+      unwrap(ctx.db.from("keg_bin_on_hand").select("pool_id, keg_size, location_id, bin_id, qty").eq("brewery_id", ctx.breweryId)),
       unwrap(ctx.db.from("locations").select("id, name").eq("brewery_id", ctx.breweryId)),
       unwrap(ctx.db.from("bins").select("id, name").eq("brewery_id", ctx.breweryId)),
+      unwrap(ctx.db.from("keg_customer_balances").select("customer_id, qty").eq("brewery_id", ctx.breweryId)),
+      unwrap(ctx.db.from("customers").select("id, name").eq("brewery_id", ctx.breweryId)),
     ]);
     const name = (list: { id: string; name: string }[] | null, id: string) => list?.find((x) => x.id === id)?.name ?? "";
+    const kegsOut = new Map<string, number>();
+    for (const o of out ?? []) kegsOut.set(o.customer_id as string, (kegsOut.get(o.customer_id as string) ?? 0) + Number(o.qty));
     return {
       pools: pools ?? [],
       rows: (rows ?? []).map((r) => ({ ...r, qty: Number(r.qty), location_name: name(locations, r.location_id as string), bin_name: name(bins, r.bin_id as string) })),
+      customers: [...kegsOut].filter(([, n]) => n !== 0).map(([customer_id, kegs_out]) => ({ customer_id, name: name(customers, customer_id), kegs_out }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
     };
   },
 });
@@ -112,7 +119,7 @@ defineQuery({
       unwrap(ctx.db.from("keg_deposit_balances").select("keg_pool_id, keg_size, deposit_cents").eq("brewery_id", ctx.breweryId).eq("customer_id", i.customerId)),
       listPools(ctx),
     ]);
-    const rows = (kegs ?? []).map((k) => ({
+    const rows = (kegs ?? []).filter((k) => Number(k.qty) !== 0).map((k) => ({
       pool_id: k.pool_id as string,
       pool_name: pools?.find((p) => p.id === k.pool_id)?.name ?? "",
       keg_size: k.keg_size as string,

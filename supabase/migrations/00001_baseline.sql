@@ -1851,6 +1851,14 @@ create view keg_bin_totals with (security_invoker = true) as
                          when 'retired' then -qty when 'lost' then -qty when 'transferred_out' then -qty else 0 end)::int as qty
   from keg_events group by 1,2,3,4,5;
 
+-- What a bin physically holds: shipped kegs have left it, returned ones are
+-- back. record_keg_event refuses to take out more than this.
+create view keg_bin_on_hand with (security_invoker = true) as
+  select brewery_id, pool_id, keg_size, location_id, bin_id,
+         sum(case reason when 'acquired' then qty when 'found' then qty when 'transferred_in' then qty when 'returned' then qty
+                         when 'retired' then -qty when 'lost' then -qty when 'transferred_out' then -qty when 'shipped' then -qty else 0 end)::int as qty
+  from keg_events group by 1,2,3,4,5;
+
 create view keg_fleet_totals with (security_invoker = true) as
   select brewery_id, pool_id, keg_size,
          sum(case reason when 'acquired' then qty when 'found' then qty
@@ -4462,12 +4470,18 @@ begin
     jsonb_build_object('brewery', p_brewery, 'name', p_name, 'kind', p_kind, 'vendor', p_vendor,
                        'per_fill_cents', p_per_fill_cents, 'deposit_cents', p_deposit_cents));
   if v_replay is not null then return v_replay; end if;
+  -- The table's checks say the same; these are the readable versions.
+  if p_kind = 'owned' and p_vendor is not null then raise exception 'an owned pool has no vendor'; end if;
+  if p_kind <> 'owned' and p_vendor is null then raise exception 'a % pool needs a vendor', p_kind; end if;
+  if p_kind = 'pay_per_fill' and p_per_fill_cents is null then raise exception 'a pay-per-fill pool needs a per-fill cost'; end if;
   insert into public.keg_pools (brewery_id, name, kind, vendor_id, per_fill_cents, deposit_cents)
   values (p_brewery, p_name, p_kind, p_vendor, p_per_fill_cents, coalesce(p_deposit_cents, 0)) returning * into v_row;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
 -- Nulls keep the current value: the form sends only what changed.
+-- ponytail: coalesce cannot clear vendor or per-fill cost to null; a
+-- p_clear text[] mask when someone needs to.
 create function update_keg_pool(
   p_brewery uuid, p_id uuid, p_name text, p_vendor uuid, p_per_fill_cents int, p_deposit_cents int, p_active boolean, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
@@ -4492,26 +4506,38 @@ end $$;
 -- only turns it into a readable message and pins the bin to the location.
 -- transferred_in/out are not intents here: they come from stock transfers
 -- and bin moves in pairs.
+-- shipment_id is not taken here: linking keg events to shipments is the
+-- ship_order path (slice 9), not a hand-entered id.
 create function record_keg_event(
   p_brewery uuid, p_pool uuid, p_keg_size public.keg_size, p_qty int, p_reason public.keg_event_reason,
-  p_location uuid, p_bin uuid, p_customer uuid, p_shipment uuid, p_note text, p_request_id uuid
+  p_location uuid, p_bin uuid, p_customer uuid, p_note text, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_replay jsonb; v_row public.keg_events;
+declare v_replay jsonb; v_row public.keg_events; v_active boolean; v_on_hand int;
 begin
   perform private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'record_keg_event', p_request_id,
     jsonb_build_object('brewery', p_brewery, 'pool', p_pool, 'keg_size', p_keg_size, 'qty', p_qty, 'reason', p_reason,
-                       'location', p_location, 'bin', p_bin, 'customer', p_customer, 'shipment', p_shipment, 'note', p_note));
+                       'location', p_location, 'bin', p_bin, 'customer', p_customer, 'note', p_note));
   if v_replay is not null then return v_replay; end if;
   if p_qty <= 0 then raise exception 'qty must be positive'; end if;
   if p_reason in ('transferred_in','transferred_out') then raise exception 'transfers are recorded by stock transfers and bin moves'; end if;
   if p_reason in ('shipped','returned') and p_customer is null then raise exception 'customer is required for % kegs', p_reason; end if;
-  if p_reason in ('acquired','retired') and p_customer is not null then raise exception '% kegs carry no customer', p_reason; end if;
+  -- found is a fleet correction at the bin; a keg found at a customer is a
+  -- shipped event, so the customer balance is never moved by found.
+  if p_reason in ('acquired','retired','found') and p_customer is not null then raise exception '% kegs carry no customer', p_reason; end if;
+  select active into v_active from public.keg_pools where id = p_pool and brewery_id = p_brewery;
+  if v_active is null then raise exception 'keg pool not found'; end if;
+  if not v_active then raise exception 'keg pool is out of service'; end if;
   if not exists (select 1 from public.bins where id = p_bin and location_id = p_location and brewery_id = p_brewery) then
     raise exception 'bin is not in that location';
   end if;
-  insert into public.keg_events (brewery_id, pool_id, keg_size, location_id, bin_id, qty, reason, customer_id, shipment_id, note, created_by)
-  values (p_brewery, p_pool, p_keg_size, p_location, p_bin, p_qty, p_reason, p_customer, p_shipment, p_note, auth.uid()) returning * into v_row;
+  if p_reason in ('retired','shipped','lost') then
+    select coalesce(sum(qty), 0) into v_on_hand from public.keg_bin_on_hand
+      where pool_id = p_pool and keg_size = p_keg_size and bin_id = p_bin;
+    if v_on_hand < p_qty then raise exception 'not enough kegs in that bin: % on hand', v_on_hand; end if;
+  end if;
+  insert into public.keg_events (brewery_id, pool_id, keg_size, location_id, bin_id, qty, reason, customer_id, note, created_by)
+  values (p_brewery, p_pool, p_keg_size, p_location, p_bin, p_qty, p_reason, p_customer, p_note, auth.uid()) returning * into v_row;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
@@ -5646,7 +5672,7 @@ grant select on on_hand, bin_on_hand, atp, invoice_totals, keg_deposit_balances,
   format_volumes, occupancy_volumes, product_volume_requirements,
   material_on_hand, material_bin_on_hand, material_lot_on_hand, material_on_order, material_last_cost,
   contract_balances, material_requirements, po_open_balances, vendor_lead_times,
-  keg_bin_totals, keg_fleet_totals, keg_customer_balances to authenticated;
+  keg_bin_totals, keg_bin_on_hand, keg_fleet_totals, keg_customer_balances to authenticated;
 grant all on all tables in schema public to service_role;
 grant all on all sequences in schema public to service_role;
 
@@ -5735,7 +5761,7 @@ grant execute on function
   record_material_count(uuid,uuid,uuid,date,jsonb,uuid),
   create_keg_pool(uuid,text,public.keg_pool_kind,uuid,int,int,uuid),
   update_keg_pool(uuid,uuid,text,uuid,int,int,boolean,uuid),
-  record_keg_event(uuid,uuid,public.keg_size,int,public.keg_event_reason,uuid,uuid,uuid,uuid,text,uuid)
+  record_keg_event(uuid,uuid,public.keg_size,int,public.keg_event_reason,uuid,uuid,uuid,text,uuid)
   to authenticated;
 grant usage on schema private, extensions to service_role;
 -- service_role reaches `private` only for the UUID default its seed inserts

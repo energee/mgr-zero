@@ -1861,7 +1861,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, warehouse
 
-Keg pools with on-hand kegs per pool, size, location and bin
+Keg pools, kegs on hand per pool, size, location and bin, and customers with kegs out
 
 Takes no input.
 
@@ -1909,7 +1909,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse
 
-Record kegs acquired, retired, shipped to or returned from a customer, lost or found, at a location and bin; shipped and returned need the customer
+Record kegs acquired, retired, shipped to or returned from a customer, lost or found, at a location and bin; shipped and returned need the customer, found never has one, and retired, shipped or lost cannot exceed what the bin holds
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -1920,7 +1920,6 @@ Record kegs acquired, retired, shipped to or returned from a customer, lost or f
 | `locationId` | uuid | yes |
 | `binId` | uuid | yes |
 | `customerId` | uuid | no |
-| `shipmentId` | uuid | no |
 | `note` | string | no |
 
 ```bash
