@@ -317,15 +317,16 @@ export async function listChatChannels(ctx: Ctx, installationId: string) {
 
 export async function saveChatNotificationDestination(ctx: Ctx, installationId: string, channelId: string, requestId: string) {
   const completed = await unwrap(serviceClient().rpc("chat_settings_request_completed", { p_brewery: ctx.breweryId, p_user: ctx.userId, p_request_id: requestId }));
-  const installation = await settingsInstallation(ctx, installationId);
-  if (!completed) {
+  // Completed requests reach the SQL actor check and canonical replay before mutable installation checks.
+  const installation = completed ? null : await settingsInstallation(ctx, installationId);
+  if (installation) {
     if (installation.state !== "active") throw new CommandError("Slack delivery is not active", 400);
     const checked = await slackTransport().validateDestination({ installationId: installation.external_installation_id, destinationId: channelId });
     if (!checked.ok) throw new CommandError("Choose an active private channel with MGR added and sharing turned off.", 400);
   }
   return await unwrap(serviceClient().rpc("set_notification_destination", {
     p_brewery: ctx.breweryId, p_installation: installationId, p_external_destination_id: channelId,
-    p_request_id: requestId, p_actor: ctx.userId, p_version: installation.updated_at,
+    p_request_id: requestId, p_actor: ctx.userId, p_version: installation?.updated_at ?? null,
   })) as { id: string };
 }
 
