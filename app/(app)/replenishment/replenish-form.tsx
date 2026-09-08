@@ -21,10 +21,12 @@ function initialQtys(suggestions: Suggestion[]) {
 
 export function ReplenishForm({
   toLocationId,
+  canCreate,
   warehouses,
   suggestions,
 }: {
   toLocationId: string;
+  canCreate: boolean;
   warehouses: Location[];
   suggestions: Suggestion[];
 }) {
@@ -99,11 +101,11 @@ export function ReplenishForm({
       )}
 
       <CommandFormMessage error={form.error} />
-      <div>
+      {canCreate && <div>
         <Button type="submit" disabled={form.submitting || !fromLocationId || suggestions.length === 0}>
           {form.submitting ? "Creating…" : "Create replenishment order"}
         </Button>
-      </div>
+      </div>}
     </form>
   );
 }
