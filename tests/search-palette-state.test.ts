@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { searchCacheKey, searchLoading, pickerHits } from "@/lib/mgr/search-palette-state";
+import { searchCacheKey, searchLoading, restrictToOptions, excludeSeen } from "@/lib/mgr/search-palette-state";
 
 describe("search palette state", () => {
   it("scopes cached matches to brewery, kinds, and term", () => {
@@ -16,8 +16,8 @@ describe("search palette state", () => {
   it("only offers current picker options and avoids duplicate recent rows", () => {
     const hit = { kind: "sku" as const, id: "sku-1", label: "Hazy", detail: "half keg", href: "/catalog", exact: false };
     const removed = { ...hit, id: "removed" };
-    expect(pickerHits([hit, removed], [hit])).toEqual([hit]);
-    expect(pickerHits([hit], [hit], [hit])).toEqual([]);
-    expect(pickerHits([hit, removed])).toEqual([hit, removed]);
+    expect(restrictToOptions([hit, removed], [hit])).toEqual([hit]);
+    expect(excludeSeen(restrictToOptions([hit], [hit]), [hit])).toEqual([]);
+    expect(restrictToOptions([hit, removed])).toEqual([hit, removed]);
   });
 });

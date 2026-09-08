@@ -136,7 +136,7 @@ Wholesale Shop shows the packages the brewery has designated for wholesale â€” Â
   <Card title="Movement log">Entries show time, type, SKU, location and bin, signed quantity, frozen barrel volume, destination state or channel when present, and the movement/source references. **Older movements** and **Newer movements** page through the history.</Card>
 </Cards>
 
-**Bins.** A bin is a named place inside a location: a walk-in, a cold room, a dry rack. Every location starts with three, **Cold**, **Dry**, and **Walk-in**, and always keeps at least one; rename or remove the rest to match the building. A bin that has ever recorded stock cannot be removed, even at a zero balance, because the movement history still names it; rename it instead. Beer that ships on an order leaves from the location's first bin alphabetically, so name the bin you pick from so it sorts first.
+**Bins.** A bin is a named place inside a location: a walk-in, a cold room, a dry rack. Every location starts with three, **Cold**, **Dry**, and **Walk-in**, and always keeps at least one; add, rename, or remove them from [Locations](#locations). A bin that has ever recorded stock cannot be removed, even at a zero balance, because the movement history still names it; rename it instead. When shipping, choose the actual source bin and lot for each quantity; tracked lots stay identified through shipment and returns.
 
 ### Record a movement
 
@@ -310,6 +310,14 @@ MGR creates a separate credit memo at the prices frozen on the invoice lines, ne
 <Screen name="Locations" />
 
 **Locations** (open `/locations`; Settings links here) lists every warehouse and taproom. Admin sees **Add location**: a name and a type, *Warehouse* or *Taproom*. Names are unique within the brewery. Admin returns to **Settings**; other staff return to **Beer**. **All finished goods inventory** opens the global inventory, not a location filter. Select **Edit** (Admin) or **Review** (read-only staff) on a row to open the location: its type, the brewery's timezone, and a **Location bins** link. Admin can rename a location or change its type with **Edit** then **Save location**; movement history stays exactly as recorded.
+
+### Add or rename a bin
+
+<Screen name="Location bins" />
+
+<Screen name="Bin" />
+
+Select **Location bins** on a location to see its bins. Admin and Warehouse can select **Add bin**, or **Edit** on a bin, to enter a **Bin name** and **Save bin**. A location always keeps at least one bin, and a bin that has ever recorded stock keeps its name in the movement history, so both are renamed rather than removed; **Remove** takes out any other bin. See [Bins](#inventory) for the three bins every location starts with.
 
 ## Stock transfers [#transfers]
 
@@ -612,9 +620,7 @@ Do not hunt for hidden controls for these:
 
 - public account sign-up
 - attaching an existing sign-in account, resending or revoking an invitation, or assigning multiple staff roles
-- choosing the warehouse that fulfills wholesale-customer portal orders from the interface
 - cancelling a purchase order, editing one after it is saved, or sending one by email from MGR
-- editing brands, formats, or SKUs after creation
 - deleting customers, ship-tos, inventory history, orders, invoices, or credit memos
 - recording payments
 - reviewing or reattributing auto-reconciled losses before a filing, a printed lot trace packet, and the customers who received a lot
