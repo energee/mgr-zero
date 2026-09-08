@@ -1798,6 +1798,19 @@ quantity. `create_replenishment_order` turns those quantities into an
 already-confirmed taproom transfer, skipping the draft and submit steps a
 wholesale order goes through.
 
+Kegs are tracked as pools — owned, leased, or pay-per-fill — over a
+location-grain event ledger. A leased or pay-per-fill pool names its vendor,
+and a pay-per-fill pool also needs a per-fill cost; `update_keg_pool` only
+changes the fields you send, and an inactive pool refuses new events.
+`record_keg_event` posts one append-only row: quantity is always positive and
+`reason` carries the direction (acquired, retired, shipped, returned, lost,
+found). Shipped and returned require a customer; acquired, retired, and found
+never carry one; lost may optionally name a customer, which reduces their keg
+balance. Retired, shipped, and lost cannot take out more kegs than the bin
+currently holds. Kegs moving between bins or locations go through the
+transfer and movement commands, not this one, and a keg deposit refund is its
+own credit memo.
+
 {/* ops:taproom */}
 
 #### create_keg_pool [#create_keg_pool]
