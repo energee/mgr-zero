@@ -1,3 +1,4 @@
+import { buildReturnLines } from "@/app/(app)/invoices/[id]/credit-memo-form";
 import { beforeAll, expect, it } from "vitest";
 import { admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedCustomer, priceSku, sql, seedMaterial } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
@@ -30,6 +31,14 @@ async function order(qty = 4) {
   await runCommand("record_pick", { orderId: o.order_id, picks: [{ lineId: line, qty }] }, ctx);
   return { id: o.order_id, line };
 }
+it("rejects UUID spellings that alias the same shipping source", async () => {
+  const o = await order();
+  const requestId = crypto.randomUUID();
+  const result = await ctx.db.rpc("ship_order", { p_order: o.id, p_ship: [{ line_id: o.line, qty_shipped: 4, sources: [{ bin_id: bin, lot_id: lots[0], qty: 2 }, { bin_id: bin.toUpperCase(), lot_id: lots[0].toUpperCase(), qty: 2 }] }], p_carrier: null, p_tracking: null, p_request_id: requestId });
+  expect(result.error).not.toBeNull();
+  expect((await admin.from("shipments").select("id").eq("order_id", o.id)).data).toEqual([]);
+  expect((await admin.from("inventory_movements").select("id").eq("ref", o.id)).data).toEqual([]);
+});
 it("ships two real packaged lots from their actual bins with one invoice line", async () => {
   const o = await order();
   const result = await runCommand("ship_order", { orderId: o.id, ship: [{ lineId: o.line, qty: 4, sources: [{ binId: bin, lotId: lots[0], qty: 2 }, { binId: loc.binId, lotId: lots[1], qty: 2 }] }] }, ctx) as { invoice_id: string };
@@ -178,4 +187,58 @@ it("cross-location material receipts preserve selected lot and reject rounded so
   await expect(runCommand("receive_stock_transfer", { ...tr, lines: [{ lineId: line, qty: 0.00001, sources: [{ lotId: lot.id, qty: 0.00001 }] }] }, ctx)).rejects.toThrow(/four decimals/);
   await runCommand("receive_stock_transfer", { ...tr, lines: [{ lineId: line, qty: 2, sources: [{ lotId: lot.id, qty: 2 }] }] }, ctx);
   expect((await admin.from("material_movements").select("lot_id,qty").eq("material_id", material).neq("type", "opening_balance")).data).toEqual(expect.arrayContaining([{ lot_id: lot.id, qty: -2 }, { lot_id: lot.id, qty: 2 }]));
+});
+
+it("submits the real return form payload for a manual invoice without inventing shipment sources", async () => {
+  const invoice = await ins("invoices", { brewery_id: ctx.breweryId, customer_id: cust.customerId, kind: "invoice" });
+  const line = await ins("invoice_lines", { brewery_id: ctx.breweryId, invoice_id: invoice.id, kind: "sku", sku_id: cat.skuId, qty: 2, unit_price_cents: 12000, description: "Manual invoice" });
+  const lines = buildReturnLines([{ id: line.id, skuId: cat.skuId, label: "Beer", qty: 2 }], { [line.id]: "1" }, [], {}, "", null);
+  await expect(runCommand("return_shipment", { invoiceId: invoice.id, locationId: loc.id, reason: "unsold", lines }, ctx)).resolves.toBeDefined();
+  expect(buildReturnLines([{ id: line.id, skuId: cat.skuId, label: "Beer", qty: 2 }], { [line.id]: "1" }, [], {}, "", crypto.randomUUID())[0].sources).toEqual([]);
+});
+
+it("compares parsed UUID identity for ship lines, return lines and return sources", async () => {
+  const o = await order(2);
+  const other = await seedCatalog(ctx.breweryId, { product: "Alias second brand", sku: "Alias second SKU" });
+  await ins("order_lines", { brewery_id: ctx.breweryId, order_id: o.id, sku_id: other.skuId, qty_ordered: 1, unit_price_cents: 100 });
+  const alias = o.line.replaceAll("-", "");
+  const bad = await ctx.db.rpc("ship_order", { p_order: o.id, p_ship: [{ line_id: o.line, qty_shipped: 0 }, { line_id: alias, qty_shipped: 0 }], p_carrier: null, p_tracking: null, p_request_id: crypto.randomUUID() });
+  expect(bad.error?.message).toMatch(/line/);
+  expect((await admin.from("shipments").select("id").eq("order_id", o.id)).data).toEqual([]);
+  const shippedOrder = await order(2);
+  const shipped = await runCommand("ship_order", { orderId: shippedOrder.id, ship: [{ lineId: shippedOrder.line, qty: 2, sources: [{ binId: bin, lotId: lots[0], qty: 2 }] }] }, ctx) as { invoice_id: string };
+  const movement = (await admin.from("inventory_movements").select("id").eq("ref", shippedOrder.id).single()).data!.id;
+  const line = (await admin.from("invoice_lines").select("id").eq("invoice_id", shipped.invoice_id).single()).data!.id;
+  const emptySourceLines = buildReturnLines([{ id: line, skuId: cat.skuId, label: "Beer", qty: 2 }], { [line]: "1" }, [], {}, bin, shipped.invoice_id);
+  await expect(runCommand("return_shipment", { invoiceId: shipped.invoice_id, locationId: loc.id, reason: "unsold", lines: emptySourceLines }, ctx)).rejects.toThrow(/sources/);
+  for (const lines of [
+    [{ invoice_line_id: line, qty: 0.25, sources: [{ movement_id: movement, bin_id: bin, qty: 0.25 }] }, { invoice_line_id: line.replaceAll("-", ""), qty: 0.25, sources: [{ movement_id: movement, bin_id: bin, qty: 0.25 }] }],
+    [{ invoice_line_id: line, qty: 0.5, sources: [{ movement_id: movement, bin_id: bin, qty: 0.25 }, { movement_id: movement.replaceAll("-", ""), bin_id: bin, qty: 0.25 }] }],
+  ]) {
+    const requestId = crypto.randomUUID();
+    const r = await ctx.db.rpc("return_shipment", { p_invoice: shipped.invoice_id, p_lines: lines, p_location: loc.id, p_reason: "unsold", p_request_id: requestId });
+    expect(r.error?.message).toMatch(/duplicate|distinct/);
+
+    expect((await admin.from("inventory_movements").select("id").eq("source_movement_id", movement)).data).toHaveLength(lines.length === 2 ? 0 : 1);
+    expect((await admin.from("invoice_lines").select("id").eq("credited_invoice_line_id", line)).data).toHaveLength(lines.length === 2 ? 0 : 1);
+    const valid = { p_invoice: shipped.invoice_id, p_lines: [{ invoice_line_id: line, qty: 0.25, sources: [{ movement_id: movement, bin_id: bin, qty: 0.25 }] }], p_location: loc.id, p_reason: "unsold", p_request_id: requestId };
+    const ok = await ctx.db.rpc("return_shipment", valid); expect(ok.error).toBeNull();
+    expect((await ctx.db.rpc("return_shipment", valid)).data).toEqual(ok.data);
+
+  }
+});
+it("rejects UUID aliases in transfer line and source arrays before completion", async () => {
+  const dest = await seedLocation(ctx.breweryId, { name: "Alias transfer destination" });
+  const tr = await runCommand("create_stock_transfer", { fromLocationId: loc.id, toLocationId: dest.id, lines: [{ skuId: cat.skuId, qty: 1, fromBinId: bin, toBinId: dest.binId }] }, ctx) as { transferId: string };
+  await runCommand("submit_stock_transfer", tr, ctx);
+  const line = (await admin.from("stock_transfer_lines").select("id").eq("transfer_id", tr.transferId).single()).data!.id;
+  await runCommand("record_stock_transfer_pick", { ...tr, picks: [{ lineId: line, qty: 1 }] }, ctx);
+  for (const lines of [
+    [{ line_id: line, qty: 1, sources: [{ lot_id: lots[0], qty: 1 }] }, { line_id: line.replaceAll("-", ""), qty: 1, sources: [{ lot_id: lots[0], qty: 1 }] }],
+    [{ line_id: line, qty: 1, sources: [{ lot_id: lots[0], qty: 0.5 }, { lot_id: lots[0].replaceAll("-", ""), qty: 0.5 }] }],
+  ]) {
+    const r = await ctx.db.rpc("receive_stock_transfer", { p_transfer: tr.transferId, p_lines: lines, p_request_id: crypto.randomUUID() });
+    expect(r.error?.message).toMatch(/coverage|distinct/);
+    expect((await admin.from("inventory_movements").select("id").eq("ref", tr.transferId)).data).toEqual([]);
+  }
 });

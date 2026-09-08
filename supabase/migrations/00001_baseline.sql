@@ -2141,7 +2141,7 @@ begin
   lock table public.inventory_movements in share row exclusive mode;
   if jsonb_typeof(p_ship) is distinct from 'array' then raise exception 'ship list must cover every order line exactly once'; end if;
   if jsonb_array_length(p_ship) <> (select count(*) from public.order_lines where order_id = p_order)
-     or (select count(distinct e->>'line_id') from jsonb_array_elements(p_ship) e) <> jsonb_array_length(p_ship)
+     or (select count(distinct (e->>'line_id')::uuid) from jsonb_array_elements(p_ship) e) <> jsonb_array_length(p_ship)
      or exists (select 1 from jsonb_array_elements(p_ship) e where not exists
        (select 1 from public.order_lines where id = (e->>'line_id')::uuid and order_id = p_order)) then
     raise exception 'ship list must cover every order line exactly once';
@@ -2179,7 +2179,7 @@ begin
     if jsonb_typeof(v_sources) is distinct from 'array' then raise exception 'sources must be an array'; end if;
     if (sp.qty = 0 and jsonb_array_length(v_sources) <> 0)
        or coalesce((select sum((e->>'qty')::numeric) from jsonb_array_elements(v_sources) e), 0) <> sp.qty
-       or (select count(distinct jsonb_build_array(e->>'bin_id', e->>'lot_id')) from jsonb_array_elements(v_sources) e) <> jsonb_array_length(v_sources)
+       or (select count(distinct jsonb_build_array((e->>'bin_id')::uuid, (e->>'lot_id')::uuid)) from jsonb_array_elements(v_sources) e) <> jsonb_array_length(v_sources)
     then raise exception 'distinct sources must sum to shipped quantity'; end if;
     for src in select (e->>'bin_id')::uuid bin_id, (e->>'lot_id')::uuid lot_id, (e->>'to_bin_id')::uuid to_bin_id, (e->>'qty')::numeric qty from jsonb_array_elements(v_sources) e loop
       if src.qty is null or src.qty::text in ('NaN','Infinity','-Infinity') or src.qty <= 0 or src.qty <> round(src.qty, 2) then raise exception 'invalid source quantity'; end if;
@@ -2242,7 +2242,7 @@ begin
   returning id into v_cm;
   select order_id into v_order from public.shipments where id = v_inv.shipment_id;
   if jsonb_typeof(p_lines) is distinct from 'array' or jsonb_array_length(p_lines) = 0 then raise exception 'credit lines required'; end if;
-  if (select count(distinct e->>'invoice_line_id') from jsonb_array_elements(p_lines) e) <> jsonb_array_length(p_lines) then raise exception 'duplicate credit line'; end if;
+  if (select count(distinct (e->>'invoice_line_id')::uuid) from jsonb_array_elements(p_lines) e) <> jsonb_array_length(p_lines) then raise exception 'duplicate credit line'; end if;
   for cl in select (e->>'invoice_line_id')::uuid as line_id, (e->>'qty')::numeric as qty, e->'sources' as sources from jsonb_array_elements(p_lines) e loop
     if cl.qty is null or cl.qty::text in ('NaN','Infinity','-Infinity') or cl.qty <= 0 or cl.qty <> round(cl.qty, 2) then raise exception 'invalid return quantity'; end if;
     select qty into v_orig_qty from public.invoice_lines where id = cl.line_id and invoice_id = p_invoice;
@@ -2274,7 +2274,7 @@ begin
     else
       if jsonb_typeof(v_sources) is distinct from 'array' then raise exception 'return sources must be an array'; end if;
       if coalesce((select sum((e->>'qty')::numeric) from jsonb_array_elements(v_sources) e),0) <> cl.qty
-         or (select count(distinct e->>'movement_id') from jsonb_array_elements(v_sources) e) <> jsonb_array_length(v_sources) then raise exception 'distinct return sources must sum to returned quantity'; end if;
+         or (select count(distinct (e->>'movement_id')::uuid) from jsonb_array_elements(v_sources) e) <> jsonb_array_length(v_sources) then raise exception 'distinct return sources must sum to returned quantity'; end if;
       for src in select (e->>'movement_id')::uuid movement_id, (e->>'bin_id')::uuid bin_id, (e->>'qty')::numeric qty from jsonb_array_elements(v_sources) e loop
         if src.qty is null or src.qty <= 0 or src.qty::text in ('NaN','Infinity','-Infinity') or src.qty <> round(src.qty,2) then raise exception 'invalid return source quantity'; end if;
         select * into v_original from public.inventory_movements where id = src.movement_id and brewery_id = v_inv.brewery_id and ref = v_order and sku_id = v_sku and type = 'sale_removal';
@@ -5183,7 +5183,7 @@ begin
   lock table public.inventory_movements in share row exclusive mode;
   lock table public.material_movements in share row exclusive mode;
   if jsonb_typeof(p_lines) is distinct from 'array' or exists (select 1 from jsonb_array_elements(p_lines) e where not exists (select 1 from public.stock_transfer_lines where id = (e->>'line_id')::uuid and transfer_id = p_transfer))
-     or (select count(distinct e->>'line_id') from jsonb_array_elements(p_lines) e) <> jsonb_array_length(p_lines) then raise exception 'invalid transfer line coverage'; end if;
+     or (select count(distinct (e->>'line_id')::uuid) from jsonb_array_elements(p_lines) e) <> jsonb_array_length(p_lines) then raise exception 'invalid transfer line coverage'; end if;
   for l in select * from public.stock_transfer_lines where transfer_id = p_transfer loop
     select (e->>'qty')::numeric into v_qty from jsonb_array_elements(coalesce(p_lines, '[]'::jsonb)) e where (e->>'line_id')::uuid = l.id;
     v_qty := coalesce(v_qty, l.qty_picked, l.qty);
@@ -5195,7 +5195,7 @@ begin
     v_sources := coalesce(v_sources, case when v_qty = 0 then '[]'::jsonb else jsonb_build_array(jsonb_build_object('lot_id', null, 'qty', v_qty)) end);
     if jsonb_typeof(v_sources) is distinct from 'array' then raise exception 'sources must be an array'; end if;
     if coalesce((select sum((e->>'qty')::numeric) from jsonb_array_elements(v_sources) e),0) <> v_qty or
-       (select count(distinct jsonb_build_array(e->>'lot_id')) from jsonb_array_elements(v_sources) e) <> jsonb_array_length(v_sources) then raise exception 'distinct sources must sum to received quantity'; end if;
+       (select count(distinct jsonb_build_array((e->>'lot_id')::uuid)) from jsonb_array_elements(v_sources) e) <> jsonb_array_length(v_sources) then raise exception 'distinct sources must sum to received quantity'; end if;
     if v_qty = 0 then
       if jsonb_array_length(v_sources) <> 0 then raise exception 'zero receipt has no sources'; end if;
       continue;

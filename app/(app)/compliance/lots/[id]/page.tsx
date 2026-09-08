@@ -14,7 +14,7 @@ type Trace = {
   lot: { id: string; code: string; brand: string; packaged_on: string; best_by: string | null };
   run: { id: string; run_no: number | null; bbl_drawn: number | null; vessel: string } | null;
   batch: { id: string; batch_no: number | null; brewed_on: string | null } | null;
-  movements: { id: string; type: string; qty: number; created_at: string; sku: string; location: string }[];
+  movements: { id: string; type: string; qty: number; bbl: number; bin: string; ref: string | null; source_movement_id: string | null; created_at: string; sku: string; location: string }[];
   on_hand_bbl: number; warning: string;
   balances: { sku_id: string; bin_id: string; sku: string; bin: string; location: string; qty: number; bbl: number }[];
   recipients: { id: string; order_no: number; customers: { id: string; name: string } | null; ship_tos: { label: string; address1: string; city: string; state: string; zip: string } | null; shipments: { id: string; carrier: string | null; tracking: string | null; invoices: { id: string; invoice_no: number }[] }[] }[];
@@ -42,7 +42,11 @@ export default async function LotTracePage({ params }: { params: Promise<{ id: s
         {o.shipments.map(sh => <div key={sh.id}><p>{sh.carrier ?? "Shipment"} {sh.tracking}</p>{sh.invoices.map(inv => <Link key={inv.id} href={`/invoices/${inv.id}`} className="underline">Invoice {inv.invoice_no}</Link>)}</div>)}
       </div>)}
       {E.ttl("Movements")}
-      {E.tape(t.movements.map((m) => [`${m.qty > 0 ? "+" : ""}${m.qty} · ${treatmentLabel(m.type)} · ${m.sku} · ${m.location}`, m.created_at.slice(0, 10)]))}
+      {t.movements.map(m => <div key={m.id} id={`movement-${m.id}`} className="border-b py-3">
+        {E.row(`${m.qty > 0 ? "+" : ""}${m.qty} · ${treatmentLabel(m.type)} · ${m.sku}`, `${m.location} · ${m.bin} · ${m.created_at.slice(0, 10)}`, `${m.bbl} bbl recorded`)}
+        {m.source_movement_id && <Link className="underline" href={`#movement-${m.source_movement_id}`}>Source movement {m.source_movement_id}</Link>}
+        {m.ref && <p>{m.type === "return_in" || (m.type === "loss" && m.source_movement_id) ? <Link className="underline" href={`/invoices/${m.ref}`}>Credit memo {m.ref}</Link> : `Reference ${m.ref}`}</p>}
+      </div>)}
       {E.note(t.warning)}
     </>
   );

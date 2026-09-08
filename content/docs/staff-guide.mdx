@@ -299,6 +299,8 @@ Returns preserve the selected shipment lot and its original recorded volume even
 3. Split the returned quantity across the original shipped sources shown under the line. Their sum must equal the line quantity; a source cannot be returned more than was shipped. Choose **Return to location**, the destination **bin**, and the **Reason**: *Unsold* and *Wrong item* put the beer back as sellable stock at that location; *Damaged* puts it back and writes the same quantity to loss in the same step, so broken beer never lands on a pick list.
 4. Select **Return shipment**.
 
+For older invoices that have no shipment, choose the return location; MGR records untracked stock in its first bin. Shipment-backed invoices always require the original source selection.
+
 MGR creates a separate credit memo at the prices frozen on the invoice lines, never today's price, records the return-in (and, for damaged, the loss) against that credit memo, and notes the correction on the originating order's timeline. A paid invoice can still be returned; the credit sits as available credit. Credit memos cannot themselves be credited.
 
 ## Locations [#locations]
@@ -346,6 +348,8 @@ A month is generated from the inventory ledger when you open it, so nothing is s
 <Screen name="Compliance registry" />
 
 The registry has two tabs. **Brands** lists each brand with its COLA or formula approvals and its state registrations; a brand with no COLA is flagged *COLA pending*. **Add approval** takes the brand, the approval kind, its TTB number, and optional approved and expiry dates; the same kind and number on the same brand is one record, so saving it twice is refused. **Add registration** takes the brand, the two-letter state, and an optional number and expiry; one record exists per brand and state, so saving again replaces it, and **Edit** keeps the brand and state fixed. **Licenses** lists the brewery's own state licenses by state and kind (brewery, supplier, direct to consumer); **Add license** works the same way, one record per state and kind, with state and kind fixed on **Edit**. **Edit** on any row opens the same sheet filled in. Kind is stored lower-case and trimmed. Order confirmation does not read this registry yet; the planned warning for an unregistered destination state will never block.
+
+Each movement shows its actual bin and recorded barrels. Returns link to the original shipped movement and the credit memo; damaged losses link to their return movement.
 
 <Screen name="Lot trace" />
 

@@ -20,12 +20,25 @@ import type { ReturnSource } from "@/lib/commands/orders";
 
 type Line = { id: string; skuId: string; label: string; qty: number };
 
+export function buildReturnLines(lines: Line[], qtys: Record<string, string>, sources: ReturnSource[], sourceQtys: Record<string, string>, binId: string, shipmentId: string | null) {
+  return lines.filter(l => Number(qtys[l.id] ?? 0) > 0).map(l => ({
+    invoiceLineId: l.id,
+    qty: Number(qtys[l.id]),
+    ...(shipmentId === null ? {} : {
+      sources: sources.filter(s => s.sku_id === l.skuId && Number(sourceQtys[s.id]) > 0)
+        .map(s => ({ movementId: s.id, binId, qty: Number(sourceQtys[s.id]) })),
+    }),
+  }));
+}
+
 export function CreditMemoForm({
   invoiceId,
+  shipmentId,
   lines,
   locations,
 }: {
   invoiceId: string;
+  shipmentId: string | null;
   lines: Line[];
   locations: { id: string; name: string }[];
 }) {
@@ -50,9 +63,7 @@ export function CreditMemoForm({
       invoiceId,
       locationId,
       reason,
-      lines: lines
-        .filter((l) => Number(qtys[l.id] ?? 0) > 0)
-        .map((l) => ({ invoiceLineId: l.id, qty: Number(qtys[l.id]), sources: sources.filter(s => s.sku_id === l.skuId && Number(sourceQtys[s.id]) > 0).map(s => ({ movementId: s.id, binId, qty: Number(sourceQtys[s.id]) })) })),
+      lines: buildReturnLines(lines, qtys, sources, sourceQtys, binId, shipmentId),
     }),
     reset,
   });
@@ -108,7 +119,7 @@ export function CreditMemoForm({
               </SelectContent>
             </Select>
           </div>
-          <Label className="flex flex-col gap-2">Return to bin<select className="rounded border p-2" required value={binId} onChange={e => setBinId(e.target.value)}><option value="">Choose bin</option>{bins.filter(b => b.location_id === locationId).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></Label>
+          {shipmentId !== null && <Label className="flex flex-col gap-2">Return to bin<select className="rounded border p-2" required value={binId} onChange={e => setBinId(e.target.value)}><option value="">Choose bin</option>{bins.filter(b => b.location_id === locationId).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></Label>}
           <div className="flex flex-col gap-2">
             <Label htmlFor="cm-reason">Reason</Label>
             <Select value={reason} onValueChange={setReason}>
@@ -127,7 +138,7 @@ export function CreditMemoForm({
           <p className="text-sm text-muted-foreground">Credited at the price on this invoice, not today’s price group.</p>
           <CommandFormMessage error={form.error ?? loadError} />
           <CommandFormFooter>
-            <Button type="submit" disabled={form.submitting || !reason || !locationId || !binId || !!loadError}>
+            <Button type="submit" disabled={form.submitting || !reason || !locationId || (shipmentId !== null && !binId) || !!loadError}>
               {form.submitting ? "Saving…" : "Return shipment"}
             </Button>
           </CommandFormFooter>
