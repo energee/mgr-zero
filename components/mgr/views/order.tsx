@@ -2,6 +2,7 @@
 // record mounts this with ORDER_PICKED_RESTOCK; the live page mounts it with
 // toOrderViewProps(get_order). Verbs the explorer must tap (Adjust, Add line,
 // Ship, Cancel order) are drawn here; live lifecycle forms replace the footer.
+// How to convert the rest: .agents/superpowers/plans/2026-09-08-screen-views.md
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import type { OrderViewModel } from "@/lib/mgr/order-view";
