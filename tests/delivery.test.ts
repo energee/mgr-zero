@@ -63,3 +63,70 @@ describe("deliveries schema", () => {
     expect(ok).toBeNull();
   });
 });
+
+describe("save_route and list_routes", () => {
+  it("saves a mixed route, lists it by date, and refuses a shipment already on an open route", async () => {
+    const warehouse = await makeStaffCtx(b.id, "warehouse");
+    const [sh1, sh2, tr] = [await shipment(), await shipment(), await transfer()];
+    const saved = await runCommand("save_route", {
+      name: "Route A", deliveryDate: "2026-09-11", driverUserId: warehouse.userId, vehicle: "Box truck 2",
+      stops: [{ shipmentId: sh1, stopNo: 1 }, { stockTransferId: tr, stopNo: 2 }, { shipmentId: sh2, stopNo: 3 }],
+    }, adminCtx) as { routeId: string };
+    expect(saved.routeId).toMatch(/^[0-9a-f-]{36}$/i);
+
+    const listed = await runCommand("list_routes", { date: "2026-09-11" }, warehouse) as {
+      routes: { id: string; name: string; driver_user_id: string; stops: { stop_no: number; shipment_id: string | null; stock_transfer_id: string | null; label: string }[] }[];
+      unassigned: { shipments: { id: string }[]; transfers: { id: string }[] };
+      drivers: { user_id: string; role: string }[];
+    };
+    const route = listed.routes.find((r) => r.id === saved.routeId)!;
+    expect(route.name).toBe("Route A");
+    expect(route.stops.map((s) => s.stop_no)).toEqual([1, 2, 3]);
+    expect(route.stops[1].stock_transfer_id).toBe(tr);
+    expect(route.stops[1].label).toMatch(/TRF-\d{4}/);
+    expect(route.stops[0].label).toMatch(/ORD-\d{4}/);
+    expect(listed.unassigned.shipments.map((s) => s.id)).not.toContain(sh1);
+    expect(listed.unassigned.transfers.map((t) => t.id)).not.toContain(tr);
+    expect(listed.drivers.map((d) => d.user_id)).toContain(warehouse.userId);
+    // an empty date lists nothing; no date lists every route that has not returned
+    expect((await runCommand("list_routes", { date: "2030-01-01" }, warehouse) as { routes: unknown[] }).routes).toEqual([]);
+
+    // re-saving replaces the stops: drop stop 3 and it becomes unassigned again
+    await runCommand("save_route", {
+      id: saved.routeId, name: "Route A", deliveryDate: "2026-09-11", driverUserId: warehouse.userId,
+      stops: [{ shipmentId: sh1, stopNo: 1 }, { stockTransferId: tr, stopNo: 2 }],
+    }, adminCtx);
+    const again = await runCommand("list_routes", { date: "2026-09-11" }, adminCtx) as typeof listed;
+    expect(again.routes.find((r) => r.id === saved.routeId)!.stops.length).toBe(2);
+    expect(again.unassigned.shipments.map((s) => s.id)).toContain(sh2);
+
+    // the same shipment cannot sit on a second open route
+    await expect(runCommand("save_route", { deliveryDate: "2026-09-12", stops: [{ shipmentId: sh1, stopNo: 1 }] }, adminCtx))
+      .rejects.toThrow(/already on route/i);
+    // a stop names exactly one document, and no document twice
+    await expect(runCommand("save_route", { deliveryDate: "2026-09-12", stops: [{ shipmentId: sh2, stockTransferId: tr, stopNo: 1 }] }, adminCtx))
+      .rejects.toThrow();
+    await expect(runCommand("save_route", { deliveryDate: "2026-09-12", stops: [{ shipmentId: sh2, stopNo: 1 }, { shipmentId: sh2, stopNo: 2 }] }, adminCtx))
+      .rejects.toThrow(/twice/i);
+    // the driver must be a warehouse or admin member
+    const sales = await makeStaffCtx(b.id, "sales");
+    await expect(runCommand("save_route", { deliveryDate: "2026-09-12", driverUserId: sales.userId, stops: [{ shipmentId: sh2, stopNo: 1 }] }, adminCtx))
+      .rejects.toThrow(/driver/i);
+    // a route cannot be empty (Routes says New route is the only action when there is nothing to deliver)
+    await expect(runCommand("save_route", { deliveryDate: "2026-09-12", stops: [] }, adminCtx)).rejects.toThrow();
+  });
+
+  it("get_delivery_stop describes a transfer stop by its destination and picked lines", async () => {
+    const tr = await transfer(3);
+    const { routeId } = await runCommand("save_route", { deliveryDate: "2026-09-13", stops: [{ stockTransferId: tr, stopNo: 1 }] }, adminCtx) as { routeId: string };
+    const { data: d } = await admin.from("deliveries").select("id").eq("route_id", routeId).single();
+    const stop = await runCommand("get_delivery_stop", { deliveryId: d!.id }, adminCtx) as {
+      delivery: { stock_transfers: { transfer_no: number; to_location: { name: string } } | null; shipments: unknown };
+      lines: { qty_shipped: number }[]; invoice: unknown;
+    };
+    expect(stop.delivery.shipments).toBeNull();
+    expect(stop.delivery.stock_transfers?.to_location.name).toBe("Storage");
+    expect(stop.lines.map((l) => Number(l.qty_shipped))).toEqual([3]);
+    expect(stop.invoice).toBeNull();
+  });
+});

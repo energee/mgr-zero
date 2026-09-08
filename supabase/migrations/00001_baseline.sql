@@ -3314,6 +3314,80 @@ begin
   v_result := private.confirm_delivery_impl(p_delivery,p_signed_by); return private.complete_command_request(p_request_id,v_result);
 end $$;
 
+-- ---------------------------------------------------------------- delivery routes (Program 8)
+-- One RPC writes the route header and replaces its stops. A stop is a shipped
+-- customer shipment or a picked stock transfer; a document sits on at most one
+-- route (unique columns) and cannot be moved off an open route it is already
+-- on except by re-saving that route. Delivered stops must be kept. The driver
+-- is a warehouse or admin member; who may depart, confirm and return is that
+-- driver or an admin.
+create function private.save_route_impl(
+  p_brewery uuid, p_id uuid, p_name text, p_delivery_date date, p_driver uuid, p_vehicle text, p_note text, p_stops jsonb
+) returns jsonb language plpgsql set search_path = '' as $$
+declare v_id uuid := p_id; s jsonb; v_ship uuid; v_tr uuid; v_route uuid; v_seen_ship uuid[] := '{}'; v_seen_tr uuid[] := '{}';
+begin
+  if jsonb_typeof(p_stops) <> 'array' or jsonb_array_length(p_stops) = 0 then raise exception 'a route needs at least one stop'; end if;
+  if p_driver is not null and not exists (
+    select 1 from public.brewery_users where brewery_id = p_brewery and user_id = p_driver and role in ('admin','warehouse')
+  ) then raise exception 'driver must be a warehouse or admin member'; end if;
+  if v_id is null then
+    insert into public.routes (brewery_id, name, delivery_date, driver_user_id, vehicle, note)
+    values (p_brewery, nullif(trim(p_name), ''), p_delivery_date, p_driver, nullif(trim(p_vehicle), ''), nullif(trim(p_note), ''))
+    returning id into v_id;
+  else
+    perform 1 from public.routes where id = v_id and brewery_id = p_brewery for update;
+    if not found then raise exception 'route not found'; end if;
+    if exists (select 1 from public.routes where id = v_id and departed_at is not null) then raise exception 'route has departed'; end if;
+    update public.routes set name = nullif(trim(p_name), ''), delivery_date = p_delivery_date, driver_user_id = p_driver,
+      vehicle = nullif(trim(p_vehicle), ''), note = nullif(trim(p_note), '') where id = v_id;
+  end if;
+  for s in select * from jsonb_array_elements(p_stops) loop
+    v_ship := (s->>'shipment_id')::uuid; v_tr := (s->>'stock_transfer_id')::uuid;
+    if num_nonnulls(v_ship, v_tr) <> 1 then raise exception 'a stop is one shipment or one stock transfer'; end if;
+    if v_ship = any(v_seen_ship) or v_tr = any(v_seen_tr) then raise exception 'the same document is listed twice'; end if;
+    v_seen_ship := v_seen_ship || v_ship; v_seen_tr := v_seen_tr || v_tr;
+    select d.route_id into v_route from public.deliveries d join public.routes r on r.id = d.route_id
+      where (v_ship is not null and d.shipment_id = v_ship) or (v_tr is not null and d.stock_transfer_id = v_tr);
+    if v_route is not null and v_route <> v_id then raise exception 'document is already on route %', v_route; end if;
+    if v_ship is not null and not exists (select 1 from public.shipments where id = v_ship and brewery_id = p_brewery) then raise exception 'shipment not found'; end if;
+    if v_tr is not null and not exists (
+      select 1 from public.stock_transfers where id = v_tr and brewery_id = p_brewery and status in ('picked','in_transit')
+    ) then raise exception 'transfer must be picked before it can be delivered'; end if;
+  end loop;
+  -- delivered stops stay; replace the rest
+  v_seen_ship := array_remove(v_seen_ship, null); v_seen_tr := array_remove(v_seen_tr, null);
+  if exists (
+    select 1 from public.deliveries d where d.route_id = v_id and d.delivered_at is not null
+      and not (d.shipment_id = any(v_seen_ship) or d.stock_transfer_id = any(v_seen_tr))
+  ) then raise exception 'a delivered stop cannot be removed'; end if;
+  delete from public.deliveries where route_id = v_id and delivered_at is null;
+  -- two passes so renumbering never collides with a kept delivered stop
+  update public.deliveries set stop_no = -stop_no where route_id = v_id;
+  for s in select * from jsonb_array_elements(p_stops) loop
+    v_ship := (s->>'shipment_id')::uuid; v_tr := (s->>'stock_transfer_id')::uuid;
+    update public.deliveries set stop_no = (s->>'stop_no')::int where route_id = v_id
+      and ((v_ship is not null and shipment_id = v_ship) or (v_tr is not null and stock_transfer_id = v_tr));
+    if not found then
+      insert into public.deliveries (brewery_id, route_id, shipment_id, stock_transfer_id, stop_no)
+      values (p_brewery, v_id, v_ship, v_tr, (s->>'stop_no')::int);
+    end if;
+  end loop;
+  return jsonb_build_object('routeId', v_id);
+end $$;
+
+create function save_route(
+  p_brewery uuid, p_id uuid, p_name text, p_delivery_date date, p_driver uuid, p_vehicle text, p_note text, p_stops jsonb, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_result jsonb;
+begin
+  perform private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'save_route', p_request_id,
+    jsonb_build_object('id', p_id, 'name', p_name, 'delivery_date', p_delivery_date, 'driver', p_driver, 'vehicle', p_vehicle, 'note', p_note, 'stops', p_stops));
+  if v_replay is not null then return v_replay; end if;
+  v_result := private.save_route_impl(p_brewery, p_id, p_name, p_delivery_date, p_driver, p_vehicle, p_note, p_stops);
+  return private.complete_command_request(p_request_id, v_result);
+end $$;
+
 create function record_pick(p_order uuid,p_picks jsonb,p_request_id uuid) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare v_brewery uuid; v_replay jsonb; v_result jsonb;
@@ -5766,7 +5840,8 @@ grant execute on function
   record_material_count(uuid,uuid,uuid,date,jsonb,uuid),
   create_keg_pool(uuid,text,public.keg_pool_kind,uuid,int,int,uuid),
   update_keg_pool(uuid,uuid,text,uuid,int,int,boolean,uuid),
-  record_keg_event(uuid,uuid,public.keg_size,int,public.keg_event_reason,uuid,uuid,uuid,text,uuid)
+  record_keg_event(uuid,uuid,public.keg_size,int,public.keg_event_reason,uuid,uuid,uuid,text,uuid),
+  save_route(uuid,uuid,text,date,uuid,text,text,jsonb,uuid)
   to authenticated;
 grant usage on schema private, extensions to service_role;
 -- service_role reaches `private` only for the UUID default its seed inserts
