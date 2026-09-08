@@ -1,3 +1,5 @@
+import { InventoryDetailView } from "@/components/mgr/views/inventory-detail";
+import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 // components/mgr/screens.tsx — the screen inventory and the source of truth
 // for what each MGR screen shows (plan §4, §7); /docs/screens renders it. Every
 // record is typed; `states` is annotation the gallery captions under the
@@ -246,7 +248,7 @@ const FILL_CHIPS = ["Empty", "About ¼ left", "About ½ left"];
 
 // Gate copy shared by the frames naming one gate. Two frames drifting apart is
 // the failure this prevents: the copy is the promise, so it lives once.
-const REVERSAL_GATE = "isn’t available yet: a reversal needs an auditable link and TTB semantics. Until it closes no movement anywhere in MGR can be corrected, and a mistyped removal reaches the report";
+const REVERSAL_GATE = "is limited to standalone adjustments and losses on inventory SKU detail. Count corrections remain unavailable; shipments and other compound entries keep their own correction workflow";
 
 // The Work list chips, in the order every Work list draws them.
 const WORK_CHIPS = ["all", "orders", "transfers", "batches", "runs", "POs", "routes"];
@@ -849,21 +851,22 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Beer",
     name: "SKU detail",
-    to: { Warehouse: "SKU detail", Taproom: "SKU detail" },
+    to: { Warehouse: "SKU detail", Taproom: "SKU detail", "Reverse movement": "Reverse movement", "+1 · adjustment": "Reverse movement" },
     job: "See on-hand, ATP and immutable tape together",
-    reads: "get_on_hand · get_atp · list_movements",
-    writes: "reverse_inventory_movement [SCHEMA-GATE: auditable link + valid sign and TTB semantics]",
-    states: permitted("sales or warehouse required"),
-    spec: "Correction is not actionable yet: opposite-sign rows fail movement CHECKs; enable only after a structured reversal link and reporting semantics exist.",
-    body: (<>
-      {E.back("Finished goods", "Hazy IPA · ½ bbl")}
-      {E.num("11", "ATP · 15 on hand · 4 allocated")}
-      {E.row("Warehouse", "", "12")}
-      {E.row("Taproom", "", "3")}
-      {E.tape([["+8 production in · Warehouse", "Mon"], ["−4 taproom transfer", "Tue"], ["−1 depletion · Taproom", "Wed"]])}
-      {E.btn("Record movement")}
-      {E.gated("Reverse a movement", REVERSAL_GATE)}
-    </>),
+    reads: "get_inventory_sku · get_on_hand · get_atp · list_movements",
+    writes: "reverse_inventory_movement [standalone adjustment/loss only; admin or warehouse]",
+    states: permitted("sales reads; admin or warehouse reverses eligible standalone adjustments/losses"),
+    spec: "Review opens inventory SKU detail with complete on-hand by location, ATP and paginated immutable history. Admin and Warehouse reverse only standalone adjustments and losses with a required note; the exact linked opposite retains frozen volume, class, bin and lot. Sales reads only. Count corrections remain unavailable; shipment rows retain Return shipment. This is distinct from the catalog SKU editor.",
+    body: <InventoryDetailView model={INVENTORY_DETAIL} movementAction={() => E.btn("Reverse movement")} />,
+  },
+  {
+    step: 3, slice: 1, tab: "Beer", surface: "sheet", name: "Reverse movement",
+    to: { "Confirm reversal": "SKU detail" },
+    job: "Correct one selected standalone adjustment or loss",
+    reads: "list_movements", writes: "reverse_inventory_movement",
+    states: [["permission", "Admin or Warehouse only; Sales reads history"], ["insufficient", "Original bin/lot cannot cover the exact removal"], ["already reversed", "Open the linked correction"], ["unsupported", "Count and compound corrections retain their owner"]],
+    spec: "The selected movement and exact opposite quantity, frozen BBL, bin and lot are read-only. A correction note is required. Confirm reversal appends one linked row; unchanged failed submissions keep their request ID.",
+    body: <>{E.fld("Movement", "+1 adjustment · Warehouse / Cold · Untracked")}{E.fld("Exact reversal", "−1 unit · −0.5 bbl")}{E.edit("Correction note", "Entered twice")}{E.btn("Confirm reversal")}</>,
   },
   {
     step: 3,
@@ -875,7 +878,7 @@ export const SCREENS: Screen[] = [
     job: "Enter a positive amount; the form derives direction and the server calculates barrels",
     reads: "list_skus · list_locations · list_bins · get_atp",
     writes: "record_movement [existing; one append-only inventory movement]",
-    states: [["offline", "Queue with requestId"], ["stale", "ATP changed · preview again", 1], ["permission", "admin or warehouse required · sales reads Beer only", 1], ["echo", "Committed row · correction waits for schema gate"], ["unregistered destination", "Stout to OH warns and links to the registry · never blocks", 1]],
+    states: [["offline", "Queue with requestId"], ["stale", "ATP changed · preview again", 1], ["permission", "admin or warehouse required · sales reads Beer only", 1], ["echo", "Committed row · eligible standalone adjustment/loss correction opens inventory SKU detail"], ["unregistered destination", "Stout to OH warns and links to the registry · never blocks", 1]],
     spec: "The form derives the signed API quantity from the movement kind (adjustments ask Add or Remove); the server derives 0.50000000 bbl and never accepts client-supplied barrels. Drawn with festival removal selected: sample and festival removal leave the premises and require a destination state (the schema enforces it); destruction, loss and depletion never carry one. An unregistered brand and destination warn here with the same copy the order screens use, because a festival removal leaves the premises exactly as a shipment does and was the one path that crossed a state line without saying so. This frame carries Hazy IPA into PA, which is registered, so the warning is a state rather than drawn copy. Channel stays.",
     body: (<>
       <div className="md:hidden">{E.pick("Kind", "festival removal", MOVEMENT_KINDS)}</div>

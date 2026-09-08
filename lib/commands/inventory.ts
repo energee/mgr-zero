@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap, Ctx, CommandExecution, STAFF_ROLES } from "./registry";
+import { defineCommand, defineQuery, unwrap, Ctx, CommandExecution, CommandError, STAFF_ROLES } from "./registry";
 import { stockLine } from "./stock-line";
 
 const movementInput = z.object({
@@ -34,6 +34,14 @@ defineCommand({
 });
 
 defineCommand({
+  name: "reverse_inventory_movement", description: "Reverse one standalone adjustment or loss with an exact linked opposite entry; compound movements and counts keep their correction owner",
+  input: z.object({ movementId: z.string().uuid(), note: z.string().trim().min(1) }), roles: ["admin", "warehouse"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("reverse_inventory_movement", {
+    p_brewery: ctx.breweryId, p_movement: i.movementId, p_note: i.note, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
   name: "set_taproom_par", description: "Set par level for a SKU at a taproom",
   input: z.object({ locationId: z.string().uuid(), skuId: z.string().uuid(), parQty: z.number().nonnegative() }),
   roles: ["admin", "sales"],
@@ -65,10 +73,18 @@ const readRoles = ["admin", "sales", "warehouse"] as const;
 defineQuery({
   name: "get_on_hand", description: "On-hand quantity per SKU/location",
   input: bySku, roles: [...readRoles],
-  handler: (ctx, i) => {
-    let q = ctx.db.from("on_hand").select().eq("brewery_id", ctx.breweryId);
-    if (i.skuId) q = q.eq("sku_id", i.skuId);
-    return unwrap(q);
+  handler: async (ctx, i) => {
+    const rows: { sku_id: string; location_id: string; qty: number; locations: { name: string } | null }[] = [];
+    for (let start = 0; ; start += 500) {
+      let q = ctx.db.from("on_hand").select("*, locations(name)", { count: "exact" }).eq("brewery_id", ctx.breweryId)
+        .order("sku_id").order("location_id").range(start, start + 499);
+      if (i.skuId) q = q.eq("sku_id", i.skuId);
+      const result = await q;
+      const page = await unwrap(Promise.resolve(result)) as typeof rows;
+      rows.push(...page);
+      if (result.count === null || (!page.length && rows.length < result.count)) throw new Error("Could not read complete on-hand stock");
+      if (rows.length >= result.count) return rows;
+    }
   },
 });
 
@@ -106,14 +122,30 @@ defineQuery({
 });
 
 defineQuery({
-  name: "list_movements", description: "Recent inventory movements",
-  input: z.object({ skuId: z.string().uuid().optional(), limit: z.number().int().min(1).max(200).default(50), offset: z.number().int().nonnegative().default(0) }),
+  name: "list_movements", description: "Paginated immutable movements with location/bin/lot labels and reversal links; movementId selects an original and its exact compensation",
+  input: z.object({ skuId: z.string().uuid().optional(), movementId: z.string().uuid().optional(), limit: z.number().int().min(1).max(200).default(50), offset: z.number().int().nonnegative().default(0) }),
   roles: [...readRoles],
-  handler: (ctx, i) => {
-    let q = ctx.db.from("inventory_movements").select().eq("brewery_id", ctx.breweryId)
+  handler: async (ctx, i) => {
+    let q = ctx.db.from("inventory_movements").select("*, locations(name), bins(name), lots!inventory_movements_lot_fk(code)").eq("brewery_id", ctx.breweryId)
       .order("created_at", { ascending: false }).order("id", { ascending: false }).range(i.offset, i.offset + i.limit - 1);
     if (i.skuId) q = q.eq("sku_id", i.skuId);
-    return unwrap(q);
+    if (i.movementId) q = q.or(`id.eq.${i.movementId},compensates_id.eq.${i.movementId}`);
+    const rows = (await unwrap(q)) ?? [];
+    if (!rows.length) return [];
+    const corrections = await unwrap(ctx.db.from("inventory_movements").select("id, compensates_id")
+      .eq("brewery_id", ctx.breweryId).in("compensates_id", rows.map(r => r.id)));
+    return rows.map(row => ({ ...row, reversed_by: corrections?.find(c => c.compensates_id === row.id)?.id ?? null }));
+  },
+});
+
+defineQuery({
+  name: "get_inventory_sku", description: "One inventory SKU with brand and format, including inactive and zero-stock history",
+  input: z.object({ skuId: z.string().uuid() }), roles: [...readRoles],
+  handler: async (ctx, i) => {
+    const row = await unwrap(ctx.db.from("skus").select("id, name, active, brands(name), formats(name)")
+      .eq("brewery_id", ctx.breweryId).eq("id", i.skuId).maybeSingle());
+    if (!row) throw new CommandError("SKU not found", 404, "not_found");
+    return row;
   },
 });
 

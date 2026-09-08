@@ -33,7 +33,7 @@ export const API_AREAS = [
   { slug: "compliance", title: "Compliance", match: /(compliance|brand_approval|state_registration|state_license|list_lots|trace_lot|loss)/ },
   { slug: "purchasing", title: "Purchasing & materials", match: /(purchase_order|vendor|material)/ },
   { slug: "production", title: "Production", match: /(batch|brew_day|cellar|vessel|fermentation|recipe|water_profile)/ },
-  { slug: "catalog", title: "Catalog & pricing", match: /(product|sku|brand|price|sale_channel|sales_channel)/ },
+  { slug: "catalog", title: "Catalog & pricing", match: /^(?!get_inventory_sku$).*(product|sku|brand|price|sale_channel|sales_channel)/ },
   { slug: "packaging", title: "Packaging", match: /(packaging_run|format|repack|occupanc)/ },
   { slug: "taproom", title: "Taproom & kegs", match: /(keg|taproom|_taps|tap_history|replenishment)/ },
   { slug: "delivery", title: "Delivery & routes", match: /(route|delivery|shipment|depart)/ },

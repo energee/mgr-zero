@@ -563,12 +563,17 @@ create table inventory_movements (
   tax_treatment tax_treatment,
   dest_state text,
   lot_id uuid,                                   -- FK to lots added below
+  package_type package_type not null,             -- frozen report classification
+  compensates_id uuid,                           -- exact standalone adjustment/loss correction
   source_movement_id uuid,                       -- exact shipped return / damaged-return provenance
   ref uuid,                                      -- order_id / pos_sale id / run id
   note text,
   created_by uuid not null references auth.users(id),
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
+  unique (brewery_id, compensates_id),
+  foreign key (compensates_id, brewery_id) references inventory_movements (id, brewery_id),
+  check (compensates_id is null or (source_movement_id is null and compensates_id <> id)),
   foreign key (source_movement_id, brewery_id) references inventory_movements (id, brewery_id),
   foreign key (sku_id, brewery_id) references skus (id, brewery_id),
   foreign key (location_id, brewery_id) references locations (id, brewery_id),
@@ -583,7 +588,7 @@ create table inventory_movements (
       when 'sale_removal' then qty < 0 and sale_channel_id is not null and dest_state is not null and tax_treatment is not null
       when 'depletion'    then qty < 0 and sale_channel_id is not null and dest_state is null and tax_treatment is not null
       when 'destruction'      then qty < 0 and sale_channel_id is null and dest_state is null and tax_treatment is null
-      when 'loss'             then qty < 0 and sale_channel_id is null and dest_state is null and tax_treatment is null
+      when 'loss'             then (qty < 0 or compensates_id is not null) and sale_channel_id is null and dest_state is null and tax_treatment is null
       when 'sample'           then qty < 0 and dest_state is not null
       when 'festival_removal' then qty < 0 and dest_state is not null
       when 'opening_balance'  then qty > 0 and sale_channel_id is null and dest_state is null and tax_treatment is null
@@ -604,6 +609,18 @@ create index movements_lot_idx on inventory_movements (lot_id) where lot_id is n
 create function enforce_bbl_integrity() returns trigger language plpgsql set search_path = '' as $$
 declare original public.inventory_movements; returned_qty numeric; returned_bbl numeric;
 begin
+  if new.compensates_id is not null then
+    select * into original from public.inventory_movements where id = new.compensates_id and brewery_id = new.brewery_id;
+    if original.id is null or original.id = new.id or original.compensates_id is not null
+       or original.type not in ('adjustment','loss') or original.ref is not null or original.source_movement_id is not null
+       or new.source_movement_id is not null or new.ref is not null
+       or (new.sku_id, new.location_id, new.bin_id, new.lot_id, new.type, new.sale_channel_id, new.tax_treatment, new.dest_state)
+          is distinct from (original.sku_id, original.location_id, original.bin_id, original.lot_id, original.type, original.sale_channel_id, original.tax_treatment, original.dest_state)
+       or new.qty <> -original.qty then raise exception 'invalid standalone movement compensation'; end if;
+    new.bbl := -original.bbl;
+    new.package_type := original.package_type;
+    return new;
+  end if;
   if new.source_movement_id is not null then
     select * into original from public.inventory_movements where id = new.source_movement_id and brewery_id = new.brewery_id;
     if original.id is null or original.sku_id <> new.sku_id or original.lot_id is distinct from new.lot_id
@@ -611,6 +628,7 @@ begin
             or (new.type = 'loss' and original.type = 'return_in' and new.qty = -original.qty and new.ref = original.ref)) then
       raise exception 'invalid movement compensation source';
     end if;
+    new.package_type := original.package_type;
     -- The original volume is a frozen fact, even after a format is edited.
     if new.type = 'return_in' then
       select coalesce(sum(qty),0), coalesce(sum(bbl),0) into returned_qty, returned_bbl from public.inventory_movements
@@ -622,8 +640,9 @@ begin
     end if;
     return new;
   end if;
-  select (new.qty * f.bbl_per_unit) into new.bbl
-    from public.skus s join public.format_volumes f on f.id = s.format_id where s.id = new.sku_id;
+  select (new.qty * f.bbl_per_unit), p.package_type into new.bbl, new.package_type
+    from public.skus s join public.format_volumes f on f.id = s.format_id
+    join public.formats p on p.id = s.format_id where s.id = new.sku_id;
   if new.bbl is null then raise exception 'format has no bbl_per_unit'; end if;
   return new;
 end $$;
@@ -3529,6 +3548,32 @@ begin
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
+create function reverse_inventory_movement(p_brewery uuid, p_movement uuid, p_note text, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; original public.inventory_movements; compensation public.inventory_movements;
+begin
+  perform private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
+  if not exists (select 1 from public.inventory_movements where id = p_movement and brewery_id = p_brewery) then raise exception 'movement not found'; end if;
+  v_replay := private.claim_command_request(p_brewery, 'reverse_inventory_movement', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'movement', p_movement, 'note', p_note));
+  if v_replay is not null then return v_replay; end if;
+  if p_note is null or length(btrim(p_note)) = 0 then raise exception 'correction note required'; end if;
+  -- ponytail: global ledger lock, matching all stock writers; shared stock-key locks at higher throughput.
+  lock table public.inventory_movements in share row exclusive mode;
+  select * into original from public.inventory_movements where id = p_movement and brewery_id = p_brewery for update;
+  if original.type not in ('adjustment','loss') or original.compensates_id is not null
+     or original.source_movement_id is not null or original.ref is not null then raise exception 'only standalone adjustment and loss movements can be reversed'; end if;
+  if exists (select 1 from public.inventory_movements where brewery_id = p_brewery and compensates_id = p_movement) then raise exception 'movement already reversed'; end if;
+  if original.qty > 0 and original.qty > (select coalesce(sum(qty),0) from public.inventory_movements
+      where brewery_id = p_brewery and sku_id = original.sku_id and location_id = original.location_id
+        and bin_id = original.bin_id and lot_id is not distinct from original.lot_id) then raise exception 'insufficient stock in original bin and lot'; end if;
+  insert into public.inventory_movements(brewery_id, sku_id, location_id, bin_id, lot_id, qty, type,
+    sale_channel_id, tax_treatment, dest_state, compensates_id, note, created_by)
+  values(p_brewery, original.sku_id, original.location_id, original.bin_id, original.lot_id, -original.qty, original.type,
+    original.sale_channel_id, original.tax_treatment, original.dest_state, original.id, p_note, auth.uid()) returning * into compensation;
+  return private.complete_command_request(p_request_id, to_jsonb(compensation));
+end $$;
+
 -- The manifest binds the entire batch before any row commits. Its result holds
 -- the immutable input so direct row calls cannot substitute data or identities.
 create function begin_csv_import(p_brewery uuid, p_kind text, p_rows jsonb, p_request_id uuid)
@@ -4182,17 +4227,17 @@ end $$;
 create function private.report_movements(p_brewery uuid, p_end date)
 returns table (class public.package_type, bbl numeric, type public.movement_type, tax_treatment public.tax_treatment, dest_state text, d date, side text)
 language sql stable set search_path = '' as $$
-  select f.package_type, m.bbl, m.type, m.tax_treatment, m.dest_state, (m.created_at at time zone b.timezone)::date,
+  select m.package_type, m.bbl, m.type, m.tax_treatment, m.dest_state, (m.created_at at time zone b.timezone)::date,
     case m.type
       when 'production_in' then 'in' when 'return_in' then 'in' when 'opening_balance' then 'in'
-      when 'adjustment' then case when m.bbl > 0 then 'in' else 'out' end
+      when 'adjustment' then case when coalesce(original.bbl, m.bbl) > 0 then 'in' else 'out' end
       when 'sale_removal' then 'out' when 'depletion' then 'out' when 'destruction' then 'out'
       when 'loss' then 'out' when 'sample' then 'out' when 'festival_removal' then 'out'
       when 'taproom_transfer' then 'transfer' when 'location_transfer' then 'transfer' when 'repack' then 'transfer'
     end
   from public.inventory_movements m
   join public.breweries b on b.id = m.brewery_id
-  join public.skus s on s.id = m.sku_id join public.formats f on f.id = s.format_id
+  left join public.inventory_movements original on original.id = m.compensates_id and original.brewery_id = m.brewery_id
   where m.brewery_id = p_brewery and (m.created_at at time zone b.timezone)::date <= p_end
 $$;
 
@@ -6814,6 +6859,7 @@ grant execute on function
   set_channel_price(uuid,uuid,uuid,uuid,int,uuid),
   clear_channel_price(uuid,uuid,uuid,uuid,uuid),
   replace_format_bom(uuid,uuid,jsonb,uuid),
+  reverse_inventory_movement(uuid,uuid,text,uuid),
   record_inventory_movement(uuid,uuid,uuid,uuid,numeric,public.movement_type,uuid,text,text,uuid,uuid),
   set_taproom_par(uuid,uuid,uuid,numeric,uuid),
   set_portal_fulfillment_source(uuid,uuid,uuid),

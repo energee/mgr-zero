@@ -196,9 +196,10 @@ a gap to close, not a convention to trust.
   `.agents/superpowers/specs/2026-09-07-mgr-ai-chat-design.md`; plan
   `.agents/superpowers/plans/2026-09-07-ai-chat.md`. This is a design
   prerequisite, not a claim about the current registry.
-- **Inventory correction needs durable identity.** The current FG ledger has
-  neither a structured reversal link nor sign rules/report semantics for an exact
-  opposite entry, so `reverse_inventory_movement` remains disabled.
+- **Inventory correction needs durable identity.** The FG ledger links exact standalone adjustment/loss reversals through
+  unique same-tenant `compensates_id`; the trigger preserves original bucket,
+  classification and frozen BBL. `source_movement_id` remains shipped-return
+  provenance. Inventory SKU detail exposes only eligible standalone corrections.
   Taproom counts now persist headers and explicit bin/SKU/lot UUID-or-null lines,
   including zero-variance counts. Their one-RPC command rejects stale revisions,
   incomplete buckets and overcounts; shortages post exact-bucket depletion with

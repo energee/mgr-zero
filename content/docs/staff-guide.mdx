@@ -157,7 +157,7 @@ Wholesale Shop shows the packages the brewery has designated for wholesale — �
 
 <Screen name="Finished goods" />
 
-*Admin, Sales, and Warehouse can view inventory. Admin and Warehouse can record movements.*
+*Admin, Sales, and Warehouse can view inventory. Admin and Warehouse can record movements and reverse eligible standalone adjustments and losses.*
 
 <Cards>
   <Card title="On hand">The sum of recorded movements for one SKU in one bin at one location. ATP stays per SKU.</Card>
@@ -166,6 +166,12 @@ Wholesale Shop shows the packages the brewery has designated for wholesale — �
 </Cards>
 
 **Bins.** A bin is a named place inside a location: a walk-in, a cold room, a dry rack. Every location starts with three, **Cold**, **Dry**, and **Walk-in**, and always keeps at least one; add, rename, or remove them from [Locations](#locations). A bin that has ever recorded stock cannot be removed, even at a zero balance, because the movement history still names it; rename it instead. When shipping, choose the actual source bin and lot for each quantity; tracked lots stay identified through shipment and returns.
+
+**Review** on an inventory row opens its SKU detail, separate from **Edit SKU** in Catalog. It shows on-hand by location, global ATP and allocations, and immutable paginated movement history, including inactive and zero-stock SKUs. Locations and bins retain their recorded identities; untracked lots are labeled **Untracked**.
+
+**Reverse movement** is available to Admin and Warehouse only for a standalone `adjustment` or `loss` that has not already been reversed. Select the exact history entry, enter a **Correction note**, then **Confirm reversal**. MGR appends the exact opposite quantity and frozen barrel volume in the original bin and lot, preserving package and reporting classification. The original remains; **Reversal recorded** and **Original movement** link the two entries. Removing a prior positive adjustment is refused if that exact bin/lot no longer holds enough stock. Retry an unchanged failed form to recover the same result.
+
+Sales sees history without correction controls. Shipments retain **Return shipment** through their order workflow. Count/depletion corrections remain unavailable; other compound entries keep their original correction owner. A generic adjustment is not a count correction.
 
 ### Record a movement
 
@@ -194,9 +200,9 @@ Wholesale Shop shows the packages the brewery has designated for wholesale — �
 
 `sale_removal` and `taproom_transfer` are written by shipping, not by this form.
 
-**Movement recorded** appears only after the server confirms the save. It shows the committed quantity, frozen barrel volume, bin, state/channel, note, timestamp and reference. A failed or uncertain response does not show this receipt; retry the unchanged form to recover the same save. **Done** returns to the ledger. Inventory correction remains unavailable; ask your admin before recording another entry to correct a mistake.
+**Movement recorded** appears only after the server confirms the save. It shows the committed quantity, frozen barrel volume, bin, state/channel, note, timestamp and reference. A failed or uncertain response does not show this receipt; retry the unchanged form to recover the same save. **Done** returns to the ledger. Open the SKU’s inventory **Review** page to reverse an eligible standalone adjustment or loss; other entries retain their correction workflow.
 
-MGR calculates and stores barrel volume for every movement from quantity × the BBL per unit of the SKU's format. Movements cannot be edited or deleted. See [Errors and corrections](#errors-corrections) before you try to fix inventory.
+MGR freezes barrel volume when each entry posts. Ordinary entries use quantity × the format’s BBL per unit; exact reversals negate the original stored volume, and shipment returns retain their source volume. Movements cannot be edited or deleted. See [Errors and corrections](#errors-corrections) before you try to fix inventory.
 
 Empty sections say **No inventory recorded yet.** or **No movements recorded yet.**
 
@@ -380,7 +386,7 @@ A departed route lists its stops with their delivered times. The lowest undelive
 
 <Screen name="Monthly compliance" />
 
-A month is generated from the inventory ledger when you open it, so nothing is stored until you file. The table shows each package class (kegs, cans, bottles) in barrels: begin + in − out = end, and every class must balance. Zeros print 0.00. Beer in process is what the tanks hold now, not at the period end. Below the table, **Packaged** is production into finished goods, then each removal class (taxpaid, export, samples, losses, and so on) by the tax treatment recorded when the beer moved, so editing a sale channel later does not change a past month, and taxpaid removals by destination state. **Review auto-reconciled losses** is not available yet.
+A month is generated from the inventory ledger when you open it, so nothing is stored until you file. The table shows each package class (kegs, cans, bottles) in barrels: begin + in − out = end, and every class must balance. Zeros print 0.00. Beer in process is what the tanks hold now, not at the period end. Below the table, **Packaged** is production into finished goods, then each removal class (taxpaid, export, samples, losses, and so on) by the tax treatment recorded when the beer moved, so editing a sale channel or format later does not change historical classification, and taxpaid removals by destination state. **Review auto-reconciled losses** is not available yet. Exact adjustment reversals net against the original inflow or outflow; loss reversals net against losses. A correction posts in its own period, so later corrections appear as signed amounts without rewriting an earlier filed snapshot.
 
 **Save filed snapshot** stores the figures as they stand, with an optional note, and marks the month filed; reopening it shows the snapshot rather than regenerating. MGR does not transmit anything: file with the TTB or the state yourself and record it here. The button stays off while a class does not balance; the month names the class, and today the only cause is a repack across package classes. A month can be filed once, and a period overlapping a filed one is refused. The report itself is a fixed shape, so a movement recorded later into a filed month appears in the next generation of a *different* month, never in the snapshot.
 

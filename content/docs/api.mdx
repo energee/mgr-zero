@@ -215,6 +215,7 @@ omitted. They have no roles until they are built.
 | `get_first_run_state` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `get_format_composition` | Packaging | ✓ | ✓ | ✓ |  |  |  |
 | `get_gravity_unit` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ | ✓ |  |
+| `get_inventory_sku` | Inventory & locations | ✓ | ✓ | ✓ |  |  |  |
 | `get_invoice` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |  |
 | `get_invoice_return_sources` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
 | `get_keg_fleet` | Taproom & kegs | ✓ |  | ✓ |  |  |  |
@@ -305,6 +306,7 @@ omitted. They have no roles until they are built.
 | `resolve_short_pick` | Orders & invoicing | ✓ |  | ✓ |  |  |  |
 | `return_route` | Delivery & routes | ✓ |  | ✓ |  |  |  |
 | `return_shipment` | Delivery & routes | ✓ | ✓ |  |  |  |  |
+| `reverse_inventory_movement` | Inventory & locations | ✓ |  | ✓ |  |  |  |
 | `revoke_staff` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `save_route` | Delivery & routes | ✓ |  | ✓ |  |  |  |
 | `schedule_batch` | Production | ✓ |  |  | ✓ |  |  |
@@ -1400,6 +1402,9 @@ The screens need them and the backend has not built them, so calling one returns
 
 ### Inventory & locations [#inventory]
 
+`reverse_inventory_movement` accepts only standalone adjustments and losses. Its required note and selected movement form the retry identity; it appends an exact linked opposite with frozen package class and volume in the original bin and lot. Insufficient stock prevents removing a positive adjustment. Count/depletion and compound correction owners remain unchanged. Completed retries return the original result; changed inputs conflict. Corrections post in their own period and never rewrite filed snapshots.
+
+
 The ledger is immutable. A movement is appended, never edited or deleted, and a
 correction is a new movement in the opposite direction. That is what makes the
 history admissible for excise reporting. `bbl` is computed server-side from the
@@ -1544,6 +1549,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_bin_on_hand", "input": {} }'
 ```
 
+#### get_inventory_sku [#get_inventory_sku]
+
+`query` · admin, sales, warehouse
+
+One inventory SKU with brand and format, including inactive and zero-stock history
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `skuId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_inventory_sku", "input": { "skuId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 #### get_on_hand [#get_on_hand]
 
 `query` · admin, sales, warehouse
@@ -1614,11 +1636,12 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Recent inventory movements
+Paginated immutable movements with location/bin/lot labels and reversal links; movementId selects an original and its exact compensation
 
 | Field | Type | Required |
 | --- | --- | --- |
 | `skuId` | uuid | no |
+| `movementId` | uuid | no |
 | `limit` | integer | no |
 | `offset` | integer | no |
 
@@ -1715,6 +1738,24 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_movement", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "skuId": "00000000-0000-0000-0000-000000000000", "locationId": "00000000-0000-0000-0000-000000000000", "binId": "00000000-0000-0000-0000-000000000000", "qty": 1, "type": "opening_balance" } }'
 ```
 
+#### reverse_inventory_movement [#reverse_inventory_movement]
+
+`command` · admin, warehouse
+
+Reverse one standalone adjustment or loss with an exact linked opposite entry; compound movements and counts keep their correction owner
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `movementId` | uuid | yes |
+| `note` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "reverse_inventory_movement", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "movementId": "00000000-0000-0000-0000-000000000000", "note": "string" } }'
+```
+
 #### submit_stock_transfer [#submit_stock_transfer]
 
 `command` · admin, warehouse
@@ -1768,18 +1809,6 @@ curl -X POST "$MGR_URL/api/command" \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "update_location", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "locationId": "00000000-0000-0000-0000-000000000000", "name": "string", "kind": "warehouse" } }'
 ```
-
----
-
-**Designed, not yet available** {/* inventory-designed */}
-
-19 of the 20 operations in this area are available today; the 1 below are not.
-
-The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
-
-| Operation | Kind | Needed by |
-| --- | --- | --- |
-| `reverse_inventory_movement` | command | SKU detail |
 
 {/* end ops:inventory */}
 

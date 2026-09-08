@@ -45,7 +45,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         ? E.blank("No finished goods yet")
         : stocked.map((s) => {
             const on = have.get(s.id) ?? 0, a = atpBySku.get(s.id) ?? on, allocated = on - a;
-            return <div key={s.id}>{E.row(skuLabel(s), `${on} on hand · ${allocated} allocated · ATP ${a}`, a < 0 ? E.act("Shortfall", "attention", `/replenishment?sku=${s.id}`) : "", a < 0 ? "w" : "")}</div>;
+            return <div key={s.id}>{E.row(skuLabel(s), `${on} on hand · ${allocated} allocated · ATP ${a}`, <span className="flex gap-2">{E.act("Review", "primary", `/inventory/${s.id}`)}{a < 0 && E.act("Shortfall", "attention", `/replenishment?sku=${s.id}`)}</span>, a < 0 ? "w" : "")}</div>;
           })}
       {E.ttl("Movements")}
       {movements.length === 0

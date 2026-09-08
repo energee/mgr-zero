@@ -258,7 +258,9 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
       ('${B}','${f.taproom.id}','${failureRequest}@test.local','staff','warehouse','${authUser.data.user!.id}','pending_membership','${failureRequest}');`);
   expect(sql(`select count(*) from private.command_requests where actor_id='${f.taproom.id}' and request_id='${importRequest}' and result->'rows' <> '[]'::jsonb`)).toEqual(["1"]);
   expect(sql(`select count(*) from private.invite_requests where actor_id='${f.taproom.id}' and request_id in ('${inviteRequest}','${failureRequest}')`)).toEqual(["2"]);
+  const reversible = await ins("inventory_movements", { brewery_id: B, sku_id: SKU, location_id: W, bin_id: BIN, qty: 1, type: "adjustment", created_by: f.owner.id });
   const cases: Record<string, unknown[]> = {
+    reverse_inventory_movement: [B,reversible.id,"Wrong entry",R()],
     set_brewery_operating_defaults: [B,24,R()], begin_csv_import: [B,"opening_balances",importRows,R()], import_csv_row: [B,importRequest,0],
     claim_invite_request: [B,`${name}@test.local`,"staff","warehouse",null,R()], complete_invite_membership: [inviteRequest], record_invite_failure: [failureRequest],
     record_keg_event: [B,f.pool.id,"half_bbl",1,"acquired",W,BIN,null,null,R()], update_keg_pool: [B,f.pool.id,name,null,null,0,true,R()], create_keg_pool: [B,name,"owned",null,null,0,R()],
