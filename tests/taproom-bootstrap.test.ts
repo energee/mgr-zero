@@ -44,6 +44,9 @@ it("selects only verified active own personal destinations and keeps other prefe
   const input = { reason: "operations_digest", personalDestinationId: destination };
   const first = await runCommand("set_notification_destination", input, ctx, { requestId, correlationId: requestId });
   expect(await runCommand("set_notification_destination", input, ctx, { requestId, correlationId: requestId })).toEqual(first);
+  await expect(runCommand("set_notification_destination", { ...input, reason: "submitted_order" }, ctx, { requestId, correlationId: requestId })).rejects.toMatchObject({ status: 409, code: "conflict" });
+  expect(sql(`select command_name || ':' || (payload_hash = extensions.digest(jsonb_build_object('reason','operations_digest','personal_destination','${destination}'::uuid)::text,'sha256'))::text
+    from private.command_requests where actor_id='${ctx.userId}' and request_id='${requestId}'`)).toEqual(["set_notification_destination:true"]);
   const pref = await admin.from("notification_preferences").select("enabled,personal_destination_id").eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId).eq("reason", "operations_digest").single();
   expect(pref.data).toEqual({ enabled: false, personal_destination_id: destination });
   await expect(runCommand("set_notification_destination", { ...input, personalDestinationId: shared }, ctx)).rejects.toMatchObject({ status: 403 });
@@ -60,7 +63,7 @@ it("selects only verified active own personal destinations and keeps other prefe
   for (const [name, args] of [
     ["set_my_gravity_unit", { p_brewery: foreign.id, p_unit: "sg", p_request_id: crypto.randomUUID() }],
     ["set_notification_preference", { p_brewery: foreign.id, p_reason: "operations_digest", p_enabled: false, p_quiet_start: null, p_quiet_end: null, p_quiet_tz: null, p_set_quiet: false, p_request_id: crypto.randomUUID() }],
-    ["set_notification_destination", { p_brewery: foreign.id, p_reason: "operations_digest", p_personal_destination: destination, p_request_id: crypto.randomUUID() }],
+    ["set_personal_notification_destination", { p_brewery: foreign.id, p_reason: "operations_digest", p_personal_destination: destination, p_request_id: crypto.randomUUID() }],
   ] as const) expect((await ctx.db.rpc(name, args)).error?.code, name).toBe("42501");
   await admin.from("notification_destinations").update({ validated_at: null }).eq("id", destination);
   await expect(runCommand("set_notification_destination", input, ctx)).rejects.toMatchObject({ status: 403 });
@@ -223,4 +226,15 @@ it("loads complete Taproom stock and names SKUs beyond the catalog response cap"
   expect(result.taproomStock).toHaveLength(1001);
   expect(new Set(result.taproomStock.map(s => s.skuId)).size).toBe(1001);
   expect(result.taproomStock.every(s => s.sku === skus.find(row => row.id === s.skuId)?.name && s.qty === 7)).toBe(true);
+});
+
+it("separates authenticated personal selection from service-only OAuth and shared settings", () => {
+  expect(sql(`select p.proname || ':' || r.role from pg_proc p
+    cross join (values ('anon'),('authenticated'),('service_role')) r(role)
+    where p.pronamespace='public'::regnamespace
+      and p.proname in ('activate_chat_installation','find_chat_oauth_intent','set_notification_destination','set_personal_notification_destination')
+      and has_function_privilege(r.role,p.oid,'execute') order by 1`)).toEqual([
+    "activate_chat_installation:service_role", "find_chat_oauth_intent:service_role",
+    "set_notification_destination:service_role", "set_personal_notification_destination:authenticated",
+  ]);
 });

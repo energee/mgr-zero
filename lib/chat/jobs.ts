@@ -298,8 +298,9 @@ async function homeIntents(db: SupabaseClient, installationId: string, externalU
 async function settingsInstallation(ctx: Ctx, installationId: string) {
   const health = await unwrap(ctx.db.rpc("get_chat_integration_health", { p_brewery: ctx.breweryId }));
   if (health?.installation?.id !== installationId) throw new CommandError("installation changed; reload Chat settings", 403);
-  const installation = await unwrap(serviceClient().from("chat_installations").select("id, state, external_installation_id, updated_at")
-    .eq("id", installationId).eq("brewery_id", ctx.breweryId).single());
+  const installation = await unwrap(serviceClient().rpc("get_chat_settings_installation", {
+    p_brewery: ctx.breweryId, p_installation: installationId, p_actor: ctx.userId,
+  })) as { id: string; state: string; external_installation_id: string; updated_at: string } | null;
   if (!installation) throw new CommandError("installation not found", 404);
   return installation;
 }
@@ -314,15 +315,18 @@ export async function listChatChannels(ctx: Ctx, installationId: string) {
   }
 }
 
-export async function validateChatDestination(ctx: Ctx, installationId: string, channelId: string, requestId: string) {
+export async function saveChatNotificationDestination(ctx: Ctx, installationId: string, channelId: string, requestId: string) {
   const completed = await unwrap(serviceClient().rpc("chat_settings_request_completed", { p_brewery: ctx.breweryId, p_user: ctx.userId, p_request_id: requestId }));
-  if (completed) return; // The write RPC below remains the sole canonical replay/conflict owner.
   const installation = await settingsInstallation(ctx, installationId);
-  if (installation.state !== "active") throw new CommandError("Slack delivery is not active", 400);
-  const checked = await slackTransport().validateDestination({ installationId: installation.external_installation_id, destinationId: channelId });
-  if (!checked.ok) throw new CommandError("Choose an active private channel with MGR added and sharing turned off.", 400);
-  await unwrap(serviceClient().rpc("record_chat_destination_check", { p_brewery: ctx.breweryId, p_installation: installationId,
-    p_user: ctx.userId, p_channel: channelId, p_version: installation.updated_at, p_request_id: requestId }));
+  if (!completed) {
+    if (installation.state !== "active") throw new CommandError("Slack delivery is not active", 400);
+    const checked = await slackTransport().validateDestination({ installationId: installation.external_installation_id, destinationId: channelId });
+    if (!checked.ok) throw new CommandError("Choose an active private channel with MGR added and sharing turned off.", 400);
+  }
+  return await unwrap(serviceClient().rpc("set_notification_destination", {
+    p_brewery: ctx.breweryId, p_installation: installationId, p_external_destination_id: channelId,
+    p_request_id: requestId, p_actor: ctx.userId, p_version: installation.updated_at,
+  })) as { id: string };
 }
 
 export async function cleanupChatInstallation(ctx: Ctx, installationId: string, port: Pick<import("./oauth").SlackOAuthPort, "deleteInstallation">) {
@@ -339,17 +343,15 @@ async function cleanupChatInstallationLocked(ctx: Ctx, installationId: string, p
   if (installation.state !== "disconnected") return { credentialDeleted: false };
   // Credential ownership survives disable/reauthorization; disconnected rows
   // release this unique store reference to their per-row tombstone.
-  if (await chatCredentialHasOtherOwner(serviceClient(), installation.external_installation_id)) return { credentialDeleted: false };
+  if (await chatCredentialHasOtherOwner(installation.external_installation_id)) return { credentialDeleted: false };
   const credentialDeleted = installation.external_installation_id.startsWith("pending:") || await port.deleteInstallation(installation.external_installation_id).then(() => true, () => false);
   await unwrap(serviceClient().rpc("reconcile_chat_installation", { p_installation: installationId, p_credential_deleted: credentialDeleted,
     p_failure_code: credentialDeleted ? null : "credential_delete_failed" }));
   return { credentialDeleted };
 }
 
-export async function chatCredentialHasOtherOwner(db: SupabaseClient, externalInstallationId: string) {
-  const rows = await unwrap(db.from("chat_installations").select("id").eq("provider", "slack")
-    .eq("external_installation_id", externalInstallationId).eq("token_store_key", `slack:installation:${externalInstallationId}`).limit(1));
-  return Boolean(rows?.length);
+export async function chatCredentialHasOtherOwner(externalInstallationId: string) {
+  return Boolean(await unwrap(serviceClient().rpc("chat_credential_has_canonical_owner", { p_external_installation_id: externalInstallationId })));
 }
 
 export async function failChatCredentialStore(installationId: string): Promise<never> {
@@ -363,9 +365,8 @@ export async function failChatCredentialStore(installationId: string): Promise<n
 // credentials are stored, or a failed store has disabled the mapping.
 export async function withActiveChatInstallation<T>(externalId: string, read: () => Promise<T>) {
   return withChatLifecycleLock(async () => {
-    const rows = await unwrap(serviceClient().from("chat_installations").select("id")
-      .eq("provider", "slack").eq("external_installation_id", externalId).eq("state", "active").limit(1));
-    return rows?.length ? read() : null;
+    const active = await unwrap(serviceClient().rpc("has_active_canonical_chat_installation", { p_external_installation_id: externalId }));
+    return active ? read() : null;
   });
 }
 

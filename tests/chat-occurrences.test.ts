@@ -3,6 +3,8 @@
 // recipient fan-out (roles, mutes, links), and resolved suppression (live DB).
 import { beforeAll, describe, expect, it } from "vitest";
 import { admin, channelId, makeBrewery, makeStaffCtx, priceSku } from "./helpers";
+import { toNotification } from "@/lib/chat/jobs";
+import { renderSlackMessage } from "@/lib/chat/slack-renderer";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -131,4 +133,23 @@ describe("notification occurrences", () => {
     const { error } = await adminCtx.db.rpc("scan_chat_notification_occurrences", { p_brewery: b.id, p_now: "2026-09-05T14:00:00Z" });
     expect(error?.message).toMatch(/permission denied|not find the function/i);
   });
+});
+
+it("keeps buyer question text and customer names in MGR while projecting safe invoice identity to chat", async () => {
+  const invoice = await ins("invoices", { brewery_id: b.id, kind: "invoice", customer_id: customerId, issued_on: "2026-09-05" });
+  const question = await ins("invoice_questions", { brewery_id: b.id, invoice_id: invoice.id, customer_id: customerId, body: "Private buyer note with contact and price", created_by: sales.userId });
+  const today = await adminCtx.db.rpc("get_today_items", { p_brewery: b.id, p_now: "2036-09-05T14:00:00Z" });
+  expect(today.error).toBeNull();
+  expect(JSON.stringify(today.data)).toContain("Private buyer note");
+  await scan("2036-09-05T14:00:00Z");
+  const [occ] = await occurrences(question.id);
+  expect(occ).toMatchObject({ reason: "invoice_question", subject_type: "invoice", subject_id: question.id,
+    payload: { safe_label: expect.stringMatching(/^INV-\d+$/), detail: "Buyer asked about this invoice", href: `/invoices/${invoice.id}` } });
+  expect(JSON.stringify(occ.payload)).not.toMatch(/Private buyer|Bar/);
+  const rendered = renderSlackMessage(toNotification(occ), { intentId: "fixture", mgrBaseUrl: "https://mgr.test" });
+  expect(JSON.stringify(rendered)).not.toMatch(/Private buyer|Bar/);
+  expect(JSON.stringify(rendered)).toContain(`/invoices/${invoice.id}`);
+  const home = await admin.rpc("get_chat_home_items", { p_installation: inst.id, p_external_user_id: `U-${sales.userId.slice(0, 8)}` });
+  expect(home.error).toBeNull();
+  expect(home.data).toEqual(expect.arrayContaining([expect.objectContaining({ subject_id: question.id, payload: occ.payload })]));
 });

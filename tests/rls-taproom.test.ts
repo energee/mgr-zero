@@ -259,14 +259,13 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     set_brewery_operating_defaults: [B,24,R()], begin_csv_import: [B,"opening_balances",importRows,R()], import_csv_row: [B,importRequest,0],
     claim_invite_request: [B,`${name}@test.local`,"staff","warehouse",null,R()], complete_invite_membership: [inviteRequest], record_invite_failure: [failureRequest],
     record_keg_event: [B,f.pool.id,"half_bbl",1,"acquired",W,BIN,null,null,R()], update_keg_pool: [B,f.pool.id,name,null,null,0,true,R()], create_keg_pool: [B,name,"owned",null,null,0,R()],
-    activate_chat_installation: [I,"fixture-state","https://example.test/chat/callback",B,null,"Fixture",`fixture-${B}`,{ scopes: ["chat:write","im:write","groups:read"] }],
     begin_chat_installation: [B,"slack","https://example.test/chat/callback","state",R()], begin_chat_reauthorization: [B,I,"https://example.test/chat/callback","state",R()],
     close_packaging_run: [B,readyRun.id,0.0645,[{sku_id:SKU,qty_actual:1}],name,day,null,W,BIN,R()],
     create_purchase_order: [B,VENDOR,day,null,[{material_id:MAT,qty_ordered:1,unit_cost_cents:100}],R()], create_recipe: [B,BRAND,name,null,R()],
     create_recipe_version: [B,f.recipe.id,152,0.75,0.75,60,40,null,[{material_id:MAT,per_bbl_qty:1,stage:"mash"}],R()],
     delete_bin: [B,emptyBin,R()], disable_chat_installation: [B,I,R()], disconnect_chat_installation: [B,I,R()], draft_purchase_order_from_requirements: [B,[MAT],R()],
-    mark_chat_installation_reauthorization: [I,"token_expired"], portal_create_order: [B,f.customer.customerId,f.customer.shipToId,null,null,[{sku_id:SKU,qty:1}],R(),day],
-    receive_purchase_order: [B,sentPo.id,W,BIN,day,[{po_line_id:sentLine.id,qty_counted:1}],R()], reconcile_chat_installation: [I,true,null],
+    portal_create_order: [B,f.customer.customerId,f.customer.shipToId,null,null,[{sku_id:SKU,qty:1}],R(),day],
+    receive_purchase_order: [B,sentPo.id,W,BIN,day,[{po_line_id:sentLine.id,qty_counted:1}],R()],
     record_brew_day: [B,plannedBatch.id,emptyVessel.id,2,day,R()], record_cellar_transfer: [B,f.occupancy.id,emptyVessel.id,1,0,R()],
     record_fermentation_reading: [B,f.occupancy.id,now,68,5,4.2,null,R()], record_material_count: [B,W,BIN,day,[{material_id:MAT,qty:1}],R()],
     record_repack: [B,W,BIN,parentSku.id,1,SKU,6,R()], record_stock_transfer_pick: [submitted.id,[{line_id:transferLine.id,qty:1}],R()], record_submitted_order_occurrence: [f.order.id],
@@ -280,8 +279,8 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   const catalog = sql(`select json_build_object('name',p.proname,'signature',p.oid::regprocedure::text,'args',p.proargnames[1:p.pronargs]) from pg_proc p
     where p.pronamespace='public'::regnamespace and has_function_privilege('authenticated',p.oid,'execute')
       and not exists(select 1 from pg_depend d where d.objid=p.oid and d.deptype='e')`).map(row => JSON.parse(row) as {name:string;signature:string;args:string[]});
-  const readNames = ["get_taproom_count_snapshot","get_taproom_count","taproom_can","staff_brewery_rows","keg_bin_on_hand_rows","get_chat_integration_health","get_chat_link_intent","list_chat_user_links","find_chat_oauth_intent","generate_compliance_report","get_today_items","is_staff_of","my_brewery_ids","my_customer_ids","portal_availability","portal_brewery_rows","staff_role","today_live_reasons","list_team_members"];
-  const ownNames = ["set_my_gravity_unit","consume_chat_link_proof","unlink_chat_user","set_notification_preference","set_notification_destination"];
+  const readNames = ["get_taproom_count_snapshot","get_taproom_count","taproom_can","staff_brewery_rows","keg_bin_on_hand_rows","get_chat_integration_health","get_chat_link_intent","list_chat_user_links","generate_compliance_report","get_today_items","is_staff_of","my_brewery_ids","my_customer_ids","portal_availability","portal_brewery_rows","staff_role","today_live_reasons","list_team_members"];
+  const ownNames = ["set_my_gravity_unit","consume_chat_link_proof","unlink_chat_user","set_notification_preference","set_personal_notification_destination"];
   const existing = [...readFileSync(new URL("./rls-command-boundary.test.ts", import.meta.url), "utf8").matchAll(/rpc: "(\w+)"/g)].map(m => m[1]);
   expect([...new Set(catalog.map(c => c.name))].sort()).toEqual([...new Set([...Object.keys(cases),...existing,...readNames,...ownNames,"provision_brewery"])].sort());
   const publicSnapshot = () => sql((Object.keys(matrix) as Table[]).map(table => {
@@ -289,13 +288,13 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     return `select '${table}:' || md5(coalesce(jsonb_agg(to_jsonb(t) order by to_jsonb(t)::text)::text,'')) from public.${table} t where ${predicate}`;
   }).join(";"));
   const publicBefore = publicSnapshot();
-  const readSignatures = ["get_taproom_count_snapshot(uuid,uuid)","get_taproom_count(uuid,uuid)","taproom_can(uuid,text)","staff_brewery_rows()","keg_bin_on_hand_rows()","get_chat_integration_health(uuid)","get_chat_link_intent(uuid,text)","list_chat_user_links(uuid)","find_chat_oauth_intent(text)","generate_compliance_report(uuid,text,date,date)","get_today_items(uuid,timestamp with time zone)","is_staff_of(uuid)","my_brewery_ids()","my_customer_ids()","portal_availability(uuid)","portal_brewery_rows()","staff_role(uuid)","today_live_reasons()","list_team_members(uuid)"];
-  const ownSignatures = ["set_my_gravity_unit(uuid,text,uuid)","consume_chat_link_proof(uuid,text,uuid)","unlink_chat_user(uuid,uuid,uuid)","set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text,boolean,uuid)","set_notification_destination(uuid,text,uuid,uuid)"];
+  const readSignatures = ["get_taproom_count_snapshot(uuid,uuid)","get_taproom_count(uuid,uuid)","taproom_can(uuid,text)","staff_brewery_rows()","keg_bin_on_hand_rows()","get_chat_integration_health(uuid)","get_chat_link_intent(uuid,text)","list_chat_user_links(uuid)","generate_compliance_report(uuid,text,date,date)","get_today_items(uuid,timestamp with time zone)","is_staff_of(uuid)","my_brewery_ids()","my_customer_ids()","portal_availability(uuid)","portal_brewery_rows()","staff_role(uuid)","today_live_reasons()","list_team_members(uuid)"];
+  const ownSignatures = ["set_my_gravity_unit(uuid,text,uuid)","consume_chat_link_proof(uuid,text,uuid)","unlink_chat_user(uuid,uuid,uuid)","set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text,boolean,uuid)","set_personal_notification_destination(uuid,text,uuid,uuid)"];
   expect(catalog.filter(c => readNames.includes(c.name)).map(c => c.signature).sort()).toEqual(readSignatures.sort());
-  expect(catalog.filter(c => ownNames.includes(c.name)).map(c => c.signature).sort()).toEqual([...ownSignatures,"set_notification_destination(uuid,uuid,text,uuid)"].sort());
+  expect(catalog.filter(c => ownNames.includes(c.name)).map(c => c.signature).sort()).toEqual([...ownSignatures].sort());
   expect(catalog.filter(c => c.name === "provision_brewery").map(c => c.signature)).toEqual(["provision_brewery(text,text,text,uuid)"]);
   for (const name of new Set(existing)) expect(catalog.filter(c => c.name === name), `${name} existing lifecycle case`).toHaveLength(1);
-  const sharedDestination = await db.rpc("set_notification_destination", { p_brewery: B, p_installation: I, p_external_destination_id: "shared", p_request_id: R() });
+  const sharedDestination = await db.rpc("set_notification_destination", { p_brewery: B, p_installation: I, p_external_destination_id: "shared", p_request_id: R(), p_actor: f.owner.id, p_version: now });
   expect(sharedDestination.error?.code).toBe("42501");
   const before = sql(`select md5(string_agg(row_to_json(t)::text,'' order by request_id)) from private.command_requests t where brewery_id='${B}';
     select md5(string_agg(row_to_json(t)::text,'' order by request_id)) from private.invite_requests t where brewery_id='${B}'`);
@@ -322,7 +321,11 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     record_chat_callback_receipt: ["slack",B,R(),"action",f.taproom.id,"fixture-hash"], chat_assert_job: [], list_chat_scan_targets: [],
     claim_chat_callback_receipts: [1,now], complete_chat_callback_receipt: [callback,"ignored",null], get_chat_home_items: [I,f.taproom.id], get_chat_delivery_context: [delivery,now],
     block_notification_destination: [destination,"fixture"], issue_chat_action_intent: [I,f.taproom.id,"mgr_refresh",null], consume_chat_action_intent: [callback,action,"mgr_refresh",{}],
-    record_chat_destination_check: [B,I,f.taproom.id,"shared",now,R()], chat_settings_request_completed: [B,f.taproom.id,importRequest],
+    activate_chat_installation: [I,"fixture-state","https://example.test/chat/callback",B,null,"Fixture",`fixture-${B}`,{ scopes: ["chat:write","im:write","groups:read"] },f.owner.id],
+    find_chat_oauth_intent: ["fixture-state",f.owner.id], mark_chat_installation_reauthorization: [I,"token_expired"], reconcile_chat_installation: [I,true,null],
+    set_notification_destination: [B,I,"shared",R(),f.owner.id,now], get_chat_settings_installation: [B,I,f.owner.id],
+    chat_credential_has_canonical_owner: [B], has_active_canonical_chat_installation: [B], get_chat_installation_lifecycle: [I], prune_chat_integration_logs: ["90 days"],
+    chat_settings_request_completed: [B,f.taproom.id,importRequest],
   };
   const serviceCatalog = sql(`select json_build_object('name',p.proname,'signature',p.oid::regprocedure::text,'args',p.proargnames[1:p.pronargs]) from pg_proc p
     where p.pronamespace='public'::regnamespace and p.prorettype not in ('trigger'::regtype,'event_trigger'::regtype)
@@ -334,10 +337,14 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     const result = await db.rpc(c.name, Object.fromEntries((c.args ?? []).map((key,i) => [key,args[i]])));
     expect(result.error?.code, `${c.signature}: ${result.error?.message}`).toBe("42501");
   }
+  expect(publicSnapshot()).toEqual(publicBefore);
+  expect(sql(`select md5(string_agg(row_to_json(t)::text,'' order by request_id)) from private.command_requests t where brewery_id='${B}';
+    select md5(string_agg(row_to_json(t)::text,'' order by request_id)) from private.invite_requests t where brewery_id='${B}'`)).toEqual(before);
+  const ownCommands = ownNames.map(name => name === "set_personal_notification_destination" ? "set_notification_destination" : name);
   const ctx = { db, userId: f.taproom.id, breweryId: B, role: "taproom" as const };
   const commands = listTools().filter(t => t.kind === "command" && t.scope === "tenant");
-  expect(commands.filter(t => { const roles = getCommandDefinition(t.name)!.roles; return roles === "any" || Array.isArray(roles) && roles.includes("taproom"); }).map(t => t.name).sort()).toEqual([...ownNames,"record_taproom_count"].sort());
-  for (const command of commands.filter(t => !ownNames.includes(t.name) && t.name !== "record_taproom_count")) {
+  expect(commands.filter(t => { const roles = getCommandDefinition(t.name)!.roles; return roles === "any" || Array.isArray(roles) && roles.includes("taproom"); }).map(t => t.name).sort()).toEqual([...ownCommands,"record_taproom_count"].sort());
+  for (const command of commands.filter(t => !ownCommands.includes(t.name) && t.name !== "record_taproom_count")) {
     const definition = getCommandDefinition(command.name)!;
     const input = sampleInput(definition.input);
     expect(definition.input.safeParse(input).success, `${command.name} valid registry input`).toBe(true);

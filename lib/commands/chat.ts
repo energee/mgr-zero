@@ -43,14 +43,12 @@ defineCommand({
   input: z.union([z.object({ reason: z.enum(REASONS), personalDestinationId: z.string().uuid() }), z.object({ installationId: z.string().uuid(), externalDestinationId: z.string().min(1) })]),
   roles: STAFF_ROLES,
   handler: async (ctx, i, execution) => {
-    if ("personalDestinationId" in i) return await unwrap(ctx.db.rpc("set_notification_destination", {
+    if ("personalDestinationId" in i) return await unwrap(ctx.db.rpc("set_personal_notification_destination", {
       p_brewery: ctx.breweryId, p_reason: i.reason, p_personal_destination: i.personalDestinationId, p_request_id: execution.requestId,
     })) as { id: string };
     if (ctx.role !== "admin") throw new CommandError("permission denied", 403, "permission_denied");
-    const { validateChatDestination } = await import("@/lib/chat/jobs");
-    await validateChatDestination(ctx, i.installationId, i.externalDestinationId, execution.requestId);
-    return await unwrap(ctx.db.rpc("set_notification_destination", { p_brewery: ctx.breweryId, p_request_id: execution.requestId,
-      p_installation: i.installationId, p_external_destination_id: i.externalDestinationId })) as { id: string };
+    const { saveChatNotificationDestination } = await import("@/lib/chat/jobs");
+    return saveChatNotificationDestination(ctx, i.installationId, i.externalDestinationId, execution.requestId);
   },
 });
 
@@ -167,7 +165,7 @@ defineCommand({ name: "disconnect_chat_installation", description: "Stop Slack d
   handler: async (ctx, i, execution) => {
     const { disconnectSlackInstallation } = await import("@/lib/chat/oauth");
     const { slackOAuthPort } = await import("@/lib/chat/slack-adapter");
-    // Construct the provider lazily: local disconnect succeeds even without provider setup.
+    // atomic-exempt: Slack credential delete is provider HTTP after the disconnect RPC and cannot share that transaction.
     return disconnectSlackInstallation(ctx, i.installationId, { deleteInstallation: async (id) => slackOAuthPort().deleteInstallation(id) }, execution.requestId);
   },
 });

@@ -187,6 +187,7 @@ it("validates channel privacy on the server and binds durable proofs to actor, g
     const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
     const result = await runCommand("set_notification_destination", input, ctx, execution);
     expect(await runCommand("set_notification_destination", input, ctx, execution)).toEqual(result);
+    await expect(runCommand("set_notification_destination", { ...input, externalDestinationId: "C-CHANGED" }, ctx, execution)).rejects.toMatchObject({ status: 409, code: "conflict" });
     for (const flag of ["is_archived", "is_shared", "is_ext_shared", "is_pending_ext_shared"] as const) {
       info = { ...info, [flag]: true };
       await expect(runCommand("set_notification_destination", input, ctx)).rejects.toThrow(/private channel/);
@@ -198,12 +199,27 @@ it("validates channel privacy on the server and binds durable proofs to actor, g
     expect((await ctx.db.rpc("chat_settings_request_completed", { p_brewery: ctx.breweryId, p_user: ctx.userId, p_request_id: execution.requestId })).error).not.toBeNull();
     const version = (await admin.from("chat_installations").select("updated_at").eq("id", installation).single()).data!.updated_at;
     const request = crypto.randomUUID();
-    await rpc("record_chat_destination_check", { p_brewery: ctx.breweryId, p_installation: installation, p_user: ctx.userId, p_channel: "C-STALE", p_version: version, p_request_id: request });
     await runCommand("set_brewery_quiet_hours", { installationId: installation, start: "20:00", end: "06:00" }, ctx);
-    const stale = await ctx.db.rpc("set_notification_destination", { p_brewery: ctx.breweryId, p_installation: installation, p_external_destination_id: "C-STALE", p_request_id: request });
-    expect(stale.error?.message).toMatch(/validated/);
-    expect((await ctx.db.rpc("record_chat_destination_check", { p_brewery: ctx.breweryId, p_installation: installation, p_user: ctx.userId, p_channel: "C-STALE", p_version: version, p_request_id: request })).error).not.toBeNull();
+    const stale = await admin.rpc("set_notification_destination", {
+      p_brewery: ctx.breweryId, p_installation: installation, p_external_destination_id: "C-STALE",
+      p_request_id: request, p_actor: ctx.userId, p_version: version,
+    });
+    expect(stale.error?.message).toMatch(/changed|validated/);
+    expect((await ctx.db.rpc("set_notification_destination", {
+      p_brewery: ctx.breweryId, p_installation: installation, p_external_destination_id: "C-STALE", p_request_id: request, p_actor: ctx.userId, p_version: version,
+    })).error?.code).toBe("42501");
     expect((await admin.from("notification_destinations").select("external_destination_id").eq("installation_id", installation).eq("kind", "private_channel").eq("state", "active").single()).data?.external_destination_id).toBe("C-VALIDATED");
+    await admin.from("brewery_users").update({ role: "sales" }).eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId);
+    read.mockClear();
+    try {
+      await expect(runCommand("set_notification_destination", input, ctx, execution)).rejects.toMatchObject({ status: 403 });
+      expect(read).not.toHaveBeenCalled();
+      expect((await admin.rpc("set_notification_destination", {
+        p_brewery: ctx.breweryId, p_installation: installation, p_external_destination_id: "C-VALIDATED",
+        p_request_id: execution.requestId, p_actor: ctx.userId, p_version: version,
+      })).error?.code).toBe("42501");
+    } finally { await admin.from("brewery_users").update({ role: "admin" }).eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId); }
+
   } finally { read.mockRestore(); }
 });
 

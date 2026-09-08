@@ -122,7 +122,12 @@ One baseline edit, four parts, in `supabase/migrations/00001_baseline.sql`.
    Program 12 commands (`tap_keg`, `swap_keg`, `kick_keg`,
    `record_taproom_count`) are created with it; `set_my_gravity_unit`,
    `consume_chat_link_proof`, `unlink_chat_user`, `set_notification_preference`
-   and the personal branch of `set_notification_destination` add it. The personal destination branch selects a previously verified active own
+   and the personal branch of `set_notification_destination` add it. That branch
+   calls authenticated `set_personal_notification_destination`, retaining the
+   `set_notification_destination` ledger command and canonical reason/destination
+   payload. The shared-channel RPC keeps `set_notification_destination` and its
+   service-only grant; its command branch checks Admin before the service owner
+   rechecks current membership. The personal branch selects a verified active own
    destination per reason using `notification_preferences.personal_destination_id`;
    it cannot provision an external identity or change an admin shared channel.
    Fanout honors that selection; NULL keeps existing routing. Personal quiet
