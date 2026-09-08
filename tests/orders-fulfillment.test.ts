@@ -299,7 +299,7 @@ describe("confirm_delivery", () => {
       p_carrier: null, p_tracking: null, p_invoice_timing: "on_delivery", p_request_id: crypto.randomUUID(),
     });
     const { data: sh } = await admin.from("shipments").select("id").eq("order_id", id).single();
-    const { data: route } = await admin.from("routes").insert({ brewery_id: b.id, delivery_date: "2026-09-08", driver_user_id: staffId, name: "A" }).select().single();
+    const { data: route } = await admin.from("routes").insert({ brewery_id: b.id, delivery_date: "2026-09-08", driver_user_id: staffId, name: "A", departed_at: new Date().toISOString() }).select().single();
     const { data: del } = await admin.from("deliveries").insert({ brewery_id: b.id, route_id: route!.id, shipment_id: sh!.id, stop_no: 1 }).select().single();
     const mvBefore = await admin.from("inventory_movements").select("id").eq("ref", id);
     const { data, error } = await staffDb.rpc("confirm_delivery", { p_delivery: del!.id, p_signed_by: "Dana", p_request_id: crypto.randomUUID() });
@@ -316,10 +316,10 @@ describe("confirm_delivery", () => {
     const again = await staffDb.rpc("confirm_delivery", { p_delivery: del!.id, p_signed_by: "Dana", p_request_id: crypto.randomUUID() });
     expect(again.error?.message).toMatch(/already delivered/);
     const stop = await runCommand("get_delivery_stop", { deliveryId: del!.id }, { db: staffDb, userId: staffId, breweryId: b.id, role: "admin" }) as
-      { delivery: { signed_by: string; shipments: { invoice_timing: string } }; lines: { qty_shipped: number }[]; invoice: { id: string } | null };
+      { delivery: { signed_by: string; shipments: { invoice_timing: string } }; lines: { qty: number }[]; invoice: { id: string } | null };
     expect(stop.delivery.signed_by).toBe("Dana");
     expect(stop.delivery.shipments.invoice_timing).toBe("on_delivery");
-    expect(stop.lines.map((l) => Number(l.qty_shipped))).toEqual([3]);
+    expect(stop.lines.map((l) => l.qty)).toEqual([3]);
     expect(stop.invoice?.id).toBe(invoiceId);
   });
 });

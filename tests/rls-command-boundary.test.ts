@@ -512,7 +512,7 @@ describe("registered staff mutation role × RPC matrix", () => {
       },
     },
     {
-      command: "confirm_delivery", rpc: "confirm_delivery", allowed: ["admin", "warehouse"],
+      command: "save_route", rpc: "save_route", allowed: ["admin", "warehouse"],
       input: async () => {
         const orderId = await confirmedOrder();
         const lineId = await orderLine(orderId);
@@ -520,7 +520,51 @@ describe("registered staff mutation role × RPC matrix", () => {
         await db.rpc("record_pick", { p_order: orderId, p_picks: [{ line_id: lineId, qty_picked: 1 }], p_request_id: crypto.randomUUID() });
         await db.rpc("ship_order", { p_order: orderId, p_ship: [{ line_id: lineId, qty_shipped: 1 }], p_carrier: null, p_tracking: null, p_request_id: crypto.randomUUID() });
         const { data: sh } = await admin.from("shipments").select("id").eq("order_id", orderId).single();
-        const { data: route } = await admin.from("routes").insert({ brewery_id: brewery.id, delivery_date: "2026-09-08", name: "matrix" }).select("id").single();
+        return {
+          command: { deliveryDate: "2026-09-09", stops: [{ shipmentId: sh!.id, stopNo: 1 }] },
+          rpc: { p_brewery: brewery.id, p_id: null, p_name: null, p_delivery_date: "2026-09-09", p_driver: null, p_vehicle: null, p_note: null, p_stops: [{ shipment_id: sh!.id, stock_transfer_id: null, stop_no: 1 }] },
+        };
+      },
+    },
+    {
+      command: "depart_route", rpc: "depart_route", allowed: ["admin", "warehouse"],
+      input: async role => {
+        const orderId = await confirmedOrder();
+        const lineId = await orderLine(orderId);
+        const db = contexts().admin.db;
+        await db.rpc("record_pick", { p_order: orderId, p_picks: [{ line_id: lineId, qty_picked: 1 }], p_request_id: crypto.randomUUID() });
+        await db.rpc("ship_order", { p_order: orderId, p_ship: [{ line_id: lineId, qty_shipped: 1 }], p_carrier: null, p_tracking: null, p_request_id: crypto.randomUUID() });
+        const { data: sh } = await admin.from("shipments").select("id").eq("order_id", orderId).single();
+        const { data: route } = await admin.from("routes").insert({ brewery_id: brewery.id, delivery_date: "2026-09-09", name: "depart", driver_user_id: contexts()[role].userId }).select("id").single();
+        await admin.from("deliveries").insert({ brewery_id: brewery.id, route_id: route!.id, shipment_id: sh!.id, stop_no: 1 });
+        return { command: { routeId: route!.id }, rpc: { p_route: route!.id } };
+      },
+    },
+    {
+      command: "return_route", rpc: "return_route", allowed: ["admin", "warehouse"],
+      input: async role => {
+        const orderId = await confirmedOrder();
+        const lineId = await orderLine(orderId);
+        const db = contexts().admin.db;
+        await db.rpc("record_pick", { p_order: orderId, p_picks: [{ line_id: lineId, qty_picked: 1 }], p_request_id: crypto.randomUUID() });
+        await db.rpc("ship_order", { p_order: orderId, p_ship: [{ line_id: lineId, qty_shipped: 1 }], p_carrier: null, p_tracking: null, p_request_id: crypto.randomUUID() });
+        const { data: sh } = await admin.from("shipments").select("id").eq("order_id", orderId).single();
+        const { data: route } = await admin.from("routes").insert({ brewery_id: brewery.id, delivery_date: "2026-09-09", name: "return", driver_user_id: contexts()[role].userId, departed_at: new Date().toISOString() }).select("id").single();
+        await admin.from("deliveries").insert({ brewery_id: brewery.id, route_id: route!.id, shipment_id: sh!.id, stop_no: 1, delivered_at: new Date().toISOString() });
+        return { command: { routeId: route!.id }, rpc: { p_route: route!.id } };
+      },
+    },
+    {
+      command: "confirm_delivery", rpc: "confirm_delivery", allowed: ["admin", "warehouse"],
+      input: async role => {
+        const orderId = await confirmedOrder();
+        const lineId = await orderLine(orderId);
+        const db = contexts().admin.db;
+        await db.rpc("record_pick", { p_order: orderId, p_picks: [{ line_id: lineId, qty_picked: 1 }], p_request_id: crypto.randomUUID() });
+        await db.rpc("ship_order", { p_order: orderId, p_ship: [{ line_id: lineId, qty_shipped: 1 }], p_carrier: null, p_tracking: null, p_request_id: crypto.randomUUID() });
+        const { data: sh } = await admin.from("shipments").select("id").eq("order_id", orderId).single();
+        // the assigned driver or an admin runs a route; the member under test is the driver
+        const { data: route } = await admin.from("routes").insert({ brewery_id: brewery.id, delivery_date: "2026-09-08", name: "matrix", driver_user_id: contexts()[role].userId, departed_at: new Date().toISOString() }).select("id").single();
         const { data: del } = await admin.from("deliveries").insert({ brewery_id: brewery.id, route_id: route!.id, shipment_id: sh!.id, stop_no: 1 }).select("id").single();
         return { command: { deliveryId: del!.id, signedBy: "Dana" }, rpc: { p_delivery: del!.id, p_signed_by: "Dana" } };
       },

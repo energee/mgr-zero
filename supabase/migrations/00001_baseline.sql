@@ -1567,14 +1567,19 @@ create table deliveries (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
   route_id uuid not null,
-  shipment_id uuid not null unique,
+  -- a stop delivers a customer shipment or a stock transfer, never both
+  -- (locations spec Decision 4); each document sits on at most one route
+  shipment_id uuid unique,
+  stock_transfer_id uuid unique,
   stop_no int not null,
   delivered_at timestamptz,
   signed_by text,
   note text,
   unique (route_id, stop_no),
   foreign key (route_id, brewery_id) references routes (id, brewery_id),
-  foreign key (shipment_id, brewery_id) references shipments (id, brewery_id)
+  foreign key (shipment_id, brewery_id) references shipments (id, brewery_id),
+  foreign key (stock_transfer_id, brewery_id) references stock_transfers (id, brewery_id),
+  check (num_nonnulls(shipment_id, stock_transfer_id) = 1)
 );
 
 -- ---------------------------------------------------------------- views (derived truth)
@@ -3279,9 +3284,12 @@ begin
   select * into d from public.deliveries where id = p_delivery for update;
   if not found then raise exception 'delivery not found'; end if;
   if d.delivered_at is not null then raise exception 'already delivered'; end if;
+  if not exists (select 1 from public.routes where id = d.route_id and departed_at is not null) then raise exception 'route has not departed'; end if;
+  update public.deliveries set delivered_at = now(), signed_by = nullif(trim(p_signed_by), '') where id = p_delivery;
+  -- a transfer stop is only stamped: receive_stock_transfer moves the stock, and nothing is invoiced
+  if d.stock_transfer_id is not null then return jsonb_build_object('delivery_id', p_delivery, 'invoice_id', null); end if;
   select * into sh from public.shipments where id = d.shipment_id;
   select * into o from public.orders where id = sh.order_id;
-  update public.deliveries set delivered_at = now(), signed_by = nullif(trim(p_signed_by), '') where id = p_delivery;
   select id into v_invoice from public.invoices where shipment_id = sh.id and kind = 'invoice' limit 1;
   if v_invoice is null and sh.invoice_timing = 'on_delivery' and o.kind = 'wholesale'
      and exists (select 1 from public.order_lines ol where ol.order_id = o.id and coalesce(ol.qty_shipped, 0) > 0) then
@@ -3301,12 +3309,140 @@ create function confirm_delivery(p_delivery uuid,p_signed_by text,p_request_id u
 language plpgsql security definer set search_path = '' as $$
 declare v_brewery uuid; v_replay jsonb; v_result jsonb;
 begin
-  select brewery_id into v_brewery from public.deliveries where id = p_delivery;
-  if v_brewery is null then raise exception 'permission denied' using errcode = '42501'; end if;
-  perform private.assert_staff(v_brewery,array['admin','warehouse']::public.staff_role[]);
+  v_brewery := private.assert_route_runner((select route_id from public.deliveries where id = p_delivery));
   v_replay := private.claim_command_request(v_brewery,'confirm_delivery',p_request_id,jsonb_build_object('delivery',p_delivery,'signed_by',p_signed_by));
   if v_replay is not null then return v_replay; end if;
   v_result := private.confirm_delivery_impl(p_delivery,p_signed_by); return private.complete_command_request(p_request_id,v_result);
+end $$;
+
+-- ---------------------------------------------------------------- delivery routes (Program 8)
+-- One RPC writes the route header and replaces its stops. A stop is a shipped
+-- customer shipment or a picked stock transfer; a document sits on at most one
+-- route (unique columns) and cannot be moved off an open route it is already
+-- on except by re-saving that route. Delivered stops must be kept. The driver
+-- is a warehouse or admin member; who may depart, confirm and return is that
+-- driver or an admin.
+create function private.save_route_impl(
+  p_brewery uuid, p_id uuid, p_name text, p_delivery_date date, p_driver uuid, p_vehicle text, p_note text, p_stops jsonb
+) returns jsonb language plpgsql set search_path = '' as $$
+declare v_id uuid := p_id; r public.routes; s jsonb; v_ship uuid; v_tr uuid; v_doc uuid; v_route uuid; v_seen uuid[] := '{}'; v_no int; v_seen_no int[] := '{}';
+begin
+  if jsonb_typeof(p_stops) <> 'array' or jsonb_array_length(p_stops) = 0 then raise exception 'a route needs at least one stop'; end if;
+  if p_driver is not null and not exists (
+    select 1 from public.brewery_users where brewery_id = p_brewery and user_id = p_driver and role in ('admin','warehouse')
+  ) then raise exception 'driver must be a warehouse or admin member'; end if;
+  if v_id is null then
+    insert into public.routes (brewery_id, name, delivery_date, driver_user_id, vehicle, note)
+    values (p_brewery, nullif(trim(p_name), ''), p_delivery_date, p_driver, nullif(trim(p_vehicle), ''), nullif(trim(p_note), ''))
+    returning id into v_id;
+  else
+    select * into r from public.routes where id = v_id and brewery_id = p_brewery for update;
+    if not found then raise exception 'route not found'; end if;
+    -- ponytail: a departed route is frozen, so a refused stop blocks the return until it is delivered; a per-stop
+    -- "leave for a later route" verb on the run page is the upgrade path
+    if r.departed_at is not null then raise exception 'route has departed'; end if;
+    update public.routes set name = nullif(trim(p_name), ''), delivery_date = p_delivery_date, driver_user_id = p_driver,
+      vehicle = nullif(trim(p_vehicle), ''), note = nullif(trim(p_note), '') where id = v_id;
+  end if;
+  for s in select * from jsonb_array_elements(p_stops) loop
+    v_ship := (s->>'shipment_id')::uuid; v_tr := (s->>'stock_transfer_id')::uuid; v_doc := coalesce(v_ship, v_tr);
+    if num_nonnulls(v_ship, v_tr) <> 1 then raise exception 'a stop is one shipment or one stock transfer'; end if;
+    if v_doc = any(v_seen) then raise exception 'the same document is listed twice'; end if;
+    v_seen := v_seen || v_doc;
+    v_no := (s->>'stop_no')::int;
+    if v_no is null or v_no < 1 then raise exception 'stop number must be positive'; end if;
+    if v_no = any(v_seen_no) then raise exception 'stop number % is used twice', v_no; end if;
+    v_seen_no := v_seen_no || v_no;
+    -- the brewery check comes first so a foreign id learns nothing about where it sits
+    if v_ship is not null and not exists (select 1 from public.shipments where id = v_ship and brewery_id = p_brewery) then raise exception 'shipment not found'; end if;
+    if v_tr is not null and not exists (
+      select 1 from public.stock_transfers where id = v_tr and brewery_id = p_brewery and status in ('picked','in_transit')
+    ) then raise exception 'transfer must be picked before it can be delivered'; end if;
+    select d.route_id into v_route from public.deliveries d where d.brewery_id = p_brewery and coalesce(d.shipment_id, d.stock_transfer_id) = v_doc;
+    if v_route is not null and v_route <> v_id then raise exception 'document is already on route %', v_route; end if;
+  end loop;
+  -- delivered stops stay; replace the rest
+  if exists (
+    select 1 from public.deliveries d where d.route_id = v_id and d.delivered_at is not null
+      and not (coalesce(d.shipment_id, d.stock_transfer_id) = any(v_seen))
+  ) then raise exception 'a delivered stop cannot be removed'; end if;
+  -- kept stops keep their id: Today rows, chat subjects and open Confirm pages point at it
+  delete from public.deliveries where route_id = v_id and delivered_at is null and not (coalesce(shipment_id, stock_transfer_id) = any(v_seen));
+  -- two passes so renumbering never collides with a kept stop
+  update public.deliveries set stop_no = -stop_no where route_id = v_id;
+  for s in select * from jsonb_array_elements(p_stops) loop
+    v_ship := (s->>'shipment_id')::uuid; v_tr := (s->>'stock_transfer_id')::uuid;
+    update public.deliveries set stop_no = (s->>'stop_no')::int where route_id = v_id and coalesce(shipment_id, stock_transfer_id) = coalesce(v_ship, v_tr);
+    if not found then
+      insert into public.deliveries (brewery_id, route_id, shipment_id, stock_transfer_id, stop_no)
+      values (p_brewery, v_id, v_ship, v_tr, (s->>'stop_no')::int);
+    end if;
+  end loop;
+  return jsonb_build_object('routeId', v_id);
+end $$;
+
+-- The assigned driver or an admin runs a route; other warehouse members may
+-- plan it but never depart, confirm or return it. Returns the brewery.
+create function private.assert_route_runner(p_route uuid) returns uuid
+language plpgsql stable security definer set search_path = '' as $$
+declare r public.routes;
+begin
+  select * into r from public.routes where id = p_route;
+  if r.id is null then raise exception 'permission denied' using errcode = '42501'; end if;
+  perform private.assert_staff(r.brewery_id, array['admin','warehouse']::public.staff_role[]);
+  if r.driver_user_id is distinct from auth.uid() and public.staff_role(r.brewery_id) <> 'admin' then
+    raise exception 'only the assigned driver or an admin may run this route' using errcode = '42501';
+  end if;
+  return r.brewery_id;
+end $$;
+
+create function depart_route(p_route uuid, p_request_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_brewery uuid; v_replay jsonb; r public.routes; v_tr uuid;
+begin
+  v_brewery := private.assert_route_runner(p_route);
+  v_replay := private.claim_command_request(v_brewery, 'depart_route', p_request_id, jsonb_build_object('route', p_route));
+  if v_replay is not null then return v_replay; end if;
+  select * into r from public.routes where id = p_route for update;
+  if r.departed_at is not null then raise exception 'route has already departed'; end if;
+  if not exists (select 1 from public.deliveries where route_id = p_route) then raise exception 'a route needs at least one stop'; end if;
+  update public.routes set departed_at = now() where id = p_route returning * into r;
+  -- the truck now carries the transfer stops; the transition rule stays with lock_transfer
+  for v_tr in select stock_transfer_id from public.deliveries where route_id = p_route and stock_transfer_id is not null loop
+    perform private.lock_transfer(v_tr, array['picked','in_transit']::public.stock_transfer_status[]);
+    update public.stock_transfers set status = 'in_transit' where id = v_tr;
+  end loop;
+  return private.complete_command_request(p_request_id, jsonb_build_object('routeId', p_route, 'departed_at', r.departed_at));
+end $$;
+
+create function return_route(p_route uuid, p_request_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_brewery uuid; v_replay jsonb; r public.routes;
+begin
+  v_brewery := private.assert_route_runner(p_route);
+  v_replay := private.claim_command_request(v_brewery, 'return_route', p_request_id, jsonb_build_object('route', p_route));
+  if v_replay is not null then return v_replay; end if;
+  select * into r from public.routes where id = p_route for update;
+  if r.returned_at is not null then raise exception 'route has already returned'; end if;
+  if r.departed_at is null then raise exception 'route has not departed'; end if;
+  if exists (select 1 from public.deliveries where route_id = p_route and delivered_at is null) then
+    raise exception 'every stop must be delivered before the route returns';
+  end if;
+  update public.routes set returned_at = now() where id = p_route returning * into r;
+  return private.complete_command_request(p_request_id, jsonb_build_object('routeId', p_route, 'returned_at', r.returned_at));
+end $$;
+
+create function save_route(
+  p_brewery uuid, p_id uuid, p_name text, p_delivery_date date, p_driver uuid, p_vehicle text, p_note text, p_stops jsonb, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_result jsonb;
+begin
+  perform private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'save_route', p_request_id,
+    jsonb_build_object('id', p_id, 'name', p_name, 'delivery_date', p_delivery_date, 'driver', p_driver, 'vehicle', p_vehicle, 'note', p_note, 'stops', p_stops));
+  if v_replay is not null then return v_replay; end if;
+  v_result := private.save_route_impl(p_brewery, p_id, p_name, p_delivery_date, p_driver, p_vehicle, p_note, p_stops);
+  return private.complete_command_request(p_request_id, v_result);
 end $$;
 
 create function record_pick(p_order uuid,p_picks jsonb,p_request_id uuid) returns jsonb
@@ -5116,7 +5252,7 @@ create view private.today_candidates with (security_invoker = true) as
     from orders o
     where o.needs_restock = true
   union all
-  -- only the lowest undelivered stop of an open route is "next"
+  -- only the lowest undelivered stop of a departed, unreturned route is "next"
   select r.brewery_id, 'delivery_next', 'delivery', d.id::text,
          md5(concat_ws('|', r.driver_user_id, r.delivery_date, d.stop_no, d.delivered_at, r.returned_at)),
          coalesce(r.name, 'Route') || ' · stop ' || d.stop_no,
@@ -5128,7 +5264,7 @@ create view private.today_candidates with (security_invoker = true) as
     from deliveries d
     join routes r on r.id = d.route_id
     join breweries b on b.id = r.brewery_id
-    where d.delivered_at is null and r.returned_at is null
+    where d.delivered_at is null and r.departed_at is not null and r.returned_at is null
       and d.stop_no = (select min(d2.stop_no) from deliveries d2 where d2.route_id = d.route_id and d2.delivered_at is null)
   union all
   -- overdue when the latest reading (or occupancy start when none) plus the
@@ -5148,10 +5284,10 @@ create view private.today_candidates with (security_invoker = true) as
     where vo.ended_at is null;
 grant select on private.today_candidates to service_role;
 
--- ponytail: delivery_next joins this list when its MGR page ships (slice 10
--- delivery stop). fermentation_reading_overdue is live: /cellar/<occupancy>/reading exists.
+-- Every reason has a live MGR page: /work/deliveries/<stop> (Program 8) and
+-- /cellar/<occupancy>/reading.
 create function today_live_reasons() returns text[]
-language sql immutable set search_path = '' as $$ select array['submitted_order','pick_due','restock_due','fermentation_reading_overdue'] $$;
+language sql immutable set search_path = '' as $$ select array['submitted_order','pick_due','restock_due','delivery_next','fermentation_reading_overdue'] $$;
 
 create function get_today_items(p_brewery uuid, p_now timestamptz default now())
 returns setof private.today_candidates
@@ -5761,7 +5897,10 @@ grant execute on function
   record_material_count(uuid,uuid,uuid,date,jsonb,uuid),
   create_keg_pool(uuid,text,public.keg_pool_kind,uuid,int,int,uuid),
   update_keg_pool(uuid,uuid,text,uuid,int,int,boolean,uuid),
-  record_keg_event(uuid,uuid,public.keg_size,int,public.keg_event_reason,uuid,uuid,uuid,text,uuid)
+  record_keg_event(uuid,uuid,public.keg_size,int,public.keg_event_reason,uuid,uuid,uuid,text,uuid),
+  save_route(uuid,uuid,text,date,uuid,text,text,jsonb,uuid),
+  depart_route(uuid,uuid),
+  return_route(uuid,uuid)
   to authenticated;
 grant usage on schema private, extensions to service_role;
 -- service_role reaches `private` only for the UUID default its seed inserts

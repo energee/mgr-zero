@@ -183,6 +183,7 @@ omitted. They have no roles until they are built.
 | `delete_bin` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `delete_price_group` | Catalog & pricing | ✓ | ✓ |  |  |  |
 | `delete_sale_channel` | Catalog & pricing | ✓ |  |  |  |  |
+| `depart_route` | Delivery & routes | ✓ |  | ✓ |  |  |
 | `draft_purchase_order_from_requirements` | Purchasing & materials | ✓ |  | ✓ |  |  |
 | `get_atp` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `get_bin_on_hand` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
@@ -227,6 +228,7 @@ omitted. They have no roles until they are built.
 | `list_price_groups` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
 | `list_purchase_orders` | Purchasing & materials | ✓ |  | ✓ |  |  |
 | `list_recipes` | Production | ✓ |  |  | ✓ |  |
+| `list_routes` | Delivery & routes | ✓ | ✓ | ✓ |  |  |
 | `list_sale_channels` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |
 | `list_skus` | Catalog & pricing | ✓ | ✓ | ✓ | ✓ |  |
 | `list_standing_allocations` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
@@ -260,7 +262,9 @@ omitted. They have no roles until they are built.
 | `replace_format_components` | Packaging | ✓ | ✓ |  |  |  |
 | `replenishment_suggestions` | Taproom & kegs | ✓ | ✓ | ✓ |  |  |
 | `resolve_short_pick` | Orders & invoicing | ✓ |  | ✓ |  |  |
+| `return_route` | Delivery & routes | ✓ |  | ✓ |  |  |
 | `return_shipment` | Delivery & routes | ✓ | ✓ |  |  |  |
+| `save_route` | Delivery & routes | ✓ |  | ✓ |  |  |
 | `schedule_batch` | Production | ✓ |  |  | ✓ |  |
 | `schedule_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |
 | `send_purchase_order` | Purchasing & materials | ✓ |  | ✓ |  |  |
@@ -524,7 +528,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer
 
-Role-filtered work that is assigned, due, or overdue right now (submitted orders, picks due, restocks due; more reasons as their pages ship)
+Role-filtered work that is assigned, due, or overdue right now (submitted orders, picks and restocks due, the next delivery stop, fermentation readings overdue)
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -2837,7 +2841,7 @@ before the route can close.
 
 `command` · admin, warehouse
 
-Sign a delivery stop; an on-delivery shipment gets its invoice now (shipped quantities, order prices); never moves stock
+Sign a delivery stop as the assigned driver or an admin; an on-delivery shipment gets its invoice now (shipped quantities, order prices); a transfer stop is only stamped; never moves stock
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -2851,11 +2855,28 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "confirm_delivery", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "deliveryId": "00000000-0000-0000-0000-000000000000", "signedBy": "string" } }'
 ```
 
+#### depart_route [#depart_route]
+
+`command` · admin, warehouse
+
+Stamp the route's departure as its driver or an admin; needs at least one stop, and its transfer stops become in transit
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `routeId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "depart_route", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "routeId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 #### get_delivery_stop [#get_delivery_stop]
 
-`query` · admin, sales, warehouse
+`query` · admin, warehouse, sales
 
-One delivery stop: route, ship-to, shipped lines, invoice timing, and whether it is signed
+One delivery stop: route, ship-to or destination, its lines (shipped or picked quantities), invoice timing, and whether it is signed
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -2866,6 +2887,41 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_delivery_stop", "input": { "deliveryId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+#### list_routes [#list_routes]
+
+`query` · admin, warehouse, sales
+
+Delivery routes with their stops (one route by id, one day, or every route not yet returned), the shipped orders and picked transfers on no route, and the members who may drive
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `id` | uuid | no |
+| `date` | date (YYYY-MM-DD) | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_routes", "input": {} }'
+```
+
+#### return_route [#return_route]
+
+`command` · admin, warehouse
+
+Stamp the route's return as its driver or an admin, once it has departed and every stop is delivered
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `routeId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "return_route", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "routeId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### return_shipment [#return_shipment]
@@ -2888,20 +2944,28 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "return_shipment", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "invoiceId": "00000000-0000-0000-0000-000000000000", "locationId": "00000000-0000-0000-0000-000000000000", "reason": "damaged", "lines": [ { "invoiceLineId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
 ```
 
----
+#### save_route [#save_route]
 
-**Designed, not yet available** {/* delivery-designed */}
+`command` · admin, warehouse
 
-3 of the 7 operations in this area are available today; the 4 below are not.
+Create or edit a delivery route and replace its stops (shipments or stock transfers) in one step; delivered stops must be kept and a departed route cannot change
 
-The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
-
-| Operation | Kind | Needed by |
+| Field | Type | Required |
 | --- | --- | --- |
-| `depart_route` | command | Route |
-| `list_routes` | query | Routes |
-| `return_route` | command | Route, Return route, Driver route |
-| `save_route` | command | Route |
+| `deliveryDate` | date (YYYY-MM-DD) | yes |
+| `stops` | array of object | yes |
+| `id` | uuid | no |
+| `name` | string | no |
+| `driverUserId` | uuid | no |
+| `vehicle` | string | no |
+| `note` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "save_route", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "deliveryDate": "2026-01-31", "stops": [ { "stopNo": 1 } ] } }'
+```
 
 {/* end ops:delivery */}
 

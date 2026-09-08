@@ -6,6 +6,9 @@ import { sql } from "./helpers";
 
 const AUTHENTICATED_RPCS = [
   "record_keg_event(uuid,uuid,keg_size,integer,keg_event_reason,uuid,uuid,uuid,text,uuid)",
+  "save_route(uuid,uuid,text,date,uuid,text,text,jsonb,uuid)",
+  "depart_route(uuid,uuid)",
+  "return_route(uuid,uuid)",
   "update_keg_pool(uuid,uuid,text,uuid,integer,integer,boolean,uuid)",
   "create_keg_pool(uuid,text,keg_pool_kind,uuid,integer,integer,uuid)",
   "activate_chat_installation(uuid,text,text,text,text,text,text,jsonb)",

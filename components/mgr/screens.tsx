@@ -3058,16 +3058,17 @@ export const SCREENS: Screen[] = [
     name: "Routes",
     to: { Assign: "Route", "Add to route": "Route" },
     job: "See planned and active delivery routes and build the next one",
-    reads: "list_routes [design]",
+    reads: "list_routes",
     writes: "none [route planning happens on Route]",
-    states: [["unassigned", "shipped orders waiting for a route are called out"], ["empty", "no routes yet: New route is the only action"]],
-    spec: "The Work list with the Routes tab active. Every row names its next action; New route opens Route in builder mode, and Route returns here.",
+    states: [["unassigned", "shipped orders and picked transfers waiting for a route are called out"], ["empty", "no routes yet: New route is the only action"]],
+    spec: "Work › Deliveries. Every route not yet returned names its next action; New route opens Route in builder mode, and Route returns here. A stop is a shipped order or a picked stock transfer.",
     body: (<>
       {E.hd("Work", "driver default", E.btn("New route"))}
       {E.tabs(WORK_CHIPS, 6, "w-full", WORK_TABS)}
-      {E.row("Route A · Thu", "3 stops · Maria · departed 8:10", E.act("Resume", "info"))}
-      {E.row("Route B · Fri", "2 stops · driver not assigned", E.act("Assign", "attention"), "w")}
-      {E.row("ORD-0236 · Dock", "shipped · no route", E.act("Add to route", "attention"), "w")}
+      {E.row("Route A · 2026-09-10", "departed · 1 of 3 delivered", E.act("Resume", "info"))}
+      {E.row("Route B · 2026-09-11", "2 stops · driver not assigned", E.act("Assign", "attention"), "w")}
+      {E.row("ORD-0236 · Ridgeline · Dock", "shipped · no route", E.act("Add to route", "attention"), "w")}
+      {E.row("TRF-0004 · Storage", "shipped · no route", E.act("Add to route", "attention"), "w")}
     </>),
   },
   {
@@ -3076,19 +3077,21 @@ export const SCREENS: Screen[] = [
     tab: "Work",
     name: "Route",
     job: "Build route, inspect derived load and finish route timestamps",
-    reads: "get_route_load [view] · get_route_builder [view; require persisted shipment invoice timing]",
-    writes: "save_route [design; one RPC: route + stop assignments] · depart_route · return_route [design]",
-    states: [["permission", "warehouse membership + assigned route", 1], ["post-route", "All stops complete · no return time yet"]],
-    spec: "Planned state: Depart is the one primary; Save route plan is outline. Return lives on Return route once the route has departed. Load derives only from shipments with a persisted invoice mode; the checklist is presentation only, with no loaded status or mark-loaded command. Unassigned shipments become stops with driver, vehicle and stop order in the same route-save RPC. A refused delivery has no screen: leave the stop open and assign it to a later route. Resume opens the next incomplete stop for the assigned driver.",
+    reads: "list_routes",
+    writes: "save_route · depart_route",
+    states: [["permission", "warehouse membership; Depart needs the assigned driver or an admin", 1], ["departed", "the builder closes; Driver route and Return route take over"]],
+    spec: "Planned state: Depart is the one primary; Save route plan is outline. Return lives on Return route once the route has departed. The stops are a checklist of this route's documents plus every shipped order and picked transfer on no route, each checked one with its stop number; driver, vehicle and stop order save in the same route-save RPC, and a delivered stop cannot be unchecked. There is no loaded status or mark-loaded command. A refused delivery has no screen: leave the stop open and assign it to a later route. A driver shows by the first characters of their id until staff have names.",
     body: (<>
-      {E.back("Routes", "Route A · Thu")}
+      {E.back("Routes", "Route A · 2026-09-10")}
       {E.edit("Delivery date", "2026-09-10", "date")}
-      {E.pick("Driver", "Maria", ["Maria", "Dave"])}
+      {E.pick("Driver", "driver 7f3a21c0 · warehouse", ["driver 7f3a21c0 · warehouse", "driver 2b9e44d1 · admin"])}
       {E.edit("Vehicle", "Box truck 2")}
-      {E.row("Stop 1 · Ridgeline", "4 Hazy halves · 6 Pils cases", "next")}
-      {E.row("Stop 2 · Al’s Bar", "2 Stout sixths · later")}
-      {E.row("Stop 3 · Teresa’s", "8 Hazy halves · 12 Pils cases · later", "", "w")}
-      {E.row("Unassigned · ORD-0236 · Dock", "3 Hazy halves · shipped, no route", E.act("Add stop", "attention"), "w")}
+      {E.edit("Route name", "Route A")}
+      {E.ttl("Stops")}
+      {E.row("ORD-0231 · Ridgeline · Tap Room", "stop 1", "1")}
+      {E.row("ORD-0233 · Al’s Bar · Dock", "stop 2", "2")}
+      {E.row("TRF-0004 · Storage", "stop 3", "3")}
+      {E.row("ORD-0236 · Teresa’s · Dock", "shipped · no route", "", "w")}
       {E.btns([["Save route plan", "g"], ["Depart route", "p"]])}
     </>),
   },
@@ -3099,16 +3102,17 @@ export const SCREENS: Screen[] = [
     name: "Return route",
     to: { "Return route": "Routes" },
     job: "Stamp the return once every stop is done",
-    reads: "get_route_load [view]",
-    writes: "return_route [design]",
-    states: [["permission", "warehouse membership + assigned route", 1], ["planned", "Depart lives on Route"], ["departed", "Return is the one verb"], ["complete", "already returned"]],
-    spec: "The departed state of a route. Planned routes Depart on Route; this screen is only Return.",
+    reads: "list_routes",
+    writes: "return_route",
+    states: [["permission", "the assigned driver or an admin", 1], ["planned", "Depart lives on Route"], ["departed", "Return is the one verb, enabled once every stop is delivered"], ["complete", "already returned: the return time replaces the button"]],
+    spec: "The departed state of a route once every stop is delivered. Planned routes Depart on Route; this screen is only Return.",
     body: (<>
-      {E.back("Routes", "Route A · Thu")}
-      {E.fld("Driver · vehicle", "Maria · Box truck 2")}
-      {E.row("Stop 1 · Ridgeline", "delivered 8:42", "done", "ok")}
-      {E.row("Stop 2 · Al’s Bar", "delivered 9:15", "done", "ok")}
-      {E.row("Stop 3 · Teresa’s", "delivered 10:03", "done", "ok")}
+      {E.back("Routes", "Route A · 2026-09-10")}
+      {E.fld("Driver · vehicle", "driver 7f3a21c0 · Box truck 2")}
+      {E.fld("Departed", "8:10 AM")}
+      {E.row("Stop 1 · ORD-0231 · Ridgeline · Tap Room", "delivered 8:42 AM", "done", "ok")}
+      {E.row("Stop 2 · ORD-0233 · Al’s Bar · Dock", "delivered 9:15 AM", "done", "ok")}
+      {E.row("Stop 3 · TRF-0004 · Storage", "delivered 10:03 AM", "done", "ok")}
       {E.sp()}
       {E.btn("Return route")}
     </>),
@@ -3120,16 +3124,17 @@ export const SCREENS: Screen[] = [
     name: "Driver route",
     to: { Resume: "Confirm delivery" },
     job: "The route as the driver sees it: every stop, the load, Return",
-    reads: "get_route_load [view]",
-    writes: "return_route [design]",
-    states: [["permission", "warehouse membership + assigned route", 1], ["departed", "Return is the one verb"], ["next stop", "Resume opens Confirm delivery"]],
-    spec: "Off Driver Today’s Route A row. Planner Route is for building; this is for running. Load is derived from the shipments on the stops.",
+    reads: "list_routes",
+    writes: "return_route",
+    states: [["permission", "the assigned driver or an admin", 1], ["departed", "Return is the one verb, disabled while a stop is open"], ["next stop", "Resume opens Confirm delivery"]],
+    spec: "The departed route as the driver runs it, reached from Deliveries (Resume) or the stop's Back. Route is for building; this is for running. Only the lowest undelivered stop is next; Today shows the same stop.",
     body: (<>
-      {E.back("Today", "Route A · Thu")}
-      {E.fld("Load", "14 Hazy halves · 18 Pils cases · 2 Stout sixths")}
-      {E.row("Stop 1 · Ridgeline Tap Room", "4 Hazy halves · 6 Pils cases", E.act("Resume", "info"), "w")}
-      {E.row("Stop 2 · Al’s Bar", "2 Stout sixths · later")}
-      {E.row("Stop 3 · Teresa’s", "8 Hazy halves · 12 Pils cases · later")}
+      {E.back("Routes", "Route A · 2026-09-10")}
+      {E.fld("Driver · vehicle", "driver 7f3a21c0 · Box truck 2")}
+      {E.fld("Departed", "8:10 AM")}
+      {E.row("Stop 1 · ORD-0231 · Ridgeline · Tap Room", "next", E.act("Resume", "info"), "w")}
+      {E.row("Stop 2 · ORD-0233 · Al’s Bar · Dock", "later")}
+      {E.row("Stop 3 · TRF-0004 · Storage", "later")}
       {E.sp()}
       {E.btn("Return route")}
     </>),
@@ -3142,7 +3147,7 @@ export const SCREENS: Screen[] = [
     job: "Name receiving contact, then commit delivery and invoice",
     reads: "get_delivery_stop",
     writes: "confirm_delivery [one RPC: delivered_at + signed_by + invoice only when persisted mode is on-delivery; never ships]",
-    states: [["offline", "keep stop open; commit waits", 1], ["response lost", "same requestId returns result"], ["permission", "warehouse membership and being the route’s assigned driver, or admin", 1], ["success", "INV number after commit"]],
+    states: [["offline", "keep stop open; commit waits", 1], ["response lost", "same requestId returns result"], ["permission", "warehouse membership and being the route’s assigned driver, or admin", 1], ["success", "INV number after commit"], ["transfer stop", "destination and picked lines instead of a customer; stamped, never invoiced; Receive on the transfer moves the stock"]],
     spec: "2 taps: receiving-contact chip from the ship-to → Delivered. Back goes to Driver route. The receiving name is stored as text; the UI never implies a signature image is retained.",
     body: (<>
       {E.back("Driver route", "Route A · Stop 1 of 3")}

@@ -25,7 +25,7 @@ type Row = {
 
 defineQuery({
   name: "get_today",
-  description: "Role-filtered work that is assigned, due, or overdue right now (submitted orders, picks due, restocks due; more reasons as their pages ship)",
+  description: "Role-filtered work that is assigned, due, or overdue right now (submitted orders, picks and restocks due, the next delivery stop, fermentation readings overdue)",
   input: z.object({ now: z.string().datetime({ offset: true }).optional() }),
   roles: STAFF_ROLES,
   handler: async (ctx, i): Promise<TodayItem[]> => {

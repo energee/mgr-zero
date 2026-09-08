@@ -308,7 +308,7 @@ export const ROUTES: Record<string, string> = {
   "/batches": "Batches",
   "/packaging": "Packaging runs",
   "/purchase-orders": "Purchase orders",
-  "/orders#deliveries": "Routes",
+  "/routes": "Routes",
   "/invoices": "Invoices",
   "/catalog": "Catalog",
   "/catalog#menu": "Menu",
