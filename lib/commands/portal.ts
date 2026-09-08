@@ -78,17 +78,18 @@ defineQuery({
 });
 
 defineQuery({
-  name: "portal_order", description: "Portal: one order with lines and its event history",
+  name: "portal_order", description: "Portal: one order with lines, its event history and its shipment once shipped",
   roles: "customer",
   input: z.object({ orderId: z.string().uuid() }),
   handler: async (ctx, i) => {
     requireCustomer(ctx);
     const order = await unwrap(ctx.db.from("orders").select("*, ship_tos(label, city, state)").eq("id", i.orderId).single());
-    const [ln, events] = await Promise.all([
+    const [ln, events, shipment] = await Promise.all([
       unwrap(ctx.db.from("order_lines").select("*, skus(name)").eq("order_id", i.orderId)),
       unwrap(ctx.db.from("order_events").select().eq("order_id", i.orderId).order("created_at")),
+      unwrap(ctx.db.from("shipments").select("id").eq("order_id", i.orderId).maybeSingle()),
     ]);
-    return { order, lines: ln, events };
+    return { order, lines: ln, events, shipment };
   },
 });
 

@@ -1,90 +1,33 @@
-// app/(app)/orders/[id]/page.tsx — single order: header, line table with
-// per-sku ATP badges, event timeline, and lifecycle-buttons.tsx for the
-// status-gated actions. Reads through the command registry (get_order,
-// list_skus) with a brewery-scoped Ctx. An unknown or malformed id renders
-// not-found.tsx; other failures throw to the (app) error boundary.
-import { DirectionIcon } from "@/components/mgr/icon";
+// app/(app)/orders/[id]/page.tsx — Order (screen record): the staff home for
+// one order: state and next action, lines with ATP, the event history, and
+// the restock flag. lifecycle-buttons.tsx holds the status-gated verbs
+// (Submit, Confirm, Adjust, Pick, Ship, Cancel); Confirm has its own
+// two-tap review at /orders/[id]/confirm, a taproom transfer completes at
+// /orders/[id]/complete, and Put back at /orders/[id]/restock. An unknown
+// or malformed id renders not-found.tsx.
+import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
+import { docNo } from "@/lib/mgr/doc-no";
+import { money } from "@/lib/mgr/money";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { LifecycleButtons } from "./lifecycle-buttons";
 
 type OrderStatus = "draft" | "submitted" | "confirmed" | "picked" | "shipped" | "cancelled";
-type OrderKind = "wholesale" | "taproom_transfer";
-type Order = {
-  id: string;
-  order_no: number | null;
-  kind: OrderKind;
-  status: OrderStatus;
-  po_number: string | null;
-  requested_ship_date: string | null;
-  note: string | null;
-  needs_restock: boolean;
-  customers: { name: string } | null;
-  ship_tos: { label: string; city: string; state: string } | null;
-};
-type OrderLine = {
-  id: string;
-  sku_id: string;
-  qty_ordered: number;
-  qty_picked: number | null;
-  qty_shipped: number | null;
-  unit_price_cents: number;
-  skus: { name: string } | null;
-};
-type OrderEvent = {
-  id: string;
-  event: string;
-  actor: string;
-  payload: Record<string, unknown>;
-  created_at: string;
-};
+type Order = { id: string; order_no: number | null; kind: "wholesale" | "taproom_transfer"; status: OrderStatus; po_number: string | null; requested_ship_date: string | null; note: string | null; needs_restock: boolean; customers: { name: string } | null; ship_tos: { label: string; city: string; state: string } | null };
+type OrderLine = { id: string; sku_id: string; qty_ordered: number; qty_picked: number | null; qty_shipped: number | null; unit_price_cents: number; skus: { name: string } | null };
+type OrderEvent = { id: string; event: string; actor: string; payload: Record<string, unknown>; created_at: string };
 type Atp = { sku_id: string; qty: number };
 type SkuRow = { id: string; name: string; brands: { name: string } | null };
 
-function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
-}
+const NEXT: Record<OrderStatus, string> = { draft: "submit", submitted: "confirm", confirmed: "pick", picked: "ship", shipped: "delivered or returned", cancelled: "none" };
 
-function fmtLines(entries: unknown, skuNames: Map<string, string>): string {
+function lineChange(entries: unknown, skuNames: Map<string, string>): string {
   if (!entries) return "—";
-  const arr = Array.isArray(entries)
-    ? (entries as { sku_id: string; qty: number }[]).map((l) => [l.sku_id, l.qty] as const)
-    : Object.entries(entries as Record<string, number>);
-  return arr.map(([skuId, qty]) => `${skuNames.get(skuId) ?? skuId.slice(0, 8)}: ${qty}`).join(", ");
-}
-
-function EventLine({ event, skuNames }: { event: OrderEvent; skuNames: Map<string, string> }) {
-  const time = fmtTime(event.created_at);
-  const actor = event.actor.slice(0, 8);
-  if (event.event === "lines_adjusted") {
-    const before = fmtLines(event.payload.before, skuNames);
-    const after = fmtLines(event.payload.lines, skuNames);
-    const reason = typeof event.payload.reason === "string" ? event.payload.reason : "";
-    return (
-      <li>
-        {time} — lines adjusted — {actor}
-        <div className="text-muted-foreground">
-          {before} <DirectionIcon /> {after} ({reason})
-        </div>
-      </li>
-    );
-  }
-  if (event.event === "cancelled" && typeof event.payload.reason === "string") {
-    return (
-      <li>
-        {time} — cancelled — {actor}
-        <div className="text-muted-foreground">{event.payload.reason}</div>
-      </li>
-    );
-  }
-  return (
-    <li>
-      {time} — {event.event.replace(/_/g, " ")} — {actor}
-    </li>
-  );
+  const arr = Array.isArray(entries) ? (entries as { sku_id: string; qty: number }[]).map((l) => [l.sku_id, l.qty] as const) : Object.entries(entries as Record<string, number>);
+  return arr.map(([skuId, qty]) => `${skuNames.get(skuId) ?? "line"} ${qty}`).join(", ");
 }
 
 export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -92,97 +35,39 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
   const [{ order, lines, events, atp }, skuRows] = (await Promise.all([
-    orNotFound(runCommand("get_order", { orderId: id }, ctx)),
-    runCommand("list_skus", {}, ctx),
+    orNotFound(runCommand("get_order", { orderId: id }, ctx)), runCommand("list_skus", {}, ctx),
   ])) as [{ order: Order; lines: OrderLine[]; events: OrderEvent[]; atp: Atp[] }, SkuRow[]];
-
-  const atpMap = new Map(atp.map((a) => [a.sku_id, a.qty]));
-  const skuNames = new Map(lines.map((l) => [l.sku_id, l.skus?.name ?? l.sku_id.slice(0, 8)]));
+  const atpMap = new Map(atp.map((a) => [a.sku_id, Number(a.qty)]));
+  const skuNames = new Map(lines.map((l) => [l.sku_id, l.skus?.name ?? "line"]));
   const skus = skuRows.map((s) => ({ id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name }));
-
+  const label = docNo("ORD", order.order_no, "Order");
+  const where = order.customers ? `${order.customers.name}${order.ship_tos ? ` · ${order.ship_tos.city}, ${order.ship_tos.state}` : ""}` : "Taproom transfer";
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">
-            Order {order.order_no ?? order.id.slice(0, 8)}
-            {order.needs_restock && (
-              <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-normal text-amber-800 align-middle">
-                staged — needs restocking
-              </span>
-            )}
-          </h1>
-          <div className="text-sm text-muted-foreground">
-            {order.status} · {order.kind}
-            {order.customers?.name ? ` · ${order.customers.name}` : ""}
-            {order.ship_tos ? ` · ${order.ship_tos.label} (${order.ship_tos.city}, ${order.ship_tos.state})` : ""}
-            {order.po_number ? ` · PO ${order.po_number}` : ""}
-            {order.requested_ship_date ? ` · requested ${order.requested_ship_date}` : ""}
-          </div>
-        </div>
-        <LifecycleButtons
-          orderId={order.id}
-          status={order.status}
-          lines={lines.map((l) => ({ skuId: l.sku_id, skuName: l.skus?.name ?? l.sku_id, qty: Number(l.qty_ordered) }))}
-          skus={skus}
-          pickLines={lines.map((l) => ({
-            id: l.id,
-            skuName: l.skus?.name ?? l.sku_id,
-            qtyOrdered: Number(l.qty_ordered),
-            qtyPicked: l.qty_picked === null ? null : Number(l.qty_picked),
-          }))}
-        />
-      </div>
-
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium text-muted-foreground">Lines</h2>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-muted-foreground">
-              <th className="py-1 font-normal">SKU</th>
-              <th className="py-1 font-normal">Ordered</th>
-              <th className="py-1 font-normal">Picked</th>
-              <th className="py-1 font-normal">Shipped</th>
-              <th className="py-1 font-normal">Price</th>
-              <th className="py-1 font-normal">ATP</th>
-            </tr>
-          </thead>
-          <tbody>
-            {lines.map((l) => {
-              const lineAtp = atpMap.get(l.sku_id);
-              return (
-                <tr key={l.id} className="border-t">
-                  <td className="py-1">{l.skus?.name ?? l.sku_id.slice(0, 8)}</td>
-                  <td className="py-1">{l.qty_ordered}</td>
-                  <td className="py-1">{l.qty_picked ?? "—"}</td>
-                  <td className="py-1">{l.qty_shipped ?? "—"}</td>
-                  <td className="py-1">${(l.unit_price_cents / 100).toFixed(2)}</td>
-                  <td className="py-1">
-                    {lineAtp !== undefined && lineAtp < 0 ? (
-                      <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-800">{lineAtp}</span>
-                    ) : (
-                      (lineAtp ?? "—")
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium text-muted-foreground">Event timeline</h2>
-        {events.length ? (
-          <ul className="flex flex-col gap-2 text-sm">
-            {events.map((e) => (
-              <EventLine key={e.id} event={e} skuNames={skuNames} />
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-muted-foreground">No events yet.</p>
-        )}
-      </section>
-    </div>
+    <>
+      {E.back("Orders", label, undefined, "/orders")}
+      {E.ttl(where)}
+      {E.row("Current state", `${order.status}${order.needs_restock ? " · restock pending" : ""}`, E.status(`Next: ${order.status === "picked" && order.needs_restock ? "put back" : NEXT[order.status]}`), order.needs_restock ? "w" : "")}
+      {order.status === "picked" && order.needs_restock && E.act("Put back", "attention", `/orders/${order.id}/restock`)}
+      {order.status === "submitted" && E.act("Review and confirm", "success", `/orders/${order.id}/confirm`)}
+      {order.status === "picked" && order.kind === "taproom_transfer" && E.act("Complete transfer", "success", `/orders/${order.id}/complete`)}
+      {order.ship_tos && E.fld("Ship-to", order.ship_tos.label)}
+      {order.po_number && E.fld("Customer PO", order.po_number)}
+      {order.requested_ship_date && E.fld("Requested", order.requested_ship_date)}
+      {order.note && E.fld("Note", order.note)}
+      <LifecycleButtons orderId={order.id} status={order.status}
+        lines={lines.map((l) => ({ skuId: l.sku_id, skuName: l.skus?.name ?? l.sku_id, qty: Number(l.qty_ordered) }))} skus={skus}
+        pickLines={lines.map((l) => ({ id: l.id, skuName: l.skus?.name ?? l.sku_id, qtyOrdered: Number(l.qty_ordered), qtyPicked: l.qty_picked === null ? null : Number(l.qty_picked) }))} />
+      {E.ttl("Lines")}
+      {lines.map((l) => {
+        const a = atpMap.get(l.sku_id);
+        const qtys = [`${l.qty_ordered} ordered`, l.qty_picked !== null && `${l.qty_picked} picked`, l.qty_shipped !== null && `${l.qty_shipped} shipped`].filter(Boolean).join(" · ");
+        return <div key={l.id}>{E.row(l.skus?.name ?? "Line", `${qtys} · ${money(l.unit_price_cents)} each`, a === undefined ? "" : `ATP ${a}`, a !== undefined && a < 0 ? "w" : "")}</div>;
+      })}
+      {E.ttl("History")}
+      {events.length === 0 ? E.blank("No events yet") : E.tape(events.map((e) => [
+        `${new Date(e.created_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" })} · ${e.event.replace(/_/g, " ")}`,
+        e.event === "lines_adjusted" ? `${lineChange(e.payload.before, skuNames)} → ${lineChange(e.payload.lines, skuNames)}${typeof e.payload.reason === "string" ? ` (${e.payload.reason})` : ""}` : typeof e.payload.reason === "string" ? e.payload.reason : "",
+      ]))}
+    </>
   );
 }

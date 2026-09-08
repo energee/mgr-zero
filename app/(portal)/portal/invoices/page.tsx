@@ -1,66 +1,34 @@
-// app/(portal)/portal/invoices/page.tsx — the caller's invoices and credit
-// memos (portal_invoices). portal_invoices returns raw invoice_lines rather
-// than a subtotal_cents column (unlike staff's list_invoices, which reads
-// the invoice_totals view), so totals are summed client-side here. The
-// number opens the invoice detail (portal_invoice).
-import Link from "next/link";
+// app/(portal)/portal/invoices/page.tsx — Invoice history (screen record):
+// the caller's invoices and credit memos (portal_invoices). portal_invoices
+// returns raw invoice_lines rather than a subtotal column (unlike staff's
+// list_invoices, which reads the invoice_totals view), so totals are summed
+// here. A row opens the invoice detail (portal_invoice).
+import { E } from "@/components/mgr/e";
 import { getActiveCustomer } from "@/lib/portal";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
+import { docNo } from "@/lib/mgr/doc-no";
+import { money } from "@/lib/mgr/money";
 import "@/lib/commands/all";
 
-type InvoiceLine = { amount_cents: number };
-type Invoice = {
-  id: string;
-  invoice_no: number | null;
-  kind: "invoice" | "credit_memo";
-  paid_at: string | null;
-  invoice_lines: InvoiceLine[];
-};
+type Invoice = { id: string; invoice_no: number | null; kind: "invoice" | "credit_memo"; due_on: string | null; paid_at: string | null; invoice_lines: { amount_cents: number }[] };
 
 export default async function PortalInvoicesPage() {
   const customer = await getActiveCustomer();
-  const ctx = await buildContext(customer.breweryId);
-  const invoices = (await runCommand("portal_invoices", {}, ctx)) as Invoice[];
-
+  const invoices = (await runCommand("portal_invoices", {}, await buildContext(customer.breweryId))) as Invoice[];
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-xl font-semibold">Invoices</h1>
-      {invoices.length ? (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-muted-foreground">
-              <th className="py-1 font-normal">No.</th>
-              <th className="py-1 font-normal">Kind</th>
-              <th className="py-1 font-normal">Total</th>
-              <th className="py-1 font-normal">Paid</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoices.map((inv) => {
-              const totalCents = inv.invoice_lines.reduce((sum, l) => sum + l.amount_cents, 0);
-              return (
-                <tr key={inv.id} className="border-t">
-                  <td className="py-1"><Link href={`/portal/invoices/${inv.id}`} className="underline underline-offset-2">{inv.invoice_no ?? inv.id.slice(0, 8)}</Link></td>
-                  <td className="py-1">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs ${
-                        inv.kind === "credit_memo" ? "bg-info text-info-foreground" : "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      {inv.kind === "credit_memo" ? "credit memo" : "invoice"}
-                    </span>
-                  </td>
-                  <td className="py-1">${(totalCents / 100).toFixed(2)}</td>
-                  <td className="py-1">{inv.paid_at ? new Date(inv.paid_at).toLocaleDateString() : "—"}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      ) : (
-        <p className="text-sm text-muted-foreground">No invoices yet.</p>
-      )}
-    </div>
+    <>
+      {E.hd("Invoices", customer.customerName)}
+      {invoices.length === 0 ? E.blank("No invoices yet") : invoices.map((inv) => {
+        const total = inv.invoice_lines.reduce((sum, l) => sum + l.amount_cents, 0);
+        const credit = inv.kind === "credit_memo";
+        const paid = inv.paid_at !== null;
+        return (
+          <div key={inv.id}>{E.row(docNo(credit ? "CM" : "INV", inv.invoice_no, credit ? "Credit memo" : "Invoice"),
+            credit ? "credit" : paid ? `paid ${new Date(inv.paid_at!).toLocaleDateString()}` : inv.due_on ? `due ${inv.due_on}` : "unpaid",
+            credit || paid ? money(total) : E.act(money(total), "info", `/portal/invoices/${inv.id}`), credit || paid ? "ok" : "")}</div>
+        );
+      })}
+    </>
   );
 }

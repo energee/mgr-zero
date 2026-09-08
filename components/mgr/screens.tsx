@@ -1380,7 +1380,7 @@ export const SCREENS: Screen[] = [
     to: { Open: "Customer detail" },
     job: "Manage accounts, addresses and portal users",
     reads: "list_customers · get_customer",
-    writes: "upsert_customer · upsert_ship_to · invite_customer_user [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI]",
+    writes: "invite_customer_user [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI] · upsert_customer · upsert_ship_to",
     states: DEFAULT_STATES,
     body: (<>
       {E.back("More", "Customers", E.btn("Add customer"))}
