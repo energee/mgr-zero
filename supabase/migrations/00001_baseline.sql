@@ -2565,6 +2565,106 @@ begin
   return p_result;
 end $$;
 
+-- Invitations span Auth and membership transactions. The Auth trigger binds the
+-- identity inside Auth's transaction, so even losing its HTTP response is safe.
+create table private.invite_requests (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references public.breweries(id),
+  actor_id uuid not null,
+  email text not null unique,
+  role public.staff_role,
+  customer_id uuid,
+  kind text not null check (kind in ('staff','customer')),
+  auth_user_id uuid references auth.users(id),
+  state text not null default 'pending_auth' check (state in ('pending_auth','pending_membership','complete','failed')),
+  request_id uuid not null unique,
+  auth_token uuid not null default private.new_uuid(),
+  last_error text,
+  created_at timestamptz not null default now(),
+  foreign key (customer_id, brewery_id) references public.customers(id, brewery_id),
+  check ((kind = 'staff' and role is not null and customer_id is null)
+      or (kind = 'customer' and role is null and customer_id is not null))
+);
+alter table private.invite_requests enable row level security;
+create index invite_requests_brewery_idx on private.invite_requests(brewery_id);
+
+create function claim_invite_request(p_brewery uuid, p_email text, p_kind text,
+  p_role public.staff_role, p_customer uuid, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row private.invite_requests; v_email text := lower(btrim(p_email));
+begin
+  if p_kind is null or p_kind not in ('staff','customer') or
+    (p_kind = 'staff' and (p_role is null or p_customer is not null)) or
+    (p_kind = 'customer' and (p_role is not null or p_customer is null)) or
+    v_email is null or v_email !~ '^[^[:space:]@]+@[^[:space:]@]+[.][^[:space:]@]+$'
+    then raise exception 'invalid invitation'; end if;
+  perform private.assert_staff(p_brewery, case when p_kind = 'staff' then array['admin']::public.staff_role[] else array['admin','sales']::public.staff_role[] end);
+  if p_kind = 'customer' and not exists (select 1 from public.customers where id = p_customer and brewery_id = p_brewery) then
+    raise exception 'permission denied' using errcode = '42501';
+  end if;
+  v_replay := private.claim_command_request(p_brewery,
+    case when p_kind = 'staff' then 'invite_staff' else 'invite_customer_user' end, p_request_id,
+    jsonb_build_object('email', v_email, 'role', p_role, 'customer', p_customer));
+  if v_replay is null then
+    if exists (select 1 from auth.users where lower(email) = v_email) then raise exception 'email already has an account' using errcode = 'MG409'; end if;
+    begin
+      insert into private.invite_requests(brewery_id, actor_id, email, role, customer_id, kind, request_id)
+      values(p_brewery, auth.uid(), v_email, p_role, p_customer, p_kind, p_request_id) returning * into v_row;
+    exception when unique_violation then raise exception 'invitation already requested' using errcode = 'MG409'; end;
+    perform private.complete_command_request(p_request_id, jsonb_build_object('inviteId', v_row.id));
+  else
+    select * into v_row from private.invite_requests where id = (v_replay->>'inviteId')::uuid and actor_id = auth.uid();
+  end if;
+  return jsonb_build_object('id', v_row.id, 'email', v_row.email, 'authToken', v_row.auth_token,
+    'userId', v_row.auth_user_id, 'state', v_row.state);
+end $$;
+
+-- invited_at is Auth-owned, unlike editable user metadata. A signup or metadata
+-- update cannot claim access. GoTrue sets invited_at after INSERT in the same tx.
+create function private.bind_invited_auth_user() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if new.invited_at is not null and (tg_op = 'INSERT' or old.invited_at is null) then
+    update private.invite_requests set auth_user_id = new.id, state = 'pending_membership', last_error = null
+      where auth_token::text = new.raw_user_meta_data->>'mgr_invite_token'
+        and email = lower(new.email) and auth_user_id is null and state in ('pending_auth','failed');
+  end if;
+  return new;
+end $$;
+create trigger bind_invited_auth_user after insert or update of invited_at on auth.users
+for each row execute function private.bind_invited_auth_user();
+
+create function complete_invite_membership(p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_row private.invite_requests;
+begin
+  select * into v_row from private.invite_requests where request_id = p_request_id and actor_id = auth.uid() for update;
+  if not found then raise exception 'permission denied' using errcode = '42501'; end if;
+  perform private.assert_staff(v_row.brewery_id, case when v_row.kind = 'staff' then array['admin']::public.staff_role[] else array['admin','sales']::public.staff_role[] end);
+  if v_row.state = 'complete' then return jsonb_build_object('userId', v_row.auth_user_id); end if;
+  if v_row.auth_user_id is null then raise exception 'invitation is awaiting Auth'; end if;
+  if v_row.kind = 'staff' then
+    insert into public.brewery_users(brewery_id,user_id,role) values(v_row.brewery_id,v_row.auth_user_id,v_row.role);
+  else
+    insert into public.customer_users(customer_id,user_id) values(v_row.customer_id,v_row.auth_user_id);
+  end if;
+  update private.invite_requests set state = 'complete', last_error = null where id = v_row.id;
+  return jsonb_build_object('userId', v_row.auth_user_id);
+exception when unique_violation then raise exception 'membership already exists' using errcode = 'MG409';
+end $$;
+
+create function record_invite_failure(p_request_id uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+declare v_row private.invite_requests;
+begin
+  select * into v_row from private.invite_requests where request_id = p_request_id and actor_id = auth.uid() for update;
+  if not found then raise exception 'permission denied' using errcode = '42501'; end if;
+  perform private.assert_staff(v_row.brewery_id, case when v_row.kind = 'staff' then array['admin']::public.staff_role[] else array['admin','sales']::public.staff_role[] end);
+  update private.invite_requests set last_error = 'Invitation interrupted; retry this request',
+    state = case when auth_user_id is null then 'failed' else 'pending_membership' end
+    where id = v_row.id and state <> 'complete';
+end $$;
+
 create function upsert_format(
   p_brewery uuid, p_id uuid, p_name text, p_basis public.format_basis, p_package_type public.package_type,
   p_keg_size public.keg_size, p_units_per_case int, p_bbl_per_unit numeric, p_request_id uuid
@@ -6143,6 +6243,9 @@ grant execute on function
   update_location(uuid,uuid,text,public.location_kind,uuid),
   update_brewery(uuid,text,text,text,text,text,int,uuid),
   list_team_members(uuid),
+  claim_invite_request(uuid,text,text,public.staff_role,uuid,uuid),
+  complete_invite_membership(uuid),
+  record_invite_failure(uuid),
   update_staff_role(uuid,uuid,public.staff_role,uuid),
   revoke_staff(uuid,uuid,uuid),
   raise_invoice_question(uuid,uuid,text,uuid),

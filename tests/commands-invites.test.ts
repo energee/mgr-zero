@@ -1,41 +1,125 @@
-// tests/commands-invites.test.ts — invite_staff / invite_customer_user are
-// registered but fail closed (audit P1.9): no auth-admin call and no
-// membership row may result. Role and input checks still run first.
 import { describe, it, expect, beforeAll } from "vitest";
-import { makeBrewery, makeStaffCtx, admin, seedCustomer } from "./helpers";
-import { runCommand } from "@/lib/commands/registry";
+import { makeBrewery, makeStaffCtx, admin, seedCustomer, sql } from "./helpers";
+import { runCommand, type Ctx } from "@/lib/commands/registry";
 import "@/lib/commands/all";
+import { inviteStaff, inviteCustomerUser } from "@/lib/supabase/invites";
 
-describe("invitations (blocked)", () => {
-  let adminCtx: any, warehouseCtx: any, b: any;
+const execution = () => ({ requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() });
+const email = () => `${crypto.randomUUID()}@test.local`;
+describe("durable invitations", () => {
+  let ctx: Ctx, warehouse: Ctx, customerId: string;
   beforeAll(async () => {
-    b = await makeBrewery();
-    adminCtx = await makeStaffCtx(b.id, "admin");
-    warehouseCtx = await makeStaffCtx(b.id, "warehouse");
+    const b = await makeBrewery();
+    ctx = await makeStaffCtx(b.id);
+    warehouse = await makeStaffCtx(b.id, "warehouse");
+    customerId = (await seedCustomer(b.id)).customerId;
   });
-
-  it("invite_staff fails closed for admins and creates no membership", async () => {
-    const email = `${crypto.randomUUID()}@test.local`;
-    await expect(runCommand("invite_staff", { email, role: "sales" }, adminCtx)).rejects.toThrow(/not available/i);
-    const { data } = await admin.from("brewery_users").select("user_id").eq("brewery_id", b.id).eq("role", "sales");
-    expect(data).toEqual([]);
+  for (const kind of ["staff", "customer"] as const) {
+    it(`${kind}: loses Auth response, keeps the bound identity, and retries without another account`, async () => {
+      const address = email(), ex = execution();
+      const input = kind === "staff" ? { email: address, role: "sales" as const } : { email: address, customerId };
+      const fault = { afterAuth: async () => { throw new Error("injected after Auth"); } };
+      await expect(kind === "staff"
+        ? inviteStaff(ctx, { email: address, role: "sales" }, ex, fault)
+        : inviteCustomerUser(ctx, { email: address, customerId }, ex, fault)).rejects.toMatchObject({ code: "invite_failed" });
+      expect(sql(`select state || ':' || (auth_user_id is not null)::text from private.invite_requests where request_id = '${ex.requestId}'`)).toEqual(["pending_membership:true"]);
+      expect(sql(`select count(*) from auth.users where email = '${address}'`)).toEqual(["1"]);
+      const table = kind === "staff" ? "brewery_users" : "customer_users";
+      const userId = sql(`select id from auth.users where email = '${address}'`)[0];
+      expect((await admin.from(table).select("user_id").eq("user_id", userId)).data).toEqual([]);
+      const name = kind === "staff" ? "invite_staff" : "invite_customer_user";
+      expect(await runCommand(name, input, ctx, ex)).toEqual({ userId });
+      expect(sql(`select count(*) from auth.users where email = '${address}'`)).toEqual(["1"]);
+      expect((await admin.from(table).select("user_id").eq("user_id", userId)).data).toHaveLength(1);
+      // Once complete, even concurrent retries must not regrant revoked access.
+      await admin.from(table).delete().eq("user_id", userId);
+      await Promise.all([runCommand(name, input, ctx, ex), runCommand(name, input, ctx, ex)]);
+      expect((await admin.from(table).select("user_id").eq("user_id", userId)).data).toEqual([]);
+    });
+    it(`${kind}: a real membership constraint failure remains retryable`, async () => {
+      const address = email(), ex = execution();
+      const table = kind === "staff" ? "brewery_users" : "customer_users";
+      const input = kind === "staff" ? { email: address, role: "sales" } : { email: address, customerId };
+      const hook = { afterAuth: async () => {
+        const userId = sql(`select id from auth.users where email = '${address}'`)[0];
+        sql(`alter table public.${table} add constraint invite_test_failure check (user_id <> '${userId}'::uuid)`);
+      } };
+      try {
+        await expect(kind === "staff" ? inviteStaff(ctx, { email: address, role: "sales" }, ex, hook)
+          : inviteCustomerUser(ctx, { email: address, customerId }, ex, hook)).rejects.toMatchObject({ code: "db_error" });
+        expect(sql(`select state from private.invite_requests where request_id = '${ex.requestId}'`)).toEqual(["pending_membership"]);
+      } finally { sql(`alter table public.${table} drop constraint if exists invite_test_failure`); }
+      await runCommand(kind === "staff" ? "invite_staff" : "invite_customer_user", input, ctx, ex);
+      expect(sql(`select count(*) from auth.users where email = '${address}'`)).toEqual(["1"]);
+    });
+    it(`${kind}: completes and replays without duplicate Auth or membership`, async () => {
+      const input = kind === "staff" ? { email: email(), role: "sales" } : { email: email(), customerId };
+      const name = kind === "staff" ? "invite_staff" : "invite_customer_user";
+      const ex = execution();
+      const result = await runCommand(name, input, ctx, ex) as { userId: string };
+      expect(await runCommand(name, input, ctx, ex)).toEqual(result);
+      expect(sql(`select count(*) from auth.users where email = '${input.email}'`)).toEqual(["1"]);
+      const table = kind === "staff" ? "brewery_users" : "customer_users";
+      expect((await admin.from(table).select("user_id").eq("user_id", result.userId)).data).toHaveLength(1);
+    });
+  }
+  it("binds request identity to payload, kind, actor and brewery", async () => {
+    const ex = execution(), input = { email: email(), role: "sales" };
+    await runCommand("invite_staff", input, ctx, ex);
+    await expect(runCommand("invite_staff", { ...input, role: "brewer" }, ctx, ex)).rejects.toMatchObject({ code: "conflict" });
+    await expect(runCommand("invite_customer_user", { email: input.email, customerId }, ctx, ex)).rejects.toMatchObject({ code: "conflict" });
+    const other = await makeStaffCtx((await makeBrewery()).id);
+    await expect(runCommand("invite_staff", input, other, ex)).rejects.toMatchObject({ code: "conflict" });
+    await expect(other.db.rpc("complete_invite_membership", { p_request_id: ex.requestId })).resolves.toMatchObject({ error: { code: "42501" } });
+    await expect(runCommand("invite_staff", input, { ...ctx, breweryId: other.breweryId }, ex)).rejects.toMatchObject({ code: "permission_denied" });
+    await expect(runCommand("invite_customer_user", { email: email(), customerId }, other)).rejects.toMatchObject({ code: "permission_denied" });
+    await expect(runCommand("invite_staff", input, ctx)).rejects.toMatchObject({ code: "conflict" });
   });
-
-  it("warehouse role still gets a permission error, not the block", async () => {
-    await expect(runCommand("invite_staff", { email: "x@test.local", role: "sales" }, warehouseCtx))
-      .rejects.toThrow(/permission/i);
+  it("shares request identity with ordinary commands in both directions", async () => {
+    const first = execution();
+    await runCommand("invite_staff", { email: email(), role: "sales" }, ctx, first);
+    await expect(runCommand("set_my_gravity_unit", { unit: "plato" }, ctx, first)).rejects.toMatchObject({ code: "conflict" });
+    const second = execution();
+    await runCommand("set_my_gravity_unit", { unit: "plato" }, ctx, second);
+    await expect(runCommand("invite_staff", { email: email(), role: "sales" }, ctx, second)).rejects.toMatchObject({ code: "conflict" });
   });
-
-  it("invite_customer_user fails closed even for the brewery's own customer", async () => {
-    const c = { id: (await seedCustomer(b.id, { name: "Own Co" })).customerId };
-    await expect(runCommand("invite_customer_user", { email: `${crypto.randomUUID()}@test.local`, customerId: c.id }, adminCtx))
-      .rejects.toThrow(/not available/i);
-    const { data } = await admin.from("customer_users").select("user_id").eq("customer_id", c.id);
-    expect(data).toEqual([]);
+  it("delivers the invitation to local Mailpit", async () => {
+    const address = email();
+    await runCommand("invite_staff", { email: address, role: "sales" }, ctx);
+    const url = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!);
+    expect(["127.0.0.1", "localhost"]).toContain(url.hostname);
+    url.port = String(Number(url.port) + 3); // Both committed stacks put Mailpit three ports after Auth's API.
+    url.pathname = "/api/v1/search";
+    url.searchParams.set("query", `to:${address}`);
+    const response = await fetch(url);
+    expect(response.ok).toBe(true);
+    const mail = await response.json();
+    expect(mail.messages).toHaveLength(1);
+    expect(mail.messages[0].Subject).toMatch(/invited/i);
   });
-
-  it("list_team_members still works", async () => {
-    const members = await runCommand("list_team_members", {}, adminCtx) as { role: string }[];
-    expect(members.some(m => m.role === "admin")).toBe(true);
+  it("concurrent first attempts produce one account and membership", async () => {
+    const ex = execution(), input = { email: email(), role: "brewer" };
+    const outcomes = await Promise.allSettled(Array.from({ length: 3 }, () => runCommand("invite_staff", input, ctx, ex)));
+    expect(outcomes.some(o => o.status === "fulfilled")).toBe(true);
+    await runCommand("invite_staff", input, ctx, ex);
+    expect(sql(`select count(*) from auth.users u join public.brewery_users b on b.user_id = u.id where u.email = '${input.email}'`)).toEqual(["1"]);
+  });
+  it("rechecks database roles even when the supplied context claims admin", async () => {
+    await expect(runCommand("invite_staff", { email: email(), role: "admin" }, { ...warehouse, role: "admin", userId: ctx.userId })).rejects.toMatchObject({ code: "permission_denied" });
+    const sales = await makeStaffCtx(ctx.breweryId, "sales");
+    await expect(runCommand("invite_staff", { email: email(), role: "sales" }, sales)).rejects.toMatchObject({ code: "permission_denied" });
+    await expect(runCommand("invite_customer_user", { email: email(), customerId }, sales)).resolves.toHaveProperty("userId");
+  });
+  it("uninvited Auth creation with matching metadata cannot self-claim", async () => {
+    const ex = execution(), address = email();
+    const { data: claim, error } = await ctx.db.rpc("claim_invite_request", { p_brewery: ctx.breweryId, p_email: address, p_kind: "staff", p_role: "sales", p_customer: null, p_request_id: ex.requestId });
+    expect(error).toBeNull();
+    const created = await admin.auth.admin.createUser({ email: address, password: "test-password-1", email_confirm: true, user_metadata: { mgr_invite_token: claim.authToken } });
+    expect(created.error).toBeNull();
+    expect(sql(`select auth_user_id is null from private.invite_requests where request_id = '${ex.requestId}'`)).toEqual(["t"]);
+    await expect(ctx.db.rpc("complete_invite_membership", { p_request_id: ex.requestId })).resolves.toMatchObject({ error: { message: "invitation is awaiting Auth" } });
+  });
+  it("rejects warehouse permissions before creating Auth", async () => {
+    await expect(runCommand("invite_staff", { email: email(), role: "sales" }, warehouse)).rejects.toMatchObject({ code: "permission_denied" });
   });
 });
