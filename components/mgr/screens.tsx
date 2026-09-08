@@ -1209,10 +1209,10 @@ export const SCREENS: Screen[] = [
     name: "Weekly count",
     to: { "Record count": "Weekly count", "Create transfer order": "Order" },
     job: "Target-state count plus active suggested transfer",
-    reads: "get_taproom_count_snapshot [view; SCHEMA-GATE] · replenishment_suggestions · list_locations",
-    writes: "record_taproom_count [SCHEMA-GATE: durable count + lines + optional movements in one RPC] · create_replenishment_order",
+    reads: "get_taproom_count_snapshot · replenishment_suggestions · list_locations",
+    writes: "record_taproom_count [API available; count page pending] · create_replenishment_order",
     states: permitted("warehouse or admin required"),
-    spec: "Count is target-state only and disabled until durable count persistence lands; the taproom lead uses the warehouse permission bundle. INVERTED (this frame was drawn the other way round): the physical count is the source of truth and posts the depletion, connected or not. POS supplies expected consumption and posts nothing, so disconnecting removes the expected column and changes nothing about what the count writes. That is also why a keg moving warehouse → taproom stays on the books as taproom stock: a taproom transfer carries no channel, and the beer leaves only when a count says it is gone, which makes a month-end count yield the month’s removal cleanly. Variance is drawn twice on purpose: inline while someone can still recount, and as a report where a pattern across weeks (one line, one shift) is the only place it becomes legible. Counts are in kegs and cases, so qty never needs fractional widening.",
+    spec: "This count drawing remains disabled until the explicit bin/SKU/lot count page is wired. The durable count API permits Admin, Warehouse, and Taproom; POS comparison remains a separate planned report. INVERTED (this frame was drawn the other way round): the physical count is the source of truth and posts the depletion, connected or not. POS supplies expected consumption and posts nothing, so disconnecting removes the expected column and changes nothing about what the count writes. That is also why a keg moving warehouse → taproom stays on the books as taproom stock: a taproom transfer carries no channel, and the beer leaves only when a count says it is gone, which makes a month-end count yield the month’s removal cleanly. Variance is drawn twice on purpose: inline while someone can still recount, and as a report where a pattern across weeks (one line, one shift) is the only place it becomes legible. Counts are in kegs and cases, so qty never needs fractional widening.",
     body: (<>
       {E.back("Beer", "Taproom")}
       {E.ttl("Weekly count / sales depletion")}

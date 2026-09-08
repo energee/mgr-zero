@@ -18,7 +18,7 @@
 - Swap closes interval A and opens B in one RPC; carries `open_interval_id` and requires `closed_at is null` (compare-and-swap).
 - Remaining fill: chips only (`empty` | `quarter` | `half`). Stored as `closing_fill numeric` 0, 0.25, 0.5.
 - Reverse: new movement with `compensates_id` FK to original; original unchanged. TTB reports include originals and compensations with signed net amounts. Sign must be exact opposite qty and same type/channel/dest_state.
-- complete_batch / reattribute_loss: included here as Task 6 because Cellar map and Monthly compliance still show them gated after 5 and 9.
+- complete_batch / reattribute_loss: Task 6 remains gated pending the user's completion/loss decision; it is outside count-core implementation.
 - TDD, docs:api, staff-guide, nav Taps + Taproom `planned` off.
 
 ## File map
@@ -35,38 +35,23 @@
 
 ---
 
-### Task 1: Durable taproom count snapshot
+### Task 1: Durable explicit-bucket taproom count core
 
-**Files:** baseline tables + `record_taproom_count` + `get_taproom_count_snapshot`
+**Files:** baseline, `lib/commands/taproom.ts`, `tests/taproom-count.test.ts`, exhaustive RLS/RPC tests, command API and staff guide. No count page in this task.
 
 **Interfaces:**
-- `taproom_counts (id, brewery_id, location_id, counted_on date, counted_by, created_at)` unique `(location_id, counted_on)`
-- `taproom_count_lines (count_id, sku_id, qty_expected numeric, qty_counted numeric, movement_id uuid null)`
-- `record_taproom_count({ locationId, countedOn, lines: [{ skuId, qtyCounted }] })` warehouse/admin
-  - `qty_expected` from POS sales since last count (0 if no POS)
-  - delta = previous on-hand at location − qtyCounted (for packaged SKUs). If delta > 0, insert `depletion` movement of −delta and store `movement_id`. If delta = 0, `movement_id` null.
-  - Always insert header+lines.
-- `get_taproom_count_snapshot({ locationId, countedOn? })` latest.
+- `taproom_counts (id, brewery_id, location_id, counted_on, counted_by, created_at, prior_count_id)`; unique tenant/location/date; prior identity is constrained to the same tenant and location.
+- `taproom_count_lines (id, brewery_id, count_id, location_id, bin_id, sku_id, lot_id nullable, qty_before, qty_counted, movement_id nullable)`; NULL-aware unique count/bin/SKU/lot grain and composite tenant-safe foreign keys. Both tables are append-only.
+- `get_taproom_count_snapshot({ locationId })` returns all current movement buckets, including historical zero balances, safe bin/SKU labels, today's brewery-local date, prior count identity, and a revision binding relevant movement IDs and prior count. SQL aggregation reads beyond API row limits. No raw lots or printed lot codes are exposed.
+- `record_taproom_count({ locationId, countedOn, revision, lines: [{ binId, skuId, lotId: UUID|null, qtyCounted }] })` permits Admin, Warehouse, and Taproom. Quantities mean remaining whole packaged units. A partly full keg counts as one until gone; fill chips never enter the ledger.
+- Authenticate → claim/replay request → count-scope advisory lock → existing global inventory ledger lock → validate brewery-local current date, chronology, revision and complete exact bucket keys → save header/all lines and only negative per-bucket depletion → freeze result. Replays precede stale/same-day checks; changed payload reuse conflicts.
+- `qty_before` is current ledger stock, **not POS expected consumption**. Depletion is `qty_before - qty_counted`, posted only when positive with exactly the supplied bucket's lot identity. NULL means untracked stock, never FIFO or aggregate allocation. Resolve the tenant's named Taproom channel in SQL and freeze its tax treatment; destination state stays null. Matching counts do not require a channel or POS connection.
+- Reject omitted/extra/duplicate canonical keys, wrong tenant/location/bin/SKU/lot, negative/fractional/nonfinite quantities, overcounts, stale snapshots and historical/same-day counts atomically. A later chronological count is accepted only on today's brewery-local date.
+- `get_taproom_count({ countId })` returns the durable occurrence, prior identity, every saved observation and linked frozen movement BBL.
+- Printed-label access and Admin count correction remain pending domain decisions. Without a known physical lot identity, ask Warehouse; do not infer attribution. A mistaken low count cannot be fixed by another depletion-only count or generic adjustment.
 
-- [ ] **Step 1:**
-
-```ts
-it("a matching count writes a snapshot and no movements", async () => {
-  // on-hand 4 at taproom for sku; count 4
-  const r = await runCommand("record_taproom_count", { locationId: tapId, countedOn: "2026-09-07", lines: [{ skuId, qtyCounted: 4 }] }, warehouseCtx);
-  const { data: mvs } = await admin.from("inventory_movements").select("id").eq("type", "depletion").eq("sku_id", skuId);
-  expect(mvs!.length).toBe(0);
-  const { data: lines } = await admin.from("taproom_count_lines").select("qty_counted,movement_id");
-  expect(Number(lines![0].qty_counted)).toBe(4);
-  expect(lines![0].movement_id).toBeNull();
-});
-
-it("a short count posts depletion equal to the gap", async () => {
-  // on-hand 4, count 2 → depletion qty -2, channel taproom
-});
-```
-
-- [ ] **Step 2–5:** Implement. Commit `feat(taproom): weekly count snapshot posts only the depletion gap`
+- [ ] **Step 1:** Real-Postgres red against absent count RPC/tables. Cover matching header/all lines/no posting; 7→2 posts −5; A4/B2/NULL0→A3/B2/NULL0 changes only A; tracked and untracked coexist; invalid input leaves no partial rows; count/transfer concurrency and stale revisions; exact replay and changed-payload conflict; chronology with brewery-date fixtures; frozen alternate-channel tax/BBL; no POS; more than 1000 movements/buckets; exhaustive count-table RLS positive controls and role-safe writes.
+- [ ] **Step 2–5:** Implement, reset only the isolated test stack, run focused tests/typecheck/lint, then fresh spec review followed by quality review. Parent runs grouped full proof. Commit `feat(taproom): durable explicit-bucket counts post only depletion` after focused proof. Program 12 stays incomplete until remaining tasks and gates are resolved.
 
 ---
 
@@ -75,9 +60,9 @@ it("a short count posts depletion equal to the gap", async () => {
 **Files:** view `taproom_variance` + query `get_taproom_variance`
 
 **Interfaces:**
-- Per brand, window 4 or 12 weeks: sum expected, sum counted, variance = counted − expected. Exclude lines whose sku was `not_in_inventory` (interval flag, Task 3). Never writes movements.
+- Per brand, window 4 or 12 weeks: POS serving-volume expectations remain a separate projection/snapshot from physical count `qty_before` and `qty_counted`. Actual consumption comes from count-owned depletion, not summing remaining stock. Exclude guest/untracked intervals as specified by Task 3. Never writes movements; the report sign and no-POS presentation are resolved in this task.
 
-- [ ] **Step 1:** Two weeks Hazy expected 3 counted 2 each → variance −2 over 4 weeks. No POS → expected 0, report still returns counted (spec: empty expected column / empty report when no POS — **follow the screen state "no POS": report is empty, counts still post**). Test both.
+- [ ] **Step 1:** Two weeks Hazy expected consumption 3 and count-derived actual consumption 2 each → variance −2 over 4 weeks. No POS → expected 0, report still returns count-derived consumption (spec: empty expected column / empty report when no POS — **follow the screen state "no POS": report is empty, counts still post**). Test both.
 
 - [ ] **Step 2–5:** Commit `feat(taproom): variance by brand is reported, never posted`
 
@@ -127,7 +112,7 @@ create table tap_intervals (
 
 **Interfaces:**
 - `reverse_inventory_movement({ movementId, note })` admin/warehouse
-- Inserts opposite qty, same type/channel/dest_state/sku/location/bin, `compensates_id = original`. Reject if original already compensated. Reject types that have a compound compensation (`sale_removal` from a shipment → use `return_shipment`). Allowed: `adjustment`, `opening_balance`? **Only `adjustment`, `loss`, `sample`, `destruction`, `depletion` (if not count-owned — count-owned reverse is a new count).** Simplest v1: allow reverse of `adjustment` and `loss` only; depletion reverses via a new count. Document that in the SKU detail screen remaining gate if needed.
+- Inserts opposite qty, same type/channel/dest_state/sku/location/bin, `compensates_id = original`. Reject if original already compensated. Reject types that have a compound compensation (`sale_removal` from a shipment → use `return_shipment`). Allowed: `adjustment`, `opening_balance`? **Only `adjustment`, `loss`, `sample`, `destruction`, `depletion` (if not count-owned — count-owned correction remains gated pending the Admin exact-frozen-reversal + linked corrected-count decision).** Simplest v1: allow reverse of `adjustment` and `loss` only; count-owned depletion cannot be reversed by another depletion-only count; its correction remains gated. Document that in the SKU detail screen remaining gate if needed.
 
 SKU detail writes `reverse_inventory_movement [SCHEMA-GATE…]` — ungate for adjustment/loss; keep sale_removal pointing at Return shipment.
 

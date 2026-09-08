@@ -15,7 +15,7 @@ const matrix = {
   styles: "deny", price_groups: "deny", brands: "tenant", formats: "tenant", format_components: "tenant",
   keg_pools: "tenant", skus: "tenant", format_bom: "deny", locations: "taproom", bins: "taproom",
   sale_channels: "deny", channel_prices: "deny", inventory_movements: "taproom", allocations: "deny",
-  taproom_pars: "taproom", recipes: "deny", recipe_versions: "deny", recipe_ingredients: "deny",
+  taproom_pars: "taproom", taproom_counts: "tenant", taproom_count_lines: "tenant", recipes: "deny", recipe_versions: "deny", recipe_ingredients: "deny",
   vessels: "deny", batches: "deny", vessel_occupancies: "deny", transfers: "deny", volume_adjustments: "deny",
   fermentation_readings: "deny", material_movements: "deny", batch_additions: "deny", packaging_runs: "deny",
   lots: "deny", packaging_run_outputs: "deny", packaging_run_consumptions: "deny", material_contracts: "deny",
@@ -70,6 +70,10 @@ async function fixtures() {
     await put("taproom_pars", { location_id: loc.id, sku_id: cat.skuId, par_qty: 10 });
     await put("keg_events", { pool_id: pool.id, keg_size: "half_bbl", location_id: loc.id, bin_id: loc.binId, qty: 5, reason: "acquired", created_by: owner.id });
     await put("keg_events", { pool_id: pool.id, keg_size: "half_bbl", location_id: loc.id, bin_id: loc.binId, qty: 2, reason: "retired", created_by: owner.id });
+  }
+  for (const loc of taps) {
+    const count = await put("taproom_counts", { location_id: loc.id, counted_on: day, counted_by: owner.id });
+    await put("taproom_count_lines", { count_id: count.id, location_id: loc.id, bin_id: loc.binId, sku_id: cat.skuId, qty_before: 7, qty_counted: 7 });
   }
   // A negative and a zero group must survive aggregation exactly as before.
   await put("keg_events", { pool_id: pool.id, keg_size: "quarter_bbl", location_id: taps[0].id, bin_id: taps[0].binId, qty: 2, reason: "retired", created_by: owner.id });
@@ -276,7 +280,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   const catalog = sql(`select json_build_object('name',p.proname,'signature',p.oid::regprocedure::text,'args',p.proargnames[1:p.pronargs]) from pg_proc p
     where p.pronamespace='public'::regnamespace and has_function_privilege('authenticated',p.oid,'execute')
       and not exists(select 1 from pg_depend d where d.objid=p.oid and d.deptype='e')`).map(row => JSON.parse(row) as {name:string;signature:string;args:string[]});
-  const readNames = ["taproom_can","staff_brewery_rows","keg_bin_on_hand_rows","get_chat_integration_health","get_chat_link_intent","list_chat_user_links","find_chat_oauth_intent","generate_compliance_report","get_today_items","is_staff_of","my_brewery_ids","my_customer_ids","portal_availability","portal_brewery_rows","staff_role","today_live_reasons","list_team_members"];
+  const readNames = ["get_taproom_count_snapshot","get_taproom_count","taproom_can","staff_brewery_rows","keg_bin_on_hand_rows","get_chat_integration_health","get_chat_link_intent","list_chat_user_links","find_chat_oauth_intent","generate_compliance_report","get_today_items","is_staff_of","my_brewery_ids","my_customer_ids","portal_availability","portal_brewery_rows","staff_role","today_live_reasons","list_team_members"];
   const ownNames = ["set_my_gravity_unit","consume_chat_link_proof","unlink_chat_user","set_notification_preference","set_notification_destination"];
   const existing = [...readFileSync(new URL("./rls-command-boundary.test.ts", import.meta.url), "utf8").matchAll(/rpc: "(\w+)"/g)].map(m => m[1]);
   expect([...new Set(catalog.map(c => c.name))].sort()).toEqual([...new Set([...Object.keys(cases),...existing,...readNames,...ownNames,"provision_brewery"])].sort());
@@ -285,7 +289,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     return `select '${table}:' || md5(coalesce(jsonb_agg(to_jsonb(t) order by to_jsonb(t)::text)::text,'')) from public.${table} t where ${predicate}`;
   }).join(";"));
   const publicBefore = publicSnapshot();
-  const readSignatures = ["taproom_can(uuid,text)","staff_brewery_rows()","keg_bin_on_hand_rows()","get_chat_integration_health(uuid)","get_chat_link_intent(uuid,text)","list_chat_user_links(uuid)","find_chat_oauth_intent(text)","generate_compliance_report(uuid,text,date,date)","get_today_items(uuid,timestamp with time zone)","is_staff_of(uuid)","my_brewery_ids()","my_customer_ids()","portal_availability(uuid)","portal_brewery_rows()","staff_role(uuid)","today_live_reasons()","list_team_members(uuid)"];
+  const readSignatures = ["get_taproom_count_snapshot(uuid,uuid)","get_taproom_count(uuid,uuid)","taproom_can(uuid,text)","staff_brewery_rows()","keg_bin_on_hand_rows()","get_chat_integration_health(uuid)","get_chat_link_intent(uuid,text)","list_chat_user_links(uuid)","find_chat_oauth_intent(text)","generate_compliance_report(uuid,text,date,date)","get_today_items(uuid,timestamp with time zone)","is_staff_of(uuid)","my_brewery_ids()","my_customer_ids()","portal_availability(uuid)","portal_brewery_rows()","staff_role(uuid)","today_live_reasons()","list_team_members(uuid)"];
   const ownSignatures = ["set_my_gravity_unit(uuid,text,uuid)","consume_chat_link_proof(uuid,text,uuid)","unlink_chat_user(uuid,uuid,uuid)","set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text,boolean,uuid)","set_notification_destination(uuid,text,uuid,uuid)"];
   expect(catalog.filter(c => readNames.includes(c.name)).map(c => c.signature).sort()).toEqual(readSignatures.sort());
   expect(catalog.filter(c => ownNames.includes(c.name)).map(c => c.signature).sort()).toEqual([...ownSignatures,"set_notification_destination(uuid,uuid,text,uuid)"].sort());
@@ -332,8 +336,8 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   }
   const ctx = { db, userId: f.taproom.id, breweryId: B, role: "taproom" as const };
   const commands = listTools().filter(t => t.kind === "command" && t.scope === "tenant");
-  expect(commands.filter(t => { const roles = getCommandDefinition(t.name)!.roles; return roles === "any" || Array.isArray(roles) && roles.includes("taproom"); }).map(t => t.name).sort()).toEqual([...ownNames].sort());
-  for (const command of commands.filter(t => !ownNames.includes(t.name))) {
+  expect(commands.filter(t => { const roles = getCommandDefinition(t.name)!.roles; return roles === "any" || Array.isArray(roles) && roles.includes("taproom"); }).map(t => t.name).sort()).toEqual([...ownNames,"record_taproom_count"].sort());
+  for (const command of commands.filter(t => !ownNames.includes(t.name) && t.name !== "record_taproom_count")) {
     const definition = getCommandDefinition(command.name)!;
     const input = sampleInput(definition.input);
     expect(definition.input.safeParse(input).success, `${command.name} valid registry input`).toBe(true);

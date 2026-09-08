@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { sql } from "./helpers";
 
 const AUTHENTICATED_RPCS = [
+  "get_taproom_count_snapshot(uuid,uuid)", "get_taproom_count(uuid,uuid)", "record_taproom_count(uuid,uuid,date,text,jsonb,uuid)",
   "taproom_can(uuid,text)", "staff_brewery_rows()", "keg_bin_on_hand_rows()",
   "get_chat_integration_health(uuid)",
   "get_chat_link_intent(uuid,text)",

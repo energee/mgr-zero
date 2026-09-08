@@ -116,7 +116,7 @@ $$ select role from public.brewery_users where user_id = auth.uid() and brewery_
 create function taproom_can(b uuid, t text) returns boolean
 language sql stable security definer set search_path = '' as $$
   select public.staff_role(b) = 'taproom' and t = any(array[
-    'locations','bins','inventory_movements','taproom_pars',
+    'locations','bins','inventory_movements','taproom_pars','taproom_counts','taproom_count_lines',
     'brands','formats','format_components','skus','keg_pools',
     'pos_locations','pos_item_mappings','pos_sales']);
 $$;
@@ -1060,6 +1060,42 @@ begin
 end $$;
 create trigger receipt_lines_po_status after insert on receipt_lines
   for each row execute function update_po_status();
+
+
+-- Durable taproom observations. NULL is an explicit untracked bucket, never allocation advice.
+create table taproom_counts (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references breweries(id),
+  location_id uuid not null,
+  counted_on date not null,
+  counted_by uuid not null references auth.users(id),
+  created_at timestamptz not null default now(),
+  prior_count_id uuid,
+  unique (id, location_id, brewery_id),
+  unique (brewery_id, location_id, counted_on),
+  foreign key (location_id, brewery_id) references locations(id, brewery_id),
+  foreign key (prior_count_id, location_id, brewery_id) references taproom_counts(id, location_id, brewery_id)
+);
+create table taproom_count_lines (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references breweries(id),
+  count_id uuid not null,
+  location_id uuid not null,
+  bin_id uuid not null,
+  sku_id uuid not null,
+  lot_id uuid,
+  qty_before numeric not null check (qty_before >= 0 and qty_before = trunc(qty_before) and qty_before::text not in ('NaN','Infinity','-Infinity')),
+  qty_counted numeric not null check (qty_counted >= 0 and qty_counted <= qty_before and qty_counted = trunc(qty_counted)),
+  movement_id uuid unique,
+  unique nulls not distinct (count_id, bin_id, sku_id, lot_id),
+  foreign key (count_id, location_id, brewery_id) references taproom_counts(id, location_id, brewery_id),
+  foreign key (bin_id, location_id, brewery_id) references bins(id, location_id, brewery_id),
+  foreign key (sku_id, brewery_id) references skus(id, brewery_id),
+  foreign key (lot_id, brewery_id) references lots(id, brewery_id),
+  foreign key (movement_id, brewery_id) references inventory_movements(id, brewery_id),
+  check ((qty_before = qty_counted) = (movement_id is null))
+);
+create index taproom_count_lines_brewery_idx on taproom_count_lines(brewery_id, count_id);
 
 -- A count is taken at one bin: on-hand is compared and adjusted there.
 create table material_counts (
@@ -5520,7 +5556,7 @@ begin
     'recipes','recipe_versions','recipe_ingredients','vessels','batches','vessel_occupancies',
     'fermentation_readings','batch_additions','packaging_runs','lots','packaging_run_outputs',
     'packaging_run_consumptions','material_contracts','purchase_orders','purchase_order_lines',
-    'receipts','receipt_lines','material_counts','material_count_lines','orders','order_lines',
+    'receipts','receipt_lines','material_counts','material_count_lines','taproom_counts','taproom_count_lines','orders','order_lines',
     'shipments','invoices','invoice_lines','pos_locations','pos_item_mappings','pos_sales',
     'brand_approvals','state_registrations','brewery_state_licenses','report_filings',
     'routes','deliveries','invoice_questions']
@@ -6599,7 +6635,7 @@ grant select on breweries, brewery_users, customer_users,
   recipes, recipe_versions, recipe_ingredients, vessels, batches, vessel_occupancies, transfers,
   volume_adjustments, fermentation_readings, material_movements, batch_additions, packaging_runs,
   lots, packaging_run_outputs, packaging_run_consumptions, material_contracts, purchase_orders,
-  purchase_order_lines, receipts, receipt_lines, material_counts, material_count_lines, orders,
+  purchase_order_lines, receipts, receipt_lines, material_counts, material_count_lines, taproom_counts, taproom_count_lines, orders,
   order_lines, order_events, shipments, invoices, invoice_lines, invoice_questions, keg_events,
   pos_locations, pos_item_mappings, pos_sales, brand_approvals, state_registrations,
   brewery_state_licenses, report_filings, routes, deliveries, qbo_connections, pos_connections
@@ -6612,6 +6648,7 @@ grant select on bin_move_stock, on_hand, bin_on_hand, atp, invoice_totals, keg_d
   contract_balances, material_requirements, po_open_balances, vendor_lead_times,
   keg_bin_totals, keg_bin_on_hand, keg_fleet_totals, keg_customer_balances to authenticated;
 grant all on all tables in schema public to service_role;
+revoke update, delete, truncate on taproom_counts, taproom_count_lines from service_role;
 grant all on all sequences in schema public to service_role;
 
 -- Availability badge tiers for portal customers: coarse tiers only, never raw
@@ -7272,3 +7309,121 @@ begin
 end $$;
 revoke all on function set_notification_destination(uuid,text,uuid,uuid) from public,anon,authenticated,service_role;
 grant execute on function set_notification_destination(uuid,text,uuid,uuid) to authenticated;
+
+-- One statement owns the complete count snapshot, including history beyond API row limits.
+-- Private and invoker: only the checked definer entry points below may use it.
+create function private.taproom_count_snapshot(p_brewery uuid, p_location uuid) returns jsonb
+language sql stable set search_path = '' as $$
+  with prior as (
+    select id, counted_on from public.taproom_counts
+    where brewery_id = p_brewery and location_id = p_location order by counted_on desc limit 1
+  ), movements as materialized (
+    select id, bin_id, sku_id, lot_id, qty from public.inventory_movements
+    where brewery_id = p_brewery and location_id = p_location
+  ), buckets as (
+    select bin_id, sku_id, lot_id, sum(qty) qty_before from movements group by bin_id, sku_id, lot_id
+  )
+  select jsonb_build_object(
+    'location_id', p_location,
+    'counted_on', (now() at time zone (select timezone from public.breweries where id = p_brewery))::date,
+    'prior_count', (select to_jsonb(prior) from prior),
+    'revision', encode(extensions.digest(jsonb_build_array(p_brewery, p_location,
+      (select id from prior), (select jsonb_agg(id order by id) from movements))::text, 'sha256'), 'hex'),
+    'lines', (select coalesce(jsonb_agg(jsonb_build_object('bin_id', b.bin_id, 'bin_name', n.name,
+      'sku_id', b.sku_id, 'sku_name', s.name, 'lot_id', b.lot_id, 'qty_before', b.qty_before)
+      order by b.bin_id, b.sku_id, b.lot_id nulls first), '[]'::jsonb)
+      from buckets b join public.bins n on n.id = b.bin_id and n.brewery_id = p_brewery
+      join public.skus s on s.id = b.sku_id and s.brewery_id = p_brewery));
+$$;
+
+create function get_taproom_count_snapshot(p_brewery uuid, p_location uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform private.assert_staff(p_brewery, array['admin','warehouse','taproom']::public.staff_role[]);
+  if not exists (select 1 from public.locations where id = p_location and brewery_id = p_brewery and kind = 'taproom') then
+    raise exception 'choose an owned taproom location';
+  end if;
+  return private.taproom_count_snapshot(p_brewery, p_location);
+end $$;
+
+create function get_taproom_count(p_brewery uuid, p_count uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare v_result jsonb;
+begin
+  perform private.assert_staff(p_brewery, array['admin','warehouse','taproom']::public.staff_role[]);
+  select to_jsonb(c) || jsonb_build_object('lines', (select coalesce(jsonb_agg(to_jsonb(l) ||
+    jsonb_build_object('bbl', m.bbl) order by l.bin_id, l.sku_id, l.lot_id nulls first), '[]'::jsonb)
+    from public.taproom_count_lines l left join public.inventory_movements m on m.id = l.movement_id and m.brewery_id = l.brewery_id
+    where l.count_id = c.id and l.brewery_id = p_brewery)) into v_result
+    from public.taproom_counts c where c.id = p_count and c.brewery_id = p_brewery;
+  if v_result is null then raise exception 'count not found'; end if;
+  return v_result;
+end $$;
+
+create function record_taproom_count(p_brewery uuid, p_location uuid, p_counted_on date, p_revision text, p_lines jsonb, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid; v_replay jsonb; v_snapshot jsonb; v_count uuid; v_channel uuid; v_tax public.tax_treatment;
+  v_line jsonb; v_qty numeric; v_before numeric; v_movement uuid;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin','warehouse','taproom']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'record_taproom_count', p_request_id,
+    jsonb_build_object('location', p_location, 'counted_on', p_counted_on, 'revision', p_revision, 'lines', p_lines));
+  if v_replay is not null then return v_replay; end if;
+  -- Count-only scope lock precedes the ledger, like shipping's document lock.
+  -- No sibling ledger writer acquires this advisory lock.
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('taproom-count:' || p_brewery::text || ':' || p_location::text, 0));
+  -- ponytail: global ledger lock; migrate every writer to shared stock-key locks for higher throughput.
+  lock table public.inventory_movements in share row exclusive mode;
+  if not exists (select 1 from public.locations where id = p_location and brewery_id = p_brewery and kind = 'taproom') then
+    raise exception 'choose an owned taproom location';
+  end if;
+  v_snapshot := private.taproom_count_snapshot(p_brewery, p_location);
+  if p_counted_on is distinct from (v_snapshot->>'counted_on')::date then raise exception 'count today in the brewery timezone; historical counts cannot use current stock'; end if;
+  if p_counted_on <= (v_snapshot->'prior_count'->>'counted_on')::date then raise exception 'a count already exists on this date; count corrections are not yet available'; end if;
+  if p_revision is distinct from v_snapshot->>'revision' then raise exception 'stock or prior count changed; refresh and review every bucket' using errcode = 'MG409'; end if;
+  if jsonb_typeof(p_lines) is distinct from 'array' then raise exception 'count lines must be an array'; end if;
+  if exists (select 1 from jsonb_array_elements(p_lines) e where jsonb_typeof(e) is distinct from 'object'
+    or not (e ?& array['bin_id','sku_id','lot_id','qty_counted'])
+    or jsonb_typeof(e->'bin_id') is distinct from 'string' or jsonb_typeof(e->'sku_id') is distinct from 'string'
+    or jsonb_typeof(e->'lot_id') not in ('string','null') or jsonb_typeof(e->'qty_counted') is distinct from 'number') then raise exception 'explicit bin, SKU, lot UUID or null, and numeric counted quantity are required'; end if;
+  if (select count(distinct jsonb_build_array((e->>'bin_id')::uuid, (e->>'sku_id')::uuid, (e->>'lot_id')::uuid)) from jsonb_array_elements(p_lines) e) <> jsonb_array_length(p_lines)
+    then raise exception 'duplicate count bucket'; end if;
+  if jsonb_array_length(p_lines) <> jsonb_array_length(v_snapshot->'lines') or exists (
+    select 1 from jsonb_array_elements(v_snapshot->'lines') b where not exists (
+      select 1 from jsonb_array_elements(p_lines) e where (e->>'bin_id')::uuid = (b->>'bin_id')::uuid
+      and (e->>'sku_id')::uuid = (b->>'sku_id')::uuid and (e->>'lot_id')::uuid is not distinct from (b->>'lot_id')::uuid))
+    then raise exception 'count every displayed bucket exactly once; refresh for changed stock'; end if;
+  -- ponytail: JSON bucket matching is quadratic; use a typed keyed join if large-location counts become slow.
+  -- Validate all observations before the first durable write.
+  for v_line in select * from jsonb_array_elements(p_lines) loop
+    v_qty := (v_line->>'qty_counted')::numeric;
+    select (b->>'qty_before')::numeric into v_before from jsonb_array_elements(v_snapshot->'lines') b
+      where (b->>'bin_id')::uuid = (v_line->>'bin_id')::uuid and (b->>'sku_id')::uuid = (v_line->>'sku_id')::uuid
+      and (b->>'lot_id')::uuid is not distinct from (v_line->>'lot_id')::uuid;
+    if v_qty::text in ('NaN','Infinity','-Infinity') or v_qty < 0 or v_qty <> trunc(v_qty) then raise exception 'count remaining whole packaged units; a partial keg counts as one until gone'; end if;
+    if v_before < 0 or v_before <> trunc(v_before) then raise exception 'stock needs Warehouse review before counting'; end if;
+    if v_qty > v_before then raise exception 'count exceeds recorded stock; ask Warehouse to investigate. Count correction is not yet available'; end if;
+  end loop;
+  insert into public.taproom_counts(brewery_id, location_id, counted_on, counted_by, prior_count_id)
+    values(p_brewery, p_location, p_counted_on, v_actor, (v_snapshot->'prior_count'->>'id')::uuid) returning id into v_count;
+  for v_line in select * from jsonb_array_elements(p_lines) loop
+    v_qty := (v_line->>'qty_counted')::numeric;
+    select (b->>'qty_before')::numeric into v_before from jsonb_array_elements(v_snapshot->'lines') b
+      where (b->>'bin_id')::uuid = (v_line->>'bin_id')::uuid and (b->>'sku_id')::uuid = (v_line->>'sku_id')::uuid
+      and (b->>'lot_id')::uuid is not distinct from (v_line->>'lot_id')::uuid;
+    v_movement := null;
+    if v_qty < v_before then
+      select id, tax_treatment into v_channel, v_tax from public.sale_channels where brewery_id = p_brewery and name = 'Taproom';
+      if v_channel is null then raise exception 'Admin must restore the Taproom sale channel before recording depletion'; end if;
+      insert into public.inventory_movements(brewery_id, location_id, bin_id, sku_id, lot_id, qty, type, sale_channel_id, tax_treatment, dest_state, ref, created_by)
+        values(p_brewery, p_location, (v_line->>'bin_id')::uuid, (v_line->>'sku_id')::uuid, (v_line->>'lot_id')::uuid,
+          v_qty - v_before, 'depletion', v_channel, v_tax, null, v_count, v_actor) returning id into v_movement;
+    end if;
+    insert into public.taproom_count_lines(brewery_id, count_id, location_id, bin_id, sku_id, lot_id, qty_before, qty_counted, movement_id)
+      values(p_brewery, v_count, p_location, (v_line->>'bin_id')::uuid, (v_line->>'sku_id')::uuid, (v_line->>'lot_id')::uuid, v_before, v_qty, v_movement);
+  end loop;
+  return private.complete_command_request(p_request_id, public.get_taproom_count(p_brewery, v_count));
+end $$;
+revoke all on function private.taproom_count_snapshot(uuid,uuid) from public,anon,authenticated,service_role;
+revoke all on function get_taproom_count_snapshot(uuid,uuid),get_taproom_count(uuid,uuid),record_taproom_count(uuid,uuid,date,text,jsonb,uuid) from public,anon,authenticated,service_role;
+grant execute on function get_taproom_count_snapshot(uuid,uuid),get_taproom_count(uuid,uuid),record_taproom_count(uuid,uuid,date,text,jsonb,uuid) to authenticated;

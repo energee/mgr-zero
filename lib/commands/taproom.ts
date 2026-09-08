@@ -6,7 +6,7 @@
 // the fleet total is keg_fleet_totals (shipped kegs are still the fleet),
 // and what a customer holds is keg_customer_balances plus
 // keg_deposit_balances. Tap board writes
-// (tap/kick/swap) and the weekly count are parked until Program 12.
+// (tap/kick/swap) remain parked; durable physical counts are implemented below.
 import { z } from "zod";
 import { defineCommand, defineQuery, unwrap, type Ctx } from "./registry";
 
@@ -128,4 +128,26 @@ defineQuery({
     })).sort((a, b) => a.pool_name.localeCompare(b.pool_name) || a.keg_size.localeCompare(b.keg_size));
     return { rows, kegs_out: rows.reduce((n, r) => n + r.kegs_out, 0), deposit_cents: rows.reduce((n, r) => n + r.deposit_cents, 0) };
   },
+});
+
+const COUNT_ROLES = ["admin", "warehouse", "taproom"] as const;
+defineQuery({
+  name: "get_taproom_count_snapshot", description: "Prepare today's complete taproom count by bin, SKU and explicit lot UUID or null; includes zero buckets, safe labels, prior count and revision, without POS or lot-label access",
+  input: z.object({ locationId: z.string().uuid() }), roles: [...COUNT_ROLES],
+  handler: (ctx, i) => unwrap(ctx.db.rpc("get_taproom_count_snapshot", { p_brewery: ctx.breweryId, p_location: i.locationId })),
+});
+defineQuery({
+  name: "get_taproom_count", description: "Read a saved taproom count with every physical observation, prior count, movement identity and frozen depletion BBL",
+  input: z.object({ countId: z.string().uuid() }), roles: [...COUNT_ROLES],
+  handler: (ctx, i) => unwrap(ctx.db.rpc("get_taproom_count", { p_brewery: ctx.breweryId, p_count: i.countId })),
+});
+defineCommand({
+  name: "record_taproom_count", description: "Save today's complete explicit-bucket count of remaining whole packaged units using the prepared revision; partial kegs count as one until gone. Persist matching counts without movements; shortages alone post exact-lot depletion. Stale, incomplete, duplicate and overcounts are refused; count correction is not yet available",
+  input: z.object({ locationId: z.string().uuid(), countedOn: z.string().date(), revision: z.string().min(1),
+    lines: z.array(z.object({ binId: z.string().uuid(), skuId: z.string().uuid(), lotId: z.string().uuid().nullable(), qtyCounted: z.number().int().nonnegative() })) }),
+  roles: [...COUNT_ROLES],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_taproom_count", {
+    p_brewery: ctx.breweryId, p_location: i.locationId, p_counted_on: i.countedOn, p_revision: i.revision,
+    p_lines: i.lines.map(l => ({ bin_id: l.binId, sku_id: l.skuId, lot_id: l.lotId, qty_counted: l.qtyCounted })), p_request_id: execution.requestId,
+  })),
 });

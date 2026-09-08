@@ -521,6 +521,17 @@ describe("registered staff mutation role × RPC matrix", () => {
       },
     },
     {
+      command: "record_taproom_count", rpc: "record_taproom_count", allowed: ["admin", "warehouse", "taproom"],
+      input: async () => {
+        const loc = await seedLocation(brewery.id, { name: `Count ${crypto.randomUUID()}`, kind: "taproom" });
+        const snapshot = await runCommand("get_taproom_count_snapshot", { locationId: loc.id }, adminCtx) as { revision: string; counted_on: string };
+        return {
+          command: { locationId: loc.id, countedOn: snapshot.counted_on, revision: snapshot.revision, lines: [] },
+          rpc: { p_brewery: brewery.id, p_location: loc.id, p_counted_on: snapshot.counted_on, p_revision: snapshot.revision, p_lines: [] },
+        };
+      },
+    },
+    {
       command: "record_pick", rpc: "record_pick", allowed: ["admin", "warehouse"],
       input: async () => {
         const orderId = await confirmedOrder();

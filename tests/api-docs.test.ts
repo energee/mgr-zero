@@ -23,6 +23,18 @@ const read = (path: string) => readFileSync(resolve(root, path), "utf8");
 const PAGE = () => read("content/docs/api.mdx");
 
 describe("HTTP API reference", () => {
+  it("publishes explicit-bucket taproom count commands with truthful correction limits", () => {
+    for (const name of ["get_taproom_count_snapshot", "record_taproom_count", "get_taproom_count"]) {
+      expect(apiOperations().find(o => o.name === name)).toMatchObject({ status: "available", roles: "admin, warehouse, taproom" });
+    }
+    const definition = getCommandDefinition("record_taproom_count")!;
+    const input = sampleInput(definition.input);
+    expect(definition.input.safeParse(input).success).toBe(true);
+    expect(definition.input.safeParse({ ...input, lines: [{ binId: "00000000-0000-0000-0000-000000000000", skuId: "00000000-0000-0000-0000-000000000000", qtyCounted: 1 }] }).success).toBe(false);
+    expect(PAGE()).toContain("Saved-count correction remains unavailable");
+    expect(PAGE()).toContain("partial keg counts as one until gone");
+  });
+
   it("documents provisioning as authenticated pre-tenant and omits brewery from its example", () => {
     const operation = apiOperations().find(o => o.name === "provision_brewery");
     expect(operation).toMatchObject({ scope: "pretenant", roles: "authenticated pre-tenant" });

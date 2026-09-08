@@ -58,6 +58,16 @@ SKU fields in **New Order** use the same search, narrowed to SKUs. They show rec
 A permission error is the end of that attempt. Ask an administrator. Hitting submit again will not change your access.
 </Callout>
 
+## Taproom physical counts [#taproom-counts]
+
+Admin, Warehouse, and Taproom can prepare, record, and read physical counts through the [command API](/docs/api#taproom). The count page is not available yet. A count records remaining whole packaged units for every displayed bin, SKU, and lot identity, including zero quantities. A partially full keg counts as one until it is gone; estimated fill levels never change the inventory ledger.
+
+Use today's date in the brewery's timezone and the revision from the prepared count. Every displayed bucket needs its own observation. A lot UUID and **untracked** stock are separate buckets; there is no automatic lot allocation. Printed lot labels are not supplied. If you cannot match physical stock to its full lot UUID, ask Warehouse for help before submitting.
+
+A matching count still saves its date, author, and all observations. Shortages post only the missing units to the exact bucket, using the Taproom sale channel. POS setup and sales do not affect this posting. Stock changes require a fresh review. Counts above recorded stock, incomplete counts, and a second count on the same date are refused. Retry an unchanged submission with the same request ID to recover the original result.
+
+Saved counts cannot yet be corrected. If a submitted count is wrong, ask Admin to investigate; a generic inventory adjustment does not reverse that count's recorded depletion or its tax reporting.
+
 ## Navigate MGR [#navigation]
 
 <Screen name="Today" />
