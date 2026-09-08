@@ -39,6 +39,7 @@ export type InvoiceViewModel = {
 };
 
 export type InvoiceSnapshot = {
+  backHref?: string;
   invoice: {
     id: string;
     invoice_no: number | null;
@@ -68,13 +69,13 @@ export type InvoiceSnapshot = {
 };
 
 /** Map a get_invoice + list_invoice_questions payload onto InvoiceView. */
-export function toInvoiceViewProps({ invoice, lines, questions, mappings }: InvoiceSnapshot): InvoiceViewModel {
+export function toInvoiceViewProps({ invoice, lines, questions, mappings, backHref }: InvoiceSnapshot): InvoiceViewModel {
   const credit = invoice.kind === "credit_memo";
   const total = lines.reduce((sum, l) => sum + l.amount_cents, 0);
   const dueOrIssued = invoice.due_on ? `due ${invoice.due_on}` : `issued ${invoice.issued_on}`;
   const paid = invoice.paid_at ? ` · paid ${new Date(invoice.paid_at).toLocaleDateString()}` : "";
   return {
-    backHref: "/invoices",
+    backHref,
     title: docNo(credit ? "CM" : "INV", invoice.invoice_no, credit ? "Credit memo" : "Invoice"),
     customer: invoice.customers?.name ?? "—",
     summary: `${dueOrIssued} · ${plural(lines.length, "line")}${paid}`,

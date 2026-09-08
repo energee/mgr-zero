@@ -20,7 +20,7 @@ export default async function PortalOrderDetailPage({ params }: { params: Promis
   );
   return (
     <PortalOrderView
-      model={toPortalOrderViewProps(snapshot)}
+      model={toPortalOrderViewProps({ ...snapshot, backHref: "/portal/orders" })}
       linkRows
       reorderHref={`/portal?reorder=${snapshot.order.id}`}
       continueHref={snapshot.order.status === "draft" ? `/portal?draft=${snapshot.order.id}` : undefined}

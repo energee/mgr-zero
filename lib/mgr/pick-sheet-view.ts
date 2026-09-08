@@ -9,6 +9,7 @@ export type PickSheetRowView = {
   title: string;
   detail: string;
   href: string;
+  verb: "Pick" | "Open";
 };
 
 export type PickSheetGroupView = {
@@ -58,6 +59,7 @@ export function toPickSheetViewProps({ orders }: PickSheetSnapshot): PickSheetVi
           title: `${o.customers?.name ?? "Transfer"} · ${docNo("ORD", o.order_no, "Order")}`,
           detail: `${o.status} · ${plural(o.order_lines.length, "line")}`,
           href: `/orders/${o.id}`,
+          verb: o.status === "confirmed" ? "Pick" as const : "Open" as const,
         };
       });
       return {

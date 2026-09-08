@@ -220,6 +220,8 @@ export const INERT: (string | RegExp)[] = [
   "Disable",
   "Download PDF",
   "Due",
+  "Issued",
+  "Credit",
   "Found \u00b7 Al\u2019s Bar",
   "Hazy \u00b7 \u00bd bbl keg",
   "Import 2 customer rows",

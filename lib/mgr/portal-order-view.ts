@@ -35,6 +35,7 @@ export type PortalOrderViewModel = {
 };
 
 export type PortalOrderSnapshot = {
+  backHref?: string;
   order: {
     id: string;
     order_no: number | null;
@@ -77,11 +78,11 @@ function calendarDay(iso: string): string {
 }
 
 /** Map a portal_order payload onto PortalOrderView. */
-export function toPortalOrderViewProps({ order, lines, events, shipment }: PortalOrderSnapshot): PortalOrderViewModel {
+export function toPortalOrderViewProps({ order, lines, events, shipment, backHref }: PortalOrderSnapshot): PortalOrderViewModel {
   const invoice = shipment?.invoices.find((v) => v.kind === "invoice");
   const ship = order.ship_tos;
   return {
-    backHref: "/portal/orders",
+    backHref,
     title: docNo("ORD", order.order_no, "Order"),
     status: buyerStatus(order.status, order.requested_ship_date),
     shipTo: ship ? `${ship.label} · ${ship.city}, ${ship.state}` : undefined,

@@ -1,4 +1,5 @@
-import { E } from "@/components/mgr/e";
+import { CustomerView } from "@/components/mgr/views/customer";
+import { toCustomerViewProps } from "@/lib/mgr/customer-view";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
@@ -25,23 +26,20 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
     <CustomerForm key={JSON.stringify(customer)} channels={channels.map((c) => ({ id: c.id, name: c.name }))}
       customer={{ id: customer.id, name: customer.name, type: customer.type, state: customer.state, saleChannelId: customer.sale_channel_id, licenseNumber: customer.license_no, paymentTerms: customer.payment_terms, taxTreatment: customer.tax_treatment }} />
   );
-  return (
-    <>
-      {E.back("Customers", customer.name, edit, "/customers")}
-      {E.fld("Type", customer.type)}
-      {E.fld("State", customer.state)}
-      {E.fld("License number", customer.license_no ?? "none")}
-      {E.fld("Terms", customer.payment_terms)}
-      {E.fld("Tax treatment", customer.tax_treatment?.replaceAll("_", " ") ?? "Inherit sale channel")}
-      {E.nav("Orders", "Orders for this customer", "", undefined, `/orders?customerId=${customer.id}`)}
-      {E.fld("Sale channel", customer.sale_channels.name)}
-      {E.ttl("Ship-tos")}
-      {shipTos.map((s) => (
-        <div key={s.id}>{E.row(`${s.label}${s.is_default ? " · default" : ""}`, `${s.address1}${s.address2 ? `, ${s.address2}` : ""} · ${s.city}, ${s.state} ${s.zip}`, canWrite ? <ShipToForm key={JSON.stringify(s)} customerId={customer.id} shipTo={s} /> : undefined)}</div>
-      ))}
-      {canWrite && <ShipToForm customerId={customer.id} />}
-      {(brewery.role === "admin" || brewery.role === "sales") && <InviteForm customerId={customer.id} />}
-      {E.row("Customer keg balance", "kegs out and deposits held", E.act("Open", "primary", `/kegs/customers/${customer.id}`))}
-    </>
-  );
+  return <CustomerView
+    model={toCustomerViewProps({ customer, shipTos, backHref: "/customers" })}
+    headerAction={edit}
+    detail={{
+      shipTos: shipTos.map(s => ({
+        key: s.id,
+        title: `${s.label}${s.is_default ? " · default" : ""}`,
+        detail: `${s.address1}${s.address2 ? `, ${s.address2}` : ""} · ${s.city}, ${s.state} ${s.zip}`,
+        action: canWrite ? <ShipToForm key={JSON.stringify(s)} customerId={customer.id} shipTo={s} /> : null,
+      })),
+      addShipTo: canWrite ? <ShipToForm customerId={customer.id} /> : null,
+      portalUsers: canWrite ? <InviteForm customerId={customer.id} /> : null,
+      kegHref: `/kegs/customers/${customer.id}`,
+      ordersHref: `/orders?customerId=${customer.id}`,
+    }}
+  />;
 }

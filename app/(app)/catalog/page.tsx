@@ -3,6 +3,8 @@
 // brand opens sku-form.tsx (SKU), Add format opens format-form.tsx. Open format
 // links to its components and Package BOM. A SKU is one brand × one packaged
 // format; bbl per unit lives on the format.
+import { CatalogView } from "@/components/mgr/views/catalog";
+import { toCatalogViewProps } from "@/lib/mgr/catalog-view";
 import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -30,12 +32,14 @@ export default async function CatalogPage() {
   const formatById = new Map(formats.map((f) => [f.id, f]));
   const packaged: FormatOption[] = formats.filter((f) => f.basis === "packaged").map((f) => ({ id: f.id, name: f.name }));
   return (
-    <>
-      {E.back("More", "Catalog", canWrite ? <BrandForm groups={groups} /> : undefined, "/more")}
-      {brands.length === 0 ? E.blank("No brands yet") : brands.map((brand) => (
+    <CatalogView
+      model={toCatalogViewProps({ brands, priceGroups: groups, backHref: "/more" })}
+      createAction={canWrite ? <BrandForm groups={groups} /> : null}
+      linkRows
+      brands={brands.length === 0 ? E.blank("No brands yet") : brands.map((brand) => (
         <div key={brand.id}>
           {E.row(brand.name, `${brand.styles?.name ?? "style not set"}${brand.abv != null ? ` · ${brand.abv}% ABV` : ""} · ${plural(brand.skus.length, "SKU")}`,
-            canWrite ? <div className="flex max-w-44 flex-wrap gap-2 md:max-w-none"><BrandForm groups={groups} brand={{ id: brand.id, name: brand.name, style: brand.styles?.name ?? null, abv: brand.abv, description: brand.description, category: brand.category, priceGroupId: brand.price_group_id, hops: brand.hops }} /><SkuForm brandId={brand.id} formats={packaged} /><PourForm brand={brand} /></div> : undefined, "", undefined,
+            canWrite ? <div className="flex max-w-44 flex-wrap gap-2 md:max-w-none"><BrandForm key={JSON.stringify(brand)} groups={groups} brand={{ id: brand.id, name: brand.name, style: brand.styles?.name ?? null, abv: brand.abv, description: brand.description, category: brand.category, priceGroupId: brand.price_group_id, hops: brand.hops }} /><SkuForm brandId={brand.id} formats={packaged} /><PourForm brand={brand} /></div> : undefined, "", undefined,
             brand.skus.length ? brand.skus.map((sku) => {
               const f = formatById.get(sku.format_id);
               return <div key={sku.id} className="flex flex-wrap items-center justify-between gap-2 text-sm"><span>{sku.name} · {sku.active ? "Active" : "Inactive"}{sku.upc ? ` · UPC ${sku.upc}` : ""}</span><span className="text-muted-foreground">{f?.name ?? "—"}{f?.bbl_per_unit ? ` · ${formatVolume(f.bbl_per_unit)}` : ""}</span>{canWrite && <SkuEditForm sku={sku} formatName={f?.name ?? "—"} />}</div>;
@@ -43,11 +47,12 @@ export default async function CatalogPage() {
           {formats.filter((f) => f.brand_id === brand.id).map((f) => <div key={f.id}>{E.row(`${brand.name} · ${f.name}`, `${f.ounces} oz · poured`, canWrite ? <PourForm key={`${f.id}-${f.name}-${f.ounces}`} brand={brand} pour={{ id: f.id, name: f.name, ounces: f.ounces! }} /> : undefined)}</div>)}
         </div>
       ))}
-      {E.row("Price groups", plural(groups.length, "group"), E.act("Open", "primary", "/pricing"))}
-      {E.hd("Formats", "package composition", canWrite ? <FormatForm /> : undefined)}
-      {packaged.length === 0 ? E.blank("No formats yet") : formats.filter((f) => f.basis === "packaged").map((f) => (
-        <div key={f.id}>{E.row(f.name, `${f.basis}${f.package_type ? ` · ${f.package_type}${f.keg_size ? ` (${f.keg_size.replace(/_/g, " ")})` : ""}` : ""}${f.units_per_case ? ` · ${f.units_per_case} per case` : ""}${f.bbl_per_unit ? ` · ${formatVolume(f.bbl_per_unit)}` : ""}`, E.act("Open format", "primary", `/catalog/formats/${f.id}`))}</div>
-      ))}
-    </>
+      footer={<>
+        {E.hd("Formats", "package composition", canWrite ? <FormatForm /> : undefined)}
+        {packaged.length === 0 ? E.blank("No formats yet") : formats.filter((f) => f.basis === "packaged").map((f) => (
+          <div key={f.id}>{E.row(f.name, `${f.basis}${f.package_type ? ` · ${f.package_type}${f.keg_size ? ` (${f.keg_size.replace(/_/g, " ")})` : ""}` : ""}${f.units_per_case ? ` · ${f.units_per_case} per case` : ""}${f.bbl_per_unit ? ` · ${formatVolume(f.bbl_per_unit)}` : ""}`, E.act("Open format", "primary", `/catalog/formats/${f.id}`))}</div>
+        ))}
+      </>}
+    />
   );
 }

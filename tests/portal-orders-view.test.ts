@@ -84,7 +84,7 @@ describe("Order detail view", () => {
   it("maps portal_order onto buyer status, ship-to, lines, invoice, and Reorder", () => {
     const model = toPortalOrderViewProps(portalOrderShipped);
     expect(model.title).toBe("ORD-0225");
-    expect(model.backHref).toBe("/portal/orders");
+    expect(model.backHref).toBeUndefined();
     expect(model.status).toMatch(/Shipped/);
     expect(model.shipTo).toBe("Main · Phoenixville, PA");
     expect(model.reorder).toBe(true);

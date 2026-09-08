@@ -35,7 +35,7 @@ export function PickSheetView({
             {E.ttl(group.title)}
             {group.rows.map((row) => (
               <Fragment key={row.key}>
-                {E.nav(row.title, row.detail, "", undefined, linkRows ? row.href : undefined)}
+                {E.row(row.title, row.detail, E.act(row.verb, "primary", linkRows ? row.href : undefined))}
               </Fragment>
             ))}
             {E.row("Totals", group.totals)}

@@ -19,6 +19,7 @@ export type ConfirmOrderViewModel = {
 };
 
 export type ConfirmOrderSnapshot = {
+  backHref?: string;
   order: {
     id: string;
     order_no: number | null;
@@ -32,11 +33,11 @@ export type ConfirmOrderSnapshot = {
   locations: { id: string; name: string }[];
 };
 
-export function toConfirmOrderViewProps({ order, lines, atp, locations }: ConfirmOrderSnapshot): ConfirmOrderViewModel {
+export function toConfirmOrderViewProps({ order, lines, atp, locations, backHref }: ConfirmOrderSnapshot): ConfirmOrderViewModel {
   const atpMap = new Map(atp.map((a) => [a.sku_id, Number(a.qty)]));
   const ships = order.requested_ship_date ? ` · ships ${order.requested_ship_date}` : "";
   return {
-    backHref: "/orders",
+    backHref,
     title: docNo("ORD", order.order_no, "Order"),
     where: order.customers?.name ?? "Taproom transfer",
     state: `Submitted${ships}`,

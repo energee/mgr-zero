@@ -99,7 +99,7 @@ describe("Portal invoice view", () => {
   it("maps portal_invoice onto number, total, due, lines, and brewery phone", () => {
     const model = toPortalInvoiceViewProps(portalInvoiceUnpaid);
     expect(model.title).toBe("INV-1042");
-    expect(model.backHref).toBe("/portal/invoices");
+    expect(model.backHref).toBeUndefined();
     expect(model.total).toBe("$948.00");
     expect(model.due).toBe("2026-10-03");
     expect(model.paid).toBe(false);

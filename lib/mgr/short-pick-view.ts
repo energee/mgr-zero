@@ -17,6 +17,7 @@ export type ShortPickViewModel = {
 };
 
 export type ShortPickSnapshot = {
+  backHref?: string;
   order: {
     id: string;
     order_no: number | null;
@@ -40,7 +41,7 @@ function unitWord(name: string) {
 }
 
 /** Map get_order + the short line's count onto ShortPickView. */
-export function toShortPickViewProps({ order, line, locations }: ShortPickSnapshot): ShortPickViewModel {
+export function toShortPickViewProps({ order, line, locations, backHref }: ShortPickSnapshot): ShortPickViewModel {
   const name = line.skus?.name ?? "Line";
   const ordered = Number(line.qty_ordered);
   const counted = Number(line.qty_picked ?? 0);
@@ -49,7 +50,7 @@ export function toShortPickViewProps({ order, line, locations }: ShortPickSnapsh
   const who = order.customers?.name ?? "Taproom transfer";
   return {
     backTo: "Pick",
-    backHref: `/orders/${order.id}`,
+    backHref,
     title: `${docNo("ORD", order.order_no, "Order")} · short line`,
     source: `${who} · ${loc}`,
     lineName: name,

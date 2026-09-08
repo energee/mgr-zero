@@ -17,6 +17,7 @@ it.each([{ kind: "invoice" as const, paid: false, status: "Unpaid" }, { kind: "i
   state.kind = kind; state.paid = paid;
   const html = renderToStaticMarkup(await InvoicePage({ params: Promise.resolve({ id: "invoice" }) }));
   expect(html).toContain("Ask about this invoice");
+  expect(html).toContain('href="/portal/invoices"');
   expect(html).not.toContain("Download PDF");
   expect(html).toContain("Issued");
   expect(html).toContain("2026-09-08");

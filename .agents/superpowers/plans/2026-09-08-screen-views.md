@@ -1,7 +1,7 @@
 # Screen views — convert every MGR drawing to one component
 
 Date: 2026-09-08
-Status: In progress (Order proved on `screen-view-order`)
+Status: In progress (packs 0–4 landed on `screen-view-order`; one pack per PR applies after this PR)
 Worktree: `.agents/worktrees/screen-view-order`
 
 **Goal:** The inventory record and the live page cannot drift. One view owns the drawing; a mock feeds `/docs/screens`; an adapter feeds the app.
@@ -27,9 +27,19 @@ Sheets (`surface: "sheet"`): the view is the CommandForm **body**. `ScreenSheet`
 
 Several records on one live file (Order, Adjust lines, Pick, … on `orders/[id]`): one view per **record name**, mounted by the page or form that actually shows that job.
 
+## Conversion checklist (every pack)
+
+Would have caught the dummy Pars adapter, href leaks, dropped Pick/Open, suppressed question/footer, and missing portal-guide updates:
+
+1. **No invented domain.** Live `toXViewProps` never fabricates a SKU, ATP, unit, or barrel volume the command did not return. Optional fields stay omitted.
+2. **No live href defaults.** Adapters pass `backHref` through only when the caller set it. Inventory `toXViewProps(fixture)` leaves it undefined so `E.back`/`E.act` stay `"#"`. A test renders inventory HTML and forbids `href="/orders`, `href="/portal`, `href="/customers`, `href="/invoices`.
+3. **Live verbs survive.** Diff the pre-extract page against the view: every status-gated verb (Pick vs Open, separate detail links and Reorder/Continue actions in history, Reorder on detail, Question on every invoice state) still draws. Inert verbs that do not navigate are omitted, not faked.
+4. **Slots, not flags.** `footer === undefined` keeps inventory defaults; `footer={null}` suppresses them. Question/detail/filters slots render in every state the live page uses. No `mode` / `readOnly` boolean that switches trees.
+5. **Guides match what ships.** Staff-guide and portal-guide sections for the converted screens name the fields and verbs the view actually draws (order note, issued date, Credit vs paid, list vs detail Reorder).
+
 ## Constraints
 
-- **One pack per PR.** `screens.tsx` is still one file; two agents editing it is the failure the worktree rule exists to prevent.
+- **One pack per PR — after this proof PR.** Packs 0–4 (Order, Orders family, Portal, Customers, Catalog + locations + pricing) landed together here so inventory and live could not drift mid-conversion. Later packs are one pack per PR: `screens.tsx` is still one file; two agents editing it is the failure the worktree rule exists to prevent.
 - **Convert live screens first.** A record with no `SCREEN_ROUTES` row waits until the program that ungates it. Extract view+mock in that same PR, not earlier.
 - **Venue frames stay fixtures** in `venue.tsx`. They are not MGR `E.*`.
 - **Do not add a `mode: "fixture" | "live"` flag.** Slots and optional fields.
@@ -47,8 +57,8 @@ Counts are `SCREEN_ROUTES` rows (live or parity-mapped). Order is 1 of ~110. Gat
 | 0 | **Order (done)** | `components/mgr/views/order.tsx` | Order | Proof |
 | 1 | **Orders family** | `views/orders/` | Orders, New order, Confirm order, Complete transfer, Adjust lines, Short pick, Pick, Ship and invoice, Shipment done, Ship on delivery, Return and credit, Put back, Pick sheet, Pars and allocation, Invoice | Same owner as Order; closes the leftover seams (Adjust / Add line / Ship in the view vs `LifecycleButtons`) |
 | 2 | **Portal (done)** | `views/` | Shop, Review order, Order history, Order detail, Invoice history, Pay invoice, Question invoice, Payment unavailable, Paid invoice, Account, Portal Me | Shares `INV` and order identity; customer-role commands only. Live Cart / QuestionForm / MeSheet stay wrappers. |
-| 3 | **Customers** | `views/customers/` | Customers, Customer detail, Ship-to form | Feeds orders; small |
-| 4 | **Catalog + locations + pricing** | `views/catalog/` | Catalog, Brand, SKU, SKU list, Formats, Format, Package BOM; Locations, Location detail, Location bins, Bin; Price groups, Price group; Sale channels, Channel; Units | One command-module family (`catalog.ts` + pricing) |
+| 3 | **Customers (done)** | `views/` | Customers, Customer detail, Ship-to form | Feeds orders; small. Live CustomerForm / ShipToForm stay wrappers. |
+| 4 | **Catalog + locations + pricing (drawings extracted)** | `views/catalog/` | Catalog, Brand, SKU, SKU list, Formats, Format, Package BOM; Locations, Location detail, Location bins, Bin; Price groups, Price group; Sale channels, Channel; Units | One command-module family (`catalog.ts` + pricing) |
 | 5 | **Inventory + transfers** | `views/inventory/` | Finished goods, Record movement, Movement recorded; Transfers, New transfer, Transfer detail | Ledger grain; keep append-only copy in the view |
 | 6 | **Shell** | `views/shell/` | Today, Today empty, Sales, Brewer, Driver, Taproom, First-run checklist; Beer, Work, More; Search, Entity picker; Me, Settings, Team; Permission denied; Sign in, Session expired, Reset / Set password, Portal sign in / forgot / set password, No membership | High traffic; several records share `app/(app)/page.tsx` — one view per record name, or one landing view with mocks |
 | 7 | **Production** | `views/production/` | Batches, Schedule batch, Brew day, Vessel detail; Close packaging run, Run closed; Recipes, Recipe | Live pages exist; cellar sheets (reading, addition, transfer, map) convert when they have routes |
@@ -76,7 +86,9 @@ Do not pre-extract these. When that program ships the live page, the page **is**
 - QuickBooks / Square / Slack **venue** frames (`s.venue`)
 - Annotation-only `states:` captions that do not change the drawing
 
-## Pack 1 — Orders family (next)
+The shared catalog/customer/location/pricing wrappers retain the live mutation forms as slots. Field-level form conversion remains separate; extracted fixture sheets are not a claim that those controlled forms have been replaced. Poured formats remain brand-owned, with ounces and no invented keg ratio.
+
+## Pack 1 — Orders family (done in this PR)
 
 Close the seams Order left:
 

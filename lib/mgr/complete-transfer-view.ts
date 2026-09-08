@@ -17,6 +17,7 @@ export type CompleteTransferViewModel = {
 };
 
 export type CompleteTransferSnapshot = {
+  backHref?: string;
   order: {
     id: string;
     order_no: number | null;
@@ -27,11 +28,11 @@ export type CompleteTransferSnapshot = {
   locations: { id: string; name: string }[];
 };
 
-export function toCompleteTransferViewProps({ order, lines, locations }: CompleteTransferSnapshot): CompleteTransferViewModel {
+export function toCompleteTransferViewProps({ order, lines, locations, backHref }: CompleteTransferSnapshot): CompleteTransferViewModel {
   const name = (lid: string | null) => locations.find((l) => l.id === lid)?.name ?? "—";
   return {
     backTo: docNo("ORD", order.order_no, "Transfer"),
-    backHref: `/orders/${order.id}`,
+    backHref,
     fromLabel: name(order.from_location_id),
     toLabel: name(order.to_location_id),
     lines: lines.map((l) => {

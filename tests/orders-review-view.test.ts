@@ -58,7 +58,7 @@ describe("Complete transfer view loop", () => {
   it("maps the shared fixture through the adapter", () => {
     const model = toCompleteTransferViewProps(orderTransferComplete);
     expect(model.backTo).toBe("ORD-0088");
-    expect(model.backHref).toMatch(/\/orders\//);
+    expect(model.backHref).toBeUndefined();
     expect(model.fromLabel).toBe("Warehouse");
     expect(model.toLabel).toBe("Taproom");
     expect(model.lines[0]?.detail).toBe("4 / 4");
