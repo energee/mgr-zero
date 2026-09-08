@@ -1,9 +1,8 @@
 // lib/commands/client.ts — the one way client components mutate anything.
-// Each invocation serializes a UUID request ID once, so any transport retry
-// reuses the identical request body while the server adds correlation metadata.
+// Callers may retain a request ID for an unchanged failed submission; ordinary
+// three-argument calls still generate one UUID per invocation.
 
-export async function command(breweryId: string, name: string, input: unknown) {
-  const requestId = crypto.randomUUID();
+export async function command(breweryId: string, name: string, input: unknown, requestId: string = crypto.randomUUID()) {
   const res = await fetch("/api/command", {
     method: "POST",
     headers: { "content-type": "application/json" },

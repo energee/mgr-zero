@@ -9,7 +9,7 @@ import { createHash } from "node:crypto";
 import type pg from "pg";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { unwrap } from "@/lib/commands/registry";
+import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import { paced } from "@/lib/chat/pacing";
 import { assertPortableNotification, type NotificationReason, type PortableNotification } from "./contracts";
 import type { ChatProviderTransport, ProviderMessageRef } from "./provider";
@@ -285,4 +285,80 @@ async function homeIntents(db: SupabaseClient, installationId: string, externalU
     if (id) actions[action] = id as string;
   }
   return actions;
+}
+
+// Authenticated settings delegate only provider-owned operations here. Recheck
+// the current RLS-bound admin first; no user session or domain write is minted.
+async function settingsInstallation(ctx: Ctx, installationId: string) {
+  const health = await unwrap(ctx.db.rpc("get_chat_integration_health", { p_brewery: ctx.breweryId }));
+  if (health?.installation?.id !== installationId) throw new CommandError("installation changed; reload Chat settings", 403);
+  const installation = await unwrap(serviceClient().from("chat_installations").select("id, state, external_installation_id, updated_at")
+    .eq("id", installationId).eq("brewery_id", ctx.breweryId).single());
+  if (!installation) throw new CommandError("installation not found", 404);
+  return installation;
+}
+
+export async function listChatChannels(ctx: Ctx, installationId: string) {
+  const installation = await settingsInstallation(ctx, installationId);
+  if (installation.state !== "active") return [];
+  try {
+    return await (await import("./slack-adapter")).slackPrivateChannels(installation.external_installation_id);
+  } catch {
+    throw new CommandError("Slack channels are unavailable. Check authorization and try again.", 503);
+  }
+}
+
+export async function validateChatDestination(ctx: Ctx, installationId: string, channelId: string, requestId: string) {
+  const completed = await unwrap(serviceClient().rpc("chat_settings_request_completed", { p_brewery: ctx.breweryId, p_user: ctx.userId, p_request_id: requestId }));
+  if (completed) return; // The write RPC below remains the sole canonical replay/conflict owner.
+  const installation = await settingsInstallation(ctx, installationId);
+  if (installation.state !== "active") throw new CommandError("Slack delivery is not active", 400);
+  const checked = await slackTransport().validateDestination({ installationId: installation.external_installation_id, destinationId: channelId });
+  if (!checked.ok) throw new CommandError("Choose an active private channel with MGR added and sharing turned off.", 400);
+  await unwrap(serviceClient().rpc("record_chat_destination_check", { p_brewery: ctx.breweryId, p_installation: installationId,
+    p_user: ctx.userId, p_channel: channelId, p_version: installation.updated_at, p_request_id: requestId }));
+}
+
+export async function cleanupChatInstallation(ctx: Ctx, installationId: string, port: Pick<import("./oauth").SlackOAuthPort, "deleteInstallation">) {
+  try { return await withChatLifecycleLock(() => cleanupChatInstallationLocked(ctx, installationId, port)); }
+  catch {
+    // Local delivery has already stopped; preserve a visible, retryable cleanup failure.
+    await unwrap(serviceClient().rpc("reconcile_chat_installation", { p_installation: installationId, p_credential_deleted: false, p_failure_code: "credential_delete_failed" }));
+    return { credentialDeleted: false };
+  }
+}
+
+async function cleanupChatInstallationLocked(ctx: Ctx, installationId: string, port: Pick<import("./oauth").SlackOAuthPort, "deleteInstallation">) {
+  const installation = await settingsInstallation(ctx, installationId);
+  if (installation.state !== "disconnected") return { credentialDeleted: false };
+  // A delayed retry must never delete a new installation's workspace token.
+  const active = await unwrap(serviceClient().from("chat_installations").select("id").eq("external_installation_id", installation.external_installation_id)
+    .eq("provider", "slack").eq("state", "active").limit(1));
+  if (active?.length) return { credentialDeleted: false };
+  const credentialDeleted = installation.external_installation_id.startsWith("pending:") || await port.deleteInstallation(installation.external_installation_id).then(() => true, () => false);
+  await unwrap(serviceClient().rpc("reconcile_chat_installation", { p_installation: installationId, p_credential_deleted: credentialDeleted,
+    p_failure_code: credentialDeleted ? null : "credential_delete_failed" }));
+  return { credentialDeleted };
+}
+
+// ponytail: globally serialize infrequent credential lifecycle I/O. Per-workspace
+// locks are the upgrade if install throughput matters (OAuth learns the team late).
+export async function withChatLifecycleLock<T>(work: () => Promise<T>, pool = chatStatePool()): Promise<T> {
+  let connection: pg.PoolClient;
+  try { connection = await pool.connect(); }
+  catch { throw new CommandError("Chat credential storage is unavailable. Try again.", 503); }
+  let failed = false;
+  try {
+    await connection.query("begin");
+    await connection.query("set local lock_timeout = '5s'");
+    await connection.query("select pg_advisory_xact_lock(162788, 16)");
+    const result = await work();
+    await connection.query("commit");
+    return result;
+  } catch (error) {
+    failed = true;
+    await connection.query("rollback").catch(() => undefined);
+    if ((error as { code?: string }).code === "55P03") throw new CommandError("Another Slack connection change is in progress. Try again.", 503);
+    throw error;
+  } finally { connection.release(failed); }
 }

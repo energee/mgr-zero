@@ -21,7 +21,7 @@ let pool: pg.Pool | undefined;
 let state: ReturnType<typeof createPostgresState> | undefined;
 
 export function chatStatePool(): pg.Pool {
-  pool ??= new pg.Pool({ connectionString: chatStateUrl(), options: "-c search_path=chat_sdk", max: 5 });
+  pool ??= new pg.Pool({ connectionString: chatStateUrl(), options: "-c search_path=chat_sdk", max: 5, connectionTimeoutMillis: 5000 });
   return pool;
 }
 

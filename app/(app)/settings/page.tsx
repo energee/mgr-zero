@@ -31,7 +31,7 @@ export default async function SettingsPage() {
       {E.nav("Team", plural(team.length, "member"), "", undefined, "/settings/team")}
       {E.gated("Accounting", "QuickBooks isn’t connected yet")}
       {E.gated("Point of sale", "Square isn’t connected yet")}
-      {E.nav("Chat", "Slack account link", "", undefined, "/settings/chat/link")}
+      {E.nav("Chat", "Slack notifications and preferences", "", undefined, "/settings/chat")}
       {E.gated("Import", "CSV import isn’t available yet")}
     </>
   );

@@ -27,7 +27,7 @@ never copy it into a second place.
 | `lib/chat/` | Provider-neutral chat notification contracts and validation, Chat SDK state, Slack adapter/transport/renderer, OAuth installation and staff linking, job authentication, preview fixtures, and `jobs.ts`, the rule-4 service-role owner. |
 | `lib/commands/chat.ts`, `lib/commands/today.ts` | Staff chat linking and notification settings; the role-filtered Today projection. |
 | `app/api/chat/`, `app/api/webhooks/slack/` | Thin Slack OAuth, scheduled-job, and events/App Home routes that delegate to `lib/chat/`. |
-| `app/(app)/settings/chat/` | Slack account linking (`link/page.tsx`, the only route here) and `chat-settings-client.tsx`, a fixture-only preview panel. There is no chat settings page yet; notification settings are reachable only through the `lib/commands/chat.ts` commands. |
+| `app/(app)/settings/chat/` | Admin connection settings, health, linked people and disconnect confirmation; personal preferences for every staff role; read-only link identity preview followed by explicit command consent. `chat-settings-client.tsx` owns forms and the ten provider-free fixture previews. |
 | `lib/commands/context.ts`, `lib/auth/request-context.ts` | `buildContext`: the command caller's verified identity and brewery membership; the request-scoped Supabase identity and membership lookups shared by layouts and commands. |
 | `lib/env/{public,server,server-parser}.ts` | Runtime configuration: the only Supabase values permitted in browser bundles; the server-only environment singleton; and the parser (incl. optional `VERCEL_ENV`) shared by server code, scripts, and tests. |
 | `lib/time-window.ts`, `lib/volume.ts` | Domain display helpers: a stored `hh:mm` window (may wrap midnight) as the string a brewer reads; a stored barrel figure in the unit a brewer reads (storage and TTB stay bbl). |
@@ -114,7 +114,7 @@ a gap to close, not a convention to trust.
    `service_role` chat RPCs (`scan_chat_*`, `lease_chat_deliveries`,
    `complete/retry/suppress_chat_delivery`, `claim/complete_chat_callback_receipt`,
    `issue_chat_link_proof`, `resolve_chat_actor`, `reconcile_chat_installation`,
-   `issue_chat_action_intent`, `consume_chat_action_intent`),
+   `issue_chat_action_intent`, `consume_chat_action_intent`, `record_chat_destination_check`, `chat_settings_request_completed`),
    never ordinary domain commands, and never mints a user token.
    *Enforced by:* `no-restricted-imports` in `eslint.config.mjs`, run in CI.
 5. **Every mutation is one idempotent Postgres transaction.**

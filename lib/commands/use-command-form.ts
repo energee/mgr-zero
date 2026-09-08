@@ -6,7 +6,7 @@
 // build the command input.
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useBrewery } from "@/app/(app)/brewery-provider";
 import { command } from "./client";
@@ -17,13 +17,18 @@ export function useCommandAction() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const pending = useRef<{ key: string; requestId: string } | null>(null);
+
   // Resolves true on success, so a caller that navigates away can wait for it.
-  async function run(name: string, input: unknown, onSuccess?: () => void) {
+  async function run(name: string, input: unknown, onSuccess?: (data: unknown) => void) {
     setBusy(true);
     setError(null);
     try {
-      await command(breweryId, name, input);
-      onSuccess?.();
+      const key = JSON.stringify([breweryId, name, input]);
+      if (pending.current?.key !== key) pending.current = { key, requestId: crypto.randomUUID() };
+      const data = await command(breweryId, name, input, pending.current.requestId);
+      pending.current = null;
+      onSuccess?.(data);
       router.refresh();
       return true;
     } catch (err) {

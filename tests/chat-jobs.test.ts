@@ -5,7 +5,7 @@
 // failures (terminal + reauthorization flag), invalid shared channel, and
 // cleanup limited to expired private state rows.
 import { randomBytes } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import pg from "pg";
 import { DB, admin, channelId, makeBrewery, makeStaffCtx, priceSku } from "./helpers";
 import type { ChatProviderTransport } from "@/lib/chat/provider";
@@ -20,6 +20,17 @@ process.env.CHAT_JOB_SECRET = "job-secret";
 
 const adminUrl = DB;
 const sql = new pg.Pool({ connectionString: adminUrl });
+
+import * as slackAdapterModule from "@/lib/chat/slack-adapter";
+import type { SlackClientLike } from "@/lib/chat/slack-transport";
+// Stub only outgoing provider reads; destination proof and consumption use Postgres.
+beforeAll(() => {
+  process.env.APP_URL = "https://mgr.test";
+  vi.spyOn(slackAdapterModule, "slackClientFor").mockReturnValue({
+    conversationsInfo: async () => ({ is_private: true, is_archived: false, is_member: true, is_shared: false, is_ext_shared: false, is_pending_ext_shared: false }),
+  postMessage: async () => { throw new Error("unexpected provider send"); }, updateMessage: async () => { throw new Error("unexpected provider update"); }, publishHome: async () => { throw new Error("unexpected provider publish"); },
+  } as SlackClientLike);
+});
 
 type Ctx = Awaited<ReturnType<typeof makeStaffCtx>>;
 let b: { id: string }, adminCtx: Ctx, sales: Ctx, inst: { id: string; external_installation_id: string };

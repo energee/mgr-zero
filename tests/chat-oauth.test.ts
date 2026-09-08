@@ -2,8 +2,8 @@
 // hashed ten-minute state, exact redirect binding, idempotent activation, scope
 // checks, reconciliation, and disable-first disconnect (live DB, fake Slack port).
 import { createHash } from "node:crypto";
-import { beforeAll, describe, expect, it, vi } from "vitest";
-import { admin, makeBrewery, makeStaffCtx } from "./helpers";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { admin, makeBrewery, makeStaffCtx, DB, sql } from "./helpers";
 import {
   REQUIRED_SLACK_SCOPES,
   beginSlackInstall,
@@ -13,6 +13,18 @@ import {
   reconcileSlackInstall,
   type SlackOAuthPort,
 } from "@/lib/chat/oauth";
+
+const sdkRole = "chat_oauth_test";
+beforeAll(() => {
+  expect(new URL(DB).port).toBe("54352");
+  sql(`set client_min_messages=warning; drop role if exists ${sdkRole}; create role ${sdkRole} login password 'oauth-test-password'; grant mgr_chat_sdk to ${sdkRole}`);
+  const url = new URL(DB); url.username = sdkRole; url.password = "oauth-test-password";
+  process.env.CHAT_STATE_DATABASE_URL = url.toString();
+});
+afterAll(async () => {
+  await (await import("@/lib/chat/state")).chatStatePool().end();
+  sql(`set client_min_messages=warning; drop role if exists ${sdkRole}`);
+});
 
 process.env.SLACK_CLIENT_ID ??= "test-client-id";
 
@@ -214,4 +226,36 @@ describe("Slack installation lifecycle", () => {
     expect(r.last_failure_code).toBe("credential_delete_failed");
     expect(r.oauth_reconciled_at).toBeNull();
   });
+});
+
+it("orders a delayed credential delete before a concurrent OAuth store and activation", async () => {
+  const b = await makeBrewery(), ctx = await makeStaffCtx(b.id);
+  const first = fakePort();
+  const initial = await beginSlackInstall(ctx, REDIRECT);
+  await completeSlackInstall(ctx.db, callback(initial.authorizeUrl), first.port, REDIRECT);
+  let started!: () => void, release!: () => void;
+  const deleting = new Promise<void>((resolve) => { started = resolve; });
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const originalDelete = first.port.deleteInstallation;
+  const port = { deleteInstallation: async (id: string) => { started(); await gate; await originalDelete(id); } };
+  const disconnect = disconnectSlackInstallation(ctx, initial.installationId, port);
+  await deleting;
+  const next = await beginSlackInstall(ctx, REDIRECT);
+  const activate = completeSlackInstall(ctx.db, callback(next.authorizeUrl), first.port, REDIRECT);
+  // Wait for a second real connection to reach the advisory lock, not a timer guess.
+  let waiting = false;
+  for (let attempt = 0; attempt < 50 && !waiting; attempt++) {
+    waiting = sql("select count(*) from pg_locks where locktype='advisory' and not granted")[0] !== "0";
+    if (!waiting) await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  try {
+    expect(waiting).toBe(true);
+    expect(first.port.handleOAuthCallback).toHaveBeenCalledTimes(1);
+  } finally { release(); }
+  expect(await disconnect).toEqual({ credentialDeleted: true });
+  await activate;
+  expect(first.stored.has(first.teamId)).toBe(true);
+  expect((await row(next.installationId)).state).toBe("active");
+  await disconnectSlackInstallation(ctx, initial.installationId, first.port);
+  expect(first.stored.has(first.teamId)).toBe(true);
 });

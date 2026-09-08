@@ -8,7 +8,7 @@ import { renderSlackPreferences } from "./slack-renderer";
 import { createSlackAdapter, type SlackAdapter } from "@chat-adapter/slack";
 import { chatState } from "./state";
 import type { SlackOAuthPort } from "./oauth";
-import type { SlackClientLike, SlackConversationInfo } from "./slack-transport";
+import { checkSlackConversation, type SlackClientLike, type SlackConversationInfo } from "./slack-transport";
 
 function required(name: string): string {
   const value = process.env[name];
@@ -135,4 +135,24 @@ export function validSlackSignature(request: Request, raw: string): boolean {
   if (!/^\d+$/.test(timestamp) || Math.abs(Date.now() / 1000 - Number(timestamp)) > 300 || !/^v0=[0-9a-f]{64}$/.test(signature)) return false;
   const expected = "v0=" + createHmac("sha256", required("SLACK_SIGNING_SECRET")).update(`v0:${timestamp}:${raw}`).digest("hex");
   return timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+}
+
+// The picker never offers a public, shared, archived or bot-inaccessible channel.
+export async function slackPrivateChannels(installationId: string): Promise<{ id: string; name: string }[]> {
+  await chatReady();
+  const slack = slackAdapter();
+  const installation = await slack.getInstallation(installationId);
+  if (!installation) throw new Error("installation_not_found");
+  const channels: { id: string; name: string }[] = [];
+  let cursor: string | undefined;
+  do {
+    const response = await slack.webClient.conversations.list({ token: installation.botToken, types: "private_channel", exclude_archived: true, limit: 200, cursor });
+    for (const channel of response.channels ?? []) {
+      if (channel.id && channel.name && checkSlackConversation(channel).ok) {
+        channels.push({ id: channel.id, name: channel.name });
+      }
+    }
+    cursor = response.response_metadata?.next_cursor || undefined;
+  } while (cursor);
+  return channels.sort((a, b) => a.name.localeCompare(b.name));
 }

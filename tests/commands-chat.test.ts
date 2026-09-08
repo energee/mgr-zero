@@ -1,7 +1,11 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { admin, ins, makeBrewery, makeStaffCtx, seedCustomer, seedLocation } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
+import * as slackAdapterModule from "@/lib/chat/slack-adapter";
+import type { SlackClientLike } from "@/lib/chat/slack-transport";
+import { issueChatLinkProof } from "@/lib/chat/linking";
+
 
 let ctx: Awaited<ReturnType<typeof makeStaffCtx>>, installation: string, delivery: string, occurrence: string, orderId: string;
 const externalUser = "U-ACTIONS";
@@ -121,4 +125,114 @@ describe("chat integration state", () => {
     expect((await rpc("consume_chat_action_intent", { p_receipt: removed.receipt_id, p_intent: removedToken, p_action: "mgr_refresh", p_input: {} })).disposition).toBe("ignored");
     await ins("brewery_users", { brewery_id: ctx.breweryId, user_id: ctx.userId, role: "admin" });
   });
+});
+
+describe("live Chat settings", () => {
+  it("reads bounded admin health and defaults, while staff access only their own preferences", async () => {
+    const health = await runCommand("get_chat_integration_health", {}, ctx) as { installation: { id: string }; queue: Record<string, number> };
+    expect(health.installation.id).toBe(installation);
+    expect(JSON.stringify(health)).not.toMatch(/token_store_key|oauth_intent_hash|proof_hash/);
+    expect(health.queue).toHaveProperty("retrying");
+    expect(await runCommand("get_brewery_operating_defaults", {}, ctx)).toMatchObject({ fermentation_reading_due_hours: 24 });
+    const sales = await makeStaffCtx(ctx.breweryId, "sales");
+    await expect(runCommand("get_chat_integration_health", {}, sales)).rejects.toMatchObject({ status: 403 });
+    await expect(runCommand("list_chat_user_links", {}, sales)).rejects.toMatchObject({ status: 403 });
+    expect(await runCommand("get_notification_preferences", {}, sales)).toMatchObject({ preferences: expect.arrayContaining([expect.objectContaining({ reason: "submitted_order", enabled: true })]) });
+    const requestId = crypto.randomUUID(), execution = { requestId, correlationId: requestId };
+    await runCommand("set_brewery_operating_defaults", { readingDueHours: 36 }, ctx, execution);
+    await runCommand("set_brewery_operating_defaults", { readingDueHours: 48 }, ctx);
+    await runCommand("set_brewery_operating_defaults", { readingDueHours: 36 }, ctx, execution);
+    expect(await runCommand("get_brewery_operating_defaults", {}, ctx)).toMatchObject({ fermentation_reading_due_hours: 48 });
+  });
+  it("rejects arbitrary destinations through the direct authenticated RPC", async () => {
+    const r = await ctx.db.rpc("set_notification_destination", { p_installation: installation, p_external_destination_id: "C-PUBLIC" });
+    expect(r.error).not.toBeNull();
+  });
+  it("replays quiet hours without overwriting a newer change and rejects other selected breweries", async () => {
+    const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+    const input = { installationId: installation, start: "21:00", end: "06:00" };
+    await runCommand("set_brewery_quiet_hours", input, ctx, execution);
+    await runCommand("set_brewery_quiet_hours", { ...input, start: "22:00" }, ctx);
+    await runCommand("set_brewery_quiet_hours", input, ctx, execution);
+    expect((await admin.from("chat_installations").select("quiet_hours_start").eq("id", installation).single()).data?.quiet_hours_start).toBe("22:00:00");
+    const b = await makeBrewery();
+    await ins("brewery_users", { brewery_id: b.id, user_id: ctx.userId, role: "admin" });
+    await expect(runCommand("set_brewery_quiet_hours", input, { ...ctx, breweryId: b.id })).rejects.toMatchObject({ status: 403 });
+  });
+});
+
+
+it("previews actual identities without consuming and requires explicit, replay-safe consent", async () => {
+  process.env.APP_URL = "https://mgr.test";
+  const person = await makeStaffCtx(ctx.breweryId, "sales");
+  const issued = await issueChatLinkProof(admin, installation, "U-CONSENT");
+  const preview = await runCommand("get_chat_link_intent", { proof: issued.proof }, person);
+  expect(preview).toMatchObject({ slackIdentity: "U-CONSENT", brewery: expect.any(String), mgrIdentity: expect.any(String) });
+  expect((await admin.from("chat_user_links").select("state").eq("id", issued.linkId).single()).data?.state).toBe("pending");
+  const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+  const result = await runCommand("consume_chat_link_proof", { proof: issued.proof }, person, execution);
+  expect(await runCommand("consume_chat_link_proof", { proof: issued.proof }, person, execution)).toEqual(result);
+  expect(await runCommand("get_chat_link_intent", { proof: issued.proof }, person)).toBeNull();
+});
+
+it("validates channel privacy on the server and binds durable proofs to actor, generation, tenant and request", async () => {
+  process.env.APP_URL = "https://mgr.test";
+  let info = { is_private: false, is_archived: false, is_member: true, is_shared: false, is_ext_shared: false, is_pending_ext_shared: false };
+  const read = vi.spyOn(slackAdapterModule, "slackClientFor").mockReturnValue({ conversationsInfo: async () => info, postMessage: async () => { throw new Error("unexpected provider send"); }, updateMessage: async () => { throw new Error("unexpected provider update"); }, publishHome: async () => { throw new Error("unexpected provider publish"); },
+  } as SlackClientLike);
+  try {
+    const input = { installationId: installation, externalDestinationId: "C-VALIDATED" };
+    await expect(runCommand("set_notification_destination", input, ctx)).rejects.toThrow(/private channel/);
+    info = { ...info, is_private: true };
+    const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+    const result = await runCommand("set_notification_destination", input, ctx, execution);
+    expect(await runCommand("set_notification_destination", input, ctx, execution)).toEqual(result);
+    for (const flag of ["is_archived", "is_shared", "is_ext_shared", "is_pending_ext_shared"] as const) {
+      info = { ...info, [flag]: true };
+      await expect(runCommand("set_notification_destination", input, ctx)).rejects.toThrow(/private channel/);
+      info = { ...info, [flag]: false };
+    }
+    info = { ...info, is_member: false };
+    expect(await runCommand("set_notification_destination", input, ctx, execution)).toEqual(result);
+    await expect(runCommand("set_notification_destination", input, ctx)).rejects.toThrow(/private channel/);
+    expect((await ctx.db.rpc("chat_settings_request_completed", { p_brewery: ctx.breweryId, p_user: ctx.userId, p_request_id: execution.requestId })).error).not.toBeNull();
+    const version = (await admin.from("chat_installations").select("updated_at").eq("id", installation).single()).data!.updated_at;
+    const request = crypto.randomUUID();
+    await rpc("record_chat_destination_check", { p_brewery: ctx.breweryId, p_installation: installation, p_user: ctx.userId, p_channel: "C-STALE", p_version: version, p_request_id: request });
+    await runCommand("set_brewery_quiet_hours", { installationId: installation, start: "20:00", end: "06:00" }, ctx);
+    const stale = await ctx.db.rpc("set_notification_destination", { p_brewery: ctx.breweryId, p_installation: installation, p_external_destination_id: "C-STALE", p_request_id: request });
+    expect(stale.error?.message).toMatch(/validated/);
+    expect((await ctx.db.rpc("record_chat_destination_check", { p_brewery: ctx.breweryId, p_installation: installation, p_user: ctx.userId, p_channel: "C-STALE", p_version: version, p_request_id: request })).error).not.toBeNull();
+    expect((await admin.from("notification_destinations").select("external_destination_id").eq("installation_id", installation).eq("kind", "private_channel").eq("state", "active").single()).data?.external_destination_id).toBe("C-VALIDATED");
+  } finally { read.mockRestore(); }
+});
+
+
+it("reports queue counts, successful timestamps and only redacted health fields", async () => {
+  const stamp = "2026-09-08T09:00:00+00:00";
+  await admin.from("chat_installations").update({ last_failure_code: "xoxb-sensitive", granted_capabilities: { scopes: ["chat:write", "xoxb-sensitive"] } }).eq("id", installation);
+  await admin.from("notification_deliveries").update({ sent_at: stamp, state: "retrying" }).eq("id", delivery);
+  await ins("chat_callback_receipts", { brewery_id: ctx.breweryId, installation_id: installation, provider: "slack", callback_id: crypto.randomUUID(), callback_kind: "app_home_opened", disposition: "processed", payload_hash: "fixture", received_at: stamp, completed_at: stamp });
+  const health = await runCommand("get_chat_integration_health", {}, ctx) as { installation: { lastError: string; scopes: string[] }; queue: { retrying: number }; lastCallback: string; lastDelivery: string };
+  expect(health.installation).toMatchObject({ lastError: "provider_error", scopes: ["chat:write"] });
+  expect(health.queue.retrying).toBeGreaterThanOrEqual(1);
+  expect(new Date(health.lastCallback).getTime()).toBeGreaterThanOrEqual(new Date(stamp).getTime());
+  expect(new Date(health.lastDelivery).getTime()).toBe(new Date(stamp).getTime());
+  expect(JSON.stringify(health)).not.toContain("xoxb-sensitive");
+});
+
+it("admits only current admins for disable and preserves completed lifecycle replay", async () => {
+  const b = await makeBrewery(), owner = await makeStaffCtx(b.id), staff = await makeStaffCtx(b.id, "sales");
+  const i = await ins("chat_installations", { brewery_id: b.id, provider: "slack", external_installation_id: b.id, display_label: "Lifecycle", state: "active", installer_user_id: owner.userId, token_store_key: b.id });
+  const input = { installationId: i.id }, execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+  await expect(runCommand("disable_chat_installation", input, staff)).rejects.toMatchObject({ status: 403 });
+  await expect(runCommand("disconnect_chat_installation", input, staff)).rejects.toMatchObject({ status: 403 });
+  await runCommand("disable_chat_installation", input, owner, execution);
+  expect(await runCommand("get_chat_integration_health", {}, owner)).toMatchObject({ installation: { state: "disabled" } });
+  await admin.from("chat_installations").update({ state: "active" }).eq("id", i.id);
+  await runCommand("disable_chat_installation", input, owner, execution);
+  expect(await runCommand("get_chat_integration_health", {}, owner)).toMatchObject({ installation: { state: "active" } });
+  const other = { ...owner, breweryId: ctx.breweryId };
+  await ins("brewery_users", { brewery_id: ctx.breweryId, user_id: owner.userId, role: "admin" });
+  await expect(runCommand("disable_chat_installation", input, other)).rejects.toMatchObject({ status: 403 });
 });

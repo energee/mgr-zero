@@ -40,6 +40,15 @@ export function classifySlackError(err: unknown): ProviderErrorClass {
   return { retryable: true, code: "network" };
 }
 
+export function checkSlackConversation(info: Partial<SlackConversationInfo>): DestinationCheck {
+    if (!info.is_private) return { ok: false, reason: "not_private" };
+    if (info.is_archived) return { ok: false, reason: "archived" };
+    if (!info.is_member) return { ok: false, reason: "bot_not_member" };
+    if (info.is_ext_shared || info.is_pending_ext_shared) return { ok: false, reason: "externally_shared" };
+    if (info.is_shared) return { ok: false, reason: "shared" };
+    return { ok: true };
+}
+
 export class SlackTransport implements ChatProviderTransport {
   readonly provider = "slack" as const;
   readonly capabilities = SLACK_CAPABILITIES;
@@ -52,12 +61,7 @@ export class SlackTransport implements ChatProviderTransport {
     } catch (err) {
       return { ok: false, reason: classifySlackError(err).code };
     }
-    if (!info.is_private) return { ok: false, reason: "not_private" };
-    if (info.is_archived) return { ok: false, reason: "archived" };
-    if (!info.is_member) return { ok: false, reason: "bot_not_member" };
-    if (info.is_ext_shared || info.is_pending_ext_shared) return { ok: false, reason: "externally_shared" };
-    if (info.is_shared) return { ok: false, reason: "shared" };
-    return { ok: true };
+    return checkSlackConversation(info);
   }
 
   async send({ installationId, destinationId, notification, intentId }: { installationId: string; destinationId: string; notification: PortableNotification; intentId: string }): Promise<ProviderMessageRef> {
