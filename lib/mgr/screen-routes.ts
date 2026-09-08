@@ -13,6 +13,8 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Beer", file: "app/(app)/beer/page.tsx" },
   { name: "Work", file: "app/(app)/work/page.tsx" },
   { name: "More", file: "app/(app)/more/page.tsx" },
+  { name: "Search", file: "app/(app)/search/page.tsx" },
+  { name: "Entity picker", file: "components/mgr/search-palette.tsx" },
   { name: "Today empty", file: "app/(app)/page.tsx" },
   { name: "Brewer", file: "app/(app)/page.tsx" },
   { name: "Driver", file: "app/(app)/page.tsx" },

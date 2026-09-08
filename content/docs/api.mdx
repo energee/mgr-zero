@@ -274,6 +274,7 @@ omitted. They have no roles until they are built.
 | `save_route` | Delivery & routes | ✓ |  | ✓ |  |  |
 | `schedule_batch` | Production | ✓ |  |  | ✓ |  |
 | `schedule_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |
+| `search_entities` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
 | `send_purchase_order` | Purchasing & materials | ✓ |  | ✓ |  |  |
 | `set_brewery_gravity_unit` | Team & brewery settings | ✓ |  |  |  |  |
 | `set_brewery_quiet_hours` | Team & brewery settings | ✓ |  |  |  |  |
@@ -582,6 +583,24 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_work", "input": {} }'
 ```
 
+#### search_entities [#search_entities]
+
+`query` · admin, sales, warehouse, brewer
+
+Search SKUs, orders, invoices, lots, customers, purchase orders and batches by name prefix or exact document number (ORD-, INV-, PO-, B-, L-); exact numbers sort first; RLS decides the rows and kinds only narrow
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `q` | string | yes |
+| `kinds` | array of sku or order or invoice or lot or customer or po or batch | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "search_entities", "input": { "q": "string" } }'
+```
+
 #### set_notification_destination [#set_notification_destination]
 
 `command` · admin
@@ -640,7 +659,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* today-designed */}
 
-9 of the 15 operations in this area are available today; the 6 below are not.
+10 of the 15 operations in this area are available today; the 5 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
@@ -650,7 +669,6 @@ The screens need them and the backend has not built them, so calling one returns
 | `get_notification_occurrence` | query | Personal DM |
 | `get_notification_preferences` | query | Chat settings, Notification preferences |
 | `issue_chat_link_proof` | command | Link identity |
-| `search_entities` | query | Search, Entity picker |
 | `snooze_notification` | command | Personal DM, Notification preferences |
 
 {/* end ops:today */}

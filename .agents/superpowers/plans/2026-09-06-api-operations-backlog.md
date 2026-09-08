@@ -4,7 +4,7 @@
 
 # API operations backlog
 
-32 operations the screens declare they need that the command registry does not yet answer, against 147 that it does.
+31 operations the screens declare they need that the command registry does not yet answer, against 148 that it does.
 
 This is the backend push, scoped. Each row names the operation a screen asked for and the screens waiting on it, so an area can be built and shipped whole rather than a command at a time. `/docs/api` publishes the same list per area, marked designed, so an integrator sees the roadmap without being told a date.
 
@@ -72,7 +72,7 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `set_brewery_operating_defaults` | command | Chat settings |
 | `update_brewery` | command | Settings |
 | `update_staff_roles` | command | Team, Team member |
-## Today & notifications: 6 to build, 9 built
+## Today & notifications: 5 to build, 10 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
@@ -80,5 +80,4 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | `get_notification_occurrence` | query | Personal DM |
 | `get_notification_preferences` | query | Chat settings, Notification preferences |
 | `issue_chat_link_proof` | command | Link identity |
-| `search_entities` | query | Search, Entity picker |
 | `snooze_notification` | command | Personal DM, Notification preferences |
