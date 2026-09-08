@@ -188,6 +188,7 @@ omitted. They have no roles until they are built.
 | `file_compliance_report` | Compliance | ✓ | ✓ |  |  |  |
 | `generate_compliance_report` | Compliance | ✓ | ✓ |  |  |  |
 | `get_atp` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
+| `get_beer_overview` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
 | `get_bin_on_hand` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `get_brew_day` | Production | ✓ |  |  | ✓ |  |
 | `get_chat_link_status` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
@@ -242,6 +243,7 @@ omitted. They have no roles until they are built.
 | `list_vendors` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |
 | `list_vendors_and_contracts` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |
 | `list_vessels` | Production | ✓ |  |  | ✓ |  |
+| `list_work` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
 | `move_stock_bin` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `portal_catalog` | Customer portal |  |  |  |  | ✓ |
 | `portal_create_order` | Customer portal |  |  |  |  | ✓ |
@@ -501,6 +503,21 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "consume_chat_link_proof", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "proof": "string" } }'
 ```
 
+#### get_beer_overview [#get_beer_overview]
+
+`query` · admin, sales, warehouse, brewer
+
+Counts behind the Beer landing: finished-goods shortages, taproom SKUs below par, open taps, tanks with beer, material shortages and kegs out at customers
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_beer_overview", "input": {} }'
+```
+
 #### get_chat_link_status [#get_chat_link_status]
 
 `query` · admin, sales, warehouse, brewer
@@ -548,6 +565,21 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_today", "input": {} }'
+```
+
+#### list_work [#list_work]
+
+`query` · admin, sales, warehouse, brewer
+
+Everything in motion for the Work landing: Today's rows plus the open purchase orders and routes the caller may open, each tagged with its Work chip and sorted by due date
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_work", "input": {} }'
 ```
 
 #### set_notification_destination [#set_notification_destination]
@@ -608,7 +640,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* today-designed */}
 
-7 of the 13 operations in this area are available today; the 6 below are not.
+9 of the 15 operations in this area are available today; the 6 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 

@@ -261,7 +261,7 @@ export const SCREENS: Screen[] = [
   {
     step: 1, slice: "all", tab: "Beer", name: "Beer", job: "Inventory, cellar, materials and kegs",
     to: { Taproom: "Weekly count", Materials: "Materials on hand" },
-    reads: "get_beer_overview [view; one read across slices]", writes: "none",
+    reads: "get_beer_overview", writes: "none",
     states: DEFAULT_STATES,
     body: (<>
       {E.hd("Beer")}
@@ -276,7 +276,7 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 1, slice: "all", tab: "Work", name: "Work", job: "Everything currently in motion, ordered by next due action",
-    reads: "list_work [view; role default + remembered explicit filter]", writes: "none",
+    reads: "list_work", writes: "none",
     states: DEFAULT_STATES,
     spec: "Warehouse default rows shown; the chips are the kinds the role may open (a brewer has no POs or routes) and an explicit chip choice is remembered. Rows sort by urgency/due time, not newest activity.",
     body: (<>

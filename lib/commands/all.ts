@@ -15,5 +15,6 @@ import "./purchasing";
 import "./settings";
 import "./taproom";
 import "./delivery";
+import "./landings";
 import "./compliance";
 export {};

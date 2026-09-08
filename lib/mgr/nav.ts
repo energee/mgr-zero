@@ -33,7 +33,7 @@ export const STAFF_NAV: readonly NavItem[] = [
   { label: "Today", href: "/", icon: Home01Icon },
   {
     label: "Beer",
-    href: "/inventory",
+    href: "/beer",
     icon: BeerIcon,
     children: [
       { label: "Inventory", href: "/inventory", roles: ["sales", "warehouse"] },
@@ -46,7 +46,7 @@ export const STAFF_NAV: readonly NavItem[] = [
   },
   {
     label: "Work",
-    href: "/orders",
+    href: "/work",
     icon: Package01Icon,
     children: [
       { label: "Orders", href: "/orders", roles: ["sales", "warehouse"] },
@@ -61,7 +61,7 @@ export const STAFF_NAV: readonly NavItem[] = [
   },
   {
     label: "More",
-    href: "/invoices",
+    href: "/more",
     icon: Settings01Icon,
     children: [
       { label: "Invoices", href: "/invoices", roles: ["sales"] },
