@@ -7,6 +7,8 @@ descriptions, and `scripts/pr-directives.ts` moves finished `TODO.md` items
 here.
 
 ## Done
+- 2026-09-07 — Program 7 — taproom and kegs merged (needs 2) (#199)
+- 2026-09-07 — Program 6 — purchasing merged (#198)
 - 2026-09-07 — Program 5 — production and packaging merged (#194)
 - 2026-09-07 — `PROGRESS.md` is the log only: Now dropped (in-flight work is the PR list, remaining scope is `TODO.md`). Its workstreams were finished (UI components port; Vercel readiness PR #29; audit P1 PR #27) or became programs in `TODO.md` (locations/bins → 2, sale channels → 4, purchasing → 6, Slice 1C → 13 and 15).
 - 2026-09-07 — Screens design-refinement pass: `screens.tsx` audited end-to-end against schema/plan/brewing-domain (16 mismatches fixed, e.g. Receive PO now takes a lot code it used to draw read-only; 12 more flagged in DRIFT, PR #159); unit switchers unified into one segmented `Qty`/`TabBar` control and a command form's close now reads as a destructive discard (PR #160); row icons grew to 24px with an accent-ramp, WCAG-labeled corner status dot, and rail tabs (Today/Beer/Work/More) draw alike (PR #164); page actions hug their label on desk with list-create verbs on the title row (PR #174); Wholesale Shop lists packages by brand from each packaging run's wholesale-list designation, and buyers no longer see ATP (PR #175); Search and Entity picker gained keyboard selection via one shared `E.palette`, closing #99 (PR #182); Schedule batch draws Recipe and Brand as optional per the nullable schema and revision-2 intent-vs-commitment design (PR #172).
