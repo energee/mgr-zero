@@ -34,7 +34,7 @@ Wrong credentials show **Incorrect email or password.** Signed in but not on a b
 | --- | --- |
 | **Admin** | Every staff screen and action that exists. |
 | **Sales** | Catalog; customers and pricing; create, submit, confirm, adjust, and cancel orders, plus credits; view inventory; invoices; replenishment suggestions and creating the replenishment order; the compliance registry, the monthly report and its filed snapshot, and lot trace. |
-| **Warehouse** | View inventory and record movements; keg pools and keg events on **Kegs**; view orders, pick, and ship; build delivery routes, and depart, confirm each stop, and return a route you are the assigned driver of; view replenishment suggestions (**Create replenishment order** is on the page but submitting it returns a permission error); schedule, pick a tank for, start, and close packaging runs, and repack; vendors, materials and contracts; purchase orders (draft, mark sent, receive), material counts, and drafting orders from Planning. Catalog, Customers, the Invoices list, and Team open if you type their address, but they are not in Warehouse's navigation. |
+| **Warehouse** | View inventory and record movements; keg pools and keg events on **Kegs**; view orders, pick, and ship; build delivery routes, and depart, confirm each stop, and return a route you are the assigned driver of; view replenishment suggestions (write controls are available only to Admin and Sales); schedule, pick a tank for, start, and close packaging runs, and repack; vendors, materials and contracts; purchase orders (draft, mark sent, receive), material counts, and drafting orders from Planning. Catalog, Customers, the Invoices list, and Team open if you type their address, but they are not in Warehouse's navigation. |
 | **Brewer** | Today; linking your Slack account from App Home; Recipes and versions; Batches, vessels, and recording brew day; Cellar transfers and fermentation readings; packaging runs (schedule, pick a tank, start, and close) — but not **Repack**, which is Admin and Warehouse only; vendors, materials, contracts and material counts, and reading Planning (drafting the orders is Admin and Warehouse). See [Navigate MGR](#navigation). |
 
 <Callout type="info">
@@ -359,7 +359,7 @@ Each pool row shows the kegs each bin holds per size, so 36 in the taproom and 4
 
 <Screen name="Pars and allocation" />
 
-*Admin, Sales, and Warehouse can open Replenishment. Admin and Sales can create a replenishment order. **Create replenishment order** also appears for Warehouse, but submitting it returns a permission error.*
+*Admin, Sales, and Warehouse can open Replenishment. Admin and Sales can set pars, reserve or release standing stock, and create replenishment orders.*
 
 1. Open **Replenishment** and choose a taproom. The first taproom is selected by default.
 2. Review each SKU's par, on-hand amount, and suggested quantity. Suggested quantity is the par shortfall, never less than zero.
@@ -367,7 +367,11 @@ Each pool row shows the kegs each bin holds per size, so 36 in the taproom and 4
 4. Edit **Transfer qty** as needed. Only positive lines are included.
 5. Select **Create replenishment order**. MGR creates it already confirmed, ready for warehouse picking.
 
-The page says **No taprooms configured.** when none exist, or **No pars set for this taproom.** when there are no suggestions. The current interface has no controls to create locations or set par levels.
+Use **Set taproom par** to choose any SKU and set its target stock at the selected taproom, including a SKU with no existing par. A zero par removes its replenishment target. Suggestions refresh after saving.
+
+Use **Set standing allocation** to reserve a named quantity against available-to-promise without an order. Selecting an existing SKU loads its current reserved quantity. Zero releases the standing reservation. Under **Standing allocations**, **Release** opens a confirmation showing the SKU and quantity; confirming returns that reservation to available-to-promise without moving stock or changing its par. Failures appear in the form and keep your inputs available to correct or retry.
+
+The page says **No taprooms yet: add one under Locations** when none exist, or **No pars set for this taproom.** when there are no suggestions. Add SKUs under Catalog before setting quantities.
 
 ## Recipes [#recipes]
 

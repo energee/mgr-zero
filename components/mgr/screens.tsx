@@ -1313,7 +1313,7 @@ export const SCREENS: Screen[] = [
     reads: "get_shortfalls · list_standing_allocations",
     writes: "adjust_order_lines · release_allocation · set_taproom_par · set_standing_allocation",
     states: DEFAULT_STATES,
-    spec: "There is no ranking command or priority column; every change is a named quantity edit. Taproom par edits the bin's par (§16.6 keys pars on bins), the same row the Bin sheet shows.",
+    spec: "There is no ranking command or priority column; every change is a named quantity edit. Taproom par sets the selected taproom's target for a SKU; standing allocation reserves a named SKU quantity without an order. Releasing a standing allocation returns its quantity to ATP without moving stock.",
     body: (<>
       {E.back("Finished goods", "Pils · 16 oz case")}
       {E.num("−6 cases · −0.58 bbl", "ATP · 22 cases on hand · 28 allocated")}
