@@ -1567,14 +1567,19 @@ create table deliveries (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
   route_id uuid not null,
-  shipment_id uuid not null unique,
+  -- a stop delivers a customer shipment or a stock transfer, never both
+  -- (locations spec Decision 4); each document sits on at most one route
+  shipment_id uuid unique,
+  stock_transfer_id uuid unique,
   stop_no int not null,
   delivered_at timestamptz,
   signed_by text,
   note text,
   unique (route_id, stop_no),
   foreign key (route_id, brewery_id) references routes (id, brewery_id),
-  foreign key (shipment_id, brewery_id) references shipments (id, brewery_id)
+  foreign key (shipment_id, brewery_id) references shipments (id, brewery_id),
+  foreign key (stock_transfer_id, brewery_id) references stock_transfers (id, brewery_id),
+  check (num_nonnulls(shipment_id, stock_transfer_id) = 1)
 );
 
 -- ---------------------------------------------------------------- views (derived truth)
