@@ -25,6 +25,12 @@ export function chatStatePool(): pg.Pool {
   return pool;
 }
 
+// Advisory-lock holders must not reserve an SDK pool slot while their work
+// waits for another slot to read/write credentials.
+export function chatLifecycleClient() {
+  return new pg.Client({ connectionString: chatStateUrl(), options: "-c search_path=chat_sdk", connectionTimeoutMillis: 5000 });
+}
+
 export function chatState() {
   state ??= createPostgresState({ client: chatStatePool(), keyPrefix: process.env.CHAT_STATE_KEY_PREFIX ?? "mgr" });
   return state;

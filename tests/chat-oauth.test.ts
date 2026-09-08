@@ -2,6 +2,7 @@
 // hashed ten-minute state, exact redirect binding, idempotent activation, scope
 // checks, reconciliation, and disable-first disconnect (live DB, fake Slack port).
 import { createHash } from "node:crypto";
+import { WebClient } from "@slack/web-api";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { admin, makeBrewery, makeStaffCtx, DB, sql } from "./helpers";
 import {
@@ -34,8 +35,8 @@ function fakePort(overrides: Partial<SlackOAuthPort> = {}, teamId = `T${crypto.r
   const stored = new Map<string, { botToken: string }>();
   const port: SlackOAuthPort = {
     handleOAuthCallback: vi.fn(async () => {
-      stored.set(teamId, { botToken: "xoxb-fake" });
-      return { teamId, isEnterpriseInstall: false, teamName: "Demo Brewing", scopes: [...REQUIRED_SLACK_SCOPES] };
+      return { teamId, isEnterpriseInstall: false, teamName: "Demo Brewing", scopes: [...REQUIRED_SLACK_SCOPES],
+        persist: async () => { stored.set(teamId, { botToken: "xoxb-fake" }); } };
     }),
     getInstallation: vi.fn(async (id: string) => stored.get(id) ?? null),
     deleteInstallation: vi.fn(async (id: string) => { stored.delete(id); }),
@@ -117,26 +118,32 @@ describe("Slack installation lifecycle", () => {
     expect(port.handleOAuthCallback).not.toHaveBeenCalled();
   });
 
-  it("refuses a workspace already active for another brewery and deletes the orphaned credential", async () => {
-    const { port, teamId } = fakePort();
+  it.each(["active", "disabled", "needs_reauthorization"])("preserves the exact credential and mapping of an existing %s workspace owner", async (state) => {
+    const { port, teamId, stored } = fakePort();
     const first = await makeStaffCtx((await makeBrewery()).id);
-    await completeSlackInstall(first.db, callback((await beginSlackInstall(first, REDIRECT)).authorizeUrl), port, REDIRECT);
+    const initial = await beginSlackInstall(first, REDIRECT);
+    await completeSlackInstall(first.db, callback(initial.authorizeUrl), port, REDIRECT);
+    stored.set(teamId, { botToken: "xoxb-original-owner" });
+    expect((await admin.from("chat_installations").update({ state }).eq("id", initial.installationId)).error).toBeNull();
+    const original = await row(initial.installationId);
     const second = await makeStaffCtx((await makeBrewery()).id);
     const { authorizeUrl, installationId } = await beginSlackInstall(second, REDIRECT);
-    await expect(completeSlackInstall(second.db, callback(authorizeUrl), port, REDIRECT)).rejects.toThrow(/another brewery/i);
-    expect(port.deleteInstallation).toHaveBeenCalledWith(teamId);
+    await expect(completeSlackInstall(second.db, callback(authorizeUrl), port, REDIRECT)).rejects.toThrow();
+    expect(stored.get(teamId)).toEqual({ botToken: "xoxb-original-owner" });
+    expect(await row(initial.installationId)).toEqual(original);
+    expect(port.deleteInstallation).not.toHaveBeenCalled();
     expect((await row(installationId)).state).toBe("pending");
   });
 
-  it("rejects a scope mismatch and removes the stored credential", async () => {
+  it("rejects a scope mismatch without touching stored credentials", async () => {
     const brewery = await makeBrewery();
     const ctx = await makeStaffCtx(brewery.id);
     const { port } = fakePort({
-      handleOAuthCallback: vi.fn(async () => ({ teamId: "TSCOPE", isEnterpriseInstall: false, scopes: ["chat:write"] })),
+      handleOAuthCallback: vi.fn(async () => ({ teamId: "TSCOPE", isEnterpriseInstall: false, scopes: ["chat:write"], persist: vi.fn() })),
     });
     const { authorizeUrl, installationId } = await beginSlackInstall(ctx, REDIRECT);
     await expect(completeSlackInstall(ctx.db, callback(authorizeUrl), port, REDIRECT)).rejects.toThrow(/scope/i);
-    expect(port.deleteInstallation).toHaveBeenCalledWith("TSCOPE");
+    expect(port.deleteInstallation).not.toHaveBeenCalled();
     expect((await row(installationId)).state).toBe("pending");
   });
 
@@ -157,7 +164,7 @@ describe("Slack installation lifecycle", () => {
 
     const wrongWorkspace = fakePort({}, "TOTHER").port;
     await expect(completeSlackInstall(ctx.db, callback(reauth.authorizeUrl), wrongWorkspace, REDIRECT)).rejects.toThrow(/different workspace/i);
-    expect(wrongWorkspace.deleteInstallation).toHaveBeenCalledWith("TOTHER");
+    expect(wrongWorkspace.deleteInstallation).not.toHaveBeenCalled();
 
     const again = await beginSlackReauthorization(ctx, installationId, REDIRECT);
     const done = await completeSlackInstall(ctx.db, callback(again.authorizeUrl), fakePort({}, teamId).port, REDIRECT);
@@ -173,7 +180,7 @@ describe("Slack installation lifecycle", () => {
     const { port, teamId, stored } = fakePort();
     const { authorizeUrl, installationId } = await beginSlackInstall(ctx, REDIRECT);
     // Simulate a crash between token storage and MGR activation.
-    await port.handleOAuthCallback(callback(authorizeUrl), { redirectUri: REDIRECT });
+    await (await port.handleOAuthCallback(callback(authorizeUrl), { redirectUri: REDIRECT })).persist();
     await admin.from("chat_installations").update({ external_installation_id: teamId }).eq("id", installationId);
     expect(stored.has(teamId)).toBe(true);
     const outcome = await reconcileSlackInstall(admin, installationId, port);
@@ -283,4 +290,114 @@ it.each([
   expect(port.deleteInstallation).toHaveBeenCalledTimes(calls);
   expect(stored.get(teamId)).toEqual({ botToken: "xoxb-replacement" });
   expect((await row(replacement.installationId)).state).toBe(state);
+});
+
+it("preserves both owners on wrong-workspace reauthorization and on activation rejection", async () => {
+  const { port, stored, teamId } = fakePort();
+  const first = await makeStaffCtx((await makeBrewery()).id);
+  const initial = await beginSlackInstall(first, REDIRECT);
+  await completeSlackInstall(first.db, callback(initial.authorizeUrl), port, REDIRECT);
+  stored.set(teamId, { botToken: "xoxb-keep" });
+  const other = await makeStaffCtx((await makeBrewery()).id);
+  const second = fakePort();
+  const otherInitial = await beginSlackInstall(other, REDIRECT);
+  await completeSlackInstall(other.db, callback(otherInitial.authorizeUrl), second.port, REDIRECT);
+  const reauth = await beginSlackReauthorization(other, otherInitial.installationId, REDIRECT);
+  const original = await row(initial.installationId), otherOriginal = await row(otherInitial.installationId);
+  await expect(completeSlackInstall(other.db, callback(reauth.authorizeUrl), port, REDIRECT)).rejects.toThrow(/different workspace/);
+  expect(stored.get(teamId)).toEqual({ botToken: "xoxb-keep" });
+  expect(await row(initial.installationId)).toEqual(original);
+  expect(await row(otherInitial.installationId)).toEqual(otherOriginal);
+  expect(second.stored.get(second.teamId)).toEqual({ botToken: "xoxb-fake" });
+  // Membership disappears during exchange, after the initial intent check.
+  const next = await beginSlackReauthorization(first, initial.installationId, REDIRECT);
+  const exchange = port.handleOAuthCallback;
+  port.handleOAuthCallback = async (request, options) => {
+    const staged = await exchange(request, options);
+    await admin.from("brewery_users").delete().eq("user_id", first.userId).eq("brewery_id", first.breweryId);
+    return staged;
+  };
+  await expect(completeSlackInstall(first.db, callback(next.authorizeUrl), port, REDIRECT)).rejects.toThrow();
+  expect(stored.get(teamId)).toEqual({ botToken: "xoxb-keep" });
+});
+
+it("records failed final persistence as reauthorization required without a successful replay", async () => {
+  const ctx = await makeStaffCtx((await makeBrewery()).id);
+  const { port, stored } = fakePort();
+  const exchange = port.handleOAuthCallback;
+  port.handleOAuthCallback = async (request, options) => ({ ...await exchange(request, options), persist: async () => { throw new Error("store unavailable"); } });
+  const initial = await beginSlackInstall(ctx, REDIRECT);
+  await expect(completeSlackInstall(ctx.db, callback(initial.authorizeUrl), port, REDIRECT)).rejects.toThrow(/Reauthorize/);
+  expect(await row(initial.installationId)).toMatchObject({ state: "needs_reauthorization", last_failure_code: "credential_store_failed" });
+  expect(stored.size).toBe(0);
+  await expect(completeSlackInstall(ctx.db, callback(initial.authorizeUrl), port, REDIRECT)).rejects.toThrow(/already used/);
+});
+
+it.each([false, true])("holds real adapter token consumers until staged persistence finishes (failure=%s)", async (fails) => {
+  process.env.SLACK_CLIENT_SECRET = "test-secret";
+  process.env.SLACK_SIGNING_SECRET = "test-signing";
+  process.env.CHAT_SDK_ENCRYPTION_KEY = Buffer.alloc(32, 1).toString("base64");
+  const { slackAdapter, slackOAuthPort, slackClientFor, slackPrivateChannels, chatReady } = await import("@/lib/chat/slack-adapter");
+  await chatReady();
+  const slack = slackAdapter(), teamId = `T-${crypto.randomUUID()}`;
+  const send = vi.fn();
+  const exchange = vi.spyOn(WebClient.prototype, "apiCall").mockImplementation(async (method, options) => {
+    if (method === "oauth.v2.access") return { ok: true, access_token: "xoxb-staged", team: { id: teamId, name: "Staged" }, scope: REQUIRED_SLACK_SCOPES.join(","), bot_user_id: "B1" };
+    if (method === "auth.test") return { ok: true, response_metadata: { scopes: [...REQUIRED_SLACK_SCOPES] } };
+    if (method === "conversations.list") return { ok: true, channels: [] };
+    if (method === "chat.postMessage") { send(options); return { ok: true, channel: "D-stage", ts: "1" }; }
+    throw new Error(`unexpected provider call ${method}`);
+  });
+  const rawStore = slack.setInstallation.bind(slack);
+  let started!: () => void, release!: () => void;
+  const storing = new Promise<void>(resolve => { started = resolve; });
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const persist = vi.spyOn(slack, "setInstallation").mockImplementation(async (id, installation) => {
+    started(); await gate;
+    if (fails) throw new Error("store unavailable");
+    await rawStore(id, installation);
+  });
+  const ctx = await makeStaffCtx((await makeBrewery()).id);
+  const initial = await beginSlackInstall(ctx, REDIRECT);
+  const activation = completeSlackInstall(ctx.db, callback(initial.authorizeUrl), slackOAuthPort(), REDIRECT).then(() => "active", () => "failed");
+  await storing;
+  expect((await row(initial.installationId)).state).toBe("active");
+  expect(await slack.getInstallation(teamId)).toBeNull();
+  const sending = slackClientFor(teamId).postMessage({ channel: "D-stage", text: "test", blocks: [] }).then(() => "sent", () => "blocked");
+  let waiting = false;
+  for (let attempt = 0; attempt < 50 && !waiting; attempt++) {
+    waiting = sql("select count(*) from pg_locks where locktype='advisory' and not granted")[0] !== "0";
+    if (!waiting) await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  try { expect(waiting).toBe(true); expect(send).not.toHaveBeenCalled(); }
+  finally { release(); }
+  expect(await activation).toBe(fails ? "failed" : "active");
+  expect(await sending).toBe(fails ? "blocked" : "sent");
+  expect(send).toHaveBeenCalledTimes(fails ? 0 : 1);
+  if (!fails) expect(send).toHaveBeenCalledWith(expect.objectContaining({ token: "xoxb-staged" }));
+  expect((await row(initial.installationId)).state).toBe(fails ? "needs_reauthorization" : "active");
+  if (!fails) {
+    const before = await slack.getInstallation(teamId);
+    expect(before).toEqual({ botToken: "xoxb-staged", botUserId: "B1", teamName: "Staged" });
+    expect(await slackPrivateChannels(teamId)).toEqual([]);
+    await Promise.all(Array.from({ length: 6 }, () => slackClientFor(teamId).postMessage({ channel: "D-stage", text: "parallel", blocks: [] })));
+    expect(send).toHaveBeenCalledTimes(7);
+    const other = await makeStaffCtx((await makeBrewery()).id);
+    const rejected = await beginSlackInstall(other, REDIRECT);
+    await expect(completeSlackInstall(other.db, callback(rejected.authorizeUrl), slackOAuthPort(), REDIRECT)).rejects.toThrow(/another brewery/);
+    expect(await slack.getInstallation(teamId)).toEqual(before);
+    expect(persist).toHaveBeenCalledTimes(1);
+  }
+  exchange.mockRestore(); persist.mockRestore();
+});
+
+it("does not replay success after activation lost its credential before persistence", async () => {
+  const ctx = await makeStaffCtx((await makeBrewery()).id);
+  const { port, stored } = fakePort();
+  const initial = await beginSlackInstall(ctx, REDIRECT);
+  await completeSlackInstall(ctx.db, callback(initial.authorizeUrl), port, REDIRECT);
+  stored.clear(); // Durable activation survived a process exit; no shared credential did.
+  await expect(completeSlackInstall(ctx.db, callback(initial.authorizeUrl), port, REDIRECT)).rejects.toThrow(/Reauthorize/);
+  expect(await row(initial.installationId)).toMatchObject({ state: "needs_reauthorization", last_failure_code: "credential_store_failed" });
+  expect(port.handleOAuthCallback).toHaveBeenCalledTimes(1);
 });

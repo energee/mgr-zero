@@ -100,6 +100,20 @@ describe("quiet hours", () => {
     ])));
     expect(byUser[adminCtx.userId]).toBe("2026-09-05T10:00:00.000Z"); // brewery window ends 06:00 local
     expect(byUser[sales.userId]).toBe("2026-09-05T13:00:00.000Z"); // personal window ends 09:00 local
+    // Current dispatch policy uses the same precedence and retains a later
+    // snooze/retry deadline instead of shortening it to the quiet release.
+    const deliveries = (await admin.from("notification_deliveries").select("id, destination_id").eq("occurrence_id", occ.id)).data!;
+    for (const d of deliveries) {
+      const user = (await admin.from("notification_destinations").select("user_id").eq("id", d.destination_id).single()).data!.user_id;
+      expect((await admin.from("notification_deliveries").update({ next_attempt_at: "2026-09-05T02:00:00Z" }).eq("id", d.id)).error).toBeNull();
+      const context = await admin.rpc("get_chat_delivery_context", { p_delivery: d.id, p_now: "2026-09-05T02:30:00Z" });
+      expect(context.error).toBeNull();
+      expect(iso(context.data.quiet_release_at)).toBe(byUser[user]);
+      expect((await admin.from("notification_deliveries").update({ next_attempt_at: "2026-09-06T16:00:00Z" }).eq("id", d.id)).error).toBeNull();
+      const later = await admin.rpc("get_chat_delivery_context", { p_delivery: d.id, p_now: "2026-09-05T02:30:00Z" });
+      expect(later.error).toBeNull();
+      expect(iso(later.data.quiet_release_at)).toBe("2026-09-06T16:00:00.000Z");
+    }
     await runCommand("set_brewery_quiet_hours", { installationId: inst.id, start: null, end: null }, adminCtx);
     await runCommand("set_notification_preference", { reason: "submitted_order", enabled: true, quietHours: null }, sales);
   });

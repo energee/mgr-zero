@@ -16,6 +16,7 @@ export type SlackOAuthPort = {
     isEnterpriseInstall: boolean;
     teamName?: string;
     scopes: readonly string[];
+    persist(): Promise<void>;
   }>;
   getInstallation(id: string): Promise<{ botToken: string } | null>;
   deleteInstallation(id: string): Promise<void>;
@@ -73,9 +74,8 @@ export function beginSlackReauthorization(ctx: Ctx, installationId: string, redi
 const sameScopes = (granted: readonly string[]) =>
   granted.length === REQUIRED_SLACK_SCOPES.length && REQUIRED_SLACK_SCOPES.every((scope) => granted.includes(scope));
 
-// Validates the intent before any token exchange, exchanges the code (Chat SDK
-// stores the token in its private state), then activates the MGR mapping. Any
-// failure after the exchange deletes the credential the SDK just stored.
+// Exchange into memory, then activate the mapping before publishing credentials.
+// Rejected activation never touches another workspace owner’s SDK key.
 export async function completeSlackInstall(db: SupabaseClient, request: Request, port: SlackOAuthPort, redirectUri: string) {
   const { withChatLifecycleLock } = await import("./jobs");
   return withChatLifecycleLock(() => completeSlackInstallLocked(db, request, port, redirectUri));
@@ -89,6 +89,10 @@ async function completeSlackInstallLocked(db: SupabaseClient, request: Request, 
   const intent = await unwrap<Intent | null>(db.rpc("find_chat_oauth_intent", { p_state_hash: sha256(state) }));
   if (!intent) throw new CommandError("oauth state invalid", 400);
   if (intent.consumed_at && intent.state === "active") {
+    if (!await port.getInstallation(intent.external_installation_id)) {
+      const { failChatCredentialStore } = await import("./jobs");
+      return failChatCredentialStore(intent.installation_id);
+    }
     return { installationId: intent.installation_id, breweryId: intent.brewery_id, replayed: true };
   }
   if (intent.consumed_at) throw new CommandError("oauth state already used", 400);
@@ -97,25 +101,24 @@ async function completeSlackInstallLocked(db: SupabaseClient, request: Request, 
 
   const granted = await port.handleOAuthCallback(request, { redirectUri });
   const externalId = granted.teamId;
+  if (!sameScopes(granted.scopes)) throw new CommandError("oauth scope mismatch", 400);
+  const result = await rpc<{ installation_id: string; replayed: boolean }>(db, "activate_chat_installation", {
+    p_installation: intent.installation_id,
+    p_state_hash: sha256(state),
+    p_redirect_uri: redirectUri,
+    p_external_installation_id: externalId,
+    p_external_enterprise_id: granted.enterpriseId ?? null,
+    p_display_label: granted.teamName ?? externalId,
+    p_token_store_key: `slack:installation:${externalId}`,
+    p_granted_capabilities: { scopes: [...granted.scopes], enterprise: granted.isEnterpriseInstall },
+  });
   try {
-    if (!sameScopes(granted.scopes)) throw new CommandError("oauth scope mismatch", 400);
-    const result = await rpc<{ installation_id: string; replayed: boolean }>(db, "activate_chat_installation", {
-        p_installation: intent.installation_id,
-        p_state_hash: sha256(state),
-        p_redirect_uri: redirectUri,
-        p_external_installation_id: externalId,
-        p_external_enterprise_id: granted.enterpriseId ?? null,
-        p_display_label: granted.teamName ?? externalId,
-        p_token_store_key: `slack:installation:${externalId}`,
-        p_granted_capabilities: { scopes: [...granted.scopes], enterprise: granted.isEnterpriseInstall },
-    });
-    return { installationId: result.installation_id, breweryId: intent.brewery_id, replayed: result.replayed };
-  } catch (e) {
-    // Never keep a credential MGR could not bind; if this delete fails too,
-    // the reconciler retries from the durable intent.
-    await port.deleteInstallation(externalId).catch(() => undefined);
-    throw e;
+    await granted.persist();
+  } catch {
+    const { failChatCredentialStore } = await import("./jobs");
+    return failChatCredentialStore(intent.installation_id);
   }
+  return { installationId: result.installation_id, breweryId: intent.brewery_id, replayed: result.replayed };
 }
 
 // Reconciler entry point for a partial install: the token exists but the MGR

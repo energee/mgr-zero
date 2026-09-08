@@ -14,7 +14,7 @@ import { paced } from "@/lib/chat/pacing";
 import { assertPortableNotification, type NotificationReason, type PortableNotification } from "./contracts";
 import type { ChatProviderTransport, ProviderMessageRef } from "./provider";
 import { issueChatLinkProof } from "./linking";
-import { chatStatePool } from "./state";
+import { chatStatePool, chatLifecycleClient } from "./state";
 import { SlackTransport, classifySlackError } from "./slack-transport";
 import { slackClientFor } from "./slack-adapter";
 
@@ -76,6 +76,7 @@ type DeliveryContext = {
   external_user_id: string | null;
   preference_enabled: boolean;
   counts: Record<string, number> | null;
+  quiet_release_at: string | null;
 };
 type Lease = { id: string; occurrence_id: string; destination_id: string; installation_id: string; provider: string; lease_expires_at: string; attempt_count: number };
 type Deps = { db?: SupabaseClient; transport?: ChatProviderTransport; now?: Date };
@@ -179,6 +180,11 @@ export async function runChatDeliveryBatch({ limit = 50, now = new Date(), db = 
     const existing = ctx.delivery.provider_message_id && ctx.delivery.provider_conversation_id
       ? { conversationId: ctx.delivery.provider_conversation_id, messageId: ctx.delivery.provider_message_id } : null;
     if (resolved && !existing) { await stop("suppressed", "resolved"); continue; }
+    if (personal && ctx.quiet_release_at && new Date(ctx.quiet_release_at) > now) {
+      await unwrap(db.rpc("retry_chat_delivery", { p_delivery: lease.id, p_lease: lease.lease_expires_at,
+        p_next_attempt_at: ctx.quiet_release_at, p_error_code: "quiet_hours" }));
+      counts.retried++; continue;
+    }
     const notification = ctx.occurrence.reason === "operations_digest" ? digestNotification(ctx) : toNotification(ctx.occurrence);
     const installationId = ctx.installation.external_installation_id;
     try {
@@ -190,7 +196,7 @@ export async function runChatDeliveryBatch({ limit = 50, now = new Date(), db = 
           if (intentId) notification.actions = [...notification.actions, { id, label, intentId, enabled: true }];
         }
       }
-      if (!personal && !existing) {
+      if (!personal) {
         const check = await transport.validateDestination({ installationId, destinationId: ctx.destination.external_destination_id });
         if (!check.ok) {
           await unwrap(db.rpc("block_notification_destination", { p_destination: ctx.destination.id, p_reason: check.reason }));
@@ -342,13 +348,32 @@ async function cleanupChatInstallationLocked(ctx: Ctx, installationId: string, p
   return { credentialDeleted };
 }
 
-// ponytail: globally serialize infrequent credential lifecycle I/O. Per-workspace
-// locks are the upgrade if install throughput matters (OAuth learns the team late).
-export async function withChatLifecycleLock<T>(work: () => Promise<T>, pool = chatStatePool()): Promise<T> {
-  let connection: pg.PoolClient;
-  try { connection = await pool.connect(); }
-  catch { throw new CommandError("Chat credential storage is unavailable. Try again.", 503); }
-  let failed = false;
+export async function failChatCredentialStore(installationId: string): Promise<never> {
+  await unwrap(serviceClient().rpc("mark_chat_installation_reauthorization", {
+    p_installation: installationId, p_failure_code: "credential_store_failed",
+  }));
+  throw new CommandError("Slack credentials could not be saved. Reauthorize from Chat settings.", 503);
+}
+
+// Token reads share the lifecycle lock so activation is not observable until
+// credentials are stored, or a failed store has disabled the mapping.
+export async function withActiveChatInstallation<T>(externalId: string, read: () => Promise<T>) {
+  return withChatLifecycleLock(async () => {
+    const rows = await unwrap(serviceClient().from("chat_installations").select("id")
+      .eq("provider", "slack").eq("external_installation_id", externalId).eq("state", "active").limit(1));
+    return rows?.length ? read() : null;
+  });
+}
+
+// ponytail: one global lock and one dedicated connection per waiting caller.
+// Per-workspace locks are the upgrade if contention matters (OAuth learns the team late).
+export async function withChatLifecycleLock<T>(work: () => Promise<T>): Promise<T> {
+  const connection = chatLifecycleClient();
+  try { await connection.connect(); }
+  catch {
+    await connection.end().catch(() => undefined);
+    throw new CommandError("Chat credential storage is unavailable. Try again.", 503);
+  }
   try {
     await connection.query("begin");
     await connection.query("set local lock_timeout = '5s'");
@@ -357,9 +382,8 @@ export async function withChatLifecycleLock<T>(work: () => Promise<T>, pool = ch
     await connection.query("commit");
     return result;
   } catch (error) {
-    failed = true;
     await connection.query("rollback").catch(() => undefined);
     if ((error as { code?: string }).code === "55P03") throw new CommandError("Another Slack connection change is in progress. Try again.", 503);
     throw error;
-  } finally { connection.release(failed); }
+  } finally { await connection.end(); }
 }

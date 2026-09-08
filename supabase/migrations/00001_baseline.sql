@@ -6057,6 +6057,10 @@ language sql stable security definer set search_path = '' as $$
       'state', dest.state, 'user_id', dest.user_id),
     'installation', jsonb_build_object('id', i.id, 'state', i.state, 'external_installation_id', i.external_installation_id,
       'provider', i.provider, 'brewery_id', i.brewery_id),
+    'quiet_release_at', case when dest.kind='personal' then greatest(d.next_attempt_at,
+      public.chat_quiet_release(p_now, coalesce(p.quiet_hours_start,i.quiet_hours_start),
+        case when p.quiet_hours_start is not null then p.quiet_hours_end else i.quiet_hours_end end,
+        case when p.quiet_hours_start is not null then coalesce(p.quiet_hours_timezone,b.timezone) else coalesce(i.quiet_hours_timezone,b.timezone) end)) else null end,
     'external_user_id', (select l.external_user_id from public.chat_user_links l where l.installation_id=i.id and l.user_id=dest.user_id and l.state='active'),
     'source_current', o.reason='operations_digest' or coalesce(c.source_version=o.source_version,false),
     -- A removed/changed-role user gets no provider write. When the source has
@@ -6076,6 +6080,8 @@ language sql stable security definer set search_path = '' as $$
   join public.notification_occurrences o on o.id = d.occurrence_id
   join public.notification_destinations dest on dest.id = d.destination_id
   join public.chat_installations i on i.id = d.installation_id
+  join public.breweries b on b.id=d.brewery_id
+  left join public.notification_preferences p on p.brewery_id=d.brewery_id and p.user_id=dest.user_id and p.reason=o.reason
   left join current_items c on c.reason=o.reason and c.subject_type=o.subject_type and c.subject_id=o.subject_id
   left join public.brewery_users bu on bu.brewery_id=d.brewery_id and bu.user_id=dest.user_id
   where d.id = p_delivery;
