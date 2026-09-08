@@ -4,15 +4,13 @@
 // invoice a credit memo against a subset of lines (credit-memo-form.tsx).
 // The QuickBooks mappings and push wait for Program 13. An unknown or
 // malformed id renders not-found.tsx.
-import { E } from "@/components/mgr/e";
+import { InvoiceView } from "@/components/mgr/views/invoice";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
-import { docNo } from "@/lib/mgr/doc-no";
-import { money } from "@/lib/mgr/money";
-import { plural } from "@/lib/mgr/plural";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
+import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
 import { CreditMemoForm } from "./credit-memo-form";
 import { MarkAnswered } from "./mark-answered";
 
@@ -30,20 +28,15 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
     brewery.role === "warehouse" ? [] : runCommand("list_invoice_questions", { invoiceId: id }, ctx),
   ])) as [{ invoice: Invoice; lines: InvoiceLine[] }, LocationRow[], Question[]];
   const credit = invoice.kind === "credit_memo";
-  const no = docNo(credit ? "CM" : "INV", invoice.invoice_no, credit ? "Credit memo" : "Invoice");
-  const total = lines.reduce((sum, l) => sum + l.amount_cents, 0);
   const memo = !credit && brewery.role !== "warehouse"
     ? <CreditMemoForm invoiceId={invoice.id} lines={lines.map((l) => ({ id: l.id, label: l.skus?.name ?? l.description, qty: Number(l.qty) }))} locations={locations.map((l) => ({ id: l.id, name: l.name }))} />
     : undefined;
   return (
-    <>
-      {E.back("Invoices", no, memo, "/invoices")}
-      {E.row(invoice.customers?.name ?? "—", `${invoice.due_on ? `due ${invoice.due_on}` : `issued ${invoice.issued_on}`} · ${plural(lines.length, "line")}${invoice.paid_at ? ` · paid ${new Date(invoice.paid_at).toLocaleDateString()}` : ""}`, money(total), invoice.paid_at || credit ? "ok" : "")}
-      {lines.map((l) => <div key={l.id}>{E.row(l.skus?.name ?? l.description, `${Number(l.qty)} × ${money(l.unit_price_cents)}`, money(l.amount_cents))}</div>)}
-      {E.gated("QuickBooks", "mapping and push aren’t connected yet")}
-      {questions.map((q) => (
-        <div key={q.id}>{E.row("Buyer asked about this invoice", `“${q.body}” · ${q.customers?.name ?? "buyer"}, ${new Date(q.created_at).toLocaleDateString()}`, q.answered_at ? "answered" : <MarkAnswered questionId={q.id} />, q.answered_at ? "ok" : "w")}</div>
-      ))}
-    </>
+    <InvoiceView
+      model={toInvoiceViewProps({ invoice, lines, questions })}
+      headerAction={memo}
+      questionAction={(q) => <MarkAnswered questionId={q.id} />}
+      qboGate="mapping and push aren’t connected yet"
+    />
   );
 }

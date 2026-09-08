@@ -22,20 +22,42 @@
 // not an oversight.
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
+import { AdjustLinesView } from "@/components/mgr/views/adjust-lines";
 import { CompleteTransferView } from "@/components/mgr/views/complete-transfer";
 import { ConfirmOrderView } from "@/components/mgr/views/confirm-order";
+import { InvoiceView } from "@/components/mgr/views/invoice";
 import { NewOrderView } from "@/components/mgr/views/new-order";
 import { OrderView } from "@/components/mgr/views/order";
 import { OrdersView } from "@/components/mgr/views/orders-list";
+import { ParsView } from "@/components/mgr/views/pars";
+import { PickView } from "@/components/mgr/views/pick";
+import { PickSheetView } from "@/components/mgr/views/pick-sheet";
 import { PutBackView } from "@/components/mgr/views/put-back";
+import { ReturnCreditView } from "@/components/mgr/views/return-credit";
+import { ShipView } from "@/components/mgr/views/ship";
+import { ShipmentDoneView } from "@/components/mgr/views/shipment-done";
+import { ShortPickView } from "@/components/mgr/views/short-pick";
 import { OHIO_STOUT_NOTE, LOC_TAPROOM, LOC_WAREHOUSE } from "@/lib/mgr/fixtures/demo";
+import { invoiceFailedAls } from "@/lib/mgr/fixtures/invoice";
 import { completeTransferTape, newOrderDraft, orderPickedRestock, orderPickedRestockPutBack, orderSubmittedRidgeline, orderTransferComplete, ordersWorkList } from "@/lib/mgr/fixtures/orders";
+import { orderAdjustLines, orderPick, orderReturnCredit, orderShipInvoice, orderShipOnDelivery, orderShipmentDone, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
+import { parsPils } from "@/lib/mgr/fixtures/pars";
+import { pickSheet } from "@/lib/mgr/fixtures/pick-sheet";
+import { toAdjustLinesViewProps } from "@/lib/mgr/adjust-lines-view";
 import { toCompleteTransferViewProps } from "@/lib/mgr/complete-transfer-view";
 import { toConfirmOrderViewProps } from "@/lib/mgr/confirm-order-view";
+import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
 import { toNewOrderViewProps } from "@/lib/mgr/new-order-view";
 import { toOrderViewProps } from "@/lib/mgr/order-view";
 import { toOrdersListViewProps } from "@/lib/mgr/orders-list-view";
+import { toParsViewProps } from "@/lib/mgr/pars-view";
+import { toPickViewProps } from "@/lib/mgr/pick-view";
+import { toPickSheetViewProps } from "@/lib/mgr/pick-sheet-view";
 import { toPutBackViewProps } from "@/lib/mgr/put-back-view";
+import { toReturnCreditViewProps } from "@/lib/mgr/return-credit-view";
+import { toShipViewProps } from "@/lib/mgr/ship-view";
+import { toShipmentDoneViewProps } from "@/lib/mgr/shipment-done-view";
+import { toShortPickViewProps } from "@/lib/mgr/short-pick-view";
 import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-icons";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
@@ -991,14 +1013,7 @@ export const SCREENS: Screen[] = [
     writes: "adjust_order_lines [sets needs_restock on a picked order]",
     states: [["permission", "sales or admin required", 1], ["picked", "qty below picked stages the rest for Put back"], ["stale", "another user changed a line · refresh", 1]],
     spec: "Opens from Order · Adjust. This is a line edit, not a short pick: Short pick is pick-time shortage from the Pick frame. Reason is required. Saving replaces the full line set in one RPC.",
-    body: (<>
-      {E.back("ORD-0229", "Adjust lines")}
-      {E.row("Hazy IPA · ½ bbl keg", "", E.stq(4))}
-      {E.row("Pils · 16 oz case", "picked 10", E.stq(7), "w")}
-      {E.row("Stout · ⅙ bbl keg", "", E.stq(2))}
-      {E.edit("Reason", "customer cut")}
-      {E.btn("Save lines")}
-    </>),
+    body: <AdjustLinesView model={toAdjustLinesViewProps(orderAdjustLines)} reason="customer cut" />,
   },
   {
     step: 5,
@@ -1011,17 +1026,7 @@ export const SCREENS: Screen[] = [
     writes: "resolve_short_pick [one RPC: short_reason + chosen resolution (line qty + allocation) + order_events row]",
     states: [["permission", "warehouse or admin required", 1], ["adjust down", "ordered 10 → 7 · allocation shrinks · ATP recovers"], ["keep staged", "7 staged · 3 remain owed · the order keeps its Pick action"], ["resumed", "Pick reopens showing 7 already picked · only the owed 3 need counting"], ["stale", "another picker changed this line · recheck", 1], ["offline", "resolution waits for live ATP", 1]],
     spec: "Opens from a Pick line whose count is below ordered. Reason is required; exactly one resolution is chosen and the verb names it: adjusting the order is green (mutable order edit); keeping the remainder staged is also green. Keeping the remainder owed does not finish the pick: the order stays picked with a line below ordered and keeps its Pick row in Work and Today until every line reaches its ordered quantity, and reopening Pick shows what is already counted. The restock implication is copy in the preview, never a status column. Done picking completes afterward on the Pick frame.",
-    body: (<>
-      {E.back("Pick", "ORD-0231 · short line")}
-      {E.fld("Order · source", "Ridgeline · Warehouse")}
-      {E.row("Pils · 16 oz case", "ordered 10", E.stq(7), "w")}
-      {E.nav("Reason", "required", "w")}
-      {E.ttl("Resolve the missing 3")}
-      {E.chips(["Adjust order to 7", "Keep 3 owed · staged"], 0)}
-      {E.info(<>Preview: order line 10 {E.arrow()} 7. Customer sees “adjusted”.</>)}
-      {E.sp()}
-      {E.btn("Adjust order to 7 cases")}
-    </>),
+    body: <ShortPickView model={toShortPickViewProps(orderShortPick)} />,
   },
   {
     step: 5,
@@ -1033,16 +1038,7 @@ export const SCREENS: Screen[] = [
     writes: "record_pick · resolve_short_pick",
     states: [["permission", "warehouse or admin required", 1], ["short pick", "a line below ordered opens the Short pick frame", 1], ["partly picked", "reopened after a kept-owed line · counted lines start at what was picked"], ["concurrent", "another picker changed qty"], ["cancelled", "staged · restock now", 1], ["offline", "queue whole pick set once"]],
     spec: "2 taps from Today: Pick → Done picking (all-as-ordered only). Shortage is not a chip here: entering a count below ordered opens Short pick.",
-    body: (<>
-      {E.back("ORD-0231", "Pick · Warehouse")}
-      {E.info("From Warehouse · lines start at ordered; touch only exceptions.")}
-      {E.row("Hazy IPA · ½ bbl keg", "ordered 4", E.stq(4), "ok")}
-      {E.row("Pils · 16 oz case", "ordered 10", E.stq(10), "ok")}
-      {E.row("Stout · ⅙ bbl keg", "ordered 2", E.stq(2), "ok")}
-      {E.btn("Print pick sheet", "g")}
-      {E.sp()}
-      {E.btn("Done picking")}
-    </>),
+    body: <PickView model={toPickViewProps(orderPick)} />,
   },
   {
     step: 5,
@@ -1068,19 +1064,7 @@ export const SCREENS: Screen[] = [
     writes: "ship_order [needs_restock when any qty_shipped < qty_picked; invoice timing = now persisted with the shipment]",
     states: [["stale", "picked qty changed · preview again", 1], ["short ship", "qty below picked needs a reason; remainder is released", 1], ["offline", "wait for live recheck", 1], ["permission", "warehouse or admin required", 1], ["accepted", "INV number on commit · restock row if qty short"]],
     spec: <>Ship qty prefills from picked and is editable per line; a shortage reason appears only when qty &lt; picked, and the same condition sets the restock flag, so the case released here becomes a Put back row rather than staying staged with nothing naming it. Carrier/tracking never block the commit. The preview names the destination state from the ship-to and says the invoice number is assigned on commit. On-delivery timing lives on Ship · confirmation; taproom transfers use Complete transfer.</>,
-    body: (<>
-      {E.back("ORD-0231", "Ship")}
-      {E.pick("Fulfillment source", "Warehouse", ["Warehouse", "Taproom"])}
-      {E.row("Hazy IPA · ½ bbl keg", "ordered 4 · picked 4", E.stq(4), "ok")}
-      {E.row("Pils · 16 oz case", "ordered 10 · picked 10", E.stq(9), "w")}
-      {E.nav("Reason", "required", "w")}
-      {E.info("Shipping 9 of 10 Pils: the remaining 1 is cancelled and its allocation released. There is no backorder.")}
-      {E.inp("Carrier", "tracking · optional")}
-      {E.chips(["Invoice now", "On delivery"], 0)}
-      {E.tape([["−4 Hazy ½ bbl · sale removal · PA", "2.00 bbl"], ["−9 Pils cases · sale removal · PA", "0.87 bbl"], ["1 Pils case released · restock", ""], ["invoice number", "assigned on commit"]])}
-      {E.sp()}
-      {E.btn("Ship order", "irr")}
-    </>),
+    body: <ShipView model={toShipViewProps(orderShipInvoice)} fulfillmentOptions={[LOC_WAREHOUSE.name, LOC_TAPROOM.name]} />,
   },
   {
     step: 5,
@@ -1092,12 +1076,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["permission", "warehouse or admin required", 1], ["accepted", "INV number on the tape"], ["short", "restock row on Today"]],
     spec: "Post-commit of Ship and invoice. A tape means recorded. Return shipment is the correction.",
-    body: (<>
-      {E.back("ORD-0231", "Shipped")}
-      {E.fld("Invoice", `${INV.no} · assigned`)}
-      {E.tape([["−4 Hazy ½ bbl · sale removal · PA", "2.00 bbl"], ["−9 Pils cases · sale removal · PA", "0.87 bbl"], [INV.no, "invoiced now"]])}
-      {E.info("To correct this shipment, Return shipment.")}
-    </>),
+    body: <ShipmentDoneView model={toShipmentDoneViewProps(orderShipmentDone)} />,
   },
   {
     step: 5,
@@ -1110,16 +1089,7 @@ export const SCREENS: Screen[] = [
     writes: "ship_order [invoice_timing = on_delivery persisted on the shipment; the same one RPC without the invoice; confirm_delivery invoices later]",
     states: [["stale", "picked qty changed · preview", 1], ["offline", "wait for live recheck", 1], ["permission", "warehouse or admin required", 1]],
     spec: "Folded into Ship and invoice as the On delivery chip. Same fields as Invoice now; the timing is saved on the shipment so Confirm delivery can invoice later. Two screens both titled Ship was confusing.",
-    body: (<>
-      {E.back("ORD-0231", "Ship")}
-      {E.pick("Fulfillment source", "Warehouse", ["Warehouse", "Taproom"])}
-      {E.row("Hazy IPA · ½ bbl keg", "picked 4", E.stq(4), "ok")}
-      {E.row("Pils · 16 oz case", "picked 10", E.stq(10), "ok")}
-      {E.chips(["Invoice now", "On delivery"], 1)}
-      {E.tape([["−4 Hazy ½ bbl · sale removal · PA", "2.00 bbl"], ["−10 Pils cases · sale removal · PA", "0.97 bbl"], ["invoice number", "deferred to delivery"]])}
-      {E.sp()}
-      {E.btn("Ship order", "irr")}
-    </>),
+    body: <ShipView model={toShipViewProps(orderShipOnDelivery)} fulfillmentOptions={[LOC_WAREHOUSE.name, LOC_TAPROOM.name]} invoiceTiming={1} />,
   },
   {
     step: 5,
@@ -1206,14 +1176,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["day chosen", "confirmed orders requesting that ship date"], ["totals", "read-only · what to bring to the floor in one trip"], ["empty", "nothing confirmed for that day"], ["mixed sources", "one source at a time · a Taproom order is not on the Warehouse sheet", 1]],
     spec: "A staging aid, not a command surface: nothing here writes, and a row opens that order's Pick, which is where counting happens. Totals sum the day so a picker carries one load out instead of walking back per order; they are read-only because a total spans orders and picking is per-order. Scoped to one fulfillment source, since a sheet mixing Warehouse and Taproom lines would send someone to the wrong room.",
-    body: (<>
-      {E.back("Work", "Pick sheet")}
-      {E.chips(["Wed 9/2", "Thu 9/3", "Fri 9/4"], 1)}
-      {E.nav("Ridgeline · ORD-0231", "3 lines")}
-      {E.nav("Al’s Bar · ORD-0232", "1 line")}
-      {E.nav("Teresa’s · ORD-0234", "5 lines")}
-      {E.row("Totals", "Hazy halves 9 · Pils cases 22")}
-    </>),
+    body: <PickSheetView model={toPickSheetViewProps(pickSheet)} />,
   },
   {
     step: 5,
@@ -1275,15 +1238,7 @@ export const SCREENS: Screen[] = [
     writes: "adjust_order_lines · release_allocation · set_taproom_par · set_standing_allocation",
     states: DEFAULT_STATES,
     spec: "There is no ranking command or priority column; every change is a named quantity edit. Taproom par edits the bin's par (§16.6 keys pars on bins), the same row the Bin sheet shows.",
-    body: (<>
-      {E.back("Finished goods", "Pils · 16 oz case")}
-      {E.num("−6 cases · −0.58 bbl", "ATP · 22 cases on hand · 28 allocated")}
-      {E.row("ORD-0231 · Ridgeline", "10 cases · 0.97 bbl", E.act("Adjust", "attention"))}
-      {E.row("ORD-0234 · Teresa’s", "12 cases · 1.16 bbl", E.act("Release", "destructive"))}
-      {E.row("Taproom standing", "6 cases · 0.58 bbl", E.act("Edit"))}
-      {E.row("Taproom par", "8 cases · 0.77 bbl", E.act("Edit par"))}
-      {E.btns([["Adjust selected", "p"], ["Edit par", "g"]])}
-    </>),
+    body: <ParsView model={toParsViewProps(parsPils)} />,
   },
   {
     step: 5,
@@ -1296,18 +1251,7 @@ export const SCREENS: Screen[] = [
     writes: "return_shipment [one RPC: return_in movements at explicit destination + loss movement for a damaged return + credit memo at the invoiced price; owned-fleet keg_events linked to shipment when slice 9 is enabled]",
     states: [["permission", "sales or warehouse required", 1], ["unsold", "returns as sellable stock at the chosen destination"], ["damaged", "returns, then posts loss in the same RPC · never re-sold", 1], ["wrong item", "sellable · the mis-picked SKU goes back on the shelf"], ["invoice paid", "the credit memo sits unapplied as available credit", 1], ["partial", "only the returned units credit back"]],
     spec: "Reason decides the beer, never the money. Unsold and wrong item return as sellable stock at the destination; damaged returns and is written to loss in the same RPC, because beer that came back broken is not inventory and pretending otherwise puts it back on a pick list. The credit is the price frozen on the original invoice line and the deposit is the one recorded on the original shipment, never today's price group, on the same principle that freezes a channel onto a movement at write time. A paid invoice can still be returned: the credit memo lands unapplied and sits as available credit, which is the state the QuickBooks credit-memo frame already draws.",
-    body: (<>
-      {E.back("ORD-0231", "Beer return")}
-      {E.row("Hazy IPA · ½ bbl keg", "shipped 4 · returning", E.stq(1))}
-      {E.chips(["damaged", "wrong item", "unsold"])}
-      {E.pick("Return to", "Warehouse · original fulfillment source", ["Warehouse · original fulfillment source", "Taproom"])}
-      {E.row("Deposit refund", "½ bbl pool · 1 · as deposited", "−$30.00")}
-      {E.info(`Credited at the price on ${INV.no}, not today’s price group.`)}
-      {E.tape([["+1 Hazy ½ bbl · return in", "Warehouse"], ["−1 Hazy ½ bbl · loss · damaged", "not sellable"], ["credit memo number · on commit", "−$180.00"]])}
-      {E.note("Empty-keg asset returns are a different Keg fleet command.")}
-      {E.sp()}
-      {E.btn("Return shipment", "irr")}
-    </>),
+    body: <ReturnCreditView model={toReturnCreditViewProps(orderReturnCredit)} />,
   },
   {
     step: 5,
@@ -1524,15 +1468,7 @@ export const SCREENS: Screen[] = [
     writes: "push_invoice_to_qbo [design] · resolve_invoice_question",
     states: [["permission", "sales or admin required", 1], ["unmapped", "push stays unavailable", 1], ["ready", "every customer and item is mapped"], ["pushed", "QuickBooks owns later accounting edits"], ["buyer question", "the note is read here, and answered off-system", 1]],
     spec: "The drill-in for one invoice, and where a buyer's question lands: the portal writes it, the sales Today row points here, and marking it answered is what clears that row. Nothing about the invoice changes; the reply happens in a phone call or an email, which is why the verb says answered rather than replied.",
-    body: (<>
-      {E.back("Invoices", INV.failed)}
-      {E.row("Al’s Bar", "due 10/03 · 3 lines", "$540")}
-      {E.row("Customer mapping", "Al’s Bar · customer 227", E.act("Fix", "attention"), "ok")}
-      {E.row("Pils · case", "QuickBooks item is missing", E.act("Fix", "attention"), "w")}
-      {E.info("Push becomes available after every customer and item has a QuickBooks match.")}
-      {E.row("Buyer asked about this invoice", "“The Pils count looks short.” · Dana, Tue", E.act("Mark answered", "success"), "w")}
-      {E.btn("Push invoice to QuickBooks Online", "irr disabled")}
-    </>),
+    body: <InvoiceView model={toInvoiceViewProps(invoiceFailedAls)} />,
   },
   {
     step: 5,

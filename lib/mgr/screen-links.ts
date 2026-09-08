@@ -77,7 +77,7 @@ export const TAPS: [string | RegExp, string][] = [
   ["Record opening count", "Record movement"],
   [/^Route [A-Z]( · |$)/, "Route"],
   [/^TRF-\d+/, "Transfer detail"],
-  [/^(Ridgeline|Al’s Bar|Teresa’s) · ORD-\d+/, "Pick"],
+  [/^(Ridgeline Tap Room|Ridgeline|Al’s Bar|Teresa’s) · ORD-\d+/, "Pick"],
   [/^Unassigned · ORD-\d+/, "Order"],
   ["Cancel order", "Orders"],
   ["Done picking", "Order"],

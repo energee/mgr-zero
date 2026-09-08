@@ -84,8 +84,8 @@ Close the seams Order left:
 2. **Confirm order** and **Complete transfer** — done (own pages).
 3. **Put back** — done (own page).
 4. **Orders** list + **New order** sheet — done (list is shared; live create stays `order-form.tsx` because `E.pick` is not a controlled CommandForm).
-5. **Adjust lines**, **Pick**, **Short pick**, **Ship and invoice** / **Ship on delivery** / **Shipment done**, **Return and credit** — today they hang off `orders/[id]/page.tsx` via `LifecycleButtons`. Each becomes a view; the live form files become slot wrappers. Inventory labels (**Adjust**, **Ship**, **Cancel order**) should come from the view so docs and app stop forking verbs.
-6. **Pick sheet**, **Pars and allocation**, **Invoice**.
+5. **Adjust lines**, **Pick**, **Short pick**, **Ship and invoice** / **Ship on delivery** / **Shipment done**, **Return and credit** — inventory mounts the views. Live create/edit stays the CommandForm files (`adjust-lines-form.tsx`, `pick-form.tsx`, `short-pick-form.tsx`, `ship-form.tsx`, invoice `credit-memo-form.tsx`) because `E.stq` / `E.pick` are not controlled inputs (same as New order).
+6. **Pick sheet**, **Pars and allocation**, **Invoice** — done (list/detail pages mount the views; live Pars still slots `ReplenishForm` and has no order-allocation join yet).
 
 Stop after this pack and check: adding a field to an order line updates `/docs/screens` Order and `/orders/[id]` together.
 
