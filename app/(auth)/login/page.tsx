@@ -1,13 +1,14 @@
 /**
- * Sign-in page. Renders the shadcn-based LoginForm. Arrives with `?error=`
- * from the login action (bad credentials) or from getActiveBrewery (signed
- * in, but not a member of any brewery).
+ * Sign-in page (screen records Sign in and Session expired). Renders the
+ * shadcn-based LoginForm. Arrives with `?error=` from the login action (bad
+ * credentials) or from lib/commands/client.ts when a command answered 401
+ * (the session ended mid-work).
  */
 import { LoginForm } from "@/components/login-form"
 
 const ERRORS: Record<string, string> = {
   "1": "Incorrect email or password.",
-  "no-membership": "Your account isn't a member of any brewery yet. Ask an admin for an invitation.",
+  "expired": "Your session ended. Sign in to retry.",
 }
 
 export default async function LoginPage({

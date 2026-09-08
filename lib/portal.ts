@@ -6,7 +6,7 @@ export async function getActiveCustomer() {
   if (!(await getRequestIdentity())) redirect("/login");
 
   const memberships = await getCustomerMemberships();
-  if (!memberships.length) redirect("/login?error=no-membership");
+  if (!memberships.length) redirect("/no-membership");
 
   const membership = memberships[0];
   return {

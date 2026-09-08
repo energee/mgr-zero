@@ -343,7 +343,7 @@ export const SCREENS: Screen[] = [
   {
     step: 1, slice: "all", tab: "More", name: "Settings", job: "Edit brewery/location basics and route to rare setup",
     to: { "Source water · Municipal · Denver": "Water profiles" },
-    reads: "list_locations · list_team_members", writes: "update_brewery · update_location [design; mutable single rows]",
+    reads: "get_brewery · list_locations · list_team_members", writes: "update_brewery · update_location",
     states: permitted("admin only"),
     spec: "Invoices remains a first-class More and desk-rail destination. TTB registry number and PA license are brewery columns and feed the compliance report header. The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. Deployment mode is read-only. Team opens the Team frame.",
     body: (<>

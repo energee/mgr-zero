@@ -15,6 +15,7 @@ import { STAFF_NAV, type NavItem } from "../lib/mgr/nav";
 const PAGE_QUERIES: Record<string, readonly string[]> = {
   "/beer": ["get_beer_overview"],
   "/work": ["list_work"],
+  "/settings": ["get_brewery", "list_locations", "list_team_members"],
   "/recipes": ["list_recipes", "list_brands", "get_recipe", "list_materials", "get_gravity_unit"],
   "/batches": ["list_batches", "list_brands", "list_recipes", "list_vessels", "get_brew_day"],
   "/cellar": ["list_occupancies", "list_vessels", "get_gravity_unit"],

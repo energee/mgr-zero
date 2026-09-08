@@ -53,3 +53,16 @@ describe("gravity unit preference", () => {
     await expect(runCommand("set_my_gravity_unit", { unit: "sg" }, outsider)).rejects.toThrow();
   });
 });
+
+describe("brewery settings (Program 10 task 4)", () => {
+  it("get_brewery reads the row for any staff role; update_brewery is admin-only and replays", async () => {
+    const before = (await runCommand("get_brewery", {}, brewerCtx)) as { name: string; customer_phone: string | null };
+    expect(before.customer_phone).toBeNull();
+    const input = { name: "Demo Brewing", timezone: "America/Chicago", ttbRegistryNo: "BR-PA-12345", paLicenseNo: "G-1234", customerPhone: "(610) 555-0142", readingDueHours: 36 };
+    await expect(runCommand("update_brewery", input, brewerCtx)).rejects.toThrow(/permission denied/);
+    const after = (await runCommand("update_brewery", input, adminCtx)) as { name: string; timezone: string; customer_phone: string; fermentation_reading_due_hours: number };
+    expect(after).toMatchObject({ name: "Demo Brewing", timezone: "America/Chicago", customer_phone: "(610) 555-0142", fermentation_reading_due_hours: 36 });
+    expect((await runCommand("get_brewery", {}, brewerCtx)) as object).toMatchObject({ name: "Demo Brewing", ttb_registry_no: "BR-PA-12345" });
+    await expect(runCommand("update_brewery", { ...input, timezone: "Mars/Olympus" }, adminCtx)).rejects.toThrow();
+  });
+});

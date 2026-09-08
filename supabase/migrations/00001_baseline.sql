@@ -79,6 +79,8 @@ create table breweries (
   timezone text not null default 'America/New_York',
   settings jsonb not null default '{}',
   fermentation_reading_due_hours int not null default 24 check (fermentation_reading_due_hours between 1 and 168),
+  -- the number the portal prints when online payment is unavailable (Program 10 task 4)
+  customer_phone text,
   gravity_unit text not null default 'plato' check (gravity_unit in ('plato','sg')),
   created_at timestamptz not null default now()
 );
@@ -2663,6 +2665,28 @@ begin
   if v_replay is not null then return v_replay; end if;
   update public.locations set name = p_name, kind = p_kind where id = p_id and brewery_id = p_brewery returning * into v_row;
   if v_row.id is null then raise exception 'location not found'; end if;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- Brewery basics from Settings: one mutable row, admin only. The timezone
+-- must name a zone Postgres knows, so a typo never breaks every due date.
+create function update_brewery(
+  p_brewery uuid, p_name text, p_timezone text, p_ttb_registry_no text, p_pa_license_no text,
+  p_customer_phone text, p_reading_due_hours int, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.breweries;
+begin
+  perform private.assert_staff(p_brewery, array['admin']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'update_brewery', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'name', p_name, 'timezone', p_timezone, 'ttb', p_ttb_registry_no,
+      'pa', p_pa_license_no, 'phone', p_customer_phone, 'hours', p_reading_due_hours));
+  if v_replay is not null then return v_replay; end if;
+  if not exists (select 1 from pg_catalog.pg_timezone_names where name = p_timezone) then
+    raise exception 'unknown timezone %', p_timezone using errcode = 'P0001';
+  end if;
+  update public.breweries set name = p_name, timezone = p_timezone, ttb_registry_no = p_ttb_registry_no,
+    pa_license_no = p_pa_license_no, customer_phone = p_customer_phone, fermentation_reading_due_hours = p_reading_due_hours
+    where id = p_brewery returning * into v_row;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
@@ -5993,6 +6017,7 @@ grant execute on function
   replace_format_components(uuid,uuid,jsonb,uuid),
   create_location(uuid,text,public.location_kind,uuid),
   update_location(uuid,uuid,text,public.location_kind,uuid),
+  update_brewery(uuid,text,text,text,text,text,int,uuid),
   create_bin(uuid,uuid,text,uuid),
   update_bin(uuid,uuid,text,uuid),
   delete_bin(uuid,uuid,uuid),
