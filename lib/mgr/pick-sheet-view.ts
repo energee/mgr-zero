@@ -56,7 +56,7 @@ export function toPickSheetViewProps({ orders }: PickSheetSnapshot): PickSheetVi
         return {
           key: o.id,
           title: `${o.customers?.name ?? "Transfer"} · ${docNo("ORD", o.order_no, "Order")}`,
-          detail: plural(o.order_lines.length, "line"),
+          detail: `${o.status} · ${plural(o.order_lines.length, "line")}`,
           href: `/orders/${o.id}`,
         };
       });

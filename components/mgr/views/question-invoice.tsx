@@ -18,7 +18,7 @@ export function QuestionInvoiceView({
     <>
       {E.fld("Invoice", model.label)}
       {E.inp("What’s wrong with this invoice?")}
-      {footer ?? E.btn(`Send to ${model.breweryName}`)}
+      {footer !== undefined ? footer : E.btn(`Send to ${model.breweryName}`)}
     </>
   );
 }

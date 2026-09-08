@@ -22,7 +22,7 @@ export function PickView({
       ))}
       {E.btn("Print pick sheet", "g")}
       {E.sp()}
-      {footer ?? E.btn("Done picking")}
+      {footer !== undefined ? footer : E.btn("Done picking")}
     </>
   );
 }

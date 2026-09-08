@@ -43,7 +43,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   return (
     <OrdersView
       model={toOrdersListViewProps({ role: brewery.role, status, orders })}
-      createAction={canWrite ? <OrderForm customers={customers} locations={locations} skus={skus} /> : undefined}
+      createAction={canWrite ? <OrderForm customers={customers} locations={locations} skus={skus} /> : null}
       linkRows
       filters={(
         <>

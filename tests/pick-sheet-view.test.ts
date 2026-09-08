@@ -23,7 +23,7 @@ describe("Pick sheet view loop", () => {
       "Al’s Bar · ORD-0232",
       "Teresa’s · ORD-0234",
     ]);
-    expect(model.groups[0]?.rows.map((r) => r.detail)).toEqual(["3 lines", "1 line", "5 lines"]);
+    expect(model.groups[0]?.rows.map((r) => r.detail)).toEqual(["confirmed · 3 lines", "confirmed · 1 line", "confirmed · 5 lines"]);
     expect(model.groups[0]?.rows.map((r) => r.href)).toEqual([
       "/orders/00000000-0000-4000-8000-000000000231",
       "/orders/00000000-0000-4000-8000-000000000232",

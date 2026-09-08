@@ -27,7 +27,7 @@ export function CompleteTransferView({
       {E.info("No invoice: this is an internal move.")}
       {sources}
       {E.sp()}
-      {footer ?? E.btn("Complete transfer", "irr")}
+      {footer !== undefined ? footer : E.btn("Complete transfer", "irr")}
     </>
   );
 }

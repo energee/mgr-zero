@@ -39,7 +39,7 @@ export default async function ReplenishmentPage({ searchParams }: { searchParams
         const model = toParsViewProps({ shortfall, unit, bblPerUnit: item?.format_volume?.bbl_per_unit == null ? null : Number(item.format_volume.bbl_per_unit), orderAllocations: [], standing: [], par: null });
         model.atpDetail += " across all locations";
         model.rows = shortfall.reservations.map(r => ({ key: r.id, title: r.source === "order_line" ? `Order ${r.orderNo ?? r.ref}` : `Standing allocation · ${locationRows.find(l => l.id === r.ref)?.name ?? r.ref}`, detail: `${r.qty} ${unit} reserved`, verb: "Review", tone: "primary", href: r.orderId ? `/orders/${r.orderId}` : r.source === "taproom_standing" ? `/replenishment?location=${r.ref}&sku=${shortfall.skuId}#standing-allocations` : undefined }));
-        return <section key={shortfall.skuId} aria-label={`${shortfall.skuName} shortfall`}><ParsView model={model} linkRows footer={<></>} /></section>;
+        return <section key={shortfall.skuId} aria-label={`${shortfall.skuName} shortfall`}><ParsView model={model} linkRows footer={null} /></section>;
       })}
       {sku && <div>{shortfalls.length === 0 && E.note("This SKU has no current shortfall.")}{E.btn("All shortfalls", "g", "/replenishment")}</div>}
       {taprooms.length === 0

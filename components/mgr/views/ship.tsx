@@ -38,7 +38,7 @@ export function ShipView({
       {E.tape(tape ?? model.tape)}
       {sources}
       {E.sp()}
-      {footer ?? E.btn("Ship order", "irr")}
+      {footer !== undefined ? footer : E.btn("Ship order", "irr")}
     </>
   );
 }

@@ -35,7 +35,7 @@ export function ParsView({
               {E.row(row.title, row.detail, E.act(row.verb, row.tone, linkRows ? row.href : undefined))}
             </Fragment>
           ))}
-          {footer ?? E.btns([["Adjust selected", "p"], ["Edit par", "g"]])}
+          {footer !== undefined ? footer : E.btns([["Adjust selected", "p"], ["Edit par", "g"]])}
         </>
       )}
     </>

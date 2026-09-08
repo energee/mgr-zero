@@ -45,7 +45,7 @@ export function PortalOrderView({
           linkRows ? model.invoice.href : undefined,
         )
         : null}
-      {footer ?? (continueHref ? E.btn("Continue / edit", "p", continueHref) : model.reorder ? E.btn("Reorder", "g", reorderHref) : null)}
+      {footer !== undefined ? footer : (continueHref ? E.btn("Continue / edit", "p", continueHref) : model.reorder ? E.btn("Reorder", "g", reorderHref) : null)}
     </>
   );
 }

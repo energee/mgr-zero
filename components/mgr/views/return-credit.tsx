@@ -35,7 +35,7 @@ export function ReturnCreditView({
       {E.note(model.note)}
       {sources}
       {E.sp()}
-      {footer ?? E.btn("Return shipment", "irr")}
+      {footer !== undefined ? footer : E.btn("Return shipment", "irr")}
     </>
   );
 }

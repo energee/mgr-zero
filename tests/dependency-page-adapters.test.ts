@@ -5,11 +5,13 @@ vi.mock("@/lib/brewery", () => ({ getActiveBrewery: async () => ({ id: "brewery"
 vi.mock("@/lib/portal", () => ({ getActiveCustomer: async () => ({ breweryId: "brewery", customerId: "buyer", customerName: "Buyer" }) }));
 vi.mock("@/lib/commands/context", () => ({ buildContext: async () => ({ role: state.role }) }));
 vi.mock("@/lib/commands/all", () => ({}));
+vi.mock("@/lib/commands/use-command-form", () => ({ useCommandForm: () => ({ open: false, setOpen() {}, busy: false, error: "", submit() {} }) }));
 vi.mock("@/lib/commands/registry", () => ({ runCommand: query }));
 vi.mock("@/lib/mgr/page-query", () => ({ runPageQuery: query }));
 async function query(name: string, input: unknown) {
   state.calls.push([name, input]);
   switch (name) {
+    case "daily_pick_sheet": return ["confirmed", "picked"].map((status, i) => ({ id: status, order_no: i + 1, status, requested_ship_date: null, customers: { name: status === "confirmed" ? "Needs picking" : "Already staged" }, order_lines: [{ id: "line", sku_id: "sku", qty_ordered: 4, qty_picked: status === "picked" ? 4 : null, skus: { name: "Keg" } }] }));
     case "list_orders": return [];
     case "list_customers": return [{ id: "buyer", name: "Buyer" }];
     case "get_customer": return { shipTos: [{ id: "ship", label: "Door", is_default: true }] };
@@ -23,6 +25,7 @@ async function query(name: string, input: unknown) {
     default: throw new Error(name);
   }
 }
+import PickPage from "@/app/(app)/pick/page";
 import OrdersPage from "@/app/(app)/orders/page";
 import ReplenishmentPage from "@/app/(app)/replenishment/page";
 import ShopPage from "@/app/(portal)/portal/page";
@@ -30,7 +33,7 @@ import ShopPage from "@/app/(portal)/portal/page";
 it("preserves customer filtering, default destinations, active SKUs and Warehouse readonly", async () => {
   state.role = "warehouse"; state.calls = [];
   const readonly = await OrdersPage({ searchParams: Promise.resolve({ customerId: "buyer", status: "draft" }) });
-  expect(readonly.props.createAction).toBeUndefined();
+  expect(readonly.props.createAction).toBeNull();
   expect(state.calls).toContainEqual(["list_orders", { customerId: "buyer", status: "draft" }]);
   expect(renderToStaticMarkup(readonly.props.filters)).toContain("customerId=buyer");
   state.role = "sales";
@@ -62,4 +65,18 @@ it("renders the selected shortfall with actual package volume and competing orde
   const controls = page.props.children[4].props.children;
   expect(controls[0]).toBe(false);
   expect(controls[1].props.canCreate).toBe(false);
+});
+
+it.each(["warehouse", "admin", "sales"])("renders the actual Orders page with the permitted create control for %s", async role => {
+  state.role = role;
+  const html = renderToStaticMarkup(await OrdersPage({ searchParams: Promise.resolve({}) }));
+  if (role === "warehouse") expect(html).not.toMatch(/New order|New Order/);
+  else expect(html).toMatch(/New order|New Order/);
+});
+it("keeps confirmed and picked states visible on the rendered printable pick sheet", async () => {
+  const html = renderToStaticMarkup(await PickPage({ searchParams: Promise.resolve({}) }));
+  expect(html).toContain("confirmed · 1 line");
+  expect(html).toContain("picked · 1 line");
+  expect(html).toContain("Needs picking");
+  expect(html).toContain("Already staged");
 });

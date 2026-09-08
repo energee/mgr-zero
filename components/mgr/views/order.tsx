@@ -43,8 +43,8 @@ export function OrderView({
       {showAddLine ? E.btn("Add line", "g") : null}
       {complianceNote ? E.note(complianceNote) : null}
       {model.events.length === 0 ? E.blank("No events yet") : E.tape(model.events)}
-      {footer ?? E.btns([["Ship", "p"], ["Cancel order", "del"]])}
-      {!footer ? E.info("Cancel asks you to confirm. Allocations release.") : null}
+      {footer !== undefined ? footer : E.btns([["Ship", "p"], ["Cancel order", "del"]])}
+      {footer === undefined ? E.info("Cancel asks you to confirm. Allocations release.") : null}
     </>
   );
 }

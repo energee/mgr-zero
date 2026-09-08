@@ -22,7 +22,7 @@ export function AdjustLinesView({
         <Fragment key={line.key}>{E.row(line.name, line.detail, E.stq(line.qty), line.tone ?? "")}</Fragment>
       ))}
       {E.edit("Reason", reason)}
-      {footer ?? E.btn("Save lines")}
+      {footer !== undefined ? footer : E.btn("Save lines")}
     </>
   );
 }
