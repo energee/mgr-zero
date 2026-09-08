@@ -5,10 +5,7 @@ import { NextResponse } from "next/server";
 export function slackAppOrigin() {
   const base = process.env.APP_URL;
   if (!base) throw new Error("APP_URL is not configured");
-  let url: URL;
-  try { url = new URL(base); } catch { throw new Error("APP_URL must be an https origin"); }
-  if (url.protocol !== "https:") throw new Error("APP_URL must be an https origin");
-  return url.origin;
+  return new URL(base).origin;
 }
 
 export function slackRedirectUri() {
