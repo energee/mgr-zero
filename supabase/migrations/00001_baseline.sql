@@ -2776,6 +2776,13 @@ begin
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
+-- Match ECMAScript String.trim at every UPC write boundary, including Unicode
+-- WhiteSpace/LineTerminator characters. Internal barcode characters are retained.
+create function private.normalize_upc(p_upc text) returns text
+language sql immutable set search_path = '' as $$
+  select nullif(btrim(p_upc, U&'\0009\000A\000B\000C\000D\0020\00A0\1680\2000\2001\2002\2003\2004\2005\2006\2007\2008\2009\200A\2028\2029\202F\205F\3000\FEFF'), '');
+$$;
+
 -- create_sku: one brand × one packaged format. The display name is filled
 -- from both unless given.
 create function create_sku(
@@ -2784,7 +2791,7 @@ create function create_sku(
 declare v_replay jsonb; v_row public.skus; v_brand public.brands; v_format public.formats;
 begin
   perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
-  p_upc := nullif(trim(p_upc), '');
+  p_upc := private.normalize_upc(p_upc);
   v_replay := private.claim_command_request(p_brewery, 'create_sku', p_request_id,
     jsonb_build_object('brewery', p_brewery, 'brand', p_brand, 'format', p_format, 'name', p_name, 'upc', p_upc));
   if v_replay is not null then return v_replay; end if;
@@ -2806,7 +2813,7 @@ create function update_sku(
 declare v_replay jsonb; v_row public.skus;
 begin
   perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
-  p_upc := nullif(trim(p_upc), '');
+  p_upc := private.normalize_upc(p_upc);
   v_replay := private.claim_command_request(p_brewery, 'update_sku', p_request_id,
     jsonb_build_object('brewery', p_brewery, 'id', p_id, 'active', p_active, 'upc', p_upc));
   if v_replay is not null then return v_replay; end if;

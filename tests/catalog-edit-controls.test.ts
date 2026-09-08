@@ -66,7 +66,22 @@ it("normalizes UPC on creation too, so whitespace cannot evade SKU barcode uniqu
   await expect(runCommand("create_sku", { brandId: second.id, formatId: format.id, upc: "9876" }, ctx)).rejects.toThrow();
   const rawDuplicate = await ctx.db.rpc("create_sku", { p_brewery: ctx.breweryId, p_brand: second.id, p_format: format.id, p_name: null, p_upc: " 9876 ", p_request_id: crypto.randomUUID() });
   expect(rawDuplicate.error?.code).toBe("23505");
-  expect(await runCommand("create_sku", { brandId: second.id, formatId: format.id, upc: "  " }, ctx)).toMatchObject({ upc: null });
+  // ECMAScript trim whitespace, including Unicode separators and BOM, must
+  // normalize identically when the registered command is bypassed.
+  const whitespace = "\t\n\v\f\r \u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff";
+  const duplicate = await ctx.db.rpc("create_sku", { p_brewery: ctx.breweryId, p_brand: second.id, p_format: format.id, p_name: null, p_upc: `${whitespace}9876${whitespace}`, p_request_id: crypto.randomUUID() });
+  expect(duplicate.error?.code).toBe("23505");
+  const blank = await ctx.db.rpc("create_sku", { p_brewery: ctx.breweryId, p_brand: second.id, p_format: format.id, p_name: null, p_upc: whitespace, p_request_id: crypto.randomUUID() });
+  expect(blank.error).toBeNull();
+  expect(blank.data.upc).toBeNull();
+  for (const edge of whitespace) {
+    const update = await ctx.db.rpc("update_sku", { p_brewery: ctx.breweryId, p_id: blank.data.id, p_active: true, p_upc: `${edge}9876${edge}`, p_request_id: crypto.randomUUID() });
+    expect(update.error?.message).toMatch(/UPC.*another SKU/);
+  }
+  const cleared = await ctx.db.rpc("update_sku", { p_brewery: ctx.breweryId, p_id: blank.data.id, p_active: true, p_upc: whitespace, p_request_id: crypto.randomUUID() });
+  expect(cleared.error).toBeNull();
+  expect(cleared.data.upc).toBeNull();
+
 });
 it("gates catalog mutators and excludes inactive SKUs from New Order picker options", () => {
   const page = readFileSync("app/(app)/catalog/page.tsx", "utf8");
