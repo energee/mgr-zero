@@ -185,6 +185,7 @@ create table vendors (
   name text not null,
   contact_name text, email text, phone text, address text,
   payment_terms text not null default 'net30',
+  lead_time_days int check (lead_time_days >= 0),      -- per vendor, not per material (spec 2026-09-07 §3): the only dates that can check it are keyed by the PO's vendor
   qbo_vendor_id text,
   active boolean not null default true,
   created_at timestamptz not null default now(),
@@ -201,8 +202,7 @@ create table materials (
   purchase_uom uom not null,
   purchase_uom_factor numeric(14,6) not null default 1 check (purchase_uom_factor > 0), -- base units per purchase unit
   lot_tracked boolean not null default false,
-  default_vendor_id uuid,
-  lead_time_days int,
+  default_vendor_id uuid,                              -- Planning drafts to the active contract's vendor, else this one, else "no vendor"
   reorder_point numeric(14,4),                          -- base uom
   extract_potential numeric,                             -- SG-style potential, e.g. 1.037 = 37 PPG (lib/recipe-gravity.ts)
   active boolean not null default true,
@@ -910,11 +910,18 @@ create table purchase_orders (
   vendor_id uuid not null,
   status po_status not null default 'draft',
   ordered_on date, expected_on date,
+  -- How the PO left the building (spec 2026-09-07 §1): a property of the send,
+  -- never a fork in status. mailto/external are attestations ("Marked sent by …");
+  -- 'direct' (MGR sends the mail) is not a legal value until a provider is approved.
+  sent_via text check (sent_via in ('mailto','external')),
+  sent_by uuid references auth.users(id),
   note text,
   created_by uuid not null references auth.users(id),
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
   unique (brewery_id, po_no),
+  check (status <> 'draft' or sent_via is null),                              -- a draft was never sent
+  check (status not in ('sent','partially_received','received') or sent_via is not null),  -- a sent PO says how
   foreign key (vendor_id, brewery_id) references vendors (id, brewery_id)
 );
 create index purchase_orders_status_idx on purchase_orders (brewery_id, status, expected_on);
@@ -971,31 +978,54 @@ create table receipt_lines (
 );
 create index receipt_lines_po_line_idx on receipt_lines (po_line_id);
 
--- Derive PO received / partially_received from counted receipts.
+-- What a PO line still owes (spec 2026-09-07 §2): derived from counted
+-- receipts, never stored, and the one place that derivation lives — PO status,
+-- material on order and contract drawdown all read it. Purchase uom.
+create view po_open_balances with (security_invoker = true) as
+  select l.brewery_id, l.po_id, l.id as po_line_id, l.material_id, l.contract_id, l.qty_ordered,
+         coalesce(r.counted, 0) as qty_received,
+         greatest(l.qty_ordered - coalesce(r.counted, 0), 0) as qty_open
+  from purchase_order_lines l
+  left join lateral (select sum(qty_counted) counted from receipt_lines rl where rl.po_line_id = l.id) r on true;
+
+-- Derive PO received / partially_received from counted receipts. A PO with no
+-- lines derives NULL (bool_and over zero rows), not partially_received: the
+-- trigger then leaves the status alone (spec 2026-09-07 §2).
+create function private.po_receipt_status(p_po uuid) returns public.po_status
+language sql stable set search_path = '' as $$
+  select case bool_and(qty_open = 0)
+           when true then 'received'::public.po_status
+           when false then 'partially_received'::public.po_status
+         end
+  from public.po_open_balances where po_id = p_po
+$$;
+
 create function update_po_status() returns trigger language plpgsql set search_path = '' as $$
-declare po uuid; complete boolean;
+declare po uuid; v_status public.po_status;
 begin
   select po_id into po from public.purchase_order_lines where id = new.po_line_id;
-  select bool_and(coalesce(r.counted, 0) >= l.qty_ordered) into complete
-    from public.purchase_order_lines l
-    left join (select po_line_id, sum(qty_counted) counted from public.receipt_lines group by 1) r on r.po_line_id = l.id
-    where l.po_id = po;
-  update public.purchase_orders
-    set status = case when complete then 'received' else 'partially_received' end::public.po_status
+  v_status := private.po_receipt_status(po);
+  if v_status is null then return null; end if;
+  update public.purchase_orders set status = v_status
     where id = po and status in ('draft','sent','partially_received');
   return null;
 end $$;
 create trigger receipt_lines_po_status after insert on receipt_lines
   for each row execute function update_po_status();
 
+-- A count is taken at one bin: on-hand is compared and adjusted there.
 create table material_counts (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
+  location_id uuid not null,
+  bin_id uuid not null,
   counted_on date not null default current_date,
   counted_by uuid not null references auth.users(id),
   note text,
   created_at timestamptz not null default now(),
-  unique (id, brewery_id)
+  unique (id, brewery_id),
+  foreign key (location_id, brewery_id) references locations (id, brewery_id),
+  foreign key (bin_id, location_id, brewery_id) references bins (id, location_id, brewery_id)
 );
 
 create table material_count_lines (
@@ -1004,9 +1034,9 @@ create table material_count_lines (
   count_id uuid not null,
   material_id uuid not null,
   lot_id uuid,
-  qty_expected numeric(14,4) not null,                 -- on-hand snapshot at count time
+  qty_expected numeric(14,4) not null,                 -- on-hand snapshot at count time (the lot's share when lot_id is set)
   qty_counted numeric(14,4) not null check (qty_counted >= 0),
-  movement_id uuid unique,                             -- count_adjustment; null when no variance
+  movement_id uuid unique,                             -- count_adjustment; null when no variance. A variance split across lots is one line per lot.
   foreign key (count_id, brewery_id) references material_counts (id, brewery_id),
   foreign key (material_id, brewery_id) references materials (id, brewery_id),
   foreign key (lot_id, material_id, brewery_id) references material_lots (id, material_id, brewery_id),
@@ -1636,12 +1666,10 @@ create view material_lot_on_hand with (security_invoker = true) as
   group by 1,2,3,4;
 
 create view material_on_order with (security_invoker = true) as
-  select l.brewery_id, l.material_id,
-         sum((l.qty_ordered - coalesce(r.counted, 0)) * m.purchase_uom_factor) as qty   -- base uom
-  from purchase_order_lines l
-  join purchase_orders po on po.id = l.po_id and po.status in ('sent','partially_received')
-  join materials m on m.id = l.material_id
-  left join (select po_line_id, sum(qty_counted) counted from receipt_lines group by 1) r on r.po_line_id = l.id
+  select b.brewery_id, b.material_id, sum(b.qty_open * m.purchase_uom_factor) as qty   -- base uom
+  from po_open_balances b
+  join purchase_orders po on po.id = b.po_id and po.status in ('sent','partially_received')
+  join materials m on m.id = b.material_id
   group by 1,2;
 
 create view material_last_cost with (security_invoker = true) as
@@ -1649,30 +1677,85 @@ create view material_last_cost with (security_invoker = true) as
   from material_movements where type = 'receipt' and unit_cost_cents is not null
   order by brewery_id, material_id, created_at desc;
 
+-- A contract is drawn down many times a year (spec 2026-09-07 §4): received is
+-- what accounting reconciles against, on order is what is placed but not yet
+-- arrived, and available (committed less both) is the only number a buyer
+-- decides against. Drafts and cancelled POs hold nothing. Purchase uom.
 create view contract_balances with (security_invoker = true) as
-  select c.id as contract_id, c.brewery_id, c.material_id, c.qty_committed,
-         c.qty_committed - coalesce(sum(l.qty_ordered), 0) as qty_remaining
-  from material_contracts c left join purchase_order_lines l on l.contract_id = c.id
-  group by c.id;
+  select contract_id, brewery_id, vendor_id, material_id, qty_committed, qty_received, qty_on_order,
+         qty_committed - qty_received - qty_on_order as qty_available
+  from (
+    select c.id as contract_id, c.brewery_id, c.vendor_id, c.material_id, c.qty_committed,
+           coalesce(sum(b.qty_received), 0) as qty_received,
+           coalesce(sum(case when po.status in ('sent','partially_received') then b.qty_open else 0 end), 0) as qty_on_order
+    from material_contracts c
+    left join po_open_balances b on b.contract_id = c.id
+    left join purchase_orders po on po.id = b.po_id
+    group by c.id, c.brewery_id, c.vendor_id, c.material_id, c.qty_committed) x;
 
+-- Observed lead time per vendor (spec 2026-09-07 §3): the last receipt stops the
+-- vendor's clock, the first receipt is what unblocks production; late is
+-- arrival against the promise (expected_on). Rolling last 10 received POs per
+-- vendor, tagged by transport because an external send is an attestation.
+create view vendor_lead_times with (security_invoker = true) as
+  with per_po as (
+    select po.brewery_id, po.vendor_id, po.sent_via,
+           max(r.received_on) - po.ordered_on as lead_days,
+           min(r.received_on) - po.ordered_on as first_lead_days,
+           max(r.received_on) - po.expected_on as late_days,
+           row_number() over (partition by po.vendor_id order by po.ordered_on desc, po.id) as recency
+    from purchase_orders po join receipts r on r.po_id = po.id
+    where po.status = 'received' and po.ordered_on is not null
+    group by po.id)
+  select brewery_id, vendor_id, sent_via, count(*)::int as n,
+         round(avg(lead_days), 1) as avg_lead_days,
+         round(avg(first_lead_days), 1) as avg_first_lead_days,
+         round(avg(late_days), 1) as avg_late_days
+  from per_po where recency <= 10
+  group by 1, 2, 3;
+
+-- Material gaps for Planning (spec 2026-09-07 §5). Demand is what committed
+-- consumers will draw: unbrewed batches through their recipe, open packaging
+-- runs through the format BOM. Supply nets on hand and open POs so a gap is
+-- never ordered twice. Summed per material first, resolved to a vendor second
+-- (§3): the contract with commitment still available, else the material's
+-- default vendor, else no vendor and the row cannot draft. Buy-by is needed-by
+-- less the vendor's typed lead time; a gap past it is out of reach and the
+-- drafting RPC leaves it out. Base uom; purchase_units_short is the gap
+-- rounded up to whole purchase units.
 create view material_requirements with (security_invoker = true) as
   with req as (
-    select b.brewery_id, ri.material_id, sum(ri.per_bbl_qty * b.planned_bbl) as required
+    select b.brewery_id, ri.material_id, sum(ri.per_bbl_qty * b.planned_bbl) as required, min(b.planned_on) as needed_by
     from batches b join recipe_ingredients ri on ri.recipe_version_id = b.recipe_version_id
     where b.brewed_on is null group by 1,2
     union all
-    select r.brewery_id, bom.material_id, sum(o.qty_planned * bom.qty_per_unit)
+    select r.brewery_id, bom.material_id, sum(o.qty_planned * bom.qty_per_unit), min(r.planned_on)
     from packaging_runs r join packaging_run_outputs o on o.run_id = r.id
     join skus s on s.id = o.sku_id
     join format_bom bom on bom.format_id = s.format_id
-    where r.closed_at is null group by 1,2)
-  select req.brewery_id, req.material_id, sum(req.required) as required,
-         coalesce(oh.qty, 0) as on_hand, coalesce(oo.qty, 0) as on_order,
-         sum(req.required) - coalesce(oh.qty, 0) - coalesce(oo.qty, 0) as short
-  from req
-  left join material_on_hand oh on oh.material_id = req.material_id
-  left join material_on_order oo on oo.material_id = req.material_id
-  group by 1,2, oh.qty, oo.qty;
+    where r.closed_at is null group by 1,2),
+  gap as (
+    select req.brewery_id, req.material_id, sum(req.required) as required, min(req.needed_by) as needed_by,
+           coalesce(oh.qty, 0) as on_hand, coalesce(oo.qty, 0) as on_order,
+           sum(req.required) - coalesce(oh.qty, 0) - coalesce(oo.qty, 0) as short
+    from req
+    left join material_on_hand oh on oh.material_id = req.material_id
+    left join material_on_order oo on oo.material_id = req.material_id
+    group by 1,2, oh.qty, oo.qty)
+  select gap.*, m.name as material_name, m.base_uom, m.purchase_uom, m.purchase_uom_factor,
+         ceil(greatest(gap.short, 0) / m.purchase_uom_factor) as purchase_units_short,
+         coalesce(c.vendor_id, m.default_vendor_id) as vendor_id, v.name as vendor_name, v.lead_time_days,
+         gap.needed_by - v.lead_time_days as buy_by,
+         coalesce(gap.needed_by - v.lead_time_days < current_date, false) as out_of_reach,
+         c.contract_id, c.qty_available as contract_qty_available, c.unit_cost_cents as contract_unit_cost_cents
+  from gap join materials m on m.id = gap.material_id
+  left join lateral (
+    select cb.contract_id, cb.vendor_id, cb.qty_available, mc.unit_cost_cents
+    from contract_balances cb join material_contracts mc on mc.id = cb.contract_id
+    where cb.material_id = gap.material_id and cb.qty_available > 0
+      and (mc.starts_on is null or mc.starts_on <= current_date) and (mc.ends_on is null or mc.ends_on >= current_date)
+    order by mc.ends_on nulls last limit 1) c on true
+  left join vendors v on v.id = coalesce(c.vendor_id, m.default_vendor_id);
 
 create view recipe_version_costs with (security_invoker = true) as
   select ri.recipe_version_id, ri.brewery_id,
@@ -3878,6 +3961,335 @@ begin
   return private.complete_command_request(p_request_id, v_result);
 end $$;
 
+-- ---------------------------------------------------------------- Purchasing
+-- Vendors, materials and contracts are plain upserts. Lead time is typed on
+-- the vendor (spec 2026-09-07 §3); a contract never gates ordering (§4).
+create function upsert_vendor(
+  p_brewery uuid, p_vendor uuid, p_name text, p_email text, p_phone text, p_lead_time_days int,
+  p_payment_terms text, p_active boolean, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.vendors;
+begin
+  perform private.assert_staff(p_brewery, array['admin','warehouse','brewer']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'upsert_vendor', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'vendor', p_vendor, 'name', p_name, 'email', p_email, 'phone', p_phone,
+      'lead_time_days', p_lead_time_days, 'payment_terms', p_payment_terms, 'active', p_active));
+  if v_replay is not null then return v_replay; end if;
+  if p_vendor is null then
+    insert into public.vendors (brewery_id, name, email, phone, lead_time_days, payment_terms, active)
+    values (p_brewery, p_name, p_email, p_phone, p_lead_time_days, coalesce(p_payment_terms, 'net30'), coalesce(p_active, true))
+    returning * into v_row;
+  else
+    update public.vendors set name = p_name, email = p_email, phone = p_phone, lead_time_days = p_lead_time_days,
+      payment_terms = coalesce(p_payment_terms, payment_terms), active = coalesce(p_active, active)
+    where id = p_vendor and brewery_id = p_brewery returning * into v_row;
+    if v_row.id is null then raise exception 'vendor not found'; end if;
+  end if;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- The unit vocabulary is fixed: a 44 lb hop box is purchase_uom each with
+-- purchase_uom_factor 44, never a "box" unit. Units are refused once a
+-- movement exists, because every ledger row was written in them.
+create function upsert_material(
+  p_brewery uuid, p_material uuid, p_name text, p_category public.material_category, p_base_uom public.uom,
+  p_purchase_uom public.uom, p_purchase_uom_factor numeric, p_lot_tracked boolean, p_default_vendor uuid,
+  p_reorder_point numeric, p_active boolean, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.materials;
+begin
+  perform private.assert_staff(p_brewery, array['admin','warehouse','brewer']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'upsert_material', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'material', p_material, 'name', p_name, 'category', p_category,
+      'base_uom', p_base_uom, 'purchase_uom', p_purchase_uom, 'purchase_uom_factor', p_purchase_uom_factor,
+      'lot_tracked', p_lot_tracked, 'default_vendor', p_default_vendor, 'reorder_point', p_reorder_point, 'active', p_active));
+  if v_replay is not null then return v_replay; end if;
+  if p_material is null then
+    insert into public.materials (brewery_id, name, category, base_uom, purchase_uom, purchase_uom_factor, lot_tracked, default_vendor_id, reorder_point, active)
+    values (p_brewery, p_name, p_category, p_base_uom, p_purchase_uom, coalesce(p_purchase_uom_factor, 1),
+            coalesce(p_lot_tracked, false), p_default_vendor, p_reorder_point, coalesce(p_active, true))
+    returning * into v_row;
+  else
+    select * into v_row from public.materials where id = p_material and brewery_id = p_brewery for update;
+    if v_row.id is null then raise exception 'material not found'; end if;
+    if (v_row.base_uom, v_row.purchase_uom, v_row.purchase_uom_factor) is distinct from (p_base_uom, p_purchase_uom, coalesce(p_purchase_uom_factor, 1))
+       and exists (select 1 from public.material_movements where material_id = p_material) then
+      raise exception 'material is in use: its units cannot change';
+    end if;
+    update public.materials set name = p_name, category = p_category, base_uom = p_base_uom, purchase_uom = p_purchase_uom,
+      purchase_uom_factor = coalesce(p_purchase_uom_factor, 1), lot_tracked = coalesce(p_lot_tracked, lot_tracked),
+      default_vendor_id = p_default_vendor, reorder_point = coalesce(p_reorder_point, reorder_point), active = coalesce(p_active, active)
+    where id = p_material returning * into v_row;
+  end if;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+create function upsert_material_contract(
+  p_brewery uuid, p_contract uuid, p_vendor uuid, p_material uuid, p_qty_committed numeric, p_unit_cost_cents int,
+  p_starts_on date, p_ends_on date, p_contract_no text, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.material_contracts;
+begin
+  perform private.assert_staff(p_brewery, array['admin','warehouse','brewer']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'upsert_material_contract', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'contract', p_contract, 'vendor', p_vendor, 'material', p_material,
+      'qty_committed', p_qty_committed, 'unit_cost_cents', p_unit_cost_cents, 'starts_on', p_starts_on, 'ends_on', p_ends_on, 'contract_no', p_contract_no));
+  if v_replay is not null then return v_replay; end if;
+  if p_contract is null then
+    insert into public.material_contracts (brewery_id, vendor_id, material_id, qty_committed, unit_cost_cents, starts_on, ends_on, contract_no)
+    values (p_brewery, p_vendor, p_material, p_qty_committed, p_unit_cost_cents, p_starts_on, p_ends_on, p_contract_no)
+    returning * into v_row;
+  else
+    update public.material_contracts set vendor_id = p_vendor, material_id = p_material, qty_committed = p_qty_committed,
+      unit_cost_cents = p_unit_cost_cents, starts_on = p_starts_on, ends_on = p_ends_on, contract_no = p_contract_no
+    where id = p_contract and brewery_id = p_brewery returning * into v_row;
+    if v_row.id is null then raise exception 'contract not found'; end if;
+  end if;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- One RPC writes the draft PO and every line. A line with a contract takes the
+-- contract's price when none is typed; a contract never gates ordering (§4).
+create function create_purchase_order(
+  p_brewery uuid, p_vendor uuid, p_expected_on date, p_note text, p_lines jsonb, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid; v_replay jsonb; v_po public.purchase_orders; l jsonb; v_contract_price int;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'create_purchase_order', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'vendor', p_vendor, 'expected_on', p_expected_on, 'note', p_note, 'lines', p_lines));
+  if v_replay is not null then return v_replay; end if;
+  if jsonb_array_length(p_lines) = 0 then raise exception 'a purchase order needs at least one line'; end if;
+  insert into public.purchase_orders (brewery_id, vendor_id, expected_on, note, created_by)
+  values (p_brewery, p_vendor, p_expected_on, p_note, v_actor) returning * into v_po;
+  for l in select * from jsonb_array_elements(p_lines) loop
+    -- The composite FK only proves the brewery; a contract drawn down here must be this vendor's, for this material.
+    v_contract_price := null;
+    if l->>'contract_id' is not null then
+      select unit_cost_cents into v_contract_price from public.material_contracts
+        where id = (l->>'contract_id')::uuid and brewery_id = p_brewery and vendor_id = p_vendor and material_id = (l->>'material_id')::uuid;
+      if not found then raise exception 'contract % is not this vendor''s contract for that material', l->>'contract_id'; end if;
+    end if;
+    insert into public.purchase_order_lines (brewery_id, po_id, material_id, qty_ordered, unit_cost_cents, contract_id, expected_lot_code)
+    values (p_brewery, v_po.id, (l->>'material_id')::uuid, (l->>'qty_ordered')::numeric,
+      coalesce((l->>'unit_cost_cents')::int, v_contract_price), (l->>'contract_id')::uuid, l->>'expected_lot_code');
+  end loop;
+  return private.complete_command_request(p_request_id, to_jsonb(v_po));
+end $$;
+
+-- Same shape as lock_order / lock_transfer: the row locked, or a MG409 naming the status it is in.
+create function private.lock_purchase_order(p_brewery uuid, p_po uuid, p_allowed public.po_status[]) returns public.purchase_orders
+language plpgsql set search_path = '' as $$
+declare po public.purchase_orders;
+begin
+  select * into po from public.purchase_orders where id = p_po and brewery_id = p_brewery for update;
+  if not found then raise exception 'purchase order not found'; end if;
+  if not (po.status = any(p_allowed)) then raise exception 'purchase order is %', po.status using errcode = 'MG409'; end if;
+  return po;
+end $$;
+
+-- Marking a PO sent is an attestation: nothing leaves the process (spec §1).
+-- ordered_on is the day the human says it went out, which is why observed
+-- lead times are tagged with sent_via.
+create function send_purchase_order(p_brewery uuid, p_po uuid, p_sent_via text, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid; v_replay jsonb; v_po public.purchase_orders;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'send_purchase_order', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'po', p_po, 'sent_via', p_sent_via));
+  if v_replay is not null then return v_replay; end if;
+  v_po := private.lock_purchase_order(p_brewery, p_po, array['draft']::public.po_status[]);
+  update public.purchase_orders set status = 'sent', ordered_on = current_date, sent_via = p_sent_via, sent_by = v_actor
+  where id = p_po returning * into v_po;
+  return private.complete_command_request(p_request_id, to_jsonb(v_po));
+end $$;
+
+-- One RPC: receipt header, a line per counted PO line, the material lot read
+-- off the package (created here, never from the PO's expected lot), and a
+-- receipt movement in base units at the named bin. Only counted quantity
+-- posts; over and short are recorded, never blocked. The trigger on
+-- receipt_lines derives the PO status.
+create function receive_purchase_order(
+  p_brewery uuid, p_po uuid, p_location uuid, p_bin uuid, p_received_on date, p_lines jsonb, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_actor uuid; v_replay jsonb; v_po public.purchase_orders; v_receipt_id uuid; l jsonb;
+  v_line public.purchase_order_lines; v_mat public.materials; v_counted numeric; v_expected numeric;
+  v_lot uuid; v_movement uuid;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'receive_purchase_order', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'po', p_po, 'location', p_location, 'bin', p_bin, 'received_on', p_received_on, 'lines', p_lines));
+  if v_replay is not null then return v_replay; end if;
+  v_po := private.lock_purchase_order(p_brewery, p_po, array['sent','partially_received']::public.po_status[]);
+  if jsonb_array_length(p_lines) = 0 then raise exception 'a receipt needs at least one counted line'; end if;
+  insert into public.receipts (brewery_id, po_id, received_on, received_by)
+  values (p_brewery, p_po, coalesce(p_received_on, current_date), v_actor) returning id into v_receipt_id;
+  for l in select * from jsonb_array_elements(p_lines) loop
+    select * into v_line from public.purchase_order_lines where id = (l->>'po_line_id')::uuid and po_id = p_po;
+    if v_line.id is null then raise exception 'line % is not on this purchase order', l->>'po_line_id'; end if;
+    select * into v_mat from public.materials where id = v_line.material_id;
+    v_counted := (l->>'qty_counted')::numeric;
+    select qty_open into v_expected from public.po_open_balances where po_line_id = v_line.id;
+    v_lot := null; v_movement := null;
+    if v_mat.lot_tracked then
+      if nullif(trim(l->>'lot_code'), '') is null then raise exception '% is lot-tracked: a lot code is required', v_mat.name; end if;
+      insert into public.material_lots (brewery_id, material_id, lot_code, vendor_id, received_on, best_by)
+      values (p_brewery, v_mat.id, trim(l->>'lot_code'), v_po.vendor_id, coalesce(p_received_on, current_date), (l->>'best_by')::date)
+      -- ponytail: exact (trimmed) lot-code match; case/punctuation normalization needs a generated column carrying the unique
+      on conflict (material_id, lot_code) do update set best_by = coalesce(excluded.best_by, public.material_lots.best_by)
+      returning id into v_lot;
+    end if;
+    if v_counted > 0 then
+      insert into public.material_movements (brewery_id, material_id, location_id, bin_id, lot_id, qty, type, unit_cost_cents, created_by)
+      values (p_brewery, v_mat.id, p_location, p_bin, v_lot, v_counted * v_mat.purchase_uom_factor, 'receipt',
+              case when v_line.unit_cost_cents is null then null else round(v_line.unit_cost_cents / v_mat.purchase_uom_factor)::int end, v_actor)
+      returning id into v_movement;
+    end if;
+    insert into public.receipt_lines (brewery_id, receipt_id, po_line_id, qty_expected, qty_counted, lot_id, movement_id)
+    values (p_brewery, v_receipt_id, v_line.id, v_expected, v_counted, v_lot, v_movement);
+  end loop;
+  select * into v_po from public.purchase_orders where id = p_po;
+  return private.complete_command_request(p_request_id, jsonb_build_object('receipt_id', v_receipt_id, 'po_id', p_po, 'status', v_po.status));
+end $$;
+
+-- Planning's verb: one draft PO per vendor the chosen gaps resolve to (§5).
+-- Quantities are whole purchase units. A contracted material takes the
+-- contract's price up to its available commitment and a spot line (no
+-- contract, no price) beyond it — a draft that priced everything at contract
+-- rate would be wrong money (§4). Materials with no vendor, and gaps already
+-- past their buy-by date, are reported, not drafted. Drafts are not supply:
+-- the gap stands until the PO is marked sent.
+create function draft_purchase_order_from_requirements(p_brewery uuid, p_materials uuid[], p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_actor uuid; v_replay jsonb; r record; v_po uuid; v_last_vendor uuid; v_pos jsonb := '[]'; v_skipped jsonb := '[]';
+  v_units numeric; v_contracted numeric;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'draft_purchase_order_from_requirements', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'materials', to_jsonb(p_materials)));
+  if v_replay is not null then return v_replay; end if;
+  for r in
+    select * from public.material_requirements mr
+    where mr.brewery_id = p_brewery and mr.material_id = any(p_materials) and mr.short > 0
+    order by mr.vendor_id, mr.material_id
+  loop
+    if r.vendor_id is null then
+      v_skipped := v_skipped || jsonb_build_object('materialId', r.material_id, 'reason', 'no_vendor');
+      continue;
+    end if;
+    if r.out_of_reach then
+      v_skipped := v_skipped || jsonb_build_object('materialId', r.material_id, 'reason', 'out_of_reach');
+      continue;
+    end if;
+    if r.vendor_id is distinct from v_last_vendor then   -- rows arrive grouped by vendor
+      insert into public.purchase_orders (brewery_id, vendor_id, note, created_by)
+      values (p_brewery, r.vendor_id, 'Drafted from Planning', v_actor) returning id into v_po;
+      v_pos := v_pos || to_jsonb(v_po);
+      v_last_vendor := r.vendor_id;
+    end if;
+    v_units := r.purchase_units_short;
+    v_contracted := 0;
+    if r.contract_id is not null then
+      v_contracted := greatest(least(v_units, floor(r.contract_qty_available)), 0);
+      if v_contracted > 0 then
+        insert into public.purchase_order_lines (brewery_id, po_id, material_id, qty_ordered, unit_cost_cents, contract_id)
+        values (p_brewery, v_po, r.material_id, v_contracted, r.contract_unit_cost_cents, r.contract_id);
+      end if;
+    end if;
+    if v_units - v_contracted > 0 then
+      insert into public.purchase_order_lines (brewery_id, po_id, material_id, qty_ordered)
+      values (p_brewery, v_po, r.material_id, v_units - v_contracted);
+    end if;
+  end loop;
+  return private.complete_command_request(p_request_id, jsonb_build_object('purchaseOrderIds', v_pos, 'skipped', v_skipped));
+end $$;
+
+-- Cycle count at one bin (Cycle count sheet): one number per material, the
+-- header always written (a zero-variance count is a durable occurrence), and
+-- only the variance posts, as count_adjustment movements. A count is one
+-- number but a material may hold several lots, so this decides which lot
+-- moves: a shortage consumes earliest best-by first (lots with none fall to
+-- receipt order behind those that have one) and may split across lots, one
+-- count line per lot; an overage lands on the newest lot.
+create function record_material_count(
+  p_brewery uuid, p_location uuid, p_bin uuid, p_counted_on date, p_lines jsonb, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_actor uuid; v_replay jsonb; v_count public.material_counts; l jsonb; v_mat public.materials;
+  v_on_hand numeric; v_counted numeric; v_delta numeric; v_take numeric; v_movement uuid; lot record;
+  v_lines jsonb := '[]'; v_movements jsonb;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin','warehouse','brewer']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'record_material_count', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'location', p_location, 'bin', p_bin, 'counted_on', p_counted_on, 'lines', p_lines));
+  if v_replay is not null then return v_replay; end if;
+  if jsonb_array_length(p_lines) = 0 then raise exception 'a count needs at least one material'; end if;
+  insert into public.material_counts (brewery_id, location_id, bin_id, counted_on, counted_by)
+  values (p_brewery, p_location, p_bin, coalesce(p_counted_on, current_date), v_actor) returning * into v_count;
+  for l in select * from jsonb_array_elements(p_lines) loop
+    select * into v_mat from public.materials where id = (l->>'material_id')::uuid and brewery_id = p_brewery;
+    if v_mat.id is null then raise exception 'material not found'; end if;
+    v_counted := (l->>'qty')::numeric;
+    select coalesce(qty, 0) into v_on_hand from public.material_bin_on_hand
+      where material_id = v_mat.id and location_id = p_location and bin_id = p_bin;
+    v_on_hand := coalesce(v_on_hand, 0);
+    v_delta := v_counted - v_on_hand;
+    v_movements := '[]';
+    if v_delta = 0 or not v_mat.lot_tracked then
+      -- No lot to pick: one count line, and a movement only when there is a variance.
+      v_movement := null;
+      if v_delta <> 0 then
+        insert into public.material_movements (brewery_id, material_id, location_id, bin_id, qty, type, created_by)
+        values (p_brewery, v_mat.id, p_location, p_bin, v_delta, 'count_adjustment', v_actor) returning id into v_movement;
+        v_movements := v_movements || to_jsonb(v_movement);
+      end if;
+      insert into public.material_count_lines (brewery_id, count_id, material_id, qty_expected, qty_counted, movement_id)
+      values (p_brewery, v_count.id, v_mat.id, v_on_hand, v_counted, v_movement);
+    elsif v_delta > 0 then
+      -- Overage: the newest lot at this bin (unrecorded stock is likeliest the delivery just counted in).
+      select ml.id, coalesce(sum(mm.qty), 0) as qty into lot
+      from public.material_lots ml left join public.material_movements mm
+        on mm.brewery_id = p_brewery and mm.material_id = v_mat.id and mm.lot_id = ml.id
+          and mm.location_id = p_location and mm.bin_id = p_bin
+      where ml.material_id = v_mat.id group by ml.id, ml.received_on, ml.created_at
+      order by ml.received_on desc nulls last, ml.created_at desc limit 1;
+      if lot.id is null then raise exception '% is lot-tracked and has no lot to count against', v_mat.name; end if;
+      insert into public.material_movements (brewery_id, material_id, location_id, bin_id, lot_id, qty, type, created_by)
+      values (p_brewery, v_mat.id, p_location, p_bin, lot.id, v_delta, 'count_adjustment', v_actor) returning id into v_movement;
+      insert into public.material_count_lines (brewery_id, count_id, material_id, lot_id, qty_expected, qty_counted, movement_id)
+      values (p_brewery, v_count.id, v_mat.id, lot.id, lot.qty, lot.qty + v_delta, v_movement);
+      v_movements := v_movements || to_jsonb(v_movement);
+    else
+      -- Shortage: earliest best-by first, lots with none behind those that have one, then receipt order.
+      v_delta := -v_delta;
+      for lot in
+        select ml.id, sum(mm.qty) as qty
+        from public.material_lots ml join public.material_movements mm
+          on mm.brewery_id = p_brewery and mm.material_id = v_mat.id and mm.lot_id = ml.id
+          and mm.location_id = p_location and mm.bin_id = p_bin
+        where ml.material_id = v_mat.id group by ml.id, ml.best_by, ml.received_on, ml.created_at
+        having sum(mm.qty) > 0
+        order by ml.best_by asc nulls last, ml.received_on asc nulls last, ml.created_at
+      loop
+        exit when v_delta <= 0;
+        v_take := least(lot.qty, v_delta);
+        insert into public.material_movements (brewery_id, material_id, location_id, bin_id, lot_id, qty, type, created_by)
+        values (p_brewery, v_mat.id, p_location, p_bin, lot.id, -v_take, 'count_adjustment', v_actor) returning id into v_movement;
+        insert into public.material_count_lines (brewery_id, count_id, material_id, lot_id, qty_expected, qty_counted, movement_id)
+        values (p_brewery, v_count.id, v_mat.id, lot.id, lot.qty, lot.qty - v_take, v_movement);
+        v_movements := v_movements || to_jsonb(v_movement);
+        v_delta := v_delta - v_take;
+      end loop;
+      if v_delta > 0 then raise exception 'count of % is below zero for its lots at this bin', v_mat.name; end if;
+    end if;
+    v_lines := v_lines || jsonb_build_object('material_id', v_mat.id, 'qty_expected', v_on_hand, 'qty_counted', v_counted, 'movement_ids', v_movements);
+  end loop;
+  return private.complete_command_request(p_request_id, jsonb_build_object('id', v_count.id, 'counted_on', v_count.counted_on, 'lines', v_lines));
+end $$;
+
 -- ---------------------------------------------------------------- Stock transfers
 -- Internal moves of stuff between two locations (spec 2026-09-06 Decision 3).
 create function private.lock_transfer(p_transfer uuid, p_allowed public.stock_transfer_status[]) returns public.stock_transfers
@@ -5165,7 +5577,9 @@ grant select on breweries, brewery_users, customer_users,
 -- Security-invoker views retain the underlying tables' RLS predicates; expose
 -- only the derived reads consumed by registered commands.
 grant select on on_hand, bin_on_hand, atp, invoice_totals, keg_deposit_balances, portal_brewery, sku_prices,
-  format_volumes, occupancy_volumes, product_volume_requirements to authenticated;
+  format_volumes, occupancy_volumes, product_volume_requirements,
+  material_on_hand, material_bin_on_hand, material_lot_on_hand, material_on_order, material_last_cost,
+  contract_balances, material_requirements, po_open_balances, vendor_lead_times to authenticated;
 grant all on all tables in schema public to service_role;
 grant all on all sequences in schema public to service_role;
 
@@ -5243,7 +5657,15 @@ grant execute on function
   schedule_packaging_run(uuid,uuid,date,uuid,jsonb,uuid),
   update_packaging_run(uuid,uuid,uuid,jsonb,timestamptz,uuid),
   close_packaging_run(uuid,uuid,numeric,jsonb,text,date,date,uuid,uuid,uuid),
-  record_repack(uuid,uuid,uuid,uuid,numeric,uuid,numeric,uuid)
+  record_repack(uuid,uuid,uuid,uuid,numeric,uuid,numeric,uuid),
+  upsert_vendor(uuid,uuid,text,text,text,int,text,boolean,uuid),
+  upsert_material(uuid,uuid,text,public.material_category,public.uom,public.uom,numeric,boolean,uuid,numeric,boolean,uuid),
+  upsert_material_contract(uuid,uuid,uuid,uuid,numeric,int,date,date,text,uuid),
+  create_purchase_order(uuid,uuid,date,text,jsonb,uuid),
+  send_purchase_order(uuid,uuid,text,uuid),
+  receive_purchase_order(uuid,uuid,uuid,uuid,date,jsonb,uuid),
+  draft_purchase_order_from_requirements(uuid,uuid[],uuid),
+  record_material_count(uuid,uuid,uuid,date,jsonb,uuid)
   to authenticated;
 grant usage on schema private, extensions to service_role;
 -- service_role reaches `private` only for the UUID default its seed inserts

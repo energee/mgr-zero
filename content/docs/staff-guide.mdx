@@ -32,8 +32,8 @@ change the search term.
 | --- | --- |
 | **Admin** | Every staff screen and action that exists. |
 | **Sales** | Catalog; customers and pricing; create, submit, confirm, adjust, and cancel orders, plus credits; view inventory; invoices; replenishment suggestions and creating the replenishment order. |
-| **Warehouse** | View inventory and record movements; view orders, pick, and ship; view replenishment suggestions (**Create replenishment order** is on the page but submitting it returns a permission error); schedule, pick a tank for, start, and close packaging runs, and repack. Catalog, Customers, the Invoices list, and Team open if you type their address, but Warehouse has no More tab, so none of those show up in navigation. |
-| **Brewer** | Today; linking your Slack account from App Home; Recipes and versions; Batches, vessels, and recording brew day; Cellar transfers and fermentation readings; packaging runs (schedule, pick a tank, start, and close) — but not **Repack**, which is Admin and Warehouse only. See [Navigate MGR](#navigation). |
+| **Warehouse** | View inventory and record movements; view orders, pick, and ship; view replenishment suggestions (**Create replenishment order** is on the page but submitting it returns a permission error); schedule, pick a tank for, start, and close packaging runs, and repack; vendors, materials and contracts; purchase orders (draft, mark sent, receive), material counts, and drafting orders from Planning. Catalog, Customers, the Invoices list, and Team open if you type their address, but they are not in Warehouse's navigation. |
+| **Brewer** | Today; linking your Slack account from App Home; Recipes and versions; Batches, vessels, and recording brew day; Cellar transfers and fermentation readings; packaging runs (schedule, pick a tank, start, and close) — but not **Repack**, which is Admin and Warehouse only; vendors, materials, contracts and material counts, and reading Planning (drafting the orders is Admin and Warehouse). See [Navigate MGR](#navigation). |
 
 <Callout type="info">
 A permission error is the end of that attempt. Ask an administrator. Hitting submit again will not change your access.
@@ -45,16 +45,16 @@ A permission error is the end of that attempt. Ask an administrator. Hitting sub
 
 The brewery name in the header is the brewery whose records you are looking at. Navigation has up to four sections: **Today**, **Beer**, **Work**, and **More**. On a phone they sit as tabs along the bottom, and tapping the tab opens that group's primary page. On a wider screen they sit in a left rail.
 
-- **Beer** holds **Inventory** and **Cellar**.
-- **Work** holds **Orders**, **Pick**, **Replenishment**, **Transfers**, **Batches**, and **Packaging**.
-- **More** holds **Invoices**, **Catalog**, **Customers**, **Price groups**, **Recipes**, **Settings** (the team roster), and **Sale channels**.
+- **Beer** holds **Inventory**, **Cellar**, and **Materials**.
+- **Work** holds **Orders**, **Pick**, **Replenishment**, **Transfers**, **Batches**, **Packaging**, and **POs**.
+- **More** holds **Invoices**, **Catalog**, **Customers**, **Price groups**, **Recipes**, **Vendors**, **Planning**, **Settings** (the team roster), and **Sale channels**.
 
-Links your role cannot use are simply not shown. Planned areas stay hidden until they are built (Taproom, Taps, Materials, Kegs, POs, Deliveries, Menu, Compliance, Planning, Import), so a tab with nothing you can open does not appear.
+Links your role cannot use are simply not shown. Planned areas stay hidden until they are built (Taproom, Taps, Kegs, Deliveries, Menu, Compliance, Import), so a tab with nothing you can open does not appear.
 
 CSV import has no screen yet, so there is no **Import** link. See [Actions not yet available](#unavailable).
 
 <Callout type="warn">
-**Brewer navigation:** Brewer sees Today, Beer (Cellar), Work (Batches, Packaging), and More (Recipes). Materials, Taps, Taproom, and Planning are planned and hidden. Repack, on the Packaging page, is Admin and Warehouse only, so Brewer does not see that button.
+**Brewer navigation:** Brewer sees Today, Beer (Cellar, Materials), Work (Batches, Packaging), and More (Recipes, Vendors, Planning). Taps and Taproom are planned and hidden. Repack, on the Packaging page, and the Draft purchase orders button on Planning are Admin and Warehouse only, so Brewer does not see them.
 </Callout>
 
 **Me** in the header shows your brewery and role, lets you **Switch to light mode** or **Switch to dark mode**, and offers **Sign out**. Forms open as a panel from the bottom of the screen on a phone and as a centered dialog on a wider screen. On a phone, page actions such as **New Order** or **Save** span the column. On a wider screen, create actions sit on the title row and other actions hug their label instead of stretching across the page. Sign-in and other entry cards stay a narrow column, so their buttons still span that card.
@@ -342,6 +342,40 @@ A run without a tank shows **Pick source** on its page: choose a **Source tank**
 
 **Repack** (Admin and Warehouse only — a Brewer does not see this button), next to Schedule run, breaks a composed unit (a case) into the units it is made of at one location and bin — a shape change, never a production or a removal. Choose the **Location** and **Bin**, the SKU you are **Breaking** and its quantity, and the SKU you are packing it **Into** and its quantity. It is refused unless the two SKUs share a brand and their formats are joined by exactly one composition record, and unless the volumes on both sides match exactly.
 
+## Purchasing: vendors, materials, and purchase orders [#purchasing]
+
+<Screen name="Purchase orders" />
+
+Purchasing is four pages. **Vendors** and **Materials** hold the definitions, **POs** (Work tab) is where an order lives from draft to received, and **Planning** shows what committed work is short of and drafts the orders to cover it.
+
+### Vendors and contracts
+
+**Vendors** (More tab; Admin, Warehouse, Brewer) lists your suppliers. **Add vendor** and **Edit** take a name, optional email and phone, payment terms (due on receipt, net 15, net 30), and a **Lead time** in days. The lead time is the vendor's, not the material's: it is what Planning subtracts from a needed-by date to get a buy-by date. Once a vendor has received orders, the row also shows the observed average from sent to last receipt, with how many orders it rests on (n=3 is weak evidence) and how it was sent, because a date someone typed for an order phoned in is not the same evidence as one MGR stamped.
+
+Below the vendors, **Contracts** lists commitments: one vendor, one material, a quantity in purchase units, an optional price and window. A contract is not an order. You order against it all year, so each row shows four numbers: **committed**, **received**, **on order** (placed but not yet arrived), and **available**, which is committed less both. Available is the one to decide against; received is the one accounting reconciles. A contract never stops you ordering: exceed it and the extra lines are ordinary spot lines.
+
+### Materials
+
+**Materials** (Beer tab; Admin, Warehouse, Brewer) lists material definitions with on hand summed across every bin. **Add material** and **Edit** take a name, a kind (malt, hop, yeast, adjunct, chemical, packaging, other), the base unit you consume in, the purchase unit you buy in and how many base units one purchase unit holds (a 44 lb hop box is purchase unit *each*, 44 base units), whether it is **lot-tracked**, and an optional **default vendor**. Units are refused once the material has movements, because every ledger row was written in them. A lot-tracked material asks for a lot code at every receipt; an untracked one never does.
+
+**Count** on a material row opens a cycle count for one bin: pick the location and bin, type what you counted in base units, and **Record count**. The count is always recorded, even when it matches. Only the variance posts, as a count adjustment. When the material holds several lots, a shortage comes off the earliest best-by lots first and an overage lands on the newest lot; a shortage crossing two lots writes one adjustment per lot. Count label stock as whole rolls and leave the open roll out; its remainder falls into the variance and self-corrects at the next count.
+
+### Purchase orders
+
+**POs** (Work tab; Admin and Warehouse) lists open orders: drafts, sent, and partially received. Each row names its next action. **New PO** takes a vendor, an optional expected date, and lines: a material, a quantity in purchase units, an optional unit cost, and on a lot-tracked material an optional **Expected lot**, the lot the vendor named when you ordered. The expected lot is advisory: it creates nothing, and receiving prefills from it. **Save draft** numbers the order PO-0001 upward.
+
+A draft's page offers **Mark sent**. Choose how it went out, **From my mail client** or **Phoned, faxed, or vendor portal**, and confirm. MGR does not send email: it records that you sent the order today and who did. The status then reads **Marked sent** with the date, never *Delivered*, because nothing here can know that. Marking is one-way; a sent order cannot go back to draft.
+
+A sent order's page is the receiving form. Choose the location and bin everything lands in and the received date, then for each line still due type what you **counted**. Lines default to what is still due; type over them. Over and short are both allowed and both recorded. A lot-tracked line asks for the **lot code off the package** (prefilled from the expected lot when the order named one; if the vendor shipped another lot, type what the box says) and an optional best-by date. **Receive purchase order** writes the receipt, its lines, the lots, and receipt movements into that bin in one step; only what you counted posts to inventory. The order becomes **partially received** until every line is met, then **received**. What each line still owes is worked out from the receipts every time, so a second receipt against the same order simply closes the remainder. **Show received and cancelled** at the foot of the list reveals finished orders.
+
+### Planning
+
+<Screen name="Planning" />
+
+**Planning** (More tab; Admin, Warehouse, Brewer) lists each material that committed work is short of. Demand is what unbrewed batches need through their recipe and what open packaging runs need through their format's bill of materials; supply is on hand plus what is already on a sent purchase order, so a gap is never ordered twice. A draft is not supply until it is marked sent. Each row shows need, on hand, on order, the needed-by date, the vendor the gap resolves to (a contract with commitment still available, else the material's default vendor), that vendor's lead time, and the **buy by** date. A row past its buy-by date is out of reach and is left out of the draft; a material with no contract and no default vendor cannot draft at all until you set one.
+
+**Draft N purchase orders** (Admin and Warehouse) writes one draft per vendor for every buyable row, quantities rounded up to whole purchase units, priced from the contract for what its available commitment covers and left blank beyond that. The label says how many before you commit, and the page then opens the POs list so you can review and mark them sent.
+
 ## Team [#team]
 
 <Screen name="Team" />
@@ -416,6 +450,7 @@ Do not hunt for hidden controls for these:
 - staff or customer-portal invitations
 - CSV import
 - adding, renaming or removing bins, setting taproom pars, or choosing the warehouse that fulfills wholesale-customer portal orders, from the interface
+- cancelling a purchase order, editing one after it is saved, or sending one by email from MGR
 - editing brands, formats, or SKUs after creation
 - deleting customers, ship-tos, inventory history, orders, invoices, or credit memos
 - editing staff roles or seeing staff email addresses
