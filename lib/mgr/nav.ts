@@ -41,7 +41,7 @@ export const STAFF_NAV: readonly NavItem[] = [
       { label: "Taps", href: "/inventory#taps", planned: true, roles: ["warehouse"] },
       { label: "Cellar", href: "/cellar", roles: ["brewer"] },
       { label: "Materials", href: "/materials", roles: ["brewer", "warehouse"] },
-      { label: "Kegs", href: "/inventory#kegs", planned: true, roles: ["warehouse"] },
+      { label: "Kegs", href: "/kegs", roles: ["warehouse"] },
     ],
   },
   {

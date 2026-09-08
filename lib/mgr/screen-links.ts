@@ -298,7 +298,7 @@ export const ROUTES: Record<string, string> = {
   "/inventory#taps": "Tap board",
   "/cellar": "Cellar map",
   "/materials": "Materials on hand",
-  "/inventory#kegs": "Keg fleet",
+  "/kegs": "Keg fleet",
   "/orders": "Orders",
   "/pick": "Pick sheet",
   "/replenishment": "Pars and allocation",

@@ -32,7 +32,7 @@ change the search term.
 | --- | --- |
 | **Admin** | Every staff screen and action that exists. |
 | **Sales** | Catalog; customers and pricing; create, submit, confirm, adjust, and cancel orders, plus credits; view inventory; invoices; replenishment suggestions and creating the replenishment order. |
-| **Warehouse** | View inventory and record movements; view orders, pick, and ship; view replenishment suggestions (**Create replenishment order** is on the page but submitting it returns a permission error); schedule, pick a tank for, start, and close packaging runs, and repack; vendors, materials and contracts; purchase orders (draft, mark sent, receive), material counts, and drafting orders from Planning. Catalog, Customers, the Invoices list, and Team open if you type their address, but they are not in Warehouse's navigation. |
+| **Warehouse** | View inventory and record movements; keg pools and keg events on **Kegs**; view orders, pick, and ship; view replenishment suggestions (**Create replenishment order** is on the page but submitting it returns a permission error); schedule, pick a tank for, start, and close packaging runs, and repack; vendors, materials and contracts; purchase orders (draft, mark sent, receive), material counts, and drafting orders from Planning. Catalog, Customers, the Invoices list, and Team open if you type their address, but they are not in Warehouse's navigation. |
 | **Brewer** | Today; linking your Slack account from App Home; Recipes and versions; Batches, vessels, and recording brew day; Cellar transfers and fermentation readings; packaging runs (schedule, pick a tank, start, and close) — but not **Repack**, which is Admin and Warehouse only; vendors, materials, contracts and material counts, and reading Planning (drafting the orders is Admin and Warehouse). See [Navigate MGR](#navigation). |
 
 <Callout type="info">
@@ -45,11 +45,11 @@ A permission error is the end of that attempt. Ask an administrator. Hitting sub
 
 The brewery name in the header is the brewery whose records you are looking at. Navigation has up to four sections: **Today**, **Beer**, **Work**, and **More**. On a phone they sit as tabs along the bottom, and tapping the tab opens that group's primary page. On a wider screen they sit in a left rail.
 
-- **Beer** holds **Inventory**, **Cellar**, and **Materials**.
+- **Beer** holds **Inventory**, **Cellar**, **Materials**, and **Kegs**.
 - **Work** holds **Orders**, **Pick**, **Replenishment**, **Transfers**, **Batches**, **Packaging**, and **POs**.
 - **More** holds **Invoices**, **Catalog**, **Customers**, **Price groups**, **Recipes**, **Vendors**, **Planning**, **Settings** (the team roster), and **Sale channels**.
 
-Links your role cannot use are simply not shown. Planned areas stay hidden until they are built (Taproom, Taps, Kegs, Deliveries, Menu, Compliance, Import), so a tab with nothing you can open does not appear.
+Links your role cannot use are simply not shown. Planned areas stay hidden until they are built (Taproom, Taps, Deliveries, Menu, Compliance, Import), so a tab with nothing you can open does not appear.
 
 CSV import has no screen yet, so there is no **Import** link. See [Actions not yet available](#unavailable).
 
@@ -269,6 +269,36 @@ MGR creates a separate credit memo at the prices frozen on the invoice lines, ne
 ## Stock transfers [#transfers]
 
 **Transfers** (Work tab; Warehouse and Admin) move stock between two of the brewery's locations without an order or an invoice. **New transfer** takes a source and destination location, the bin at each end (the first bin is preselected), and SKU lines with quantities. Materials and empty kegs move through the same command from the API. The document is numbered TRF-0001 upward and walks **Submit**, **Record pick** (quantities default to what was requested), and **Receive**. Receiving writes the paired stock movements in one step, out of the source bin and into the destination bin, so on hand changes place and nothing counts as a removal; the fleet total for kegs is unchanged. A same-location pair is refused: moving stock between two bins of one location is a bin move, which writes the paired rows without a document.
+
+## Keg fleet [#kegs]
+
+<Screen name="Keg fleet" />
+
+**Kegs** (Beer tab; Warehouse and Admin) is the brewery's returnable keg fleet: pools and where their kegs are. One-way kegs are materials and do not appear here.
+
+### Keg pools
+
+A pool is one group of kegs you count together: **Owned**, **Leased**, or **Pay per fill**. **Add keg pool** takes the name, the kind, an optional per-fill cost, and the deposit charged per keg. **Edit** on a pool row changes its name, costs, or deposit, or takes it out of service. The kind cannot change after creation.
+
+### Record a keg event
+
+**Record keg event** posts one line to the keg ledger. Choose the pool, the size, the reason, the location and bin the kegs are at (the first bin is preselected), and how many kegs:
+
+- **Acquired** and **Retired** add kegs to or remove them from the fleet at that bin. No customer.
+- **Shipped** and **Returned** move empty kegs to or from a customer; the customer is required. Shipped names the bin they left from, Returned the bin they came back into. The fleet total does not change.
+- **Lost** and **Found** adjust the count at that bin; a customer is optional and, when given, moves that customer's balance.
+
+The quantity is always positive; the reason is the direction. Kegs moving between bins or locations are recorded through **Transfers** or a bin move, not here. Empty kegs only: beer coming back with a keg, and its credit, is [Return shipment](#invoices). A keg deposit refund is a separate credit memo.
+
+Each pool row shows its kegs per size, location, and bin, so 36 in the taproom and 40 in storage read as two rows.
+
+<Screen name="Customer keg balance" />
+
+**Customer keg balance** lists, for one customer, the kegs out per pool and size and the deposit invoiced for them (zero when no deposit was ever invoiced). Kegs out is shipped minus returned minus lost.
+
+<Screen name="Keg event history" />
+
+**Keg event history** is the ledger newest first. The pool and customer filters combine. Nothing here can be edited; a wrong entry is corrected by recording the opposite event.
 
 ## Taproom replenishment [#replenishment]
 

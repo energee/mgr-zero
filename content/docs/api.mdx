@@ -170,6 +170,7 @@ omitted. They have no roles until they are built.
 | `consume_chat_link_proof` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
 | `create_bin` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `create_credit_memo` | Orders & invoicing | ✓ | ✓ |  |  |  |
+| `create_keg_pool` | Taproom & kegs | ✓ |  | ✓ |  |  |
 | `create_location` | Inventory & locations | ✓ |  |  |  |  |
 | `create_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `create_purchase_order` | Purchasing & materials | ✓ |  | ✓ |  |  |
@@ -188,9 +189,11 @@ omitted. They have no roles until they are built.
 | `get_brew_day` | Production | ✓ |  |  | ✓ |  |
 | `get_chat_link_status` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
 | `get_customer` | Customers | ✓ | ✓ | ✓ |  |  |
+| `get_customer_keg_balance` | Taproom & kegs | ✓ |  | ✓ |  |  |
 | `get_delivery_stop` | Delivery & routes | ✓ | ✓ | ✓ |  |  |
 | `get_gravity_unit` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ |  |
 | `get_invoice` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
+| `get_keg_fleet` | Taproom & kegs | ✓ |  | ✓ |  |  |
 | `get_material_on_hand` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |
 | `get_material_requirements` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |
 | `get_on_hand` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
@@ -213,6 +216,8 @@ omitted. They have no roles until they are built.
 | `list_fermentation_readings` | Production | ✓ |  |  | ✓ |  |
 | `list_formats` | Packaging | ✓ | ✓ | ✓ |  |  |
 | `list_invoices` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
+| `list_keg_events` | Taproom & kegs | ✓ |  | ✓ |  |  |
+| `list_keg_pools` | Taproom & kegs | ✓ |  | ✓ |  |  |
 | `list_locations` | Inventory & locations | ✓ | ✓ | ✓ | ✓ |  |
 | `list_materials` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |
 | `list_movements` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
@@ -244,6 +249,7 @@ omitted. They have no roles until they are built.
 | `record_brew_day` | Production | ✓ |  |  | ✓ |  |
 | `record_cellar_transfer` | Production | ✓ |  |  | ✓ |  |
 | `record_fermentation_reading` | Production | ✓ |  |  | ✓ |  |
+| `record_keg_event` | Taproom & kegs | ✓ |  | ✓ |  |  |
 | `record_material_count` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |
 | `record_movement` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `record_pick` | Orders & invoicing | ✓ |  | ✓ |  |  |
@@ -273,6 +279,7 @@ omitted. They have no roles until they are built.
 | `unlink_chat_user` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
 | `update_bin` | Inventory & locations | ✓ |  | ✓ |  |  |
 | `update_draft_order` | Orders & invoicing | ✓ | ✓ |  |  |  |
+| `update_keg_pool` | Taproom & kegs | ✓ |  | ✓ |  |  |
 | `update_location` | Inventory & locations | ✓ |  |  |  |  |
 | `update_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |
 | `upsert_brand` | Catalog & pricing | ✓ | ✓ |  |  |  |
@@ -1793,6 +1800,27 @@ wholesale order goes through.
 
 {/* ops:taproom */}
 
+#### create_keg_pool [#create_keg_pool]
+
+`command` · admin, warehouse
+
+Add a keg pool: owned, leased from a vendor, or pay-per-fill, with its per-keg deposit
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `name` | string | yes |
+| `kind` | owned or leased or pay_per_fill | yes |
+| `vendorId` | uuid | no |
+| `perFillCents` | integer | no |
+| `depositCents` | integer | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_keg_pool", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "name": "string", "kind": "owned" } }'
+```
+
 #### create_replenishment_order [#create_replenishment_order]
 
 `command` · admin, sales
@@ -1810,6 +1838,96 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_replenishment_order", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "fromLocationId": "00000000-0000-0000-0000-000000000000", "toLocationId": "00000000-0000-0000-0000-000000000000", "lines": [ { "skuId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
+```
+
+#### get_customer_keg_balance [#get_customer_keg_balance]
+
+`query` · admin, warehouse
+
+Kegs a customer has out per pool and size, with the deposit held for them
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `customerId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_customer_keg_balance", "input": { "customerId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+#### get_keg_fleet [#get_keg_fleet]
+
+`query` · admin, warehouse
+
+Keg pools with on-hand kegs per pool, size, location and bin
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_keg_fleet", "input": {} }'
+```
+
+#### list_keg_events [#list_keg_events]
+
+`query` · admin, warehouse
+
+Keg event history, newest first, optionally for one pool or one customer
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `poolId` | uuid | no |
+| `customerId` | uuid | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_keg_events", "input": {} }'
+```
+
+#### list_keg_pools [#list_keg_pools]
+
+`query` · admin, warehouse
+
+Keg pools, alphabetical, active and retired alike
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_keg_pools", "input": {} }'
+```
+
+#### record_keg_event [#record_keg_event]
+
+`command` · admin, warehouse
+
+Record kegs acquired, retired, shipped to or returned from a customer, lost or found, at a location and bin; shipped and returned need the customer
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `poolId` | uuid | yes |
+| `kegSize` | half_bbl or quarter_bbl or sixth_bbl or fifty_l or thirty_l or twenty_l | yes |
+| `qty` | integer | yes |
+| `reason` | acquired or retired or shipped or returned or lost or found | yes |
+| `locationId` | uuid | yes |
+| `binId` | uuid | yes |
+| `customerId` | uuid | no |
+| `shipmentId` | uuid | no |
+| `note` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "record_keg_event", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "poolId": "00000000-0000-0000-0000-000000000000", "kegSize": "half_bbl", "qty": 1, "reason": "acquired", "locationId": "00000000-0000-0000-0000-000000000000", "binId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### replenishment_suggestions [#replenishment_suggestions]
@@ -1848,26 +1966,43 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_taproom_par", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "locationId": "00000000-0000-0000-0000-000000000000", "skuId": "00000000-0000-0000-0000-000000000000", "parQty": 1 } }'
 ```
 
+#### update_keg_pool [#update_keg_pool]
+
+`command` · admin, warehouse
+
+Rename a keg pool, change its vendor, per-fill cost or deposit, or take it out of service; omitted fields keep their value
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `poolId` | uuid | yes |
+| `name` | string | no |
+| `vendorId` | uuid | no |
+| `perFillCents` | integer | no |
+| `depositCents` | integer | no |
+| `active` | boolean | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "update_keg_pool", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "poolId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 ---
 
 **Designed, not yet available** {/* taproom-designed */}
 
-3 of the 13 operations in this area are available today; the 10 below are not.
+10 of the 15 operations in this area are available today; the 5 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
-| `create_keg_pool` | command | Keg fleet |
-| `get_customer_keg_balance` | query | Customer keg balance |
 | `kick_keg` | command | Tap board, Kick keg |
-| `list_keg_events` | query | Keg event history |
 | `list_open_taps` | query | Tap board, Kick keg, Swap keg |
-| `record_keg_event` | command | Keg fleet |
 | `record_taproom_count` | command | Weekly count |
 | `swap_keg` | command | Tap board, Swap keg |
 | `tap_keg` | command | Tap board |
-| `update_keg_pool` | command | Keg fleet |
 
 {/* end ops:taproom */}
 

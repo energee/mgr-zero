@@ -2890,10 +2890,10 @@ export const SCREENS: Screen[] = [
     name: "Keg fleet",
     to: { "Record keg return \u00b7 refund $120": "Keg event history" },
     job: "Manage pools and record events without confusing beer returns",
-    reads: "get_keg_fleet [view] · keg_bin_totals [view]",
-    writes: "create_keg_pool · update_keg_pool [design; mutable single rows] · record_keg_event [design; intents acquired / returned / lost / found / retired; returned = one RPC: keg event + standalone credit memo with keg_deposit_refund line]",
+    reads: "get_keg_fleet · list_customers",
+    writes: "create_keg_pool · update_keg_pool · record_keg_event",
     states: [["acquire", "qty into pool · no customer"], ["return empty", "customer required · deposit refund previews"], ["lost / found", "customer balance moves · no money"], ["retire", "out of service · no customer"]],
-    spec: "Return empty posts the deposit refund in the same RPC; there is no deposit-only screen. Beer coming back with the keg is Return shipment (beer + deposit). No dirty/clean CIP status.",
+    spec: "Return empty is a keg event only; the deposit refund is a separate credit memo (no refund line is posted with the keg event yet). Beer coming back with the keg is Return shipment (beer + deposit). No dirty/clean CIP status.",
     body: (<>
       {E.back("Beer", "Keg fleet")}
       {E.fld("Selected pool", "Microstar ⅙ bbl · 76 kegs · pay per fill")}
@@ -2921,7 +2921,7 @@ export const SCREENS: Screen[] = [
     name: "Customer keg balance",
     to: { "Over 90 days": "Keg event history" },
     job: "See every keg pool one customer has out and the deposit exposure",
-    reads: "get_customer_keg_balance [design]",
+    reads: "get_customer_keg_balance · list_customers",
     writes: "none",
     states: [["permission", "warehouse or admin required", 1], ["current", "all pools and deposits shown"], ["overdue", "oldest unreturned kegs flagged", 1], ["none", "no kegs currently out"]],
     spec: "The same customer-owned detail is reachable from Customers and Keg fleet.",
@@ -2940,7 +2940,7 @@ export const SCREENS: Screen[] = [
     tab: "Beer",
     name: "Keg event history",
     job: "Audit acquired, returned, lost, found and retired keg events",
-    reads: "list_keg_events [design]",
+    reads: "list_keg_events · list_keg_pools · list_customers",
     writes: "none",
     states: [["permission", "warehouse or admin required", 1], ["all", "newest first"], ["filtered", "customer and pool filters combine"], ["empty", "no matching events"]],
     spec: "This is the immutable keg ledger, not an editor.",
