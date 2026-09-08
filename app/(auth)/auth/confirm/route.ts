@@ -4,7 +4,7 @@
 // on Expired reset copy at /reset instead of opening the password form.
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { inviteAudience, safeNextPath } from "@/lib/auth/invite";
+import { inviteAudience, safeNextUrl } from "@/lib/auth/invite";
 import { publicEnv } from "@/lib/env/public";
 
 function authClient(req: NextRequest) {
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
   const type = req.nextUrl.searchParams.get("type");
   const audience = inviteAudience(req.nextUrl.searchParams.get("audience"));
   // Same-origin paths only: "//host" would be a protocol-relative open redirect.
-  const next = safeNextPath(req.url, req.nextUrl.searchParams.get("next"));
+  const next = safeNextUrl(req.url, req.nextUrl.searchParams.get("next"));
   if (tokenHash || type === "invite") {
     if (!tokenHash || type !== "invite" || !audience) return NextResponse.redirect(new URL("/invite-expired", req.url));
     const { db, redirect } = authClient(req);

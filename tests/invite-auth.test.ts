@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { acceptInviteErrorPath, inviteAudience, inviteLanding, safeNextPath } from "@/lib/auth/invite";
+import { NextResponse } from "next/server";
+import { acceptInviteErrorPath, inviteAudience, inviteLanding, safeNextUrl } from "@/lib/auth/invite";
 import type { CustomerMembership, RequestAuthContext, StaffMembership } from "@/lib/auth/request-context";
 
 const auth = (staff: StaffMembership[] = [], customer: CustomerMembership[] = []): RequestAuthContext => ({
@@ -17,10 +18,15 @@ describe("invite acceptance", () => {
   });
 
   it("keeps callback redirects on the request origin", () => {
-    expect(safeNextPath("http://localhost:3000/auth/confirm", "/password?from=mail")).toBe("/password?from=mail");
-    expect(safeNextPath("http://localhost:3000/auth/confirm", "//evil.example/path")).toBe("/password");
-    expect(safeNextPath("http://localhost:3000/auth/confirm", "/\t/evil.example")).toBe("/password");
-    expect(safeNextPath("http://localhost:3000/auth/confirm", "https://evil.example")).toBe("/password");
+    const request = "http://localhost:3000/auth/confirm";
+    expect(safeNextUrl(request, "/password?from=mail")).toBe("http://localhost:3000/password?from=mail");
+    expect(safeNextUrl(request, "password?from=mail")).toBe("http://localhost:3000/password?from=mail");
+    for (const wanted of ["//evil.example/path", "/\t/evil.example", "https://evil.example"]) {
+      expect(safeNextUrl(request, wanted)).toBe("http://localhost:3000/password");
+    }
+    const normalized = safeNextUrl(request, "/.//evil.example");
+    expect(new URL(NextResponse.redirect(normalized).headers.get("location")!).origin).toBe("http://localhost:3000");
+    expect(normalized).toBe("http://localhost:3000//evil.example");
   });
 
   it("preserves valid invite context after form validation", () => {

@@ -6,11 +6,12 @@ export function inviteAudience(value: unknown): InviteAudience | null {
   return value === "staff" || value === "customer" ? value : null;
 }
 
-export function safeNextPath(requestUrl: string, wanted: string | null) {
-  if (!wanted) return "/password";
+export function safeNextUrl(requestUrl: string, wanted: string | null) {
+  const fallback = new URL("/password", requestUrl).href;
+  if (!wanted) return fallback;
   const request = new URL(requestUrl);
   const destination = new URL(wanted, request.origin);
-  return destination.origin === request.origin ? `${destination.pathname}${destination.search}${destination.hash}` : "/password";
+  return destination.origin === request.origin ? destination.href : fallback;
 }
 
 export function acceptInviteErrorPath(audience: InviteAudience | null, name: string) {
