@@ -64,6 +64,19 @@ function assertNoSlackRequests() {
   assert(!requests.toLowerCase().includes("slack.com"), `unexpected Slack request: ${requests}`);
 }
 
+function traversePreviewsByKeyboard() {
+  const first = CHAT_PREVIEW_FIXTURES[0];
+  ab("focus", `input[value=${JSON.stringify(first.id)}]`);
+  ab("press", "Space");
+  for (let index = 0; index < CHAT_PREVIEW_FIXTURES.length; index++) {
+    const fixture = CHAT_PREVIEW_FIXTURES[index];
+    assert.equal(ab("eval", `document.querySelector('input[value=${JSON.stringify(fixture.id)}]')?.checked`).result, true, `${fixture.title} was not selected by keyboard`);
+    assert.equal(ab("eval", "document.activeElement?.matches(':focus-visible')").result, true, `${fixture.title} lost visible keyboard focus`);
+    assert.equal(ab("eval", `document.querySelector('section[aria-labelledby="chat-preview-${fixture.id}"] h3')?.textContent`).result, fixture.title);
+    if (index < CHAT_PREVIEW_FIXTURES.length - 1) ab("press", "ArrowRight");
+  }
+}
+
 async function main() {
   let server: ChildProcess | null = null;
   try {
@@ -78,20 +91,10 @@ async function main() {
     ab("find", "label", "Password", "fill", "test-password-1");
     ab("find", "role", "button", "click", "--name", "Sign in");
     ab("wait", "--url", "**/");
+    ab("network", "requests", "--clear");
     ab("open", `${BASE_URL}/settings/chat`);
     ab("wait", "--text", "Fixture data only. Previews never send Slack messages.");
-    ab("network", "requests", "--clear");
-
-    const first = CHAT_PREVIEW_FIXTURES[0];
-    ab("focus", `input[value=${JSON.stringify(first.id)}]`);
-    ab("press", "Space");
-    for (let index = 0; index < CHAT_PREVIEW_FIXTURES.length; index++) {
-      const fixture = CHAT_PREVIEW_FIXTURES[index];
-      assert.equal(ab("eval", `document.querySelector('input[value=${JSON.stringify(fixture.id)}]')?.checked`).result, true, `${fixture.title} was not selected by keyboard`);
-      assert.equal(ab("eval", `document.activeElement?.matches(':focus-visible')`).result, true, `${fixture.title} lost visible keyboard focus`);
-      assert.equal(ab("eval", `document.querySelector('section[aria-labelledby="chat-preview-${fixture.id}"] h3')?.textContent`).result, fixture.title);
-      if (index < CHAT_PREVIEW_FIXTURES.length - 1) ab("press", "ArrowRight");
-    }
+    traversePreviewsByKeyboard();
 
     assert.equal(ab("eval", "document.querySelector('[role=dialog]') === null").result, true, "preview gallery unexpectedly opened a real modal");
     ab("focus", 'input[value="fermentation-gated"]'); ab("press", "Space");
@@ -104,10 +107,12 @@ async function main() {
     ab("screenshot", join(SHOTS, "chat-settings-phone.png"), "--full");
 
     ab("set", "viewport", "1440", "1000");
+    traversePreviewsByKeyboard();
     assertNoOverflow();
     ab("screenshot", join(SHOTS, "chat-settings-desktop.png"), "--full");
     assertNoSlackRequests();
 
+    ab("network", "requests", "--clear");
     ab("open", `${BASE_URL}/docs/integrations`);
     ab("wait", "--text", "Link identity");
     const body = ab("get", "text", "body").text ?? "";
@@ -115,7 +120,7 @@ async function main() {
     assertNoOverflow();
     ab("screenshot", join(SHOTS, "slack-venues-desktop.png"), "--full");
     assertNoSlackRequests();
-    console.log("Chat browser smoke passed: 10 keyboard previews, gated forms, 375/1440 screenshots, Slack venues, focus, no overflow, no Slack requests.");
+    console.log("Chat browser smoke passed: 10 keyboard previews at 375/1440, gated forms, screenshots, Slack venues, focus, no overflow, no Slack requests.");
   } finally {
     try { ab("close"); } catch { /* best-effort browser cleanup */ }
     stopServer(server);
