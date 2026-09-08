@@ -92,6 +92,8 @@ const AUTHENTICATED_RPCS = [
   "list_team_members(uuid)",
   "update_staff_role(uuid,uuid,staff_role,uuid)",
   "revoke_staff(uuid,uuid,uuid)",
+  "raise_invoice_question(uuid,uuid,text,uuid)",
+  "resolve_invoice_question(uuid,uuid,uuid)",
   "update_packaging_run(uuid,uuid,uuid,jsonb,timestamp with time zone,uuid)",
   "upsert_brand(uuid,uuid,text,text,numeric,text,text,uuid,text,uuid)",
   "upsert_brand_approval(uuid,uuid,uuid,approval_kind,text,date,date,text,uuid)",

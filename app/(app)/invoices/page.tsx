@@ -1,68 +1,33 @@
-// app/(app)/invoices/page.tsx — invoices and credit memos list. Totals come
-// from list_invoices, which merges in subtotal_cents from the invoice_totals
-// view (see the handler in lib/commands/orders.ts) rather than a separate
-// command — list_invoices' shape is now { ...invoice, subtotal_cents }.
-import Link from "next/link";
+// app/(app)/invoices/page.tsx — the AR list (screen record Invoices, minus
+// its QuickBooks rows until Program 13): every invoice and credit memo with
+// its customer, total and paid date, each opening Invoice. Totals come from
+// list_invoices, which merges subtotal_cents from the invoice_totals view.
+import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
+import { docNo } from "@/lib/mgr/doc-no";
+import { money } from "@/lib/mgr/money";
 import "@/lib/commands/all";
 
-type Invoice = {
-  id: string;
-  invoice_no: number | null;
-  kind: "invoice" | "credit_memo";
-  paid_at: string | null;
-  subtotal_cents: number;
-  customers: { name: string } | null;
-};
+type Invoice = { id: string; invoice_no: number | null; kind: "invoice" | "credit_memo"; due_on: string | null; paid_at: string | null; subtotal_cents: number; customers: { name: string } | null };
 
 export default async function InvoicesPage() {
   const brewery = await getActiveBrewery();
-  const ctx = await buildContext(brewery.id);
-  const invoices = (await runCommand("list_invoices", {}, ctx)) as Invoice[];
-
+  const invoices = (await runCommand("list_invoices", {}, await buildContext(brewery.id))) as Invoice[];
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-xl font-semibold">Invoices</h1>
-      {invoices.length ? (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-muted-foreground">
-              <th className="py-1 font-normal">No.</th>
-              <th className="py-1 font-normal">Kind</th>
-              <th className="py-1 font-normal">Customer</th>
-              <th className="py-1 font-normal">Total</th>
-              <th className="py-1 font-normal">Paid</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoices.map((inv) => (
-              <tr key={inv.id} className="border-t">
-                <td className="py-1">
-                  <Link href={`/invoices/${inv.id}`} className="underline underline-offset-2">
-                    {inv.invoice_no ?? inv.id.slice(0, 8)}
-                  </Link>
-                </td>
-                <td className="py-1">
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs ${
-                      inv.kind === "credit_memo" ? "bg-amber-100 text-amber-800" : "bg-neutral-100 text-neutral-800"
-                    }`}
-                  >
-                    {inv.kind === "credit_memo" ? "credit memo" : "invoice"}
-                  </span>
-                </td>
-                <td className="py-1">{inv.customers?.name ?? "—"}</td>
-                <td className="py-1">${(inv.subtotal_cents / 100).toFixed(2)}</td>
-                <td className="py-1">{inv.paid_at ? new Date(inv.paid_at).toLocaleDateString() : "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <p className="text-sm text-muted-foreground">No invoices yet.</p>
-      )}
-    </div>
+    <>
+      {E.back("More", "Invoices", undefined, "/more")}
+      {E.gated("QuickBooks", "accounting sync isn’t connected yet")}
+      {invoices.length === 0 ? E.blank("No invoices yet") : invoices.map((inv) => {
+        const credit = inv.kind === "credit_memo";
+        const paid = inv.paid_at !== null;
+        return (
+          <div key={inv.id}>{E.row(`${docNo(credit ? "CM" : "INV", inv.invoice_no, credit ? "Credit memo" : "Invoice")} · ${inv.customers?.name ?? "—"}`,
+            credit ? `credit memo · ${money(inv.subtotal_cents)}` : paid ? `paid ${new Date(inv.paid_at!).toLocaleDateString()} · ${money(inv.subtotal_cents)}` : `${inv.due_on ? `due ${inv.due_on}` : "unpaid"} · ${money(inv.subtotal_cents)}`,
+            E.act("Open", "primary", `/invoices/${inv.id}`), paid || credit ? "ok" : "")}</div>
+        );
+      })}
+    </>
   );
 }

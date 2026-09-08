@@ -4,7 +4,7 @@
 // empty state offers the role's first verb. An admin on a brewery with no
 // location and no brand sees the First-run checklist (first-run.tsx) instead.
 // Screens stay fixtures: nothing here imports SCREENS.
-import { Package01Icon, Route01Icon, ThermometerIcon } from "@hugeicons/core-free-icons";
+import { Invoice01Icon, Package01Icon, Route01Icon, ThermometerIcon } from "@hugeicons/core-free-icons";
 import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -16,9 +16,9 @@ import { FirstRunChecklist, type FirstRun } from "./first-run";
 type Reason = TodayItem["reason"];
 const VERB: Record<Reason, [string, "info" | "attention"]> = {
   submitted_order: ["Confirm", "info"], pick_due: ["Pick", "info"], restock_due: ["Put back", "attention"],
-  delivery_next: ["Resume", "info"], fermentation_reading_overdue: ["Record", "info"],
+  delivery_next: ["Resume", "info"], fermentation_reading_overdue: ["Record", "info"], invoice_question: ["Answer", "info"],
 };
-const ICON: Record<TodayItem["subjectType"], typeof Package01Icon> = { order: Package01Icon, delivery: Route01Icon, occupancy: ThermometerIcon };
+const ICON: Record<TodayItem["subjectType"], typeof Package01Icon> = { order: Package01Icon, delivery: Route01Icon, occupancy: ThermometerIcon, invoice: Invoice01Icon };
 
 export default async function TodayPage() {
   const brewery = await getActiveBrewery();

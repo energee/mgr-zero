@@ -1570,8 +1570,8 @@ export const SCREENS: Screen[] = [
     name: "Invoice",
     to: { "Customer mapping": "Mapping conflict", "Pils · case": "Fix mapping" },
     job: "Review one invoice, resolve its mappings and push it",
-    reads: "get_invoice · get_qbo_connection · get_qbo_mapping_candidates [design]",
-    writes: "push_invoice_to_qbo · resolve_invoice_question [design; clears the sales Today row]",
+    reads: "get_qbo_connection · get_qbo_mapping_candidates [design] · get_invoice · list_invoice_questions",
+    writes: "push_invoice_to_qbo [design] · resolve_invoice_question",
     states: [["permission", "sales or admin required", 1], ["unmapped", "push stays unavailable", 1], ["ready", "every customer and item is mapped"], ["pushed", "QuickBooks owns later accounting edits"], ["buyer question", "the note is read here, and answered off-system", 1]],
     spec: "The drill-in for one invoice, and where a buyer's question lands: the portal writes it, the sales Today row points here, and marking it answered is what clears that row. Nothing about the invoice changes; the reply happens in a phone call or an email, which is why the verb says answered rather than replied.",
     body: (<>
@@ -1869,8 +1869,8 @@ export const SCREENS: Screen[] = [
     name: "Question invoice",
     to: { "Send to Demo Brewing": "Pay invoice" },
     job: "Ask the brewery about a line, a total or a payment",
-    reads: "portal_invoice [design]",
-    writes: "raise_invoice_question [design; one RPC: question row + Today row for sales; chat notification when a provider is connected]",
+    reads: "portal_invoice",
+    writes: "raise_invoice_question",
     states: [["sent", "the buyer sees it went · nothing on the invoice changes"], ["received", "a sales Today row names the invoice and the buyer"], ["no chat provider", "the Today row is the whole delivery · no email is sent", 1], ["answered", "Mark answered on the Invoice frame clears the sales row"]],
     spec: "Off Pay invoice and Payment unavailable. The buyer writes a note and it has to land somewhere a person will see: it writes a question row that appears on the sales Today list, and rides the chat integration as a personal message when one is connected. Nothing on the invoice changes.",
     body: (<>

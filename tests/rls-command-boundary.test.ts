@@ -267,6 +267,17 @@ describe("registered staff mutation role × RPC matrix", () => {
       },
     },
     {
+      command: "resolve_invoice_question", rpc: "resolve_invoice_question", allowed: ["admin", "sales"],
+      input: async () => {
+        const { data: inv } = await admin.from("invoices").insert({ brewery_id: brewery.id, customer_id: customerId, kind: "invoice" }).select("id").single();
+        const { data: q } = await admin.from("invoice_questions").insert({ brewery_id: brewery.id, invoice_id: inv!.id, customer_id: customerId, body: "matrix", created_by: adminCtx.userId }).select("id").single();
+        return {
+          command: { questionId: q!.id },
+          rpc: { p_brewery: brewery.id, p_question: q!.id },
+        };
+      },
+    },
+    {
       command: "update_staff_role", rpc: "update_staff_role", allowed: ["admin"],
       input: async () => {
         const member = await makeStaff(brewery.id, "brewer");

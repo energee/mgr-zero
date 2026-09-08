@@ -212,6 +212,25 @@ defineQuery({
   },
 });
 
+/** Buyer questions about invoices (Program 10 task 8): unanswered first. */
+defineQuery({
+  name: "list_invoice_questions", description: "Questions buyers raised from the portal about invoices, unanswered first; invoiceId narrows to one invoice",
+  roles: [...salesRoles],
+  input: z.object({ invoiceId: z.string().uuid().optional() }),
+  handler: (ctx, i) => {
+    let q = ctx.db.from("invoice_questions").select("*, invoices(invoice_no), customers(name)").eq("brewery_id", ctx.breweryId);
+    if (i.invoiceId) q = q.eq("invoice_id", i.invoiceId);
+    return unwrap(q.order("answered_at", { ascending: true, nullsFirst: true }).order("created_at", { ascending: false }));
+  },
+});
+
+defineCommand({
+  name: "resolve_invoice_question", description: "Mark a buyer's invoice question answered (the reply happens off-system); clears its sales Today row",
+  roles: [...salesRoles],
+  input: z.object({ questionId: z.string().uuid() }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("resolve_invoice_question", { p_brewery: ctx.breweryId, p_question: i.questionId, p_request_id: execution.requestId })),
+});
+
 defineQuery({
   name: "daily_pick_sheet", description: "Confirmed/picked orders grouped by requested ship date with lines",
   roles: [...readRoles],

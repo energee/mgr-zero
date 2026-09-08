@@ -7,6 +7,7 @@ export type NotificationReason =
   | "restock_due"
   | "delivery_next"
   | "fermentation_reading_overdue"
+  | "invoice_question"
   | "operations_digest";
 
 export type PortableAction = {
@@ -66,7 +67,7 @@ const portableActionSchema = z.object({
 }).strict();
 
 const portableNotificationSchema = z.object({
-  reason: z.enum(["submitted_order", "pick_due", "restock_due", "delivery_next", "fermentation_reading_overdue", "operations_digest"]),
+  reason: z.enum(["submitted_order", "pick_due", "restock_due", "delivery_next", "fermentation_reading_overdue", "invoice_question", "operations_digest"]),
   urgency: z.enum(["normal", "attention"]),
   subject: z.object({
     type: z.enum(["order", "delivery", "occupancy", "digest"]),

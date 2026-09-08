@@ -120,6 +120,13 @@ defineQuery({
   },
 });
 
+defineCommand({
+  name: "raise_invoice_question", description: "Portal: ask the brewery about one of the caller's invoices; the question lands on the sales Today list and nothing on the invoice changes",
+  roles: "customer",
+  input: z.object({ invoiceId: z.string().uuid(), body: z.string().trim().min(1).max(2000) }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("raise_invoice_question", { p_brewery: ctx.breweryId, p_invoice: i.invoiceId, p_body: i.body, p_request_id: execution.requestId })),
+});
+
 defineQuery({
   name: "portal_invoice", description: "Portal: one of the caller's invoices or credit memos with its lines and total; another customer's id is not found",
   roles: "customer",

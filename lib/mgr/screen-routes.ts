@@ -28,6 +28,7 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Portal forgot password", file: "app/(auth)/reset/page.tsx" },
   { name: "Portal set password", file: "app/(auth)/password/page.tsx" },
   { name: "Today empty", file: "app/(app)/page.tsx" },
+  { name: "Sales", file: "app/(app)/page.tsx" },
   { name: "Brewer", file: "app/(app)/page.tsx" },
   { name: "Driver", file: "app/(app)/page.tsx" },
   { name: "Taproom", file: "app/(app)/page.tsx" },
@@ -57,12 +58,15 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Transfer detail", file: "app/(app)/transfers/[id]/page.tsx" },
   { name: "Pick sheet", file: "app/(app)/pick/page.tsx" },
   { name: "Pars and allocation", file: "app/(app)/replenishment/page.tsx" },
+  { name: "Invoice", file: "app/(app)/invoices/[id]/page.tsx" },
   { name: "Customers", file: "app/(app)/customers/page.tsx" },
   { name: "Customer detail", file: "app/(app)/customers/[id]/page.tsx" },
   { name: "Ship-to form", file: "app/(app)/customers/[id]/page.tsx" },
   { name: "Catalog", file: "app/(app)/catalog/page.tsx" },
   { name: "Brand", file: "app/(app)/catalog/page.tsx" },
   { name: "SKU", file: "app/(app)/catalog/page.tsx" },
+  { name: "Formats", file: "app/(app)/catalog/page.tsx" },
+  { name: "Format", file: "app/(app)/catalog/page.tsx" },
   { name: "Package BOM", file: "app/(app)/catalog/page.tsx" },
   { name: "SKU list", file: "app/(app)/catalog/page.tsx" },
   { name: "Shop", file: "app/(portal)/portal/page.tsx" },
@@ -70,6 +74,8 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Order history", file: "app/(portal)/portal/orders/page.tsx" },
   { name: "Order detail", file: "app/(portal)/portal/orders/[id]/page.tsx" },
   { name: "Invoice history", file: "app/(portal)/portal/invoices/page.tsx" },
+  { name: "Pay invoice", file: "app/(portal)/portal/invoices/[id]/page.tsx" },
+  { name: "Question invoice", file: "app/(portal)/portal/invoices/[id]/page.tsx" },
   { name: "Payment unavailable", file: "app/(portal)/portal/invoices/[id]/page.tsx" },
   { name: "Paid invoice", file: "app/(portal)/portal/invoices/[id]/page.tsx" },
   { name: "Account", file: "app/(portal)/portal/account/page.tsx" },
@@ -94,6 +100,7 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Contracts", file: "app/(app)/vendors/page.tsx" },
   { name: "Contract", file: "app/(app)/vendors/page.tsx" },
   { name: "Recipes", file: "app/(app)/recipes/page.tsx" },
+  { name: "Recipe", file: "app/(app)/recipes/[id]/page.tsx" },
   { name: "Compliance months", file: "app/(app)/compliance/page.tsx" },
   { name: "Compliance registry", file: "app/(app)/compliance/registry/page.tsx" },
   { name: "Brand approval", file: "app/(app)/compliance/registry/page.tsx" },
@@ -124,31 +131,35 @@ const NOT_A_COMMAND = /\[(platform|client state)/;
  * so a part inherits the tag of the next tagged part, as
  * tests/screen-command-gates.test.ts reads it. A `[design]` tag on a command
  * that has since shipped is stale prose; the registry is the fact. */
-function commandTokens(text: unknown): { name: string; live: boolean }[] {
+function commandTokens(text: unknown): { name: string; live: boolean; designed: boolean }[] {
   if (typeof text !== "string") return [];
-  const out: { name: string; live: boolean }[] = [];
-  let skip = false, gated = false;
+  const out: { name: string; live: boolean; designed: boolean }[] = [];
+  let skip = false, gated = false, designed = false;
   for (const part of text.split("·").map((p) => p.trim()).reverse()) {
-    if (/\[/.test(part)) { skip = NOT_A_COMMAND.test(part); gated = GATE.test(part); }
+    if (/\[/.test(part)) { skip = NOT_A_COMMAND.test(part); gated = GATE.test(part); designed = /\[design/.test(part); }
     if (skip) continue;
     const name = part.match(/^([a-z_]+)/)?.[1];
-    if (name && name.includes("_")) out.push({ name, live: !gated && Boolean(getCommandDefinition(name)) });
+    if (name && name.includes("_")) out.push({ name, live: !gated && Boolean(getCommandDefinition(name)), designed });
   }
   return out;
 }
 
-/** Whether the live app can draw this record today: every read is live and,
- * when the record writes anything, at least one write is. A screen with mixed
- * live and gated writes (Team, with invite still gated) is in; a screen whose
- * only writes wait on a gate (Import) is out until the gate lifts. */
+/** Whether the live app can draw this record today: no read is blocked and,
+ * when the record writes anything, at least one write is live. A read blocks
+ * when it is gate-tagged, or unregistered without a `[design]` tag (a `[view]`
+ * the page cannot exist without); a `[design]` read another program owns
+ * (Invoice's QuickBooks reads) leaves the rest of the page drawable. A screen
+ * with mixed live and gated writes (Team, with invite still gated) is in; a
+ * screen whose only writes wait on a gate (Import) is out until it lifts. */
 export function isUngated(s: Screen): boolean {
   if (s.venue) return false;
   const writes = commandTokens(s.writes);
-  return commandTokens(s.reads).every((t) => t.live) && (writes.length === 0 || writes.some((t) => t.live));
+  const blocked = commandTokens(s.reads).some((t) => !t.live && !t.designed);
+  return !blocked && (writes.length === 0 || writes.some((t) => t.live));
 }
 
-/** Programs 11 and 15 own these; their records name no command a gate could sit on. */
-const DEFERRED = new Set(["Accept invite", "Expired invite", "Expired reset", "Composer answer", "Offline outbox"]);
+/** Programs 5, 11, 14, 15 and 16 own these; their records carry no tag a rule could gate on. */
+const DEFERRED = new Set(["Accept invite", "Expired invite", "Expired reset", "Composer answer", "Offline outbox", "Linked people", "POS sale detail", "Water profiles", "Link your Slack"]);
 
 /** The MGR screens the parity test holds the app to. */
 export const ungatedMgrScreens = (): Screen[] => SCREENS.filter((s) => isUngated(s) && !DEFERRED.has(s.name));

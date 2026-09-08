@@ -1,7 +1,8 @@
 // app/(portal)/portal/invoices/[id]/page.tsx — one invoice or credit memo
 // for the signed-in customer (portal_invoice), drawn to the Pay invoice
 // screen record minus the payment itself: QuickBooks Payments is parked, so
-// an unpaid invoice says how to pay instead of offering a dead Pay button.
+// an unpaid invoice says how to pay instead of offering a dead Pay button
+// (Payment unavailable). Question invoice is question-form.tsx.
 import { E } from "@/components/mgr/e";
 import { getActiveCustomer } from "@/lib/portal";
 import { buildContext } from "@/lib/commands/context";
@@ -10,6 +11,7 @@ import "@/lib/commands/all";
 import { docNo } from "@/lib/mgr/doc-no";
 import { money } from "@/lib/mgr/money";
 import { orNotFound } from "@/lib/mgr/not-found";
+import { QuestionForm } from "./question-form";
 
 type Detail = {
   invoice: { id: string; invoice_no: number | null; kind: "invoice" | "credit_memo"; issued_on: string; due_on: string | null; paid_at: string | null; total_cents: number };
@@ -33,6 +35,7 @@ export default async function PortalInvoicePage({ params }: { params: Promise<{ 
       {invoice.kind === "invoice" ? E.row("Status", paid ? `Paid ${new Date(invoice.paid_at!).toLocaleDateString()}` : "Unpaid", "", paid ? "ok" : "w") : E.row("Status", "Credit", "", "ok")}
       {E.tbl(["Item", "Qty", "Amount"], lines.map((l) => [l.skus?.name ?? l.description ?? l.kind, String(Number(l.qty)), money(l.amount_cents)]))}
       {invoice.kind === "invoice" && !paid ? E.info("Contact the brewery to pay this invoice.") : null}
+      <QuestionForm invoiceId={invoice.id} label={`${no} · ${money(invoice.total_cents)}`} brewery="the brewery" />
     </>
   );
 }

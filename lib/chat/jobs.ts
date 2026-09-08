@@ -79,13 +79,13 @@ type Deps = { db?: SupabaseClient; transport?: ChatProviderTransport; now?: Date
 
 const TITLE: Record<NotificationReason, string> = {
   submitted_order: "Review submitted order", pick_due: "Pick due", restock_due: "Put back staged beer", delivery_next: "Next stop",
-  fermentation_reading_overdue: "Reading overdue", operations_digest: "Operations digest",
+  fermentation_reading_overdue: "Reading overdue", invoice_question: "Buyer asked about an invoice", operations_digest: "Operations digest",
 };
 const OWNER: Record<NotificationReason, PortableNotification["ownerClass"]> = {
-  submitted_order: "sales", pick_due: "warehouse", restock_due: "warehouse", delivery_next: "driver", fermentation_reading_overdue: "brewer", operations_digest: "team",
+  submitted_order: "sales", pick_due: "warehouse", restock_due: "warehouse", delivery_next: "driver", fermentation_reading_overdue: "brewer", invoice_question: "sales", operations_digest: "team",
 };
 const DIGEST_LINES: [NotificationReason, string][] = [
-  ["submitted_order", "Submitted orders"], ["pick_due", "Picks due"], ["restock_due", "Restocks due"], ["delivery_next", "Assigned deliveries"], ["fermentation_reading_overdue", "Fermentation readings"],
+  ["submitted_order", "Submitted orders"], ["pick_due", "Picks due"], ["restock_due", "Restocks due"], ["delivery_next", "Assigned deliveries"], ["fermentation_reading_overdue", "Fermentation readings"], ["invoice_question", "Buyer questions"],
 ];
 const REAUTH_CODES = new Set(["invalid_auth", "token_revoked", "account_inactive", "token_expired", "not_authed"]);
 

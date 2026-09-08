@@ -13,11 +13,11 @@ export type WorkKind = "orders" | "transfers" | "batches" | "runs" | "POs" | "ro
 export type WorkRow = { kind: WorkKind; label: string; detail: string; href: string; verb: string; tone: "info" | "attention" | "success"; dueAt: string | null };
 
 const KIND: Record<TodayItem["reason"], WorkKind> = {
-  submitted_order: "orders", pick_due: "orders", restock_due: "orders", delivery_next: "routes", fermentation_reading_overdue: "batches",
+  submitted_order: "orders", pick_due: "orders", restock_due: "orders", delivery_next: "routes", fermentation_reading_overdue: "batches", invoice_question: "orders",
 };
 const VERB: Record<TodayItem["reason"], [string, WorkRow["tone"]]> = {
   submitted_order: ["Confirm", "success"], pick_due: ["Pick", "info"], restock_due: ["Put back", "attention"],
-  delivery_next: ["Resume", "info"], fermentation_reading_overdue: ["Record", "info"],
+  delivery_next: ["Resume", "info"], fermentation_reading_overdue: ["Record", "info"], invoice_question: ["Answer", "info"],
 };
 
 /** The Work chips a role opens by default; an explicit chip choice is remembered on the client. */

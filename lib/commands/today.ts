@@ -7,8 +7,8 @@ import { z } from "zod";
 import { defineQuery, unwrap, type StaffRole, STAFF_ROLES } from "./registry";
 
 export type TodayItem = {
-  reason: "submitted_order" | "pick_due" | "restock_due" | "delivery_next" | "fermentation_reading_overdue";
-  subjectType: "order" | "delivery" | "occupancy";
+  reason: "submitted_order" | "pick_due" | "restock_due" | "delivery_next" | "fermentation_reading_overdue" | "invoice_question";
+  subjectType: "order" | "delivery" | "occupancy" | "invoice";
   subjectId: string;
   sourceVersion: string;
   safeLabel: string;
@@ -26,7 +26,7 @@ type Row = {
 
 defineQuery({
   name: "get_today",
-  description: "Role-filtered work that is assigned, due, or overdue right now (submitted orders, picks and restocks due, the next delivery stop, fermentation readings overdue)",
+  description: "Role-filtered work that is assigned, due, or overdue right now (submitted orders, picks and restocks due, the next delivery stop, fermentation readings overdue, buyer questions about invoices)",
   input: z.object({ now: z.string().datetime({ offset: true }).optional() }),
   roles: STAFF_ROLES,
   handler: async (ctx, i): Promise<TodayItem[]> => {
