@@ -71,6 +71,8 @@ type DeliveryContext = {
   destination: { id: string; kind: "personal" | "private_channel"; external_destination_id: string; state: string; user_id: string | null };
   installation: { id: string; state: string; external_installation_id: string; provider: string; brewery_id: string };
   link_active: boolean;
+  source_current: boolean;
+  recipient_eligible: boolean;
   external_user_id: string | null;
   preference_enabled: boolean;
   counts: Record<string, number> | null;
@@ -167,13 +169,13 @@ export async function runChatDeliveryBatch({ limit = 50, now = new Date(), db = 
       await unwrap(db.rpc("complete_chat_delivery", { p_delivery: lease.id, p_lease: lease.lease_expires_at, p_conversation_id: ref.conversationId, p_message_id: ref.messageId }));
       counts[kind]++;
     };
-    const ctx = (await unwrap(db.rpc("get_chat_delivery_context", { p_delivery: lease.id }))) as DeliveryContext | null;
+    const ctx = (await unwrap(db.rpc("get_chat_delivery_context", { p_delivery: lease.id, p_now: now.toISOString() }))) as DeliveryContext | null;
     if (!ctx) { await stop("terminal", "context_missing"); continue; }
     if (ctx.installation.state !== "active") { await stop("terminal", "installation_inactive"); continue; }
     if (ctx.destination.state !== "active") { await stop("terminal", "destination_blocked"); continue; }
     const personal = ctx.destination.kind === "personal";
-    if (personal && (!ctx.link_active || !ctx.preference_enabled)) { await stop("suppressed", "recipient_ineligible"); continue; }
-    const resolved = ctx.occurrence.state !== "active";
+    if (personal && (!ctx.link_active || !ctx.preference_enabled || !ctx.recipient_eligible)) { await stop("suppressed", "recipient_ineligible"); continue; }
+    const resolved = ctx.occurrence.state !== "active" || !ctx.source_current;
     const existing = ctx.delivery.provider_message_id && ctx.delivery.provider_conversation_id
       ? { conversationId: ctx.delivery.provider_conversation_id, messageId: ctx.delivery.provider_message_id } : null;
     if (resolved && !existing) { await stop("suppressed", "resolved"); continue; }

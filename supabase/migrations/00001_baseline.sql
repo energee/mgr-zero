@@ -5455,18 +5455,18 @@ begin
   return jsonb_build_object('link_id', l.id, 'installation_id', l.installation_id, 'brewery_id', l.brewery_id);
 end $$;
 
-create function unlink_chat_user(p_link uuid, p_request_id uuid) returns jsonb
+create function unlink_chat_user(p_brewery uuid, p_link uuid, p_request_id uuid) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare l public.chat_user_links; v_replay jsonb;
 begin
-  select * into l from public.chat_user_links where id = p_link for update;
+  perform private.assert_staff(p_brewery, enum_range(null::public.staff_role));
+  v_replay := private.claim_command_request(p_brewery, 'unlink_chat_user', p_request_id, jsonb_build_object('link',p_link));
+  if v_replay is not null then return v_replay; end if;
+  select * into l from public.chat_user_links where id = p_link and brewery_id = p_brewery for update;
   if not found then raise exception 'permission denied' using errcode = '42501'; end if;
-  perform private.assert_staff(l.brewery_id, enum_range(null::public.staff_role));
-  if l.user_id is distinct from auth.uid() and public.staff_role(l.brewery_id) <> 'admin' then
+  if l.user_id is distinct from auth.uid() and public.staff_role(p_brewery) <> 'admin' then
     raise exception 'permission denied' using errcode = '42501';
   end if;
-  v_replay := private.claim_command_request(l.brewery_id, 'unlink_chat_user', p_request_id, jsonb_build_object('link',p_link));
-  if v_replay is not null then return v_replay; end if;
   perform private.unlink_chat_identity(l.installation_id, l.user_id);
   return private.complete_command_request(p_request_id, '{"ok":true}');
 end $$;
@@ -5491,9 +5491,9 @@ begin
 end $$;
 
 revoke execute on function issue_chat_link_proof(uuid, text, text), consume_chat_link_proof(text),
-  unlink_chat_user(uuid, uuid), resolve_chat_actor(text, text, text)
+  unlink_chat_user(uuid, uuid, uuid), resolve_chat_actor(text, text, text)
   from public, anon, authenticated;
-grant execute on function consume_chat_link_proof(text), unlink_chat_user(uuid, uuid) to authenticated;
+grant execute on function consume_chat_link_proof(text), unlink_chat_user(uuid, uuid, uuid) to authenticated;
 grant execute on function issue_chat_link_proof(uuid, text, text), resolve_chat_actor(text, text, text) to service_role;
 
 -- ---------------------------------------------------------------- Today reasons (shared projection)
@@ -6047,9 +6047,14 @@ begin
 end $$;
 
 -- Everything the worker must re-check before touching the provider, in one read.
-create function get_chat_delivery_context(p_delivery uuid) returns jsonb
+create function get_chat_delivery_context(p_delivery uuid, p_now timestamptz default now()) returns jsonb
 language sql stable security definer set search_path = '' as $$
   select public.chat_assert_job();
+  with current_items as materialized (
+    select c.* from public.notification_deliveries d
+      cross join lateral public.scan_chat_today_candidates(d.brewery_id,p_now) c
+      where d.id=p_delivery
+  )
   select jsonb_build_object(
     'delivery', jsonb_build_object('id', d.id, 'state', d.state, 'attempt_count', d.attempt_count,
       'provider_conversation_id', d.provider_conversation_id, 'provider_message_id', d.provider_message_id,
@@ -6061,19 +6066,26 @@ language sql stable security definer set search_path = '' as $$
     'installation', jsonb_build_object('id', i.id, 'state', i.state, 'external_installation_id', i.external_installation_id,
       'provider', i.provider, 'brewery_id', i.brewery_id),
     'external_user_id', (select l.external_user_id from public.chat_user_links l where l.installation_id=i.id and l.user_id=dest.user_id and l.state='active'),
+    'source_current', o.reason='operations_digest' or coalesce(c.source_version=o.source_version,false),
+    -- A removed/changed-role user gets no provider write. When the source has
+    -- resolved, only a still-eligible prior recipient may get a resolved update.
+    'recipient_eligible', bu.user_id is not null and (bu.role='admin' or
+      case when c.subject_id is not null then bu.role::text=any(c.recipient_roles) and (c.assigned_user_id is null or c.assigned_user_id=dest.user_id)
+        else o.payload->'recipient_roles' ? bu.role::text and (o.payload->>'assigned_user_id' is null or o.payload->>'assigned_user_id'=dest.user_id::text) end),
     'link_active', exists (select 1 from public.chat_user_links l
       where l.installation_id = i.id and l.user_id = dest.user_id and l.state = 'active'),
     'preference_enabled', coalesce((select p.enabled from public.notification_preferences p
       where p.brewery_id = d.brewery_id and p.user_id = dest.user_id and p.reason = o.reason), true),
     'counts', case when o.reason = 'operations_digest' then
       (select coalesce(jsonb_object_agg(x.reason, x.n), '{}'::jsonb)
-         from (select reason, count(*) as n from public.notification_occurrences
-                 where brewery_id = d.brewery_id and state = 'active' and reason <> 'operations_digest' group by reason) x)
+         from (select reason, count(*) as n from current_items group by reason) x)
       else null end)
   from public.notification_deliveries d
   join public.notification_occurrences o on o.id = d.occurrence_id
   join public.notification_destinations dest on dest.id = d.destination_id
   join public.chat_installations i on i.id = d.installation_id
+  left join current_items c on c.reason=o.reason and c.subject_type=o.subject_type and c.subject_id=o.subject_id
+  left join public.brewery_users bu on bu.brewery_id=d.brewery_id and bu.user_id=dest.user_id
   where d.id = p_delivery;
 $$;
 
@@ -6087,11 +6099,11 @@ begin
 end $$;
 
 revoke execute on function chat_assert_job(), list_chat_scan_targets(), claim_chat_callback_receipts(int, timestamptz),
-  complete_chat_callback_receipt(uuid, text, text), get_chat_home_items(uuid, text), get_chat_delivery_context(uuid),
+  complete_chat_callback_receipt(uuid, text, text), get_chat_home_items(uuid, text), get_chat_delivery_context(uuid, timestamptz),
   block_notification_destination(uuid, text)
   from public, anon, authenticated;
 grant execute on function list_chat_scan_targets(), claim_chat_callback_receipts(int, timestamptz),
-  complete_chat_callback_receipt(uuid, text, text), get_chat_home_items(uuid, text), get_chat_delivery_context(uuid),
+  complete_chat_callback_receipt(uuid, text, text), get_chat_home_items(uuid, text), get_chat_delivery_context(uuid, timestamptz),
   block_notification_destination(uuid, text)
   to service_role;
 -- ---------------------------------------------------------------- immutability grants
@@ -6255,7 +6267,7 @@ grant execute on function
   disconnect_chat_installation(uuid),
   reconcile_chat_installation(uuid, boolean, text),
   consume_chat_link_proof(text),
-  unlink_chat_user(uuid, uuid),
+  unlink_chat_user(uuid, uuid, uuid),
   today_live_reasons(),
   get_today_items(uuid, timestamptz),
   record_submitted_order_occurrence(uuid),

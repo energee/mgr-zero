@@ -160,6 +160,60 @@ describe("delivery batch", () => {
     expect((await deliveriesOf(id)).find((d) => d.id === sent.id)!.state).toBe("updated");
   });
 
+  it("rechecks source resolution before sending or updating without a scan", async () => {
+    await drain();
+    const id=await submittedOrder();
+    const [sent,unsent]=await deliveriesOf(id);
+    await admin.from("notification_deliveries").update({provider_message_id:"old-message",provider_conversation_id:"D-old"}).eq("id",sent.id);
+    await adminCtx.db.rpc("cancel_order",{p_request_id:crypto.randomUUID(),p_order:id,p_reason:"resolved before scanner"});
+    expect((await admin.from("notification_occurrences").select("state").eq("id",sent.occurrence_id).single()).data?.state).toBe("active");
+    calls.sends.length=0;calls.updates.length=0;
+    const result=await deliver();
+    expect(result).toMatchObject({sent:0,updated:1,suppressed:1});
+    expect(calls.sends).toHaveLength(0);
+    expect(calls.updates).toEqual([{ref:{conversationId:"D-old",messageId:"old-message"},resolved:true}]);
+    expect((await admin.from("notification_deliveries").select("state").eq("id",unsent.id).single()).data?.state).toBe("suppressed");
+  });
+
+  it("rechecks membership and role before personal send/update", async () => {
+    for(const change of ["removed","role"]){
+      await drain();const id=await submittedOrder();
+      const rows=await deliveriesOf(id);
+      const salesDestination=(await admin.from("notification_destinations").select("id").eq("installation_id",inst.id).eq("user_id",sales.userId).single()).data!.id;
+      const target=rows.find(d=>d.destination_id===salesDestination)!;
+      await admin.from("notification_deliveries").update({state:"terminal"}).eq("id",rows.find(d=>d.id!==target.id)!.id);
+      if(change==="role") await admin.from("notification_deliveries").update({provider_message_id:"existing",provider_conversation_id:"D-existing"}).eq("id",target.id);
+      if(change==="removed") await admin.from("brewery_users").delete().eq("brewery_id",b.id).eq("user_id",sales.userId);
+      else await admin.from("brewery_users").update({role:"brewer"}).eq("brewery_id",b.id).eq("user_id",sales.userId);
+      try{
+        calls.sends.length=0;calls.updates.length=0;
+        expect(await deliver()).toMatchObject({sent:0,updated:0,suppressed:1});
+        expect(calls.sends).toHaveLength(0);expect(calls.updates).toHaveLength(0);
+      } finally {
+        if(change==="removed") await ins("brewery_users",{brewery_id:b.id,user_id:sales.userId,role:"sales"});
+        else await admin.from("brewery_users").update({role:"sales"}).eq("brewery_id",b.id).eq("user_id",sales.userId);
+      }
+    }
+  });
+
+  it("rejects the old driver after reassignment without rescanning", async () => {
+    await drain();
+    const driver=await makeStaffCtx(b.id,"warehouse");const replacement=await makeStaffCtx(b.id,"warehouse");
+    const destination=await linkWithDm(driver,"U-driver");
+    const order=await submittedOrder();
+    const shipment=await ins("shipments",{brewery_id:b.id,order_id:order,created_by:adminCtx.userId});
+    const route=await ins("routes",{brewery_id:b.id,name:"Reassign",delivery_date:"2026-09-05",driver_user_id:driver.userId,departed_at:"2026-09-05T12:00:00Z"});
+    const stop=await ins("deliveries",{brewery_id:b.id,route_id:route.id,shipment_id:shipment.id,stop_no:1});
+    await runChatScan({now:new Date(NOW),db:admin});
+    const occurrence=(await admin.from("notification_occurrences").select("id").eq("subject_id",stop.id).eq("reason","delivery_next").single()).data!;
+    const target=(await admin.from("notification_deliveries").select("id").eq("occurrence_id",occurrence.id).eq("destination_id",destination.id).single()).data!;
+    await drain();await admin.from("notification_deliveries").update({state:"queued",provider_message_id:"driver-message",provider_conversation_id:"D-driver"}).eq("id",target.id);
+    await admin.from("routes").update({driver_user_id:replacement.userId}).eq("id",route.id);
+    calls.sends.length=0;calls.updates.length=0;
+    expect(await deliver()).toMatchObject({sent:0,updated:0,suppressed:1});
+    expect(calls.sends).toHaveLength(0);expect(calls.updates).toHaveLength(0);
+  });
+
   it("honours Retry-After, backs off transient failures with bounded jitter, and terminates permanent failures with a reauthorization flag", async () => {
     await drain();
     const id = await submittedOrder();

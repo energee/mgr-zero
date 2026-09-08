@@ -62,7 +62,7 @@ defineCommand({
   description: "Unlink a Slack user from MGR (own link, or any link as admin); stops personal delivery",
   input: z.object({ linkId: z.string().uuid() }),
   roles: STAFF_ROLES,
-  handler: async (ctx, i, execution) => { await unwrap(ctx.db.rpc("unlink_chat_user", { p_link: i.linkId, p_request_id: execution.requestId })); return { ok: true }; },
+  handler: async (ctx, i, execution) => { await unwrap(ctx.db.rpc("unlink_chat_user", { p_brewery: ctx.breweryId, p_link: i.linkId, p_request_id: execution.requestId })); return { ok: true }; },
 });
 
 defineQuery({

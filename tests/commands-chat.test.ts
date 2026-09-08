@@ -93,6 +93,20 @@ describe("chat integration state", () => {
     expect((await rpc("consume_chat_action_intent",{p_receipt:r.receipt_id,p_intent:token,p_action:"mgr_refresh",p_input:{}})).disposition).toBe("ignored");
     expect((await admin.from("chat_action_intents").select("consumed_at").eq("id",token).single()).data?.consumed_at).toBeNull();
   });
+  it("binds unlink to selected brewery and rejects request reuse after switching breweries", async () => {
+    const b=await makeBrewery();
+    await ins("brewery_users",{brewery_id:b.id,user_id:ctx.userId,role:"admin"});
+    const installationB=await ins("chat_installations",{brewery_id:b.id,provider:"slack",external_installation_id:b.id,display_label:"B",state:"active",installer_user_id:ctx.userId,token_store_key:b.id});
+    const link=await ins("chat_user_links",{brewery_id:b.id,installation_id:installationB.id,provider:"slack",external_user_id:"U-B",user_id:ctx.userId,state:"active",linked_at:new Date().toISOString()});
+    const input={linkId:link.id};
+    await expect(runCommand("unlink_chat_user",input,ctx)).rejects.toMatchObject({status:403});
+    expect((await admin.from("chat_user_links").select("state").eq("id",link.id).single()).data?.state).toBe("active");
+    const execution={requestId:crypto.randomUUID(),correlationId:crypto.randomUUID()};
+    const ctxB={...ctx,breweryId:b.id};
+    const result=await runCommand("unlink_chat_user",input,ctxB,execution);
+    expect(await runCommand("unlink_chat_user",input,ctxB,execution)).toEqual(result);
+    await expect(runCommand("unlink_chat_user",input,ctx,execution)).rejects.toMatchObject({status:409,code:"conflict"});
+  });
   it("rejects foreign users, expired intents, removed membership and ordinary callers", async () => {
     const token = await intent("mgr_refresh");
     const wrong = await receipt(token, "mgr_refresh", "U-OTHER");

@@ -84,7 +84,7 @@ const AUTHENTICATED_RPCS = [
   "submit_order(uuid,uuid)",
   "submit_stock_transfer(uuid,uuid)",
   "today_live_reasons()",
-  "unlink_chat_user(uuid,uuid)",
+  "unlink_chat_user(uuid,uuid,uuid)",
   "set_personal_quiet_hours(uuid,time without time zone,time without time zone,text,uuid)",
   "snooze_notification(uuid,uuid,timestamp with time zone,uuid)",
   "update_bin(uuid,uuid,text,uuid)",
