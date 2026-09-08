@@ -16,24 +16,28 @@ export function planDraftSync(draftId: string | null) {
 /** Both buttons need a ship-to and at least one positive line and are locked
  *  while a call is in flight. An existing draft does not relax the line rule:
  *  syncing zero lines would be rejected by the database anyway. */
-export function cartActionsDisabled(s: { shipToId: string; lineCount: number; busy: boolean }) {
-  return !s.shipToId || s.lineCount === 0 || s.busy;
+export function cartActionsDisabled(s: { shipToId: string; lineCount: number; busy: boolean; hasSource?: boolean }) {
+  return !s.shipToId || s.lineCount === 0 || s.busy || s.hasSource === false;
 }
 
 import { z } from "zod";
 
 const scopeSchema = z.object({ actorId: z.string().uuid(), customerId: z.string().uuid(), breweryId: z.string().uuid() }).strict();
 const fieldsSchema = z.object({ shipToId: z.string().uuid(), poNumber: z.string(), note: z.string(), requestedShipDate: z.string().date().nullable(), lines: z.array(z.object({ skuId: z.string().uuid(), qty: z.number().int().positive() }).strict()).min(1) }).strict();
+const identitySchema = z.object({ actorId: z.string().uuid(), customerId: z.string().uuid() }).strict();
+const createInputSchema = fieldsSchema.extend({ expectedIdentity: identitySchema });
+const submitInputSchema = z.object({ orderId: z.string().uuid(), expectedIdentity: identitySchema }).strict();
 const attemptSchema = z.object({
   scope: scopeSchema, requestId: z.string().uuid(), purpose: z.enum(["draft", "submit"]), fields: fieldsSchema,
   command: z.enum(["portal_create_order", "portal_update_draft_order", "portal_submit_order"]),
-  input: z.union([fieldsSchema, fieldsSchema.extend({ orderId: z.string().uuid() }), z.object({ orderId: z.string().uuid() }).strict()]),
+  input: z.union([createInputSchema, createInputSchema.extend({ orderId: z.string().uuid() }), submitInputSchema]),
 }).strict().superRefine((a, ctx) => {
-  const expected = a.command === "portal_submit_order" ? z.object({ orderId: z.string().uuid() }).strict()
-    : a.command === "portal_create_order" ? fieldsSchema : fieldsSchema.extend({ orderId: z.string().uuid() });
+  const expected = a.command === "portal_submit_order" ? submitInputSchema
+    : a.command === "portal_create_order" ? createInputSchema : createInputSchema.extend({ orderId: z.string().uuid() });
+  if (a.input.expectedIdentity.actorId !== a.scope.actorId || a.input.expectedIdentity.customerId !== a.scope.customerId) ctx.addIssue({ code: "custom", message: "Recovery identity changed" });
   if (!expected.safeParse(a.input).success || (a.command === "portal_submit_order" && a.purpose !== "submit")) ctx.addIssue({ code: "custom", message: "Invalid recovery stage" });
   if (a.command !== "portal_submit_order") {
-    const fields = fieldsSchema.parse(Object.fromEntries(Object.entries(a.input).filter(([key]) => key !== "orderId")));
+    const fields = fieldsSchema.parse(Object.fromEntries(Object.entries(a.input).filter(([key]) => key !== "orderId" && key !== "expectedIdentity")));
     if (JSON.stringify(fields) !== JSON.stringify(a.fields)) ctx.addIssue({ code: "custom", message: "Recovery fields changed" });
   }
 });
@@ -94,7 +98,7 @@ export async function executePortalAttempt(
   const id = "orderId" in attempt.input ? attempt.input.orderId : result?.order_id;
   if (!id || !z.string().uuid().safeParse(id).success) throw new Error("Order response could not be confirmed. Retry the same request.");
   if (attempt.purpose === "submit" && attempt.command !== "portal_submit_order") {
-    return executePortalAttempt({ ...attempt, command: "portal_submit_order", input: { orderId: id }, requestId: crypto.randomUUID() }, storage, send, onStage);
+    return executePortalAttempt({ ...attempt, command: "portal_submit_order", input: { orderId: id, expectedIdentity: attempt.input.expectedIdentity }, requestId: crypto.randomUUID() }, storage, send, onStage);
   }
   storage.removeItem(portalAttemptKey(attempt.scope));
   return id;

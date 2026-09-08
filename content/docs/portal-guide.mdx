@@ -32,14 +32,14 @@ The header shows your customer account name. Navigation offers **Order**, **Orde
 
 New carts select your default ship-to, or the first address if none is designated. You can choose another address; saving the cart keeps your explicit choice. Contact brewery staff to change the account default.
 
-Both buttons stay disabled without a ship-to, without a positive line, or while saving. That holds even after a draft has been saved from this cart. With no priced products, Shop asks you to call the brewery.
+Save draft and Review order stay disabled without a ship-to, without a positive line, without a configured shipping source, or while saving. Shop and review show **Ships from** with the brewery’s configured warehouse name. That holds even after a draft has been saved from this cart. With no priced products, Shop asks you to call the brewery.
 
 <Callout type="warn">
-**Before ordering:** if the brewery has not configured its portal fulfillment warehouse, saving fails with **portal fulfillment source is not configured**. Ask brewery staff to set that up.
+**Before ordering:** if **Ships from** says **Not configured**, contact the brewery. Fresh saves and submissions stay disabled until the brewery configures its shipping warehouse. You can still retry an earlier uncertain request to confirm its outcome.
 </Callout>
 
 <Callout type="warn">
-**Saved drafts and retries:** open a draft in Orders and choose **Continue/edit draft** to change or submit that same order. A submitted order can no longer be edited. After an uncertain response, fields stay locked and **Retry order request** reuses the exact request, including after reloading or signing back in on the same browser tab. No request is sent automatically. Use **View order status** to check progress. Keep this tab open until the outcome is clear; closing it clears its recovery information. If recovery storage is unavailable, MGR does not start a new write. Contact the brewery if the outcome remains unclear.
+**Saved drafts and retries:** open a draft in Orders and choose **Continue/edit draft** to change or submit that same order. A submitted order can no longer be edited. After an uncertain response, fields stay locked and **Retry order request** reuses the exact request, including after reloading or signing back in on the same browser tab. No request is sent automatically. If another tab signs in to a different account, Retry refuses to send the order under that account; sign back in as the original buyer. Use **View order status** to check progress. Keep this tab open until the outcome is clear; closing it clears its recovery information. If recovery storage is unavailable, MGR does not start a new write. Contact the brewery if the outcome remains unclear.
 </Callout>
 
 From a shipped order, **Reorder** starts a new cart with still-active, currently priced packages and the previous quantities. Removed or unpriced packages are listed explicitly. Prices come from the current catalog, not the previous invoice. A still-valid ship-to is kept; the old PO, note and requested date are not copied. Review the new cart before submitting.

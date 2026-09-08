@@ -10,7 +10,7 @@ import { E } from "@/components/mgr/e";
 import { CommandForm, CommandFormMessage } from "@/components/mgr/command-form";
 import { command, CommandResponseError } from "@/lib/commands/client";
 import { defaultShipToId } from "@/lib/order-form-rules";
-import { canRetirePortalFailure, cartLines, planDraftSync, portalAttemptKey, restorePortalAttempt, executePortalAttempt, type PortalAttempt, type PortalScope, type PortalFields } from "@/lib/portal-cart";
+import { cartActionsDisabled, canRetirePortalFailure, cartLines, planDraftSync, portalAttemptKey, restorePortalAttempt, executePortalAttempt, type PortalAttempt, type PortalScope, type PortalFields } from "@/lib/portal-cart";
 
 export type CatalogItem = { skuId: string; name: string; product: string; unitPriceCents: number };
 export type ShipToOption = { id: string; label: string; is_default?: boolean };
@@ -19,7 +19,7 @@ export function submissionFailureMessage(message: string, draftId: string | null
 }
 
 type CartProps = {
-  items: CatalogItem[]; shipTos: ShipToOption[]; scope: PortalScope;
+  items: CatalogItem[]; shipTos: ShipToOption[]; scope: PortalScope; fulfillmentSource: { id: string; name: string } | null;
   initial?: { fields: PortalFields; draftId: string | null; removed: string[] };
 };
 const subscribe = () => () => {};
@@ -27,7 +27,7 @@ export function Cart(props: CartProps) {
   const hydrated = useSyncExternalStore(subscribe, () => true, () => false);
   return hydrated ? <ReadyCart {...props} /> : E.info("Loading order recovery…");
 }
-function ReadyCart({ items, shipTos, scope, initial }: CartProps) {
+function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource }: CartProps) {
   const router = useRouter();
   const [recovery] = useState(() => {
     try { return { attempt: restorePortalAttempt(sessionStorage.getItem(portalAttemptKey(scope)), scope), error: null }; }
@@ -45,7 +45,7 @@ function ReadyCart({ items, shipTos, scope, initial }: CartProps) {
   const [error, setError] = useState<string | null>(recovery.error);
   const lines = cartLines(qty);
   const locked = !ready || busy || attempt !== null;
-  const disabled = locked || !fields.shipToId || !lines?.length;
+  const disabled = cartActionsDisabled({ hasSource: fulfillmentSource !== null, busy: locked, shipToId: fields.shipToId, lineCount: lines?.length ?? 0 });
   const unavailable = (lines ?? []).filter(l => !items.some(i => i.skuId === l.skuId));
   const subtotal = (lines ?? []).reduce((n, l) => n + (items.find(i => i.skuId === l.skuId)?.unitPriceCents ?? 0) * l.qty, 0);
 
@@ -59,7 +59,7 @@ function ReadyCart({ items, shipTos, scope, initial }: CartProps) {
       if (!active) {
         const snapshot = { ...fields, lines: lines! };
         const plan = planDraftSync(draftId);
-        active = { scope, purpose, fields: snapshot, command: plan.command, requestId: crypto.randomUUID(), input: plan.command === "portal_create_order" ? snapshot : { ...snapshot, orderId: plan.orderId } };
+        active = { scope, purpose, fields: snapshot, command: plan.command, requestId: crypto.randomUUID(), input: { ...snapshot, expectedIdentity: { actorId: scope.actorId, customerId: scope.customerId }, ...(plan.command === "portal_update_draft_order" ? { orderId: plan.orderId } : {}) } };
       }
       const id = await executePortalAttempt(active, sessionStorage, command, next => {
         active = next; setAttempt(next);
@@ -84,6 +84,8 @@ function ReadyCart({ items, shipTos, scope, initial }: CartProps) {
     {attempt && <Button type="button" disabled={busy} onClick={() => run(attempt.purpose)}>Retry order request</Button>}
   </>;
   return <div className="flex flex-col gap-4">
+    {E.fld("Ships from", fulfillmentSource?.name ?? "Not configured")}
+    {!fulfillmentSource && E.info("The brewery has not set where orders ship from. Contact the brewery before starting or submitting a new order. An existing uncertain request can still be retried.")}
     {!items.length && E.blank("Nothing is listed for wholesale yet. Call the brewery.")}
     {initial?.removed.length ? E.info(`Removed unavailable or unpriced items: ${initial.removed.join(", ")}. Review the remaining quantities.`) : null}
     <fieldset disabled={locked} className="flex flex-col gap-3">
@@ -108,6 +110,7 @@ function ReadyCart({ items, shipTos, scope, initial }: CartProps) {
     {feedback}
     <div className="flex gap-2"><Button variant="outline" disabled={disabled} onClick={() => run("draft")}>Save draft</Button><Button disabled={disabled} onClick={() => setReview(true)}>Review order</Button></div>
     <CommandForm open={review} onOpenChange={setReview} title="Review order">
+      {E.fld("Ships from", fulfillmentSource?.name ?? "Not configured")}
       {E.fld("Ship to", shipTos.find(s => s.id === fields.shipToId)?.label ?? "Select a ship-to")}
       {E.fld("Requested date", fields.requestedShipDate ?? "Not specified")}
       {fields.poNumber && E.fld("PO number", fields.poNumber)}{fields.note && E.fld("Note", fields.note)}

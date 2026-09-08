@@ -3,7 +3,7 @@ import { cartLines, reconcilePortalOrder, restorePortalAttempt, storePortalAttem
 const id = "11111111-1111-4111-8111-111111111111";
 const scope = { actorId: id, customerId: id, breweryId: id };
 const fields = { shipToId: id, poNumber: "", note: "", requestedShipDate: null, lines: [{ skuId: id, qty: 2 }] };
-const attempt = { scope, requestId: id, command: "portal_create_order", input: fields, purpose: "submit", fields };
+const attempt = { scope, requestId: id, command: "portal_create_order", input: { ...fields, expectedIdentity: { actorId: id, customerId: id } }, purpose: "submit", fields };
 describe("portal continuity", () => {
   it("rejects invalid quantities instead of silently dropping them", () => {
     expect(cartLines({ [id]: "2" })).toEqual([{ skuId: id, qty: 2 }]);
@@ -78,4 +78,11 @@ it("keeps the create recovery when saving the next submit stage fails", async ()
   for (const key of ["actorId", "customerId", "breweryId"] as const) {
     expect(() => restorePortalAttempt(raw, { ...scope, [key]: "22222222-2222-4222-8222-222222222222" })).toThrow();
   }
+});
+
+import { cartActionsDisabled } from "@/lib/portal-cart";
+it("disables fresh actions without an explicit fulfillment source", () => {
+  expect(cartActionsDisabled({ hasSource: false, busy: false, shipToId: id, lineCount: 1 })).toBe(true);
+  expect(cartActionsDisabled({ hasSource: true, busy: false, shipToId: id, lineCount: 1 })).toBe(false);
+  expect(cartActionsDisabled({ hasSource: true, busy: true, shipToId: id, lineCount: 1 })).toBe(true);
 });

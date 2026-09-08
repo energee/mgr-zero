@@ -15,7 +15,7 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
   const ctx = await buildContext(customer.breweryId);
   const [items, account] = await Promise.all([
     runCommand("portal_catalog", {}, ctx) as Promise<CatalogItem[]>,
-    runCommand("get_portal_account", {}, ctx) as Promise<{ shipTos: ShipToRow[]; membership: { userId: string } }>,
+    runCommand("get_portal_account", {}, ctx) as Promise<{ shipTos: ShipToRow[]; membership: { userId: string }; fulfillmentSource: { id: string; name: string } | null }>,
   ]);
   const shipToOptions: ShipToOption[] = account.shipTos.map((s) => ({ id: s.id, is_default: s.is_default, label: `${s.label} (${s.city}, ${s.state})` }));
   const sourceId = query.draft ?? query.reorder;
@@ -25,7 +25,7 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
   return (
     <>
       {E.hd("Order", customer.customerName)}
-      <Cart key={`${account.membership.userId}:${customer.customerId}:${customer.breweryId}:${sourceId ?? "new"}`} items={items} shipTos={shipToOptions} initial={initial} scope={{ actorId: account.membership.userId, customerId: customer.customerId, breweryId: customer.breweryId }} />
+      <Cart key={`${account.membership.userId}:${customer.customerId}:${customer.breweryId}:${sourceId ?? "new"}`} items={items} fulfillmentSource={account.fulfillmentSource} shipTos={shipToOptions} initial={initial} scope={{ actorId: account.membership.userId, customerId: customer.customerId, breweryId: customer.breweryId }} />
     </>
   );
 }

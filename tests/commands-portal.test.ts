@@ -113,6 +113,34 @@ describe("portal commands", () => {
     }
   });
 
+  it("binds an uncertain request to the original actor at verified dispatch", async () => {
+    const secondUser = await makeCustomerUser(customerId);
+    const second = { ...custCtx, db: await asUser(secondUser.email), userId: secondUser.id };
+    const input = { shipToId, lines: [{ skuId, qty: 1 }], expectedIdentity: { actorId: custCtx.userId, customerId } };
+    const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+    const made = await runCommand("portal_create_order", input, custCtx, execution) as { order_id: string }; // response lost
+    await expect(runCommand("portal_create_order", input, second, execution)).rejects.toThrow(/account changed/);
+    const replay = await runCommand("portal_create_order", input, custCtx, execution);
+    expect(replay).toEqual(made);
+    const madeByB = await admin.from("orders").select("id").eq("created_by", second.userId);
+    expect(madeByB.data).toEqual([]);
+    // Same request ID under B is still unclaimed after the rejection.
+    const other = await runCommand("portal_create_order", { ...input, expectedIdentity: { actorId: second.userId, customerId } }, second, execution) as { order_id: string };
+    expect(other.order_id).not.toBe(made.order_id);
+    for (const name of ["portal_update_draft_order", "portal_submit_order"]) {
+      await expect(runCommand(name, { ...input, orderId: made.order_id }, second)).rejects.toThrow(/account changed/);
+    }
+  });
+
+  it("exposes only the configured customer-facing fulfillment source", async () => {
+    const account = await runCommand("get_portal_account", {}, custCtx) as any;
+    expect(account.fulfillmentSource).toMatchObject({ name: "Configured WH" });
+    const previous = account.fulfillmentSource.id;
+    await admin.from("breweries").update({ portal_fulfillment_location_id: null }).eq("id", b.id);
+    try { expect((await runCommand("get_portal_account", {}, custCtx) as any).fulfillmentSource).toBeNull(); }
+    finally { await admin.from("breweries").update({ portal_fulfillment_location_id: previous }).eq("id", b.id); }
+  });
+
   it("rejects a ship-to that belongs to another customer", async () => {
     const other = await seedCustomer(b.id, { name: "Foreign Bar", saleChannelId });
     await expect(runCommand("portal_create_order", { shipToId: other.shipToId, lines: [{ skuId, qty: 1 }] }, custCtx))

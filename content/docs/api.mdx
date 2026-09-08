@@ -3898,6 +3898,7 @@ Portal: create a draft order for the caller's account
 | `poNumber` | string | no |
 | `note` | string | no |
 | `requestedShipDate` | date (YYYY-MM-DD) or null | no |
+| `expectedIdentity` | object | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -3979,6 +3980,7 @@ Portal: submit a draft order
 | Field | Type | Required |
 | --- | --- | --- |
 | `orderId` | uuid | yes |
+| `expectedIdentity` | object | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -4001,6 +4003,7 @@ Portal: replace a draft order's lines/fields
 | `poNumber` | string | no |
 | `note` | string | no |
 | `requestedShipDate` | date (YYYY-MM-DD) or null | no |
+| `expectedIdentity` | object | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
