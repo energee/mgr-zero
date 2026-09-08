@@ -14,15 +14,17 @@ You're in by invitation. There is no public sign-up and no password-reset button
 2. Select **Sign in**.
 3. MGR opens **Today** for the brewery you're a member of.
 
-Wrong credentials show **Incorrect email or password.** Signed in but not on a brewery? The page says **Your account isn't a member of any brewery yet. Ask an admin for an invitation.** Open **Me** in the header when you want **Sign out**.
+Wrong credentials show **Incorrect email or password.** Signed in but not on a brewery? MGR shows **No brewery yet** with **Sign out**; ask an admin for an invitation. If your session ends while you work, the next action returns you to Sign in with **Your session ended. Sign in to retry.** Open **Me** in the header when you want **Sign out**.
+
+<Screen name="Reset password" />
+
+**Forgot password?** on the sign-in card opens **Reset password**. Enter your **Email** and select **Send reset link**; the page always says a link is on its way if that email is on an account, so it never confirms whether one is. The link in the email opens **Set new password**, which shows the account and asks you to **Choose a password** and **Save password**; a used or timed-out link lands back on Reset password saying so. Signed in already? **Change password** in **Me** opens the same page.
 
 ## Search and pick records [#search]
 
-In the screen explorer, **Search** groups results by kind. Type to filter, use the
-Up and Down arrow keys to move between matches, and press Enter to open one.
-**Entity picker** shows Recent and All SKUs, with availability as text. Select a
-result with Enter or a click to return to the calling screen. If nothing matches,
-change the search term.
+<Screen name="Search" />
+
+**Search** in the header opens one search across SKUs, orders, invoices, lots, customers, purchase orders, and batches. Type a name to match on its first letters, or a document number (ORD-0231, INV-1042, PO-0142, B-0012, a lot code) to match it exactly; an exact number sorts first. Results group by kind; use the Up and Down arrow keys to move between matches and press Enter or click to open one. You only ever see records your role may read, and if nothing matches, the list says **No matches · change the term**.
 
 ## Know what your role can do [#roles]
 
@@ -45,9 +47,9 @@ A permission error is the end of that attempt. Ask an administrator. Hitting sub
 
 The brewery name in the header is the brewery whose records you are looking at. Navigation has up to four sections: **Today**, **Beer**, **Work**, and **More**. On a phone they sit as tabs along the bottom, and tapping the tab opens that group's primary page. On a wider screen they sit in a left rail.
 
-- **Beer** holds **Inventory**, **Cellar**, **Materials**, and **Kegs**.
-- **Work** holds **Orders**, **Pick**, **Replenishment**, **Transfers**, **Batches**, **Packaging**, **POs**, and **Deliveries**.
-- **More** holds **Invoices**, **Catalog**, **Customers**, **Price groups**, **Recipes**, **Vendors**, **Compliance**, **Planning**, **Settings** (the team roster), **Sale channels**, **Locations**, and **Units**.
+- **Beer** opens a landing that counts each area (finished-goods shortages, tanks with beer, material shortages, kegs out) and holds **Inventory**, **Cellar**, **Materials**, and **Kegs**. Taproom and Taps are shown locked until they are built.
+- **Work** opens everything in motion: Today's rows plus the open purchase orders and delivery routes your role may open, sorted by due date, with chips (**all**, **orders**, **transfers**, **batches**, **runs**, **POs**, **routes**) that filter it. The chip you pick is remembered on that device. It holds **Orders**, **Pick**, **Replenishment**, **Transfers**, **Batches**, **Packaging**, **POs**, and **Deliveries**.
+- **More** opens the list of your setup and desk pages: **Invoices**, **Catalog**, **Customers**, **Price groups**, **Recipes**, **Vendors**, **Compliance**, **Planning**, **Settings**, **Sale channels**, **Locations**, and **Units**.
 
 Links your role cannot use are simply not shown. Planned areas stay hidden until they are built (Taproom, Taps, Menu, Import), so a tab with nothing you can open does not appear.
 
@@ -57,7 +59,7 @@ CSV import has no screen yet, so there is no **Import** link. See [Actions not y
 **Brewer navigation:** Brewer sees Today, Beer (Cellar, Materials), Work (Batches, Packaging), and More (Recipes, Vendors, Planning). Taps and Taproom are planned and hidden. Repack, on the Packaging page, and the Draft purchase orders button on Planning are Admin and Warehouse only, so Brewer does not see them.
 </Callout>
 
-**Me** in the header shows your brewery and role, lets you **Switch to light mode** or **Switch to dark mode**, and offers **Sign out**. Forms open as a panel from the bottom of the screen on a phone and as a centered dialog on a wider screen. On a phone, page actions such as **New Order** or **Save** span the column. On a wider screen, create actions sit on the title row and other actions hug their label instead of stretching across the page. Sign-in and other entry cards stay a narrow column, so their buttons still span that card.
+**Me** in the header shows the email you signed in with, your brewery and role, lets you **Switch to light mode** or **Switch to dark mode**, offers **Change password**, and **Sign out**. When your account belongs to more than one brewery, Me also lists them with **Switch** beside each one that is not current. Forms open as a panel from the bottom of the screen on a phone and as a centered dialog on a wider screen. On a phone, page actions such as **New Order** or **Save** span the column. On a wider screen, create actions sit on the title row and other actions hug their label instead of stretching across the page. Sign-in and other entry cards stay a narrow column, so their buttons still span that card.
 
 <Cards>
   <Card title="Today">The tab you land on after signing in: one row per piece of work your role can finish now, each with its order number, a short detail line, and the verb that opens it. Admin sees everything; Sales sees submitted orders (**Confirm**); Warehouse sees confirmed orders whose requested ship date has arrived (**Pick**) and orders holding staged beer that needs restocking (**Put back**), including cancelled ones, until the restock is confirmed. A dot on the icon marks a row needing attention. With nothing waiting, Today says **Nothing waiting** and offers **Record movement**, which opens Inventory.</Card>
@@ -215,6 +217,14 @@ A wholesale order fails if an ordered SKU has no price: its brand is on no price
 
 ### Move an order through fulfillment
 
+<Screen name="Confirm order" />
+
+A submitted order's **Confirm** on Today, Work, or the Orders list opens a review two taps from Today: the customer, the fulfillment source, each line with its ATP, and a note when confirming would oversell (that stays your call). **Confirm order** confirms it and returns to Orders; **Cancel order** asks for a reason first.
+
+<Screen name="Complete transfer" />
+
+A picked taproom transfer shows **Complete transfer** on its order page: the same step a wholesale order ships with, minus the invoice. Each line moves at its picked quantity from the source to the taproom.
+
 <Screen name="Order" />
 
 | Action | When shown | What happens |
@@ -244,10 +254,13 @@ Select **Print** to open the browser print dialog. MGR hides the staff navigatio
 ## Invoices and credit memos [#invoices]
 
 <Screen name="Invoices" />
+<Screen name="Invoice" />
 
-*Admin and Sales open the Invoices list from **Invoices**. Warehouse can open it by entering the address directly (no More tab yet) and sees the invoice created by a wholesale shipment from **View invoice** right after shipping. Only Admin and Sales can return beer against an invoice.*
+*Admin and Sales open the Invoices list from **More**. Warehouse can open it by entering the address directly and sees the invoice created by a wholesale shipment from **View invoice** right after shipping. Only Admin and Sales can return beer against an invoice or mark a buyer's question answered.*
 
-The list shows number, kind, customer, total, and paid date. Open an invoice number to see issue date, line quantities, captured unit prices, amounts, and total. An empty list says **No invoices yet.** Payment is display-only. There is no record-payment action.
+The list shows each invoice or credit memo with its customer, total, and due or paid date. **Open** an invoice to see the customer, line quantities, captured unit prices, amounts, and total. An empty list says **No invoices yet.** Payment is display-only; there is no record-payment action, and the QuickBooks rows stay locked until accounting sync is connected.
+
+When a buyer asks about an invoice from the portal, the question appears on the invoice as **Buyer asked about this invoice** with their words, and as an **Answer** row on Today for Admin and Sales. Reply by phone or email, then select **Mark answered**; that clears the Today row and nothing on the invoice changes.
 
 ### Return beer and correct the invoice
 
@@ -452,7 +465,19 @@ A sent order's page is the receiving form. Choose the location and bin everythin
 
 <Screen name="Team" />
 
-Admin can open **Team** from **Settings** to see current staff memberships. The page also opens for Sales and Warehouse when the address is entered directly, but it is not linked in their navigation. Each row shows a **User ID** and **Role**. Email addresses are not displayed. The page is read-only: no invitation, role-change, or removal controls. An empty roster says **No staff members yet.**
+Admin opens **Team** from **Settings**. Each member shows as an **@handle** (the first part of their email) with the email and role; your own row is marked **you**. Open another member's row to change their **Role** and **Save role**, or **Remove** them, which ends their membership at this brewery and leaves their sign-in account alone. MGR keeps at least one admin: the only admin cannot step down or be removed, and nobody can remove themselves. **Invite staff** stays locked until invitations are made retry-safe. Sales and Warehouse are sent to **No access** if they open the address directly.
+
+## Settings [#settings]
+
+<Screen name="Settings" />
+
+Admin opens **Settings** from **More** to edit the brewery's basics in one form: **Brewery name**, **Timezone** (a zone name MGR knows, such as America/New_York), **TTB registry number**, **PA license**, the **Customer-facing phone** the portal prints when online payment is unavailable, and **Reading overdue after (hours)**, which sets when a fermentation reading counts as overdue on Today. **Save brewery** writes them together. Below the form, rows open **Locations** and **Team**; Source water, Accounting, Point of sale, and Import stay locked until their areas are built, and **Chat** opens the Slack account link.
+
+## No access [#no-access]
+
+<Screen name="Permission denied" />
+
+Navigation hides what your role cannot open, but a bookmarked address still lands on the page. When the page's first read is refused, MGR shows **No access** with what was refused, who you are signed in as, and the role that would satisfy it, plus **Back to Today** and **Go to Beer**. An admin can change your role in Settings, then Team.
 
 ## Sale channels [#channels]
 
@@ -517,15 +542,13 @@ If the link is missing, expired, already used, or belongs to another account, go
 
 Do not hunt for hidden controls for these:
 
-- public account sign-up or password reset
-- switching between breweries when a staff account belongs to more than one
+- public account sign-up
 - staff or customer-portal invitations
 - CSV import
 - adding, renaming or removing bins, setting taproom pars, or choosing the warehouse that fulfills wholesale-customer portal orders, from the interface
 - cancelling a purchase order, editing one after it is saved, or sending one by email from MGR
 - editing brands, formats, or SKUs after creation
 - deleting customers, ship-tos, inventory history, orders, invoices, or credit memos
-- editing staff roles or seeing staff email addresses
 - recording payments
 - reviewing or reattributing auto-reconciled losses before a filing, a printed lot trace packet, and the customers who received a lot
 - an order-confirmation warning from the compliance registry, or deleting an approval, registration, or license
