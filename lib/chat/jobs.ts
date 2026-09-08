@@ -9,14 +9,14 @@ import { createHash } from "node:crypto";
 import type pg from "pg";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { unwrap } from "@/lib/commands/registry";
+import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import { paced } from "@/lib/chat/pacing";
 import { assertPortableNotification, type NotificationReason, type PortableNotification } from "./contracts";
 import type { ChatProviderTransport, ProviderMessageRef } from "./provider";
 import { issueChatLinkProof } from "./linking";
-import { chatStatePool } from "./state";
+import { chatStatePool, chatLifecycleClient } from "./state";
 import { SlackTransport, classifySlackError } from "./slack-transport";
-import { slackClientFor } from "./slack-adapter";
+import { slackClientFor, slackPrivateChannels } from "./slack-adapter";
 
 let client: SupabaseClient | undefined;
 export function serviceClient(): SupabaseClient {
@@ -71,8 +71,12 @@ type DeliveryContext = {
   destination: { id: string; kind: "personal" | "private_channel"; external_destination_id: string; state: string; user_id: string | null };
   installation: { id: string; state: string; external_installation_id: string; provider: string; brewery_id: string };
   link_active: boolean;
+  source_current: boolean;
+  recipient_eligible: boolean;
+  external_user_id: string | null;
   preference_enabled: boolean;
   counts: Record<string, number> | null;
+  quiet_release_at: string | null;
 };
 type Lease = { id: string; occurrence_id: string; destination_id: string; installation_id: string; provider: string; lease_expires_at: string; attempt_count: number };
 type Deps = { db?: SupabaseClient; transport?: ChatProviderTransport; now?: Date };
@@ -142,7 +146,7 @@ export async function runChatCallbackBatch({ limit = 25, now = new Date(), db = 
       } else {
         await unwrap(db.rpc("scan_chat_notification_occurrences", { p_brewery: r.brewery_id, p_now: now.toISOString() }));
         const fresh = ((await unwrap(db.rpc("get_chat_home_items", { p_installation: r.installation_id, p_external_user_id: r.external_user_id }))) as Occurrence[] | null) ?? [];
-        await transport.publishHome({ installationId: r.external_installation_id, externalUserId: r.external_user_id, items: fresh.map(toNotification) });
+        await transport.publishHome({ installationId: r.external_installation_id, externalUserId: r.external_user_id, items: fresh.map(toNotification), intents: await homeIntents(db, r.installation_id, r.external_user_id) });
       }
       await done("processed"); processed++;
     } catch (e) {
@@ -166,20 +170,34 @@ export async function runChatDeliveryBatch({ limit = 50, now = new Date(), db = 
       await unwrap(db.rpc("complete_chat_delivery", { p_delivery: lease.id, p_lease: lease.lease_expires_at, p_conversation_id: ref.conversationId, p_message_id: ref.messageId }));
       counts[kind]++;
     };
-    const ctx = (await unwrap(db.rpc("get_chat_delivery_context", { p_delivery: lease.id }))) as DeliveryContext | null;
+    const ctx = (await unwrap(db.rpc("get_chat_delivery_context", { p_delivery: lease.id, p_now: now.toISOString() }))) as DeliveryContext | null;
     if (!ctx) { await stop("terminal", "context_missing"); continue; }
     if (ctx.installation.state !== "active") { await stop("terminal", "installation_inactive"); continue; }
     if (ctx.destination.state !== "active") { await stop("terminal", "destination_blocked"); continue; }
     const personal = ctx.destination.kind === "personal";
-    if (personal && (!ctx.link_active || !ctx.preference_enabled)) { await stop("suppressed", "recipient_ineligible"); continue; }
-    const resolved = ctx.occurrence.state !== "active";
+    if (personal && (!ctx.link_active || !ctx.preference_enabled || !ctx.recipient_eligible)) { await stop("suppressed", "recipient_ineligible"); continue; }
+    const resolved = ctx.occurrence.state !== "active" || !ctx.source_current;
     const existing = ctx.delivery.provider_message_id && ctx.delivery.provider_conversation_id
       ? { conversationId: ctx.delivery.provider_conversation_id, messageId: ctx.delivery.provider_message_id } : null;
     if (resolved && !existing) { await stop("suppressed", "resolved"); continue; }
+    if (personal && ctx.quiet_release_at && new Date(ctx.quiet_release_at) > now) {
+      await unwrap(db.rpc("retry_chat_delivery", { p_delivery: lease.id, p_lease: lease.lease_expires_at,
+        p_next_attempt_at: ctx.quiet_release_at, p_error_code: "quiet_hours" }));
+      counts.retried++; continue;
+    }
     const notification = ctx.occurrence.reason === "operations_digest" ? digestNotification(ctx) : toNotification(ctx.occurrence);
     const installationId = ctx.installation.external_installation_id;
     try {
-      if (!personal && !existing) {
+      if (personal && !resolved) {
+        const extras = await Promise.all(([["snooze", "mgr_snooze", "Snooze 1 hour"], ["mute_reason", "mgr_mute_reason", "Mute this reason"]] as const).map(async ([id, action, label]) => {
+          const intentId = await unwrap(db.rpc("issue_chat_action_intent", {
+            p_installation: ctx.installation.id, p_external_user_id: ctx.external_user_id, p_action: action, p_delivery: lease.id,
+          })) as string | null;
+          return intentId ? { id, label, intentId, enabled: true as const } : null;
+        }));
+        notification.actions = [...notification.actions, ...extras.filter((action) => action !== null)];
+      }
+      if (!personal) {
         const check = await transport.validateDestination({ installationId, destinationId: ctx.destination.external_destination_id });
         if (!check.ok) {
           await unwrap(db.rpc("block_notification_destination", { p_destination: ctx.destination.id, p_reason: check.reason }));
@@ -220,4 +238,157 @@ export async function cleanupChatState({ now = new Date(), pool = chatStatePool(
     deleted += r.rowCount ?? 0;
   }
   return { deleted };
+}
+
+// The raw body is authenticated before this boundary. Only its hash and
+// routing identifiers enter the receipt; form values are never logged/stored.
+export type SlackInteraction = {
+  team: { id: string }; user: { id: string }; type: string; trigger_id?: string;
+  actions?: { action_id: string; value?: string }[];
+  view?: { id: string; callback_id: string; private_metadata?: string; state?: { values?: Record<string, Record<string, { value?: string; selected_option?: { value: string } }>> } };
+};
+export const SLACK_ACTION_IDS = ["mgr_open", "mgr_snooze", "mgr_mute_reason", "mgr_preferences", "mgr_refresh", "mgr_unlink"];
+function isSlackInteraction(p: SlackInteraction | null): p is SlackInteraction {
+  if (typeof p?.team?.id !== "string" || typeof p.user?.id !== "string" || !p.team.id || !p.user.id || p.team.id.length > 200 || p.user.id.length > 200) return false;
+  return (p.type === "block_actions" && Array.isArray(p.actions) && p.actions.length === 1 && SLACK_ACTION_IDS.includes(p.actions[0]?.action_id))
+    || (p.type === "view_submission" && p.view?.callback_id === "mgr_save_preferences" && !!p.view.state?.values);
+}
+export function slackInteraction(raw: string): SlackInteraction | null {
+  try {
+    const p = JSON.parse(new URLSearchParams(raw).get("payload") ?? "null") as SlackInteraction | null;
+    return isSlackInteraction(p) ? p : null;
+  } catch { return null; }
+}
+export async function recordSlackInteraction(p: SlackInteraction) {
+  const hash = createHash("sha256").update(JSON.stringify(p)).digest("hex");
+  return await unwrap(serviceClient().rpc("record_chat_callback_receipt", {
+    p_provider: "slack", p_external_installation_id: p.team.id, p_external_user_id: p.user.id,
+    p_callback_id: hash, p_callback_kind: p.type === "view_submission" ? "mgr_save_preferences" : p.actions![0].action_id,
+    p_payload_hash: hash,
+  })) as { receipt_id: string; disposition: string; duplicate: boolean; result: { disposition: string; intentId?: string } | null } | null;
+}
+export async function consumeSlackInteraction(p: SlackInteraction) {
+  if (!isSlackInteraction(p)) return { disposition: "ignored" };
+  const receipt = await recordSlackInteraction(p);
+  if (!receipt) return { disposition: "ignored" };
+  const action = p.type === "view_submission" ? "mgr_save_preferences" : p.actions![0].action_id;
+  const token = p.type === "view_submission" ? p.view?.private_metadata : p.actions![0].value;
+  // Invalid metadata cannot reach a UUID cast or an error message containing provider input.
+  const intent = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token ?? "") ? token : null;
+  const values = p.view?.state?.values ?? {};
+  const field = (name: string) => values[name]?.[name]?.selected_option?.value ?? values[name]?.[name]?.value ?? "";
+  const input = action === "mgr_save_preferences" ? {
+    reason: field("reason"), enabled: field("enabled") === "true" ? true : field("enabled") === "false" ? false : null, start: field("start"), end: field("end"), timezone: field("timezone"),
+  } : {};
+  return await unwrap(serviceClient().rpc("consume_chat_action_intent", {
+    p_receipt: receipt.receipt_id, p_intent: intent, p_action: action, p_input: input,
+  })) as { disposition: string; code?: string; intentId?: string; quietHours?: { start: string | null; end: string | null; timezone: string | null } };
+}
+
+async function homeIntents(db: SupabaseClient, installationId: string, externalUserId: string) {
+  const issued = await Promise.all(["mgr_preferences", "mgr_refresh", "mgr_unlink"].map(async (action) => {
+    const id = await unwrap(db.rpc("issue_chat_action_intent", { p_installation: installationId, p_external_user_id: externalUserId, p_action: action, p_delivery: null }));
+    return [action, id] as const;
+  }));
+  return Object.fromEntries(issued.filter((entry): entry is readonly [string, string] => Boolean(entry[1])));
+}
+
+// Authenticated settings delegate only provider-owned operations here. Recheck
+// the current RLS-bound admin first; no user session or domain write is minted.
+async function settingsInstallation(ctx: Ctx, installationId: string) {
+  const health = await unwrap(ctx.db.rpc("get_chat_integration_health", { p_brewery: ctx.breweryId }));
+  if (health?.installation?.id !== installationId) throw new CommandError("installation changed; reload Chat settings", 403);
+  const installation = await unwrap(serviceClient().rpc("get_chat_settings_installation", {
+    p_brewery: ctx.breweryId, p_installation: installationId, p_actor: ctx.userId,
+  })) as { id: string; state: string; external_installation_id: string; updated_at: string } | null;
+  if (!installation) throw new CommandError("installation not found", 404);
+  return installation;
+}
+
+export async function listChatChannels(ctx: Ctx, installationId: string) {
+  const installation = await settingsInstallation(ctx, installationId);
+  if (installation.state !== "active") return [];
+  try {
+    return await slackPrivateChannels(installation.external_installation_id);
+  } catch {
+    throw new CommandError("Slack channels are unavailable. Check authorization and try again.", 503);
+  }
+}
+
+export async function saveChatNotificationDestination(ctx: Ctx, installationId: string, channelId: string, requestId: string) {
+  const completed = await unwrap(serviceClient().rpc("chat_settings_request_completed", { p_brewery: ctx.breweryId, p_user: ctx.userId, p_request_id: requestId }));
+  const installation = await settingsInstallation(ctx, installationId);
+  if (!completed) {
+    if (installation.state !== "active") throw new CommandError("Slack delivery is not active", 400);
+    const checked = await slackTransport().validateDestination({ installationId: installation.external_installation_id, destinationId: channelId });
+    if (!checked.ok) throw new CommandError("Choose an active private channel with MGR added and sharing turned off.", 400);
+  }
+  return await unwrap(serviceClient().rpc("set_notification_destination", {
+    p_brewery: ctx.breweryId, p_installation: installationId, p_external_destination_id: channelId,
+    p_request_id: requestId, p_actor: ctx.userId, p_version: installation.updated_at,
+  })) as { id: string };
+}
+
+export async function cleanupChatInstallation(ctx: Ctx, installationId: string, port: Pick<import("./oauth").SlackOAuthPort, "deleteInstallation">) {
+  try { return await withChatLifecycleLock(() => cleanupChatInstallationLocked(ctx, installationId, port)); }
+  catch {
+    // Local delivery has already stopped; preserve a visible, retryable cleanup failure.
+    await unwrap(serviceClient().rpc("reconcile_chat_installation", { p_installation: installationId, p_credential_deleted: false, p_failure_code: "credential_delete_failed" }));
+    return { credentialDeleted: false };
+  }
+}
+
+async function cleanupChatInstallationLocked(ctx: Ctx, installationId: string, port: Pick<import("./oauth").SlackOAuthPort, "deleteInstallation">) {
+  const installation = await settingsInstallation(ctx, installationId);
+  if (installation.state !== "disconnected") return { credentialDeleted: false };
+  // Credential ownership survives disable/reauthorization; disconnected rows
+  // release this unique store reference to their per-row tombstone.
+  if (await chatCredentialHasOtherOwner(installation.external_installation_id)) return { credentialDeleted: false };
+  const credentialDeleted = installation.external_installation_id.startsWith("pending:") || await port.deleteInstallation(installation.external_installation_id).then(() => true, () => false);
+  await unwrap(serviceClient().rpc("reconcile_chat_installation", { p_installation: installationId, p_credential_deleted: credentialDeleted,
+    p_failure_code: credentialDeleted ? null : "credential_delete_failed" }));
+  return { credentialDeleted };
+}
+
+export async function chatCredentialHasOtherOwner(externalInstallationId: string) {
+  return Boolean(await unwrap(serviceClient().rpc("chat_credential_has_canonical_owner", { p_external_installation_id: externalInstallationId })));
+}
+
+export async function failChatCredentialStore(installationId: string): Promise<never> {
+  await unwrap(serviceClient().rpc("mark_chat_installation_reauthorization", {
+    p_installation: installationId, p_failure_code: "credential_store_failed",
+  }));
+  throw new CommandError("Slack credentials could not be saved. Reauthorize from Chat settings.", 503);
+}
+
+// Token reads share the lifecycle lock so activation is not observable until
+// credentials are stored, or a failed store has disabled the mapping.
+export async function withActiveChatInstallation<T>(externalId: string, read: () => Promise<T>) {
+  return withChatLifecycleLock(async () => {
+    const active = await unwrap(serviceClient().rpc("has_active_canonical_chat_installation", { p_external_installation_id: externalId }));
+    return active ? read() : null;
+  });
+}
+
+// ponytail: one global lock and one dedicated connection per waiting caller.
+// Per-workspace locks are the upgrade if contention matters (OAuth learns the team late).
+export async function withChatLifecycleLock<T>(work: () => Promise<T>): Promise<T> {
+  const connection = chatLifecycleClient();
+  try { await connection.connect(); }
+  catch {
+    await connection.end().catch(() => undefined);
+    throw new CommandError("Chat credential storage is unavailable. Try again.", 503);
+  }
+  try {
+    await connection.query("begin");
+    await connection.query("set local lock_timeout = '5s'");
+    await connection.query("select pg_advisory_xact_lock(162788, 16)");
+    const result = await work();
+    await connection.query("commit");
+    return result;
+  } catch (error) {
+    await connection.query("rollback").catch(() => undefined);
+    if ((error as { code?: string }).code === "55P03") throw new CommandError("Another Slack connection change is in progress. Try again.", 503);
+    throw error;
+  } finally { await connection.end(); }
 }

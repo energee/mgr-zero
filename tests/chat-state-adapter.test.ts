@@ -1,9 +1,10 @@
 // Proves Chat SDK state operations are confined to the private PostgreSQL schema.
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
+import { DB } from "./helpers";
 import { createPostgresState } from "@chat-adapter/state-pg";
 
-const adminUrl = process.env.POSTGRES_URL ?? "postgresql://postgres:postgres@127.0.0.1:54342/postgres";
+const adminUrl = DB;
 const admin = new pg.Pool({ connectionString: adminUrl });
 const role = `mgr_chat_test_${process.pid}`;
 const password = crypto.randomUUID();

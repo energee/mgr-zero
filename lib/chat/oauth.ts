@@ -2,12 +2,18 @@
 // callback completion, reconciliation, and disconnect. Provider I/O goes through
 // SlackOAuthPort so tests run against a fake; durable state lives in the
 // chat_installations lifecycle RPCs (baseline § chat installation lifecycle).
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
+import { chatCredentialHasOtherOwner, cleanupChatInstallation, failChatCredentialStore, serviceClient, withChatLifecycleLock } from "./jobs";
 
 export const PROVIDER = "slack";
 export const REQUIRED_SLACK_SCOPES = ["chat:write", "im:write", "groups:read"] as const;
+const CHAT_ENV = ["APP_URL", "SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SLACK_SIGNING_SECRET", "CHAT_SDK_ENCRYPTION_KEY", "CHAT_STATE_DATABASE_URL"] as const;
+
+export function isChatConfigured() {
+  return CHAT_ENV.every((key) => Boolean(process.env[key]));
+}
 
 export type SlackOAuthPort = {
   handleOAuthCallback(request: Request, options: { redirectUri: string }): Promise<{
@@ -16,6 +22,7 @@ export type SlackOAuthPort = {
     isEnterpriseInstall: boolean;
     teamName?: string;
     scopes: readonly string[];
+    persist(): Promise<void>;
   }>;
   getInstallation(id: string): Promise<{ botToken: string } | null>;
   deleteInstallation(id: string): Promise<void>;
@@ -52,35 +59,51 @@ function authorizeUrl(state: string, redirectUri: string) {
   return url.toString();
 }
 
-async function beginIntent(ctx: Ctx, redirectUri: string, name: string, args: Record<string, unknown>) {
+async function beginIntent(ctx: Ctx, redirectUri: string, name: string, args: Record<string, unknown>, requestId: string) {
   if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
-  const state = randomBytes(32).toString("base64url");
-  const result = await rpc<{ installation_id: string }>(ctx.db, name, { ...args, p_redirect_uri: redirectUri, p_state_hash: sha256(state) });
-  return { installationId: result.installation_id, authorizeUrl: authorizeUrl(state, redirectUri) };
+  // UUID entropy belongs to the caller's stable command request; hashing binds
+  // the state to this verified actor while allowing an unchanged retry.
+  const state = sha256(`${requestId}:${ctx.userId}`);
+  const url = authorizeUrl(state, redirectUri);
+  const result = await rpc<{ installation_id: string }>(ctx.db, name, { ...args, p_request_id: requestId, p_redirect_uri: redirectUri, p_state_hash: sha256(state) });
+  return { installationId: result.installation_id, authorizeUrl: url };
 }
 
-export function beginSlackInstall(ctx: Ctx, redirectUri: string) {
-  return beginIntent(ctx, redirectUri, "begin_chat_installation", { p_brewery: ctx.breweryId, p_provider: PROVIDER });
+export function beginSlackInstall(ctx: Ctx, redirectUri: string, requestId: string = randomUUID()) {
+  return beginIntent(ctx, redirectUri, "begin_chat_installation", { p_brewery: ctx.breweryId, p_provider: PROVIDER }, requestId);
 }
 
-export function beginSlackReauthorization(ctx: Ctx, installationId: string, redirectUri: string) {
-  return beginIntent(ctx, redirectUri, "begin_chat_reauthorization", { p_installation: installationId });
+export function beginSlackReauthorization(ctx: Ctx, installationId: string, redirectUri: string, requestId: string = randomUUID()) {
+  return beginIntent(ctx, redirectUri, "begin_chat_reauthorization", { p_brewery: ctx.breweryId, p_installation: installationId }, requestId);
 }
 
 const sameScopes = (granted: readonly string[]) =>
   granted.length === REQUIRED_SLACK_SCOPES.length && REQUIRED_SLACK_SCOPES.every((scope) => granted.includes(scope));
 
-// Validates the intent before any token exchange, exchanges the code (Chat SDK
-// stores the token in its private state), then activates the MGR mapping. Any
-// failure after the exchange deletes the credential the SDK just stored.
+// Exchange into memory, then activate the mapping before publishing credentials.
+// Rejected activation never touches another workspace owner’s SDK key.
 export async function completeSlackInstall(db: SupabaseClient, request: Request, port: SlackOAuthPort, redirectUri: string) {
+  return withChatLifecycleLock(() => completeSlackInstallLocked(db, request, port, redirectUri));
+}
+
+async function completeSlackInstallLocked(db: SupabaseClient, request: Request, port: SlackOAuthPort, redirectUri: string) {
   const params = new URL(request.url).searchParams;
   if (params.get("error")) throw new CommandError("oauth cancelled", 400);
   const state = params.get("state");
   if (!state) throw new CommandError("oauth state missing", 400);
-  const intent = await unwrap<Intent | null>(db.rpc("find_chat_oauth_intent", { p_state_hash: sha256(state) }));
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) throw new CommandError("oauth state invalid", 400);
+  const jobs = serviceClient();
+  const intent = await unwrap<Intent | null>(jobs.rpc("find_chat_oauth_intent", { p_state_hash: sha256(state), p_actor: user.id }));
   if (!intent) throw new CommandError("oauth state invalid", 400);
+  const membership = await unwrap<{ role: string } | null>(
+    db.from("brewery_users").select("role").eq("brewery_id", intent.brewery_id).eq("user_id", user.id).maybeSingle(),
+  );
+  if (membership?.role !== "admin") throw new CommandError("oauth state invalid", 400);
   if (intent.consumed_at && intent.state === "active") {
+    if (!await port.getInstallation(intent.external_installation_id)) {
+      return failChatCredentialStore(intent.installation_id);
+    }
     return { installationId: intent.installation_id, breweryId: intent.brewery_id, replayed: true };
   }
   if (intent.consumed_at) throw new CommandError("oauth state already used", 400);
@@ -89,43 +112,45 @@ export async function completeSlackInstall(db: SupabaseClient, request: Request,
 
   const granted = await port.handleOAuthCallback(request, { redirectUri });
   const externalId = granted.teamId;
+  if (!sameScopes(granted.scopes)) throw new CommandError("oauth scope mismatch", 400);
+  const result = await rpc<{ installation_id: string; replayed: boolean }>(jobs, "activate_chat_installation", {
+    p_installation: intent.installation_id,
+    p_state_hash: sha256(state),
+    p_redirect_uri: redirectUri,
+    p_external_installation_id: externalId,
+    p_external_enterprise_id: granted.enterpriseId ?? null,
+    p_display_label: granted.teamName ?? externalId,
+    p_token_store_key: `ignored:${externalId}`,
+    p_granted_capabilities: { scopes: [...granted.scopes], enterprise: granted.isEnterpriseInstall },
+    p_actor: user.id,
+  });
   try {
-    if (!sameScopes(granted.scopes)) throw new CommandError("oauth scope mismatch", 400);
-    const result = await rpc<{ installation_id: string; replayed: boolean }>(db, "activate_chat_installation", {
-        p_installation: intent.installation_id,
-        p_state_hash: sha256(state),
-        p_redirect_uri: redirectUri,
-        p_external_installation_id: externalId,
-        p_external_enterprise_id: granted.enterpriseId ?? null,
-        p_display_label: granted.teamName ?? externalId,
-        p_token_store_key: `slack:installation:${externalId}`,
-        p_granted_capabilities: { scopes: [...granted.scopes], enterprise: granted.isEnterpriseInstall },
-    });
-    return { installationId: result.installation_id, breweryId: intent.brewery_id, replayed: result.replayed };
-  } catch (e) {
-    // Never keep a credential MGR could not bind; if this delete fails too,
-    // the reconciler retries from the durable intent.
-    await port.deleteInstallation(externalId).catch(() => undefined);
-    throw e;
+    await granted.persist();
+  } catch {
+    return failChatCredentialStore(intent.installation_id);
   }
+  return { installationId: result.installation_id, breweryId: intent.brewery_id, replayed: result.replayed };
 }
 
 // Reconciler entry point for a partial install: the token exists but the MGR
 // row never activated. Runs with the service-role client from a job.
 export async function reconcileSlackInstall(db: SupabaseClient, installationId: string, port: SlackOAuthPort) {
-  const { data: r } = await db
-    .from("chat_installations")
-    .select("state, external_installation_id")
-    .eq("id", installationId)
-    .single();
+  return withChatLifecycleLock(() => reconcileSlackInstallLocked(db, installationId, port));
+}
+
+async function reconcileSlackInstallLocked(_db: SupabaseClient, installationId: string, port: SlackOAuthPort) {
+  const r = await unwrap<{ state: string; external_installation_id: string } | null>(
+    serviceClient().rpc("get_chat_installation_lifecycle", { p_installation: installationId }),
+  );
   if (!r) throw new CommandError("installation not found", 404);
+  if (await chatCredentialHasOtherOwner(r.external_installation_id)) return { credentialDeleted: false };
   let credentialDeleted = false;
   if (r.state !== "active" && !r.external_installation_id.startsWith("pending:")) {
     credentialDeleted = await port
       .deleteInstallation(r.external_installation_id)
       .then(() => true, () => false);
   }
-  await unwrap(db.rpc("reconcile_chat_installation", {
+  await unwrap(serviceClient().rpc("reconcile_chat_installation", {
     p_installation: installationId,
     p_credential_deleted: credentialDeleted,
     p_failure_code: credentialDeleted ? null : "credential_delete_failed",
@@ -135,16 +160,8 @@ export async function reconcileSlackInstall(db: SupabaseClient, installationId: 
 
 // Disable-first: the RPC marks the row disconnected and invalidates links,
 // destinations, and action intents before the provider credential is touched.
-export async function disconnectSlackInstallation(ctx: Ctx, installationId: string, port: SlackOAuthPort) {
+export async function disconnectSlackInstallation(ctx: Ctx, installationId: string, port: Pick<SlackOAuthPort, "deleteInstallation">, requestId: string = randomUUID()) {
   if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
-  const r = await rpc<{ external_installation_id: string }>(ctx.db, "disconnect_chat_installation", { p_installation: installationId });
-  const credentialDeleted = r.external_installation_id.startsWith("pending:")
-    ? true
-    : await port.deleteInstallation(r.external_installation_id).then(() => true, () => false);
-  await unwrap(ctx.db.rpc("reconcile_chat_installation", {
-    p_installation: installationId,
-    p_credential_deleted: credentialDeleted,
-    p_failure_code: credentialDeleted ? null : "credential_delete_failed",
-  }));
-  return { credentialDeleted };
+  await rpc(ctx.db, "disconnect_chat_installation", { p_brewery: ctx.breweryId, p_installation: installationId, p_request_id: requestId });
+  return cleanupChatInstallation(ctx, installationId, port);
 }

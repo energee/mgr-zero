@@ -9,6 +9,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:e2e": "bun tests-e2e/portal-smoke.ts",
+    "test:e2e:chat": "tsx tests-e2e/chat-previews.ts",
+    "render:slack-manifest": "tsx scripts/render-slack-manifest.ts",
     "docs:api": "bun scripts/write-api-docs.ts"
   },
   "dependencies": {

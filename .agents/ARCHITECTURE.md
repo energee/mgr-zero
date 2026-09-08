@@ -25,10 +25,10 @@ never copy it into a second place.
 | `lib/order-form-rules.ts` | Pure "is the New Order form submittable" rule behind `app/(app)/orders/order-form.tsx` (customer + ship-to or to-location, from-location, one complete line), mirroring `create_order`'s input schema; also supplies the empty-catalog hint. |
 | `lib/portal-cart.ts` | Pure decisions behind the portal cart's Save draft/Submit buttons (`app/(portal)/portal/cart.tsx`): which command syncs the cart's current lines (`portal_create_order` vs `portal_update_draft_order`) and when the buttons are disabled. |
 | `lib/mgr/not-found.ts` | `orNotFound()`: wraps a detail page's registry read so an unknown or malformed id renders the app's `not-found.tsx` instead of the generic error boundary; shared by `(app)` and `(portal)` detail pages. |
-| `lib/chat/` | Provider-neutral chat notification contracts and validation, Chat SDK state, Slack adapter/transport/renderer, OAuth installation and staff linking, job authentication, preview fixtures, and `jobs.ts`, the rule-4 service-role owner. |
+| `lib/chat/` | Provider-neutral chat notification contracts and validation, Chat SDK state, Slack adapter/transport/renderer, OAuth installation and staff linking, job authentication, preview fixtures, and `jobs.ts`, the rule-4 service-role owner. Service access is limited to integration state: OAuth/link lifecycle, callback receipts and action intents, occurrence scan/fan-out, delivery leases/results, App Home reads, destination proofs, and `chat_sdk` cleanup; it never executes domain commands or impersonates staff. |
 | `lib/commands/chat.ts`, `lib/commands/today.ts` | Staff chat linking and notification settings; the role-filtered Today projection. |
 | `app/api/chat/`, `app/api/webhooks/slack/` | Thin Slack OAuth, scheduled-job, and events/App Home routes that delegate to `lib/chat/`. |
-| `app/(app)/settings/chat/` | Slack account linking (`link/page.tsx`, the only route here) and `chat-settings-client.tsx`, a fixture-only preview panel. There is no chat settings page yet; notification settings are reachable only through the `lib/commands/chat.ts` commands. |
+| `app/(app)/settings/chat/` | Admin connection settings, health, linked people and disconnect confirmation; personal preferences for every staff role; read-only link identity preview followed by explicit command consent. `chat-settings-client.tsx` owns forms and the ten provider-free fixture previews. |
 | `lib/commands/context.ts`, `lib/auth/request-context.ts` | `buildContext`: the command caller's verified identity and brewery membership; the request-scoped Supabase identity and membership lookups shared by layouts and commands. |
 | `lib/env/{public,server,server-parser}.ts` | Runtime configuration: the only Supabase values permitted in browser bundles; the server-only environment singleton; and the parser (incl. optional `VERCEL_ENV`) shared by server code, scripts, and tests. |
 | `lib/time-window.ts`, `lib/volume.ts` | Domain display helpers: a stored `hh:mm` window (may wrap midnight) as the string a brewer reads; a stored barrel figure in the unit a brewer reads (storage and TTB stay bbl). |
@@ -56,6 +56,37 @@ never copy it into a second place.
 | `.agents/skills/` | Project-local, harness-compatible agent workflows loaded on demand. |
 | `.pi/prompts/` | Thin Pi slash-command aliases; workflow instructions remain owned by the corresponding skill. |
 | `.agents/` | This file, agent memory and progress; worktrees live under `.agents/worktrees/`. |
+
+The chat RPC boundary is explicit. Authenticated commands use
+`begin_chat_installation`, `begin_chat_reauthorization`,
+`disable_chat_installation`, `disconnect_chat_installation`,
+`set_brewery_quiet_hours`, `set_notification_preference`,
+`set_personal_quiet_hours`, `snooze_notification`, `consume_chat_link_proof`,
+`unlink_chat_user`, and `set_brewery_operating_defaults`; authenticated reads
+use `get_chat_link_intent`, `get_chat_integration_health`, and
+`list_chat_user_links`. Never grant `activate_chat_installation` or
+`find_chat_oauth_intent` to `authenticated`; never trust a caller
+`token_store_key` (activate always stores `slack:installation:<team id>`).
+The chat service alone may call `find_chat_oauth_intent`,
+`activate_chat_installation`, `mark_chat_installation_reauthorization`,
+`reconcile_chat_installation`, `issue_chat_link_proof`, `resolve_chat_actor`,
+`scan_chat_notification_occurrences`, `list_chat_scan_targets`,
+`lease_chat_deliveries`, `complete_chat_delivery`, `retry_chat_delivery`,
+`suppress_chat_delivery`, `record_chat_callback_receipt`,
+`claim_chat_callback_receipts`, `complete_chat_callback_receipt`,
+`get_chat_home_items`, `get_chat_delivery_context`,
+`block_notification_destination`, `issue_chat_action_intent`,
+`consume_chat_action_intent`, `set_notification_destination`,
+`get_chat_settings_installation`, `chat_credential_has_canonical_owner`,
+`has_active_canonical_chat_installation`, `get_chat_installation_lifecycle`,
+`chat_settings_request_completed`, and `prune_chat_integration_logs`.
+`lib/chat/jobs.ts` calls only those named RPCs — never
+`from("chat_installations")`. Private helpers and trigger functions stay
+ungranted. Every browser write carries the existing command `requestId`; the
+service calls above are limited to integration state and current projections.
+Callback receipts, deliveries, and action intents are not pruned
+automatically; call `prune_chat_integration_logs` before hosted traffic
+(v1 90-day log prune). No scheduler is wired.
 
 ## Iron rules
 
@@ -115,8 +146,16 @@ a gap to close, not a convention to trust.
    webhooks and scheduled jobs where no user exists, may call only the named
    `service_role` chat RPCs (`scan_chat_*`, `lease_chat_deliveries`,
    `complete/retry/suppress_chat_delivery`, `claim/complete_chat_callback_receipt`,
-   `issue_chat_link_proof`, `resolve_chat_actor`, `reconcile_chat_installation`),
-   never ordinary domain commands, and never mints a user token.
+   `issue_chat_link_proof`, `resolve_chat_actor`, `reconcile_chat_installation`,
+   `activate_chat_installation`, `find_chat_oauth_intent`,
+   `mark_chat_installation_reauthorization`, `issue_chat_action_intent`,
+   `consume_chat_action_intent`, `set_notification_destination`,
+   `get_chat_settings_installation`, `chat_credential_has_canonical_owner`,
+   `has_active_canonical_chat_installation`, `get_chat_installation_lifecycle`,
+   `chat_settings_request_completed`, `prune_chat_integration_logs`),
+   never `from("chat_installations")`, never ordinary domain commands, and
+   never mints a user token. Those activate/find RPCs are not granted to
+   `authenticated` and must not trust a caller `token_store_key`.
    *Enforced by:* `no-restricted-imports` in `eslint.config.mjs`, run in CI.
 5. **Every mutation is one idempotent Postgres transaction.**
    Application roles have no direct table DML. A write handler calls one

@@ -14,6 +14,7 @@ export function ParsView({
   footer,
   empty,
   linkRows,
+  rowAction,
 }: {
   model: ParsViewModel;
   createAction?: ReactNode;
@@ -22,6 +23,8 @@ export function ParsView({
   empty?: string;
   /** Live: row verbs are links. Inventory leaves them unlabeled taps. */
   linkRows?: boolean;
+  /** Live: CommandForm on a standing row. Inventory omits and uses verb/href. */
+  rowAction?: (row: ParsViewModel["rows"][number]) => ReactNode;
 }) {
   return (
     <>
@@ -32,7 +35,7 @@ export function ParsView({
           {model.atp ? E.num(model.atp, model.atpDetail) : null}
           {model.rows.map((row) => (
             <Fragment key={row.key}>
-              {E.row(row.title, row.detail, row.verb ? E.act(row.verb, row.tone, linkRows ? row.href : undefined) : "")}
+              {E.row(row.title, row.detail, rowAction?.(row) ?? (row.verb ? E.act(row.verb, row.tone, linkRows ? row.href : undefined) : ""))}
             </Fragment>
           ))}
           {footer === undefined ? E.btns([["Adjust selected", "p"], ["Edit par", "g"]]) : footer}

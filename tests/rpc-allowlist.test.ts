@@ -5,6 +5,11 @@ import { describe, expect, it } from "vitest";
 import { sql } from "./helpers";
 
 const AUTHENTICATED_RPCS = [
+  "get_chat_integration_health(uuid)",
+  "get_chat_link_intent(uuid,text)",
+  "list_chat_user_links(uuid)",
+  "set_brewery_operating_defaults(uuid,integer,uuid)",
+
   "begin_csv_import(uuid,text,jsonb,uuid)",
   "import_csv_row(uuid,uuid,integer)",
   "claim_invite_request(uuid,text,text,staff_role,uuid,uuid)",
@@ -17,17 +22,16 @@ const AUTHENTICATED_RPCS = [
   "return_route(uuid,uuid)",
   "update_keg_pool(uuid,uuid,text,uuid,integer,integer,boolean,uuid)",
   "create_keg_pool(uuid,text,keg_pool_kind,uuid,integer,integer,uuid)",
-  "activate_chat_installation(uuid,text,text,text,text,text,text,jsonb)",
   "adjust_order_lines(uuid,jsonb,text,uuid)",
-  "begin_chat_installation(uuid,text,text,text)",
-  "begin_chat_reauthorization(uuid,text,text)",
+  "begin_chat_installation(uuid,text,text,text,uuid)",
+  "begin_chat_reauthorization(uuid,uuid,text,text,uuid)",
   "cancel_order(uuid,text,uuid)",
   "clear_channel_price(uuid,uuid,uuid,uuid,uuid)",
   "close_packaging_run(uuid,uuid,numeric,jsonb,text,date,date,uuid,uuid,uuid)",
   "confirm_delivery(uuid,text,uuid)",
   "confirm_order(uuid,uuid)",
   "confirm_restock(uuid,uuid)",
-  "consume_chat_link_proof(text)",
+  "consume_chat_link_proof(uuid,text,uuid)",
   "create_bin(uuid,uuid,text,uuid)",
   "create_credit_memo(uuid,jsonb,uuid,text,uuid)",
   "create_location(uuid,text,location_kind,uuid)",
@@ -41,15 +45,13 @@ const AUTHENTICATED_RPCS = [
   "delete_bin(uuid,uuid,uuid)",
   "delete_price_group(uuid,uuid,uuid)",
   "delete_sale_channel(uuid,uuid,uuid)",
-  "disable_chat_installation(uuid)",
-  "disconnect_chat_installation(uuid)",
+  "disable_chat_installation(uuid,uuid,uuid)",
+  "disconnect_chat_installation(uuid,uuid,uuid)",
   "draft_purchase_order_from_requirements(uuid,uuid[],uuid)",
   "file_compliance_report(uuid,text,date,date,text,uuid)",
-  "find_chat_oauth_intent(text)",
   "generate_compliance_report(uuid,text,date,date)",
   "get_today_items(uuid,timestamp with time zone)",
   "is_staff_of(uuid)",
-  "mark_chat_installation_reauthorization(uuid,text)",
   "move_stock_bin(uuid,uuid,uuid,uuid,keg_size,numeric,uuid,uuid,text,uuid)",
   "my_brewery_ids()",
   "my_customer_ids()",
@@ -58,7 +60,6 @@ const AUTHENTICATED_RPCS = [
   "portal_create_order(uuid,uuid,uuid,text,text,jsonb,uuid)",
   "receive_purchase_order(uuid,uuid,uuid,uuid,date,jsonb,uuid)",
   "receive_stock_transfer(uuid,jsonb,uuid)",
-  "reconcile_chat_installation(uuid,boolean,text)",
   "record_brew_day(uuid,uuid,uuid,numeric,date,uuid)",
   "record_cellar_transfer(uuid,uuid,uuid,numeric,numeric,uuid)",
   "record_fermentation_reading(uuid,uuid,timestamp with time zone,numeric,numeric,numeric,text,uuid)",
@@ -77,10 +78,9 @@ const AUTHENTICATED_RPCS = [
   "schedule_packaging_run(uuid,uuid,date,uuid,jsonb,uuid)",
   "send_purchase_order(uuid,uuid,text,uuid)",
   "set_brewery_gravity_unit(uuid,text,uuid)",
-  "set_brewery_quiet_hours(uuid,time without time zone,time without time zone)",
+  "set_brewery_quiet_hours(uuid,uuid,time without time zone,time without time zone,uuid)",
   "set_my_gravity_unit(uuid,text,uuid)",
-  "set_notification_destination(uuid,text)",
-  "set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text)",
+  "set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text,boolean,uuid)",
   "set_portal_fulfillment_source(uuid,uuid,uuid)",
   "set_channel_price(uuid,uuid,uuid,uuid,integer,uuid)",
   "set_standing_allocation(uuid,uuid,numeric,uuid)",
@@ -90,7 +90,9 @@ const AUTHENTICATED_RPCS = [
   "submit_order(uuid,uuid)",
   "submit_stock_transfer(uuid,uuid)",
   "today_live_reasons()",
-  "unlink_chat_user(uuid)",
+  "unlink_chat_user(uuid,uuid,uuid)",
+  "set_personal_quiet_hours(uuid,time without time zone,time without time zone,text,uuid)",
+  "snooze_notification(uuid,uuid,timestamp with time zone,uuid)",
   "update_bin(uuid,uuid,text,uuid)",
   "update_draft_order(uuid,uuid,date,text,text,jsonb,uuid)",
   "update_location(uuid,uuid,text,location_kind,uuid)",
@@ -127,4 +129,36 @@ describe("authenticated RPC allowlist", () => {
     // same comparator on both sides: Postgres collation orders punctuation differently from JS
     expect([...actual].sort()).toEqual([...AUTHENTICATED_RPCS].sort());
   });
+});
+
+
+it("grants action issuance and receipt consumption only to the service owner", () => {
+  expect(sql(`select p.proname || ':' || r.role from pg_proc p
+    cross join (values ('anon'),('authenticated'),('service_role')) r(role)
+    where p.pronamespace='public'::regnamespace and p.proname in ('issue_chat_action_intent','consume_chat_action_intent')
+      and has_function_privilege(r.role,p.oid,'execute') order by 1`)).toEqual([
+    "consume_chat_action_intent:service_role", "issue_chat_action_intent:service_role",
+  ]);
+});
+
+it("grants chat oauth activation and job RPCs only to the service owner", () => {
+  expect(sql(`select p.proname || ':' || r.role from pg_proc p
+    cross join (values ('anon'),('authenticated'),('service_role')) r(role)
+    where p.pronamespace='public'::regnamespace and p.proname in (
+      'activate_chat_installation','find_chat_oauth_intent',
+      'mark_chat_installation_reauthorization','reconcile_chat_installation',
+      'set_notification_destination','get_chat_settings_installation',
+      'chat_credential_has_canonical_owner','has_active_canonical_chat_installation',
+      'get_chat_installation_lifecycle')
+      and has_function_privilege(r.role,p.oid,'execute') order by 1`)).toEqual([
+    "activate_chat_installation:service_role",
+    "chat_credential_has_canonical_owner:service_role",
+    "find_chat_oauth_intent:service_role",
+    "get_chat_installation_lifecycle:service_role",
+    "get_chat_settings_installation:service_role",
+    "has_active_canonical_chat_installation:service_role",
+    "mark_chat_installation_reauthorization:service_role",
+    "reconcile_chat_installation:service_role",
+    "set_notification_destination:service_role",
+  ]);
 });

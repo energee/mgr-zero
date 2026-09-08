@@ -68,6 +68,7 @@ describe("Pars view", () => {
     expect(src).toMatch(/<ParsView\b/);
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
     expect(src).toMatch(/<ReplenishForm\b/);
+    expect(src).toMatch(/<QuantityForm\b/);
     expect(src).toMatch(/backHref: "\/inventory"/);
     expect(src).not.toMatch(/get_shortfalls/);
     expect(src).not.toMatch(/shortfalls\[0\]/);

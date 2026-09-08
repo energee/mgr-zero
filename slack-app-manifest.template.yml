@@ -1,0 +1,29 @@
+display_information:
+  name: MGR
+  description: Staff brewery operations notifications
+  background_color: "#18211c"
+features:
+  bot_user:
+    display_name: MGR
+  app_home:
+    home_tab_enabled: true
+    messages_tab_enabled: true
+oauth_config:
+  redirect_urls:
+    - ${APP_URL}/api/chat/slack/oauth
+  scopes:
+    bot:
+      - chat:write
+      - im:write
+      - groups:read
+settings:
+  event_subscriptions:
+    request_url: ${APP_URL}/api/webhooks/slack
+    bot_events:
+      - app_home_opened
+  interactivity:
+    is_enabled: true
+    request_url: ${APP_URL}/api/webhooks/slack
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: true

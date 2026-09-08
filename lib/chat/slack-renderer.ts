@@ -16,7 +16,7 @@ const linkButton = (label: string, url: string, primary = false): Block => ({
   ...(primary ? { style: "primary" } : {}),
 });
 const intentButton = (action: PortableAction, intentId: string): Block => ({
-  type: "button", action_id: action.id, text: { type: "plain_text", text: clip(action.label, 75), emoji: false }, value: intentId,
+  type: "button", action_id: ({ snooze: "mgr_snooze", mute_reason: "mgr_mute_reason", edit_preferences: "mgr_preferences", refresh: "mgr_refresh", open_mgr: "open_mgr" })[action.id], text: { type: "plain_text", text: clip(action.label, 75), emoji: false }, value: action.intentId ?? intentId,
 });
 const actions = (elements: Block[]): Block[] => (elements.length ? [{ type: "actions", elements: elements.slice(0, 25) }] : []);
 
@@ -75,7 +75,7 @@ export function renderSlackDigest(o: DigestOptions): { text: string; blocks: Blo
 
 type HomeOptions =
   | { linked: false; linkUrl: string; mgrBaseUrl: string }
-  | { linked: true; items: readonly PortableNotification[]; mgrBaseUrl: string };
+  | { linked: true; items: readonly PortableNotification[]; mgrBaseUrl: string; intents?: Record<string, string> };
 
 export function renderSlackHome(o: HomeOptions): { type: "home"; blocks: Block[] } {
   if (!o.linked) {
@@ -96,6 +96,29 @@ export function renderSlackHome(o: HomeOptions): { type: "home"; blocks: Block[]
       accessory: linkButton("Open", `${o.mgrBaseUrl}${openPath}`),
     });
   }
-  blocks.push(...actions([linkButton("Open Today in MGR", `${o.mgrBaseUrl}/`, true)]));
+  blocks.push(...actions([linkButton("Open Today in MGR", `${o.mgrBaseUrl}/`, true), linkButton("Notification settings in MGR", `${o.mgrBaseUrl}/settings/chat`),
+    ...Object.entries(o.intents ?? {}).filter(([id]) => ["mgr_preferences", "mgr_refresh", "mgr_unlink"].includes(id)).map(([id, value]) => ({
+      type: "button", action_id: id, text: { type: "plain_text", text: ({ mgr_preferences: "Preferences", mgr_refresh: "Refresh", mgr_unlink: "Unlink MGR" } as Record<string,string>)[id] }, value,
+    })),
+  ]));
   return { type: "home", blocks };
+}
+
+
+export function renderSlackPreferences(intentId: string, quiet?: { start: string | null; end: string | null; timezone: string | null }) {
+  const option = (text: string, value: string) => ({ text: { type: "plain_text", text }, value });
+  const field = (id: string, label: string, element: Block, optional = false) => ({ type: "input", block_id: id, label: { type: "plain_text", text: label }, element: { ...element, action_id: id }, optional });
+  return {
+    type: "modal", callback_id: "mgr_save_preferences", private_metadata: intentId,
+    title: { type: "plain_text", text: "Notification preferences" }, submit: { type: "plain_text", text: "Save" }, close: { type: "plain_text", text: "Cancel" },
+    blocks: [
+      section("Choose a reason to mute or unmute. Quiet hours apply to all your chat reminders. Today is always current."),
+      field("reason", "Notification reason", { type: "static_select", options: Object.entries(REASON_LABEL).map(([value, label]) => option(label, value)) }),
+      field("enabled", "Delivery for this reason", { type: "static_select", options: [option("Enabled", "true"), option("Muted", "false")] }),
+      field("start", "Quiet hours start (HH:MM)", { type: "plain_text_input", ...(quiet?.start ? { initial_value: quiet.start.slice(0,5) } : {}) }, true),
+      field("end", "Quiet hours end (HH:MM)", { type: "plain_text_input", ...(quiet?.end ? { initial_value: quiet.end.slice(0,5) } : {}) }, true),
+      field("timezone", "Timezone (blank uses brewery timezone)", { type: "plain_text_input", ...(quiet?.timezone ? { initial_value: quiet.timezone } : {}) }, true),
+      context("Clear both times to use brewery quiet hours. If this form expires, reopen Preferences or use Notification settings in MGR."),
+    ],
+  };
 }

@@ -21,8 +21,14 @@ let pool: pg.Pool | undefined;
 let state: ReturnType<typeof createPostgresState> | undefined;
 
 export function chatStatePool(): pg.Pool {
-  pool ??= new pg.Pool({ connectionString: chatStateUrl(), options: "-c search_path=chat_sdk", max: 5 });
+  pool ??= new pg.Pool({ connectionString: chatStateUrl(), options: "-c search_path=chat_sdk", max: 5, connectionTimeoutMillis: 5000 });
   return pool;
+}
+
+// Advisory-lock holders must not reserve an SDK pool slot while their work
+// waits for another slot to read/write credentials.
+export function chatLifecycleClient() {
+  return new pg.Client({ connectionString: chatStateUrl(), options: "-c search_path=chat_sdk", connectionTimeoutMillis: 5000 });
 }
 
 export function chatState() {

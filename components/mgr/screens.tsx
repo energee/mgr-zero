@@ -1287,7 +1287,7 @@ export const SCREENS: Screen[] = [
     reads: "get_shortfalls · list_standing_allocations",
     writes: "adjust_order_lines · release_allocation · set_taproom_par · set_standing_allocation",
     states: DEFAULT_STATES,
-    spec: "There is no ranking command or priority column; every change is a named quantity edit. Taproom par edits the bin's par (§16.6 keys pars on bins), the same row the Bin sheet shows.",
+    spec: "There is no ranking command or priority column; every change is a named quantity edit. Taproom par sets the selected taproom's target for a SKU; standing allocation reserves a named SKU quantity without an order. Releasing a standing allocation returns its quantity to ATP without moving stock.",
     body: <ParsView model={toParsViewProps(parsPils)} />,
   },
   {
@@ -2986,8 +2986,8 @@ export const SCREENS: Screen[] = [
     group: "Chat",
     name: "Chat disconnected",
     job: "Explain the projection before an admin installs a provider",
-    reads: "get_chat_integration_health [design]",
-    writes: "begin_chat_installation [design; admin-only, single-use OAuth intent]",
+    reads: "get_chat_integration_health",
+    writes: "begin_chat_installation [admin-only, single-use OAuth intent]",
     states: [["permission", "admin only", 1], ["OAuth cancelled", "remain disconnected · try again", 1]],
     spec: "This is production Settings UI, not a developer demo. Preview surfaces remain available while disconnected and use non-sensitive fixtures.",
     body: (<>
@@ -3007,14 +3007,14 @@ export const SCREENS: Screen[] = [
     name: "Chat settings",
     to: { Disconnect: "Disconnect Slack" , "Open": "Chat settings" },
     job: "Operate one brewery/provider installation and inspect every outbound surface",
-    reads: "get_chat_integration_health · get_notification_preferences · get_brewery_operating_defaults [design] · chat_preview_fixtures [presentation]",
-    writes: "set_notification_destination · set_brewery_quiet_hours · set_brewery_operating_defaults · disable_chat_installation · disconnect_chat_installation [design]",
+    reads: "get_chat_integration_health · get_notification_preferences · get_brewery_operating_defaults · [presentation: ten provider-free fixtures]",
+    writes: "set_notification_destination · set_brewery_quiet_hours · set_brewery_operating_defaults · disable_chat_installation · disconnect_chat_installation",
     states: [["permission", "admin only", 1], ["healthy", "last callback and delivery shown"], ["retrying", "queue count + redacted reason", 1], ["disabled", "no sends; previews still work", 1]],
     spec: "Preview picker renders the same provider-neutral fixtures consumed by renderer contract tests. It never queries live customer data or sends a message. Reading cadence is MGR-owned and controls both Today and chat.",
     body: (<>
       {E.back("Settings", "Chat")}
       {E.row("Slack · Demo Brewing", "Connected · scopes healthy", E.act("Disconnect", "destructive"), "ok", SlackMark)}
-      {E.pick("Operations channel", "#mgr-operations · private", ["#mgr-operations · private", "#general"])}
+      {E.pick("Operations channel", "#mgr-operations · private", ["#mgr-operations · private"])}
       {E.window("Quiet hours", "21:00", "06:00")}
       {E.fld("Reading overdue after", `${OVERDUE_HOURS} h · set on Settings`)}
       {E.nav("Health", "last message from Slack today · 8:42 AM")}
@@ -3033,9 +3033,9 @@ export const SCREENS: Screen[] = [
     slice: "chat",
     tab: "More",
     group: "Chat",
-    name: "Linked people", gatedBy: "Program 16",
+    name: "Linked people",
     job: "See which MGR users linked Slack and remove a stale link",
-    reads: "list_chat_user_links [design]",
+    reads: "list_chat_user_links",
     writes: "unlink_chat_user",
     states: [["permission", "admin only", 1], ["linked", "three people"], ["unlinked", "personal messages stop for that person", 1]],
     spec: "A brewery admin can remove a stale identity link without disconnecting Slack for everyone.",
@@ -3053,10 +3053,10 @@ export const SCREENS: Screen[] = [
     tab: "More",
     group: "Chat",
     surface: "entry",
-    name: "Link your Slack", gatedBy: "Program 16",
+    name: "Link your Slack",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
     job: "Link the signed-in Slack identity to the signed-in MGR user",
-    reads: "get_chat_link_intent [design]",
+    reads: "get_chat_link_intent",
     writes: "consume_chat_link_proof [single-use]",
     states: [["ready", "both identities named"], ["expired", "return to MGR and request a new link", 1]],
     spec: "The entry page names both identities and the brewery before consuming the single-use proof.",
@@ -3076,8 +3076,8 @@ export const SCREENS: Screen[] = [
     name: "Disconnect Slack",
     to: { "Disconnect Slack": "Chat disconnected" },
     job: "Confirm the external effects of disconnecting Slack",
-    reads: "get_chat_integration_health [design]",
-    writes: "disconnect_chat_installation [design]",
+    reads: "get_chat_integration_health",
+    writes: "disconnect_chat_installation",
     states: [["permission", "admin only", 1], ["confirmed", "installation and identity links removed"]],
     spec: "The confirmation distinguishes stopped delivery from MGR work that remains.",
     body: (<>
@@ -3093,8 +3093,8 @@ export const SCREENS: Screen[] = [
     group: "Chat",
     name: "Reauthorization",
     job: "Fail closed while keeping recovery understandable and personal delivery isolated",
-    reads: "get_chat_integration_health [design]",
-    writes: "begin_chat_reauthorization · disable_chat_installation · disconnect_chat_installation [design]",
+    reads: "get_chat_integration_health",
+    writes: "begin_chat_reauthorization · disable_chat_installation · disconnect_chat_installation",
     states: [["permission", "admin only", 1], ["token revoked", "all provider sends stop", 1], ["channel externalized", "team digest stops; eligible personal sends continue", 1], ["uninstalled", "links and queued actions invalidated", 1]],
     spec: "Provider errors remain redacted. Emergency disable does not depend on Slack being reachable.",
     body: (<>

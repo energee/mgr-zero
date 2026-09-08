@@ -1,10 +1,21 @@
 // tests/chat-delivery-policy.test.ts — delivery policy: brewery/personal quiet
 // hours (incl. DST), 08:00/12:00 digest windows with missed-window recovery,
 // and bounded leasing with lease-token outcomes and crash recovery (live DB).
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { admin, channelId, makeBrewery, makeStaffCtx, priceSku } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
+
+import * as slackAdapterModule from "@/lib/chat/slack-adapter";
+import type { SlackClientLike } from "@/lib/chat/slack-transport";
+// Stub only outgoing provider reads; destination proof and consumption use Postgres.
+beforeAll(() => {
+  process.env.APP_URL = "https://mgr.test";
+  vi.spyOn(slackAdapterModule, "slackClientFor").mockReturnValue({
+    conversationsInfo: async () => ({ is_private: true, is_archived: false, is_member: true, is_shared: false, is_ext_shared: false, is_pending_ext_shared: false }),
+  postMessage: async () => { throw new Error("unexpected provider send"); }, updateMessage: async () => { throw new Error("unexpected provider update"); }, publishHome: async () => { throw new Error("unexpected provider publish"); },
+  } as SlackClientLike);
+});
 
 type Ctx = Awaited<ReturnType<typeof makeStaffCtx>>;
 let b: { id: string }, adminCtx: Ctx, sales: Ctx, inst: { id: string }, channel: { id: string };
@@ -89,6 +100,20 @@ describe("quiet hours", () => {
     ])));
     expect(byUser[adminCtx.userId]).toBe("2026-09-05T10:00:00.000Z"); // brewery window ends 06:00 local
     expect(byUser[sales.userId]).toBe("2026-09-05T13:00:00.000Z"); // personal window ends 09:00 local
+    // Current dispatch policy uses the same precedence and retains a later
+    // snooze/retry deadline instead of shortening it to the quiet release.
+    const deliveries = (await admin.from("notification_deliveries").select("id, destination_id").eq("occurrence_id", occ.id)).data!;
+    for (const d of deliveries) {
+      const user = (await admin.from("notification_destinations").select("user_id").eq("id", d.destination_id).single()).data!.user_id;
+      expect((await admin.from("notification_deliveries").update({ next_attempt_at: "2026-09-05T02:00:00Z" }).eq("id", d.id)).error).toBeNull();
+      const context = await admin.rpc("get_chat_delivery_context", { p_delivery: d.id, p_now: "2026-09-05T02:30:00Z" });
+      expect(context.error).toBeNull();
+      expect(iso(context.data.quiet_release_at)).toBe(byUser[user]);
+      expect((await admin.from("notification_deliveries").update({ next_attempt_at: "2026-09-06T16:00:00Z" }).eq("id", d.id)).error).toBeNull();
+      const later = await admin.rpc("get_chat_delivery_context", { p_delivery: d.id, p_now: "2026-09-05T02:30:00Z" });
+      expect(later.error).toBeNull();
+      expect(iso(later.data.quiet_release_at)).toBe("2026-09-06T16:00:00.000Z");
+    }
     await runCommand("set_brewery_quiet_hours", { installationId: inst.id, start: null, end: null }, adminCtx);
     await runCommand("set_notification_preference", { reason: "submitted_order", enabled: true, quietHours: null }, sales);
   });

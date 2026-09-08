@@ -4,7 +4,7 @@
 
 # API operations backlog
 
-24 operations the screens declare they need that the command registry does not yet answer, against 157 that it does.
+19 operations the screens declare they need that the command registry does not yet answer, against 170 that it does.
 
 This is the backend push, scoped. Each row names the operation a screen asked for and the screens waiting on it, so an area can be built and shipped whole rather than a command at a time. `/docs/api` publishes the same list per area, marked designed, so an integrator sees the roadmap without being told a date.
 
@@ -59,18 +59,9 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | Operation | Kind | Needed by |
 | --- | --- | --- |
 | `reverse_inventory_movement` | command | SKU detail |
-## Team & brewery settings: 2 to build, 13 built
+## Today & notifications: 2 to build, 21 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
-| `get_brewery_operating_defaults` | query | Chat settings |
-| `set_brewery_operating_defaults` | command | Chat settings |
-## Today & notifications: 5 to build, 10 built
-
-| Operation | Kind | Needed by |
-| --- | --- | --- |
-| `get_chat_link_intent` | query | Link your Slack |
 | `get_notification_occurrence` | query | Personal DM |
-| `get_notification_preferences` | query | Chat settings, Notification preferences |
 | `issue_chat_link_proof` | command | Link identity |
-| `snooze_notification` | command | Personal DM, Notification preferences |

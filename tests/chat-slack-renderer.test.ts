@@ -85,6 +85,8 @@ describe("Slack renderer", () => {
       const { blocks } = renderSlackDigest({ title: fixture.title, fields: [{ label: fixture.gated!.label, value: fixture.gated!.reason }], mgrBaseUrl: MGR, openLabel: fixture.actions[0].label, openPath: "/" });
       const buttons = (blocks as Block[]).filter((b) => b.type === "actions").flatMap((b) => b.elements!);
       expect(buttons.length).toBe(1);
+      expect(buttons[0].action_id).toBe("open_mgr");
+      expect(buttons[0]).not.toHaveProperty("value");
       expect(buttons[0].url).toMatch(new RegExp(`^${MGR}`));
       expect(JSON.stringify(blocks)).not.toMatch(/"type":"input"|plain_text_input|number_input/);
     }

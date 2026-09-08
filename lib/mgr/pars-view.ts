@@ -104,7 +104,7 @@ export function toParsViewProps({
     }),
     ...standing.map((a) => ({
       key: a.id,
-      title: `${a.locations?.name ?? "Taproom"} standing`,
+      title: a.locations?.name ? `${a.locations.name} standing` : (a.skus?.name ?? "Standing"),
       detail: qtyDetail(Number(a.qty), bblPerUnit, unit),
       verb: withVolume ? "Edit" : undefined,
       tone: "primary" as const,

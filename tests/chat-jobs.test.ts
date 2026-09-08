@@ -5,9 +5,9 @@
 // failures (terminal + reauthorization flag), invalid shared channel, and
 // cleanup limited to expired private state rows.
 import { randomBytes } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import pg from "pg";
-import { admin, channelId, makeBrewery, makeStaffCtx, priceSku } from "./helpers";
+import { DB, admin, channelId, makeBrewery, makeStaffCtx, priceSku } from "./helpers";
 import type { ChatProviderTransport } from "@/lib/chat/provider";
 import { SLACK_CAPABILITIES } from "@/lib/chat/slack-transport";
 import { authorizeJob } from "@/lib/chat/job-auth";
@@ -18,14 +18,25 @@ import "@/lib/commands/all";
 process.env.APP_URL = "https://mgr.test";
 process.env.CHAT_JOB_SECRET = "job-secret";
 
-const adminUrl = process.env.POSTGRES_URL ?? "postgresql://postgres:postgres@127.0.0.1:54342/postgres";
+const adminUrl = DB;
 const sql = new pg.Pool({ connectionString: adminUrl });
+
+import * as slackAdapterModule from "@/lib/chat/slack-adapter";
+import type { SlackClientLike } from "@/lib/chat/slack-transport";
+// Stub only outgoing provider reads; destination proof and consumption use Postgres.
+beforeAll(() => {
+  process.env.APP_URL = "https://mgr.test";
+  vi.spyOn(slackAdapterModule, "slackClientFor").mockReturnValue({
+    conversationsInfo: async () => ({ is_private: true, is_archived: false, is_member: true, is_shared: false, is_ext_shared: false, is_pending_ext_shared: false }),
+  postMessage: async () => { throw new Error("unexpected provider send"); }, updateMessage: async () => { throw new Error("unexpected provider update"); }, publishHome: async () => { throw new Error("unexpected provider publish"); },
+  } as SlackClientLike);
+});
 
 type Ctx = Awaited<ReturnType<typeof makeStaffCtx>>;
 let b: { id: string }, adminCtx: Ctx, sales: Ctx, inst: { id: string; external_installation_id: string };
 let customerId: string, shipToId: string, whId: string, whBinId: string, skuId: string;
 
-const calls = { sends: [] as { destinationId: string; at: number; notification: { subject: { safeLabel: string }; detail: string } }[], updates: [] as { ref: { messageId: string }; resolved?: boolean }[], homes: [] as { externalUserId: string; items: readonly unknown[]; linkUrl?: string }[] };
+const calls = { sends: [] as { destinationId: string; at: number; notification: { subject: { safeLabel: string }; detail: string; actions: readonly { id: string; intentId?: string }[] } }[], updates: [] as { ref: { messageId: string }; resolved?: boolean }[], homes: [] as { externalUserId: string; items: readonly unknown[]; linkUrl?: string; intents?: Record<string,string> }[] };
 let failNext: unknown = null;
 let validation: { ok: true } | { ok: false; reason: string } = { ok: true };
 const transport: ChatProviderTransport = {
@@ -33,7 +44,7 @@ const transport: ChatProviderTransport = {
   validateDestination: async () => validation,
   send: async (i) => { if (failNext) { const e = failNext; failNext = null; throw e; } calls.sends.push({ destinationId: i.destinationId, at: Date.now(), notification: i.notification }); return { conversationId: i.destinationId, messageId: `m${calls.sends.length}` }; },
   update: async (i) => { if (failNext) { const e = failNext; failNext = null; throw e; } calls.updates.push({ ref: i.ref, resolved: i.resolved }); },
-  publishHome: async (i) => { calls.homes.push({ externalUserId: i.externalUserId, items: i.items, linkUrl: i.linkUrl }); },
+  publishHome: async (i) => { calls.homes.push({ externalUserId: i.externalUserId, items: i.items, linkUrl: i.linkUrl, intents: i.intents }); },
 };
 
 async function ins<T = { id: string }>(table: string, row: Record<string, unknown>): Promise<T> {
@@ -106,6 +117,8 @@ describe("callback batch (App Home)", () => {
     expect(result.processed).toBeGreaterThanOrEqual(2); // the claim is global; other suites may leave receipts
     const linked = calls.homes.find((h) => h.externalUserId === "U-sales")!;
     expect(linked.linkUrl).toBeUndefined();
+    expect(Object.keys(linked.intents!)).toEqual(["mgr_preferences", "mgr_refresh", "mgr_unlink"]);
+    expect(Object.values(linked.intents!).every(id => /^[0-9a-f-]{36}$/.test(id))).toBe(true);
     expect(linked.items.length).toBeGreaterThanOrEqual(1);
     expect(JSON.stringify(linked.items)).toMatch(/ORD-\d{4}/);
     const stranger = calls.homes.find((h) => h.externalUserId === "U-stranger")!;
@@ -125,6 +138,7 @@ describe("delivery batch", () => {
     const before = await deliveriesOf(first);
     expect(before.every((d) => d.state === "queued")).toBe(true);
     const result = await deliver();
+    expect(calls.sends.every(s => s.notification.actions.some(a => a.id === "snooze" && /^[0-9a-f-]{36}$/.test(a.intentId!)))).toBe(true);
     expect(result.sent).toBe(4); // 2 orders × (admin + sales)
     for (const orderId of [first, second]) {
       for (const d of await deliveriesOf(orderId)) {
@@ -155,6 +169,63 @@ describe("delivery batch", () => {
     expect(result.updated).toBe(1);
     expect(calls.updates.at(-1)).toEqual({ ref: { conversationId: sent.provider_conversation_id, messageId: sent.provider_message_id }, resolved: true });
     expect((await deliveriesOf(id)).find((d) => d.id === sent.id)!.state).toBe("updated");
+  });
+
+  it("rechecks source resolution before sending or updating without a scan", async () => {
+    await drain();
+    const id=await submittedOrder();
+    const [sent,unsent]=await deliveriesOf(id);
+    await admin.from("notification_deliveries").update({provider_message_id:"old-message",provider_conversation_id:"D-old"}).eq("id",sent.id);
+    await adminCtx.db.rpc("cancel_order",{p_request_id:crypto.randomUUID(),p_order:id,p_reason:"resolved before scanner"});
+    expect((await admin.from("notification_occurrences").select("state").eq("id",sent.occurrence_id).single()).data?.state).toBe("active");
+    calls.sends.length=0;calls.updates.length=0;
+    const result=await deliver();
+    expect(result).toMatchObject({sent:0,updated:1,suppressed:1});
+    expect(calls.sends).toHaveLength(0);
+    expect(calls.updates).toEqual([{ref:{conversationId:"D-old",messageId:"old-message"},resolved:true}]);
+    expect((await admin.from("notification_deliveries").select("state").eq("id",unsent.id).single()).data?.state).toBe("suppressed");
+  });
+
+  it("rechecks membership and role before personal send/update", async () => {
+    for(const change of ["removed","role"]){
+      await drain();const id=await submittedOrder();
+      const rows=await deliveriesOf(id);
+      const salesDestination=(await admin.from("notification_destinations").select("id").eq("installation_id",inst.id).eq("user_id",sales.userId).single()).data!.id;
+      const target=rows.find(d=>d.destination_id===salesDestination)!;
+      await admin.from("notification_deliveries").update({state:"terminal"}).eq("id",rows.find(d=>d.id!==target.id)!.id);
+      if(change==="role") await admin.from("notification_deliveries").update({provider_message_id:"existing",provider_conversation_id:"D-existing"}).eq("id",target.id);
+      if(change==="removed") await admin.from("brewery_users").delete().eq("brewery_id",b.id).eq("user_id",sales.userId);
+      else await admin.from("brewery_users").update({role:"brewer"}).eq("brewery_id",b.id).eq("user_id",sales.userId);
+      try{
+        calls.sends.length=0;calls.updates.length=0;
+        expect(await deliver()).toMatchObject({sent:0,updated:0,suppressed:1});
+        expect(calls.sends).toHaveLength(0);expect(calls.updates).toHaveLength(0);
+      } finally {
+        if(change==="removed") await ins("brewery_users",{brewery_id:b.id,user_id:sales.userId,role:"sales"});
+        else await admin.from("brewery_users").update({role:"sales"}).eq("brewery_id",b.id).eq("user_id",sales.userId);
+      }
+    }
+  });
+
+  it.each(["warehouse", "admin"] as const)("rejects the old %s driver after reassignment without rescanning", async (role) => {
+    await drain();
+    const driver=role === "admin" ? adminCtx : await makeStaffCtx(b.id,"warehouse");
+    const replacement=await makeStaffCtx(b.id,"warehouse");
+    const destination=role === "admin"
+      ? (await admin.from("notification_destinations").select("id").eq("installation_id",inst.id).eq("user_id",driver.userId).single()).data!
+      : await linkWithDm(driver,"U-driver");
+    const order=await submittedOrder();
+    const shipment=await ins("shipments",{brewery_id:b.id,order_id:order,created_by:adminCtx.userId});
+    const route=await ins("routes",{brewery_id:b.id,name:"Reassign",delivery_date:"2026-09-05",driver_user_id:driver.userId,departed_at:"2026-09-05T12:00:00Z"});
+    const stop=await ins("deliveries",{brewery_id:b.id,route_id:route.id,shipment_id:shipment.id,stop_no:1});
+    await runChatScan({now:new Date(NOW),db:admin});
+    const occurrence=(await admin.from("notification_occurrences").select("id").eq("subject_id",stop.id).eq("reason","delivery_next").single()).data!;
+    const target=(await admin.from("notification_deliveries").select("id").eq("occurrence_id",occurrence.id).eq("destination_id",destination.id).single()).data!;
+    await drain();await admin.from("notification_deliveries").update({state:"queued",provider_message_id:"driver-message",provider_conversation_id:"D-driver"}).eq("id",target.id);
+    await admin.from("routes").update({driver_user_id:replacement.userId}).eq("id",route.id);
+    calls.sends.length=0;calls.updates.length=0;
+    expect(await deliver()).toMatchObject({sent:0,updated:0,suppressed:1});
+    expect(calls.sends).toHaveLength(0);expect(calls.updates).toHaveLength(0);
   });
 
   it("honours Retry-After, backs off transient failures with bounded jitter, and terminates permanent failures with a reauthorization flag", async () => {
@@ -208,6 +279,63 @@ describe("delivery batch", () => {
     expect(sentDigest.notification.detail).not.toMatch(/ORD-|Bar/);
     expect((await admin.from("notification_deliveries").select("state").eq("destination_id", channel2.id).single()).data?.state).toBe("sent");
   });
+  it.each([false, true])("revalidates existing digest updates while personal updates remain unaffected (resolved=%s)", async (resolved) => {
+    await drain();
+    validation = { ok: true };
+    const channel = await runCommand("set_notification_destination", { installationId: inst.id, externalDestinationId: "C-update" }, adminCtx) as { id: string };
+    const id = await submittedOrder();
+    await runChatScan({ now: new Date("2036-09-07T12:30:00Z"), db: admin });
+    await deliver(50, "2036-09-07T12:30:00Z");
+    const personal = await deliveriesOf(id);
+    const digest = (await admin.from("notification_deliveries").select().eq("destination_id", channel.id).single()).data!;
+    expect(digest.provider_message_id).toBeTruthy();
+    if (resolved) expect((await admin.from("notification_occurrences").update({ state: "resolved", resolved_at: new Date().toISOString() }).eq("id", digest.occurrence_id)).error).toBeNull();
+    expect((await admin.from("notification_deliveries").update({ state: "queued", next_attempt_at: "2036-09-07T12:31:00Z" }).in("id", [digest.id, ...personal.map(d => d.id)])).error).toBeNull();
+    calls.sends.length = 0; calls.updates.length = 0;
+    validation = { ok: false, reason: "shared_channel" };
+    await deliver(50, "2036-09-07T12:32:00Z");
+    expect(calls.sends).toEqual([]);
+    expect(calls.updates.map(c => c.ref.messageId).sort()).toEqual(personal.map(d => d.provider_message_id).sort());
+    expect((await admin.from("notification_deliveries").select("state, last_error_code").eq("id", digest.id).single()).data).toEqual({ state: "terminal", last_error_code: "shared_channel" });
+    expect((await admin.from("notification_destinations").select("state").eq("id", channel.id).single()).data?.state).toBe("blocked");
+    validation = { ok: true };
+  });
+
+  it.each(["snooze", "admin change", "retry"])("defers personal %s work through current quiet hours without hiding Home", async (kind) => {
+    await drain();
+    await runCommand("set_brewery_quiet_hours", { installationId: inst.id, start: null, end: null }, adminCtx);
+    expect((await admin.from("breweries").update({ timezone: "UTC" }).eq("id", b.id)).error).toBeNull();
+    const start = new Date(Date.now() + 30 * 60_000), attempt = new Date(Date.now() + 61 * 60_000), end = new Date(Date.now() + 120 * 60_000);
+    end.setUTCSeconds(0, 0);
+    const id = await submittedOrder();
+    const rows = await deliveriesOf(id);
+    const beforeHome = (await admin.rpc("get_chat_home_items", { p_installation: inst.id, p_external_user_id: "U-sales" })).data;
+    if (kind === "snooze") {
+      await deliver(50, new Date().toISOString());
+      expect((await deliveriesOf(id)).every(d => d.provider_message_id)).toBe(true);
+      for (const d of rows) {
+        const dest = (await admin.from("notification_destinations").select("user_id").eq("id", d.destination_id).single()).data!;
+        await runCommand("snooze_notification", { deliveryId: d.id, until: attempt.toISOString() }, dest.user_id === sales.userId ? sales : adminCtx);
+      }
+    } else if (kind === "retry") {
+      failNext = Object.assign(new Error("rate limited"), { data: { error: "ratelimited" }, retryAfter: 3600 });
+      await deliver(1, new Date().toISOString());
+      expect((await deliveriesOf(id)).some(d => d.state === "retrying")).toBe(true);
+    }
+    await runCommand("set_brewery_quiet_hours", { installationId: inst.id, start: start.toISOString().slice(11,16), end: end.toISOString().slice(11,16) }, adminCtx);
+    calls.sends.length = 0; calls.updates.length = 0;
+    await deliver(50, attempt.toISOString());
+    expect(calls.sends).toEqual([]); expect(calls.updates).toEqual([]);
+    const deferred = await deliveriesOf(id);
+    expect(deferred.every(d => new Date(d.next_attempt_at).toISOString() === end.toISOString())).toBe(true);
+    expect(deferred.every(d => d.state === "retrying")).toBe(true);
+    expect((await admin.rpc("get_chat_home_items", { p_installation: inst.id, p_external_user_id: "U-sales" })).data).toEqual(beforeHome);
+    await deliver(50, end.toISOString());
+    expect(kind === "snooze" ? calls.updates : calls.sends).toHaveLength(rows.length);
+    await runCommand("set_brewery_quiet_hours", { installationId: inst.id, start: null, end: null }, adminCtx);
+    await admin.from("breweries").update({ timezone: "America/New_York" }).eq("id", b.id);
+  });
+
 });
 
 describe("state cleanup", () => {

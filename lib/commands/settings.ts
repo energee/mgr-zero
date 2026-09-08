@@ -48,6 +48,7 @@ defineCommand({
   })),
 });
 
+const readingDueHours = z.number().int().min(1).max(168);
 const BREWERY_COLUMNS = "id, name, timezone, ttb_registry_no, pa_license_no, customer_phone, fermentation_reading_due_hours, gravity_unit";
 
 defineQuery({
@@ -64,11 +65,25 @@ defineCommand({
   input: z.object({
     name: z.string().trim().min(1), timezone: z.string().trim().min(1),
     ttbRegistryNo: z.string().trim().optional(), paLicenseNo: z.string().trim().optional(), customerPhone: z.string().trim().optional(),
-    readingDueHours: z.number().int().min(1).max(168),
+    readingDueHours,
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_brewery", {
     p_brewery: ctx.breweryId, p_name: i.name, p_timezone: i.timezone, p_ttb_registry_no: i.ttbRegistryNo || null,
     p_pa_license_no: i.paLicenseNo || null, p_customer_phone: i.customerPhone || null, p_reading_due_hours: i.readingDueHours,
     p_request_id: execution.requestId,
+  })),
+});
+
+// Cadence has one stored value and one database constraint (1–168 hours).
+defineQuery({
+  name: "get_brewery_operating_defaults", description: "Read the brewery timezone and fermentation reading cadence",
+  input: z.object({}), roles: ["admin"],
+  handler: (ctx) => unwrap(ctx.db.from("breweries").select("timezone, fermentation_reading_due_hours").eq("id", ctx.breweryId).single()),
+});
+defineCommand({
+  name: "set_brewery_operating_defaults", description: "Change only the brewery fermentation reading cadence, in hours",
+  input: z.object({ readingDueHours }), roles: ["admin"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_brewery_operating_defaults", {
+    p_brewery: ctx.breweryId, p_reading_due_hours: i.readingDueHours, p_request_id: execution.requestId,
   })),
 });

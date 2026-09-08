@@ -1264,9 +1264,36 @@ until they are designed.
 `AGENTS.md` authorises editing the baseline in place, so this lands as one
 revised `00001_baseline.sql` rather than a migration chain.
 
-**Verification note:** at the time of writing, `npx supabase start` fails
-locally on `staff_role already exists` and the test suite dies at import from
-`.env.local` key drift (`ANON_KEY`/`SERVICE_ROLE_KEY` vs the
-`PUBLISHABLE_KEY`/`SECRET_KEY` the code now reads). CI is green on the same
-commit, so both are local. None of §16 should be migrated until the database
-runs locally and `npx vitest run` passes.
+## 17. Chat notification state (implemented 2026-09-07)
+
+Provider-neutral tenant state lives in `chat_installations`, `chat_user_links`,
+`notification_destinations`, `notification_preferences`,
+`notification_occurrences`, `notification_deliveries`,
+`chat_callback_receipts`, and `chat_action_intents`. Every tenant row carries
+`brewery_id`, tenant-safe foreign keys, RLS, and bounded grants. Installation,
+link, destination, preference, occurrence, delivery, receipt, and action-intent
+states are checked enums. One live installation per brewery/provider, one
+active workspace mapping, and semantic occurrence/delivery unique keys make
+repeated scans converge. Delivery leases use `queued`, `leased`, `retrying`,
+`sent`, `updated`, `suppressed`, and `terminal`; callback work uses `pending`,
+`processing`, `processed`, `ignored`, and `failed`.
+
+The morning and midday digest windows are fixed in brewery local time. The
+brewery fermentation-reading cadence defaults to 24 hours and may be set from
+1–168 hours. Quiet hours delay personal delivery while Today remains current;
+personal preferences survive linking and unlinking. Public and externally
+shared channels are excluded: the sole shared destination is a currently
+private, internal, active channel where the bot is a member.
+
+Chat SDK subscriptions, locks, cache, lists, and queues live in the separate
+`chat_sdk` schema. Its tables are owned by `mgr_chat_sdk`; the schema grants
+that role `USAGE` and `CREATE`. A dedicated `mgr_chat_runtime` login inherits
+only that role and uses `search_path = chat_sdk`; it has no public tenant-data
+grants. Scheduled service RPCs may maintain integration metadata, lease delivery
+work, and rebuild current projections. They cannot impersonate a user or execute
+an MGR domain command. Authenticated settings writes use the same actor-bound
+`private.command_requests` ledger as all normal commands; provider callback,
+semantic notification, and SDK-state dedupe remain separate.
+
+The chat tables and grants in §17 are implemented in the baseline migration and
+covered by the isolated Postgres schema, RLS, allowlist, and chat contract tests.

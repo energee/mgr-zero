@@ -41,7 +41,7 @@ export const API_AREAS = [
   { slug: "inventory", title: "Inventory & locations", match: /(movement|on_hand|atp|bin|location|count|inventory|transfer)/ },
   { slug: "customers", title: "Customers", match: /(customer|ship_to|portal_fulfillment)/ },
   { slug: "team", title: "Team & brewery settings", match: /(staff|team|invite|brewery|provision|first_run|operating_defaults|import_csv|gravity_unit)/ },
-  { slug: "today", title: "Today & notifications", match: /(today|work|notification|shortfall|search_entities|beer_overview|snooze|quiet_hours|chat_link|chat_user|preview_command)/ },
+  { slug: "today", title: "Today & notifications", match: /(today|work|notification|shortfall|search_entities|beer_overview|snooze|quiet_hours|chat|preview_command)/ },
 ] as const;
 
 export type ApiAreaSlug = (typeof API_AREAS)[number]["slug"];

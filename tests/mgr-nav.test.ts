@@ -25,7 +25,7 @@ describe("navFor", () => {
     // Units is shipped and open to every staff role, since a gravity display
     // unit is a personal preference rather than a permission
     // (set_my_gravity_unit admits all four roles).
-    expect(warehouse.find((t) => t.label === "More")!.children!.map((c) => c.label)).toEqual(["Menu", "Vendors", "Planning", "Units"]);
+    expect(warehouse.find((t) => t.label === "More")!.children!.map((c) => c.label)).toEqual(["Menu", "Vendors", "Planning", "Chat", "Units"]);
   });
 });
 
