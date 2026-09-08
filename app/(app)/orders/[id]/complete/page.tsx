@@ -4,11 +4,11 @@
 // movements leave the source and arrive at the destination. Each line moves
 // at its picked quantity (complete-button.tsx).
 import { redirect } from "next/navigation";
-import { E } from "@/components/mgr/e";
+import { CompleteTransferView } from "@/components/mgr/views/complete-transfer";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand, requirePagePermission } from "@/lib/mgr/page-query";
-import { docNo } from "@/lib/mgr/doc-no";
+import { toCompleteTransferViewProps } from "@/lib/mgr/complete-transfer-view";
 import { orNotFound } from "@/lib/mgr/not-found";
 import "@/lib/commands/all";
 import { ShipForm } from "../ship-form";
@@ -26,16 +26,10 @@ export default async function CompleteTransferPage({ params }: { params: Promise
     runCommand("list_locations", {}, ctx) as Promise<{ id: string; name: string }[]>,
   ]);
   if (order.kind !== "taproom_transfer" || order.status !== "picked") redirect(`/orders/${order.id}`);
-  const name = (lid: string | null) => locations.find((l) => l.id === lid)?.name ?? "—";
-  const label = docNo("ORD", order.order_no, "Transfer");
   return (
-    <>
-      {E.back(label, "Complete transfer", undefined, `/orders/${order.id}`)}
-      {E.fld("From → to", `${name(order.from_location_id)} → ${name(order.to_location_id)}`)}
-      {lines.map((l) => <div key={l.id}>{E.row(l.skus?.name ?? "Line", "move / picked", `${Number(l.qty_picked ?? 0)} / ${Number(l.qty_picked ?? 0)}`, Number(l.qty_picked ?? 0) < Number(l.qty_ordered) ? "w" : "ok")}</div>)}
-      {E.info("No invoice: this is an internal move.")}
-      {E.sp()}
-      <ShipForm transfer orderId={order.id} lines={lines.map(l => ({ id: l.id, skuId: l.sku_id, skuName: l.skus?.name ?? "Line", qtyPicked: Number(l.qty_picked ?? 0) }))} />
-    </>
+    <CompleteTransferView
+      model={toCompleteTransferViewProps({ order, lines, locations })}
+      footer={<ShipForm transfer orderId={order.id} lines={lines.map(l => ({ id: l.id, skuId: l.sku_id, skuName: l.skus?.name ?? "Line", qtyPicked: Number(l.qty_picked ?? 0) }))} />}
+    />
   );
 }

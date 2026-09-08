@@ -1,3 +1,5 @@
+import { ParsView } from "@/components/mgr/views/pars";
+import { toParsViewProps } from "@/lib/mgr/pars-view";
 import { E } from "@/components/mgr/e";
 import { LinkTabs } from "@/components/mgr/work-tabs";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -21,17 +23,20 @@ export default async function ReplenishmentPage({ searchParams }: { searchParams
   const warehouses = locationRows.filter((l) => l.kind === "warehouse");
   const toLocationId = taprooms.find((t) => t.id === location)?.id ?? taprooms[0]?.id;
   const canEdit = ctx.role === "admin" || ctx.role === "sales";
-  const skus = canEdit ? await runCommand("list_skus", {}, ctx) as { id: string; name: string }[] : [];
+  const skus = await runCommand("list_skus", {}, ctx) as { id: string; name: string; formats: { name: string; package_type: string } | null; format_volume: { bbl_per_unit: number } | null }[];
   const allocations = toLocationId ? await runCommand("list_standing_allocations", { locationId: toLocationId }, ctx) as { id: string; sku_id: string; qty: number; skus: { name: string } | null }[] : [];
   const suggestions = toLocationId ? ((await runCommand("replenishment_suggestions", { locationId: toLocationId }, ctx)) as Suggestion[]) : [];
   return (
     <>
       {E.back("Finished goods", "Pars and allocation", undefined, "/inventory")}
-      {shortfalls.map(shortfall => <section key={shortfall.skuId} aria-label={`${shortfall.skuName} shortfall`}>
-        {E.ttl(`${shortfall.skuName} shortfall`)}
-        {E.note(`${shortfall.onHand} on hand · ${shortfall.allocated} reserved · ATP ${shortfall.atp} across all locations`)}
-        {shortfall.reservations.map(r => <div key={r.id}>{E.row(r.source === "order_line" ? `Order ${r.orderNo ?? r.ref}` : `Standing allocation · ${locationRows.find(l => l.id === r.ref)?.name ?? r.ref}`, `${r.qty} units reserved`, E.act("Review", "primary", r.orderId ? `/orders/${r.orderId}` : r.source === "taproom_standing" ? `/replenishment?location=${r.ref}&sku=${shortfall.skuId}#standing-allocations` : undefined))}</div>)}
-      </section>)}
+      {shortfalls.map(shortfall => {
+        const item = skus.find(s => s.id === shortfall.skuId);
+        const unit = item?.formats?.name ?? "unit";
+        const model = toParsViewProps({ shortfall, unit, bblPerUnit: item?.format_volume?.bbl_per_unit == null ? null : Number(item.format_volume.bbl_per_unit), orderAllocations: [], standing: [], par: null });
+        model.atpDetail += " across all locations";
+        model.rows = shortfall.reservations.map(r => ({ key: r.id, title: r.source === "order_line" ? `Order ${r.orderNo ?? r.ref}` : `Standing allocation · ${locationRows.find(l => l.id === r.ref)?.name ?? r.ref}`, detail: `${r.qty} ${unit} reserved`, verb: "Review", tone: "primary", href: r.orderId ? `/orders/${r.orderId}` : r.source === "taproom_standing" ? `/replenishment?location=${r.ref}&sku=${shortfall.skuId}#standing-allocations` : undefined }));
+        return <section key={shortfall.skuId} aria-label={`${shortfall.skuName} shortfall`}><ParsView model={model} linkRows footer={<></>} /></section>;
+      })}
       {sku && <div>{shortfalls.length === 0 && E.note("This SKU has no current shortfall.")}{E.btn("All shortfalls", "g", "/replenishment")}</div>}
       {taprooms.length === 0
         ? E.blank("No taprooms yet: add one under Locations")

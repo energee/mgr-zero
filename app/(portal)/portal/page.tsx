@@ -1,3 +1,4 @@
+import { ShopView } from "@/components/mgr/views/shop";
 import { reconcilePortalOrder, type PortalSavedOrder } from "@/lib/portal-cart";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { E } from "@/components/mgr/e";
@@ -23,9 +24,7 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
   if (saved && query.draft && saved.order.status !== "draft") return <>{E.hd("Order is no longer a draft")}{E.btn("View order status", "g", `/portal/orders/${saved.order.id}`)}</>;
   const initial = saved ? reconcilePortalOrder(saved, items, shipToOptions, !query.draft) : undefined;
   return (
-    <>
-      {E.hd("Order", customer.customerName)}
-      <Cart key={`${account.membership.userId}:${customer.customerId}:${customer.breweryId}:${sourceId ?? "new"}`} items={items} fulfillmentSource={account.fulfillmentSource} shipTos={shipToOptions} initial={initial} scope={{ actorId: account.membership.userId, customerId: customer.customerId, breweryId: customer.breweryId }} />
-    </>
+    <ShopView model={{ customer: customer.customerName, groups: [], source: account.fulfillmentSource?.name ?? "Not configured", shipToLine: "", depositInfo: "", reviewVerb: "" }} comingUp={null} footer={null} catalog={<Cart key={`${account.membership.userId}:${customer.customerId}:${customer.breweryId}:${sourceId ?? "new"}`} items={items} fulfillmentSource={account.fulfillmentSource} shipTos={shipToOptions} initial={initial} scope={{ actorId: account.membership.userId, customerId: customer.customerId, breweryId: customer.breweryId }} />
+    } />
   );
 }

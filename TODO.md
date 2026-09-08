@@ -59,7 +59,6 @@ land early as their own small PRs.
 - [ ] `set_taproom_par`, `set_standing_allocation`, `release_allocation` on `/replenishment` (Pars and allocation)
 - [ ] `replace_format_bom`, `replace_format_components` on Format (Package BOM)
 - [ ] `move_stock_bin` on Location bins
-- [ ] Search trigger in `components/mgr/app-shell.tsx` over `app/api/search`
 - [ ] `set_notification_destination`, `set_notification_preference`, `set_brewery_quiet_hours` (Program 16 page at `/settings/chat`)
 - [ ] `unlink_chat_user` (Linked people)
 - [ ] `set_portal_fulfillment_source` (Settings)

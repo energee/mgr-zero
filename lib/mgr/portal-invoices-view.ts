@@ -1,0 +1,65 @@
+// lib/mgr/portal-invoices-view.ts — view-model for portal Invoice history.
+// portal_invoices returns raw invoice_lines (no invoice_totals subtotal), so
+// the adapter sums amount_cents the way the live list does.
+import { docNo } from "./doc-no";
+import { money } from "./money";
+
+export type PortalInvoicesRowView = {
+  key: string;
+  title: string;
+  detail: string;
+  total: string;
+  href: string;
+  unpaid: boolean;
+  tone: "" | "ok";
+};
+
+export type PortalInvoicesViewModel = {
+  subtitle: string;
+  rows: PortalInvoicesRowView[];
+  empty?: string;
+};
+
+export type PortalInvoicesSnapshot = {
+  customerName: string;
+  invoices: {
+    id: string;
+    invoice_no: number | null;
+    kind: "invoice" | "credit_memo";
+    due_on: string | null;
+    paid_at: string | null;
+    invoice_lines: { amount_cents: number }[];
+  }[];
+};
+
+function day(iso: string): string {
+  return /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(0, 10) : iso;
+}
+
+function invoiceDetail(inv: PortalInvoicesSnapshot["invoices"][number]): string {
+  if (inv.kind === "credit_memo") return "credit";
+  if (inv.paid_at) return `paid ${day(inv.paid_at)}`;
+  return inv.due_on ? `due ${inv.due_on}` : "unpaid";
+}
+
+/** Map a portal_invoices payload onto PortalInvoicesView. */
+export function toPortalInvoicesViewProps({ customerName, invoices }: PortalInvoicesSnapshot): PortalInvoicesViewModel {
+  return {
+    subtitle: customerName,
+    empty: invoices.length === 0 ? "No invoices yet" : undefined,
+    rows: invoices.map((inv) => {
+      const credit = inv.kind === "credit_memo";
+      const unpaid = !credit && inv.paid_at === null;
+      const total = inv.invoice_lines.reduce((sum, l) => sum + l.amount_cents, 0);
+      return {
+        key: inv.id,
+        title: docNo(credit ? "CM" : "INV", inv.invoice_no, credit ? "Credit memo" : "Invoice"),
+        detail: invoiceDetail(inv),
+        total: money(total),
+        href: `/portal/invoices/${inv.id}`,
+        unpaid,
+        tone: unpaid ? "" : "ok",
+      };
+    }),
+  };
+}
