@@ -8,7 +8,7 @@
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createRequestAuthContext } from "@/lib/auth/request-context";
-import { inviteAudience, inviteLanding } from "@/lib/auth/invite";
+import { acceptInviteErrorPath, inviteAudience, inviteLanding } from "@/lib/auth/invite";
 import { createServerClient } from "@/lib/supabase/server";
 
 /** Where a signed-in account belongs: staff on Today, a buyer in the portal. */
@@ -57,7 +57,7 @@ export async function acceptInvite(form: FormData) {
   const audience = inviteAudience(form.get("audience"));
   const name = String(form.get("name") ?? "").trim();
   const password = String(form.get("password") ?? "");
-  if (!audience || !name || password.length < 8) redirect("/accept?error=1");
+  if (!audience || !name || password.length < 8) redirect(acceptInviteErrorPath(audience, name));
 
   const db = await createServerClient();
   const auth = createRequestAuthContext(() => Promise.resolve(db));

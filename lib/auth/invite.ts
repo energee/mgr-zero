@@ -6,6 +6,20 @@ export function inviteAudience(value: unknown): InviteAudience | null {
   return value === "staff" || value === "customer" ? value : null;
 }
 
+export function safeNextPath(requestUrl: string, wanted: string | null) {
+  if (!wanted) return "/password";
+  const request = new URL(requestUrl);
+  const destination = new URL(wanted, request.origin);
+  return destination.origin === request.origin ? `${destination.pathname}${destination.search}${destination.hash}` : "/password";
+}
+
+export function acceptInviteErrorPath(audience: InviteAudience | null, name: string) {
+  if (!audience) return "/invite-expired";
+  const query = new URLSearchParams({ audience, error: "1" });
+  if (name) query.set("name", name);
+  return `/accept?${query}`;
+}
+
 export async function inviteLanding(auth: RequestAuthContext, audience: InviteAudience) {
   const identity = await auth.getIdentity();
   if (!identity) return null;

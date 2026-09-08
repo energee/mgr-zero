@@ -6,7 +6,8 @@ import { Entry } from "../entry";
 export default function InviteExpiredPage() {
   return <Entry title="Invite expired">
     {E.note("This invite is no longer valid.")}
-    {E.info("Ask an admin to send a new one, or sign in if you already accepted it.")}
-    <Button asChild><Link href="/login">Back to sign in</Link></Button>
+    {E.info("Set a password through account recovery, or sign in if you already accepted this invite.")}
+    <Button asChild><Link href="/reset">Reset password</Link></Button>
+    <Button variant="outline" asChild><Link href="/login">Back to sign in</Link></Button>
   </Entry>;
 }

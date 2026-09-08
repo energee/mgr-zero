@@ -9,8 +9,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { acceptInvite } from "../actions";
 import { Entry } from "../entry";
 
-export default async function AcceptPage({ searchParams }: { searchParams: Promise<{ audience?: string; error?: string }> }) {
-  const { audience: rawAudience, error } = await searchParams;
+export default async function AcceptPage({ searchParams }: { searchParams: Promise<{ audience?: string; error?: string; name?: string }> }) {
+  const { audience: rawAudience, error, name } = await searchParams;
   const audience = inviteAudience(rawAudience);
   if (!audience) redirect("/invite-expired");
   const db = await createServerClient();
@@ -24,7 +24,7 @@ export default async function AcceptPage({ searchParams }: { searchParams: Promi
     <form action={acceptInvite}>
       <input type="hidden" name="audience" value={audience} />
       <FieldGroup>
-        <Field><FieldLabel htmlFor="name">Your name</FieldLabel><Input id="name" name="name" autoComplete="name" required /></Field>
+        <Field><FieldLabel htmlFor="name">Your name</FieldLabel><Input id="name" name="name" autoComplete="name" defaultValue={name} required /></Field>
         <Field><FieldLabel htmlFor="password">Choose a password</FieldLabel><Input id="password" name="password" type="password" autoComplete="new-password" minLength={8} required /></Field>
         <Field><Button type="submit">Join {landing.name}</Button></Field>
       </FieldGroup>

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { inviteAudience, inviteLanding } from "@/lib/auth/invite";
+import { acceptInviteErrorPath, inviteAudience, inviteLanding, safeNextPath } from "@/lib/auth/invite";
 import type { CustomerMembership, RequestAuthContext, StaffMembership } from "@/lib/auth/request-context";
 
 const auth = (staff: StaffMembership[] = [], customer: CustomerMembership[] = []): RequestAuthContext => ({
@@ -14,6 +14,18 @@ describe("invite acceptance", () => {
     expect(inviteAudience("staff")).toBe("staff");
     expect(inviteAudience("customer")).toBe("customer");
     expect(inviteAudience("warehouse")).toBeNull();
+  });
+
+  it("keeps callback redirects on the request origin", () => {
+    expect(safeNextPath("http://localhost:3000/auth/confirm", "/password?from=mail")).toBe("/password?from=mail");
+    expect(safeNextPath("http://localhost:3000/auth/confirm", "//evil.example/path")).toBe("/password");
+    expect(safeNextPath("http://localhost:3000/auth/confirm", "/\t/evil.example")).toBe("/password");
+    expect(safeNextPath("http://localhost:3000/auth/confirm", "https://evil.example")).toBe("/password");
+  });
+
+  it("preserves valid invite context after form validation", () => {
+    expect(acceptInviteErrorPath("staff", "Pat Brewer")).toBe("/accept?audience=staff&error=1&name=Pat+Brewer");
+    expect(acceptInviteErrorPath(null, "Pat Brewer")).toBe("/invite-expired");
   });
 
   it("derives the displayed destination from membership", async () => {
