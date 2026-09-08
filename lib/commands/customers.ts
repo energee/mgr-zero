@@ -2,7 +2,7 @@
 // cells (channel × price group × format). Single-row writes call one explicit
 // security-definer RPC; pass `id` to update, omit to create.
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap } from "./registry";
+import { defineCommand, defineQuery, stateCode, unwrap } from "./registry";
 
 const roles = ["admin", "sales"] as const;
 
@@ -12,7 +12,7 @@ defineCommand({
   input: z.object({
     id: z.string().uuid().optional(), name: z.string().min(1),
     type: z.enum(["distributor", "retailer", "brewery", "other"]),
-    state: z.string().regex(/^[A-Z]{2}$/), // customers.state is NOT NULL (home state)
+    state: stateCode, // customers.state is NOT NULL (home state)
     // The channel is the customer's row into the price grid (§16.3) and is required.
     saleChannelId: z.string().uuid(),
     licenseNumber: z.string().optional(), paymentTerms: z.string().optional(),
@@ -33,7 +33,7 @@ defineCommand({
   input: z.object({
     id: z.string().uuid().optional(), customerId: z.string().uuid(), label: z.string().min(1),
     address1: z.string().min(1), address2: z.string().optional(),
-    city: z.string().min(1), state: z.string().regex(/^[A-Z]{2}$/), zip: z.string().min(1),
+    city: z.string().min(1), state: stateCode, zip: z.string().min(1),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_ship_to", {
     p_brewery: ctx.breweryId, p_id: i.id ?? null, p_customer: i.customerId, p_label: i.label,

@@ -36,8 +36,8 @@ describe("registry", () => {
     expect(again.registration_no).toBe("OH-2");
     await expect(runCommand("upsert_state_registration", { brandId, state: "Ohio" }, sales)).rejects.toBeTruthy();
     await runCommand("upsert_brewery_state_license", { state: "PA", kind: "brewery", licenseNo: "G-21884", expiresOn: "2027-06-30" }, sales);
-    const relicensed = await runCommand("upsert_brewery_state_license", { state: "PA", kind: "brewery", licenseNo: "G-21885" }, sales) as { license_no: string };
-    expect(relicensed.license_no).toBe("G-21885");
+    const relicensed = await runCommand("upsert_brewery_state_license", { state: "PA", kind: " Brewery", licenseNo: "G-21885" }, sales) as { license_no: string; kind: string };
+    expect(relicensed).toMatchObject({ license_no: "G-21885", kind: "brewery" });
 
     const reg = await runCommand("get_compliance_registry", {}, sales) as {
       brands: { id: string; name: string; approvals: { kind: string; ttb_id: string }[]; registrations: { state: string; registration_no: string | null }[] }[];
@@ -51,11 +51,12 @@ describe("registry", () => {
   });
 });
 
+const SEPT = { jurisdiction: "TTB", periodStart: "2026-09-01", periodEnd: "2026-09-30" };
 type Line = { class: string; begin: number; in: number; out: number; end: number };
 type Report = { figures: { lines: Line[]; removals: Record<string, number>; byState: Record<string, number>; packaged: number; inProcess: number; balances: boolean }; warnings: string[] };
 
 describe("generate_compliance_report", () => {
-  const PERIOD = { jurisdiction: "TTB", periodStart: "2026-09-01", periodEnd: "2026-09-30" };
+  const PERIOD = SEPT;
   let canSku: string, kegSku: string, loc: { id: string; binId: string }, wholesale: string, exportCh: string;
 
   beforeAll(async () => {
@@ -108,7 +109,7 @@ describe("generate_compliance_report", () => {
 });
 
 describe("file_compliance_report", () => {
-  const PERIOD = { jurisdiction: "TTB", periodStart: "2026-09-01", periodEnd: "2026-09-30" };
+  const PERIOD = SEPT;
   const exec = (requestId: string) => ({ requestId, correlationId: crypto.randomUUID() });
 
   it("files the generated figures as an immutable snapshot, replays by request id, and refuses a second filing of the period", async () => {
@@ -132,12 +133,16 @@ describe("file_compliance_report", () => {
     const [loc] = (await admin.from("locations").select("id, bins(id)").eq("brewery_id", b.id).limit(1)).data as unknown as { id: string; bins: { id: string }[] }[];
     const { data: sku } = await admin.from("skus").select("id").eq("brewery_id", b.id).limit(1).single();
     await admin.from("inventory_movements").insert({ brewery_id: b.id, sku_id: sku!.id, location_id: loc.id, bin_id: loc.bins[0].id, qty: 7, type: "opening_balance", created_by: sales.userId, created_at: "2026-09-20T12:00:00Z" });
-    const live = await runCommand("generate_compliance_report", { jurisdiction: "TTB", periodStart: "2026-09-01", periodEnd: "2026-09-30" }, sales) as Report;
+    const live = await runCommand("generate_compliance_report", SEPT, sales) as Report;
     const { data: after } = await admin.from("report_filings").select("figures").eq("id", filedRow!.id).single();
     expect(after!.figures).toEqual(filedRow!.figures);
     expect(live.figures).not.toEqual(filedRow!.figures);
     const { filings, today } = await runCommand("list_compliance_reports", {}, sales) as { filings: { period_start: string; filed_at: string | null }[]; today: string };
     expect(filings.map((f) => f.period_start)).toEqual(["2026-09-01"]);
+    const one = await runCommand("list_compliance_reports", { jurisdiction: "TTB", periodStart: "2026-09-01" }, sales) as { filings: unknown[] };
+    expect(one.filings.length).toBe(1);
+    const none = await runCommand("list_compliance_reports", { jurisdiction: "US-PA" }, sales) as { filings: unknown[] };
+    expect(none.filings).toEqual([]);
     expect(filings[0].filed_at).toBeTruthy();
     expect(today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
@@ -170,6 +175,7 @@ describe("trace_lot", () => {
       run: { id: string; run_no: number; bbl_drawn: number; vessel: string };
       batch: { id: string; batch_no: number; brewed_on: string };
       movements: { type: string; qty: number; sku: string; location: string }[];
+      on_hand: number;
     };
     expect(t.lot).toMatchObject({ id: lot!.id, code: "L-261201-TP", brand: "Trace Porter", packaged_on: "2026-12-01" });
     expect(t.run).toMatchObject({ id: run.id, vessel: "FV-TRACE" });
@@ -179,6 +185,7 @@ describe("trace_lot", () => {
       ["production_in", 396, "Porter case", "Trace warehouse"],
       ["sample", -2, "Porter case", "Trace warehouse"],
     ]);
+    expect(t.on_hand).toBe(394);
     // sales may trace; an unknown lot is not found
     await expect(runCommand("trace_lot", { lotId: crypto.randomUUID() }, sales)).rejects.toMatchObject({ status: 404 });
   });

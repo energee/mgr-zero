@@ -60,6 +60,18 @@ export async function unwrap<T>(query: PromiseLike<{ data: T; error: { message: 
   return data;
 }
 
+/** unwrap for a list read; supabase-js without generated types cannot say what the rows are, so the caller names T. */
+export const rows = <T,>(q: Parameters<typeof unwrap>[0]) => unwrap(q) as unknown as Promise<T[]>;
+
+/** Today (YYYY-MM-DD) in the brewery's own timezone, not the server's UTC day: what a date field defaults to. */
+export async function breweryToday(ctx: Ctx): Promise<string> {
+  const { timezone } = (await unwrap(ctx.db.from("breweries").select("timezone").eq("id", ctx.breweryId).single())) as { timezone: string };
+  return new Date().toLocaleDateString("en-CA", { timeZone: timezone });
+}
+
+/** A two-letter US state code, the shape customers.state, ship_tos.state and the registry tables check. */
+export const stateCode = z.string().regex(/^[A-Z]{2}$/, "two-letter state code");
+
 // Maps a Supabase/PostgREST error to the public CommandError envelope. P0001 is
 // `raise exception` without an errcode, i.e. the domain rules our own RPCs
 // raise, so its message is the user-facing one. Anything unlisted is logged

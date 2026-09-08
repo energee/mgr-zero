@@ -29,7 +29,7 @@ export type ApiOperation = {
  * independent. */
 export const API_AREAS = [
   { slug: "portal", title: "Customer portal", match: /^(portal_|get_portal_|list_portal_)/ },
-  { slug: "compliance", title: "Compliance", match: /(compliance|brand_approval|state_registration|state_license|lot|loss)/ },
+  { slug: "compliance", title: "Compliance", match: /(compliance|brand_approval|state_registration|state_license|list_lots|trace_lot|loss)/ },
   { slug: "purchasing", title: "Purchasing & materials", match: /(purchase_order|vendor|material)/ },
   { slug: "production", title: "Production", match: /(batch|brew_day|cellar|vessel|fermentation|recipe|water_profile)/ },
   { slug: "catalog", title: "Catalog & pricing", match: /(product|sku|brand|price|sale_channel|sales_channel)/ },

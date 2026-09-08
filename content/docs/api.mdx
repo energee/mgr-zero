@@ -3048,9 +3048,13 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales
 
-Every filed snapshot, newest period first, and the brewery's today for the month list
+Filed snapshots, newest period first, optionally one jurisdiction and period, plus the brewery's today for the month list
 
-Takes no input.
+| Field | Type | Required |
+| --- | --- | --- |
+| `jurisdiction` | string | no |
+| `periodStart` | date (YYYY-MM-DD) | no |
+| `periodEnd` | date (YYYY-MM-DD) | no |
 
 ```bash
 curl -X POST "$MGR_URL/api/command" \
@@ -3078,7 +3082,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse, brewer
 
-One finished-goods lot: its packaging run, the tank and batch it came from, and every ledger movement that names the lot
+One finished-goods lot: its packaging run, the tank and batch it came from, every ledger movement that names the lot, and the units still on hand
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -3118,7 +3122,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Record or replace one of the brewery's state licenses by state and kind
+Record or replace one of the brewery's state licenses by state and kind (kind is stored lower-case and trimmed)
 
 | Field | Type | Required |
 | --- | --- | --- |

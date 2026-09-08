@@ -1,16 +1,15 @@
 // lib/commands/compliance.ts — compliance (Program 9). The registry holds
 // COLA/formula approvals and state registrations per brand and the brewery's
-// state licenses; the order screens warn from it and never block. A period
-// report is generated from the movement ledger on demand and filed as an
-// immutable jsonb snapshot; MGR never transmits a filing.
+// state licenses. A period report is generated from the movement ledger on
+// demand and filed as an immutable jsonb snapshot; MGR never transmits a
+// filing. trace_lot follows a finished-goods lot back to its batch and through
+// every ledger movement that names it.
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap } from "./registry";
+import { isoDate } from "./packaging";
+import { breweryToday, defineCommand, defineQuery, rows, stateCode, unwrap } from "./registry";
 
 const ROLES = ["admin", "sales"] as const;
-const rows = <T,>(q: Parameters<typeof unwrap>[0]) => unwrap(q) as unknown as Promise<T[]>;
-
-const state = z.string().regex(/^[A-Z]{2}$/, "two-letter state code");
-const day = z.string().date().optional();
+const day = isoDate.optional();
 
 defineCommand({
   name: "upsert_brand_approval", description: "Record or edit one brand's COLA or formula approval by its TTB id; the same id on the same brand is one record",
@@ -25,7 +24,7 @@ defineCommand({
 defineCommand({
   name: "upsert_state_registration", description: "Record or replace a brand's permission to sell in one state",
   roles: [...ROLES],
-  input: z.object({ brandId: z.string().uuid(), state, registrationNo: z.string().optional(), approvedOn: day, expiresOn: day }),
+  input: z.object({ brandId: z.string().uuid(), state: stateCode, registrationNo: z.string().optional(), approvedOn: day, expiresOn: day }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_state_registration", {
     p_brewery: ctx.breweryId, p_brand: i.brandId, p_state: i.state, p_registration_no: i.registrationNo ?? null,
     p_approved_on: i.approvedOn ?? null, p_expires_on: i.expiresOn ?? null, p_request_id: execution.requestId,
@@ -33,9 +32,9 @@ defineCommand({
 });
 
 defineCommand({
-  name: "upsert_brewery_state_license", description: "Record or replace one of the brewery's state licenses by state and kind",
+  name: "upsert_brewery_state_license", description: "Record or replace one of the brewery's state licenses by state and kind (kind is stored lower-case and trimmed)",
   roles: [...ROLES],
-  input: z.object({ state, kind: z.string().min(1), licenseNo: z.string().optional(), expiresOn: day, note: z.string().optional() }),
+  input: z.object({ state: stateCode, kind: z.string().trim().min(1), licenseNo: z.string().optional(), expiresOn: day, note: z.string().optional() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("upsert_brewery_state_license", {
     p_brewery: ctx.breweryId, p_state: i.state, p_kind: i.kind, p_license_no: i.licenseNo ?? null,
     p_expires_on: i.expiresOn ?? null, p_note: i.note ?? null, p_request_id: execution.requestId,
@@ -71,7 +70,7 @@ export type Report = {
   warnings: string[];
 };
 
-const period = z.object({ jurisdiction: z.string().regex(/^[A-Z-]+$/, "TTB or US-XX"), periodStart: z.string().date(), periodEnd: z.string().date() });
+const period = z.object({ jurisdiction: z.string().regex(/^[A-Z-]+$/, "TTB or US-XX"), periodStart: isoDate, periodEnd: isoDate });
 
 defineQuery({
   name: "generate_compliance_report", description: "Compute a period report from the movement ledger: per package class begin + in − out = end in bbl, removals by frozen tax treatment and destination state, packaged volume, and beer in process; nothing is stored",
@@ -90,44 +89,15 @@ defineCommand({
 });
 
 defineQuery({
-  name: "list_compliance_reports", description: "Every filed snapshot, newest period first, and the brewery's today for the month list",
-  roles: [...ROLES], input: z.object({}),
-  handler: async (ctx) => {
-    const [filings, brewery] = await Promise.all([
-      rows<Filing>(ctx.db.from("report_filings").select("*").eq("brewery_id", ctx.breweryId).order("period_start", { ascending: false }).order("jurisdiction")),
-      unwrap(ctx.db.from("breweries").select("timezone").eq("id", ctx.breweryId).single()) as Promise<{ timezone: string }>,
-    ]);
-    return { filings, today: new Date().toLocaleDateString("en-CA", { timeZone: brewery.timezone }) };
-  },
-});
-
-type LotRow = {
-  id: string; code: string; packaged_on: string; best_by: string | null; brands: { name: string } | null;
-  packaging_runs: { id: string; run_no: number | null; bbl_drawn: number | null; closed_at: string | null; vessel_occupancies: { vessels: { name: string } | null; batches: { id: string; batch_no: number | null; brewed_on: string | null; planned_on: string } | null } | null } | null;
-};
-type LotMovement = { id: string; type: string; qty: number; ref: string | null; created_at: string; skus: { name: string } | null; locations: { name: string } | null };
-
-defineQuery({
-  name: "trace_lot", description: "One finished-goods lot: its packaging run, the tank and batch it came from, and every ledger movement that names the lot",
-  roles: [...ROLES, "warehouse", "brewer"],
-  input: z.object({ lotId: z.string().uuid() }),
+  name: "list_compliance_reports", description: "Filed snapshots, newest period first, optionally one jurisdiction and period, plus the brewery's today for the month list",
+  roles: [...ROLES], input: period.partial(),
   handler: async (ctx, i) => {
-    const lot = await unwrap(ctx.db.from("lots")
-      .select("id, code, packaged_on, best_by, brands(name), packaging_runs(id, run_no, bbl_drawn, closed_at, vessel_occupancies(vessels(name), batches(id, batch_no, brewed_on, planned_on)))")
-      .eq("id", i.lotId).eq("brewery_id", ctx.breweryId).single()) as unknown as LotRow;
-    // ponytail: ship_order records no lot on its sale removals, so a shipment
-    // appears here only once pick/ship takes a lot per line (DRIFT "pick/ship
-    // lots"); until then recall contacts cannot be derived from the ledger.
-    const movements = await rows<LotMovement>(ctx.db.from("inventory_movements").select("id, type, qty, ref, created_at, skus(name), locations(name)")
-      .eq("lot_id", i.lotId).order("created_at"));
-    const run = lot.packaging_runs;
-    const occ = run?.vessel_occupancies;
-    return {
-      lot: { id: lot.id, code: lot.code, brand: lot.brands?.name ?? "", packaged_on: lot.packaged_on, best_by: lot.best_by },
-      run: run ? { id: run.id, run_no: run.run_no, bbl_drawn: run.bbl_drawn, closed_at: run.closed_at, vessel: occ?.vessels?.name ?? "" } : null,
-      batch: occ?.batches ?? null,
-      movements: movements.map((m) => ({ id: m.id, type: m.type, qty: Number(m.qty), ref: m.ref, created_at: m.created_at, sku: m.skus?.name ?? "", location: m.locations?.name ?? "" })),
-    };
+    let q = ctx.db.from("report_filings").select("*").eq("brewery_id", ctx.breweryId).order("period_start", { ascending: false }).order("jurisdiction");
+    if (i.jurisdiction) q = q.eq("jurisdiction", i.jurisdiction);
+    if (i.periodStart) q = q.eq("period_start", i.periodStart);
+    if (i.periodEnd) q = q.eq("period_end", i.periodEnd);
+    const [filings, today] = await Promise.all([rows<Filing>(q), breweryToday(ctx)]);
+    return { filings, today };
   },
 });
 
@@ -137,4 +107,38 @@ defineQuery({
   name: "list_lots", description: "Finished-goods lots, newest packaged first, as the entry to a lot trace",
   roles: [...ROLES, "warehouse", "brewer"], input: z.object({}),
   handler: (ctx) => rows<LotRowOut>(ctx.db.from("lots").select("id, code, packaged_on, brands(name)").eq("brewery_id", ctx.breweryId).order("packaged_on", { ascending: false }).limit(50)),
+});
+
+type LotRow = {
+  id: string; code: string; packaged_on: string; best_by: string | null; brands: { name: string } | null;
+  packaging_runs: { id: string; run_no: number | null; bbl_drawn: number | null; vessel_occupancies: { vessels: { name: string } | null; batches: { id: string; batch_no: number | null; brewed_on: string | null } | null } | null } | null;
+};
+type LotMovement = { id: string; type: string; qty: number; created_at: string; skus: { name: string } | null; locations: { name: string } | null };
+
+defineQuery({
+  name: "trace_lot", description: "One finished-goods lot: its packaging run, the tank and batch it came from, every ledger movement that names the lot, and the units still on hand",
+  roles: [...ROLES, "warehouse", "brewer"],
+  input: z.object({ lotId: z.string().uuid() }),
+  handler: async (ctx, i) => {
+    // ponytail: ship_order records no lot on its sale removals, so a shipment
+    // appears here only once pick/ship takes a lot per line (DRIFT "pick/ship
+    // lots"); until then recall contacts cannot be derived from the ledger.
+    const [lot, movements] = await Promise.all([
+      unwrap(ctx.db.from("lots")
+        .select("id, code, packaged_on, best_by, brands(name), packaging_runs(id, run_no, bbl_drawn, vessel_occupancies(vessels(name), batches(id, batch_no, brewed_on)))")
+        .eq("id", i.lotId).eq("brewery_id", ctx.breweryId).single()) as unknown as Promise<LotRow>,
+      rows<LotMovement>(ctx.db.from("inventory_movements").select("id, type, qty, created_at, skus(name), locations(name)")
+        .eq("brewery_id", ctx.breweryId).eq("lot_id", i.lotId).order("created_at")),
+    ]);
+    const run = lot.packaging_runs;
+    const occ = run?.vessel_occupancies;
+    const moves = movements.map((m) => ({ id: m.id, type: m.type, qty: Number(m.qty), created_at: m.created_at, sku: m.skus?.name ?? "", location: m.locations?.name ?? "" }));
+    return {
+      lot: { id: lot.id, code: lot.code, brand: lot.brands?.name ?? "", packaged_on: lot.packaged_on, best_by: lot.best_by },
+      run: run ? { id: run.id, run_no: run.run_no, bbl_drawn: run.bbl_drawn, vessel: occ?.vessels?.name ?? "" } : null,
+      batch: occ?.batches ?? null,
+      movements: moves,
+      on_hand: moves.reduce((n, m) => n + m.qty, 0),
+    };
+  },
 });

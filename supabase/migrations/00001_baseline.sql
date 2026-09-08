@@ -3433,9 +3433,11 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------- compliance registry (Program 9)
--- Three upserts on the registry tables. Each row is either edited by id or
--- matched on its natural key (unique constraint); a second row with a taken
--- key is the same record, so it returns MG409 rather than a duplicate.
+-- Three upserts on the registry tables. An approval's TTB id is itself
+-- editable, so approvals edit by id and a second row with a taken
+-- (brand, kind, ttb_id) is MG409; registrations and licenses key on what the
+-- user types (brand + state, state + kind), so insert-or-update is the whole
+-- edit path.
 create function upsert_brand_approval(
   p_brewery uuid, p_id uuid, p_brand uuid, p_kind public.approval_kind, p_ttb_id text, p_approved_on date, p_expires_on date, p_note text, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
@@ -3487,8 +3489,9 @@ begin
   v_replay := private.claim_command_request(p_brewery, 'upsert_brewery_state_license', p_request_id,
     jsonb_build_object('state', p_state, 'kind', p_kind, 'license_no', p_license_no, 'expires_on', p_expires_on, 'note', p_note));
   if v_replay is not null then return v_replay; end if;
+  -- kind is free text on the unique key: normalize it so "Brewery " and "brewery" are one license
   insert into public.brewery_state_licenses (brewery_id, state, kind, license_no, expires_on, note)
-    values (p_brewery, p_state, p_kind, p_license_no, p_expires_on, p_note)
+    values (p_brewery, p_state, lower(trim(p_kind)), p_license_no, p_expires_on, p_note)
     on conflict (brewery_id, state, kind) do update
       set license_no = excluded.license_no, expires_on = excluded.expires_on, note = excluded.note
     returning * into v_row;
@@ -3498,18 +3501,19 @@ end $$;
 -- ---------------------------------------------------------------- compliance report (Program 9)
 -- The period report is a read over the movement ledger, never a stored figure
 -- (brewing-domain "TTB & compliance"): per package class, begin + in − out =
--- end, all in bbl, from movements dated by when the beer moved. Removals are
--- keyed by the tax treatment frozen on each movement, so a channel edited
--- later cannot move a past month. The identity is checked on the unrounded
--- sums and every package_type gets a line, so zeros are 0.00, never absent.
--- Transfers and repacks stay inside a class and sit on neither side; a type
--- this classifier does not know has no side, breaks the identity, and is
--- named in warnings: an unhandled class fails loudly. The cellar is the one
--- exemption (beer leaves it by packaging), reported as one in-process figure.
+-- end, all in bbl, from movements dated by when the beer moved in the
+-- brewery's own timezone. Removals are keyed by the tax treatment frozen on
+-- each movement, so a channel edited later cannot move a past month. The
+-- identity is checked on the unrounded sums and every package_type gets a
+-- line, so zeros are 0.00, never absent. Transfers and repacks stay inside a
+-- class and sit on neither side; a type this classifier does not know has no
+-- side, breaks the identity, and is named in warnings: an unhandled class
+-- fails loudly. The cellar is the one exemption (beer leaves it by packaging),
+-- reported as one in-process figure.
 create function private.report_movements(p_brewery uuid, p_end date)
 returns table (class public.package_type, bbl numeric, type public.movement_type, tax_treatment public.tax_treatment, dest_state text, d date, side text)
 language sql stable set search_path = '' as $$
-  select f.package_type, m.bbl, m.type, m.tax_treatment, m.dest_state, (m.created_at at time zone 'UTC')::date,
+  select f.package_type, m.bbl, m.type, m.tax_treatment, m.dest_state, (m.created_at at time zone b.timezone)::date,
     case m.type
       when 'production_in' then 'in' when 'return_in' then 'in' when 'opening_balance' then 'in'
       when 'adjustment' then case when m.bbl > 0 then 'in' else 'out' end
@@ -3518,52 +3522,48 @@ language sql stable set search_path = '' as $$
       when 'taproom_transfer' then 'transfer' when 'location_transfer' then 'transfer' when 'repack' then 'transfer'
     end
   from public.inventory_movements m
+  join public.breweries b on b.id = m.brewery_id
   join public.skus s on s.id = m.sku_id join public.formats f on f.id = s.format_id
-  where m.brewery_id = p_brewery and (m.created_at at time zone 'UTC')::date <= p_end
+  where m.brewery_id = p_brewery and (m.created_at at time zone b.timezone)::date <= p_end
 $$;
 
 -- ponytail: inProcess is the tanks now, not at period end; replaying transfers
 -- and adjustments to a date is the upgrade when a filed month needs it.
 create function generate_compliance_report(p_brewery uuid, p_jurisdiction text, p_start date, p_end date)
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
-declare v_lines jsonb; v_off text[]; v_unknown text[]; v_removals jsonb; v_by_state jsonb; v_packaged numeric; v_in_process numeric;
+declare v_lines jsonb; v_warnings text[]; v_removals jsonb; v_by_state jsonb; v_packaged numeric; v_in_process numeric;
 begin
   perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
   if p_end < p_start then raise exception 'the period ends before it starts'; end if;
-  select jsonb_agg(jsonb_build_object('class', c.class, 'begin', round(x.b, 2), 'in', round(x.i, 2), 'out', round(x.o, 2), 'end', round(x.e, 2)) order by c.class),
-         array_agg(c.class::text || ' does not balance' order by c.class) filter (where x.b + x.i - x.o <> x.e)
-    into v_lines, v_off
-  from unnest(enum_range(null::public.package_type)) as c(class)
-  cross join lateral (
-    select coalesce(sum(bbl) filter (where d < p_start), 0) as b,
-           coalesce(sum(bbl) filter (where d >= p_start and side = 'in'), 0) as i,
-           coalesce(-sum(bbl) filter (where d >= p_start and side = 'out'), 0) as o,
-           coalesce(sum(bbl), 0) as e
-    from private.report_movements(p_brewery, p_end) r where r.class = c.class) x;
-  select array_agg(distinct 'unclassified movement type ' || type::text) into v_unknown
-    from private.report_movements(p_brewery, p_end) where d >= p_start and side is null;
-  select coalesce(jsonb_object_agg(k, round(v, 2)), '{}'::jsonb) into v_removals from (
-    select case when type in ('sale_removal', 'depletion') then tax_treatment::text else type::text end as k, -sum(bbl) as v
-    from private.report_movements(p_brewery, p_end) where d >= p_start and side = 'out' and type <> 'adjustment' group by 1) t;
-  select coalesce(jsonb_object_agg(dest_state, round(v, 2)), '{}'::jsonb) into v_by_state from (
-    select dest_state, -sum(bbl) as v from private.report_movements(p_brewery, p_end)
-    where d >= p_start and type = 'sale_removal' and tax_treatment = 'taxable' group by 1) t;
-  select coalesce(sum(bbl), 0) into v_packaged from private.report_movements(p_brewery, p_end) where d >= p_start and type = 'production_in';
+  -- one pass over the ledger; every figure is an aggregate of the same rows
+  with r as materialized (select * from private.report_movements(p_brewery, p_end)),
+  per_class as (
+    select c.class,
+      coalesce(sum(bbl) filter (where d < p_start), 0) as b,
+      coalesce(sum(bbl) filter (where d >= p_start and side = 'in'), 0) as i,
+      coalesce(-sum(bbl) filter (where d >= p_start and side = 'out'), 0) as o,
+      coalesce(sum(bbl), 0) as e
+    from unnest(enum_range(null::public.package_type)) as c(class) left join r on r.class = c.class group by c.class)
+  select
+    (select jsonb_agg(jsonb_build_object('class', class, 'begin', round(b, 2), 'in', round(i, 2), 'out', round(o, 2), 'end', round(e, 2)) order by class) from per_class),
+    coalesce((select array_agg(class::text || ' does not balance' order by class) from per_class where b + i - o <> e), '{}')
+      || coalesce((select array_agg(distinct 'unclassified movement type ' || type::text) from r where d >= p_start and side is null), '{}'),
+    (select coalesce(jsonb_object_agg(k, round(v, 2)), '{}'::jsonb) from (
+      select case when type in ('sale_removal', 'depletion') then tax_treatment::text else type::text end as k, -sum(bbl) as v
+      from r where d >= p_start and side = 'out' and type <> 'adjustment' group by 1) t),
+    (select coalesce(jsonb_object_agg(dest_state, round(v, 2)), '{}'::jsonb) from (
+      select dest_state, -sum(bbl) as v from r where d >= p_start and type = 'sale_removal' and tax_treatment = 'taxable' group by 1) t),
+    (select coalesce(sum(bbl), 0) from r where d >= p_start and type = 'production_in')
+    into v_lines, v_warnings, v_removals, v_by_state, v_packaged;
   select coalesce(sum(bbl), 0) into v_in_process from public.occupancy_volumes where brewery_id = p_brewery and ended_at is null;
   return jsonb_build_object(
     'figures', jsonb_build_object(
       'jurisdiction', p_jurisdiction, 'periodStart', p_start, 'periodEnd', p_end,
       'lines', v_lines, 'removals', v_removals, 'byState', v_by_state,
       'packaged', round(v_packaged, 2), 'inProcess', round(v_in_process, 2),
-      'balances', v_off is null and v_unknown is null),
-    'warnings', to_jsonb(coalesce(v_off, '{}'::text[]) || coalesce(v_unknown, '{}'::text[])));
+      'balances', cardinality(v_warnings) = 0),
+    'warnings', to_jsonb(v_warnings));
 end $$;
-
--- Filing freezes the generated figures as the jsonb snapshot that was actually
--- filed (brewing-domain: a filed month is never rewritten). MGR does not
--- transmit anything. A report that does not balance cannot be filed; the
--- period's unique key makes a second filing a conflict, while the same
--- request id replays the first.
 create function file_compliance_report(p_brewery uuid, p_jurisdiction text, p_start date, p_end date, p_note text, p_request_id uuid)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_replay jsonb; v_report jsonb; v_row public.report_filings;

@@ -2773,7 +2773,7 @@ export const SCREENS: Screen[] = [
     reads: "get_compliance_registry",
     writes: "upsert_brand_approval · upsert_state_registration · upsert_brewery_state_license",
     states: [["pending", "a brand with no COLA is flagged", 1], ["empty", "no brands yet: nothing to register"], ["permission", "sales or admin required", 1]],
-    spec: "Unregistered destination/brand combinations warn during order confirm and link here. One page, two lists: each brand with its approvals and state registrations under it, then the brewery's licenses; the three sheets add or edit a row.",
+    spec: "Unregistered destination/brand combinations are meant to warn during order confirm and link here; that read is not built yet (drift: order warning). One page, two lists: each brand with its approvals and state registrations under it, then the brewery's licenses; the three sheets add or edit a row.",
     body: (<>
       {E.back("Compliance months", "Registry")}
       {E.tabs(["brands", "licenses"])}
@@ -2786,7 +2786,7 @@ export const SCREENS: Screen[] = [
       {E.ttl("Licenses")}
       {E.row("PA brewery", "G-21884 · expires 2027-06-30", E.act("Edit"))}
       {E.btn("Add license", "g")}
-      {E.note("Order confirmation warns from this registry when a brand is not registered for the destination state. It never blocks.")}
+      {E.note("Order confirmation does not read this registry yet; a warning for an unregistered destination state is planned and will never block.")}
     </>),
   },
   {

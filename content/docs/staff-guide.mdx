@@ -304,7 +304,7 @@ A month is generated from the inventory ledger when you open it, so nothing is s
 
 <Screen name="Compliance registry" />
 
-The registry has two tabs. **Brands** lists each brand with its COLA or formula approvals and its state registrations; a brand with no COLA is flagged *COLA pending*. **Add approval** takes the brand, the approval kind, its TTB number, and optional approved and expiry dates; the same number on the same brand is one record, so saving it twice is refused. **Add registration** takes the brand, the two-letter state, and an optional number and expiry; one record exists per brand and state, so saving again replaces it. **Licenses** lists the brewery's own state licenses by state and kind (brewery, supplier, direct to consumer); **Add license** works the same way, one record per state and kind. **Edit** on any row opens the same sheet filled in. Order confirmation warns from this registry when a brand is not registered for the destination state, and never blocks.
+The registry has two tabs. **Brands** lists each brand with its COLA or formula approvals and its state registrations; a brand with no COLA is flagged *COLA pending*. **Add approval** takes the brand, the approval kind, its TTB number, and optional approved and expiry dates; the same number on the same brand is one record, so saving it twice is refused. **Add registration** takes the brand, the two-letter state, and an optional number and expiry; one record exists per brand and state, so saving again replaces it. **Licenses** lists the brewery's own state licenses by state and kind (brewery, supplier, direct to consumer); **Add license** works the same way, one record per state and kind. **Edit** on any row opens the same sheet filled in. Kind is stored lower-case and trimmed. Order confirmation does not read this registry yet; the planned warning for an unregistered destination state will never block.
 
 <Screen name="Lot trace" />
 
@@ -528,6 +528,7 @@ Do not hunt for hidden controls for these:
 - editing staff roles or seeing staff email addresses
 - recording payments
 - reviewing or reattributing auto-reconciled losses before a filing, a printed lot trace packet, and the customers who received a lot
+- an order-confirmation warning from the compliance registry
 - filing a state or other non-TTB report, or a period other than a calendar month, from the interface (the API accepts any jurisdiction and range)
 - Slack installation, notification settings, or unlinking from a visible MGR settings page
 
