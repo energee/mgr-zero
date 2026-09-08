@@ -2,8 +2,7 @@
 // Each invocation serializes a UUID request ID once, so any transport retry
 // reuses the identical request body while the server adds correlation metadata.
 
-export async function command(breweryId: string, name: string, input: unknown) {
-  const requestId = crypto.randomUUID();
+export async function command(breweryId: string, name: string, input: unknown, requestId = crypto.randomUUID()) {
   const res = await fetch("/api/command", {
     method: "POST",
     headers: { "content-type": "application/json" },

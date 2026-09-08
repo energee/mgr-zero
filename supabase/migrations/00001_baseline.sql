@@ -3234,6 +3234,104 @@ begin
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
+-- The manifest binds the entire batch before any row commits. Its result holds
+-- the immutable input so direct row calls cannot substitute data or identities.
+create function begin_csv_import(p_brewery uuid, p_kind text, p_rows jsonb, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_input jsonb := jsonb_build_object('kind', p_kind, 'rows', p_rows);
+begin
+  perform private.assert_staff(p_brewery, array['admin']::public.staff_role[]);
+  if p_kind is null or p_kind not in ('customers','ship_tos','products_skus','channel_prices','opening_balances') then raise exception 'invalid import kind'; end if;
+  if p_rows is null or jsonb_typeof(p_rows) <> 'array' then raise exception 'rows must be an array'; end if;
+  if jsonb_array_length(p_rows) not between 1 and 5000 then raise exception 'import requires 1–5000 rows'; end if;
+  if exists (select 1 from jsonb_array_elements(p_rows) r where jsonb_typeof(r) <> 'object') then raise exception 'rows must be objects'; end if;
+  if exists (select 1 from jsonb_array_elements(p_rows) r, jsonb_each(r) f where jsonb_typeof(f.value) <> 'string') then raise exception 'CSV fields must be strings'; end if;
+  v_replay := private.claim_command_request(p_brewery, 'import_csv', p_request_id, v_input);
+  if v_replay is null then perform private.complete_command_request(p_request_id, v_input); end if;
+  return jsonb_build_object('rows', jsonb_array_length(p_rows));
+end $$;
+
+-- Domain-separated SHA256 UUIDv8s, derived here, never trusted from callers.
+create function private.import_request_id(p_parent uuid, p_part text) returns uuid
+language sql immutable set search_path = '' as $$
+  select (substr(h,1,8)||'-'||substr(h,9,4)||'-8'||substr(h,14,3)||'-a'||substr(h,18,3)||'-'||substr(h,21,12))::uuid
+  from (select encode(extensions.digest('mgr-import:'||p_parent::text||':'||p_part, 'sha256'), 'hex') h) s
+$$;
+
+create function import_csv_row(p_brewery uuid, p_request_id uuid, p_row_n integer)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_manifest jsonb; k text; r jsonb; f record; v_required text[]; v_allowed text[];
+  v_id uuid; v_brand uuid; v_result jsonb; v_replay jsonb; v_request uuid;
+begin
+  perform private.assert_staff(p_brewery, array['admin']::public.staff_role[]);
+  select result into v_manifest from private.command_requests
+    where actor_id = auth.uid() and request_id = p_request_id and brewery_id = p_brewery and command_name = 'import_csv';
+  if v_manifest is null then raise exception 'import manifest not found'; end if;
+  if p_row_n is null or p_row_n < 0 or p_row_n >= jsonb_array_length(v_manifest->'rows') or p_row_n >= 5000 then raise exception 'invalid import row index'; end if;
+  k := v_manifest->>'kind'; r := v_manifest->'rows'->p_row_n;
+  v_request := private.import_request_id(p_request_id, p_row_n::text);
+  v_replay := private.claim_command_request(p_brewery, 'import_csv_row', v_request, jsonb_build_object('parent', p_request_id, 'row_n', p_row_n, 'kind', k, 'row', r));
+  if v_replay is not null then return v_replay; end if;
+  -- Only this inner subtransaction catches row failures: any new brand/style,
+  -- child ledger entry, and SKU are rolled back together. Siblings live in other calls.
+  begin
+    v_required := case k
+      when 'customers' then array['name','type','state','saleChannelId']
+      when 'ship_tos' then array['customerId','label','address1','city','state','zip']
+      when 'products_skus' then array['product','formatId']
+      when 'channel_prices' then array['saleChannelId','priceGroupId','formatId','unitPriceCents']
+      when 'opening_balances' then array['skuId','locationId','binId','qty'] end;
+    if v_required is null then raise exception 'invalid import kind'; end if;
+    v_allowed := v_required || case k
+      when 'customers' then array['licenseNumber','paymentTerms']
+      when 'ship_tos' then array['address2']
+      when 'products_skus' then array['sku_name','style','abv','upc']
+      when 'opening_balances' then array['note'] else array[]::text[] end;
+    for f in select unnest(v_required) as name loop
+      if nullif(btrim(r->>f.name), '') is null then raise exception '% is required', f.name; end if;
+    end loop;
+    for f in select key, btrim(value) as value from jsonb_each_text(r) loop
+      if not f.key = any(v_allowed) then raise exception 'unknown CSV field %', f.key; end if;
+      if f.value = '' then continue; end if;
+      if f.key like '%Id' and f.value !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then raise exception '% must be a UUID', f.key; end if;
+      if f.key = 'state' and f.value !~ '^[A-Z]{2}$' then raise exception 'state must be two uppercase letters'; end if;
+      if f.key in ('qty','abv','unitPriceCents') then
+        if f.value !~ '^[+-]?[0-9]+(\.[0-9]+)?$' then raise exception '% must be a decimal', f.key; end if;
+        if f.key = 'qty' and f.value::numeric <= 0 then raise exception 'qty must be positive'; end if;
+        if f.key = 'unitPriceCents' and (f.value !~ '^[0-9]+$' or f.value::numeric > 2147483647) then raise exception 'unitPriceCents must be whole cents (0–2147483647)'; end if;
+      end if;
+    end loop;
+    select jsonb_object_agg(key, nullif(btrim(value), '')) into r from jsonb_each_text(r);
+    v_id := private.import_request_id(v_request, 'write');
+    case k
+      when 'customers' then
+        v_result := public.upsert_customer(p_brewery, null, r->>'name', (r->>'type')::public.customer_type, r->>'state', (r->>'saleChannelId')::uuid, r->>'licenseNumber', r->>'paymentTerms', null, v_id);
+      when 'ship_tos' then
+        v_result := public.upsert_ship_to(p_brewery, null, (r->>'customerId')::uuid, r->>'label', r->>'address1', r->>'address2', r->>'city', r->>'state', r->>'zip', v_id);
+      when 'products_skus' then
+        -- Existing brands are reused without replacing their metadata. An
+        -- advisory lock serializes same-name creation across simultaneous rows.
+        perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_brewery::text || ':' || (r->>'product'), 0));
+        select id into v_brand from public.brands where brewery_id = p_brewery and name = r->>'product';
+        if v_brand is null then
+          v_result := public.upsert_brand(p_brewery, null, r->>'product', r->>'style', (r->>'abv')::numeric, null, null, null, null, private.import_request_id(v_request, 'brand'));
+          v_brand := (v_result->>'id')::uuid;
+        end if;
+        v_result := public.create_sku(p_brewery, v_brand, (r->>'formatId')::uuid, r->>'sku_name', r->>'upc', v_id);
+      when 'channel_prices' then
+        v_result := public.set_channel_price(p_brewery, (r->>'saleChannelId')::uuid, (r->>'priceGroupId')::uuid, (r->>'formatId')::uuid, (r->>'unitPriceCents')::integer, v_id);
+      when 'opening_balances' then
+        v_result := public.record_inventory_movement(p_brewery, (r->>'skuId')::uuid, (r->>'locationId')::uuid, (r->>'binId')::uuid, (r->>'qty')::numeric, 'opening_balance', null, null, r->>'note', v_id);
+    end case;
+    v_result := jsonb_build_object('status', 'committed', 'result', v_result);
+  exception when sqlstate 'P0001' or integrity_constraint_violation or data_exception then
+    v_result := jsonb_build_object('status', 'blocked', 'error', SQLERRM);
+  end;
+  -- Failed rows also have durable results. Corrected input starts a new batch
+  -- containing ONLY blocked rows; transport retries always use the old manifest.
+  return private.complete_command_request(v_request, v_result);
+end $$;
+
 create function set_taproom_par(
   p_brewery uuid, p_location uuid, p_sku uuid, p_par_qty numeric, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
@@ -6274,6 +6372,7 @@ grant execute on function
   create_bin(uuid,uuid,text,uuid),
   update_bin(uuid,uuid,text,uuid),
   delete_bin(uuid,uuid,uuid),
+  begin_csv_import(uuid,text,jsonb,uuid), import_csv_row(uuid,uuid,integer),
   upsert_customer(uuid,uuid,text,public.customer_type,text,uuid,text,text,public.tax_treatment,uuid),
   upsert_sale_channel(uuid,uuid,text,public.tax_treatment,uuid),
   delete_sale_channel(uuid,uuid,uuid),
