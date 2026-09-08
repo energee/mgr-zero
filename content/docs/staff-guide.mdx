@@ -24,7 +24,9 @@ Wrong credentials show **Incorrect email or password.** Signed in but not on a b
 
 <Screen name="Search" />
 
-**Search** in the header opens one search across SKUs, orders, invoices, lots, customers, purchase orders, and batches. Type a name to match on its first letters, or a document number (ORD-0231, INV-1042, PO-0142, B-0012, a lot code) to match it exactly; an exact number sorts first. Results group by kind; use the Up and Down arrow keys to move between matches and press Enter or click to open one. You only ever see records your role may read, and if nothing matches, the list says **No matches · change the term**.
+**Search** in the header opens one search across SKUs, orders, invoices, lots, customers, purchase orders, and batches. Type a name to match on its first letters, or a document number (ORD-0231, INV-1042, PO-0142, B-0012, a lot code) to match it exactly; an exact number sorts first. Results group by kind; use the Up and Down arrow keys to move between matches and press Enter or click to open one. You only ever see records your role may read. The sheet distinguishes loading, failed, offline cached, and valid empty results.
+
+SKU fields in **New Order** use the same search, narrowed to SKUs. They show recently selected SKUs first, followed by the current SKU list; successful searches are cached for the current signed-in session, brewery, and term so an offline retry can show those cached matches. Reloading or signing out clears recent choices and cached matches.
 
 ## Know what your role can do [#roles]
 
