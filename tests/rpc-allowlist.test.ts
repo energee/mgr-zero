@@ -101,6 +101,7 @@ const AUTHENTICATED_RPCS = [
   "update_bin(uuid,uuid,text,uuid)",
   "update_draft_order(uuid,uuid,date,text,text,jsonb,uuid)",
   "update_location(uuid,uuid,text,location_kind,uuid)",
+  "update_sku(uuid,uuid,boolean,text,uuid)",
   "update_brewery(uuid,text,text,text,text,text,integer,uuid)",
   "list_team_members(uuid)",
   "update_staff_role(uuid,uuid,staff_role,uuid)",

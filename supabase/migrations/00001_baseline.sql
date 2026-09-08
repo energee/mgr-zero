@@ -2784,6 +2784,7 @@ create function create_sku(
 declare v_replay jsonb; v_row public.skus; v_brand public.brands; v_format public.formats;
 begin
   perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
+  p_upc := nullif(trim(p_upc), '');
   v_replay := private.claim_command_request(p_brewery, 'create_sku', p_request_id,
     jsonb_build_object('brewery', p_brewery, 'brand', p_brand, 'format', p_format, 'name', p_name, 'upc', p_upc));
   if v_replay is not null then return v_replay; end if;
@@ -2795,6 +2796,28 @@ begin
   if (select bbl_per_unit from public.format_volumes where id = p_format) is null then raise exception 'format has no volume yet: type bbl_per_unit or add components'; end if;
   insert into public.skus (brewery_id, brand_id, format_id, name, upc)
     values (p_brewery, p_brand, p_format, coalesce(nullif(trim(p_name), ''), v_brand.name || ' · ' || v_format.name), p_upc) returning * into v_row;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+-- SKU identity is immutable here: deactivation never rewrites its history.
+create function update_sku(
+  p_brewery uuid, p_id uuid, p_active boolean, p_upc text, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_row public.skus;
+begin
+  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
+  p_upc := nullif(trim(p_upc), '');
+  v_replay := private.claim_command_request(p_brewery, 'update_sku', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'id', p_id, 'active', p_active, 'upc', p_upc));
+  if v_replay is not null then return v_replay; end if;
+  if p_active is null then raise exception 'active is required'; end if;
+  begin
+    update public.skus set active = p_active, upc = p_upc
+      where id = p_id and brewery_id = p_brewery returning * into v_row;
+  exception when unique_violation then
+    raise exception 'UPC is already assigned to another SKU; use a different UPC or clear it';
+  end;
+  if v_row.id is null then raise exception 'sku not found'; end if;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
@@ -6414,6 +6437,7 @@ grant execute on function my_brewery_ids(), my_customer_ids(), is_staff_of(uuid)
 grant execute on function
   provision_brewery(text,text,text,uuid),
   create_sku(uuid,uuid,uuid,text,text,uuid),
+  update_sku(uuid,uuid,boolean,text,uuid),
   upsert_brand(uuid,uuid,text,text,numeric,text,text,uuid,text,uuid),
   upsert_format(uuid,uuid,text,public.format_basis,public.package_type,public.keg_size,int,numeric,uuid),
   replace_format_components(uuid,uuid,jsonb,uuid),

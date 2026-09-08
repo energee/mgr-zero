@@ -49,3 +49,28 @@ export function SkuForm({ brandId, formats }: { brandId: string; formats: Format
     </CommandForm>
   );
 }
+
+// Only mutable SKU facts are sent; changing its package means creating another SKU.
+export function SkuEditForm({ sku, formatName }: { sku: { id: string; name: string; active: boolean; upc: string | null }; formatName: string }) {
+  const [active, setActive] = useState(sku.active);
+  const [upc, setUpc] = useState(sku.upc ?? "");
+  const reset = () => { setActive(sku.active); setUpc(sku.upc ?? ""); };
+  const form = useCommandForm("update_sku", {
+    build: () => ({ skuId: sku.id, active, upc }), reset,
+  });
+  return (
+    <CommandForm open={form.open} onOpenChange={(open) => { if (open) reset(); form.setOpen(open); }} title={`Edit SKU · ${sku.name}`} trigger={<Button variant="outline" size="sm">Edit SKU</Button>}>
+      <form onSubmit={form.submit} className="flex flex-col gap-4">
+        <p className="text-sm">Format: {formatName}. Create another SKU to use a different format.</p>
+        <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />Active · available to sell</label>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor={`sku-upc-${sku.id}`}>UPC (optional)</Label>
+          <Input id={`sku-upc-${sku.id}`} value={upc} onChange={(e) => setUpc(e.target.value)} />
+        </div>
+        <p className="text-sm text-muted-foreground">Inactive SKUs leave inventory and order history intact and cannot be added to new orders. Clear UPC to remove it.</p>
+        <CommandFormMessage error={form.error} />
+        <CommandFormFooter><Button type="submit" disabled={form.submitting}>{form.submitting ? "Saving…" : "Save SKU"}</Button></CommandFormFooter>
+      </form>
+    </CommandForm>
+  );
+}

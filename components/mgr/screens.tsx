@@ -1614,7 +1614,7 @@ export const SCREENS: Screen[] = [
     to: { "Hazy IPA": "Brand", Pils: "Brand", Stout: "Brand" },
     job: "Define brands, their sellable formats and prices without ledger writes",
     reads: "list_brands · list_skus",
-    writes: "upsert_brand · create_sku · update_sku [design]",
+    writes: "upsert_brand · create_sku · update_sku",
     states: DEFAULT_STATES,
     spec: "Brand facts (ABV and tax class) edit on Brand; SKU associates the brand with a Format. Volume and packaging stay on the Format. This page remains a list with simple pricing, never the v1 price matrix.",
     body: (<>
@@ -1652,7 +1652,7 @@ export const SCREENS: Screen[] = [
     name: "Brand",
     job: "Sellable facts without ledger writes, including the TTB fields",
     reads: "list_brands · list_skus",
-    writes: "upsert_brand · update_sku [design; the products to brands rename] · create_sku",
+    writes: "upsert_brand · update_sku · create_sku",
     states: [["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class; description, category, price group and hops optional"], ["new style", "typing a style no one has used offers Add; saved with the brand", 0], ["new SKU", "choose one existing packaged Format; a poured format (pint, taster) is never a SKU. Square publishes it as brand × format"], ["inactive SKU", "hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"]],
     spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category and hops are optional nullable columns; price group is the row of the price grid the brand sits on, so the price of any of its packaged SKUs is the cell where the customer's sale channel meets that group and the SKU's format. The brand carries no price of its own, and a brand on no group is unpriced everywhere. Package facts live on Formats. A SKU is one brand × one packaged format. A poured format is never a SKU: the menu publishes brand × pint to Square, and a sale depletes the keg SKU. No container source editor here.",
     body: (<>
@@ -1680,7 +1680,7 @@ export const SCREENS: Screen[] = [
     to: { "Save SKU": "SKU list" },
     job: "Associate one shared package format with a brand",
     reads: "list_formats",
-    writes: "create_sku · update_sku [design; no update_sku command yet]",
+    writes: "create_sku · update_sku",
     states: [["permission", "sales or admin required", 1], ["active", "available to price and sell"], ["inactive", "history remains", 1], ["in use", "format cannot change; create another SKU", 1]],
     spec: "A SKU is one brand × one packaged format. It owns active state, optional UPC, and provider mappings. Price lives on the grid cell (sale channel × price group × format), never as a SKU exception. Group-shared barcodes are a follow-on table; until then a SKU may carry its own UPC. Name, volume and packaging derive from the Format. A different volume or BOM is a different Format.",
     body: (<>

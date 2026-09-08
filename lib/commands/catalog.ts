@@ -20,10 +20,19 @@ defineCommand({
 
 defineCommand({
   name: "create_sku", description: "Create a SKU: one brand × one packaged format; the name defaults to brand · format",
-  input: z.object({ brandId: z.string().uuid(), formatId: z.string().uuid(), name: z.string().optional(), upc: z.string().optional() }),
+  input: z.object({ brandId: z.string().uuid(), formatId: z.string().uuid(), name: z.string().optional(), upc: z.string().trim().optional() }),
   roles: ["admin", "sales"],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_sku", {
-    p_brewery: ctx.breweryId, p_brand: i.brandId, p_format: i.formatId, p_name: i.name ?? null, p_upc: i.upc ?? null, p_request_id: execution.requestId,
+    p_brewery: ctx.breweryId, p_brand: i.brandId, p_format: i.formatId, p_name: i.name ?? null, p_upc: i.upc || null, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "update_sku", description: "Edit a SKU's active state and optional UPC; brand, format, provider mappings and history stay unchanged",
+  input: z.object({ skuId: z.string().uuid(), active: z.boolean(), upc: z.string().trim().optional() }),
+  roles: ["admin", "sales"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("update_sku", {
+    p_brewery: ctx.breweryId, p_id: i.skuId, p_active: i.active, p_upc: i.upc || null, p_request_id: execution.requestId,
   })),
 });
 
@@ -208,7 +217,7 @@ defineQuery({
   // Brewers read brands too: recipes, batches and packaging runs all name one.
   name: "list_brands", description: "Brands with their style and SKUs, alphabetical",
   input: z.object({}), roles: STAFF_ROLES,
-  handler: (ctx) => unwrap(ctx.db.from("brands").select("*, styles(name), skus(id, name, format_id, active)").eq("brewery_id", ctx.breweryId).order("name")),
+  handler: (ctx) => unwrap(ctx.db.from("brands").select("*, styles(name), skus(id, name, format_id, active, upc)").eq("brewery_id", ctx.breweryId).order("name")),
 });
 
 // Replacement inputs must include the entire set, even beyond PostgREST's row cap.
