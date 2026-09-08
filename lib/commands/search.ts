@@ -25,7 +25,10 @@ async function byKind(ctx: Ctx, kind: SearchKind, q: string): Promise<SearchHit[
   const b = ctx.breweryId;
   const prefix = `${escapeLike(q)}%`;
   const doc = DOC.find(([re, k]) => k === kind && re.test(q));
-  const n = doc ? Number(q.match(doc[0])![1]) : null;
+  // The prefixes accept unbounded digits; a value past int4 would make Postgres
+  // raise rather than simply not match, so it is no match here.
+  const parsed = doc ? Number(q.match(doc[0])![1]) : null;
+  const n = parsed !== null && Number.isInteger(parsed) && parsed > 0 && parsed <= 2147483647 ? parsed : null;
   const hit = (id: string, label: string, detail: string, href: string, exact = false): SearchHit => ({ kind, id, label, detail, href, exact });
   switch (kind) {
     case "sku": {

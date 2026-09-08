@@ -16,13 +16,14 @@ import { QuestionForm } from "./question-form";
 type Detail = {
   invoice: { id: string; invoice_no: number | null; kind: "invoice" | "credit_memo"; issued_on: string; due_on: string | null; paid_at: string | null; total_cents: number };
   lines: { id: string; kind: string; qty: number; amount_cents: number; description: string | null; skus: { name: string } | null }[];
+  brewery: { name: string; customer_phone: string | null };
 };
 
 export default async function PortalInvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const customer = await getActiveCustomer();
   const ctx = await buildContext(customer.breweryId);
-  const { invoice, lines } = await orNotFound(runCommand("portal_invoice", { invoiceId: id }, ctx) as Promise<Detail>);
+  const { invoice, lines, brewery } = await orNotFound(runCommand("portal_invoice", { invoiceId: id }, ctx) as Promise<Detail>);
   const creditMemo = invoice.kind === "credit_memo";
   const no = docNo(creditMemo ? "CM" : "INV", invoice.invoice_no, creditMemo ? "Credit memo" : "Invoice");
   const paid = invoice.paid_at !== null;
@@ -34,7 +35,7 @@ export default async function PortalInvoicePage({ params }: { params: Promise<{ 
       {invoice.due_on ? E.row("Due", invoice.due_on) : null}
       {invoice.kind === "invoice" ? E.row("Status", paid ? `Paid ${new Date(invoice.paid_at!).toLocaleDateString()}` : "Unpaid", "", paid ? "ok" : "w") : E.row("Status", "Credit", "", "ok")}
       {E.tbl(["Item", "Qty", "Amount"], lines.map((l) => [l.skus?.name ?? l.description ?? l.kind, String(Number(l.qty)), money(l.amount_cents)]))}
-      {invoice.kind === "invoice" && !paid ? E.info("Contact the brewery to pay this invoice.") : null}
+      {invoice.kind === "invoice" && !paid ? E.info(brewery.customer_phone ? `Call ${brewery.name} at ${brewery.customer_phone} to pay this invoice.` : "Contact the brewery to pay this invoice.") : null}
       <QuestionForm invoiceId={invoice.id} label={`${no} · ${money(invoice.total_cents)}`} />
     </>
   );

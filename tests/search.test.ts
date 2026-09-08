@@ -37,6 +37,11 @@ describe("search_entities", () => {
     expect((await search("ridge")).map((h) => h.id)).toContain(customerId);
     expect(await search("zzz-nothing")).toEqual([]);
   });
+  it("a document number past the column's range is no match, not an error", async () => {
+    await expect(search("ORD-99999999999999999999")).resolves.toEqual([]);
+    await expect(search("INV-2147483648")).resolves.toEqual([]);
+  });
+
   it("kinds narrow the search and never widen it", async () => {
     const hits = await search("Haz", adminCtx, ["customer"]);
     expect(hits.map((h) => h.kind)).not.toContain("sku");

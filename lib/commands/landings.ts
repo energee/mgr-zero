@@ -11,7 +11,8 @@ import { poNo } from "@/lib/mgr/doc-no";
 import { plural } from "@/lib/mgr/plural";
 
 export type WorkKind = "orders" | "transfers" | "batches" | "runs" | "POs" | "routes";
-export type WorkRow = { kind: WorkKind; label: string; detail: string; href: string; verb: string; tone: "info" | "attention" | "success"; dueAt: string | null };
+/** `id` is the row's own identity: two rows can share an href (two open questions on one invoice). */
+export type WorkRow = { kind: WorkKind; id: string; label: string; detail: string; href: string; verb: string; tone: "info" | "attention" | "success"; dueAt: string | null };
 
 const KIND: Record<TodayItem["reason"], WorkKind> = {
   submitted_order: "orders", pick_due: "orders", restock_due: "orders", delivery_next: "routes", fermentation_reading_overdue: "batches", invoice_question: "orders",
@@ -75,13 +76,13 @@ defineQuery({
       canRun(ctx, "list_routes") ? runCommand("list_routes", {}, ctx) as Promise<{ routes: { id: string; name: string | null; delivery_date: string; departed_at: string | null; stops: unknown[] }[] }> : { routes: [] },
     ]);
     const rows: WorkRow[] = [
-      ...today.map((t) => ({ kind: KIND[t.reason], label: t.safeLabel, detail: t.detail, href: t.href, verb: TODAY_VERB[t.reason][0], tone: TODAY_VERB[t.reason][1], dueAt: t.dueAt })),
+      ...today.map((t) => ({ kind: KIND[t.reason], id: t.subjectId, label: t.safeLabel, detail: t.detail, href: t.href, verb: TODAY_VERB[t.reason][0], tone: TODAY_VERB[t.reason][1], dueAt: t.dueAt })),
       ...pos.map((p) => ({
-        kind: "POs" as const, label: `${poNo(p.po_no)} · ${p.vendor_name ?? "vendor"}`, detail: p.status.replace("_", " ") + (p.expected_on ? ` · due ${p.expected_on}` : ""),
+        kind: "POs" as const, id: p.id, label: `${poNo(p.po_no)} · ${p.vendor_name ?? "vendor"}`, detail: p.status.replace("_", " ") + (p.expected_on ? ` · due ${p.expected_on}` : ""),
         href: `/purchase-orders/${p.id}`, verb: p.status === "draft" ? "Send" : "Receive", tone: "info" as const, dueAt: p.expected_on,
       })),
       ...routes.routes.map((r) => ({
-        kind: "routes" as const, label: r.name ?? "Route", detail: `${plural(r.stops.length, "stop")} · ${r.delivery_date}`,
+        kind: "routes" as const, id: r.id, label: r.name ?? "Route", detail: `${plural(r.stops.length, "stop")} · ${r.delivery_date}`,
         href: `/routes/${r.id}`, verb: r.departed_at ? "Return" : "Depart", tone: "info" as const, dueAt: r.delivery_date,
       })),
     ];

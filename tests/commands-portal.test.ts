@@ -193,6 +193,13 @@ describe("portal commands", () => {
 });
 
 describe("account and invoice reads", () => {
+  it("portal_invoice carries the brewery's customer-facing phone so the buyer knows who to call", async () => {
+    await runCommand("update_brewery", { name: "Demo", timezone: "America/New_York", customerPhone: "(610) 555-0142", readingDueHours: 24 }, adminCtx);
+    const { data: inv } = await admin.from("invoices").insert({ brewery_id: b.id, customer_id: customerId, kind: "invoice" }).select("id").single();
+    const got = await runCommand("portal_invoice", { invoiceId: inv!.id }, custCtx) as { brewery: { name: string; customer_phone: string | null } };
+    expect(got.brewery.customer_phone).toBe("(610) 555-0142");
+  });
+
   it("get_portal_account returns the caller's customer, ship-tos, membership and deposits only", async () => {
     const acct = await runCommand("get_portal_account", {}, custCtx) as {
       customer: { id: string; name: string }; shipTos: { id: string; label: string; city: string; state: string }[];

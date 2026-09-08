@@ -19,7 +19,7 @@ const ROLES: [string, string][] = [
   ["warehouse", "pick, receive, count, transfer"], ["brewer", "batches, cellar, packaging"],
 ];
 
-export function MemberForm({ member, lastAdmin }: { member: TeamMember; lastAdmin: boolean }) {
+export function MemberForm({ member }: { member: TeamMember }) {
   const [role, setRole] = useState(member.role);
   const form = useCommandForm("update_staff_role", { build: () => ({ userId: member.userId, role }), reset: () => setRole(member.role) });
   const remove = useCommandAction();
@@ -35,14 +35,13 @@ export function MemberForm({ member, lastAdmin }: { member: TeamMember; lastAdmi
             <SelectContent><SelectGroup>{ROLES.map(([r, does]) => <SelectItem key={r} value={r}>{r} · {does}</SelectItem>)}</SelectGroup></SelectContent>
           </Select>
         </div>
-        {lastAdmin && E.note("This is the only admin; keep one admin before changing or removing them.")}
         <CommandFormMessage error={form.error ?? remove.error} />
         <CommandFormFooter>
-          <Button type="submit" disabled={form.submitting || role === member.role || (lastAdmin && role !== "admin")}>{form.submitting ? "Saving…" : "Save role"}</Button>
+          <Button type="submit" disabled={form.submitting || role === member.role}>{form.submitting ? "Saving…" : "Save role"}</Button>
         </CommandFormFooter>
       </form>
       {E.note(`Removing ${first} ends this brewery membership. Their sign-in account remains.`)}
-      <Button type="button" variant="destructive" className="w-full" disabled={remove.busy || lastAdmin}
+      <Button type="button" variant="destructive" className="w-full" disabled={remove.busy}
         onClick={() => void remove.run("revoke_staff", { userId: member.userId }, () => form.setOpen(false))}>Remove {first}</Button>
     </CommandForm>
   );

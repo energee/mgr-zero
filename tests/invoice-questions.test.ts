@@ -25,8 +25,10 @@ beforeAll(async () => {
 });
 
 describe("invoice questions", () => {
-  it("a buyer raises one on their own invoice only", async () => {
-    await expect(runCommand("raise_invoice_question", { invoiceId, body: "The Pils count looks short." }, other)).rejects.toThrow();
+  it("a buyer raises one on their own invoice only, and a missing invoice reads the same as a foreign one", async () => {
+    await expect(runCommand("raise_invoice_question", { invoiceId, body: "The Pils count looks short." }, other)).rejects.toThrow(/permission denied/);
+    // enumeration: an id that matches nothing must not be distinguishable from someone else's
+    await expect(runCommand("raise_invoice_question", { invoiceId: crypto.randomUUID(), body: "x" }, buyer)).rejects.toThrow(/permission denied/);
     const q = await runCommand("raise_invoice_question", { invoiceId, body: "The Pils count looks short." }, buyer) as { id: string; invoice_id: string };
     expect(q.invoice_id).toBe(invoiceId);
     await expect(runCommand("raise_invoice_question", { invoiceId, body: "x" }, sales)).rejects.toThrow(/permission denied/);
@@ -35,7 +37,7 @@ describe("invoice questions", () => {
   it("lands on the sales Today list and clears when marked answered", async () => {
     const before = await runCommand("get_today", {}, sales) as TodayItem[];
     const row = before.find((i) => i.reason === "invoice_question");
-    expect(row).toMatchObject({ subjectType: "invoice", subjectId: invoiceId, href: `/invoices/${invoiceId}` });
+    expect(row).toMatchObject({ subjectType: "invoice", href: `/invoices/${invoiceId}` });
     expect((await runCommand("get_today", {}, warehouse) as TodayItem[]).some((i) => i.reason === "invoice_question")).toBe(false);
 
     const open = await runCommand("list_invoice_questions", {}, sales) as { id: string; answered_at: string | null; body: string }[];
@@ -46,10 +48,20 @@ describe("invoice questions", () => {
     expect((await runCommand("list_invoice_questions", { invoiceId }, sales) as { answered_at: string | null }[])[0].answered_at).not.toBeNull();
   });
 
+  it("two open questions on one invoice are two rows with their own identities", async () => {
+    await runCommand("raise_invoice_question", { invoiceId, body: "And the delivery date?" }, buyer);
+    await runCommand("raise_invoice_question", { invoiceId, body: "Is the deposit included?" }, buyer);
+    const rows = (await runCommand("get_today", {}, sales) as TodayItem[]).filter((i) => i.reason === "invoice_question");
+    expect(rows).toHaveLength(2);
+    expect(new Set(rows.map((r) => r.subjectId)).size).toBe(2);
+    expect(rows.every((r) => r.href === `/invoices/${invoiceId}`)).toBe(true);
+  });
+
   it("another customer cannot read it", async () => {
     const { data } = await other.db.from("invoice_questions").select("id").eq("invoice_id", invoiceId);
     expect(data).toEqual([]);
-    const { data: mine } = await buyer.db.from("invoice_questions").select("id").eq("invoice_id", invoiceId);
-    expect(mine?.length).toBe(1);
+    const { data: mine } = await buyer.db.from("invoice_questions").select("id, customer_id").eq("invoice_id", invoiceId);
+    expect(mine?.length).toBeGreaterThan(0);
+    expect(mine?.every((q) => q.customer_id === buyer.customerId)).toBe(true);
   });
 });

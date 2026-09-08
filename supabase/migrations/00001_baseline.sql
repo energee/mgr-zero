@@ -1617,10 +1617,11 @@ returns table (
   id uuid,
   name text,
   timezone text,
+  customer_phone text,
   portal_fulfillment_location_id uuid
 )
 language sql stable security definer set search_path = '' as $$
-  select b.id, b.name, b.timezone, b.portal_fulfillment_location_id
+  select b.id, b.name, b.timezone, b.customer_phone, b.portal_fulfillment_location_id
   from public.breweries b
   where b.id in (
     select c.brewery_id from public.customers c
@@ -1629,7 +1630,7 @@ language sql stable security definer set search_path = '' as $$
 $$;
 
 create view portal_brewery with (security_invoker = true) as
-  select id, name, timezone, portal_fulfillment_location_id
+  select id, name, timezone, customer_phone, portal_fulfillment_location_id
   from public.portal_brewery_rows();
 comment on function portal_brewery_rows() is
   'portal brewery projection; never add staff-only columns';
@@ -2693,7 +2694,9 @@ returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_replay jsonb; v_customer uuid; v_actor uuid; v_row public.invoice_questions;
 begin
   select customer_id into v_customer from public.invoices where id = p_invoice and brewery_id = p_brewery;
-  if v_customer is null then raise exception 'invoice not found' using errcode = 'P0001'; end if;
+  -- a missing invoice and someone else's answer the same way, so a buyer cannot
+  -- learn which ids are real
+  if v_customer is null then raise exception 'permission denied' using errcode = '42501'; end if;
   v_actor := private.assert_customer(p_brewery, v_customer);
   v_replay := private.claim_command_request(p_brewery, 'raise_invoice_question', p_request_id,
     jsonb_build_object('brewery', p_brewery, 'invoice', p_invoice, 'body', p_body));
@@ -2729,7 +2732,8 @@ language sql stable security definer set search_path = '' as $$
     from public.brewery_users bu
     join auth.users u on u.id = bu.user_id
     where bu.brewery_id = p_brewery
-      and exists (select 1 from public.brewery_users me where me.brewery_id = p_brewery and me.user_id = auth.uid())
+      and exists (select 1 from public.brewery_users me where me.brewery_id = p_brewery and me.user_id = auth.uid()
+                    and me.role = any (array['admin','sales','warehouse']::public.staff_role[]))
     order by bu.role, u.email;
 $$;
 
@@ -5568,7 +5572,9 @@ create view private.today_candidates with (security_invoker = true) as
     where vo.ended_at is null
   union all
   -- a buyer's open question about an invoice; Mark answered clears it
-  select q.brewery_id, 'invoice_question', 'invoice', q.invoice_id::text,
+  -- the row is one question: two open questions on one invoice are two rows,
+  -- so the subject is the question and only the href points at the invoice
+  select q.brewery_id, 'invoice_question', 'invoice', q.id::text,
          md5(concat_ws('|', q.id, q.answered_at)),
          'INV-' || lpad(i.invoice_no::text, 4, '0') || ' · ' || c.name,
          'buyer asked: ' || left(q.body, 60),

@@ -30,7 +30,7 @@ export function WorkList({ rows, defaults }: { rows: WorkRow[]; defaults: WorkKi
         <TabsList variant="solid" className="w-full">{CHIPS.map((c) => <TabsTrigger key={c} value={c}>{c}</TabsTrigger>)}</TabsList>
       </Tabs>
       {shown.length === 0 ? E.blank("Nothing in motion") : shown.map((r) => (
-        <div key={r.href}>{E.row(r.label, r.detail, E.act(r.verb, r.tone, r.href), r.tone === "attention" ? "w" : "", ICON[r.kind])}</div>
+        <div key={`${r.kind}:${r.id}`}>{E.row(r.label, r.detail, E.act(r.verb, r.tone, r.href), r.tone === "attention" ? "w" : "", ICON[r.kind])}</div>
       ))}
     </>
   );

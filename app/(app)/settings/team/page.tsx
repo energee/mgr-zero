@@ -17,13 +17,12 @@ export default async function TeamPage() {
   const [brewery, identity] = await Promise.all([getActiveBrewery(), getRequestIdentity()]);
   if (brewery.role !== "admin") redirect(deniedHref("Team", ["admin"]));
   const members = (await runCommand("list_team_members", {}, await buildContext(brewery.id))) as TeamMember[];
-  const admins = members.filter((m) => m.role === "admin").length;
   return (
     <>
       {E.back("Settings", "Team", undefined, "/settings")}
       {members.map((m) => m.userId === identity?.userId
         ? <div key={m.userId}>{E.row(m.handle, `${m.email} · ${m.role}`, "you")}</div>
-        : <MemberForm key={m.userId} member={m} lastAdmin={m.role === "admin" && admins === 1} />)}
+        : <MemberForm key={m.userId} member={m} />)}
       {E.gated("Invite staff", "invitations aren’t available yet")}
     </>
   );

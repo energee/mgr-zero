@@ -28,6 +28,14 @@ describe("team", () => {
     await expect(roster(sales)).resolves.toBeTruthy();
   });
 
+  it("does not hand staff emails to a role the registered query refuses", async () => {
+    const brewer = await makeStaffCtx(b.id, "brewer");
+    await expect(runCommand("list_team_members", {}, brewer)).rejects.toThrow(/permission denied/);
+    // the definer RPC is granted to authenticated, so it has to apply the same rule
+    const { data } = await brewer.db.rpc("list_team_members", { p_brewery: b.id });
+    expect(data).toEqual([]);
+  });
+
   it("changes one member's role; the last admin cannot step down", async () => {
     await expect(runCommand("update_staff_role", { userId: adminCtx.userId, role: "sales" }, adminCtx)).rejects.toThrow(/admin/);
     await runCommand("update_staff_role", { userId: sales.userId, role: "warehouse" }, adminCtx);
