@@ -94,3 +94,33 @@ defineQuery({
   roles: [...ROLES], input: z.object({}),
   handler: (ctx) => rows<Filing>(ctx.db.from("report_filings").select("*").eq("brewery_id", ctx.breweryId).order("period_start", { ascending: false }).order("jurisdiction")),
 });
+
+type LotRow = {
+  id: string; code: string; packaged_on: string; best_by: string | null; brands: { name: string } | null;
+  packaging_runs: { id: string; run_no: number | null; bbl_drawn: number | null; closed_at: string | null; vessel_occupancies: { vessels: { name: string } | null; batches: { id: string; batch_no: number | null; brewed_on: string | null; planned_on: string } | null } | null } | null;
+};
+type LotMovement = { id: string; type: string; qty: number; ref: string | null; created_at: string; skus: { name: string } | null; locations: { name: string } | null };
+
+defineQuery({
+  name: "trace_lot", description: "One finished-goods lot: its packaging run, the tank and batch it came from, and every ledger movement that names the lot",
+  roles: [...ROLES, "warehouse", "brewer"],
+  input: z.object({ lotId: z.string().uuid() }),
+  handler: async (ctx, i) => {
+    const lot = await unwrap(ctx.db.from("lots")
+      .select("id, code, packaged_on, best_by, brands(name), packaging_runs(id, run_no, bbl_drawn, closed_at, vessel_occupancies(vessels(name), batches(id, batch_no, brewed_on, planned_on)))")
+      .eq("id", i.lotId).eq("brewery_id", ctx.breweryId).single()) as unknown as LotRow;
+    // ponytail: ship_order records no lot on its sale removals, so a shipment
+    // appears here only once pick/ship takes a lot per line (DRIFT "pick/ship
+    // lots"); until then recall contacts cannot be derived from the ledger.
+    const movements = await rows<LotMovement>(ctx.db.from("inventory_movements").select("id, type, qty, ref, created_at, skus(name), locations(name)")
+      .eq("lot_id", i.lotId).order("created_at"));
+    const run = lot.packaging_runs;
+    const occ = run?.vessel_occupancies;
+    return {
+      lot: { id: lot.id, code: lot.code, brand: lot.brands?.name ?? "", packaged_on: lot.packaged_on, best_by: lot.best_by },
+      run: run ? { id: run.id, run_no: run.run_no, bbl_drawn: run.bbl_drawn, closed_at: run.closed_at, vessel: occ?.vessels?.name ?? "" } : null,
+      batch: occ?.batches ?? null,
+      movements: movements.map((m) => ({ id: m.id, type: m.type, qty: Number(m.qty), ref: m.ref, created_at: m.created_at, sku: m.skus?.name ?? "", location: m.locations?.name ?? "" })),
+    };
+  },
+});
