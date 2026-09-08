@@ -36,7 +36,7 @@ SKU fields in **New Order** use the same search, narrowed to SKUs. They show rec
 | --- | --- |
 | **Admin** | Every staff screen and action that exists. |
 | **Sales** | Catalog; customers and pricing; create, submit, confirm, adjust, and cancel orders, plus credits; view inventory; invoices; replenishment suggestions and creating the replenishment order; the compliance registry, the monthly report and its filed snapshot, and lot trace. |
-| **Warehouse** | View inventory and record movements; keg pools and keg events on **Kegs**; view orders, pick, and ship; build delivery routes, and depart, confirm each stop, and return a route you are the assigned driver of; view replenishment suggestions (**Create replenishment order** is on the page but submitting it returns a permission error); schedule, pick a tank for, start, and close packaging runs, and repack; vendors, materials and contracts; purchase orders (draft, mark sent, receive), material counts, and drafting orders from Planning. Catalog, Customers, the Invoices list, and Team open if you type their address, but they are not in Warehouse's navigation. |
+| **Warehouse** | View inventory and record movements; keg pools and keg events on **Kegs**; view orders, pick, and ship; build delivery routes, and depart, confirm each stop, and return a route you are the assigned driver of; view replenishment suggestions (**Create replenishment order** is on the page but submitting it returns a permission error); schedule, pick a tank for, start, and close packaging runs, and repack; vendors, materials and contracts; purchase orders (draft, mark sent, receive), material counts, and drafting orders from Planning. Catalog, Customers, the Invoices list, and Team open if you type their address, but they are not in Warehouse's navigation. Locations opens the same way; there Warehouse can add, rename, or remove a location's bins, though only Admin can add a location or edit its name and type. |
 | **Brewer** | Today; linking your Slack account from App Home; Recipes and versions; Batches, vessels, and recording brew day; Cellar transfers and fermentation readings; packaging runs (schedule, pick a tank, start, and close) — but not **Repack**, which is Admin and Warehouse only; vendors, materials, contracts and material counts, and reading Planning (drafting the orders is Admin and Warehouse). See [Navigate MGR](#navigation). |
 
 <Callout type="info">
@@ -112,7 +112,7 @@ Wholesale Shop shows the packages the brewery has designated for wholesale — �
   <Card title="Movement log">The 50 newest entries: time, type, SKU, location, signed quantity, and note.</Card>
 </Cards>
 
-**Bins.** A bin is a named place inside a location: a walk-in, a cold room, a dry rack. Every location starts with three, **Cold**, **Dry**, and **Walk-in**, and always keeps at least one; rename or remove the rest to match the building. A bin that has ever recorded stock cannot be removed, even at a zero balance, because the movement history still names it; rename it instead. Beer that ships on an order leaves from the location's first bin alphabetically, so name the bin you pick from so it sorts first.
+**Bins.** A bin is a named place inside a location: a walk-in, a cold room, a dry rack. Every location starts with three, **Cold**, **Dry**, and **Walk-in**, and always keeps at least one; add, rename, or remove them from [Locations](#locations). A bin that has ever recorded stock cannot be removed, even at a zero balance, because the movement history still names it; rename it instead. Beer that ships on an order leaves from the location's first bin alphabetically, so name the bin you pick from so it sorts first.
 
 ### Record a movement
 
@@ -279,7 +279,15 @@ MGR creates a separate credit memo at the prices frozen on the invoice lines, ne
 
 <Screen name="Locations" />
 
-**Locations** (open `/locations`; Settings links here) lists every warehouse and taproom. Admin sees **Add location**: a name and a type, *Warehouse* or *Taproom*. Names are unique within the brewery. Select **Edit** on a row to open the location: its type, the brewery's timezone, and a gated **Location bins** row (bins are not built yet). Admin can rename a location or change its type with **Edit** then **Save location**; movement history stays exactly as recorded.
+**Locations** (open `/locations`; Settings links here; Admin only in navigation, though Warehouse can reach a location directly by its address) lists every warehouse, taproom, and storage location. Admin sees **Add location**: a name and a type, *Warehouse*, *Taproom*, or *Storage*. Names are unique within the brewery. Select **Edit** on a row to open the location: its type, the brewery's timezone, and a **Location bins** row. Only Admin can rename a location or change its type, with **Edit** then **Save location**; movement history stays exactly as recorded.
+
+### Add or rename a bin
+
+<Screen name="Location bins" />
+
+<Screen name="Bin" />
+
+Select **Location bins** on a location to see its bins. Admin and Warehouse can select **Add bin**, or **Edit** on a bin, to enter a **Bin name** and **Save bin**. A location always keeps at least one bin, and a bin that has ever recorded stock keeps its name in the movement history, so both are renamed rather than removed; **Remove** takes out any other bin. See [Bins](#inventory) for the three bins every location starts with.
 
 ## Stock transfers [#transfers]
 
@@ -547,7 +555,7 @@ Do not hunt for hidden controls for these:
 - public account sign-up
 - staff or customer-portal invitations
 - CSV import
-- adding, renaming or removing bins, setting taproom pars, or choosing the warehouse that fulfills wholesale-customer portal orders, from the interface
+- setting taproom pars, or choosing the warehouse that fulfills wholesale-customer portal orders, from the interface
 - cancelling a purchase order, editing one after it is saved, or sending one by email from MGR
 - editing brands, formats, or SKUs after creation
 - deleting customers, ship-tos, inventory history, orders, invoices, or credit memos
