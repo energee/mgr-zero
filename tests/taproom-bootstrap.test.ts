@@ -1,5 +1,5 @@
 import { beforeAll, expect, it, vi } from "vitest";
-import { admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
+import { admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, seedLocation, sql } from "./helpers";
 import { createRequestAuthContext } from "@/lib/auth/request-context";
 import { runCommand, type StaffRole } from "@/lib/commands/registry";
 import "@/lib/commands/all";
@@ -160,4 +160,67 @@ it("keeps direct table DML forbidden even on the role's readable tables", async 
   expect((await ctx.db.from("brands").insert({ brewery_id: ctx.breweryId, name: "Denied raw insert" })).error?.code).toBe("42501");
   expect((await ctx.db.from("notification_preferences").update({ enabled: true }).eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId)).error?.code).toBe("42501");
   expect((await ctx.db.from("inventory_movements").delete().eq("brewery_id", ctx.breweryId)).error?.code).toBe("42501");
+});
+
+it("rejects a real pending snooze callback after Sales becomes Taproom without changing delivery or due state", async () => {
+  const b = await makeBrewery(); const staff = await makeStaffCtx(b.id, "sales");
+  const installation = (await ins("chat_installations", { brewery_id: b.id, provider: "slack", external_installation_id: crypto.randomUUID(), display_label: "Snooze fixture", state: "active", installer_user_id: staff.userId, token_store_key: crypto.randomUUID() })).id;
+  await ins("chat_user_links", { brewery_id: b.id, installation_id: installation, provider: "slack", external_user_id: "U-SNOOZE", user_id: staff.userId, state: "active" });
+  const destination = await ins("notification_destinations", { brewery_id: b.id, installation_id: installation, kind: "personal", external_destination_id: "D-SNOOZE", user_id: staff.userId, privacy_class: "direct" });
+  const customer = await seedCustomer(b.id); const location = await seedLocation(b.id);
+  const order = await ins("orders", { brewery_id: b.id, kind: "wholesale", status: "submitted", customer_id: customer.customerId, ship_to_id: customer.shipToId, sale_channel_id: customer.saleChannelId, from_location_id: location.id, created_by: staff.userId });
+  expect((await admin.rpc("record_submitted_order_occurrence", { p_order: order.id })).error).toBeNull();
+  const occurrence = (await admin.from("notification_occurrences").select("id").eq("subject_id", order.id).single()).data!;
+  const delivery = (await admin.from("notification_deliveries").select("id").eq("occurrence_id", occurrence.id).eq("destination_id", destination.id).single()).data!;
+  const issue = async () => {
+    const result = await admin.rpc("issue_chat_action_intent", { p_installation: installation, p_external_user_id: "U-SNOOZE", p_action: "mgr_snooze", p_delivery: delivery.id });
+    expect(result.error).toBeNull(); expect(result.data).toMatch(/^[0-9a-f-]{36}$/);
+    return result.data as string;
+  };
+  const consume = async (intent: string) => {
+    const receipt = await ins("chat_callback_receipts", { brewery_id: b.id, installation_id: installation, provider: "slack", callback_id: crypto.randomUUID(), callback_kind: "mgr_snooze", external_user_id: "U-SNOOZE", disposition: "pending", payload_hash: "fixture", received_at: new Date().toISOString() });
+    const result = await admin.rpc("consume_chat_action_intent", { p_receipt: receipt.id, p_intent: intent, p_action: "mgr_snooze", p_input: {} });
+    expect(result.error).toBeNull(); return result.data;
+  };
+  // Positive control: this exact delivery has current work and really can snooze.
+  expect(await consume(await issue())).toEqual({ disposition: "processed" });
+  const stale = await issue();
+  const before = (await admin.from("notification_deliveries").select().eq("id", delivery.id).single()).data;
+  const dueBefore = await runCommand("get_today", {}, staff);
+  expect((dueBefore as unknown[]).length).toBeGreaterThan(0);
+  expect((await admin.from("brewery_users").update({ role: "taproom" }).eq("brewery_id", b.id).eq("user_id", staff.userId)).error).toBeNull();
+  expect(await consume(stale)).toEqual({ disposition: "ignored", code: "invalid_action" });
+  expect((await admin.from("notification_deliveries").select().eq("id", delivery.id).single()).data).toEqual(before);
+  expect((await admin.from("notification_occurrences").select("state").eq("id", occurrence.id).single()).data).toEqual({ state: "active" });
+  expect((await admin.from("notification_preferences").select().eq("brewery_id", b.id)).data).toEqual([]);
+  expect((await admin.from("chat_action_intents").select("consumed_at").eq("id", stale).single()).data).toEqual({ consumed_at: null });
+  expect((await admin.rpc("issue_chat_action_intent", { p_installation: installation, p_external_user_id: "U-SNOOZE", p_action: "mgr_snooze", p_delivery: delivery.id })).data).toBeNull();
+});
+
+it("loads complete Taproom stock and names SKUs beyond the catalog response cap", async () => {
+  const brewery = await makeBrewery();
+  const staff = await makeStaffCtx(brewery.id, "taproom");
+  const cat = await seedCatalog(brewery.id);
+  const location = await seedLocation(brewery.id, { kind: "taproom", name: "Big taproom" });
+  const brands = Array.from({ length: 1001 }, (_, n) => ({ id: crypto.randomUUID(), brewery_id: brewery.id, name: `Brand ${n}` }));
+  expect((await admin.from("brands").insert(brands)).error).toBeNull();
+  const skus = Array.from({ length: 1001 }, (_, n) => ({ id: crypto.randomUUID(), brewery_id: brewery.id,
+    brand_id: brands[n].id, format_id: cat.formatId, name: `Stocked SKU ${n}` }));
+  expect((await admin.from("skus").insert(skus)).error).toBeNull();
+  const firstPage = await staff.db.from("skus").select("id").eq("brewery_id", brewery.id);
+  expect(firstPage.error).toBeNull();
+  expect(firstPage.data).toHaveLength(1000);
+  const outside = skus.find(s => !firstPage.data!.some(row => row.id === s.id))!;
+  expect(outside).toBeDefined();
+  const movement = (skuId: string) => ({ brewery_id: brewery.id, sku_id: skuId, location_id: location.id,
+    bin_id: location.binId, qty: 7, type: "opening_balance", created_by: staff.userId });
+  await ins("inventory_movements", movement(outside.id));
+  expect.soft(await runCommand("get_beer_overview", {}, staff)).toEqual({ taproomStock: [
+    { skuId: outside.id, locationId: location.id, sku: outside.name, location: location.name, qty: 7 },
+  ] });
+  expect((await admin.from("inventory_movements").insert(skus.filter(s => s.id !== outside.id).map(s => movement(s.id)))).error).toBeNull();
+  const result = await runCommand("get_beer_overview", {}, staff) as { taproomStock: { skuId: string; sku: string; qty: number }[] };
+  expect(result.taproomStock).toHaveLength(1001);
+  expect(new Set(result.taproomStock.map(s => s.skuId)).size).toBe(1001);
+  expect(result.taproomStock.every(s => s.sku === skus.find(row => row.id === s.skuId)?.name && s.qty === 7)).toBe(true);
 });

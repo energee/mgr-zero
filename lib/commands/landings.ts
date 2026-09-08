@@ -5,7 +5,7 @@
 // filters it. Both read through the RLS-bound ctx.db and refuse nothing: a
 // role that may not open an area simply gets no rows from it.
 import { z } from "zod";
-import { canRun, defineQuery, runCommand, STAFF_ROLES, unwrap } from "./registry";
+import { canRun, CommandError, defineQuery, runCommand, STAFF_ROLES, unwrap } from "./registry";
 import type { TodayItem } from "./today";
 import { poNo } from "@/lib/mgr/doc-no";
 import { plural } from "@/lib/mgr/plural";
@@ -42,15 +42,33 @@ defineQuery({
   handler: async (ctx) => {
     const b = ctx.breweryId;
     if (ctx.role === "taproom") {
-      const [stock, skus, locations] = await Promise.all([
-        unwrap(ctx.db.from("on_hand").select("sku_id, location_id, qty").eq("brewery_id", b)),
-        unwrap(ctx.db.from("skus").select("id, name").eq("brewery_id", b)),
-        unwrap(ctx.db.from("locations").select("id, name").eq("brewery_id", b)),
+      const stock: { sku_id: string; location_id: string; qty: number }[] = [];
+      let total: number | undefined;
+      do {
+        const response = await ctx.db.from("on_hand").select("sku_id, location_id, qty", { count: "exact" })
+          .eq("brewery_id", b).order("sku_id").order("location_id").range(stock.length, stock.length + 499);
+        const rows = await unwrap(Promise.resolve(response));
+        if (response.count === null || (total !== undefined && response.count !== total) || !rows || (!rows.length && stock.length < response.count)) {
+          throw new CommandError("Stock changed while loading. Reload to review it.", 409, "conflict");
+        }
+        total = response.count;
+        stock.push(...rows);
+      } while (stock.length < total);
+      // Resolve only referenced labels in bounded batches, through the same RLS boundary.
+      async function names(table: "skus" | "locations", ids: string[]) {
+        const labels = new Map<string, string>();
+        for (let start = 0; start < ids.length; start += 100) {
+          const rows = await unwrap(ctx.db.from(table).select("id, name").eq("brewery_id", b).in("id", ids.slice(start, start + 100)));
+          for (const row of rows ?? []) labels.set(row.id, row.name);
+        }
+        return labels;
+      }
+      const [skuNames, locationNames] = await Promise.all([
+        names("skus", [...new Set(stock.map(s => s.sku_id))]),
+        names("locations", [...new Set(stock.map(s => s.location_id))]),
       ]);
-      const skuNames = new Map((skus ?? []).map(s => [s.id, s.name]));
-      const locationNames = new Map((locations ?? []).map(l => [l.id, l.name]));
-      return { taproomStock: (stock ?? []).map(s => ({ skuId: s.sku_id, locationId: s.location_id,
-        sku: skuNames.get(s.sku_id) ?? "", location: locationNames.get(s.location_id) ?? "", qty: Number(s.qty) })) };
+      return { taproomStock: stock.map(s => ({ skuId: s.sku_id, locationId: s.location_id,
+        sku: skuNames.get(s.sku_id) ?? s.sku_id, location: locationNames.get(s.location_id) ?? s.location_id, qty: Number(s.qty) })) };
     }
     const [fgShortages, pars, onHand, openOccupancies, materialShortages, kegs] = await Promise.all([
       count(ctx.db.from("atp").select("sku_id", { count: "exact", head: true }).eq("brewery_id", b).lt("qty", 0)),
