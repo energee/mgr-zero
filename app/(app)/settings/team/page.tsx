@@ -1,7 +1,3 @@
-// app/(app)/settings/team/page.tsx — Team (screen record): the roster as
-// @handles from list_team_members, your own row marked "you", every other row
-// opening the Team member sheet (member-form.tsx). Invite staff stays gated
-// until Program 11 closes the invitation workflow gate (ARCHITECTURE.md).
 import { redirect } from "next/navigation";
 import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -11,6 +7,7 @@ import { runCommand } from "@/lib/commands/registry";
 import { getRequestIdentity } from "@/lib/auth/request-context";
 import { deniedHref } from "@/lib/mgr/denied";
 import "@/lib/commands/all";
+import { InviteForm } from "./invite-form";
 import { MemberForm } from "./member-form";
 
 export default async function TeamPage() {
@@ -23,7 +20,7 @@ export default async function TeamPage() {
       {members.map((m) => m.userId === identity?.userId
         ? <div key={m.userId}>{E.row(m.handle, `${m.email} · ${m.role}`, "you")}</div>
         : <MemberForm key={m.userId} member={m} />)}
-      {E.gated("Invite staff", "invitations aren’t available yet")}
+      <InviteForm />
     </>
   );
 }

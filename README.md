@@ -58,6 +58,15 @@ limiting on `/api/command`: not yet implemented (authz audit A1).
 `development` (`lib/env/server-parser.ts`). Vercel sets it on deploys; locally
 it is normally absent.
 
+`MGR_DEDICATED=1` hides and rejects the hosted-web **Create brewery** page and action.
+It does not block authenticated API provisioning or database bootstrap. Omit it
+for the hosted web entry.
+
+Local Auth configs allow password-recovery callbacks on localhost and 127.0.0.1,
+ports 3000 and 3002, under `/auth/confirm`. Restart the relevant local Supabase
+stack after changing its redirect allowlist. Hosted Auth needs its own approved
+origin and invitation template when deployment is configured.
+
 Apply migrations and seed a dev user/brewery:
 
 ```bash

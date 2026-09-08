@@ -1,14 +1,10 @@
-// app/(app)/customers/[id]/page.tsx — Customer detail (screen record): one
-// account's facts with Edit → customer-form.tsx, its ship-tos with
-// ship-to-form.tsx, and links to its keg balance and orders. Portal-user
-// invites stay gated until Program 11. An unknown or malformed id renders
-// not-found.tsx.
 import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
+import { InviteForm } from "../../settings/team/invite-form";
 import { CustomerForm } from "../customer-form";
 import { ShipToForm } from "../ship-to-form";
 
@@ -41,7 +37,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         <div key={s.id}>{E.row(s.label, `${s.address1}${s.address2 ? `, ${s.address2}` : ""} · ${s.city}, ${s.state} ${s.zip}`, <ShipToForm customerId={customer.id} shipTo={s} />)}</div>
       ))}
       <ShipToForm customerId={customer.id} />
-      {E.gated("Portal users", "invitations aren’t available yet")}
+      {(brewery.role === "admin" || brewery.role === "sales") && <InviteForm customerId={customer.id} />}
       {E.row("Customer keg balance", "kegs out and deposits held", E.act("Open", "primary", `/kegs/customers/${customer.id}`))}
     </>
   );

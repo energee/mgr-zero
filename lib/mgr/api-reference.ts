@@ -20,7 +20,7 @@ export const opsEnd = (key: string) => `{/* end ops:${key} */}`;
 
 /** The request body a caller sends: the envelope, with this operation's input. */
 function exampleBody(o: ApiOperation, input: Record<string, unknown>) {
-  const body: Record<string, unknown> = { breweryId: "00000000-0000-0000-0000-000000000000", name: o.name };
+  const body: Record<string, unknown> = { ...(o.scope === "pretenant" ? {} : { breweryId: "00000000-0000-0000-0000-000000000000" }), name: o.name };
   // Only a write needs a client-generated request id; a query may omit it.
   if (o.kind === "command") body.requestId = "11111111-1111-1111-1111-111111111111";
   body.input = input;
@@ -39,7 +39,9 @@ function available(o: ApiOperation) {
       : "Takes no input.",
   );
 
-  const body = exampleBody(o, schema ? sampleInput(schema) : {});
+  const input = schema ? sampleInput(schema) : {};
+  if (o.name === "provision_brewery") input.timezone = "America/New_York";
+  const body = exampleBody(o, input);
   parts.push(
     ["```bash", `curl -X POST "$MGR_URL/api/command" \\`, `  -H 'content-type: application/json' \\`,
      `  -H "authorization: Bearer $MGR_TOKEN" \\`, `  -d '${body.replace(/\n\s*/g, " ")}'`, "```"].join("\n"),
@@ -108,7 +110,7 @@ export function renderRoleMatrix(): string {
       // by name alone would tick nothing and document an operation open to
       // everyone as callable by nobody.
       const roles = o.roles ?? "";
-      const cells = ROLES.map((r) => (roles === "any" || roles.split(", ").includes(r) ? "✓" : ""));
+      const cells = ROLES.map((r) => (o.scope !== "pretenant" && (roles === "any" || roles.split(", ").includes(r)) ? "✓" : ""));
       const area = API_AREAS.find((a) => a.slug === areaOf(o.name));
       return `| \`${o.name}\` | ${area?.title ?? ""} | ${cells.join(" | ")} |`;
     });
