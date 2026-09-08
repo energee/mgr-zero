@@ -68,6 +68,14 @@ A matching count still saves its date, author, and all observations. Shortages p
 
 Saved counts cannot yet be corrected. If a submitted count is wrong, ask Admin to investigate; a generic inventory adjustment does not reverse that count's recorded depletion or its tax reporting.
 
+## Tap intervals [#tap-intervals]
+
+Admin, Warehouse, and Taproom can record taps through the [command API](/docs/api#taproom). The tap board page is not available yet. Open a keg at a taproom location with its packaged keg SKU, or supply a guest name and nominal size in BBL. Own keg size comes from its format and stays fixed for that interval. A guest always shows as not in inventory; an own keg also receives that flag when its taproom has no positive stock. Tapping never changes inventory.
+
+Opening fill is about ¼, ½, 60%, or full. A tap number is optional and can repeat. Kick closes an interval with a reason and estimated remaining fill: empty, about ¼, or about ½. Swap closes and replaces it in one action. Omit the incoming keg to reuse the outgoing own SKU; a guest replacement always requires an explicit name and size. An omitted replacement number leaves the new interval unnumbered.
+
+Retry an unchanged action with the same request ID to recover its original result, even after another action. A new action against an already closed interval is refused and reports the closing actor ID and time. Open taps includes every interval, with unnumbered entries last; recent history returns the latest 50 closed intervals with actor IDs, @handles, and times. These fill estimates do not change counts or inventory. No POS yield or remaining-volume bar is supplied.
+
 ## Navigate MGR [#navigation]
 
 <Screen name="Today" />

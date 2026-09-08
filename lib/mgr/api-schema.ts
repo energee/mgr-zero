@@ -67,6 +67,8 @@ function baseLabel(node: any): string {
     case "number":
       return format.includes("safeint") || format.includes("int") ? "integer" : "number";
     case "boolean": return "boolean";
+    case "literal": return inner.def.values.map(String).join(" or ");
+    case "union": return inner.def.options.map(typeLabel).join(" or ");
     case "enum": return Object.keys(inner.def.entries ?? {}).join(" or ");
     case "array": return `array of ${typeLabel(inner.def.element)}`;
     case "object": return "object";
@@ -108,6 +110,8 @@ export function sampleValue(node: any): unknown {
       return fit;
     }
     case "boolean": return true;
+    case "literal": return inner.def.values[0];
+    case "union": return sampleValue(inner.def.options[0]);
     case "enum": return Object.keys(inner.def.entries ?? {})[0];
     case "array": return [sampleValue(inner.def.element)];
     case "object": return sampleInput(inner);

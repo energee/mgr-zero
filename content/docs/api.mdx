@@ -236,6 +236,7 @@ omitted. They have no roles until they are built.
 | `import_csv` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `invite_customer_user` | Customers | ✓ | ✓ |  |  |  |  |
 | `invite_staff` | Team & brewery settings | ✓ |  |  |  |  |  |
+| `kick_keg` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
 | `list_batches` | Production | ✓ |  |  | ✓ |  |  |
 | `list_bins` | Inventory & locations | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `list_brands` | Catalog & pricing | ✓ | ✓ | ✓ | ✓ | ✓ |  |
@@ -255,6 +256,7 @@ omitted. They have no roles until they are built.
 | `list_materials` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |  |
 | `list_movements` | Inventory & locations | ✓ | ✓ | ✓ |  |  |  |
 | `list_occupancies` | Packaging | ✓ |  | ✓ | ✓ |  |  |
+| `list_open_taps` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
 | `list_orders` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |  |
 | `list_packaging_runs` | Packaging | ✓ |  | ✓ | ✓ |  |  |
 | `list_price_groups` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |  |
@@ -265,6 +267,7 @@ omitted. They have no roles until they are built.
 | `list_skus` | Catalog & pricing | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `list_standing_allocations` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |  |
 | `list_stock_transfers` | Inventory & locations | ✓ | ✓ | ✓ |  |  |  |
+| `list_tap_history` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
 | `list_team_members` | Team & brewery settings | ✓ | ✓ | ✓ |  |  |  |
 | `list_vendors` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |  |
 | `list_vendors_and_contracts` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |  |
@@ -322,6 +325,8 @@ omitted. They have no roles until they are built.
 | `snooze_notification` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |  |
 | `submit_order` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
 | `submit_stock_transfer` | Inventory & locations | ✓ |  | ✓ |  |  |  |
+| `swap_keg` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
+| `tap_keg` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
 | `trace_lot` | Compliance | ✓ | ✓ |  |  |  |  |
 | `unlink_chat_user` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `update_bin` | Inventory & locations | ✓ |  | ✓ |  |  |  |
@@ -2323,6 +2328,25 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_taproom_count_snapshot", "input": { "locationId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
+#### kick_keg [#kick_keg]
+
+`command` · admin, warehouse, taproom
+
+Close an open keg interval with estimated remaining fill (empty, quarter or half) and a reason. Does not change inventory
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `openIntervalId` | uuid | yes |
+| `closeFill` | 0 or 0.25 or 0.5 | yes |
+| `reason` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "kick_keg", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "openIntervalId": "00000000-0000-0000-0000-000000000000", "closeFill": 0, "reason": "string" } }'
+```
+
 #### list_keg_events [#list_keg_events]
 
 `query` · admin, warehouse
@@ -2354,6 +2378,40 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_keg_pools", "input": {} }'
+```
+
+#### list_open_taps [#list_open_taps]
+
+`query` · admin, warehouse, taproom
+
+All open intervals at one taproom, numbered first; frozen size, fill, safe SKU and brand labels, stock flag and opening actor ID/handle/time. No POS yield or remaining-volume estimate
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_open_taps", "input": { "locationId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+#### list_tap_history [#list_tap_history]
+
+`query` · admin, warehouse, taproom
+
+The latest 50 closed intervals at one taproom with opening and closing actor IDs, safe handles, times, frozen nominal size, fill and reason
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_tap_history", "input": { "locationId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### record_keg_event [#record_keg_event]
@@ -2436,6 +2494,48 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_taproom_par", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "locationId": "00000000-0000-0000-0000-000000000000", "skuId": "00000000-0000-0000-0000-000000000000", "parQty": 1 } }'
 ```
 
+#### swap_keg [#swap_keg]
+
+`command` · admin, warehouse, taproom
+
+Atomically close the outgoing interval and open its replacement at the same location. incomingKeg is {skuId} or {label, nominalBbl}; omission defaults to the outgoing own SKU, while guests require explicit identity. Exact retries return the original pair. Does not change inventory
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `openIntervalId` | uuid | yes |
+| `incomingOpeningFill` | 0.25 or 0.5 or 0.6 or 1 | yes |
+| `closeFill` | 0 or 0.25 or 0.5 | yes |
+| `reason` | string | yes |
+| `incomingKeg` | object or object | no |
+| `tapNumber` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "swap_keg", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "openIntervalId": "00000000-0000-0000-0000-000000000000", "incomingOpeningFill": 0.25, "closeFill": 0, "reason": "string" } }'
+```
+
+#### tap_keg [#tap_keg]
+
+`command` · admin, warehouse, taproom
+
+Open a keg interval at an owned taproom. keg is {skuId} for an own packaged keg or {label, nominalBbl} for a guest; freezes size and flags absent stock. Optional tap numbers may repeat. Does not change inventory
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+| `keg` | object or object | yes |
+| `openingFill` | 0.25 or 0.5 or 0.6 or 1 | yes |
+| `tapNumber` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "tap_keg", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "locationId": "00000000-0000-0000-0000-000000000000", "keg": { "skuId": "00000000-0000-0000-0000-000000000000" }, "openingFill": 0.25 } }'
+```
+
 #### update_keg_pool [#update_keg_pool]
 
 `command` · admin, warehouse
@@ -2457,21 +2557,6 @@ curl -X POST "$MGR_URL/api/command" \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "update_keg_pool", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "poolId": "00000000-0000-0000-0000-000000000000" } }'
 ```
-
----
-
-**Designed, not yet available** {/* taproom-designed */}
-
-13 of the 17 operations in this area are available today; the 4 below are not.
-
-The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
-
-| Operation | Kind | Needed by |
-| --- | --- | --- |
-| `kick_keg` | command | Tap board, Kick keg |
-| `list_open_taps` | query | Tap board, Kick keg, Swap keg |
-| `swap_keg` | command | Tap board, Swap keg |
-| `tap_keg` | command | Tap board |
 
 {/* end ops:taproom */}
 

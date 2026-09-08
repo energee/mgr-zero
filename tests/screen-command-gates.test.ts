@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "@/components/mgr/screens";
 import { getCommandDefinition } from "@/lib/commands/registry";
-import { taggedOperations } from "@/lib/mgr/screen-routes";
+import { isUngated, taggedOperations } from "@/lib/mgr/screen-routes";
 import "@/lib/commands/all";
 
 const TAGGED = /\[(SCHEMA-GATE|IMPLEMENTATION-GATE|client state|platform|view|[^\]]*design)/i;
@@ -30,4 +30,10 @@ describe("ungated screen writes", () => {
     const jsx = SCREENS.filter((s) => typeof s.writes !== "string").map((s) => s.name);
     expect(jsx).toEqual([]);
   });
+});
+
+
+it("keeps interval pages gated while their command API is available", () => {
+  for (const name of ["tap_keg", "kick_keg", "swap_keg", "list_open_taps"]) expect(getCommandDefinition(name)).toBeDefined();
+  for (const name of ["Tap board", "Kick keg", "Swap keg"]) expect(isUngated(SCREENS.find(s => s.name === name)!)).toBe(false);
 });

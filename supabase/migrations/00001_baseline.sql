@@ -116,7 +116,7 @@ $$ select role from public.brewery_users where user_id = auth.uid() and brewery_
 create function taproom_can(b uuid, t text) returns boolean
 language sql stable security definer set search_path = '' as $$
   select public.staff_role(b) = 'taproom' and t = any(array[
-    'locations','bins','inventory_movements','taproom_pars','taproom_counts','taproom_count_lines',
+    'locations','bins','inventory_movements','taproom_pars','taproom_counts','taproom_count_lines','tap_intervals',
     'brands','formats','format_components','skus','keg_pools',
     'pos_locations','pos_item_mappings','pos_sales']);
 $$;
@@ -7598,3 +7598,133 @@ grant execute on function
   get_chat_installation_lifecycle(uuid),
   prune_chat_integration_logs(interval)
   to service_role;
+
+-- Tap state is an interval, not inventory and not a unique physical line.
+create table tap_intervals (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references breweries(id),
+  location_id uuid not null,
+  tap_number text check (length(btrim(tap_number)) between 1 and 80),
+  sku_id uuid,
+  label text,
+  nominal_bbl numeric not null check (nominal_bbl > 0 and nominal_bbl::text not in ('NaN','Infinity','-Infinity')),
+  opening_fill numeric not null check (opening_fill in (.25,.5,.6,1)),
+  closing_fill numeric check (closing_fill in (0,.25,.5)),
+  not_in_inventory boolean not null,
+  opened_at timestamptz not null default now(),
+  opened_by uuid not null references auth.users(id),
+  closed_at timestamptz,
+  closed_by uuid references auth.users(id),
+  close_reason text,
+  unique (id,brewery_id),
+  foreign key (location_id,brewery_id) references locations(id,brewery_id),
+  foreign key (sku_id,brewery_id) references skus(id,brewery_id),
+  check ((sku_id is not null and label is null) or (sku_id is null and label is not null and length(btrim(label)) between 1 and 200 and not_in_inventory)),
+  check ((closed_at is null and closed_by is null and closing_fill is null and close_reason is null)
+    or (closed_at is not null and closed_at >= opened_at and closed_by is not null and closing_fill is not null and close_reason is not null and length(btrim(close_reason)) between 1 and 200))
+);
+create index tap_intervals_location_idx on tap_intervals(brewery_id,location_id,opened_at desc);
+create index tap_intervals_open_idx on tap_intervals(brewery_id,location_id) where closed_at is null;
+alter table tap_intervals enable row level security;
+create policy staff_read on tap_intervals for select using (public.is_staff_of(brewery_id) or public.taproom_can(brewery_id,'tap_intervals'));
+revoke all on tap_intervals from public,anon,authenticated;
+grant select on tap_intervals to authenticated;
+grant all on tap_intervals to service_role;
+
+create function private.open_tap(p_brewery uuid,p_location uuid,p_sku uuid,p_label text,p_nominal_bbl numeric,p_tap_number text,p_opening_fill numeric,p_actor uuid)
+returns jsonb language plpgsql set search_path = '' as $$
+declare v_nominal numeric; v_format uuid; v_untracked boolean; v_row public.tap_intervals;
+begin
+  perform 1 from public.locations where id=p_location and brewery_id=p_brewery and kind='taproom' for share;
+  if not found then raise exception 'choose an owned taproom location'; end if;
+  if p_sku is null then
+    if p_label is null or p_nominal_bbl is null then raise exception 'guest keg requires a label and nominal size'; end if;
+    v_nominal:=p_nominal_bbl; v_untracked:=true;
+  else
+    if p_label is not null or p_nominal_bbl is not null then raise exception 'own keg uses its SKU label and format volume'; end if;
+    -- Hold the authoritative identity and volume against concurrent catalog edits.
+    select f.id into v_format from public.skus s join public.formats f on f.id=s.format_id and f.brewery_id=s.brewery_id
+      where s.id=p_sku and s.brewery_id=p_brewery and f.basis='packaged' and f.package_type='keg' for share of s,f;
+    if v_format is null then raise exception 'choose an owned packaged keg SKU'; end if;
+    -- Component replacement locks its parent; child volume edits lock each child.
+    perform 1 from public.format_components c join public.formats f on f.id=c.child_format_id and f.brewery_id=c.brewery_id
+      where c.parent_format_id=v_format and c.brewery_id=p_brewery order by f.id for share of f;
+    select bbl_per_unit into v_nominal from public.format_volumes where id=v_format and brewery_id=p_brewery;
+    if v_nominal is null then raise exception 'keg format needs a nominal volume'; end if;
+    select coalesce(sum(qty),0)<=0 into v_untracked from public.inventory_movements where brewery_id=p_brewery and location_id=p_location and sku_id=p_sku;
+  end if;
+  insert into public.tap_intervals(brewery_id,location_id,sku_id,label,nominal_bbl,tap_number,opening_fill,not_in_inventory,opened_by)
+    values(p_brewery,p_location,p_sku,btrim(p_label),v_nominal,btrim(p_tap_number),p_opening_fill,v_untracked,p_actor) returning * into v_row;
+  return to_jsonb(v_row);
+end $$;
+
+create function private.close_tap(p_brewery uuid,p_interval uuid,p_closing_fill numeric,p_reason text,p_actor uuid)
+returns jsonb language plpgsql set search_path = '' as $$
+declare v_row public.tap_intervals;
+begin
+  select * into v_row from public.tap_intervals where id=p_interval and brewery_id=p_brewery for update;
+  if not found then raise exception 'tap interval not found'; end if;
+  if v_row.closed_at is not null then raise exception 'Keg already closed by % at %; refresh the tap board',v_row.closed_by,v_row.closed_at using errcode='MG409'; end if;
+  update public.tap_intervals set closed_at=now(),closed_by=p_actor,closing_fill=p_closing_fill,close_reason=btrim(p_reason)
+    where id=p_interval and brewery_id=p_brewery returning * into v_row;
+  return to_jsonb(v_row);
+end $$;
+
+create function tap_keg(p_brewery uuid,p_location uuid,p_sku uuid,p_label text,p_nominal_bbl numeric,p_tap_number text,p_opening_fill numeric,p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid; v_replay jsonb;
+begin
+  v_actor:=private.assert_staff(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
+  v_replay:=private.claim_command_request(p_brewery,'tap_keg',p_request_id,jsonb_build_array(p_location,p_sku,btrim(p_label),p_nominal_bbl,btrim(p_tap_number),p_opening_fill));
+  if v_replay is not null then return v_replay; end if;
+  return private.complete_command_request(p_request_id,private.open_tap(p_brewery,p_location,p_sku,p_label,p_nominal_bbl,p_tap_number,p_opening_fill,v_actor));
+end $$;
+create function kick_keg(p_brewery uuid,p_interval uuid,p_closing_fill numeric,p_reason text,p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid; v_replay jsonb;
+begin
+  v_actor:=private.assert_staff(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
+  v_replay:=private.claim_command_request(p_brewery,'kick_keg',p_request_id,jsonb_build_array(p_interval,p_closing_fill,btrim(p_reason)));
+  if v_replay is not null then return v_replay; end if;
+  return private.complete_command_request(p_request_id,private.close_tap(p_brewery,p_interval,p_closing_fill,p_reason,v_actor));
+end $$;
+create function swap_keg(p_brewery uuid,p_interval uuid,p_closing_fill numeric,p_reason text,p_sku uuid,p_label text,p_nominal_bbl numeric,p_tap_number text,p_opening_fill numeric,p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid; v_replay jsonb; v_outgoing jsonb; v_incoming jsonb; v_sku uuid;
+begin
+  v_actor:=private.assert_staff(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
+  v_replay:=private.claim_command_request(p_brewery,'swap_keg',p_request_id,jsonb_build_array(p_interval,p_closing_fill,btrim(p_reason),p_sku,btrim(p_label),p_nominal_bbl,btrim(p_tap_number),p_opening_fill));
+  if v_replay is not null then return v_replay; end if;
+  v_outgoing:=private.close_tap(p_brewery,p_interval,p_closing_fill,p_reason,v_actor);
+  v_sku:=p_sku;
+  if p_sku is null and p_label is null and p_nominal_bbl is null then v_sku:=(v_outgoing->>'sku_id')::uuid; end if;
+  v_incoming:=private.open_tap(p_brewery,(v_outgoing->>'location_id')::uuid,v_sku,p_label,p_nominal_bbl,p_tap_number,p_opening_fill,v_actor);
+  return private.complete_command_request(p_request_id,jsonb_build_object('outgoing',v_outgoing,'incoming',v_incoming));
+end $$;
+
+create function list_open_taps(p_brewery uuid,p_location uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform private.assert_staff(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
+  if not exists(select 1 from public.locations where id=p_location and brewery_id=p_brewery and kind='taproom') then raise exception 'choose an owned taproom location'; end if;
+  return (select coalesce(jsonb_agg(to_jsonb(t)||jsonb_build_object('sku_name',s.name,'brand_id',s.brand_id,'brand_name',b.name,'opened_by_label',split_part(u.email,'@',1))
+    order by t.tap_number nulls last,t.opened_at,t.id),'[]'::jsonb)
+    from public.tap_intervals t left join public.skus s on s.id=t.sku_id and s.brewery_id=t.brewery_id
+    left join public.brands b on b.id=s.brand_id and b.brewery_id=t.brewery_id
+    left join auth.users u on u.id=t.opened_by
+    where t.brewery_id=p_brewery and t.location_id=p_location and t.closed_at is null);
+end $$;
+create function list_tap_history(p_brewery uuid,p_location uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform private.assert_staff(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
+  if not exists(select 1 from public.locations where id=p_location and brewery_id=p_brewery and kind='taproom') then raise exception 'choose an owned taproom location'; end if;
+  return (select coalesce(jsonb_agg(to_jsonb(t)||jsonb_build_object('opened_by_label',split_part(o.email,'@',1),
+    'closed_by_label',split_part(c.email,'@',1),'sku_name',s.name,'brand_name',b.name) order by t.closed_at desc,t.id),'[]'::jsonb) from
+    (select * from public.tap_intervals where brewery_id=p_brewery and location_id=p_location and closed_at is not null order by closed_at desc,id limit 50) t
+    left join auth.users o on o.id=t.opened_by left join auth.users c on c.id=t.closed_by
+    left join public.skus s on s.id=t.sku_id and s.brewery_id=t.brewery_id left join public.brands b on b.id=s.brand_id and b.brewery_id=t.brewery_id);
+end $$;
+revoke all on function private.open_tap(uuid,uuid,uuid,text,numeric,text,numeric,uuid),private.close_tap(uuid,uuid,numeric,text,uuid) from public,anon,authenticated,service_role;
+revoke all on function tap_keg(uuid,uuid,uuid,text,numeric,text,numeric,uuid),kick_keg(uuid,uuid,numeric,text,uuid),swap_keg(uuid,uuid,numeric,text,uuid,text,numeric,text,numeric,uuid),list_open_taps(uuid,uuid),list_tap_history(uuid,uuid) from public,anon,authenticated,service_role;
+grant execute on function tap_keg(uuid,uuid,uuid,text,numeric,text,numeric,uuid),kick_keg(uuid,uuid,numeric,text,uuid),swap_keg(uuid,uuid,numeric,text,uuid,text,numeric,text,numeric,uuid),list_open_taps(uuid,uuid),list_tap_history(uuid,uuid) to authenticated;

@@ -919,28 +919,30 @@ different answers to "what are we selling right now". A published menu is also
 the ownership boundary: MGR's catalog holds test batches and unannounced beer,
 so a public site must consume a menu, never the catalog.
 
-### 16.8 `keg_taps` — new, optional
+### 16.8 `tap_intervals` — optional tap state
 
-Two events bracketing an interval. **Neither posts a movement** — tapping opens
-an interval, kicking closes it, and nothing reaches the ledger either way
-(§16.15). Depletion comes from the physical count.
+Two events bracket an interval. Neither posts a movement: physical counts own
+inventory depletion (§16.15). Program 12 implements the §16.13/§16.16 contract:
 
 ```
-keg_taps (
-  id, brewery_id, sku_id, lot_id, bin_id,
-  opened_at, closed_at, close_reason,        -- 'blown' | 'dumped' | 'returned'
-  open_fill  numeric(3,2) default 1.00,      -- coarse: 1, .75, .5, .25, heel
-  close_fill numeric(3,2) default 0.00,
-  tap_label text                             -- free text, unvalidated, never an FK
+tap_intervals (
+  id, brewery_id, location_id, tap_number, sku_id, label, nominal_bbl,
+  opening_fill, opened_at, opened_by,
+  closing_fill, closed_at, closed_by, close_reason, not_in_inventory
 )
--- sku_id, lot_id, bin_id are §0 composite (x_id, brewery_id) FKs.
--- keg_taps_open_idx (brewery_id) where closed_at is null — the board, the
--- compare-and-swap guard and the realtime filter all select on it
--- (same shape as occupancies_open_idx / allocations_open_idx).
 ```
 
-Yield = poured bbl ÷ (`formats.bbl_per_unit` × (`open_fill` − `close_fill`)). A half bbl
-is 124 × 16oz on paper and 112–120 in life; a keg reading 95 has a problem.
+Location and optional SKU have composite tenant FKs. Numbers are optional and
+nonunique. Own SKUs must use a packaged keg format; nominal BBL is frozen from
+that format under a catalog lock at opening. Guests require a label and positive
+finite nominal BBL with no fake SKU. Guests and own kegs without positive stock
+are flagged not in inventory. Opening chips are .25/.5/.6/1; closing chips are
+0/.25/.5. Fill remains a coarse report estimate. No lot/bin identity or printed
+lot lookup is added. Open queries aggregate all intervals without an API row cap;
+closed history is bounded to 50 intervals with actor IDs and times.
+
+Future yield uses frozen nominal BBL and fill estimates; it requires POS serving
+volume and is not supplied by the interval API.
 
 **Fill levels are estimates for a report, never ledger quantities.** They must
 never reach `inventory_movements`, because `bbl` feeds excise math and a rough
@@ -1259,10 +1261,10 @@ to the read side instead of a CHECK (§16.11).
 4. Remaining fill is three chips — Empty, about ¼, about ½ — as Kick keg and
    Swap keg already draw. No weighing; a report estimate stays coarse.
 
-Guest kegs (DRIFT §16.13): `keg_taps` gains a free-text `label` and
-`nominal_bbl` so a keg with no brand or SKU still yields. Kicking a guest keg
-already on the board works now; tapping a new one stays SCHEMA-GATE until the
-columns land in Program 12.
+Guest kegs (§16.13): `tap_intervals` stores a free-text `label` and positive
+finite `nominal_bbl` with no fake SKU. Program 12 provides guest tap/kick/swap
+through the command API; the board UI stays gated until implemented. Yield
+requires the later POS reporting contract.
 
 Nothing in §16.16 is open.
 

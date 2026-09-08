@@ -35,7 +35,7 @@ export const API_AREAS = [
   { slug: "production", title: "Production", match: /(batch|brew_day|cellar|vessel|fermentation|recipe|water_profile)/ },
   { slug: "catalog", title: "Catalog & pricing", match: /(product|sku|brand|price|sale_channel|sales_channel)/ },
   { slug: "packaging", title: "Packaging", match: /(packaging_run|format|repack|occupanc)/ },
-  { slug: "taproom", title: "Taproom & kegs", match: /(keg|taproom|_taps|replenishment)/ },
+  { slug: "taproom", title: "Taproom & kegs", match: /(keg|taproom|_taps|tap_history|replenishment)/ },
   { slug: "delivery", title: "Delivery & routes", match: /(route|delivery|shipment|depart)/ },
   { slug: "orders", title: "Orders & invoicing", match: /(order|invoice|pick|allocation|credit_memo|restock)/ },
   { slug: "inventory", title: "Inventory & locations", match: /(movement|on_hand|atp|bin|location|count|inventory|transfer)/ },

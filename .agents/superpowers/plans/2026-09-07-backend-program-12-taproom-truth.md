@@ -90,9 +90,9 @@ create table tap_intervals (
   brewery_id uuid not null references breweries(id),
   location_id uuid not null,
   tap_number text,                 -- optional, not unique
-  sku_id uuid,                     -- null when not_in_inventory guest (gated create)
+  sku_id uuid,                     -- null only for explicit guest identity
   label text,                      -- guest name; null when sku_id set
-  nominal_bbl numeric,
+  nominal_bbl numeric not null,    -- positive finite; frozen format BBL for own SKU
   opening_fill numeric not null default 1 check (opening_fill in (0.25,0.5,0.6,1)),
   closing_fill numeric check (closing_fill in (0,0.25,0.5)),
   not_in_inventory boolean not null default false,
@@ -105,11 +105,12 @@ create table tap_intervals (
 );
 ```
 
-- `swap_keg({ openIntervalId, incomingSkuId, tapNumber?, incomingOpeningFill?, closeFill, closeReason? })` one RPC: update A `closed_at` where `id = openIntervalId and closed_at is null` (0 rows → raise `'already swapped'`), insert B. No inventory_movements.
+- `swap_keg({ openIntervalId, incomingKeg?, tapNumber?, incomingOpeningFill, closeFill, reason })` one RPC: update A `closed_at` where `id = openIntervalId and closed_at is null` (0 rows → raise `'already swapped'`), insert B. No inventory_movements.
 - `kick_keg({ openIntervalId, closeFill, reason })` close only.
-- `tap_keg({ skuId, locationId, tapNumber?, openingFill })` open on empty tap.
+- `tap_keg({ keg: { skuId } | { label, nominalBbl }, locationId, tapNumber?, openingFill })` open on empty tap.
 - `list_open_taps({ locationId })`
-- Guest create (`not_in_inventory` + label + nominal_bbl) ungates when label and nominal size are stored; kick of an existing guest interval is allowed.
+- Guest identity is `{ label, nominalBbl }`; own identity is `{ skuId }`. Omitted incoming identity defaults only to an outgoing own SKU. Guest swaps require explicit identity. The server derives `not_in_inventory`; no inventory writes.
+- Successful exact replay precedes lifecycle CAS; changed payload conflicts. `list_tap_history({ locationId })` returns the latest 50 closed intervals with actor IDs and times. UI gates remain until the board is built.
 
 - [ ] **Step 1:** Swap twice with the same `openIntervalId` — second raises already swapped. Kick leaves remaining open stock (no ledger). list_open_taps returns B not A.
 

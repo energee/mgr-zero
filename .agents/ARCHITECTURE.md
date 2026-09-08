@@ -11,6 +11,7 @@ never copy it into a second place.
 | `supabase/migrations/*.sql` | Schema, RLS policies, triggers, grants, and the transactional command-request ledger. The only source of truth for data rules. Pre-deploy, the baseline is edited in place (see `.agents/superpowers/specs/2026-08-31-mgr-schema-decisions.md`). Application roles have read-only table access; every mutation enters through an explicitly granted, idempotent `security definer` RPC with `search_path = ''`, database-derived actor/tenant/role checks, and a canonical request hash. Private helpers and implementation functions are not executable by application roles. |
 | `lib/commands/registry.ts` | `defineCommand` / `defineQuery`, `Ctx`, role checks, `CommandError`. Every domain operation the app performs is registered here. |
 | `lib/commands/<area>.ts` | Business logic per area (catalog, inventory, orders, customers, portal; `import.ts` owns independent, atomic CSV rows with durable batch and row outcomes). Handlers read through the RLS-bound `ctx.db`; public-schema writes call the narrow RPC boundary and forward `CommandExecution.requestId`. `orders.ts` owns order lifecycle (create/submit/confirm/adjust/cancel), allocations, pick/ship, per-shipment invoices, credit memos, and replenishment. `customers.ts` owns customer/ship-to/price-list CRUD and the portal fulfillment source. `catalog.ts` owns products, SKUs, locations and their bins (`list_bins`, `create_bin`, `update_bin`, `delete_bin`); `inventory.ts` owns the movement ledger at bin grain (`record_movement` needs a `binId`; `get_bin_on_hand`). `portal.ts` owns the customer-role commands (`portal_create_order`, `portal_update_draft_order`, `portal_submit_order`, `portal_catalog`, `portal_orders`, `portal_order`, `portal_invoices`) — the only commands a `customer` role may call. |
+| `lib/commands/taproom.ts` | Keg pools/events, durable explicit-bucket taproom counts, and tap interval reads plus atomic tap/kick/swap RPCs. Intervals freeze nominal size, never write inventory, and keep guest identity separate from own SKUs absent stock. |
 | `lib/commands/all.ts` | The one side-effecting import that registers every command module. |
 | `app/api/command/route.ts` | The single HTTP entry point. Dispatches to the registry; contains no business logic. Cookie session or `Authorization: Bearer <supabase access_token>`. |
 | `lib/commands/client.ts`, `use-command-form.ts` | How the UI calls commands. |
@@ -195,13 +196,13 @@ a gap to close, not a convention to trust.
   `.agents/superpowers/specs/2026-09-07-mgr-ai-chat-design.md`; plan
   `.agents/superpowers/plans/2026-09-07-ai-chat.md`. This is a design
   prerequisite, not a claim about the current registry.
-- **Inventory correction and taproom counts need durable identity.** The current
-  FG ledger has neither a structured reversal link nor sign rules/report semantics
-  for an exact opposite entry, so `reverse_inventory_movement` remains disabled.
-  The current schema also has no FG count header/lines; a zero-variance weekly
-  count would disappear entirely. Before either UI ships, the baseline must add
-  auditable correction identity and a durable taproom count occurrence/snapshot,
-  and their registered one-RPC commands must have real-Postgres/report proofs.
+- **Inventory correction needs durable identity.** The current FG ledger has
+  neither a structured reversal link nor sign rules/report semantics for an exact
+  opposite entry, so `reverse_inventory_movement` remains disabled.
+  Taproom counts now persist headers and explicit bin/SKU/lot UUID-or-null lines,
+  including zero-variance counts. Their one-RPC command rejects stale revisions,
+  incomplete buckets and overcounts; shortages post exact-bucket depletion with
+  frozen BBL. The count UI and count correction remain pending.
 - **Auth invitations use a durable external-write workflow.** One canonical
   command request claims a private invitation. Auth's first `invited_at` write
   binds its user id in that same transaction using an invitation token and
