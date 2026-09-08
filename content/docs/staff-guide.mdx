@@ -108,7 +108,7 @@ Wholesale Shop shows the packages the brewery has designated for wholesale — �
 
 <Cards>
   <Card title="On hand">The sum of recorded movements for one SKU in one bin at one location. ATP stays per SKU.</Card>
-  <Card title="ATP">Available to promise: on hand minus open reservations for that SKU. It can go negative.</Card>
+  <Card title="ATP">Available to promise: on hand minus open reservations for that SKU. It can go negative. A negative row shows a **Shortfall** button that opens [Replenishment](#replenishment).</Card>
   <Card title="Movement log">The 50 newest entries: time, type, SKU, location, signed quantity, and note.</Card>
 </Cards>
 
@@ -528,9 +528,9 @@ In specific gravity you may type either spelling: `1.050` or `1050`.
 
 When your brewery's Slack connection is available, open its MGR App Home and choose **Link MGR account**. Sign in to MGR if asked. A valid link confirms that Slack is linked.
 
-Linked App Home shows a role-filtered **Today** queue with up to 20 current items. Admin sees all live items; Sales sees submitted orders to review; Warehouse sees confirmed orders whose requested ship date is due and orders with staged beer to put back. Select **Open** on an item to view its order in MGR. With no current work, App Home says **You’re caught up**.
+Linked App Home shows a role-filtered **Today** queue with up to 20 current items, the same work your MGR Today tab shows for your role. Admin sees all live items; Sales sees submitted orders to review and buyer questions about invoices; Warehouse sees confirmed orders whose requested ship date is due, orders with staged beer to put back, and their own next stop when they're a route's assigned driver; Brewer sees overdue fermentation readings. Select **Open** on an item to view its order in MGR. With no current work, App Home says **You’re caught up**.
 
-Linked eligible staff also receive private Slack messages for newly submitted orders and picks that become due. The message contains a safe order label, requested-date detail, and **Open in MGR**. When the work resolves, that same message changes to **Resolved**. MGR never posts customer contacts, prices, or notes to Slack.
+Linked eligible staff also receive a private Slack message for each of those same items as it comes due: Sales gets a newly submitted order or a buyer question about an invoice, Warehouse gets a pick due, a restock to put back, or their assigned next delivery stop, and Brewer gets an overdue fermentation reading. The message contains a safe order label, requested-date detail, and **Open in MGR**. When the work resolves, that same message changes to **Resolved**. MGR never posts customer contacts, prices, or notes to Slack.
 
 If the link is missing, expired, already used, or belongs to another account, go back to Slack and request a fresh link. Notification settings and unlink controls are not in the MGR interface yet.
 
