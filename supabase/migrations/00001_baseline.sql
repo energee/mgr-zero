@@ -3339,6 +3339,8 @@ begin
   else
     perform 1 from public.routes where id = v_id and brewery_id = p_brewery for update;
     if not found then raise exception 'route not found'; end if;
+    -- ponytail: a departed route is frozen, so a refused stop blocks the return until it is delivered; a per-stop
+    -- "leave for a later route" verb on the run page is the upgrade path
     if exists (select 1 from public.routes where id = v_id and departed_at is not null) then raise exception 'route has departed'; end if;
     update public.routes set name = nullif(trim(p_name), ''), delivery_date = p_delivery_date, driver_user_id = p_driver,
       vehicle = nullif(trim(p_vehicle), ''), note = nullif(trim(p_note), '') where id = v_id;

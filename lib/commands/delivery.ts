@@ -88,7 +88,7 @@ defineQuery({
       return { delivery, lines, invoice };
     }
     // a transfer stop carries what was picked; lines read the same shape as shipped order lines
-    const picked = await unwrap(ctx.db.from("stock_transfer_lines").select("id, qty_picked, skus(name), materials(name), keg_pools(name)").eq("transfer_id", stock_transfers!.id)) as
+    const picked = await unwrap(ctx.db.from("stock_transfer_lines").select("id, qty_picked, skus(name), materials(name), keg_pools(name)").eq("transfer_id", stock_transfers!.id)) as unknown as
       { id: string; qty_picked: number | null; skus: { name: string } | null; materials: { name: string } | null; keg_pools: { name: string } | null }[];
     const lines = picked.map((l) => ({ id: l.id, qty_shipped: l.qty_picked ?? 0, skus: l.skus ?? l.materials ?? l.keg_pools }));
     return { delivery, lines, invoice: null };
