@@ -265,6 +265,8 @@ A picked taproom transfer shows **Complete transfer** on its order page: the sam
 
 The order detail shows customer and ship-to for wholesale orders, PO, requested date, ordered/picked/shipped quantity, captured price, current ATP, and a time-stamped event history. The current detail page does not display a taproom transfer's destination, and it does not show the order note. A note entered by a portal customer is visible only on the portal's own order detail. An empty order list says **No orders yet.** An empty timeline says **No events yet.** A shipped or cancelled order has no further action controls.
 
+Shipping asks for each line's actual **source bin and lot**. Select **Add source** for every bin/lot used and enter its quantity; the sources must sum to the shipped quantity, and zero lines have no sources. Untracked legacy stock is labeled explicitly. A selected source must have enough stock when the shipment commits. An internal transfer also requires its destination bin and preserves the same lot on both legs. Shipping keeps one invoice line per order line even when several sources supplied it. On-delivery shipping moves the beer once; delivery confirmation creates only the invoice.
+
 ## Pick sheet [#pick-sheet]
 
 <Screen name="Pick sheet" />
@@ -286,13 +288,15 @@ The list shows each invoice or credit memo with its customer, total, and due or 
 
 When a buyer asks about an invoice from the portal, the question appears on the invoice as **Buyer asked about this invoice** with their words, and as an **Answer** row on Today for Admin and Sales. Reply by phone or email, then select **Mark answered**; that clears the Today row and nothing on the invoice changes.
 
+Returns preserve the selected shipment lot and its original recorded volume even if the format definition later changes. A damaged return writes that same volume back out as loss atomically.
+
 ### Return beer and correct the invoice
 
 <Screen name="Return and credit" />
 
 1. Open the invoice and select **Return**.
 2. Enter the quantity coming back for each applicable line. Leave unrelated lines at zero. A return cannot exceed the remaining uncredited quantity.
-3. Choose **Return to location** and the **Reason**: *Unsold* and *Wrong item* put the beer back as sellable stock at that location; *Damaged* puts it back and writes the same quantity to loss in the same step, so broken beer never lands on a pick list.
+3. Split the returned quantity across the original shipped sources shown under the line. Their sum must equal the line quantity; a source cannot be returned more than was shipped. Choose **Return to location**, the destination **bin**, and the **Reason**: *Unsold* and *Wrong item* put the beer back as sellable stock at that location; *Damaged* puts it back and writes the same quantity to loss in the same step, so broken beer never lands on a pick list.
 4. Select **Return shipment**.
 
 MGR creates a separate credit memo at the prices frozen on the invoice lines, never today's price, records the return-in (and, for damaged, the loss) against that credit memo, and notes the correction on the originating order's timeline. A paid invoice can still be returned; the credit sits as available credit. Credit memos cannot themselves be credited.
@@ -345,7 +349,7 @@ The registry has two tabs. **Brands** lists each brand with its COLA or formula 
 
 <Screen name="Lot trace" />
 
-A lot is one closed packaging run. Its trace shows the brand and package, the run and packaging date, the tank and batch it was drawn from, the barrels drawn, and every ledger movement carrying the lot: the production that made it and any samples, losses, or destructions pulled from it, with what remains on hand. Shipments do not record a lot yet, so the customers who received it are not listed.
+A lot is one closed packaging run. Its trace shows the brand and package, the run and packaging date, the tank and batch it was drawn from, the barrels drawn, and every ledger movement carrying the lot: the production that made it and any samples, losses, or destructions pulled from it, with what remains on hand. Shipping records the source bin and lot for every quantity. The trace lists actual customer recipients, ship-to addresses, orders and invoices, and recorded balances separately for each SKU and bin with total barrels. Historical untracked movements cannot be assigned to a lot; there is no per-pint POS trace.
 
 ## Keg fleet [#kegs]
 
@@ -620,3 +624,5 @@ The [screen explorer](/docs/screens-explore) is a drawing of MGR, including scre
 ### Portal fulfillment warehouse
 
 In **Settings**, Admin can see the current **Portal fulfillment warehouse**, select **Change warehouse**, choose a warehouse, and **Save warehouse**. Only warehouse locations are offered. If none exist, follow **Locations** to add one. This source is used for new portal orders; other brewery settings do not change it.
+
+For cross-location stock transfers, receiving shows the recorded lots at each source bin. Enter the quantity from each source so it totals the received line; finished goods and material transfers preserve that lot on both legs. Manual inventory movements also offer the recorded lot in the selected SKU/bin. Select it for samples, losses or other lot-specific changes; historical untracked balances stay untracked.

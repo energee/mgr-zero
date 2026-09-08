@@ -11,10 +11,10 @@ import { runCommand } from "@/lib/commands/registry";
 import { docNo } from "@/lib/mgr/doc-no";
 import { orNotFound } from "@/lib/mgr/not-found";
 import "@/lib/commands/all";
-import { CompleteButton } from "./complete-button";
+import { ShipForm } from "../ship-form";
 
 type Order = { id: string; order_no: number | null; kind: string; status: string; from_location_id: string; to_location_id: string | null };
-type Line = { id: string; qty_ordered: number; qty_picked: number | null; skus: { name: string } | null };
+type Line = { id: string; sku_id: string; qty_ordered: number; qty_picked: number | null; skus: { name: string } | null };
 
 export default async function CompleteTransferPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -34,7 +34,7 @@ export default async function CompleteTransferPage({ params }: { params: Promise
       {lines.map((l) => <div key={l.id}>{E.row(l.skus?.name ?? "Line", "move / picked", `${Number(l.qty_picked ?? 0)} / ${Number(l.qty_picked ?? 0)}`, Number(l.qty_picked ?? 0) < Number(l.qty_ordered) ? "w" : "ok")}</div>)}
       {E.info("No invoice: this is an internal move.")}
       {E.sp()}
-      <CompleteButton orderId={order.id} ship={lines.map((l) => ({ lineId: l.id, qty: Number(l.qty_picked ?? 0) }))} />
+      <ShipForm transfer orderId={order.id} lines={lines.map(l => ({ id: l.id, skuId: l.sku_id, skuName: l.skus?.name ?? "Line", qtyPicked: Number(l.qty_picked ?? 0) }))} />
     </>
   );
 }

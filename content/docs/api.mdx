@@ -216,12 +216,14 @@ omitted. They have no roles until they are built.
 | `get_format_composition` | Packaging | ✓ | ✓ | ✓ |  |  |
 | `get_gravity_unit` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ |  |
 | `get_invoice` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
+| `get_invoice_return_sources` | Orders & invoicing | ✓ | ✓ |  |  |  |
 | `get_keg_fleet` | Taproom & kegs | ✓ |  | ✓ |  |  |
 | `get_material_on_hand` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |
 | `get_material_requirements` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |
 | `get_notification_preferences` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |
 | `get_on_hand` | Inventory & locations | ✓ | ✓ | ✓ |  |  |
 | `get_order` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |
+| `get_order_ship_sources` | Orders & invoicing | ✓ |  | ✓ |  |  |
 | `get_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |
 | `get_portal_account` | Customer portal |  |  |  |  | ✓ |
 | `get_purchase_order` | Purchasing & materials | ✓ |  | ✓ |  |  |
@@ -1058,6 +1060,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_invoice", "input": { "invoiceId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
+#### get_invoice_return_sources [#get_invoice_return_sources]
+
+`query` · admin, sales
+
+Original shipped movements available as explicit return identities
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `invoiceId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_invoice_return_sources", "input": { "invoiceId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 #### get_order [#get_order]
 
 `query` · admin, sales, warehouse
@@ -1073,6 +1092,23 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_order", "input": { "orderId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+#### get_order_ship_sources [#get_order_ship_sources]
+
+`query` · admin, warehouse
+
+Recorded source bins and lots for a picked order; no customer recall contact data
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `orderId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_order_ship_sources", "input": { "orderId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### list_invoice_questions [#list_invoice_questions]
@@ -1338,7 +1374,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* orders-designed */}
 
-23 of the 24 operations in this area are available today; the 1 below are not.
+25 of the 26 operations in this area are available today; the 1 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
@@ -1652,6 +1688,7 @@ Append an inventory movement (immutable; corrections are reversals); sale_remova
 | `binId` | uuid | yes |
 | `qty` | number | yes |
 | `type` | opening_balance or production_in or adjustment or sale_removal or taproom_transfer or depletion or return_in or destruction or loss or sample or festival_removal | yes |
+| `lotId` | uuid | no |
 | `saleChannelId` | uuid | no |
 | `destState` | string, fixed length | no |
 | `note` | string | no |

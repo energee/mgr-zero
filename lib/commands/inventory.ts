@@ -3,6 +3,7 @@ import { defineCommand, defineQuery, unwrap, Ctx, CommandExecution, STAFF_ROLES 
 import { stockLine } from "./stock-line";
 
 const movementInput = z.object({
+  lotId: z.string().uuid().optional(),
   skuId: z.string().uuid(), locationId: z.string().uuid(), binId: z.string().uuid(),
   qty: z.number().refine(n => n !== 0, "qty cannot be 0"),
   type: z.enum(["opening_balance", "production_in", "adjustment", "sale_removal", "taproom_transfer",
@@ -22,7 +23,7 @@ export function insertMovement(ctx: Ctx, input: z.infer<typeof movementInput>, e
   return unwrap(ctx.db.rpc("record_inventory_movement", {
     p_brewery: ctx.breweryId, p_sku: input.skuId, p_location: input.locationId, p_bin: input.binId, p_qty: input.qty,
     p_type: input.type, p_sale_channel: input.saleChannelId ?? null, p_dest_state: input.destState ?? null,
-    p_note: input.note ?? null, p_request_id: execution.requestId,
+    p_note: input.note ?? null, p_lot: input.lotId ?? null, p_request_id: execution.requestId,
   }));
 }
 

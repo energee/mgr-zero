@@ -2,9 +2,12 @@
 // Picking a location preselects its first bin (list_bins is alphabetical), so the common case is one tap.
 "use client";
 
+import { command } from "@/lib/commands/client";
+import { useBrewery } from "../brewery-provider";
+import type { BinMoveStock } from "@/lib/commands/inventory";
 import { movementFields } from "@/lib/movement-form";
 import { formatVolume } from "@/lib/volume";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
@@ -36,6 +39,10 @@ export function MovementForm({
   bins: { id: string; location_id: string; name: string }[];
   channels: { id: string; name: string }[];
 }) {
+  const breweryId = useBrewery();
+  const [stock, setStock] = useState<BinMoveStock[]>([]);
+  const [lotId, setLotId] = useState("");
+  const [stockError, setStockError] = useState<string | null>(null);
   const [skuId, setSkuId] = useState("");
   const [locationId, setLocationId] = useState("");
   const [binId, setBinId] = useState("");
@@ -49,10 +56,16 @@ export function MovementForm({
   const [saleChannelId, setSaleChannelId] = useState(defaultChannelId);
   const [note, setNote] = useState("");
   const form = useCommandForm("record_movement", {
-    build: () => ({ skuId, locationId, binId, ...movementFields(type, qty, direction, destState, saleChannelId), type, note: note || undefined }),
-    reset: () => { setSkuId(""); setLocationId(""); setBinId(""); setQty(""); setType("opening_balance"); setSaleChannelId(defaultChannelId); setNote(""); setDestState(""); setDirection("add"); },
+    build: () => ({ skuId, locationId, binId, lotId: lotId || undefined, ...movementFields(type, qty, direction, destState, saleChannelId), type, note: note || undefined }),
+    reset: () => { setLotId(""); setStock([]); setSkuId(""); setLocationId(""); setBinId(""); setQty(""); setType("opening_balance"); setSaleChannelId(defaultChannelId); setNote(""); setDestState(""); setDirection("add"); },
   });
 
+  useEffect(() => {
+    if (!locationId || !form.open) return;
+    let live = true;
+    command(breweryId, "get_bin_move_stock", { locationId }).then(data => { if (live) { setStock(data as BinMoveStock[]); setStockError(null); } }).catch(err => { if (live) setStockError(String(err)); });
+    return () => { live = false; };
+  }, [breweryId, locationId, form.open]);
   let fields: ReturnType<typeof movementFields> | null = null;
   try { fields = movementFields(type, qty, direction, destState, saleChannelId); } catch { /* Incomplete inputs disable submission. */ }
   const unitVolume = skus.find(s => s.id === skuId)?.bblPerUnit;
@@ -66,7 +79,7 @@ export function MovementForm({
         <form onSubmit={e => { if (!fields) { e.preventDefault(); return; } void form.submit(e); }} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="movement-sku">SKU</Label>
-            <Select value={skuId} onValueChange={setSkuId}>
+            <Select value={skuId} onValueChange={v => { setSkuId(v); setLotId(""); }}>
               <SelectTrigger id="movement-sku">
                 <SelectValue placeholder="Select a SKU" />
               </SelectTrigger>
@@ -83,7 +96,7 @@ export function MovementForm({
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="movement-location">Location</Label>
-            <Select value={locationId} onValueChange={(v) => { setLocationId(v); setBinId(bins.filter((b) => b.location_id === v)[0]?.id ?? ""); }}>
+            <Select value={locationId} onValueChange={(v) => { setLocationId(v); setLotId(""); setBinId(bins.filter((b) => b.location_id === v)[0]?.id ?? ""); }}>
               <SelectTrigger id="movement-location">
                 <SelectValue placeholder="Select a location" />
               </SelectTrigger>
@@ -100,7 +113,7 @@ export function MovementForm({
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="movement-bin">Bin</Label>
-            <Select value={binId} onValueChange={setBinId} disabled={!locationId}>
+            <Select value={binId} onValueChange={v => { setBinId(v); setLotId(""); }} disabled={!locationId}>
               <SelectTrigger id="movement-bin"><SelectValue placeholder="Select a bin" /></SelectTrigger>
               <SelectContent>
                 {bins.filter((b) => b.location_id === locationId).map((b) => (
@@ -150,6 +163,8 @@ export function MovementForm({
               <SelectContent><SelectItem value="add">Add stock</SelectItem><SelectItem value="remove">Remove stock</SelectItem></SelectContent>
             </Select>
           </div>}
+          <Label className="flex flex-col gap-2">Lot<select className="rounded border p-2" value={lotId} onChange={e => setLotId(e.target.value)}><option value="">Untracked / legacy stock</option>{stock.filter(s => s.kind === "sku" && s.stock_id === skuId && s.bin_id === binId && s.lot_id).map(s => <option key={s.lot_id} value={s.lot_id!}>{s.lot_code} · {s.qty} available</option>)}</select></Label>
+          <CommandFormMessage error={stockError} />
           <div className="flex flex-col gap-2">
             <Label htmlFor="movement-qty">
               Qty <span className="font-normal text-muted-foreground">(positive SKU units)</span>

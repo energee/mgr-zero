@@ -30,7 +30,9 @@ export function LifecycleButtons({
   lines,
   skus,
   pickLines,
+  transfer = false,
 }: {
+  transfer?: boolean;
   orderId: string;
   status: OrderStatus;
   lines: { skuId: string; skuName: string; qty: number }[];
@@ -102,7 +104,7 @@ export function LifecycleButtons({
             <ShortPickForm orderId={orderId} short={short} onOpenChange={(open) => { if (!open) setShort(null); }} />
           </>
         )}
-        {status === "picked" && <ShipForm orderId={orderId} lines={pickLines} />}
+        {status === "picked" && <ShipForm transfer={transfer} orderId={orderId} lines={pickLines} />}
         {canCancel && (
           <CommandForm open={cancelOpen} onOpenChange={(next) => { setCancelOpen(next); if (!next) { setCancelReason(""); setError(null); } }} title="Cancel order" trigger={<Button size="sm" variant="destructive" disabled={busy}>
                 Cancel

@@ -1096,8 +1096,8 @@ export const SCREENS: Screen[] = [
     name: "Ship and invoice",
     to: { "Ship order": "Shipment done" },
     job: "Default wholesale ship: commit removal and the invoice together",
-    reads: "get_order",
-    writes: "ship_order [needs_restock when any qty_shipped < qty_picked; invoice timing = now persisted with the shipment]",
+    reads: "get_order, get_order_ship_sources",
+    writes: "ship_order [explicit bin/lot source quantities sum to every line; needs_restock when any qty_shipped < qty_picked; invoice timing = now persisted with the shipment]",
     states: [["stale", "picked qty changed · preview again", 1], ["short ship", "qty below picked needs a reason; remainder is released", 1], ["offline", "wait for live recheck", 1], ["permission", "warehouse or admin required", 1], ["accepted", "INV number on commit · restock row if qty short"]],
     spec: <>Ship qty prefills from picked and is editable per line; a shortage reason appears only when qty &lt; picked, and the same condition sets the restock flag, so the case released here becomes a Put back row rather than staying staged with nothing naming it. Carrier/tracking never block the commit. The preview names the destination state from the ship-to and says the invoice number is assigned on commit. On-delivery timing lives on Ship · confirmation; taproom transfers use Complete transfer.</>,
     body: (<>
@@ -1109,6 +1109,8 @@ export const SCREENS: Screen[] = [
       {E.info("Shipping 9 of 10 Pils: the remaining 1 is cancelled and its allocation released. There is no backorder.")}
       {E.inp("Carrier", "tracking · optional")}
       {E.chips(["Invoice now", "On delivery"], 0)}
+      {E.pick("Source bin and lot", "Cooler · L-240831-HZ", ["Cooler · L-240831-HZ", "Cooler · Untracked / legacy stock"])}
+      {E.fld("Source quantities", "Every source sums to its shipped line") }
       {E.tape([["−4 Hazy ½ bbl · sale removal · PA", "2.00 bbl"], ["−9 Pils cases · sale removal · PA", "0.87 bbl"], ["1 Pils case released · restock", ""], ["invoice number", "assigned on commit"]])}
       {E.sp()}
       {E.btn("Ship order", "irr")}
@@ -1138,7 +1140,7 @@ export const SCREENS: Screen[] = [
     name: "Ship on delivery",
     to: { "Ship order": "Shipment done" },
     job: "The On delivery state of Ship and invoice",
-    reads: "get_order",
+    reads: "get_order, get_order_ship_sources",
     writes: "ship_order [invoice_timing = on_delivery persisted on the shipment; the same one RPC without the invoice; confirm_delivery invoices later]",
     states: [["stale", "picked qty changed · preview", 1], ["offline", "wait for live recheck", 1], ["permission", "warehouse or admin required", 1]],
     spec: "Folded into Ship and invoice as the On delivery chip. Same fields as Invoice now; the timing is saved on the shipment so Confirm delivery can invoice later. Two screens both titled Ship was confusing.",
@@ -1148,6 +1150,8 @@ export const SCREENS: Screen[] = [
       {E.row("Hazy IPA · ½ bbl keg", "picked 4", E.stq(4), "ok")}
       {E.row("Pils · 16 oz case", "picked 10", E.stq(10), "ok")}
       {E.chips(["Invoice now", "On delivery"], 1)}
+      {E.pick("Source bin and lot", "Cooler · L-240831-HZ", ["Cooler · L-240831-HZ", "Cooler · Untracked / legacy stock"])}
+      {E.fld("Source quantities", "Every source sums to its shipped line") }
       {E.tape([["−4 Hazy ½ bbl · sale removal · PA", "2.00 bbl"], ["−10 Pils cases · sale removal · PA", "0.97 bbl"], ["invoice number", "deferred to delivery"]])}
       {E.sp()}
       {E.btn("Ship order", "irr")}
@@ -1160,8 +1164,8 @@ export const SCREENS: Screen[] = [
     name: "Complete transfer",
     to: { "TRF-0088": "Order" },
     job: "Finish a taproom transfer order: same movements, no invoice",
-    reads: "get_order",
-    writes: "ship_order [taproom_transfer kind: paired taproom_transfer movements (−source, +destination); no invoice]",
+    reads: "get_order, get_order_ship_sources",
+    writes: "ship_order [explicit source and destination bins preserve lot; taproom_transfer kind: paired taproom_transfer movements (−source, +destination); no invoice]",
     states: [["stale", "picked qty changed · preview again", 1], ["short", "qty below picked releases the remainder"], ["permission", "warehouse or admin required", 1], ["accepted", "taproom on-hand rises immediately"]],
     spec: "No invoice-timing chip and no destination state: beer moves between the brewery’s own locations. Copper because the paired movements are append-only. Requested from Taproom · Needs replenishment.",
     body: (<>
@@ -1169,6 +1173,8 @@ export const SCREENS: Screen[] = [
       {E.fld(<>From {E.arrow(null)} to</>, <>Warehouse {E.arrow()} Taproom</>)}
       {E.row("Pils · 16 oz case", "move / picked", "4 / 4", "ok")}
       {E.row("Hazy IPA · ½ bbl keg", "move / picked", "2 / 2", "ok")}
+      {E.pick("Source bin and lot", "Cooler · L-240831-HZ", ["Cooler · L-240831-HZ", "Cooler · Untracked / legacy stock"])}
+      {E.fld("Source quantities", "Every source sums to its shipped line") }
       {E.tape([["−4 Pils cases · taproom transfer · Warehouse", formatVolume("0.39")], ["+4 Pils cases · taproom transfer · Taproom", formatVolume("0.39")], ["−2 / +2 Hazy ½ bbl · taproom transfer", formatVolume("1.00")]])}
       {E.info("No invoice: this is an internal move.")}
       {E.sp()}
@@ -1333,13 +1339,14 @@ export const SCREENS: Screen[] = [
     name: "Return and credit",
     to: { "Return shipment": "Order" },
     job: "Return beer and correct money atomically",
-    reads: "get_order",
+    reads: "get_invoice, get_invoice_return_sources, list_bins",
     writes: "return_shipment [one RPC: return_in movements at explicit destination + loss movement for a damaged return + credit memo at the invoiced price; owned-fleet keg_events linked to shipment when slice 9 is enabled]",
-    states: [["permission", "sales or warehouse required", 1], ["unsold", "returns as sellable stock at the chosen destination"], ["damaged", "returns, then posts loss in the same RPC · never re-sold", 1], ["wrong item", "sellable · the mis-picked SKU goes back on the shelf"], ["invoice paid", "the credit memo sits unapplied as available credit", 1], ["partial", "only the returned units credit back"]],
+    states: [["permission", "admin or sales required", 1], ["unsold", "returns as sellable stock at the chosen destination"], ["damaged", "returns, then posts loss in the same RPC · never re-sold", 1], ["wrong item", "sellable · the mis-picked SKU goes back on the shelf"], ["invoice paid", "the credit memo sits unapplied as available credit", 1], ["partial", "only the returned units credit back"]],
     spec: "Reason decides the beer, never the money. Unsold and wrong item return as sellable stock at the destination; damaged returns and is written to loss in the same RPC, because beer that came back broken is not inventory and pretending otherwise puts it back on a pick list. The credit is the price frozen on the original invoice line and the deposit is the one recorded on the original shipment, never today's price group, on the same principle that freezes a channel onto a movement at write time. A paid invoice can still be returned: the credit memo lands unapplied and sits as available credit, which is the state the QuickBooks credit-memo frame already draws.",
     body: (<>
       {E.back("ORD-0231", "Beer return")}
       {E.row("Hazy IPA · ½ bbl keg", "shipped 4 · returning", E.stq(1))}
+      {E.pick("Original shipped source", "Cooler · L-240831-HZ", ["Cooler · L-240831-HZ"])}
       {E.chips(["damaged", "wrong item", "unsold"])}
       {E.pick("Return to", "Warehouse · original fulfillment source", ["Warehouse · original fulfillment source", "Taproom"])}
       {E.row("Deposit refund", "½ bbl pool · 1 · as deposited", "−$30.00")}
@@ -2243,15 +2250,19 @@ export const SCREENS: Screen[] = [
     job: "Trace a lot from its tank and batch through every ledger movement that names it",
     reads: "trace_lot",
     writes: "none",
-    states: [["still on hand", "unsold units are the part a recall can actually stop"], ["no shipments", "pick and ship record no lot yet, so no customer is listed", 1], ["unknown lot", "not found"]],
-    spec: "The lot is one packaging run, so the trace follows lot → run → tank → batch and lists every movement carrying the lot: the production that made it, samples and losses pulled from it. Shipments record no lot until pick/ship takes one per line (drift: pick/ship lots), so recall contacts cannot come from the ledger yet and the page says so instead of drawing an empty contact list. It does not descend into POS sale lines, because a sale posts nothing to the ledger and would imply a per-pint traceability MGR does not have.",
+    states: [["still on hand", "unsold units are the part a recall can actually stop"], ["no shipments", "no recorded shipment of this lot", 1], ["unknown lot", "not found"]],
+    spec: "The lot is one packaging run, so the trace follows lot → run → tank → batch and lists every movement carrying the lot: the production that made it, samples and losses pulled from it. Shipping records explicit bin/lot allocations per order line; returns and transfers preserve them. Trace shows actual customer recipients, ship-to addresses, orders and invoices, and balances per SKU/bin plus barrels. Historical untracked consumption cannot be assigned to a lot. It does not descend into POS sale lines, because a sale posts nothing to the ledger and would imply a per-pint traceability MGR does not have.",
     body: (<>
       {E.back("Compliance months", "L-240831-HZ")}
-      {E.row("Hazy IPA · 16 oz case", "run 28 · packaged 8/31 · best by 2/27", "118 on hand")}
+      {E.row("Hazy IPA · 16 oz case", "run 28 · packaged 8/31 · best by 2/27", "7.61 bbl recorded balance")}
       {E.fld("Tank · batch", "FV-3 · batch 41 · brewed 8/10")}
       {E.fld("Drawn", "25.00 bbl")}
       {E.tape([["+120 · production in · Hazy IPA 16 oz case · Warehouse", "8/31"], ["−2 · sample · Hazy IPA 16 oz case · Warehouse", "9/02"]])}
-      {E.note("Shipments do not record a lot yet, so a customer who received this lot is not listed. Unsold units are the part a recall can still stop.")}
+      {E.ttl("Recorded balances by SKU and bin")}
+      {E.row("Hazy IPA · 16 oz case", "Warehouse · Cooler", "118 units · 7.61 bbl")}
+      {E.ttl("Recipients")}
+      {E.blank("No recorded shipments of this lot")}
+      {E.note("Only recorded lot identities are traced. Historical untracked stock and consumption cannot be assigned to this lot.")}
     </>),
   },
   {

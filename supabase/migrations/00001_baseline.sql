@@ -494,11 +494,13 @@ create table inventory_movements (
   tax_treatment tax_treatment,
   dest_state text,
   lot_id uuid,                                   -- FK to lots added below
+  source_movement_id uuid,                       -- exact shipped return / damaged-return provenance
   ref uuid,                                      -- order_id / pos_sale id / run id
   note text,
   created_by uuid not null references auth.users(id),
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
+  foreign key (source_movement_id, brewery_id) references inventory_movements (id, brewery_id),
   foreign key (sku_id, brewery_id) references skus (id, brewery_id),
   foreign key (location_id, brewery_id) references locations (id, brewery_id),
   -- the bin must be one of this location's bins, structurally (spec 2026-09-06 Decision 1)
@@ -526,11 +528,31 @@ create table inventory_movements (
     end)
 );
 create index movements_onhand_idx on inventory_movements (brewery_id, sku_id, location_id, bin_id);
+create index movements_source_idx on inventory_movements (brewery_id, source_movement_id) where source_movement_id is not null;
 create index movements_created_idx on inventory_movements (brewery_id, created_at);
 create index movements_lot_idx on inventory_movements (lot_id) where lot_id is not null;
 
 create function enforce_bbl_integrity() returns trigger language plpgsql set search_path = '' as $$
+declare original public.inventory_movements; returned_qty numeric; returned_bbl numeric;
 begin
+  if new.source_movement_id is not null then
+    select * into original from public.inventory_movements where id = new.source_movement_id and brewery_id = new.brewery_id;
+    if original.id is null or original.sku_id <> new.sku_id or original.lot_id is distinct from new.lot_id
+       or not ((new.type = 'return_in' and original.type = 'sale_removal' and new.qty > 0 and new.qty <= -original.qty)
+            or (new.type = 'loss' and original.type = 'return_in' and new.qty = -original.qty and new.ref = original.ref)) then
+      raise exception 'invalid movement compensation source';
+    end if;
+    -- The original volume is a frozen fact, even after a format is edited.
+    if new.type = 'return_in' then
+      select coalesce(sum(qty),0), coalesce(sum(bbl),0) into returned_qty, returned_bbl from public.inventory_movements
+        where brewery_id = new.brewery_id and source_movement_id = original.id and type = 'return_in';
+      if returned_qty + new.qty > -original.qty then raise exception 'return exceeds original shipment'; end if;
+      new.bbl := round(original.bbl * (returned_qty + new.qty) / original.qty, 8) - returned_bbl;
+    else
+      new.bbl := -original.bbl;
+    end if;
+    return new;
+  end if;
   select (new.qty * f.bbl_per_unit) into new.bbl
     from public.skus s join public.format_volumes f on f.id = s.format_id where s.id = new.sku_id;
   if new.bbl is null then raise exception 'format has no bbl_per_unit'; end if;
@@ -2111,20 +2133,18 @@ create function private.ship_order_impl(p_order uuid, p_ship jsonb, p_carrier te
 language plpgsql set search_path = '' as $$
 declare
   o public.orders; sp record; v_state text; v_invoice uuid; v_shipment uuid;
-  v_channel uuid; v_tax public.tax_treatment;
+  v_channel uuid; v_tax public.tax_treatment; v_sources jsonb; src record; v_line public.order_lines; v_available numeric;
 begin
   o := private.lock_order(p_order, array['picked']::public.order_status[]);
-  -- Full-coverage guard: ensure p_ship covers every order line. Runs after the
-  -- lock so the line set can't change between the check and the lock (TOCTOU).
-  if exists (
-    select 1 from public.order_lines ol
-    where ol.order_id = p_order
-    and not exists (
-      select 1 from jsonb_array_elements(p_ship) e
-      where (e->>'line_id')::uuid = ol.id
-    )
-  ) then
-    raise exception 'ship list must cover every order line';
+  -- ponytail: serialize ledger consumers globally; use shared per-stock-key
+  -- locks in every writer if warehouse write throughput outgrows this lock.
+  lock table public.inventory_movements in share row exclusive mode;
+  if jsonb_typeof(p_ship) is distinct from 'array' then raise exception 'ship list must cover every order line exactly once'; end if;
+  if jsonb_array_length(p_ship) <> (select count(*) from public.order_lines where order_id = p_order)
+     or (select count(distinct e->>'line_id') from jsonb_array_elements(p_ship) e) <> jsonb_array_length(p_ship)
+     or exists (select 1 from jsonb_array_elements(p_ship) e where not exists
+       (select 1 from public.order_lines where id = (e->>'line_id')::uuid and order_id = p_order)) then
+    raise exception 'ship list must cover every order line exactly once';
   end if;
   insert into public.shipments (brewery_id, order_id, carrier, tracking, invoice_timing, created_by)
   values (o.brewery_id, p_order, p_carrier, p_tracking, coalesce(p_invoice_timing, 'now'), auth.uid()) returning id into v_shipment;
@@ -2148,25 +2168,44 @@ begin
     returning id into v_invoice;
     end if;
   end if;
-  for sp in select (e->>'line_id')::uuid as line_id, (e->>'qty_shipped')::numeric as qty from jsonb_array_elements(p_ship) e loop
+  for sp in select (e->>'line_id')::uuid as line_id, (e->>'qty_shipped')::numeric as qty, e->'sources' as sources from jsonb_array_elements(p_ship) e loop
+    select * into v_line from public.order_lines where id = sp.line_id and order_id = p_order;
+    if sp.qty is null or sp.qty::text in ('NaN','Infinity','-Infinity') or sp.qty < 0 or sp.qty <> round(sp.qty, 2)
+       or sp.qty > least(v_line.qty_ordered, coalesce(v_line.qty_picked, 0)) then raise exception 'invalid shipped quantity'; end if;
+    -- Old callers can only consume actual untracked first-bin stock.
+    v_sources := coalesce(sp.sources, case when sp.qty = 0 then '[]'::jsonb else jsonb_build_array(jsonb_build_object(
+      'bin_id', private.first_bin(o.from_location_id), 'lot_id', null, 'qty', sp.qty,
+      'to_bin_id', case when o.kind = 'taproom_transfer' then private.first_bin(o.to_location_id) end)) end);
+    if jsonb_typeof(v_sources) is distinct from 'array' then raise exception 'sources must be an array'; end if;
+    if (sp.qty = 0 and jsonb_array_length(v_sources) <> 0)
+       or coalesce((select sum((e->>'qty')::numeric) from jsonb_array_elements(v_sources) e), 0) <> sp.qty
+       or (select count(distinct jsonb_build_array(e->>'bin_id', e->>'lot_id')) from jsonb_array_elements(v_sources) e) <> jsonb_array_length(v_sources)
+    then raise exception 'distinct sources must sum to shipped quantity'; end if;
+    for src in select (e->>'bin_id')::uuid bin_id, (e->>'lot_id')::uuid lot_id, (e->>'to_bin_id')::uuid to_bin_id, (e->>'qty')::numeric qty from jsonb_array_elements(v_sources) e loop
+      if src.qty is null or src.qty::text in ('NaN','Infinity','-Infinity') or src.qty <= 0 or src.qty <> round(src.qty, 2) then raise exception 'invalid source quantity'; end if;
+      if not exists (select 1 from public.bins where id = src.bin_id and location_id = o.from_location_id and brewery_id = o.brewery_id) then raise exception 'invalid source bin'; end if;
+      if o.kind = 'taproom_transfer' and not exists (select 1 from public.bins where id = src.to_bin_id and location_id = o.to_location_id and brewery_id = o.brewery_id) then raise exception 'choose a destination bin'; end if;
+      if o.kind = 'wholesale' and src.to_bin_id is not null then raise exception 'wholesale source has no destination bin'; end if;
+      select coalesce(sum(qty), 0) into v_available from public.inventory_movements
+        where brewery_id = o.brewery_id and sku_id = v_line.sku_id and bin_id = src.bin_id and lot_id is not distinct from src.lot_id;
+      if v_available < src.qty then raise exception 'insufficient selected bin/lot stock; choose recorded sources'; end if;
+    end loop;
     update public.order_lines set qty_shipped = sp.qty where id = sp.line_id and order_id = p_order;
     if sp.qty > 0 then
       if o.kind = 'wholesale' then
-        insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, sale_channel_id, tax_treatment, dest_state, ref, created_by)
-        select o.brewery_id, ol.sku_id, o.from_location_id, private.first_bin(o.from_location_id), -sp.qty, 'sale_removal', v_channel, v_tax, v_state, p_order, auth.uid()
-        from public.order_lines ol where ol.id = sp.line_id;
+        insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, lot_id, qty, type, sale_channel_id, tax_treatment, dest_state, ref, created_by)
+        select o.brewery_id, v_line.sku_id, o.from_location_id, (e->>'bin_id')::uuid, (e->>'lot_id')::uuid, -(e->>'qty')::numeric,
+          'sale_removal', v_channel, v_tax, v_state, p_order, auth.uid() from jsonb_array_elements(v_sources) e;
         if v_invoice is not null then
           insert into public.invoice_lines (brewery_id, invoice_id, kind, sku_id, qty, unit_price_cents, description)
           select o.brewery_id, v_invoice, 'sku', ol.sku_id, sp.qty, ol.unit_price_cents, s.name
           from public.order_lines ol join public.skus s on s.id = ol.sku_id where ol.id = sp.line_id;
         end if;
       else
-        insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, ref, created_by)
-        select o.brewery_id, ol.sku_id, o.from_location_id, private.first_bin(o.from_location_id), -sp.qty, 'taproom_transfer', p_order, auth.uid()
-        from public.order_lines ol where ol.id = sp.line_id;
-        insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, ref, created_by)
-        select o.brewery_id, ol.sku_id, o.to_location_id, private.first_bin(o.to_location_id), sp.qty, 'taproom_transfer', p_order, auth.uid()
-        from public.order_lines ol where ol.id = sp.line_id;
+        insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, lot_id, qty, type, ref, created_by)
+        select o.brewery_id, v_line.sku_id, o.from_location_id, (e->>'bin_id')::uuid, (e->>'lot_id')::uuid, -(e->>'qty')::numeric, 'taproom_transfer'::public.movement_type, p_order, auth.uid() from jsonb_array_elements(v_sources) e
+        union all
+        select o.brewery_id, v_line.sku_id, o.to_location_id, (e->>'to_bin_id')::uuid, (e->>'lot_id')::uuid, (e->>'qty')::numeric, 'taproom_transfer'::public.movement_type, p_order, auth.uid() from jsonb_array_elements(v_sources) e;
       end if;
       update public.allocations set status = 'fulfilled'
         where source = 'order_line' and ref = sp.line_id and status = 'open';
@@ -2191,7 +2230,7 @@ end $$;
 
 create function private.create_credit_memo_impl(p_invoice uuid, p_lines jsonb, p_location uuid, p_reason text) returns jsonb
 language plpgsql set search_path = '' as $$
-declare v_inv public.invoices; v_cm uuid; v_order uuid; cl record; v_orig_qty numeric; v_already_credited numeric;
+declare v_inv public.invoices; v_cm uuid; v_order uuid; cl record; v_orig_qty numeric; v_already_credited numeric; v_sources jsonb; src record; v_original public.inventory_movements; v_sku uuid;
 begin
   -- for update: concurrent memos against one invoice serialize here, so the
   -- over-credit guard below always sees the other memo's lines.
@@ -2201,7 +2240,11 @@ begin
   insert into public.invoices (brewery_id, kind, customer_id, issued_on)
   values (v_inv.brewery_id, 'credit_memo', v_inv.customer_id, current_date)
   returning id into v_cm;
-  for cl in select (e->>'invoice_line_id')::uuid as line_id, (e->>'qty')::numeric as qty from jsonb_array_elements(p_lines) e loop
+  select order_id into v_order from public.shipments where id = v_inv.shipment_id;
+  if jsonb_typeof(p_lines) is distinct from 'array' or jsonb_array_length(p_lines) = 0 then raise exception 'credit lines required'; end if;
+  if (select count(distinct e->>'invoice_line_id') from jsonb_array_elements(p_lines) e) <> jsonb_array_length(p_lines) then raise exception 'duplicate credit line'; end if;
+  for cl in select (e->>'invoice_line_id')::uuid as line_id, (e->>'qty')::numeric as qty, e->'sources' as sources from jsonb_array_elements(p_lines) e loop
+    if cl.qty is null or cl.qty::text in ('NaN','Infinity','-Infinity') or cl.qty <= 0 or cl.qty <> round(cl.qty, 2) then raise exception 'invalid return quantity'; end if;
     select qty into v_orig_qty from public.invoice_lines where id = cl.line_id and invoice_id = p_invoice;
     if v_orig_qty is null then raise exception 'invoice line % not found on invoice', cl.line_id; end if;
     -- Over-credit guard: qty already credited against this invoice line across
@@ -2214,9 +2257,34 @@ begin
     insert into public.invoice_lines (brewery_id, invoice_id, kind, sku_id, qty, unit_price_cents, description, credited_invoice_line_id)
     select v_inv.brewery_id, v_cm, 'sku', il.sku_id, -cl.qty, il.unit_price_cents, il.description, il.id
     from public.invoice_lines il where il.id = cl.line_id and il.invoice_id = p_invoice;
-    insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, ref, note, created_by)
-    select v_inv.brewery_id, il.sku_id, p_location, private.first_bin(p_location), cl.qty, 'return_in', v_cm, p_reason, auth.uid()
-    from public.invoice_lines il where il.id = cl.line_id and il.invoice_id = p_invoice;
+    select sku_id into v_sku from public.invoice_lines where id = cl.line_id and invoice_id = p_invoice;
+    v_sources := cl.sources;
+    if v_sources is null and v_order is not null then
+      -- A legacy caller may return one untracked shipment source; no guessed lot.
+      select * into v_original from public.inventory_movements where brewery_id = v_inv.brewery_id and ref = v_order and sku_id = v_sku and type = 'sale_removal';
+      if v_original.id is null or v_original.lot_id is not null or
+         (select count(*) from public.inventory_movements where brewery_id = v_inv.brewery_id and ref = v_order and sku_id = v_sku and type = 'sale_removal') <> 1 then
+        raise exception 'choose original shipped sources for this return';
+      end if;
+      v_sources := jsonb_build_array(jsonb_build_object('movement_id', v_original.id, 'bin_id', private.first_bin(p_location), 'qty', cl.qty));
+    end if;
+    if v_sources is null and v_order is null then
+      insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, ref, note, created_by)
+      values (v_inv.brewery_id, v_sku, p_location, private.first_bin(p_location), cl.qty, 'return_in', v_cm, p_reason, auth.uid());
+    else
+      if jsonb_typeof(v_sources) is distinct from 'array' then raise exception 'return sources must be an array'; end if;
+      if coalesce((select sum((e->>'qty')::numeric) from jsonb_array_elements(v_sources) e),0) <> cl.qty
+         or (select count(distinct e->>'movement_id') from jsonb_array_elements(v_sources) e) <> jsonb_array_length(v_sources) then raise exception 'distinct return sources must sum to returned quantity'; end if;
+      for src in select (e->>'movement_id')::uuid movement_id, (e->>'bin_id')::uuid bin_id, (e->>'qty')::numeric qty from jsonb_array_elements(v_sources) e loop
+        if src.qty is null or src.qty <= 0 or src.qty::text in ('NaN','Infinity','-Infinity') or src.qty <> round(src.qty,2) then raise exception 'invalid return source quantity'; end if;
+        select * into v_original from public.inventory_movements where id = src.movement_id and brewery_id = v_inv.brewery_id and ref = v_order and sku_id = v_sku and type = 'sale_removal';
+        if v_original.id is null then raise exception 'source was not shipped on this invoice'; end if;
+        if not exists (select 1 from public.bins where id = src.bin_id and location_id = p_location and brewery_id = v_inv.brewery_id) then raise exception 'invalid return destination bin'; end if;
+        if src.qty > -v_original.qty - (select coalesce(sum(qty),0) from public.inventory_movements where brewery_id = v_inv.brewery_id and source_movement_id = v_original.id and type = 'return_in') then raise exception 'return exceeds remaining shipped source quantity'; end if;
+        insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, lot_id, source_movement_id, qty, type, ref, note, created_by)
+        values (v_inv.brewery_id, v_sku, p_location, src.bin_id, v_original.lot_id, v_original.id, src.qty, 'return_in', v_cm, p_reason, auth.uid());
+      end loop;
+    end if;
   end loop;
   -- Append to the originating order's event log, if this invoice came from a
   -- shipment (credit memos on a manually-issued invoice have none).
@@ -3261,22 +3329,37 @@ end $$;
 
 create function record_inventory_movement(
   p_brewery uuid, p_sku uuid, p_location uuid, p_bin uuid, p_qty numeric, p_type public.movement_type,
-  p_sale_channel uuid, p_dest_state text, p_note text, p_request_id uuid
+  p_sale_channel uuid, p_dest_state text, p_note text, p_request_id uuid, p_lot uuid default null
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_replay jsonb; v_row public.inventory_movements; v_tax public.tax_treatment;
 begin
   perform private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'record_inventory_movement', p_request_id,
-    jsonb_build_object('brewery', p_brewery, 'sku', p_sku, 'location', p_location, 'bin', p_bin, 'qty', p_qty, 'type', p_type, 'sale_channel', p_sale_channel, 'dest_state', p_dest_state, 'note', p_note));
+    jsonb_build_object('brewery', p_brewery, 'sku', p_sku, 'location', p_location, 'bin', p_bin, 'qty', p_qty, 'type', p_type, 'sale_channel', p_sale_channel, 'dest_state', p_dest_state, 'note', p_note, 'lot', p_lot));
   if v_replay is not null then return v_replay; end if;
+  if p_qty is null or p_qty::text in ('NaN','Infinity','-Infinity') or p_qty = 0 or p_qty <> round(p_qty,2) then raise exception 'invalid movement quantity'; end if;
+  if p_qty < 0 then
+    -- ponytail: global ledger lock; shared stock-key locks across every writer at higher throughput.
+    lock table public.inventory_movements in share row exclusive mode;
+    if p_lot is null and exists (select 1 from public.inventory_movements where brewery_id = p_brewery and sku_id = p_sku and bin_id = p_bin and lot_id is not null)
+       and -p_qty > (select coalesce(sum(qty),0) from public.inventory_movements where brewery_id = p_brewery and sku_id = p_sku and bin_id = p_bin and lot_id is null) then raise exception 'choose the recorded lot for this removal'; end if;
+  end if;
+  if p_lot is not null then
+    if not exists (select 1 from public.inventory_movements where brewery_id = p_brewery and sku_id = p_sku and lot_id = p_lot) then raise exception 'lot does not belong to SKU'; end if;
+    if p_qty < 0 then
+      -- ponytail: global ledger lock; shared key locks across all writers when needed.
+      lock table public.inventory_movements in share row exclusive mode;
+      if -p_qty > (select coalesce(sum(qty),0) from public.inventory_movements where brewery_id = p_brewery and sku_id = p_sku and bin_id = p_bin and lot_id = p_lot) then raise exception 'insufficient selected lot stock'; end if;
+    end if;
+  end if;
   -- A staff-entered movement has no customer, so the channel default is the
   -- resolved treatment; the composite FK below rejects another brewery's channel.
   if p_sale_channel is not null then
     select tax_treatment into v_tax from public.sale_channels
      where id = p_sale_channel and brewery_id = p_brewery;
   end if;
-  insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, sale_channel_id, tax_treatment, dest_state, note, created_by)
-    values (p_brewery, p_sku, p_location, p_bin, p_qty, p_type, p_sale_channel, v_tax, p_dest_state, p_note, auth.uid()) returning * into v_row;
+  insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, lot_id, qty, type, sale_channel_id, tax_treatment, dest_state, note, created_by)
+    values (p_brewery, p_sku, p_location, p_bin, p_lot, p_qty, p_type, p_sale_channel, v_tax, p_dest_state, p_note, auth.uid()) returning * into v_row;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
@@ -4051,8 +4134,8 @@ begin
   v_memo := (private.create_credit_memo_impl(p_invoice, p_lines, p_location, p_reason)->>'invoice_id')::uuid;
   if p_reason = 'damaged' then
     select brewery_id into v_brewery from public.invoices where id = p_invoice;
-    insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, ref, note, created_by)
-    select v_brewery, m.sku_id, m.location_id, m.bin_id, -m.qty, 'loss', v_memo, 'damaged return', auth.uid()
+    insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, lot_id, source_movement_id, qty, type, ref, note, created_by)
+    select v_brewery, m.sku_id, m.location_id, m.bin_id, m.lot_id, m.id, -m.qty, 'loss', v_memo, 'damaged return', auth.uid()
     from public.inventory_movements m where m.ref = v_memo and m.type = 'return_in';
   end if;
   return jsonb_build_object('credit_memo_id', v_memo);
@@ -5093,22 +5176,51 @@ end $$;
 -- removal figures never move.
 create function private.receive_stock_transfer_impl(p_transfer uuid, p_lines jsonb) returns jsonb
 language plpgsql set search_path = '' as $$
-declare t public.stock_transfers; l public.stock_transfer_lines; rq record; v_qty numeric;
+declare t public.stock_transfers; l public.stock_transfer_lines; rq record; v_qty numeric; v_sources jsonb; src record; v_available numeric; v_explicit boolean;
 begin
   t := private.lock_transfer(p_transfer, array['picked','in_transit']::public.stock_transfer_status[]);
+  -- ponytail: global ledger locks, shared stock-key locks across every writer at higher throughput.
+  lock table public.inventory_movements in share row exclusive mode;
+  lock table public.material_movements in share row exclusive mode;
+  if jsonb_typeof(p_lines) is distinct from 'array' or exists (select 1 from jsonb_array_elements(p_lines) e where not exists (select 1 from public.stock_transfer_lines where id = (e->>'line_id')::uuid and transfer_id = p_transfer))
+     or (select count(distinct e->>'line_id') from jsonb_array_elements(p_lines) e) <> jsonb_array_length(p_lines) then raise exception 'invalid transfer line coverage'; end if;
   for l in select * from public.stock_transfer_lines where transfer_id = p_transfer loop
     select (e->>'qty')::numeric into v_qty from jsonb_array_elements(coalesce(p_lines, '[]'::jsonb)) e where (e->>'line_id')::uuid = l.id;
     v_qty := coalesce(v_qty, l.qty_picked, l.qty);
     if l.keg_pool_id is not null and v_qty <> trunc(v_qty) then raise exception 'empty kegs must be whole units'; end if;
-    if v_qty <= 0 then continue; end if;
+    if v_qty::text in ('NaN','Infinity','-Infinity') or v_qty < 0 or v_qty > least(l.qty,coalesce(l.qty_picked,l.qty)) then raise exception 'invalid received quantity'; end if;
+    if l.material_id is not null and v_qty <> round(v_qty,4) then raise exception 'material quantities require at most four decimals'; end if;
+    if l.sku_id is not null and v_qty <> round(v_qty,2) then raise exception 'FG quantities require at most two decimals'; end if;
+    select e->'sources', e ? 'sources' into v_sources, v_explicit from jsonb_array_elements(p_lines) e where (e->>'line_id')::uuid = l.id;
+    v_sources := coalesce(v_sources, case when v_qty = 0 then '[]'::jsonb else jsonb_build_array(jsonb_build_object('lot_id', null, 'qty', v_qty)) end);
+    if jsonb_typeof(v_sources) is distinct from 'array' then raise exception 'sources must be an array'; end if;
+    if coalesce((select sum((e->>'qty')::numeric) from jsonb_array_elements(v_sources) e),0) <> v_qty or
+       (select count(distinct jsonb_build_array(e->>'lot_id')) from jsonb_array_elements(v_sources) e) <> jsonb_array_length(v_sources) then raise exception 'distinct sources must sum to received quantity'; end if;
+    if v_qty = 0 then
+      if jsonb_array_length(v_sources) <> 0 then raise exception 'zero receipt has no sources'; end if;
+      continue;
+    end if;
+    for src in select (e->>'lot_id')::uuid lot_id, (e->>'qty')::numeric qty from jsonb_array_elements(v_sources) e loop
+      if src.qty is null or src.qty::text in ('NaN','Infinity','-Infinity') or src.qty <= 0 then raise exception 'invalid source quantity'; end if;
+      if l.sku_id is not null then
+        if src.qty <> round(src.qty,2) then raise exception 'FG quantities require at most two decimals'; end if;
+        select coalesce(sum(qty),0) into v_available from public.inventory_movements where brewery_id = t.brewery_id and sku_id = l.sku_id and bin_id = l.from_bin_id and lot_id is not distinct from src.lot_id;
+        if v_available < src.qty and (coalesce(v_explicit,false) or src.lot_id is not null or exists (select 1 from public.inventory_movements where brewery_id = t.brewery_id and sku_id = l.sku_id and bin_id = l.from_bin_id and lot_id is not null)) then raise exception 'insufficient selected FG source stock'; end if;
+      elsif l.material_id is not null then
+        if src.qty <> round(src.qty,4) then raise exception 'material quantities require at most four decimals'; end if;
+        select coalesce(sum(qty),0) into v_available from public.material_movements where brewery_id = t.brewery_id and material_id = l.material_id and bin_id = l.from_bin_id and lot_id is not distinct from src.lot_id;
+        if v_available < src.qty and (coalesce(v_explicit,false) or src.lot_id is not null) then raise exception 'insufficient selected material source stock'; end if;
+      elsif src.lot_id is not null then raise exception 'empty kegs have no lot';
+      end if;
+    end loop;
     if l.sku_id is not null then
-      insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, ref, created_by)
-      values (t.brewery_id, l.sku_id, t.from_location_id, l.from_bin_id, -v_qty, 'location_transfer', t.id, auth.uid()),
-             (t.brewery_id, l.sku_id, t.to_location_id,   l.to_bin_id,    v_qty, 'location_transfer', t.id, auth.uid());
+      insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, lot_id, qty, type, ref, created_by)
+      select t.brewery_id, l.sku_id, t.from_location_id, l.from_bin_id, (e->>'lot_id')::uuid, -(e->>'qty')::numeric, 'location_transfer'::public.movement_type, t.id, auth.uid() from jsonb_array_elements(v_sources) e
+      union all select t.brewery_id, l.sku_id, t.to_location_id, l.to_bin_id, (e->>'lot_id')::uuid, (e->>'qty')::numeric, 'location_transfer'::public.movement_type, t.id, auth.uid() from jsonb_array_elements(v_sources) e;
     elsif l.material_id is not null then
-      insert into public.material_movements (brewery_id, material_id, location_id, bin_id, qty, type, note, created_by)
-      values (t.brewery_id, l.material_id, t.from_location_id, l.from_bin_id, -v_qty, 'transfer_out', 'transfer ' || t.id, auth.uid()),
-             (t.brewery_id, l.material_id, t.to_location_id,   l.to_bin_id,    v_qty, 'transfer_in',  'transfer ' || t.id, auth.uid());
+      insert into public.material_movements (brewery_id, material_id, location_id, bin_id, lot_id, qty, type, note, created_by)
+      select t.brewery_id, l.material_id, t.from_location_id, l.from_bin_id, (e->>'lot_id')::uuid, -(e->>'qty')::numeric, 'transfer_out'::public.material_movement_type, 'transfer ' || t.id, auth.uid() from jsonb_array_elements(v_sources) e
+      union all select t.brewery_id, l.material_id, t.to_location_id, l.to_bin_id, (e->>'lot_id')::uuid, (e->>'qty')::numeric, 'transfer_in'::public.material_movement_type, 'transfer ' || t.id, auth.uid() from jsonb_array_elements(v_sources) e;
     else
       insert into public.keg_events (brewery_id, pool_id, keg_size, location_id, bin_id, qty, reason, note, created_by)
       values (t.brewery_id, l.keg_pool_id, l.keg_size, t.from_location_id, l.from_bin_id, v_qty::int, 'transferred_out', 'transfer ' || t.id, auth.uid()),
@@ -5139,7 +5251,7 @@ create function move_stock_bin(
   p_brewery uuid, p_sku uuid, p_material uuid, p_keg_pool uuid, p_keg_size public.keg_size,
   p_qty numeric, p_from_bin uuid, p_to_bin uuid, p_note text, p_request_id uuid, p_material_lot uuid default null, p_sku_lot uuid default null
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_replay jsonb; v_from public.bins; v_to public.bins;
+declare v_replay jsonb; v_from public.bins; v_to public.bins; v_available numeric;
 begin
   perform private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'move_stock_bin', p_request_id,
@@ -5158,6 +5270,11 @@ begin
   if v_from.id is null or v_to.id is null then raise exception 'bin not found'; end if;
   if v_from.location_id <> v_to.location_id then raise exception 'bins are in different locations: use create_stock_transfer'; end if;
   if p_sku is not null then
+    -- ponytail: global ledger lock; migrate all writers to shared stock-key locks for throughput.
+    lock table public.inventory_movements in share row exclusive mode;
+    if p_qty <> round(p_qty,2) then raise exception 'FG quantities require at most two decimals'; end if;
+    select coalesce(sum(qty),0) into v_available from public.inventory_movements where brewery_id = p_brewery and sku_id = p_sku and bin_id = p_from_bin and lot_id is not distinct from p_sku_lot;
+    if v_available < p_qty and (p_sku_lot is not null or exists (select 1 from public.inventory_movements where brewery_id = p_brewery and sku_id = p_sku and bin_id = p_from_bin and lot_id is not null)) then raise exception 'insufficient selected FG source stock'; end if;
     insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, qty, type, lot_id, note, created_by)
     values (p_brewery, p_sku, v_from.location_id, p_from_bin, -p_qty, 'location_transfer', p_sku_lot, p_note, auth.uid()),
            (p_brewery, p_sku, v_to.location_id,   p_to_bin,    p_qty, 'location_transfer', p_sku_lot, p_note, auth.uid());
@@ -6495,7 +6612,7 @@ grant execute on function
   set_channel_price(uuid,uuid,uuid,uuid,int,uuid),
   clear_channel_price(uuid,uuid,uuid,uuid,uuid),
   replace_format_bom(uuid,uuid,jsonb,uuid),
-  record_inventory_movement(uuid,uuid,uuid,uuid,numeric,public.movement_type,uuid,text,text,uuid),
+  record_inventory_movement(uuid,uuid,uuid,uuid,numeric,public.movement_type,uuid,text,text,uuid,uuid),
   set_taproom_par(uuid,uuid,uuid,numeric,uuid),
   set_portal_fulfillment_source(uuid,uuid,uuid),
   create_order(uuid,public.order_kind,uuid,uuid,uuid,uuid,date,text,text,jsonb,uuid),

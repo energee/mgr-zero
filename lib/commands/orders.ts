@@ -2,7 +2,7 @@
 // to one plpgsql function (00001_baseline.sql, iron rule 5); this layer does
 // zod validation, role gating, and camelCase→p_* argument mapping.
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap } from "./registry";
+import { defineCommand, defineQuery, unwrap, runCommand } from "./registry";
 
 const lines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive() })).min(1);
 const salesRoles = ["admin", "sales"] as const;
@@ -112,10 +112,12 @@ defineCommand({
   roles: [...warehouseRoles], requiresConfirmation: true,
   input: z.object({
     orderId: z.string().uuid(), carrier: z.string().optional(), tracking: z.string().optional(),
-    ship: pickLines, invoiceTiming: z.enum(["now", "on_delivery"]).default("now"),
+    ship: z.array(z.object({ lineId: z.string().uuid(), qty: z.number().nonnegative().multipleOf(0.01),
+      sources: z.array(z.object({ binId: z.string().uuid(), lotId: z.string().uuid().nullable(), qty: z.number().positive().multipleOf(0.01), toBinId: z.string().uuid().optional() })).optional(),
+    })).min(1), invoiceTiming: z.enum(["now", "on_delivery"]).default("now"),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("ship_order", {
-    p_order: i.orderId, p_ship: i.ship.map(s => ({ line_id: s.lineId, qty_shipped: s.qty })),
+    p_order: i.orderId, p_ship: i.ship.map(s => ({ line_id: s.lineId, qty_shipped: s.qty, ...(s.sources === undefined ? {} : { sources: s.sources.map(a => ({ bin_id: a.binId, lot_id: a.lotId, qty: a.qty, to_bin_id: a.toBinId ?? null })) }) })),
     p_carrier: i.carrier ?? null, p_tracking: i.tracking ?? null, p_invoice_timing: i.invoiceTiming, p_request_id: execution.requestId,
   })),
 });
@@ -152,10 +154,10 @@ defineCommand({
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({
     invoiceId: z.string().uuid(), locationId: z.string().uuid(), reason: z.enum(["damaged", "wrong_item", "unsold"]),
-    lines: z.array(z.object({ invoiceLineId: z.string().uuid(), qty: z.number().positive() })).min(1),
+    lines: z.array(z.object({ invoiceLineId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01), sources: z.array(z.object({ movementId: z.string().uuid(), binId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01) })).optional() })).min(1),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("return_shipment", {
-    p_invoice: i.invoiceId, p_lines: i.lines.map(l => ({ invoice_line_id: l.invoiceLineId, qty: l.qty })),
+    p_invoice: i.invoiceId, p_lines: i.lines.map(l => ({ invoice_line_id: l.invoiceLineId, qty: l.qty, ...(l.sources === undefined ? {} : { sources: l.sources.map(a => ({ movement_id: a.movementId, bin_id: a.binId, qty: a.qty })) }) })),
     p_location: i.locationId, p_reason: i.reason, p_request_id: execution.requestId,
   })),
 });
@@ -165,10 +167,10 @@ defineCommand({
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({
     invoiceId: z.string().uuid(), locationId: z.string().uuid(), reason: z.string().min(1),
-    lines: z.array(z.object({ invoiceLineId: z.string().uuid(), qty: z.number().positive() })).min(1),
+    lines: z.array(z.object({ invoiceLineId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01), sources: z.array(z.object({ movementId: z.string().uuid(), binId: z.string().uuid(), qty: z.number().positive().multipleOf(0.01) })).optional() })).min(1),
   }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("create_credit_memo", {
-    p_invoice: i.invoiceId, p_lines: i.lines.map(l => ({ invoice_line_id: l.invoiceLineId, qty: l.qty })),
+    p_invoice: i.invoiceId, p_lines: i.lines.map(l => ({ invoice_line_id: l.invoiceLineId, qty: l.qty, ...(l.sources === undefined ? {} : { sources: l.sources.map(a => ({ movement_id: a.movementId, bin_id: a.binId, qty: a.qty })) }) })),
     p_location: i.locationId, p_reason: i.reason, p_request_id: execution.requestId,
   })),
 });
@@ -289,5 +291,43 @@ defineQuery({
       skuId: p.sku_id, sku: p.skus.name, par: Number(p.par_qty), onHand: oh.get(p.sku_id) ?? 0,
       suggested: Math.max(0, Number(p.par_qty) - (oh.get(p.sku_id) ?? 0)),
     }));
+  },
+});
+
+export type ShipSources = { stock: import("./inventory").BinMoveStock[]; bins: { id: string; name: string; location_id: string }[]; destinationBins: { id: string; name: string; location_id: string }[] };
+defineQuery({
+  name: "get_order_ship_sources", description: "Recorded source bins and lots for a picked order; no customer recall contact data",
+  roles: [...warehouseRoles], input: z.object({ orderId: z.string().uuid() }),
+  handler: async (ctx, i) => {
+    const order = await unwrap(ctx.db.from("orders").select("from_location_id,to_location_id,order_lines(sku_id)").eq("id", i.orderId).eq("brewery_id", ctx.breweryId).single());
+    if (!order) throw new Error("Order not found");
+    const [stock, bins, destinationBins] = await Promise.all([
+      runCommand("get_bin_move_stock", { locationId: order.from_location_id }, ctx) as Promise<ShipSources["stock"]>,
+      runCommand("list_bins", { locationId: order.from_location_id }, ctx) as Promise<ShipSources["bins"]>,
+      order.to_location_id ? runCommand("list_bins", { locationId: order.to_location_id }, ctx) as Promise<ShipSources["bins"]> : [],
+    ]);
+    const skus = new Set(order.order_lines.map((l: { sku_id: string }) => l.sku_id));
+    return { stock: stock.filter(s => s.kind === "sku" && skus.has(s.stock_id)), bins, destinationBins };
+  },
+});
+
+export type ReturnSource = { id: string; sku_id: string; qty: number; lot_id: string | null; lots: { code: string } | null; bins: { name: string } | null };
+defineQuery({
+  name: "get_invoice_return_sources", description: "Original shipped movements available as explicit return identities",
+  roles: [...salesRoles], input: z.object({ invoiceId: z.string().uuid() }),
+  handler: async (ctx, i) => {
+    const invoice = await unwrap(ctx.db.from("invoices").select("shipment_id").eq("id", i.invoiceId).eq("brewery_id", ctx.breweryId).single());
+    if (!invoice?.shipment_id) return [];
+    const shipment = await unwrap(ctx.db.from("shipments").select("order_id").eq("id", invoice.shipment_id).single());
+    if (!shipment) throw new Error("Shipment not found");
+    const sources: ReturnSource[] = [];
+    for (let start = 0; ; start += 500) {
+      const result = await ctx.db.from("inventory_movements").select("id,sku_id,qty,lot_id,lots(code),bins(name)", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).eq("ref", shipment.order_id).eq("type", "sale_removal").order("id").range(start, start + 499);
+      const page = await unwrap(Promise.resolve(result)) as unknown as ReturnSource[];
+      sources.push(...page);
+      if (result.count === null || (!page.length && sources.length < result.count)) throw new Error("Could not read complete shipped sources");
+      if (sources.length >= result.count) return sources;
+    }
   },
 });

@@ -53,9 +53,9 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       {order.po_number && E.fld("Customer PO", order.po_number)}
       {order.requested_ship_date && E.fld("Requested", order.requested_ship_date)}
       {order.note && E.fld("Note", order.note)}
-      <LifecycleButtons orderId={order.id} status={order.status}
+      <LifecycleButtons transfer={order.kind === "taproom_transfer"} orderId={order.id} status={order.status}
         lines={lines.map((l) => ({ skuId: l.sku_id, skuName: l.skus?.name ?? l.sku_id, qty: Number(l.qty_ordered) }))} skus={skus}
-        pickLines={lines.map((l) => ({ id: l.id, skuName: l.skus?.name ?? l.sku_id, qtyOrdered: Number(l.qty_ordered), qtyPicked: l.qty_picked === null ? null : Number(l.qty_picked) }))} />
+        pickLines={lines.map((l) => ({ id: l.id, skuId: l.sku_id, skuName: l.skus?.name ?? l.sku_id, qtyOrdered: Number(l.qty_ordered), qtyPicked: l.qty_picked === null ? null : Number(l.qty_picked) }))} />
       {E.ttl("Lines")}
       {lines.map((l) => {
         const a = atpMap.get(l.sku_id);

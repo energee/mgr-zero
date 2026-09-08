@@ -67,7 +67,7 @@ const AUTHENTICATED_RPCS = [
   "record_brew_day(uuid,uuid,uuid,numeric,date,uuid)",
   "record_cellar_transfer(uuid,uuid,uuid,numeric,numeric,uuid)",
   "record_fermentation_reading(uuid,uuid,timestamp with time zone,numeric,numeric,numeric,text,uuid)",
-  "record_inventory_movement(uuid,uuid,uuid,uuid,numeric,movement_type,uuid,text,text,uuid)",
+  "record_inventory_movement(uuid,uuid,uuid,uuid,numeric,movement_type,uuid,text,text,uuid,uuid)",
   "record_material_count(uuid,uuid,uuid,date,jsonb,uuid)",
   "record_pick(uuid,jsonb,uuid)",
   "record_repack(uuid,uuid,uuid,uuid,numeric,uuid,numeric,uuid)",

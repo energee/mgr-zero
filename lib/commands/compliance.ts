@@ -113,32 +113,51 @@ type LotRow = {
   id: string; code: string; packaged_on: string; best_by: string | null; brands: { name: string } | null;
   packaging_runs: { id: string; run_no: number | null; bbl_drawn: number | null; vessel_occupancies: { vessels: { name: string } | null; batches: { id: string; batch_no: number | null; brewed_on: string | null } | null } | null } | null;
 };
-type LotMovement = { id: string; type: string; qty: number; created_at: string; skus: { name: string } | null; locations: { name: string } | null };
+type LotMovement = { id: string; type: string; qty: number; bbl: number; sku_id: string; bin_id: string; ref: string | null; source_movement_id: string | null; created_at: string; skus: { name: string } | null; bins: { name: string } | null; locations: { name: string } | null };
 
 defineQuery({
   name: "trace_lot", description: "One finished-goods lot: its packaging run, the tank and batch it came from, every ledger movement that names the lot, and the units still on hand",
   roles: [...ROLES],
   input: z.object({ lotId: z.string().uuid() }),
   handler: async (ctx, i) => {
-    // ponytail: ship_order records no lot on its sale removals, so a shipment
-    // appears here only once pick/ship takes a lot per line (DRIFT "pick/ship
-    // lots"); until then recall contacts cannot be derived from the ledger.
-    const [lot, movements] = await Promise.all([
-      unwrap(ctx.db.from("lots")
-        .select("id, code, packaged_on, best_by, brands(name), packaging_runs(id, run_no, bbl_drawn, vessel_occupancies(vessels(name), batches(id, batch_no, brewed_on)))")
-        .eq("id", i.lotId).eq("brewery_id", ctx.breweryId).single()) as unknown as Promise<LotRow>,
-      rows<LotMovement>(ctx.db.from("inventory_movements").select("id, type, qty, created_at, skus(name), locations(name)")
-        .eq("brewery_id", ctx.breweryId).eq("lot_id", i.lotId).order("created_at")),
-    ]);
+    const lot = await unwrap(ctx.db.from("lots")
+      .select("id, code, packaged_on, best_by, brands(name), packaging_runs(id, run_no, bbl_drawn, vessel_occupancies(vessels(name), batches(id, batch_no, brewed_on)))")
+      .eq("id", i.lotId).eq("brewery_id", ctx.breweryId).single()) as unknown as LotRow;
+    const movements: LotMovement[] = [];
+    for (let start = 0; ; start += 500) {
+      const result = await ctx.db.from("inventory_movements").select("id,type,qty,bbl,sku_id,bin_id,ref,source_movement_id,created_at,skus(name),bins(name),locations(name)", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).eq("lot_id", i.lotId).order("created_at").order("id").range(start, start + 499);
+      const page = await unwrap(Promise.resolve(result)) as unknown as LotMovement[];
+      movements.push(...page);
+      if (result.count === null || (!page.length && movements.length < result.count)) throw new Error("Could not read complete lot trace");
+      if (movements.length >= result.count) break;
+    }
+    const orderIds = [...new Set(movements.filter(m => m.type === "sale_removal" && m.ref).map(m => m.ref!))];
+    const recipients = [];
+    // Small batches keep URL size bounded; each unique order has one shipment.
+    for (let start = 0; start < orderIds.length; start += 100) {
+      const orders = await unwrap(ctx.db.from("orders").select("id,order_no,customers(id,name),ship_tos(id,label,address1,address2,city,state,zip),shipments(id,carrier,tracking,invoices(id,invoice_no))")
+        .eq("brewery_id", ctx.breweryId).in("id", orderIds.slice(start, start + 100)));
+      recipients.push(...(orders ?? []));
+    }
     const run = lot.packaging_runs;
     const occ = run?.vessel_occupancies;
-    const moves = movements.map((m) => ({ id: m.id, type: m.type, qty: Number(m.qty), created_at: m.created_at, sku: m.skus?.name ?? "", location: m.locations?.name ?? "" }));
+    const moves = movements.map((m) => ({ id: m.id, type: m.type, qty: Number(m.qty), bbl: Number(m.bbl), sku_id: m.sku_id, bin_id: m.bin_id, bin: m.bins?.name ?? "", ref: m.ref, source_movement_id: m.source_movement_id, created_at: m.created_at, sku: m.skus?.name ?? "", location: m.locations?.name ?? "" }));
+    const balances = new Map<string, { sku_id: string; sku: string; bin_id: string; bin: string; location: string; qty: number; bbl: number }>();
+    for (const m of moves) {
+      const key = `${m.sku_id}:${m.bin_id}`;
+      const b = balances.get(key) ?? { sku_id: m.sku_id, sku: m.sku, bin_id: m.bin_id, bin: m.bin, location: m.location, qty: 0, bbl: 0 };
+      b.qty += m.qty; b.bbl += m.bbl; balances.set(key, b);
+    }
     return {
       lot: { id: lot.id, code: lot.code, brand: lot.brands?.name ?? "", packaged_on: lot.packaged_on, best_by: lot.best_by },
       run: run ? { id: run.id, run_no: run.run_no, bbl_drawn: run.bbl_drawn, vessel: occ?.vessels?.name ?? "" } : null,
       batch: occ?.batches ?? null,
       movements: moves,
-      on_hand: moves.reduce((n, m) => n + m.qty, 0),
+      balances: [...balances.values()], on_hand_bbl: moves.reduce((n, m) => n + m.bbl, 0), recipients,
+      // Compatibility only when all units are the same SKU; never sum package units.
+      on_hand: new Set(moves.map(m => m.sku_id)).size <= 1 ? moves.reduce((n, m) => n + m.qty, 0) : null,
+      warning: "Only recorded lot identities are traced. Historical untracked stock and consumption cannot be assigned to this lot.",
     };
   },
 });
