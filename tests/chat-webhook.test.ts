@@ -163,7 +163,7 @@ describe("receipt-first Slack actions", () => {
   it("returns 503 on a durable mutation failure and retries once without worker theft", async () => {
     const token = await issue("mgr_unlink");
     const raw = actionBody(token,"mgr_unlink");
-    expect(new URL(adminUrl).port).toBe("54352");
+    expect(new URL(adminUrl).port).toBe(process.env.CI === "true" ? "54342" : "54352");
     // A real PostgreSQL failure after receipt insertion and before intent commit.
     await sql.query(`create function public.test_chat_action_failure() returns trigger language plpgsql set search_path='' as $$ begin
       if new.user_id='${actorId}'::uuid and new.state='unlinked' then raise exception 'test_action_failure'; end if; return new; end $$`);
