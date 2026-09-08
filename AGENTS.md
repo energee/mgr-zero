@@ -35,6 +35,14 @@ database (as CI already has) and stop touching the dev one.
   active `chat_installations` row, and every past run left a fake one behind.
   `update chat_installations set state = 'disconnected' where state = 'active'`
   clears it (no seed creates installations, so every active row is a leftover).
+- Conversion must not invent a SKU, ATP, unit, or barrel volume the command
+  did not return.
+- Conversion must not default `backHref` (or other live paths) on fixture
+  adapters; inventory `E.back`/`E.act` stay `"#"` unless the caller passed href.
+- Conversion must not drop live verbs (Pick vs Open, Reorder on detail, Question
+  on every invoice state) or suppress `question` / `footer={null}` slots.
+- Conversion must not ship a customer-visible field or verb without updating
+  `content/docs/staff-guide.mdx` and/or `portal-guide.mdx`.
 
 ## Where to look
 

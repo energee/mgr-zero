@@ -3,13 +3,13 @@
 // chip filters by `?status=`. New order opens order-form.tsx; the
 // customer→ship-to lookup it needs is pre-loaded here (one get_customer per
 // customer) so the sheet needs no client-side round trip.
-import { E } from "@/components/mgr/e";
 import { LinkTabs, WORK_CHIPS } from "@/components/mgr/work-tabs";
+import { OrdersView } from "@/components/mgr/views/orders-list";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
-import { docNo } from "@/lib/mgr/doc-no";
-import { nextAction, type OrderStatus } from "@/lib/mgr/order-status";
+import { toOrdersListViewProps } from "@/lib/mgr/orders-list-view";
+import { type OrderStatus } from "@/lib/mgr/order-status";
 import "@/lib/commands/all";
 import { OrderForm, type CustomerOption, type LocationOption, type SkuOption } from "./order-form";
 
@@ -33,24 +33,16 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const locations: LocationOption[] = locationRows.map((l) => ({ id: l.id, name: l.name, kind: l.kind }));
   const skus: SkuOption[] = skuRows.map((s) => ({ id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name }));
   return (
-    <>
-      {E.hd("Work", `${brewery.role} default`, <OrderForm customers={customers} locations={locations} skus={skus} />)}
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <LinkTabs items={WORK_CHIPS} current="orders" className="w-full md:w-fit" />
-        <LinkTabs items={[["all", "/orders"], ...STATUSES.map((s): [string, string] => [s, `/orders?status=${s}`])]} current={status ?? "all"} className="w-full justify-start overflow-x-auto md:w-fit" />
-      </div>
-      {orders.length === 0
-        ? E.blank(status ? `No ${status} orders` : "No orders yet")
-        : orders.map((o) => {
-            const { verb, tone, href } = nextAction(o.status, o.needs_restock, o.id);
-            return (
-              <div key={o.id}>
-                {E.row(`${docNo("ORD", o.order_no, "Order")} · ${o.customers?.name ?? "transfer"}`,
-                  `${o.status}${o.requested_ship_date ? ` · ships ${o.requested_ship_date}` : ""}${o.needs_restock ? " · restock staged" : ""}`,
-                  E.act(verb, tone, href), o.needs_restock ? "w" : "")}
-              </div>
-            );
-          })}
-    </>
+    <OrdersView
+      model={toOrdersListViewProps({ role: brewery.role, status, orders })}
+      createAction={<OrderForm customers={customers} locations={locations} skus={skus} />}
+      linkRows
+      filters={(
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <LinkTabs items={WORK_CHIPS} current="orders" className="w-full md:w-fit" />
+          <LinkTabs items={[["all", "/orders"], ...STATUSES.map((s): [string, string] => [s, `/orders?status=${s}`])]} current={status ?? "all"} className="w-full justify-start overflow-x-auto md:w-fit" />
+        </div>
+      )}
+    />
   );
 }

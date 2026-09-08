@@ -2,11 +2,13 @@
 // (portal_catalog) and cart (cart.tsx). The ship-to list has no portal
 // command (RLS's customer_own policy lets the caller read their own ship_tos
 // directly), so it's queried here via ctx.db rather than adding a command
-// for a single select-list read.
-import { E } from "@/components/mgr/e";
+// for a single select-list read. Live catalog stays Cart (E.stq is not a
+// controlled input); ShopView draws the Order heading.
+import { ShopView } from "@/components/mgr/views/shop";
 import { getActiveCustomer } from "@/lib/portal";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand, unwrap } from "@/lib/commands/registry";
+import { toShopViewProps } from "@/lib/mgr/shop-view";
 import "@/lib/commands/all";
 import { Cart, type CatalogItem, type ShipToOption } from "./cart";
 
@@ -21,9 +23,19 @@ export default async function ShopPage() {
   ]);
   const shipToOptions: ShipToOption[] = shipTos.map((s) => ({ id: s.id, label: `${s.label} (${s.city}, ${s.state})` }));
   return (
-    <>
-      {E.hd("Order", customer.customerName)}
-      {items.length ? <Cart items={items} shipTos={shipToOptions} /> : E.blank("Nothing is listed for wholesale yet. Call the brewery.")}
-    </>
+    <ShopView
+      model={toShopViewProps({
+        customer: { id: customer.customerId, name: customer.customerName },
+        shipTos: shipTos.map((s) => ({ id: s.id, label: s.label, address1: "", city: s.city, state: s.state, zip: "" })),
+        shipToId: shipTos[0]?.id ?? "",
+        requestedDate: "",
+        source: { name: "Warehouse" },
+        catalog: items.map((i) => ({ skuId: i.skuId, name: i.name, product: i.product, unitPriceCents: i.unitPriceCents, badge: "in", qty: 0 })),
+        depositCentsPerKeg: 3000,
+      })}
+      catalog={items.length ? <Cart items={items} shipTos={shipToOptions} /> : undefined}
+      comingUp={null}
+      footer={null}
+    />
   );
 }

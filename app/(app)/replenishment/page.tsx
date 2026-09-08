@@ -1,15 +1,15 @@
 // app/(app)/replenishment/page.tsx — Pars and allocation (screen record) for
-// a taproom: pick a taproom (via ?location=) to see its par, on hand and
-// suggested gap per SKU from replenishment_suggestions, then
-// replenish-form.tsx picks a source warehouse and submits
-// create_replenishment_order. ponytail: the par and standing-allocation
-// edits (set_taproom_par, set_standing_allocation, release_allocation) are
-// registered but still wait for their forms (TODO.md quick wins).
-import { E } from "@/components/mgr/e";
+// a taproom: pick a taproom (via ?location=) to see standing allocations and
+// replenishment suggestions, then replenish-form.tsx submits
+// create_replenishment_order. Order-allocation Adjust/Release rows wait on a
+// dedicated join; the inventory fixture already draws them. Live never invents
+// a SKU, ATP, or barrel volume.
 import { LinkTabs } from "@/components/mgr/work-tabs";
+import { ParsView } from "@/components/mgr/views/pars";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
+import { toParsViewProps, type ParsStandingAllocation } from "@/lib/mgr/pars-view";
 import "@/lib/commands/all";
 import { ReplenishForm } from "./replenish-form";
 
@@ -24,14 +24,33 @@ export default async function ReplenishmentPage({ searchParams }: { searchParams
   const taprooms = locationRows.filter((l) => l.kind === "taproom");
   const warehouses = locationRows.filter((l) => l.kind === "warehouse");
   const toLocationId = location ?? taprooms[0]?.id;
-  const suggestions = toLocationId ? ((await runCommand("replenishment_suggestions", { locationId: toLocationId }, ctx)) as Suggestion[]) : [];
+  const taproom = taprooms.find((t) => t.id === toLocationId);
+  const [suggestions, standing] = toLocationId
+    ? await Promise.all([
+      runCommand("replenishment_suggestions", { locationId: toLocationId }, ctx) as Promise<Suggestion[]>,
+      runCommand("list_standing_allocations", { locationId: toLocationId }, ctx) as Promise<ParsStandingAllocation[]>,
+    ])
+    : [[], []] as [Suggestion[], ParsStandingAllocation[]];
+  const standingRows = standing.map((a) => ({
+    ...a,
+    locations: taproom ? { name: taproom.name } : a.locations,
+  }));
   return (
-    <>
-      {E.back("Finished goods", "Pars and allocation", undefined, "/inventory")}
-      {taprooms.length === 0
-        ? E.blank("No taprooms yet: add one under Locations")
-        : <LinkTabs items={taprooms.map((t): [string, string] => [t.name, `/replenishment?location=${t.id}`])} current={taprooms.find((t) => t.id === toLocationId)?.name ?? ""} className="w-full md:w-fit" />}
-      {toLocationId && <ReplenishForm toLocationId={toLocationId} warehouses={warehouses.map((w) => ({ id: w.id, name: w.name }))} suggestions={suggestions} />}
-    </>
+    <ParsView
+      linkRows
+      empty={taprooms.length === 0 ? "No taprooms yet: add one under Locations" : undefined}
+      model={toParsViewProps({
+        orderAllocations: [],
+        standing: standingRows,
+        par: null,
+        backHref: "/inventory",
+      })}
+      filters={taprooms.length === 0
+        ? undefined
+        : <LinkTabs items={taprooms.map((t): [string, string] => [t.name, `/replenishment?location=${t.id}`])} current={taproom?.name ?? ""} className="w-full md:w-fit" />}
+      footer={toLocationId
+        ? <ReplenishForm toLocationId={toLocationId} warehouses={warehouses.map((w) => ({ id: w.id, name: w.name }))} suggestions={suggestions} />
+        : undefined}
+    />
   );
 }

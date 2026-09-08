@@ -1,9 +1,10 @@
 // app/(app)/locations/[id]/bins/page.tsx — Location bins: list_bins for one
 // location, Add/Edit via bin-form.tsx. Warehouse or admin.
-import { E } from "@/components/mgr/e";
+import { LocationBinsView } from "@/components/mgr/views/location-bins";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
+import { toLocationBinsViewProps } from "@/lib/mgr/location-bins-view";
 import "@/lib/commands/all";
 import { isUuid } from "@/lib/commands/context";
 import { notFound } from "next/navigation";
@@ -22,11 +23,15 @@ export default async function LocationBinsPage({ params }: { params: Promise<{ i
   const bins = (await runCommand("list_bins", { locationId: id }, ctx)) as BinRow[];
   const canWrite = brewery.role === "admin" || brewery.role === "warehouse";
   return (
-    <>
-      {E.back(location.name, "Bins", canWrite ? <BinForm locationId={id} /> : undefined, `/locations/${id}`)}
-      {bins.map((b) => (
-        <div key={b.id}>{E.row(b.name, "", canWrite ? <BinForm locationId={id} bin={b} /> : undefined)}</div>
-      ))}
-    </>
+    <LocationBinsView
+      model={toLocationBinsViewProps({ location, bins, backHref: `/locations/${id}` })}
+      createAction={canWrite ? <BinForm locationId={id} /> : null}
+      bins={bins.map((b) => ({
+        key: b.id,
+        title: b.name,
+        detail: "",
+        action: canWrite ? <BinForm locationId={id} bin={b} /> : undefined,
+      }))}
+    />
   );
 }
