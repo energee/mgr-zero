@@ -74,7 +74,7 @@ const AUTHENTICATED_RPCS = [
   "set_brewery_quiet_hours(uuid,time without time zone,time without time zone)",
   "set_my_gravity_unit(uuid,text,uuid)",
   "set_notification_destination(uuid,text)",
-  "set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text)",
+  "set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text,boolean,uuid)",
   "set_portal_fulfillment_source(uuid,uuid,uuid)",
   "set_channel_price(uuid,uuid,uuid,uuid,integer,uuid)",
   "set_standing_allocation(uuid,uuid,numeric,uuid)",
@@ -84,7 +84,9 @@ const AUTHENTICATED_RPCS = [
   "submit_order(uuid,uuid)",
   "submit_stock_transfer(uuid,uuid)",
   "today_live_reasons()",
-  "unlink_chat_user(uuid)",
+  "unlink_chat_user(uuid,uuid)",
+  "set_personal_quiet_hours(uuid,time without time zone,time without time zone,text,uuid)",
+  "snooze_notification(uuid,uuid,timestamp with time zone,uuid)",
   "update_bin(uuid,uuid,text,uuid)",
   "update_draft_order(uuid,uuid,date,text,text,jsonb,uuid)",
   "update_location(uuid,uuid,text,location_kind,uuid)",
@@ -121,4 +123,14 @@ describe("authenticated RPC allowlist", () => {
     // same comparator on both sides: Postgres collation orders punctuation differently from JS
     expect([...actual].sort()).toEqual([...AUTHENTICATED_RPCS].sort());
   });
+});
+
+
+it("grants action issuance and receipt consumption only to the service owner", () => {
+  expect(sql(`select p.proname || ':' || r.role from pg_proc p
+    cross join (values ('anon'),('authenticated'),('service_role')) r(role)
+    where p.pronamespace='public'::regnamespace and p.proname in ('issue_chat_action_intent','consume_chat_action_intent')
+      and has_function_privilege(r.role,p.oid,'execute') order by 1`)).toEqual([
+    "consume_chat_action_intent:service_role", "issue_chat_action_intent:service_role",
+  ]);
 });

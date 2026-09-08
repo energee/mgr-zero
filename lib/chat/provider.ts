@@ -13,7 +13,7 @@ export interface ChatProviderTransport {
   validateDestination(input: { installationId: string; destinationId: string }): Promise<DestinationCheck>;
   send(input: { installationId: string; destinationId: string; notification: PortableNotification; intentId: string }): Promise<ProviderMessageRef>;
   update(input: { installationId: string; ref: ProviderMessageRef; notification: PortableNotification; intentId: string; resolved?: boolean }): Promise<void>;
-  publishHome(input: { installationId: string; externalUserId: string; items: readonly PortableNotification[]; linkUrl?: string }): Promise<void>;
+  publishHome(input: { installationId: string; externalUserId: string; items: readonly PortableNotification[]; linkUrl?: string; intents?: Record<string, string> }): Promise<void>;
 }
 
 /** Classified provider failure: retryable (with optional provider delay) or permanent. */

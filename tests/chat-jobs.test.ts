@@ -7,7 +7,7 @@
 import { randomBytes } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
-import { admin, channelId, makeBrewery, makeStaffCtx, priceSku } from "./helpers";
+import { DB, admin, channelId, makeBrewery, makeStaffCtx, priceSku } from "./helpers";
 import type { ChatProviderTransport } from "@/lib/chat/provider";
 import { SLACK_CAPABILITIES } from "@/lib/chat/slack-transport";
 import { authorizeJob } from "@/lib/chat/job-auth";
@@ -18,14 +18,14 @@ import "@/lib/commands/all";
 process.env.APP_URL = "https://mgr.test";
 process.env.CHAT_JOB_SECRET = "job-secret";
 
-const adminUrl = process.env.POSTGRES_URL ?? "postgresql://postgres:postgres@127.0.0.1:54342/postgres";
+const adminUrl = DB;
 const sql = new pg.Pool({ connectionString: adminUrl });
 
 type Ctx = Awaited<ReturnType<typeof makeStaffCtx>>;
 let b: { id: string }, adminCtx: Ctx, sales: Ctx, inst: { id: string; external_installation_id: string };
 let customerId: string, shipToId: string, whId: string, whBinId: string, skuId: string;
 
-const calls = { sends: [] as { destinationId: string; at: number; notification: { subject: { safeLabel: string }; detail: string } }[], updates: [] as { ref: { messageId: string }; resolved?: boolean }[], homes: [] as { externalUserId: string; items: readonly unknown[]; linkUrl?: string }[] };
+const calls = { sends: [] as { destinationId: string; at: number; notification: { subject: { safeLabel: string }; detail: string; actions: readonly { id: string; intentId?: string }[] } }[], updates: [] as { ref: { messageId: string }; resolved?: boolean }[], homes: [] as { externalUserId: string; items: readonly unknown[]; linkUrl?: string; intents?: Record<string,string> }[] };
 let failNext: unknown = null;
 let validation: { ok: true } | { ok: false; reason: string } = { ok: true };
 const transport: ChatProviderTransport = {
@@ -33,7 +33,7 @@ const transport: ChatProviderTransport = {
   validateDestination: async () => validation,
   send: async (i) => { if (failNext) { const e = failNext; failNext = null; throw e; } calls.sends.push({ destinationId: i.destinationId, at: Date.now(), notification: i.notification }); return { conversationId: i.destinationId, messageId: `m${calls.sends.length}` }; },
   update: async (i) => { if (failNext) { const e = failNext; failNext = null; throw e; } calls.updates.push({ ref: i.ref, resolved: i.resolved }); },
-  publishHome: async (i) => { calls.homes.push({ externalUserId: i.externalUserId, items: i.items, linkUrl: i.linkUrl }); },
+  publishHome: async (i) => { calls.homes.push({ externalUserId: i.externalUserId, items: i.items, linkUrl: i.linkUrl, intents: i.intents }); },
 };
 
 async function ins<T = { id: string }>(table: string, row: Record<string, unknown>): Promise<T> {
@@ -106,6 +106,8 @@ describe("callback batch (App Home)", () => {
     expect(result.processed).toBeGreaterThanOrEqual(2); // the claim is global; other suites may leave receipts
     const linked = calls.homes.find((h) => h.externalUserId === "U-sales")!;
     expect(linked.linkUrl).toBeUndefined();
+    expect(Object.keys(linked.intents!)).toEqual(["mgr_preferences", "mgr_refresh", "mgr_unlink"]);
+    expect(Object.values(linked.intents!).every(id => /^[0-9a-f-]{36}$/.test(id))).toBe(true);
     expect(linked.items.length).toBeGreaterThanOrEqual(1);
     expect(JSON.stringify(linked.items)).toMatch(/ORD-\d{4}/);
     const stranger = calls.homes.find((h) => h.externalUserId === "U-stranger")!;
@@ -125,6 +127,7 @@ describe("delivery batch", () => {
     const before = await deliveriesOf(first);
     expect(before.every((d) => d.state === "queued")).toBe(true);
     const result = await deliver();
+    expect(calls.sends.every(s => s.notification.actions.some(a => a.id === "snooze" && /^[0-9a-f-]{36}$/.test(a.intentId!)))).toBe(true);
     expect(result.sent).toBe(4); // 2 orders × (admin + sales)
     for (const orderId of [first, second]) {
       for (const d of await deliveriesOf(orderId)) {

@@ -71,10 +71,10 @@ export class SlackTransport implements ChatProviderTransport {
     await this.clientFor(installationId).updateMessage({ channel: ref.conversationId, ts: ref.messageId, text, blocks });
   }
 
-  async publishHome({ installationId, externalUserId, items, linkUrl }: { installationId: string; externalUserId: string; items: readonly PortableNotification[]; linkUrl?: string }): Promise<void> {
+  async publishHome({ installationId, externalUserId, items, linkUrl, intents }: { installationId: string; externalUserId: string; items: readonly PortableNotification[]; linkUrl?: string; intents?: Record<string, string> }): Promise<void> {
     const view = linkUrl
       ? renderSlackHome({ linked: false, linkUrl, mgrBaseUrl: this.o.mgrBaseUrl })
-      : renderSlackHome({ linked: true, items, mgrBaseUrl: this.o.mgrBaseUrl });
+      : renderSlackHome({ linked: true, items, intents, mgrBaseUrl: this.o.mgrBaseUrl });
     await this.clientFor(installationId).publishHome({ userId: externalUserId, view });
   }
 }

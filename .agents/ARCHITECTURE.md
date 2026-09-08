@@ -113,7 +113,8 @@ a gap to close, not a convention to trust.
    webhooks and scheduled jobs where no user exists, may call only the named
    `service_role` chat RPCs (`scan_chat_*`, `lease_chat_deliveries`,
    `complete/retry/suppress_chat_delivery`, `claim/complete_chat_callback_receipt`,
-   `issue_chat_link_proof`, `resolve_chat_actor`, `reconcile_chat_installation`),
+   `issue_chat_link_proof`, `resolve_chat_actor`, `reconcile_chat_installation`,
+   `issue_chat_action_intent`, `consume_chat_action_intent`),
    never ordinary domain commands, and never mints a user token.
    *Enforced by:* `no-restricted-imports` in `eslint.config.mjs`, run in CI.
 5. **Every mutation is one idempotent Postgres transaction.**

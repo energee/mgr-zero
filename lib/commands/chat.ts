@@ -7,7 +7,7 @@ import { defineCommand, defineQuery, unwrap, STAFF_ROLES } from "./registry";
 import { sha256 } from "@/lib/chat/linking";
 
 const REASONS = ["submitted_order", "pick_due", "restock_due", "delivery_next", "fermentation_reading_overdue", "invoice_question", "operations_digest"] as const;
-const hhmm = z.string().regex(/^\d{2}:\d{2}$/, "HH:MM");
+const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "HH:MM");
 const quietHours = z.object({ start: hhmm, end: hhmm, timezone: z.string().min(1).optional() }).nullable().optional();
 
 defineCommand({
@@ -15,8 +15,9 @@ defineCommand({
   description: "Mute/unmute one notification reason for yourself and optionally override your quiet hours (chat delivery only; MGR Today is unaffected)",
   input: z.object({ reason: z.enum(REASONS), enabled: z.boolean(), quietHours }),
   roles: STAFF_ROLES,
-  handler: async (ctx, i) => {
+  handler: async (ctx, i, execution) => {
     await unwrap(ctx.db.rpc("set_notification_preference", {
+      p_request_id: execution.requestId, p_set_quiet: i.quietHours !== undefined,
       p_brewery: ctx.breweryId, p_reason: i.reason, p_enabled: i.enabled,
       p_quiet_start: i.quietHours?.start ?? null, p_quiet_end: i.quietHours?.end ?? null, p_quiet_tz: i.quietHours?.timezone ?? null,
     }));
@@ -61,7 +62,7 @@ defineCommand({
   description: "Unlink a Slack user from MGR (own link, or any link as admin); stops personal delivery",
   input: z.object({ linkId: z.string().uuid() }),
   roles: STAFF_ROLES,
-  handler: async (ctx, i) => { await unwrap(ctx.db.rpc("unlink_chat_user", { p_link: i.linkId })); return { ok: true }; },
+  handler: async (ctx, i, execution) => { await unwrap(ctx.db.rpc("unlink_chat_user", { p_link: i.linkId, p_request_id: execution.requestId })); return { ok: true }; },
 });
 
 defineQuery({
@@ -76,4 +77,25 @@ defineQuery({
     );
     return link ? { linked: true as const, linkId: link.id, linkedAt: link.linked_at } : { linked: false as const };
   },
+});
+
+
+defineCommand({
+  name: "snooze_notification",
+  description: "Delay one personal chat reminder for up to seven days; Today due state is unchanged",
+  input: z.object({ deliveryId: z.string().uuid(), until: z.iso.datetime({ offset: true }) }),
+  roles: STAFF_ROLES,
+  handler: async (ctx, i, execution) => await unwrap(ctx.db.rpc("snooze_notification", {
+    p_brewery: ctx.breweryId, p_delivery: i.deliveryId, p_until: i.until, p_request_id: execution.requestId,
+  })) as { ok: true },
+});
+
+defineCommand({
+  name: "set_personal_quiet_hours",
+  description: "Override personal chat quiet hours for every reason; null clears the override",
+  input: z.object({ start: hhmm.nullable(), end: hhmm.nullable(), timezone: z.string().min(1).nullable().optional() }),
+  roles: STAFF_ROLES,
+  handler: async (ctx, i, execution) => await unwrap(ctx.db.rpc("set_personal_quiet_hours", {
+    p_brewery: ctx.breweryId, p_start: i.start, p_end: i.end, p_timezone: i.timezone ?? null, p_request_id: execution.requestId,
+  })) as { ok: true },
 });

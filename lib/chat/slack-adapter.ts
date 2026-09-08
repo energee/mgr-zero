@@ -2,6 +2,9 @@
 // Postgres state, and the SlackOAuthPort the lifecycle services call in
 // production. Multi-workspace mode: tokens live encrypted in chat_sdk state.
 import { Chat } from "chat";
+import { createHmac, timingSafeEqual } from "node:crypto";
+import { consumeSlackInteraction, SLACK_ACTION_IDS, type SlackInteraction } from "./jobs";
+import { renderSlackPreferences } from "./slack-renderer";
 import { createSlackAdapter, type SlackAdapter } from "@chat-adapter/slack";
 import { chatState } from "./state";
 import type { SlackOAuthPort } from "./oauth";
@@ -28,7 +31,33 @@ export function slackAdapter(): SlackAdapter {
 }
 
 export function chat(): Chat<{ slack: SlackAdapter }> {
-  instance ??= new Chat({ userName: "mgr", adapters: { slack: slackAdapter() }, state: chatState() });
+  if (!instance) {
+    instance = new Chat({ userName: "mgr", adapters: { slack: slackAdapter() }, state: chatState() });
+    instance.onAction(SLACK_ACTION_IDS, async (event) => {
+      const payload = event.raw as SlackInteraction;
+      const result = await consumeSlackInteraction(payload);
+      if (event.actionId === "mgr_preferences" && result.disposition === "processed" && result.intentId && event.triggerId) {
+        const installation = await slackAdapter().getInstallation(payload.team.id);
+        if (installation) {
+          // SDK openModal wraps metadata with its own context. Direct Block Kit
+          // keeps private_metadata exactly the issued opaque intent UUID.
+          try {
+            await slackAdapter().webClient.views.open({ token: installation.botToken, trigger_id: event.triggerId,
+              view: renderSlackPreferences(result.intentId, result.quietHours) as never });
+          } catch {
+            // Authenticated settings is always present beside Preferences in Home.
+            // An expired/unsupported provider trigger must never execute a form.
+          }
+        }
+      }
+    });
+    instance.onModalSubmit("mgr_save_preferences", async (event) => {
+      const result = await consumeSlackInteraction(event.raw as SlackInteraction);
+      return result.disposition === "processed" ? { action: "close" as const } : {
+        action: "errors" as const, errors: { reason: result.code === "invalid_action" ? "Check the reason and quiet hours; times must be HH:MM with a valid timezone." : "This form expired. Reopen Preferences or use MGR settings." },
+      };
+    });
+  }
   return instance;
 }
 
@@ -95,4 +124,15 @@ export function slackOAuthPort(): SlackOAuthPort {
     getInstallation: (id) => chatReady().then(() => slack.getInstallation(id)),
     deleteInstallation: (id) => chatReady().then(() => slack.deleteInstallation(id)),
   };
+}
+
+
+// Interactive receipts must exist before SDK dispatch. The SDK still verifies
+// again; this exact-byte check is the pre-dispatch durability boundary.
+export function validSlackSignature(request: Request, raw: string): boolean {
+  const timestamp = request.headers.get("x-slack-request-timestamp") ?? "";
+  const signature = request.headers.get("x-slack-signature") ?? "";
+  if (!/^\d+$/.test(timestamp) || Math.abs(Date.now() / 1000 - Number(timestamp)) > 300 || !/^v0=[0-9a-f]{64}$/.test(signature)) return false;
+  const expected = "v0=" + createHmac("sha256", required("SLACK_SIGNING_SECRET")).update(`v0:${timestamp}:${raw}`).digest("hex");
+  return timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
 }

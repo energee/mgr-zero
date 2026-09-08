@@ -71,6 +71,7 @@ type DeliveryContext = {
   destination: { id: string; kind: "personal" | "private_channel"; external_destination_id: string; state: string; user_id: string | null };
   installation: { id: string; state: string; external_installation_id: string; provider: string; brewery_id: string };
   link_active: boolean;
+  external_user_id: string | null;
   preference_enabled: boolean;
   counts: Record<string, number> | null;
 };
@@ -142,7 +143,7 @@ export async function runChatCallbackBatch({ limit = 25, now = new Date(), db = 
       } else {
         await unwrap(db.rpc("scan_chat_notification_occurrences", { p_brewery: r.brewery_id, p_now: now.toISOString() }));
         const fresh = ((await unwrap(db.rpc("get_chat_home_items", { p_installation: r.installation_id, p_external_user_id: r.external_user_id }))) as Occurrence[] | null) ?? [];
-        await transport.publishHome({ installationId: r.external_installation_id, externalUserId: r.external_user_id, items: fresh.map(toNotification) });
+        await transport.publishHome({ installationId: r.external_installation_id, externalUserId: r.external_user_id, items: fresh.map(toNotification), intents: await homeIntents(db, r.installation_id, r.external_user_id) });
       }
       await done("processed"); processed++;
     } catch (e) {
@@ -179,6 +180,14 @@ export async function runChatDeliveryBatch({ limit = 50, now = new Date(), db = 
     const notification = ctx.occurrence.reason === "operations_digest" ? digestNotification(ctx) : toNotification(ctx.occurrence);
     const installationId = ctx.installation.external_installation_id;
     try {
+      if (personal && !resolved) {
+        for (const [id, action, label] of [["snooze", "mgr_snooze", "Snooze 1 hour"], ["mute_reason", "mgr_mute_reason", "Mute this reason"]] as const) {
+          const intentId = await unwrap(db.rpc("issue_chat_action_intent", {
+            p_installation: ctx.installation.id, p_external_user_id: ctx.external_user_id, p_action: action, p_delivery: lease.id,
+          })) as string | null;
+          if (intentId) notification.actions = [...notification.actions, { id, label, intentId, enabled: true }];
+        }
+      }
       if (!personal && !existing) {
         const check = await transport.validateDestination({ installationId, destinationId: ctx.destination.external_destination_id });
         if (!check.ok) {
@@ -220,4 +229,58 @@ export async function cleanupChatState({ now = new Date(), pool = chatStatePool(
     deleted += r.rowCount ?? 0;
   }
   return { deleted };
+}
+
+// The raw body is authenticated before this boundary. Only its hash and
+// routing identifiers enter the receipt; form values are never logged/stored.
+export type SlackInteraction = {
+  team: { id: string }; user: { id: string }; type: string; trigger_id?: string;
+  actions?: { action_id: string; value?: string }[];
+  view?: { id: string; callback_id: string; private_metadata?: string; state?: { values?: Record<string, Record<string, { value?: string; selected_option?: { value: string } }>> } };
+};
+export const SLACK_ACTION_IDS = ["mgr_open", "mgr_snooze", "mgr_mute_reason", "mgr_preferences", "mgr_refresh", "mgr_unlink"];
+function isSlackInteraction(p: SlackInteraction | null): p is SlackInteraction {
+  if (typeof p?.team?.id !== "string" || typeof p.user?.id !== "string" || !p.team.id || !p.user.id || p.team.id.length > 200 || p.user.id.length > 200) return false;
+  return (p.type === "block_actions" && Array.isArray(p.actions) && p.actions.length === 1 && SLACK_ACTION_IDS.includes(p.actions[0]?.action_id))
+    || (p.type === "view_submission" && p.view?.callback_id === "mgr_save_preferences" && !!p.view.state?.values);
+}
+export function slackInteraction(raw: string): SlackInteraction | null {
+  try {
+    const p = JSON.parse(new URLSearchParams(raw).get("payload") ?? "null") as SlackInteraction | null;
+    return isSlackInteraction(p) ? p : null;
+  } catch { return null; }
+}
+export async function recordSlackInteraction(p: SlackInteraction) {
+  const hash = createHash("sha256").update(JSON.stringify(p)).digest("hex");
+  return await unwrap(serviceClient().rpc("record_chat_callback_receipt", {
+    p_provider: "slack", p_external_installation_id: p.team.id, p_external_user_id: p.user.id,
+    p_callback_id: hash, p_callback_kind: p.type === "view_submission" ? "mgr_save_preferences" : p.actions![0].action_id,
+    p_payload_hash: hash,
+  })) as { receipt_id: string; disposition: string; duplicate: boolean; result: { disposition: string; intentId?: string } | null } | null;
+}
+export async function consumeSlackInteraction(p: SlackInteraction) {
+  if (!isSlackInteraction(p)) return { disposition: "ignored" };
+  const receipt = await recordSlackInteraction(p);
+  if (!receipt) return { disposition: "ignored" };
+  const action = p.type === "view_submission" ? "mgr_save_preferences" : p.actions![0].action_id;
+  const token = p.type === "view_submission" ? p.view?.private_metadata : p.actions![0].value;
+  // Invalid metadata cannot reach a UUID cast or an error message containing provider input.
+  const intent = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token ?? "") ? token : null;
+  const values = p.view?.state?.values ?? {};
+  const field = (name: string) => values[name]?.[name]?.selected_option?.value ?? values[name]?.[name]?.value ?? "";
+  const input = action === "mgr_save_preferences" ? {
+    reason: field("reason"), enabled: field("enabled") === "true" ? true : field("enabled") === "false" ? false : null, start: field("start"), end: field("end"), timezone: field("timezone"),
+  } : {};
+  return await unwrap(serviceClient().rpc("consume_chat_action_intent", {
+    p_receipt: receipt.receipt_id, p_intent: intent, p_action: action, p_input: input,
+  })) as { disposition: string; code?: string; intentId?: string; quietHours?: { start: string | null; end: string | null; timezone: string | null } };
+}
+
+async function homeIntents(db: SupabaseClient, installationId: string, externalUserId: string) {
+  const actions: Record<string, string> = {};
+  for (const action of ["mgr_preferences", "mgr_refresh", "mgr_unlink"]) {
+    const id = await unwrap(db.rpc("issue_chat_action_intent", { p_installation: installationId, p_external_user_id: externalUserId, p_action: action, p_delivery: null }));
+    if (id) actions[action] = id as string;
+  }
+  return actions;
 }
