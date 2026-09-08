@@ -3,10 +3,11 @@
 // ship-to-form.tsx, and links to its keg balance and orders. Portal-user
 // invites stay gated until Program 11. An unknown or malformed id renders
 // not-found.tsx.
-import { E } from "@/components/mgr/e";
+import { CustomerView } from "@/components/mgr/views/customer";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
+import { toCustomerViewProps } from "@/lib/mgr/customer-view";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { CustomerForm } from "../customer-form";
@@ -29,20 +30,18 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       customer={{ id: customer.id, name: customer.name, type: customer.type, state: customer.state, saleChannelId: customer.sale_channel_id, licenseNumber: customer.license_no, paymentTerms: customer.payment_terms }} />
   );
   return (
-    <>
-      {E.back("Customers", customer.name, edit, "/customers")}
-      {E.fld("Type", customer.type)}
-      {E.fld("State", customer.state)}
-      {E.fld("License number", customer.license_no ?? "none")}
-      {E.fld("Terms", customer.payment_terms)}
-      {E.fld("Sale channel", customer.sale_channels.name)}
-      {E.ttl("Ship-tos")}
-      {shipTos.map((s) => (
-        <div key={s.id}>{E.row(s.label, `${s.address1}${s.address2 ? `, ${s.address2}` : ""} · ${s.city}, ${s.state} ${s.zip}`, <ShipToForm customerId={customer.id} shipTo={s} />)}</div>
-      ))}
-      <ShipToForm customerId={customer.id} />
-      {E.gated("Portal users", "invitations aren’t available yet")}
-      {E.row("Customer keg balance", "kegs out and deposits held", E.act("Open", "primary", `/kegs/customers/${customer.id}`))}
-    </>
+    <CustomerView
+      model={toCustomerViewProps({ customer, shipTos })}
+      headerAction={edit}
+      readOnly
+      kegHref={`/kegs/customers/${customer.id}`}
+      addShipTo={<ShipToForm customerId={customer.id} />}
+      shipTos={shipTos.map((s) => ({
+        key: s.id,
+        title: s.label,
+        detail: `${s.address1}${s.address2 ? `, ${s.address2}` : ""} · ${s.city}, ${s.state} ${s.zip}`,
+        action: <ShipToForm customerId={customer.id} shipTo={s} />,
+      }))}
+    />
   );
 }

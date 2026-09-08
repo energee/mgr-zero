@@ -25,6 +25,8 @@ import { E } from "@/components/mgr/e";
 import { AdjustLinesView } from "@/components/mgr/views/adjust-lines";
 import { CompleteTransferView } from "@/components/mgr/views/complete-transfer";
 import { ConfirmOrderView } from "@/components/mgr/views/confirm-order";
+import { CustomerView } from "@/components/mgr/views/customer";
+import { CustomersView } from "@/components/mgr/views/customers";
 import { InvoiceView } from "@/components/mgr/views/invoice";
 import { NewOrderView } from "@/components/mgr/views/new-order";
 import { OrderView } from "@/components/mgr/views/order";
@@ -42,11 +44,13 @@ import { PutBackView } from "@/components/mgr/views/put-back";
 import { QuestionInvoiceView } from "@/components/mgr/views/question-invoice";
 import { ReturnCreditView } from "@/components/mgr/views/return-credit";
 import { ReviewOrderView } from "@/components/mgr/views/review-order";
+import { ShipToView } from "@/components/mgr/views/ship-to";
 import { ShipView } from "@/components/mgr/views/ship";
 import { ShipmentDoneView } from "@/components/mgr/views/shipment-done";
 import { ShopView } from "@/components/mgr/views/shop";
 import { ShortPickView } from "@/components/mgr/views/short-pick";
 import { OHIO_STOUT_NOTE, LOC_TAPROOM, LOC_WAREHOUSE } from "@/lib/mgr/fixtures/demo";
+import { customerRidgeline, customersList, shipToMain } from "@/lib/mgr/fixtures/customers";
 import { invoiceFailedAls } from "@/lib/mgr/fixtures/invoice";
 import { completeTransferTape, newOrderDraft, orderPickedRestock, orderPickedRestockPutBack, orderSubmittedRidgeline, orderTransferComplete, ordersWorkList } from "@/lib/mgr/fixtures/orders";
 import { orderAdjustLines, orderPick, orderReturnCredit, orderShipInvoice, orderShipOnDelivery, orderShipmentDone, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
@@ -59,6 +63,8 @@ import { portalOrderShipped, portalOrdersList } from "@/lib/mgr/fixtures/portal-
 import { toAdjustLinesViewProps } from "@/lib/mgr/adjust-lines-view";
 import { toCompleteTransferViewProps } from "@/lib/mgr/complete-transfer-view";
 import { toConfirmOrderViewProps } from "@/lib/mgr/confirm-order-view";
+import { toCustomerViewProps } from "@/lib/mgr/customer-view";
+import { toCustomersViewProps } from "@/lib/mgr/customers-view";
 import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
 import { toNewOrderViewProps } from "@/lib/mgr/new-order-view";
 import { toOrderViewProps } from "@/lib/mgr/order-view";
@@ -76,6 +82,7 @@ import { toPutBackViewProps } from "@/lib/mgr/put-back-view";
 import { toQuestionInvoiceViewProps } from "@/lib/mgr/question-invoice-view";
 import { toReviewOrderViewProps } from "@/lib/mgr/review-order-view";
 import { toReturnCreditViewProps } from "@/lib/mgr/return-credit-view";
+import { toShipToViewProps } from "@/lib/mgr/ship-to-view";
 import { toShipViewProps } from "@/lib/mgr/ship-view";
 import { toShipmentDoneViewProps } from "@/lib/mgr/shipment-done-view";
 import { toShopViewProps } from "@/lib/mgr/shop-view";
@@ -1298,12 +1305,7 @@ export const SCREENS: Screen[] = [
     reads: "list_customers · get_customer",
     writes: "invite_customer_user [IMPLEMENTATION-GATE: harden Auth + membership workflow before UI] · upsert_customer · upsert_ship_to",
     states: DEFAULT_STATES,
-    body: (<>
-      {E.back("More", "Customers", E.btn("Add customer"))}
-      {E.search("Search customers")}
-      {E.row("Ridgeline Tap Room", "retailer · PA · 2 portal users", E.act("Open"))}
-      {E.row("Al’s Bar", "retailer · OH · brewery remits", E.act("Open"), "w")}
-    </>),
+    body: <CustomersView model={toCustomersViewProps(customersList)} />,
   },
   {
     step: 5,
@@ -1315,20 +1317,7 @@ export const SCREENS: Screen[] = [
     writes: "upsert_customer",
     states: [["permission", "sales or admin required", 1], ["active", "may place orders"], ["inactive", "history remains"], ["license warning", "renewal needs review", 1]],
     spec: "The list opens a named account; related operational records remain links rather than inline editors.",
-    body: (<>
-      {E.back("Customers", "Ridgeline Tap Room")}
-      {E.edit("Customer name", "Ridgeline Tap Room")}
-      {E.pick("Type", "Retailer", ["Retailer", "Distributor"])}
-      {E.edit("License number", "PA R-55821")}
-      {E.edit("Terms", "Net 30")}
-      {E.pick("Sale channel", "Wholesale", CHANNELS)}
-      {E.pick("Tax treatment", "Inherit from channel", ["Inherit from channel", ...TAX_TREATMENTS])}
-      {E.nav("Ship-tos", "Main · Dock")}
-      {E.row("Portal users", "2 active", E.act("Invite"))}
-      {E.nav("Customer keg balance", "38 out · $1,140 deposits held")}
-      {E.nav("Orders", "3 open · 42 total")}
-      {E.btn("Save customer")}
-    </>),
+    body: <CustomerView model={toCustomerViewProps(customerRidgeline)} />,
   },
   {
     step: 5,
@@ -1359,16 +1348,7 @@ export const SCREENS: Screen[] = [
     writes: "upsert_ship_to",
     states: [["permission", "sales or admin required", 1], ["new", "address required"], ["existing", "orders keep their frozen destination"], ["default", "new orders select it first"]],
     spec: "Editing an address never rewrites the destination recorded on an existing order.",
-    body: (<>
-      {E.ttl("Main ship-to")}
-      {E.inp("Label", "Main")}
-      {E.inp("Address", "114 Bridge St")}
-      {E.inp("City", "Phoenixville")}
-      {E.inp("State", "PA")}
-      {E.inp("Postal code", "19460")}
-      {E.row("Default ship-to", "selected first on new orders", E.sw(true, "Default ship-to"), "ok")}
-      {E.btn("Save ship-to")}
-    </>),
+    body: <ShipToView model={toShipToViewProps(shipToMain)} />,
   },
   {
     step: 5,
