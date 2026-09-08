@@ -55,3 +55,9 @@ Parent reports screenshots viewed and sessions closed: Team staff invite → act
 Single staff role and buyer membership only. No roles-array migration, customer Account admin, invite resend/revocation, or existing-account attachment. Removed staff access is not repaired by replay. Invitation email delivery itself is not exactly-once. Wizard/invite request identity survives only while the page stays open; no offline outbox or reload restoration. Sequential import RPCs remain capped at 5000 rows. `MGR_DEDICATED=1` disables hosted web creation only; authenticated API/database bootstrap remain available.
 
 No unresolved task-local issue found. Whole-program completion is deliberately left for parent validation/review.
+
+## Review fix round 1
+
+- Corrected first-run guide prose and screen spec to the existing `!hasLocation && !hasBrand` condition: it appears only while neither exists; adding either a location or a brand ends the checklist. No application behavior changed.
+- `bunx vitest run tests/docs.test.ts tests/design-docs.test.ts`: 2 files passed, 15 tests passed (3.43s), output pristine.
+- `git diff --check`: clean. API counts unchanged.

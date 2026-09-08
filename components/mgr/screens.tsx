@@ -709,7 +709,7 @@ export const SCREENS: Screen[] = [
     reads: "get_first_run_state",
     writes: "invite_staff [existing] · create_location",
     states: permitted("admin only"),
-    spec: "Admin sees this until a location and brand exist. Import and staff invitation are optional and do not block onboarding. Team and first-run use the same staff invitation form with one role.",
+    spec: "Admin sees this only while neither a location nor a brand exists; adding either ends the checklist. Import and staff invitation are optional and do not block onboarding. Team and first-run use the same staff invitation form with one role.",
     body: (<>
       {E.hd("Set up Demo Brewing", "5 steps")}
       {E.row("1 · Add locations", "inline form expanded", "in progress", "ok")}
