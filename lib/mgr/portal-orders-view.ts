@@ -9,6 +9,7 @@ export type PortalOrdersRowView = {
   title: string;
   detail: string;
   href: string;
+  actionHref?: string;
   verb?: "Reorder" | "Continue / edit";
   warning?: boolean;
 };
@@ -68,7 +69,8 @@ export function toPortalOrdersViewProps({ customerName, breweryName, orders }: P
         key: o.id,
         title: docNo("ORD", o.order_no, "Order"),
         detail: total === undefined ? status : `${status} · ${money(total)}`,
-        href: reorder ? `/portal?reorder=${o.id}` : o.status === "draft" ? `/portal?draft=${o.id}` : `/portal/orders/${o.id}`,
+        href: `/portal/orders/${o.id}`,
+        actionHref: reorder ? `/portal?reorder=${o.id}` : o.status === "draft" ? `/portal?draft=${o.id}` : undefined,
         verb: reorder ? "Reorder" : o.status === "draft" ? "Continue / edit" : undefined,
         warning: Boolean(adjusted),
       };

@@ -1720,7 +1720,7 @@ export const SCREENS: Screen[] = [
     reads: "portal_invoice",
     writes: "raise_invoice_question",
     states: [["sent", "the buyer sees it went · nothing on the invoice changes"], ["received", "a sales Today row names the invoice and the buyer"], ["no chat provider", "the Today row is the whole delivery · no email is sent", 1], ["answered", "Mark answered on the Invoice frame clears the sales row"]],
-    spec: "Off Pay invoice and Payment unavailable. The buyer writes a note and it has to land somewhere a person will see: it writes a question row that appears on the sales Today list, and rides the chat integration as a personal message when one is connected. Nothing on the invoice changes.",
+    spec: "Available on unpaid and paid invoices and credit memos. The buyer writes a note and it has to land somewhere a person will see: it writes a question row that appears on the sales Today list, and rides the chat integration as a personal message when one is connected. Nothing on the invoice changes.",
     body: <QuestionInvoiceView model={toQuestionInvoiceViewProps(portalInvoiceUnpaid)} />,
   },
   {

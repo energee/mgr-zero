@@ -18,6 +18,9 @@ export type PortalInvoiceViewModel = {
   due?: string;
   paidOn?: string;
   paid: boolean;
+  kind: "invoice" | "credit_memo";
+  issued: string;
+  status: "Credit" | "Paid" | "Unpaid";
   breweryName: string;
   breweryPhone: string | null;
   lines: PortalInvoiceLineView[];
@@ -57,7 +60,10 @@ export function toPortalInvoiceViewProps({ invoice, lines, brewery }: PortalInvo
     total: money(invoice.total_cents),
     due: invoice.due_on ?? undefined,
     paidOn: invoice.paid_at ? day(invoice.paid_at) : undefined,
-    paid: invoice.paid_at !== null || credit,
+    paid: !credit && invoice.paid_at !== null,
+    kind: invoice.kind,
+    issued: invoice.issued_on,
+    status: credit ? "Credit" : invoice.paid_at ? "Paid" : "Unpaid",
     breweryName: brewery.name,
     breweryPhone: brewery.customer_phone,
     lines: lines.map((l) => ({

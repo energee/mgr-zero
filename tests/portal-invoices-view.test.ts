@@ -159,7 +159,7 @@ describe("Portal invoice view", () => {
     expect(html).toMatch(/Question this invoice/);
   });
 
-  it("the paid drawing still shows Download PDF and no Question", () => {
+  it("the paid drawing keeps Question alongside its fixture PDF action", () => {
     const html = htmlOf(createElement(PortalInvoiceView, {
       model: toPortalInvoiceViewProps(portalInvoicePaid),
       variant: "paid",
@@ -170,7 +170,7 @@ describe("Portal invoice view", () => {
     expect(html).toMatch(/2026-08-29/);
     expect(html).toMatch(/>Download PDF</);
     expect(html).not.toMatch(/>Pay invoice</);
-    expect(html).not.toMatch(/Question this invoice/);
+    expect(html).toMatch(/Question this invoice/);
     expect(html).not.toMatch(/Unpaid/);
   });
 

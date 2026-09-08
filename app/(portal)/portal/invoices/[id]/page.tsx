@@ -20,6 +20,7 @@ export default async function PortalInvoicePage({ params }: { params: Promise<{ 
   return (
     <PortalInvoiceView
       model={model}
+      footer={null}
       question={<QuestionForm invoiceId={snapshot.invoice.id} label={`${model.title} · ${model.total}`} />}
     />
   );
