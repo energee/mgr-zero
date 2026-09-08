@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { E } from "@/components/mgr/e";
 import { SlackMark } from "@/components/mgr/brand-icons";
 import { getActiveBrewery } from "@/lib/brewery";
+import { isChatConfigured } from "@/lib/chat/oauth";
 import { buildContext } from "@/lib/commands/context";
 import { runCommand } from "@/lib/commands/registry";
 import type { ChatHealth } from "@/lib/commands/chat";
@@ -18,7 +19,7 @@ export default async function ChatSettingsPage({ searchParams }: { searchParams:
     runCommand("get_brewery_operating_defaults", {}, ctx) as Promise<{ timezone: string; fermentation_reading_due_hours: number }>, searchParams,
   ]);
   const installation = health.installation;
-  const configured = ["APP_URL", "SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SLACK_SIGNING_SECRET", "CHAT_SDK_ENCRYPTION_KEY", "CHAT_STATE_DATABASE_URL"].every((key) => Boolean(process.env[key]));
+  const configured = isChatConfigured();
   const connected = installation && !["disconnected", "pending"].includes(installation.state);
   return <>
     {E.back("Settings", "Chat", undefined, "/settings")}

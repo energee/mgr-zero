@@ -5,9 +5,15 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
+import { chatCredentialHasOtherOwner, cleanupChatInstallation, failChatCredentialStore, withChatLifecycleLock } from "./jobs";
 
 export const PROVIDER = "slack";
 export const REQUIRED_SLACK_SCOPES = ["chat:write", "im:write", "groups:read"] as const;
+const CHAT_ENV = ["APP_URL", "SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SLACK_SIGNING_SECRET", "CHAT_SDK_ENCRYPTION_KEY", "CHAT_STATE_DATABASE_URL"] as const;
+
+export function isChatConfigured() {
+  return CHAT_ENV.every((key) => Boolean(process.env[key]));
+}
 
 export type SlackOAuthPort = {
   handleOAuthCallback(request: Request, options: { redirectUri: string }): Promise<{
@@ -77,7 +83,6 @@ const sameScopes = (granted: readonly string[]) =>
 // Exchange into memory, then activate the mapping before publishing credentials.
 // Rejected activation never touches another workspace owner’s SDK key.
 export async function completeSlackInstall(db: SupabaseClient, request: Request, port: SlackOAuthPort, redirectUri: string) {
-  const { withChatLifecycleLock } = await import("./jobs");
   return withChatLifecycleLock(() => completeSlackInstallLocked(db, request, port, redirectUri));
 }
 
@@ -90,7 +95,6 @@ async function completeSlackInstallLocked(db: SupabaseClient, request: Request, 
   if (!intent) throw new CommandError("oauth state invalid", 400);
   if (intent.consumed_at && intent.state === "active") {
     if (!await port.getInstallation(intent.external_installation_id)) {
-      const { failChatCredentialStore } = await import("./jobs");
       return failChatCredentialStore(intent.installation_id);
     }
     return { installationId: intent.installation_id, breweryId: intent.brewery_id, replayed: true };
@@ -115,7 +119,6 @@ async function completeSlackInstallLocked(db: SupabaseClient, request: Request, 
   try {
     await granted.persist();
   } catch {
-    const { failChatCredentialStore } = await import("./jobs");
     return failChatCredentialStore(intent.installation_id);
   }
   return { installationId: result.installation_id, breweryId: intent.brewery_id, replayed: result.replayed };
@@ -124,7 +127,6 @@ async function completeSlackInstallLocked(db: SupabaseClient, request: Request, 
 // Reconciler entry point for a partial install: the token exists but the MGR
 // row never activated. Runs with the service-role client from a job.
 export async function reconcileSlackInstall(db: SupabaseClient, installationId: string, port: SlackOAuthPort) {
-  const { withChatLifecycleLock } = await import("./jobs");
   return withChatLifecycleLock(() => reconcileSlackInstallLocked(db, installationId, port));
 }
 
@@ -135,9 +137,7 @@ async function reconcileSlackInstallLocked(db: SupabaseClient, installationId: s
     .eq("id", installationId)
     .single();
   if (!r) throw new CommandError("installation not found", 404);
-  const credentialOwner = await unwrap(db.from("chat_installations").select("id").eq("provider", "slack")
-    .eq("external_installation_id", r.external_installation_id).eq("token_store_key", `slack:installation:${r.external_installation_id}`).limit(1));
-  if (credentialOwner?.length) return { credentialDeleted: false };
+  if (await chatCredentialHasOtherOwner(db, r.external_installation_id)) return { credentialDeleted: false };
   let credentialDeleted = false;
   if (r.state !== "active" && !r.external_installation_id.startsWith("pending:")) {
     credentialDeleted = await port
@@ -157,6 +157,5 @@ async function reconcileSlackInstallLocked(db: SupabaseClient, installationId: s
 export async function disconnectSlackInstallation(ctx: Ctx, installationId: string, port: Pick<SlackOAuthPort, "deleteInstallation">, requestId: string = randomUUID()) {
   if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
   await rpc(ctx.db, "disconnect_chat_installation", { p_brewery: ctx.breweryId, p_installation: installationId, p_request_id: requestId });
-  const { cleanupChatInstallation } = await import("./jobs");
   return cleanupChatInstallation(ctx, installationId, port);
 }
