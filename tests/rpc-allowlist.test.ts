@@ -38,6 +38,7 @@ const AUTHENTICATED_RPCS = [
   "disable_chat_installation(uuid)",
   "disconnect_chat_installation(uuid)",
   "draft_purchase_order_from_requirements(uuid,uuid[],uuid)",
+  "file_compliance_report(uuid,text,date,date,text,uuid)",
   "find_chat_oauth_intent(text)",
   "generate_compliance_report(uuid,text,date,date)",
   "get_today_items(uuid,timestamp with time zone)",

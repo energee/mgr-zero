@@ -78,3 +78,19 @@ defineQuery({
   roles: [...ROLES], input: period,
   handler: (ctx, i) => unwrap(ctx.db.rpc("generate_compliance_report", { p_brewery: ctx.breweryId, p_jurisdiction: i.jurisdiction, p_start: i.periodStart, p_end: i.periodEnd })) as Promise<Report>,
 });
+
+export type Filing = { id: string; jurisdiction: string; period_start: string; period_end: string; figures: Report["figures"]; filed_at: string | null; filed_by: string | null; note: string | null; created_at: string };
+
+defineCommand({
+  name: "file_compliance_report", description: "Generate the period report and save it as the immutable filed snapshot; refused when the report does not balance or the period is already filed. MGR does not transmit the filing",
+  roles: [...ROLES], input: period.extend({ note: z.string().optional() }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("file_compliance_report", {
+    p_brewery: ctx.breweryId, p_jurisdiction: i.jurisdiction, p_start: i.periodStart, p_end: i.periodEnd, p_note: i.note ?? null, p_request_id: execution.requestId,
+  })),
+});
+
+defineQuery({
+  name: "list_compliance_reports", description: "Every filed snapshot, newest period first",
+  roles: [...ROLES], input: z.object({}),
+  handler: (ctx) => rows<Filing>(ctx.db.from("report_filings").select("*").eq("brewery_id", ctx.breweryId).order("period_start", { ascending: false }).order("jurisdiction")),
+});

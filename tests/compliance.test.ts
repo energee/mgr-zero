@@ -3,7 +3,7 @@
 // generated from the movement ledger, the immutable filed snapshot, and the
 // lot trace. MGR never transmits a filing.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, channelId, makeBrewery, makeStaffCtx, seedCatalog, seedLocation } from "./helpers";
+import { admin, channelId, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -104,5 +104,47 @@ describe("generate_compliance_report", () => {
   it("warehouse cannot generate", async () => {
     const warehouse = await makeStaffCtx(b.id, "warehouse");
     await expect(runCommand("generate_compliance_report", PERIOD, warehouse)).rejects.toMatchObject({ status: 403 });
+  });
+});
+
+describe("file_compliance_report", () => {
+  const PERIOD = { jurisdiction: "TTB", periodStart: "2026-09-01", periodEnd: "2026-09-30" };
+  const exec = (requestId: string) => ({ requestId, correlationId: crypto.randomUUID() });
+
+  it("files the generated figures as an immutable snapshot, replays by request id, and refuses a second filing of the period", async () => {
+    const requestId = crypto.randomUUID();
+    const filed = await runCommand("file_compliance_report", { ...PERIOD, note: "filed on pay.gov" }, sales, exec(requestId)) as { id: string; figures: Report["figures"]; filed_by: string };
+    expect(filed.figures.balances).toBe(true);
+    expect(filed.filed_by).toBe(sales.userId);
+    expect(filed.figures.removals.taxable).toBe(2.29);
+    // zeros are 0.00 in the stored snapshot, never blank
+    const [text] = sql(`select figures::text from report_filings where id = '${filed.id}'`);
+    expect(text).toContain('"begin": 0.00');
+    // the same request id returns the same filing
+    const again = await runCommand("file_compliance_report", { ...PERIOD, note: "filed on pay.gov" }, sales, exec(requestId)) as { id: string };
+    expect(again.id).toBe(filed.id);
+    // a new request for the same period is a second filing: refused
+    await expect(runCommand("file_compliance_report", PERIOD, sales, exec(crypto.randomUUID()))).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("a movement added after filing does not change the snapshot, and the list shows the filing", async () => {
+    const { data: filedRow } = await admin.from("report_filings").select("id, figures").eq("brewery_id", b.id).eq("period_start", "2026-09-01").single();
+    const [loc] = (await admin.from("locations").select("id, bins(id)").eq("brewery_id", b.id).limit(1)).data as unknown as { id: string; bins: { id: string }[] }[];
+    const { data: sku } = await admin.from("skus").select("id").eq("brewery_id", b.id).limit(1).single();
+    await admin.from("inventory_movements").insert({ brewery_id: b.id, sku_id: sku!.id, location_id: loc.id, bin_id: loc.bins[0].id, qty: 7, type: "opening_balance", created_by: sales.userId, created_at: "2026-09-20T12:00:00Z" });
+    const live = await runCommand("generate_compliance_report", { jurisdiction: "TTB", periodStart: "2026-09-01", periodEnd: "2026-09-30" }, sales) as Report;
+    const { data: after } = await admin.from("report_filings").select("figures").eq("id", filedRow!.id).single();
+    expect(after!.figures).toEqual(filedRow!.figures);
+    expect(live.figures).not.toEqual(filedRow!.figures);
+    const list = await runCommand("list_compliance_reports", {}, sales) as { id: string; jurisdiction: string; period_start: string; filed_at: string | null; figures: Report["figures"] }[];
+    expect(list.map((f) => f.period_start)).toEqual(["2026-09-01"]);
+    expect(list[0].filed_at).toBeTruthy();
+  });
+
+  it("an empty brewery files zeros: a report with nothing in it still balances", async () => {
+    const empty = await makeBrewery();
+    const ctx = await makeStaffCtx(empty.id, "admin");
+    const filed = await runCommand("file_compliance_report", { jurisdiction: "US-PA", periodStart: "2026-08-01", periodEnd: "2026-08-31" }, ctx) as { figures: Report["figures"] };
+    expect(filed.figures.lines.map((l) => l.end)).toEqual([0, 0, 0]);
   });
 });

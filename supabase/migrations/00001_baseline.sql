@@ -3559,6 +3559,32 @@ begin
     'warnings', to_jsonb(coalesce(v_off, '{}'::text[]) || coalesce(v_unknown, '{}'::text[])));
 end $$;
 
+-- Filing freezes the generated figures as the jsonb snapshot that was actually
+-- filed (brewing-domain: a filed month is never rewritten). MGR does not
+-- transmit anything. A report that does not balance cannot be filed; the
+-- period's unique key makes a second filing a conflict, while the same
+-- request id replays the first.
+create function file_compliance_report(p_brewery uuid, p_jurisdiction text, p_start date, p_end date, p_note text, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_report jsonb; v_row public.report_filings;
+begin
+  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'file_compliance_report', p_request_id,
+    jsonb_build_object('jurisdiction', p_jurisdiction, 'start', p_start, 'end', p_end, 'note', p_note));
+  if v_replay is not null then return v_replay; end if;
+  v_report := public.generate_compliance_report(p_brewery, p_jurisdiction, p_start, p_end);
+  if not (v_report->'figures'->>'balances')::boolean then
+    raise exception 'the report does not balance: %', array_to_string(array(select jsonb_array_elements_text(v_report->'warnings')), '; ');
+  end if;
+  begin
+    insert into public.report_filings (brewery_id, jurisdiction, period_start, period_end, figures, filed_at, filed_by, note)
+      values (p_brewery, p_jurisdiction, p_start, p_end, v_report->'figures', now(), auth.uid(), p_note) returning * into v_row;
+  exception when unique_violation then
+    raise exception 'this period is already filed' using errcode = 'MG409';
+  end;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
 create function save_route(
   p_brewery uuid, p_id uuid, p_name text, p_delivery_date date, p_driver uuid, p_vehicle text, p_note text, p_stops jsonb, p_request_id uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
@@ -6031,7 +6057,8 @@ grant execute on function
   upsert_brand_approval(uuid,uuid,uuid,public.approval_kind,text,date,date,text,uuid),
   upsert_state_registration(uuid,uuid,text,text,date,date,uuid),
   upsert_brewery_state_license(uuid,text,text,text,date,text,uuid),
-  generate_compliance_report(uuid,text,date,date)
+  generate_compliance_report(uuid,text,date,date),
+  file_compliance_report(uuid,text,date,date,text,uuid)
   to authenticated;
 grant usage on schema private, extensions to service_role;
 -- service_role reaches `private` only for the UUID default its seed inserts
