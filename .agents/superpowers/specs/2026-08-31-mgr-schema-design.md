@@ -736,7 +736,9 @@ from the brand and format; it retains its stable ID, active state, UPC and provi
 mappings, but stops carrying its own package facts or `bbl_per_unit`. The trigger
 `enforce_bbl_integrity()` reads it through the format. **Safe for history** —
 `inventory_movements.bbl` is frozen at write time, so correcting a format later
-cannot move past movements.
+cannot move past movements. Closed packaging yield reads those linked frozen output
+movements, not today’s format volume. Correcting a definition affects future
+calculations and open plans; recorded material consumption is likewise unchanged.
 
 Atomic-format volume entry accepts a per-instance subset of `oz`, `gal`, `bbl`, `mL`
 and `L`; the command converts the entered value to canonical bbl before writing.

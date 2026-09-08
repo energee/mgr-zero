@@ -1888,12 +1888,11 @@ create view product_volume_requirements with (security_invoker = true) as
 
 create view packaging_run_yields with (security_invoker = true) as
   select r.id as run_id, r.brewery_id, r.bbl_drawn,
-         coalesce(sum(o.qty_actual * f.bbl_per_unit), 0) as bbl_packaged,
-         r.bbl_drawn - coalesce(sum(o.qty_actual * f.bbl_per_unit), 0) as loss_bbl
+         coalesce(sum(m.bbl), 0) as bbl_packaged,
+         r.bbl_drawn - coalesce(sum(m.bbl), 0) as loss_bbl
   from packaging_runs r
   left join packaging_run_outputs o on o.run_id = r.id
-  left join skus s on s.id = o.sku_id
-  left join format_volumes f on f.id = s.format_id
+  left join inventory_movements m on m.id = o.movement_id and m.brewery_id = r.brewery_id
   where r.closed_at is not null
   group by r.id;
 
@@ -3316,7 +3315,8 @@ begin
   v_replay := private.claim_command_request(p_brewery, 'replace_format_bom', p_request_id,
     jsonb_build_object('brewery', p_brewery, 'format', p_format, 'lines', p_lines));
   if v_replay is not null then return v_replay; end if;
-  if not exists (select 1 from public.formats where id = p_format and brewery_id = p_brewery) then raise exception 'format not found'; end if;
+  perform 1 from public.formats where id = p_format and brewery_id = p_brewery for update;
+  if not found then raise exception 'format not found'; end if;
   delete from public.format_bom where format_id = p_format;
   for l in select (e->>'material_id')::uuid as material_id, (e->>'qty_per_unit')::numeric as qty,
                   coalesce(e->>'on_break', 'consumed')::public.format_material_disposition as on_break

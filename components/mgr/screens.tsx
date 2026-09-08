@@ -1643,7 +1643,7 @@ export const SCREENS: Screen[] = [
     reads: "get_format_composition",
     writes: "replace_format_bom",
     states: [["permission", "sales or admin required", 1], ["complete", "every material has a quantity"], ["empty", "the Format consumes no tracked packaging"]],
-    spec: "The BOM belongs entirely to the Format. A different material list requires another Format; SKUs never override it.",
+    spec: "The BOM belongs entirely to the Format. A different physical package requires another Format; correcting its existing definition affects future calculations, not recorded consumption. SKUs never override it.",
     body: (<>
       {E.nav("Format", "case · 24×16 oz")}
       {E.row("16 oz can", "quantity 24", E.act("Edit"))}
@@ -1689,7 +1689,7 @@ export const SCREENS: Screen[] = [
     reads: "list_formats",
     writes: "create_sku · update_sku",
     states: [["permission", "sales or admin required", 1], ["active", "available to price and sell"], ["inactive", "history remains", 1], ["in use", "format cannot change; create another SKU", 1]],
-    spec: "A SKU is one brand × one packaged format. It owns active state, optional UPC, and provider mappings. Price lives on the grid cell (sale channel × price group × format), never as a SKU exception. Group-shared barcodes are a follow-on table; until then a SKU may carry its own UPC. Name, volume and packaging derive from the Format. A different volume or BOM is a different Format.",
+    spec: "A SKU is one brand × one packaged format. It owns active state, optional UPC, and provider mappings. Price lives on the grid cell (sale channel × price group × format), never as a SKU exception. Group-shared barcodes are a follow-on table; until then a SKU may carry its own UPC. Name, volume and packaging derive from the Format. A different physical package is a different Format. Corrections affect future calculations and open plans; recorded movement volumes and closed packaging yield stay frozen.",
     body: (<>
       {E.pick("Format", "½ bbl keg", ["½ bbl keg", "⅙ bbl keg", "case · 24×16 oz"])}
       {E.row("Active", "available to price and sell", E.sw(true, "Active"))}

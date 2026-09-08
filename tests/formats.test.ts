@@ -1,8 +1,9 @@
 // tests/formats.test.ts — a format is the physical shape and the only place
 // bbl_per_unit is typed (schema §16.2); packaged formats hold stock, poured
 // ones are a ratio back to a keg and hold none.
+import pg from "pg";
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaffCtx, seedLocation } from "./helpers";
+import { admin, makeBrewery, makeStaffCtx, seedLocation, seedMaterial, DB } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -31,7 +32,7 @@ describe("formats", () => {
 });
 
 describe("format_components", () => {
-  it("a case of six four-packs derives 6 × child bbl; a sku on it freezes that volume; cycles and second levels are rejected", async () => {
+  it("a case of six four-packs derives 6 × child bbl; a movement freezes that volume; cycles and second levels are rejected", async () => {
     const four = await runCommand("upsert_format", { name: "4pk 16oz", basis: "packaged", packageType: "can", bblPerUnit: 0.002 }, ctx) as { id: string };
     const caseFmt = await runCommand("upsert_format", { name: "case 24×16oz", basis: "packaged", packageType: "can" }, ctx) as { id: string };
     const { data: brand } = await admin.from("brands").insert({ brewery_id: ctx.breweryId, name: "Comp IPA" }).select("id").single();
@@ -114,4 +115,37 @@ describe("large format replacement sets", () => {
     expect(reloaded.components).toEqual(detail.components);
     expect(reloaded.lines).toEqual(detail.lines);
   });
+});
+
+it("serializes complete BOM replacements, preserves replay, and rolls back invalid replacement", async () => {
+  const fmt = await runCommand("upsert_format", { name: "Concurrent BOM", basis: "packaged", packageType: "can", bblPerUnit: 0.01 }, ctx) as { id: string };
+  const materials = await Promise.all(["A", "B"].map(name => seedMaterial(ctx.breweryId, { name: `Concurrent ${name}`, category: "packaging", uom: "each" })));
+  const clients = [new pg.Client({ connectionString: DB }), new pg.Client({ connectionString: DB }), new pg.Client({ connectionString: DB })];
+  const ids = [crypto.randomUUID(), crypto.randomUUID()];
+  const args = materials.map((id, i) => [ctx.breweryId, fmt.id, JSON.stringify([{ material_id: id, qty_per_unit: 1 }]), ids[i]]);
+  const query = "select replace_format_bom($1,$2,$3,$4) as result";
+  try {
+    await Promise.all(clients.map(c => c.connect()));
+    for (const c of clients.slice(0, 2)) {
+      await c.query("begin; set local role authenticated");
+      await c.query("select set_config('request.jwt.claim.sub', $1, true)", [ctx.userId]);
+    }
+    const first = await clients[0].query(query, args[0]);
+    const pid = (await clients[1].query("select pg_backend_pid() as pid")).rows[0].pid;
+    const second = clients[1].query(query, args[1]);
+    // Hold A uncommitted until B either blocks on it or finishes the old buggy RPC.
+    await expect.poll(async () => (await clients[2].query("select query like 'select replace_format_bom%' and (state = 'idle in transaction' or wait_event_type = 'Lock') as reached from pg_stat_activity where pid=$1", [pid])).rows[0].reached).toBe(true);
+    await clients[0].query("commit");
+    await second;
+    await clients[1].query("commit");
+    expect((await ctx.db.from("format_bom").select("material_id").eq("format_id", fmt.id)).data).toEqual([{ material_id: materials[1] }]);
+    await clients[0].query("begin; set local role authenticated");
+    await clients[0].query("select set_config('request.jwt.claim.sub', $1, true)", [ctx.userId]);
+    expect((await clients[0].query(query, args[0])).rows).toEqual(first.rows);
+    await clients[0].query("commit");
+    await expect(runCommand("replace_format_bom", { formatId: fmt.id, lines: [{ materialId: crypto.randomUUID(), qtyPerUnit: 1 }] }, ctx)).rejects.toBeTruthy();
+    expect((await ctx.db.from("format_bom").select("material_id").eq("format_id", fmt.id)).data).toEqual([{ material_id: materials[1] }]);
+  } finally {
+    await Promise.all(clients.map(async c => { await c.query("rollback").catch(() => {}); await c.end(); }));
+  }
 });
