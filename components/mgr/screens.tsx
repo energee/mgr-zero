@@ -34,7 +34,9 @@ import { CatalogView } from "@/components/mgr/views/catalog";
 import { ChannelView } from "@/components/mgr/views/channel";
 import { ClosePackagingRunView } from "@/components/mgr/views/close-packaging-run";
 import { CompleteTransferView } from "@/components/mgr/views/complete-transfer";
+import { ConfirmDeliveryView } from "@/components/mgr/views/confirm-delivery";
 import { ConfirmOrderView } from "@/components/mgr/views/confirm-order";
+import { DriverRouteView } from "@/components/mgr/views/driver-route";
 import { ContractView } from "@/components/mgr/views/contract";
 import { ContractsView } from "@/components/mgr/views/contracts";
 import { CycleCountView } from "@/components/mgr/views/cycle-count";
@@ -87,6 +89,9 @@ import { RecordMovementView } from "@/components/mgr/views/record-movement";
 import { RunClosedView } from "@/components/mgr/views/run-closed";
 import { ReverseMovementView } from "@/components/mgr/views/reverse-movement";
 import { ReturnCreditView } from "@/components/mgr/views/return-credit";
+import { ReturnRouteView } from "@/components/mgr/views/return-route";
+import { RouteView } from "@/components/mgr/views/route";
+import { RoutesView } from "@/components/mgr/views/routes";
 import { ReviewOrderView } from "@/components/mgr/views/review-order";
 import { SaleChannelsView } from "@/components/mgr/views/sale-channels";
 import { ScheduleBatchView } from "@/components/mgr/views/schedule-batch";
@@ -147,6 +152,7 @@ import {
   newPoCountryMalt, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorYch, vendorsList,
 } from "@/lib/mgr/fixtures/purchasing";
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger } from "@/lib/mgr/fixtures/kegs";
+import { confirmDeliveryStop1, driverRouteA, returnRouteA, routeAPlan, routesDriver } from "@/lib/mgr/fixtures/delivery";
 import { toAdjustLinesViewProps } from "@/lib/mgr/adjust-lines-view";
 import { toBatchesViewProps } from "@/lib/mgr/batches-view";
 import { toBeerViewProps } from "@/lib/mgr/beer-view";
@@ -160,7 +166,9 @@ import { toCompleteTransferViewProps } from "@/lib/mgr/complete-transfer-view";
 import { toContractViewProps } from "@/lib/mgr/contract-view";
 import { toContractsViewProps } from "@/lib/mgr/contracts-view";
 import { toCycleCountViewProps } from "@/lib/mgr/cycle-count-view";
+import { toConfirmDeliveryViewProps } from "@/lib/mgr/confirm-delivery-view";
 import { toConfirmOrderViewProps } from "@/lib/mgr/confirm-order-view";
+import { toDriverRouteViewProps } from "@/lib/mgr/driver-route-view";
 import { toCustomerViewProps } from "@/lib/mgr/customer-view";
 import { toCustomersViewProps } from "@/lib/mgr/customers-view";
 import { toDeniedViewProps } from "@/lib/mgr/denied-view";
@@ -212,6 +220,9 @@ import { toScheduleBatchViewProps } from "@/lib/mgr/schedule-batch-view";
 import { toReverseMovementViewProps } from "@/lib/mgr/reverse-movement-view";
 import { toReviewOrderViewProps } from "@/lib/mgr/review-order-view";
 import { toReturnCreditViewProps } from "@/lib/mgr/return-credit-view";
+import { toReturnRouteViewProps } from "@/lib/mgr/return-route-view";
+import { toRouteViewProps } from "@/lib/mgr/route-view";
+import { toRoutesViewProps } from "@/lib/mgr/routes-view";
 import { toSaleChannelsViewProps } from "@/lib/mgr/sale-channels-view";
 import { toSearchViewProps } from "@/lib/mgr/search-view";
 import { toSessionExpiredViewProps } from "@/lib/mgr/session-expired-view";
@@ -2484,14 +2495,7 @@ export const SCREENS: Screen[] = [
     writes: "none [route planning happens on Route]",
     states: [["unassigned", "shipped orders and picked transfers waiting for a route are called out"], ["empty", "no routes yet: New route is the only action"]],
     spec: "Work › Deliveries. Every route not yet returned names its next action; New route opens Route in builder mode, and Route returns here. A stop is a shipped order or a picked stock transfer.",
-    body: (<>
-      {E.hd("Work", "driver default", E.btn("New route"))}
-      {E.tabs(WORK_CHIPS, 6, "w-full", WORK_TABS)}
-      {E.row("Route A · 2026-09-10", "departed · 1 of 3 delivered", E.act("Resume", "info"))}
-      {E.row("Route B · 2026-09-11", "2 stops · driver not assigned", E.act("Assign", "attention"), "w")}
-      {E.row("ORD-0236 · Ridgeline · Dock", "shipped · no route", E.act("Add to route", "attention"), "w")}
-      {E.row("TRF-0004 · Storage", "shipped · no route", E.act("Add to route", "attention"), "w")}
-    </>),
+    body: <RoutesView model={toRoutesViewProps(routesDriver)} />,
   },
   {
     step: 7,
@@ -2503,19 +2507,7 @@ export const SCREENS: Screen[] = [
     writes: "save_route · depart_route",
     states: [["permission", "warehouse membership; Depart needs the assigned driver or an admin", 1], ["departed", "the builder closes; Driver route and Return route take over"]],
     spec: "Planned state: Depart is the one primary; Save route plan is outline. Return lives on Return route once the route has departed. The stops are a checklist of this route's documents plus every shipped order and picked transfer on no route, each checked one with its stop number; driver, vehicle and stop order save in the same route-save RPC, and a delivered stop cannot be unchecked. There is no loaded status or mark-loaded command. A refused delivery has no screen: leave the stop open and assign it to a later route. A driver shows by the first characters of their id until staff have names.",
-    body: (<>
-      {E.back("Routes", "Route A · 2026-09-10")}
-      {E.edit("Delivery date", "2026-09-10", "date")}
-      {E.pick("Driver", "driver 7f3a21c0 · warehouse", ["driver 7f3a21c0 · warehouse", "driver 2b9e44d1 · admin"])}
-      {E.edit("Vehicle", "Box truck 2")}
-      {E.edit("Route name", "Route A")}
-      {E.ttl("Stops")}
-      {E.row("ORD-0231 · Ridgeline · Tap Room", "stop 1", "1")}
-      {E.row("ORD-0233 · Al’s Bar · Dock", "stop 2", "2")}
-      {E.row("TRF-0004 · Storage", "stop 3", "3")}
-      {E.row("ORD-0236 · Teresa’s · Dock", "shipped · no route", "", "w")}
-      {E.btns([["Save route plan", "g"], ["Depart route", "p"]])}
-    </>),
+    body: <RouteView model={toRouteViewProps(routeAPlan)} />,
   },
   {
     step: 7,
@@ -2528,16 +2520,7 @@ export const SCREENS: Screen[] = [
     writes: "return_route",
     states: [["permission", "the assigned driver or an admin", 1], ["planned", "Depart lives on Route"], ["departed", "Return is the one verb, enabled once every stop is delivered"], ["complete", "already returned: the return time replaces the button"]],
     spec: "The departed state of a route once every stop is delivered. Planned routes Depart on Route; this screen is only Return.",
-    body: (<>
-      {E.back("Routes", "Route A · 2026-09-10")}
-      {E.fld("Driver · vehicle", "driver 7f3a21c0 · Box truck 2")}
-      {E.fld("Departed", "8:10 AM")}
-      {E.row("Stop 1 · ORD-0231 · Ridgeline · Tap Room", "delivered 8:42 AM", "done", "ok")}
-      {E.row("Stop 2 · ORD-0233 · Al’s Bar · Dock", "delivered 9:15 AM", "done", "ok")}
-      {E.row("Stop 3 · TRF-0004 · Storage", "delivered 10:03 AM", "done", "ok")}
-      {E.sp()}
-      {E.btn("Return route")}
-    </>),
+    body: <ReturnRouteView model={toReturnRouteViewProps(returnRouteA)} />,
   },
   {
     step: 7,
@@ -2550,16 +2533,7 @@ export const SCREENS: Screen[] = [
     writes: "return_route",
     states: [["permission", "the assigned driver or an admin", 1], ["departed", "Return is the one verb, disabled while a stop is open"], ["next stop", "Resume opens Confirm delivery"]],
     spec: "The departed route as the driver runs it, reached from Deliveries (Resume) or the stop's Back. Route is for building; this is for running. Only the lowest undelivered stop is next; Today shows the same stop.",
-    body: (<>
-      {E.back("Routes", "Route A · 2026-09-10")}
-      {E.fld("Driver · vehicle", "driver 7f3a21c0 · Box truck 2")}
-      {E.fld("Departed", "8:10 AM")}
-      {E.row("Stop 1 · ORD-0231 · Ridgeline · Tap Room", "next", E.act("Resume", "info"), "w")}
-      {E.row("Stop 2 · ORD-0233 · Al’s Bar · Dock", "later")}
-      {E.row("Stop 3 · TRF-0004 · Storage", "later")}
-      {E.sp()}
-      {E.btn("Return route")}
-    </>),
+    body: <DriverRouteView model={toDriverRouteViewProps(driverRouteA)} />,
   },
   {
     step: 7,
@@ -2571,16 +2545,7 @@ export const SCREENS: Screen[] = [
     writes: "confirm_delivery [one RPC: delivered_at + signed_by + invoice only when persisted mode is on-delivery; never ships]",
     states: [["offline", "keep stop open; commit waits", 1], ["response lost", "same requestId returns result"], ["permission", "warehouse membership and being the route’s assigned driver, or admin", 1], ["success", "INV number after commit"], ["transfer stop", "destination and picked lines instead of a customer; stamped, never invoiced; Receive on the transfer moves the stock"]],
     spec: "2 taps: receiving-contact chip from the ship-to → Delivered. Back goes to Driver route. The receiving name is stored as text; the UI never implies a signature image is retained.",
-    body: (<>
-      {E.back("Driver route", "Route A · Stop 1 of 3")}
-      {E.ttl("Ridgeline Tap Room")}
-      {E.fld("Invoice timing", "On delivery · saved")}
-      {E.row("Hazy IPA · ½ bbl keg", "", "4")}
-      {E.row("Pils · 16 oz case", "", "6")}
-      {E.edit("Received by", "", "text", ["Dana", "Chris"])}
-      {E.sp()}
-      {E.btn("Delivered", "irr")}
-    </>),
+    body: <ConfirmDeliveryView model={toConfirmDeliveryViewProps(confirmDeliveryStop1)} />,
   },
   {
     step: 7,
