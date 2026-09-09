@@ -1,5 +1,13 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import { pushInvoiceToQbo, QboOAuthClient } from "@/lib/qbo";
+import { completeQboOAuth, pushInvoiceToQbo, QboOAuthClient } from "@/lib/qbo";
+import {
+  claimQboOAuth,
+  completeQboOAuthStore,
+  disconnectQbo,
+  failQboOAuth,
+  readVersionedIntegrationTokens,
+} from "@/lib/supabase/integration-tokens";
 import { admin, makeBrewery, makeCustomerUser, makeStaffCtx, priceSku, seedCatalog, seedCustomer, sql } from "./helpers";
 
 const config = {
@@ -8,6 +16,7 @@ const config = {
   redirectUri: "https://mgr.test/api/integrations/qbo/oauth",
   apiBaseUrl: "https://sandbox-quickbooks.api.intuit.com",
 };
+const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 
 async function pushFixture(kind: "invoice" | "credit_memo" = "invoice", role: "admin" | "sales" = "sales") {
   const brewery = await makeBrewery();
@@ -86,6 +95,75 @@ describe("QuickBooks durable outbound push", () => {
     expect(remote).toHaveLength(1);
     expect(sql(`select status || ':' || qbo_entity_id from public.qbo_pushes where invoice_id='${f.invoice.id}'`))
       .toEqual(["pushed:invoice-remote-1"]);
+  });
+
+  it("recovers an unknown push through a verified same-realm reconnect without changing its identity", async () => {
+    const f = await pushFixture("invoice", "admin");
+    const beforeDisconnect = await readVersionedIntegrationTokens(f.ctx, "qbo");
+    const remote = new Map<string, { Invoice: { Id: string; SyncToken: string } }>();
+    let loseFirstResponse = true;
+    const pushFetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (input, init) => {
+      const key = new URL(String(input)).searchParams.get("requestid")!;
+      const entity = remote.get(key) ?? { Invoice: { Id: "reconnected-invoice", SyncToken: "0" } };
+      remote.set(key, entity);
+      if (loseFirstResponse) {
+        loseFirstResponse = false;
+        throw new TypeError("socket closed after provider commit");
+      }
+      return new Response(JSON.stringify(entity), { status: 200 });
+    });
+    const pushClient = new QboOAuthClient(config, pushFetch);
+    const pushRequestId = crypto.randomUUID();
+
+    await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, pushRequestId, pushClient))
+      .rejects.toThrow("QuickBooks is unavailable");
+    const frozen = sql(`select provider_request_id::text || '|' || request_body from public.qbo_pushes where invoice_id='${f.invoice.id}'`)[0];
+    await expect(disconnectQbo(f.ctx, f.connectionId, vi.fn().mockResolvedValue(undefined), crypto.randomUUID()))
+      .resolves.toMatchObject({ disconnected: true });
+
+    const unavailableFetch = vi.fn<typeof globalThis.fetch>();
+    await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, pushRequestId, new QboOAuthClient(config, unavailableFetch)))
+      .rejects.toThrow("QuickBooks connection required");
+    expect(unavailableFetch).not.toHaveBeenCalled();
+
+    const state = `same-realm-${crypto.randomUUID()}`;
+    expect((await f.ctx.db.rpc("begin_qbo_oauth", {
+      p_brewery: f.brewery.id, p_redirect_uri: config.redirectUri, p_state_hash: hash(state),
+      p_provider_intent: "reconnect", p_request_id: crypto.randomUUID(),
+    })).error).toBeNull();
+    const oauthFetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        access_token: "reconnected-access", refresh_token: "reconnected-refresh", expires_in: 3600,
+        x_refresh_token_expires_in: 86400,
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ CompanyInfo: { Id: "verified-company" } }), { status: 200 }));
+    const reconnected = await completeQboOAuth({
+      request: new Request(`${config.redirectUri}?code=reconnect-code&state=${state}&realmId=${f.realm}`),
+      actorId: f.ctx.userId, selectedBreweryId: f.brewery.id, redirectUri: config.redirectUri,
+      client: new QboOAuthClient(config, oauthFetch),
+      store: { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth },
+    });
+    expect(reconnected).toBe(f.connectionId);
+    const current = await readVersionedIntegrationTokens(f.ctx, "qbo");
+    expect(current).toMatchObject({ connectionId: f.connectionId, refreshToken: "reconnected-refresh" });
+    expect(current.credentialVersion).toBeGreaterThan(beforeDisconnect.credentialVersion);
+
+    const stale = await admin.rpc("cas_integration_tokens", {
+      p_brewery: f.brewery.id, p_provider: "qbo", p_connection: beforeDisconnect.connectionId,
+      p_actor: f.ctx.userId, p_expected_version: beforeDisconnect.credentialVersion,
+      p_access_token: "late-access", p_refresh_token: "late-refresh", p_received_at: new Date().toISOString(),
+      p_access_seconds: 3600, p_refresh_seconds: 86400, p_hard_seconds: null,
+    });
+    expect(stale).toMatchObject({ data: false, error: null });
+
+    await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, pushRequestId, pushClient))
+      .resolves.toMatchObject({ status: "pushed", remoteId: "reconnected-invoice" });
+    expect(pushFetch).toHaveBeenCalledTimes(2);
+    expect(String(pushFetch.mock.calls[0][0])).toBe(String(pushFetch.mock.calls[1][0]));
+    expect(pushFetch.mock.calls[0][1]?.body).toBe(pushFetch.mock.calls[1][1]?.body);
+    expect(`${new URL(String(pushFetch.mock.calls[1][0])).searchParams.get("requestid")}|${pushFetch.mock.calls[1][1]?.body}`).toBe(frozen);
+    expect(remote).toHaveLength(1);
+    expect(sql(`select count(*) from public.qbo_pushes where invoice_id='${f.invoice.id}'`)).toEqual(["1"]);
   });
 
   it("shares one active attempt under concurrency and freezes it across mapping edits", async () => {
