@@ -1710,7 +1710,13 @@ create table invoices (
   qbo_sync_token text,
   qbo_remote_state qbo_remote_state not null default 'live',
   qbo_tax_cents int, qbo_total_cents int, qbo_balance_cents int,   -- written by the sync job only
+  qbo_accountant_drift boolean not null default false,
   paid_at timestamptz,
+  written_off_at timestamptz,
+  written_off_by uuid references auth.users(id),
+  written_off_reason text check (written_off_reason is null or length(written_off_reason) between 1 and 500),
+  check ((written_off_at is null) = (written_off_by is null)),
+  check ((written_off_at is null) = (written_off_reason is null)),
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
   unique (brewery_id, invoice_no),
@@ -1885,6 +1891,8 @@ create table qbo_connections (
   remote_revocation_state text not null default 'not_requested' check (remote_revocation_state in ('not_requested','confirmed','unresolved')),
   last_error text,
   qbo_deposit_item_id text,
+  allow_online_ach_payment boolean not null default true,
+  allow_online_credit_card_payment boolean not null default true,
   credential_version bigint not null default 0,
   connected_by uuid references auth.users(id),
   updated_at timestamptz not null default now(),
@@ -2182,7 +2190,7 @@ begin
  if old.realm_id is distinct from new.realm_id then
   update public.customers set qbo_customer_id=null,qbo_realm_id=null where brewery_id=old.brewery_id;
   update public.skus set qbo_item_id=null,qbo_realm_id=null where brewery_id=old.brewery_id;
-  update public.invoices set qbo_invoice_id=null,qbo_sync_status='pending',qbo_sync_error=null,qbo_sync_token=null,qbo_remote_state='live',qbo_tax_cents=null,qbo_total_cents=null,qbo_balance_cents=null where brewery_id=old.brewery_id;
+  update public.invoices set qbo_invoice_id=null,qbo_sync_status='pending',qbo_sync_error=null,qbo_sync_token=null,qbo_remote_state='live',qbo_tax_cents=null,qbo_total_cents=null,qbo_balance_cents=null,qbo_accountant_drift=false where brewery_id=old.brewery_id;
  end if; return new;
 end $$;
 revoke execute on function private.purge_qbo_identity() from public,anon,authenticated,service_role;
@@ -2441,7 +2449,10 @@ create view taproom_replenishment with (security_invoker = true) as
 create view invoice_totals with (security_invoker = true) as
   select i.id as invoice_id, i.brewery_id, i.customer_id, i.kind, i.qbo_sync_status, i.paid_at,
          coalesce(sum(l.amount_cents), 0)::int as subtotal_cents,
-         i.qbo_tax_cents, i.qbo_total_cents, i.qbo_balance_cents
+         i.qbo_tax_cents, i.qbo_total_cents, i.qbo_balance_cents,
+         case when i.kind='invoice' and i.qbo_remote_state='live' and i.written_off_at is null
+                   and i.paid_at is not null and i.qbo_balance_cents=0
+              then coalesce(i.qbo_total_cents,0) else 0 end as collected_cents
   from invoices i left join invoice_lines l on l.invoice_id = i.id
   group by i.id;
 
@@ -3510,6 +3521,22 @@ begin
   return private.complete_command_request(p_request_id,v_result);
 end $$;
 
+create function set_qbo_push_defaults(p_brewery uuid,p_allow_ach boolean,p_allow_card boolean,p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path='' as $$
+declare v_replay jsonb; v_result jsonb;
+begin
+  if public.staff_role(p_brewery) <> 'admin' then raise insufficient_privilege using message='permission denied'; end if;
+  v_replay:=private.claim_command_request(p_brewery,'set_qbo_push_defaults',p_request_id,
+    jsonb_build_object('allowAch',p_allow_ach,'allowCard',p_allow_card));
+  if v_replay is not null then return v_replay; end if;
+  update public.qbo_connections set allow_online_ach_payment=p_allow_ach,
+    allow_online_credit_card_payment=p_allow_card,updated_at=now()
+    where brewery_id=p_brewery and state='connected';
+  if not found then raise exception 'QuickBooks connection required'; end if;
+  v_result:=jsonb_build_object('allowAch',p_allow_ach,'allowCard',p_allow_card);
+  return private.complete_command_request(p_request_id,v_result);
+end $$;
+
 create function start_qbo_push(p_brewery uuid,p_invoice uuid,p_new_attempt_reason text,p_request_id uuid)
 returns jsonb language plpgsql security definer set search_path='' as $$
 declare
@@ -3524,6 +3551,7 @@ begin
   if not found then raise exception 'QuickBooks connection required'; end if;
   select * into v_inv from public.invoices where id=p_invoice and brewery_id=p_brewery for update;
   if not found then raise exception 'invoice not found'; end if;
+  if v_inv.written_off_at is not null then raise exception 'written-off invoice cannot be pushed'; end if;
   if p_new_attempt_reason is not null and p_new_attempt_reason not in ('corrected','remote_deleted') then raise exception 'invalid QuickBooks attempt reason'; end if;
 
   v_replay:=private.claim_command_request(p_brewery,'push_invoice_to_qbo',p_request_id,
@@ -3607,6 +3635,8 @@ begin
     'CustomerRef',jsonb_build_object('value',v_customer.qbo_customer_id),
     'DocNumber',v_inv.invoice_no::text,'TxnDate',v_inv.issued_on,
     'DueDate',case when v_inv.kind='invoice' then v_inv.due_on end,
+    'AllowOnlineACHPayment',case when v_inv.kind='invoice' then v_conn.allow_online_ach_payment end,
+    'AllowOnlineCreditCardPayment',case when v_inv.kind='invoice' then v_conn.allow_online_credit_card_payment end,
     'BillAddr',v_address,'BillEmail',case when v_email is null then null else jsonb_build_object('Address',v_email) end,
     'Line',v_lines));
   v_reason:=coalesce(p_new_attempt_reason,'initial');
@@ -3649,7 +3679,11 @@ begin
     response=p_response,error=left(p_error,500),finished_at=now() where id=p_push;
   if p_status='pushed' then
     update public.invoices set qbo_invoice_id=p_qbo_entity_id,qbo_sync_status='pushed',qbo_sync_error=null,
-      qbo_sync_token=p_response->>'SyncToken',qbo_remote_state='live' where id=v_push.invoice_id and brewery_id=p_brewery;
+      qbo_sync_token=p_response->>'SyncToken',qbo_remote_state='live',qbo_accountant_drift=false,
+      qbo_tax_cents=case when p_response ? 'TotalTax' then round((p_response->>'TotalTax')::numeric*100)::int end,
+      qbo_total_cents=case when p_response ? 'TotalAmt' then round((p_response->>'TotalAmt')::numeric*100)::int end,
+      qbo_balance_cents=case when p_response ? 'Balance' then round((p_response->>'Balance')::numeric*100)::int end
+      where id=v_push.invoice_id and brewery_id=p_brewery;
   else
     update public.invoices set qbo_sync_status='push_failed',qbo_sync_error=left(p_error,500)
       where id=v_push.invoice_id and brewery_id=p_brewery;
@@ -3658,10 +3692,77 @@ begin
   return private.complete_command_request_for(p_actor,p_request_id,v_result);
 end $$;
 
+create function apply_qbo_invoice_state(
+  p_brewery uuid,p_invoice uuid,p_connection uuid,p_realm text,p_remote_id text,p_actor uuid,
+  p_remote_state text,p_sync_token text,p_tax_cents int,p_total_cents int,p_balance_cents int,
+  p_content_matches boolean,p_cash_paid boolean,p_paid_at timestamptz,p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path='' as $$
+declare v_inv public.invoices; v_push public.qbo_pushes; v_replay jsonb; v_result jsonb; v_drift boolean:=false;
+begin
+  if not exists(select 1 from public.brewery_users where brewery_id=p_brewery and user_id=p_actor and role in ('admin','sales'))
+    then raise insufficient_privilege using message='permission denied'; end if;
+  if p_remote_state not in ('live','voided','deleted') then raise exception 'invalid QuickBooks invoice state'; end if;
+  perform 1 from public.qbo_connections where brewery_id=p_brewery and id=p_connection and realm_id=p_realm and state='connected' for share;
+  if not found then raise exception 'QuickBooks connection changed' using errcode='MG409'; end if;
+  select * into v_inv from public.invoices where id=p_invoice and brewery_id=p_brewery for update;
+  if not found then raise exception 'invoice not found'; end if;
+  select * into v_push from public.qbo_pushes
+    where invoice_id=p_invoice and brewery_id=p_brewery and connection_id=p_connection and realm_id=p_realm
+      and status='pushed' and qbo_entity_id=p_remote_id
+    order by finished_at desc nulls last,created_at desc,id desc limit 1;
+  if not found or v_inv.qbo_invoice_id is distinct from p_remote_id then
+    raise exception 'QuickBooks invoice identity changed' using errcode='MG409';
+  end if;
+  v_replay:=private.claim_command_request_for(p_actor,p_brewery,'apply_qbo_invoice_state',p_request_id,
+    jsonb_build_object('invoiceId',p_invoice,'connectionId',p_connection,'realmId',p_realm,'remoteId',p_remote_id,
+      'remoteState',p_remote_state,'syncToken',p_sync_token,'taxCents',p_tax_cents,'totalCents',p_total_cents,
+      'balanceCents',p_balance_cents,'contentMatches',p_content_matches,'cashPaid',p_cash_paid,'paidAt',p_paid_at));
+  if v_replay is not null then return v_replay; end if;
+  if p_remote_state='live' then
+    v_drift:=not p_content_matches
+      or (v_push.response ? 'TotalAmt' and round((v_push.response->>'TotalAmt')::numeric*100)::int is distinct from p_total_cents)
+      or (v_push.response ? 'TotalTax' and round((v_push.response->>'TotalTax')::numeric*100)::int is distinct from p_tax_cents);
+  end if;
+  update public.invoices set qbo_remote_state=p_remote_state::public.qbo_remote_state,
+    qbo_sync_token=p_sync_token,qbo_tax_cents=p_tax_cents,qbo_total_cents=p_total_cents,
+    qbo_balance_cents=p_balance_cents,qbo_accountant_drift=v_drift,
+    paid_at=case
+      when p_remote_state='live' and p_cash_paid and p_balance_cents=0 and p_total_cents>0 then coalesce(paid_at,p_paid_at,now())
+      when p_remote_state='live' then null
+      else paid_at end
+    where id=p_invoice and brewery_id=p_brewery;
+  v_result:=jsonb_build_object('invoiceId',p_invoice,'remoteState',p_remote_state,'paid',
+    p_remote_state='live' and p_cash_paid and p_balance_cents=0 and p_total_cents>0,'drifted',v_drift);
+  return private.complete_command_request_for(p_actor,p_request_id,v_result);
+end $$;
+
+create function write_off_invoice(p_brewery uuid,p_invoice uuid,p_reason text,p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path='' as $$
+declare v_actor uuid; v_inv public.invoices; v_replay jsonb; v_result jsonb;
+begin
+  v_actor:=private.assert_staff(p_brewery,array['admin']::public.staff_role[]);
+  if nullif(btrim(p_reason),'') is null or length(btrim(p_reason))>500 then raise exception 'write-off reason must be 1 to 500 characters'; end if;
+  v_replay:=private.claim_command_request(p_brewery,'write_off_invoice',p_request_id,
+    jsonb_build_object('invoiceId',p_invoice,'reason',btrim(p_reason)));
+  if v_replay is not null then return v_replay; end if;
+  select * into v_inv from public.invoices where id=p_invoice and brewery_id=p_brewery for update;
+  if not found then raise exception 'invoice not found'; end if;
+  if v_inv.kind<>'invoice' or v_inv.qbo_remote_state not in ('voided','deleted') or v_inv.written_off_at is not null then
+    raise exception 'only an unwritten-off QuickBooks voided or deleted invoice can be written off';
+  end if;
+  update public.invoices set written_off_at=now(),written_off_by=v_actor,written_off_reason=btrim(p_reason)
+    where id=p_invoice and brewery_id=p_brewery;
+  v_result:=jsonb_build_object('invoiceId',p_invoice,'status','written_off','reason',btrim(p_reason));
+  return private.complete_command_request(p_request_id,v_result);
+end $$;
+
 revoke all on function set_qbo_customer_mapping(uuid,uuid,text,uuid),set_qbo_item_mapping(uuid,uuid,text,uuid),
-  set_qbo_deposit_mapping(uuid,text,uuid),start_qbo_push(uuid,uuid,text,uuid),
-  finish_qbo_push(uuid,uuid,uuid,text,text,text,jsonb,uuid) from public,anon,authenticated,service_role;
+  set_qbo_deposit_mapping(uuid,text,uuid),set_qbo_push_defaults(uuid,boolean,boolean,uuid),start_qbo_push(uuid,uuid,text,uuid),
+  finish_qbo_push(uuid,uuid,uuid,text,text,text,jsonb,uuid),
+  apply_qbo_invoice_state(uuid,uuid,uuid,text,text,uuid,text,text,int,int,int,boolean,boolean,timestamptz,uuid),
+  write_off_invoice(uuid,uuid,text,uuid) from public,anon,authenticated,service_role;
 grant execute on function finish_qbo_push(uuid,uuid,uuid,text,text,text,jsonb,uuid) to service_role;
+grant execute on function apply_qbo_invoice_state(uuid,uuid,uuid,text,text,uuid,text,text,int,int,int,boolean,boolean,timestamptz,uuid) to service_role;
 
 -- Bootstrap is authenticated but deliberately has no tenant identity yet.
 create function provision_brewery(p_name text, p_timezone text, p_ttb text, p_request_id uuid)
@@ -9386,4 +9487,5 @@ grant execute on function public.consume_command_admission() to authenticated;
 grant execute on function public.begin_qbo_oauth(uuid,text,text,text,uuid) to authenticated;
 grant execute on function public.set_qbo_customer_mapping(uuid,uuid,text,uuid),
   public.set_qbo_item_mapping(uuid,uuid,text,uuid),public.set_qbo_deposit_mapping(uuid,text,uuid),
+  public.set_qbo_push_defaults(uuid,boolean,boolean,uuid),public.write_off_invoice(uuid,uuid,text,uuid),
   public.start_qbo_push(uuid,uuid,text,uuid) to authenticated;

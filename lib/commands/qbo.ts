@@ -53,6 +53,15 @@ defineCommand({
 });
 
 defineCommand({
+  name: "set_qbo_push_defaults", description: "Set the ACH and card options copied onto future QuickBooks invoices",
+  input: z.object({ allowAch: z.boolean(), allowCard: z.boolean() }), roles: ["admin"],
+  handler: (ctx, input, execution) => unwrap(ctx.db.rpc("set_qbo_push_defaults", {
+    p_brewery: ctx.breweryId, p_allow_ach: input.allowAch, p_allow_card: input.allowCard,
+    p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
   name: "push_invoice_to_qbo", description: "Push a frozen local invoice or credit memo to the current QuickBooks company with a durable request ID",
   input: z.object({
     invoiceId: z.string().uuid(),
@@ -63,4 +72,23 @@ defineCommand({
     const { pushInvoiceToQbo, qboConfig, QboOAuthClient } = await import("@/lib/qbo");
     return pushInvoiceToQbo(ctx, input.invoiceId, execution.requestId, new QboOAuthClient(qboConfig()), input.newAttemptReason);
   },
+});
+
+defineCommand({
+  name: "sync_qbo_payments", description: "Read current QuickBooks invoice balances, payment evidence, edits, voids, and deletions",
+  input: z.object({}), roles: ["admin", "sales"],
+  handler: async (ctx, _input, execution) => {
+    const { qboConfig, QboOAuthClient, syncQboInvoices } = await import("@/lib/qbo");
+    return syncQboInvoices(ctx, execution.requestId, new QboOAuthClient(qboConfig()));
+  },
+});
+
+defineCommand({
+  name: "write_off_invoice", description: "Mark a QuickBooks-voided or deleted invoice written off in MGR without recording cash or changing QuickBooks",
+  input: z.object({ invoiceId: z.string().uuid(), reason: z.string().trim().min(1).max(500) }),
+  roles: ["admin"], requiresConfirmation: true,
+  handler: (ctx, input, execution) => unwrap(ctx.db.rpc("write_off_invoice", {
+    p_brewery: ctx.breweryId, p_invoice: input.invoiceId, p_reason: input.reason,
+    p_request_id: execution.requestId,
+  })),
 });

@@ -2,6 +2,7 @@ import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import {
+  applyQboInvoiceState,
   compareAndSwapQboTokens,
   finishQboPush,
   readVersionedIntegrationTokens,
@@ -44,6 +45,18 @@ type QboPushStart = {
   remoteId?: string;
   alreadyPushed?: boolean;
 };
+
+type QboInvoiceRead = {
+  ok: true;
+  syncToken: string;
+  taxCents: number;
+  totalCents: number;
+  balanceCents: number;
+  cashPaid: boolean;
+  paidAt: string | null;
+  privateNote: string;
+  content: string;
+} | { ok: false; status: number; definitive: boolean };
 
 function positiveSeconds(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
@@ -195,6 +208,88 @@ export async function pushInvoiceToQbo(
   });
 }
 
+function derivedRequestId(requestId: string, invoiceId: string) {
+  const hash = sha256(`${requestId}:${invoiceId}`);
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20, 32)}`;
+}
+
+type QboSyncTarget = {
+  id: string;
+  qbo_invoice_id: string;
+  qbo_pushes: {
+    connection_id: string;
+    realm_id: string;
+    qbo_entity_id: string | null;
+    request_body: string;
+    response: Record<string, unknown> | null;
+  }[];
+};
+
+export async function syncQboInvoices(ctx: Ctx, requestId: string, client: QboOAuthClient) {
+  if (ctx.role !== "admin" && ctx.role !== "sales") {
+    throw new CommandError("permission denied: QuickBooks sync requires admin or sales", 403, "permission_denied");
+  }
+  const connection = await unwrap(ctx.db.from("qbo_connections").select("id,realm_id")
+    .eq("brewery_id", ctx.breweryId).eq("state", "connected").single()) as { id: string; realm_id: string };
+  let tokens = await readVersionedIntegrationTokens(ctx, "qbo");
+  if (tokens.connectionId !== connection.id) throw new CommandError("QuickBooks connection changed", 409, "conflict");
+  if (isPast(tokens.accessExpiresAt)) tokens = await refreshQboCredentials(ctx, client, tokens);
+
+  const targets: QboSyncTarget[] = [];
+  for (let start = 0; ; start += 500) {
+    const page = await ctx.db.from("invoices")
+      .select("id,qbo_invoice_id,qbo_pushes!inner(connection_id,realm_id,qbo_entity_id,request_body,response)", { count: "exact" })
+      .eq("brewery_id", ctx.breweryId).eq("kind", "invoice").eq("qbo_sync_status", "pushed")
+      .not("qbo_invoice_id", "is", null).eq("qbo_pushes.status", "pushed")
+      .order("id").range(start, start + 499);
+    const rows = await unwrap(Promise.resolve(page)) as unknown as QboSyncTarget[];
+    targets.push(...rows);
+    if (page.count === null || (!rows.length && targets.length < page.count)) throw new Error("QuickBooks invoice list was incomplete");
+    if (targets.length >= page.count) break;
+  }
+
+  let synced = 0;
+  let paid = 0;
+  let voided = 0;
+  let deleted = 0;
+  let drifted = 0;
+  for (const target of targets) {
+    const push = target.qbo_pushes.find((row) => row.connection_id === connection.id
+      && row.realm_id === connection.realm_id && row.qbo_entity_id === target.qbo_invoice_id);
+    if (!push) continue;
+    let read = await client.readInvoice(connection.realm_id, target.qbo_invoice_id, tokens.accessToken)
+      .catch(() => { throw new Error("QuickBooks is unavailable"); });
+    if (!read.ok && read.status === 401) {
+      tokens = await refreshQboCredentials(ctx, client, tokens);
+      if (tokens.connectionId !== connection.id) throw new Error("QuickBooks is unavailable");
+      read = await client.readInvoice(connection.realm_id, target.qbo_invoice_id, tokens.accessToken)
+        .catch(() => { throw new Error("QuickBooks is unavailable"); });
+    }
+    if (!read.ok && !read.definitive) throw new Error("QuickBooks is unavailable");
+    const pushedTotal = typeof push.response?.TotalAmt === "number" ? Math.round(push.response.TotalAmt * 100) : null;
+    const remoteState = read.ok && /^Voided\b/i.test(read.privateNote) && read.totalCents === 0
+      && read.balanceCents === 0 && pushedTotal !== null && pushedTotal > 0 ? "voided" : read.ok ? "live" : "deleted";
+    const result = await applyQboInvoiceState(ctx, {
+      invoiceId: target.id, connectionId: connection.id, realmId: connection.realm_id,
+      remoteId: target.qbo_invoice_id, remoteState,
+      syncToken: read.ok ? read.syncToken : null,
+      taxCents: read.ok ? read.taxCents : null,
+      totalCents: read.ok ? read.totalCents : null,
+      balanceCents: read.ok ? read.balanceCents : null,
+      contentMatches: read.ok && read.content === meaningfulInvoiceContent(JSON.parse(push.request_body)),
+      cashPaid: read.ok && read.cashPaid,
+      paidAt: read.ok ? read.paidAt : null,
+      requestId: derivedRequestId(requestId, target.id),
+    });
+    synced += 1;
+    if (result.paid) paid += 1;
+    if (result.remoteState === "voided") voided += 1;
+    if (result.remoteState === "deleted") deleted += 1;
+    if (result.drifted) drifted += 1;
+  }
+  return { synced, paid, voided, deleted, drifted };
+}
+
 export class QboOAuthClient {
   constructor(private readonly config: QboConfig, private readonly transport: typeof globalThis.fetch = globalThis.fetch) {}
 
@@ -272,6 +367,39 @@ export class QboOAuthClient {
     return { ok: true as const, remoteId: row.Id as string, response: safe };
   }
 
+  async readInvoice(realmId: string, remoteId: string, accessToken: string): Promise<QboInvoiceRead> {
+    const url = new URL(`/v3/company/${encodeURIComponent(realmId)}/invoice/${encodeURIComponent(remoteId)}`, this.config.apiBaseUrl);
+    url.searchParams.set("minorversion", ACCOUNTING_MINOR_VERSION);
+    const response = await this.transport(url, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+      redirect: "error",
+    });
+    if (!response.ok) return { ok: false, status: response.status, definitive: response.status === 404 };
+    const payload = await response.json() as { Invoice?: Record<string, unknown> };
+    const invoice = payload?.Invoice;
+    const cents = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value >= 0
+      ? Math.round(value * 100) : null;
+    const totalCents = cents(invoice?.TotalAmt);
+    const balanceCents = cents(invoice?.Balance);
+    const tax = invoice?.TxnTaxDetail;
+    const taxCents = cents(tax && typeof tax === "object" ? (tax as Record<string, unknown>).TotalTax : 0);
+    if (!invoice || invoice.Id !== remoteId || typeof invoice.SyncToken !== "string"
+      || totalCents === null || balanceCents === null || taxCents === null) {
+      throw new Error("QuickBooks response was invalid");
+    }
+    const linked = Array.isArray(invoice.LinkedTxn) ? invoice.LinkedTxn : [];
+    const updated = invoice.MetaData && typeof invoice.MetaData === "object"
+      ? (invoice.MetaData as Record<string, unknown>).LastUpdatedTime : null;
+    return {
+      ok: true, syncToken: invoice.SyncToken, totalCents, balanceCents, taxCents,
+      cashPaid: linked.some((item) => item && typeof item === "object" && (item as Record<string, unknown>).TxnType === "Payment"),
+      paidAt: typeof updated === "string" && Number.isFinite(Date.parse(updated)) ? updated : null,
+      privateNote: typeof invoice.PrivateNote === "string" ? invoice.PrivateNote : "",
+      content: meaningfulInvoiceContent(invoice),
+    };
+  }
+
   private basic() {
     return `Basic ${Buffer.from(`${this.config.clientId}:${this.config.clientSecret}`).toString("base64")}`;
   }
@@ -291,6 +419,25 @@ export class QboOAuthClient {
     if (!response.ok) throw new Error("QuickBooks token request failed");
     return parseTokens(await response.json(), receivedAt);
   }
+}
+
+function meaningfulInvoiceContent(invoice: Record<string, unknown>) {
+  const ref = (value: unknown) => value && typeof value === "object" ? (value as Record<string, unknown>).value : undefined;
+  const lines = Array.isArray(invoice.Line) ? invoice.Line : [];
+  return JSON.stringify({
+    customer: ref(invoice.CustomerRef), docNumber: invoice.DocNumber, txnDate: invoice.TxnDate,
+    dueDate: invoice.DueDate, allowAch: invoice.AllowOnlineACHPayment,
+    allowCard: invoice.AllowOnlineCreditCardPayment,
+    lines: lines.filter((line) => line && typeof line === "object"
+      && (line as Record<string, unknown>).DetailType === "SalesItemLineDetail").map((line) => {
+      const row = line as Record<string, unknown>;
+      const detail = row.SalesItemLineDetail as Record<string, unknown> | undefined;
+      return {
+        amount: row.Amount, description: row.Description, item: ref(detail?.ItemRef),
+        qty: detail?.Qty, unitPrice: detail?.UnitPrice,
+      };
+    }),
+  });
 }
 
 export function qboConfig(env: Record<string, string | undefined> = process.env): QboConfig {

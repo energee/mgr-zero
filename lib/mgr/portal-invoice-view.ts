@@ -3,6 +3,7 @@
 // Pay vs unavailable vs paid is a presentation prop on the view, not a mode.
 import { docNo } from "./doc-no";
 import { money } from "./money";
+import { invoiceCurrentState } from "./invoice-state";
 
 export type PortalInvoiceLineView = {
   key: string;
@@ -20,7 +21,7 @@ export type PortalInvoiceViewModel = {
   paid: boolean;
   kind: "invoice" | "credit_memo";
   issued: string;
-  status: "Credit" | "Paid" | "Unpaid";
+  status: "Credit" | "Paid" | "Unpaid" | "Voided" | "Deleted" | "Written off";
   breweryName: string;
   breweryPhone: string | null;
   lines: PortalInvoiceLineView[];
@@ -35,6 +36,9 @@ export type PortalInvoiceSnapshot = {
     issued_on: string;
     due_on: string | null;
     paid_at: string | null;
+    qbo_remote_state?: "live" | "voided" | "deleted";
+    qbo_balance_cents?: number | null;
+    written_off_at?: string | null;
     total_cents: number;
   };
   lines: {
@@ -55,16 +59,19 @@ function day(iso: string): string {
 /** Map a portal_invoice payload onto PortalInvoiceView. */
 export function toPortalInvoiceViewProps({ invoice, lines, brewery, backHref }: PortalInvoiceSnapshot): PortalInvoiceViewModel {
   const credit = invoice.kind === "credit_memo";
+  const state = invoiceCurrentState(invoice);
+  const paid = !credit && state === "paid";
+  const status = state === "written_off" ? "Written off" : `${state[0].toUpperCase()}${state.slice(1)}` as PortalInvoiceViewModel["status"];
   return {
     backHref,
     title: docNo(credit ? "CM" : "INV", invoice.invoice_no, credit ? "Credit memo" : "Invoice"),
     total: money(invoice.total_cents),
     due: invoice.due_on ?? undefined,
-    paidOn: invoice.paid_at ? day(invoice.paid_at) : undefined,
-    paid: !credit && invoice.paid_at !== null,
+    paidOn: paid ? day(invoice.paid_at!) : undefined,
+    paid,
     kind: invoice.kind,
     issued: invoice.issued_on,
-    status: credit ? "Credit" : invoice.paid_at ? "Paid" : "Unpaid",
+    status: credit ? "Credit" : status,
     breweryName: brewery.name,
     breweryPhone: brewery.customer_phone,
     lines: lines.map((l) => ({

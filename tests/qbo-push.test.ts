@@ -69,6 +69,8 @@ describe("QuickBooks durable outbound push", () => {
       expect(body).toContain('"UnitPrice": 3.33');
       expect(body).toContain('"Qty": 3');
       expect(body).toContain('"BillEmail"');
+      expect(body).toContain('"AllowOnlineACHPayment": true');
+      expect(body).toContain('"AllowOnlineCreditCardPayment": true');
       expect(body).toContain(f.buyer.email);
       const entity = remote.get(key) ?? { Invoice: { Id: "invoice-remote-1", SyncToken: "0", TotalAmt: 9.99, Balance: 9.99 } };
       remote.set(key, entity);

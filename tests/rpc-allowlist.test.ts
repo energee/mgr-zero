@@ -40,6 +40,8 @@ const AUTHENTICATED_RPCS = [
   "set_qbo_customer_mapping(uuid,uuid,text,uuid)",
   "set_qbo_item_mapping(uuid,uuid,text,uuid)",
   "set_qbo_deposit_mapping(uuid,text,uuid)",
+  "set_qbo_push_defaults(uuid,boolean,boolean,uuid)",
+  "write_off_invoice(uuid,uuid,text,uuid)",
   "start_qbo_push(uuid,uuid,text,uuid)",
   "cancel_order(uuid,text,uuid)",
   "clear_channel_price(uuid,uuid,uuid,uuid,uuid)",

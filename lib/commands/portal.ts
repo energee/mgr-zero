@@ -103,7 +103,7 @@ defineQuery({
     const [ln, events, shipment] = await Promise.all([
       unwrap(ctx.db.from("order_lines").select("*, skus(name)").eq("order_id", i.orderId)),
       unwrap(ctx.db.from("order_events").select().eq("order_id", i.orderId).order("created_at")),
-      unwrap(ctx.db.from("shipments").select("id, invoices(id, invoice_no, kind, paid_at, invoice_lines(amount_cents))").eq("order_id", i.orderId).maybeSingle()),
+      unwrap(ctx.db.from("shipments").select("id, invoices(id, invoice_no, kind, paid_at, qbo_remote_state, qbo_balance_cents, written_off_at, invoice_lines(amount_cents))").eq("order_id", i.orderId).maybeSingle()),
     ]);
     return { order, lines: ln, events, shipment };
   },
@@ -154,7 +154,7 @@ defineQuery({
     const customerId = requireCustomer(ctx);
     // RLS already scopes to the caller's customer; the customer_id filter makes a foreign id a plain not_found
     const [invoice, lines, brewery] = await Promise.all([
-      unwrap(ctx.db.from("invoices").select("id, invoice_no, kind, issued_on, due_on, paid_at").eq("id", i.invoiceId).eq("customer_id", customerId).single()),
+      unwrap(ctx.db.from("invoices").select("id, invoice_no, kind, issued_on, due_on, paid_at, qbo_remote_state, qbo_balance_cents, written_off_at").eq("id", i.invoiceId).eq("customer_id", customerId).single()),
       unwrap(ctx.db.from("invoice_lines").select("id, kind, qty, unit_price_cents, amount_cents, description, skus(name)").eq("invoice_id", i.invoiceId)),
       unwrap(ctx.db.from("portal_brewery").select("name, customer_phone").eq("id", ctx.breweryId).single()),
     ]);

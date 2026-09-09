@@ -155,7 +155,7 @@ export async function compareAndSwapQboTokens(ctx: Ctx, expected: VersionedInteg
 export async function getQboHealth(ctx: Ctx) {
   if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
   const { data, error } = await ctx.db.from("qbo_connections")
-    .select("id,realm_label,state,remote_revocation_state,last_error,access_expires_at,refresh_expires_at,refresh_hard_expires_at")
+    .select("id,realm_label,state,remote_revocation_state,last_error,access_expires_at,refresh_expires_at,refresh_hard_expires_at,allow_online_ach_payment,allow_online_credit_card_payment")
     .eq("brewery_id", ctx.breweryId).maybeSingle();
   if (error) throw new Error("QuickBooks health is unavailable");
   if (!data) return { connected: false, state: "disconnected" as const, realmLabel: null, lastError: null };
@@ -165,6 +165,8 @@ export async function getQboHealth(ctx: Ctx) {
     realmLabel: data.realm_label as string | null, remoteRevocationState: data.remote_revocation_state as string,
     lastError: data.last_error as string | null, accessExpiresAt: data.access_expires_at as string | null,
     refreshExpiresAt: data.refresh_expires_at as string | null, refreshHardExpiresAt: data.refresh_hard_expires_at as string | null,
+    allowAch: data.allow_online_ach_payment as boolean,
+    allowCard: data.allow_online_credit_card_payment as boolean,
   };
 }
 
@@ -206,4 +208,32 @@ export async function finishQboPush(ctx: Ctx, input: {
   if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
   if (error) throw new Error("QuickBooks push reconciliation failed");
   return data as { pushId: string; status: "pushed" | "push_failed"; remoteId: string | null };
+}
+
+export async function applyQboInvoiceState(ctx: Ctx, input: {
+  invoiceId: string;
+  connectionId: string;
+  realmId: string;
+  remoteId: string;
+  remoteState: "live" | "voided" | "deleted";
+  syncToken: string | null;
+  taxCents: number | null;
+  totalCents: number | null;
+  balanceCents: number | null;
+  contentMatches: boolean;
+  cashPaid: boolean;
+  paidAt: string | null;
+  requestId: string;
+}) {
+  const { data, error } = await createAdminClient().rpc("apply_qbo_invoice_state", {
+    p_brewery: ctx.breweryId, p_invoice: input.invoiceId, p_connection: input.connectionId,
+    p_realm: input.realmId, p_remote_id: input.remoteId, p_actor: ctx.userId,
+    p_remote_state: input.remoteState, p_sync_token: input.syncToken, p_tax_cents: input.taxCents,
+    p_total_cents: input.totalCents, p_balance_cents: input.balanceCents,
+    p_content_matches: input.contentMatches, p_cash_paid: input.cashPaid,
+    p_paid_at: input.paidAt, p_request_id: input.requestId,
+  });
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error) throw new Error("QuickBooks invoice state could not be recorded");
+  return data as { invoiceId: string; remoteState: "live" | "voided" | "deleted"; paid: boolean; drifted: boolean };
 }
