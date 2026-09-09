@@ -3360,6 +3360,20 @@ create table private.command_requests (
   check ((brewery_id is null) = (command_name = 'provision_brewery'))
 );
 
+-- A failed provider read can be retried against this exact target set. Only
+-- the authenticated begin RPC and service-only completion RPC can reach it.
+create table private.qbo_invoice_sync_batches (
+  actor_id uuid not null,
+  request_id uuid not null,
+  brewery_id uuid not null,
+  connection_id uuid not null,
+  realm_id text not null,
+  targets jsonb not null check (jsonb_typeof(targets) = 'array'),
+  created_at timestamptz not null default now(),
+  primary key (actor_id, request_id),
+  foreign key (actor_id, request_id) references private.command_requests(actor_id, request_id) on delete cascade
+);
+
 -- Optional PostgREST headers narrow an already-authenticated request to the
 -- server-verified context that rendered it. They never grant membership.
 create function private.assert_request_scope(p_brewery uuid, p_customer uuid default null) returns void
@@ -3692,48 +3706,149 @@ begin
   return private.complete_command_request_for(p_actor,p_request_id,v_result);
 end $$;
 
-create function apply_qbo_invoice_state(
-  p_brewery uuid,p_invoice uuid,p_connection uuid,p_realm text,p_remote_id text,p_actor uuid,
-  p_remote_state text,p_sync_token text,p_tax_cents int,p_total_cents int,p_balance_cents int,
-  p_content_matches boolean,p_cash_paid boolean,p_paid_at timestamptz,p_request_id uuid
-) returns jsonb language plpgsql security definer set search_path='' as $$
-declare v_inv public.invoices; v_push public.qbo_pushes; v_replay jsonb; v_result jsonb; v_drift boolean:=false;
+create function begin_qbo_invoice_sync(p_brewery uuid,p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path='' as $$
+declare
+  v_actor uuid; v_request private.command_requests; v_conn public.qbo_connections;
+  v_targets jsonb; v_payload_hash bytea:=extensions.digest('{}'::jsonb::text,'sha256');
 begin
-  if not exists(select 1 from public.brewery_users where brewery_id=p_brewery and user_id=p_actor and role in ('admin','sales'))
-    then raise insufficient_privilege using message='permission denied'; end if;
-  if p_remote_state not in ('live','voided','deleted') then raise exception 'invalid QuickBooks invoice state'; end if;
-  perform 1 from public.qbo_connections where brewery_id=p_brewery and id=p_connection and realm_id=p_realm and state='connected' for share;
+  v_actor:=private.assert_staff(p_brewery,array['admin','sales']::public.staff_role[]);
+  select * into v_request from private.command_requests
+    where actor_id=v_actor and request_id=p_request_id for update;
+  if found then
+    if v_request.brewery_id is distinct from p_brewery or v_request.command_name<>'sync_qbo_payments'
+       or v_request.payload_hash<>v_payload_hash then
+      raise exception 'request id was already used with a different payload' using errcode='MG409';
+    end if;
+    if v_request.result is not null then return jsonb_build_object('replayResult',v_request.result); end if;
+    select connection_id,realm_id,targets into v_conn.id,v_conn.realm_id,v_targets
+      from private.qbo_invoice_sync_batches where actor_id=v_actor and request_id=p_request_id;
+    if not found then raise exception 'QuickBooks sync request is incomplete' using errcode='MG409'; end if;
+    perform 1 from public.qbo_connections where brewery_id=p_brewery and id=v_conn.id
+      and realm_id=v_conn.realm_id and state='connected' for share;
+    if not found then raise exception 'QuickBooks connection changed' using errcode='MG409'; end if;
+    return jsonb_build_object('actorId',v_actor,'connectionId',v_conn.id,'realmId',v_conn.realm_id,'targets',v_targets);
+  end if;
+
+  select * into v_conn from public.qbo_connections
+    where brewery_id=p_brewery and state='connected' for share;
+  if not found then raise exception 'QuickBooks connection required'; end if;
+  insert into private.command_requests(actor_id,brewery_id,request_id,command_name,payload_hash)
+    values(v_actor,p_brewery,p_request_id,'sync_qbo_payments',v_payload_hash)
+    on conflict(actor_id,request_id) do nothing;
+  if not found then
+    select * into v_request from private.command_requests
+      where actor_id=v_actor and request_id=p_request_id for update;
+    if v_request.brewery_id is distinct from p_brewery or v_request.command_name<>'sync_qbo_payments'
+       or v_request.payload_hash<>v_payload_hash then
+      raise exception 'request id was already used with a different payload' using errcode='MG409';
+    end if;
+    if v_request.result is not null then return jsonb_build_object('replayResult',v_request.result); end if;
+    select connection_id,realm_id,targets into v_conn.id,v_conn.realm_id,v_targets
+      from private.qbo_invoice_sync_batches where actor_id=v_actor and request_id=p_request_id;
+    if not found then raise exception 'QuickBooks sync request is incomplete' using errcode='MG409'; end if;
+    perform 1 from public.qbo_connections where brewery_id=p_brewery and id=v_conn.id
+      and realm_id=v_conn.realm_id and state='connected' for share;
+    if not found then raise exception 'QuickBooks connection changed' using errcode='MG409'; end if;
+    return jsonb_build_object('actorId',v_actor,'connectionId',v_conn.id,'realmId',v_conn.realm_id,'targets',v_targets);
+  end if;
+  select coalesce(jsonb_agg(jsonb_build_object(
+      'invoiceId',i.id,'remoteId',i.qbo_invoice_id,'pushId',p.id,
+      'requestBody',p.request_body,'pushedResponse',p.response) order by i.id),'[]'::jsonb)
+    into v_targets
+  from public.invoices i
+  join lateral (
+    select qp.* from public.qbo_pushes qp
+    where qp.invoice_id=i.id and qp.brewery_id=p_brewery and qp.connection_id=v_conn.id
+      and qp.realm_id=v_conn.realm_id and qp.status='pushed' and qp.qbo_entity_id=i.qbo_invoice_id
+    order by qp.finished_at desc nulls last,qp.created_at desc,qp.id desc limit 1
+  ) p on true
+  where i.brewery_id=p_brewery and i.kind='invoice' and i.qbo_sync_status='pushed'
+    and i.qbo_invoice_id is not null;
+  insert into private.qbo_invoice_sync_batches(actor_id,request_id,brewery_id,connection_id,realm_id,targets)
+    values(v_actor,p_request_id,p_brewery,v_conn.id,v_conn.realm_id,v_targets);
+  return jsonb_build_object('actorId',v_actor,'connectionId',v_conn.id,'realmId',v_conn.realm_id,'targets',v_targets);
+end $$;
+
+create function complete_qbo_invoice_sync(
+  p_brewery uuid,p_actor uuid,p_request_id uuid,p_connection uuid,p_realm text,p_observations jsonb
+) returns jsonb language plpgsql security definer set search_path='' as $$
+declare
+  v_batch private.qbo_invoice_sync_batches; v_request private.command_requests;
+  v_target jsonb; v_observation jsonb; v_inv public.invoices; v_push public.qbo_pushes;
+  v_state text; v_drift boolean; v_paid boolean;
+  v_synced int:=0; v_paid_count int:=0; v_voided int:=0; v_deleted int:=0; v_drifted int:=0; v_result jsonb;
+begin
+  if p_actor is null or not exists(select 1 from public.brewery_users
+      where brewery_id=p_brewery and user_id=p_actor and role in ('admin','sales')) then
+    raise insufficient_privilege using message='permission denied';
+  end if;
+  perform 1 from public.qbo_connections where brewery_id=p_brewery and id=p_connection
+    and realm_id=p_realm and state='connected' for share;
   if not found then raise exception 'QuickBooks connection changed' using errcode='MG409'; end if;
-  select * into v_inv from public.invoices where id=p_invoice and brewery_id=p_brewery for update;
-  if not found then raise exception 'invoice not found'; end if;
-  select * into v_push from public.qbo_pushes
-    where invoice_id=p_invoice and brewery_id=p_brewery and connection_id=p_connection and realm_id=p_realm
-      and status='pushed' and qbo_entity_id=p_remote_id
-    order by finished_at desc nulls last,created_at desc,id desc limit 1;
-  if not found or v_inv.qbo_invoice_id is distinct from p_remote_id then
-    raise exception 'QuickBooks invoice identity changed' using errcode='MG409';
-  end if;
-  v_replay:=private.claim_command_request_for(p_actor,p_brewery,'apply_qbo_invoice_state',p_request_id,
-    jsonb_build_object('invoiceId',p_invoice,'connectionId',p_connection,'realmId',p_realm,'remoteId',p_remote_id,
-      'remoteState',p_remote_state,'syncToken',p_sync_token,'taxCents',p_tax_cents,'totalCents',p_total_cents,
-      'balanceCents',p_balance_cents,'contentMatches',p_content_matches,'cashPaid',p_cash_paid,'paidAt',p_paid_at));
-  if v_replay is not null then return v_replay; end if;
-  if p_remote_state='live' then
-    v_drift:=not p_content_matches
-      or (v_push.response ? 'TotalAmt' and round((v_push.response->>'TotalAmt')::numeric*100)::int is distinct from p_total_cents)
-      or (v_push.response ? 'TotalTax' and round((v_push.response->>'TotalTax')::numeric*100)::int is distinct from p_tax_cents);
-  end if;
-  update public.invoices set qbo_remote_state=p_remote_state::public.qbo_remote_state,
-    qbo_sync_token=p_sync_token,qbo_tax_cents=p_tax_cents,qbo_total_cents=p_total_cents,
-    qbo_balance_cents=p_balance_cents,qbo_accountant_drift=v_drift,
-    paid_at=case
-      when p_remote_state='live' and p_cash_paid and p_balance_cents=0 and p_total_cents>0 then coalesce(paid_at,p_paid_at,now())
-      when p_remote_state='live' then null
-      else paid_at end
-    where id=p_invoice and brewery_id=p_brewery;
-  v_result:=jsonb_build_object('invoiceId',p_invoice,'remoteState',p_remote_state,'paid',
-    p_remote_state='live' and p_cash_paid and p_balance_cents=0 and p_total_cents>0,'drifted',v_drift);
-  return private.complete_command_request_for(p_actor,p_request_id,v_result);
+  select * into v_request from private.command_requests
+    where actor_id=p_actor and request_id=p_request_id for update;
+  if not found or v_request.brewery_id is distinct from p_brewery or v_request.command_name<>'sync_qbo_payments'
+    then raise exception 'QuickBooks sync request changed' using errcode='MG409'; end if;
+  if v_request.result is not null then return v_request.result; end if;
+  select * into v_batch from private.qbo_invoice_sync_batches
+    where actor_id=p_actor and request_id=p_request_id for update;
+  if not found or v_batch.brewery_id<>p_brewery or v_batch.connection_id<>p_connection or v_batch.realm_id<>p_realm
+    then raise exception 'QuickBooks sync request changed' using errcode='MG409'; end if;
+  if jsonb_typeof(p_observations)<>'array'
+     or jsonb_array_length(p_observations)<>jsonb_array_length(v_batch.targets)
+     or exists(select 1 from jsonb_array_elements(p_observations) o
+       where (select count(*) from jsonb_array_elements(v_batch.targets) t
+         where t->>'invoiceId'=o->>'invoiceId' and t->>'remoteId'=o->>'remoteId')<>1)
+     or exists(select 1 from jsonb_array_elements(v_batch.targets) t
+       where (select count(*) from jsonb_array_elements(p_observations) o
+         where o->>'invoiceId'=t->>'invoiceId' and o->>'remoteId'=t->>'remoteId')<>1)
+    then raise exception 'QuickBooks sync observations changed' using errcode='MG409'; end if;
+
+  -- Lock all targets in deterministic order before applying any observation.
+  perform 1 from public.invoices i join jsonb_array_elements(v_batch.targets) t
+    on i.id=(t->>'invoiceId')::uuid and i.brewery_id=p_brewery order by i.id for update of i;
+  for v_target in select value from jsonb_array_elements(v_batch.targets) order by value->>'invoiceId' loop
+    select value into v_observation from jsonb_array_elements(p_observations)
+      where value->>'invoiceId'=v_target->>'invoiceId' and value->>'remoteId'=v_target->>'remoteId';
+    select * into v_inv from public.invoices where id=(v_target->>'invoiceId')::uuid and brewery_id=p_brewery;
+    select * into v_push from public.qbo_pushes where id=(v_target->>'pushId')::uuid and brewery_id=p_brewery
+      and invoice_id=v_inv.id and connection_id=p_connection and realm_id=p_realm and status='pushed'
+      and qbo_entity_id=v_target->>'remoteId';
+    if v_inv.id is null or v_push.id is null or v_inv.qbo_invoice_id is distinct from v_target->>'remoteId' then
+      raise exception 'QuickBooks invoice identity changed' using errcode='MG409';
+    end if;
+    v_state:=v_observation->>'remoteState';
+    if v_state not in ('live','voided','deleted') then raise exception 'invalid QuickBooks invoice state'; end if;
+    v_drift:=false;
+    if v_state='live' then
+      v_drift:=not (v_observation->>'contentMatches')::boolean
+        or (v_push.response ? 'TotalAmt' and round((v_push.response->>'TotalAmt')::numeric*100)::int
+          is distinct from (v_observation->>'totalCents')::int)
+        or (v_push.response ? 'TotalTax' and round((v_push.response->>'TotalTax')::numeric*100)::int
+          is distinct from (v_observation->>'taxCents')::int);
+    end if;
+    v_paid:=v_state='live' and (v_observation->>'cashPaid')::boolean
+      and (v_observation->>'balanceCents')::int=0 and (v_observation->>'totalCents')::int>0;
+    update public.invoices set qbo_remote_state=v_state::public.qbo_remote_state,
+      qbo_sync_token=v_observation->>'syncToken',
+      qbo_tax_cents=case when v_observation->'taxCents'='null'::jsonb then null else (v_observation->>'taxCents')::int end,
+      qbo_total_cents=case when v_observation->'totalCents'='null'::jsonb then null else (v_observation->>'totalCents')::int end,
+      qbo_balance_cents=case when v_observation->'balanceCents'='null'::jsonb then null else (v_observation->>'balanceCents')::int end,
+      qbo_accountant_drift=v_drift,
+      paid_at=case when v_paid then coalesce(paid_at,nullif(v_observation->>'paidAt','')::timestamptz,now())
+        when v_state='live' then null else paid_at end
+      where id=v_inv.id and brewery_id=p_brewery;
+    v_synced:=v_synced+1;
+    v_paid_count:=v_paid_count+v_paid::int;
+    v_voided:=v_voided+(v_state='voided')::int;
+    v_deleted:=v_deleted+(v_state='deleted')::int;
+    v_drifted:=v_drifted+v_drift::int;
+  end loop;
+  v_result:=jsonb_build_object('synced',v_synced,'paid',v_paid_count,'voided',v_voided,'deleted',v_deleted,'drifted',v_drifted);
+  perform private.complete_command_request_for(p_actor,p_request_id,v_result);
+  delete from private.qbo_invoice_sync_batches where actor_id=p_actor and request_id=p_request_id;
+  return v_result;
 end $$;
 
 create function write_off_invoice(p_brewery uuid,p_invoice uuid,p_reason text,p_request_id uuid)
@@ -3759,10 +3874,10 @@ end $$;
 revoke all on function set_qbo_customer_mapping(uuid,uuid,text,uuid),set_qbo_item_mapping(uuid,uuid,text,uuid),
   set_qbo_deposit_mapping(uuid,text,uuid),set_qbo_push_defaults(uuid,boolean,boolean,uuid),start_qbo_push(uuid,uuid,text,uuid),
   finish_qbo_push(uuid,uuid,uuid,text,text,text,jsonb,uuid),
-  apply_qbo_invoice_state(uuid,uuid,uuid,text,text,uuid,text,text,int,int,int,boolean,boolean,timestamptz,uuid),
+  begin_qbo_invoice_sync(uuid,uuid),complete_qbo_invoice_sync(uuid,uuid,uuid,uuid,text,jsonb),
   write_off_invoice(uuid,uuid,text,uuid) from public,anon,authenticated,service_role;
 grant execute on function finish_qbo_push(uuid,uuid,uuid,text,text,text,jsonb,uuid) to service_role;
-grant execute on function apply_qbo_invoice_state(uuid,uuid,uuid,text,text,uuid,text,text,int,int,int,boolean,boolean,timestamptz,uuid) to service_role;
+grant execute on function complete_qbo_invoice_sync(uuid,uuid,uuid,uuid,text,jsonb) to service_role;
 
 -- Bootstrap is authenticated but deliberately has no tenant identity yet.
 create function provision_brewery(p_name text, p_timezone text, p_ttb text, p_request_id uuid)
@@ -9488,4 +9603,4 @@ grant execute on function public.begin_qbo_oauth(uuid,text,text,text,uuid) to au
 grant execute on function public.set_qbo_customer_mapping(uuid,uuid,text,uuid),
   public.set_qbo_item_mapping(uuid,uuid,text,uuid),public.set_qbo_deposit_mapping(uuid,text,uuid),
   public.set_qbo_push_defaults(uuid,boolean,boolean,uuid),public.write_off_invoice(uuid,uuid,text,uuid),
-  public.start_qbo_push(uuid,uuid,text,uuid) to authenticated;
+  public.start_qbo_push(uuid,uuid,text,uuid),public.begin_qbo_invoice_sync(uuid,uuid) to authenticated;

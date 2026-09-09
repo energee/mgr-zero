@@ -75,7 +75,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "sync_qbo_payments", description: "Read current QuickBooks invoice balances, payment evidence, edits, voids, and deletions",
+  name: "sync_qbo_payments", description: "Read one frozen batch of current QuickBooks invoice balances, payment evidence, edits, voids, and deletions, then apply it all-or-none; the exact requestId replays the recorded result",
   input: z.object({}), roles: ["admin", "sales"],
   handler: async (ctx, _input, execution) => {
     const { qboConfig, QboOAuthClient, syncQboInvoices } = await import("@/lib/qbo");

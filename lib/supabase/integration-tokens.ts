@@ -210,10 +210,24 @@ export async function finishQboPush(ctx: Ctx, input: {
   return data as { pushId: string; status: "pushed" | "push_failed"; remoteId: string | null };
 }
 
-export async function applyQboInvoiceState(ctx: Ctx, input: {
+export type QboInvoiceSyncResult = {
+  synced: number;
+  paid: number;
+  voided: number;
+  deleted: number;
+  drifted: number;
+};
+
+export type QboInvoiceSyncTarget = {
   invoiceId: string;
-  connectionId: string;
-  realmId: string;
+  remoteId: string;
+  pushId: string;
+  requestBody: string;
+  pushedResponse: Record<string, unknown> | null;
+};
+
+export type QboInvoiceObservation = {
+  invoiceId: string;
   remoteId: string;
   remoteState: "live" | "voided" | "deleted";
   syncToken: string | null;
@@ -223,17 +237,48 @@ export async function applyQboInvoiceState(ctx: Ctx, input: {
   contentMatches: boolean;
   cashPaid: boolean;
   paidAt: string | null;
-  requestId: string;
-}) {
-  const { data, error } = await createAdminClient().rpc("apply_qbo_invoice_state", {
-    p_brewery: ctx.breweryId, p_invoice: input.invoiceId, p_connection: input.connectionId,
-    p_realm: input.realmId, p_remote_id: input.remoteId, p_actor: ctx.userId,
-    p_remote_state: input.remoteState, p_sync_token: input.syncToken, p_tax_cents: input.taxCents,
-    p_total_cents: input.totalCents, p_balance_cents: input.balanceCents,
-    p_content_matches: input.contentMatches, p_cash_paid: input.cashPaid,
-    p_paid_at: input.paidAt, p_request_id: input.requestId,
+};
+
+export async function beginQboInvoiceSync(ctx: Ctx, requestId: string) {
+  const { data, error } = await ctx.db.rpc("begin_qbo_invoice_sync", {
+    p_brewery: ctx.breweryId, p_request_id: requestId,
   });
   if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
-  if (error) throw new Error("QuickBooks invoice state could not be recorded");
-  return data as { invoiceId: string; remoteState: "live" | "voided" | "deleted"; paid: boolean; drifted: boolean };
+  if (error) throw new Error("QuickBooks invoice sync could not be started");
+  const row = data as {
+    actorId?: unknown;
+    connectionId?: unknown;
+    realmId?: unknown;
+    targets?: unknown;
+    replayResult?: unknown;
+  } | null;
+  if (row?.replayResult && typeof row.replayResult === "object") {
+    return { replayResult: row.replayResult as QboInvoiceSyncResult } as const;
+  }
+  if (typeof row?.actorId !== "string" || typeof row.connectionId !== "string"
+    || typeof row.realmId !== "string" || !Array.isArray(row.targets)) {
+    throw new Error("QuickBooks invoice sync start was invalid");
+  }
+  return {
+    actorId: row.actorId,
+    connectionId: row.connectionId,
+    realmId: row.realmId,
+    targets: row.targets as QboInvoiceSyncTarget[],
+  } as const;
+}
+
+export async function completeQboInvoiceSync(ctx: Ctx, input: {
+  actorId: string;
+  connectionId: string;
+  realmId: string;
+  requestId: string;
+  observations: QboInvoiceObservation[];
+}) {
+  const { data, error } = await createAdminClient().rpc("complete_qbo_invoice_sync", {
+    p_brewery: ctx.breweryId, p_actor: input.actorId, p_request_id: input.requestId,
+    p_connection: input.connectionId, p_realm: input.realmId, p_observations: input.observations,
+  });
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error) throw new Error("QuickBooks invoice sync could not be recorded");
+  return data as QboInvoiceSyncResult;
 }

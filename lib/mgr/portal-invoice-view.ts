@@ -19,6 +19,7 @@ export type PortalInvoiceViewModel = {
   due?: string;
   paidOn?: string;
   paid: boolean;
+  payable: boolean;
   kind: "invoice" | "credit_memo";
   issued: string;
   status: "Credit" | "Paid" | "Unpaid" | "Voided" | "Deleted" | "Written off";
@@ -69,6 +70,7 @@ export function toPortalInvoiceViewProps({ invoice, lines, brewery, backHref }: 
     due: invoice.due_on ?? undefined,
     paidOn: paid ? day(invoice.paid_at!) : undefined,
     paid,
+    payable: !credit && state === "unpaid",
     kind: invoice.kind,
     issued: invoice.issued_on,
     status: credit ? "Credit" : status,

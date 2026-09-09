@@ -4371,7 +4371,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Read current QuickBooks invoice balances, payment evidence, edits, voids, and deletions
+Read one frozen batch of current QuickBooks invoice balances, payment evidence, edits, voids, and deletions, then apply it all-or-none; the exact requestId replays the recorded result
 
 Takes no input.
 

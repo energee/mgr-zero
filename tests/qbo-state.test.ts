@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { QboOAuthClient, syncQboInvoices } from "@/lib/qbo";
+import { beginQboInvoiceSync, completeQboInvoiceSync } from "@/lib/supabase/integration-tokens";
 import { PortalInvoiceView } from "@/components/mgr/views/portal-invoice";
 import { invoiceCurrentState } from "@/lib/mgr/invoice-state";
 import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
@@ -181,11 +182,28 @@ describe("QuickBooks current invoice state", () => {
     await expect(syncQboInvoices(f.ctx, requestId, client)).resolves.toEqual(result);
     expect(retryFetch).toHaveBeenCalledTimes(2);
     expect(sql(`select coalesce(qbo_sync_token,'NULL') from invoices where id='${lateId}'`)).toEqual(["NULL"]);
+
+    const atomicRequestId = crypto.randomUUID();
+    const pending = await beginQboInvoiceSync(f.ctx, atomicRequestId);
+    if ("replayResult" in pending) throw new Error("unexpected replay");
+    sql(`update invoices set qbo_invoice_id='changed-after-fetch' where id='${secondId}'`);
+    await expect(completeQboInvoiceSync(f.ctx, {
+      actorId: pending.actorId,
+      connectionId: pending.connectionId,
+      realmId: pending.realmId,
+      requestId: atomicRequestId,
+      observations: pending.targets.map((target) => ({
+        invoiceId: target.invoiceId, remoteId: target.remoteId, remoteState: "live" as const,
+        syncToken: "must-roll-back", taxCents: 1000, totalCents: 10000, balanceCents: 5000,
+        contentMatches: true, cashPaid: true, paidAt: "2026-09-09T15:00:00Z",
+      })),
+    })).rejects.toThrow("QuickBooks invoice identity changed");
+    expect(sql(`select qbo_sync_token from invoices where id='${firstId}'`)).toEqual(["synced-remote-one"]);
   });
 
   it("marks only a definitive 404 from the original current realm as deleted", async () => {
     expect(sql(`select r.role from pg_proc p cross join (values ('anon'),('authenticated'),('service_role')) r(role)
-      where p.oid='public.apply_qbo_invoice_state(uuid,uuid,uuid,text,text,uuid,text,text,integer,integer,integer,boolean,boolean,timestamp with time zone,uuid)'::regprocedure
+      where p.oid='public.complete_qbo_invoice_sync(uuid,uuid,uuid,uuid,text,jsonb)'::regprocedure
         and has_function_privilege(r.role,p.oid,'execute') order by 1`)).toEqual(["service_role"]);
     const deleted = await stateFixture();
     const notFound = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response("missing", { status: 404 }));
@@ -204,6 +222,12 @@ describe("QuickBooks current invoice state", () => {
     await syncQboInvoices(wrongRealm.ctx, crypto.randomUUID(), new QboOAuthClient(config, noFetch));
     expect(noFetch).not.toHaveBeenCalled();
     expect(sql(`select qbo_remote_state from invoices where id='${wrongRealm.invoice.id}'`)).toEqual(["live"]);
+
+    const warehouse = await stateFixture("warehouse");
+    const forbiddenFetch = vi.fn<typeof globalThis.fetch>();
+    await expect(syncQboInvoices(warehouse.ctx, crypto.randomUUID(), new QboOAuthClient(config, forbiddenFetch)))
+      .rejects.toThrow("permission denied");
+    expect(forbiddenFetch).not.toHaveBeenCalled();
   });
 
   it("sets future ACH/card defaults and writes off only eligible invoices with exact replay", async () => {
@@ -265,14 +289,19 @@ describe("QuickBooks current invoice state", () => {
     expect(toPortalInvoiceViewProps({
       invoice: { ...invoice, total_cents: 10000 }, lines: [], brewery: { name: "Brewery", customer_phone: null },
     })).toMatchObject({ paid: false, paidOn: undefined, status: "Voided" });
-    const html = renderToStaticMarkup(createElement(PortalInvoiceView, {
-      model: toPortalInvoiceViewProps({
-        invoice: { ...invoice, total_cents: 10000 }, lines: [], brewery: { name: "Brewery", customer_phone: null },
-      }),
-      footer: null,
-    }));
-    expect(html).toContain("This invoice is not payable.");
-    expect(html).not.toMatch(/still due|arrange payment|>Due</);
+    for (const state of [
+      { qbo_remote_state: "voided" as const, written_off_at: null, status: "Voided" },
+      { qbo_remote_state: "deleted" as const, written_off_at: null, status: "Deleted" },
+      { qbo_remote_state: "deleted" as const, written_off_at: "2026-09-09T16:00:00Z", status: "Written off" },
+    ]) {
+      const model = toPortalInvoiceViewProps({
+        invoice: { ...invoice, ...state, total_cents: 10000 }, lines: [], brewery: { name: "Brewery", customer_phone: null },
+      });
+      expect(model).toMatchObject({ paid: false, paidOn: undefined, payable: false, status: state.status });
+      const html = renderToStaticMarkup(createElement(PortalInvoiceView, { model, footer: null }));
+      expect(html).toContain("This invoice is not payable.");
+      expect(html).not.toMatch(/still due|arrange payment|>Due</);
+    }
     expect(toPortalInvoicesViewProps({ customerName: "Buyer", invoices: [{ ...invoice, invoice_lines: [{ amount_cents: 10000 }] }] }).rows[0])
       .toMatchObject({ detail: "voided", unpaid: false });
   });

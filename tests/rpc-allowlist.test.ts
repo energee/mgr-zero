@@ -37,6 +37,7 @@ const AUTHENTICATED_RPCS = [
   "begin_chat_installation(uuid,text,text,text,uuid)",
   "begin_chat_reauthorization(uuid,uuid,text,text,uuid)",
   "begin_qbo_oauth(uuid,text,text,text,uuid)",
+  "begin_qbo_invoice_sync(uuid,uuid)",
   "set_qbo_customer_mapping(uuid,uuid,text,uuid)",
   "set_qbo_item_mapping(uuid,uuid,text,uuid)",
   "set_qbo_deposit_mapping(uuid,text,uuid)",
