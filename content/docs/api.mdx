@@ -2546,7 +2546,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse, taproom
 
-Atomically close the outgoing interval and open its replacement at the same location. incomingKeg is {skuId} or {label, nominalBbl}; omission defaults to the outgoing own SKU, while guests require explicit identity. Exact retries return the original pair. Does not change inventory
+Atomically close the outgoing interval and open its replacement at the same location. incomingKeg is &#123;skuId&#125; or &#123;label, nominalBbl&#125;; omission defaults to the outgoing own SKU, while guests require explicit identity. Exact retries return the original pair. Does not change inventory
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -2568,7 +2568,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse, taproom
 
-Open a keg interval at an owned taproom. keg is {skuId} for an own packaged keg or {label, nominalBbl} for a guest; freezes size and flags absent stock. Optional tap numbers may repeat. Does not change inventory
+Open a keg interval at an owned taproom. keg is &#123;skuId&#125; for an own packaged keg or &#123;label, nominalBbl&#125; for a guest; freezes size and flags absent stock. Optional tap numbers may repeat. Does not change inventory
 
 | Field | Type | Required |
 | --- | --- | --- |
