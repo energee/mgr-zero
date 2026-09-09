@@ -243,7 +243,7 @@ Owners: baseline RPC/grants; `lib/commands/taproom.ts`; Taproom page/form; Weekl
 
 Depends on T4a only by shared Taproom files; land after it to avoid competing edits. Owners: baseline count/movement tables, the immediate movement proof, the deferred reciprocal-graph trigger, and private effective-count SQL; `lib/commands/taproom.ts`; existing count state/page/form; variance and draft projection consumers; API/staff docs; count, variance, compliance-period, RLS/RPC, UI/browser tests. Prove the correction core and all existing count invariants before moving on.
 
-### T4c — completion reconciliation
+### T4c — completion reconciliation (implemented)
 
 Depends on no count schema semantics but follows T4b because both edit the baseline and generated docs. Owners: schema/program/domain contract text first; baseline volume/batch schema, occupancy view, formula and RPC; the shared gate helper and the six enumerated committed cellar writers; `lib/commands/production.ts`; Cellar page/form and screen record; production/compliance/RLS/RPC/API/browser tests, including the two-connection barriers. This card lands computed completion and the generic root only.
 
@@ -256,4 +256,3 @@ At each card: write the meaningful red first; edit only the baseline migration; 
 ## Explicit exclusions
 
 No historical count cascade, correction of a correction, mistaken-high count correction, mutable original rows, generic correction framework, extra loss-cause enum, raw lot/history access for Taproom, PDF/label dependency, provider action, legal filing-line mapping, hosted change, second migration, or schema work outside these accepted contracts.
-

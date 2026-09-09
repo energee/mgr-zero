@@ -173,6 +173,7 @@ omitted. They have no roles until they are built.
 | `cancel_order` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
 | `clear_channel_price` | Catalog & pricing | ✓ | ✓ |  |  |  |  |
 | `close_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |  |
+| `complete_batch` | Production | ✓ |  |  | ✓ |  |  |
 | `confirm_delivery` | Delivery & routes | ✓ |  | ✓ |  |  |  |
 | `confirm_order` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
 | `confirm_restock` | Orders & invoicing | ✓ |  | ✓ |  |  |  |
@@ -200,6 +201,7 @@ omitted. They have no roles until they are built.
 | `file_compliance_report` | Compliance | ✓ | ✓ |  |  |  |  |
 | `generate_compliance_report` | Compliance | ✓ | ✓ |  |  |  |  |
 | `get_atp` | Inventory & locations | ✓ | ✓ | ✓ |  |  |  |
+| `get_batch_completion_preview` | Production | ✓ |  |  | ✓ |  |  |
 | `get_beer_overview` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `get_bin_move_stock` | Inventory & locations | ✓ |  | ✓ |  |  |  |
 | `get_bin_on_hand` | Inventory & locations | ✓ | ✓ | ✓ |  |  |  |
@@ -2995,6 +2997,23 @@ reading notification is measured against.
 
 {/* ops:production */}
 
+#### complete_batch [#complete_batch]
+
+`command` · admin, brewer
+
+Close a brewed batch and all of its open occupancies, adding one exact nonphysical reconciliation loss when the server-derived residual meets the threshold
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `batchId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "complete_batch", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "batchId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 #### create_recipe [#create_recipe]
 
 `command` · admin, brewer
@@ -3038,6 +3057,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_recipe_version", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "recipeId": "00000000-0000-0000-0000-000000000000", "mashTempF": 1, "brewhouseEfficiency": 1, "yeastAttenuation": 1, "ingredients": [ { "materialId": "00000000-0000-0000-0000-000000000000", "perBblQty": 1, "stage": "mash" } ] } }'
 ```
 
+#### get_batch_completion_preview [#get_batch_completion_preview]
+
+`query` · admin, brewer
+
+Preview the server-derived batch baseline, frozen packaged volume, prior attributed removals, residual and completion threshold
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `batchId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_batch_completion_preview", "input": { "batchId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 #### get_brew_day [#get_brew_day]
 
 `query` · admin, brewer
@@ -3076,7 +3112,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, brewer
 
-Batches by planned date, newest first, with the brand and recipe they intend and the vessel each one currently sits in
+Batches by planned date, newest first, with completion status and the brand, recipe, and current vessel when one is open
 
 Takes no input.
 
@@ -3241,13 +3277,12 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* production-designed */}
 
-13 of the 19 operations in this area are available today; the 6 below are not.
+15 of the 20 operations in this area are available today; the 5 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
-| `complete_batch` | command | Cellar map |
 | `get_recipe_outcomes` | query | Recipe |
 | `get_water_profile` | query | Water profile |
 | `list_water_profiles` | query | Water, Water profiles |

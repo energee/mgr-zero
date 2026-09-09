@@ -65,6 +65,7 @@ create type po_status as enum ('draft','sent','partially_received','received','c
 create type ingredient_stage as enum ('mash','boil','whirlpool','fermentation','dry_hop','packaging','other');
 create type vessel_kind as enum ('fermenter','brite','barrel','kettle','other');
 create type volume_adjustment_reason as enum ('loss','dump','gain','measurement');
+create type cellar_removal_class as enum ('loss','sample','taproom','destruction');
 create type keg_pool_kind as enum ('owned','leased','pay_per_fill');
 create type keg_event_reason as enum ('acquired','retired','shipped','returned','lost','found','transferred_out','transferred_in');
 create type stock_transfer_status as enum ('draft','submitted','picked','in_transit','received','cancelled');
@@ -839,15 +840,104 @@ create table volume_adjustments (   -- ledger: cellar losses/dumps/gains
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
   occupancy_id uuid not null,
-  bbl numeric(10,3) not null check (bbl <> 0),
+  bbl numeric not null check (bbl <> 0 and bbl not in ('NaN'::numeric, 'Infinity'::numeric, '-Infinity'::numeric) and bbl = round(bbl, 8)),
   reason volume_adjustment_reason not null,
+  removal_class cellar_removal_class,
+  tax_treatment tax_treatment,
+  dest_state text,
+  affects_occupancy boolean not null default true,
   at timestamptz not null default now(),
   note text,
   created_by uuid not null references auth.users(id),
   created_at timestamptz not null default now(),
+  unique (id, brewery_id),
+  constraint volume_adjustment_classification check (
+    (removal_class is null and reason in ('gain','measurement') and tax_treatment is null and dest_state is null)
+    or
+    (bbl < 0 and removal_class is not null and reason in ('loss','dump')
+      and (reason <> 'dump' or removal_class = 'destruction')
+      and case removal_class
+        when 'sample' then tax_treatment is null and dest_state is not null and dest_state ~ '^[A-Z]{2}$'
+        when 'taproom' then tax_treatment is not null and dest_state is null
+        else tax_treatment is null and dest_state is null
+      end)
+  ),
   foreign key (occupancy_id, brewery_id) references vessel_occupancies (id, brewery_id)
 );
 create index volume_adjustments_occ_idx on volume_adjustments (occupancy_id);
+
+alter table batches add column completion_adjustment_id uuid;
+alter table batches add constraint batches_completion_adjustment_unique unique (completion_adjustment_id, brewery_id);
+alter table batches add constraint batches_completion_adjustment_fk
+  foreign key (completion_adjustment_id, brewery_id) references volume_adjustments (id, brewery_id);
+
+-- The tax treatment for direct cellar Taproom removals is a tenant-owned
+-- system identity. Its editable display name never participates.
+create function private.enforce_cellar_removal() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if new.removal_class is null and new.bbl < 0 and new.reason = 'loss' then new.removal_class := 'loss'; end if;
+  if new.removal_class is null and new.bbl < 0 and new.reason = 'dump' then new.removal_class := 'destruction'; end if;
+  if new.removal_class = 'taproom' then
+    select sc.tax_treatment into new.tax_treatment from public.sale_channels sc
+      where sc.brewery_id = new.brewery_id and sc.system_code = 'taproom';
+    if new.tax_treatment is null then raise exception 'Taproom sale channel is required'; end if;
+  end if;
+  return new;
+end $$;
+create trigger volume_adjustments_classification before insert or update on volume_adjustments
+for each row execute function private.enforce_cellar_removal();
+
+-- Validate the reciprocal completion graph at commit. Checking OLD as well as
+-- NEW prevents a privileged pointer removal/repoint from orphaning a root.
+create function private.enforce_completion_adjustment_graph() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare v_adjustment uuid; v_batch uuid; a public.volume_adjustments; b public.batches; n int;
+begin
+  foreach v_adjustment in array array[
+    case when tg_table_name = 'volume_adjustments' then old.id else nullif(to_jsonb(old)->>'completion_adjustment_id', '')::uuid end,
+    case when tg_table_name = 'volume_adjustments' then new.id else nullif(to_jsonb(new)->>'completion_adjustment_id', '')::uuid end
+  ] loop
+    if v_adjustment is null then continue; end if;
+    select * into a from public.volume_adjustments where id = v_adjustment;
+    select count(*) into n from public.batches where completion_adjustment_id = v_adjustment;
+    if a.id is null then
+      if n <> 0 then raise exception 'invalid batch completion adjustment graph'; end if;
+    elsif not a.affects_occupancy or n <> 0 then
+      if n <> 1 then raise exception 'invalid batch completion adjustment graph'; end if;
+      select * into b from public.batches where completion_adjustment_id = v_adjustment;
+      if b.id is null or b.closed_at is null or b.brewery_id <> a.brewery_id
+        or a.bbl >= 0 or a.reason <> 'loss' or a.removal_class <> 'loss'
+        or a.tax_treatment is not null or a.dest_state is not null or a.affects_occupancy
+        or not exists (select 1 from public.vessel_occupancies o
+          where o.id = a.occupancy_id and o.brewery_id = b.brewery_id and o.batch_id = b.id)
+      then raise exception 'invalid batch completion adjustment graph'; end if;
+    end if;
+  end loop;
+
+  if tg_table_name = 'batches' then
+    foreach v_batch in array array[old.id, new.id] loop
+      if v_batch is null then continue; end if;
+      select * into b from public.batches where id = v_batch;
+      if b.id is not null and b.completion_adjustment_id is not null then
+        select * into a from public.volume_adjustments where id = b.completion_adjustment_id;
+        if a.id is null or b.closed_at is null or a.brewery_id <> b.brewery_id
+          or a.bbl >= 0 or a.reason <> 'loss' or a.removal_class <> 'loss'
+          or a.tax_treatment is not null or a.dest_state is not null or a.affects_occupancy
+          or not exists (select 1 from public.vessel_occupancies o
+            where o.id = a.occupancy_id and o.brewery_id = b.brewery_id and o.batch_id = b.id)
+        then raise exception 'invalid batch completion adjustment graph'; end if;
+      end if;
+    end loop;
+  end if;
+  return null;
+end $$;
+create constraint trigger volume_adjustments_completion_graph
+after insert or update or delete on volume_adjustments deferrable initially deferred
+for each row execute function private.enforce_completion_adjustment_graph();
+create constraint trigger batches_completion_graph
+after insert or update or delete on batches deferrable initially deferred
+for each row execute function private.enforce_completion_adjustment_graph();
 
 create table fermentation_readings (   -- manual entry only; °F and °Plato per brewing-domain.md
   id uuid primary key default private.new_uuid(),
@@ -2104,7 +2194,7 @@ create view occupancy_volumes with (security_invoker = true) as
          o.initial_bbl
            + coalesce((select sum(bbl) from transfers t where t.to_occupancy_id = o.id), 0)
            - coalesce((select sum(bbl + loss_bbl) from transfers t where t.from_occupancy_id = o.id), 0)
-           + coalesce((select sum(bbl) from volume_adjustments a where a.occupancy_id = o.id), 0)
+           + coalesce((select sum(bbl) from volume_adjustments a where a.occupancy_id = o.id and a.affects_occupancy), 0)
            - coalesce((select sum(bbl_drawn) from packaging_runs r where r.occupancy_id = o.id and r.closed_at is not null), 0)
            as bbl
   from vessel_occupancies o;
@@ -4624,6 +4714,122 @@ begin
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
+-- ponytail: one cellar writer per brewery; replace with narrower shared workflow locks if cellar throughput requires it.
+create function private.lock_cellar_workflow(p_brewery uuid) returns void
+language sql security definer set search_path = '' as $$
+  select pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_brewery::text, 0))
+$$;
+
+-- One formula owns both the advisory preview and the authoritative completion.
+create function private.batch_completion_calculation(p_brewery uuid, p_batch uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare
+  v_batch public.batches; v_scope_count bigint; v_initial numeric; v_in numeric; v_out numeric;
+  v_physical numeric; v_packaged numeric; v_transfer_loss numeric; v_removals numeric;
+  v_baseline numeric; v_attributed numeric; v_residual numeric; v_threshold numeric;
+begin
+  select * into v_batch from public.batches where id = p_batch and brewery_id = p_brewery;
+  if v_batch.id is null then raise exception 'batch not found'; end if;
+  if v_batch.brewed_on is null then raise exception 'batch has not been brewed'; end if;
+  if v_batch.closed_at is not null then raise exception 'batch is already completed'; end if;
+
+  select count(*), coalesce(sum(o.initial_bbl), 0) into v_scope_count, v_initial
+    from public.vessel_occupancies o where o.brewery_id = p_brewery and o.batch_id = p_batch;
+  if v_scope_count = 0 then raise exception 'batch has no authoritative occupancy'; end if;
+  if exists (
+    select 1 from public.packaging_runs r join public.vessel_occupancies o on o.id = r.occupancy_id
+    where o.brewery_id = p_brewery and o.batch_id = p_batch and r.closed_at is null
+  ) then raise exception 'a packaging run is still open for this batch'; end if;
+
+  select coalesce(sum(t.bbl), 0) into v_in
+    from public.transfers t
+    join public.vessel_occupancies destination on destination.id = t.to_occupancy_id
+    join public.vessel_occupancies source on source.id = t.from_occupancy_id
+    where destination.brewery_id = p_brewery and destination.batch_id = p_batch and source.batch_id <> p_batch;
+  select coalesce(sum(t.bbl), 0) into v_out
+    from public.transfers t
+    join public.vessel_occupancies source on source.id = t.from_occupancy_id
+    join public.vessel_occupancies destination on destination.id = t.to_occupancy_id
+    where source.brewery_id = p_brewery and source.batch_id = p_batch and destination.batch_id <> p_batch;
+  select coalesce(sum(a.bbl), 0) into v_physical
+    from public.volume_adjustments a join public.vessel_occupancies o on o.id = a.occupancy_id
+    where o.brewery_id = p_brewery and o.batch_id = p_batch and a.affects_occupancy
+      and a.removal_class is null and a.reason in ('gain','measurement');
+  select coalesce(sum(m.bbl), 0) into v_packaged
+    from public.packaging_runs r
+    join public.vessel_occupancies o on o.id = r.occupancy_id
+    join public.packaging_run_outputs output on output.run_id = r.id
+    join public.inventory_movements m on m.id = output.movement_id and m.brewery_id = r.brewery_id
+    where o.brewery_id = p_brewery and o.batch_id = p_batch and r.closed_at is not null
+      and m.type = 'production_in' and m.bbl > 0;
+  select coalesce(sum(t.loss_bbl), 0) into v_transfer_loss
+    from public.transfers t join public.vessel_occupancies o on o.id = t.from_occupancy_id
+    where o.brewery_id = p_brewery and o.batch_id = p_batch;
+  select coalesce(sum(a.bbl), 0) into v_removals
+    from public.volume_adjustments a join public.vessel_occupancies o on o.id = a.occupancy_id
+    where o.brewery_id = p_brewery and o.batch_id = p_batch and a.removal_class is not null;
+
+  v_baseline := v_initial + v_in - v_out + v_physical;
+  if v_baseline <= 0 then raise exception 'batch completion baseline must be positive'; end if;
+  v_attributed := v_transfer_loss - v_removals;
+  v_residual := v_baseline - v_packaged - v_attributed;
+  if v_residual < 0 then raise exception 'batch has a negative completion residual; packaged and attributed volume exceed its baseline'; end if;
+  v_threshold := greatest(0.05::numeric, v_baseline * 0.005::numeric);
+  return jsonb_build_object(
+    'batchId', p_batch, 'closedAt', null, 'baselineBbl', v_baseline, 'packagedBbl', v_packaged,
+    'attributedBbl', v_attributed, 'residualBbl', v_residual, 'thresholdBbl', v_threshold,
+    'adjustmentId', null);
+end $$;
+
+create function get_batch_completion_preview(p_brewery uuid, p_batch uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform private.assert_staff(p_brewery, array['admin','brewer']::public.staff_role[]);
+  return private.batch_completion_calculation(p_brewery, p_batch);
+end $$;
+
+create function complete_batch(p_brewery uuid, p_batch uuid, p_request_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  v_actor uuid; v_replay jsonb; v_result jsonb; v_batch public.batches;
+  v_close timestamptz; v_anchor uuid; v_adjustment uuid; v_residual numeric; v_threshold numeric;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin','brewer']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'complete_batch', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'batch', p_batch));
+  if v_replay is not null then return v_replay; end if;
+
+  perform private.lock_cellar_workflow(p_brewery);
+  lock table public.inventory_movements in share row exclusive mode;
+  select * into v_batch from public.batches where id = p_batch and brewery_id = p_brewery for update;
+  if v_batch.id is null then raise exception 'batch not found'; end if;
+  perform o.id from public.vessel_occupancies o
+    where o.brewery_id = p_brewery and o.batch_id = p_batch order by o.id for update;
+  v_result := private.batch_completion_calculation(p_brewery, p_batch);
+  v_residual := (v_result->>'residualBbl')::numeric;
+  v_threshold := (v_result->>'thresholdBbl')::numeric;
+
+  select o.id into v_anchor from public.vessel_occupancies o
+    where o.brewery_id = p_brewery and o.batch_id = p_batch
+    order by (o.ended_at is null) desc, o.started_at desc, o.id desc limit 1;
+  select greatest(now(), max(o.started_at)) into v_close from public.vessel_occupancies o
+    where o.brewery_id = p_brewery and o.batch_id = p_batch;
+
+  if v_residual >= v_threshold then
+    insert into public.volume_adjustments
+      (brewery_id, occupancy_id, bbl, reason, removal_class, affects_occupancy, at, created_by)
+    values (p_brewery, v_anchor, -v_residual, 'loss', 'loss', false, v_close, v_actor)
+    returning id into v_adjustment;
+  end if;
+  update public.vessel_occupancies set ended_at = v_close
+    where brewery_id = p_brewery and batch_id = p_batch and ended_at is null;
+  update public.batches set closed_at = v_close, completion_adjustment_id = v_adjustment
+    where id = p_batch;
+
+  v_result := v_result || jsonb_build_object('closedAt', v_close, 'adjustmentId', v_adjustment);
+  return private.complete_command_request(p_request_id, v_result);
+end $$;
+
 -- One call stamps the brew day and opens the occupancy, so a brewed batch is
 -- never sitting in nowhere. started_at is midnight of brewed_on: the cellar
 -- thinks in days, and the gist exclusion on (vessel_id, tstzrange) then reads
@@ -4641,6 +4847,8 @@ begin
     jsonb_build_object('brewery', p_brewery, 'batch', p_batch, 'vessel', p_vessel,
       'initial_bbl', p_initial_bbl, 'brewed_on', p_brewed_on));
   if v_replay is not null then return v_replay; end if;
+
+  perform private.lock_cellar_workflow(p_brewery);
 
   select * into v_vessel from public.vessels where id = p_vessel and brewery_id = p_brewery for update;
   if v_vessel.id is null then raise exception 'vessel not found'; end if;
@@ -4693,6 +4901,8 @@ begin
       'volume_bbl', p_volume_bbl, 'loss_bbl', p_loss_bbl));
   if v_replay is not null then return v_replay; end if;
 
+  perform private.lock_cellar_workflow(p_brewery);
+
   select * into v_vessel from public.vessels where id = p_to_vessel and brewery_id = p_brewery for update;
   if v_vessel.id is null then raise exception 'vessel not found'; end if;
   select * into v_from from public.vessel_occupancies
@@ -4744,6 +4954,8 @@ begin
     jsonb_build_object('brewery', p_brewery, 'occupancy', p_occupancy, 'at', p_at, 'temp_f', p_temp_f,
       'gravity_plato', p_gravity_plato, 'ph', p_ph, 'note', p_note));
   if v_replay is not null then return v_replay; end if;
+
+  perform private.lock_cellar_workflow(p_brewery);
 
   perform private.assert_open_occupancy(p_brewery, p_occupancy);
 
@@ -4820,6 +5032,8 @@ begin
       'occupancy', p_occupancy, 'outputs', p_outputs));
   if v_replay is not null then return v_replay; end if;
 
+  perform private.lock_cellar_workflow(p_brewery);
+
   if not exists (select 1 from public.brands where id = p_brand and brewery_id = p_brewery) then
     raise exception 'brand not found';
   end if;
@@ -4846,6 +5060,8 @@ begin
     jsonb_build_object('brewery', p_brewery, 'run', p_run, 'occupancy', p_occupancy,
       'outputs', p_outputs, 'started_at', p_started_at));
   if v_replay is not null then return v_replay; end if;
+
+  perform private.lock_cellar_workflow(p_brewery);
 
   select * into v_run from public.packaging_runs where id = p_run and brewery_id = p_brewery for update;
   if v_run.id is null then raise exception 'packaging run not found'; end if;
@@ -4907,6 +5123,8 @@ begin
       'outputs', p_outputs, 'lot_code', p_lot_code, 'packaged_on', p_packaged_on,
       'best_by', p_best_by, 'location', p_location, 'bin', p_bin));
   if v_replay is not null then return v_replay; end if;
+
+  perform private.lock_cellar_workflow(p_brewery);
 
   select * into v_run from public.packaging_runs where id = p_run and brewery_id = p_brewery for update;
   if v_run.id is null then raise exception 'packaging run not found'; end if;
@@ -6964,7 +7182,7 @@ grant select on bin_move_stock, on_hand, bin_on_hand, atp, invoice_totals, keg_d
   contract_balances, material_requirements, po_open_balances, vendor_lead_times,
   keg_bin_totals, keg_bin_on_hand, keg_fleet_totals, keg_customer_balances to authenticated;
 grant all on all tables in schema public to service_role;
-revoke insert, update, delete, truncate on inventory_movements, taproom_counts, taproom_count_lines from service_role;
+revoke insert, update, delete, truncate on inventory_movements, taproom_counts, taproom_count_lines, volume_adjustments from service_role;
 revoke update, delete, truncate on pos_sales from service_role;
 grant all on all sequences in schema public to service_role;
 
@@ -7062,6 +7280,8 @@ grant execute on function
   create_recipe_version(uuid,uuid,numeric,numeric,numeric,int,numeric,text,jsonb,uuid),
   upsert_vessel(uuid,uuid,text,public.vessel_kind,numeric,uuid),
   schedule_batch(uuid,uuid,uuid,date,numeric,text,uuid),
+  get_batch_completion_preview(uuid,uuid),
+  complete_batch(uuid,uuid,uuid),
   record_brew_day(uuid,uuid,uuid,numeric,date,uuid),
   record_cellar_transfer(uuid,uuid,uuid,numeric,numeric,uuid),
   record_fermentation_reading(uuid,uuid,timestamptz,numeric,numeric,numeric,text,uuid),
@@ -7094,6 +7314,9 @@ grant usage on schema private, extensions to service_role;
 -- evaluate; the ledger and token store stay behind owner-run definer functions.
 grant execute on function private.new_uuid() to service_role;
 grant execute on all functions in schema public to service_role;
+revoke execute on function private.lock_cellar_workflow(uuid), private.batch_completion_calculation(uuid,uuid),
+  private.enforce_cellar_removal(), private.enforce_completion_adjustment_graph()
+  from service_role;
 
 -- ---------------------------------------------------------------- chat Data API ACLs
 -- Re-applied after the blanket revoke above. Chat configuration stays
