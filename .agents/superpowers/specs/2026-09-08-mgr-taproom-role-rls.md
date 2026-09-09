@@ -26,9 +26,9 @@ in the cooler, count it, and change kegs. Nothing else.
 | --- | --- | --- | --- |
 | Tap board and keg taps: `tap_intervals` (`keg_taps` in §16.13's wording) | yes | `tap_keg`, `swap_keg`, `kick_keg` | whole brewery |
 | Weekly count: `taproom_counts`, `taproom_count_lines` | yes | `record_taproom_count` | whole brewery |
-| Taproom bins and on-hand: `locations`, `bins`, `inventory_movements`, `taproom_pars`, and the `on_hand` / `bin_on_hand` / `keg_bin_on_hand` views | yes | none | rows whose location is `kind = 'taproom'` |
+| Taproom bins and on-hand: `locations`, `bins`, `taproom_pars`, and the `on_hand` / `keg_bin_on_hand` qty projections | yes | none | rows whose location is `kind = 'taproom'` |
 | Catalog vocabulary: `brands`, `formats`, `format_components`, `skus`, `keg_pools` | yes | none | whole brewery |
-| Menu and POS mapping: `pos_locations`, `pos_item_mappings`, `pos_sales`, and `pos_menus` when Program 14 lands it | yes | none | whole brewery |
+| Menu and POS mapping: `pos_locations`, `pos_item_mappings` (`pos_sales` and `pos_menus` wait until Program 14) | yes | none | whole brewery |
 | Own account: `staff_brewery` (id, name, timezone, gravity unit), `brewery_users`, `chat_user_links`, `notification_preferences`, `notification_destinations` (personal) | yes | `set_my_gravity_unit`, `consume_chat_link_proof`, `unlink_chat_user`, `set_notification_preference`, `set_notification_destination` (personal) | own row only, as the existing self policies already say |
 | Everything else | no | no | — |
 
@@ -41,11 +41,9 @@ connections, and every RPC that writes them. A taproom user calling a forbidden 
 is empty under RLS, or receives `42501` where table SELECT itself is revoked.
 Authenticated pre-tenant `provision_brewery` remains separately authorized.
 
-Movements are read, never written directly: the weekly count posts its own
-`depletion` rows through `record_taproom_count`, and tapping a keg posts
-nothing (§16.15). `taproom_transfer` rows into the taproom are visible because
-their destination location is a taproom; the warehouse leg of the same pair
-is not.
+Raw `inventory_movements` are not readable. Qty on hand at taproom locations
+comes from `on_hand_rows()`. The weekly count posts its own `depletion` rows
+through `record_taproom_count`, and tapping a keg posts nothing (§16.15).
 
 ## Mechanism
 
@@ -58,7 +56,8 @@ One baseline edit, four parts, in `supabase/migrations/00001_baseline.sql`.
    create function is_staff_of(b uuid) returns boolean
    language sql stable security definer set search_path = '' as
    $$ select exists(select 1 from public.brewery_users
-                    where user_id = auth.uid() and brewery_id = b and role <> 'taproom') $$;
+                    where user_id = auth.uid() and brewery_id = b
+                      and role in ('admin','sales','warehouse','brewer')) $$;
    ```
 
    Every existing `staff_read`, `member_read`, `integration_operator_read`
@@ -76,10 +75,10 @@ One baseline edit, four parts, in `supabase/migrations/00001_baseline.sql`.
    $$ select exists(select 1 from public.brewery_users
                     where user_id = auth.uid() and brewery_id = b and role = 'taproom')
         and t = any (array[
-          'tap_intervals','taproom_counts','taproom_count_lines',
-          'locations','bins','inventory_movements','taproom_pars',
+          'taproom_counts','taproom_count_lines',
+          'locations','bins','taproom_pars',
           'brands','formats','format_components','skus','keg_pools',
-          'pos_locations','pos_item_mappings','pos_sales','pos_menus']) $$;
+          'pos_locations','pos_item_mappings']) $$;
    ```
 
    The table list lives in one place. Adding a table to the bartender's
@@ -90,25 +89,29 @@ One baseline edit, four parts, in `supabase/migrations/00001_baseline.sql`.
    every generated policy becomes:
 
    ```sql
-   create policy staff_read on %I for select
-     using (public.is_staff_of(brewery_id) or public.taproom_can(brewery_id, %L))
+   create policy staff_read on %I for select using (public.is_staff_of(brewery_id))
    ```
 
-   Four tables add a row scope on the taproom branch, written out by hand
-   after the loop (the loop's policy is dropped for them first):
+   Only tables in `taproom_can` are then rewritten with `or taproom_can`. Ledgers
+   stay `is_staff_of` only, so adding a name to the predicate cannot widen
+   `keg_events` or `inventory_movements`. Location-bound taproom tables
+   (`locations`, `bins`, `taproom_pars`) add a row scope on the taproom branch:
 
    ```sql
-   create policy staff_read on inventory_movements for select using (
+   create policy staff_read on bins for select using (
      public.is_staff_of(brewery_id)
-     or (public.taproom_can(brewery_id, 'inventory_movements')
+     or (public.taproom_can(brewery_id, 'bins')
          and location_id in (select id from public.locations where kind = 'taproom')));
    ```
 
-   The same shape on `bins` and `taproom_pars` (both by `location_id`);
-   `locations` itself tests `kind = 'taproom'` directly. The `on_hand` and `bin_on_hand` invoker views inherit movement row scope.
-   `keg_bin_on_hand` instead wraps a narrow auth-derived definer aggregate:
-   original staff see their own tenant, taproom sees only taproom locations,
-   with the same six columns and arithmetic. Raw keg events stay denied.
+   `locations` itself tests `kind = 'taproom'` directly. `on_hand` wraps
+   `on_hand_rows()`, a definer aggregate of qty only: original staff see their
+   tenant, taproom sees taproom locations, with `brewery_id` first from
+   `my_brewery_ids()`. `atp` is original-four (`is_staff_of`); portal badges
+   read movements directly inside `portal_availability`. `keg_bin_on_hand`
+   is the same pattern over keg events. Raw `inventory_movements`, `pos_sales`,
+   and keg events stay denied. `tap_intervals` / `pos_menus` are omitted until
+   those tables exist.
    Raw `breweries` stays denied too. `staff_brewery_rows()` and its invoker
    view expose only own membership id, name, timezone and gravity unit.
    Request membership resolution joins that projection without a private

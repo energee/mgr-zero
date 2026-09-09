@@ -136,12 +136,14 @@ defineQuery({ name: "get_notification_preferences", description: "Read your own 
       unwrap(ctx.db.from("notification_destinations").select("id, external_destination_id").eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId).eq("kind", "personal").eq("state", "active").not("validated_at", "is", null)),
     ]);
     const quiet = preferences?.find((p) => p.quiet_hours_start !== null);
+    if (!brewery?.timezone) throw new CommandError("staff membership brewery is unavailable");
+    const timezone = quiet?.quiet_hours_timezone ?? brewery.timezone;
     return { preferences: REASONS.map((reason) => {
       const saved = preferences?.find(p => p.reason === reason);
       return { reason, enabled: saved?.enabled ?? true,
         ...(saved?.personal_destination_id ? { personalDestinationId: saved.personal_destination_id } : {}) };
     }),
-      quietStart: quiet?.quiet_hours_start ?? null, quietEnd: quiet?.quiet_hours_end ?? null, timezone: quiet?.quiet_hours_timezone ?? brewery?.timezone ?? "UTC", link, destinations: destinations ?? [] };
+      quietStart: quiet?.quiet_hours_start ?? null, quietEnd: quiet?.quiet_hours_end ?? null, timezone, link, destinations: destinations ?? [] };
   },
 });
 defineQuery({ name: "list_chat_channels", description: "List private active Slack channels with the bot present and no sharing",

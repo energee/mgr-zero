@@ -1239,7 +1239,7 @@ export const SCREENS: Screen[] = [
     job: "Target-state count plus active suggested transfer",
     reads: "get_taproom_count_snapshot · replenishment_suggestions · list_locations",
     writes: "record_taproom_count [API available; count page pending] · create_replenishment_order",
-    states: permitted("warehouse or admin required"),
+    states: permitted("admin, warehouse or taproom · count page pending"),
     spec: "This count drawing remains disabled until the explicit bin/SKU/lot count page is wired. The durable count API permits Admin, Warehouse, and Taproom; POS comparison remains a separate planned report. INVERTED (this frame was drawn the other way round): the physical count is the source of truth and posts the depletion, connected or not. POS supplies expected consumption and posts nothing, so disconnecting removes the expected column and changes nothing about what the count writes. That is also why a keg moving warehouse → taproom stays on the books as taproom stock: a taproom transfer carries no channel, and the beer leaves only when a count says it is gone, which makes a month-end count yield the month’s removal cleanly. Variance is drawn twice on purpose: inline while someone can still recount, and as a report where a pattern across weeks (one line, one shift) is the only place it becomes legible. Counts are in kegs and cases, so qty never needs fractional widening.",
     body: (<>
       {E.back("Beer", "Taproom")}
@@ -1250,7 +1250,7 @@ export const SCREENS: Screen[] = [
       {E.row("Stout · ⅙ bbl keg", "expected 2", E.stq(2))}
       {E.info("Variance −1 Hazy · ½ bbl unaccounted. Recording posts 4 Pils + 2 Hazy + 2 Stout depletion; the variance is reported, never posted.")}
       {E.nav("Variance by brand", "four weeks · where the gap keeps showing up")}
-      {E.gated("Record count", "isn’t available yet: counts have nowhere durable to land. The count is the only thing that posts taproom depletion, so until this closes taproom stock only ever grows")}
+      {E.gated("Record count", "isn’t available yet: the count API is live, this page is not. Until the page ships, taproom depletion is recorded through the command API")}
       {E.ttl("Needs replenishment")}
       {E.note("Below par: transfer 4 Pils + 2 Hazy.")}
       {E.fld("Transfer from", "Warehouse · selected")}

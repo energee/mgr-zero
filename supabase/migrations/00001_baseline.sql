@@ -116,9 +116,9 @@ $$ select role from public.brewery_users where user_id = auth.uid() and brewery_
 create function taproom_can(b uuid, t text) returns boolean
 language sql stable security definer set search_path = '' as $$
   select public.staff_role(b) = 'taproom' and t = any(array[
-    'locations','bins','inventory_movements','taproom_pars','taproom_counts','taproom_count_lines',
+    'locations','bins','taproom_pars','taproom_counts','taproom_count_lines',
     'brands','formats','format_components','skus','keg_pools',
-    'pos_locations','pos_item_mappings','pos_sales']);
+    'pos_locations','pos_item_mappings']);
 $$;
 
 -- Own account display/defaults without private brewery settings.
@@ -312,7 +312,7 @@ create table formats (
   name text not null check (length(btrim(name)) > 0),
   basis format_basis not null,
   brand_id uuid,
-  ounces numeric,
+  ounces numeric(12,4),
   package_type package_type,                -- container; null for poured
   keg_size keg_size,
   units_per_case int check (units_per_case > 0),
@@ -321,13 +321,13 @@ create table formats (
   unique (id, brewery_id),
   foreign key (brand_id, brewery_id) references brands (id, brewery_id),
   check ((basis = 'poured' and brand_id is not null and ounces is not null
-          and ounces > 0 and ounces < 'Infinity'::numeric)
+          and ounces > 0 and ounces < 1000)
       or (basis = 'packaged' and brand_id is null and ounces is null)),
   check (basis = 'packaged' or (bbl_per_unit is null and package_type is null and keg_size is null and units_per_case is null)),
   check (package_type = 'keg' or keg_size is null)
 );
-create unique index formats_packaged_name_idx on formats (brewery_id, name) where basis = 'packaged';
-create unique index formats_poured_name_idx on formats (brewery_id, brand_id, name) where basis = 'poured';
+create unique index formats_packaged_name_idx on formats (brewery_id, btrim(name)) where basis = 'packaged';
+create unique index formats_poured_name_idx on formats (brewery_id, brand_id, btrim(name)) where basis = 'poured';
 create index formats_brewery_idx on formats (brewery_id, basis);
 
 -- Formats compose one level (§16.2a): a case is six four-packs. Only atomic
@@ -498,9 +498,12 @@ create table sale_channels (
   brewery_id uuid not null references breweries(id),
   name text not null,
   tax_treatment tax_treatment not null default 'taxable',
+  -- Stable identity for seeded defaults; display name is editable and never load-bearing.
+  system_code text check (system_code in ('taproom')),
   unique (id, brewery_id),
   unique (brewery_id, name)
 );
+create unique index sale_channels_system_code_uidx on sale_channels (brewery_id, system_code) where system_code is not null;
 create index sale_channels_brewery_idx on sale_channels (brewery_id);
 
 -- Every brewery is born with the four defaults. A trigger rather than a
@@ -509,11 +512,11 @@ create index sale_channels_brewery_idx on sale_channels (brewery_id);
 create function private.seed_sale_channels() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
-  insert into public.sale_channels (brewery_id, name, tax_treatment) values
-    (new.id, 'Wholesale', 'taxable'),
-    (new.id, 'Taproom',   'taxable'),
-    (new.id, 'DTC',       'taxable'),
-    (new.id, 'Export',    'export');
+  insert into public.sale_channels (brewery_id, name, tax_treatment, system_code) values
+    (new.id, 'Wholesale', 'taxable', null),
+    (new.id, 'Taproom',   'taxable', 'taproom'),
+    (new.id, 'DTC',       'taxable', null),
+    (new.id, 'Export',    'export', null);
   return new;
 end $$;
 
@@ -1118,11 +1121,22 @@ create table taproom_counts (
   counted_by uuid not null references auth.users(id),
   created_at timestamptz not null default now(),
   prior_count_id uuid,
+  unique (id, brewery_id),
   unique (id, location_id, brewery_id),
   unique (brewery_id, location_id, counted_on),
   foreign key (location_id, brewery_id) references locations(id, brewery_id),
   foreign key (prior_count_id, location_id, brewery_id) references taproom_counts(id, location_id, brewery_id)
 );
+create function private.require_taproom_count_location() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if not exists (select 1 from public.locations where id = new.location_id and brewery_id = new.brewery_id and kind = 'taproom') then
+    raise exception 'choose an owned taproom location';
+  end if;
+  return new;
+end $$;
+create trigger taproom_counts_location before insert or update of location_id, brewery_id on taproom_counts
+  for each row execute function private.require_taproom_count_location();
 create table taproom_count_lines (
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
@@ -1134,6 +1148,7 @@ create table taproom_count_lines (
   qty_before numeric not null check (qty_before >= 0 and qty_before = trunc(qty_before) and qty_before::text not in ('NaN','Infinity','-Infinity')),
   qty_counted numeric not null check (qty_counted >= 0 and qty_counted <= qty_before and qty_counted = trunc(qty_counted)),
   movement_id uuid unique,
+  unique (id, brewery_id),
   unique nulls not distinct (count_id, bin_id, sku_id, lot_id),
   foreign key (count_id, location_id, brewery_id) references taproom_counts(id, location_id, brewery_id),
   foreign key (bin_id, location_id, brewery_id) references bins(id, location_id, brewery_id),
@@ -1765,20 +1780,34 @@ create view portal_brewery with (security_invoker = true) as
 comment on function portal_brewery_rows() is
   'portal brewery projection; never add staff-only columns';
 
+create function on_hand_rows()
+returns table (brewery_id uuid, sku_id uuid, location_id uuid, qty numeric)
+language sql stable security definer set search_path = '' as $$
+  select m.brewery_id, m.sku_id, m.location_id, sum(m.qty)
+  from public.inventory_movements m
+  join public.locations l on l.id = m.location_id and l.brewery_id = m.brewery_id
+  where m.brewery_id in (select public.my_brewery_ids())
+    and (public.is_staff_of(m.brewery_id)
+         or (public.staff_role(m.brewery_id) = 'taproom' and l.kind = 'taproom'))
+  group by 1,2,3;
+$$;
+comment on function on_hand_rows() is
+  'Authorized location balances only; raw movement notes, tax, dest_state and document refs stay on inventory_movements.';
 create view on_hand with (security_invoker = true) as
-  select brewery_id, sku_id, location_id, sum(qty) as qty
-  from inventory_movements group by 1,2,3;
+  select brewery_id, sku_id, location_id, qty from public.on_hand_rows();
 
 create view atp with (security_invoker = true) as
   -- Reservations can precede the first receipt/production movement. Include
   -- those SKUs with zero on hand; ATP remains global across all locations.
+  -- Original-four staff only: taproom stock is not available-to-promise.
   select s.brewery_id, s.id as sku_id, coalesce(o.qty, 0) - coalesce(a.qty, 0) as qty
   from skus s
   left join (select brewery_id, sku_id, sum(qty) as qty from on_hand group by brewery_id, sku_id) o
     on o.brewery_id = s.brewery_id and o.sku_id = s.id
   left join (select brewery_id, sku_id, sum(qty) as qty from allocations where status = 'open' group by brewery_id, sku_id) a
     on a.brewery_id = s.brewery_id and a.sku_id = s.id
-  where o.sku_id is not null or a.sku_id is not null;
+  where (o.sku_id is not null or a.sku_id is not null)
+    and public.is_staff_of(s.brewery_id);
 
 -- Bin grain, beside on_hand rather than replacing it: atp and taproom_replenishment
 -- keep their location-grain join. Spec 2026-09-06 Decision 2.
@@ -2024,8 +2053,9 @@ language sql stable security definer set search_path = '' as $$
                          when 'retired' then -e.qty when 'lost' then -e.qty when 'transferred_out' then -e.qty when 'shipped' then -e.qty else 0 end)::int
   from public.keg_events e
   join public.locations l on l.id = e.location_id and l.brewery_id = e.brewery_id
-  where public.is_staff_of(e.brewery_id)
-    or (public.staff_role(e.brewery_id) = 'taproom' and l.kind = 'taproom')
+  where e.brewery_id in (select public.my_brewery_ids())
+    and (public.is_staff_of(e.brewery_id)
+         or (public.staff_role(e.brewery_id) = 'taproom' and l.kind = 'taproom'))
   group by 1,2,3,4,5;
 $$;
 comment on function keg_bin_on_hand_rows() is
@@ -2107,8 +2137,9 @@ begin
     select sale_channel_id into v_channel from public.customers where id = p_customer and brewery_id = p_brewery;
     if v_channel is null then raise exception 'customer not found'; end if;
   else
-    -- a transfer has no customer: the channel named Taproom, else the first by name
-    select id into v_channel from public.sale_channels where brewery_id = p_brewery order by (name = 'Taproom') desc, name limit 1;
+    -- a transfer has no customer: the seeded taproom system_code, else the first by name
+    select id into v_channel from public.sale_channels where brewery_id = p_brewery
+      order by (system_code = 'taproom') desc, name limit 1;
   end if;
   insert into public.orders (brewery_id, kind, customer_id, ship_to_id, from_location_id, to_location_id,
                              sale_channel_id, requested_ship_date, po_number, note, created_by)
@@ -5649,6 +5680,15 @@ begin
     'routes','deliveries','invoice_questions']
   loop
     execute format('alter table %I enable row level security', t);
+    execute format('create policy staff_read on %I for select using (public.is_staff_of(brewery_id))', t);
+  end loop;
+  -- Taproom tenant-wide reads. Ledgers and other tables stay is_staff_of only
+  -- so adding a name to taproom_can cannot widen a location-bound table.
+  foreach t in array array[
+    'brands','formats','format_components','skus','keg_pools',
+    'taproom_counts','taproom_count_lines','pos_locations','pos_item_mappings']
+  loop
+    execute format('drop policy staff_read on %I', t);
     execute format('create policy staff_read on %I for select using (public.is_staff_of(brewery_id) or public.taproom_can(brewery_id, %L))', t, t);
   end loop;
   -- Append-only ledgers retain staff reads. Only the inventory command paths
@@ -5656,7 +5696,7 @@ begin
   foreach t in array array['inventory_movements','material_movements','keg_events','transfers','volume_adjustments']
   loop
     execute format('alter table %I enable row level security', t);
-    execute format('create policy staff_read on %I for select using (public.is_staff_of(brewery_id) or public.taproom_can(brewery_id, %L))', t, t);
+    execute format('create policy staff_read on %I for select using (public.is_staff_of(brewery_id))', t);
     execute format('revoke update, delete on %I from authenticated, anon', t);
   end loop;
   -- order_events is append-only but has custom staff + customer policies below.
@@ -5676,7 +5716,7 @@ drop policy staff_read on locations;
 create policy staff_read on locations for select using (
   public.is_staff_of(brewery_id) or (public.taproom_can(brewery_id, 'locations') and kind = 'taproom'));
 do $$ declare t text; begin
-  foreach t in array array['bins','inventory_movements','taproom_pars'] loop
+  foreach t in array array['bins','taproom_pars'] loop
     execute format('drop policy staff_read on %I', t);
     execute format('create policy staff_read on %I for select using (public.is_staff_of(brewery_id) or (public.taproom_can(brewery_id, %L) and location_id in (select id from public.locations where kind = ''taproom'')))', t, t);
   end loop;
@@ -6763,8 +6803,21 @@ grant all on all sequences in schema public to service_role;
 -- cannot read the ledger; the where-clause pins the caller to their own account.
 create function portal_availability(p_customer uuid) returns table (sku_id uuid, badge text)
 language sql stable security definer set search_path = '' as $$
+  -- Own-account badge only. Do not read public.atp: that view is staff-scoped.
+  with availability as (
+    select s.id as sku_id, s.brewery_id,
+      coalesce(o.qty, 0) - coalesce(al.qty, 0) as qty
+    from public.skus s
+    left join (
+      select brewery_id, sku_id, sum(qty) as qty from public.inventory_movements group by 1,2
+    ) o on o.brewery_id = s.brewery_id and o.sku_id = s.id
+    left join (
+      select brewery_id, sku_id, sum(qty) as qty from public.allocations where status = 'open' group by 1,2
+    ) al on al.brewery_id = s.brewery_id and al.sku_id = s.id
+    where o.sku_id is not null or al.sku_id is not null
+  )
   select a.sku_id, case when a.qty <= 0 then 'out' when a.qty < 20 then 'low' else 'in' end
-  from public.atp a
+  from availability a
   join public.customers c on c.brewery_id = a.brewery_id
   where c.id = p_customer and c.id in (select public.my_customer_ids());
 $$;
@@ -7118,10 +7171,12 @@ begin
     and t.allowed_action=p_action and r.callback_kind=p_action and t.expires_at>now() and t.consumed_at is null then
     begin
       if p_action='mgr_snooze' then
+        if actor->>'role' = 'taproom' then raise exception 'permission denied' using errcode='42501'; end if;
         perform private.snooze_chat_delivery(t.brewery_id,t.user_id,(t.integration_input->>'delivery')::uuid,(t.integration_input->>'until')::timestamptz);
       elsif p_action='mgr_mute_reason' then
         perform private.set_chat_preference(t.brewery_id,t.user_id,t.integration_input->>'reason',false);
       elsif p_action='mgr_save_preferences' then
+        if actor->>'role' = 'taproom' then raise exception 'permission denied' using errcode='42501'; end if;
         if jsonb_typeof(p_input->'enabled') <> 'boolean' or nullif(p_input->>'start','') !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
           or nullif(p_input->>'end','') !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' then
           raise exception 'invalid preferences' using errcode='22023'; end if;
@@ -7357,13 +7412,14 @@ begin
   if auth.role() is distinct from 'service_role' or not exists (
     select 1 from public.brewery_users where brewery_id=p_brewery and user_id=p_user and role='admin'
   ) then raise exception 'permission denied' using errcode='42501'; end if;
-  return exists(select 1 from private.command_requests where actor_id=p_user and request_id=p_request_id and result is not null);
+  return exists(select 1 from private.command_requests
+    where actor_id=p_user and request_id=p_request_id and command_name='set_notification_destination' and result is not null);
 end $$;
 revoke all on function chat_settings_request_completed(uuid,uuid,uuid) from public,anon,authenticated,service_role;
 grant execute on function chat_settings_request_completed(uuid,uuid,uuid) to service_role;
 
-revoke all on function taproom_can(uuid,text), staff_brewery_rows(), keg_bin_on_hand_rows() from public, anon, authenticated, service_role;
-grant execute on function taproom_can(uuid,text), staff_brewery_rows(), keg_bin_on_hand_rows() to authenticated;
+revoke all on function taproom_can(uuid,text), staff_brewery_rows(), keg_bin_on_hand_rows(), on_hand_rows() from public, anon, authenticated, service_role;
+grant execute on function taproom_can(uuid,text), staff_brewery_rows(), keg_bin_on_hand_rows(), on_hand_rows() to authenticated;
 grant select on staff_brewery to authenticated;
 
 -- Select an already verified personal destination; provider identities are never supplied here.
@@ -7438,7 +7494,9 @@ begin
     jsonb_build_object('bbl', m.bbl) order by l.bin_id, l.sku_id, l.lot_id nulls first), '[]'::jsonb)
     from public.taproom_count_lines l left join public.inventory_movements m on m.id = l.movement_id and m.brewery_id = l.brewery_id
     where l.count_id = c.id and l.brewery_id = p_brewery)) into v_result
-    from public.taproom_counts c where c.id = p_count and c.brewery_id = p_brewery;
+    from public.taproom_counts c
+    join public.locations loc on loc.id = c.location_id and loc.brewery_id = c.brewery_id and loc.kind = 'taproom'
+    where c.id = p_count and c.brewery_id = p_brewery;
   if v_result is null then raise exception 'count not found'; end if;
   return v_result;
 end $$;
@@ -7452,18 +7510,9 @@ begin
   v_replay := private.claim_command_request(p_brewery, 'record_taproom_count', p_request_id,
     jsonb_build_object('location', p_location, 'counted_on', p_counted_on, 'revision', p_revision, 'lines', p_lines));
   if v_replay is not null then return v_replay; end if;
-  -- Count-only scope lock precedes the ledger, like shipping's document lock.
-  -- No sibling ledger writer acquires this advisory lock.
-  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('taproom-count:' || p_brewery::text || ':' || p_location::text, 0));
-  -- ponytail: global ledger lock; migrate every writer to shared stock-key locks for higher throughput.
-  lock table public.inventory_movements in share row exclusive mode;
   if not exists (select 1 from public.locations where id = p_location and brewery_id = p_brewery and kind = 'taproom') then
     raise exception 'choose an owned taproom location';
   end if;
-  v_snapshot := private.taproom_count_snapshot(p_brewery, p_location);
-  if p_counted_on is distinct from (v_snapshot->>'counted_on')::date then raise exception 'count today in the brewery timezone; historical counts cannot use current stock'; end if;
-  if p_counted_on <= (v_snapshot->'prior_count'->>'counted_on')::date then raise exception 'a count already exists on this date; count corrections are not yet available'; end if;
-  if p_revision is distinct from v_snapshot->>'revision' then raise exception 'stock or prior count changed; refresh and review every bucket' using errcode = 'MG409'; end if;
   if jsonb_typeof(p_lines) is distinct from 'array' then raise exception 'count lines must be an array'; end if;
   if exists (select 1 from jsonb_array_elements(p_lines) e where jsonb_typeof(e) is distinct from 'object'
     or not (e ?& array['bin_id','sku_id','lot_id','qty_counted'])
@@ -7471,12 +7520,22 @@ begin
     or jsonb_typeof(e->'lot_id') not in ('string','null') or jsonb_typeof(e->'qty_counted') is distinct from 'number') then raise exception 'explicit bin, SKU, lot UUID or null, and numeric counted quantity are required'; end if;
   if (select count(distinct jsonb_build_array((e->>'bin_id')::uuid, (e->>'sku_id')::uuid, (e->>'lot_id')::uuid)) from jsonb_array_elements(p_lines) e) <> jsonb_array_length(p_lines)
     then raise exception 'duplicate count bucket'; end if;
-  if jsonb_array_length(p_lines) <> jsonb_array_length(v_snapshot->'lines') or exists (
-    select 1 from jsonb_array_elements(v_snapshot->'lines') b where not exists (
-      select 1 from jsonb_array_elements(p_lines) e where (e->>'bin_id')::uuid = (b->>'bin_id')::uuid
-      and (e->>'sku_id')::uuid = (b->>'sku_id')::uuid and (e->>'lot_id')::uuid is not distinct from (b->>'lot_id')::uuid))
+  -- Count-only scope lock precedes the ledger, like shipping's document lock.
+  -- No sibling ledger writer acquires this advisory lock.
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('taproom-count:' || p_brewery::text || ':' || p_location::text, 0));
+  -- ponytail: global ledger lock; migrate every writer to shared stock-key locks for higher throughput.
+  lock table public.inventory_movements in share row exclusive mode;
+  v_snapshot := private.taproom_count_snapshot(p_brewery, p_location);
+  if p_counted_on is distinct from (v_snapshot->>'counted_on')::date then raise exception 'count today in the brewery timezone; historical counts cannot use current stock'; end if;
+  if p_counted_on <= (v_snapshot->'prior_count'->>'counted_on')::date then raise exception 'a count already exists on this date; count corrections are not yet available'; end if;
+  if p_revision is distinct from v_snapshot->>'revision' then raise exception 'stock or prior count changed; refresh and review every bucket' using errcode = 'MG409'; end if;
+  if exists (
+    select 1
+    from jsonb_to_recordset(p_lines) as e(bin_id uuid, sku_id uuid, lot_id uuid, qty_counted numeric)
+    full join jsonb_to_recordset(v_snapshot->'lines') as b(bin_id uuid, sku_id uuid, lot_id uuid, qty_before numeric, bin_name text, sku_name text)
+      on e.bin_id = b.bin_id and e.sku_id = b.sku_id and e.lot_id is not distinct from b.lot_id
+    where e.bin_id is null or b.bin_id is null)
     then raise exception 'count every displayed bucket exactly once; refresh for changed stock'; end if;
-  -- ponytail: JSON bucket matching is quadratic; use a typed keyed join if large-location counts become slow.
   -- Validate all observations before the first durable write.
   for v_line in select * from jsonb_array_elements(p_lines) loop
     v_qty := (v_line->>'qty_counted')::numeric;
@@ -7496,7 +7555,7 @@ begin
       and (b->>'lot_id')::uuid is not distinct from (v_line->>'lot_id')::uuid;
     v_movement := null;
     if v_qty < v_before then
-      select id, tax_treatment into v_channel, v_tax from public.sale_channels where brewery_id = p_brewery and name = 'Taproom';
+      select id, tax_treatment into v_channel, v_tax from public.sale_channels where brewery_id = p_brewery and system_code = 'taproom';
       if v_channel is null then raise exception 'Admin must restore the Taproom sale channel before recording depletion'; end if;
       insert into public.inventory_movements(brewery_id, location_id, bin_id, sku_id, lot_id, qty, type, sale_channel_id, tax_treatment, dest_state, ref, created_by)
         values(p_brewery, p_location, (v_line->>'bin_id')::uuid, (v_line->>'sku_id')::uuid, (v_line->>'lot_id')::uuid,

@@ -35,6 +35,21 @@ const count = async (q: PromiseLike<{ count: number | null; error: unknown }>) =
   return n ?? 0;
 };
 
+export function labeledTaproomStock(
+  stock: { sku_id: string; location_id: string; qty: number }[],
+  skuNames: Map<string, string>,
+  locationNames: Map<string, string>,
+) {
+  return stock.map((row) => {
+    const sku = skuNames.get(row.sku_id);
+    const location = locationNames.get(row.location_id);
+    if (sku === undefined || location === undefined) {
+      throw new CommandError("Stock changed while loading. Reload to review it.", 409, "conflict");
+    }
+    return { skuId: row.sku_id, locationId: row.location_id, sku, location, qty: Number(row.qty) };
+  });
+}
+
 defineQuery({
   name: "get_beer_overview",
   description: "Counts behind the Beer landing: finished-goods shortages, taproom SKUs below par, open taps, tanks with beer, material shortages and kegs out at customers",
@@ -67,8 +82,7 @@ defineQuery({
         names("skus", [...new Set(stock.map(s => s.sku_id))]),
         names("locations", [...new Set(stock.map(s => s.location_id))]),
       ]);
-      return { taproomStock: stock.map(s => ({ skuId: s.sku_id, locationId: s.location_id,
-        sku: skuNames.get(s.sku_id) ?? s.sku_id, location: locationNames.get(s.location_id) ?? s.location_id, qty: Number(s.qty) })) };
+      return { taproomStock: labeledTaproomStock(stock, skuNames, locationNames) };
     }
     const [fgShortages, pars, onHand, openOccupancies, materialShortages, kegs] = await Promise.all([
       count(ctx.db.from("atp").select("sku_id", { count: "exact", head: true }).eq("brewery_id", b).lt("qty", 0)),

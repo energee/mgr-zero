@@ -137,12 +137,31 @@ it("permits the next chronological current-day count, rejects same/earlier/futur
 });
 
 it("matches without POS or a channel, but missing channel makes depletion fail atomically", async () => {
-  const f = await fixture(); await admin.from("sale_channels").delete().eq("brewery_id", f.brewery.id).eq("name", "Taproom");
+  const f = await fixture(); await admin.from("sale_channels").delete().eq("brewery_id", f.brewery.id).eq("system_code", "taproom");
   const input = await args(f), before = state(f);
   const failed = await f.ctx.db.rpc("record_taproom_count", { ...input, p_lines: [{ ...input.p_lines[0], qty_counted: 2 }] });
   expect(failed.error?.message).toContain("Taproom sale channel"); expect(state(f)).toEqual(before);
   expect((await f.ctx.db.rpc("record_taproom_count", input)).error).toBeNull();
   expect((await admin.from("pos_connections").select("id").eq("brewery_id", f.brewery.id)).data).toEqual([]);
+});
+
+it("depletes after the taproom channel is renamed", async () => {
+  const f = await fixture();
+  expect((await admin.from("sale_channels").update({ name: "Bar" }).eq("brewery_id", f.brewery.id).eq("system_code", "taproom")).error).toBeNull();
+  const input = await args(f); input.p_lines[0].qty_counted = 2;
+  const saved = await f.ctx.db.rpc("record_taproom_count", input);
+  expect(saved.error).toBeNull();
+  const channel = await admin.from("sale_channels").select("id").eq("brewery_id", f.brewery.id).eq("system_code", "taproom").single();
+  const movements = await admin.from("inventory_movements").select("qty,sale_channel_id").eq("ref", saved.data.id);
+  expect(movements.data).toEqual([{ qty: -5, sale_channel_id: channel.data!.id }]);
+});
+
+it("refuses a warehouse-location count header", async () => {
+  const f = await fixture();
+  const wh = await seedLocation(f.brewery.id, { name: "Count warehouse" });
+  expect((await admin.from("taproom_counts").insert({
+    brewery_id: f.brewery.id, location_id: wh.id, counted_on: f.day, counted_by: f.ctx.userId,
+  })).error).not.toBeNull();
 });
 
 it("serializes competing counts and exact concurrent replays", async () => {

@@ -16,6 +16,13 @@ const rpc = (extra = {}) => ctx.db.rpc("upsert_format", {
   p_brand: brandId, p_ounces: 16, p_request_id: crypto.randomUUID(), ...extra,
 });
 
+it("rejects trimmed-name collisions and ounces at or above 1000", async () => {
+  const name = `Trim ${crypto.randomUUID()}`;
+  expect((await rpc({ p_name: name })).error).toBeNull();
+  expect((await rpc({ p_name: `${name} ` })).error).not.toBeNull();
+  expect((await rpc({ p_ounces: 1000 })).error).not.toBeNull();
+});
+
 it("requires brand and positive finite ounces in registry and SQL, and rejects incompatible facts", async () => {
   for (const invalid of [{ name: " " }, { brandId: undefined }, { ounces: undefined }, { ounces: 0 }, { ounces: -1 }, { ounces: Infinity }, { ounces: NaN }, { packageType: "can" }, { kegSize: "half_bbl" }, { unitsPerCase: 6 }, { bblPerUnit: 0.1 }, { basis: "packaged" }]) {
     await expect(runCommand("upsert_format", { ...input(), ...invalid }, ctx)).rejects.toMatchObject({ code: "invalid_input" });
@@ -47,7 +54,7 @@ it("allows each brand its own Pint, edits ounces, and binds replay to brand and 
   await expect(runCommand("upsert_format", packaged, ctx)).rejects.toThrow();
   expect((await rpc({ p_name: "Pint", p_request_id: request })).data).toEqual(first.data);
   const taproom = await makeStaffCtx(ctx.breweryId, "taproom");
-  await expect(runCommand("list_formats", { brandId }, taproom)).resolves.toEqual([expect.objectContaining({ id: first.data.id, ounces: 14 })]);
+  await expect(runCommand("list_formats", { brandId }, taproom)).resolves.toEqual(expect.arrayContaining([expect.objectContaining({ id: first.data.id, ounces: 14 })]));
   await expect(runCommand("list_formats", { brandId: foreignBrand.id }, taproom)).resolves.toEqual([]);
   await expect(runCommand("upsert_format", input(), taproom)).rejects.toMatchObject({ code: "permission_denied" });
   expect((await taproom.db.rpc("upsert_format", { p_brewery: ctx.breweryId, p_id: null, p_name: "Taster", p_basis: "poured", p_package_type: null, p_keg_size: null, p_units_per_case: null, p_bbl_per_unit: null, p_brand: brandId, p_ounces: 4, p_request_id: crypto.randomUUID() })).error).not.toBeNull();
