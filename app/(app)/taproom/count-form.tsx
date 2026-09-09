@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -63,7 +64,7 @@ export function TaproomPrintWorksheet({ breweryId, locationId, locationName, rev
   revision: string;
   initialLabels: PrintLabel[];
 }) {
-  const [labels, setLabels] = useState(initialLabels);
+  const [labels, setLabels] = useState<PrintLabel[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const active = useRef(true);
@@ -77,10 +78,14 @@ export function TaproomPrintWorksheet({ breweryId, locationId, locationName, rev
     try {
       const fresh = await command(breweryId, "get_taproom_print_labels", { locationId, revision }) as PrintLabel[];
       if (!active.current) return;
-      setLabels(fresh);
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      if (!active.current) return;
-      window.print();
+      flushSync(() => setLabels(fresh));
+      const disarm = () => { if (active.current) flushSync(() => setLabels(null)); };
+      window.addEventListener("afterprint", disarm, { once: true });
+      try { window.print(); }
+      finally {
+        window.removeEventListener("afterprint", disarm);
+        disarm();
+      }
     } catch (cause) { if (active.current) setError(countError(cause)); }
     finally { if (active.current) setBusy(false); }
   }
@@ -88,20 +93,22 @@ export function TaproomPrintWorksheet({ breweryId, locationId, locationName, rev
   return <>
     <div className="flex flex-wrap items-center gap-3 print:hidden">
       <Button type="button" variant="outline" disabled={busy} onClick={print}>{busy ? "Checking stock…" : "Print current stock labels"}</Button>
-      {labels.length === 0 && <span className="text-sm text-muted-foreground">No current positive stock to print.</span>}
+      {initialLabels.length === 0 && <span className="text-sm text-muted-foreground">No current positive stock to print.</span>}
       <CommandFormMessage error={error} />
     </div>
     <section aria-labelledby="print-labels-heading" className="hidden print:block">
       <h1 id="print-labels-heading" className="text-xl font-semibold">Taproom stock labels · {locationName}</h1>
-      <p className="mb-4 text-sm">Current positive stock · worksheet rows from the captured count</p>
-      {labels.length === 0 ? <p>No current positive stock to print.</p> : <ol className="grid grid-cols-2 gap-3">
-        {labels.map((label) => <li key={`${label.bin_id}:${label.sku_id}:${label.lot_id ?? "untracked"}`} value={label.worksheet_row} className="break-inside-avoid rounded-lg border p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide">Worksheet row {label.worksheet_row}</p>
-          <h2 className="text-lg font-semibold">{label.brand_name} · {label.sku_name}</h2>
-          <p>{label.package_volume_label} · {label.bin_name} · {label.qty} on hand</p>
-          <p className="font-medium">{label.lot_id ? `Lot ${label.lot_code}` : "Untracked"}</p>
-        </li>)}
-      </ol>}
+      {labels === null ? <p>Use Print current stock labels on this page so MGR can check current stock before printing.</p> : <>
+        <p className="mb-4 text-sm">Current positive stock · worksheet rows from the captured count</p>
+        {labels.length === 0 ? <p>No current positive stock to print.</p> : <ol className="grid grid-cols-2 gap-3">
+          {labels.map((label) => <li key={`${label.bin_id}:${label.sku_id}:${label.lot_id ?? "untracked"}`} value={label.worksheet_row} className="break-inside-avoid rounded-lg border p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide">Worksheet row {label.worksheet_row}</p>
+            <h2 className="text-lg font-semibold">{label.brand_name} · {label.sku_name}</h2>
+            <p>{label.package_volume_label} · {label.bin_name} · {label.qty} on hand</p>
+            <p className="font-medium">{label.lot_id ? `Lot ${label.lot_code}` : "Untracked"}</p>
+          </li>)}
+        </ol>}
+      </>}
     </section>
   </>;
 }
