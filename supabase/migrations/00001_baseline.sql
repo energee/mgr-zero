@@ -3514,10 +3514,10 @@ declare
   v_invalid int; v_unmapped int;
 begin
   if public.staff_role(p_brewery) not in ('admin','sales') then raise insufficient_privilege using message='permission denied'; end if;
-  select * into v_inv from public.invoices where id=p_invoice and brewery_id=p_brewery for update;
-  if not found then raise exception 'invoice not found'; end if;
   select * into v_conn from public.qbo_connections where brewery_id=p_brewery and state='connected' for share;
   if not found then raise exception 'QuickBooks connection required'; end if;
+  select * into v_inv from public.invoices where id=p_invoice and brewery_id=p_brewery for update;
+  if not found then raise exception 'invoice not found'; end if;
   if p_new_attempt_reason is not null and p_new_attempt_reason not in ('corrected','remote_deleted') then raise exception 'invalid QuickBooks attempt reason'; end if;
 
   v_replay:=private.claim_command_request(p_brewery,'push_invoice_to_qbo',p_request_id,
@@ -3628,8 +3628,10 @@ begin
     then raise insufficient_privilege using message='permission denied'; end if;
   select * into v_push from public.qbo_pushes where id=p_push and brewery_id=p_brewery for update;
   if not found then raise exception 'QuickBooks push not found'; end if;
-  if not exists(select 1 from public.qbo_connections where brewery_id=p_brewery and id=v_push.connection_id and realm_id=v_push.realm_id and state='connected')
-    then raise exception 'QuickBooks connection changed; pending push remains frozen and cannot be finalized by another connection' using errcode='MG409'; end if;
+  perform 1 from public.qbo_connections
+    where brewery_id=p_brewery and id=v_push.connection_id and realm_id=v_push.realm_id and state='connected'
+    for share;
+  if not found then raise exception 'QuickBooks connection changed; pending push remains frozen and cannot be finalized by another connection' using errcode='MG409'; end if;
   if p_request_id<>v_push.finish_request_id then raise exception 'invalid QuickBooks finish identity' using errcode='MG409'; end if;
   if p_status not in ('pushed','push_failed') then raise exception 'invalid QuickBooks push result'; end if;
   if p_status='pushed' and nullif(btrim(p_qbo_entity_id),'') is null then raise exception 'QuickBooks entity id required'; end if;
