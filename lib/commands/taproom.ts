@@ -8,7 +8,7 @@
 // keg_deposit_balances. Tap board writes
 // and durable physical counts are implemented below.
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap, type Ctx } from "./registry";
+import { CommandError, defineCommand, defineQuery, unwrap, type Ctx } from "./registry";
 
 export const KEG_SIZES = ["half_bbl", "quarter_bbl", "sixth_bbl", "fifty_l", "thirty_l", "twenty_l"] as const;
 export const KEG_POOL_KINDS = ["owned", "leased", "pay_per_fill"] as const;
@@ -132,7 +132,7 @@ defineQuery({
 
 const COUNT_ROLES = ["admin", "warehouse", "taproom"] as const;
 defineQuery({
-  name: "get_taproom_count_snapshot", description: "Prepare today's complete taproom count by bin, SKU and explicit lot UUID or null; includes zero buckets, safe labels, prior count and revision, without POS or lot-label access",
+  name: "get_taproom_count_snapshot", description: "Prepare today's complete taproom count by bin, SKU and explicit lot UUID or null; includes zero buckets, safe brand/package-volume labels, prior count and revision, without POS or lot-label access",
   input: z.object({ locationId: z.string().uuid() }), roles: [...COUNT_ROLES],
   handler: (ctx, i) => unwrap(ctx.db.rpc("get_taproom_count_snapshot", { p_brewery: ctx.breweryId, p_location: i.locationId })),
 });
@@ -140,6 +140,35 @@ defineQuery({
   name: "get_taproom_count", description: "Read a saved taproom count with every physical observation, prior count, movement identity and frozen depletion BBL",
   input: z.object({ countId: z.string().uuid() }), roles: [...COUNT_ROLES],
   handler: (ctx, i) => unwrap(ctx.db.rpc("get_taproom_count", { p_brewery: ctx.breweryId, p_count: i.countId })),
+});
+defineQuery({
+  name: "list_taproom_counts", description: "Newest 50 durable physical-count headers at one owned taproom, with observation, movement and depleted-unit totals",
+  input: z.object({ locationId: z.string().uuid() }), roles: [...COUNT_ROLES],
+  handler: async (ctx, i) => {
+    const location = await unwrap(ctx.db.from("locations").select("kind").eq("brewery_id", ctx.breweryId).eq("id", i.locationId).maybeSingle()) as { kind: string } | null;
+    if (location?.kind !== "taproom") throw new CommandError("choose an owned taproom location");
+    const counts = await unwrap(ctx.db.from("taproom_counts")
+      .select("id,location_id,counted_on,counted_by,created_at,prior_count_id")
+      .eq("brewery_id", ctx.breweryId).eq("location_id", i.locationId)
+      .order("created_at", { ascending: false }).order("id", { ascending: false }).limit(50)) as unknown as {
+        id: string; location_id: string; counted_on: string; counted_by: string; created_at: string; prior_count_id: string | null;
+      }[];
+    const lines: { count_id: string; qty_before: number; qty_counted: number; movement_id: string | null }[] = [];
+    for (let start = 0; counts.length > 0; start += 500) {
+      const page = await unwrap(ctx.db.from("taproom_count_lines").select("count_id,qty_before,qty_counted,movement_id", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).in("count_id", counts.map((count) => count.id)).order("count_id").order("id").range(start, start + 499)) as unknown as typeof lines;
+      lines.push(...page);
+      if (page.length < 500) break;
+    }
+    return counts.map((count) => {
+      const observed = lines.filter((line) => line.count_id === count.id);
+      return ({ ...count,
+        observations: observed.length,
+        movements: observed.filter((line) => line.movement_id !== null).length,
+        depleted_units: observed.reduce((total, line) => total + Number(line.qty_before) - Number(line.qty_counted), 0),
+      });
+    });
+  },
 });
 defineCommand({
   name: "record_taproom_count", description: "Save today's complete explicit-bucket count of remaining whole packaged units using the prepared revision; partial kegs count as one until gone. Persist matching counts without movements; shortages alone post exact-lot depletion. Stale, incomplete, duplicate and overcounts are refused; count correction is not yet available",

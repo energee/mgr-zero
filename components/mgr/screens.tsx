@@ -1237,28 +1237,27 @@ export const SCREENS: Screen[] = [
     step: 5,
     slice: 1,
     tab: "Beer",
-    name: "Weekly count", gatedBy: "Program 12",
-    to: { "Record count": "Weekly count", "Create transfer order": "Order" },
-    job: "Target-state count plus active suggested transfer",
-    reads: "get_taproom_count_snapshot · replenishment_suggestions · list_locations",
-    writes: "record_taproom_count [API available; count page pending] · create_replenishment_order",
-    states: permitted("warehouse or admin required"),
-    spec: "This count drawing remains disabled until the explicit bin/SKU/lot count page is wired. The durable count API permits Admin, Warehouse, and Taproom; POS comparison remains a separate planned report. INVERTED (this frame was drawn the other way round): the physical count is the source of truth and posts the depletion, connected or not. POS supplies expected consumption and posts nothing, so disconnecting removes the expected column and changes nothing about what the count writes. That is also why a keg moving warehouse → taproom stays on the books as taproom stock: a taproom transfer carries no channel, and the beer leaves only when a count says it is gone, which makes a month-end count yield the month’s removal cleanly. Variance is drawn twice on purpose: inline while someone can still recount, and as a report where a pattern across weeks (one line, one shift) is the only place it becomes legible. Counts are in kegs and cases, so qty never needs fractional widening.",
+    name: "Weekly count",
+    to: { "Hazy IPA": "SKU detail", "Record count": "Weekly count", "Open count": "Weekly count" },
+    job: "Record every physical stock bucket and compare the draft with expected brand consumption",
+    reads: "get_taproom_count_snapshot · get_taproom_draft_projection · list_taproom_counts · get_taproom_count · list_locations · list_skus · list_bins",
+    writes: "record_taproom_count",
+    states: permitted("taproom, warehouse or admin required").concat([["unknown response", "freeze every quantity and retry the same request", 1], ["stale", "start a fresh blank recount from the new stock revision", 1], ["no POS", "expected stays blank; the physical count still records"], ["matching", "durable receipt with every observation and no movement"]]),
+    spec: "The physical count is the source of truth and posts depletion, connected or not. Every bin/SKU/lot-or-untracked bucket is entered explicitly in whole packaged units; omitted zeros, fractions, inferred allocation and overcounts are refused. Taproom sees worksheet row numbers for tracked buckets and must get a labeled worksheet from Warehouse instead of guessing physical lot identity; Admin and Warehouse may use their existing stock labels. The draft brand expectation refreshes independently and never replaces the captured stock revision. Draft actual groups explicit bucket depletion using captured package volumes; it and expected-minus-actual stay blank until every bucket for that brand is entered, and remain labeled as estimates until the authoritative receipt is saved. An unknown response freezes request ID and payload for exact retry. A stale response offers a fresh blank recount. Saved receipts and the newest 50 headers remain readable even when every line matched and no movement was posted. Count correction remains unavailable.",
     body: (<>
-      {E.back("Beer", "Taproom")}
-      {E.ttl("Weekly count / sales depletion")}
-      {E.note("This count posts the depletion. POS sales are the expected number beside it; the gap is what the taproom lost to pours, comps, staff drinks and line cleaning.")}
-      {E.row("Pils · 16 oz case", "expected 4", E.stq(4))}
-      {E.row("Hazy · ½ bbl keg", "expected 3", E.stq(2), "w")}
-      {E.row("Stout · ⅙ bbl keg", "expected 2", E.stq(2))}
-      {E.info("Variance −1 Hazy · ½ bbl unaccounted. Recording posts 4 Pils + 2 Hazy + 2 Stout depletion; the variance is reported, never posted.")}
-      {E.nav("Variance by brand", "four weeks · where the gap keeps showing up")}
-      {E.gated("Record count", "isn’t available yet: counts have nowhere durable to land. The count is the only thing that posts taproom depletion, so until this closes taproom stock only ever grows")}
-      {E.ttl("Needs replenishment")}
-      {E.note("Below par: transfer 4 Pils + 2 Hazy.")}
-      {E.fld("Transfer from", "Warehouse · selected")}
-      {E.row("Transfer to", "Taproom", E.status("Fixed"))}
-      {E.btn("Create transfer order", "g")}
+      {E.back("Beer", "Weekly count")}
+      {E.tabs(["Ridgeline Tap Room", "Downtown"], 0, "w-full")}
+      {E.ttl("Expected consumption")}
+      {E.row("Hazy IPA", "expected 1.5 bbl · draft actual 1.0 bbl", "difference +0.5 bbl")}
+      {E.btn("Refresh expected", "g")}
+      {E.ttl("Count every stock bucket")}
+      {E.note("Server date Sep 8 · whole remaining packages only · enter zero explicitly. A partly full keg is one.")}
+      {E.row("Pils · 16 oz case", "Cold · untracked stock · recorded 6", E.stq(4))}
+      {E.row("Hazy · ½ bbl keg", "Cold · lot L-260901-HZ · worksheet row 1 · recorded 3", E.stq(2), "w")}
+      {E.btn("Record count")}
+      {E.ttl("Recent saved counts")}
+      {E.row("Weekly count · Sep 1", "3 observations · 1 movement · 1 unit depleted", E.act("Open count", "primary"))}
+      {E.note("Saved counts cannot be corrected yet. A generic adjustment does not reverse their depletion or tax reporting.")}
     </>),
   },
   {

@@ -271,6 +271,7 @@ omitted. They have no roles until they are built.
 | `list_standing_allocations` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |  |
 | `list_stock_transfers` | Inventory & locations | ✓ | ✓ | ✓ |  |  |  |
 | `list_tap_history` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
+| `list_taproom_counts` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
 | `list_team_members` | Team & brewery settings | ✓ | ✓ | ✓ |  |  |  |
 | `list_vendors` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |  |
 | `list_vendors_and_contracts` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |  |
@@ -2225,7 +2226,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 ### Taproom & kegs [#taproom]
 
-Physical counts are available to Admin, Warehouse, and Taproom through the commands below; the count page is not yet available. Prepare a complete snapshot, then submit every explicit bin/SKU/lot bucket with its revision and today's brewery-local date. `lotId: null` names untracked stock, never automatic allocation. Quantities are remaining whole packages; a partial keg counts as one until gone. Matching counts persist without movements. Shortages alone post exact-bucket depletion, with the tenant's Taproom channel tax treatment and volume frozen at posting; POS does not change the posting.
+Physical counts are available to Admin, Warehouse, and Taproom through the commands below and the live **Taproom** page. Prepare a complete snapshot, then submit every explicit bin/SKU/lot bucket with its revision and today's brewery-local date. `lotId: null` names untracked stock, never automatic allocation. Quantities are remaining whole packages; a partial keg counts as one until gone. Matching counts persist without movements. Shortages alone post exact-bucket depletion, with the tenant's Taproom channel tax treatment and volume frozen at posting; POS does not change the posting. `list_taproom_counts` returns only the newest 50 headers for one owned taproom; use `get_taproom_count` for a durable receipt.
 
 Changed stock or prior count requires refreshing the snapshot. Omitted, duplicate, extra, fractional, negative, overcount, historical and same-day repeat submissions are refused. An unchanged request ID returns the original result before these freshness checks; changed payload reuse conflicts. Saved-count correction remains unavailable, and generic inventory adjustments do not reverse count depletion. Printed lot labels are not exposed: ambiguous physical lot identity needs Warehouse assistance.
 
@@ -2348,7 +2349,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, warehouse, taproom
 
-Prepare today's complete taproom count by bin, SKU and explicit lot UUID or null; includes zero buckets, safe labels, prior count and revision, without POS or lot-label access
+Prepare today's complete taproom count by bin, SKU and explicit lot UUID or null; includes zero buckets, safe brand/package-volume labels, prior count and revision, without POS or lot-label access
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -2480,6 +2481,23 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_tap_history", "input": { "locationId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+#### list_taproom_counts [#list_taproom_counts]
+
+`query` · admin, warehouse, taproom
+
+Newest 50 durable physical-count headers at one owned taproom, with observation, movement and depleted-unit totals
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_taproom_counts", "input": { "locationId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### record_keg_event [#record_keg_event]

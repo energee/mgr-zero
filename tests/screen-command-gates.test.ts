@@ -42,3 +42,10 @@ it("keeps variance page gated while the read API is available", () => {
   expect(getCommandDefinition("get_taproom_variance")).toBeDefined();
   expect(isUngated(SCREENS.find(s => s.name === "Variance by brand")!)).toBe(false);
 });
+
+it("ships the weekly count screen with its durable reads and write", () => {
+  const screen = SCREENS.find(s => s.name === "Weekly count")!;
+  for (const name of ["get_taproom_count_snapshot", "get_taproom_draft_projection", "list_taproom_counts", "get_taproom_count", "record_taproom_count"])
+    expect(getCommandDefinition(name)).toBeDefined();
+  expect(isUngated(screen)).toBe(true);
+});

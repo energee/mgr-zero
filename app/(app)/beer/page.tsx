@@ -16,6 +16,7 @@ export default async function BeerPage() {
   const o = (await runCommand("get_beer_overview", {}, await buildContext(brewery.id))) as Overview | { taproomStock: { skuId: string; locationId: string; sku: string; location: string; qty: number }[] };
   if ("taproomStock" in o) return <>
     {E.hd("Beer")}
+    {E.nav("Weekly count", "record physical stock and review expected consumption", "", undefined, "/taproom")}
     <section id="taproom">
       <h2 className="text-lg font-semibold">Taproom stock</h2>
       {o.taproomStock.length ? o.taproomStock.map(s => (
@@ -27,7 +28,7 @@ export default async function BeerPage() {
     <>
       {E.hd("Beer")}
       {E.nav("Finished goods", `${plural(o.fgShortages, "shortage")} · ATP by SKU`, "", undefined, "/inventory")}
-      {E.gated("Taproom", `${plural(o.taproomBelowPar, "SKU")} below par · weekly count isn’t available yet`)}
+      {(brewery.role === "admin" || brewery.role === "warehouse") && E.nav("Taproom", `${plural(o.taproomBelowPar, "SKU")} below par · weekly count`, "", undefined, "/taproom")}
       {E.gated("Taps", "Tap board isn’t available yet")}
       {E.nav("Cellar", `${plural(o.openOccupancies, "tank")} with beer`, "", undefined, "/cellar")}
       {E.nav("Materials", plural(o.materialShortages, "shortage"), "", undefined, "/materials")}

@@ -27,10 +27,30 @@ describe("durable explicit taproom counts", () => {
     expect((await admin.from("taproom_counts").select("id").eq("id", saved.id)).data).toHaveLength(1);
     expect((await admin.from("inventory_movements").select("id").eq("brewery_id", f.brewery.id)).data).toHaveLength(1);
   });
+
+  it("lists only an owned taproom's newest 50 durable count headers in stable order", async () => {
+    const f = await fixture();
+    const other = await fixture();
+    const warehouse = await seedLocation(f.brewery.id, { name: "Warehouse" });
+    sql(`insert into public.taproom_counts(id,brewery_id,location_id,counted_on,counted_by,created_at)
+      select private.new_uuid(),'${f.brewery.id}','${f.location.id}',date '2026-01-01'+n,'${f.ctx.userId}',timestamptz '2026-01-01 12:00Z'+n*interval '1 day'
+      from generate_series(0,50) n`);
+
+    const rows = await runCommand("list_taproom_counts", { locationId: f.location.id }, f.ctx) as { counted_on: string }[];
+    expect(rows).toHaveLength(50);
+    expect(rows[0].counted_on).toBe("2026-02-20");
+    expect(rows.at(-1)?.counted_on).toBe("2026-01-02");
+    await expect(runCommand("list_taproom_counts", { locationId: other.location.id }, f.ctx)).rejects.toThrow(/owned taproom/);
+    await expect(runCommand("list_taproom_counts", { locationId: warehouse.id }, f.ctx)).rejects.toThrow(/owned taproom/);
+    for (const role of ["sales", "brewer"] as const) {
+      const denied = await makeStaffCtx(f.brewery.id, role);
+      await expect(runCommand("list_taproom_counts", { locationId: f.location.id }, denied)).rejects.toMatchObject({ code: "permission_denied" });
+    }
+  });
 });
 
 type Fixture = Awaited<ReturnType<typeof fixture>>;
-type Bucket = { bin_id: string; sku_id: string; lot_id: string | null; qty_before: number };
+type Bucket = { bin_id: string; sku_id: string; lot_id: string | null; qty_before: number; brand_id: string; brand_name: string; bbl_per_unit: number };
 async function prepare(f: Fixture) {
   const result = await f.ctx.db.rpc("get_taproom_count_snapshot", { p_brewery: f.brewery.id, p_location: f.location.id });
   expect(result.error).toBeNull();
@@ -72,6 +92,17 @@ it("7 remaining to 2 posts exactly -5, freezes tax and volume, and replays befor
   expect(changed.error?.code).toBe("MG409"); expect(state(f)).toEqual(before);
 });
 
+it("snapshot carries authoritative brand volume and a pre-submit format change stales its revision", async () => {
+  const f = await fixture();
+  const input = await args(f);
+  const snapshot = await prepare(f);
+  expect(snapshot.lines[0]).toMatchObject({ brand_id: f.cat.brandId, brand_name: "IPA", bbl_per_unit: .5 });
+  await admin.from("formats").update({ bbl_per_unit: .25 }).eq("id", f.cat.formatId);
+  const changed = await f.ctx.db.rpc("record_taproom_count", input);
+  expect(changed.error?.code).toBe("MG409");
+  expect(state(f)).toEqual(["0:0:1:0"]);
+});
+
 it("A4/B2/NULL0 counts A3/B2/NULL0: only A loses one, no raw lot metadata", async () => {
   const f = await fixture(0); const a = await lot(f, "SECRET-A"), b = await lot(f, "SECRET-B");
   await movement(f, 4, a); await movement(f, 2, b); await movement(f, 1); await movement(f, -1);
@@ -84,7 +115,7 @@ it("A4/B2/NULL0 counts A3/B2/NULL0: only A loses one, no raw lot metadata", asyn
   const snapshot = await prepare(f);
   expect(snapshot.lines.map(l => [l.lot_id, l.qty_before])).toEqual([[null, 0], ...[a, b].sort().map(id => [id, id === a ? 3 : 2])]);
   expect(JSON.stringify(snapshot)).not.toContain("SECRET");
-  expect(Object.keys(snapshot.lines[0]).sort()).toEqual(["bin_id", "bin_name", "lot_id", "qty_before", "sku_id", "sku_name"]);
+  expect(Object.keys(snapshot.lines[0]).sort()).toEqual(["bbl_per_unit", "bin_id", "bin_name", "brand_id", "brand_name", "lot_id", "qty_before", "sku_id", "sku_name"]);
   expect((await f.ctx.db.from("lots").select("*")).data).toEqual([]);
   expect((await f.ctx.db.from("packaging_runs").select("*")).data).toEqual([]);
 });
@@ -195,6 +226,9 @@ it("uses all movements and all buckets beyond the API 1000-row ceiling", async (
   const input = await args(f); expect(input.p_lines).toHaveLength(1002);
   const result = await f.ctx.db.rpc("record_taproom_count", input); expect(result.error).toBeNull(); expect(result.data.lines).toHaveLength(1002);
   expect((await f.ctx.db.rpc("get_taproom_count", { p_brewery: f.brewery.id, p_count: result.data.id })).data.lines).toHaveLength(1002);
+  expect(await runCommand("list_taproom_counts", { locationId: f.location.id }, f.ctx)).toMatchObject([
+    { id: result.data.id, observations: 1002, movements: 0, depleted_units: 0 },
+  ]);
 }, 30_000);
 
 it("count tables are append-only with tenant-safe references and direct DML denied", async () => {

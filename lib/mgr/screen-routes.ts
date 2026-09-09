@@ -22,6 +22,7 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Today", file: "app/(app)/page.tsx" },
   { name: "First-run checklist", file: "app/(app)/page.tsx" },
   { name: "Beer", file: "app/(app)/beer/page.tsx" },
+  { name: "Weekly count", file: "app/(app)/taproom/page.tsx" },
   { name: "Work", file: "app/(app)/work/page.tsx" },
   { name: "More", file: "app/(app)/more/page.tsx" },
   { name: "Search", file: "app/(app)/search/page.tsx" },

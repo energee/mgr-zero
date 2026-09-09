@@ -7456,18 +7456,26 @@ language sql stable set search_path = '' as $$
     where brewery_id = p_brewery and location_id = p_location
   ), buckets as (
     select bin_id, sku_id, lot_id, sum(qty) qty_before from movements group by bin_id, sku_id, lot_id
+  ), details as (
+    select b.bin_id,n.name bin_name,b.sku_id,s.name sku_name,s.brand_id,br.name brand_name,
+      v.bbl_per_unit,b.lot_id,b.qty_before
+    from buckets b join public.bins n on n.id=b.bin_id and n.brewery_id=p_brewery
+    join public.skus s on s.id=b.sku_id and s.brewery_id=p_brewery
+    join public.brands br on br.id=s.brand_id and br.brewery_id=p_brewery
+    join public.format_volumes v on v.id=s.format_id and v.brewery_id=p_brewery
   )
   select jsonb_build_object(
     'location_id', p_location,
     'counted_on', (now() at time zone (select timezone from public.breweries where id = p_brewery))::date,
     'prior_count', (select to_jsonb(prior) from prior),
     'revision', encode(extensions.digest(jsonb_build_array(p_brewery, p_location,
-      (select id from prior), (select jsonb_agg(id order by id) from movements))::text, 'sha256'), 'hex'),
-    'lines', (select coalesce(jsonb_agg(jsonb_build_object('bin_id', b.bin_id, 'bin_name', n.name,
-      'sku_id', b.sku_id, 'sku_name', s.name, 'lot_id', b.lot_id, 'qty_before', b.qty_before)
-      order by b.bin_id, b.sku_id, b.lot_id nulls first), '[]'::jsonb)
-      from buckets b join public.bins n on n.id = b.bin_id and n.brewery_id = p_brewery
-      join public.skus s on s.id = b.sku_id and s.brewery_id = p_brewery));
+      (select id from prior), (select jsonb_agg(id order by id) from movements),
+      (select jsonb_agg(jsonb_build_array(bin_id,sku_id,lot_id,qty_before,brand_id,bbl_per_unit)
+        order by bin_id,sku_id,lot_id nulls first) from details))::text, 'sha256'), 'hex'),
+    'lines', (select coalesce(jsonb_agg(jsonb_build_object('bin_id', d.bin_id, 'bin_name', d.bin_name,
+      'sku_id', d.sku_id, 'sku_name', d.sku_name, 'brand_id', d.brand_id, 'brand_name', d.brand_name,
+      'bbl_per_unit', d.bbl_per_unit, 'lot_id', d.lot_id, 'qty_before', d.qty_before)
+      order by d.bin_id, d.sku_id, d.lot_id nulls first), '[]'::jsonb) from details d));
 $$;
 
 create function get_taproom_count_snapshot(p_brewery uuid, p_location uuid) returns jsonb
