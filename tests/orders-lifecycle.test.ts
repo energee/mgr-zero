@@ -1,6 +1,6 @@
 // tests/orders-lifecycle.test.ts — create → submit → confirm → adjust → cancel via rpc.
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation, seedCustomer, priceSku } from "./helpers";
+import { admin, ins, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation, seedCustomer, priceSku } from "./helpers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 let b: { id: string }, staffDb: SupabaseClient, staffId: string;
@@ -16,8 +16,7 @@ beforeAll(async () => {
   ({ customerId, shipToId } = cust);
   await priceSku(b.id, { saleChannelId: cust.saleChannelId, brandId: cat.brandId, formatId: cat.formatId, cents: 12000 });
   // on-hand: 100 units
-  const { error: imErr } = await admin.from("inventory_movements").insert({ brewery_id: b.id, sku_id: skuId, location_id: whId, bin_id: whBinId, qty: 100, type: "opening_balance", created_by: staffId });
-  if (imErr) throw new Error(`Failed to create inventory movement: ${imErr.message}`);
+  await ins("inventory_movements", { brewery_id: b.id, sku_id: skuId, location_id: whId, bin_id: whBinId, qty: 100, type: "opening_balance", created_by: staffId });
 });
 
 async function createOrder(qty = 10) {

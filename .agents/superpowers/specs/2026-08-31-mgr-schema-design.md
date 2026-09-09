@@ -476,11 +476,12 @@ sort int`. idx `(recipe_version_id)`, `(material_id)`. Revoke update/delete.
 (decision). unique `(brewery_id, name)`.
 
 ### `batches`
-`batch_no bigint` (trigger), `product_id → products, recipe_version_id →
+`batch_no bigint` (trigger), `intended_brand_id → brands` nullable, `recipe_version_id →
 recipe_versions, planned_on date not null, planned_bbl numeric > 0, brewed_on date,
-closed_at timestamptz, note, created_by`. State is derived: planned (`brewed_on null`),
+closed_at timestamptz, completion_adjustment_id → volume_adjustments nullable unique,
+note, created_by`. State is derived: planned (`brewed_on null`),
 active (open occupancy), closed. unique `(brewery_id, batch_no)`. idx `(brewery_id,
-planned_on)`, `(product_id)`.
+planned_on)`, `(intended_brand_id)`.
 
 ### `vessel_occupancies`
 `vessel_id → vessels, batch_id → batches, started_at timestamptz not null, ended_at
@@ -502,29 +503,36 @@ reuses it. These dependent rows are one RPC; no vessel status column or ledger m
 is involved. idx on both occupancy columns.
 
 ### `volume_adjustments` — ledger
-`occupancy_id → vessel_occupancies, bbl numeric <> 0, reason volume_adjustment_reason,
-at, note, created_by`. Cellar losses/dumps feed TTB.
+`occupancy_id → vessel_occupancies, bbl unconstrained numeric` with finite, nonzero and
+at-most-eight-decimal checks, `reason volume_adjustment_reason`, nullable
+`removal_class cellar_removal_class`, frozen `tax_treatment` / `dest_state`,
+`affects_occupancy bool`, at, note, created_by. Existing negative loss and dump rows map
+to loss and destruction; signed gain/measurement rows remain unclassified. Sample
+requires a two-letter state, Taproom freezes tax from the tenant channel whose immutable
+`system_code='taproom'`, and loss/destruction carry neither.
 
-**SCHEMA-GATE — batch completion, reconciliation, and re-attribution:** this current
-shape is not sufficient for the planned `complete_batch` or loss-review flow.
-`reason='loss'` plus free-text `note` cannot
-reliably distinguish a system-created Completion Reconciliation from an ordinary manual
-loss, and `volume_adjustment_reason` cannot express cellar sample, taproom-pour, and
-destruction removals as distinct TTB classifications. Before slice 4 writes automatic
-reconciliation rows or slice 6 offers review/re-attribution, the schema must provide:
+`complete_batch` is implemented as one Admin/Brewer RPC. Its shared calculation covers
+every occupancy whose stored batch identity matches, cross-batch transfer boundaries,
+signed physical gain/measurement adjustments, transfer losses, classified cellar
+removals, and frozen positive production movements from closed runs. It refuses missing,
+unbrewed or already-completed batches, missing occupancy, nonpositive baselines, open
+packaging runs and negative residuals. It closes all still-open scoped occupancies at one
+valid timestamp and appends one nonphysical generic-loss root only when the residual is
+at least `greatest(0.05, baseline * 0.005)`. A deferred same-tenant reciprocal constraint
+proves that root is referenced by exactly one completed batch and belongs to that batch's
+occupancy scope. Nonphysical rows do not change `occupancy_volumes`; all other adjustment
+rows do. No update/delete or application/service insert is permitted.
 
-- immutable, queryable system origin for a reconciliation row (not `note`);
-- the required distinct cellar-removal classifications; and
-- an auditable link to the exact original row plus one registered atomic compensating
-  command that reverses/reclassifies the selected amount with new rows.
-
-Once resolved, `complete_batch` owns `batches.closed_at`, closes the appropriate
-remaining occupancy state, and appends any threshold-qualified completion
-reconciliation in one function after verifying no packaging run remains open.
-
-No update/delete of `volume_adjustments` is permitted. This pass intentionally does not
-choose a new column or table; the database design, migration, TTB projection, and
-real-Postgres proofs are a blocking follow-up.
+`volume_adjustment_reclassifications` is the append-only allocation ledger: tenant,
+source completion adjustment, positive finite at-most-eight-decimal BBL, target class,
+frozen tax/state, actor, and audit time. A source may have several partial allocations.
+Each allocation owns exactly two nonphysical `volume_adjustments` through
+`reclassification_id` plus `reverse | replacement`: an equal positive generic-loss
+reversal and negative target replacement. Immediate tenant-safe foreign keys and a
+deferred reciprocal graph check prove the root, source occupancy, brewery, signs,
+amount, class, tax, state, and exactly-two-leg shape. The same graph limits total
+allocations to the root. Neither application nor service roles can mutate either
+append-only table directly.
 
 ### `fermentation_readings`
 `occupancy_id, at timestamptz, temp_f numeric(5,1), ph numeric(4,2), gravity_plato
@@ -539,7 +547,8 @@ material_movements unique not null`. Trigger asserts the movement `type =
 
 ### View `occupancy_volumes`
 `initial_bbl + transfers_in − transfers_out − transfer losses + adjustments − bbl_drawn
-by closed packaging runs` per occupancy; `vessel_contents` joins open occupancies to
+by closed packaging runs` per occupancy, where only adjustments with
+`affects_occupancy=true` change physical volume; `vessel_contents` joins open occupancies to
 vessels (this replaces a vessel status column).
 
 ## 10. Packaging
@@ -591,6 +600,11 @@ unique `(brewery_id, state, kind)`. Destination-state supplier registrations (OH
 filed_by, note`. unique `(brewery_id, jurisdiction, period_start, period_end)`. The
 ledger stays recomputable; this is the snapshot that was actually filed (decision).
 Report generators are code, not schema; CBMA rates are code (§14).
+Generated figures keep `removals` as the one additive filing total and expose
+`cellarRemovals` only as an explanatory breakdown. Signed reclassification legs post in
+their actual creation period. A nonzero direct-cellar Taproom amount exposes an external
+mapping requirement and blocks filing until that mapping is separately approved;
+existing `report_filings.figures` snapshots remain immutable.
 
 ## 12. Kegs (owned / leased / pay-per-fill fleets)
 
@@ -1219,6 +1233,16 @@ and menu availability need anyway, and a month-end count yields the month's
 removal cleanly — satisfying the domain rule that a removal belongs to the month
 the beer left.
 
+**Implemented print projection (Program 12 T4a).**
+`get_taproom_print_labels(brewery, location, revision)` is the sole narrow lot-code
+boundary for Admin, Warehouse, and Taproom count work. It obtains one current
+`private.taproom_count_snapshot`, refuses a different exact revision, assigns
+worksheet ordinality across that complete snapshot, then returns only positive
+buckets in the same order. The fields are limited to the worksheet row, safe
+bin/SKU/brand/package labels, tracked lot UUID and code (or untracked), and
+quantity. It exposes no history or other lot metadata, adds no `lots` SELECT
+grant, and never claims a command request.
+
 Three consequences worth stating:
 
 1. **`inventory_movements.qty` does not need widening.** The `numeric(12,2)`
@@ -1237,9 +1261,17 @@ Three consequences worth stating:
 **Implemented comparison contract (Program 12 Task 2).** `get_taproom_variance`
 selects whole completed count pairs by the ending count's brewery-local date,
 from today minus 4/12 × 7 days plus one through today. Exact sale bounds are
-`(prior.created_at, current.created_at]`; first counts remain visible as
+`(prior.observed_at, current.observed_at]`; first counts remain visible as
 missing-baseline observations and cannot supply comparable variance. A period
 may start before the nominal window, which is exposed explicitly.
+
+**Implemented latest-count correction (Program 12 T4b).** `observed_at` is the
+immutable physical observation boundary while `created_at` remains audit time.
+Admin may append one replacement for the latest uncorrected mistaken-low root;
+effective count reads, next-count baseline, and variance resolve that replacement
+without rewriting the original or a filed report. The complete schema, graph,
+ledger, replay, and role rules live in
+`2026-09-09-program12-completion-and-count-correction.md` §B.
 
 `pos_sales` retains immutable connection/order/line identity, catalog variation
 identity separately, and source version. Versions are not additive facts;

@@ -25,7 +25,7 @@ in the cooler, count it, and change kegs. Nothing else.
 | Surface | Read | Write | Rows |
 | --- | --- | --- | --- |
 | Tap board and keg taps: `tap_intervals` (`keg_taps` in §16.13's wording) | yes | `tap_keg`, `swap_keg`, `kick_keg` | whole brewery |
-| Weekly count: `taproom_counts`, `taproom_count_lines` | yes | `record_taproom_count` | whole brewery |
+| Weekly count: `taproom_counts`, `taproom_count_lines` | yes, plus effective correction audit and `get_taproom_print_labels` for current positive-stock lot codes at one exact snapshot revision | `record_taproom_count`; never Admin-only `correct_taproom_count` | whole brewery |
 | Taproom bins and on-hand: `locations`, `bins`, `taproom_pars`, and the `on_hand` / `keg_bin_on_hand` qty projections | yes | none | rows whose location is `kind = 'taproom'` |
 | Catalog vocabulary: `brands`, `formats`, `format_components`, `skus`, `keg_pools` | yes | none | whole brewery |
 | Menu and POS mapping: `pos_locations`, `pos_item_mappings` (`pos_sales` and `pos_menus` wait until Program 14) | yes | none | whole brewery |
@@ -42,9 +42,14 @@ connections, and every RPC that writes them. A taproom user calling a forbidden 
 is empty under RLS, or receives `42501` where table SELECT itself is revoked.
 Authenticated pre-tenant `provision_brewery` remains separately authorized.
 
-Raw `inventory_movements` are not readable. Qty on hand at taproom locations
-comes from `on_hand_rows()`. The weekly count posts its own `depletion` rows
+Raw `inventory_movements` and raw `lots` are not readable. Qty on hand at
+taproom locations comes from `on_hand_rows()`. The checked print RPC is the
+only exception for a current positive-stock lot code; it does not expose lot
+history or widen `taproom_can`. The weekly count posts its own `depletion` rows
 through `record_taproom_count`, and tapping a keg posts nothing (§16.15).
+They may read a correction's effective receipt, author, time, and reason, while
+the latest-root correction command remains Admin-only under the accepted
+Program 12 completion and correction spec §B.
 
 ## Mechanism
 
@@ -179,8 +184,9 @@ is needed.
 
 ## Consequences and non-goals
 
-- A bartender sees taproom stock as numbers on the board and the count sheet
-  only; there is no Inventory page for the role and no direct movement entry.
+- A bartender sees taproom stock as numbers on the board and count sheet, plus
+  the print-only current positive-stock labels from the checked snapshot RPC;
+  there is no Inventory page, raw lot history, or direct movement entry.
 - Two taproom locations at one brewery share one bartender view; per-location
   staffing is a later refinement (a `location_id` on `brewery_users`) and is
   not designed here.

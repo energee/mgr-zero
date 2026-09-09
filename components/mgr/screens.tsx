@@ -756,7 +756,7 @@ export const SCREENS: Screen[] = [
     reads: "get_inventory_sku · get_on_hand · get_atp · list_movements",
     writes: "reverse_inventory_movement [standalone adjustment/loss only; admin or warehouse]",
     states: permitted("sales reads; admin or warehouse reverses eligible standalone adjustments/losses"),
-    spec: "Review opens inventory SKU detail with complete on-hand by location, ATP and paginated immutable history. Admin and Warehouse reverse only standalone adjustments and losses with a required note; the exact linked opposite retains frozen volume, class, bin and lot. Sales reads only. Count corrections remain unavailable; shipment rows retain Return shipment. This is distinct from the catalog SKU editor.",
+    spec: "Review opens inventory SKU detail with complete on-hand by location, ATP and paginated immutable history. Admin and Warehouse reverse only standalone adjustments and losses with a required note; the exact linked opposite retains frozen volume, class, bin and lot. Sales reads only. Count corrections live on the eligible latest saved weekly count; shipment rows retain Return shipment. This is distinct from the catalog SKU editor.",
     body: <InventoryDetailView model={INVENTORY_DETAIL} movementAction={() => E.btn("Reverse movement")} />,
   },
   {
@@ -1094,12 +1094,12 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Beer",
     name: "Weekly count",
-    to: { "Hazy IPA": "SKU detail", "Record count": "Weekly count", "Open count": "Weekly count" },
+    to: { "Hazy IPA": "SKU detail", "Print current stock labels": "Weekly count", "Record count": "Weekly count", "Open count": "Weekly count", "Correct count": "Weekly count" },
     job: "Record every physical stock bucket and compare the draft with expected brand consumption",
-    reads: "get_taproom_count_snapshot · get_taproom_draft_projection · list_taproom_counts · get_taproom_count · list_locations",
-    writes: "record_taproom_count",
-    states: permitted("taproom, warehouse or admin required").concat([["unknown response", "timeouts and 5xx freeze every quantity and retry the same request", 1], ["stale", "changed stock or brewery date starts a fresh blank recount", 1], ["no POS", "expected stays blank; the physical count still records"], ["matching", "durable receipt with every observation and no movement"]]),
-    spec: "The physical count is the source of truth and posts depletion, connected or not. Every bin/SKU/lot-or-untracked bucket is entered explicitly in whole packaged units; omitted zeros, fractions, inferred allocation and overcounts are refused. Taproom sees worksheet row numbers for tracked buckets and must get a labeled worksheet from Warehouse instead of guessing physical lot identity; Admin and Warehouse may use their existing stock labels. The draft keeps and links the captured prior-count identity/date. Brand expectation refreshes independently and never replaces the captured stock revision; if its baseline changed, comparison and inputs lock until an explicit fresh recount. Draft actual groups explicit bucket depletion using captured package volumes; it and expected-minus-actual stay blank until every existing bucket for that brand is entered, while a projected brand with no physical bucket has zero actual. Both remain labeled as estimates until the authoritative receipt is saved. A timeout or 5xx response freezes request ID and payload for exact retry; a definitive first validation failure is editable. Changed stock or an expired brewery date offers a fresh blank recount. Saved receipts include safe bin/SKU labels for every observation beyond list-query caps, and the newest 50 headers remain readable even when every line matched and no movement was posted. Count correction remains unavailable.",
+    reads: "get_taproom_count_snapshot · get_taproom_print_labels · get_taproom_draft_projection · list_taproom_counts · get_taproom_count · list_locations",
+    writes: "record_taproom_count · correct_taproom_count [Admin only; latest uncorrected root; increases only]",
+    states: permitted("taproom, warehouse or admin required").concat([["unknown response", "timeouts and 5xx freeze every quantity and retry the same request", 1], ["stale", "changed stock or brewery date starts a fresh blank recount", 1], ["no POS", "expected stays blank; the physical count still records"], ["matching", "durable receipt with every observation and no movement"], ["corrected", "one logical history row shows the effective receipt and correction audit"], ["correction permission", "Admin only on the latest uncorrected root", 1]]),
+    spec: "The physical count is the source of truth and posts depletion, connected or not. Every bin/SKU/lot-or-untracked bucket is entered explicitly in whole packaged units; omitted zeros, fractions, inferred allocation and overcounts are refused. Taproom sees the full worksheet row number on every bucket instead of raw lot identifiers on screen; all three count roles can print the current positive-stock worksheet through one checked projection with lot codes, stable original row numbers, and no history. Print rechecks the captured revision and refuses stale stock without changing count entries or uncertain retries. The draft keeps and links the captured prior-count identity/date. Brand expectation refreshes independently and never replaces the captured stock revision; if its baseline changed, comparison and inputs lock until an explicit fresh recount. Draft actual groups explicit bucket depletion using captured package volumes; it and expected-minus-actual stay blank until every existing bucket for that brand is entered, while a projected brand with no physical bucket has zero actual. Both remain labeled as estimates until the authoritative receipt is saved. A timeout or 5xx response freezes request ID and payload for exact retry; a definitive first validation failure is editable. Changed stock or an expired brewery date offers a fresh blank recount. Saved receipts include safe bin/SKU labels for every observation beyond list-query caps, and the newest 50 logical root headers remain readable even when every line matched and no movement was posted. Admin can correct only the latest uncorrected root when at least one quantity was counted too low, up to the frozen quantity before that count. The replacement keeps every original bucket and observation time, appends signed ledger entries in the correction period, and leaves the original receipt immutable. History and the receipt show the effective count plus who corrected it, when, and why. Warehouse and Taproom can read that audit but never see the correction action. An uncertain response freezes the correction reason, quantities, request ID, and payload for exact retry.",
     body: (<>
       {E.back("Beer", "Weekly count")}
       {E.tabs(["Ridgeline Tap Room", "Downtown"], 0, "w-full")}
@@ -1109,12 +1109,17 @@ export const SCREENS: Screen[] = [
       {E.btn("Refresh expected", "g")}
       {E.ttl("Count every stock bucket")}
       {E.note("Server date Sep 8 · whole remaining packages only · enter zero explicitly. A partly full keg is one.")}
-      {E.row("Pils · 16 oz case", "Cold · untracked stock · recorded 6", E.stq(4))}
-      {E.row("Hazy · ½ bbl keg", "Cold · lot L-260901-HZ · worksheet row 1 · recorded 3", E.stq(2), "w")}
+      {E.btn("Print current stock labels", "g")}
+      {E.note("Print includes only current positive stock and keeps the captured worksheet row numbers.")}
+      {E.row("Pils · 16 oz case", "Cold · untracked stock · worksheet row 1 · recorded 6", E.stq(4))}
+      {E.row("Hazy · ½ bbl keg", "Cold · lot L-260901-HZ · worksheet row 2 · recorded 3", E.stq(2), "w")}
       {E.btn("Record count")}
+      {E.ttl("Saved count · Sep 8")}
+      {E.note("Latest uncorrected count · saved row 2 · recorded 7, counted 2")}
+      {E.btn("Correct count", "g")}
       {E.ttl("Recent saved counts")}
-      {E.row("Weekly count · Sep 1", "3 observations · 1 movement · 1 unit depleted", E.act("Open count", "primary"))}
-      {E.note("Saved counts cannot be corrected yet. A generic adjustment does not reverse their depletion or tax reporting.")}
+      {E.row("Weekly count · Sep 1", "3 observations · 1 movement · 1 unit depleted · corrected by Admin", E.act("Open count", "primary"))}
+      {E.note("Admin can correct only the latest saved count when a quantity was counted too low. Warehouse and Taproom read the correction history without the action.")}
     </>),
   },
   {
@@ -1602,16 +1607,16 @@ export const SCREENS: Screen[] = [
     name: "Cellar map",
     to: { "FV3 \u00b7 fermenter \u00b7 15 bbl": "Vessel detail" , "Add vessel": "Vessel detail" },
     job: "Occupancy is the subject: fill, gravity and overdue lead every tile",
-    reads: "get_cellar_map [view]",
-    writes: "upsert_vessel [design; mutable single rows] · complete_batch [SCHEMA-GATE: close/reconciliation identity + classifications; one RPC: batch close + occupancy close + automatic reconciliation]",
-    states: DEFAULT_STATES,
-    spec: "Complete batch stays disabled until close/reconciliation identity exists: the batch’s closing time, the occupancy close and the typed automatic reconciliation must commit atomically. Tile fill derives from occupancy vs vessel capacity, never from a status column. Reading is the one primary; Transfer and Brew day are outline. A tile opens Vessel detail.",
+    reads: "list_occupancies · list_vessels · list_batches · get_batch_completion_preview",
+    writes: "upsert_vessel [design; mutable single rows] · complete_batch",
+    states: [["open run", "complete batch refused"], ["negative residual", "reload cellar facts", 1], ["uncertain", "retry unchanged request", 1], ["saved", "batch and all open occupancies closed"]],
+    spec: "Complete batch reviews the server-derived baseline, frozen packaged output, prior attributed volume, threshold and residual, then atomically closes the batch and all of its open occupancies. A threshold-qualified residual becomes one typed nonphysical loss root; the form accepts no amount or cause. Tile fill derives from occupancy vs vessel capacity, never from a status column. Reading is the one primary; Transfer and Brew day are outline. A tile opens Vessel detail.",
     body: (<>
       {E.back("Beer", "Cellar", E.btn("Add vessel", "g"))}
       {E.tiles([["FV1", "Pils · 12.8 / 15 bbl", "1.9 °P · read 4 h", 0, 85], ["FV2", "Hazy · 9.0 / 15 bbl", "7.5 °P · read 8 h", 0, 60], ["FV3", "Stout · 13.5 / 15 bbl", "5.2 °P · overdue 31 h", 1, 90], ["BT1", "Pils · 7.0 / 10 bbl", "carbing", 0, 70], ["BT2", "Empty · 0 / 10 bbl", "available", 0, 0], ["FB1", "Saison · 0.4 / 1 bbl", "aging · read 1 d", 0, 40]], "c2")}
       {E.btns([["Reading", "p"], ["Transfer", "g"], ["Brew day", "g"]], "c3")}
       {E.nav("FV3 · fermenter · 15 bbl", "occupancy, readings and vessel facts")}
-      {E.gated("Complete batch")}
+      {E.btn("Complete batch", "g")}
       {E.sp()}
     </>),
   },
@@ -2186,26 +2191,33 @@ export const SCREENS: Screen[] = [
     slice: 6,
     tab: "More",
     name: "Monthly compliance",
-    to: { Confirm: "Monthly compliance" },
+    to: { Confirm: "Monthly compliance", "Reattribute loss": "Monthly compliance" },
     job: "Generate from ledgers, review, then record the external filing",
-    reads: "list_compliance_reports · generate_compliance_report · get_loss_review [view; SCHEMA-GATE for typed completion-loss identity]",
-    writes: "file_compliance_report · reattribute_loss [SCHEMA-GATE; requires typed origin/classification + atomic compensation]",
-    states: [["current", "generated from the ledger now"], ["does not balance", "a movement type the report cannot classify is named · Save stays off", 1], ["filed", "the snapshot is shown, not regenerated"], ["permission", "sales or admin required", 1]],
-    spec: "Reattribution waits for schema that identifies completion rows and cellar removal class; correction must be atomic append-only compensation, never free-text note matching. The identity checks are v1 lessons drawn in user copy: balance per class, cellar as in-process, 0.00 never blank, no transmission. Beer in process is the tanks now, not at period end, and says so. Removals are keyed by the tax treatment frozen on each movement, so editing a channel later does not move a past month; taxable removals also break down by destination state for the states that remit.",
+    reads: "list_compliance_reports · generate_compliance_report · get_loss_review",
+    writes: "file_compliance_report · reattribute_loss",
+    states: [["current", "generated from the ledger now"], ["does not balance", "a movement type the report cannot classify is named · Save stays off", 1], ["mapping required", "direct cellar Taproom volume needs an approved external filing-line mapping · Save stays off", 1], ["filed", "the snapshot is shown, not regenerated"], ["permission", "sales or admin required", 1]],
+    spec: "Admin and Sales review exact completion reconciliation losses and allocate each remainder to Sample, Taproom, or Destruction through append-only category changes, never free-text note matching. Corrections post in the period they are saved and leave earlier filed snapshots unchanged. The identity checks are v1 lessons drawn in user copy: balance per class, one additive removal total, an explanatory non-additive cellar breakdown, 0.00 never blank, no transmission. Beer in process is the tanks now, not at period end, and says so. Removals are keyed by frozen tax treatment; direct cellar Taproom volume requires an approved external filing-line mapping before Save turns on.",
     body: (<>
       {E.back("Compliance months", "August 2026")}
-      {E.gated("1 · Review auto-reconciled losses", "review isn’t available yet")}
+      {E.row("1 · Review auto-reconciled losses", "Completion reconciliations stay in history while allocations change their removal category.")}
+      {E.fld("Batch 1042 · original generic loss 0.05741935 bbl · allocated 0.02000000 bbl", "remaining 0.03741935 bbl")}
+      {E.fld("Sample · Destination PA · prior allocation", "0.02000000 bbl")}
+      {E.btn("Reattribute loss", "g")}
+      {E.info("An allocation changes removal categories in the period you save it. Earlier filed snapshots stay unchanged.")}
       {E.row("2 · Review generated figures", "", E.status("Current", "ok"))}
       {E.tbl(["class", "begin", "+", "−", "end"], [["kegs", "41.00", "30.50", "33.20", "38.30"], ["cans", "12.60", "18.00", "14.90", "15.70"], ["bottles", "0.00", "0.00", "0.00", "0.00"]])}
-      {E.info("Every class balances: begin + in − out = end, in barrels. Cellar leaves by packaging, not as a removal. Zeros print 0.00.")}
+      {E.info("Every package class balances: begin + in − out = end, in barrels. Cellar removals are included once below. Zeros print 0.00.")}
       {E.row("Beer in process", "tanks now, not at period end", "120.40 bbl")}
       {E.row("Packaged", "production into finished goods", "48.50 bbl")}
       {E.row("Taxpaid removals", "", "41.20 bbl")}
       {E.row("Export", "", "6.90 bbl")}
+      {E.fld("Losses", "0.05741935 bbl")}
+      {E.info("Cellar removals breakdown is explanatory and is already included once in the removal totals. Do not add it again.")}
+      {E.fld("Cellar · Losses · non-additive breakdown", "0.05741935 bbl")}
       {E.row("Taxpaid to PA", "destination state", "38.10 bbl")}
       {E.row("Taxpaid to OH", "destination state", "3.10 bbl")}
       {E.row("3 · Confirm filed outside MGR", "", "")}
-      {E.info("MGR saves the immutable snapshot; it does not transmit the filing. Save stays off until the report balances.")}
+      {E.info("MGR saves the immutable snapshot; it does not transmit the filing. Save stays off until the report balances and required external mappings are approved.")}
       {E.edit("Note · optional", "filed on pay.gov")}
       {E.btn("Save filed snapshot", "irr")}
     </>),

@@ -34,16 +34,22 @@ describe("HTTP API reference", () => {
     expect(() => compiled.default({})).not.toThrow();
   });
 
-  it("publishes explicit-bucket taproom count commands with truthful correction limits", () => {
-    for (const name of ["get_taproom_count_snapshot", "get_taproom_draft_projection", "record_taproom_count", "get_taproom_count"]) {
+  it("publishes explicit-bucket taproom counts and the narrow Admin correction", () => {
+    for (const name of ["get_taproom_count_snapshot", "get_taproom_print_labels", "get_taproom_draft_projection", "record_taproom_count", "get_taproom_count", "list_taproom_counts"]) {
       expect(apiOperations().find(o => o.name === name)).toMatchObject({ status: "available", roles: "admin, warehouse, taproom" });
     }
     const definition = getCommandDefinition("record_taproom_count")!;
     const input = sampleInput(definition.input);
     expect(definition.input.safeParse(input).success).toBe(true);
     expect(definition.input.safeParse({ ...input, lines: [{ binId: "00000000-0000-0000-0000-000000000000", skuId: "00000000-0000-0000-0000-000000000000", qtyCounted: 1 }] }).success).toBe(false);
-    expect(PAGE()).toContain("Saved-count correction remains unavailable");
+    const correction = getCommandDefinition("correct_taproom_count")!;
+    expect(apiOperations().find(o => o.name === correction.name)).toMatchObject({ status: "available", roles: "admin" });
+    expect(correction.input.safeParse({ countId: "00000000-0000-4000-8000-000000000000", corrections: [{ lineId: "00000000-0000-4000-8000-000000000001", qtyCounted: 4 }], reason: "Misread tally" }).success).toBe(true);
+    expect(correction.input.safeParse({ countId: "00000000-0000-4000-8000-000000000000", corrections: [{ lineId: "00000000-0000-4000-8000-000000000001", qtyCounted: 4.5 }], reason: " " }).success).toBe(false);
+    expect(PAGE()).toContain("latest uncorrected mistaken-low Taproom count");
     expect(PAGE()).toContain("partial keg counts as one until gone");
+    expect(PAGE()).toContain("current positive Taproom stock");
+    expect(PAGE()).toContain("Full lot history remains outside this projection");
   });
 
   it("documents provisioning as authenticated pre-tenant and omits brewery from its example", () => {

@@ -3,7 +3,7 @@
 // .agents/superpowers/specs/2026-09-06-mgr-locations-bins-transfers-design.md, Decision 1.
 import { describe, it, expect, beforeAll } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { admin, makeBrewery, makeStaffCtx, seedCatalog } from "./helpers";
+import { admin, insertFixture, makeBrewery, makeStaffCtx, seedCatalog } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -88,10 +88,9 @@ describe("bins", () => {
     const { data: pool } = await admin.from("keg_pools").insert({ brewery_id: ctx.breweryId, name: "Bin pool", kind: "owned" }).select().single();
 
     // the wrong location for the bin is a FK violation on every ledger, not app code
-    const fg = await admin.from("inventory_movements").insert({
+    expect(() => insertFixture("inventory_movements", {
       brewery_id: ctx.breweryId, sku_id: skuId, location_id: a.id, bin_id: binB.id, qty: 1, bbl: 0, type: "opening_balance", created_by: ctx.userId,
-    });
-    expect(fg.error?.code).toBe("23503");
+    })).toThrow(/SQLSTATE 23503/);
     const mm = await admin.from("material_movements").insert({
       brewery_id: ctx.breweryId, material_id: mat!.id, location_id: a.id, bin_id: binB.id, qty: 5, type: "opening_balance", created_by: ctx.userId,
     });

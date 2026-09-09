@@ -129,10 +129,10 @@ describe("vessels, scheduling and brew day", () => {
 
     const listed = (await runCommand("list_batches", {}, ctx)) as {
       id: string; brand_name: string | null; recipe_name: string | null;
-      planned_on: string; brewed_on: string | null; vessel_name: string | null;
+      planned_on: string; brewed_on: string | null; closed_at: string | null; vessel_name: string | null;
     }[];
     expect(listed.find((r) => r.id === batch.id))
-      .toMatchObject({ brand_name: null, recipe_name: null, planned_on: "2026-10-01", brewed_on: null, vessel_name: null });
+      .toMatchObject({ brand_name: null, recipe_name: null, planned_on: "2026-10-01", brewed_on: null, closed_at: null, vessel_name: null });
 
     await runCommand("record_brew_day", { batchId: batch.id, vesselId: fv, initialBbl: 29.5, brewedOn: "2026-10-01" }, ctx);
 

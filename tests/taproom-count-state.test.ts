@@ -1,14 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
+  beginCorrectionAttempt,
   beginCountAttempt,
   countBrandComparison,
   countDraftFromSnapshot,
   countFailureKind,
+  completeCorrectionAttempt,
+  correctionStateFromReceipt,
+  failCorrectionAttempt,
   failCountAttempt,
   projectionMatchesCountDraft,
   projectionExpectedText,
   replaceCountProjection,
   replaceCountSnapshot,
+  updateCorrectionQuantity,
+  updateCorrectionReason,
   updateCountQuantity,
 } from "@/lib/mgr/taproom-count-state";
 
@@ -30,6 +36,53 @@ const snapshot = {
 };
 
 describe("taproom count controlled state", () => {
+  it("freezes a correction request and sends only increased lines on an exact retry", () => {
+    const lineIds = [
+      "00000000-0000-4000-8000-000000000011",
+      "00000000-0000-4000-8000-000000000012",
+    ];
+    let state = correctionStateFromReceipt("00000000-0000-4000-8000-000000000010", [
+      { id: lineIds[0], sku_name: "Hazy half", bin_name: "Cold", lot_id: ids.lot, qty_before: 7, qty_counted: 2 },
+      { id: lineIds[1], sku_name: "Pils case", bin_name: "Shelf", lot_id: null, qty_before: 6, qty_counted: 5 },
+    ]);
+    state = updateCorrectionQuantity(state, lineIds[0], "4");
+    state = updateCorrectionReason(state, " Misread the tally ");
+    state = beginCorrectionAttempt(state, "00000000-0000-4000-8000-000000000013");
+    const frozen = state.attempt;
+
+    expect(frozen).toMatchObject({
+      kind: "submitting",
+      requestId: "00000000-0000-4000-8000-000000000013",
+      payload: {
+        countId: "00000000-0000-4000-8000-000000000010",
+        corrections: [{ lineId: lineIds[0], qtyCounted: 4 }],
+        reason: "Misread the tally",
+      },
+    });
+    state = failCorrectionAttempt(state, "unknown", "No response received");
+    state = updateCorrectionQuantity(state, lineIds[0], "6");
+    state = updateCorrectionReason(state, "Different reason");
+    state = beginCorrectionAttempt(state, "00000000-0000-4000-8000-000000000014");
+    expect(state.attempt).toEqual(frozen);
+    const saved = completeCorrectionAttempt(state);
+    expect(saved.attempt).toEqual({ kind: "saved" });
+    expect(updateCorrectionQuantity(saved, lineIds[0], "6")).toBe(saved);
+    expect(updateCorrectionReason(saved, "Different reason")).toBe(saved);
+    expect(beginCorrectionAttempt(saved, "00000000-0000-4000-8000-000000000014")).toBe(saved);
+  });
+
+  it("requires a reason and at least one whole increase within the recorded quantity", () => {
+    const line = { id: "00000000-0000-4000-8000-000000000011", sku_name: "Hazy half", bin_name: "Cold", lot_id: null, qty_before: 7, qty_counted: 2 };
+    let state = correctionStateFromReceipt("00000000-0000-4000-8000-000000000010", [line]);
+    expect(() => beginCorrectionAttempt(state, crypto.randomUUID())).toThrow(/reason/);
+    state = updateCorrectionReason(state, "Tally error");
+    expect(() => beginCorrectionAttempt(state, crypto.randomUUID())).toThrow(/increase/);
+    for (const [quantity, message] of [["1", /cannot reduce/], ["7.5", /whole/], ["8", /recorded stock/]] as const) {
+      const changed = updateCorrectionQuantity(state, line.id, quantity);
+      expect(() => beginCorrectionAttempt(changed, crypto.randomUUID())).toThrow(message);
+    }
+  });
+
   it("keeps exact bucket identity and the original revision through edits and a separate projection refresh", () => {
     let state = countDraftFromSnapshot(snapshot, { expected_bbl: null, reason: "no_pos_coverage" });
     const keys = state.draft.lines.map((line) => line.key);

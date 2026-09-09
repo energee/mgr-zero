@@ -12,6 +12,8 @@ never copy it into a second place.
 | `lib/commands/registry.ts` | `defineCommand` / `defineQuery`, `Ctx`, role checks, `CommandError`. Every domain operation the app performs is registered here. |
 | `lib/commands/<area>.ts` | Business logic per area (catalog, inventory, orders, customers, portal; `import.ts` owns independent, atomic CSV rows with durable batch and row outcomes). Handlers read through the RLS-bound `ctx.db`; public-schema writes call the narrow RPC boundary and forward `CommandExecution.requestId`. `orders.ts` owns order lifecycle (create/submit/confirm/adjust/cancel), allocations, pick/ship, per-shipment invoices, credit memos, and replenishment. `customers.ts` owns customer/ship-to/price-list CRUD and the portal fulfillment source. `catalog.ts` owns products, SKUs, locations and their bins (`list_bins`, `create_bin`, `update_bin`, `delete_bin`); `inventory.ts` owns the movement ledger at bin grain (`record_movement` needs a `binId`; `get_bin_on_hand`). `portal.ts` owns the customer-role commands (`portal_create_order`, `portal_update_draft_order`, `portal_submit_order`, `portal_catalog`, `portal_orders`, `portal_order`, `portal_invoices`) — the only commands a `customer` role may call. |
 | `lib/commands/taproom.ts` | Keg pools/events, durable explicit-bucket taproom counts, and tap interval reads plus atomic tap/kick/swap RPCs. Intervals freeze nominal size, never write inventory, and keep guest identity separate from own SKUs absent stock. Completed-period brand variance reads count-owned frozen depletion against immutable `pos_sale_expectations`; the draft projection reads expected consumption from the latest durable count through its server as-of without posting inventory or allocating lots. Both reuse `private.taproom_pos_allocations`; `pos_sales_coverage` records explicit source/location observation windows. `private.reconcile_pos_sale` owns first serving interpretation of raw order/line facts, with no application or service execute grant until the provider owner lands. |
+| `lib/commands/production.ts` | Recipe, batch, vessel, cellar and fermentation operations. Batch completion previews and commits one database-owned formula over all batch occupancies, frozen closed-run output movements, transfers and typed adjustments; completion accepts no caller amount or classification. |
+| `lib/commands/compliance.ts` | Compliance registry, lot trace, generated and immutable filed reports, and completion-loss review. Loss reattribution allocates one exact part of a completion root through a frozen append-only signed pair; report removal totals include it once, while the cellar breakdown is explanatory. Direct cellar Taproom volume retains an explicit external-mapping filing gate. |
 | `lib/commands/all.ts` | The one side-effecting import that registers every command module. |
 | `app/api/command/route.ts` | The single HTTP entry point. Dispatches to the registry; contains no business logic. Cookie session or `Authorization: Bearer <supabase access_token>`. |
 | `lib/commands/client.ts`, `use-command-form.ts` | How the UI calls commands. |
@@ -203,7 +205,13 @@ a gap to close, not a convention to trust.
   Taproom counts now persist headers and explicit bin/SKU/lot UUID-or-null lines,
   including zero-variance counts. Their one-RPC command rejects stale revisions,
   incomplete buckets and overcounts; shortages post exact-bucket depletion with
-  frozen BBL. The count UI and count correction remain pending.
+  frozen BBL. The count UI also exposes the latest uncorrected mistaken-low root
+  to Admin: one replacement count and linked signed movements preserve the root,
+  reporting classification, observation time, and effective next-count baseline.
+  Batch completion links any exact automatic generic-loss root from
+  `batches.completion_adjustment_id`, excludes that nonphysical row from vessel
+  volume, and validates the reciprocal same-tenant graph at commit. See the
+  accepted Program 12 completion and correction spec.
 - **Auth invitations use a durable external-write workflow.** One canonical
   command request claims a private invitation. Auth's first `invited_at` write
   binds its user id in that same transaction using an invitation token and

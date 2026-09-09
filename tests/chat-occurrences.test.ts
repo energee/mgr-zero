@@ -2,7 +2,7 @@
 // submitted-order transition, catch-up scan idempotence, semantic keys,
 // recipient fan-out (roles, mutes, links), and resolved suppression (live DB).
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, channelId, makeBrewery, makeStaffCtx, priceSku } from "./helpers";
+import { admin, channelId, insertFixture, makeBrewery, makeStaffCtx, priceSku } from "./helpers";
 import { toNotification } from "@/lib/chat/jobs";
 import { renderSlackMessage } from "@/lib/chat/slack-renderer";
 import { runCommand } from "@/lib/commands/registry";
@@ -14,6 +14,7 @@ let inst: { id: string };
 let customerId: string, shipToId: string, whId: string, whBinId: string, skuId: string;
 
 async function ins<T = { id: string }>(table: string, row: Record<string, unknown>): Promise<T> {
+  if (table === "inventory_movements") return insertFixture<T>(table, row)[0];
   const { data, error } = await admin.from(table).insert(row).select().single();
   if (error) throw new Error(`${table}: ${error.message}`);
   return data as T;

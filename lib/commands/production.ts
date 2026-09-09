@@ -189,7 +189,8 @@ defineCommand({
 // embeds through the composite foreign keys read far less clearly than this.
 type BatchRow = {
   id: string; batch_no: number | null; intended_brand_id: string | null; recipe_version_id: string | null;
-  planned_on: string; planned_bbl: number; brewed_on: string | null; note: string | null;
+  planned_on: string; planned_bbl: number; brewed_on: string | null; closed_at: string | null;
+  completion_adjustment_id: string | null; note: string | null;
 };
 
 // A batch names a recipe *version*; the human-readable name lives one hop
@@ -220,11 +221,11 @@ async function openVessels(ctx: Ctx, batchIds: string[]) {
 }
 
 defineQuery({
-  name: "list_batches", description: "Batches by planned date, newest first, with the brand and recipe they intend and the vessel each one currently sits in",
+  name: "list_batches", description: "Batches by planned date, newest first, with completion status and the brand, recipe, and current vessel when one is open",
   input: z.object({}), roles: ["admin", "brewer"],
   handler: async (ctx) => {
     const batches = (await unwrap(ctx.db.from("batches")
-      .select("id, batch_no, intended_brand_id, recipe_version_id, planned_on, planned_bbl, brewed_on, note")
+      .select("id, batch_no, intended_brand_id, recipe_version_id, planned_on, planned_bbl, brewed_on, closed_at, completion_adjustment_id, note")
       .eq("brewery_id", ctx.breweryId).order("planned_on", { ascending: false })) ?? []) as BatchRow[];
     if (batches.length === 0) return [];
 
@@ -253,6 +254,26 @@ defineQuery({
     if (!batch) throw new CommandError("batch not found", 404, "not_found");
     return { batch, occupancy: (await openVessels(ctx, [i.batchId])).get(i.batchId) ?? null };
   },
+});
+
+defineQuery({
+  name: "get_batch_completion_preview",
+  description: "Preview the server-derived batch baseline, frozen packaged volume, prior attributed removals, residual and completion threshold",
+  input: z.object({ batchId: z.string().uuid() }),
+  roles: ["admin", "brewer"],
+  handler: (ctx, i) => unwrap(ctx.db.rpc("get_batch_completion_preview", {
+    p_brewery: ctx.breweryId, p_batch: i.batchId,
+  })),
+});
+
+defineCommand({
+  name: "complete_batch",
+  description: "Close a brewed batch and all of its open occupancies, adding one exact nonphysical reconciliation loss when the server-derived residual meets the threshold",
+  input: z.object({ batchId: z.string().uuid() }),
+  roles: ["admin", "brewer"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("complete_batch", {
+    p_brewery: ctx.breweryId, p_batch: i.batchId, p_request_id: execution.requestId,
+  })),
 });
 
 // ------------------------------------------------------------ cellar

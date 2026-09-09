@@ -3,7 +3,7 @@
 // ones belong to a brand, carry ounces, and hold none.
 import pg from "pg";
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaffCtx, seedLocation, seedMaterial, DB } from "./helpers";
+import { admin, insertFixture, makeBrewery, makeStaffCtx, seedLocation, seedMaterial, DB } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -43,8 +43,8 @@ describe("format_components", () => {
     expect(derived.composed).toBe(true);
     const sku = await runCommand("create_sku", { brandId: brand!.id, formatId: caseFmt.id }, ctx) as { id: string };
     const { id: locId, binId } = await seedLocation(ctx.breweryId, { name: "Comp WH" });
-    const { data: mv } = await admin.from("inventory_movements").insert({ brewery_id: ctx.breweryId, sku_id: sku.id, location_id: locId, bin_id: binId, qty: 10, type: "opening_balance", created_by: ctx.userId }).select("bbl").single();
-    expect(Number(mv!.bbl)).toBeCloseTo(0.12, 6);
+    const [mv] = insertFixture<{ bbl: number }>("inventory_movements", { brewery_id: ctx.breweryId, sku_id: sku.id, location_id: locId, bin_id: binId, qty: 10, type: "opening_balance", created_by: ctx.userId });
+    expect(Number(mv.bbl)).toBeCloseTo(0.12, 6);
     await expect(runCommand("replace_format_components", { formatId: four.id, components: [{ childFormatId: caseFmt.id, qty: 1 }] }, ctx)).rejects.toThrow(/cycle|one level|derives/i);
     await expect(runCommand("replace_format_components", { formatId: caseFmt.id, components: [{ childFormatId: caseFmt.id, qty: 1 }] }, ctx)).rejects.toThrow(/cycle|one level/i);
   });

@@ -66,22 +66,76 @@ defineQuery({
 
 export type ReportLine = { class: "keg" | "can" | "bottle"; begin: number; in: number; out: number; end: number };
 export type Report = {
-  figures: { jurisdiction: string; periodStart: string; periodEnd: string; lines: ReportLine[]; removals: Record<string, number>; byState: Record<string, number>; packaged: number; inProcess: number; balances: boolean };
+  figures: { jurisdiction: string; periodStart: string; periodEnd: string; lines: ReportLine[]; removals: Record<string, number>; cellarRemovals: Record<string, number>; byState: Record<string, number>; packaged: number; inProcess: number; balances: boolean };
   warnings: string[];
+  externalMappingRequired: string[];
 };
 
 const period = z.object({ jurisdiction: z.string().regex(/^[A-Z-]+$/, "TTB or US-XX"), periodStart: isoDate, periodEnd: isoDate });
 
+const positiveBblText = z.string()
+  .regex(/^(?:\d+(?:\.\d{0,8})?|\.\d{1,8})$/, "positive decimal BBL with at most eight fractional digits")
+  .refine((value) => /[1-9]/.test(value), "BBL must be positive");
+const positiveBblNumber = z.number().finite().positive()
+  .refine((value) => {
+    const [coefficient, exponentText] = String(value).toLowerCase().split("e");
+    const fractionDigits = coefficient.split(".")[1]?.length ?? 0;
+    return Math.max(0, fractionDigits - Number(exponentText ?? 0)) <= 8;
+  }, "BBL must have at most eight fractional digits");
+const exactPositiveBbl = z.union([positiveBblText, positiveBblNumber]);
+
 defineQuery({
-  name: "generate_compliance_report", description: "Compute a period report from the movement ledger: per package class begin + in − out = end in bbl, removals by frozen tax treatment and destination state, packaged volume, and beer in process; nothing is stored",
+  name: "generate_compliance_report", description: "Compute a period report from finished-goods and cellar ledgers: package-class balances, one additive removal total, an explanatory cellar breakdown, packaged volume, and beer in process; nothing is stored",
   roles: [...ROLES], input: period,
   handler: (ctx, i) => unwrap(ctx.db.rpc("generate_compliance_report", { p_brewery: ctx.breweryId, p_jurisdiction: i.jurisdiction, p_start: i.periodStart, p_end: i.periodEnd })) as Promise<Report>,
+});
+
+export type LossAllocation = {
+  id: string; bbl: string; classification: "sample" | "taproom" | "destruction";
+  destination_state: string | null; tax_treatment: string | null; created_at: string; created_by: string;
+};
+export type LossReview = {
+  adjustment_id: string; batch_id: string; batch_no: number; closed_at: string;
+  original_bbl: string; remaining_bbl: string; allocations: LossAllocation[];
+};
+
+defineQuery({
+  name: "get_loss_review",
+  description: "List completion reconciliation losses in a period with exact original, allocated, and remaining BBL",
+  roles: [...ROLES],
+  input: z.object({ periodStart: isoDate, periodEnd: isoDate }),
+  handler: (ctx, i) => unwrap(ctx.db.rpc("get_loss_review", {
+    p_brewery: ctx.breweryId, p_start: i.periodStart, p_end: i.periodEnd,
+  })) as Promise<LossReview[]>,
+});
+
+defineCommand({
+  name: "reattribute_loss",
+  description: "Allocate part of a completion reconciliation loss to samples, direct cellar Taproom removals, or destruction while preserving the original and exact total; Sample requires a destination state",
+  roles: [...ROLES],
+  input: z.object({
+    adjustmentId: z.string().uuid(),
+    bbl: exactPositiveBbl,
+    classification: z.enum(["sample", "taproom", "destruction"]),
+    destinationState: stateCode.optional(),
+  })
+    .refine((input) => input.classification !== "sample" || Boolean(input.destinationState), {
+      path: ["destinationState"], message: "Sample requires a destination state",
+    })
+    .refine((input) => input.classification === "sample" || !input.destinationState, {
+      path: ["destinationState"], message: "Destination state is only valid for Sample",
+    }),
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("reattribute_loss", {
+    p_brewery: ctx.breweryId, p_adjustment: i.adjustmentId, p_bbl: typeof i.bbl === "number" ? String(i.bbl) : i.bbl,
+    p_classification: i.classification, p_destination_state: i.destinationState ?? null,
+    p_request_id: execution.requestId,
+  })),
 });
 
 export type Filing = { id: string; jurisdiction: string; period_start: string; period_end: string; figures: Report["figures"]; filed_at: string | null; filed_by: string | null; note: string | null; created_at: string };
 
 defineCommand({
-  name: "file_compliance_report", description: "Generate the period report and save it as the immutable filed snapshot; refused when the report does not balance or the period is already filed. MGR does not transmit the filing",
+  name: "file_compliance_report", description: "Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, or direct cellar Taproom volume without an approved external mapping. MGR does not transmit the filing",
   roles: [...ROLES], input: period.extend({ note: z.string().optional() }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("file_compliance_report", {
     p_brewery: ctx.breweryId, p_jurisdiction: i.jurisdiction, p_start: i.periodStart, p_end: i.periodEnd, p_note: i.note ?? null, p_request_id: execution.requestId,

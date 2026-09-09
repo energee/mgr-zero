@@ -3,7 +3,7 @@
 // replaces a route's stops in one RPC; depart/confirm/return walk the route
 // and Today's delivery_next follows the assigned driver.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, seedLocation, priceSku } from "./helpers";
+import { admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, seedLocation, priceSku } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -22,7 +22,7 @@ beforeAll(async () => {
   const cust = await seedCustomer(b.id);
   ({ customerId, shipToId } = cust);
   await priceSku(b.id, { saleChannelId: cust.saleChannelId, brandId: cat.brandId, formatId: cat.formatId, cents: 12000 });
-  await admin.from("inventory_movements").insert({ brewery_id: b.id, sku_id: skuId, location_id: whId, bin_id: whBinId, qty: 100, type: "opening_balance", created_by: adminCtx.userId });
+  await ins("inventory_movements", { brewery_id: b.id, sku_id: skuId, location_id: whId, bin_id: whBinId, qty: 100, type: "opening_balance", created_by: adminCtx.userId });
 });
 
 /** A shipped wholesale order; returns its shipment id. */

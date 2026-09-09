@@ -51,7 +51,7 @@ type F = Awaited<ReturnType<typeof fixture>>;
 const stamp = (f: F, days: number) => new Date(f.at(days)).toISOString();
 async function count(f: F, days: number, prior: string | null = null, actual = 2, cat = f.cat) {
   const at = stamp(f, days);
-  const c = await ins("taproom_counts", { brewery_id: f.brewery.id, location_id: f.location.id, counted_on: at.slice(0, 10), created_at: at, counted_by: f.ctx.userId, prior_count_id: prior });
+  const c = await ins("taproom_counts", { brewery_id: f.brewery.id, location_id: f.location.id, counted_on: at.slice(0, 10), observed_at: at, created_at: at, counted_by: f.ctx.userId, prior_count_id: prior });
   const m = actual ? await ins("inventory_movements", { brewery_id: f.brewery.id, location_id: f.location.id, bin_id: f.location.binId, sku_id: cat.skuId,
     qty: -actual / .5, type: "depletion", tax_treatment: "taxable", sale_channel_id: await channelId(f.brewery.id, "Taproom"), created_by: f.ctx.userId, ref: c.id }) : null;
   await ins("taproom_count_lines", { brewery_id: f.brewery.id, count_id: c.id, location_id: f.location.id, bin_id: f.location.binId, sku_id: cat.skuId, qty_before: actual / .5, qty_counted: 0, movement_id: m?.id ?? null });
@@ -231,8 +231,8 @@ it("brewery-local ending dates include the first day exactly, and UTC sale bound
   const priorAt = new Date(`${start}T00:00:00+14:00`);
   priorAt.setUTCDate(priorAt.getUTCDate()-7);
   const endAt = new Date(`${start}T00:00:00+14:00`);
-  const first = await ins("taproom_counts", { brewery_id: f.brewery.id, location_id: f.location.id, counted_on: new Date(priorAt.getTime()+14*3600000).toISOString().slice(0,10), created_at: priorAt.toISOString(), counted_by: f.ctx.userId });
-  const last = await ins("taproom_counts", { brewery_id: f.brewery.id, location_id: f.location.id, counted_on: start, created_at: endAt.toISOString(), counted_by: f.ctx.userId, prior_count_id: first.id });
+  const first = await ins("taproom_counts", { brewery_id: f.brewery.id, location_id: f.location.id, counted_on: new Date(priorAt.getTime()+14*3600000).toISOString().slice(0,10), observed_at: priorAt.toISOString(), created_at: priorAt.toISOString(), counted_by: f.ctx.userId });
+  const last = await ins("taproom_counts", { brewery_id: f.brewery.id, location_id: f.location.id, counted_on: start, observed_at: endAt.toISOString(), created_at: endAt.toISOString(), counted_by: f.ctx.userId, prior_count_id: first.id });
   const offset = (at: Date,hours: number) => new Date(at.getTime()-hours*3600000).toISOString().slice(0,19)+`-0${hours}:00`;
   reconcile(f,(await sale(f,-10,248,{sold_at:offset(priorAt,4)})).id);
   reconcile(f,(await sale(f,-10,248,{sold_at:offset(endAt,5)})).id);

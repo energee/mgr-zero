@@ -125,6 +125,8 @@ describe("Movement recorded view", () => {
     expect(model.title).toBe("Hazy IPA · ½ bbl");
     expect(model.tapeLabel).toBe("−1 keg · festival removal · PA");
     expect(model.tapeDetail).toBe(`${formatVolume("0.50000000")} · just now`);
+    expect(model.correctionGate).toMatch(/latest eligible saved weekly count/i);
+    expect(model.correctionGate).not.toMatch(/unavailable/i);
   });
 
   it("renders the tape and Record inventory correction", () => {

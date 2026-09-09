@@ -1,7 +1,7 @@
 // tests/rls-command-boundary.test.ts — live PostgREST proof that staff writes use only role-scoped RPCs.
 // Every mutation RPC takes a p_request_id (request ledger); direct calls here mint a fresh one.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, makeBrewery, makeStaff, makeStaffCtx, seedCatalog, seedLocation, seedCustomer, seedPriceGroup, priceSku } from "./helpers";
+import { admin, ins, makeBrewery, makeStaff, makeStaffCtx, seedCatalog, seedLocation, seedCustomer, seedPriceGroup, priceSku } from "./helpers";
 import { runCommand, type Ctx, type StaffRole } from "../lib/commands/registry";
 import "../lib/commands/all";
 
@@ -549,6 +549,21 @@ describe("registered staff mutation role × RPC matrix", () => {
         return {
           command: { locationId: loc.id, countedOn: snapshot.counted_on, revision: snapshot.revision, lines: [] },
           rpc: { p_brewery: brewery.id, p_location: loc.id, p_counted_on: snapshot.counted_on, p_revision: snapshot.revision, p_lines: [] },
+        };
+      },
+    },
+    {
+      command: "correct_taproom_count", rpc: "correct_taproom_count", allowed: ["admin"],
+      input: async () => {
+        const loc = await seedLocation(brewery.id, { name: `Correct count ${crypto.randomUUID()}`, kind: "taproom" });
+        await ins("inventory_movements", { brewery_id: brewery.id, sku_id: skuId, location_id: loc.id,
+          bin_id: loc.binId, qty: 2, type: "opening_balance", created_by: adminCtx.userId });
+        const snapshot = await runCommand("get_taproom_count_snapshot", { locationId: loc.id }, adminCtx) as { revision: string; counted_on: string; lines: { bin_id: string; sku_id: string; lot_id: null; qty_before: number }[] };
+        const saved = await runCommand("record_taproom_count", { locationId: loc.id, countedOn: snapshot.counted_on, revision: snapshot.revision,
+          lines: snapshot.lines.map(line => ({ binId: line.bin_id, skuId: line.sku_id, lotId: line.lot_id, qtyCounted: 0 })) }, adminCtx) as { id: string; lines: { id: string }[] };
+        return {
+          command: { countId: saved.id, corrections: [{ lineId: saved.lines[0].id, qtyCounted: 1 }], reason: "Boundary correction" },
+          rpc: { p_brewery: brewery.id, p_count: saved.id, p_corrections: [{ line_id: saved.lines[0].id, qty_counted: 1 }], p_reason: "Boundary correction" },
         };
       },
     },

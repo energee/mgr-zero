@@ -7,13 +7,12 @@ import { requirePagePermission, runPageQuery as runCommand } from "@/lib/mgr/pag
 import type { TaproomCountSnapshot } from "@/lib/mgr/taproom-count-state";
 import { plural } from "@/lib/mgr/plural";
 import "@/lib/commands/all";
-import { TaproomCountForm, type DraftProjection } from "./count-form";
+import { TaproomCountCorrection, TaproomCountForm, TaproomPrintWorksheet, type DraftProjection, type PrintLabel } from "./count-form";
 
 type Location = { id: string; name: string; kind: string };
-type Stock = { bin_id: string; stock_id: string; lot_id: string | null; lot_code: string | null };
-type CountHeader = { id: string; location_id: string; counted_on: string; counted_by: string; created_at: string; prior_count_id: string | null; observations: number; movements: number; depleted_units: number };
+type CountHeader = { id: string; root_id: string; effective_id: string; location_id: string; counted_on: string; observed_at: string; counted_by: string; created_at: string; prior_count_id: string | null; corrected_at: string | null; corrected_by: string | null; correction_reason: string | null; observations: number; movements: number; depleted_units: number };
 type ReceiptLine = { id: string; bin_id: string; bin_name: string | null; sku_id: string; sku_name: string | null; lot_id: string | null; qty_before: number; qty_counted: number; movement_id: string | null; bbl: number | null };
-type Receipt = CountHeader & { lines: ReceiptLine[] };
+type Receipt = CountHeader & { correction_eligible: boolean; lines: ReceiptLine[] };
 const key = (binId: string, skuId: string, lotId: string | null) => `${binId}:${skuId}:${lotId ?? "untracked"}`;
 
 export default async function TaproomPage({ searchParams }: { searchParams: Promise<{ location?: string; count?: string }> }) {
@@ -25,31 +24,43 @@ export default async function TaproomPage({ searchParams }: { searchParams: Prom
   const location = locations.find((item) => item.id === selected.location) ?? locations[0];
   if (!location) return <>{E.back("Beer", "Weekly count", undefined, "/beer")}{E.blank("No taproom locations yet. Ask Admin to add one under Locations.")}</>;
 
-  const [snapshot, projection, history, stock] = await Promise.all([
-    runCommand("get_taproom_count_snapshot", { locationId: location.id }, ctx) as Promise<TaproomCountSnapshot>,
+  const snapshot = await runCommand("get_taproom_count_snapshot", { locationId: location.id }, ctx) as TaproomCountSnapshot;
+  const [printLabels, projection, history] = await Promise.all([
+    runCommand("get_taproom_print_labels", { locationId: location.id, revision: snapshot.revision }, ctx) as Promise<PrintLabel[]>,
     runCommand("get_taproom_draft_projection", { locationId: location.id }, ctx) as Promise<DraftProjection>,
     runCommand("list_taproom_counts", { locationId: location.id }, ctx) as Promise<CountHeader[]>,
-    brewery.role === "admin" || brewery.role === "warehouse" ? runCommand("get_bin_move_stock", { locationId: location.id }, ctx) as Promise<Stock[]> : Promise.resolve([]),
   ]);
   const receipt = selected.count ? await runCommand("get_taproom_count", { countId: selected.count }, ctx) as Receipt : null;
   const shownReceipt = receipt?.location_id === location.id ? receipt : null;
-  const lotLabels = Object.fromEntries(stock.filter((row) => row.lot_id && row.lot_code).map((row) => [key(row.bin_id, row.stock_id, row.lot_id), row.lot_code!]));
+  const lotLabels = Object.fromEntries(printLabels.filter((row) => row.lot_id && row.lot_code).map((row) => [key(row.bin_id, row.sku_id, row.lot_id), row.lot_code!]));
 
   return <>
-    {E.back("Beer", "Weekly count", undefined, "/beer")}
-    <div className="flex flex-wrap gap-3 text-sm"><Link className="underline" href={`/taproom/board?location=${location.id}`}>Tap board</Link><Link className="underline" href={`/taproom/variance?location=${location.id}`}>Variance by brand</Link></div>
-    <LinkTabs items={locations.map((item) => [item.name, `/taproom?location=${item.id}`])} current={location.name} className="w-full md:w-fit" />
-    <TaproomCountForm key={`${location.id}:${snapshot.revision}`} breweryId={brewery.id} snapshot={snapshot} projection={projection} lotLabels={lotLabels} role={brewery.role as "admin" | "warehouse" | "taproom"} />
-    {shownReceipt && <section aria-labelledby="receipt-heading" className="rounded-xl border p-4">
-      <h2 id="receipt-heading" className="text-lg font-semibold">Saved count · {shownReceipt.counted_on}</h2>
+    <div className="contents print:hidden">
+      {E.back("Beer", "Weekly count", undefined, "/beer")}
+      <div className="flex flex-wrap gap-3 text-sm"><Link className="underline" href={`/taproom/board?location=${location.id}`}>Tap board</Link><Link className="underline" href={`/taproom/variance?location=${location.id}`}>Variance by brand</Link></div>
+      <LinkTabs items={locations.map((item) => [item.name, `/taproom?location=${item.id}`])} current={location.name} className="w-full md:w-fit" />
+    </div>
+    <TaproomPrintWorksheet key={`${location.id}:${snapshot.revision}`} breweryId={brewery.id} locationId={location.id} locationName={location.name} revision={snapshot.revision} initialLabels={printLabels} />
+    <div className="contents print:hidden">
+      <TaproomCountForm key={`${location.id}:${snapshot.revision}`} breweryId={brewery.id} snapshot={snapshot} projection={projection} lotLabels={lotLabels} role={brewery.role as "admin" | "warehouse" | "taproom"} />
+      {shownReceipt && <section aria-labelledby="receipt-heading" className="rounded-xl border p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3"><h2 id="receipt-heading" className="text-lg font-semibold">Saved count · {shownReceipt.counted_on}</h2>
+      {brewery.role === "admin" && shownReceipt.correction_eligible && <TaproomCountCorrection breweryId={brewery.id} locationId={location.id} countId={shownReceipt.root_id} lines={shownReceipt.lines} />}</div>
       <p className="text-sm text-muted-foreground">Recorded by {shownReceipt.counted_by === ctx.userId ? "you" : "staff"} at <time dateTime={shownReceipt.created_at}>{new Date(shownReceipt.created_at).toLocaleString()}</time>{shownReceipt.prior_count_id ? <> · <Link className="underline" href={`/taproom?location=${location.id}&count=${shownReceipt.prior_count_id}`}>prior count</Link></> : " · first count"}</p>
-      {shownReceipt.lines.map((line, index) => <div key={line.id}>{E.row(line.sku_name ?? "Saved SKU", `${line.bin_name ?? "Saved bin"} · ${line.lot_id ? brewery.role === "taproom" ? `tracked worksheet row ${shownReceipt.lines.slice(0, index + 1).filter((item) => item.lot_id).length}` : `tracked lot${lotLabels[key(line.bin_id, line.sku_id, line.lot_id)] ? ` ${lotLabels[key(line.bin_id, line.sku_id, line.lot_id)]}` : ""}` : "untracked stock"} · ${Number(line.qty_before)} recorded → ${Number(line.qty_counted)} counted · ${line.bbl == null ? "0 bbl depleted" : `${Math.abs(Number(line.bbl))} bbl depleted`}`, <span className="break-all text-xs">{line.movement_id ? `movement ${line.movement_id}` : "matched · no movement"}</span>)}</div>)}
-    </section>}
-    <section aria-labelledby="history-heading">
+      {shownReceipt.corrected_at && <p className="mt-2 rounded-lg border bg-muted/20 p-3 text-sm"><strong>Corrected</strong> by {shownReceipt.corrected_by === ctx.userId ? "you" : "Admin"} at <time dateTime={shownReceipt.corrected_at}>{new Date(shownReceipt.corrected_at).toLocaleString()}</time> · {shownReceipt.correction_reason}</p>}
+      {shownReceipt.lines.map((line, index) => {
+        const savedIdentity = line.lot_id
+          ? brewery.role === "taproom" ? `tracked · saved row ${index + 1}` : `tracked lot ${lotLabels[key(line.bin_id, line.sku_id, line.lot_id)] ?? line.lot_id} · saved row ${index + 1}`
+          : `untracked stock · saved row ${index + 1}`;
+        return <div key={line.id}>{E.row(line.sku_name ?? "Saved SKU", `${line.bin_name ?? "Saved bin"} · ${savedIdentity} · ${Number(line.qty_before)} recorded → ${Number(line.qty_counted)} counted · ${line.bbl == null ? "0 bbl depleted" : `${Math.abs(Number(line.bbl))} bbl depleted`}`, <span className="break-all text-xs">{line.movement_id ? `movement ${line.movement_id}` : "matched · no movement"}</span>)}</div>;
+      })}
+      </section>}
+      <section aria-labelledby="history-heading">
       <h2 id="history-heading" className="text-lg font-semibold">Recent saved counts</h2>
       <p className="text-sm text-muted-foreground">Newest 50 at this taproom.</p>
-      {history.length === 0 ? E.blank("No saved counts yet") : history.map((count) => <div key={count.id}>{E.row(`Weekly count · ${count.counted_on}`, `${new Date(count.created_at).toLocaleString()} · ${plural(count.observations, "observation")} · ${plural(count.movements, "movement")} · ${plural(count.depleted_units, "unit")} depleted`, E.act("Open count", "primary", `/taproom?location=${location.id}&count=${count.id}`))}</div>)}
-    </section>
-    <p className="text-sm text-muted-foreground">Saved counts cannot be corrected yet. Ask Admin to investigate; a generic inventory adjustment does not reverse count depletion or tax reporting.</p>
+      {history.length === 0 ? E.blank("No saved counts yet") : history.map((count) => <div key={count.id}>{E.row(`Weekly count · ${count.counted_on}`, `${new Date(count.created_at).toLocaleString()} · ${plural(count.observations, "observation")} · ${plural(count.movements, "movement")} · ${plural(count.depleted_units, "unit")} depleted${count.corrected_at ? ` · corrected ${new Date(count.corrected_at).toLocaleString()} by Admin` : ""}`, E.act("Open count", "primary", `/taproom?location=${location.id}&count=${count.id}`))}</div>)}
+      </section>
+      <p className="text-sm text-muted-foreground">Admin can correct only the latest saved count when a quantity was counted too low. The original receipt remains in the audit trail.</p>
+    </div>
   </>;
 }

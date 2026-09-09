@@ -70,7 +70,9 @@ Without usable POS observations, comparison rows are empty and expected stays bl
 
 Admin, Warehouse, and Taproom open **Taproom** under Beer to prepare, record, and read physical counts. Choose a taproom location, then enter remaining whole packaged units for every displayed bin, SKU, and lot identity, including zero quantities. A partially full keg counts as one until it is gone; estimated fill levels never change the inventory ledger.
 
-The page uses today's date in the brewery's timezone and holds the revision and prior-count identity from the prepared count. The expected card links that captured prior count by date and ID, or says **first count**. Every displayed bucket needs its own observation. A tracked lot and **untracked** stock are separate buckets; there is no automatic lot allocation. Admin and Warehouse see existing stock labels when one is available. Taproom sees neutral worksheet row numbers instead of raw lot identifiers; ask Warehouse for the matching labeled worksheet before submitting rather than guessing.
+The page uses today's date in the brewery's timezone and holds the revision and prior-count identity from the prepared count. The expected card links that captured prior count by date and ID, or says **first count**. Every displayed bucket needs its own observation. A tracked lot and **untracked** stock are separate buckets; there is no automatic lot allocation. Admin and Warehouse see existing stock labels when one is available. Taproom sees the full worksheet row number on every bucket instead of raw lot identifiers on screen.
+
+**Print current stock labels** uses the same captured count revision for Admin, Warehouse, and Taproom. The printed worksheet includes only current positive Taproom stock, keeps each row's position from the full count worksheet, and names a tracked lot by its current code or says **Untracked**. MGR rechecks the revision immediately before opening the browser's native print flow. If stock or the prior count changed, printing is refused and the page tells you to reload and review; entries and an uncertain count retry remain in place. An empty positive-stock projection says there is nothing current to print. Full lot history remains outside this projection as Admin and Sales compliance data.
 
 A matching count still saves its server date and time, author, and all observations. Its receipt says **matched · no movement** per unchanged bucket. Shortages post only the missing units to the exact bucket, using the Taproom sale channel; the receipt shows the movement reference and frozen depleted BBL. POS setup and sales do not affect this posting. The page lists the newest 50 saved count headers for the selected taproom and can reopen each complete durable receipt, including counts larger than catalog list limits. Stock changes or a draft held past the brewery's local midnight require **Start fresh recount**, which clears entries and loads a new revision and server-owned date. Counts above recorded stock, incomplete counts, and a second count on the same date are refused.
 
@@ -78,7 +80,9 @@ The page also shows expected consumption while the next count is still a draft. 
 
 If the page cannot tell whether a submission reached the server, including a timeout or `5xx` response, it freezes every quantity and the request ID. Select **Retry unchanged count** to recover the original result without posting twice. A later refusal cannot unlock an already uncertain request. A definitive first validation error leaves the fields editable for a corrected new attempt.
 
-Saved counts cannot yet be corrected. If a submitted count is wrong, ask Admin to investigate; a generic inventory adjustment does not reverse that count's recorded depletion or its tax reporting.
+Admin can select **Correct count** on the latest saved count when one or more quantities were counted too low. Enter the corrected whole units, no more than the stock recorded before the count, and a reason. The form sends only increased lines but preserves every original bucket in the effective receipt. It cannot reduce a count, exceed the recorded-before quantity, correct a historical count, or correct an earlier correction. Warehouse and Taproom can read the corrected receipt and its author, time, and reason, but only Admin sees the action.
+
+The original header, observations, and ledger rows remain unchanged. MGR appends an exact compensation for each changed depletion and, when the corrected amount still falls below recorded stock, a smaller replacement depletion using the original package volume, channel, tax treatment, state, bin, SKU, and lot. The corrected count keeps the original observation time, appears as one logical occurrence in history, becomes the next count's baseline, and updates variance without counting unchanged lines twice. Its signed ledger entries belong to the time when Admin made the correction; an earlier filed compliance snapshot stays byte-for-byte unchanged. If the response is uncertain, **Retry unchanged correction** reuses the frozen reason, quantities, payload, and request ID.
 
 ## Tap intervals [#tap-intervals]
 
@@ -179,7 +183,7 @@ Wholesale Shop shows the packages the brewery has designated for wholesale — �
 
 **Reverse movement** is available to Admin and Warehouse only for a standalone `adjustment` or `loss` that has not already been reversed. Select the exact history entry, enter a **Correction note**, then **Confirm reversal**. MGR appends the exact opposite quantity and frozen barrel volume in the original bin and lot, preserving package and reporting classification. The original remains; **Reversal recorded** and **Original movement** link the two entries. Removing a prior positive adjustment is refused if that exact bin/lot no longer holds enough stock. Retry an unchanged failed form to recover the same result.
 
-Sales sees history without correction controls. Shipments retain **Return shipment** through their order workflow. Count/depletion corrections remain unavailable; other compound entries keep their original correction owner. A generic adjustment is not a count correction.
+Sales sees history without correction controls. Shipments retain **Return shipment** through their order workflow. Taproom count depletion uses **Correct count** on the eligible latest saved count; other compound entries keep their original correction owner. A generic adjustment is not a count correction.
 
 ### Record a movement
 
@@ -394,9 +398,11 @@ A departed route lists its stops with their delivered times. The lowest undelive
 
 <Screen name="Monthly compliance" />
 
-A month is generated from the inventory ledger when you open it, so nothing is stored until you file. The table shows each package class (kegs, cans, bottles) in barrels: begin + in − out = end, and every class must balance. Zeros print 0.00. Beer in process is what the tanks hold now, not at the period end. Below the table, **Packaged** is production into finished goods, then each removal class (taxpaid, export, samples, losses, and so on) by the tax treatment recorded when the beer moved, so editing a sale channel or format later does not change historical classification, and taxpaid removals by destination state. **Review auto-reconciled losses** is not available yet. Exact adjustment reversals net against the original inflow or outflow; loss reversals net against losses. A correction posts in its own period, so later corrections appear as signed amounts without rewriting an earlier filed snapshot.
+A month is generated from the inventory ledger when you open it, so nothing is stored until you file. The table shows each package class (kegs, cans, bottles) in barrels: begin + in − out = end, and every class must balance. Zeros print 0.00. Beer in process is what the tanks hold now, not at the period end. Below the table, **Packaged** is production into finished goods, then each removal class (taxpaid, export, samples, losses, and so on) by the tax treatment recorded when the beer moved, so editing a sale channel or format later does not change historical classification, and taxpaid removals by destination state.
 
-**Save filed snapshot** stores the figures as they stand, with an optional note, and marks the month filed; reopening it shows the snapshot rather than regenerating. MGR does not transmit anything: file with the TTB or the state yourself and record it here. The button stays off while a class does not balance; the month names the class, and today the only cause is a repack across package classes. A month can be filed once, and a period overlapping a filed one is refused. The report itself is a fixed shape, so a movement recorded later into a filed month appears in the next generation of a *different* month, never in the snapshot.
+**Review auto-reconciled losses** lists each loss posted in the month, with its batch close time, original generic loss, prior allocations, and exact remaining barrels. Admin and Sales can reattribute part of the remainder to **Sample**, **Taproom**, or **Destruction**. Samples require the two-letter destination state. Taproom freezes the current Taproom channel tax treatment even if its display name changes. Keep an uncertain form open: the amount, target, state, and request stay frozen until **Retry unchanged reattribution** recovers the saved result. The original remains in history and total volume does not change. The separate **Cellar removals breakdown** is explanatory and is already included once in the removal totals; never add it again. Corrections post in the period when they are saved and never rewrite an earlier filed snapshot.
+
+**Save filed snapshot** stores the figures as they stand, with an optional note, and marks the month filed; reopening it shows the snapshot rather than regenerating. MGR does not transmit anything: file with the TTB or the state yourself and record it here. The button stays off while a class does not balance. Direct cellar Taproom volume also blocks filing because its external filing-line mapping has not been approved; MGR does not guess that mapping or offer an acknowledgment bypass. A month can be filed once, and a period overlapping a filed one is refused. The report itself is a fixed shape, so a movement recorded later into a filed month appears in the next generation of a *different* month, never in the snapshot.
 
 <Screen name="Compliance registry" />
 
@@ -497,6 +503,8 @@ Vessels themselves are managed at the bottom of the Batches page: **New vessel**
 *Admin and Brewer.*
 
 Open **Cellar** from the **Beer** navigation to see every occupied tank: its vessel, the brand it holds, the barrels in it, and how long it has been there. Select **Transfer** for a **From** occupancy, a **To** vessel, the **Barrels moving**, and an optional **Loss (bbl)**. Moving into an empty vessel opens a new occupancy there; moving into an already-occupied vessel blends into it, keeping that vessel's existing batch identity — a blend is never a new batch. A source occupancy closes automatically once it empties.
+
+Select **Complete batch**, choose the batch, and review its server-calculated **Baseline**, **Frozen packaged**, **Prior attributed**, **Threshold**, and **Predicted residual**. The final action accepts no amount or cause. MGR recalculates under the cellar lock, refuses while any packaging run for that batch is open or when packaged and attributed volume exceed the baseline, and then closes the batch and every open occupancy that still belongs to it at one time. A residual at or above the greater of 0.05 bbl or 0.5% of baseline becomes one automatic generic loss for later compliance review; a smaller residual closes without an adjustment. Packaged volume comes from the frozen finished-goods movements written when runs closed, so later format edits and the run's barrels-drawn figure do not rewrite it. If the response is uncertain, keep the form open and select **Retry unchanged completion**; a confirmed response is shown as saved before the page refreshes.
 
 Select **Reading** on a tank to open its reading log and record the next one: **Temperature** is required; **Gravity**, **pH**, and a note are each optional, because a quick temperature check is a legitimate reading on its own. Readings never overwrite one another — each is its own row, newest first. The gravity field is labelled and read in whatever unit you chose under [Gravity units](#gravity-units); MGR stores degrees Plato either way. If what you type there is not a gravity MGR can read, the field says so and **Save reading** stays disabled until you correct it or clear the field — a mistyped gravity is never quietly dropped from an otherwise saved reading.
 
@@ -633,6 +641,8 @@ A bookmarked staff page that your role cannot read opens **No access**, names th
 
 **Inventory is wrong.** Do a physical count and figure out what happened. Record an adjustment only for a verified count difference. Never disguise a sale, sample, loss, destruction, festival removal, return, or transfer as another type. Put a note on the correction.
 
+**A saved Taproom count was too low.** Ask Admin to open the latest saved count and use **Correct count**. Keep the signed compensation and replacement entries with that count; do not add a generic inventory adjustment.
+
 **A shipped order or invoice is wrong.** Do not add an unrelated inventory movement. Use **Return** on the invoice so the credit and the returned stock stay linked to the shipment history.
 
 ## Import CSV [#import]
@@ -666,7 +676,7 @@ Do not hunt for hidden controls for these:
 - cancelling a purchase order, editing one after it is saved, or sending one by email from MGR
 - deleting customers, ship-tos, inventory history, orders, invoices, or credit memos
 - recording payments
-- reviewing or reattributing auto-reconciled losses before a filing, a printed lot trace packet, and the customers who received a lot
+- a printed lot trace packet and the customers who received a lot
 - an order-confirmation warning from the compliance registry, or deleting an approval, registration, or license
 - filing a state or other non-TTB report, or a period other than a calendar month, from the interface (the API accepts any jurisdiction and range)
 

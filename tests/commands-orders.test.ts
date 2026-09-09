@@ -1,6 +1,6 @@
 // tests/commands-orders.test.ts — registry wiring for order commands: roles, validation, rpc passthrough.
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedCustomer, priceSku } from "./helpers";
+import { admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedCustomer, priceSku } from "./helpers";
 import { runCommand } from "../lib/commands/registry";
 import "../lib/commands/all";
 
@@ -64,7 +64,7 @@ describe("standing taproom allocations", () => {
   it("set creates an open allocation, shows in list, and reduces ATP; qty 0 releases it", async () => {
     const tap = await seedLocation(b.id, { name: "Tap", kind: "taproom" });
     const tapId = tap.id;
-    await admin.from("inventory_movements").insert({
+    await ins("inventory_movements", {
       brewery_id: b.id, sku_id: skuId, location_id: tapId, bin_id: tap.binId, qty: 20, type: "opening_balance", created_by: adminCtx.userId,
     });
     const atpBefore = await runCommand("get_atp", { skuId }, adminCtx) as { sku_id: string; qty: number }[];
