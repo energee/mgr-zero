@@ -4954,6 +4954,8 @@ begin
 
   -- The bin cannot go short. Same balance bin_on_hand reads, at the same grain;
   -- read straight from the ledger because that view is security_invoker.
+  -- ponytail: global ledger lock, matching all stock writers; shared stock-key locks at higher throughput.
+  lock table public.inventory_movements in share row exclusive mode;
   select coalesce(sum(m.qty), 0) into v_on_hand from public.inventory_movements m
    where m.brewery_id = p_brewery and m.sku_id = p_parent_sku
      and m.location_id = p_location and m.bin_id = p_bin;
