@@ -3,9 +3,9 @@
 import { z, ZodType } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type StaffRole = "admin" | "sales" | "warehouse" | "brewer";
+export type StaffRole = "admin" | "sales" | "warehouse" | "brewer" | "taproom";
 /** Every staff role: the `roles` of a read that all of staff may run. */
-export const STAFF_ROLES: StaffRole[] = ["admin", "sales", "warehouse", "brewer"];
+export const STAFF_ROLES: StaffRole[] = ["admin", "sales", "warehouse", "brewer", "taproom"];
 export type PreTenantCtx = { db: SupabaseClient; userId: string; breweryId: null; role: null };
 export type OperationCtx = Ctx | PreTenantCtx;
 export type Ctx = { db: SupabaseClient; userId: string; breweryId: string; role: StaffRole | "customer"; customerId?: string };
@@ -67,7 +67,7 @@ export const rows = <T,>(q: Parameters<typeof unwrap>[0]) => unwrap(q) as unknow
 
 /** Today (YYYY-MM-DD) in the brewery's own timezone, not the server's UTC day: what a date field defaults to. */
 export async function breweryToday(ctx: Ctx): Promise<string> {
-  const { timezone } = (await unwrap(ctx.db.from("breweries").select("timezone").eq("id", ctx.breweryId).single())) as { timezone: string };
+  const { timezone } = (await unwrap(ctx.db.from("staff_brewery").select("timezone").eq("id", ctx.breweryId).single())) as { timezone: string };
   return new Date().toLocaleDateString("en-CA", { timeZone: timezone });
 }
 

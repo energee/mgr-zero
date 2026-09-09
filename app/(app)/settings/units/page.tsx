@@ -21,8 +21,8 @@ export default async function UnitsPage() {
   const ctx = await buildContext(brewery.id);
   const units = (await runCommand("get_gravity_unit", {}, ctx)) as Effective;
   return (
-    <UnitsView
-      model={toUnitsViewProps({ ...units, backHref: "/settings" })}
+    <UnitsView backLabel={ctx.role === "taproom" ? "More" : "Settings"}
+      model={toUnitsViewProps({ ...units, backHref: ctx.role === "taproom" ? "/more" : "/settings" })}
       controls={<GravityUnitForm brewery={units.brewery} mine={units.mine} canSetBrewery={ctx.role === "admin"} />}
     />
   );

@@ -39,7 +39,7 @@ export const STAFF_NAV: readonly NavItem[] = [
     icon: BeerIcon,
     children: [
       { label: "Inventory", href: "/inventory", roles: ["sales", "warehouse"] },
-      { label: "Taproom", href: "/inventory#taproom", planned: true, roles: ["warehouse"] },
+      { label: "Taproom", href: "/beer", roles: ["taproom"] },
       { label: "Taps", href: "/inventory#taps", planned: true, roles: ["warehouse"] },
       { label: "Cellar", href: "/cellar", roles: ["brewer"] },
       { label: "Materials", href: "/materials", roles: ["brewer", "warehouse"] },

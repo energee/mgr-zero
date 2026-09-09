@@ -432,7 +432,7 @@ export const SCREENS: Screen[] = [
   {
     step: 1, slice: "all", tab: "More", name: "Settings", job: "Edit brewery/location basics and route to rare setup",
     to: { "Source water · Municipal · Denver": "Water profiles" },
-    reads: "get_brewery · list_locations · list_team_members", writes: "update_brewery · update_location",
+    reads: "get_brewery · list_locations · list_team_members", writes: "update_brewery · update_location · set_portal_fulfillment_source",
     states: permitted("admin only"),
     spec: "Invoices remains a first-class More and desk-rail destination. TTB registry number and PA license are brewery columns and feed the compliance report header. The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. Deployment mode is read-only. Team opens the Team frame.",
     body: (<>
@@ -445,6 +445,8 @@ export const SCREENS: Screen[] = [
       {E.edit("Reading overdue after (hours)", OVERDUE_HOURS, "number")}
       {E.fld("Deployment", "dedicated · read-only")}
       {E.btn("Save brewery")}
+      {E.pick("Portal fulfillment warehouse", "Warehouse", ["Warehouse"])}
+      {E.btn("Save warehouse", "g")}
       {E.nav("Source water · Municipal · Denver", "every recipe starts here unless it overrides")}
       {E.nav("Locations", "Warehouse · Taproom")}
       {E.nav("Team", "3 members · 1 pending invite")}
@@ -463,8 +465,8 @@ export const SCREENS: Screen[] = [
     job: "List brewery locations and create the next one",
     reads: "list_locations",
     writes: "create_location",
-    states: [["permission", "admin only", 1], ["active", "inventory and work may use it"], ["empty", "Add location is the only action"]],
-    spec: "Settings links here instead of editing whichever location happened to be selected.",
+    states: [["permission", "admin edits · sales, warehouse and brewer read", 1], ["active", "inventory and work may use it"], ["empty", "Add location is the only action"]],
+    spec: "Settings links here instead of editing whichever location happened to be selected. Admin edits; other staff review locations and return to Beer. All finished goods inventory is the global ledger, not a location filter.",
     body: <LocationsView model={toLocationsViewProps(locationsList)} />,
   },
   {
@@ -870,11 +872,11 @@ export const SCREENS: Screen[] = [
     surface: "sheet",
     name: "Record movement",
     to: { "Record movement": "Movement recorded" },
-    job: "Enter a positive amount; server derives direction and barrels",
+    job: "Enter a positive amount; the form derives direction and the server calculates barrels",
     reads: "list_skus · list_locations · list_bins · get_atp",
     writes: "record_movement [existing; one append-only inventory movement]",
-    states: [["offline", "Queue with requestId"], ["stale", "ATP changed · preview again", 1], ["permission", "warehouse or brewer required · sales reads Beer only", 1], ["echo", "Committed row · correction waits for schema gate"], ["unregistered destination", "Stout to OH warns and links to the registry · never blocks", 1]],
-    spec: "The server derives sign and 0.50000000 bbl; the client never supplies either. Drawn with festival removal selected: sample and festival removal leave the premises and require a destination state (the schema enforces it); destruction, loss and depletion never carry one. An unregistered brand and destination warn here with the same copy the order screens use, because a festival removal leaves the premises exactly as a shipment does and was the one path that crossed a state line without saying so. This frame carries Hazy IPA into PA, which is registered, so the warning is a state rather than drawn copy. Channel stays.",
+    states: [["offline", "Queue with requestId"], ["stale", "ATP changed · preview again", 1], ["permission", "admin or warehouse required · sales reads Beer only", 1], ["echo", "Committed row · correction waits for schema gate"], ["unregistered destination", "Stout to OH warns and links to the registry · never blocks", 1]],
+    spec: "The form derives the signed API quantity from the movement kind (adjustments ask Add or Remove); the server derives 0.50000000 bbl and never accepts client-supplied barrels. Drawn with festival removal selected: sample and festival removal leave the premises and require a destination state (the schema enforces it); destruction, loss and depletion never carry one. An unregistered brand and destination warn here with the same copy the order screens use, because a festival removal leaves the premises exactly as a shipment does and was the one path that crossed a state line without saying so. This frame carries Hazy IPA into PA, which is registered, so the warning is a state rather than drawn copy. Channel stays.",
     body: (<>
       <div className="md:hidden">{E.pick("Kind", "festival removal", MOVEMENT_KINDS)}</div>
       <div className="hidden md:block">{E.chips(MOVEMENT_KINDS, 4)}</div>
@@ -899,7 +901,7 @@ export const SCREENS: Screen[] = [
     reads: "list_movements",
     writes: "none",
     states: [["echo", "the tape is the record"], ["correction gated", "Record inventory correction waits on its schema"]],
-    spec: "Post-commit of Record movement. A tape means recorded. The named correction is Record inventory correction, not Undo.",
+    spec: "Post-commit of Record movement. A tape means recorded: show the committed movement reference, bin, frozen barrel volume, destination state/channel and timestamp from the RPC result. An uncertain response never shows this receipt. The ledger has Older/Newer paging. The named correction is Record inventory correction, not Undo.",
     body: (<>
       {E.back("Beer", "Hazy IPA · ½ bbl")}
       {E.tape([["−1 keg · festival removal · PA", "½ bbl · just now"]])}
@@ -1109,8 +1111,8 @@ export const SCREENS: Screen[] = [
     name: "Ship and invoice",
     to: { "Ship order": "Shipment done" },
     job: "Default wholesale ship: commit removal and the invoice together",
-    reads: "get_order",
-    writes: "ship_order [needs_restock when any qty_shipped < qty_picked; invoice timing = now persisted with the shipment]",
+    reads: "get_order, get_order_ship_sources",
+    writes: "ship_order [explicit bin/lot source quantities sum to every line; needs_restock when any qty_shipped < qty_picked; invoice timing = now persisted with the shipment]",
     states: [["stale", "picked qty changed · preview again", 1], ["short ship", "qty below picked needs a reason; remainder is released", 1], ["offline", "wait for live recheck", 1], ["permission", "warehouse or admin required", 1], ["accepted", "INV number on commit · restock row if qty short"]],
     spec: <>Ship qty prefills from picked and is editable per line; a shortage reason appears only when qty &lt; picked, and the same condition sets the restock flag, so the case released here becomes a Put back row rather than staying staged with nothing naming it. Carrier/tracking never block the commit. The preview names the destination state from the ship-to and says the invoice number is assigned on commit. On-delivery timing lives on Ship · confirmation; taproom transfers use Complete transfer.</>,
     body: <ShipView sources={<>{E.pick("Source bin and lot", "Cooler · L-240831-HZ", ["Cooler · L-240831-HZ", "Cooler · Untracked / legacy stock"])}{E.fld("Source quantities", "Every source sums to its shipped line")}</>} model={toShipViewProps(orderShipInvoice)} fulfillmentOptions={[LOC_WAREHOUSE.name, LOC_TAPROOM.name]} />,
@@ -1134,7 +1136,7 @@ export const SCREENS: Screen[] = [
     name: "Ship on delivery",
     to: { "Ship order": "Shipment done" },
     job: "The On delivery state of Ship and invoice",
-    reads: "get_order",
+    reads: "get_order, get_order_ship_sources",
     writes: "ship_order [invoice_timing = on_delivery persisted on the shipment; the same one RPC without the invoice; confirm_delivery invoices later]",
     states: [["stale", "picked qty changed · preview", 1], ["offline", "wait for live recheck", 1], ["permission", "warehouse or admin required", 1]],
     spec: "Folded into Ship and invoice as the On delivery chip. Same fields as Invoice now; the timing is saved on the shipment so Confirm delivery can invoice later. Two screens both titled Ship was confusing.",
@@ -1147,8 +1149,8 @@ export const SCREENS: Screen[] = [
     name: "Complete transfer",
     to: { "TRF-0088": "Order", "ORD-0088": "Order" },
     job: "Finish a taproom transfer order: same movements, no invoice",
-    reads: "get_order",
-    writes: "ship_order [taproom_transfer kind: paired taproom_transfer movements (−source, +destination); no invoice]",
+    reads: "get_order, get_order_ship_sources",
+    writes: "ship_order [explicit source and destination bins preserve lot; taproom_transfer kind: paired taproom_transfer movements (−source, +destination); no invoice]",
     states: [["stale", "picked qty changed · preview again", 1], ["short", "qty below picked releases the remainder"], ["permission", "warehouse or admin required", 1], ["accepted", "taproom on-hand rises immediately"]],
     spec: "No invoice-timing chip and no destination state: beer moves between the brewery’s own locations. Copper because the paired movements are append-only. Requested from Taproom · Needs replenishment.",
     body: <CompleteTransferView sources={<>{E.pick("Source bin and lot", "Cooler · L-240831-HZ", ["Cooler · L-240831-HZ", "Cooler · Untracked / legacy stock"])}{E.fld("Source quantities", "Every source sums to its shipped line")}</>} model={toCompleteTransferViewProps(orderTransferComplete)} tape={completeTransferTape} />,
@@ -1232,13 +1234,13 @@ export const SCREENS: Screen[] = [
     step: 5,
     slice: 1,
     tab: "Beer",
-    name: "Weekly count",
+    name: "Weekly count", gatedBy: "Program 12",
     to: { "Record count": "Weekly count", "Create transfer order": "Order" },
     job: "Target-state count plus active suggested transfer",
-    reads: "get_taproom_count_snapshot [view; SCHEMA-GATE] · replenishment_suggestions · list_locations",
-    writes: "record_taproom_count [SCHEMA-GATE: durable count + lines + optional movements in one RPC] · create_replenishment_order",
-    states: permitted("warehouse or admin required"),
-    spec: "Count is target-state only and disabled until durable count persistence lands; the taproom lead uses the warehouse permission bundle. INVERTED (this frame was drawn the other way round): the physical count is the source of truth and posts the depletion, connected or not. POS supplies expected consumption and posts nothing, so disconnecting removes the expected column and changes nothing about what the count writes. That is also why a keg moving warehouse → taproom stays on the books as taproom stock: a taproom transfer carries no channel, and the beer leaves only when a count says it is gone, which makes a month-end count yield the month’s removal cleanly. Variance is drawn twice on purpose: inline while someone can still recount, and as a report where a pattern across weeks (one line, one shift) is the only place it becomes legible. Counts are in kegs and cases, so qty never needs fractional widening.",
+    reads: "get_taproom_count_snapshot · replenishment_suggestions · list_locations",
+    writes: "record_taproom_count [API available; count page pending] · create_replenishment_order",
+    states: permitted("admin, warehouse or taproom · count page pending"),
+    spec: "This count drawing remains disabled until the explicit bin/SKU/lot count page is wired. The durable count API permits Admin, Warehouse, and Taproom; POS comparison remains a separate planned report. INVERTED (this frame was drawn the other way round): the physical count is the source of truth and posts the depletion, connected or not. POS supplies expected consumption and posts nothing, so disconnecting removes the expected column and changes nothing about what the count writes. That is also why a keg moving warehouse → taproom stays on the books as taproom stock: a taproom transfer carries no channel, and the beer leaves only when a count says it is gone, which makes a month-end count yield the month’s removal cleanly. Variance is drawn twice on purpose: inline while someone can still recount, and as a report where a pattern across weeks (one line, one shift) is the only place it becomes legible. Counts are in kegs and cases, so qty never needs fractional widening.",
     body: (<>
       {E.back("Beer", "Taproom")}
       {E.ttl("Weekly count / sales depletion")}
@@ -1248,7 +1250,7 @@ export const SCREENS: Screen[] = [
       {E.row("Stout · ⅙ bbl keg", "expected 2", E.stq(2))}
       {E.info("Variance −1 Hazy · ½ bbl unaccounted. Recording posts 4 Pils + 2 Hazy + 2 Stout depletion; the variance is reported, never posted.")}
       {E.nav("Variance by brand", "four weeks · where the gap keeps showing up")}
-      {E.gated("Record count", "isn’t available yet: counts have nowhere durable to land. The count is the only thing that posts taproom depletion, so until this closes taproom stock only ever grows")}
+      {E.gated("Record count", "isn’t available yet: the count API is live, this page is not. Until the page ships, taproom depletion is recorded through the command API")}
       {E.ttl("Needs replenishment")}
       {E.note("Below par: transfer 4 Pils + 2 Hazy.")}
       {E.fld("Transfer from", "Warehouse · selected")}
@@ -1297,9 +1299,9 @@ export const SCREENS: Screen[] = [
     name: "Return and credit",
     to: { "Return shipment": "Order" },
     job: "Return beer and correct money atomically",
-    reads: "get_order",
+    reads: "get_invoice, get_invoice_return_sources, list_bins",
     writes: "return_shipment [one RPC: return_in movements at explicit destination + loss movement for a damaged return + credit memo at the invoiced price; owned-fleet keg_events linked to shipment when slice 9 is enabled]",
-    states: [["permission", "sales or warehouse required", 1], ["unsold", "returns as sellable stock at the chosen destination"], ["damaged", "returns, then posts loss in the same RPC · never re-sold", 1], ["wrong item", "sellable · the mis-picked SKU goes back on the shelf"], ["invoice paid", "the credit memo sits unapplied as available credit", 1], ["partial", "only the returned units credit back"]],
+    states: [["permission", "admin or sales required", 1], ["unsold", "returns as sellable stock at the chosen destination"], ["damaged", "returns, then posts loss in the same RPC · never re-sold", 1], ["wrong item", "sellable · the mis-picked SKU goes back on the shelf"], ["invoice paid", "the credit memo sits unapplied as available credit", 1], ["partial", "only the returned units credit back"]],
     spec: "Reason decides the beer, never the money. Unsold and wrong item return as sellable stock at the destination; damaged returns and is written to loss in the same RPC, because beer that came back broken is not inventory and pretending otherwise puts it back on a pick list. The credit is the price frozen on the original invoice line and the deposit is the one recorded on the original shipment, never today's price group, on the same principle that freezes a channel onto a movement at write time. A paid invoice can still be returned: the credit memo lands unapplied and sits as available credit, which is the state the QuickBooks credit-memo frame already draws.",
     body: <ReturnCreditView sources={E.pick("Original shipped source", "Cooler · L-240831-HZ", ["Cooler · L-240831-HZ"])} model={toReturnCreditViewProps(orderReturnCredit)} />,
   },
@@ -1517,7 +1519,7 @@ export const SCREENS: Screen[] = [
     to: { "Hazy IPA": "Brand", Pils: "Brand", Stout: "Brand" },
     job: "Define brands, their sellable formats and prices without ledger writes",
     reads: "list_brands · list_skus",
-    writes: "upsert_brand · create_sku · update_sku [design]",
+    writes: "upsert_brand · create_sku · update_sku",
     states: DEFAULT_STATES,
     spec: "Brand facts (ABV and tax class) edit on Brand; SKU associates the brand with a Format. Volume and packaging stay on the Format. This page remains a list with simple pricing, never the v1 price matrix.",
     body: <CatalogView model={toCatalogViewProps(catalogBrands)} />,
@@ -1529,10 +1531,10 @@ export const SCREENS: Screen[] = [
     surface: "sheet",
     name: "Package BOM",
     job: "Replace the packaging materials consumed by one format",
-    reads: "list_formats · list_materials [design]",
+    reads: "get_format_composition",
     writes: "replace_format_bom",
     states: [["permission", "sales or admin required", 1], ["complete", "every material has a quantity"], ["empty", "the Format consumes no tracked packaging"]],
-    spec: "The BOM belongs entirely to the Format. A different material list requires another Format; SKUs never override it.",
+    spec: "The BOM belongs entirely to the Format. A different physical package requires another Format; correcting its existing definition affects future calculations, not recorded consumption. SKUs never override it.",
     body: <PackageBomView model={toPackageBomViewProps(packageBomCase)} />,
   },
   {
@@ -1542,7 +1544,7 @@ export const SCREENS: Screen[] = [
     name: "Brand",
     job: "Sellable facts without ledger writes, including the TTB fields",
     reads: "list_brands · list_skus",
-    writes: "upsert_brand · update_sku [design; the products to brands rename] · create_sku",
+    writes: "upsert_brand · update_sku · create_sku",
     states: [["permission", "sales or admin required", 1], ["new brand", "name + style + ABV + tax class; description, category, price group and hops optional"], ["new style", "typing a style no one has used offers Add; saved with the brand", 0], ["new SKU", "choose one existing packaged Format; a poured format (pint, taster) is never a SKU. Square publishes it as brand × format"], ["inactive SKU", "hidden from portal; history keeps it"], ["other tax class", "the tax class appears as a field once the brewery sells one besides beer"]],
     spec: "The TTB tax class defaults to beer; other classes appear when the brewery sells one. Style is a picker over the brewery's own styles table; an unmatched entry offers Add and the brand save creates it; no separate styles screen. Description, category and hops are optional nullable columns; price group is the row of the price grid the brand sits on, so the price of any of its packaged SKUs is the cell where the customer's sale channel meets that group and the SKU's format. The brand carries no price of its own, and a brand on no group is unpriced everywhere. Package facts live on Formats. A SKU is one brand × one packaged format. A poured format is never a SKU: the menu publishes brand × pint to Square, and a sale depletes the keg SKU. No container source editor here.",
     body: <BrandView model={toBrandViewProps(brandHazy)} />,
@@ -1556,9 +1558,9 @@ export const SCREENS: Screen[] = [
     to: { "Save SKU": "SKU list" },
     job: "Associate one shared package format with a brand",
     reads: "list_formats",
-    writes: "create_sku · update_sku [design; no update_sku command yet]",
+    writes: "create_sku · update_sku",
     states: [["permission", "sales or admin required", 1], ["active", "available to price and sell"], ["inactive", "history remains", 1], ["in use", "format cannot change; create another SKU", 1]],
-    spec: "A SKU is one brand × one packaged format. It owns active state, optional UPC, and provider mappings. Price lives on the grid cell (sale channel × price group × format), never as a SKU exception. Group-shared barcodes are a follow-on table; until then a SKU may carry its own UPC. Name, volume and packaging derive from the Format. A different volume or BOM is a different Format.",
+    spec: "A SKU is one brand × one packaged format. It owns active state, optional UPC, and provider mappings. Price lives on the grid cell (sale channel × price group × format), never as a SKU exception. Group-shared barcodes are a follow-on table; until then a SKU may carry its own UPC. Name, volume and packaging derive from the Format. A different physical package is a different Format. Corrections affect future calculations and open plans; recorded movement volumes and closed packaging yield stay frozen.",
     body: <SkuView model={toSkuViewProps(skuHazyHalf)} />,
   },
   {
@@ -1581,8 +1583,8 @@ export const SCREENS: Screen[] = [
     name: "Shop",
     to: { Change: "Account", "½ bbl keg": "Shop", "⅙ bbl keg": "Shop", "case · 24×16 oz": "Shop", "12 oz bottle": "Shop", "Coming up": "Coming up" },
     job: "A buyer catalog: listed packages by brand, quantity, Place order",
-    reads: "portal_catalog · get_portal_account",
-    writes: "portal_create_order · portal_submit_order",
+    reads: "portal_catalog · get_portal_account · portal_order",
+    writes: "portal_create_order · portal_update_draft_order · portal_submit_order",
     states: [["empty catalog", "call brewery; nothing orderable"], ["missing price", "item cannot enter cart", 1], ["no ship-to", "contact brewery; choose an existing ship-to", 1], ["no source", "Review stays off until the brewery sets where orders ship from", 1], ["unlisted package", "a format not on the wholesale list is absent", 1], ["receipt", "ORD number after commit"]],
     spec: "Grouped by brand; each row is a package the brewery listed for wholesale (½ keg, ⅙ keg, case, bottle). The list is the offer, not warehouse ATP: no in/low/out badges, no counts. Unlisted packages are absent, not greyed. Schedule packaging run is where staff designate the list. Drawn with a fulfillment source already set; the no-source state keeps Review off and never silently chooses Warehouse. Stepper − and + each ship as 48×48 targets. No staff vocabulary (ATP, gates, fulfillment engineering) anywhere in the portal. No persistent cart: leaving the page keeps nothing. Reorder on a shipped order still prefills Review.",
     body: <ShopView model={toShopViewProps(ridgelineShop)} />,
@@ -1614,8 +1616,8 @@ export const SCREENS: Screen[] = [
     name: "Review order",
     to: { "Hazy IPA · ½ bbl keg": "Review order", "Pils · case · 24×16 oz": "Review order" },
     job: "Confirm quantities, ship-to and fulfillment line, then place the order",
-    reads: "portal_catalog · get_portal_account",
-    writes: "portal_create_order · portal_submit_order",
+    reads: "portal_catalog · get_portal_account · portal_order",
+    writes: "portal_create_order · portal_update_draft_order · portal_submit_order",
     states: [["price changed", "revalidated price shown before Place order", 1], ["inactive SKU", "line removed · told plainly", 1], ["no source", "Place order stays off until the brewery sets where orders ship from", 1], ["submit error", "keep quantities · Retry safe", 1], ["duplicate", "same request returns the same ORD number"]],
     spec: "The confirm step for the shop steppers and for Reorder from a shipped order. Buyer copy only: price, package, quantity, “Ships from Warehouse”, Place order. No ATP, no gate names. Drawn with a fulfillment source already set. After submit the portal is read-only; changes go through the brewery.",
     body: <ReviewOrderView model={toReviewOrderViewProps(ridgelineReviewOrder)} />,
@@ -1630,7 +1632,7 @@ export const SCREENS: Screen[] = [
     reads: "portal_orders",
     writes: "none",
     states: [["expanded row", "lines with ordered vs shipped and plain adjusted copy"], ["no orders", "Start one from Order"]],
-    spec: "A row opens Order detail. Reorder is on the shipped Order detail, not this list. Adjusted quantities are stated in buyer copy. No cancel: the portal is read-only after submit, and the row says whom to call.",
+    spec: "A row opens Order detail. Shipped rows offer Reorder. Adjusted quantities are stated in buyer copy. No cancel: the portal is read-only after submit, and the row says whom to call.",
     body: <PortalOrdersView model={toPortalOrdersViewProps(portalOrdersList)} />,
   },
   {
@@ -2021,15 +2023,19 @@ export const SCREENS: Screen[] = [
     job: "Trace a lot from its tank and batch through every ledger movement that names it",
     reads: "trace_lot",
     writes: "none",
-    states: [["still on hand", "unsold units are the part a recall can actually stop"], ["no shipments", "pick and ship record no lot yet, so no customer is listed", 1], ["unknown lot", "not found"]],
-    spec: "The lot is one packaging run, so the trace follows lot → run → tank → batch and lists every movement carrying the lot: the production that made it, samples and losses pulled from it. Shipments record no lot until pick/ship takes one per line (drift: pick/ship lots), so recall contacts cannot come from the ledger yet and the page says so instead of drawing an empty contact list. It does not descend into POS sale lines, because a sale posts nothing to the ledger and would imply a per-pint traceability MGR does not have.",
+    states: [["still on hand", "unsold units are the part a recall can actually stop"], ["no shipments", "no recorded shipment of this lot", 1], ["unknown lot", "not found"]],
+    spec: "The lot is one packaging run, so the trace follows lot → run → tank → batch and lists every movement carrying the lot: the production that made it, samples and losses pulled from it. Shipping records explicit bin/lot allocations per order line; returns and transfers preserve them. Trace shows actual customer recipients, ship-to addresses, orders and invoices, and balances per SKU/bin plus barrels. Historical untracked consumption cannot be assigned to a lot. It does not descend into POS sale lines, because a sale posts nothing to the ledger and would imply a per-pint traceability MGR does not have.",
     body: (<>
       {E.back("Compliance months", "L-240831-HZ")}
-      {E.row("Hazy IPA · 16 oz case", "run 28 · packaged 8/31 · best by 2/27", "118 on hand")}
+      {E.row("Hazy IPA · 16 oz case", "run 28 · packaged 8/31 · best by 2/27", "7.61 bbl recorded balance")}
       {E.fld("Tank · batch", "FV-3 · batch 41 · brewed 8/10")}
       {E.fld("Drawn", "25.00 bbl")}
       {E.tape([["+120 · production in · Hazy IPA 16 oz case · Warehouse", "8/31"], ["−2 · sample · Hazy IPA 16 oz case · Warehouse", "9/02"]])}
-      {E.note("Shipments do not record a lot yet, so a customer who received this lot is not listed. Unsold units are the part a recall can still stop.")}
+      {E.ttl("Recorded balances by SKU and bin")}
+      {E.row("Hazy IPA · 16 oz case", "Warehouse · Cooler", "118 units · 7.61 bbl")}
+      {E.ttl("Recipients")}
+      {E.blank("No recorded shipments of this lot")}
+      {E.note("Only recorded lot identities are traced. Historical untracked stock and consumption cannot be assigned to this lot.")}
     </>),
   },
   {
@@ -3317,10 +3323,10 @@ export const SCREENS: Screen[] = [
     tab: "More",
     name: "Formats",
     job: "Enter volume once on an atomic format and derive every shape above it",
-    reads: "list_formats · get_format_components [design; composed children, not a registered query yet]",
+    reads: "list_formats · get_format_composition",
     writes: "upsert_format · replace_format_components [one RPC replaces the child set] · replace_format_bom [one RPC replaces the bill; formats, format_components and format_bom superseded skus.bbl_per_unit and sku_bom]",
-    states: [["permission", "sales or admin required", 1], ["atomic", "owns one volume entered in an allowed unit"], ["children missing", "a composed format cannot be created before its children", 1], ["poured", "never holds stock · a ratio back to the keg"], ["in use", "editing a format never moves frozen movement bbl"]],
-    spec: "Volume is the basis of all TTB math, so exactly one atomic Format owns it. The input receives its allowed units per instance: US beer packages offer oz, gal and bbl; metric formats may offer mL and L. The server converts the entry to canonical bbl. Composed formats compute volume from their children, which is also what makes repack (§16.10) validated rather than asserted. The basis says only whether the shape holds stock. Each BOM line's on-break disposition is what the repack sheet reads.",
+    states: [["permission", "sales or admin required", 1], ["atomic", "owns one volume entered in an allowed unit"], ["children missing", "a composed format cannot be created before its children", 1], ["poured", "brand-owned name and positive ounces · never holds stock"], ["in use", "editing a format never moves frozen movement bbl"]],
+    spec: "Volume is the basis of all TTB math, so exactly one atomic Format owns it. The input receives its allowed units per instance: US beer packages offer oz, gal and bbl; metric formats may offer mL and L. The server converts the entry to canonical bbl. Composed formats compute volume from their children, which is also what makes repack (§16.10) validated rather than asserted. Poured formats belong to a brand with a name and positive ounces; they have no package facts, components or BOM. Create and edit them under the brand in Catalog. Packaged names are unique per brewery; poured names per brand. Each BOM line's on-break disposition is what the repack sheet reads.",
     body: <FormatsView model={toFormatsViewProps(formatsInventory)} />,
   },
   {
@@ -3331,7 +3337,7 @@ export const SCREENS: Screen[] = [
     name: "Format",
     to: { "Save format": "Formats" },
     job: "Create or edit one atomic or composed package format",
-    reads: "list_formats · get_format_components [design; composed children, not a registered query yet]",
+    reads: "list_formats · get_format_composition",
     writes: "upsert_format · replace_format_components · replace_format_bom",
     states: [["permission", "sales or admin required", 1], ["atomic", "volume unit choices are set by this input"], ["composed", "volume derives from child formats"]],
     body: <FormatView model={toFormatViewProps(formatCan)} />,

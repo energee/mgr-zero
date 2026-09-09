@@ -22,7 +22,7 @@ export function ShipToView({
       {E.inp("State", model.state)}
       {E.inp("Postal code", model.zip)}
       {E.row("Default ship-to", "selected first on new orders", E.sw(model.isDefault, "Default ship-to"), model.isDefault ? "ok" : "")}
-      {footer ?? E.btn("Save ship-to")}
+      {footer !== undefined ? footer : E.btn("Save ship-to")}
     </>
   );
 }

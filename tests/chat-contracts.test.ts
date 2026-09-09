@@ -45,3 +45,8 @@ describe("portable chat presentation contracts", () => {
     });
   });
 });
+
+it("accepts the live invoice-question subject without changing its question identity", () => {
+  expect(() => assertPortableNotification({ ...validNotification, reason: "invoice_question",
+    subject: { type: "invoice", id: "question-1", safeLabel: "INV-0001" } })).not.toThrow();
+});

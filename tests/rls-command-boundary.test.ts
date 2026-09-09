@@ -2,7 +2,7 @@
 // Every mutation RPC takes a p_request_id (request ledger); direct calls here mint a fresh one.
 import { beforeAll, describe, expect, it } from "vitest";
 import { admin, makeBrewery, makeStaff, makeStaffCtx, seedCatalog, seedLocation, seedCustomer, seedPriceGroup, priceSku } from "./helpers";
-import { runCommand, type Ctx } from "../lib/commands/registry";
+import { runCommand, type Ctx, type StaffRole } from "../lib/commands/registry";
 import "../lib/commands/all";
 
 type StaffCtx = Ctx;
@@ -12,6 +12,7 @@ let adminCtx: StaffCtx;
 let salesCtx: StaffCtx;
 let warehouseCtx: StaffCtx;
 let brewerCtx: StaffCtx;
+let taproomCtx: StaffCtx;
 let formatId: string;
 let skuId: string;
 let locationId: string;
@@ -27,6 +28,7 @@ beforeAll(async () => {
   salesCtx = await makeStaffCtx(brewery.id, "sales");
   warehouseCtx = await makeStaffCtx(brewery.id, "warehouse");
   brewerCtx = await makeStaffCtx(brewery.id, "brewer");
+  taproomCtx = await makeStaffCtx(brewery.id, "taproom");
 
   const cat = await seedCatalog(brewery.id, { product: "Boundary IPA", sku: "Boundary case" });
   ({ formatId, skuId } = cat);
@@ -115,7 +117,6 @@ describe("staff command database boundary", () => {
   });
 });
 
-type StaffRole = "admin" | "sales" | "warehouse" | "brewer";
 type MatrixInput = { command: Record<string, unknown>; rpc: Record<string, unknown> };
 type MatrixCase = {
   command: string;
@@ -124,12 +125,13 @@ type MatrixCase = {
   input: (role: StaffRole) => Promise<MatrixInput>;
 };
 
-const staffRoles: StaffRole[] = ["admin", "sales", "warehouse", "brewer"];
+const staffRoles: StaffRole[] = ["admin", "sales", "warehouse", "brewer", "taproom"];
 const contexts = (): Record<StaffRole, StaffCtx> => ({
   admin: adminCtx,
   sales: salesCtx,
   warehouse: warehouseCtx,
   brewer: brewerCtx,
+  taproom: taproomCtx,
 });
 const unique = (label: string, role: StaffRole) => `${label} ${role} ${crypto.randomUUID().slice(0, 8)}`;
 // price_groups is unique on (brewery, position); seedPriceGroup picks the next free one.
@@ -519,6 +521,17 @@ describe("registered staff mutation role × RPC matrix", () => {
       },
     },
     {
+      command: "record_taproom_count", rpc: "record_taproom_count", allowed: ["admin", "warehouse", "taproom"],
+      input: async () => {
+        const loc = await seedLocation(brewery.id, { name: `Count ${crypto.randomUUID()}`, kind: "taproom" });
+        const snapshot = await runCommand("get_taproom_count_snapshot", { locationId: loc.id }, adminCtx) as { revision: string; counted_on: string };
+        return {
+          command: { locationId: loc.id, countedOn: snapshot.counted_on, revision: snapshot.revision, lines: [] },
+          rpc: { p_brewery: brewery.id, p_location: loc.id, p_counted_on: snapshot.counted_on, p_revision: snapshot.revision, p_lines: [] },
+        };
+      },
+    },
+    {
       command: "record_pick", rpc: "record_pick", allowed: ["admin", "warehouse"],
       input: async () => {
         const orderId = await confirmedOrder();
@@ -669,7 +682,7 @@ describe("registered staff mutation role × RPC matrix", () => {
       command: "file_compliance_report", rpc: "file_compliance_report", allowed: ["admin", "sales"],
       input: async role => {
         // one period per role: a filed period conflicts on its second filing
-        const month = { admin: "01", sales: "02", warehouse: "03", brewer: "04" }[role];
+        const month = { admin: "01", sales: "02", warehouse: "03", brewer: "04", taproom: "05" }[role];
         return {
           command: { jurisdiction: "TTB", periodStart: `2025-${month}-01`, periodEnd: `2025-${month}-28` },
           rpc: { p_brewery: brewery.id, p_jurisdiction: "TTB", p_start: `2025-${month}-01`, p_end: `2025-${month}-28`, p_note: null },
@@ -717,6 +730,7 @@ describe("registered staff mutation role × RPC matrix", () => {
         const input = await entry.input(role);
         const { error } = await contexts()[role].db.rpc(entry.rpc, { ...input.rpc, p_request_id: crypto.randomUUID() });
         expect(error?.code, `${entry.command} RPC rejects ${role}`).toBe("42501");
+        await expect(runCommand(entry.command, input.command, contexts()[role])).rejects.toMatchObject({ status: 403 });
       }
     });
   }

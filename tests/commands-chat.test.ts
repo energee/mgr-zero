@@ -187,6 +187,7 @@ it("validates channel privacy on the server and binds durable proofs to actor, g
     const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
     const result = await runCommand("set_notification_destination", input, ctx, execution);
     expect(await runCommand("set_notification_destination", input, ctx, execution)).toEqual(result);
+    await expect(runCommand("set_notification_destination", { ...input, externalDestinationId: "C-CHANGED" }, ctx, execution)).rejects.toMatchObject({ status: 409, code: "conflict" });
     for (const flag of ["is_archived", "is_shared", "is_ext_shared", "is_pending_ext_shared"] as const) {
       info = { ...info, [flag]: true };
       await expect(runCommand("set_notification_destination", input, ctx)).rejects.toThrow(/private channel/);
@@ -205,9 +206,20 @@ it("validates channel privacy on the server and binds durable proofs to actor, g
     });
     expect(stale.error?.message).toMatch(/changed|validated/);
     expect((await ctx.db.rpc("set_notification_destination", {
-      p_brewery: ctx.breweryId, p_installation: installation, p_external_destination_id: "C-STALE", p_request_id: request,
-    })).error).not.toBeNull();
+      p_brewery: ctx.breweryId, p_installation: installation, p_external_destination_id: "C-STALE", p_request_id: request, p_actor: ctx.userId, p_version: version,
+    })).error?.code).toBe("42501");
     expect((await admin.from("notification_destinations").select("external_destination_id").eq("installation_id", installation).eq("kind", "private_channel").eq("state", "active").single()).data?.external_destination_id).toBe("C-VALIDATED");
+    await admin.from("brewery_users").update({ role: "sales" }).eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId);
+    read.mockClear();
+    try {
+      await expect(runCommand("set_notification_destination", input, ctx, execution)).rejects.toMatchObject({ status: 403 });
+      expect(read).not.toHaveBeenCalled();
+      expect((await admin.rpc("set_notification_destination", {
+        p_brewery: ctx.breweryId, p_installation: installation, p_external_destination_id: "C-VALIDATED",
+        p_request_id: execution.requestId, p_actor: ctx.userId, p_version: version,
+      })).error?.code).toBe("42501");
+    } finally { await admin.from("brewery_users").update({ role: "admin" }).eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId); }
+
   } finally { read.mockRestore(); }
 });
 
@@ -256,4 +268,36 @@ it("reads own saved preferences before linking and after unlinking without expos
   expect((await other.db.from("notification_preferences").select("reason").eq("user_id", person.userId)).data).toEqual([]);
   await admin.from("brewery_users").delete().eq("brewery_id", ctx.breweryId).eq("user_id", person.userId);
   expect((await person.db.from("notification_preferences").select("reason")).data).toEqual([]);
+});
+
+it("replays a completed shared destination after replacing its installation without restoring it", async () => {
+  process.env.APP_URL = "https://mgr.test";
+  const owner = await makeStaffCtx((await makeBrewery()).id);
+  const initial = await ins("chat_installations", { brewery_id: owner.breweryId, provider: "slack", external_installation_id: crypto.randomUUID(), display_label: "Original", state: "active", installer_user_id: owner.userId, token_store_key: crypto.randomUUID() });
+  const provider = vi.spyOn(slackAdapterModule, "slackClientFor").mockReturnValue({
+    conversationsInfo: async () => ({ is_private: true, is_archived: false, is_member: true, is_shared: false, is_ext_shared: false, is_pending_ext_shared: false }),
+    postMessage: async () => { throw new Error("unexpected provider send"); },
+    updateMessage: async () => { throw new Error("unexpected provider update"); },
+    publishHome: async () => { throw new Error("unexpected provider publish"); },
+  } as SlackClientLike);
+  try {
+    const input = { installationId: initial.id, externalDestinationId: "C-ORIGINAL" };
+    const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+    const result = await runCommand("set_notification_destination", input, owner, execution);
+    expect((await owner.db.rpc("disconnect_chat_installation", { p_brewery: owner.breweryId, p_installation: initial.id, p_request_id: crypto.randomUUID() })).error).toBeNull();
+    const replacement = await owner.db.rpc("begin_chat_installation", { p_brewery: owner.breweryId, p_provider: "slack", p_redirect_uri: "https://mgr.test/api/chat/slack/oauth", p_state_hash: crypto.randomUUID(), p_request_id: crypto.randomUUID() });
+    expect(replacement.error).toBeNull();
+    const before = await admin.from("notification_destinations").select().eq("installation_id", initial.id);
+    expect(before.data).toEqual([expect.objectContaining({ state: "blocked" })]);
+    provider.mockClear();
+    expect(await runCommand("set_notification_destination", input, owner, execution)).toEqual(result);
+    await expect(runCommand("set_notification_destination", { ...input, installationId: replacement.data.installation_id }, owner, execution)).rejects.toMatchObject({ status: 409, code: "conflict" });
+    expect((await admin.from("notification_destinations").select().eq("installation_id", initial.id)).data).toEqual(before.data);
+    expect((await admin.from("notification_destinations").select().eq("installation_id", replacement.data.installation_id)).data).toEqual([]);
+    expect((await admin.from("brewery_users").update({ role: "sales" }).eq("brewery_id", owner.breweryId).eq("user_id", owner.userId)).error).toBeNull();
+    await expect(runCommand("set_notification_destination", input, owner, execution)).rejects.toMatchObject({ status: 403 });
+    expect((await admin.rpc("set_notification_destination", { p_brewery: owner.breweryId, p_installation: initial.id,
+      p_external_destination_id: input.externalDestinationId, p_request_id: execution.requestId, p_actor: owner.userId, p_version: null })).error?.code).toBe("42501");
+    expect(provider).not.toHaveBeenCalled();
+  } finally { provider.mockRestore(); }
 });

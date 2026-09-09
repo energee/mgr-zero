@@ -1,7 +1,7 @@
 // app/(app)/settings/chat/disconnect/page.tsx — Explicit disconnect confirmation and retryable credential cleanup.
 import { E } from "@/components/mgr/e";
 import { requireAdminContext } from "@/lib/brewery";
-import { runCommand } from "@/lib/commands/registry";
+import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import type { ChatHealth } from "@/lib/commands/chat";
 import "@/lib/commands/all";
 import { ChatDisconnect } from "../chat-settings-client";

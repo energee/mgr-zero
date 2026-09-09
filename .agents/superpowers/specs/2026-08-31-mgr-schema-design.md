@@ -715,6 +715,7 @@ brand's excise numbers wrong.
 formats (
   id, brewery_id, name,
   basis format_basis not null,              -- 'packaged' | 'poured': does it hold stock
+  brand_id uuid, ounces numeric,            -- required only for poured (§16.16); positive finite ounces
   package_type package_type,                -- container; null for poured
   keg_size keg_size,
   units_per_case int,
@@ -724,8 +725,10 @@ formats (
 
 - **packaged** — its own inventory unit. What `packaging_runs` output, what a
   bin holds, what a SKU is.
-- **poured** — never held. A glass is not stock; it is a ratio back to the keg
-  it is drawn from. This is exactly what a Square *variation* is, which is why
+- **poured** — never held. The brand owns its name and ounce size (§16.16).
+  Package facts are null; names are unique per brand rather than brewery.
+  Its ratio is derived from whichever keg of that brand is open, not stored
+  against a fixed package format. This is what a Square *variation* is, which is why
   `skus.square_item_id` alone cannot map a sale (see §16.5).
 
 New enum: `format_basis as enum ('packaged','poured')`.
@@ -746,10 +749,10 @@ different physical volume is a different format.
 
 ### 16.2a `format_components` — composition (decided 2026-09-02)
 
-Formats compose. A four-pack is four cans plus a PakTech; a 16oz case is six
-four-packs plus a case tray. And a 16oz pour is 1/124 of a half bbl — **the same
-relation with a fractional quantity**: a pour is a `format_components` row
-with a fractional `qty`, and `basis` means only "does this hold stock".
+Packaged formats compose. A four-pack is four cans plus a PakTech; a 16oz
+case is six four-packs plus a case tray. Poured formats never participate in
+`format_components`: each brand owns its pour names and ounce sizes (§16.16).
+A pour's ratio derives from whichever keg of that brand is open.
 
 ```
 format_components (parent_format_id, child_format_id, qty numeric(12,6))
@@ -945,8 +948,9 @@ eyeball has no business in a federal filing. A yield derived from a non-default
 fill renders as *estimated*.
 
 Fill fractions and serving sizes are never ledger quantities: only the count
-posts (§16.15), and `format_components.qty` is `numeric(12,6)` so pours sum
-without rounding in a view.
+posts (§16.15). Serving volume derives from each brand-owned pour's numeric
+`ounces`; its ratio to an open keg derives from that keg's nominal volume,
+not from `format_components.qty` (§16.16).
 
 Attribution when two kegs of one SKU are open: split proportionally, and label
 the number as split. `tap_label` does not improve attribution — Square has no
@@ -1242,9 +1246,12 @@ to the read side instead of a CHECK (§16.11).
    its poured formats as a name and a size in ounces (a pint, a taster). A
    pour is a ratio back to whichever keg of that brand is open at that
    location, so bin-derived availability is per brand rather than per keg
-   size. §16.2's `formats` table keeps `basis = 'poured'` only as the
-   vocabulary; Program 12's plan redraws the storage (brand-owned rows with
-   `name`, `ounces`) before the tap board and POS mapping use it.
+   size. The existing `formats` table stores these brand-owned rows with
+   `basis = 'poured'`, a same-tenant `brand_id`, `name`, and positive finite
+   `ounces`; package facts stay null. Poured names are unique per brand,
+   packaged names per brewery. Packaged formats have neither brand nor ounces.
+   The existing `upsert_format` and `list_formats` operations own both kinds;
+   there is no second pour identity table or fixed packaged-format ratio.
 3. The `taproom` role **ships with per-role RLS**. A per-role policy spec —
    which tables a bartender reads, which they write, and how `P-staff`
    splits — is written and reviewed before Program 12 starts; TODO.md

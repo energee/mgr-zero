@@ -122,6 +122,13 @@ export function sampleValue(node: any): unknown {
 
 /** Top-level fields of an operation's input, required ones first. */
 export function fieldsOf(schema: ZodType): ApiField[] {
+  const options = (schema as any).def?.options as ZodType[] | undefined;
+  if (options) {
+    const fields = options.map(fieldsOf);
+    return [...new Map(fields.flat().map(field => [field.name, { ...field,
+      required: fields.every(option => option.some(f => f.name === field.name && f.required)),
+    }])).values()];
+  }
   const shape = (schema as any).def?.shape;
   if (!shape) return [];
   return Object.entries<any>(shape)
@@ -131,6 +138,8 @@ export function fieldsOf(schema: ZodType): ApiField[] {
 
 /** An example input: required fields, plus one optional field when a cross-field rule requires it. */
 export function sampleInput(schema: ZodType): Record<string, unknown> {
+  const options = (schema as any).def?.options as ZodType[] | undefined;
+  if (options) return sampleInput(options[0]);
   const shape = (schema as any).def?.shape;
   if (!shape) return {};
   const sample: Record<string, unknown> = {};

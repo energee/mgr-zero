@@ -17,7 +17,7 @@ export function FormatsView({
 }) {
   return (
     <>
-      {E.back("Settings", "Formats", createAction ?? E.btn("Add format"), model.backHref)}
+      {E.back("Settings", "Formats", createAction !== undefined ? createAction : E.btn("Add format"), model.backHref)}
       {model.empty ? E.blank(model.empty) : E.tbl(model.headers, model.rows.map((r) => r.cells))}
       {footer}
     </>

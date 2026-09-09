@@ -101,7 +101,7 @@ describe("Sale channels view", () => {
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
     expect(src).toMatch(/<ChannelForm\b/);
     expect(src).toMatch(/<DeleteChannelButton\b/);
-    expect(src).toMatch(/backHref: "\/settings"/);
+    expect(src).toContain('backHref: "/settings"');
   });
 });
 
@@ -202,6 +202,6 @@ describe("Units view", () => {
     expect(src).toMatch(/<UnitsView\b/);
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
     expect(src).toMatch(/<GravityUnitForm\b/);
-    expect(src).toMatch(/backHref: "\/settings"/);
+    expect(src).toContain('backHref: ctx.role === "taproom" ? "/more" : "/settings"');
   });
 });

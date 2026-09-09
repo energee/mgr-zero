@@ -25,7 +25,7 @@ export function SaleChannelsView({
 }) {
   return (
     <>
-      {E.back("Settings", "Sale channels", createAction ?? E.btn("Add channel"), model.backHref)}
+      {E.back("Settings", "Sale channels", createAction !== undefined ? createAction : E.btn("Add channel"), model.backHref)}
       {info ? E.info(info) : null}
       {model.empty
         ? E.blank(model.empty)

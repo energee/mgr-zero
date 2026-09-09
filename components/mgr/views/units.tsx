@@ -10,16 +10,18 @@ export type { UnitsViewModel };
 export function UnitsView({
   model,
   controls,
+  backLabel = "Settings",
 }: {
   model: UnitsViewModel;
   /** Live: GravityUnitForm. Inventory draws ttl + chips. */
   controls?: ReactNode;
+  backLabel?: string;
 }) {
   return (
     <>
-      {E.back("Settings", "Units", undefined, model.backHref)}
+      {E.back(backLabel, "Units", undefined, model.backHref)}
       {E.info("Gravity is always stored in °Plato. This changes only how it is shown and typed.")}
-      {controls ?? (
+      {controls !== undefined ? controls : (
         <>
           {E.ttl("Brewery default")}
           {E.chips(model.breweryOptions, model.breweryIndex)}

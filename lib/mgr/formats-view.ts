@@ -19,6 +19,8 @@ export type FormatsFormatRow = {
   name: string;
   basis: "packaged" | "poured";
   package_type: string | null;
+  brands?: { name: string } | null;
+  ounces?: number | null;
   bbl_per_unit: string | number | null;
 };
 
@@ -40,15 +42,6 @@ function childLabel(child: FormatsFormatRow, composed: boolean): string {
   return child.package_type ?? child.name;
 }
 
-function pouredFrom(format: FormatsFormatRow, formats: FormatsFormatRow[]): string | undefined {
-  const bbl = format.bbl_per_unit == null ? NaN : Number(format.bbl_per_unit);
-  if (!Number.isFinite(bbl) || bbl <= 0) return undefined;
-  const half = formats.find((f) => f.basis === "packaged" && Number(f.bbl_per_unit) === 0.5);
-  if (!half?.bbl_per_unit) return undefined;
-  const ratio = Math.round(Number(half.bbl_per_unit) / bbl);
-  return `1/${ratio} × ${formatVolume(half.bbl_per_unit)}`;
-}
-
 function fromOf(
   format: FormatsFormatRow,
   formats: FormatsFormatRow[],
@@ -56,7 +49,7 @@ function fromOf(
 ): string {
   const kids = components.filter((c) => c.parent_format_id === format.id);
   if (kids.length === 0) {
-    return format.basis === "poured" ? (pouredFrom(format, formats) ?? "unit") : "unit";
+    return format.basis === "poured" ? (format.brands?.name ?? "—") : "unit";
   }
   const parts = kids.map((c) => {
     const child = formats.find((f) => f.id === c.child_format_id);
@@ -75,9 +68,9 @@ export function toFormatsViewProps({ formats, components = [], backHref }: Forma
     rows: formats.map((f) => ({
       key: f.id,
       cells: [
-        f.name,
+        f.brands ? `${f.brands.name} · ${f.name}` : f.name,
         f.basis,
-        f.bbl_per_unit != null ? formatVolume(f.bbl_per_unit) : "—",
+        f.basis === "poured" ? (f.ounces != null ? `${f.ounces} oz` : "—") : f.bbl_per_unit != null ? formatVolume(f.bbl_per_unit) : "—",
         fromOf(f, formats, components),
       ],
     })),

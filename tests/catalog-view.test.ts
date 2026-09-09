@@ -240,7 +240,7 @@ describe("Formats view", () => {
       ["four-pack", "packaged", formatVolume("0.01612903"), "4 × can"],
       ["case · 24×16oz", "packaged", formatVolume("0.09677419"), "6 × four-pack"],
       ["½ bbl keg", "packaged", formatVolume("0.50000000"), "unit"],
-      ["pint", "poured", formatVolume("0.00403226"), "1/124 × ½ bbl"],
+      ["Hazy IPA · Pint", "poured", "16 oz", "Hazy IPA"],
     ]);
   });
 
@@ -250,7 +250,7 @@ describe("Formats view", () => {
     expect(html).toMatch(/16 oz can/);
     expect(html).toMatch(/four-pack/);
     expect(html).toMatch(/½ bbl keg/);
-    expect(html).toMatch(/pint/);
+    expect(html).toMatch(/Pint/);
     expect(html).toContain(formatVolume("0.50000000"));
     expect(html).not.toMatch(/→/);
   });
@@ -281,7 +281,7 @@ describe("Format view", () => {
     expect(html).toMatch(/>Save format</);
     expect(html).toMatch(/Packaging BOM/);
     expect(html).toMatch(/packaged/);
-    expect(html).toMatch(/poured/);
+    expect(html).toMatch(/New pour beside its brand/);
     expect(html).toMatch(/Can body/);
     expect(html).not.toMatch(/→/);
   });

@@ -19,7 +19,7 @@ export function ChannelView({
       {E.chips(model.taxOptions, model.taxIndex)}
       {E.info("Customers may override this. Sales without a customer take the channel default.")}
       {E.note("A channel with movements cannot be deleted.")}
-      {footer ?? E.btn("Save channel")}
+      {footer !== undefined ? footer : E.btn("Save channel")}
     </>
   );
 }

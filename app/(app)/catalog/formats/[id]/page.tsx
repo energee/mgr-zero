@@ -5,10 +5,11 @@ import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { canComposeFormat, eligibleChildren } from "@/lib/format-edit-rules";
 import "@/lib/commands/all";
+import { PourForm } from "../../pour-form";
 import { FormatRowsForm } from "./rows-form";
 
 type Detail = {
-  format: { id: string; name: string; basis: string; bbl_per_unit: string | null };
+  format: { brand_id: string | null; brands: { name: string } | null; ounces: number | null; id: string; name: string; basis: string; bbl_per_unit: string | null };
   components: { child_format_id: string; qty: number }[];
   lines: { material_id: string; qty_per_unit: number; on_break: "consumed" | "return_to_stock" }[];
   formats: { id: string; name: string; basis: string; bbl_per_unit: string | null; composed: boolean }[];
@@ -22,6 +23,10 @@ export default async function FormatPage({ params }: { params: Promise<{ id: str
   const ctx = await buildContext(brewery.id);
   const data = await orNotFound(runCommand("get_format_composition", { formatId: id }, ctx)) as Detail;
   const writable = ctx.role === "admin" || ctx.role === "sales";
+  if (data.format.basis === "poured") {
+    const f = data.format;
+    return <>{E.back("Catalog", `${f.brands?.name} · ${f.name}`, writable ? <PourForm key={`${f.id}-${f.name}-${f.ounces}`} brand={{ id: f.brand_id!, name: f.brands!.name }} pour={{ id: f.id, name: f.name, ounces: f.ounces! }} /> : undefined, "/catalog")}{E.info(`${f.ounces} oz · poured · never held as stock`)}</>;
+  }
   const children = eligibleChildren(id, data.formats);
   const components = data.components.map((c) => ({ id: c.child_format_id, qty: String(c.qty) }));
   const lines = data.lines.map((l) => ({ id: l.material_id, qty: String(l.qty_per_unit), onBreak: l.on_break }));

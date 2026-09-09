@@ -98,7 +98,7 @@ export function renderErrors(): string {
   ].join("\n") + "\n";
 }
 
-const ROLES = ["admin", "sales", "warehouse", "brewer", "customer"] as const;
+const ROLES = ["admin", "sales", "warehouse", "brewer", "taproom", "customer"] as const;
 
 /** Which role may call which available operation, one row per operation. */
 export function renderRoleMatrix(): string {

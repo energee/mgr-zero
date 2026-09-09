@@ -2,7 +2,7 @@
 // boundary: role filtering leaves no gaps, and the active tab is the longest
 // href prefix of the current path (so /orders/123 lights Work, / lights Today).
 import { describe, expect, it } from "vitest";
-import { activeTab, isUnder, navFor, PORTAL_NAV, STAFF_NAV } from "../lib/mgr/nav";
+import { activeTab, isUnder, shippedNav, navFor, PORTAL_NAV, STAFF_NAV } from "../lib/mgr/nav";
 
 describe("navFor", () => {
   it("admin sees every item", () => {
@@ -61,4 +61,10 @@ describe("activeTab", () => {
   it("returns undefined off the map", () => {
     expect(activeTab(STAFF_NAV, "/nowhere")).toBeUndefined();
   });
+});
+
+it("taproom has Beer and own settings without forbidden Work", () => {
+  const nav = navFor(shippedNav(STAFF_NAV), "taproom");
+  expect(nav.map(t => t.label)).toEqual(["Today", "Beer", "More"]);
+  expect(nav.find(t => t.label === "More")!.children!.map(t => t.label)).toEqual(["Chat", "Units"]);
 });

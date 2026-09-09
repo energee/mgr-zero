@@ -100,7 +100,7 @@ describe("Locations list", () => {
     expect(src).toMatch(/from "@\/components\/mgr\/views\/locations"/);
     expect(src).toMatch(/<LocationsView\b/);
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
-    expect(src).toMatch(/backHref: "\/settings\/team"/);
+    expect(src).toContain('backHref: brewery.role === "admin" ? "/settings" : "/beer"');
   });
 });
 

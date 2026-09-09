@@ -5,7 +5,7 @@
 // filters it. Both read through the RLS-bound ctx.db and refuse nothing: a
 // role that may not open an area simply gets no rows from it.
 import { z } from "zod";
-import { canRun, defineQuery, runCommand, STAFF_ROLES, unwrap } from "./registry";
+import { canRun, CommandError, defineQuery, runCommand, STAFF_ROLES, unwrap } from "./registry";
 import type { TodayItem } from "./today";
 import { poNo } from "@/lib/mgr/doc-no";
 import { plural } from "@/lib/mgr/plural";
@@ -35,12 +35,55 @@ const count = async (q: PromiseLike<{ count: number | null; error: unknown }>) =
   return n ?? 0;
 };
 
+export function labeledTaproomStock(
+  stock: { sku_id: string; location_id: string; qty: number }[],
+  skuNames: Map<string, string>,
+  locationNames: Map<string, string>,
+) {
+  return stock.map((row) => {
+    const sku = skuNames.get(row.sku_id);
+    const location = locationNames.get(row.location_id);
+    if (sku === undefined || location === undefined) {
+      throw new CommandError("Stock changed while loading. Reload to review it.", 409, "conflict");
+    }
+    return { skuId: row.sku_id, locationId: row.location_id, sku, location, qty: Number(row.qty) };
+  });
+}
+
 defineQuery({
   name: "get_beer_overview",
   description: "Counts behind the Beer landing: finished-goods shortages, taproom SKUs below par, open taps, tanks with beer, material shortages and kegs out at customers",
   input: z.object({}), roles: STAFF_ROLES,
   handler: async (ctx) => {
     const b = ctx.breweryId;
+    if (ctx.role === "taproom") {
+      const stock: { sku_id: string; location_id: string; qty: number }[] = [];
+      let total: number | undefined;
+      do {
+        const response = await ctx.db.from("on_hand").select("sku_id, location_id, qty", { count: "exact" })
+          .eq("brewery_id", b).order("sku_id").order("location_id").range(stock.length, stock.length + 499);
+        const rows = await unwrap(Promise.resolve(response));
+        if (response.count === null || (total !== undefined && response.count !== total) || !rows || (!rows.length && stock.length < response.count)) {
+          throw new CommandError("Stock changed while loading. Reload to review it.", 409, "conflict");
+        }
+        total = response.count;
+        stock.push(...rows);
+      } while (stock.length < total);
+      // Resolve only referenced labels in bounded batches, through the same RLS boundary.
+      async function names(table: "skus" | "locations", ids: string[]) {
+        const labels = new Map<string, string>();
+        for (let start = 0; start < ids.length; start += 100) {
+          const rows = await unwrap(ctx.db.from(table).select("id, name").eq("brewery_id", b).in("id", ids.slice(start, start + 100)));
+          for (const row of rows ?? []) labels.set(row.id, row.name);
+        }
+        return labels;
+      }
+      const [skuNames, locationNames] = await Promise.all([
+        names("skus", [...new Set(stock.map(s => s.sku_id))]),
+        names("locations", [...new Set(stock.map(s => s.location_id))]),
+      ]);
+      return { taproomStock: labeledTaproomStock(stock, skuNames, locationNames) };
+    }
     const [fgShortages, pars, onHand, openOccupancies, materialShortages, kegs] = await Promise.all([
       count(ctx.db.from("atp").select("sku_id", { count: "exact", head: true }).eq("brewery_id", b).lt("qty", 0)),
       unwrap(ctx.db.from("taproom_pars").select("location_id, sku_id, par_qty").eq("brewery_id", b)),
@@ -67,7 +110,7 @@ defineQuery({
 defineQuery({
   name: "list_work",
   description: "Everything in motion for the Work landing: Today's rows plus the open purchase orders and routes the caller may open, each tagged with its Work chip and sorted by due date",
-  input: z.object({}), roles: STAFF_ROLES,
+  input: z.object({}), roles: ["admin", "sales", "warehouse", "brewer"],
   handler: async (ctx): Promise<WorkRow[]> => {
     // ponytail: transfers, batches and runs ride on Today's rows only; their list pages are one tap away
     const [today, pos, routes] = await Promise.all([

@@ -2,7 +2,7 @@
 import { E } from "@/components/mgr/e";
 import { requireAdminContext } from "@/lib/brewery";
 import { isChatConfigured } from "@/lib/chat/oauth";
-import { runCommand } from "@/lib/commands/registry";
+import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import type { ChatHealth } from "@/lib/commands/chat";
 import "@/lib/commands/all";
 import { ChatConnectionAction, ChatDisable } from "../chat-settings-client";

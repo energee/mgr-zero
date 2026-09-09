@@ -41,7 +41,7 @@ export function InviteForm({ customerId }: { customerId?: string }) {
         {customerId ? E.fld("Role", "Buyer") : <>
           <Label htmlFor={`${id}-role`}>Role</Label>
           <select id={`${id}-role`} className="min-h-11 rounded-md border bg-background px-3" value={role} disabled={action.busy} onChange={event => setRole(event.target.value)}>
-            <option value="warehouse">Warehouse</option><option value="sales">Sales</option><option value="brewer">Brewer</option><option value="admin">Admin</option>
+            <option value="warehouse">Warehouse</option><option value="sales">Sales</option><option value="brewer">Brewer</option><option value="taproom">Taproom</option><option value="admin">Admin</option>
           </select>
         </>}
         {E.note("Sending an invite emails the recipient. Existing accounts cannot be attached with this form. Keep this page open to retry unchanged details after an error.")}

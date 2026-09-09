@@ -35,7 +35,7 @@ export function LocationView({
           {E.nav("Location bins", model.bins)}
         </>
       )}
-      {footer ?? (readOnly ? null : E.btn("Save location"))}
+      {footer !== undefined ? footer : (readOnly ? null : E.btn("Save location"))}
     </>
   );
 }

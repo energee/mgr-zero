@@ -28,7 +28,7 @@ export function LocationBinsView({
         : model.rows.map((row) => (
           <Fragment key={row.key}>{E.nav(row.title, row.detail)}</Fragment>
         ))}
-      {footer ?? (createAction !== undefined ? null : E.btn("Add bin", "g"))}
+      {footer !== undefined ? footer : (createAction !== undefined ? null : E.btn("Add bin", "g"))}
     </>
   );
 }

@@ -7,7 +7,7 @@
 // than one definer SQL function; a trigram index is the upgrade path if a
 // brewery's catalog outgrows prefix matching.
 import { z } from "zod";
-import { defineQuery, STAFF_ROLES, unwrap, type Ctx } from "./registry";
+import { defineQuery, unwrap, type Ctx } from "./registry";
 import { docNo, poNo, batNo } from "@/lib/mgr/doc-no";
 
 export const SEARCH_KINDS = ["sku", "order", "invoice", "lot", "customer", "po", "batch"] as const;
@@ -70,7 +70,7 @@ defineQuery({
   name: "search_entities",
   description: "Search SKUs, orders, invoices, lots, customers, purchase orders and batches by name prefix or exact document number (ORD-, INV-, PO-, B-, L-); exact numbers sort first; RLS decides the rows and kinds only narrow",
   input: z.object({ q: z.string().trim().min(1).max(80), kinds: z.array(z.enum(SEARCH_KINDS)).optional() }),
-  roles: STAFF_ROLES,
+  roles: ["admin", "sales", "warehouse", "brewer"],
   handler: async (ctx, i): Promise<SearchHit[]> => {
     const kinds = i.kinds?.length ? i.kinds : [...SEARCH_KINDS];
     const hits = (await Promise.all(kinds.map((k) => byKind(ctx, k, i.q)))).flat();

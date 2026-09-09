@@ -21,9 +21,9 @@ export function PriceGroupsView({
 }) {
   return (
     <>
-      {E.back("Catalog", "Price groups", createAction ?? E.btn("Create price group"), backHref)}
+      {E.back("Catalog", "Price groups", createAction !== undefined ? createAction : E.btn("Create price group"), backHref)}
       {E.info("Rows are price groups and columns are formats, one table per sale channel. A beer sits on one group and a customer on one channel; the cell where they meet is the price.")}
-      {tables ?? model.channels.map((channel) => (
+      {tables !== undefined ? tables : model.channels.map((channel) => (
         <Fragment key={channel.name}>
           {E.ttl(channel.name)}
           <div className="min-w-0 overflow-x-auto">

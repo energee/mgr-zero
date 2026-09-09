@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 import { sql } from "./helpers";
 
 const AUTHENTICATED_RPCS = [
+  "get_taproom_count_snapshot(uuid,uuid)", "get_taproom_count(uuid,uuid)", "record_taproom_count(uuid,uuid,date,text,jsonb,uuid)",
+  "taproom_can(uuid,text)", "staff_brewery_rows()", "keg_bin_on_hand_rows()", "on_hand_rows()",
   "get_chat_integration_health(uuid)",
   "get_chat_link_intent(uuid,text)",
   "list_chat_user_links(uuid)",
@@ -80,6 +82,7 @@ const AUTHENTICATED_RPCS = [
   "set_brewery_gravity_unit(uuid,text,uuid)",
   "set_brewery_quiet_hours(uuid,uuid,time without time zone,time without time zone,uuid)",
   "set_my_gravity_unit(uuid,text,uuid)",
+  "set_personal_notification_destination(uuid,text,uuid,uuid)",
   "set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text,boolean,uuid)",
   "set_portal_fulfillment_source(uuid,uuid,uuid)",
   "set_channel_price(uuid,uuid,uuid,uuid,integer,uuid)",
@@ -108,7 +111,7 @@ const AUTHENTICATED_RPCS = [
   "upsert_brand_approval(uuid,uuid,uuid,approval_kind,text,date,date,text,uuid)",
   "upsert_brewery_state_license(uuid,text,text,text,date,text,uuid)",
   "upsert_customer(uuid,uuid,text,customer_type,text,uuid,text,text,tax_treatment,uuid)",
-  "upsert_format(uuid,uuid,text,format_basis,package_type,keg_size,integer,numeric,uuid)",
+  "upsert_format(uuid,uuid,text,format_basis,package_type,keg_size,integer,numeric,uuid,uuid,numeric)",
   "upsert_material(uuid,uuid,text,material_category,uom,uom,numeric,boolean,uuid,numeric,boolean,uuid)",
   "upsert_material_contract(uuid,uuid,uuid,uuid,numeric,integer,date,date,text,uuid)",
   "upsert_price_group(uuid,uuid,text,integer,integer,uuid)",

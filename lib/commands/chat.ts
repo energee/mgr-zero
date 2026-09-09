@@ -3,7 +3,7 @@
 // (personal preferences/quiet hours, brewery quiet hours, operations channel).
 // None of these touch MGR due state. Every write is one Postgres RPC.
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap, STAFF_ROLES } from "./registry";
+import { defineCommand, defineQuery, unwrap, STAFF_ROLES, CommandError } from "./registry";
 import { sha256 } from "@/lib/chat/linking";
 
 const REASONS = ["submitted_order", "pick_due", "restock_due", "delivery_next", "fermentation_reading_overdue", "invoice_question", "operations_digest"] as const;
@@ -16,6 +16,7 @@ defineCommand({
   input: z.object({ reason: z.enum(REASONS), enabled: z.boolean(), quietHours }),
   roles: STAFF_ROLES,
   handler: async (ctx, i, execution) => {
+    if (ctx.role === "taproom" && i.quietHours !== undefined) throw new CommandError("permission denied", 403, "permission_denied");
     await unwrap(ctx.db.rpc("set_notification_preference", {
       p_request_id: execution.requestId, p_set_quiet: i.quietHours !== undefined,
       p_brewery: ctx.breweryId, p_reason: i.reason, p_enabled: i.enabled,
@@ -38,10 +39,14 @@ defineCommand({
 
 defineCommand({
   name: "set_notification_destination",
-  description: "Choose the one private operations channel that receives the morning and midday digests (replaces the previous one)",
-  input: z.object({ installationId: z.string().uuid(), externalDestinationId: z.string().min(1) }),
-  roles: ["admin"],
+  description: "Provide reason + personalDestinationId to choose your verified personal destination, or as admin provide installationId + externalDestinationId for the private operations channel",
+  input: z.union([z.object({ reason: z.enum(REASONS), personalDestinationId: z.string().uuid() }), z.object({ installationId: z.string().uuid(), externalDestinationId: z.string().min(1) })]),
+  roles: STAFF_ROLES,
   handler: async (ctx, i, execution) => {
+    if ("personalDestinationId" in i) return await unwrap(ctx.db.rpc("set_personal_notification_destination", {
+      p_brewery: ctx.breweryId, p_reason: i.reason, p_personal_destination: i.personalDestinationId, p_request_id: execution.requestId,
+    })) as { id: string };
+    if (ctx.role !== "admin") throw new CommandError("permission denied", 403, "permission_denied");
     const { saveChatNotificationDestination } = await import("@/lib/chat/jobs");
     return saveChatNotificationDestination(ctx, i.installationId, i.externalDestinationId, execution.requestId);
   },
@@ -86,7 +91,7 @@ defineCommand({
   name: "snooze_notification",
   description: "Delay one personal chat reminder for up to seven days; Today due state is unchanged",
   input: z.object({ deliveryId: z.string().uuid(), until: z.iso.datetime({ offset: true }) }),
-  roles: STAFF_ROLES,
+  roles: ["admin", "sales", "warehouse", "brewer"],
   handler: async (ctx, i, execution) => await unwrap(ctx.db.rpc("snooze_notification", {
     p_brewery: ctx.breweryId, p_delivery: i.deliveryId, p_until: i.until, p_request_id: execution.requestId,
   })) as { ok: true },
@@ -96,7 +101,7 @@ defineCommand({
   name: "set_personal_quiet_hours",
   description: "Override personal chat quiet hours for every reason; null clears the override",
   input: z.object({ start: hhmm.nullable(), end: hhmm.nullable(), timezone: z.string().min(1).nullable().optional() }),
-  roles: STAFF_ROLES,
+  roles: ["admin", "sales", "warehouse", "brewer"],
   handler: async (ctx, i, execution) => await unwrap(ctx.db.rpc("set_personal_quiet_hours", {
     p_brewery: ctx.breweryId, p_start: i.start, p_end: i.end, p_timezone: i.timezone ?? null, p_request_id: execution.requestId,
   })) as { ok: true },
@@ -107,7 +112,7 @@ export type ChatHealth = {
   linkedCount: number; queue: Record<string, number>; lastCallback: string | null; lastDelivery: string | null;
   destinations: { id: string; channelId: string; state: string; privacy: string; reason: string | null }[];
 };
-export type ChatPreferences = { preferences: { reason: typeof REASONS[number]; enabled: boolean }[]; quietStart: string | null; quietEnd: string | null; timezone: string; link: { id: string; external_user_id: string } | null };
+export type ChatPreferences = { preferences: { reason: typeof REASONS[number]; enabled: boolean; personalDestinationId?: string | null }[]; destinations?: { id: string; external_destination_id: string }[]; quietStart: string | null; quietEnd: string | null; timezone: string; link: { id: string; external_user_id: string } | null };
 export type ChatLinkIntent = { brewery: string; mgrIdentity: string; slackIdentity: string; workspace: string; expiresAt: string };
 export type ChatLinkedPerson = { id: string; name: string; role: string; slackIdentity: string; linkedAt: string };
 
@@ -124,14 +129,21 @@ defineQuery({ name: "get_chat_link_intent", description: "Preview both identitie
 defineQuery({ name: "get_notification_preferences", description: "Read your own reason preferences, personal quiet hours and Slack link",
   input: z.object({}), roles: STAFF_ROLES,
   handler: async (ctx): Promise<ChatPreferences> => {
-    const [preferences, brewery, link] = await Promise.all([
-      unwrap(ctx.db.from("notification_preferences").select("reason, enabled, quiet_hours_start, quiet_hours_end, quiet_hours_timezone").eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId)),
-      unwrap(ctx.db.from("breweries").select("timezone").eq("id", ctx.breweryId).single()),
+    const [preferences, brewery, link, destinations] = await Promise.all([
+      unwrap(ctx.db.from("notification_preferences").select("reason, enabled, personal_destination_id, quiet_hours_start, quiet_hours_end, quiet_hours_timezone").eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId)),
+      unwrap(ctx.db.from("staff_brewery").select("timezone").eq("id", ctx.breweryId).single()),
       unwrap(ctx.db.from("chat_user_links").select("id, external_user_id").eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId).eq("state", "active").maybeSingle()),
+      unwrap(ctx.db.from("notification_destinations").select("id, external_destination_id").eq("brewery_id", ctx.breweryId).eq("user_id", ctx.userId).eq("kind", "personal").eq("state", "active").not("validated_at", "is", null)),
     ]);
     const quiet = preferences?.find((p) => p.quiet_hours_start !== null);
-    return { preferences: REASONS.map((reason) => ({ reason, enabled: preferences?.find((p) => p.reason === reason)?.enabled ?? true })),
-      quietStart: quiet?.quiet_hours_start ?? null, quietEnd: quiet?.quiet_hours_end ?? null, timezone: quiet?.quiet_hours_timezone ?? brewery?.timezone ?? "UTC", link };
+    if (!brewery?.timezone) throw new CommandError("staff membership brewery is unavailable");
+    const timezone = quiet?.quiet_hours_timezone ?? brewery.timezone;
+    return { preferences: REASONS.map((reason) => {
+      const saved = preferences?.find(p => p.reason === reason);
+      return { reason, enabled: saved?.enabled ?? true,
+        ...(saved?.personal_destination_id ? { personalDestinationId: saved.personal_destination_id } : {}) };
+    }),
+      quietStart: quiet?.quiet_hours_start ?? null, quietEnd: quiet?.quiet_hours_end ?? null, timezone, link, destinations: destinations ?? [] };
   },
 });
 defineQuery({ name: "list_chat_channels", description: "List private active Slack channels with the bot present and no sharing",

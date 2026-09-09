@@ -23,7 +23,7 @@ export function CustomersView({
 }) {
   return (
     <>
-      {E.back("More", "Customers", createAction ?? E.btn("Add customer"), backHref)}
+      {E.back("More", "Customers", createAction !== undefined ? createAction : E.btn("Add customer"), backHref)}
       {search !== undefined ? search : E.search("Search customers")}
       {model.empty
         ? E.blank(model.empty)

@@ -18,7 +18,7 @@ export function BinView({
       {E.edit("Bin name", model.name)}
       {E.info("A location keeps at least one bin. Rename the last one rather than removing it.")}
       {E.note("Tap lines are not bins. The tap board owns those.")}
-      {footer ?? E.btn("Save bin")}
+      {footer !== undefined ? footer : E.btn("Save bin")}
     </>
   );
 }

@@ -1,7 +1,7 @@
 // app/(app)/settings/chat/people/page.tsx — Current linked staff identities and administrator unlink controls.
 import { E } from "@/components/mgr/e";
 import { requireAdminContext } from "@/lib/brewery";
-import { runCommand } from "@/lib/commands/registry";
+import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import type { ChatLinkedPerson } from "@/lib/commands/chat";
 import "@/lib/commands/all";
 import { ChatLinkedPeople } from "../chat-settings-client";

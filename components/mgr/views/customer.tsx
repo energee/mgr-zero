@@ -11,6 +11,7 @@ export type CustomerDetailSlot = {
   shipTos?: { key: string; title: string; detail: string; action?: ReactNode }[];
   addShipTo?: ReactNode;
   kegHref?: string;
+  ordersHref?: string;
   /** Live sales/admin: InviteForm. `null` hides the gated placeholder. */
   portalUsers?: ReactNode;
 };
@@ -36,6 +37,8 @@ export function CustomerView({
           {E.fld("State", model.state)}
           {E.fld("License number", model.license || "none")}
           {E.fld("Terms", model.terms)}
+          {E.fld("Tax treatment", model.taxTreatment)}
+          {E.nav("Orders", "Orders for this customer", "", undefined, detail.ordersHref)}
           {E.fld("Sale channel", model.channel)}
           {E.ttl("Ship-tos")}
           {detail.shipTos?.map((s) => (
@@ -61,7 +64,7 @@ export function CustomerView({
           {E.nav("Orders", model.orders)}
         </>
       )}
-      {footer ?? (detail ? null : E.btn("Save customer"))}
+      {footer !== undefined ? footer : (detail ? null : E.btn("Save customer"))}
     </>
   );
 }

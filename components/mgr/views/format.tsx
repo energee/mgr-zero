@@ -15,12 +15,12 @@ export function FormatView({
   createAction?: ReactNode;
   footer?: ReactNode;
 }) {
-  const basisOn = model.basisOptions.indexOf(model.basis);
   return (
     <>
       {createAction}
       {E.edit("Format name", model.name)}
-      {E.chips(model.basisOptions, basisOn < 0 ? 0 : basisOn, true)}
+      {E.fld("Basis", model.basis)}
+      {E.info("Create a brand-owned glass using New pour beside its brand in Catalog.")}
       {E.pick("Package", model.packageType, model.packageOptions)}
       {E.volume(model.volumeValue, model.volumeUnits, model.volumeUnitIndex)}
       {E.info(model.composedInfo)}

@@ -71,7 +71,7 @@ export function ChatSettingsControls({ installation, readingDueHours, timezone, 
   </div>;
 }
 
-export function ChatPersonalPreferences({ preferences }: { preferences: ChatPreferences }) {
+export function ChatPersonalPreferences({ preferences, canSetQuietHours = true }: { preferences: ChatPreferences; canSetQuietHours?: boolean }) {
   const action = useCommandAction();
   const [start, setStart] = useState(preferences.quietStart?.slice(0, 5) ?? "");
   const [end, setEnd] = useState(preferences.quietEnd?.slice(0, 5) ?? "");
@@ -82,13 +82,21 @@ export function ChatPersonalPreferences({ preferences }: { preferences: ChatPref
     {preferences.preferences.map((p) => <label key={p.reason} className="flex items-center justify-between gap-3 border-b py-3 text-sm">
       {p.reason.replaceAll("_", " ")}<input type="checkbox" className="size-5" checked={p.enabled} disabled={action.busy} onChange={(e) => void action.run("set_notification_preference", { reason: p.reason, enabled: e.target.checked })} />
     </label>)}
-    <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); void action.run("set_personal_quiet_hours", { start: start || null, end: end || null, timezone }); }}>
+    {Boolean(preferences.destinations?.length) && preferences.preferences.map(p => <label key={`destination-${p.reason}`} className="flex items-center justify-between gap-3 text-sm">
+      {p.reason.replaceAll("_", " ")} destination
+      <select aria-label={`${p.reason.replaceAll("_", " ")} destination`} value={p.personalDestinationId ?? ""} disabled={action.busy}
+        onChange={e => void action.run("set_notification_destination", { reason: p.reason, personalDestinationId: e.target.value })}>
+        <option value="" disabled>Default delivery</option>
+        {preferences.destinations!.map(d => <option key={d.id} value={d.id}>{d.external_destination_id}</option>)}
+      </select>
+    </label>)}
+    {canSetQuietHours && <form className="flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); void action.run("set_personal_quiet_hours", { start: start || null, end: end || null, timezone }); }}>
       <Label htmlFor="personal-quiet-start">My quiet hours start</Label><Input id="personal-quiet-start" type="time" value={start} onChange={(e) => setStart(e.target.value)} />
       <Label htmlFor="personal-quiet-end">My quiet hours end</Label><Input id="personal-quiet-end" type="time" value={end} onChange={(e) => setEnd(e.target.value)} />
       <Label htmlFor="personal-timezone">My timezone</Label><Input id="personal-timezone" value={timezone} onChange={(e) => setTimezone(e.target.value)} required />
       <p className="text-sm text-muted-foreground">Clear both times to follow the brewery quiet hours.</p>
       <Button disabled={action.busy || Boolean(start) !== Boolean(end)}>Save my quiet hours</Button>
-    </form><CommandFormMessage error={action.error} />
+    </form>}<CommandFormMessage error={action.error} />
   </div>;
 }
 

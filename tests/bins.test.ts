@@ -8,7 +8,7 @@ import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
 type Row = { id: string; name: string };
-type Ctx = { db: SupabaseClient; userId: string; breweryId: string; role: "admin" | "sales" | "warehouse" | "brewer" };
+type Ctx = { db: SupabaseClient; userId: string; breweryId: string; role: import("@/lib/commands/registry").StaffRole };
 
 describe("bins", () => {
   let ctx: Ctx;

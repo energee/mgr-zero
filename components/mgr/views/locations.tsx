@@ -12,8 +12,8 @@ export function LocationsView({
   createAction,
   footer,
   linkRows,
-  backLabel,
-  rowActionLabel,
+  backLabel = "Settings",
+  rowActionLabel = "Edit",
 }: {
   model: LocationsViewModel;
   createAction?: ReactNode;
@@ -26,12 +26,12 @@ export function LocationsView({
 }) {
   return (
     <>
-      {E.back(backLabel ?? "Settings", "Locations", createAction !== undefined ? createAction : E.btn("Add location"), model.backHref)}
+      {E.back(backLabel, "Locations", createAction !== undefined ? createAction : E.btn("Add location"), model.backHref)}
       {model.empty
         ? E.blank(model.empty)
         : model.rows.map((row) => (
           <Fragment key={row.key}>
-            {E.row(row.title, row.detail, E.act(rowActionLabel ?? "Edit", "primary", linkRows ? row.href : undefined))}
+            {E.row(row.title, row.detail, E.act(rowActionLabel, "primary", linkRows ? row.href : undefined))}
           </Fragment>
         ))}
       {footer}

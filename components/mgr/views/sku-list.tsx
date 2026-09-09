@@ -20,7 +20,7 @@ export function SkuListView({
 }) {
   return (
     <>
-      {E.back("Brand", model.title, createAction ?? E.btn("Add SKU"), model.backHref)}
+      {E.back("Brand", model.title, createAction !== undefined ? createAction : E.btn("Add SKU"), model.backHref)}
       {model.empty
         ? E.blank(model.empty)
         : model.rows.map((row) => (

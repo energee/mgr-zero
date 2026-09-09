@@ -12,6 +12,8 @@ describe("sale_channels", () => {
     const { data } = await admin.from("sale_channels").select("name,tax_treatment").eq("brewery_id", b.id).order("name");
     expect(data!.map((c) => c.name)).toEqual(["DTC", "Export", "Taproom", "Wholesale"]);
     expect(data!.find((c) => c.name === "Export")!.tax_treatment).toBe("export");
+    const codes = await admin.from("sale_channels").select("name,system_code").eq("brewery_id", b.id);
+    expect(codes.data!.filter((c) => c.system_code === "taproom").map((c) => c.name)).toEqual(["Taproom"]);
     // Everything but Export defaults to taxable.
     for (const c of data!.filter((c) => c.name !== "Export")) expect(c.tax_treatment).toBe("taxable");
   });

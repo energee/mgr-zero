@@ -155,7 +155,7 @@ export const formatsInventory: FormatsSnapshot = {
     fmt(FMT_FOUR, "four-pack", "packaged", "0.01612903", "can"),
     fmt(FMT_CASE, "case · 24×16oz", "packaged", "0.09677419", "can"),
     fmt(FMT_HALF, "½ bbl keg", "packaged", "0.50000000", "keg"),
-    fmt(FMT_PINT, "pint", "poured", "0.00403226"),
+    { ...fmt(FMT_PINT, "Pint", "poured", null), brands: { name: HAZY }, ounces: 16 },
   ],
   components: [
     { parent_format_id: FMT_FOUR, child_format_id: FMT_CAN, qty: 4 },
