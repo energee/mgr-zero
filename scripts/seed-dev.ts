@@ -4,8 +4,10 @@
 // NOTE: password "dev-password-1" is intentionally dev-only; use only in local development.
 import { createClient } from "@supabase/supabase-js";
 import { readServerEnv } from "@/lib/env/server-parser";
+import { assertLocalSeedUrl } from "@/scripts/seed-dev-url";
 
 const serverEnv = readServerEnv();
+assertLocalSeedUrl(serverEnv.supabaseUrl);
 const admin = createClient(serverEnv.supabaseUrl, serverEnv.supabaseSecretKey, {
   auth: { persistSession: false },
 });
