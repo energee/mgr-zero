@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { isValidElement, type ReactNode } from "react";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
 import { BatchesView } from "../components/mgr/views/batches";
 import { BrewDayView } from "../components/mgr/views/brew-day";
@@ -149,6 +149,16 @@ describe("Recipes view", () => {
     const body = screen("Recipe").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(RecipeView);
     expect(body.props.model).toEqual(toRecipeViewProps(recipeHazyV4));
+  });
+
+  it("renders recipe numbers in one compact responsive grid without React key warnings", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const html = htmlOf(createElement(RecipeView, { model: toRecipeViewProps(recipeHazyV4) }));
+    const errors = error.mock.calls.flat().join(" ");
+    error.mockRestore();
+
+    expect(errors).not.toContain('unique "key" prop');
+    expect(html.match(/grid-cols-2 md:grid-cols-4/g)).toHaveLength(1);
   });
 
   it("the live recipe page mounts RecipeView and slots NewVersionForm", () => {
