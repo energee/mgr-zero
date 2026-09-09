@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
+import { admin, ins, insertFixture, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
 import { runCommand, type Ctx } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -88,15 +88,14 @@ it("refuses structural forgeries and rolls rejected requests back", async () => 
   const base = { brewery_id: ctx.breweryId, sku_id: catalog.skuId, location_id: location.id, bin_id: location.binId,
     created_by: ctx.userId, type: "adjustment", qty: -3, compensates_id: original.id };
   for (const changed of [{ qty: -2 }, { type: "loss" }, { ref: crypto.randomUUID() }, { source_movement_id: original.id }, { id: original.id }, { brewery_id: (await makeBrewery()).id }]) {
-    expect((await admin.from("inventory_movements").insert({ ...base, ...changed })).error).not.toBeNull();
+    expect(() => insertFixture("inventory_movements", { ...base, ...changed })).toThrow();
   }
   expect((await ctx.db.from("inventory_movements").insert(base)).error).not.toBeNull();
-  const owned = await admin.from("inventory_movements").insert({ ...base, compensates_id: null, qty: -1, type: "loss", ref: crypto.randomUUID() }).select().single();
-  expect(owned.error).toBeNull();
+  const [owned] = insertFixture<{ id: string }>("inventory_movements", { ...base, compensates_id: null, qty: -1, type: "loss", ref: crypto.randomUUID() });
   const requestId = crypto.randomUUID();
-  await expect(reverse(ctx, owned.data.id, "Cannot unpick one row", requestId)).rejects.toThrow(/standalone/);
+  await expect(reverse(ctx, owned.id, "Cannot unpick one row", requestId)).rejects.toThrow(/standalone/);
   expect(sql(`select count(*) from private.command_requests where request_id='${requestId}'`)).toEqual(["0"]);
-  expect(sql(`select count(*) from inventory_movements where compensates_id='${owned.data.id}'`)).toEqual(["0"]);
+  expect(sql(`select count(*) from inventory_movements where compensates_id='${owned.id}'`)).toEqual(["0"]);
   const sales = await makeStaffCtx(ctx.breweryId, "sales");
   expect((await sales.db.rpc("reverse_inventory_movement", { p_brewery: ctx.breweryId, p_movement: original.id, p_note: "Forbidden", p_request_id: crypto.randomUUID() })).error).not.toBeNull();
 });
@@ -104,11 +103,10 @@ it("refuses structural forgeries and rolls rejected requests back", async () => 
 it("posts a signed later-period correction without rewriting a filing", async () => {
   const { ctx, catalog, location } = await setup();
   const past = { jurisdiction: "TTB", periodStart: "2000-01-01", periodEnd: "2000-01-31" };
-  const row = await admin.from("inventory_movements").insert({ brewery_id: ctx.breweryId, sku_id: catalog.skuId,
-    location_id: location.id, bin_id: location.binId, created_by: ctx.userId, qty: 4, type: "adjustment", created_at: "2000-01-15T12:00:00Z" }).select().single();
-  expect(row.error).toBeNull();
+  const [row] = insertFixture<{ id: string }>("inventory_movements", { brewery_id: ctx.breweryId, sku_id: catalog.skuId,
+    location_id: location.id, bin_id: location.binId, created_by: ctx.userId, qty: 4, type: "adjustment", created_at: "2000-01-15T12:00:00Z" });
   const filed = await runCommand("file_compliance_report", past, ctx) as { id: string; figures: unknown };
-  await reverse(ctx, row.data.id);
+  await reverse(ctx, row.id);
   expect((await admin.from("report_filings").select("figures").eq("id", filed.id).single()).data?.figures).toEqual(filed.figures);
   const periodStart = new Date().toISOString().slice(0, 7) + "-01";
   const report = await runCommand("generate_compliance_report", { jurisdiction: "TTB", periodStart, periodEnd: "2099-12-31" }, ctx) as { figures: { lines: { class: string; begin: number; in: number; out: number; end: number }[]; balances: boolean } };

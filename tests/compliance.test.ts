@@ -3,7 +3,7 @@
 // generated from the movement ledger, the immutable filed snapshot, and the
 // lot trace. MGR never transmits a filing.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, channelId, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
+import { admin, channelId, insertFixture, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -66,7 +66,7 @@ describe("generate_compliance_report", () => {
     wholesale = await channelId(b.id, "Wholesale");
     exportCh = await channelId(b.id, "Export");
     const base = { brewery_id: b.id, location_id: loc.id, bin_id: loc.binId, created_by: sales.userId };
-    const { error } = await admin.from("inventory_movements").insert([
+    expect(() => insertFixture("inventory_movements", [
       { ...base, sku_id: canSku, qty: 100, type: "opening_balance", created_at: "2026-08-15T12:00:00Z" },
       { ...base, sku_id: kegSku, qty: 10, type: "opening_balance", created_at: "2026-08-15T12:00:00Z" },
       { ...base, sku_id: canSku, qty: 50, type: "production_in", created_at: "2026-09-03T12:00:00Z" },
@@ -76,8 +76,7 @@ describe("generate_compliance_report", () => {
       { ...base, sku_id: canSku, qty: -1, type: "sample", dest_state: "PA", created_at: "2026-09-15T12:00:00Z" },
       // next month: must not appear
       { ...base, sku_id: canSku, qty: -5, type: "sale_removal", sale_channel_id: wholesale, tax_treatment: "taxable", dest_state: "PA", created_at: "2026-10-02T12:00:00Z" },
-    ]);
-    expect(error).toBeNull();
+    ])).not.toThrow();
   });
 
   it("cross-foots every package class from the ledger and keys removals by frozen tax treatment", async () => {
@@ -110,7 +109,7 @@ describe("generate_compliance_report", () => {
     const kegSkuId = (await seedCatalog(other.id, { product: "Foot Keg", sku: "Foot keg", packageType: "keg", bblPerUnit: 0.5 })).skuId;
     const l = await seedLocation(other.id);
     const base = { brewery_id: other.id, location_id: l.id, bin_id: l.binId, created_by: ctx.userId };
-    await admin.from("inventory_movements").insert([
+    insertFixture("inventory_movements", [
       { ...base, sku_id: skuId, qty: 107, type: "opening_balance", created_at: "2026-08-15T12:00:00Z" },
       { ...base, sku_id: skuId, qty: 3, type: "production_in", created_at: "2026-09-03T12:00:00Z" },
     ]);
@@ -118,7 +117,7 @@ describe("generate_compliance_report", () => {
     for (const line of r.figures.lines) expect(line.begin + line.in - line.out).toBeCloseTo(line.end, 10);
     expect(r.figures.balances).toBe(true);
     // a keg repacked into cans moves beer between classes without a removal: the identity breaks and the month says which class
-    await admin.from("inventory_movements").insert([
+    insertFixture("inventory_movements", [
       { ...base, sku_id: kegSkuId, qty: 1, type: "opening_balance", created_at: "2026-08-15T12:00:00Z" },
       { ...base, sku_id: kegSkuId, qty: -1, type: "repack", created_at: "2026-09-04T12:00:00Z" },
       { ...base, sku_id: skuId, qty: 7, type: "repack", created_at: "2026-09-04T12:00:00Z" },
@@ -160,7 +159,7 @@ describe("file_compliance_report", () => {
     const { data: filedRow } = await admin.from("report_filings").select("id, figures").eq("brewery_id", b.id).eq("period_start", "2026-09-01").single();
     const [loc] = (await admin.from("locations").select("id, bins(id)").eq("brewery_id", b.id).limit(1)).data as unknown as { id: string; bins: { id: string }[] }[];
     const { data: sku } = await admin.from("skus").select("id").eq("brewery_id", b.id).limit(1).single();
-    await admin.from("inventory_movements").insert({ brewery_id: b.id, sku_id: sku!.id, location_id: loc.id, bin_id: loc.bins[0].id, qty: 7, type: "opening_balance", created_by: sales.userId, created_at: "2026-09-20T12:00:00Z" });
+    insertFixture("inventory_movements", { brewery_id: b.id, sku_id: sku!.id, location_id: loc.id, bin_id: loc.bins[0].id, qty: 7, type: "opening_balance", created_by: sales.userId, created_at: "2026-09-20T12:00:00Z" });
     const live = await runCommand("generate_compliance_report", SEPT, sales) as Report;
     const { data: after } = await admin.from("report_filings").select("figures").eq("id", filedRow!.id).single();
     expect(after!.figures).toEqual(filedRow!.figures);
@@ -197,7 +196,7 @@ describe("trace_lot", () => {
     await runCommand("close_packaging_run", { runId: run.id, bblDrawn: 25, outputs: [{ skuId: cat.skuId, qtyActual: 396 }], lotCode: "L-261201-TP", packagedOn: "2026-12-01", locationId: loc.id, binId: loc.binId }, brewer);
     const { data: lot } = await admin.from("lots").select("id").eq("packaging_run_id", run.id).single();
     // a sample pulled from the lot is a ledger row that names it
-    await admin.from("inventory_movements").insert({ brewery_id: b.id, sku_id: cat.skuId, location_id: loc.id, bin_id: loc.binId, qty: -2, type: "sample", dest_state: "PA", lot_id: lot!.id, created_by: brewer.userId });
+    insertFixture("inventory_movements", { brewery_id: b.id, sku_id: cat.skuId, location_id: loc.id, bin_id: loc.binId, qty: -2, type: "sample", dest_state: "PA", lot_id: lot!.id, created_by: brewer.userId });
 
     const t = await runCommand("trace_lot", { lotId: lot!.id }, sales) as {
       lot: { id: string; code: string; brand: string; packaged_on: string };

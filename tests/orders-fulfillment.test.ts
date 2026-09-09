@@ -1,6 +1,6 @@
 // tests/orders-fulfillment.test.ts — pick → ship → movements + invoice; credit memo; replenishment; needs_restock.
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation, seedCustomer, channelId, priceSku } from "./helpers";
+import { admin, ins, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation, seedCustomer, channelId, priceSku } from "./helpers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
@@ -19,7 +19,7 @@ beforeAll(async () => {
   const cust = await seedCustomer(b.id);
   ({ customerId, shipToId, saleChannelId } = cust);
   await priceSku(b.id, { saleChannelId, brandId: cat.brandId, formatId: cat.formatId, cents: 12000 });
-  await admin.from("inventory_movements").insert({ brewery_id: b.id, sku_id: skuId, location_id: whId, bin_id: whBinId, qty: 100, type: "opening_balance", created_by: staffId });
+  await ins("inventory_movements", { brewery_id: b.id, sku_id: skuId, location_id: whId, bin_id: whBinId, qty: 100, type: "opening_balance", created_by: staffId });
 });
 
 async function confirmedOrder(qty = 10) {

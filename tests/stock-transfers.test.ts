@@ -2,7 +2,7 @@
 // locations (spec 2026-09-06 Decision 3), never a third order kind; a move
 // inside one location is move_stock_bin and writes no document.
 import { describe, it, expect } from "vitest";
-import { admin, makeBrewery, makeStaffCtx, seedLocation, seedCatalog, sql } from "./helpers";
+import { admin, insertFixture, makeBrewery, makeStaffCtx, seedLocation, seedCatalog, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -185,10 +185,10 @@ it("FG bin moves preserve the chosen lot separately from untracked stock and ten
   expect(runError).toBeNull();
   const { data: lot, error: lotError } = await admin.from("lots").insert({ brewery_id: b.id, brand_id: cat.brandId, packaging_run_id: run!.id, code: "FG1", packaged_on: "2026-09-01" }).select().single();
   expect(lotError).toBeNull();
-  expect((await admin.from("inventory_movements").insert([
+  expect(() => insertFixture("inventory_movements", [
     { brewery_id: b.id, sku_id: cat.skuId, location_id: loc.id, bin_id: bins![0].id, qty: 4, type: "production_in", lot_id: lot!.id, created_by: ctx.userId },
     { brewery_id: b.id, sku_id: cat.skuId, location_id: loc.id, bin_id: bins![0].id, qty: 1, type: "opening_balance", created_by: ctx.userId },
-  ])).error).toBeNull();
+  ])).not.toThrow();
   const skus = await runCommand("list_skus", {}, ctx) as { id: string; format_volume: { bbl_per_unit: number } }[];
   expect(Number(skus.find(s => s.id === cat.skuId)!.format_volume.bbl_per_unit)).toBeGreaterThan(0);
   const move = { skuId: cat.skuId, skuLotId: lot!.id, qty: 2, fromBinId: bins![0].id, toBinId: bins![1].id };

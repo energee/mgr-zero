@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 vi.mock("next/navigation", () => ({ redirect: (href: string) => { throw new Error(`redirect:${href}`); } }));
 import { runPageQuery, requirePagePermission } from "@/lib/mgr/page-query";
-import { makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedCustomer, priceSku, admin } from "./helpers";
+import { makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedCustomer, priceSku, admin, insertFixture } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -55,8 +55,7 @@ describe("final screen parity", () => {
     await runCommand("upsert_format", { id: cat.formatId, name: "Updated format", basis: "packaged", packageType: "can", bblPerUnit: 0.5 }, ctx);
     const stored = await runCommand("list_movements", { skuId: cat.skuId }, ctx) as any[];
     expect(stored.find(r => r.id === receipt.id)?.bbl).toBe(originalBbl);
-    const insert = await admin.from("inventory_movements").insert(Array.from({ length: 51 }, () => ({ brewery_id: b.id, sku_id: cat.skuId, location_id: wh.id, bin_id: wh.binId, qty: 1, type: "opening_balance", created_at: "2026-09-09T12:00:00Z", created_by: ctx.userId })));
-    expect(insert.error).toBeNull();
+    expect(() => insertFixture("inventory_movements", Array.from({ length: 51 }, () => ({ brewery_id: b.id, sku_id: cat.skuId, location_id: wh.id, bin_id: wh.binId, qty: 1, type: "opening_balance", created_at: "2026-09-09T12:00:00Z", created_by: ctx.userId })))).not.toThrow();
     const first = await runCommand("list_movements", { limit: 50 }, ctx) as any[];
     const second = await runCommand("list_movements", { limit: 50, offset: 50 }, ctx) as any[];
     expect(first).toHaveLength(50); expect(second).toHaveLength(2);
@@ -70,7 +69,7 @@ describe("final screen parity", () => {
     expect((await admin.from("locations").insert(locations)).error).toBeNull();
     const bins = locations.map(l => ({ id: crypto.randomUUID(), brewery_id: b.id, location_id: l.id, name: "Count" }));
     expect((await admin.from("bins").insert(bins)).error).toBeNull();
-    expect((await admin.from("inventory_movements").insert(bins.map(bin => ({ brewery_id: b.id, sku_id: cat.skuId, location_id: bin.location_id, bin_id: bin.id, qty: 1, type: "opening_balance", created_by: ctx.userId })))).error).toBeNull();
+    expect(() => insertFixture("inventory_movements", bins.map(bin => ({ brewery_id: b.id, sku_id: cat.skuId, location_id: bin.location_id, bin_id: bin.id, qty: 1, type: "opening_balance", created_by: ctx.userId })))).not.toThrow();
     expect((await admin.from("allocations").insert(locations.map(l => ({ brewery_id: b.id, sku_id: cat.skuId, qty: 2, source: "taproom_standing", ref: l.id })))).error).toBeNull();
     const rows = await runCommand("get_shortfalls", { skuId: cat.skuId }, ctx) as any[];
     expect(rows).toHaveLength(1);

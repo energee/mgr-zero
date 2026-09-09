@@ -7,7 +7,7 @@
 import { randomBytes } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import pg from "pg";
-import { DB, admin, channelId, makeBrewery, makeStaffCtx, priceSku } from "./helpers";
+import { DB, admin, channelId, insertFixture, makeBrewery, makeStaffCtx, priceSku } from "./helpers";
 import type { ChatProviderTransport } from "@/lib/chat/provider";
 import { SLACK_CAPABILITIES } from "@/lib/chat/slack-transport";
 import { authorizeJob } from "@/lib/chat/job-auth";
@@ -48,6 +48,7 @@ const transport: ChatProviderTransport = {
 };
 
 async function ins<T = { id: string }>(table: string, row: Record<string, unknown>): Promise<T> {
+  if (table === "inventory_movements") return insertFixture<T>(table, row)[0];
   const { data, error } = await admin.from(table).insert(row).select().single();
   if (error) throw new Error(`${table}: ${error.message}`);
   return data as T;

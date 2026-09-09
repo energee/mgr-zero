@@ -64,8 +64,28 @@ export function sql(q: string, quiet = false): string[] {
   return execFileSync("psql", args, { encoding: "utf8" }).trim().split("\n").filter(Boolean);
 }
 
-/** Insert one row as the service role and return it; the raw-row fixture tests share. */
+type PrivilegedFixtureTable = "inventory_movements" | "taproom_counts" | "taproom_count_lines";
+const privilegedFixtureTables = new Set<PrivilegedFixtureTable>(["inventory_movements", "taproom_counts", "taproom_count_lines"]);
+
+/** Insert protected append-only fixture rows through the existing test-database owner. */
+export function insertFixture<T = Record<string, unknown>>(table: PrivilegedFixtureTable, input: Record<string, unknown> | Record<string, unknown>[]): T[] {
+  if (!privilegedFixtureTables.has(table)) throw new Error("invalid fixture table");
+  const rows = Array.isArray(input) ? input : [input];
+  if (rows.length === 0) return [];
+  const columns = [...new Set(rows.flatMap((row) => Object.keys(row)))];
+  if (columns.length === 0 || columns.some((column) => !/^[a-z][a-z0-9_]*$/.test(column))) throw new Error("invalid fixture columns");
+  const identifiers = columns.map((column) => `"${column}"`).join(",");
+  const payload = JSON.stringify(rows).replaceAll("'", "''");
+  return sql(`with inserted as (
+      insert into public.${table}(${identifiers})
+      select ${identifiers} from jsonb_populate_recordset(null::public.${table},'${payload}'::jsonb)
+      returning *
+    ) select to_jsonb(inserted)::text from inserted`, true).map((row) => JSON.parse(row) as T);
+}
+
+/** Insert one raw fixture row and return it; protected surfaces use the database owner. */
 export async function ins<T = { id: string }>(table: string, row: Record<string, unknown>): Promise<T> {
+  if (privilegedFixtureTables.has(table as PrivilegedFixtureTable)) return insertFixture<T>(table as PrivilegedFixtureTable, row)[0];
   const { data, error } = await admin.from(table).insert(row).select().single();
   if (error) throw new Error(`${table}: ${error.message}`);
   return data as T;

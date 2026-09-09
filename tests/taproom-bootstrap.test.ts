@@ -1,5 +1,5 @@
 import { beforeAll, expect, it, vi } from "vitest";
-import { admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, seedLocation, sql } from "./helpers";
+import { admin, ins, insertFixture, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, seedLocation, sql } from "./helpers";
 import { createRequestAuthContext } from "@/lib/auth/request-context";
 import { runCommand, type StaffRole } from "@/lib/commands/registry";
 import "@/lib/commands/all";
@@ -226,7 +226,7 @@ it("loads complete Taproom stock and names SKUs beyond the catalog response cap"
   expect.soft(await runCommand("get_beer_overview", {}, staff)).toEqual({ taproomStock: [
     { skuId: outside.id, locationId: location.id, sku: outside.name, location: location.name, qty: 7 },
   ] });
-  expect((await admin.from("inventory_movements").insert(skus.filter(s => s.id !== outside.id).map(s => movement(s.id)))).error).toBeNull();
+  expect(() => insertFixture("inventory_movements", skus.filter(s => s.id !== outside.id).map(s => movement(s.id)))).not.toThrow();
   const result = await runCommand("get_beer_overview", {}, staff) as { taproomStock: { skuId: string; sku: string; qty: number }[] };
   expect(result.taproomStock).toHaveLength(1001);
   expect(new Set(result.taproomStock.map(s => s.skuId)).size).toBe(1001);

@@ -1,6 +1,6 @@
 import { buildReturnLines } from "@/app/(app)/invoices/[id]/credit-memo-form";
 import { beforeAll, expect, it } from "vitest";
-import { admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedCustomer, priceSku, sql, seedMaterial } from "./helpers";
+import { admin, ins, insertFixture, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedCustomer, priceSku, sql, seedMaterial } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -122,7 +122,7 @@ it("traces more than 1000 movements without combining incompatible package units
   const format = await ins("formats", { brewery_id: ctx.breweryId, name: "Trace bottle", basis: "packaged", package_type: "bottle", bbl_per_unit: 0.01 });
   const sku = await ins("skus", { brewery_id: ctx.breweryId, brand_id: cat.brandId, format_id: format.id, name: "Trace bottle" });
   const rows = Array.from({ length: 1001 }, () => ({ brewery_id: ctx.breweryId, sku_id: sku.id, bin_id: bin, location_id: loc.id, lot_id: lots[0], qty: 1, type: "production_in", created_by: ctx.userId }));
-  for (let start = 0; start < rows.length; start += 500) expect((await admin.from("inventory_movements").insert(rows.slice(start,start + 500))).error).toBeNull();
+  for (let start = 0; start < rows.length; start += 500) expect(() => insertFixture("inventory_movements", rows.slice(start,start + 500))).not.toThrow();
   const trace = await runCommand("trace_lot", { lotId: lots[0] }, ctx) as { on_hand: number | null; movements: { sku_id: string }[]; balances: { sku_id: string; qty: number; bbl: number }[] };
   expect(trace.movements.filter(m => m.sku_id === sku.id)).toHaveLength(1001);
   expect(trace.on_hand).toBeNull();

@@ -1,6 +1,6 @@
 // tests/rls-ledger.test.ts
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation, channelId } from "./helpers";
+import { admin, makeBrewery, makeStaff, asUser, seedCatalog, seedLocation, channelId, insertFixture } from "./helpers";
 import "../lib/commands/all";
 
 describe("ledger integrity + RLS", () => {
@@ -18,23 +18,23 @@ describe("ledger integrity + RLS", () => {
     // No INSERT/UPDATE/DELETE grants for app roles: writes go through record_inventory_movement().
     const direct = await db.from("inventory_movements").insert(row).select().single();
     expect(direct.error?.code).toBe("42501");
-    const { data: m, error } = await admin.from("inventory_movements").insert(row).select().single();
-    expect(error).toBeNull();
-    const upd = await db.from("inventory_movements").update({ qty: 99 }).eq("id", m!.id).select();
-    expect(upd.error?.code).toBe("42501");
-    const del = await db.from("inventory_movements").delete().eq("id", m!.id).select();
-    expect(del.error?.code).toBe("42501");
-    const { data: still } = await admin.from("inventory_movements").select("qty").eq("id", m!.id).single();
+    expect((await admin.from("inventory_movements").insert(row)).error?.code).toBe("42501");
+    const [m] = insertFixture<{ id: string }>("inventory_movements", row);
+    for (const client of [db, admin]) {
+      expect((await client.from("inventory_movements").update({ qty: 99 }).eq("id", m.id).select()).error?.code).toBe("42501");
+      expect((await client.from("inventory_movements").delete().eq("id", m.id).select()).error?.code).toBe("42501");
+    }
+    const { data: still } = await admin.from("inventory_movements").select("qty").eq("id", m.id).single();
     expect(Number(still!.qty)).toBe(10);
   });
 
   it("sale_removal without dest_state is rejected by CHECK", async () => {
-    const { error } = await admin.from("inventory_movements").insert({
+    const wholesale = await channelId(b.id, "Wholesale");
+    expect(() => insertFixture("inventory_movements", {
       brewery_id: b.id, sku_id: sku.id, location_id: loc.id, bin_id: loc.binId,
-      qty: -1, bbl: -0.5, type: "sale_removal", sale_channel_id: await channelId(b.id, "Wholesale"),
+      qty: -1, bbl: -0.5, type: "sale_removal", sale_channel_id: wholesale,
       tax_treatment: "taxable", created_by: staff.id,
-    });
-    expect(error).not.toBeNull();
+    })).toThrow();
   });
 
   it("on_hand and atp views sum correctly", async () => {
@@ -48,12 +48,11 @@ describe("ledger integrity + RLS", () => {
 
   it("trigger overwrites bbl: client-supplied value is ignored, computed from qty * bbl_per_unit", async () => {
     // Insert with deliberately wrong bbl (should be 2 * 0.5 = 1, not 999)
-    const { data: m, error } = await admin.from("inventory_movements").insert({
+    const [m] = insertFixture<{ id: string }>("inventory_movements", {
       brewery_id: b.id, sku_id: sku.id, location_id: loc.id, bin_id: loc.binId,
       qty: 2, bbl: 999, type: "production_in", created_by: staff.id,
-    }).select().single();
-    expect(error).toBeNull();
-    const { data: stored } = await admin.from("inventory_movements").select("qty, bbl").eq("id", m!.id).single();
+    });
+    const { data: stored } = await admin.from("inventory_movements").select("qty, bbl").eq("id", m.id).single();
     expect(Number(stored!.qty)).toBe(2);
     expect(Number(stored!.bbl)).toBe(1);
   });
@@ -73,20 +72,19 @@ describe("removal_shape CHECK: channel/tax_treatment/dest_state required on remo
 
   it("festival_removal and sample require dest_state, just like sale_removal", async () => {
     for (const type of ["festival_removal", "sample"] as const) {
-      const { error } = await admin.from("inventory_movements").insert({
+      expect(() => insertFixture("inventory_movements", {
         brewery_id: b.id, sku_id: sku.id, location_id: loc.id, bin_id: loc.binId,
         qty: -1, bbl: -0.5, type, created_by: staff.id,
-      });
-      expect(error, `${type} without dest_state should be rejected`).not.toBeNull();
-      const ok = await admin.from("inventory_movements").insert({
+      }), `${type} without dest_state should be rejected`).toThrow();
+      expect(() => insertFixture("inventory_movements", {
         brewery_id: b.id, sku_id: sku.id, location_id: loc.id, bin_id: loc.binId,
         qty: -1, bbl: -0.5, type, dest_state: "PA", created_by: staff.id,
-      });
-      expect(ok.error, `${type} with dest_state should be accepted`).toBeNull();
+      }), `${type} with dest_state should be accepted`).not.toThrow();
     }
   });
 
   it("non-removal types (opening_balance, production_in, return_in, adjustment, taproom_transfer) reject a channel", async () => {
+    const wholesale = await channelId(b.id, "Wholesale");
     const nonRemovals: { type: string; qty: number }[] = [
       { type: "opening_balance", qty: 1 },
       { type: "production_in", qty: 1 },
@@ -95,12 +93,11 @@ describe("removal_shape CHECK: channel/tax_treatment/dest_state required on remo
       { type: "taproom_transfer", qty: 1 },
     ];
     for (const { type, qty } of nonRemovals) {
-      const { error } = await admin.from("inventory_movements").insert({
+      expect(() => insertFixture("inventory_movements", {
         brewery_id: b.id, sku_id: sku.id, location_id: loc.id, bin_id: loc.binId,
-        qty, bbl: qty * 0.5, type, sale_channel_id: await channelId(b.id, "Wholesale"),
+        qty, bbl: qty * 0.5, type, sale_channel_id: wholesale,
         tax_treatment: "taxable", created_by: staff.id,
-      });
-      expect(error, `${type} with a channel should be rejected`).not.toBeNull();
+      }), `${type} with a channel should be rejected`).toThrow();
     }
   });
 
@@ -113,14 +110,9 @@ describe("removal_shape CHECK: channel/tax_treatment/dest_state required on remo
       brewery_id: b.id, sku_id: sku.id, location_id: loc.id, bin_id: loc.binId,
       qty: -1, bbl: -0.5, type: "depletion", created_by: staff.id,
     } as const;
-    const noChannel = await admin.from("inventory_movements").insert({ ...row, tax_treatment: "taxable" });
-    expect(noChannel.error, "depletion without a channel should be rejected").not.toBeNull();
-    const withState = await admin.from("inventory_movements")
-      .insert({ ...row, sale_channel_id: dtc, tax_treatment: "taxable", dest_state: "PA" });
-    expect(withState.error, "depletion with a dest_state should be rejected").not.toBeNull();
-    const ok = await admin.from("inventory_movements")
-      .insert({ ...row, sale_channel_id: dtc, tax_treatment: "taxable" });
-    expect(ok.error, "depletion on any channel should be accepted").toBeNull();
+    expect(() => insertFixture("inventory_movements", { ...row, tax_treatment: "taxable" }), "depletion without a channel should be rejected").toThrow();
+    expect(() => insertFixture("inventory_movements", { ...row, sale_channel_id: dtc, tax_treatment: "taxable", dest_state: "PA" }), "depletion with a dest_state should be rejected").toThrow();
+    expect(() => insertFixture("inventory_movements", { ...row, sale_channel_id: dtc, tax_treatment: "taxable" }), "depletion on any channel should be accepted").not.toThrow();
   });
 });
 
@@ -146,19 +138,17 @@ describe("cross-brewery tenant consistency (composite FKs)", () => {
   });
 
   it("rejects an inventory_movement whose sku_id belongs to a different brewery than brewery_id", async () => {
-    const { error } = await admin.from("inventory_movements").insert({
+    expect(() => insertFixture("inventory_movements", {
       brewery_id: bA.id, sku_id: skuB.id, location_id: locA.id, bin_id: locA.binId,
       qty: 1, bbl: 0.5, type: "opening_balance", created_by: staffA.id,
-    });
-    expect(error).not.toBeNull();
+    })).toThrow();
   });
 
   it("rejects an inventory_movement whose location_id belongs to a different brewery than brewery_id", async () => {
-    const { error } = await admin.from("inventory_movements").insert({
+    expect(() => insertFixture("inventory_movements", {
       brewery_id: bA.id, sku_id: skuA.id, location_id: locB.id, bin_id: locB.binId,
       qty: 1, bbl: 0.5, type: "opening_balance", created_by: staffA.id,
-    });
-    expect(error).not.toBeNull();
+    })).toThrow();
   });
 
   it("rejects a sku whose brand_id belongs to a different brewery than brewery_id", async () => {

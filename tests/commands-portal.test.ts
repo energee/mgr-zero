@@ -2,7 +2,7 @@
 // scoping to the caller's own customer, availability badges never leak raw ATP,
 // and staff-only commands reject a customer ctx.
 import { describe, it, expect, beforeAll } from "vitest";
-import { admin, makeBrewery, makeStaffCtx, makeCustomerUser, asUser, seedCatalog, seedLocation, seedCustomer, priceSku } from "./helpers";
+import { admin, ins, makeBrewery, makeStaffCtx, makeCustomerUser, asUser, seedCatalog, seedLocation, seedCustomer, priceSku } from "./helpers";
 import { runCommand } from "../lib/commands/registry";
 import "../lib/commands/all";
 
@@ -20,7 +20,7 @@ beforeAll(async () => {
   await priceSku(b.id, { saleChannelId, brandId: cat.brandId, formatId: cat.formatId, cents: 3600 });
   // Put stock on hand so the "in" badge tier is reachable.
   const { data: loc } = await admin.from("locations").select("id").eq("id", warehouseId).single();
-  await admin.from("inventory_movements").insert({
+  await ins("inventory_movements", {
     brewery_id: b.id, sku_id: skuId, location_id: loc!.id, bin_id: warehouseBinId, qty: 100, bbl: 100 * 0.0645,
     type: "production_in", created_by: adminCtx.userId,
   });

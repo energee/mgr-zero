@@ -1,7 +1,7 @@
 import { Client } from "pg";
 import { DB } from "./helpers";
 import { describe, expect, it } from "vitest";
-import { admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
+import { admin, ins, insertFixture, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import { countFailureKind } from "@/lib/mgr/taproom-count-state";
 import "@/lib/commands/all";
@@ -96,10 +96,10 @@ it("prints only current positive tracked and untracked buckets at their original
     { bin_id: zeroBin, lot_id: historyLot, qty: -1, type: "adjustment" },
     { bin_id: trackedBin, lot_id: trackedLot, qty: 2, type: "opening_balance" },
     { bin_id: untrackedBin, lot_id: null, qty: 3, type: "opening_balance" },
-  ]) expect((await admin.from("inventory_movements").insert({
+  ]) expect(() => insertFixture("inventory_movements", {
     brewery_id: f.brewery.id, location_id: f.location.id, sku_id: f.cat.skuId,
     created_by: f.ctx.userId, ...row,
-  })).error).toBeNull();
+  })).not.toThrow();
   const foreign = await fixture();
   const foreignLot = await lot(foreign, "FOREIGN-LABEL");
   await movement(foreign, 9, foreignLot);
@@ -398,6 +398,22 @@ it("rejects incomplete or corrupted correction graphs at transaction commit", as
       [correctionId, qty, movementId, rootLine.id]);
   }
 
+  const nullReasonClient = new Client({ connectionString: DB }); await nullReasonClient.connect();
+  const nullReasonCorrection = crypto.randomUUID();
+  try {
+    await nullReasonClient.query("begin");
+    const transaction = (async () => {
+      await nullReasonClient.query(`insert into public.taproom_counts(id,brewery_id,location_id,counted_on,counted_by,observed_at,prior_count_id,corrects_count_id,correction_reason)
+        select $1,brewery_id,location_id,counted_on,$2,observed_at,prior_count_id,id,null from public.taproom_counts where id=$3`,
+        [nullReasonCorrection, f.ctx.userId, root.id]);
+      await compensation(nullReasonClient, nullReasonCorrection);
+      const replacementId = await replacement(nullReasonClient, nullReasonCorrection);
+      await line(nullReasonClient, nullReasonCorrection, replacementId);
+      await nullReasonClient.query("commit");
+    })();
+    await expect(transaction).rejects.toThrow(/taproom_counts_correction_shape/);
+  } finally { await nullReasonClient.query("rollback"); await nullReasonClient.end(); }
+
   await rejectAtCommit(async () => {}); // header only / missing full replacement
   await rejectAtCommit(async (client, id) => { await compensation(client, id); await replacement(client, id); }); // orphan movements
   await rejectAtCommit(async (client, id) => { await compensation(client, id); await line(client, id, null, 2); }); // unchanged line owns movement
@@ -526,9 +542,9 @@ it("depletes after the taproom channel is renamed", async () => {
 it("refuses a warehouse-location count header", async () => {
   const f = await fixture();
   const wh = await seedLocation(f.brewery.id, { name: "Count warehouse" });
-  expect((await admin.from("taproom_counts").insert({
+  expect(() => insertFixture("taproom_counts", {
     brewery_id: f.brewery.id, location_id: wh.id, counted_on: f.day, counted_by: f.ctx.userId,
-  })).error).not.toBeNull();
+  })).toThrow();
 });
 
 it("serializes competing counts and exact concurrent replays", async () => {
@@ -603,11 +619,12 @@ it("count tables are append-only with tenant-safe references and direct DML deni
   }
   const row = { brewery_id: f.brewery.id, location_id: f.location.id, counted_on: "2000-01-01", counted_by: f.ctx.userId };
   expect((await f.ctx.db.from("taproom_counts").insert(row)).error?.code).toBe("42501");
-  expect((await admin.from("taproom_counts").insert({ ...row, prior_count_id: (await ins("taproom_counts", { ...row, brewery_id: other.brewery.id, location_id: other.location.id })).id })).error?.code).toBe("23503");
+  const foreignPrior = await ins("taproom_counts", { ...row, brewery_id: other.brewery.id, location_id: other.location.id });
+  expect(() => insertFixture("taproom_counts", { ...row, prior_count_id: foreignPrior.id })).toThrow();
   const line = { ...result.data.lines[0] }; delete line.id; delete line.bbl;
   delete line.effective_line_id;
   delete line.bin_name; delete line.sku_name;
-  expect((await admin.from("taproom_count_lines").insert({ ...line, count_id: crypto.randomUUID() })).error?.code).toBe("23503");
+  expect(() => insertFixture("taproom_count_lines", { ...line, count_id: crypto.randomUUID() })).toThrow();
   expect((await other.ctx.db.rpc("get_taproom_count", { p_brewery: other.brewery.id, p_count: result.data.id })).error?.message).toBe("count not found");
   expect((await other.ctx.db.rpc("record_taproom_count", { ...await args(f) })).error?.code).toBe("42501");
   expect((await other.ctx.db.rpc("get_taproom_count_snapshot", { p_brewery: f.brewery.id, p_location: f.location.id })).error?.code).toBe("42501");
@@ -615,6 +632,34 @@ it("count tables are append-only with tenant-safe references and direct DML deni
     has_table_privilege('service_role','private.taproom_effective_counts','select'),
     has_function_privilege('authenticated','private.validate_taproom_correction_graph(uuid)','execute'),
     has_function_privilege('service_role','private.validate_taproom_correction_graph(uuid)','execute')`)).toEqual(["f|f|f|f"]);
+});
+
+it("denies service-role INSERT and every mutation privilege on the count correction surfaces", async () => {
+  const f = await fixture();
+  const fixtureCountId = crypto.randomUUID();
+  sql(`insert into public.taproom_counts(id,brewery_id,location_id,counted_on,counted_by)
+    values ('${fixtureCountId}','${f.brewery.id}','${f.location.id}',date '1999-12-31','${f.ctx.userId}')`);
+  expect((await admin.from("inventory_movements").insert({
+    brewery_id: f.brewery.id, sku_id: f.cat.skuId, location_id: f.location.id, bin_id: f.location.binId,
+    qty: 1, type: "opening_balance", created_by: f.ctx.userId,
+  })).error?.code).toBe("42501");
+  expect((await admin.from("taproom_counts").insert({
+    brewery_id: f.brewery.id, location_id: f.location.id, counted_on: "1999-12-30", counted_by: f.ctx.userId,
+  })).error?.code).toBe("42501");
+  expect((await admin.from("taproom_count_lines").insert({
+    brewery_id: f.brewery.id, count_id: fixtureCountId, location_id: f.location.id,
+    bin_id: f.location.binId, sku_id: f.cat.skuId, qty_before: 7, qty_counted: 7,
+  })).error?.code).toBe("42501");
+  expect(sql(`select string_agg(relname||':'||
+      has_table_privilege('service_role',format('public.%I',relname),'insert')||':'||
+      has_table_privilege('service_role',format('public.%I',relname),'update')||':'||
+      has_table_privilege('service_role',format('public.%I',relname),'delete')||':'||
+      has_table_privilege('service_role',format('public.%I',relname),'truncate'),',' order by relname)
+    from (values ('inventory_movements'),('taproom_count_lines'),('taproom_counts')) tables(relname)`))
+    .toEqual(["inventory_movements:false:false:false:false,taproom_count_lines:false:false:false:false,taproom_counts:false:false:false:false"]);
+  expect(sql(`select has_table_privilege('service_role','public.pos_sales','insert'),
+    has_table_privilege('service_role','public.pos_sales','update'),has_table_privilege('service_role','public.pos_sales','delete'),
+    has_table_privilege('service_role','public.pos_sales','truncate')`)).toEqual(["t|f|f|f"]);
 });
 
 it("uses the brewery's current date even when it differs from the database UTC day", async () => {
@@ -639,9 +684,9 @@ it("structurally rejects foreign count-line references and NULL-bucket duplicate
   const line = { brewery_id: f.brewery.id, count_id: header.id, location_id: f.location.id, bin_id: f.location.binId, sku_id: f.cat.skuId, lot_id: null, qty_before: 7, qty_counted: 7 };
   for (const change of [{ bin_id: foreign.location.binId }, { bin_id: otherLocation.binId }, { sku_id: foreign.cat.skuId },
     { lot_id: otherLot }, { movement_id: otherMovement.id, qty_counted: 6 }, { location_id: otherLocation.id, bin_id: otherLocation.binId }]) {
-    expect((await admin.from("taproom_count_lines").insert({ ...line, ...change })).error?.code).toBe("23503");
+    expect(() => insertFixture("taproom_count_lines", { ...line, ...change })).toThrow();
   }
   expect((await f.ctx.db.from("taproom_count_lines").insert(line)).error?.code).toBe("42501");
-  expect((await admin.from("taproom_count_lines").insert(line)).error).toBeNull();
-  expect((await admin.from("taproom_count_lines").insert(line)).error?.code).toBe("23505");
+  expect(() => insertFixture("taproom_count_lines", line)).not.toThrow();
+  expect(() => insertFixture("taproom_count_lines", line)).toThrow();
 });

@@ -1182,8 +1182,8 @@ create table taproom_counts (
   foreign key (location_id, brewery_id) references locations(id, brewery_id),
   foreign key (prior_count_id, location_id, brewery_id) references taproom_counts(id, location_id, brewery_id),
   foreign key (corrects_count_id, location_id, brewery_id) references taproom_counts(id, location_id, brewery_id),
-  check ((corrects_count_id is null and correction_reason is null)
-    or (corrects_count_id is not null and btrim(correction_reason) <> ''))
+  constraint taproom_counts_correction_shape check ((corrects_count_id is null and correction_reason is null)
+    or (corrects_count_id is not null and correction_reason is not null and btrim(correction_reason) <> ''))
 );
 create unique index taproom_counts_root_day_uidx on taproom_counts(brewery_id,location_id,counted_on) where corrects_count_id is null;
 create function private.require_taproom_count_location() returns trigger
@@ -6962,7 +6962,8 @@ grant select on bin_move_stock, on_hand, bin_on_hand, atp, invoice_totals, keg_d
   contract_balances, material_requirements, po_open_balances, vendor_lead_times,
   keg_bin_totals, keg_bin_on_hand, keg_fleet_totals, keg_customer_balances to authenticated;
 grant all on all tables in schema public to service_role;
-revoke update, delete, truncate on inventory_movements, taproom_counts, taproom_count_lines, pos_sales from service_role;
+revoke insert, update, delete, truncate on inventory_movements, taproom_counts, taproom_count_lines from service_role;
+revoke update, delete, truncate on pos_sales from service_role;
 grant all on all sequences in schema public to service_role;
 
 -- Availability badge tiers for portal customers: coarse tiers only, never raw

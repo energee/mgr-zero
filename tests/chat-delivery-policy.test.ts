@@ -2,7 +2,7 @@
 // hours (incl. DST), 08:00/12:00 digest windows with missed-window recovery,
 // and bounded leasing with lease-token outcomes and crash recovery (live DB).
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { admin, channelId, makeBrewery, makeStaffCtx, priceSku } from "./helpers";
+import { admin, channelId, insertFixture, makeBrewery, makeStaffCtx, priceSku } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -22,6 +22,7 @@ let b: { id: string }, adminCtx: Ctx, sales: Ctx, inst: { id: string }, channel:
 let customerId: string, shipToId: string, whId: string, whBinId: string, skuId: string;
 
 async function ins<T = { id: string }>(table: string, row: Record<string, unknown>): Promise<T> {
+  if (table === "inventory_movements") return insertFixture<T>(table, row)[0];
   const { data, error } = await admin.from(table).insert(row).select().single();
   if (error) throw new Error(`${table}: ${error.message}`);
   return data as T;
