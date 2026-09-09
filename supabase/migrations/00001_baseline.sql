@@ -1279,7 +1279,9 @@ declare correction uuid;
 begin
   if tg_table_name='taproom_counts' then correction:=new.id;
   elsif tg_table_name='taproom_count_lines' then
-    select id into correction from public.taproom_counts where id=new.count_id and corrects_count_id is not null;
+    select c.id into correction from public.taproom_counts c
+    where (c.id=new.count_id and c.corrects_count_id is not null) or c.corrects_count_id=new.count_id
+    order by (c.id=new.count_id) desc limit 1;
   else
     select id into correction from public.taproom_counts where id=new.ref and corrects_count_id is not null;
   end if;

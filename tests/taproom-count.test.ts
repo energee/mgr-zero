@@ -206,6 +206,30 @@ it("corrects the latest mistaken-low count with frozen compensating and replacem
   expect(sql(`select to_jsonb(l)::text from public.taproom_count_lines l where id='${root.lines[0].id}'`)).toEqual([originalLine]);
 });
 
+it("revalidates a committed correction when a root line is appended", async () => {
+  const f = await fixture(); const adminCtx = await makeStaffCtx(f.brewery.id, "admin");
+  const input = await args(f); input.p_lines[0].qty_counted = 2;
+  const rootResult = await f.ctx.db.rpc("record_taproom_count", input); expect(rootResult.error).toBeNull();
+  const root = rootResult.data;
+  const ordinarySku = await seedCatalog(f.brewery.id, { product: "Ordinary root line", sku: "Ordinary root keg", packageType: "keg", bblPerUnit: .5 });
+  expect(() => insertFixture("taproom_count_lines", { brewery_id: f.brewery.id, count_id: root.id, location_id: f.location.id,
+    bin_id: f.location.binId, sku_id: ordinarySku.skuId, qty_before: 0, qty_counted: 0 })).not.toThrow();
+  const original = root.lines.find((line: { sku_id: string }) => line.sku_id === f.cat.skuId)!;
+  const corrected = await runCommand("correct_taproom_count", { countId: root.id,
+    corrections: [{ lineId: original.id, qtyCounted: 4 }], reason: "Found two full kegs" }, adminCtx) as { effective_id: string };
+
+  const lateSku = await seedCatalog(f.brewery.id, { product: "Late root line", sku: "Late root keg", packageType: "keg", bblPerUnit: .5 });
+  const client = new Client({ connectionString: DB }); await client.connect();
+  try {
+    await client.query("begin");
+    await client.query(`insert into public.taproom_count_lines(brewery_id,count_id,location_id,bin_id,sku_id,qty_before,qty_counted)
+      values($1,$2,$3,$4,$5,0,0)`, [f.brewery.id, root.id, f.location.id, f.location.binId, lateSku.skuId]);
+    await expect(client.query("commit")).rejects.toThrow(/incomplete taproom correction graph/);
+  } finally { await client.query("rollback"); await client.end(); }
+  expect(sql(`select (select count(*) from public.taproom_count_lines where count_id='${root.id}')||'|'||
+    (select count(*) from public.taproom_count_lines where count_id='${corrected.effective_id}')`)).toEqual(["2|2"]);
+});
+
 it("restores the recorded-before quantity with compensation only", async () => {
   const f = await fixture(); const adminCtx = await makeStaffCtx(f.brewery.id, "admin");
   const input = await args(f); input.p_lines[0].qty_counted = 2;
@@ -620,11 +644,11 @@ it("count tables are append-only with tenant-safe references and direct DML deni
   const row = { brewery_id: f.brewery.id, location_id: f.location.id, counted_on: "2000-01-01", counted_by: f.ctx.userId };
   expect((await f.ctx.db.from("taproom_counts").insert(row)).error?.code).toBe("42501");
   const foreignPrior = await ins("taproom_counts", { ...row, brewery_id: other.brewery.id, location_id: other.location.id });
-  expect(() => insertFixture("taproom_counts", { ...row, prior_count_id: foreignPrior.id })).toThrow();
+  expect(() => insertFixture("taproom_counts", { ...row, prior_count_id: foreignPrior.id })).toThrow(/SQLSTATE 23503/);
   const line = { ...result.data.lines[0] }; delete line.id; delete line.bbl;
   delete line.effective_line_id;
   delete line.bin_name; delete line.sku_name;
-  expect(() => insertFixture("taproom_count_lines", { ...line, count_id: crypto.randomUUID() })).toThrow();
+  expect(() => insertFixture("taproom_count_lines", { ...line, count_id: crypto.randomUUID() })).toThrow(/SQLSTATE 23503/);
   expect((await other.ctx.db.rpc("get_taproom_count", { p_brewery: other.brewery.id, p_count: result.data.id })).error?.message).toBe("count not found");
   expect((await other.ctx.db.rpc("record_taproom_count", { ...await args(f) })).error?.code).toBe("42501");
   expect((await other.ctx.db.rpc("get_taproom_count_snapshot", { p_brewery: f.brewery.id, p_location: f.location.id })).error?.code).toBe("42501");
@@ -684,9 +708,9 @@ it("structurally rejects foreign count-line references and NULL-bucket duplicate
   const line = { brewery_id: f.brewery.id, count_id: header.id, location_id: f.location.id, bin_id: f.location.binId, sku_id: f.cat.skuId, lot_id: null, qty_before: 7, qty_counted: 7 };
   for (const change of [{ bin_id: foreign.location.binId }, { bin_id: otherLocation.binId }, { sku_id: foreign.cat.skuId },
     { lot_id: otherLot }, { movement_id: otherMovement.id, qty_counted: 6 }, { location_id: otherLocation.id, bin_id: otherLocation.binId }]) {
-    expect(() => insertFixture("taproom_count_lines", { ...line, ...change })).toThrow();
+    expect(() => insertFixture("taproom_count_lines", { ...line, ...change })).toThrow(/SQLSTATE 23503/);
   }
   expect((await f.ctx.db.from("taproom_count_lines").insert(line)).error?.code).toBe("42501");
   expect(() => insertFixture("taproom_count_lines", line)).not.toThrow();
-  expect(() => insertFixture("taproom_count_lines", line)).toThrow();
+  expect(() => insertFixture("taproom_count_lines", line)).toThrow(/SQLSTATE 23505/);
 });

@@ -90,7 +90,7 @@ describe("bins", () => {
     // the wrong location for the bin is a FK violation on every ledger, not app code
     expect(() => insertFixture("inventory_movements", {
       brewery_id: ctx.breweryId, sku_id: skuId, location_id: a.id, bin_id: binB.id, qty: 1, bbl: 0, type: "opening_balance", created_by: ctx.userId,
-    })).toThrow();
+    })).toThrow(/SQLSTATE 23503/);
     const mm = await admin.from("material_movements").insert({
       brewery_id: ctx.breweryId, material_id: mat!.id, location_id: a.id, bin_id: binB.id, qty: 5, type: "opening_balance", created_by: ctx.userId,
     });

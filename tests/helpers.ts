@@ -59,8 +59,9 @@ export async function makeStaffCtx(breweryId: string, role: StaffRole = "admin")
 // the fallback is CI's single fresh stack. `quiet` drops psql's own chatter.
 export const TEST_DB_PORT = 54352;
 export const DB = process.env.DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:54342/postgres";
-export function sql(q: string, quiet = false): string[] {
-  const args = quiet ? [DB, "-Atq", "-c", q] : [DB, "-Atc", q];
+export function sql(q: string, quiet = false, errorVerbosity: "default" | "sqlstate" = "default"): string[] {
+  const verbosity = errorVerbosity === "sqlstate" ? ["-v", "VERBOSITY=sqlstate"] : [];
+  const args = quiet ? [DB, ...verbosity, "-Atq", "-c", q] : [DB, ...verbosity, "-Atc", q];
   return execFileSync("psql", args, { encoding: "utf8" }).trim().split("\n").filter(Boolean);
 }
 
@@ -76,11 +77,18 @@ export function insertFixture<T = Record<string, unknown>>(table: PrivilegedFixt
   if (columns.length === 0 || columns.some((column) => !/^[a-z][a-z0-9_]*$/.test(column))) throw new Error("invalid fixture columns");
   const identifiers = columns.map((column) => `"${column}"`).join(",");
   const payload = JSON.stringify(rows).replaceAll("'", "''");
-  return sql(`with inserted as (
+  try {
+    return sql(`with inserted as (
       insert into public.${table}(${identifiers})
       select ${identifiers} from jsonb_populate_recordset(null::public.${table},'${payload}'::jsonb)
       returning *
-    ) select to_jsonb(inserted)::text from inserted`, true).map((row) => JSON.parse(row) as T);
+    ) select to_jsonb(inserted)::text from inserted`, true, "sqlstate").map((row) => JSON.parse(row) as T);
+  } catch (error) {
+    const stderr = String((error as { stderr?: string | Buffer }).stderr ?? "");
+    const state = stderr.match(/ERROR:\s+([0-9A-Z]{5})/)?.[1];
+    if (state) throw new Error(`fixture insert failed with SQLSTATE ${state}`);
+    throw error;
+  }
 }
 
 /** Insert one raw fixture row and return it; protected surfaces use the database owner. */
