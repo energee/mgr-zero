@@ -3,6 +3,8 @@
 import { ALS, RIDGELINE, SKU_HAZY, SKU_PILS, TERESA } from "./demo";
 import type { PickSheetSnapshot } from "@/lib/mgr/pick-sheet-view";
 
+export const PICK_SHEET_DATE_CHIPS = ["Wed 9/2", "Thu 9/3", "Fri 9/4"];
+
 const ORDER_231 = "00000000-0000-4000-8000-000000000231";
 const ORDER_232 = "00000000-0000-4000-8000-000000000232";
 const ORDER_234 = "00000000-0000-4000-8000-000000000234";

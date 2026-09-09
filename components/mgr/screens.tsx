@@ -75,7 +75,7 @@ import { binCold, locationBinsTaproom, locationTaproom, locationsList } from "@/
 import { completeTransferTape, newOrderDraft, orderPickedRestock, orderPickedRestockPutBack, orderSubmittedRidgeline, orderTransferComplete, ordersWorkList } from "@/lib/mgr/fixtures/orders";
 import { orderAdjustLines, orderPick, orderReturnCredit, orderShipInvoice, orderShipOnDelivery, orderShipmentDone, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
 import { parsPils } from "@/lib/mgr/fixtures/pars";
-import { pickSheet } from "@/lib/mgr/fixtures/pick-sheet";
+import { PICK_SHEET_DATE_CHIPS, pickSheet } from "@/lib/mgr/fixtures/pick-sheet";
 import { ridgelineReviewOrder, ridgelineShop } from "@/lib/mgr/fixtures/portal";
 import { portalAccountRidgeline, portalMeRidgeline } from "@/lib/mgr/fixtures/portal-account";
 import { portalInvoicePaid, portalInvoiceUnpaid, portalInvoicesRidgeline } from "@/lib/mgr/fixtures/portal-invoices";
@@ -1231,7 +1231,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["day chosen", "confirmed orders requesting that ship date"], ["totals", "read-only · what to bring to the floor in one trip"], ["empty", "nothing confirmed for that day"], ["mixed sources", "one source at a time · a Taproom order is not on the Warehouse sheet", 1]],
     spec: "A staging aid, not a command surface: nothing here writes, and a row opens that order's Pick, which is where counting happens. Totals sum the day so a picker carries one load out instead of walking back per order; they are read-only because a total spans orders and picking is per-order. Scoped to one fulfillment source, since a sheet mixing Warehouse and Taproom lines would send someone to the wrong room.",
-    body: <PickSheetView model={toPickSheetViewProps(pickSheet)} />,
+    body: <PickSheetView model={toPickSheetViewProps(pickSheet)} filters={E.chips(PICK_SHEET_DATE_CHIPS, 1)} />,
   },
   {
     step: 5,
