@@ -4,12 +4,12 @@
 // schedule_packaging_run; Repack is repack-form.tsx → record_repack, a
 // shape change unrelated to any one run — admin/warehouse only (record_repack's
 // own roles), so it is hidden from a brewer rather than offered and refused.
-import { E } from "@/components/mgr/e";
+import { PackagingRunsView } from "@/components/mgr/views/packaging-runs";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import "@/lib/commands/all";
-import { runNo } from "@/lib/mgr/doc-no";
+import { toPackagingRunsViewProps } from "@/lib/mgr/packaging-runs-view";
 import { ScheduleRunForm } from "./schedule-run-form";
 import { RepackForm } from "./repack-form";
 
@@ -24,13 +24,6 @@ type Location = { id: string; name: string };
 type Bin = { id: string; location_id: string; name: string };
 type Sku = { id: string; name: string; brands: { name: string } | null };
 
-function verb(run: Run): [string, "info" | "attention" | "success"] {
-  if (run.closed_at) return ["Open", "success"];
-  if (run.started_at) return ["Close", "attention"];
-  if (run.occupancy_id) return ["Start", "info"];
-  return ["Pick source", "info"];
-}
-
 export default async function PackagingPage() {
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
@@ -43,24 +36,9 @@ export default async function PackagingPage() {
   ])) as [Run[], Brand[], Occupancy[], Sku[], Location[], Bin[]];
   const skuOptions = skus.map((s) => ({ id: s.id, label: s.brands ? `${s.brands.name} — ${s.name}` : s.name }));
 
-  return (
-    <>
-      {E.hd("Packaging", "runs", <div className="flex gap-2"><ScheduleRunForm brands={brands} occupancies={occupancies} skus={skuOptions} />{canRepack ? <RepackForm locations={locations} bins={bins} skus={skuOptions} /> : null}</div>)}
-      {runs.length === 0
-        ? E.blank("No runs planned")
-        : runs.map((r) => {
-            const [label, tone] = verb(r);
-            return (
-              <div key={r.id}>
-                {E.row(
-                  runNo(r.run_no),
-                  `${r.brand_name ?? "no brand"} · ${r.planned_on} · ${r.vessel_name ?? "no source yet"} · ${Number(r.qty_planned)} planned`,
-                  E.act(label, tone, `/packaging/${r.id}`),
-                  r.closed_at ? "ok" : "",
-                )}
-              </div>
-            );
-          })}
-    </>
-  );
+  return <PackagingRunsView
+    model={toPackagingRunsViewProps(runs, (id) => `/packaging/${id}`)}
+    tabs={null}
+    actions={<div className="flex gap-2"><ScheduleRunForm brands={brands} occupancies={occupancies} skus={skuOptions} />{canRepack ? <RepackForm locations={locations} bins={bins} skus={skuOptions} /> : null}</div>}
+  />;
 }
