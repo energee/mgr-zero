@@ -278,7 +278,28 @@ describe("completion loss review", () => {
       jurisdiction: "TTB", periodStart: completed.period.start, periodEnd: completed.period.end,
     }, adminCtx) as any;
 
-    const correction = await reattribute(completed.adjustmentId, "0.02", "sample", "PA");
+    const clock = new Client({ connectionString: DB });
+    await clock.connect();
+    let correction!: { id: string };
+    try {
+      const beforeRpc = (await clock.query("select clock_timestamp() at")).rows[0].at as Date;
+      correction = await reattribute(completed.adjustmentId, "0.02", "sample", "PA");
+      const afterRpc = (await clock.query("select clock_timestamp() at")).rows[0].at as Date;
+      const postingTimes = (await clock.query<{ kind: string; created_at: Date }>(`
+        select 'allocation' kind, created_at
+          from volume_adjustment_reclassifications where brewery_id=$1 and id=$2
+        union all
+        select reclassification_leg kind, created_at
+          from volume_adjustments where brewery_id=$1 and reclassification_id=$2
+        order by kind`, [breweryId, correction.id])).rows;
+      expect(postingTimes.map((row) => row.kind)).toEqual(["allocation", "replacement", "reverse"]);
+      for (const row of postingTimes) {
+        expect(row.created_at.getTime(), `${row.kind} must use the RPC transaction time`).toBeGreaterThanOrEqual(beforeRpc.getTime());
+        expect(row.created_at.getTime(), `${row.kind} must use the RPC transaction time`).toBeLessThanOrEqual(afterRpc.getTime());
+      }
+    } finally {
+      await clock.end();
+    }
     sql(`update volume_adjustment_reclassifications set created_at='${completed.period.start}T12:00:00Z' where id='${correction.id}'; update volume_adjustments set created_at='${completed.period.start}T12:00:00Z' where reclassification_id='${correction.id}'`, true);
     expect(sql(`select bbl::text from occupancy_volumes where occupancy_id='${occupancy}'`, true)).toEqual(beforeVolume);
     const priorReport = await runCommand("generate_compliance_report", {
