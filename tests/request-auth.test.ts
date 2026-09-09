@@ -1,7 +1,7 @@
 // tests/request-auth.test.ts — proves request authentication and membership resolution stay distinct and deduplicated.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { makeBrewery, makeStaff } from "./helpers";
+import { makeBrewery, makeStaff, sql } from "./helpers";
 
 const request = vi.hoisted(() => ({ db: undefined as SupabaseClient | undefined }));
 const navigation = vi.hoisted(() => ({
@@ -93,6 +93,19 @@ describe("request authentication", () => {
 
     expect(getClaims).toHaveBeenCalledTimes(1);
     expect(membershipRequests).toBe(1);
+  });
+
+  it("shares one admission budget between cookie and bearer routes", async () => {
+    const brewery = await makeBrewery();
+    const staff = await makeStaff(brewery.id);
+    request.db = await signInAs(staff.email, globalThis.fetch);
+    const token = (await request.db.auth.getSession()).data.session!.access_token;
+    sql(`insert into private.command_admissions(user_id,window_started_at,request_count) values ('${staff.id}',now(),119)
+      on conflict(user_id) do update set window_started_at=now(),request_count=119`);
+    const payload = JSON.stringify({ breweryId: brewery.id, name: "list_brands", input: {} });
+    expect((await POST(new Request("http://localhost/api/command", { method: "POST", headers: { "content-type": "application/json" }, body: payload }))).status).toBe(200);
+    expect((await POST(new Request("http://localhost/api/command", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${token}` }, body: payload }))).status).toBe(429);
+    sql(`delete from private.command_admissions where user_id='${staff.id}'`);
   });
 
   it("uses one signed-in client, identity lookup, and staff lookup when routing a staff login", async () => {

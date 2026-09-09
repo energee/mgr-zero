@@ -42,6 +42,14 @@ membership checks still decide what the caller may do. When supplied, its actor,
 brewery, and optional customer must match the authenticated request before the
 operation runs.
 
+The endpoint accepts at most **8 MiB** of JSON per request and admits **120
+requests per authenticated account per 60 seconds**. The account budget is
+shared by cookie and bearer authentication, every brewery, and the pre-tenant
+provisioning command. A `429` response includes `Retry-After` in seconds. The
+limit protects this command endpoint; it is not an IP or general Data API
+limit. The 5,000-row CSV limit is separate, so imports with unusually large
+string cells may need to be split into smaller batches.
+
 ### Responses [#responses]
 
 Success carries the operation's result in `data`:
@@ -462,10 +470,13 @@ one value that ties what your client saw to what the server recorded.
 | 404 | `unknown_command` | No operation is registered under that `name`. | Check the spelling. An operation marked designed is not registered yet and answers this. |
 | 409 | `conflict` | A `requestId` was reused with a different payload. | Reuse a requestId only to retry the identical write; generate a new one for a new write. |
 | 409 | `context_changed` | The authenticated account, brewery, or customer no longer matches the optional rendered-context expectation. | Return to the original signed-in context to retry the unchanged action; otherwise review the current state before starting a new request. |
+| 413 | `request_too_large` | The JSON request body exceeded the 8 MiB transport limit. | Send a smaller batch. CSV imports still allow up to 5,000 rows, but unusually large string cells may require splitting the file. |
+| 429 | `rate_limited` | This authenticated account exceeded 120 command-endpoint requests in the current 60-second window. | Wait for the number of seconds in the `Retry-After` response header, then retry. An unchanged write keeps its original `requestId`. |
 | 500 | `db_error` | The database refused the write for a reason not mapped to a public code. Logged server-side. | Retry once with the same `requestId`. If it persists, quote the `correlationId` from the response. |
 | 500 | `internal_error` | A handler threw something the endpoint could not map to a public code. A server fault, and the only code whose message carries no detail. | Retry once with the same `requestId`; a write may or may not have landed, so read the record back before retrying with a new one. Report it with the `correlationId`. |
 | 500 | `missing_execution` | A command reached its handler without execution metadata. A server fault. | Report it with the `correlationId`. |
 | 502 | `invite_failed` | The invitation was interrupted before membership completion was confirmed. | Retry the identical input with the same `requestId`; the saved Auth identity is reused. |
+| 503 | `admission_unavailable` | The authenticated admission check was unavailable, so the operation did not run. | Retry later with the same `requestId` for an unchanged write. Report persistent failures with the `correlationId`. |
 {/* end ops:errors */}
 
 ### Validation failures name their fields [#validation]

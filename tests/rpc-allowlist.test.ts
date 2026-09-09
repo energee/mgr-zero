@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { sql } from "./helpers";
 
 const AUTHENTICATED_RPCS = [
+  "consume_command_admission()",
   "get_taproom_draft_projection(uuid,uuid)",
   "get_taproom_variance(uuid,uuid,integer)",
   "tap_keg(uuid,uuid,uuid,text,numeric,text,numeric,uuid)",

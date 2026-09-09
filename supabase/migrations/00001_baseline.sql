@@ -34,6 +34,40 @@ language sql volatile set search_path = '' as $$
   select extensions.gen_random_uuid()
 $$;
 
+-- Transport admission is independent of the business request ledger. One row
+-- per Auth user bounds storage; identity, clock, window, and limit are all
+-- server-owned so callers cannot split or weaken their budget.
+create table private.command_admissions (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  window_started_at timestamptz not null,
+  request_count integer not null check (request_count > 0)
+);
+
+create function public.consume_command_admission()
+returns table (allowed boolean, retry_after integer)
+language plpgsql volatile security definer set search_path = '' as $$
+declare
+  v_user uuid := auth.uid();
+  v_now timestamptz := statement_timestamp();
+  v_window interval := interval '60 seconds';
+  v_limit constant integer := 120;
+  v_row private.command_admissions%rowtype;
+begin
+  if v_user is null then raise insufficient_privilege using message = 'authentication required'; end if;
+  insert into private.command_admissions(user_id, window_started_at, request_count)
+  values (v_user, v_now, 1)
+  on conflict (user_id) do update set
+    window_started_at = case when private.command_admissions.window_started_at + v_window <= v_now then v_now else private.command_admissions.window_started_at end,
+    request_count = case when private.command_admissions.window_started_at + v_window <= v_now then 1 else private.command_admissions.request_count + 1 end
+  returning * into v_row;
+  allowed := v_row.request_count <= v_limit;
+  retry_after := case when allowed then 0 else greatest(1, ceil(extract(epoch from v_row.window_started_at + v_window - v_now))::integer) end;
+  return next;
+end $$;
+
+revoke all on private.command_admissions from public, anon, authenticated, service_role;
+revoke all on function public.consume_command_admission() from public, anon, authenticated, service_role;
+
 -- ---------------------------------------------------------------- enums
 create type staff_role as enum ('admin','sales','warehouse','brewer','taproom');
 create type customer_type as enum ('distributor','retailer','brewery','other');
@@ -8935,3 +8969,8 @@ begin
 end $$;
 revoke all on function get_taproom_variance(uuid,uuid,integer),get_taproom_draft_projection(uuid,uuid) from public,anon,authenticated,service_role;
 grant execute on function get_taproom_variance(uuid,uuid,integer),get_taproom_draft_projection(uuid,uuid) to authenticated;
+
+-- The blanket application-function ACL above intentionally precedes this
+-- transport-only exception. It accepts no caller-controlled identity or limit.
+revoke all on function public.consume_command_admission() from public, anon, authenticated, service_role;
+grant execute on function public.consume_command_admission() to authenticated;

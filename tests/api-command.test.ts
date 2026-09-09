@@ -6,6 +6,7 @@ import { z } from "zod";
 import { command } from "@/lib/commands/client";
 import { type CommandExecution, type Ctx, defineCommand } from "@/lib/commands/registry";
 import { POST } from "@/app/api/command/route";
+import { MAX_COMMAND_BODY_BYTES } from "@/lib/commands/request-limits";
 import { makeBrewery, makeStaff, sql } from "./helpers";
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54341";
@@ -94,6 +95,17 @@ describe("POST /api/command bearer auth", () => {
     const json = await res.json() as { ok: boolean; error: { code: string } };
     expect(json.ok).toBe(false);
     expect(json.error.code).toBe("invalid_request");
+  });
+
+  it("rejects an oversized command before authentication or dispatch", async () => {
+    executionHandler.mockClear();
+    const prefix = JSON.stringify({ breweryId, name: "execution_metadata_probe", input: {}, requestId: randomUUID() });
+    const req = new Request("http://localhost/api/command", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: prefix + " ".repeat(MAX_COMMAND_BODY_BYTES),
+    });
+    expect((await POST(req)).status).toBe(413);
+    expect(executionHandler).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -211,6 +223,28 @@ describe("POST /api/command bearer auth", () => {
       error: { code: "permission_denied", message: expect.any(String) },
       correlationId: expect.any(String),
     });
+  });
+
+  it("returns Retry-After and never dispatches or claims a business request when admission is denied", async () => {
+    executionHandler.mockClear();
+    sql(`insert into private.command_admissions(user_id,window_started_at,request_count) values ('${adminId}',now(),120)
+      on conflict(user_id) do update set window_started_at=now(),request_count=120`);
+    const requestId = randomUUID();
+    const res = await POST(commandReq({ breweryId, name: "execution_metadata_probe", input: {}, requestId }, adminToken));
+    expect(res.status).toBe(429);
+    expect(Number(res.headers.get("retry-after"))).toBeGreaterThan(0);
+    await expect(res.json()).resolves.toMatchObject({ ok: false, error: { code: "rate_limited" }, requestId, correlationId: expect.any(String) });
+    expect(executionHandler).not.toHaveBeenCalled();
+    expect(sql(`select count(*) from private.command_requests where request_id='${requestId}'`)).toEqual(["0"]);
+    sql(`delete from private.command_admissions where user_id='${adminId}'`);
+  });
+
+  it("applies admission to authenticated pretenant requests", async () => {
+    sql(`insert into private.command_admissions(user_id,window_started_at,request_count) values ('${adminId}',now(),120)
+      on conflict(user_id) do update set window_started_at=now(),request_count=120`);
+    const res = await POST(commandReq({ name: "provision_brewery", input: { name: "Never created", timezone: "America/New_York" }, requestId: randomUUID() }, adminToken));
+    expect(res.status).toBe(429);
+    sql(`delete from private.command_admissions where user_id='${adminId}'`);
   });
 
   it("rejects a rendered actor mismatch before invoking the handler", async () => {
