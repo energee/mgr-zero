@@ -1,0 +1,191 @@
+import { describe, expect, it, vi } from "vitest";
+import { QboOAuthClient, syncQboInvoices } from "@/lib/qbo";
+import { invoiceCurrentState } from "@/lib/mgr/invoice-state";
+import { admin, makeBrewery, makeStaffCtx, seedCustomer, sql } from "./helpers";
+
+const config = {
+  clientId: "client-id",
+  clientSecret: "client-secret",
+  redirectUri: "https://mgr.test/api/integrations/qbo/oauth",
+  apiBaseUrl: "https://sandbox-quickbooks.api.intuit.com",
+};
+
+async function stateFixture(role: "admin" | "sales" | "warehouse" = "admin") {
+  const brewery = await makeBrewery();
+  const ctx = await makeStaffCtx(brewery.id, role);
+  const customer = await seedCustomer(brewery.id);
+  const connection = await admin.from("qbo_connections").insert({
+    brewery_id: brewery.id,
+    realm_id: `realm-${crypto.randomUUID()}`,
+    state: "connected",
+  }).select("id,realm_id").single();
+  if (connection.error) throw connection.error;
+  sql(`insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token)
+    values('${brewery.id}','qbo','${connection.data.id}','access-secret','refresh-secret')`);
+  const invoice = await admin.from("invoices").insert({
+    brewery_id: brewery.id,
+    customer_id: customer.customerId,
+    qbo_invoice_id: "remote-invoice",
+    qbo_sync_status: "pushed",
+  }).select("id").single();
+  if (invoice.error) throw invoice.error;
+  const push = await admin.rpc("start_qbo_push", {
+    p_brewery: brewery.id,
+    p_invoice: invoice.data.id,
+    p_new_attempt_reason: null,
+    p_request_id: crypto.randomUUID(),
+  });
+  // The fixture has no mappings or lines, so create the already-pushed provider
+  // identity through the baseline owner rather than weakening push validation.
+  sql(`insert into public.qbo_pushes(
+      brewery_id,invoice_id,connection_id,realm_id,entity_type,provider_request_id,
+      request_body,local_snapshot,attempt_reason,status,qbo_entity_id,response,finished_at)
+    values('${brewery.id}','${invoice.data.id}','${connection.data.id}','${connection.data.realm_id}',
+      'Invoice',gen_random_uuid(),'{}','{}','initial','pushed','remote-invoice',
+      '{"Id":"remote-invoice","SyncToken":"0","TotalAmt":100,"TotalTax":10,"Balance":100}',now())`);
+  expect(push.error?.message).toContain("QuickBooks customer mapping required");
+  return { brewery, ctx, customer, connection: connection.data, invoice: invoice.data };
+}
+
+function invoiceResponse(overrides: Record<string, unknown> = {}) {
+  return new Response(JSON.stringify({
+    Invoice: {
+      Id: "remote-invoice",
+      SyncToken: "1",
+      TotalAmt: 100,
+      Balance: 50,
+      TxnTaxDetail: { TotalTax: 10 },
+      LinkedTxn: [{ TxnId: "payment-1", TxnType: "Payment" }],
+      MetaData: { LastUpdatedTime: "2026-09-09T15:00:00Z" },
+      ...overrides,
+    },
+  }), { status: 200 });
+}
+
+describe("QuickBooks current invoice state", () => {
+  it("tracks partial, paid, reopened and voided states without mistaking credits for cash", async () => {
+    const f = await stateFixture();
+    const fetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(invoiceResponse())
+      .mockResolvedValueOnce(invoiceResponse({ Balance: 0, SyncToken: "2" }))
+      .mockResolvedValueOnce(invoiceResponse({ Balance: 25, SyncToken: "3" }))
+      .mockResolvedValueOnce(invoiceResponse({ Balance: 0, SyncToken: "4" }))
+      .mockResolvedValueOnce(invoiceResponse({
+        Balance: 0,
+        TotalAmt: 0,
+        SyncToken: "5",
+        TxnTaxDetail: { TotalTax: 0 },
+        PrivateNote: "Voided by accountant",
+      }));
+    const client = new QboOAuthClient(config, fetch);
+
+    await syncQboInvoices(f.ctx, crypto.randomUUID(), client);
+    expect(sql(`select qbo_balance_cents || '|' || coalesce(paid_at::text,'NULL') from invoices where id='${f.invoice.id}'`))
+      .toEqual(["5000|NULL"]);
+
+    await syncQboInvoices(f.ctx, crypto.randomUUID(), client);
+    expect(sql(`select qbo_balance_cents || '|' || (paid_at is not null)::text || '|' || qbo_accountant_drift::text from invoices where id='${f.invoice.id}'`))
+      .toEqual(["0|true|false"]);
+
+    await syncQboInvoices(f.ctx, crypto.randomUUID(), client);
+    expect(sql(`select qbo_balance_cents || '|' || coalesce(paid_at::text,'NULL') from invoices where id='${f.invoice.id}'`))
+      .toEqual(["2500|NULL"]);
+
+    await syncQboInvoices(f.ctx, crypto.randomUUID(), client);
+    const paidAt = sql(`select paid_at::text from invoices where id='${f.invoice.id}'`)[0];
+    await syncQboInvoices(f.ctx, crypto.randomUUID(), client);
+    expect(sql(`select qbo_remote_state || '|' || paid_at::text from invoices where id='${f.invoice.id}'`))
+      .toEqual([`voided|${paidAt}`]);
+    expect(invoiceCurrentState({ qbo_remote_state: "voided", written_off_at: null, paid_at: paidAt, qbo_balance_cents: 0 }))
+      .toBe("voided");
+
+    const creditOnly = await stateFixture();
+    const creditFetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(invoiceResponse({
+      Balance: 0,
+      LinkedTxn: [{ TxnId: "credit-1", TxnType: "CreditMemo" }],
+    }));
+    await syncQboInvoices(creditOnly.ctx, crypto.randomUUID(), new QboOAuthClient(config, creditFetch));
+    expect(sql(`select coalesce(paid_at::text,'NULL') from invoices where id='${creditOnly.invoice.id}'`)).toEqual(["NULL"]);
+  });
+
+  it("distinguishes payment-only SyncToken changes from accountant total drift", async () => {
+    const f = await stateFixture();
+    const fetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(invoiceResponse({ SyncToken: "9" }))
+      .mockResolvedValueOnce(invoiceResponse({ SyncToken: "10", TotalAmt: 105 }));
+    const client = new QboOAuthClient(config, fetch);
+    await syncQboInvoices(f.ctx, crypto.randomUUID(), client);
+    expect(sql(`select qbo_sync_token || '|' || qbo_accountant_drift::text from invoices where id='${f.invoice.id}'`))
+      .toEqual(["9|false"]);
+    await syncQboInvoices(f.ctx, crypto.randomUUID(), client);
+    expect(sql(`select qbo_sync_token || '|' || qbo_accountant_drift::text from invoices where id='${f.invoice.id}'`))
+      .toEqual(["10|true"]);
+  });
+
+  it("marks only a definitive 404 from the original current realm as deleted", async () => {
+    const deleted = await stateFixture();
+    const notFound = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response("missing", { status: 404 }));
+    await syncQboInvoices(deleted.ctx, crypto.randomUUID(), new QboOAuthClient(config, notFound));
+    expect(sql(`select qbo_remote_state from invoices where id='${deleted.invoice.id}'`)).toEqual(["deleted"]);
+
+    const unavailable = await stateFixture();
+    const transport = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response("later", { status: 503 }));
+    await expect(syncQboInvoices(unavailable.ctx, crypto.randomUUID(), new QboOAuthClient(config, transport)))
+      .rejects.toThrow("QuickBooks is unavailable");
+    expect(sql(`select qbo_remote_state from invoices where id='${unavailable.invoice.id}'`)).toEqual(["live"]);
+
+    const wrongRealm = await stateFixture();
+    sql(`update public.qbo_pushes set realm_id='other-realm' where invoice_id='${wrongRealm.invoice.id}'`);
+    const noFetch = vi.fn<typeof globalThis.fetch>();
+    await syncQboInvoices(wrongRealm.ctx, crypto.randomUUID(), new QboOAuthClient(config, noFetch));
+    expect(noFetch).not.toHaveBeenCalled();
+    expect(sql(`select qbo_remote_state from invoices where id='${wrongRealm.invoice.id}'`)).toEqual(["live"]);
+  });
+
+  it("sets future ACH/card defaults and writes off only eligible invoices with exact replay", async () => {
+    const f = await stateFixture();
+    const defaultsRequest = crypto.randomUUID();
+    const defaults = await f.ctx.db.rpc("set_qbo_push_defaults", {
+      p_brewery: f.brewery.id,
+      p_allow_ach: true,
+      p_allow_card: false,
+      p_request_id: defaultsRequest,
+    });
+    expect(defaults.error).toBeNull();
+    expect(defaults.data).toEqual({ allowAch: true, allowCard: false });
+
+    sql(`update public.invoices set qbo_remote_state='voided',paid_at='2026-09-09T15:00:00Z' where id='${f.invoice.id}'`);
+    const requestId = crypto.randomUUID();
+    const input = {
+      p_brewery: f.brewery.id,
+      p_invoice: f.invoice.id,
+      p_reason: "Accountant voided an uncollectible duplicate",
+      p_request_id: requestId,
+    };
+    const first = await f.ctx.db.rpc("write_off_invoice", input);
+    const replay = await f.ctx.db.rpc("write_off_invoice", input);
+    expect(first.error).toBeNull();
+    expect(replay.data).toEqual(first.data);
+    expect(sql(`select (written_off_at is not null)::text || '|' || written_off_by || '|' || written_off_reason || '|' || paid_at::text from invoices where id='${f.invoice.id}'`))
+      .toEqual([`true|${f.ctx.userId}|Accountant voided an uncollectible duplicate|2026-09-09 15:00:00+00`]);
+
+    const live = await stateFixture();
+    expect((await live.ctx.db.rpc("write_off_invoice", {
+      p_brewery: live.brewery.id,
+      p_invoice: live.invoice.id,
+      p_reason: "Not eligible",
+      p_request_id: crypto.randomUUID(),
+    })).error).not.toBeNull();
+    const sales = await makeStaffCtx(f.brewery.id, "sales");
+    expect((await sales.db.rpc("write_off_invoice", {
+      ...input,
+      p_request_id: crypto.randomUUID(),
+    })).error?.code).toBe("42501");
+    const foreign = await stateFixture();
+    expect((await foreign.ctx.db.rpc("write_off_invoice", {
+      ...input,
+      p_brewery: foreign.brewery.id,
+      p_request_id: crypto.randomUUID(),
+    })).error).not.toBeNull();
+  });
+});
