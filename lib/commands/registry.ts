@@ -44,6 +44,13 @@ export type CommandRequest = {
   name: string;
   input: unknown;
   requestId?: string;
+  expectedContext?: CommandContextExpectation;
+};
+
+export type CommandContextExpectation = {
+  actorId: string;
+  breweryId?: string;
+  customerId?: string;
 };
 
 export class CommandError extends Error {
@@ -82,7 +89,9 @@ export const stateCode = z.string().regex(/^[A-Z]{2}$/, "two-letter state code")
 // route (lib/mgr/not-found.ts).
 function rpcError(error: { message: string; code?: string }): CommandError {
   switch (error.code) {
-    case "42501": return new CommandError(error.message, 403, "permission_denied");
+    case "42501":
+      console.error("database error 42501:", error.message);
+      return new CommandError("permission denied", 403, "permission_denied");
     case "MG409": return new CommandError(error.message, 409, "conflict");
     case "PGRST116": return new CommandError("record not found", 404, "not_found");
     case "P0001": return new CommandError(error.message);

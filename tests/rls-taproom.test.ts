@@ -309,7 +309,8 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   const readNames = ["get_batch_completion_preview","get_loss_review","get_taproom_draft_projection","get_taproom_variance","list_open_taps","list_tap_history","get_taproom_count_snapshot","get_taproom_print_labels","get_taproom_count","list_taproom_counts","taproom_can","staff_brewery_rows","keg_bin_on_hand_rows","on_hand_rows","get_chat_integration_health","get_chat_link_intent","list_chat_user_links","generate_compliance_report","get_today_items","is_staff_of","my_brewery_ids","my_customer_ids","portal_availability","portal_brewery_rows","staff_role","today_live_reasons","list_team_members"];
   const ownNames = ["set_my_gravity_unit","consume_chat_link_proof","unlink_chat_user","set_notification_preference","set_personal_notification_destination"];
   const existing = [...readFileSync(new URL("./rls-command-boundary.test.ts", import.meta.url), "utf8").matchAll(/rpc: "(\w+)"/g)].map(m => m[1]);
-  expect([...new Set(catalog.map(c => c.name))].sort()).toEqual([...new Set([...Object.keys(cases),...existing,...readNames,...ownNames,"provision_brewery"])].sort());
+  const infrastructureNames = ["consume_command_admission"];
+  expect([...new Set(catalog.map(c => c.name))].sort()).toEqual([...new Set([...Object.keys(cases),...existing,...readNames,...ownNames,...infrastructureNames,"provision_brewery"])].sort());
   const publicSnapshot = () => sql((Object.keys(matrix) as Table[]).map(table => {
     const predicate = table === "breweries" ? `id='${B}'` : table === "customer_users" ? `customer_id='${f.customer.customerId}'` : `brewery_id='${B}'`;
     return `select '${table}:' || md5(coalesce(jsonb_agg(to_jsonb(t) order by to_jsonb(t)::text)::text,'')) from public.${table} t where ${predicate}`;
@@ -320,6 +321,8 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   expect(catalog.filter(c => readNames.includes(c.name)).map(c => c.signature).sort()).toEqual(readSignatures.sort());
   expect(catalog.filter(c => ownNames.includes(c.name)).map(c => c.signature).sort()).toEqual([...ownSignatures].sort());
   expect(catalog.filter(c => c.name === "provision_brewery").map(c => c.signature)).toEqual(["provision_brewery(text,text,text,uuid)"]);
+  expect(catalog.filter(c => infrastructureNames.includes(c.name)).map(c => c.signature)).toEqual(["consume_command_admission()"]);
+  await expect(db.rpc("consume_command_admission")).resolves.toMatchObject({ data: [{ allowed: true, retry_after: 0 }], error: null });
   for (const name of new Set(existing)) expect(catalog.filter(c => c.name === name), `${name} existing lifecycle case`).toHaveLength(1);
   const sharedDestination = await db.rpc("set_notification_destination", { p_brewery: B, p_installation: I, p_external_destination_id: "shared", p_request_id: R(), p_actor: f.owner.id, p_version: now });
   expect(sharedDestination.error?.code).toBe("42501");

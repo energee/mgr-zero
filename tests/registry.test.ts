@@ -101,7 +101,11 @@ describe("command registry", () => {
 describe("unwrap maps RPC SQLSTATEs to command errors", () => {
   const failing = (code: string) => Promise.resolve({ data: null, error: { message: "boom", code } });
   it("42501 (definer authorization) → 403 permission_denied", async () => {
-    await expect(unwrap(failing("42501"))).rejects.toMatchObject({ status: 403, code: "permission_denied" });
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(unwrap(Promise.resolve({ data: null, error: { message: "new row violates RLS on private.secret", code: "42501" } })))
+      .rejects.toMatchObject({ status: 403, code: "permission_denied", message: "permission denied" });
+    expect(log).toHaveBeenCalledWith("database error 42501:", "new row violates RLS on private.secret");
+    log.mockRestore();
   });
   it("MG409 (request-id reuse) → 409 conflict", async () => {
     await expect(unwrap(failing("MG409"))).rejects.toMatchObject({ status: 409, code: "conflict" });

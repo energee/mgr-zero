@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { command, CommandResponseError } from "@/lib/commands/client";
+import { useCommandContext } from "@/app/(app)/brewery-provider";
 import {
   beginTapBoardAttempt,
   completeTapBoardAttempt,
@@ -50,6 +51,7 @@ function closingFact(history: TapHistory[], interval: TapInterval | null) {
 }
 
 export function TapBoard({ breweryId, locationId, initial, skus }: { breweryId: string; locationId: string; initial: TapBoardSnapshot; skus: TapSku[] }) {
+  const expectedContext = useRef(useCommandContext());
   const [state, setState] = useState<TapBoardState>({ snapshot: initial, sheet: null });
   const [pollError, setPollError] = useState<string | null>(null);
   const refreshGuard = useRef(createTapBoardRefreshGuard());
@@ -102,7 +104,7 @@ export function TapBoard({ breweryId, locationId, initial, skus }: { breweryId: 
     if (!submitted || submitted.attempt.kind !== "submitting") return;
     const attempt = submitted.attempt;
     const result = await submitAndRefreshTapBoard(
-      () => command(breweryId, tapBoardCommand(submitted), attempt.payload, attempt.requestId),
+      () => command(breweryId, tapBoardCommand(submitted), attempt.payload, attempt.requestId, expectedContext.current),
       loadLatest,
     );
     if (result.kind === "write_failed") {

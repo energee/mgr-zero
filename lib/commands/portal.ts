@@ -69,12 +69,12 @@ defineQuery({
   input: z.object({}),
   handler: async (ctx) => {
     const customerId = requireCustomer(ctx);
-    // RLS limits channel prices to the caller's own sale channel and skus to
-    // active ones; sku_prices already resolves the grid lookup (the cell where
-    // the caller's sale channel meets the brand's price group and the SKU's
-    // format), so a SKU with no group or an empty cell simply has no row.
+    const customer = await unwrap(ctx.db.from("customers").select("sale_channel_id").eq("id", customerId).eq("brewery_id", ctx.breweryId).single()) as { sale_channel_id: string };
+    // sku_prices resolves the grid cell where the selected customer's channel
+    // meets the brand's price group and SKU format.
     const [prices, avail] = await Promise.all([
-      unwrap(ctx.db.from("sku_prices").select("sku_id, sku_name, brand_name, unit_price_cents")),
+      unwrap(ctx.db.from("sku_prices").select("sku_id, sku_name, brand_name, unit_price_cents")
+        .eq("brewery_id", ctx.breweryId).eq("sale_channel_id", customer.sale_channel_id)),
       unwrap(ctx.db.rpc("portal_availability", { p_customer: customerId })),
     ]);
     const badges = new Map((avail as { sku_id: string; badge: string }[]).map(a => [a.sku_id, a.badge]));

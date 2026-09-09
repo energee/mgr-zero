@@ -8,25 +8,27 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useBrewery } from "@/app/(app)/brewery-provider";
+import { useBrewery, useCommandContext } from "@/app/(app)/brewery-provider";
 import { command } from "./client";
 
 export function useCommandAction() {
   const breweryId = useBrewery();
+  const expectedContext = useCommandContext();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const pending = useRef<{ key: string; requestId: string } | null>(null);
+  const pending = useRef<{ key: string; requestId: string; expectedContext: typeof expectedContext } | null>(null);
 
   // Resolves true on success, so a caller that navigates away can wait for it.
   async function run(name: string, input: unknown, onSuccess?: (data: unknown) => void, requestId?: string) {
     setBusy(true);
     setError(null);
     try {
-      const key = JSON.stringify([breweryId, name, input]);
-      if (pending.current?.key !== key) pending.current = { key, requestId: crypto.randomUUID() };
-      const data = await command(breweryId, name, input, requestId ?? pending.current.requestId);
+      const key = JSON.stringify([name, input]);
+      if (pending.current?.key !== key) pending.current = { key, requestId: crypto.randomUUID(), expectedContext };
+      const attempt = pending.current;
+      const data = await command(attempt.expectedContext.breweryId ?? breweryId, name, input, requestId ?? attempt.requestId, attempt.expectedContext);
       pending.current = null;
       onSuccess?.(data);
       router.refresh();

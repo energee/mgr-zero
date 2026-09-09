@@ -34,6 +34,40 @@ language sql volatile set search_path = '' as $$
   select extensions.gen_random_uuid()
 $$;
 
+-- Transport admission is independent of the business request ledger. One row
+-- per Auth user bounds storage; identity, clock, window, and limit are all
+-- server-owned so callers cannot split or weaken their budget.
+create table private.command_admissions (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  window_started_at timestamptz not null,
+  request_count integer not null check (request_count > 0)
+);
+
+create function public.consume_command_admission()
+returns table (allowed boolean, retry_after integer)
+language plpgsql volatile security definer set search_path = '' as $$
+declare
+  v_user uuid := auth.uid();
+  v_now timestamptz := statement_timestamp();
+  v_window interval := interval '60 seconds';
+  v_limit constant integer := 120;
+  v_row private.command_admissions%rowtype;
+begin
+  if v_user is null then raise insufficient_privilege using message = 'authentication required'; end if;
+  insert into private.command_admissions(user_id, window_started_at, request_count)
+  values (v_user, v_now, 1)
+  on conflict (user_id) do update set
+    window_started_at = case when private.command_admissions.window_started_at + v_window <= v_now then v_now else private.command_admissions.window_started_at end,
+    request_count = case when private.command_admissions.window_started_at + v_window <= v_now then 1 else private.command_admissions.request_count + 1 end
+  returning * into v_row;
+  allowed := v_row.request_count <= v_limit;
+  retry_after := case when allowed then 0 else greatest(1, ceil(extract(epoch from v_row.window_started_at + v_window - v_now))::integer) end;
+  return next;
+end $$;
+
+revoke all on private.command_admissions from public, anon, authenticated, service_role;
+revoke all on function public.consume_command_admission() from public, anon, authenticated, service_role;
+
 -- ---------------------------------------------------------------- enums
 create type staff_role as enum ('admin','sales','warehouse','brewer','taproom');
 create type customer_type as enum ('distributor','retailer','brewery','other');
@@ -71,6 +105,35 @@ create type keg_event_reason as enum ('acquired','retired','shipped','returned',
 create type stock_transfer_status as enum ('draft','submitted','picked','in_transit','received','cancelled');
 create type approval_kind as enum ('cola','formula');
 
+-- Server-verified request headers may only narrow the authenticated JWT. Read
+-- policies use a boolean predicate so unrelated rows disappear instead of
+-- aborting an otherwise valid scan.
+create function private.request_scope_allows(p_brewery uuid, p_customer uuid default null, p_allow_unspecified_customer boolean default false) returns boolean
+language plpgsql stable security definer set search_path = '' as $$
+declare v_headers jsonb; v_actor uuid; v_brewery uuid; v_customer uuid;
+begin
+  begin
+    v_headers := nullif(current_setting('request.headers', true), '')::jsonb;
+    if v_headers is null then return true; end if;
+    if jsonb_typeof(v_headers) <> 'object' then return false; end if;
+    if v_headers ? 'x-mgr-actor-id' then
+      v_actor := (v_headers ->> 'x-mgr-actor-id')::uuid;
+      if v_actor is null or v_actor is distinct from auth.uid() then return false; end if;
+    end if;
+    if v_headers ? 'x-mgr-brewery-id' then
+      v_brewery := (v_headers ->> 'x-mgr-brewery-id')::uuid;
+      if v_brewery is null or v_brewery is distinct from p_brewery then return false; end if;
+    end if;
+    if v_headers ? 'x-mgr-customer-id' then
+      v_customer := (v_headers ->> 'x-mgr-customer-id')::uuid;
+      if v_customer is null or (p_customer is null and not p_allow_unspecified_customer) or (p_customer is not null and v_customer is distinct from p_customer) then return false; end if;
+    end if;
+    return true;
+  exception when others then
+    return false;
+  end;
+end $$;
+
 -- ---------------------------------------------------------------- core
 create table breweries (
   id uuid primary key default private.new_uuid(),
@@ -103,15 +166,15 @@ comment on column brewery_users.gravity_unit is
 -- Access helpers (security definer so RLS policies can call them cheaply).
 create function my_brewery_ids() returns setof uuid
 language sql stable security definer set search_path = '' as
-$$ select brewery_id from public.brewery_users where user_id = auth.uid() $$;
+$$ select brewery_id from public.brewery_users where user_id = auth.uid() and private.request_scope_allows(brewery_id) $$;
 
 create function is_staff_of(b uuid) returns boolean
 language sql stable security definer set search_path = '' as
-$$ select exists(select 1 from public.brewery_users where user_id = auth.uid() and brewery_id = b and role in ('admin','sales','warehouse','brewer')) $$;
+$$ select private.request_scope_allows(b) and exists(select 1 from public.brewery_users where user_id = auth.uid() and brewery_id = b and role in ('admin','sales','warehouse','brewer')) $$;
 
 create function staff_role(b uuid) returns staff_role
 language sql stable security definer set search_path = '' as
-$$ select role from public.brewery_users where user_id = auth.uid() and brewery_id = b $$;
+$$ select role from public.brewery_users where user_id = auth.uid() and brewery_id = b and private.request_scope_allows(b) $$;
 
 -- Explicit taproom vocabulary; location scope remains in the policies below.
 create function taproom_can(b uuid, t text) returns boolean
@@ -128,7 +191,7 @@ returns table (id uuid, name text, timezone text, gravity_unit text)
 language sql stable security definer set search_path = '' as $$
   select b.id, b.name, b.timezone, b.gravity_unit from public.breweries b
   join public.brewery_users u on u.brewery_id = b.id
-  where u.user_id = auth.uid();
+  where u.user_id = auth.uid() and private.request_scope_allows(b.id);
 $$;
 create view staff_brewery with (security_invoker = true) as
   select id, name, timezone, gravity_unit from public.staff_brewery_rows();
@@ -186,7 +249,9 @@ create table customer_users (
 
 create function my_customer_ids() returns setof uuid
 language sql stable security definer set search_path = '' as
-$$ select customer_id from public.customer_users where user_id = auth.uid() $$;
+$$ select cu.customer_id from public.customer_users cu
+   join public.customers c on c.id = cu.customer_id
+   where cu.user_id = auth.uid() and private.request_scope_allows(c.brewery_id, c.id) $$;
 
 create table ship_tos (
   id uuid primary key default private.new_uuid(),
@@ -3080,10 +3145,30 @@ create table private.command_requests (
   check ((brewery_id is null) = (command_name = 'provision_brewery'))
 );
 
+-- Optional PostgREST headers narrow an already-authenticated request to the
+-- server-verified context that rendered it. They never grant membership.
+create function private.assert_request_scope(p_brewery uuid, p_customer uuid default null) returns void
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not private.request_scope_allows(p_brewery, p_customer, true) then
+    raise exception 'request context changed' using errcode = '42501';
+  end if;
+end $$;
+
+create function private.assert_staff_read(p_brewery uuid, p_roles public.staff_role[]) returns uuid
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not private.request_scope_allows(p_brewery) then
+    raise exception 'request context changed' using errcode = '42501';
+  end if;
+  return private.assert_staff(p_brewery, p_roles);
+end $$;
+
 create function private.assert_staff(p_brewery uuid, p_roles public.staff_role[]) returns uuid
 language plpgsql stable security definer set search_path = '' as $$
 declare v_actor uuid := auth.uid();
 begin
+  perform private.assert_request_scope(p_brewery);
   if v_actor is null or not exists (
     select 1 from public.brewery_users
     where brewery_id = p_brewery and user_id = v_actor and role = any(p_roles)
@@ -3095,6 +3180,7 @@ create function private.assert_customer(p_brewery uuid, p_customer uuid) returns
 language plpgsql stable security definer set search_path = '' as $$
 declare v_actor uuid := auth.uid();
 begin
+  perform private.assert_request_scope(p_brewery, p_customer);
   if v_actor is null or not exists (
     select 1 from public.customer_users cu
     join public.customers c on c.id = cu.customer_id
@@ -3109,6 +3195,7 @@ create function private.claim_command_request(
 declare v_actor uuid := auth.uid(); v_request private.command_requests;
 begin
   if v_actor is null then raise exception 'permission denied' using errcode = '42501'; end if;
+  perform private.assert_request_scope(p_brewery);
   insert into private.command_requests (actor_id, brewery_id, request_id, command_name, payload_hash)
   values (v_actor, p_brewery, p_request_id, p_command, extensions.digest(p_payload::text, 'sha256'))
   on conflict (actor_id, request_id) do nothing;
@@ -3164,7 +3251,8 @@ begin
   return p_result;
 end $$;
 revoke all on function private.claim_command_request_for(uuid, uuid, text, uuid, jsonb),
-  private.complete_command_request_for(uuid, uuid, jsonb)
+  private.complete_command_request_for(uuid, uuid, jsonb),
+  private.assert_request_scope(uuid, uuid)
   from public, anon, authenticated, service_role;
 
 -- Bootstrap is authenticated but deliberately has no tenant identity yet.
@@ -3487,6 +3575,7 @@ language sql stable security definer set search_path = '' as $$
     from public.brewery_users bu
     join auth.users u on u.id = bu.user_id
     where bu.brewery_id = p_brewery
+      and private.request_scope_allows(p_brewery)
       and exists (select 1 from public.brewery_users me where me.brewery_id = p_brewery and me.user_id = auth.uid()
                     and me.role = any (array['admin','sales','warehouse']::public.staff_role[]))
     order by bu.role, u.email;
@@ -4593,12 +4682,11 @@ $$;
 
 -- ponytail: inProcess is the tanks now, not at period end; replaying transfers
 -- and adjustments to a date is the upgrade when a filed month needs it.
-create function generate_compliance_report(p_brewery uuid, p_jurisdiction text, p_start date, p_end date)
+create function private.generate_compliance_report(p_brewery uuid, p_jurisdiction text, p_start date, p_end date)
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
 declare v_lines jsonb; v_warnings text[]; v_removals jsonb; v_cellar_removals jsonb; v_by_state jsonb;
   v_packaged numeric; v_in_process numeric; v_external text[] := '{}';
 begin
-  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
   if p_end < p_start then raise exception 'the period ends before it starts'; end if;
   -- one pass over the ledger; every figure is an aggregate of the same rows
   with r as materialized (select * from private.report_movements(p_brewery, p_end)),
@@ -4652,6 +4740,14 @@ begin
       else '[]'::jsonb end,
     'externalMappingRequired', to_jsonb(v_external));
 end $$;
+
+create function generate_compliance_report(p_brewery uuid, p_jurisdiction text, p_start date, p_end date)
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform private.assert_staff_read(p_brewery, array['admin','sales']::public.staff_role[]);
+  return private.generate_compliance_report(p_brewery, p_jurisdiction, p_start, p_end);
+end $$;
+
 create function file_compliance_report(p_brewery uuid, p_jurisdiction text, p_start date, p_end date, p_note text, p_request_id uuid)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_replay jsonb; v_report jsonb; v_row public.report_filings;
@@ -4660,7 +4756,7 @@ begin
   v_replay := private.claim_command_request(p_brewery, 'file_compliance_report', p_request_id,
     jsonb_build_object('jurisdiction', p_jurisdiction, 'start', p_start, 'end', p_end, 'note', p_note));
   if v_replay is not null then return v_replay; end if;
-  v_report := public.generate_compliance_report(p_brewery, p_jurisdiction, p_start, p_end);
+  v_report := private.generate_compliance_report(p_brewery, p_jurisdiction, p_start, p_end);
   if not (v_report->'figures'->>'balances')::boolean then
     raise exception 'the report does not balance: %', array_to_string(array(select jsonb_array_elements_text(v_report->'warnings')), '; ');
   end if;
@@ -4680,7 +4776,7 @@ create function get_loss_review(p_brewery uuid, p_start date, p_end date)
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
 declare v_result jsonb;
 begin
-  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
+  perform private.assert_staff_read(p_brewery, array['admin','sales']::public.staff_role[]);
   if p_end < p_start then raise exception 'the period ends before it starts'; end if;
   select coalesce(jsonb_agg(jsonb_build_object(
     'adjustment_id', root.id,
@@ -5026,7 +5122,7 @@ end $$;
 create function get_batch_completion_preview(p_brewery uuid, p_batch uuid) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 begin
-  perform private.assert_staff(p_brewery, array['admin','brewer']::public.staff_role[]);
+  perform private.assert_staff_read(p_brewery, array['admin','brewer']::public.staff_role[]);
   return private.batch_completion_calculation(p_brewery, p_batch);
 end $$;
 
@@ -6358,8 +6454,12 @@ alter table brewery_counters enable row level security;   -- no policies: only v
 
 create policy staff_read on breweries for select using (is_staff_of(id));
 -- (select auth.uid()) is evaluated once per statement, not once per row.
-create policy member_read on brewery_users for select using (user_id = (select auth.uid()) or is_staff_of(brewery_id));
-create policy self_read on customer_users for select using (user_id = (select auth.uid()));
+create policy member_read on brewery_users for select using (
+  (user_id = (select auth.uid()) and brewery_id in (select public.my_brewery_ids())) or is_staff_of(brewery_id)
+);
+create policy self_read on customer_users for select using (
+  user_id = (select auth.uid()) and customer_id in (select public.my_customer_ids())
+);
 
 -- Portal customers
 create policy customer_read_own on customers for select using (id in (select my_customer_ids()));
@@ -6863,6 +6963,7 @@ language sql stable security definer set search_path = '' as $$
     from private.today_candidates c
     join public.brewery_users bu on bu.brewery_id = c.brewery_id and bu.user_id = auth.uid()
     where c.brewery_id = p_brewery
+      and private.request_scope_allows(p_brewery)
       and c.reason = any (public.today_live_reasons())
       and (c.reason = 'submitted_order' or c.due_at is null or c.due_at <= p_now)
       and (bu.role = 'admin'
@@ -7984,7 +8085,7 @@ create function get_chat_link_intent(p_brewery uuid,p_proof_hash text) returns j
 language plpgsql stable security definer set search_path = '' as $$
 declare v_result jsonb;
 begin
-  perform private.assert_staff(p_brewery,array['admin','sales','warehouse','brewer','taproom']::public.staff_role[]);
+  perform private.assert_staff_read(p_brewery,array['admin','sales','warehouse','brewer','taproom']::public.staff_role[]);
   select jsonb_build_object('brewery',b.name,'mgrIdentity',coalesce(nullif(u.raw_user_meta_data->>'full_name',''),u.email,u.id::text),
     'slackIdentity',l.external_user_id,'workspace',i.display_label,'expiresAt',l.proof_expires_at) into v_result
     from public.chat_user_links l join public.chat_installations i on i.id=l.installation_id
@@ -8147,7 +8248,7 @@ $$;
 create function get_taproom_count_snapshot(p_brewery uuid, p_location uuid) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 begin
-  perform private.assert_staff(p_brewery, array['admin','warehouse','taproom']::public.staff_role[]);
+  perform private.assert_staff_read(p_brewery, array['admin','warehouse','taproom']::public.staff_role[]);
   if not exists (select 1 from public.locations where id = p_location and brewery_id = p_brewery and kind = 'taproom') then
     raise exception 'choose an owned taproom location';
   end if;
@@ -8160,7 +8261,7 @@ create function get_taproom_print_labels(p_brewery uuid, p_location uuid, p_revi
 language plpgsql stable security definer set search_path = '' as $$
 declare v_snapshot jsonb;
 begin
-  perform private.assert_staff(p_brewery, array['admin','warehouse','taproom']::public.staff_role[]);
+  perform private.assert_staff_read(p_brewery, array['admin','warehouse','taproom']::public.staff_role[]);
   if not exists (select 1 from public.locations where id = p_location and brewery_id = p_brewery and kind = 'taproom') then
     raise exception 'choose an owned taproom location';
   end if;
@@ -8191,11 +8292,10 @@ begin
   ), '[]'::jsonb);
 end $$;
 
-create function get_taproom_count(p_brewery uuid, p_count uuid) returns jsonb
+create function private.get_taproom_count(p_brewery uuid, p_count uuid) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 declare v_result jsonb; v_root uuid;
 begin
-  perform private.assert_staff(p_brewery, array['admin','warehouse','taproom']::public.staff_role[]);
   select root_id into v_root from private.taproom_effective_counts
     where brewery_id=p_brewery and (root_id=p_count or effective_id=p_count) limit 1;
   select jsonb_build_object('id',h.root_id,'root_id',h.root_id,'effective_id',h.effective_id,
@@ -8224,11 +8324,18 @@ begin
   return v_result;
 end $$;
 
+create function get_taproom_count(p_brewery uuid, p_count uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform private.assert_staff_read(p_brewery, array['admin','warehouse','taproom']::public.staff_role[]);
+  return private.get_taproom_count(p_brewery, p_count);
+end $$;
+
 create function list_taproom_counts(p_brewery uuid,p_location uuid) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 declare v_result jsonb;
 begin
-  perform private.assert_staff(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
+  perform private.assert_staff_read(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
   if not exists(select 1 from public.locations where id=p_location and brewery_id=p_brewery and kind='taproom') then raise exception 'choose an owned taproom location'; end if;
   with headers as (
     select root_id,effective_id,location_id,counted_on,observed_at,counted_by,created_at,prior_count_id,corrected_at,corrected_by,correction_reason,
@@ -8311,7 +8418,7 @@ begin
     insert into public.taproom_count_lines(brewery_id, count_id, location_id, bin_id, sku_id, lot_id, qty_before, qty_counted, movement_id)
       values(p_brewery, v_count, p_location, v_bin, v_sku, v_lot, v_before, v_qty, v_movement);
   end loop;
-  return private.complete_command_request(p_request_id, public.get_taproom_count(p_brewery, v_count));
+  return private.complete_command_request(p_request_id, private.get_taproom_count(p_brewery, v_count));
 end $$;
 
 create function correct_taproom_count(p_brewery uuid,p_count uuid,p_corrections jsonb,p_reason text,p_request_id uuid)
@@ -8380,7 +8487,7 @@ begin
     insert into public.taproom_count_lines(brewery_id,count_id,location_id,bin_id,sku_id,lot_id,qty_before,qty_counted,movement_id,corrects_line_id)
       values(p_brewery,correction,item.location_id,item.bin_id,item.sku_id,item.lot_id,item.qty_before,coalesce(item.requested,item.qty_counted),replacement,item.id);
   end loop;
-  return private.complete_command_request(p_request_id,public.get_taproom_count(p_brewery,root.id));
+  return private.complete_command_request(p_request_id,private.get_taproom_count(p_brewery,root.id));
 end $$;
 revoke all on function private.taproom_count_snapshot(uuid,uuid) from public,anon,authenticated,service_role;
 revoke all on function private.validate_taproom_correction_graph(uuid),private.enforce_taproom_correction_graph() from public,anon,authenticated,service_role;
@@ -8584,7 +8691,7 @@ end $$;
 create function list_open_taps(p_brewery uuid,p_location uuid) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 begin
-  perform private.assert_staff(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
+  perform private.assert_staff_read(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
   if not exists(select 1 from public.locations where id=p_location and brewery_id=p_brewery and kind='taproom') then raise exception 'choose an owned taproom location'; end if;
   return (select coalesce(jsonb_agg(to_jsonb(t)||jsonb_build_object('sku_name',s.name,'brand_id',s.brand_id,'brand_name',b.name,'opened_by_label',split_part(u.email,'@',1))
     order by t.tap_number nulls last,t.opened_at,t.id),'[]'::jsonb)
@@ -8596,7 +8703,7 @@ end $$;
 create function list_tap_history(p_brewery uuid,p_location uuid) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 begin
-  perform private.assert_staff(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
+  perform private.assert_staff_read(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
   if not exists(select 1 from public.locations where id=p_location and brewery_id=p_brewery and kind='taproom') then raise exception 'choose an owned taproom location'; end if;
   return (select coalesce(jsonb_agg(to_jsonb(t)||jsonb_build_object('opened_by_label',split_part(o.email,'@',1),
     'closed_by_label',split_part(c.email,'@',1),'sku_name',s.name,'brand_name',b.name) order by t.closed_at desc,t.id),'[]'::jsonb) from
@@ -8725,7 +8832,7 @@ create function get_taproom_variance(p_brewery uuid,p_location uuid,p_weeks inte
 language plpgsql stable security definer set search_path = '' as $$
 declare v_today date; v_start date; v_result jsonb;
 begin
-  perform private.assert_staff(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
+  perform private.assert_staff_read(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
   if p_weeks is null or p_weeks not in (4,12) then raise exception 'choose 4 or 12 weeks'; end if;
   if not exists(select 1 from public.locations where id=p_location and brewery_id=p_brewery and kind='taproom') then raise exception 'choose an owned taproom location'; end if;
   select (now() at time zone timezone)::date into v_today from public.breweries where id=p_brewery;
@@ -8802,7 +8909,7 @@ create function get_taproom_draft_projection(p_brewery uuid,p_location uuid) ret
 language plpgsql stable security definer set search_path = '' as $$
 declare v_count record; v_as_of timestamptz:=now(); v_result jsonb;
 begin
-  perform private.assert_staff(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
+  perform private.assert_staff_read(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
   if not exists(select 1 from public.locations where id=p_location and brewery_id=p_brewery and kind='taproom') then raise exception 'choose an owned taproom location'; end if;
   select root_id,effective_id,counted_on,observed_at,created_at into v_count from private.taproom_effective_counts
     where brewery_id=p_brewery and location_id=p_location
@@ -8862,3 +8969,8 @@ begin
 end $$;
 revoke all on function get_taproom_variance(uuid,uuid,integer),get_taproom_draft_projection(uuid,uuid) from public,anon,authenticated,service_role;
 grant execute on function get_taproom_variance(uuid,uuid,integer),get_taproom_draft_projection(uuid,uuid) to authenticated;
+
+-- The blanket application-function ACL above intentionally precedes this
+-- transport-only exception. It accepts no caller-controlled identity or limit.
+revoke all on function public.consume_command_admission() from public, anon, authenticated, service_role;
+grant execute on function public.consume_command_admission() to authenticated;

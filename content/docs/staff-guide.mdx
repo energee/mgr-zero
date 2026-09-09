@@ -633,6 +633,10 @@ A bookmarked staff page that your role cannot read opens **No access**, names th
 
 **A form reports an error.** Read the message, fix the visible fields, and submit again. Your entries stay until the form succeeds or you close it. Permission errors need an administrator.
 
+**MGR says there are too many requests.** Wait for the stated retry time, then retry. If the action's result was uncertain, keep the form unchanged so MGR reuses the same request ID and can recover the original result safely.
+
+**Your signed-in account or brewery changed while an action was pending.** MGR refuses the action before it writes anything. If the earlier response was uncertain, return to the original account and brewery and use the unchanged retry; do not start a replacement request until you have checked the record.
+
 **A page fails to load.** Select **Try again** once. If it still fails, give your administrator the brewery or customer name, page, approximate time, and the action you tried.
 
 **A record seems missing.** Confirm the brewery shown in the navigation, clear any order-status filter, and check the exact brand, SKU, customer, or location name.
@@ -650,6 +654,8 @@ A bookmarked staff page that your role cannot read opens **No access**, names th
 <Screen name="Import" />
 
 Admin opens **Settings → Import** or **Import CSV** on the setup checklist. Upload a CSV with a header and 1–5000 data rows, choose the kind, map columns, and review the editable preview. Quoted commas, newlines, escaped quotes, and a leading byte-order mark are supported. Malformed quoting, duplicate or missing headers, unequal row widths, and empty files show an error before anything is staged.
+
+The complete API request is limited to 8 MiB. Most 5,000-row files fit; files with unusually large notes or other cells may need to be split into smaller batches.
 
 The lookup lists show each existing record's label and ID. Map these exact fields (optional fields follow the semicolon):
 

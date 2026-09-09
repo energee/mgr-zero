@@ -11,13 +11,15 @@ export type CreateBreweryState = {
   ttb: string;
 };
 
-export function CreateBreweryForm({ action, requestId }: {
+export function CreateBreweryForm({ action, requestId, actorId }: {
   action: (previous: CreateBreweryState, form: FormData) => Promise<CreateBreweryState>;
   requestId: string;
+  actorId: string;
 }) {
   const [state, submit, pending] = useActionState(action, { error: null, name: "", timezone: "America/New_York", ttb: "" });
   return <form action={submit}>
     <input type="hidden" name="requestId" value={requestId} />
+    <input type="hidden" name="actorId" value={actorId} />
     <FieldGroup>
       <Field><FieldLabel htmlFor="name">Brewery name</FieldLabel><Input id="name" name="name" defaultValue={state.name} required /></Field>
       <Field><FieldLabel htmlFor="timezone">Timezone</FieldLabel><Input id="timezone" name="timezone" defaultValue={state.timezone} required /></Field>

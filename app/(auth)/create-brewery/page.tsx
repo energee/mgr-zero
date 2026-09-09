@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { E } from "@/components/mgr/e";
-import { buildContext, isUuid } from "@/lib/commands/context";
+import { buildRouteContext, isUuid } from "@/lib/commands/context";
 import { CommandError, runCommand } from "@/lib/commands/registry";
 import { getRequestIdentity } from "@/lib/auth/request-context";
 import { serverEnv } from "@/lib/env/server";
@@ -18,10 +18,12 @@ async function provision(_previous: CreateBreweryState, form: FormData): Promise
   let breweryId: string;
   try {
     const requestId = form.get("requestId");
+    const actorId = form.get("actorId");
     if (typeof requestId !== "string" || !isUuid(requestId)) throw new CommandError("Invalid request ID");
+    if (typeof actorId !== "string" || !isUuid(actorId)) throw new CommandError("Invalid rendered account");
     breweryId = await runCommand("provision_brewery", {
       name, timezone, ttb,
-    }, await buildContext(), { requestId, correlationId: crypto.randomUUID() }) as string;
+    }, await buildRouteContext(undefined, { actorId }), { requestId, correlationId: crypto.randomUUID() }) as string;
   } catch (error) {
     if (error instanceof CommandError) return {
       error: error.message,
@@ -37,9 +39,10 @@ async function provision(_previous: CreateBreweryState, form: FormData): Promise
 
 export default async function CreateBreweryPage() {
   if (serverEnv.dedicated) notFound();
-  if (!(await getRequestIdentity())) redirect("/login");
+  const identity = await getRequestIdentity();
+  if (!identity) redirect("/login");
   return <Entry title="Create brewery">
     {E.note("You will be the brewery’s first admin.")}
-    <CreateBreweryForm action={provision} requestId={crypto.randomUUID()} />
+    <CreateBreweryForm action={provision} requestId={crypto.randomUUID()} actorId={identity.userId} />
   </Entry>;
 }

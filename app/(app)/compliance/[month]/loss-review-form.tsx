@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { useBrewery } from "@/app/(app)/brewery-provider";
+import { useBrewery, useCommandContext } from "@/app/(app)/brewery-provider";
 import { command, CommandResponseError } from "@/lib/commands/client";
 import { canRetireCommandFailure } from "@/lib/commands/failure";
 import type { LossReview } from "@/lib/commands/compliance";
@@ -24,6 +24,7 @@ function bblUnits(value: string) {
 
 export function LossReviewForm({ loss }: { loss: LossReview }) {
   const breweryId = useBrewery();
+  const expectedContext = useRef(useCommandContext());
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
@@ -49,7 +50,7 @@ export function LossReviewForm({ loss }: { loss: LossReview }) {
     if (!requestId.current || !payload.current) return;
     setError(null); setPhase("submitting");
     try {
-      await command(breweryId, "reattribute_loss", payload.current, requestId.current);
+      await command(breweryId, "reattribute_loss", payload.current, requestId.current, expectedContext.current);
       requestId.current = null; payload.current = null; setPhase("saved"); router.refresh();
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Could not save this allocation";
