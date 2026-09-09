@@ -66,6 +66,7 @@ import { LocationsView } from "@/components/mgr/views/locations";
 import { MeView } from "@/components/mgr/views/me";
 import { MoreView } from "@/components/mgr/views/more";
 import { MovementRecordedView } from "@/components/mgr/views/movement-recorded";
+import { MonthlyComplianceView } from "@/components/mgr/views/monthly-compliance";
 import { NewOrderView } from "@/components/mgr/views/new-order";
 import { NewPoView } from "@/components/mgr/views/new-po";
 import { NewTransferView } from "@/components/mgr/views/new-transfer";
@@ -164,6 +165,7 @@ import {
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger } from "@/lib/mgr/fixtures/kegs";
 import { packagingRuns, repackCase, schedulePackagingRun } from "@/lib/mgr/fixtures/packaging";
 import { planningDemo } from "@/lib/mgr/fixtures/planning";
+import { monthlyComplianceAugust } from "@/lib/mgr/fixtures/monthly-compliance";
 import { confirmDeliveryStop1, driverRouteA, returnRouteA, routeAPlan, routesDriver } from "@/lib/mgr/fixtures/delivery";
 import {
   brandApprovalStout, complianceMonthsDemo, complianceRegistryDemo, licensePaBrewery, lotTraceHazy, stateRegistrationHazy,
@@ -239,6 +241,7 @@ import { toRunClosedViewProps } from "@/lib/mgr/run-closed-view";
 import { toScheduleBatchViewProps } from "@/lib/mgr/schedule-batch-view";
 import { toPackagingRunsViewProps } from "@/lib/mgr/packaging-runs-view";
 import { toPlanningViewProps } from "@/lib/mgr/planning-view";
+import { toMonthlyComplianceViewProps } from "@/lib/mgr/monthly-compliance-view";
 import { toRepackViewProps } from "@/lib/mgr/repack-view";
 import { toSchedulePackagingRunViewProps } from "@/lib/mgr/schedule-packaging-run-view";
 import { toReverseMovementViewProps } from "@/lib/mgr/reverse-movement-view";
@@ -2184,30 +2187,7 @@ export const SCREENS: Screen[] = [
     writes: "file_compliance_report · reattribute_loss",
     states: [["current", "generated from the ledger now"], ["does not balance", "a movement type the report cannot classify is named · Save stays off", 1], ["mapping required", "direct cellar Taproom volume needs an approved external filing-line mapping · Save stays off", 1], ["filed", "the snapshot is shown, not regenerated"], ["permission", "sales or admin required", 1]],
     spec: "Admin and Sales review exact completion reconciliation losses and allocate each remainder to Sample, Taproom, or Destruction through append-only category changes, never free-text note matching. Corrections post in the period they are saved and leave earlier filed snapshots unchanged. The identity checks are v1 lessons drawn in user copy: balance per class, one additive removal total, an explanatory non-additive cellar breakdown, 0.00 never blank, no transmission. Beer in process is the tanks now, not at period end, and says so. Removals are keyed by frozen tax treatment; direct cellar Taproom volume requires an approved external filing-line mapping before Save turns on.",
-    body: (<>
-      {E.back("Compliance months", "August 2026")}
-      {E.row("1 · Review auto-reconciled losses", "Completion reconciliations stay in history while allocations change their removal category.")}
-      {E.fld("Batch 1042 · original generic loss 0.05741935 bbl · allocated 0.02000000 bbl", "remaining 0.03741935 bbl")}
-      {E.fld("Sample · Destination PA · prior allocation", "0.02000000 bbl")}
-      {E.btn("Reattribute loss", "g")}
-      {E.info("An allocation changes removal categories in the period you save it. Earlier filed snapshots stay unchanged.")}
-      {E.row("2 · Review generated figures", "", E.status("Current", "ok"))}
-      {E.tbl(["class", "begin", "+", "−", "end"], [["kegs", "41.00", "30.50", "33.20", "38.30"], ["cans", "12.60", "18.00", "14.90", "15.70"], ["bottles", "0.00", "0.00", "0.00", "0.00"]])}
-      {E.info("Every package class balances: begin + in − out = end, in barrels. Cellar removals are included once below. Zeros print 0.00.")}
-      {E.row("Beer in process", "tanks now, not at period end", "120.40 bbl")}
-      {E.row("Packaged", "production into finished goods", "48.50 bbl")}
-      {E.row("Taxpaid removals", "", "41.20 bbl")}
-      {E.row("Export", "", "6.90 bbl")}
-      {E.fld("Losses", "0.05741935 bbl")}
-      {E.info("Cellar removals breakdown is explanatory and is already included once in the removal totals. Do not add it again.")}
-      {E.fld("Cellar · Losses · non-additive breakdown", "0.05741935 bbl")}
-      {E.row("Taxpaid to PA", "destination state", "38.10 bbl")}
-      {E.row("Taxpaid to OH", "destination state", "3.10 bbl")}
-      {E.row("3 · Confirm filed outside MGR", "", "")}
-      {E.info("MGR saves the immutable snapshot; it does not transmit the filing. Save stays off until the report balances and required external mappings are approved.")}
-      {E.edit("Note · optional", "filed on pay.gov")}
-      {E.btn("Save filed snapshot", "irr")}
-    </>),
+    body: <MonthlyComplianceView model={toMonthlyComplianceViewProps(monthlyComplianceAugust)} />,
   },
   {
     step: 7,
