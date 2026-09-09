@@ -7504,7 +7504,7 @@ end $$;
 create function record_taproom_count(p_brewery uuid, p_location uuid, p_counted_on date, p_revision text, p_lines jsonb, p_request_id uuid)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_actor uuid; v_replay jsonb; v_snapshot jsonb; v_count uuid; v_channel uuid; v_tax public.tax_treatment;
-  v_line jsonb; v_qty numeric; v_before numeric; v_movement uuid;
+  v_qty numeric; v_before numeric; v_movement uuid; v_bin uuid; v_sku uuid; v_lot uuid;
 begin
   v_actor := private.assert_staff(p_brewery, array['admin','warehouse','taproom']::public.staff_role[]);
   v_replay := private.claim_command_request(p_brewery, 'record_taproom_count', p_request_id,
@@ -7537,32 +7537,34 @@ begin
     where e.bin_id is null or b.bin_id is null)
     then raise exception 'count every displayed bucket exactly once; refresh for changed stock'; end if;
   -- Validate all observations before the first durable write.
-  for v_line in select * from jsonb_array_elements(p_lines) loop
-    v_qty := (v_line->>'qty_counted')::numeric;
-    select (b->>'qty_before')::numeric into v_before from jsonb_array_elements(v_snapshot->'lines') b
-      where (b->>'bin_id')::uuid = (v_line->>'bin_id')::uuid and (b->>'sku_id')::uuid = (v_line->>'sku_id')::uuid
-      and (b->>'lot_id')::uuid is not distinct from (v_line->>'lot_id')::uuid;
+  for v_bin, v_sku, v_lot, v_qty, v_before in
+    select e.bin_id, e.sku_id, e.lot_id, e.qty_counted, b.qty_before
+    from jsonb_to_recordset(p_lines) as e(bin_id uuid, sku_id uuid, lot_id uuid, qty_counted numeric)
+    join jsonb_to_recordset(v_snapshot->'lines') as b(bin_id uuid, sku_id uuid, lot_id uuid, qty_before numeric, bin_name text, sku_name text)
+      on e.bin_id = b.bin_id and e.sku_id = b.sku_id and e.lot_id is not distinct from b.lot_id
+  loop
     if v_qty::text in ('NaN','Infinity','-Infinity') or v_qty < 0 or v_qty <> trunc(v_qty) then raise exception 'count remaining whole packaged units; a partial keg counts as one until gone'; end if;
     if v_before < 0 or v_before <> trunc(v_before) then raise exception 'stock needs Warehouse review before counting'; end if;
     if v_qty > v_before then raise exception 'count exceeds recorded stock; ask Warehouse to investigate. Count correction is not yet available'; end if;
   end loop;
   insert into public.taproom_counts(brewery_id, location_id, counted_on, counted_by, prior_count_id)
     values(p_brewery, p_location, p_counted_on, v_actor, (v_snapshot->'prior_count'->>'id')::uuid) returning id into v_count;
-  for v_line in select * from jsonb_array_elements(p_lines) loop
-    v_qty := (v_line->>'qty_counted')::numeric;
-    select (b->>'qty_before')::numeric into v_before from jsonb_array_elements(v_snapshot->'lines') b
-      where (b->>'bin_id')::uuid = (v_line->>'bin_id')::uuid and (b->>'sku_id')::uuid = (v_line->>'sku_id')::uuid
-      and (b->>'lot_id')::uuid is not distinct from (v_line->>'lot_id')::uuid;
+  for v_bin, v_sku, v_lot, v_qty, v_before in
+    select e.bin_id, e.sku_id, e.lot_id, e.qty_counted, b.qty_before
+    from jsonb_to_recordset(p_lines) as e(bin_id uuid, sku_id uuid, lot_id uuid, qty_counted numeric)
+    join jsonb_to_recordset(v_snapshot->'lines') as b(bin_id uuid, sku_id uuid, lot_id uuid, qty_before numeric, bin_name text, sku_name text)
+      on e.bin_id = b.bin_id and e.sku_id = b.sku_id and e.lot_id is not distinct from b.lot_id
+  loop
     v_movement := null;
     if v_qty < v_before then
       select id, tax_treatment into v_channel, v_tax from public.sale_channels where brewery_id = p_brewery and system_code = 'taproom';
       if v_channel is null then raise exception 'Admin must restore the Taproom sale channel before recording depletion'; end if;
       insert into public.inventory_movements(brewery_id, location_id, bin_id, sku_id, lot_id, qty, type, sale_channel_id, tax_treatment, dest_state, ref, created_by)
-        values(p_brewery, p_location, (v_line->>'bin_id')::uuid, (v_line->>'sku_id')::uuid, (v_line->>'lot_id')::uuid,
+        values(p_brewery, p_location, v_bin, v_sku, v_lot,
           v_qty - v_before, 'depletion', v_channel, v_tax, null, v_count, v_actor) returning id into v_movement;
     end if;
     insert into public.taproom_count_lines(brewery_id, count_id, location_id, bin_id, sku_id, lot_id, qty_before, qty_counted, movement_id)
-      values(p_brewery, v_count, p_location, (v_line->>'bin_id')::uuid, (v_line->>'sku_id')::uuid, (v_line->>'lot_id')::uuid, v_before, v_qty, v_movement);
+      values(p_brewery, v_count, p_location, v_bin, v_sku, v_lot, v_before, v_qty, v_movement);
   end loop;
   return private.complete_command_request(p_request_id, public.get_taproom_count(p_brewery, v_count));
 end $$;

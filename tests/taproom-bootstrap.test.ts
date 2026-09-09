@@ -144,6 +144,8 @@ it("Beer reads only allowed taproom stock and never queries forbidden aggregates
     expect((await ctx.db.from("inventory_movements").select("id")).data).toEqual([]);
     expect((await ctx.db.from("atp").select("sku_id")).data).toEqual([]);
     expect((await ctx.db.from("pos_sales").select("id")).data).toEqual([]);
+    expect((await ctx.db.from("keg_fleet_totals").select("pool_id")).data).toEqual([]);
+    expect((await ctx.db.from("keg_customer_balances").select("customer_id")).data).toEqual([]);
   } finally { fetch.mockRestore(); }
   await expect(runCommand("get_brewery", {}, ctx)).rejects.toMatchObject({ status: 403 });
   await expect(runCommand("list_work", {}, ctx)).rejects.toMatchObject({ status: 403 });
