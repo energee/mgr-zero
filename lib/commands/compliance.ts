@@ -111,14 +111,20 @@ defineQuery({
 
 defineCommand({
   name: "reattribute_loss",
-  description: "Allocate part of a completion reconciliation loss to samples, direct cellar Taproom removals, or destruction while preserving the original and exact total",
+  description: "Allocate part of a completion reconciliation loss to samples, direct cellar Taproom removals, or destruction while preserving the original and exact total; Sample requires a destination state",
   roles: [...ROLES],
   input: z.object({
     adjustmentId: z.string().uuid(),
     bbl: exactPositiveBbl,
     classification: z.enum(["sample", "taproom", "destruction"]),
     destinationState: stateCode.optional(),
-  }),
+  })
+    .refine((input) => input.classification !== "sample" || Boolean(input.destinationState), {
+      path: ["destinationState"], message: "Sample requires a destination state",
+    })
+    .refine((input) => input.classification === "sample" || !input.destinationState, {
+      path: ["destinationState"], message: "Destination state is only valid for Sample",
+    }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("reattribute_loss", {
     p_brewery: ctx.breweryId, p_adjustment: i.adjustmentId, p_bbl: typeof i.bbl === "number" ? String(i.bbl) : i.bbl,
     p_classification: i.classification, p_destination_state: i.destinationState ?? null,

@@ -8,6 +8,25 @@ let breweryId: string;
 let adminCtx: Ctx;
 let brewerCtx: Ctx;
 let location: { id: string; binId: string };
+let fixtureDate: string;
+
+type Period = { start: string; end: string };
+
+function adjustmentPeriod(adjustmentId: string): Period {
+  const [start, end] = sql(`select concat_ws('|',
+    date_trunc('month', adjustment.created_at at time zone brewery.timezone)::date,
+    (date_trunc('month', adjustment.created_at at time zone brewery.timezone) + interval '1 month - 1 day')::date)
+    from volume_adjustments adjustment join breweries brewery on brewery.id=adjustment.brewery_id
+    where adjustment.id='${adjustmentId}'`, true)[0].split("|");
+  return { start, end };
+}
+
+function previousPeriod(period: Period): Period {
+  const [start, end] = sql(`select concat_ws('|',
+    (date_trunc('month','${period.start}'::date) - interval '1 month')::date,
+    (date_trunc('month','${period.start}'::date) - interval '1 day')::date)`, true)[0].split("|");
+  return { start, end };
+}
 
 beforeAll(async () => {
   breweryId = (await makeBrewery()).id;
@@ -16,6 +35,7 @@ beforeAll(async () => {
     makeStaffCtx(breweryId, "brewer"),
   ]);
   location = await seedLocation(breweryId);
+  fixtureDate = sql(`select ((now() at time zone timezone)::date - 2)::text from breweries where id='${breweryId}'`, true)[0];
 });
 
 async function exactCompletion() {
@@ -28,22 +48,22 @@ async function exactCompletion() {
     name: `FV ${crypto.randomUUID()}`, kind: "fermenter", capacityBbl: 2,
   }, brewerCtx) as { id: string };
   const batch = await runCommand("schedule_batch", {
-    intendedBrandId: brandId, plannedOn: "2026-09-01", plannedBbl: 1,
+    intendedBrandId: brandId, plannedOn: fixtureDate, plannedBbl: 1,
   }, brewerCtx) as { id: string };
   const brewed = await runCommand("record_brew_day", {
-    batchId: batch.id, vesselId: vessel.id, initialBbl: 1, brewedOn: "2026-09-01",
+    batchId: batch.id, vesselId: vessel.id, initialBbl: 1, brewedOn: fixtureDate,
   }, brewerCtx) as { occupancy: { id: string } };
   const run = await runCommand("schedule_packaging_run", {
-    brandId, plannedOn: "2026-09-02", occupancyId: brewed.occupancy.id,
+    brandId, plannedOn: fixtureDate, occupancyId: brewed.occupancy.id,
     outputs: [{ skuId, qtyPlanned: 1 }],
   }, brewerCtx) as { id: string };
-  await runCommand("update_packaging_run", { runId: run.id, startedAt: "2026-09-02T12:00:00Z" }, brewerCtx);
+  await runCommand("update_packaging_run", { runId: run.id, startedAt: `${fixtureDate}T00:00:00Z` }, brewerCtx);
   await runCommand("close_packaging_run", {
     runId: run.id, bblDrawn: 0.9, outputs: [{ skuId, qtyActual: 1 }],
-    lotCode: `LOSS-${crypto.randomUUID()}`, packagedOn: "2026-09-02", locationId: location.id, binId: location.binId,
+    lotCode: `LOSS-${crypto.randomUUID()}`, packagedOn: fixtureDate, locationId: location.id, binId: location.binId,
   }, brewerCtx);
   const completion = await runCommand("complete_batch", { batchId: batch.id }, brewerCtx) as { adjustmentId: string; residualBbl: string };
-  return { batchId: batch.id, adjustmentId: completion.adjustmentId, residualBbl: completion.residualBbl };
+  return { batchId: batch.id, adjustmentId: completion.adjustmentId, residualBbl: completion.residualBbl, period: adjustmentPeriod(completion.adjustmentId) };
 }
 
 const reattribute = (adjustmentId: string, bbl: string | number, classification: "sample" | "taproom" | "destruction", destinationState?: string, requestId = crypto.randomUUID()) =>
@@ -64,13 +84,13 @@ describe("completion loss review", () => {
     expect(String(completed.residualBbl)).toBe("0.05741935");
 
     const before = await runCommand("generate_compliance_report", {
-      jurisdiction: "TTB", periodStart: "2026-09-01", periodEnd: "2026-09-30",
+      jurisdiction: "TTB", periodStart: completed.period.start, periodEnd: completed.period.end,
     }, adminCtx) as any;
     expect(String(before.figures.cellarRemovals.loss)).toBe("0.05741935");
     expect(String(before.figures.removals.loss)).toBe("0.05741935");
 
     const review = await runCommand("get_loss_review", {
-      periodStart: "2026-09-01", periodEnd: "2026-09-30",
+      periodStart: completed.period.start, periodEnd: completed.period.end,
     }, adminCtx) as any[];
     expect(review).toEqual([expect.objectContaining({
       adjustment_id: completed.adjustmentId,
@@ -90,7 +110,7 @@ describe("completion loss review", () => {
     }
 
     const after = await runCommand("get_loss_review", {
-      periodStart: "2026-09-01", periodEnd: "2026-09-30",
+      periodStart: completed.period.start, periodEnd: completed.period.end,
     }, adminCtx) as any[];
     expect(String(after[0].remaining_bbl)).toBe("0.00000000");
     expect(sql(`select round(bbl,8)::text from volume_adjustment_reclassifications where source_adjustment_id='${completed.adjustmentId}' order by created_at`)).toEqual(["0.02000000", "0.03741935"]);
@@ -99,7 +119,7 @@ describe("completion loss review", () => {
     ]));
 
     const report = await runCommand("generate_compliance_report", {
-      jurisdiction: "TTB", periodStart: "2026-09-01", periodEnd: "2026-09-30",
+      jurisdiction: "TTB", periodStart: completed.period.start, periodEnd: completed.period.end,
     }, adminCtx) as any;
     expect(report.figures.cellarRemovals).toMatchObject({ loss: 0, sample: 0.02, destruction: 0.03741935 });
     expect(Object.values(report.figures.removals).reduce((sum: number, value) => sum + Number(value), 0)).toBeCloseTo(0.05741935, 8);
@@ -139,7 +159,7 @@ describe("completion loss review", () => {
     await expect(runCommand("reattribute_loss", {
       adjustmentId: completed.adjustmentId, bbl: 0.01, classification: "destruction",
     }, foreignAdmin)).rejects.toThrow(/completion loss not found/i);
-    await expect(runCommand("get_loss_review", { periodStart: "2026-09-01", periodEnd: "2026-09-30" }, brewerCtx)).rejects.toMatchObject({ status: 403 });
+    await expect(runCommand("get_loss_review", { periodStart: completed.period.start, periodEnd: completed.period.end }, brewerCtx)).rejects.toMatchObject({ status: 403 });
     await expect(runCommand("reattribute_loss", {
       adjustmentId: completed.adjustmentId, bbl: 0.01, classification: "destruction",
     }, brewerCtx)).rejects.toMatchObject({ status: 403 });
@@ -216,7 +236,7 @@ describe("completion loss review", () => {
     expect((await adminCtx.db.from("volume_adjustment_reclassifications").insert(row)).error).not.toBeNull();
     expect((await admin.from("volume_adjustment_reclassifications").insert(row)).error).not.toBeNull();
     expect((await admin.from("volume_adjustments").update({ note: "forbidden" }).eq("id", completed.adjustmentId)).error).not.toBeNull();
-    expect((await admin.rpc("get_loss_review", { p_brewery: breweryId, p_start: "2026-09-01", p_end: "2026-09-30" })).error).not.toBeNull();
+    expect((await admin.rpc("get_loss_review", { p_brewery: breweryId, p_start: completed.period.start, p_end: completed.period.end })).error).not.toBeNull();
     expect(sql(`select has_table_privilege('authenticated','volume_adjustment_reclassifications','INSERT,UPDATE,DELETE,TRUNCATE')::text,has_table_privilege('service_role','volume_adjustment_reclassifications','INSERT,UPDATE,DELETE,TRUNCATE')::text`, true)).toEqual(["false|false"]);
     for (const role of ["authenticated", "service_role"]) {
       expectSqlState(`begin; set local role ${role}; truncate volume_adjustment_reclassifications; commit`, "42501");
@@ -233,6 +253,8 @@ describe("completion loss review", () => {
     const physical = insertFixture<{ id: string }>("volume_adjustments", {
       brewery_id: breweryId, occupancy_id: sourceOccupancy, bbl: -0.01, reason: "loss", created_by: adminCtx.userId,
     })[0];
+    expectSqlState(`begin; update volume_adjustments set removal_class=null where reclassification_id='${allocation.id}' and reclassification_leg='reverse'; commit`, "23514");
+    expect(sql(`select removal_class::text from volume_adjustments where reclassification_id='${allocation.id}' and reclassification_leg='reverse'`, true)).toEqual(["loss"]);
     expectSqlState(`begin; update volume_adjustments set bbl=-0.03 where reclassification_id='${allocation.id}' and reclassification_leg='replacement'; commit`, "P0001");
     expectSqlState(`begin; update volume_adjustment_reclassifications set source_adjustment_id='${physical.id}' where id='${allocation.id}'; commit`, "P0001");
     expectSqlState(`begin; update volume_adjustments set bbl=-0.01 where id='${completed.adjustmentId}'; commit`, "P0001");
@@ -243,40 +265,42 @@ describe("completion loss review", () => {
 
   it("posts signed corrections in their actual period, leaves occupancy unchanged, preserves filed snapshots, and gates cellar Taproom filing", async () => {
     const completed = await exactCompletion();
+    const prior = previousPeriod(completed.period);
     const occupancy = sql(`select occupancy_id::text from volume_adjustments where id='${completed.adjustmentId}'`, true)[0];
     const beforeVolume = sql(`select bbl::text from occupancy_volumes where occupancy_id='${occupancy}'`, true);
-    sql(`update volume_adjustments set created_at='2026-08-20T12:00:00Z' where id='${completed.adjustmentId}'; update batches set closed_at='2026-08-20T12:00:00Z' where completion_adjustment_id='${completed.adjustmentId}'`, true);
+    sql(`update volume_adjustments set created_at='${prior.start}T12:00:00Z' where id='${completed.adjustmentId}'; update batches set closed_at='${prior.start}T12:00:00Z' where completion_adjustment_id='${completed.adjustmentId}'`, true);
     const filed = await runCommand("file_compliance_report", {
-      jurisdiction: "TTB", periodStart: "2026-08-01", periodEnd: "2026-08-31",
+      jurisdiction: "TTB", periodStart: prior.start, periodEnd: prior.end,
     }, adminCtx) as any;
     const frozen = JSON.stringify(filed.figures);
 
-    const septemberBefore = await runCommand("generate_compliance_report", {
-      jurisdiction: "TTB", periodStart: "2026-09-01", periodEnd: "2026-09-30",
+    const currentBefore = await runCommand("generate_compliance_report", {
+      jurisdiction: "TTB", periodStart: completed.period.start, periodEnd: completed.period.end,
     }, adminCtx) as any;
 
-    await reattribute(completed.adjustmentId, "0.02", "sample", "PA");
+    const correction = await reattribute(completed.adjustmentId, "0.02", "sample", "PA");
+    sql(`update volume_adjustment_reclassifications set created_at='${completed.period.start}T12:00:00Z' where id='${correction.id}'; update volume_adjustments set created_at='${completed.period.start}T12:00:00Z' where reclassification_id='${correction.id}'`, true);
     expect(sql(`select bbl::text from occupancy_volumes where occupancy_id='${occupancy}'`, true)).toEqual(beforeVolume);
-    const august = await runCommand("generate_compliance_report", {
-      jurisdiction: "TTB", periodStart: "2026-08-01", periodEnd: "2026-08-31",
+    const priorReport = await runCommand("generate_compliance_report", {
+      jurisdiction: "TTB", periodStart: prior.start, periodEnd: prior.end,
     }, adminCtx) as any;
-    const september = await runCommand("generate_compliance_report", {
-      jurisdiction: "TTB", periodStart: "2026-09-01", periodEnd: "2026-09-30",
+    const currentReport = await runCommand("generate_compliance_report", {
+      jurisdiction: "TTB", periodStart: completed.period.start, periodEnd: completed.period.end,
     }, adminCtx) as any;
-    expect(august.figures.cellarRemovals.loss).toBe(0.05741935);
-    expect(Number(september.figures.cellarRemovals.loss) - Number(septemberBefore.figures.cellarRemovals.loss ?? 0)).toBeCloseTo(-0.02, 8);
-    expect(Number(september.figures.cellarRemovals.sample) - Number(septemberBefore.figures.cellarRemovals.sample ?? 0)).toBeCloseTo(0.02, 8);
+    expect(priorReport.figures.cellarRemovals.loss).toBe(0.05741935);
+    expect(Number(currentReport.figures.cellarRemovals.loss) - Number(currentBefore.figures.cellarRemovals.loss ?? 0)).toBeCloseTo(-0.02, 8);
+    expect(Number(currentReport.figures.cellarRemovals.sample) - Number(currentBefore.figures.cellarRemovals.sample ?? 0)).toBeCloseTo(0.02, 8);
     expect(JSON.stringify((await admin.from("report_filings").select("figures").eq("id", filed.id).single()).data!.figures)).toBe(frozen);
 
     const taproom = await exactCompletion();
     await reattribute(taproom.adjustmentId, "0.01", "taproom");
     const report = await runCommand("generate_compliance_report", {
-      jurisdiction: "TTB", periodStart: "2026-09-01", periodEnd: "2026-09-30",
+      jurisdiction: "TTB", periodStart: taproom.period.start, periodEnd: taproom.period.end,
     }, adminCtx) as any;
     expect(report.externalMappingRequired).toEqual(["taproom"]);
     expect(report.warnings.join(" ")).toMatch(/approved external filing-line mapping/i);
     await expect(runCommand("file_compliance_report", {
-      jurisdiction: "TTB", periodStart: "2026-09-01", periodEnd: "2026-09-30",
+      jurisdiction: "TTB", periodStart: taproom.period.start, periodEnd: taproom.period.end,
     }, adminCtx)).rejects.toThrow(/approved external filing-line mapping/i);
   });
 });

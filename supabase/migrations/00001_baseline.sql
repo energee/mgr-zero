@@ -866,7 +866,8 @@ create table volume_adjustments (   -- ledger: cellar losses/dumps/gains
       end)
     or
     (reclassification_id is not null and reclassification_leg = 'reverse' and bbl > 0
-      and reason = 'loss' and removal_class = 'loss' and tax_treatment is null and dest_state is null and not affects_occupancy)
+      and reason = 'loss' and removal_class is not null and removal_class = 'loss'
+      and tax_treatment is null and dest_state is null and not affects_occupancy)
     or
     (reclassification_id is not null and reclassification_leg = 'replacement' and bbl < 0
       and reason = 'loss' and removal_class in ('sample','taproom','destruction') and not affects_occupancy
@@ -1013,7 +1014,7 @@ begin
       or reverse_leg.occupancy_id <> source.occupancy_id or replacement.occupancy_id <> source.occupancy_id
       or reverse_leg.affects_occupancy or replacement.affects_occupancy
       or reverse_leg.bbl <> r.bbl or replacement.bbl <> -r.bbl
-      or reverse_leg.reason <> 'loss' or reverse_leg.removal_class <> 'loss'
+      or reverse_leg.reason <> 'loss' or reverse_leg.removal_class is distinct from 'loss'
       or reverse_leg.tax_treatment is not null or reverse_leg.dest_state is not null
       or replacement.reason <> 'loss' or replacement.removal_class <> r.target_class
       or replacement.tax_treatment is distinct from r.tax_treatment or replacement.dest_state is distinct from r.dest_state

@@ -3825,7 +3825,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, sales
 
-Allocate part of a completion reconciliation loss to samples, direct cellar Taproom removals, or destruction while preserving the original and exact total
+Allocate part of a completion reconciliation loss to samples, direct cellar Taproom removals, or destruction while preserving the original and exact total; Sample requires a destination state
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -3838,7 +3838,7 @@ Allocate part of a completion reconciliation loss to samples, direct cellar Tapr
 curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
-  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "reattribute_loss", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "adjustmentId": "00000000-0000-0000-0000-000000000000", "bbl": "1", "classification": "sample" } }'
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "reattribute_loss", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "adjustmentId": "00000000-0000-0000-0000-000000000000", "bbl": "1", "classification": "sample", "destinationState": "CA" } }'
 ```
 
 #### trace_lot [#trace_lot]
