@@ -37,7 +37,7 @@ export default async function MonthPage({ params }: { params: Promise<{ month: s
     <>
       {E.back("Compliance months", monthLabel(month), undefined, "/compliance")}
       {E.row("1 · Review auto-reconciled losses", "Completion reconciliations stay in history while allocations change their removal category.")}
-      {losses.length === 0 ? E.info("No completion reconciliation losses closed in this period.") : losses.map((loss) => <section key={loss.adjustment_id} className="rounded-xl border p-4">
+      {losses.length === 0 ? E.info("No completion reconciliation losses posted in this period.") : losses.map((loss) => <section key={loss.adjustment_id} className="rounded-xl border p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="font-medium">Batch {loss.batch_no}</p>

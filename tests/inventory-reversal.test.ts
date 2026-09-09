@@ -134,7 +134,7 @@ it("nets losses and negative adjustments in their original report outflow side",
   for (const type of ["adjustment", "loss"]) await reverse(ctx, (await movement(-2, type)).id);
   const report = await runCommand("generate_compliance_report", { jurisdiction: "TTB", periodStart: "2000-01-01", periodEnd: "2099-12-31" }, ctx) as { figures: { lines: { in: number; out: number; end: number }[]; removals: Record<string, number>; balances: boolean } };
   for (const line of report.figures.lines) expect(line).toMatchObject({ in: 0, out: 0, end: 0 });
-  expect(report.figures.removals.loss).toBe(0);
+  expect(report.figures.removals.loss ?? 0).toBe(0);
   expect(report.figures.balances).toBe(true);
 });
 

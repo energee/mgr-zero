@@ -4690,7 +4690,7 @@ begin
     'original_bbl', (-root.bbl)::text,
     'remaining_bbl', (-root.bbl - coalesce(allocated.bbl, 0))::text,
     'allocations', coalesce(allocated.rows, '[]'::jsonb)
-  ) order by batch.closed_at, batch.id), '[]'::jsonb) into v_result
+  ) order by root.created_at, batch.id), '[]'::jsonb) into v_result
   from public.batches batch
   join public.breweries brewery on brewery.id = batch.brewery_id
   join public.volume_adjustments root on root.id = batch.completion_adjustment_id and root.brewery_id = batch.brewery_id
@@ -4704,7 +4704,7 @@ begin
     where r.brewery_id = batch.brewery_id and r.source_adjustment_id = root.id
   ) allocated on true
   where batch.brewery_id = p_brewery
-    and (batch.closed_at at time zone brewery.timezone)::date between p_start and p_end;
+    and (root.created_at at time zone brewery.timezone)::date between p_start and p_end;
   return v_result;
 end $$;
 
@@ -7559,7 +7559,8 @@ grant usage on schema private, extensions to service_role;
 -- evaluate; the ledger and token store stay behind owner-run definer functions.
 grant execute on function private.new_uuid() to service_role;
 grant execute on all functions in schema public to service_role;
-revoke execute on function get_loss_review(uuid,date,date), reattribute_loss(uuid,uuid,numeric,public.cellar_removal_class,text,uuid) from service_role;
+revoke execute on function get_batch_completion_preview(uuid,uuid), complete_batch(uuid,uuid,uuid),
+  get_loss_review(uuid,date,date), reattribute_loss(uuid,uuid,numeric,public.cellar_removal_class,text,uuid) from service_role;
 revoke execute on function private.lock_cellar_workflow(uuid), private.batch_completion_calculation(uuid,uuid),
   private.enforce_cellar_removal(), private.enforce_loss_reclassification_target(), private.enforce_completion_adjustment_graph()
   from service_role;

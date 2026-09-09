@@ -79,6 +79,40 @@ function expectSqlState(statement: string, state: string) {
 }
 
 describe("completion loss review", () => {
+  it("lists a future-started completion in its actual posting period", async () => {
+    const futureBrewery = await makeBrewery();
+    const futureAdmin = await makeStaffCtx(futureBrewery.id, "admin");
+    const futureBrewer = await makeStaffCtx(futureBrewery.id, "brewer");
+    const future = sql(`select concat_ws('|',
+      (date_trunc('month', (now() at time zone timezone)::date) + interval '2 months')::date,
+      date_trunc('month', (now() at time zone timezone)::date)::date,
+      (date_trunc('month', (now() at time zone timezone)::date) + interval '1 month - 1 day')::date,
+      (date_trunc('month', (now() at time zone timezone)::date) + interval '3 months - 1 day')::date)
+      from breweries where id='${futureBrewery.id}'`, true)[0].split("|");
+    const [futureStart, postingStart, postingEnd, futureEnd] = future;
+    const { brandId } = await seedCatalog(futureBrewery.id, { product: `Future loss ${crypto.randomUUID()}` });
+    const vessel = await runCommand("upsert_vessel", {
+      name: `Future FV ${crypto.randomUUID()}`, kind: "fermenter", capacityBbl: 2,
+    }, futureBrewer) as { id: string };
+    const batch = await runCommand("schedule_batch", {
+      intendedBrandId: brandId, plannedOn: futureStart, plannedBbl: 1,
+    }, futureBrewer) as { id: string };
+    await runCommand("record_brew_day", {
+      batchId: batch.id, vesselId: vessel.id, initialBbl: 1, brewedOn: futureStart,
+    }, futureBrewer);
+    const completed = await runCommand("complete_batch", { batchId: batch.id }, futureBrewer) as { adjustmentId: string; closedAt: string };
+
+    expect(completed.closedAt.slice(0, 10)).toBe(futureStart);
+    const report = await runCommand("generate_compliance_report", {
+      jurisdiction: "TTB", periodStart: postingStart, periodEnd: postingEnd,
+    }, futureAdmin) as any;
+    expect(report.figures.removals.loss).toBe(1);
+    expect(await runCommand("get_loss_review", { periodStart: postingStart, periodEnd: postingEnd }, futureAdmin)).toEqual([
+      expect.objectContaining({ adjustment_id: completed.adjustmentId, batch_id: batch.id, closed_at: expect.any(String) }),
+    ]);
+    expect(await runCommand("get_loss_review", { periodStart: futureStart, periodEnd: futureEnd }, futureAdmin)).toEqual([]);
+  });
+
   it("keeps the exact completion residual through review, allocation, and compliance projection", async () => {
     const completed = await exactCompletion();
     expect(String(completed.residualBbl)).toBe("0.05741935");
@@ -238,6 +272,11 @@ describe("completion loss review", () => {
     expect((await admin.from("volume_adjustments").update({ note: "forbidden" }).eq("id", completed.adjustmentId)).error).not.toBeNull();
     expect((await admin.rpc("get_loss_review", { p_brewery: breweryId, p_start: completed.period.start, p_end: completed.period.end })).error).not.toBeNull();
     expect(sql(`select has_table_privilege('authenticated','volume_adjustment_reclassifications','INSERT,UPDATE,DELETE,TRUNCATE')::text,has_table_privilege('service_role','volume_adjustment_reclassifications','INSERT,UPDATE,DELETE,TRUNCATE')::text`, true)).toEqual(["false|false"]);
+    expect(sql(`select concat_ws('|',
+      has_function_privilege('authenticated','get_batch_completion_preview(uuid,uuid)','execute'),
+      has_function_privilege('authenticated','complete_batch(uuid,uuid,uuid)','execute'),
+      has_function_privilege('service_role','get_batch_completion_preview(uuid,uuid)','execute'),
+      has_function_privilege('service_role','complete_batch(uuid,uuid,uuid)','execute'))`, true)).toEqual(["t|t|f|f"]);
     for (const role of ["authenticated", "service_role"]) {
       expectSqlState(`begin; set local role ${role}; truncate volume_adjustment_reclassifications; commit`, "42501");
       expectSqlState(`begin; set local role ${role}; select private.lock_cellar_workflow('${breweryId}'); commit`, "42501");
