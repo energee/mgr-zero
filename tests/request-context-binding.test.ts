@@ -92,6 +92,24 @@ describe("request context headers", () => {
     }
   });
 
+  it("fails closed for malformed, empty, or null-shaped customer scope on a staff write", async () => {
+    for (const customerHeader of ["not-a-uuid", "", "null"]) {
+      const requestId = crypto.randomUUID();
+      const scoped = await db({
+        "x-mgr-actor-id": actor.id,
+        "x-mgr-brewery-id": breweryB,
+        "x-mgr-customer-id": customerHeader,
+      });
+      expect((await scoped.rpc("update_brewery", {
+        p_brewery: breweryB, p_name: "Must stay unchanged", p_timezone: "UTC", p_ttb_registry_no: null,
+        p_pa_license_no: null, p_customer_phone: null,
+        p_reading_due_hours: 24, p_request_id: requestId,
+      })).error?.code).toBe("42501");
+      expect((await admin.from("breweries").select("name").eq("id", breweryB).single()).data?.name).not.toBe("Must stay unchanged");
+      expect(sql(`select count(*) from private.command_requests where actor_id='${actor.id}' and request_id='${requestId}'`)).toEqual(["0"]);
+    }
+  });
+
   it("restricts a multi-account portal question to the rendered customer", async () => {
     const requestId = crypto.randomUUID();
     const wrong = await db({
