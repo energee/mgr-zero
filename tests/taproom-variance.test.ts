@@ -212,8 +212,9 @@ it("rejects foreign source, format and location ownership, unauthorized reads an
   for (const p_location of [g.location.id, (await seedLocation(f.brewery.id, { name: "Warehouse" })).id]) expect((await f.ctx.db.rpc("get_taproom_variance", { p_brewery: f.brewery.id, p_location, p_weeks: 4 })).error).not.toBeNull();
   for (const p_weeks of [0, 5, 13, null]) expect((await f.ctx.db.rpc("get_taproom_variance", { p_brewery: f.brewery.id, p_location: f.location.id, p_weeks })).error).not.toBeNull();
   for (const table of ["pos_sale_expectations", "pos_sales_coverage"]) {
+    expect((await admin.from(table).select("*").eq("brewery_id", f.brewery.id)).data?.length).toBeGreaterThan(0);
     expect((await g.ctx.db.from(table).select("*").eq("brewery_id", f.brewery.id)).data).toEqual([]);
-    expect((await f.ctx.db.from(table).select("*").eq("brewery_id", f.brewery.id)).data?.length).toBeGreaterThan(0);
+    expect((await f.ctx.db.from(table).select("*").eq("brewery_id", f.brewery.id)).data).toEqual([]);
     expect((await f.ctx.db.from(table).insert({ brewery_id: f.brewery.id })).error?.code).toBe("42501");
     expect((await f.ctx.db.from(table).delete().eq("brewery_id", f.brewery.id)).error?.code).toBe("42501");
   }

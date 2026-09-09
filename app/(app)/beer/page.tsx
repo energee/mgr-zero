@@ -1,7 +1,7 @@
 // app/(app)/beer/page.tsx — the Beer landing: one row per area with the count
 // that area has to say for itself (get_beer_overview), each opening its
-// dedicated page. Taproom and Taps stay gated until Program 12 ships the
-// weekly count and tap board.
+// dedicated page. Taproom staff see taproom-location stock plus the live weekly
+// count, tap board, and brand variance pages.
 import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";

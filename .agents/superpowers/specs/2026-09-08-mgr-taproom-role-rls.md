@@ -26,9 +26,10 @@ in the cooler, count it, and change kegs. Nothing else.
 | --- | --- | --- | --- |
 | Tap board and keg taps: `tap_intervals` (`keg_taps` in §16.13's wording) | yes | `tap_keg`, `swap_keg`, `kick_keg` | whole brewery |
 | Weekly count: `taproom_counts`, `taproom_count_lines` | yes | `record_taproom_count` | whole brewery |
-| Taproom bins and on-hand: `locations`, `bins`, `inventory_movements`, `taproom_pars`, and the `on_hand` / `bin_on_hand` / `keg_bin_on_hand` views | yes | none | rows whose location is `kind = 'taproom'` |
+| Taproom bins and on-hand: `locations`, `bins`, `taproom_pars`, and the `on_hand` / `keg_bin_on_hand` qty projections | yes | none | rows whose location is `kind = 'taproom'` |
 | Catalog vocabulary: `brands`, `formats`, `format_components`, `skus`, `keg_pools` | yes | none | whole brewery |
-| Menu and POS mapping: `pos_locations`, `pos_item_mappings`, `pos_sales`, `pos_sale_expectations`, `pos_sales_coverage`, and `pos_menus` when Program 14 lands it | yes | none | whole brewery |
+| Menu and POS mapping: `pos_locations`, `pos_item_mappings` (`pos_sales` and `pos_menus` wait until Program 14) | yes | none | whole brewery |
+| POS facts and variance inputs: `pos_sales`, `pos_sale_expectations`, `pos_sales_coverage` | named draft and completed-variance projections only; no direct table read | none | whole brewery through checked RPCs |
 | Own account: `staff_brewery` (id, name, timezone, gravity unit), `brewery_users`, `chat_user_links`, `notification_preferences`, `notification_destinations` (personal) | yes | `set_my_gravity_unit`, `consume_chat_link_proof`, `unlink_chat_user`, `set_notification_preference`, `set_notification_destination` (personal) | own row only, as the existing self policies already say |
 | Everything else | no | no | — |
 
@@ -41,11 +42,9 @@ connections, and every RPC that writes them. A taproom user calling a forbidden 
 is empty under RLS, or receives `42501` where table SELECT itself is revoked.
 Authenticated pre-tenant `provision_brewery` remains separately authorized.
 
-Movements are read, never written directly: the weekly count posts its own
-`depletion` rows through `record_taproom_count`, and tapping a keg posts
-nothing (§16.15). `taproom_transfer` rows into the taproom are visible because
-their destination location is a taproom; the warehouse leg of the same pair
-is not.
+Raw `inventory_movements` are not readable. Qty on hand at taproom locations
+comes from `on_hand_rows()`. The weekly count posts its own `depletion` rows
+through `record_taproom_count`, and tapping a keg posts nothing (§16.15).
 
 ## Mechanism
 
@@ -58,7 +57,8 @@ One baseline edit, four parts, in `supabase/migrations/00001_baseline.sql`.
    create function is_staff_of(b uuid) returns boolean
    language sql stable security definer set search_path = '' as
    $$ select exists(select 1 from public.brewery_users
-                    where user_id = auth.uid() and brewery_id = b and role <> 'taproom') $$;
+                    where user_id = auth.uid() and brewery_id = b
+                      and role in ('admin','sales','warehouse','brewer')) $$;
    ```
 
    Every existing `staff_read`, `member_read`, `integration_operator_read`
@@ -77,38 +77,43 @@ One baseline edit, four parts, in `supabase/migrations/00001_baseline.sql`.
                     where user_id = auth.uid() and brewery_id = b and role = 'taproom')
         and t = any (array[
           'tap_intervals','taproom_counts','taproom_count_lines',
-          'locations','bins','inventory_movements','taproom_pars',
+          'locations','bins','taproom_pars',
           'brands','formats','format_components','skus','keg_pools',
-          'pos_locations','pos_item_mappings','pos_sales','pos_sale_expectations','pos_sales_coverage','pos_menus']) $$;
+          'pos_locations','pos_item_mappings']) $$;
    ```
 
-   The table list lives in one place. Adding a table to the bartender's
-   world is one line here plus one row in the test below; there is no second
-   allow-list to keep in step.
+   The predicate, the explicit tenant-wide policy list, and the independent
+   matrix test must change together when this surface changes.
 
 3. **Policies.** The `staff_read` generator loop passes the table name, so
    every generated policy becomes:
 
    ```sql
-   create policy staff_read on %I for select
-     using (public.is_staff_of(brewery_id) or public.taproom_can(brewery_id, %L))
+   create policy staff_read on %I for select using (public.is_staff_of(brewery_id))
    ```
 
-   Four tables add a row scope on the taproom branch, written out by hand
-   after the loop (the loop's policy is dropped for them first):
+   Only tables in `taproom_can` are then rewritten with `or taproom_can`. Ledgers
+   stay `is_staff_of` only, so adding a name to the predicate cannot widen
+   `keg_events` or `inventory_movements`. Location-bound taproom tables
+   (`locations`, `bins`, `taproom_pars`) add a row scope on the taproom branch:
 
    ```sql
-   create policy staff_read on inventory_movements for select using (
+   create policy staff_read on bins for select using (
      public.is_staff_of(brewery_id)
-     or (public.taproom_can(brewery_id, 'inventory_movements')
+     or (public.taproom_can(brewery_id, 'bins')
          and location_id in (select id from public.locations where kind = 'taproom')));
    ```
 
-   The same shape on `bins` and `taproom_pars` (both by `location_id`);
-   `locations` itself tests `kind = 'taproom'` directly. The `on_hand` and `bin_on_hand` invoker views inherit movement row scope.
-   `keg_bin_on_hand` instead wraps a narrow auth-derived definer aggregate:
-   original staff see their own tenant, taproom sees only taproom locations,
-   with the same six columns and arithmetic. Raw keg events stay denied.
+   `locations` itself tests `kind = 'taproom'` directly. `on_hand` wraps
+   `on_hand_rows()`, a definer aggregate of qty only: original staff see their
+   tenant, taproom sees taproom locations, with `brewery_id` first from
+   `my_brewery_ids()`. `atp` is original-four (`is_staff_of`); portal badges
+   read movements directly inside `portal_availability`. `keg_bin_on_hand`
+   is the same pattern over keg events. Raw `inventory_movements`, `pos_sales`,
+   `pos_sale_expectations`, `pos_sales_coverage`, and keg events stay denied;
+   checked taproom projection RPCs own the variance-input reads. `tap_intervals`
+   is created later in the baseline with the same explicit tenant-wide policy.
+   `pos_menus` remains omitted until it exists.
    Raw `breweries` stays denied too. `staff_brewery_rows()` and its invoker
    view expose only own membership id, name, timezone and gravity unit.
    Request membership resolution joins that projection without a private
@@ -134,12 +139,10 @@ One baseline edit, four parts, in `supabase/migrations/00001_baseline.sql`.
    hours and snoozes remain original-four only, including callback helpers and
    the optional quiet-hours input on `set_notification_preference`.
 
-On the application side, `StaffRole` in `lib/commands/registry.ts` gains
+On the application side, `StaffRole` in `lib/commands/registry.ts` includes
 `"taproom"`, `tests/helpers.ts` `makeStaff` / `makeStaffCtx` accept it, the
-same nine commands list it in `roles`, and `lib/mgr/nav.ts` gives the role
-Today plus the Taproom, Taps and Menu entries when Program 12 ungates them.
-The staff guide's roles table gains the row when the first taproom screen
-ships (Program 12's docs task), not in this PR.
+matrix's commands list it in `roles`, and `lib/mgr/nav.ts` gives the role
+Today plus the live Taproom, Taps, and Variance entries. Menu remains planned.
 
 ## The proof: one test walks every table
 
@@ -157,9 +160,9 @@ ships (Program 12's docs task), not in this PR.
   `taproom_can`, so the test and the predicate are two independent copies of
   the decision and drift between them fails. A table with no seeded row is a
   test failure, not a pass, so a new table cannot slip in unclassified.
-- `it("scopes the location-bound tables to taproom rows")` asserts the
-  warehouse-location rows of `inventory_movements`, `bins`, `taproom_pars` and
-  `locations` are absent while the taproom rows are present.
+- The matrix and safe-projection checks assert that warehouse rows from
+  `locations`, `bins`, `taproom_pars`, `on_hand`, and `keg_bin_on_hand` are
+  absent while taproom rows are present; raw movement and keg ledgers are denied.
 - `it("writes only through its RPCs")` calls every RPC in
   `tests/rpc-allowlist.test.ts`'s list as the taproom user with valid existing owned resources and correctly typed
   arguments and expects `42501` from all but the nine named above, which are
@@ -181,8 +184,8 @@ is needed.
 - Two taproom locations at one brewery share one bartender view; per-location
   staffing is a later refinement (a `location_id` on `brewery_users`) and is
   not designed here.
-- The role reads sales at the POS level (`pos_sales`) so the variance screen
-  can explain a gap, but never `orders` or `invoices`.
+- The role reads variance only through the named draft and completed-period
+  projections; raw POS sales, expectations, coverage, orders, and invoices stay denied.
 - Nothing here is a migration: the change is one edit to the baseline, per
   `AGENTS.md`, landed by Program 12's first task together with its test. The
   Program 12 plan's header line "`staff_role = taproom` is not added" is
