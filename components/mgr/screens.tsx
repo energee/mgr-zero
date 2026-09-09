@@ -35,6 +35,9 @@ import { ChannelView } from "@/components/mgr/views/channel";
 import { ClosePackagingRunView } from "@/components/mgr/views/close-packaging-run";
 import { CompleteTransferView } from "@/components/mgr/views/complete-transfer";
 import { ConfirmOrderView } from "@/components/mgr/views/confirm-order";
+import { ContractView } from "@/components/mgr/views/contract";
+import { ContractsView } from "@/components/mgr/views/contracts";
+import { CycleCountView } from "@/components/mgr/views/cycle-count";
 import { CustomerView } from "@/components/mgr/views/customer";
 import { CustomersView } from "@/components/mgr/views/customers";
 import { DeniedView } from "@/components/mgr/views/denied";
@@ -46,11 +49,15 @@ import { FormatsView } from "@/components/mgr/views/formats";
 import { InvoiceView } from "@/components/mgr/views/invoice";
 import { LocationBinsView } from "@/components/mgr/views/location-bins";
 import { LocationView } from "@/components/mgr/views/location";
+import { MaterialView } from "@/components/mgr/views/material";
+import { MaterialsView } from "@/components/mgr/views/materials";
+import { MaterialsOnHandView } from "@/components/mgr/views/materials-on-hand";
 import { LocationsView } from "@/components/mgr/views/locations";
 import { MeView } from "@/components/mgr/views/me";
 import { MoreView } from "@/components/mgr/views/more";
 import { MovementRecordedView } from "@/components/mgr/views/movement-recorded";
 import { NewOrderView } from "@/components/mgr/views/new-order";
+import { NewPoView } from "@/components/mgr/views/new-po";
 import { NewTransferView } from "@/components/mgr/views/new-transfer";
 import { OrderView } from "@/components/mgr/views/order";
 import { OrdersView } from "@/components/mgr/views/orders-list";
@@ -66,7 +73,10 @@ import { PortalOrderView } from "@/components/mgr/views/portal-order";
 import { PortalOrdersView } from "@/components/mgr/views/portal-orders";
 import { PriceGroupView } from "@/components/mgr/views/price-group";
 import { PriceGroupsView } from "@/components/mgr/views/price-groups";
+import { PurchaseOrdersView } from "@/components/mgr/views/purchase-orders";
 import { PutBackView } from "@/components/mgr/views/put-back";
+import { ReceiptView } from "@/components/mgr/views/receipt";
+import { ReceivePoView } from "@/components/mgr/views/receive-po";
 import { QuestionInvoiceView } from "@/components/mgr/views/question-invoice";
 import { RecipeView } from "@/components/mgr/views/recipe";
 import { RecipesView } from "@/components/mgr/views/recipes";
@@ -93,6 +103,8 @@ import { WorkView } from "@/components/mgr/views/work";
 import { TransferDetailView } from "@/components/mgr/views/transfer-detail";
 import { TransfersView } from "@/components/mgr/views/transfers";
 import { UnitsView } from "@/components/mgr/views/units";
+import { VendorView } from "@/components/mgr/views/vendor";
+import { VendorsView } from "@/components/mgr/views/vendors";
 import { VesselDetailView } from "@/components/mgr/views/vessel-detail";
 import { OHIO_STOUT_NOTE, LOC_TAPROOM, LOC_WAREHOUSE } from "@/lib/mgr/fixtures/demo";
 import { beerOverview } from "@/lib/mgr/fixtures/beer";
@@ -127,6 +139,10 @@ import { portalOrderShipped, portalOrdersList } from "@/lib/mgr/fixtures/portal-
 import { priceGroupTwo, pricingGrid } from "@/lib/mgr/fixtures/pricing";
 import { channelExport, saleChannelsList, unitsPlato } from "@/lib/mgr/fixtures/settings-catalog";
 import { newTransferDraft, transferDetailSubmitted, transfersList } from "@/lib/mgr/fixtures/transfers";
+import {
+  contractYchCitra, contractsList, cycleCountCans, materialCitra, materialsList, materialsOnHandList,
+  newPoCountryMalt, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorYch, vendorsList,
+} from "@/lib/mgr/fixtures/purchasing";
 import { toAdjustLinesViewProps } from "@/lib/mgr/adjust-lines-view";
 import { toBatchesViewProps } from "@/lib/mgr/batches-view";
 import { toBeerViewProps } from "@/lib/mgr/beer-view";
@@ -137,6 +153,9 @@ import { toCatalogViewProps } from "@/lib/mgr/catalog-view";
 import { toChannelViewProps } from "@/lib/mgr/channel-view";
 import { toClosePackagingRunViewProps } from "@/lib/mgr/close-packaging-run-view";
 import { toCompleteTransferViewProps } from "@/lib/mgr/complete-transfer-view";
+import { toContractViewProps } from "@/lib/mgr/contract-view";
+import { toContractsViewProps } from "@/lib/mgr/contracts-view";
+import { toCycleCountViewProps } from "@/lib/mgr/cycle-count-view";
 import { toConfirmOrderViewProps } from "@/lib/mgr/confirm-order-view";
 import { toCustomerViewProps } from "@/lib/mgr/customer-view";
 import { toCustomersViewProps } from "@/lib/mgr/customers-view";
@@ -150,7 +169,11 @@ import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
 import { toLocationBinsViewProps } from "@/lib/mgr/location-bins-view";
 import { toLocationViewProps } from "@/lib/mgr/location-view";
 import { toLocationsViewProps } from "@/lib/mgr/locations-view";
+import { toMaterialViewProps } from "@/lib/mgr/material-view";
+import { toMaterialsViewProps } from "@/lib/mgr/materials-view";
+import { toMaterialsOnHandViewProps } from "@/lib/mgr/materials-on-hand-view";
 import { toMeViewProps } from "@/lib/mgr/me-view";
+import { toNewPoViewProps } from "@/lib/mgr/new-po-view";
 import { toMoreViewProps } from "@/lib/mgr/more-view";
 import { toMovementRecordedViewProps } from "@/lib/mgr/movement-recorded-view";
 import { toNewOrderViewProps } from "@/lib/mgr/new-order-view";
@@ -169,7 +192,10 @@ import { toPortalOrderViewProps } from "@/lib/mgr/portal-order-view";
 import { toPortalOrdersViewProps } from "@/lib/mgr/portal-orders-view";
 import { toPriceGroupViewProps } from "@/lib/mgr/price-group-view";
 import { toPriceGroupsViewProps } from "@/lib/mgr/price-groups-view";
+import { toPurchaseOrdersViewProps } from "@/lib/mgr/purchase-orders-view";
 import { toPutBackViewProps } from "@/lib/mgr/put-back-view";
+import { toReceiptViewProps } from "@/lib/mgr/receipt-view";
+import { toReceivePoViewProps } from "@/lib/mgr/receive-po-view";
 import { toQuestionInvoiceViewProps } from "@/lib/mgr/question-invoice-view";
 import { toRecipeViewProps } from "@/lib/mgr/recipe-view";
 import { toRecipesViewProps } from "@/lib/mgr/recipes-view";
@@ -195,6 +221,8 @@ import { toTodayViewProps } from "@/lib/mgr/today-view";
 import { toTransferDetailViewProps } from "@/lib/mgr/transfer-detail-view";
 import { toTransfersViewProps } from "@/lib/mgr/transfers-view";
 import { toUnitsViewProps } from "@/lib/mgr/units-view";
+import { toVendorViewProps } from "@/lib/mgr/vendor-view";
+import { toVendorsViewProps } from "@/lib/mgr/vendors-view";
 import { toVesselDetailViewProps } from "@/lib/mgr/vessel-detail-view";
 import { toWorkViewProps } from "@/lib/mgr/work-view";
 import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-icons";
@@ -1815,13 +1843,7 @@ export const SCREENS: Screen[] = [
     writes: "none [creation and receiving happen on their own surfaces]",
     states: [["draft", "Send is the next action"], ["partial", "Receive stays available for the remainder"], ["empty", "no open purchase orders: New PO is the only action"]],
     spec: "The Work list with the POs tab active. Each row names the next action; New PO opens the existing vendor purchase draft, and Receive PO returns here.",
-    body: (<>
-      {E.hd("Work", "warehouse default", E.btn("New PO"))}
-      {E.tabs(WORK_CHIPS, 5, "w-full", WORK_TABS)}
-      {E.row("PO-0142 · Country Malt", "sent · due Thu", E.act("Receive", "info"))}
-      {E.row("PO-0141 · YCH", "partially received · 1 Citra box due", E.act("Receive", "info"), "w")}
-      {E.row("PO-0143 · CanSource", "draft · 4 pallets", E.act("Send", "info"))}
-    </>),
+    body: <PurchaseOrdersView model={toPurchaseOrdersViewProps(purchaseOrdersWarehouse)} />,
   },
   {
     step: 7,
@@ -1834,25 +1856,7 @@ export const SCREENS: Screen[] = [
     writes: "create_purchase_order [one RPC: draft PO + all lines]",
     states: [["permission", "warehouse or admin required", 1], ["new", "vendor and one line required"], ["from requirements", "Planning drafts the lines; the shortfall is the quantity"], ["contracted lot", "the vendor named a lot on the contract · it prefills receiving"], ["no lot named", "the ordinary case · receiving captures it off the package"]],
     spec: "Expected lot is what the vendor named when the order was placed, which for a hop contract is often a crop-year lot. It is advisory: it creates no lot record and posts nothing, and it is offered only on a lot-tracked material. Receiving prefills its lot from it, and what the receiver reads off the arriving package is what creates the lot. That is the same principle as counted quantity: the promise is compared and the count is what posts. Rice hulls is not lot-tracked, so it is never asked.",
-    body: (<>
-      {E.back("Purchase orders", "New PO")}
-      {E.nav("Vendor", "Country Malt")}
-      {E.edit("Expected", "2026-09-10", "date")}
-      {E.line("2-row · 55 lb bags", "lot-tracked", E.stq(40), "", <>
-        {E.edit("Unit cost", "$28.50")}
-        {E.edit("Expected lot", "CM-26-4410")}
-      </>)}
-      {E.line("Citra · 44 lb boxes", "lot-tracked", E.stq(4), "", <>
-        {E.edit("Unit cost", "$9.40")}
-        {E.edit("Expected lot", "2026-CIT-77")}
-      </>)}
-      {E.line("Rice hulls · 50 lb", "not lot-tracked", E.stq(6), "", <>
-        {E.edit("Unit cost", "$0.62")}
-      </>)}
-      {E.btn("Add line", "g")}
-      {E.sp()}
-      {E.btn("Save draft")}
-    </>),
+    body: <NewPoView model={toNewPoViewProps(newPoCountryMalt)} />,
   },
   {
     step: 7,
@@ -1864,24 +1868,7 @@ export const SCREENS: Screen[] = [
     writes: "send_purchase_order [single row draft → sent; an attestation: Marked sent, never Delivered] · receive_purchase_order [one RPC: receipt + lines (counted, over or short) + lots with best_by + material movements]",
     states: [["loading", "PO-line skeleton"], ["draft", "Send purchase order is the one active verb · counts wait, and the receive verb is not drawn", 1], ["prefilled", "the PO named a lot · the field opens on it and the ordinary receipt changes nothing"], ["no lot on the PO", "the field opens empty · recent lots for that material are offered", 1], ["lot substituted", "the vendor shipped another lot · recorded, never blocked", 1], ["stale", "receipt changed · recheck", 1], ["offline", "keep counts; commit waits"], ["permission", "warehouse or admin", 1], ["success", "partially received"]],
     spec: "Send PO (green) shows while the PO is draft; receiving needs a sent PO. Each lot-tracked line takes a lot code and best-by typed off the vendor packaging, prefilled from the lot the PO named so the ordinary receipt is a glance and no typing. When the PO named none the field opens empty and offers that material\u2019s recent lots, which is what keeps one vendor lot from becoming two records over a stray space. The receive RPC creates the material lot from what is entered here, never from the PO: the package is the only writer of a lot code. A difference is a substitution, which is reported and never blocked. Punctuation or case alone never reads as one: the schema spec owns that comparison rule. Untracked lines (rice hulls) ask for none. Only counted quantity posts; over and short are both visible and both allowed, and the keypad never clamps an over-count as the only guard. PO status is trigger-derived; never write a loaded/status flag.",
-    body: (<>
-      {E.back("Purchase orders", "PO-0142 · Country Malt")}
-      {E.fld("Status", "sent Mon · expected Thu · nothing received yet")}
-      {E.line("2-row · 55 lb bags", "expected 40 · lot from the PO", E.stq(42), "w", <>
-        {E.edit("Lot", "CM-26-4410", "text", ["CM-26-4410", "CM-26-4288", "CM-25-9910"])}
-        {E.edit("Best by", "2027-03-31", "date")}
-      </>)}
-      {E.line("Citra · 44 lb boxes", "expected 4 · lot from the PO", E.stq(3), "w", <>
-        {E.edit("Lot", "2026-CIT-91", "text", ["2026-CIT-77", "2026-CIT-91", "2025-CIT-40"])}
-        {E.edit("Best by", "2027-08-31", "date")}
-        {E.note("Substituted: the PO named 2026-CIT-77. The box decides; the receipt records both.")}
-      </>)}
-      {E.row("Rice hulls · 50 lb", "expected 6 · not lot-tracked", E.stq(6), "ok")}
-      {E.tape([["+2,310 lb 2-row · receipt", "lot CM-26-4410 · over 2 bags"], ["+132 lb Citra · receipt", "lot 2026-CIT-91 · substituted · short 1"], ["+300 lb rice hulls · receipt", "not lot-tracked"]])}
-      {E.info("2-row is over by 2 bags and Citra short 1 on a substituted lot; the PO becomes partially received.")}
-      {E.sp()}
-      {E.btn("Receive purchase order", "irr")}
-    </>),
+    body: <ReceivePoView model={toReceivePoViewProps(receivePoCountryMalt)} />,
   },
   {
     step: 7,
@@ -1894,13 +1881,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["permission", "warehouse or admin required", 1], ["partial", "the PO is partially received · the remainder is named"], ["complete", "every line met expected · nothing is owed"]],
     spec: "Post-commit of Receive PO. The tape is the receipt; status is derived. The remainder is the ordered quantity less everything counted so far, and it is the number a buyer chases a vendor with, so it is stated rather than left to be worked out from the tape. It is derived on read for the same reason status is: a stored balance would need its own correction path the moment a recount lands, and a recount is the ordinary way a miscount is fixed here.",
-    body: (<>
-      {E.back("Work", "PO-0142 · received")}
-      {E.fld("Status", "partially received")}
-      {E.fld("Still owed", "1 Citra box · 44 lb")}
-      {E.tape([["+2,310 lb 2-row · receipt", "lot CM-26-4410 · over 2 bags"], ["+132 lb Citra · receipt", "lot 2026-CIT-91 · substituted · short 1"], ["+300 lb rice hulls · receipt", "not lot-tracked"]])}
-      {E.info("2-row is over by 2 bags and Citra short 1 on a substituted lot.")}
-    </>),
+    body: <ReceiptView model={toReceiptViewProps(receiptPoCountryMalt)} />,
   },
   {
     step: 7,
@@ -1913,13 +1894,7 @@ export const SCREENS: Screen[] = [
     writes: "none [counts happen in the Cycle count sheet]",
     states: [["expiring", "the earliest best-by date needs attention"], ["empty", "no materials yet: Add material is the only action"]],
     spec: "The Beer landing's Materials row opens this list. Count opens Cycle count for that material; Add material opens the existing material and vendor flow.",
-    body: (<>
-      {E.back("Beer", "Materials on hand", E.btn("Add material"))}
-      {E.row("Cans · 16 oz", "3,100 each · 2 lots · best by none", E.act("Count", "info"))}
-      {E.row("Citra 2026 · YCH", "262 lb · 1 lot · best by 8/31/27", E.act("Count", "info"))}
-      {E.row("2-row 2026 · Country Malt", "8,800 lb · 3 lots · best by 3/15/27", E.act("Count", "info"))}
-      {E.row("Yeast · WLP066", "2 brinks · 2 lots · best by 9/8/26", E.act("Count", "info"), "w")}
-    </>),
+    body: <MaterialsOnHandView model={toMaterialsOnHandViewProps(materialsOnHandList)} />,
   },
   {
     step: 7,
@@ -1934,12 +1909,8 @@ export const SCREENS: Screen[] = [
     states: [["permission", "warehouse or brewer required", 1], ["one lot", "the variance lands on it · nothing to choose"], ["several lots", "a shortage consumes earliest best-by first; an overage lands on the newest lot"], ["no best-by", "lots with none fall to receipt order behind those that have one"], ["split", "a shortage crossing two lots names both in the preview", 1], ["counted in rolls", "labels are counted as whole rolls · the open roll is excluded and its remainder falls into the variance", 1]],
     spec: "A count is one number and a material may hold several lots, so the RPC has to decide which lot moves. A shortage consumes earliest best-by first, not earliest receipt: best-by is what a recall and an expiry sweep read, and consuming the freshest lot first would leave the oldest to expire on the shelf. An overage lands on the newest lot, since unrecorded stock is far likelier to be the delivery just counted in than one from six months ago. The chosen lot is always named in the preview: a variance that silently splits across two lots is the one thing this sheet must not do quietly. Labels are the exception to counting units, and the reason is practical: nobody counts two thousand labels left on a roll, and a sheet that asks will be handed a guess that posts as fact. Whole rolls are counted instead and the open roll is excluded, so the error is bounded at one roll and the same variance absorbs it at the next count. Applicator waste is what makes the drift, since packaging consumes one label per unit packaged while the real line wastes a little more; counting rolls on a routine keeps that from accumulating unnoticed.",
     body: (<>
-      {E.nav("Material", "Cans · 16 oz")}
-      {E.qty("3050", E.tabs(["each", "case"], 0, "w-fit"))}
-      {E.info("system 3,100 · variance −50 · from lot L-0774, best by 3/15/27")}
-      {E.pin(<>
-        {E.btn("Record count", "irr")}
-      </>)}
+      <CycleCountView model={toCycleCountViewProps(cycleCountCans)} footer={null} />
+      {E.pin(<>{E.btn("Record count", "irr")}</>)}
     </>),
   },
   {
@@ -1953,14 +1924,7 @@ export const SCREENS: Screen[] = [
     writes: "none [creation and editing happen on Vendor]",
     states: [["permission", "warehouse or brewer required", 1], ["active", "available for purchase orders"], ["contract", "committed quantity summarized"], ["empty", "Add vendor is the only action"]],
     spec: "Materials, vendors and contracts are separate lists so each row has one predictable destination.",
-    body: (<>
-      {E.back("More", "Vendors", E.btn("Add vendor"))}
-      {E.row("YCH", "hops · 1 active contract", E.act("Edit"))}
-      {E.row("Country Malt", "grain · 1 active contract", E.act("Edit"))}
-      {E.row("CanSource", "packaging · 3 materials", E.act("Edit"))}
-      {E.nav("Materials", "12 materials")}
-      {E.nav("Contracts", "2 active commitments")}
-    </>),
+    body: <VendorsView model={toVendorsViewProps(vendorsList)} />,
   },
   {
     step: 7,
@@ -1973,12 +1937,7 @@ export const SCREENS: Screen[] = [
     writes: "none [creation and editing happen on Material]",
     states: [["permission", "warehouse or brewer required", 1], ["active", "available to recipes and purchase orders"], ["inactive", "history remains", 1], ["empty", "Add material is the only action"]],
     spec: "This list owns material facts; Materials on hand remains the inventory view.",
-    body: (<>
-      {E.back("Vendors", "Materials", E.btn("Add material"))}
-      {E.row("Citra", "hop · lb · 262 lb on hand", E.act("Edit"))}
-      {E.row("2-row", "grain · lb · 8,800 lb on hand", E.act("Edit"))}
-      {E.row("Cans · 16 oz", "packaging · each · 3,100 on hand", E.act("Edit"))}
-    </>),
+    body: <MaterialsView model={toMaterialsViewProps(materialsList)} />,
   },
   {
     step: 7,
@@ -1992,19 +1951,7 @@ export const SCREENS: Screen[] = [
     writes: "upsert_material",
     states: [["permission", "warehouse or brewer required", 1], ["new", "name, kind and unit required"], ["in use", "unit change refused", 1], ["lot-tracked", "every receipt and consumption names a lot; off means none may"]],
     spec: "Inventory quantities and lots are not edited on the definition, and neither is lead time: the wait is a property of who fulfils an order, so it lives on the vendor. The purchase-unit factor does live here, because a hop box and a can pallet from one supplier are different numbers, and the factor is what turns counted bags into base units on Receive PO.",
-    body: (<>
-      {E.edit("Material name", "Citra")}
-      {E.pick("Kind", "Hop", ["Malt", "Hop", "Yeast", "Adjunct", "Chemical", "Packaging", "Other"])}
-      {E.inline(
-        E.edit("Base units", "44", "number"),
-        E.pick("Purchase unit", "each", ["each", "lb", "kg", "oz", "g", "l", "gal", "ml"]),
-        E.pick("Unit", "lb", ["lb", "oz", "kg", "each"]),
-      )}
-      {E.info("A 44 lb box is purchase unit each with 44 base units, not a “box” unit: the schema has one unit vocabulary and packaging is the factor.")}
-      {E.row("Lot-tracked", "receipts name a lot · consumption picks one", E.sw(true, "Lot-tracked"), "ok")}
-      {E.row("Active", "available to recipes and purchase orders", E.sw(true, "Material active"), "ok")}
-      {E.btn("Save material")}
-    </>),
+    body: <MaterialView model={toMaterialViewProps(materialCitra)} />,
   },
   {
     step: 7,
@@ -2018,16 +1965,7 @@ export const SCREENS: Screen[] = [
     writes: "upsert_vendor",
     states: [["permission", "warehouse or brewer required", 1], ["new", "name required"], ["active", "available for purchase orders"]],
     spec: "Contracts remain separate records because a vendor may supply many materials. Lead time lives here rather than on the material: every observation of it is an ordered-to-received span keyed by the vendor, so the estimate sits where the evidence is. Planning reads it to date the buy-by of the slowest supplier a bill of materials resolves to.",
-    body: (<>
-      {E.edit("Vendor name", "YCH")}
-      {E.edit("Email", "orders@ych.example", "email")}
-      {E.inline(
-        E.pick("Terms", "Net 30", ["Due on receipt", "Net 15", "Net 30"]),
-        E.edit("Lead time (days)", "7", "number"),
-      )}
-      {E.info("The typed figure is what Planning dates a buy-by from. Received orders give an observed average that is read, never stored.")}
-      {E.btn("Save vendor")}
-    </>),
+    body: <VendorView model={toVendorViewProps(vendorYch)} />,
   },
   {
     step: 7,
@@ -2040,11 +1978,7 @@ export const SCREENS: Screen[] = [
     writes: "none [creation and editing happen on Contract]",
     states: [["permission", "warehouse or brewer required", 1], ["active", "committed, received, on order and available all shown"], ["releases in flight", "orders placed and not yet arrived hold back availability", 1], ["fulfilled", "history remains"], ["empty", "Add contract is the only action"]],
     spec: "Each commitment is one vendor and one material. A contract is not an order: it commits a volume for a crop year, and releases are ordered against it all year, so the same contract is drawn down many times. That is why availability counts orders placed as well as deliveries taken. Counting only what has arrived would let two releases be placed against the same remaining quantity, and the over-draw would surface weeks later at receiving. Received is what accounting reconciles against; available is what a buyer decides against. Both are shown because they answer different questions.",
-    body: (<>
-      {E.back("Vendors", "Contracts", E.btn("Add contract"))}
-      {E.row("YCH · Citra 2026", "400 committed · 262 received · 100 on order · 38 lb available", E.act("Edit"), "w")}
-      {E.row("Country Malt · 2-row 2026", "20,000 committed · 8,800 received · 0 on order · 11,200 lb available", E.act("Edit"))}
-    </>),
+    body: <ContractsView model={toContractsViewProps(contractsList)} />,
   },
   {
     step: 7,
@@ -2058,18 +1992,7 @@ export const SCREENS: Screen[] = [
     writes: "upsert_material_contract",
     states: [["permission", "warehouse or brewer required", 1], ["new", "vendor, material and quantity required"], ["received", "received and on-order quantities are read-only"]],
     spec: "This sheet owns the commitment and nothing else. Receipts and open releases both update progress, and neither is editable here: a quantity a buyer could type over would stop being evidence. Available is the commitment less what has arrived and less what is already ordered, which is the only one of the four numbers worth acting on.",
-    body: (<>
-      {E.nav("Vendor", "YCH")}
-      {E.nav("Material", "Citra 2026")}
-      {E.edit("Contract quantity", "400", "number")}
-      {E.fld("Received", "262 lb · read-only")}
-      {E.fld("On order", "100 lb · read-only")}
-      {E.fld("Available to release", "38 lb")}
-      {E.edit("Starts", "2026-09-01", "date")}
-      {E.edit("Ends", "2026-10-31", "date")}
-      {E.edit("Unit cost", "$9.40")}
-      {E.btn("Save contract")}
-    </>),
+    body: <ContractView model={toContractViewProps(contractYchCitra)} />,
   },
   {
     step: 7,
