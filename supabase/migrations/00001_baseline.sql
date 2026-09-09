@@ -1885,6 +1885,7 @@ create table qbo_connections (
   remote_revocation_state text not null default 'not_requested' check (remote_revocation_state in ('not_requested','confirmed','unresolved')),
   last_error text,
   qbo_deposit_item_id text,
+  credential_version bigint not null default 0,
   connected_by uuid references auth.users(id),
   updated_at timestamptz not null default now(),
   unique (id, brewery_id)
@@ -2017,6 +2018,11 @@ language sql security definer set search_path = '' as $$
           refresh_token = excluded.refresh_token,
           credential_version = t.credential_version + 1,
           updated_at = now()
+    returning credential_version
+  ),
+  qbo_version as (
+    update public.qbo_connections q set credential_version=w.credential_version
+    from written w where p_provider='qbo' and q.brewery_id=p_brewery and q.id=p_connection
     returning true
   )
   select coalesce((select true from written), false);
@@ -2092,17 +2098,20 @@ $$;
 
 create function public.complete_qbo_oauth(p_intent uuid,p_actor uuid,p_realm_id text,p_realm_label text,p_access_token text,p_refresh_token text,p_received_at timestamptz,p_access_seconds int,p_refresh_seconds int,p_hard_seconds int)
 returns uuid language plpgsql security definer set search_path='' as $$
-declare i private.qbo_oauth_intents; v_id uuid:=private.new_uuid();
+declare i private.qbo_oauth_intents; v_id uuid:=private.new_uuid(); v_version bigint;
 begin
  select * into i from private.qbo_oauth_intents where id=p_intent for update;
  if i.id is null or i.actor_id<>p_actor or i.exchange_state<>'exchanging' or not exists(select 1 from public.brewery_users u where u.brewery_id=i.brewery_id and u.user_id=p_actor and u.role='admin') then raise exception 'oauth state invalid'; end if;
- insert into public.qbo_connections(id,brewery_id,realm_id,realm_label,state,access_expires_at,refresh_expires_at,refresh_hard_expires_at,remote_revocation_state,last_error,connected_by,updated_at)
- values(v_id,i.brewery_id,p_realm_id,p_realm_label,'connected',p_received_at+make_interval(secs=>p_access_seconds),case when p_refresh_seconds is null then null else p_received_at+make_interval(secs=>p_refresh_seconds) end,case when p_hard_seconds is null then null else p_received_at+make_interval(secs=>p_hard_seconds) end,'not_requested',null,p_actor,now())
- on conflict(brewery_id) do update set id=excluded.id,realm_id=excluded.realm_id,realm_label=excluded.realm_label,state='connected',access_expires_at=excluded.access_expires_at,refresh_expires_at=excluded.refresh_expires_at,refresh_hard_expires_at=excluded.refresh_hard_expires_at,remote_revocation_state='not_requested',last_error=null,
+ perform 1 from private.integration_tokens where brewery_id=i.brewery_id and provider='qbo' for update;
+ insert into public.qbo_connections(id,brewery_id,realm_id,realm_label,state,access_expires_at,refresh_expires_at,refresh_hard_expires_at,remote_revocation_state,last_error,credential_version,connected_by,updated_at)
+ values(v_id,i.brewery_id,p_realm_id,p_realm_label,'connected',p_received_at+make_interval(secs=>p_access_seconds),case when p_refresh_seconds is null then null else p_received_at+make_interval(secs=>p_refresh_seconds) end,case when p_hard_seconds is null then null else p_received_at+make_interval(secs=>p_hard_seconds) end,'not_requested',null,1,p_actor,now())
+ on conflict(brewery_id) do update set id=case when qbo_connections.realm_id=excluded.realm_id then qbo_connections.id else excluded.id end,realm_id=excluded.realm_id,realm_label=excluded.realm_label,state='connected',access_expires_at=excluded.access_expires_at,refresh_expires_at=excluded.refresh_expires_at,refresh_hard_expires_at=excluded.refresh_hard_expires_at,remote_revocation_state='not_requested',last_error=null,
    qbo_deposit_item_id=case when qbo_connections.realm_id=excluded.realm_id then qbo_connections.qbo_deposit_item_id end,
-   connected_by=p_actor,updated_at=now();
- insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token) values(i.brewery_id,'qbo',v_id,p_access_token,p_refresh_token)
- on conflict(brewery_id,provider) do update set connection_id=excluded.connection_id,access_token=excluded.access_token,refresh_token=excluded.refresh_token,credential_version=private.integration_tokens.credential_version+1,updated_at=now();
+   credential_version=qbo_connections.credential_version+1,connected_by=p_actor,updated_at=now()
+ returning id,credential_version into v_id,v_version;
+ insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token,credential_version)
+ values(i.brewery_id,'qbo',v_id,p_access_token,p_refresh_token,v_version)
+ on conflict(brewery_id,provider) do update set connection_id=excluded.connection_id,access_token=excluded.access_token,refresh_token=excluded.refresh_token,credential_version=excluded.credential_version,updated_at=now();
  update private.qbo_oauth_intents set exchange_state='completed' where id=i.id;
  insert into private.qbo_connection_events(brewery_id,connection_id,kind) values(i.brewery_id,v_id,'connected'); return v_id;
 end $$;
@@ -2113,28 +2122,32 @@ returns boolean language sql security definer set search_path='' as $$
   update private.integration_tokens t set access_token=p_access_token,refresh_token=p_refresh_token,credential_version=credential_version+1,updated_at=now()
   where t.brewery_id=p_brewery and t.provider=p_provider and t.connection_id=p_connection and t.credential_version=p_expected_version
   and exists(select 1 from public.brewery_users u where u.brewery_id=p_brewery and u.user_id=p_actor and u.role in ('admin','sales'))
-  and exists(select 1 from public.qbo_connections q where p_provider='qbo' and q.brewery_id=p_brewery and q.id=p_connection and q.state='connected') returning true
+  and exists(select 1 from public.qbo_connections q where p_provider='qbo' and q.brewery_id=p_brewery and q.id=p_connection and q.state='connected') returning t.credential_version
  ), expiry as (
   update public.qbo_connections q set access_expires_at=p_received_at+make_interval(secs=>p_access_seconds),
     refresh_expires_at=case when p_refresh_seconds is null then null else p_received_at+make_interval(secs=>p_refresh_seconds) end,
     refresh_hard_expires_at=case when p_hard_seconds is null then q.refresh_hard_expires_at else p_received_at+make_interval(secs=>p_hard_seconds) end,
-    updated_at=now() where q.brewery_id=p_brewery and q.id=p_connection and exists(select 1 from changed)
+    credential_version=changed.credential_version,updated_at=now() from changed
+    where q.brewery_id=p_brewery and q.id=p_connection
  ) select coalesce((select true from changed),false)
 $$;
 
 create function public.begin_qbo_disconnect(p_brewery uuid,p_connection uuid,p_actor uuid,p_request_id uuid)
 returns table(refresh_token text,replay_result jsonb) language plpgsql security definer set search_path='' as $$
-declare v_replay jsonb; v_token text; v_result jsonb:=jsonb_build_object('disconnected',true,'remoteRevocationState','unresolved');
+declare v_replay jsonb; v_token text; v_version bigint; v_result jsonb:=jsonb_build_object('disconnected',true,'remoteRevocationState','unresolved');
 begin
  if not exists(select 1 from public.brewery_users where brewery_id=p_brewery and user_id=p_actor and role='admin') then raise exception 'permission denied'; end if;
  v_replay:=private.claim_command_request_for(p_actor,p_brewery,'disconnect_qbo',p_request_id,jsonb_build_object('connectionId',p_connection));
  if v_replay is not null then return query select null::text,v_replay; return; end if;
  update private.qbo_oauth_intents set consumed_at=coalesce(consumed_at,now()),exchange_state='recovery_required'
  where brewery_id=p_brewery and exchange_state in ('pending','exchanging');
- update public.qbo_connections q set state='disconnected',remote_revocation_state='unresolved',updated_at=now()
+ delete from private.integration_tokens t where t.brewery_id=p_brewery and t.provider='qbo' and t.connection_id=p_connection
+ returning t.refresh_token,t.credential_version into v_token,v_version;
+ update public.qbo_connections q set state='disconnected',remote_revocation_state='unresolved',
+   credential_version=greatest(q.credential_version,coalesce(v_version,q.credential_version))+1,
+   updated_at=now()
  where q.brewery_id=p_brewery and q.id=p_connection and q.state='connected';
  if not found then raise exception 'connection not available'; end if;
- delete from private.integration_tokens t where t.brewery_id=p_brewery and t.provider='qbo' and t.connection_id=p_connection returning t.refresh_token into v_token;
  insert into private.qbo_connection_events(brewery_id,connection_id,kind) values(p_brewery,p_connection,'disconnected');
  perform private.complete_command_request_for(p_actor,p_request_id,v_result);
  return query select v_token,null::jsonb;
@@ -2169,9 +2182,9 @@ end $$;
 revoke execute on function private.purge_qbo_identity() from public,anon,authenticated,service_role;
 create trigger qbo_connections_identity_purge_mappings after update of id,realm_id on qbo_connections for each row execute function private.purge_qbo_identity();
 
--- A reconnect replaces the concrete external connection. Delete purges always;
--- guarded updates purge only on an actual identity or tenant-key change, so a
--- no-op metadata update cannot discard still-current credentials.
+-- A reconnect to the same verified realm preserves its logical connection.
+-- Delete and realm replacement purge credentials; metadata and credential
+-- generation updates do not discard still-current credentials.
 create function private.purge_integration_tokens() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin

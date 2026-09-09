@@ -102,7 +102,7 @@ describe("QuickBooks durable outbound push", () => {
     const beforeDisconnect = await readVersionedIntegrationTokens(f.ctx, "qbo");
     const remote = new Map<string, { Invoice: { Id: string; SyncToken: string } }>();
     let loseFirstResponse = true;
-    const pushFetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (input, init) => {
+    const pushFetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (input) => {
       const key = new URL(String(input)).searchParams.get("requestid")!;
       const entity = remote.get(key) ?? { Invoice: { Id: "reconnected-invoice", SyncToken: "0" } };
       remote.set(key, entity);

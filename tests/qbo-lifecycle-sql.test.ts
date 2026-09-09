@@ -147,7 +147,7 @@ describe("QuickBooks durable lifecycle", () => {
     expect((await admin.from("qbo_connections").select("state").eq("brewery_id", brewery.id).single()).data?.state).toBe("disconnected");
   });
 
-  it("consumes state once, replaces realm identity, and rejects stale refresh or a demoted actor", async () => {
+  it("consumes state once, replaces only changed-realm identity, and rejects stale refresh or a demoted actor", async () => {
     const brewery = await makeBrewery();
     const ctx = await makeStaffCtx(brewery.id, "admin");
     const customer = await seedCustomer(brewery.id);
@@ -252,7 +252,7 @@ describe("QuickBooks durable lifecycle", () => {
       .toEqual({ realm_id: `realm-two-${run}`, state: "disconnected" });
     expect((await admin.from("qbo_connections").update({ state: "disconnected" }).eq("brewery_id", competingBrewery.id)).error).toBeNull();
     const newestConnection = await connect(`state-three-${run}`, `realm-two-${run}`);
-    expect(newestConnection).not.toBe(newConnection);
+    expect(newestConnection).toBe(newConnection);
     expect((await admin.from("customers").select("qbo_customer_id").eq("id", customer.customerId).single()).data?.qbo_customer_id).toBe("customer-current");
     expect((await admin.from("skus").select("qbo_item_id").eq("id", catalog.skuId).single()).data?.qbo_item_id).toBe("item-current");
     expect((await admin.from("invoices").select("qbo_invoice_id,qbo_sync_status,qbo_tax_cents,qbo_total_cents,qbo_balance_cents").eq("brewery_id", brewery.id).single()).data)
@@ -263,9 +263,11 @@ describe("QuickBooks durable lifecycle", () => {
       p_received_at: new Date().toISOString(),
       p_access_seconds: 3600, p_refresh_seconds: 86400, p_hard_seconds: null,
     }))).toMatchObject({ data: false, error: null });
-    expect((await readVersionedIntegrationTokens(ctx, "qbo")).refreshToken).toBe(`refresh-realm-two-${run}`);
+    const afterReconnect = await readVersionedIntegrationTokens(ctx, "qbo");
+    expect(afterReconnect.refreshToken).toBe(`refresh-realm-two-${run}`);
+    expect(afterReconnect.credentialVersion).toBeGreaterThan(beforeDisconnect.credentialVersion);
 
-    const current = await readVersionedIntegrationTokens(ctx, "qbo");
+    const current = afterReconnect;
     const refresh = (suffix: string) => admin.rpc("cas_integration_tokens", {
       p_brewery: brewery.id, p_provider: "qbo", p_connection: current.connectionId, p_actor: ctx.userId,
       p_expected_version: current.credentialVersion, p_access_token: `race-access-${suffix}`,
