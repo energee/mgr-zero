@@ -102,14 +102,21 @@ export function createTapBoardRefreshGuard() {
   };
 }
 
+export type TapBoardSaveResult = { kind: "saved"; snapshot: TapBoardSnapshot | null; refreshError: unknown | null };
+
 export async function submitAndRefreshTapBoard(
   write: () => Promise<unknown>,
   refresh: () => Promise<TapBoardSnapshot | null>,
-): Promise<{ kind: "write_failed"; error: unknown } | { kind: "saved"; snapshot: TapBoardSnapshot | null; refreshError: unknown | null }> {
+): Promise<{ kind: "write_failed"; error: unknown } | TapBoardSaveResult> {
   try { await write(); }
   catch (error) { return { kind: "write_failed", error }; }
   try { return { kind: "saved", snapshot: await refresh(), refreshError: null }; }
   catch (refreshError) { return { kind: "saved", snapshot: null, refreshError }; }
+}
+
+export function pollErrorAfterTapBoardSave(current: string | null, result: TapBoardSaveResult): string | null {
+  if (result.snapshot) return null;
+  return result.refreshError === null ? current : "Tap action saved. Board refresh failed; reload when the connection returns.";
 }
 
 function keg(fields: TapSheetFields) {

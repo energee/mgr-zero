@@ -14,6 +14,7 @@ import {
   editTapBoardSheet,
   failTapBoardAttempt,
   openTapBoardSheet,
+  pollErrorAfterTapBoardSave,
   replaceTapBoardSnapshot,
   setTapBoardError,
   submitAndRefreshTapBoard,
@@ -121,11 +122,7 @@ export function TapBoard({ breweryId, locationId, initial, skus }: { breweryId: 
       return;
     }
     setState((current) => completeTapBoardAttempt(current, result.snapshot));
-    if (result.refreshError === null) {
-      setPollError(null);
-    } else {
-      setPollError("Tap action saved. Board refresh failed; reload when the connection returns.");
-    }
+    setPollError((current) => pollErrorAfterTapBoardSave(current, result));
   }
 
   return <>

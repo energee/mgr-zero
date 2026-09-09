@@ -6,6 +6,7 @@ import {
   editTapBoardSheet,
   failTapBoardAttempt,
   openTapBoardSheet,
+  pollErrorAfterTapBoardSave,
   replaceTapBoardSnapshot,
   submitAndRefreshTapBoard,
   TAP_BOARD_POLL_MS,
@@ -87,8 +88,37 @@ describe("tap board controlled state", () => {
     const result = await submitAndRefreshTapBoard(write, vi.fn().mockRejectedValue(refreshRejection));
 
     expect(result).toEqual({ kind: "saved", snapshot: null, refreshError: refreshRejection });
+    if (result.kind === "saved") {
+      expect(pollErrorAfterTapBoardSave("Automatic refresh failed.", result))
+        .toBe("Tap action saved. Board refresh failed; reload when the connection returns.");
+    }
     expect(write).toHaveBeenCalledOnce();
     state = completeTapBoardAttempt(state, result.kind === "saved" ? result.snapshot : null);
     expect(state).toEqual({ snapshot, sheet: null });
+  });
+
+  it("preserves a newer poll failure when an older post-write refresh is superseded", async () => {
+    const guard = createTapBoardRefreshGuard();
+    let resolvePostWrite!: (value: TapBoardSnapshot) => void;
+    let postWriteStarted = false;
+    const postWrite = submitAndRefreshTapBoard(
+      vi.fn().mockResolvedValue({ id }),
+      () => guard.run(() => new Promise<TapBoardSnapshot>((resolve) => {
+        postWriteStarted = true;
+        resolvePostWrite = resolve;
+      })),
+    );
+    await vi.waitFor(() => expect(postWriteStarted).toBe(true));
+    const automaticWarning = "Automatic refresh failed. Reload when the connection returns.";
+    await expect(guard.run(async () => { throw new Error("poll failed"); })).rejects.toThrow("poll failed");
+    resolvePostWrite(snapshot);
+    const result = await postWrite;
+
+    expect(result.kind).toBe("saved");
+    if (result.kind === "saved") {
+      expect(result).toMatchObject({ snapshot: null, refreshError: null });
+      expect(pollErrorAfterTapBoardSave(automaticWarning, result)).toBe(automaticWarning);
+      expect(pollErrorAfterTapBoardSave(automaticWarning, { ...result, snapshot })).toBeNull();
+    }
   });
 });
