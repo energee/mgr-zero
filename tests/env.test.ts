@@ -37,9 +37,16 @@ describe("environment validation", () => {
     ).toThrow("VERCEL_ENV");
   });
 
-  it("parses only the three exact server-only QuickBooks OAuth names", () => {
-    expect(readQboEnv({ QBO_CLIENT_ID: "client", QBO_CLIENT_SECRET: "secret", QBO_REDIRECT_URI: "https://mgr.test/api/integrations/qbo/oauth" }))
-      .toEqual({ clientId: "client", clientSecret: "secret", redirectUri: "https://mgr.test/api/integrations/qbo/oauth" });
+  it("parses the exact server-only QuickBooks OAuth and API names", () => {
+    expect(readQboEnv({
+      QBO_CLIENT_ID: "client", QBO_CLIENT_SECRET: "secret",
+      QBO_REDIRECT_URI: "https://mgr.test/api/integrations/qbo/oauth",
+      QBO_API_BASE: "https://sandbox-quickbooks.api.intuit.com",
+    })).toEqual({
+      clientId: "client", clientSecret: "secret",
+      redirectUri: "https://mgr.test/api/integrations/qbo/oauth",
+      apiBaseUrl: "https://sandbox-quickbooks.api.intuit.com",
+    });
     expect(() => readQboEnv({ QBO_CLIENT_ID: "client" })).toThrow("QBO_CLIENT_SECRET");
   });
 

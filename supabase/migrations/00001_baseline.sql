@@ -2053,7 +2053,7 @@ returns boolean language sql security definer set search_path='' as $$
   where id=p_intent and actor_id=p_actor and exchange_state='exchanging' returning brewery_id
  ), event as (
   insert into private.qbo_connection_events(brewery_id,kind,detail)
-  select brewery_id,'oauth_recovery_required','OAuth exchange outcome is unknown; reconnect required' from changed
+  select brewery_id,'oauth_recovery_required','OAuth completion did not finish; reconnect required' from changed
  ) select coalesce((select true from changed),false)
 $$;
 

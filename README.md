@@ -58,6 +58,11 @@ limiting on `/api/command`: not yet implemented (authz audit A1).
 `development` (`lib/env/server-parser.ts`). Vercel sets it on deploys; locally
 it is normally absent.
 
+QuickBooks setup uses server-only `QBO_CLIENT_ID`, `QBO_CLIENT_SECRET`,
+`QBO_REDIRECT_URI`, and `QBO_API_BASE`. The example API base is Intuit sandbox;
+production must use `https://quickbooks.api.intuit.com`. The redirect must
+exactly match the callback registered with Intuit.
+
 ### Slack notifications
 
 Slack setup uses `APP_URL`, `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`,

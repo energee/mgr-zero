@@ -21,11 +21,19 @@ describe("QuickBooks durable lifecycle", () => {
     const otherAdmin = await makeStaffCtx(brewery.id, "admin");
     const redirectUri = "https://mgr.test/api/integrations/qbo/oauth";
     const realmId = `realm-${crypto.randomUUID()}`;
-    const config = { clientId: "client-id", clientSecret: "client-secret", redirectUri };
-    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({
-      access_token: "access-secret", refresh_token: "refresh-secret", expires_in: 3600,
+    const config = {
+      clientId: "client-id", clientSecret: "client-secret", redirectUri,
+      apiBaseUrl: "https://sandbox-quickbooks.api.intuit.com",
+    };
+    const tokenResponse = (accessToken = "access-secret") => new Response(JSON.stringify({
+      access_token: accessToken, refresh_token: "refresh-secret", expires_in: 3600,
       x_refresh_token_expires_in: 8640000,
-    }), { status: 200, headers: { "content-type": "application/json" } }));
+    }), { status: 200, headers: { "content-type": "application/json" } });
+    const companyResponse = (realm: string) => new Response(JSON.stringify({ CompanyInfo: { Id: realm } }), {
+      status: 200, headers: { "content-type": "application/json" },
+    });
+    const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (url) =>
+      String(url).includes("/tokens/bearer") ? tokenResponse() : companyResponse(realmId));
     const store = { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth };
     const begin = (state: string) => ctx.db.rpc("begin_qbo_oauth", {
       p_brewery: brewery.id, p_redirect_uri: redirectUri, p_state_hash: hash(state),
@@ -56,6 +64,39 @@ describe("QuickBooks durable lifecycle", () => {
     expect((await admin.from("brewery_users").update({ role: "admin" })
       .eq("brewery_id", brewery.id).eq("user_id", ctx.userId)).error).toBeNull();
 
+    const knownRealm = `known-${crypto.randomUUID()}`;
+    const tamperedState = `tampered-${crypto.randomUUID()}`;
+    expect((await begin(tamperedState)).error).toBeNull();
+    const tamperedFetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(tokenResponse("attacker-access-secret"))
+      .mockResolvedValueOnce(companyResponse(`actual-${crypto.randomUUID()}`));
+    await expect(completeQboOAuth({
+      request: new Request(`${redirectUri}?code=tampered-code&state=${tamperedState}&realmId=${knownRealm}`),
+      actorId: ctx.userId, selectedBreweryId: brewery.id, redirectUri,
+      client: new QboOAuthClient(config, tamperedFetch), store,
+    })).rejects.toThrow("QuickBooks is unavailable");
+    expect(tamperedFetch).toHaveBeenCalledTimes(2);
+    expect(sql(`select count(*) from public.qbo_connections where brewery_id='${brewery.id}' or realm_id='${knownRealm}'`)).toEqual(["0"]);
+    expect(sql(`select exchange_state from private.qbo_oauth_intents where state_hash='${hash(tamperedState)}'`)).toEqual(["recovery_required"]);
+    expect(JSON.stringify(sql(`select detail from private.qbo_connection_events where brewery_id='${brewery.id}'`))).not.toMatch(/attacker-access-secret|refresh-secret/);
+
+    const legitimateBrewery = await makeBrewery();
+    const legitimateAdmin = await makeStaffCtx(legitimateBrewery.id, "admin");
+    const legitimateState = `legitimate-${crypto.randomUUID()}`;
+    expect((await legitimateAdmin.db.rpc("begin_qbo_oauth", {
+      p_brewery: legitimateBrewery.id, p_redirect_uri: redirectUri, p_state_hash: hash(legitimateState),
+      p_provider_intent: "connect", p_request_id: crypto.randomUUID(),
+    })).error).toBeNull();
+    const legitimateFetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(tokenResponse("legitimate-access-secret"))
+      .mockResolvedValueOnce(companyResponse(knownRealm));
+    await expect(completeQboOAuth({
+      request: new Request(`${redirectUri}?code=legitimate-code&state=${legitimateState}&realmId=${knownRealm}`),
+      actorId: legitimateAdmin.userId, selectedBreweryId: legitimateBrewery.id, redirectUri,
+      client: new QboOAuthClient(config, legitimateFetch), store,
+    })).resolves.toEqual(expect.any(String));
+    expect(sql(`select brewery_id from public.qbo_connections where realm_id='${knownRealm}'`)).toEqual([legitimateBrewery.id]);
+
     const validState = `valid-${crypto.randomUUID()}`;
     const supersededState = `superseded-${crypto.randomUUID()}`;
     expect((await begin(supersededState)).error).toBeNull();
@@ -64,7 +105,7 @@ describe("QuickBooks durable lifecycle", () => {
     expect(fetch).not.toHaveBeenCalled();
     await expect(callback(validState)).resolves.toEqual(expect.any(String));
     await expect(callback(validState)).rejects.toThrow("oauth state invalid");
-    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(2);
 
     const lostState = `lost-${crypto.randomUUID()}`;
     expect((await begin(lostState)).error).toBeNull();
@@ -78,12 +119,15 @@ describe("QuickBooks durable lifecycle", () => {
     expect(sql(`select exchange_state from private.qbo_oauth_intents where state_hash='${hash(lostState)}'`))
       .toEqual(["recovery_required"]);
     expect(sql(`select count(*) from private.qbo_connection_events where brewery_id='${brewery.id}' and kind='oauth_recovery_required'`))
-      .toEqual(["1"]);
+      .toEqual(["2"]);
 
     const delayedState = `delayed-${crypto.randomUUID()}`;
     expect((await begin(delayedState)).error).toBeNull();
     let releaseExchange!: (response: Response) => void;
-    const delayedFetch = vi.fn<typeof globalThis.fetch>().mockImplementation(() => new Promise((resolve) => { releaseExchange = resolve; }));
+    const delayedFetch = vi.fn<typeof globalThis.fetch>().mockImplementation((url) =>
+      String(url).includes("/tokens/bearer")
+        ? new Promise((resolve) => { releaseExchange = resolve; })
+        : Promise.resolve(companyResponse(realmId)));
     const delayedCallback = completeQboOAuth({
       request: new Request(`${redirectUri}?code=delayed-code&state=${delayedState}&realmId=${realmId}`),
       actorId: ctx.userId, selectedBreweryId: brewery.id, redirectUri,

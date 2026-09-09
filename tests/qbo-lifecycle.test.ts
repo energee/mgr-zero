@@ -5,6 +5,7 @@ const config = {
   clientId: "client-id",
   clientSecret: "client-secret",
   redirectUri: "https://mgr.test/api/integrations/qbo/oauth",
+  apiBaseUrl: "https://sandbox-quickbooks.api.intuit.com",
 };
 
 describe("QuickBooks OAuth transport", () => {
@@ -87,5 +88,51 @@ describe("QuickBooks OAuth lifecycle", () => {
 
     expect(fail).toHaveBeenCalledWith("intent-1", "actor-1");
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses a callback realm that the exchanged credential does not prove or is denied", async () => {
+    const complete = vi.fn();
+    const fail = vi.fn().mockResolvedValue(undefined);
+    const fetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        access_token: "access-secret", refresh_token: "refresh-secret", expires_in: 3600,
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ CompanyInfo: { Id: "actual-realm" } }), { status: 200 }));
+
+    await expect(completeQboOAuth({
+      request: new Request(`${config.redirectUri}?code=one-time-code&state=opaque&realmId=known-victim-realm`),
+      actorId: "actor-1", selectedBreweryId: "brewery-1", redirectUri: config.redirectUri,
+      client: new QboOAuthClient(config, fetch),
+      store: {
+        claim: vi.fn().mockResolvedValue({ intentId: "intent-1", breweryId: "brewery-1", providerIntent: "connect" }),
+        complete, fail,
+      },
+    })).rejects.toThrow("QuickBooks is unavailable");
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    const [url, init] = fetch.mock.calls[1];
+    expect(String(url)).toBe("https://sandbox-quickbooks.api.intuit.com/v3/company/known-victim-realm/companyinfo/known-victim-realm?minorversion=75");
+    expect(init).toMatchObject({ method: "GET", headers: { Authorization: "Bearer access-secret", Accept: "application/json" } });
+    expect(complete).not.toHaveBeenCalled();
+    expect(fail).toHaveBeenCalledWith("intent-1", "actor-1");
+
+    const deniedComplete = vi.fn();
+    const deniedFail = vi.fn().mockResolvedValue(undefined);
+    const deniedFetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        access_token: "denied-access-secret", refresh_token: "denied-refresh-secret", expires_in: 3600,
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ Fault: { Detail: "denied-access-secret" } }), { status: 403 }));
+    await expect(completeQboOAuth({
+      request: new Request(`${config.redirectUri}?code=denied-code&state=denied&realmId=denied-realm`),
+      actorId: "actor-1", selectedBreweryId: "brewery-1", redirectUri: config.redirectUri,
+      client: new QboOAuthClient(config, deniedFetch),
+      store: {
+        claim: vi.fn().mockResolvedValue({ intentId: "intent-2", breweryId: "brewery-1", providerIntent: "connect" }),
+        complete: deniedComplete, fail: deniedFail,
+      },
+    })).rejects.toThrow("QuickBooks is unavailable");
+    expect(deniedComplete).not.toHaveBeenCalled();
+    expect(deniedFail).toHaveBeenCalledWith("intent-2", "actor-1");
   });
 });

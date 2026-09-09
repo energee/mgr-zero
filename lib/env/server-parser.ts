@@ -14,6 +14,7 @@ export interface QboEnv {
   clientId: string;
   clientSecret: string;
   redirectUri: string;
+  apiBaseUrl: string;
 }
 
 type Environment = Record<string, string | undefined>;
@@ -29,6 +30,7 @@ export function readQboEnv(env: Environment = process.env): QboEnv {
     clientId: required(env, "QBO_CLIENT_ID"),
     clientSecret: required(env, "QBO_CLIENT_SECRET"),
     redirectUri: required(env, "QBO_REDIRECT_URI"),
+    apiBaseUrl: required(env, "QBO_API_BASE"),
   };
 }
 

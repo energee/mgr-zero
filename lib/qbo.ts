@@ -7,9 +7,10 @@ import { readQboEnv } from "@/lib/env/server-parser";
 const AUTHORIZE_URL = "https://appcenter.intuit.com/connect/oauth2";
 const TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer";
 const REVOKE_URL = "https://developer.api.intuit.com/v2/oauth2/tokens/revoke";
+const ACCOUNTING_MINOR_VERSION = "75";
 export const QBO_ACCOUNTING_SCOPE = "com.intuit.quickbooks.accounting";
 
-export type QboConfig = { clientId: string; clientSecret: string; redirectUri: string };
+export type QboConfig = { clientId: string; clientSecret: string; redirectUri: string; apiBaseUrl: string };
 export type QboTokens = {
   accessToken: string;
   refreshToken: string;
@@ -89,6 +90,7 @@ export async function completeQboOAuth(input: {
   if (!claim || claim.breweryId !== input.selectedBreweryId) throw new Error("oauth state invalid");
   try {
     const tokens = await input.client.exchange(code);
+    await input.client.verifyRealm(realmId, tokens.accessToken);
     return await input.store.complete(claim.intentId, input.actorId, realmId, tokens);
   } catch (error) {
     await input.store.fail(claim.intentId, input.actorId);
@@ -117,6 +119,20 @@ export class QboOAuthClient {
 
   refresh(refreshToken: string) {
     return this.token(new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken }));
+  }
+
+  async verifyRealm(realmId: string, accessToken: string) {
+    const escapedRealm = encodeURIComponent(realmId);
+    const url = new URL(`/v3/company/${escapedRealm}/companyinfo/${escapedRealm}`, this.config.apiBaseUrl);
+    url.searchParams.set("minorversion", ACCOUNTING_MINOR_VERSION);
+    const response = await this.transport(url, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+      redirect: "error",
+    });
+    if (!response.ok) throw new Error("QuickBooks company verification failed");
+    const body = await response.json() as { CompanyInfo?: { Id?: unknown } };
+    if (body.CompanyInfo?.Id !== realmId) throw new Error("QuickBooks company verification failed");
   }
 
   async revoke(token: string) {
