@@ -15,7 +15,7 @@ type IntegrationTokens = {
   accessToken: string;
   refreshToken: string;
 };
-type VersionedIntegrationTokens = IntegrationTokens & { credentialVersion: number; connectionId: string };
+export type VersionedIntegrationTokens = IntegrationTokens & { credentialVersion: number; connectionId: string };
 
 type ConnectionRow = { id: string };
 type TokenRow = { access_token: string; refresh_token: string; credential_version: number };
@@ -163,4 +163,22 @@ export async function disconnectQbo(ctx: Ctx, connectionId: string, revoke: (tok
   });
   if (finishError || !finished || typeof finished !== "object") throw new Error("QuickBooks disconnect reconciliation failed");
   return finished as { disconnected: true; remoteRevocationState: "confirmed" | "unresolved" };
+}
+
+export async function finishQboPush(ctx: Ctx, input: {
+  pushId: string;
+  finishRequestId: string;
+  status: "pushed" | "push_failed";
+  remoteId: string | null;
+  error: string | null;
+  response: Record<string, unknown>;
+}) {
+  const { data, error } = await createAdminClient().rpc("finish_qbo_push", {
+    p_brewery: ctx.breweryId, p_push: input.pushId, p_actor: ctx.userId,
+    p_status: input.status, p_qbo_entity_id: input.remoteId, p_error: input.error,
+    p_response: input.response, p_request_id: input.finishRequestId,
+  });
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error) throw new Error("QuickBooks push reconciliation failed");
+  return data as { pushId: string; status: "pushed" | "push_failed"; remoteId: string | null };
 }

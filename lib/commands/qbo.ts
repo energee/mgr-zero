@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineCommand, defineQuery } from "./registry";
+import { defineCommand, defineQuery, unwrap } from "./registry";
 
 defineCommand({
   name: "connect_qbo", description: "Begin administrator consent for a QuickBooks connection",
@@ -26,4 +26,41 @@ defineQuery({
   name: "get_qbo_connection", description: "Get redacted QuickBooks connection health and the connectionId required to disconnect",
   input: z.object({}), roles: ["admin"],
   handler: async (ctx) => (await import("@/lib/supabase/integration-tokens")).getQboHealth(ctx),
+});
+
+defineCommand({
+  name: "set_qbo_customer_mapping", description: "Bind a customer to a QuickBooks customer in the current company",
+  input: z.object({ customerId: z.string().uuid(), qboCustomerId: z.string().trim().min(1) }), roles: ["admin", "sales"],
+  handler: (ctx, input, execution) => unwrap(ctx.db.rpc("set_qbo_customer_mapping", {
+    p_brewery: ctx.breweryId, p_customer: input.customerId, p_qbo_customer_id: input.qboCustomerId, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "set_qbo_item_mapping", description: "Bind a SKU to a QuickBooks item in the current company",
+  input: z.object({ skuId: z.string().uuid(), qboItemId: z.string().trim().min(1) }), roles: ["admin", "sales"],
+  handler: (ctx, input, execution) => unwrap(ctx.db.rpc("set_qbo_item_mapping", {
+    p_brewery: ctx.breweryId, p_sku: input.skuId, p_qbo_item_id: input.qboItemId, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "set_qbo_deposit_mapping", description: "Set the QuickBooks item used for returnable-keg deposit charges",
+  input: z.object({ qboItemId: z.string().trim().min(1) }), roles: ["admin"],
+  handler: (ctx, input, execution) => unwrap(ctx.db.rpc("set_qbo_deposit_mapping", {
+    p_brewery: ctx.breweryId, p_qbo_item_id: input.qboItemId, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "push_invoice_to_qbo", description: "Push a frozen local invoice or credit memo to the current QuickBooks company with a durable request ID",
+  input: z.object({
+    invoiceId: z.string().uuid(),
+    newAttemptReason: z.enum(["corrected", "remote_deleted"]).optional(),
+  }),
+  roles: ["admin", "sales"], requiresConfirmation: true,
+  handler: async (ctx, input, execution) => {
+    const { pushInvoiceToQbo, qboConfig, QboOAuthClient } = await import("@/lib/qbo");
+    return pushInvoiceToQbo(ctx, input.invoiceId, execution.requestId, new QboOAuthClient(qboConfig()), input.newAttemptReason);
+  },
 });

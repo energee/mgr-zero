@@ -313,6 +313,7 @@ omitted. They have no roles until they are built.
 | `portal_submit_order` | Customer portal |  |  |  |  |  | ✓ |
 | `portal_update_draft_order` | Customer portal |  |  |  |  |  | ✓ |
 | `provision_brewery` | Team & brewery settings |  |  |  |  |  |  |
+| `push_invoice_to_qbo` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
 | `raise_invoice_question` | Orders & invoicing |  |  |  |  |  | ✓ |
 | `reattribute_loss` | Compliance | ✓ | ✓ |  |  |  |  |
 | `receive_purchase_order` | Purchasing & materials | ✓ |  | ✓ |  |  |  |
@@ -351,6 +352,9 @@ omitted. They have no roles until they are built.
 | `set_notification_preference` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `set_personal_quiet_hours` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |  |
 | `set_portal_fulfillment_source` | Customers | ✓ |  |  |  |  |  |
+| `set_qbo_customer_mapping` | Customers | ✓ | ✓ |  |  |  |  |
+| `set_qbo_deposit_mapping` | Team & brewery settings | ✓ |  |  |  |  |  |
+| `set_qbo_item_mapping` | Team & brewery settings | ✓ | ✓ |  |  |  |  |
 | `set_standing_allocation` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
 | `set_taproom_par` | Taproom & kegs | ✓ | ✓ |  |  |  |  |
 | `ship_order` | Orders & invoicing | ✓ |  | ✓ |  |  |  |
@@ -1231,6 +1235,24 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_standing_allocations", "input": {} }'
 ```
 
+#### push_invoice_to_qbo [#push_invoice_to_qbo]
+
+`command` · admin, sales
+
+Push a frozen local invoice or credit memo to the current QuickBooks company with a durable request ID
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `invoiceId` | uuid | yes |
+| `newAttemptReason` | corrected or remote_deleted | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "push_invoice_to_qbo", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "invoiceId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 #### raise_invoice_question [#raise_invoice_question]
 
 `command` · customer
@@ -1423,7 +1445,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* orders-designed */}
 
-25 of the 26 operations in this area are available today; the 1 below are not.
+26 of the 27 operations in this area are available today; the 1 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
@@ -2202,6 +2224,24 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_portal_fulfillment_source", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "locationId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+#### set_qbo_customer_mapping [#set_qbo_customer_mapping]
+
+`command` · admin, sales
+
+Bind a customer to a QuickBooks customer in the current company
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `customerId` | uuid | yes |
+| `qboCustomerId` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_qbo_customer_mapping", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "customerId": "00000000-0000-0000-0000-000000000000", "qboCustomerId": "string" } }'
 ```
 
 #### upsert_customer [#upsert_customer]
@@ -4263,6 +4303,41 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_my_gravity_unit", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "unit": "plato" } }'
+```
+
+#### set_qbo_deposit_mapping [#set_qbo_deposit_mapping]
+
+`command` · admin
+
+Set the QuickBooks item used for returnable-keg deposit charges
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `qboItemId` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_qbo_deposit_mapping", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "qboItemId": "string" } }'
+```
+
+#### set_qbo_item_mapping [#set_qbo_item_mapping]
+
+`command` · admin, sales
+
+Bind a SKU to a QuickBooks item in the current company
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `skuId` | uuid | yes |
+| `qboItemId` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_qbo_item_mapping", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "skuId": "00000000-0000-0000-0000-000000000000", "qboItemId": "string" } }'
 ```
 
 #### update_brewery [#update_brewery]

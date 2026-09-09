@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
-import { compareAndSwapQboTokens, readVersionedIntegrationTokens } from "@/lib/supabase/integration-tokens";
+import { compareAndSwapQboTokens, finishQboPush, readVersionedIntegrationTokens } from "@/lib/supabase/integration-tokens";
 import { readQboEnv } from "@/lib/env/server-parser";
 
 const AUTHORIZE_URL = "https://appcenter.intuit.com/connect/oauth2";
@@ -25,6 +25,19 @@ export type QboOAuthStore = {
   claim(stateHash: string, actorId: string, selectedBreweryId: string, redirectUri: string): Promise<QboOAuthClaim | null>;
   complete(intentId: string, actorId: string, realmId: string, tokens: QboTokens): Promise<string>;
   fail(intentId: string, actorId: string): Promise<void>;
+};
+
+type QboPushStart = {
+  pushId?: string;
+  providerRequestId?: string;
+  finishRequestId?: string;
+  requestBody?: string;
+  entityType?: "Invoice" | "CreditMemo";
+  realmId?: string;
+  connectionId?: string;
+  status: "pending" | "pushed";
+  remoteId?: string;
+  alreadyPushed?: boolean;
 };
 
 function positiveSeconds(value: unknown): number | null {
@@ -98,6 +111,51 @@ export async function completeQboOAuth(input: {
   }
 }
 
+export async function pushInvoiceToQbo(
+  ctx: Ctx,
+  invoiceId: string,
+  requestId: string,
+  client: QboOAuthClient,
+  newAttemptReason?: "corrected" | "remote_deleted",
+) {
+  if (ctx.role !== "admin" && ctx.role !== "sales") {
+    throw new CommandError("permission denied: QuickBooks push requires admin or sales", 403, "permission_denied");
+  }
+  const start = await unwrap(ctx.db.rpc("start_qbo_push", {
+    p_brewery: ctx.breweryId, p_invoice: invoiceId,
+    p_new_attempt_reason: newAttemptReason ?? null, p_request_id: requestId,
+  })) as QboPushStart;
+  if (start.alreadyPushed) return { status: "pushed" as const, remoteId: start.remoteId };
+  if (!start.pushId || !start.providerRequestId || !start.finishRequestId || !start.requestBody
+    || !start.entityType || !start.realmId || !start.connectionId) {
+    throw new Error("QuickBooks push start was invalid");
+  }
+  const tokens = await readVersionedIntegrationTokens(ctx, "qbo");
+  if (tokens.connectionId !== start.connectionId) {
+    throw new CommandError("QuickBooks connection changed; retry with the current connection", 409, "conflict");
+  }
+  let created: Awaited<ReturnType<QboOAuthClient["createTransaction"]>>;
+  try {
+    created = await client.createTransaction(start.realmId, start.entityType, start.providerRequestId, start.requestBody, tokens.accessToken);
+  } catch (error) {
+    throw new Error(sanitizeQboError(error));
+  }
+  if (!created.ok) {
+    if (created.definitive) {
+      await finishQboPush(ctx, {
+        pushId: start.pushId, finishRequestId: start.finishRequestId, status: "push_failed",
+        remoteId: null, error: "QuickBooks rejected the invoice", response: { httpStatus: created.status },
+      });
+      throw new CommandError("QuickBooks rejected the invoice; fix the mapping and choose corrected", 400);
+    }
+    throw new Error("QuickBooks is unavailable");
+  }
+  return finishQboPush(ctx, {
+    pushId: start.pushId, finishRequestId: start.finishRequestId, status: "pushed",
+    remoteId: created.remoteId, error: null, response: created.response,
+  });
+}
+
 export class QboOAuthClient {
   constructor(private readonly config: QboConfig, private readonly transport: typeof globalThis.fetch = globalThis.fetch) {}
 
@@ -145,6 +203,34 @@ export class QboOAuthClient {
       redirect: "error",
     });
     if (!response.ok) throw new Error("QuickBooks revoke failed");
+  }
+
+  async createTransaction(realmId: string, entityType: "Invoice" | "CreditMemo", requestId: string, body: string, accessToken: string) {
+    const url = new URL(`/v3/company/${encodeURIComponent(realmId)}/${entityType.toLowerCase()}`, this.config.apiBaseUrl);
+    url.searchParams.set("minorversion", ACCOUNTING_MINOR_VERSION);
+    url.searchParams.set("requestid", requestId);
+    const response = await this.transport(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json", "Content-Type": "application/json" },
+      body,
+      redirect: "error",
+    });
+    if (!response.ok) return { ok: false as const, definitive: response.status === 400 || response.status === 422, status: response.status };
+    const payload = await response.json();
+    if (!payload || typeof payload !== "object") throw new Error("QuickBooks response was invalid");
+    const entity = (payload as Record<string, unknown>)[entityType];
+    if (!entity || typeof entity !== "object" || typeof (entity as Record<string, unknown>).Id !== "string"
+      || !(entity as Record<string, unknown>).Id) throw new Error("QuickBooks response was invalid");
+    const row = entity as Record<string, unknown>;
+    const safe = Object.fromEntries(["Id", "SyncToken", "TotalAmt", "Balance"]
+      .filter((key) => typeof row[key] === "string" || (typeof row[key] === "number" && Number.isFinite(row[key])) )
+      .map((key) => [key, row[key]]));
+    const tax = row.TxnTaxDetail;
+    if (tax && typeof tax === "object" && typeof (tax as Record<string, unknown>).TotalTax === "number"
+      && Number.isFinite((tax as Record<string, unknown>).TotalTax)) {
+      safe.TotalTax = (tax as Record<string, unknown>).TotalTax;
+    }
+    return { ok: true as const, remoteId: row.Id as string, response: safe };
   }
 
   private basic() {
