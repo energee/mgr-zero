@@ -61,8 +61,9 @@ export const TEST_DB_PORT = 54352;
 export const DB = process.env.DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:54342/postgres";
 export function sql(q: string, quiet = false, errorVerbosity: "default" | "sqlstate" = "default"): string[] {
   const verbosity = errorVerbosity === "sqlstate" ? ["-v", "VERBOSITY=sqlstate"] : [];
-  const args = quiet ? [DB, ...verbosity, "-Atq", "-c", q] : [DB, ...verbosity, "-Atc", q];
-  return execFileSync("psql", args, { encoding: "utf8" }).trim().split("\n").filter(Boolean);
+  const transaction = /^\s*begin\s*;/i.test(q) ? [] : ["--single-transaction"];
+  const args = [DB, ...verbosity, "-v", "ON_ERROR_STOP=1", ...transaction, quiet ? "-Atq" : "-At", "-f", "-"];
+  return execFileSync("psql", args, { encoding: "utf8", input: q }).trim().split("\n").filter(Boolean);
 }
 
 type PrivilegedFixtureTable = "inventory_movements" | "taproom_counts" | "taproom_count_lines" | "volume_adjustments" | "volume_adjustment_reclassifications";
