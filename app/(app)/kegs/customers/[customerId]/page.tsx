@@ -5,9 +5,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { E } from "@/components/mgr/e";
+import { KegBalanceView } from "@/components/mgr/views/keg-balance";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext, isUuid } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
+import { toKegBalanceViewProps } from "@/lib/mgr/keg-balance-view";
 import "@/lib/commands/all";
 import { dollars, SIZE_LABEL } from "../../keg-labels";
 
@@ -22,16 +24,20 @@ export default async function CustomerKegBalancePage({ params }: { params: Promi
   if (!customer) notFound();
   const balance = (await runCommand("get_customer_keg_balance", { customerId }, ctx)) as Balance;
   return (
-    <>
-      {E.back("Keg fleet", customer.name, undefined, "/kegs")}
-      {E.num(`${balance.kegs_out} kegs`, `${dollars(balance.deposit_cents)} deposits held`)}
-      {balance.rows.length === 0 ? E.blank("No kegs currently out") : balance.rows.map((r) => (
-        <div key={`${r.pool_id}-${r.keg_size}`}>
-          {E.row(`${r.pool_name} ${SIZE_LABEL[r.keg_size] ?? r.keg_size}`, `${r.kegs_out} out`, dollars(r.deposit_cents))}
-        </div>
-      ))}
-      <Link href={`/kegs/history?customer=${customerId}`}>{E.nav("Keg event history", "this customer's events")}</Link>
-      {E.info("Beer returns use Return shipment. Empty keg returns are recorded from Keg fleet.")}
-    </>
+    <KegBalanceView
+      model={toKegBalanceViewProps({
+        backHref: "/kegs",
+        customer: customer.name,
+        kegs: `${balance.kegs_out} kegs`,
+        deposits: `${dollars(balance.deposit_cents)} deposits held`,
+        rows: balance.rows.map((r) => ({
+          key: `${r.pool_id}-${r.keg_size}`,
+          title: `${r.pool_name} ${SIZE_LABEL[r.keg_size] ?? r.keg_size}`,
+          detail: `${r.kegs_out} out`,
+          trailing: dollars(r.deposit_cents),
+        })),
+      })}
+      footer={<Link href={`/kegs/history?customer=${customerId}`}>{E.nav("Keg event history", "this customer's events")}</Link>}
+    />
   );
 }

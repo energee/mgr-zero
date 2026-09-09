@@ -6,9 +6,11 @@
 // printed in whatever unit the reader chose (get_gravity_unit, resolved once
 // here and handed to the form too).
 import { E } from "@/components/mgr/e";
+import { RecipeView } from "@/components/mgr/views/recipe";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
+import { toRecipeViewProps } from "@/lib/mgr/recipe-view";
 import "@/lib/commands/all";
 import { formatGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 import { orNotFound } from "@/lib/mgr/not-found";
@@ -37,29 +39,34 @@ export default async function RecipePage({ params }: { params: Promise<{ id: str
   const materialName = (mid: string) => materials.find((m) => m.id === mid)?.name ?? mid.slice(0, 8);
 
   return (
-    <>
-      {E.back("Recipes", recipe.name, <NewVersionForm recipeId={recipe.id} materials={materials} unit={gravityUnit.effective} />)}
-      {recipe.note ? E.fld("Note", recipe.note) : null}
-      {version === null ? (
-        E.blank("No version yet — create the first one")
-      ) : (
+    <RecipeView
+      model={toRecipeViewProps({ title: recipe.name, backHref: "/recipes" })}
+      createAction={<NewVersionForm recipeId={recipe.id} materials={materials} unit={gravityUnit.effective} />}
+      detail={
         <>
-          {E.fld("Version", `v${version.version}`)}
-          {E.fld("Mash temp", `${version.mash_temp_f} °F`)}
-          {E.fld("Brewhouse efficiency", pct(version.brewhouse_efficiency))}
-          {E.fld("Yeast attenuation", pct(version.yeast_attenuation))}
-          {version.boil_minutes !== null ? E.fld("Boil", `${version.boil_minutes} min`) : null}
-          {version.target_ibu !== null ? E.fld("Target IBU", version.target_ibu) : null}
-          {version.note ? E.fld("Note", version.note) : null}
-          {ogPlato !== null && fgPlato !== null && abv !== null
-            ? E.fld("Predicted OG / FG / ABV", `${formatGravity(ogPlato, gravityUnit.effective)} / ${formatGravity(fgPlato, gravityUnit.effective)} / ${abv.toFixed(1)}%`)
-            : null}
-          {E.ttl("Ingredients")}
-          {E.tbl(["material", "per bbl", "stage", "timing"], ingredients.map((i) => [
-            materialName(i.material_id), Number(i.per_bbl_qty), i.stage.replace("_", " "), i.timing_minutes ?? "—",
-          ]))}
+          {recipe.note ? E.fld("Note", recipe.note) : null}
+          {version === null ? (
+            E.blank("No version yet — create the first one")
+          ) : (
+            <>
+              {E.fld("Version", `v${version.version}`)}
+              {E.fld("Mash temp", `${version.mash_temp_f} °F`)}
+              {E.fld("Brewhouse efficiency", pct(version.brewhouse_efficiency))}
+              {E.fld("Yeast attenuation", pct(version.yeast_attenuation))}
+              {version.boil_minutes !== null ? E.fld("Boil", `${version.boil_minutes} min`) : null}
+              {version.target_ibu !== null ? E.fld("Target IBU", version.target_ibu) : null}
+              {version.note ? E.fld("Note", version.note) : null}
+              {ogPlato !== null && fgPlato !== null && abv !== null
+                ? E.fld("Predicted OG / FG / ABV", `${formatGravity(ogPlato, gravityUnit.effective)} / ${formatGravity(fgPlato, gravityUnit.effective)} / ${abv.toFixed(1)}%`)
+                : null}
+              {E.ttl("Ingredients")}
+              {E.tbl(["material", "per bbl", "stage", "timing"], ingredients.map((i) => [
+                materialName(i.material_id), Number(i.per_bbl_qty), i.stage.replace("_", " "), i.timing_minutes ?? "—",
+              ]))}
+            </>
+          )}
         </>
-      )}
-    </>
+      }
+    />
   );
 }

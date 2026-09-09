@@ -4,9 +4,11 @@
 // its own page. New PO is new-po-form.tsx → create_purchase_order.
 import Link from "next/link";
 import { E } from "@/components/mgr/e";
+import { PurchaseOrdersView } from "@/components/mgr/views/purchase-orders";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
+import { toPurchaseOrdersViewProps } from "@/lib/mgr/purchase-orders-view";
 import "@/lib/commands/all";
 import { poNo } from "@/lib/mgr/doc-no";
 import { NewPoForm } from "./new-po-form";
@@ -37,17 +39,26 @@ export default async function PurchaseOrdersPage({ searchParams }: { searchParam
   ])) as [Po[], Vendor[], Material[]];
 
   return (
-    <>
-      {E.hd("Purchase orders", all === "1" ? "every order" : "open orders", <NewPoForm vendors={vendors.filter((v) => v.active)} materials={materials} />)}
-      {pos.length === 0
-        ? E.blank(all === "1" ? "No purchase orders yet" : "No open purchase orders")
-        : pos.map((po) => {
+    <PurchaseOrdersView
+      model={toPurchaseOrdersViewProps({
+        title: "Purchase orders",
+        subtitle: all === "1" ? "every order" : "open orders",
+      })}
+      createAction={<NewPoForm vendors={vendors.filter((v) => v.active)} materials={materials} />}
+      tabs={null}
+      list={
+        pos.length === 0
+          ? E.blank(all === "1" ? "No purchase orders yet" : "No open purchase orders")
+          : pos.map((po) => {
             const [label, tone] = verb(po);
             return <div key={po.id}>{E.row(`${poNo(po.po_no)} · ${po.vendor_name ?? "—"}`, status(po), E.act(label, tone, `/purchase-orders/${po.id}`), po.status === "partially_received" ? "w" : "")}</div>;
-          })}
-      <p className="text-sm text-muted-foreground">
-        {all === "1" ? <Link href="/purchase-orders" className="underline">Open orders only</Link> : <Link href="/purchase-orders?all=1" className="underline">Show received and cancelled</Link>}
-      </p>
-    </>
+          })
+      }
+      footer={
+        <p className="text-sm text-muted-foreground">
+          {all === "1" ? <Link href="/purchase-orders" className="underline">Open orders only</Link> : <Link href="/purchase-orders?all=1" className="underline">Show received and cancelled</Link>}
+        </p>
+      }
+    />
   );
 }
