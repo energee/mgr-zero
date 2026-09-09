@@ -4,7 +4,7 @@
 import { formatVolume } from "@/lib/volume";
 
 export const MOVEMENT_CORRECTION_GATE =
-  "is limited to standalone adjustments and losses on inventory SKU detail. Count corrections remain unavailable; shipments and other compound entries keep their own correction workflow";
+  "is limited to standalone adjustments and losses on inventory SKU detail. Count corrections live on the latest eligible saved weekly count; shipments and other compound entries keep their own correction workflow";
 
 export type MovementRecordedViewModel = {
   backHref?: string;
