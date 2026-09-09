@@ -33,13 +33,16 @@ import { CompleteTransferView } from "@/components/mgr/views/complete-transfer";
 import { ConfirmOrderView } from "@/components/mgr/views/confirm-order";
 import { CustomerView } from "@/components/mgr/views/customer";
 import { CustomersView } from "@/components/mgr/views/customers";
+import { FinishedGoodsView } from "@/components/mgr/views/finished-goods";
 import { FormatView } from "@/components/mgr/views/format";
 import { FormatsView } from "@/components/mgr/views/formats";
 import { InvoiceView } from "@/components/mgr/views/invoice";
 import { LocationBinsView } from "@/components/mgr/views/location-bins";
 import { LocationView } from "@/components/mgr/views/location";
 import { LocationsView } from "@/components/mgr/views/locations";
+import { MovementRecordedView } from "@/components/mgr/views/movement-recorded";
 import { NewOrderView } from "@/components/mgr/views/new-order";
+import { NewTransferView } from "@/components/mgr/views/new-transfer";
 import { OrderView } from "@/components/mgr/views/order";
 import { OrdersView } from "@/components/mgr/views/orders-list";
 import { PackageBomView } from "@/components/mgr/views/package-bom";
@@ -56,6 +59,7 @@ import { PriceGroupView } from "@/components/mgr/views/price-group";
 import { PriceGroupsView } from "@/components/mgr/views/price-groups";
 import { PutBackView } from "@/components/mgr/views/put-back";
 import { QuestionInvoiceView } from "@/components/mgr/views/question-invoice";
+import { RecordMovementView } from "@/components/mgr/views/record-movement";
 import { ReturnCreditView } from "@/components/mgr/views/return-credit";
 import { ReviewOrderView } from "@/components/mgr/views/review-order";
 import { SaleChannelsView } from "@/components/mgr/views/sale-channels";
@@ -66,11 +70,14 @@ import { ShopView } from "@/components/mgr/views/shop";
 import { ShortPickView } from "@/components/mgr/views/short-pick";
 import { SkuListView } from "@/components/mgr/views/sku-list";
 import { SkuView } from "@/components/mgr/views/sku";
+import { TransferDetailView } from "@/components/mgr/views/transfer-detail";
+import { TransfersView } from "@/components/mgr/views/transfers";
 import { UnitsView } from "@/components/mgr/views/units";
 import { OHIO_STOUT_NOTE, LOC_TAPROOM, LOC_WAREHOUSE } from "@/lib/mgr/fixtures/demo";
 import { brandHazy, catalogBrands, formatCan, formatsInventory, packageBomCase, skuHazyHalf, skuListHazy } from "@/lib/mgr/fixtures/catalog";
 import { customerRidgeline, customersList, shipToMain } from "@/lib/mgr/fixtures/customers";
 import { invoiceFailedAls } from "@/lib/mgr/fixtures/invoice";
+import { finishedGoodsList, movementRecordedFestival, recordMovementFestival } from "@/lib/mgr/fixtures/inventory";
 import { binCold, locationBinsTaproom, locationTaproom, locationsList } from "@/lib/mgr/fixtures/locations";
 import { completeTransferTape, newOrderDraft, orderPickedRestock, orderPickedRestockPutBack, orderSubmittedRidgeline, orderTransferComplete, ordersWorkList } from "@/lib/mgr/fixtures/orders";
 import { orderAdjustLines, orderPick, orderReturnCredit, orderShipInvoice, orderShipOnDelivery, orderShipmentDone, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
@@ -82,6 +89,7 @@ import { portalInvoicePaid, portalInvoiceUnpaid, portalInvoicesRidgeline } from 
 import { portalOrderShipped, portalOrdersList } from "@/lib/mgr/fixtures/portal-orders";
 import { priceGroupTwo, pricingGrid } from "@/lib/mgr/fixtures/pricing";
 import { channelExport, saleChannelsList, unitsPlato } from "@/lib/mgr/fixtures/settings-catalog";
+import { newTransferDraft, transferDetailSubmitted, transfersList } from "@/lib/mgr/fixtures/transfers";
 import { toAdjustLinesViewProps } from "@/lib/mgr/adjust-lines-view";
 import { toBinViewProps } from "@/lib/mgr/bin-view";
 import { toBrandViewProps } from "@/lib/mgr/brand-view";
@@ -91,13 +99,16 @@ import { toCompleteTransferViewProps } from "@/lib/mgr/complete-transfer-view";
 import { toConfirmOrderViewProps } from "@/lib/mgr/confirm-order-view";
 import { toCustomerViewProps } from "@/lib/mgr/customer-view";
 import { toCustomersViewProps } from "@/lib/mgr/customers-view";
+import { toFinishedGoodsViewProps } from "@/lib/mgr/finished-goods-view";
 import { toFormatViewProps } from "@/lib/mgr/format-view";
 import { toFormatsViewProps } from "@/lib/mgr/formats-view";
 import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
 import { toLocationBinsViewProps } from "@/lib/mgr/location-bins-view";
 import { toLocationViewProps } from "@/lib/mgr/location-view";
 import { toLocationsViewProps } from "@/lib/mgr/locations-view";
+import { toMovementRecordedViewProps } from "@/lib/mgr/movement-recorded-view";
 import { toNewOrderViewProps } from "@/lib/mgr/new-order-view";
+import { toNewTransferViewProps } from "@/lib/mgr/new-transfer-view";
 import { toOrderViewProps } from "@/lib/mgr/order-view";
 import { toOrdersListViewProps } from "@/lib/mgr/orders-list-view";
 import { toPackageBomViewProps } from "@/lib/mgr/package-bom-view";
@@ -114,6 +125,7 @@ import { toPriceGroupViewProps } from "@/lib/mgr/price-group-view";
 import { toPriceGroupsViewProps } from "@/lib/mgr/price-groups-view";
 import { toPutBackViewProps } from "@/lib/mgr/put-back-view";
 import { toQuestionInvoiceViewProps } from "@/lib/mgr/question-invoice-view";
+import { toRecordMovementViewProps } from "@/lib/mgr/record-movement-view";
 import { toReviewOrderViewProps } from "@/lib/mgr/review-order-view";
 import { toReturnCreditViewProps } from "@/lib/mgr/return-credit-view";
 import { toSaleChannelsViewProps } from "@/lib/mgr/sale-channels-view";
@@ -124,6 +136,8 @@ import { toShopViewProps } from "@/lib/mgr/shop-view";
 import { toShortPickViewProps } from "@/lib/mgr/short-pick-view";
 import { toSkuListViewProps } from "@/lib/mgr/sku-list-view";
 import { toSkuViewProps } from "@/lib/mgr/sku-view";
+import { toTransferDetailViewProps } from "@/lib/mgr/transfer-detail-view";
+import { toTransfersViewProps } from "@/lib/mgr/transfers-view";
 import { toUnitsViewProps } from "@/lib/mgr/units-view";
 import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-icons";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
@@ -231,11 +245,6 @@ export const INV = {
   fee: "$9.48",
 } as const;
 
-// The movement kinds, in the order Record movement offers them. Finished goods
-// arrive from a packaging run, so the only manual way in is an opening balance:
-// "add finished goods" was a second, unreconciled path to the same stock.
-const MOVEMENT_KINDS = ["opening balance", "depletion", "loss", "sample", "festival removal", "destruction", "adjustment"];
-
 // The sale channels, in the order every picker offers them.
 const CHANNELS = ["Wholesale", "Taproom", "DTC", "Export"];
 
@@ -245,10 +254,6 @@ const OVERDUE_HOURS = "24";
 
 // A rough remaining fill, wherever a keg comes off a tap.
 const FILL_CHIPS = ["Empty", "About ¼ left", "About ½ left"];
-
-// Gate copy shared by the frames naming one gate. Two frames drifting apart is
-// the failure this prevents: the copy is the promise, so it lives once.
-const REVERSAL_GATE = "is limited to standalone adjustments and losses on inventory SKU detail. Count corrections remain unavailable; shipments and other compound entries keep their own correction workflow";
 
 // The Work list chips, in the order every Work list draws them.
 const WORK_CHIPS = ["all", "orders", "transfers", "batches", "runs", "POs", "routes"];
@@ -838,12 +843,7 @@ export const SCREENS: Screen[] = [
     writes: "none [SKU creation happens on its own surface]",
     states: [["short", "ATP below zero links to the competing orders"], ["empty", "no finished goods yet: Add SKU is the only action"]],
     spec: "The Beer landing's Finished goods row opens this list. On-hand, allocated and ATP stay together on each SKU; Review opens SKU detail and a shortage opens the shortfall. Add SKU opens the existing product and SKU flow.",
-    body: (<>
-      {E.back("Beer", "Finished goods", E.btn("Add SKU"))}
-      {E.row("Hazy IPA · ½ bbl keg", "15 on hand · 4 allocated · ATP 11", E.act("Review"))}
-      {E.row("Pils · 16 oz case", "18 on hand · 24 allocated · ATP −6", E.act("Shortfall", "attention"), "w")}
-      {E.row("Stout · ⅙ bbl keg", "9 on hand · 2 allocated · ATP 7", E.act("Review"))}
-    </>),
+    body: <FinishedGoodsView model={toFinishedGoodsViewProps(finishedGoodsList)} />,
   },
   {
     step: 3,
@@ -880,18 +880,8 @@ export const SCREENS: Screen[] = [
     states: [["offline", "Queue with requestId"], ["stale", "ATP changed · preview again", 1], ["permission", "admin or warehouse required · sales reads Beer only", 1], ["echo", "Committed row · eligible standalone adjustment/loss correction opens inventory SKU detail"], ["unregistered destination", "Stout to OH warns and links to the registry · never blocks", 1]],
     spec: "The form derives the signed API quantity from the movement kind (adjustments ask Add or Remove); the server derives 0.50000000 bbl and never accepts client-supplied barrels. Drawn with festival removal selected: sample and festival removal leave the premises and require a destination state (the schema enforces it); destruction, loss and depletion never carry one. An unregistered brand and destination warn here with the same copy the order screens use, because a festival removal leaves the premises exactly as a shipment does and was the one path that crossed a state line without saying so. This frame carries Hazy IPA into PA, which is registered, so the warning is a state rather than drawn copy. Channel stays.",
     body: (<>
-      <div className="md:hidden">{E.pick("Kind", "festival removal", MOVEMENT_KINDS)}</div>
-      <div className="hidden md:block">{E.chips(MOVEMENT_KINDS, 4)}</div>
-      {E.nav("SKU / package", "Hazy IPA · ½ bbl keg")}
-      {E.pick("Location", "Warehouse", ["Warehouse", "Taproom"])}
-      {E.pick("Bin", "Cold", ["Cold", "Dry", "Walk-in"])}
-      {E.pick("Channel", "Taproom", CHANNELS)}
-      {E.pick("Destination state", "PA · where the beer is poured", ["PA · where the beer is poured", "OH · where the beer is poured"])}
-      {E.qty("1", E.tabs(["keg", "case", "bbl"], 0, "w-fit"))}
-      {E.info("Preview: −1 keg · ½ bbl · festival removal · PA · amounts are entered positive")}
-      {E.pin(<>
-        {E.btn("Record movement", "irr")}
-      </>)}
+      <RecordMovementView model={toRecordMovementViewProps(recordMovementFestival)} footer={null} />
+      {E.pin(<>{E.btn("Record movement", "irr")}</>)}
     </>),
   },
   {
@@ -904,11 +894,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["echo", "the tape is the record"], ["correction gated", "Record inventory correction waits on its schema"]],
     spec: "Post-commit of Record movement. A tape means recorded: show the committed movement reference, bin, frozen barrel volume, destination state/channel and timestamp from the RPC result. An uncertain response never shows this receipt. The ledger has Older/Newer paging. The named correction is Record inventory correction, not Undo.",
-    body: (<>
-      {E.back("Beer", "Hazy IPA · ½ bbl")}
-      {E.tape([["−1 keg · festival removal · PA", "½ bbl · just now"]])}
-      {E.gated("Record inventory correction", REVERSAL_GATE)}
-    </>),
+    body: <MovementRecordedView model={toMovementRecordedViewProps(movementRecordedFestival)} />,
   },
   {
     step: 3,
@@ -1168,12 +1154,7 @@ export const SCREENS: Screen[] = [
     writes: "create_stock_transfer",
     states: [["empty", "New transfer is the only action"], ["draft", "Submit is next"], ["submitted", "Pick is next"], ["picked", "Receive writes the paired movements"], ["permission", "warehouse or admin required", 1]],
     spec: "The Work list with the Transfers tab active. This is the stock-transfer document (from/to location, bins on each line), not the taproom replenishment order that Complete transfer ships. A same-location pair is refused: that is a bin move.",
-    body: (<>
-      {E.hd("Work", "between locations", E.btn("New transfer"))}
-      {E.tabs(WORK_CHIPS, 2, "w-full", WORK_TABS)}
-      {E.row("TRF-0007", "Warehouse to Taproom · 2 lines · submitted", E.act("Pick", "info"), "w")}
-      {E.row("TRF-0006", "Warehouse to Storage · 1 line · picked", E.act("Receive", "success"), "w")}
-    </>),
+    body: <TransfersView model={toTransfersViewProps(transfersList)} />,
   },
   {
     step: 5,
@@ -1187,16 +1168,7 @@ export const SCREENS: Screen[] = [
     writes: "create_stock_transfer",
     states: [["permission", "warehouse or admin required", 1], ["same location", "refused · use a bin move", 1], ["empty lines", "Create stays off until one SKU has a qty"]],
     spec: "Opens from Transfers · New transfer. Materials and kegs move through the same command from the API; this sheet draws the SKU case. Bins default to the first bin at each location.",
-    body: (<>
-      {E.back("Transfers", "New transfer")}
-      {E.pick("From", "Warehouse", ["Warehouse", "Taproom", "Storage"])}
-      {E.pick("From bin", "Walk-in", ["Walk-in", "Cold", "Dry"])}
-      {E.pick("To", "Taproom", ["Taproom", "Storage"])}
-      {E.pick("To bin", "Cold", ["Walk-in", "Cold", "Dry"])}
-      {E.row("Hazy IPA · ½ bbl keg", "", E.stq(2))}
-      {E.row("Pils · 16 oz case", "", E.stq(4))}
-      {E.btn("Create transfer")}
-    </>),
+    body: <NewTransferView model={toNewTransferViewProps(newTransferDraft)} />,
   },
   {
     step: 5,
@@ -1209,15 +1181,7 @@ export const SCREENS: Screen[] = [
     writes: "submit_stock_transfer · record_stock_transfer_pick · receive_stock_transfer [one RPC: paired location_transfer movements, no invoice]",
     states: [["draft", "Submit is the one verb"], ["submitted", "Record pick defaults to requested qty"], ["picked", "Receive is irreversible"], ["received", "read-only tape · the stock has changed place"], ["permission", "warehouse or admin required", 1]],
     spec: "Not Complete transfer: that ships a taproom replenishment order. Receive posts both ledger halves or neither. No invoice.",
-    body: (<>
-      {E.back("Transfers", "TRF-0007")}
-      {E.fld(<>From {E.arrow(null)} to</>, <>Warehouse {E.arrow()} Taproom</>)}
-      {E.fld("Status", "submitted")}
-      {E.row("Hazy IPA · ½ bbl keg", "Walk-in to Cold", "2")}
-      {E.row("Pils · 16 oz case", "Walk-in to Cold", "4")}
-      {E.sp()}
-      {E.btn("Record pick")}
-    </>),
+    body: <TransferDetailView model={toTransferDetailViewProps(transferDetailSubmitted)} />,
   },
   {
     step: 5,
