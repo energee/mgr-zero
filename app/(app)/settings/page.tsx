@@ -1,11 +1,13 @@
 import { serverEnv } from "@/lib/env/server";
 import { E } from "@/components/mgr/e";
+import { SettingsView } from "@/components/mgr/views/settings";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
 import { redirect } from "next/navigation";
 import { deniedHref } from "@/lib/mgr/denied";
 import { plural } from "@/lib/mgr/plural";
+import { toSettingsViewProps } from "@/lib/mgr/settings-view";
 import "@/lib/commands/all";
 import { PortalFulfillmentForm } from "./portal-fulfillment-form";
 import { SettingsForm, type BrewerySettings } from "./settings-form";
@@ -19,19 +21,39 @@ export default async function SettingsPage() {
     runCommand("list_locations", {}, ctx) as Promise<{ id: string; name: string; kind: string }[]>,
     runCommand("list_team_members", {}, ctx) as Promise<unknown[]>,
   ]);
+  const warehouses = locations.filter((l) => l.kind === "warehouse");
   return (
-    <>
-      {E.back("More", "Settings", undefined, "/more")}
-      <SettingsForm brewery={row} />
-      <PortalFulfillmentForm key={row.portal_fulfillment_location_id ?? "unconfigured"} locations={locations.filter((l) => l.kind === "warehouse")} currentId={row.portal_fulfillment_location_id} />
-      {E.fld("Deployment", `${serverEnv.dedicated ? "dedicated" : "hosted"} · read-only`)}
-      {E.gated("Source water", "water profiles aren’t available yet")}
-      {E.nav("Locations", locations.map((l) => l.name).join(" · ") || "none yet", "", undefined, "/locations")}
-      {E.nav("Team", plural(team.length, "member"), "", undefined, "/settings/team")}
-      {E.gated("Accounting", "QuickBooks isn’t connected yet")}
-      {E.gated("Point of sale", "Square isn’t connected yet")}
-      {E.nav("Chat", "Slack notifications and preferences", "", undefined, "/settings/chat")}
-      {E.nav("Import", "upload, map and commit CSV rows", "", undefined, "/settings/import")}
-    </>
+    <SettingsView
+      model={toSettingsViewProps({
+        backHref: "/more",
+        name: row.name,
+        timezone: row.timezone,
+        timezoneOptions: ["America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles"],
+        ttb: row.ttb_registry_no ?? "",
+        paLicense: row.pa_license_no ?? "",
+        phone: row.customer_phone ?? "",
+        overdueHours: String(row.fermentation_reading_due_hours),
+        deployment: `${serverEnv.dedicated ? "dedicated" : "hosted"} · read-only`,
+        warehouse: warehouses.find((l) => l.id === row.portal_fulfillment_location_id)?.name ?? "",
+        warehouseOptions: warehouses.map((l) => l.name),
+        sourceWater: "water profiles aren’t available yet",
+        locations: locations.map((l) => l.name).join(" · ") || "none yet",
+        team: plural(team.length, "member"),
+      })}
+      breweryForm={<SettingsForm brewery={row} />}
+      fulfillmentForm={<PortalFulfillmentForm key={row.portal_fulfillment_location_id ?? "unconfigured"} locations={warehouses} currentId={row.portal_fulfillment_location_id} />}
+      deployment={E.fld("Deployment", `${serverEnv.dedicated ? "dedicated" : "hosted"} · read-only`)}
+      links={
+        <>
+          {E.gated("Source water", "water profiles aren’t available yet")}
+          {E.nav("Locations", locations.map((l) => l.name).join(" · ") || "none yet", "", undefined, "/locations")}
+          {E.nav("Team", plural(team.length, "member"), "", undefined, "/settings/team")}
+          {E.gated("Accounting", "QuickBooks isn’t connected yet")}
+          {E.gated("Point of sale", "Square isn’t connected yet")}
+          {E.nav("Chat", "Slack notifications and preferences", "", undefined, "/settings/chat")}
+          {E.nav("Import", "upload, map and commit CSV rows", "", undefined, "/settings/import")}
+        </>
+      }
+    />
   );
 }
