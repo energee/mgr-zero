@@ -94,17 +94,28 @@ defineQuery({
   name: "get_on_hand", description: "On-hand quantity per SKU/location",
   input: bySku, roles: [...readRoles],
   handler: async (ctx, i) => {
-    const rows: { sku_id: string; location_id: string; qty: number; locations: { name: string } | null }[] = [];
+    const rows: { brewery_id: string; sku_id: string; location_id: string; qty: number }[] = [];
     for (let start = 0; ; start += 500) {
-      let q = ctx.db.from("on_hand").select("*, locations(name)", { count: "exact" }).eq("brewery_id", ctx.breweryId)
+      let q = ctx.db.from("on_hand").select("brewery_id, sku_id, location_id, qty", { count: "exact" }).eq("brewery_id", ctx.breweryId)
         .order("sku_id").order("location_id").range(start, start + 499);
       if (i.skuId) q = q.eq("sku_id", i.skuId);
       const result = await q;
       const page = await unwrap(Promise.resolve(result)) as typeof rows;
       rows.push(...page);
       if (result.count === null || (!page.length && rows.length < result.count)) throw new Error("Could not read complete on-hand stock");
-      if (rows.length >= result.count) return rows;
+      if (rows.length >= result.count) break;
     }
+    const names = new Map<string, string>();
+    const locationIds = [...new Set(rows.map(row => row.location_id))];
+    for (let start = 0; start < locationIds.length; start += 100) {
+      const labels = await unwrap(ctx.db.from("locations").select("id, name").eq("brewery_id", ctx.breweryId).in("id", locationIds.slice(start, start + 100)));
+      for (const label of labels ?? []) names.set(label.id, label.name);
+    }
+    return rows.map(row => {
+      const name = names.get(row.location_id);
+      if (name === undefined) throw new CommandError("Location labels changed while loading. Reload and try again.", 409, "conflict");
+      return { ...row, locations: { name } };
+    });
   },
 });
 
