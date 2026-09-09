@@ -5,6 +5,7 @@ import { SKU_HAZY, SKU_PILS, SKU_STOUT, LOC_WAREHOUSE, LOC_TAPROOM } from "./dem
 import type { FinishedGoodsSnapshot } from "@/lib/mgr/finished-goods-view";
 import type { RecordMovementSnapshot } from "@/lib/mgr/record-movement-view";
 import type { MovementRecordedSnapshot } from "@/lib/mgr/movement-recorded-view";
+import type { ReverseMovementSnapshot } from "@/lib/mgr/reverse-movement-view";
 
 /** Beer → Finished goods: Hazy / Pils shortfall / Stout. */
 export const finishedGoodsList: FinishedGoodsSnapshot = {
@@ -29,6 +30,17 @@ export const recordMovementFestival: RecordMovementSnapshot = {
   qty: 1,
   unit: "keg",
   bbl: "0.50000000",
+};
+
+/** Reverse the standalone Warehouse · Cold +1 adjustment. */
+export const reverseMovementAdjustment: ReverseMovementSnapshot = {
+  qty: 1,
+  type: "adjustment",
+  location: "Warehouse",
+  bin: "Cold",
+  lot: "Untracked",
+  bbl: 0.5,
+  note: "Entered twice",
 };
 
 /** Post-commit echo of recordMovementFestival. */

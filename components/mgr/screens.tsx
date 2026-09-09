@@ -60,6 +60,7 @@ import { PriceGroupsView } from "@/components/mgr/views/price-groups";
 import { PutBackView } from "@/components/mgr/views/put-back";
 import { QuestionInvoiceView } from "@/components/mgr/views/question-invoice";
 import { RecordMovementView } from "@/components/mgr/views/record-movement";
+import { ReverseMovementView } from "@/components/mgr/views/reverse-movement";
 import { ReturnCreditView } from "@/components/mgr/views/return-credit";
 import { ReviewOrderView } from "@/components/mgr/views/review-order";
 import { SaleChannelsView } from "@/components/mgr/views/sale-channels";
@@ -77,7 +78,7 @@ import { OHIO_STOUT_NOTE, LOC_TAPROOM, LOC_WAREHOUSE } from "@/lib/mgr/fixtures/
 import { brandHazy, catalogBrands, formatCan, formatsInventory, packageBomCase, skuHazyHalf, skuListHazy } from "@/lib/mgr/fixtures/catalog";
 import { customerRidgeline, customersList, shipToMain } from "@/lib/mgr/fixtures/customers";
 import { invoiceFailedAls } from "@/lib/mgr/fixtures/invoice";
-import { finishedGoodsList, movementRecordedFestival, recordMovementFestival } from "@/lib/mgr/fixtures/inventory";
+import { finishedGoodsList, movementRecordedFestival, recordMovementFestival, reverseMovementAdjustment } from "@/lib/mgr/fixtures/inventory";
 import { binCold, locationBinsTaproom, locationTaproom, locationsList } from "@/lib/mgr/fixtures/locations";
 import { completeTransferTape, newOrderDraft, orderPickedRestock, orderPickedRestockPutBack, orderSubmittedRidgeline, orderTransferComplete, ordersWorkList } from "@/lib/mgr/fixtures/orders";
 import { orderAdjustLines, orderPick, orderReturnCredit, orderShipInvoice, orderShipOnDelivery, orderShipmentDone, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
@@ -126,6 +127,7 @@ import { toPriceGroupsViewProps } from "@/lib/mgr/price-groups-view";
 import { toPutBackViewProps } from "@/lib/mgr/put-back-view";
 import { toQuestionInvoiceViewProps } from "@/lib/mgr/question-invoice-view";
 import { toRecordMovementViewProps } from "@/lib/mgr/record-movement-view";
+import { toReverseMovementViewProps } from "@/lib/mgr/reverse-movement-view";
 import { toReviewOrderViewProps } from "@/lib/mgr/review-order-view";
 import { toReturnCreditViewProps } from "@/lib/mgr/return-credit-view";
 import { toSaleChannelsViewProps } from "@/lib/mgr/sale-channels-view";
@@ -865,7 +867,7 @@ export const SCREENS: Screen[] = [
     reads: "list_movements", writes: "reverse_inventory_movement",
     states: [["permission", "Admin or Warehouse only; Sales reads history"], ["insufficient", "Original bin/lot cannot cover the exact removal"], ["already reversed", "Open the linked correction"], ["unsupported", "Count and compound corrections retain their owner"]],
     spec: "The selected movement and exact opposite quantity, frozen BBL, bin and lot are read-only. A correction note is required. Confirm reversal appends one linked row; unchanged failed submissions keep their request ID.",
-    body: <>{E.fld("Movement", "+1 adjustment · Warehouse / Cold · Untracked")}{E.fld("Exact reversal", "−1 unit · −0.5 bbl")}{E.edit("Correction note", "Entered twice")}{E.btn("Confirm reversal")}</>,
+    body: <ReverseMovementView model={toReverseMovementViewProps(reverseMovementAdjustment)} />,
   },
   {
     step: 3,

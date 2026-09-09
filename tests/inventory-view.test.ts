@@ -9,10 +9,12 @@ import { FinishedGoodsView } from "../components/mgr/views/finished-goods";
 import { MovementRecordedView } from "../components/mgr/views/movement-recorded";
 import { RecordMovementView } from "../components/mgr/views/record-movement";
 import { SKU_HAZY, SKU_PILS, SKU_STOUT } from "../lib/mgr/fixtures/demo";
-import { finishedGoodsList, movementRecordedFestival, recordMovementFestival } from "../lib/mgr/fixtures/inventory";
+import { ReverseMovementView } from "../components/mgr/views/reverse-movement";
+import { finishedGoodsList, movementRecordedFestival, recordMovementFestival, reverseMovementAdjustment } from "../lib/mgr/fixtures/inventory";
 import { toFinishedGoodsViewProps } from "../lib/mgr/finished-goods-view";
 import { toMovementRecordedViewProps } from "../lib/mgr/movement-recorded-view";
 import { toRecordMovementViewProps } from "../lib/mgr/record-movement-view";
+import { toReverseMovementViewProps } from "../lib/mgr/reverse-movement-view";
 import { formatVolume } from "../lib/volume";
 
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
@@ -137,5 +139,28 @@ describe("Movement recorded view", () => {
     const body = screen("Movement recorded").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(MovementRecordedView);
     expect(body.props.model).toEqual(toMovementRecordedViewProps(movementRecordedFestival));
+  });
+});
+
+describe("Reverse movement view", () => {
+  it("maps the +1 adjustment onto the exact opposite", () => {
+    const model = toReverseMovementViewProps(reverseMovementAdjustment);
+    expect(model.movement).toBe("+1 adjustment · Warehouse / Cold · Untracked");
+    expect(model.exactReversal).toBe("−1 unit · −0.5 bbl");
+    expect(model.note).toBe("Entered twice");
+  });
+
+  it("renders Confirm reversal and the correction note", () => {
+    const html = htmlOf(createElement(ReverseMovementView, { model: toReverseMovementViewProps(reverseMovementAdjustment) }));
+    expect(html).toMatch(/>Confirm reversal</);
+    expect(html).toMatch(/Correction note/);
+    expect(html).toMatch(/Warehouse \/ Cold/);
+    expect(html).not.toMatch(/→/);
+  });
+
+  it("the Reverse movement inventory record is ReverseMovementView", () => {
+    const body = screen("Reverse movement").body as { type: unknown; props: { model: unknown } };
+    expect(body.type).toBe(ReverseMovementView);
+    expect(body.props.model).toEqual(toReverseMovementViewProps(reverseMovementAdjustment));
   });
 });
