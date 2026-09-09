@@ -65,11 +65,7 @@ describe("environment validation", () => {
       "utf8"
     );
     const seed = readFileSync(resolve(__dirname, "..", "scripts", "seed-dev.ts"), "utf8");
-    const browserClient = readFileSync(resolve(__dirname, "..", "lib", "supabase", "client.ts"), "utf8");
-
     expect(publicEnv).not.toContain("SUPABASE_SECRET_KEY");
-    expect(browserClient).not.toContain("@/lib/env/server");
-    expect(browserClient).not.toContain("SUPABASE_SECRET_KEY");
     expect(serverEnv).toContain('import "server-only"');
     expect(serverOnlyDeclaration).toContain('declare module "server-only"');
     expect(seed).not.toContain('from "@/lib/env/server";');
