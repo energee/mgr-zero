@@ -17,6 +17,7 @@ export function ConfirmDeliveryView({
     <>
       {E.back(model.backTo ?? "Driver route", model.title, undefined, model.backHref)}
       {E.ttl(model.heading)}
+      {model.shipTo && E.fld("Ship to", model.shipTo)}
       {E.fld("Invoice timing", model.invoiceTiming)}
       {model.lines.map((row) => (
         <Fragment key={row.key}>{E.row(row.title, "", row.qty)}</Fragment>

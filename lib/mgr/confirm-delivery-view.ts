@@ -6,6 +6,7 @@ export type ConfirmDeliveryViewModel = {
   backTo?: string;
   title: string;
   heading: string;
+  shipTo?: string;
   invoiceTiming: string;
   lines: ConfirmDeliveryLineView[];
   receivedBy?: string;

@@ -43,6 +43,7 @@ export default async function DeliveryStopPage({ params }: { params: Promise<{ i
         backHref: delivery.routes ? `/routes/${delivery.routes.id}` : "/routes",
         title: `${delivery.routes?.name ?? "Route"} · Stop ${delivery.stop_no}`,
         heading,
+        shipTo: order?.ship_tos ? `${order.ship_tos.label} · ${order.ship_tos.city}, ${order.ship_tos.state}` : undefined,
         invoiceTiming: timing,
         lines: lines.map((l) => ({ key: l.id, title: l.name, qty: String(l.qty) })),
       })}

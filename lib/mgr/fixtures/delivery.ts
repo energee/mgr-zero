@@ -57,6 +57,7 @@ export const confirmDeliveryStop1: ConfirmDeliveryViewModel = {
   backTo: "Driver route",
   title: "Route A · Stop 1 of 3",
   heading: "Ridgeline Tap Room",
+  shipTo: "Tap Room · Phoenixville, PA",
   invoiceTiming: "On delivery · saved",
   lines: [
     { key: "hazy", title: "Hazy IPA · ½ bbl keg", qty: "4" },

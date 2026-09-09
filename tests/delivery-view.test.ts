@@ -110,8 +110,7 @@ describe("Confirm delivery", () => {
   });
 
   it("shows the shipment destination before delivery is confirmed", () => {
-    const model = { ...confirmDeliveryStop1, shipTo: "Tap Room · Phoenixville, PA" };
-    const html = htmlOf(createElement(ConfirmDeliveryView, { model }));
+    const html = htmlOf(createElement(ConfirmDeliveryView, { model: confirmDeliveryStop1 }));
     expect(html).toMatch(/Ship to/);
     expect(html).toMatch(/Tap Room · Phoenixville, PA/);
   });
