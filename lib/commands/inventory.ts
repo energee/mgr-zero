@@ -70,15 +70,18 @@ defineCommand({
 const bySku = z.object({ skuId: z.string().uuid().optional() });
 const readRoles = ["admin", "sales", "warehouse"] as const;
 
-async function completeRows<T>(name: string, page: (start: number) => PromiseLike<{
+async function completeRows<T extends { id: string }>(name: string, page: (afterId: string | null) => PromiseLike<{
   data: T[] | null; error: { message: string; code?: string } | null; count: number | null;
 }>): Promise<T[]> {
   const rows: T[] = [];
   let total: number | undefined;
   do {
-    const result = await page(rows.length);
+    const afterId = rows.at(-1)?.id ?? null;
+    const result = await page(afterId);
     const next = await unwrap(Promise.resolve(result));
-    if (result.count === null || (total !== undefined && result.count !== total) || !next || (!next.length && rows.length < result.count)) {
+    const invalidPage = next?.some((row, index) => row.id <= (index === 0 ? afterId ?? "" : next[index - 1].id));
+    if (result.count === null || (total !== undefined && result.count !== total) || !next || invalidPage
+      || rows.length + next.length > result.count || (!next.length && rows.length < result.count)) {
       throw new CommandError(`${name} changed while loading. Reload and try again.`, 409, "conflict");
     }
     total = result.count;
@@ -170,17 +173,38 @@ defineQuery({
   // Brewers read SKUs too: the packaging pages pick the SKU a run fills.
   name: "list_skus", description: "SKUs with their brand and format, alphabetical",
   input: z.object({}), roles: STAFF_ROLES,
-  handler: (ctx) => completeRows("SKU list", (start) => ctx.db.from("skus")
-    .select("id, name, active, brand_id, format_id, brands(name), formats(name, bbl_per_unit, package_type), format_volume:format_volumes(bbl_per_unit)", { count: "exact" })
-    .eq("brewery_id", ctx.breweryId).order("name").order("id").range(start, start + 499)),
+  handler: async (ctx) => {
+    const rows = await completeRows("SKU list", async (afterId) => {
+      let query = ctx.db.from("skus")
+        .select("id, name, active, brand_id, format_id, brands(name), formats(name, bbl_per_unit, package_type), format_volume:format_volumes(bbl_per_unit)")
+        .eq("brewery_id", ctx.breweryId).order("id").limit(500);
+      if (afterId) query = query.gt("id", afterId);
+      const [result, counted] = await Promise.all([
+        query,
+        ctx.db.from("skus").select("id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId),
+      ]);
+      return { ...result, count: counted.count, error: result.error ?? counted.error };
+    });
+    return rows.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+  },
 });
 
 defineQuery({
   // Brewers read locations too: a packaging run puts its output somewhere.
   name: "list_locations", description: "Warehouses and taprooms, alphabetical",
   input: z.object({}), roles: STAFF_ROLES,
-  handler: (ctx) => completeRows("Location list", (start) => ctx.db.from("locations").select("id, name, kind", { count: "exact" })
-    .eq("brewery_id", ctx.breweryId).order("name").order("id").range(start, start + 499)),
+  handler: async (ctx) => {
+    const rows = await completeRows("Location list", async (afterId) => {
+      let query = ctx.db.from("locations").select("id, name, kind").eq("brewery_id", ctx.breweryId).order("id").limit(500);
+      if (afterId) query = query.gt("id", afterId);
+      const [result, counted] = await Promise.all([
+        query,
+        ctx.db.from("locations").select("id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId),
+      ]);
+      return { ...result, count: counted.count, error: result.error ?? counted.error };
+    });
+    return rows.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+  },
 });
 
 defineQuery({

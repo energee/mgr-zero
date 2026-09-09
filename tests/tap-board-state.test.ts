@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   beginTapBoardAttempt,
   completeTapBoardAttempt,
+  createTapBoardRefreshGuard,
   editTapBoardSheet,
   failTapBoardAttempt,
   openTapBoardSheet,
@@ -24,6 +25,24 @@ describe("tap board controlled state", () => {
     const polled = replaceTapBoardSnapshot(state, { open: [{ id, location_id: id, sku_id: null, label: "Other", nominal_bbl: .5, tap_number: null, opening_fill: 1, not_in_inventory: true, opened_at: "2026-09-08T12:00:00Z", opened_by: id, opened_by_label: "dana", brand_id: null, brand_name: null, sku_name: null }], history: [] });
     expect(polled.sheet).toBe(sheet);
     expect(polled.sheet?.fields).toMatchObject({ tapNumber: "7", guestLabel: "Dry cider", guestNominalBbl: "0.25" });
+  });
+
+  it("ignores an older refresh that resolves after a newer board result", async () => {
+    const guard = createTapBoardRefreshGuard();
+    let resolveOld!: (value: TapBoardSnapshot) => void;
+    const old = guard.run(() => new Promise<TapBoardSnapshot>((resolve) => { resolveOld = resolve; }));
+    const latest = { open: [], history: [{
+      id, location_id: id, sku_id: null, label: "Closed", nominal_bbl: .5, tap_number: null,
+      opening_fill: 1, not_in_inventory: true, opened_at: "2026-09-08T12:00:00Z", opened_by: id,
+      opened_by_label: "dana", brand_id: null, brand_name: null, sku_name: null,
+      closed_at: "2026-09-08T13:00:00Z", closed_by: id, closed_by_label: "dana",
+      closing_fill: 0, close_reason: "Kicked empty",
+    }] };
+    const newer = guard.run(async () => latest);
+
+    expect(await newer).toBe(latest);
+    resolveOld(snapshot);
+    expect(await old).toBeNull();
   });
 
   it("never defaults a guest swap to the outgoing identity", () => {

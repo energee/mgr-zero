@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,7 @@ import { command, CommandResponseError } from "@/lib/commands/client";
 import {
   beginTapBoardAttempt,
   completeTapBoardAttempt,
+  createTapBoardRefreshGuard,
   editTapBoardSheet,
   failTapBoardAttempt,
   openTapBoardSheet,
@@ -50,6 +51,7 @@ function closingFact(history: TapHistory[], interval: TapInterval | null) {
 export function TapBoard({ breweryId, locationId, initial, skus }: { breweryId: string; locationId: string; initial: TapBoardSnapshot; skus: TapSku[] }) {
   const [state, setState] = useState<TapBoardState>({ snapshot: initial, sheet: null });
   const [pollError, setPollError] = useState<string | null>(null);
+  const refreshGuard = useRef(createTapBoardRefreshGuard());
   const sheet = state.sheet;
   const locked = sheet?.attempt.kind === "submitting" || sheet?.attempt.kind === "unknown";
 
@@ -60,14 +62,16 @@ export function TapBoard({ breweryId, locationId, initial, skus }: { breweryId: 
     ]);
     return { open, history };
   }, [breweryId, locationId]);
+  const loadLatest = useCallback(() => refreshGuard.current.run(load), [load]);
 
   const refresh = useCallback(async () => {
     try {
-      const snapshot = await load();
+      const snapshot = await loadLatest();
+      if (!snapshot) return;
       setState((current) => replaceTapBoardSnapshot(current, snapshot));
       setPollError(null);
     } catch { setPollError("Automatic refresh failed. Reload when the connection returns."); }
-  }, [load]);
+  }, [loadLatest]);
 
   useEffect(() => {
     const timer = window.setInterval(refresh, TAP_BOARD_POLL_MS);
@@ -98,7 +102,7 @@ export function TapBoard({ breweryId, locationId, initial, skus }: { breweryId: 
     const attempt = submitted.attempt;
     const result = await submitAndRefreshTapBoard(
       () => command(breweryId, tapBoardCommand(submitted), attempt.payload, attempt.requestId),
-      load,
+      loadLatest,
     );
     if (result.kind === "write_failed") {
       const error = result.error;
@@ -107,7 +111,10 @@ export function TapBoard({ breweryId, locationId, initial, skus }: { breweryId: 
       let snapshot: TapBoardSnapshot | null = null;
       if (status === 409 && submitted.interval) {
         message = error instanceof CommandResponseError ? error.message : "This keg was already closed. Reload the board before acting.";
-        try { snapshot = await load(); message = closingFact(snapshot.history, submitted.interval) ?? message; }
+        try {
+          snapshot = await loadLatest();
+          if (snapshot) message = closingFact(snapshot.history, submitted.interval) ?? message;
+        }
         catch { /* keep the safe conflict copy returned by the close command */ }
       }
       setState((current) => failTapBoardAttempt(snapshot ? replaceTapBoardSnapshot(current, snapshot) : current, status, message, retrying));

@@ -86,9 +86,25 @@ export function completeTapBoardAttempt(state: TapBoardState, snapshot: TapBoard
   return { snapshot: snapshot ?? state.snapshot, sheet: null };
 }
 
+export function createTapBoardRefreshGuard() {
+  let latestStarted = 0;
+  return {
+    async run(load: () => Promise<TapBoardSnapshot>): Promise<TapBoardSnapshot | null> {
+      const request = ++latestStarted;
+      try {
+        const snapshot = await load();
+        return request === latestStarted ? snapshot : null;
+      } catch (error) {
+        if (request !== latestStarted) return null;
+        throw error;
+      }
+    },
+  };
+}
+
 export async function submitAndRefreshTapBoard(
   write: () => Promise<unknown>,
-  refresh: () => Promise<TapBoardSnapshot>,
+  refresh: () => Promise<TapBoardSnapshot | null>,
 ): Promise<{ kind: "write_failed"; error: unknown } | { kind: "saved"; snapshot: TapBoardSnapshot | null; refreshError: unknown | null }> {
   try { await write(); }
   catch (error) { return { kind: "write_failed", error }; }
