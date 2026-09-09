@@ -33,7 +33,7 @@ export default async function TodayPage() {
     const [open, counts, report] = await Promise.all([
       runCommand("list_open_taps", { locationId: location.id }, ctx) as Promise<TapInterval[]>,
       runCommand("list_taproom_counts", { locationId: location.id }, ctx) as Promise<{ counted_on: string; created_at: string }[]>,
-      runCommand("get_taproom_variance", { locationId: location.id, weeks: 4 }, ctx) as Promise<{ as_of: string; reason: string | null; rows: { variance_bbl: number | null }[] }>,
+      runCommand("get_taproom_variance", { locationId: location.id, weeks: 4 }, ctx) as Promise<{ as_of: string; reason: string | null; rows: { variance_bbl: number | null }[]; periods: { coverage_complete: boolean; reason: string | null }[] }>,
     ]);
     return <>{E.hd("Today", day)}{taproomTodayRows(location, open, counts, report).map((row) => <div key={row.href}>{E.row(row.label, row.detail, E.act(row.verb, "info", row.href))}</div>)}</>;
   }

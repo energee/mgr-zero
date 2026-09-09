@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { taproomTodayRows } from "@/lib/mgr/taproom-today";
 
 const location = { id: "11111111-1111-4111-8111-111111111111", name: "Main taproom" };
-const report = { as_of: "2026-09-08T15:00:00Z", reason: null, rows: [{ variance_bbl: 0 }] };
+const report = { as_of: "2026-09-08T15:00:00Z", reason: null, rows: [{ variance_bbl: 0 }], periods: [{ coverage_complete: true, reason: null }] };
 
 it("shows permitted Taproom exits from observed facts without inventing due policy", () => {
   const rows = taproomTodayRows(location, [], [{ counted_on: "2026-09-07", created_at: "2026-09-07T14:00:00Z" }], report);
@@ -21,4 +21,13 @@ it("keeps unavailable variance distinct from observed zero", () => {
   const rows = taproomTodayRows(location, [], [], { ...report, reason: "no_pos_coverage", rows: [] });
   expect(rows[2].detail).toContain("no pos coverage");
   expect(rows[2].detail).not.toContain("0 bbl");
+});
+
+it("labels mapped variance from incomplete POS coverage as partial", () => {
+  const rows = taproomTodayRows(location, [], [], {
+    ...report,
+    rows: [{ variance_bbl: .25 }],
+    periods: [{ coverage_complete: false, reason: null }],
+  });
+  expect(rows[2].detail).toContain("0.25 bbl expected minus actual · partial POS coverage");
 });

@@ -1267,9 +1267,9 @@ export const SCREENS: Screen[] = [
     name: "Variance by brand",
     to: { "Hazy IPA": "SKU detail" },
     job: "Where the gap between poured and counted keeps showing up",
-    reads: "get_taproom_variance",
+    reads: "list_locations · get_taproom_variance",
     writes: "none",
-    states: permitted("taproom, warehouse or admin required").concat([["no POS", "expected stays blank; actual count depletion remains visible", 1], ["first count", "actual is shown without a comparison"], ["incomplete coverage", "expected and variance stay blank"], ["unmapped", "mapped facts remain visible with the gap named"], ["not in inventory", "expected shares are explicitly excluded"]]),
+    states: permitted("taproom, warehouse or admin required").concat([["no POS", "expected stays blank; actual count depletion remains visible", 1], ["first count", "actual is shown without a comparison"], ["incomplete coverage", "mapped expected and variance remain visible; coverage is labeled incomplete"], ["unmapped", "mapped facts remain visible with the gap named"], ["not in inventory", "expected shares are explicitly excluded"]]),
     spec: "Variance is drawn twice on purpose. Inline on the draft count it can catch a miscount; this completed-period page shows whether a difference repeats. Expected comes from frozen POS serving facts, actual from frozen count depletion, and variance is expected minus actual. The comparison is reported and never posted. Whole periods use exact (prior count, current count] timestamps and are selected by their ending brewery-local date. First-count, absent or incomplete coverage, unmapped facts, excluded expected shares, unattributed volume and report as-of remain visible. Null stays unknown; zero is read alongside coverage and excluded consumption. Kegs outside inventory exclude only their expected share; count-derived actual remains intact.",
     body: (<>
       {E.back("Beer", "Variance")}
@@ -2820,7 +2820,7 @@ export const SCREENS: Screen[] = [
       {E.pick("Reason", "Kicked empty", ["Kicked empty", "Flavor change", "Quality hold"])}
       {E.ttl("Remaining")}
       {E.chips(FILL_CHIPS, 0)}
-      {E.info("Beer left in the keg remains open taproom stock and can be tapped again.")}
+      {E.info("Remaining is a rough observation. Closing this interval does not change finished-goods inventory.")}
       {E.btn("Kick keg", "del")}
     </>),
   },
@@ -2847,7 +2847,7 @@ export const SCREENS: Screen[] = [
       {E.fld("Guest keg label", "required for a guest")}
       {E.fld("Guest nominal BBL", "positive number")}
       {E.fld("Tap number", "5 · optional")}
-      {E.info("Remaining is a rough call, not a measurement; it only feeds the yield report and never the ledger.")}
+      {E.info("Remaining is a rough observation. The atomic swap does not change finished-goods inventory.")}
       {E.btn("Swap · one record", "irr")}
       {E.note("The swap is one record. A half-finished swap is not a state this can reach.")}
     </>),
