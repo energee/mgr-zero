@@ -2022,9 +2022,12 @@ returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_replay jsonb; v_id uuid;
 begin
   if public.staff_role(p_brewery) <> 'admin' then raise exception 'permission denied'; end if;
+  perform 1 from public.breweries where id=p_brewery for update;
   v_replay := private.claim_command_request(p_brewery, 'begin_qbo_oauth', p_request_id,
     jsonb_build_object('redirectUri',p_redirect_uri,'stateHash',p_state_hash,'providerIntent',p_provider_intent));
   if v_replay is not null then return v_replay; end if;
+  update private.qbo_oauth_intents set consumed_at=coalesce(consumed_at,now()),exchange_state='recovery_required'
+  where brewery_id=p_brewery and exchange_state in ('pending','exchanging');
   insert into private.qbo_oauth_intents(brewery_id,actor_id,state_hash,redirect_uri,provider_intent,expires_at)
   values(p_brewery,(select auth.uid()),p_state_hash,p_redirect_uri,p_provider_intent,now()+interval '10 minutes') returning id into v_id;
   v_replay := jsonb_build_object('intentId',v_id);
@@ -2036,7 +2039,7 @@ returns table(intent_id uuid,brewery_id uuid,provider_intent text) language plpg
 begin
  return query update private.qbo_oauth_intents i set consumed_at=now(),exchange_state='exchanging'
  where i.state_hash=p_state_hash and i.actor_id=p_actor and i.brewery_id=p_brewery and i.redirect_uri=p_redirect_uri
-   and i.consumed_at is null and i.expires_at>=now()
+   and i.consumed_at is null and i.exchange_state='pending' and i.expires_at>=now()
    and exists(select 1 from public.brewery_users u where u.brewery_id=i.brewery_id and u.user_id=p_actor and u.role='admin')
  returning i.id,i.brewery_id,i.provider_intent;
 end $$;
@@ -2054,12 +2057,10 @@ $$;
 
 create function public.complete_qbo_oauth(p_intent uuid,p_actor uuid,p_realm_id text,p_realm_label text,p_access_token text,p_refresh_token text,p_access_seconds int,p_refresh_seconds int,p_hard_seconds int)
 returns uuid language plpgsql security definer set search_path='' as $$
-declare i private.qbo_oauth_intents; c public.qbo_connections; v_id uuid:=private.new_uuid();
+declare i private.qbo_oauth_intents; v_id uuid:=private.new_uuid();
 begin
  select * into i from private.qbo_oauth_intents where id=p_intent for update;
  if i.id is null or i.actor_id<>p_actor or i.exchange_state<>'exchanging' or not exists(select 1 from public.brewery_users u where u.brewery_id=i.brewery_id and u.user_id=p_actor and u.role='admin') then raise exception 'oauth state invalid'; end if;
- select * into c from public.qbo_connections where brewery_id=i.brewery_id for update;
- if c.id is not null and c.realm_id=p_realm_id then v_id:=c.id; end if;
  insert into public.qbo_connections(id,brewery_id,realm_id,realm_label,state,access_expires_at,refresh_expires_at,refresh_hard_expires_at,remote_revocation_state,last_error,connected_by,updated_at)
  values(v_id,i.brewery_id,p_realm_id,p_realm_label,'connected',now()+make_interval(secs=>p_access_seconds),case when p_refresh_seconds is null then null else now()+make_interval(secs=>p_refresh_seconds) end,case when p_hard_seconds is null then null else now()+make_interval(secs=>p_hard_seconds) end,'not_requested',null,p_actor,now())
  on conflict(brewery_id) do update set id=excluded.id,realm_id=excluded.realm_id,realm_label=excluded.realm_label,state='connected',access_expires_at=excluded.access_expires_at,refresh_expires_at=excluded.refresh_expires_at,refresh_hard_expires_at=excluded.refresh_hard_expires_at,remote_revocation_state='not_requested',last_error=null,connected_by=p_actor,updated_at=now();
@@ -2088,6 +2089,8 @@ create function public.begin_qbo_disconnect(p_brewery uuid,p_connection uuid,p_a
 returns table(refresh_token text) language plpgsql security definer set search_path='' as $$
 begin
  if not exists(select 1 from public.brewery_users where brewery_id=p_brewery and user_id=p_actor and role='admin') then raise exception 'permission denied'; end if;
+ update private.qbo_oauth_intents set consumed_at=coalesce(consumed_at,now()),exchange_state='recovery_required'
+ where brewery_id=p_brewery and exchange_state in ('pending','exchanging');
  update public.qbo_connections q set state='disconnected',remote_revocation_state='unresolved',updated_at=now()
  where q.brewery_id=p_brewery and q.id=p_connection and q.state='connected';
  if not found then raise exception 'connection not available'; end if;

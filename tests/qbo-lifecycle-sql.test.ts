@@ -47,10 +47,36 @@ describe("QuickBooks durable lifecycle", () => {
     expect(fetch).not.toHaveBeenCalled();
 
     const validState = `valid-${crypto.randomUUID()}`;
+    const supersededState = `superseded-${crypto.randomUUID()}`;
+    expect((await begin(supersededState)).error).toBeNull();
     expect((await begin(validState)).error).toBeNull();
+    await expect(callback(supersededState)).rejects.toThrow("oauth state invalid");
+    expect(fetch).not.toHaveBeenCalled();
     await expect(callback(validState)).resolves.toEqual(expect.any(String));
     await expect(callback(validState)).rejects.toThrow("oauth state invalid");
     expect(fetch).toHaveBeenCalledTimes(1);
+
+    const delayedState = `delayed-${crypto.randomUUID()}`;
+    expect((await begin(delayedState)).error).toBeNull();
+    let releaseExchange!: (response: Response) => void;
+    const delayedFetch = vi.fn<typeof globalThis.fetch>().mockImplementation(() => new Promise((resolve) => { releaseExchange = resolve; }));
+    const delayedCallback = completeQboOAuth({
+      request: new Request(`${redirectUri}?code=delayed-code&state=${delayedState}&realmId=realm-1`),
+      actorId: ctx.userId, selectedBreweryId: brewery.id, redirectUri,
+      client: new QboOAuthClient(config, delayedFetch), store,
+    });
+    await vi.waitFor(() => expect(delayedFetch).toHaveBeenCalledTimes(1));
+    const connection = await admin.from("qbo_connections").select("id").eq("brewery_id", brewery.id).single();
+    expect(connection.error).toBeNull();
+    await expect(disconnectQbo(ctx, connection.data!.id, vi.fn().mockResolvedValue(undefined), crypto.randomUUID()))
+      .resolves.toMatchObject({ disconnected: true });
+    releaseExchange(new Response(JSON.stringify({
+      access_token: "late-access", refresh_token: "late-refresh", expires_in: 3600,
+      x_refresh_token_expires_in: 8640000,
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    await expect(delayedCallback).rejects.toThrow("QuickBooks is unavailable");
+    expect(sql(`select count(*) from private.integration_tokens where brewery_id='${brewery.id}'`)).toEqual(["0"]);
+    expect((await admin.from("qbo_connections").select("state").eq("brewery_id", brewery.id).single()).data?.state).toBe("disconnected");
   });
 
   it("consumes state once, replaces realm identity, and rejects stale refresh or a demoted actor", async () => {
