@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap, Ctx, CommandExecution, STAFF_ROLES } from "./registry";
+import { defineCommand, defineQuery, unwrap, Ctx, CommandExecution, CommandError, STAFF_ROLES } from "./registry";
 import { stockLine } from "./stock-line";
 
 const movementInput = z.object({
@@ -34,6 +34,14 @@ defineCommand({
 });
 
 defineCommand({
+  name: "reverse_inventory_movement", description: "Reverse one standalone adjustment or loss with an exact linked opposite entry; compound movements and counts keep their correction owner",
+  input: z.object({ movementId: z.string().uuid(), note: z.string().trim().min(1) }), roles: ["admin", "warehouse"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("reverse_inventory_movement", {
+    p_brewery: ctx.breweryId, p_movement: i.movementId, p_note: i.note, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
   name: "set_taproom_par", description: "Set par level for a SKU at a taproom",
   input: z.object({ locationId: z.string().uuid(), skuId: z.string().uuid(), parQty: z.number().nonnegative() }),
   roles: ["admin", "sales"],
@@ -62,13 +70,52 @@ defineCommand({
 const bySku = z.object({ skuId: z.string().uuid().optional() });
 const readRoles = ["admin", "sales", "warehouse"] as const;
 
+async function completeRows<T extends { id: string }>(name: string, page: (afterId: string | null) => PromiseLike<{
+  data: T[] | null; error: { message: string; code?: string } | null; count: number | null;
+}>): Promise<T[]> {
+  const rows: T[] = [];
+  let total: number | undefined;
+  do {
+    const afterId = rows.at(-1)?.id ?? null;
+    const result = await page(afterId);
+    const next = await unwrap(Promise.resolve(result));
+    const invalidPage = next?.some((row, index) => row.id <= (index === 0 ? afterId ?? "" : next[index - 1].id));
+    if (result.count === null || (total !== undefined && result.count !== total) || !next || invalidPage
+      || rows.length + next.length > result.count || (!next.length && rows.length < result.count)) {
+      throw new CommandError(`${name} changed while loading. Reload and try again.`, 409, "conflict");
+    }
+    total = result.count;
+    rows.push(...next);
+  } while (rows.length < total);
+  return rows;
+}
+
 defineQuery({
   name: "get_on_hand", description: "On-hand quantity per SKU/location",
   input: bySku, roles: [...readRoles],
-  handler: (ctx, i) => {
-    let q = ctx.db.from("on_hand").select().eq("brewery_id", ctx.breweryId);
-    if (i.skuId) q = q.eq("sku_id", i.skuId);
-    return unwrap(q);
+  handler: async (ctx, i) => {
+    const rows: { brewery_id: string; sku_id: string; location_id: string; qty: number }[] = [];
+    for (let start = 0; ; start += 500) {
+      let q = ctx.db.from("on_hand").select("brewery_id, sku_id, location_id, qty", { count: "exact" }).eq("brewery_id", ctx.breweryId)
+        .order("sku_id").order("location_id").range(start, start + 499);
+      if (i.skuId) q = q.eq("sku_id", i.skuId);
+      const result = await q;
+      const page = await unwrap(Promise.resolve(result)) as typeof rows;
+      rows.push(...page);
+      if (result.count === null || (!page.length && rows.length < result.count)) throw new Error("Could not read complete on-hand stock");
+      if (rows.length >= result.count) break;
+    }
+    const names = new Map<string, string>();
+    const locationIds = [...new Set(rows.map(row => row.location_id))];
+    for (let start = 0; start < locationIds.length; start += 100) {
+      const labels = await unwrap(ctx.db.from("locations").select("id, name").eq("brewery_id", ctx.breweryId).in("id", locationIds.slice(start, start + 100)));
+      for (const label of labels ?? []) names.set(label.id, label.name);
+    }
+    return rows.map(row => {
+      const name = names.get(row.location_id);
+      if (name === undefined) throw new CommandError("Location labels changed while loading. Reload and try again.", 409, "conflict");
+      return { ...row, locations: { name } };
+    });
   },
 });
 
@@ -106,14 +153,30 @@ defineQuery({
 });
 
 defineQuery({
-  name: "list_movements", description: "Recent inventory movements",
-  input: z.object({ skuId: z.string().uuid().optional(), limit: z.number().int().min(1).max(200).default(50), offset: z.number().int().nonnegative().default(0) }),
+  name: "list_movements", description: "Paginated immutable movements with location/bin/lot labels and reversal links; movementId selects an original and its exact compensation",
+  input: z.object({ skuId: z.string().uuid().optional(), movementId: z.string().uuid().optional(), limit: z.number().int().min(1).max(200).default(50), offset: z.number().int().nonnegative().default(0) }),
   roles: [...readRoles],
-  handler: (ctx, i) => {
-    let q = ctx.db.from("inventory_movements").select().eq("brewery_id", ctx.breweryId)
+  handler: async (ctx, i) => {
+    let q = ctx.db.from("inventory_movements").select("*, locations(name), bins(name), lots!inventory_movements_lot_fk(code)").eq("brewery_id", ctx.breweryId)
       .order("created_at", { ascending: false }).order("id", { ascending: false }).range(i.offset, i.offset + i.limit - 1);
     if (i.skuId) q = q.eq("sku_id", i.skuId);
-    return unwrap(q);
+    if (i.movementId) q = q.or(`id.eq.${i.movementId},compensates_id.eq.${i.movementId}`);
+    const rows = (await unwrap(q)) ?? [];
+    if (!rows.length) return [];
+    const corrections = await unwrap(ctx.db.from("inventory_movements").select("id, compensates_id")
+      .eq("brewery_id", ctx.breweryId).in("compensates_id", rows.map(r => r.id)));
+    return rows.map(row => ({ ...row, reversed_by: corrections?.find(c => c.compensates_id === row.id)?.id ?? null }));
+  },
+});
+
+defineQuery({
+  name: "get_inventory_sku", description: "One inventory SKU with brand and format, including inactive and zero-stock history",
+  input: z.object({ skuId: z.string().uuid() }), roles: [...readRoles],
+  handler: async (ctx, i) => {
+    const row = await unwrap(ctx.db.from("skus").select("id, name, active, brands(name), formats(name)")
+      .eq("brewery_id", ctx.breweryId).eq("id", i.skuId).maybeSingle());
+    if (!row) throw new CommandError("SKU not found", 404, "not_found");
+    return row;
   },
 });
 
@@ -121,14 +184,38 @@ defineQuery({
   // Brewers read SKUs too: the packaging pages pick the SKU a run fills.
   name: "list_skus", description: "SKUs with their brand and format, alphabetical",
   input: z.object({}), roles: STAFF_ROLES,
-  handler: (ctx) => unwrap(ctx.db.from("skus").select("id, name, active, brand_id, format_id, brands(name), formats(name, bbl_per_unit, package_type), format_volume:format_volumes(bbl_per_unit)").eq("brewery_id", ctx.breweryId).order("name")),
+  handler: async (ctx) => {
+    const rows = await completeRows("SKU list", async (afterId) => {
+      let query = ctx.db.from("skus")
+        .select("id, name, active, brand_id, format_id, brands(name), formats(name, bbl_per_unit, package_type), format_volume:format_volumes(bbl_per_unit)")
+        .eq("brewery_id", ctx.breweryId).order("id").limit(500);
+      if (afterId) query = query.gt("id", afterId);
+      const [result, counted] = await Promise.all([
+        query,
+        ctx.db.from("skus").select("id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId),
+      ]);
+      return { ...result, count: counted.count, error: result.error ?? counted.error };
+    });
+    return rows.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+  },
 });
 
 defineQuery({
   // Brewers read locations too: a packaging run puts its output somewhere.
   name: "list_locations", description: "Warehouses and taprooms, alphabetical",
   input: z.object({}), roles: STAFF_ROLES,
-  handler: (ctx) => unwrap(ctx.db.from("locations").select("id, name, kind").eq("brewery_id", ctx.breweryId).order("name")),
+  handler: async (ctx) => {
+    const rows = await completeRows("Location list", async (afterId) => {
+      let query = ctx.db.from("locations").select("id, name, kind").eq("brewery_id", ctx.breweryId).order("id").limit(500);
+      if (afterId) query = query.gt("id", afterId);
+      const [result, counted] = await Promise.all([
+        query,
+        ctx.db.from("locations").select("id", { count: "exact", head: true }).eq("brewery_id", ctx.breweryId),
+      ]);
+      return { ...result, count: counted.count, error: result.error ?? counted.error };
+    });
+    return rows.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+  },
 });
 
 defineQuery({

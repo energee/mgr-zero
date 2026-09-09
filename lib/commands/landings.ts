@@ -84,10 +84,11 @@ defineQuery({
       ]);
       return { taproomStock: labeledTaproomStock(stock, skuNames, locationNames) };
     }
-    const [fgShortages, pars, onHand, openOccupancies, materialShortages, kegs] = await Promise.all([
+    const [fgShortages, pars, onHand, openTaps, openOccupancies, materialShortages, kegs] = await Promise.all([
       count(ctx.db.from("atp").select("sku_id", { count: "exact", head: true }).eq("brewery_id", b).lt("qty", 0)),
       unwrap(ctx.db.from("taproom_pars").select("location_id, sku_id, par_qty").eq("brewery_id", b)),
       unwrap(ctx.db.from("on_hand").select("location_id, sku_id, qty").eq("brewery_id", b)),
+      count(ctx.db.from("tap_intervals").select("id", { count: "exact", head: true }).eq("brewery_id", b).is("closed_at", null)),
       count(ctx.db.from("occupancy_volumes").select("occupancy_id", { count: "exact", head: true }).eq("brewery_id", b).is("ended_at", null)),
       count(ctx.db.from("material_requirements").select("material_id", { count: "exact", head: true }).eq("brewery_id", b).gt("short", 0)),
       unwrap(ctx.db.from("keg_customer_balances").select("qty").eq("brewery_id", b)),
@@ -99,7 +100,7 @@ defineQuery({
     return {
       fgShortages,
       taproomBelowPar: (pars ?? []).filter((p) => (have.get(`${p.location_id}:${p.sku_id}`) ?? 0) < Number(p.par_qty)).length,
-      openTaps: 0, // ponytail: the tap board is Program 12; until then no tap is open
+      openTaps,
       openOccupancies,
       materialShortages,
       kegsOut: (kegs ?? []).reduce((n, k) => n + Number(k.qty), 0),

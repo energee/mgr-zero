@@ -16,7 +16,8 @@
 // consumed). One level only — `format_components` is one deep by design, and
 // the call only ever breaks down: the components lookup is directional.
 import { beforeAll, describe, expect, it } from "vitest";
-import { admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedMaterial, sql } from "./helpers";
+import { Client } from "pg";
+import { admin, DB, ins, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, seedMaterial, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
@@ -631,6 +632,57 @@ describe("record_repack", () => {
       locationId: repackLocationId, binId: repackBinId, parentSkuId: caseSkuId, parentQty: 999,
       childSkuId: fourPackSkuId, childQty: 999 * PER_CASE,
     }, warehouseCtx)).rejects.toThrow(/on hand/i);
+  });
+
+  it("waits for a concurrent reversal before reading stock, then rolls back the losing repack", async () => {
+    const brewery = await makeBrewery();
+    const warehouse = await makeStaffCtx(brewery.id, "warehouse");
+    const location = await seedLocation(brewery.id, { name: "Concurrent repack" });
+    const brand = await insert("brands", { brewery_id: brewery.id, name: `Concurrent ${crypto.randomUUID()}` });
+    const childFormat = await insert("formats", { brewery_id: brewery.id, name: `Child ${crypto.randomUUID()}`, basis: "packaged", package_type: "can", bbl_per_unit: .01 });
+    const parentFormat = await insert("formats", { brewery_id: brewery.id, name: `Parent ${crypto.randomUUID()}`, basis: "packaged", package_type: "can" });
+    await ins("format_components", { brewery_id: brewery.id, parent_format_id: parentFormat, child_format_id: childFormat, qty: 5 });
+    const material = await seedMaterial(brewery.id, { name: "Concurrent tray", category: "packaging", uom: "each" });
+    await ins("format_bom", { brewery_id: brewery.id, format_id: parentFormat, material_id: material, qty_per_unit: 1, on_break: "return_to_stock" });
+    const parentSku = await insert("skus", { brewery_id: brewery.id, brand_id: brand, format_id: parentFormat, name: "Concurrent parent" });
+    const childSku = await insert("skus", { brewery_id: brewery.id, brand_id: brand, format_id: childFormat, name: "Concurrent child" });
+    const original = await runCommand("record_movement", { skuId: parentSku, locationId: location.id, binId: location.binId, qty: 1, type: "adjustment" }, warehouse) as { id: string };
+    const winnerRequest = crypto.randomUUID(), loserRequest = crypto.randomUUID();
+    const a = new Client({ connectionString: DB }), b = new Client({ connectionString: DB });
+    let pending: Promise<unknown> | undefined;
+    try {
+      await Promise.all([a.connect(), b.connect()]);
+      await a.query("begin");
+      await a.query("lock table public.inventory_movements in share row exclusive mode");
+      await b.query("select set_config('request.jwt.claim.sub',$1,false)", [warehouse.userId]);
+      await b.query("set role authenticated");
+      const pid = (await b.query("select pg_backend_pid() pid")).rows[0].pid;
+      pending = b.query("select public.record_repack($1,$2,$3,$4,1,$5,5,$6) result",
+        [brewery.id, location.id, location.binId, parentSku, childSku, loserRequest]);
+      pending.catch(() => {});
+      await expect.poll(async () => (await a.query(
+        "select wait_event_type from pg_stat_activity where pid=$1 and query like 'select public.record_repack%'", [pid]
+      )).rows[0]?.wait_event_type).toBe("Lock");
+      await a.query("select set_config('request.jwt.claim.sub',$1,true)", [warehouse.userId]);
+      await a.query("set local role authenticated");
+      const winner = await a.query("select public.reverse_inventory_movement($1,$2,'Concurrent correction',$3) result",
+        [brewery.id, original.id, winnerRequest]);
+      await a.query("commit");
+      await expect(pending).rejects.toThrow(/only 0(?:\.0+)? on hand/i);
+      const replay = await warehouse.db.rpc("reverse_inventory_movement", {
+        p_brewery: brewery.id, p_movement: original.id, p_note: "Concurrent correction", p_request_id: winnerRequest,
+      });
+      expect(replay.error).toBeNull();
+      expect(replay.data).toEqual(winner.rows[0].result);
+      expect(sql(`select (coalesce(sum(qty),0)=0)::text from inventory_movements where brewery_id='${brewery.id}' and sku_id='${parentSku}' and bin_id='${location.binId}'`)).toEqual(["true"]);
+      expect(sql(`select count(*) from inventory_movements where brewery_id='${brewery.id}' and type='repack'`)).toEqual(["0"]);
+      expect(sql(`select count(*) from material_movements where brewery_id='${brewery.id}' and note like 'repack %'`)).toEqual(["0"]);
+      expect(sql(`select count(*) from private.command_requests where request_id='${loserRequest}'`)).toEqual(["0"]);
+    } finally {
+      await a.query("rollback").catch(() => {});
+      if (pending) await pending.catch(() => {});
+      await Promise.allSettled([a.end(), b.end()]);
+    }
   });
 });
 

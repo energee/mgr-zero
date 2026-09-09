@@ -326,24 +326,32 @@ token statement; the RLS-checking server boundary is their only application call
 `connection_id → pos_connections, external_location_id text, location_id → locations`.
 pk `(connection_id, external_location_id)`.
 
-### `pos_item_mappings` **· revised by §16.5 (variation-level)**
-`connection_id → pos_connections, external_item_id text, external_item_name text, sku_id
-→ skus, qty_per_sale numeric > 0` (SKU units depleted per one sold — a pint from a
-half-bbl keg is `1/124`). pk `(connection_id, external_item_id)`. Unmapped = no row.
+### `pos_item_mappings` · variation-level, expected-only (§16.15/16.16)
+`connection_id → pos_connections, external_item_id text, external_item_name text`,
+plus exactly one of a brand-owned poured `format_id`, a packaged `sku_id`, or
+human-set `ignored = true`. Primary key `(connection_id, external_item_id)`.
+Unmapped means no row; there is no fractional packaged-SKU depletion ratio.
 
 ### `pos_sales`
-`connection_id → pos_connections, external_order_id text, external_line_id text,
-external_item_id text, external_location_id text, sold_at timestamptz, qty numeric,
-gross_cents int, ingested_at default now(), movement_id → inventory_movements unique`
-(the `depletion` this line posted; null = not yet reconciled/unmapped). unique
-`(connection_id, external_line_id)` (idempotent ingest). idx `(brewery_id, sold_at)`,
-`(brewery_id) where movement_id is null`. Rows are raw facts from Square: revoke `update`
-except `movement_id` (column-level grant), revoke `delete`.
-`sync_square_sales` inserts each fetched page through one security-invoker batch
-function and relies on the unique external line ID for row dedupe. The current schema
-stores no sync cursor, so neither the command nor UI may claim cursor durability.
+Immutable raw facts: connection, required order ID and order-line UID, optional
+catalog variation ID and external location ID, original `sold_at`, positive
+quantity, gross cents, ingestion time, and source version. Unique
+`(connection_id, external_order_id, external_line_id)`; a new version is not
+another additive sale. Update/delete/truncate are denied even to the service
+role. There is no movement link or unposted index. Program 14 owns ingestion,
+explicit revisions/returns and durable sync; none is available yet.
 
-### View `pos_unmapped_items` — distinct `(connection_id, external_item_id, external_item_name)` in `pos_sales` without a mapping.
+### `pos_sale_expectations` and `pos_sales_coverage`
+One immutable serving interpretation per sale, with tenant-safe references to
+location, brand, format and optional packaged SKU; frozen serving ounces and
+expected BBL. The private ungranted reconciliation helper resolves and locks the
+current mapping/volume once. Coverage separately records complete or incomplete
+source/location observation windows, including explicit complete empty windows.
+See §16.15 for period selection, gaps, exclusions and remap limitations.
+
+### View `pos_unmapped_items`
+Distinct `(brewery_id, connection_id, external_item_id)` from raw sales without a
+mapping. A human-ignored mapping is not unmapped.
 
 ## 7. Materials and purchasing
 
@@ -660,8 +668,8 @@ shipment's order.
 10. **CBMA rate table and report generators** are code, not tables.
 11. **`allocations.ref`** stays polymorphic (existing test inserts it) and is validated
     by trigger instead of being split into two FK columns.
-12. **`pos_sales`** is treated as a ledger of external facts: no delete, `update` only
-    on `movement_id`.
+12. **`pos_sales`** is an immutable ledger of external facts: no update or delete.
+    Reconciled expectations are separate and never post inventory (§16.15).
 13. **Portal write policies** on `orders`/`order_lines` are limited to `draft`/`submitted`
     wholesale orders; staff advance everything else.
 14. **`uom` is an enum** with conversion by constant inside a family; cross-family
@@ -919,28 +927,30 @@ different answers to "what are we selling right now". A published menu is also
 the ownership boundary: MGR's catalog holds test batches and unannounced beer,
 so a public site must consume a menu, never the catalog.
 
-### 16.8 `keg_taps` — new, optional
+### 16.8 `tap_intervals` — optional tap state
 
-Two events bracketing an interval. **Neither posts a movement** — tapping opens
-an interval, kicking closes it, and nothing reaches the ledger either way
-(§16.15). Depletion comes from the physical count.
+Two events bracket an interval. Neither posts a movement: physical counts own
+inventory depletion (§16.15). Program 12 implements the §16.13/§16.16 contract:
 
 ```
-keg_taps (
-  id, brewery_id, sku_id, lot_id, bin_id,
-  opened_at, closed_at, close_reason,        -- 'blown' | 'dumped' | 'returned'
-  open_fill  numeric(3,2) default 1.00,      -- coarse: 1, .75, .5, .25, heel
-  close_fill numeric(3,2) default 0.00,
-  tap_label text                             -- free text, unvalidated, never an FK
+tap_intervals (
+  id, brewery_id, location_id, tap_number, sku_id, label, nominal_bbl,
+  opening_fill, opened_at, opened_by,
+  closing_fill, closed_at, closed_by, close_reason, not_in_inventory
 )
--- sku_id, lot_id, bin_id are §0 composite (x_id, brewery_id) FKs.
--- keg_taps_open_idx (brewery_id) where closed_at is null — the board, the
--- compare-and-swap guard and the realtime filter all select on it
--- (same shape as occupancies_open_idx / allocations_open_idx).
 ```
 
-Yield = poured bbl ÷ (`formats.bbl_per_unit` × (`open_fill` − `close_fill`)). A half bbl
-is 124 × 16oz on paper and 112–120 in life; a keg reading 95 has a problem.
+Location and optional SKU have composite tenant FKs. Numbers are optional and
+nonunique. Own SKUs must use a packaged keg format; nominal BBL is frozen from
+that format under a catalog lock at opening. Guests require a label and positive
+finite nominal BBL with no fake SKU. Guests and own kegs without positive stock
+are flagged not in inventory. Opening chips are .25/.5/.6/1; closing chips are
+0/.25/.5. Fill remains a coarse report estimate. No lot/bin identity or printed
+lot lookup is added. Open queries aggregate all intervals without an API row cap;
+closed history is bounded to 50 intervals with actor IDs and times.
+
+Future yield uses frozen nominal BBL and fill estimates; it requires POS serving
+volume and is not supplied by the interval API.
 
 **Fill levels are estimates for a report, never ledger quantities.** They must
 never reach `inventory_movements`, because `bbl` feeds excise math and a rough
@@ -1224,6 +1234,44 @@ Three consequences worth stating:
    depletion never came from tapping in the first place. The
    `not_in_inventory` flag remains useful only for excluding it from variance.
 
+**Implemented comparison contract (Program 12 Task 2).** `get_taproom_variance`
+selects whole completed count pairs by the ending count's brewery-local date,
+from today minus 4/12 × 7 days plus one through today. Exact sale bounds are
+`(prior.created_at, current.created_at]`; first counts remain visible as
+missing-baseline observations and cannot supply comparable variance. A period
+may start before the nominal window, which is exposed explicitly.
+
+`pos_sales` retains immutable connection/order/line identity, catalog variation
+identity separately, and source version. Versions are not additive facts;
+revisions and returns require Program 14's explicit correction owner. The
+existing `pos_item_mappings` chooses a brand-owned pour format, a packaged SKU,
+or a human-set ignored state. Private first reconciliation freezes resolved
+location, brand, format, serving ounces and expected BBL in
+`pos_sale_expectations` (quantity × ounces / 3968); edits affect only newly
+reconciled facts. Packaged sales freeze the authoritative packaged volume.
+There is no public fixture mutation API and no POS movement linkage.
+
+`pos_sales_coverage` records source/location `(start,end]` observation windows
+and whether the observation completed. Complete windows may join to cover a
+period, and every mapped source at that MGR location must cover it. Missing or
+incomplete coverage cannot prove zero sales. Mapped lines still contribute;
+coverage and unmapped line counts accompany the comparison. Once coverage uses a
+source/location mapping, that tuple cannot be reassigned in place; Program 14
+must define an explicit remap/correction contract. Unpaired and
+uncovered empty periods have null expected, not zero. Actual comes only from
+linked count-line depletion BBL, never current serving/package sizes.
+
+Poured sales split equally among same-brand/location intervals active at each
+sale timestamp, `[opened_at,closed_at)`, including absent-stock intervals in
+the denominator before their expected share is excluded. Overlap is labelled
+split/estimated. Brand actual remains count-owned because counts have no
+interval identity. Missing intervals retain visible unattributed expected
+volume. Guest labels carry no POS identity, so numeric guest yield remains
+absent; matching names is not attribution. Packaged sales need no tap split.
+The report is a current read projection: later reconciled facts can change
+expected and variance in closed periods, never observations or inventory.
+Provider ingestion and the live variance page remain separate tasks.
+
 **Yield (§16.8) is unaffected**: it was always a report over POS data against
 nominal volume, never a ledger write.
 
@@ -1259,10 +1307,10 @@ to the read side instead of a CHECK (§16.11).
 4. Remaining fill is three chips — Empty, about ¼, about ½ — as Kick keg and
    Swap keg already draw. No weighing; a report estimate stays coarse.
 
-Guest kegs (DRIFT §16.13): `keg_taps` gains a free-text `label` and
-`nominal_bbl` so a keg with no brand or SKU still yields. Kicking a guest keg
-already on the board works now; tapping a new one stays SCHEMA-GATE until the
-columns land in Program 12.
+Guest kegs (§16.13): `tap_intervals` stores a free-text `label` and positive
+finite `nominal_bbl` with no fake SKU. Program 12 provides guest tap/kick/swap
+through the command API; the board UI stays gated until implemented. Yield
+requires the later POS reporting contract.
 
 Nothing in §16.16 is open.
 

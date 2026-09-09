@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "@/components/mgr/screens";
 import { getCommandDefinition } from "@/lib/commands/registry";
-import { taggedOperations } from "@/lib/mgr/screen-routes";
+import { isUngated, taggedOperations } from "@/lib/mgr/screen-routes";
 import "@/lib/commands/all";
 
 const TAGGED = /\[(SCHEMA-GATE|IMPLEMENTATION-GATE|client state|platform|view|[^\]]*design)/i;
@@ -30,4 +30,22 @@ describe("ungated screen writes", () => {
     const jsx = SCREENS.filter((s) => typeof s.writes !== "string").map((s) => s.name);
     expect(jsx).toEqual([]);
   });
+});
+
+
+it("ships interval pages with their command API", () => {
+  for (const name of ["tap_keg", "kick_keg", "swap_keg", "list_open_taps"]) expect(getCommandDefinition(name)).toBeDefined();
+  for (const name of ["Tap board", "Kick keg", "Swap keg"]) expect(isUngated(SCREENS.find(s => s.name === name)!)).toBe(true);
+});
+
+it("ships the variance page with its read API", () => {
+  expect(getCommandDefinition("get_taproom_variance")).toBeDefined();
+  expect(isUngated(SCREENS.find(s => s.name === "Variance by brand")!)).toBe(true);
+});
+
+it("ships the weekly count screen with its durable reads and write", () => {
+  const screen = SCREENS.find(s => s.name === "Weekly count")!;
+  for (const name of ["get_taproom_count_snapshot", "get_taproom_draft_projection", "list_taproom_counts", "get_taproom_count", "record_taproom_count"])
+    expect(getCommandDefinition(name)).toBeDefined();
+  expect(isUngated(screen)).toBe(true);
 });

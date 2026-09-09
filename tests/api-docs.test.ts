@@ -5,6 +5,8 @@
 // derivation and the page set rather than the prose.
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
+import { compile, run } from "@mdx-js/mdx";
+import * as runtime from "react/jsx-runtime";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "@/components/mgr/screens";
 import { API_AREAS, apiOperations, areaOf, operationsInArea } from "@/lib/mgr/api-operations";
@@ -23,8 +25,17 @@ const read = (path: string) => readFileSync(resolve(root, path), "utf8");
 const PAGE = () => read("content/docs/api.mdx");
 
 describe("HTTP API reference", () => {
+  it("renders taproom descriptions with literal braces in MDX", async () => {
+    const source = renderArea("taproom");
+    expect(source).toContain("keg is &#123;skuId&#125;");
+    expect(source).toContain("&#123;label, nominalBbl&#125;");
+
+    const compiled = await run(await compile(source, { outputFormat: "function-body" }), runtime);
+    expect(() => compiled.default({})).not.toThrow();
+  });
+
   it("publishes explicit-bucket taproom count commands with truthful correction limits", () => {
-    for (const name of ["get_taproom_count_snapshot", "record_taproom_count", "get_taproom_count"]) {
+    for (const name of ["get_taproom_count_snapshot", "get_taproom_draft_projection", "record_taproom_count", "get_taproom_count"]) {
       expect(apiOperations().find(o => o.name === name)).toMatchObject({ status: "available", roles: "admin, warehouse, taproom" });
     }
     const definition = getCommandDefinition("record_taproom_count")!;

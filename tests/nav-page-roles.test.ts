@@ -31,6 +31,9 @@ const PAGE_QUERIES: Record<string, readonly string[]> = {
   "/routes": ["list_routes"],
   "/compliance": ["list_compliance_reports", "list_lots", "generate_compliance_report", "get_compliance_registry", "trace_lot"],
   "/kegs": ["get_keg_fleet", "list_locations", "list_bins", "list_customers", "list_vendors", "list_keg_events", "list_keg_pools", "get_customer_keg_balance"],
+  "/taproom": ["list_locations", "get_taproom_count_snapshot", "get_taproom_draft_projection", "list_taproom_counts", "get_taproom_count"],
+  "/taproom/board": ["list_locations", "list_skus", "list_open_taps", "list_tap_history"],
+  "/taproom/variance": ["list_locations", "get_taproom_variance"],
 };
 
 const flatten = (items: readonly NavItem[]): NavItem[] => items.flatMap((i) => [i, ...(i.children ?? [])]);

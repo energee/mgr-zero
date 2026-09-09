@@ -521,6 +521,27 @@ describe("registered staff mutation role × RPC matrix", () => {
       },
     },
     {
+      command: "tap_keg", rpc: "tap_keg", allowed: ["admin", "warehouse", "taproom"],
+      input: async () => ({ command: { locationId: taproomId, keg: { label: "Guest", nominalBbl: .5 }, openingFill: 1 },
+        rpc: { p_brewery: brewery.id, p_location: taproomId, p_sku: null, p_label: "Guest", p_nominal_bbl: .5, p_tap_number: null, p_opening_fill: 1 } }),
+    },
+    {
+      command: "kick_keg", rpc: "kick_keg", allowed: ["admin", "warehouse", "taproom"],
+      input: async () => {
+        const opened = await runCommand("tap_keg", { locationId: taproomId, keg: { label: "Guest", nominalBbl: .5 }, openingFill: 1 }, adminCtx) as { id: string };
+        return { command: { openIntervalId: opened.id, closeFill: 0, reason: "Empty" },
+          rpc: { p_brewery: brewery.id, p_interval: opened.id, p_closing_fill: 0, p_reason: "Empty" } };
+      },
+    },
+    {
+      command: "swap_keg", rpc: "swap_keg", allowed: ["admin", "warehouse", "taproom"],
+      input: async () => {
+        const opened = await runCommand("tap_keg", { locationId: taproomId, keg: { label: "Guest", nominalBbl: .5 }, openingFill: 1 }, adminCtx) as { id: string };
+        return { command: { openIntervalId: opened.id, closeFill: 0, reason: "Empty", incomingKeg: { label: "Next guest", nominalBbl: .5 }, incomingOpeningFill: 1 },
+          rpc: { p_brewery: brewery.id, p_interval: opened.id, p_closing_fill: 0, p_reason: "Empty", p_sku: null, p_label: "Next guest", p_nominal_bbl: .5, p_tap_number: null, p_opening_fill: 1 } };
+      },
+    },
+    {
       command: "record_taproom_count", rpc: "record_taproom_count", allowed: ["admin", "warehouse", "taproom"],
       input: async () => {
         const loc = await seedLocation(brewery.id, { name: `Count ${crypto.randomUUID()}`, kind: "taproom" });

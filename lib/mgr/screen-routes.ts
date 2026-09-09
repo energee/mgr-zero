@@ -9,6 +9,8 @@ import { getCommandDefinition } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
 export const SCREEN_ROUTES: { name: string; file: string }[] = [
+  { name: "Reverse movement", file: "app/(app)/inventory/reversal-form.tsx" },
+  { name: "SKU detail", file: "app/(app)/inventory/[id]/page.tsx" },
   { name: "Invite staff", file: "app/(app)/settings/team/invite-form.tsx" },
   { name: "Team member", file: "app/(app)/settings/team/member-form.tsx" },
   { name: "Invite portal user", file: "app/(app)/customers/[id]/page.tsx" },
@@ -20,6 +22,11 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Today", file: "app/(app)/page.tsx" },
   { name: "First-run checklist", file: "app/(app)/page.tsx" },
   { name: "Beer", file: "app/(app)/beer/page.tsx" },
+  { name: "Weekly count", file: "app/(app)/taproom/page.tsx" },
+  { name: "Variance by brand", file: "app/(app)/taproom/variance/page.tsx" },
+  { name: "Tap board", file: "app/(app)/taproom/board/page.tsx" },
+  { name: "Kick keg", file: "app/(app)/taproom/board/tap-board.tsx" },
+  { name: "Swap keg", file: "app/(app)/taproom/board/tap-board.tsx" },
   { name: "Work", file: "app/(app)/work/page.tsx" },
   { name: "More", file: "app/(app)/more/page.tsx" },
   { name: "Search", file: "app/(app)/search/page.tsx" },

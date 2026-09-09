@@ -116,7 +116,7 @@ $$ select role from public.brewery_users where user_id = auth.uid() and brewery_
 create function taproom_can(b uuid, t text) returns boolean
 language sql stable security definer set search_path = '' as $$
   select public.staff_role(b) = 'taproom' and t = any(array[
-    'locations','bins','taproom_pars','taproom_counts','taproom_count_lines',
+    'locations','bins','taproom_pars','taproom_counts','taproom_count_lines','tap_intervals',
     'brands','formats','format_components','skus','keg_pools',
     'pos_locations','pos_item_mappings']);
 $$;
@@ -566,12 +566,17 @@ create table inventory_movements (
   tax_treatment tax_treatment,
   dest_state text,
   lot_id uuid,                                   -- FK to lots added below
+  package_type package_type not null,             -- frozen report classification
+  compensates_id uuid,                           -- exact standalone adjustment/loss correction
   source_movement_id uuid,                       -- exact shipped return / damaged-return provenance
   ref uuid,                                      -- order_id / pos_sale id / run id
   note text,
   created_by uuid not null references auth.users(id),
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
+  unique (brewery_id, compensates_id),
+  foreign key (compensates_id, brewery_id) references inventory_movements (id, brewery_id),
+  check (compensates_id is null or (source_movement_id is null and compensates_id <> id)),
   foreign key (source_movement_id, brewery_id) references inventory_movements (id, brewery_id),
   foreign key (sku_id, brewery_id) references skus (id, brewery_id),
   foreign key (location_id, brewery_id) references locations (id, brewery_id),
@@ -586,7 +591,7 @@ create table inventory_movements (
       when 'sale_removal' then qty < 0 and sale_channel_id is not null and dest_state is not null and tax_treatment is not null
       when 'depletion'    then qty < 0 and sale_channel_id is not null and dest_state is null and tax_treatment is not null
       when 'destruction'      then qty < 0 and sale_channel_id is null and dest_state is null and tax_treatment is null
-      when 'loss'             then qty < 0 and sale_channel_id is null and dest_state is null and tax_treatment is null
+      when 'loss'             then (qty < 0 or compensates_id is not null) and sale_channel_id is null and dest_state is null and tax_treatment is null
       when 'sample'           then qty < 0 and dest_state is not null
       when 'festival_removal' then qty < 0 and dest_state is not null
       when 'opening_balance'  then qty > 0 and sale_channel_id is null and dest_state is null and tax_treatment is null
@@ -607,6 +612,18 @@ create index movements_lot_idx on inventory_movements (lot_id) where lot_id is n
 create function enforce_bbl_integrity() returns trigger language plpgsql set search_path = '' as $$
 declare original public.inventory_movements; returned_qty numeric; returned_bbl numeric;
 begin
+  if new.compensates_id is not null then
+    select * into original from public.inventory_movements where id = new.compensates_id and brewery_id = new.brewery_id;
+    if original.id is null or original.id = new.id or original.compensates_id is not null
+       or original.type not in ('adjustment','loss') or original.ref is not null or original.source_movement_id is not null
+       or new.source_movement_id is not null or new.ref is not null
+       or (new.sku_id, new.location_id, new.bin_id, new.lot_id, new.type, new.sale_channel_id, new.tax_treatment, new.dest_state)
+          is distinct from (original.sku_id, original.location_id, original.bin_id, original.lot_id, original.type, original.sale_channel_id, original.tax_treatment, original.dest_state)
+       or new.qty <> -original.qty then raise exception 'invalid standalone movement compensation'; end if;
+    new.bbl := -original.bbl;
+    new.package_type := original.package_type;
+    return new;
+  end if;
   if new.source_movement_id is not null then
     select * into original from public.inventory_movements where id = new.source_movement_id and brewery_id = new.brewery_id;
     if original.id is null or original.sku_id <> new.sku_id or original.lot_id is distinct from new.lot_id
@@ -614,6 +631,7 @@ begin
             or (new.type = 'loss' and original.type = 'return_in' and new.qty = -original.qty and new.ref = original.ref)) then
       raise exception 'invalid movement compensation source';
     end if;
+    new.package_type := original.package_type;
     -- The original volume is a frozen fact, even after a format is edited.
     if new.type = 'return_in' then
       select coalesce(sum(qty),0), coalesce(sum(bbl),0) into returned_qty, returned_bbl from public.inventory_movements
@@ -625,8 +643,9 @@ begin
     end if;
     return new;
   end if;
-  select (new.qty * f.bbl_per_unit) into new.bbl
-    from public.skus s join public.format_volumes f on f.id = s.format_id where s.id = new.sku_id;
+  select (new.qty * f.bbl_per_unit), p.package_type into new.bbl, new.package_type
+    from public.skus s join public.format_volumes f on f.id = s.format_id
+    join public.formats p on p.id = s.format_id where s.id = new.sku_id;
   if new.bbl is null then raise exception 'format has no bbl_per_unit'; end if;
   return new;
 end $$;
@@ -1629,6 +1648,7 @@ create table pos_locations (
   external_location_id text not null,
   location_id uuid not null,
   primary key (connection_id, external_location_id),
+  unique (connection_id, external_location_id, location_id, brewery_id),
   foreign key (connection_id, brewery_id) references pos_connections (id, brewery_id),
   foreign key (location_id, brewery_id) references locations (id, brewery_id)
 );
@@ -1638,32 +1658,36 @@ create table pos_item_mappings (
   connection_id uuid not null,
   external_item_id text not null,
   external_item_name text,
-  sku_id uuid not null,
-  qty_per_sale numeric(12,6) not null check (qty_per_sale > 0),   -- SKU units per one sold (pint of a 1/2 bbl = 1/124)
+  sku_id uuid,                       -- packaged sales only
+  format_id uuid,                    -- brand-owned poured format only
+  ignored boolean not null default false, -- a human decision, never inferred
+  check ((ignored and sku_id is null and format_id is null)
+    or (not ignored and num_nonnulls(sku_id,format_id) = 1)),
+  foreign key (format_id, brewery_id) references formats(id, brewery_id),
   primary key (connection_id, external_item_id),
   foreign key (connection_id, brewery_id) references pos_connections (id, brewery_id),
   foreign key (sku_id, brewery_id) references skus (id, brewery_id)
 );
 
-create table pos_sales (   -- raw external facts; update only movement_id, no delete
+create table pos_sales (   -- immutable raw source facts; never inventory movements
   id uuid primary key default private.new_uuid(),
   brewery_id uuid not null references breweries(id),
   connection_id uuid not null,
-  external_order_id text,
-  external_line_id text not null,
+  external_order_id text not null check (length(btrim(external_order_id)) > 0),
+  external_line_id text not null check (length(btrim(external_line_id)) > 0),
+  source_version text not null default '1' check (length(btrim(source_version)) > 0),
   external_item_id text,
   external_location_id text,
   sold_at timestamptz not null,
-  qty numeric(12,4) not null,
+  qty numeric(12,4) not null check (qty > 0 and qty::text not in ('NaN','Infinity','-Infinity')),
   gross_cents int,
   ingested_at timestamptz not null default now(),
-  movement_id uuid unique,                             -- the depletion this line posted
-  unique (connection_id, external_line_id),
-  foreign key (connection_id, brewery_id) references pos_connections (id, brewery_id),
-  foreign key (movement_id, brewery_id) references inventory_movements (id, brewery_id)
+  unique (connection_id, external_order_id, external_line_id),
+  unique (id, brewery_id),
+  foreign key (connection_id, brewery_id) references pos_connections (id, brewery_id)
 );
 create index pos_sales_sold_idx on pos_sales (brewery_id, sold_at);
-create index pos_sales_unposted_idx on pos_sales (brewery_id) where movement_id is null;
+
 
 -- ---------------------------------------------------------------- compliance
 create table brand_approvals (
@@ -1844,7 +1868,7 @@ create view pos_unmapped_items with (security_invoker = true) as
   select distinct s.brewery_id, s.connection_id, s.external_item_id
   from pos_sales s
   left join pos_item_mappings m on m.connection_id = s.connection_id and m.external_item_id = s.external_item_id
-  where m.sku_id is null and s.external_item_id is not null;
+  where m.connection_id is null and s.external_item_id is not null;
 
 create view material_on_hand with (security_invoker = true) as
   select brewery_id, material_id, sum(qty) as qty from material_movements group by 1,2;
@@ -3555,6 +3579,32 @@ begin
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
+create function reverse_inventory_movement(p_brewery uuid, p_movement uuid, p_note text, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; original public.inventory_movements; compensation public.inventory_movements;
+begin
+  perform private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
+  if not exists (select 1 from public.inventory_movements where id = p_movement and brewery_id = p_brewery) then raise exception 'movement not found'; end if;
+  v_replay := private.claim_command_request(p_brewery, 'reverse_inventory_movement', p_request_id,
+    jsonb_build_object('brewery', p_brewery, 'movement', p_movement, 'note', p_note));
+  if v_replay is not null then return v_replay; end if;
+  if p_note is null or length(btrim(p_note)) = 0 then raise exception 'correction note required'; end if;
+  -- ponytail: global ledger lock, matching all stock writers; shared stock-key locks at higher throughput.
+  lock table public.inventory_movements in share row exclusive mode;
+  select * into original from public.inventory_movements where id = p_movement and brewery_id = p_brewery for update;
+  if original.type not in ('adjustment','loss') or original.compensates_id is not null
+     or original.source_movement_id is not null or original.ref is not null then raise exception 'only standalone adjustment and loss movements can be reversed'; end if;
+  if exists (select 1 from public.inventory_movements where brewery_id = p_brewery and compensates_id = p_movement) then raise exception 'movement already reversed'; end if;
+  if original.qty > 0 and original.qty > (select coalesce(sum(qty),0) from public.inventory_movements
+      where brewery_id = p_brewery and sku_id = original.sku_id and location_id = original.location_id
+        and bin_id = original.bin_id and lot_id is not distinct from original.lot_id) then raise exception 'insufficient stock in original bin and lot'; end if;
+  insert into public.inventory_movements(brewery_id, sku_id, location_id, bin_id, lot_id, qty, type,
+    sale_channel_id, tax_treatment, dest_state, compensates_id, note, created_by)
+  values(p_brewery, original.sku_id, original.location_id, original.bin_id, original.lot_id, -original.qty, original.type,
+    original.sale_channel_id, original.tax_treatment, original.dest_state, original.id, p_note, auth.uid()) returning * into compensation;
+  return private.complete_command_request(p_request_id, to_jsonb(compensation));
+end $$;
+
 -- The manifest binds the entire batch before any row commits. Its result holds
 -- the immutable input so direct row calls cannot substitute data or identities.
 create function begin_csv_import(p_brewery uuid, p_kind text, p_rows jsonb, p_request_id uuid)
@@ -4208,17 +4258,17 @@ end $$;
 create function private.report_movements(p_brewery uuid, p_end date)
 returns table (class public.package_type, bbl numeric, type public.movement_type, tax_treatment public.tax_treatment, dest_state text, d date, side text)
 language sql stable set search_path = '' as $$
-  select f.package_type, m.bbl, m.type, m.tax_treatment, m.dest_state, (m.created_at at time zone b.timezone)::date,
+  select m.package_type, m.bbl, m.type, m.tax_treatment, m.dest_state, (m.created_at at time zone b.timezone)::date,
     case m.type
       when 'production_in' then 'in' when 'return_in' then 'in' when 'opening_balance' then 'in'
-      when 'adjustment' then case when m.bbl > 0 then 'in' else 'out' end
+      when 'adjustment' then case when coalesce(original.bbl, m.bbl) > 0 then 'in' else 'out' end
       when 'sale_removal' then 'out' when 'depletion' then 'out' when 'destruction' then 'out'
       when 'loss' then 'out' when 'sample' then 'out' when 'festival_removal' then 'out'
       when 'taproom_transfer' then 'transfer' when 'location_transfer' then 'transfer' when 'repack' then 'transfer'
     end
   from public.inventory_movements m
   join public.breweries b on b.id = m.brewery_id
-  join public.skus s on s.id = m.sku_id join public.formats f on f.id = s.format_id
+  left join public.inventory_movements original on original.id = m.compensates_id and original.brewery_id = m.brewery_id
   where m.brewery_id = p_brewery and (m.created_at at time zone b.timezone)::date <= p_end
 $$;
 
@@ -4904,6 +4954,8 @@ begin
 
   -- The bin cannot go short. Same balance bin_on_hand reads, at the same grain;
   -- read straight from the ledger because that view is security_invoker.
+  -- ponytail: global ledger lock, matching all stock writers; shared stock-key locks at higher throughput.
+  lock table public.inventory_movements in share row exclusive mode;
   select coalesce(sum(m.qty), 0) into v_on_hand from public.inventory_movements m
    where m.brewery_id = p_brewery and m.sku_id = p_parent_sku
      and m.location_id = p_location and m.bin_id = p_bin;
@@ -6795,7 +6847,7 @@ grant select on bin_move_stock, on_hand, bin_on_hand, atp, invoice_totals, keg_d
   contract_balances, material_requirements, po_open_balances, vendor_lead_times,
   keg_bin_totals, keg_bin_on_hand, keg_fleet_totals, keg_customer_balances to authenticated;
 grant all on all tables in schema public to service_role;
-revoke update, delete, truncate on taproom_counts, taproom_count_lines from service_role;
+revoke update, delete, truncate on taproom_counts, taproom_count_lines, pos_sales from service_role;
 grant all on all sequences in schema public to service_role;
 
 -- Availability badge tiers for portal customers: coarse tiers only, never raw
@@ -6862,6 +6914,7 @@ grant execute on function
   set_channel_price(uuid,uuid,uuid,uuid,int,uuid),
   clear_channel_price(uuid,uuid,uuid,uuid,uuid),
   replace_format_bom(uuid,uuid,jsonb,uuid),
+  reverse_inventory_movement(uuid,uuid,text,uuid),
   record_inventory_movement(uuid,uuid,uuid,uuid,numeric,public.movement_type,uuid,text,text,uuid,uuid),
   set_taproom_par(uuid,uuid,uuid,numeric,uuid),
   set_portal_fulfillment_source(uuid,uuid,uuid),
@@ -7461,18 +7514,26 @@ language sql stable set search_path = '' as $$
     where brewery_id = p_brewery and location_id = p_location
   ), buckets as (
     select bin_id, sku_id, lot_id, sum(qty) qty_before from movements group by bin_id, sku_id, lot_id
+  ), details as (
+    select b.bin_id,n.name bin_name,b.sku_id,s.name sku_name,s.brand_id,br.name brand_name,
+      v.bbl_per_unit,b.lot_id,b.qty_before
+    from buckets b join public.bins n on n.id=b.bin_id and n.brewery_id=p_brewery
+    join public.skus s on s.id=b.sku_id and s.brewery_id=p_brewery
+    join public.brands br on br.id=s.brand_id and br.brewery_id=p_brewery
+    join public.format_volumes v on v.id=s.format_id and v.brewery_id=p_brewery
   )
   select jsonb_build_object(
     'location_id', p_location,
     'counted_on', (now() at time zone (select timezone from public.breweries where id = p_brewery))::date,
     'prior_count', (select to_jsonb(prior) from prior),
     'revision', encode(extensions.digest(jsonb_build_array(p_brewery, p_location,
-      (select id from prior), (select jsonb_agg(id order by id) from movements))::text, 'sha256'), 'hex'),
-    'lines', (select coalesce(jsonb_agg(jsonb_build_object('bin_id', b.bin_id, 'bin_name', n.name,
-      'sku_id', b.sku_id, 'sku_name', s.name, 'lot_id', b.lot_id, 'qty_before', b.qty_before)
-      order by b.bin_id, b.sku_id, b.lot_id nulls first), '[]'::jsonb)
-      from buckets b join public.bins n on n.id = b.bin_id and n.brewery_id = p_brewery
-      join public.skus s on s.id = b.sku_id and s.brewery_id = p_brewery));
+      (select id from prior), (select jsonb_agg(id order by id) from movements),
+      (select jsonb_agg(jsonb_build_array(bin_id,sku_id,lot_id,qty_before,brand_id,bbl_per_unit)
+        order by bin_id,sku_id,lot_id nulls first) from details))::text, 'sha256'), 'hex'),
+    'lines', (select coalesce(jsonb_agg(jsonb_build_object('bin_id', d.bin_id, 'bin_name', d.bin_name,
+      'sku_id', d.sku_id, 'sku_name', d.sku_name, 'brand_id', d.brand_id, 'brand_name', d.brand_name,
+      'bbl_per_unit', d.bbl_per_unit, 'lot_id', d.lot_id, 'qty_before', d.qty_before)
+      order by d.bin_id, d.sku_id, d.lot_id nulls first), '[]'::jsonb) from details d));
 $$;
 
 create function get_taproom_count_snapshot(p_brewery uuid, p_location uuid) returns jsonb
@@ -7491,8 +7552,11 @@ declare v_result jsonb;
 begin
   perform private.assert_staff(p_brewery, array['admin','warehouse','taproom']::public.staff_role[]);
   select to_jsonb(c) || jsonb_build_object('lines', (select coalesce(jsonb_agg(to_jsonb(l) ||
-    jsonb_build_object('bbl', m.bbl) order by l.bin_id, l.sku_id, l.lot_id nulls first), '[]'::jsonb)
-    from public.taproom_count_lines l left join public.inventory_movements m on m.id = l.movement_id and m.brewery_id = l.brewery_id
+    jsonb_build_object('bbl', m.bbl, 'bin_name', b.name, 'sku_name', s.name) order by l.bin_id, l.sku_id, l.lot_id nulls first), '[]'::jsonb)
+    from public.taproom_count_lines l
+    left join public.inventory_movements m on m.id = l.movement_id and m.brewery_id = l.brewery_id
+    left join public.bins b on b.id = l.bin_id and b.brewery_id = l.brewery_id
+    left join public.skus s on s.id = l.sku_id and s.brewery_id = l.brewery_id
     where l.count_id = c.id and l.brewery_id = p_brewery)) into v_result
     from public.taproom_counts c
     join public.locations loc on loc.id = c.location_id and loc.brewery_id = c.brewery_id and loc.kind = 'taproom'
@@ -7526,7 +7590,7 @@ begin
   -- ponytail: global ledger lock; migrate every writer to shared stock-key locks for higher throughput.
   lock table public.inventory_movements in share row exclusive mode;
   v_snapshot := private.taproom_count_snapshot(p_brewery, p_location);
-  if p_counted_on is distinct from (v_snapshot->>'counted_on')::date then raise exception 'count today in the brewery timezone; historical counts cannot use current stock'; end if;
+  if p_counted_on is distinct from (v_snapshot->>'counted_on')::date then raise exception 'count today in the brewery timezone; historical counts cannot use current stock' using errcode = 'MG409'; end if;
   if p_counted_on <= (v_snapshot->'prior_count'->>'counted_on')::date then raise exception 'a count already exists on this date; count corrections are not yet available'; end if;
   if p_revision is distinct from v_snapshot->>'revision' then raise exception 'stock or prior count changed; refresh and review every bucket' using errcode = 'MG409'; end if;
   if exists (
@@ -7659,3 +7723,387 @@ grant execute on function
   get_chat_installation_lifecycle(uuid),
   prune_chat_integration_logs(interval)
   to service_role;
+
+-- Tap state is an interval, not inventory and not a unique physical line.
+create table tap_intervals (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references breweries(id),
+  location_id uuid not null,
+  tap_number text check (length(btrim(tap_number)) between 1 and 80),
+  sku_id uuid,
+  label text,
+  nominal_bbl numeric not null check (nominal_bbl > 0 and nominal_bbl::text not in ('NaN','Infinity','-Infinity')),
+  opening_fill numeric not null check (opening_fill in (.25,.5,.6,1)),
+  closing_fill numeric check (closing_fill in (0,.25,.5)),
+  not_in_inventory boolean not null,
+  opened_at timestamptz not null default now(),
+  opened_by uuid not null references auth.users(id),
+  closed_at timestamptz,
+  closed_by uuid references auth.users(id),
+  close_reason text,
+  unique (id,brewery_id),
+  foreign key (location_id,brewery_id) references locations(id,brewery_id),
+  foreign key (sku_id,brewery_id) references skus(id,brewery_id),
+  check ((sku_id is not null and label is null) or (sku_id is null and label is not null and length(btrim(label)) between 1 and 200 and not_in_inventory)),
+  check ((closed_at is null and closed_by is null and closing_fill is null and close_reason is null)
+    or (closed_at is not null and closed_at >= opened_at and closed_by is not null and closing_fill is not null and close_reason is not null and length(btrim(close_reason)) between 1 and 200))
+);
+create index tap_intervals_location_idx on tap_intervals(brewery_id,location_id,opened_at desc);
+create index tap_intervals_open_idx on tap_intervals(brewery_id,location_id) where closed_at is null;
+alter table tap_intervals enable row level security;
+create policy staff_read on tap_intervals for select using (public.is_staff_of(brewery_id) or public.taproom_can(brewery_id,'tap_intervals'));
+revoke all on tap_intervals from public,anon,authenticated;
+grant select on tap_intervals to authenticated;
+grant all on tap_intervals to service_role;
+
+create function private.open_tap(p_brewery uuid,p_location uuid,p_sku uuid,p_label text,p_nominal_bbl numeric,p_tap_number text,p_opening_fill numeric,p_actor uuid)
+returns jsonb language plpgsql set search_path = '' as $$
+declare v_nominal numeric; v_format uuid; v_untracked boolean; v_row public.tap_intervals;
+begin
+  perform 1 from public.locations where id=p_location and brewery_id=p_brewery and kind='taproom' for share;
+  if not found then raise exception 'choose an owned taproom location'; end if;
+  if p_sku is null then
+    if p_label is null or p_nominal_bbl is null then raise exception 'guest keg requires a label and nominal size'; end if;
+    v_nominal:=p_nominal_bbl; v_untracked:=true;
+  else
+    if p_label is not null or p_nominal_bbl is not null then raise exception 'own keg uses its SKU label and format volume'; end if;
+    -- Hold the authoritative identity and volume against concurrent catalog edits.
+    select f.id into v_format from public.skus s join public.formats f on f.id=s.format_id and f.brewery_id=s.brewery_id
+      where s.id=p_sku and s.brewery_id=p_brewery and f.basis='packaged' and f.package_type='keg' for share of s,f;
+    if v_format is null then raise exception 'choose an owned packaged keg SKU'; end if;
+    -- Component replacement locks its parent; child volume edits lock each child.
+    perform 1 from public.format_components c join public.formats f on f.id=c.child_format_id and f.brewery_id=c.brewery_id
+      where c.parent_format_id=v_format and c.brewery_id=p_brewery order by f.id for share of f;
+    select bbl_per_unit into v_nominal from public.format_volumes where id=v_format and brewery_id=p_brewery;
+    if v_nominal is null then raise exception 'keg format needs a nominal volume'; end if;
+    select coalesce(sum(qty),0)<=0 into v_untracked from public.inventory_movements where brewery_id=p_brewery and location_id=p_location and sku_id=p_sku;
+  end if;
+  insert into public.tap_intervals(brewery_id,location_id,sku_id,label,nominal_bbl,tap_number,opening_fill,not_in_inventory,opened_by)
+    values(p_brewery,p_location,p_sku,btrim(p_label),v_nominal,btrim(p_tap_number),p_opening_fill,v_untracked,p_actor) returning * into v_row;
+  return to_jsonb(v_row);
+end $$;
+
+create function private.close_tap(p_brewery uuid,p_interval uuid,p_closing_fill numeric,p_reason text,p_actor uuid)
+returns jsonb language plpgsql set search_path = '' as $$
+declare v_row public.tap_intervals; v_closed_by_label text;
+begin
+  select * into v_row from public.tap_intervals where id=p_interval and brewery_id=p_brewery for update;
+  if not found then raise exception 'tap interval not found'; end if;
+  if v_row.closed_at is not null then
+    select case when email is null then 'staff' else '@'||split_part(email,'@',1) end into v_closed_by_label from auth.users where id=v_row.closed_by;
+    raise exception 'Keg already closed by % at %; refresh the tap board',coalesce(v_closed_by_label,'staff'),v_row.closed_at using errcode='MG409';
+  end if;
+  update public.tap_intervals set closed_at=now(),closed_by=p_actor,closing_fill=p_closing_fill,close_reason=btrim(p_reason)
+    where id=p_interval and brewery_id=p_brewery returning * into v_row;
+  return to_jsonb(v_row);
+end $$;
+
+create function tap_keg(p_brewery uuid,p_location uuid,p_sku uuid,p_label text,p_nominal_bbl numeric,p_tap_number text,p_opening_fill numeric,p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid; v_replay jsonb;
+begin
+  v_actor:=private.assert_staff(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
+  v_replay:=private.claim_command_request(p_brewery,'tap_keg',p_request_id,jsonb_build_array(p_location,p_sku,btrim(p_label),p_nominal_bbl,btrim(p_tap_number),p_opening_fill));
+  if v_replay is not null then return v_replay; end if;
+  return private.complete_command_request(p_request_id,private.open_tap(p_brewery,p_location,p_sku,p_label,p_nominal_bbl,p_tap_number,p_opening_fill,v_actor));
+end $$;
+create function kick_keg(p_brewery uuid,p_interval uuid,p_closing_fill numeric,p_reason text,p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid; v_replay jsonb;
+begin
+  v_actor:=private.assert_staff(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
+  v_replay:=private.claim_command_request(p_brewery,'kick_keg',p_request_id,jsonb_build_array(p_interval,p_closing_fill,btrim(p_reason)));
+  if v_replay is not null then return v_replay; end if;
+  return private.complete_command_request(p_request_id,private.close_tap(p_brewery,p_interval,p_closing_fill,p_reason,v_actor));
+end $$;
+create function swap_keg(p_brewery uuid,p_interval uuid,p_closing_fill numeric,p_reason text,p_sku uuid,p_label text,p_nominal_bbl numeric,p_tap_number text,p_opening_fill numeric,p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid; v_replay jsonb; v_outgoing jsonb; v_incoming jsonb; v_sku uuid;
+begin
+  v_actor:=private.assert_staff(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
+  v_replay:=private.claim_command_request(p_brewery,'swap_keg',p_request_id,jsonb_build_array(p_interval,p_closing_fill,btrim(p_reason),p_sku,btrim(p_label),p_nominal_bbl,btrim(p_tap_number),p_opening_fill));
+  if v_replay is not null then return v_replay; end if;
+  v_outgoing:=private.close_tap(p_brewery,p_interval,p_closing_fill,p_reason,v_actor);
+  v_sku:=p_sku;
+  if p_sku is null and p_label is null and p_nominal_bbl is null then v_sku:=(v_outgoing->>'sku_id')::uuid; end if;
+  v_incoming:=private.open_tap(p_brewery,(v_outgoing->>'location_id')::uuid,v_sku,p_label,p_nominal_bbl,p_tap_number,p_opening_fill,v_actor);
+  return private.complete_command_request(p_request_id,jsonb_build_object('outgoing',v_outgoing,'incoming',v_incoming));
+end $$;
+
+create function list_open_taps(p_brewery uuid,p_location uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform private.assert_staff(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
+  if not exists(select 1 from public.locations where id=p_location and brewery_id=p_brewery and kind='taproom') then raise exception 'choose an owned taproom location'; end if;
+  return (select coalesce(jsonb_agg(to_jsonb(t)||jsonb_build_object('sku_name',s.name,'brand_id',s.brand_id,'brand_name',b.name,'opened_by_label',split_part(u.email,'@',1))
+    order by t.tap_number nulls last,t.opened_at,t.id),'[]'::jsonb)
+    from public.tap_intervals t left join public.skus s on s.id=t.sku_id and s.brewery_id=t.brewery_id
+    left join public.brands b on b.id=s.brand_id and b.brewery_id=t.brewery_id
+    left join auth.users u on u.id=t.opened_by
+    where t.brewery_id=p_brewery and t.location_id=p_location and t.closed_at is null);
+end $$;
+create function list_tap_history(p_brewery uuid,p_location uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform private.assert_staff(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
+  if not exists(select 1 from public.locations where id=p_location and brewery_id=p_brewery and kind='taproom') then raise exception 'choose an owned taproom location'; end if;
+  return (select coalesce(jsonb_agg(to_jsonb(t)||jsonb_build_object('opened_by_label',split_part(o.email,'@',1),
+    'closed_by_label',split_part(c.email,'@',1),'sku_name',s.name,'brand_name',b.name) order by t.closed_at desc,t.id),'[]'::jsonb) from
+    (select * from public.tap_intervals where brewery_id=p_brewery and location_id=p_location and closed_at is not null order by closed_at desc,id limit 50) t
+    left join auth.users o on o.id=t.opened_by left join auth.users c on c.id=t.closed_by
+    left join public.skus s on s.id=t.sku_id and s.brewery_id=t.brewery_id left join public.brands b on b.id=s.brand_id and b.brewery_id=t.brewery_id);
+end $$;
+revoke all on function private.open_tap(uuid,uuid,uuid,text,numeric,text,numeric,uuid),private.close_tap(uuid,uuid,numeric,text,uuid) from public,anon,authenticated,service_role;
+revoke all on function tap_keg(uuid,uuid,uuid,text,numeric,text,numeric,uuid),kick_keg(uuid,uuid,numeric,text,uuid),swap_keg(uuid,uuid,numeric,text,uuid,text,numeric,text,numeric,uuid),list_open_taps(uuid,uuid),list_tap_history(uuid,uuid) from public,anon,authenticated,service_role;
+grant execute on function tap_keg(uuid,uuid,uuid,text,numeric,text,numeric,uuid),kick_keg(uuid,uuid,numeric,text,uuid),swap_keg(uuid,uuid,numeric,text,uuid,text,numeric,text,numeric,uuid),list_open_taps(uuid,uuid),list_tap_history(uuid,uuid) to authenticated;
+
+-- POS expectations are a separate, immutable serving interpretation of one raw
+-- order/line fact. Program 14 owns explicit revisions/returns, not additive versions.
+create table pos_sale_expectations (
+  sale_id uuid primary key,
+  brewery_id uuid not null references breweries(id),
+  location_id uuid not null,
+  brand_id uuid not null,
+  format_id uuid not null,
+  sku_id uuid,
+  serving_ounces numeric not null check (serving_ounces > 0 and serving_ounces::text not in ('NaN','Infinity','-Infinity')),
+  expected_bbl numeric not null check (expected_bbl > 0 and expected_bbl::text not in ('NaN','Infinity','-Infinity')),
+  reconciled_at timestamptz not null default now(),
+  foreign key (sale_id,brewery_id) references pos_sales(id,brewery_id),
+  foreign key (location_id,brewery_id) references locations(id,brewery_id),
+  foreign key (brand_id,brewery_id) references brands(id,brewery_id),
+  foreign key (format_id,brewery_id) references formats(id,brewery_id),
+  foreign key (sku_id,brewery_id) references skus(id,brewery_id)
+);
+create index pos_expectations_location_idx on pos_sale_expectations(brewery_id,location_id);
+
+-- A completed observation is explicit, including successfully observed empty
+-- windows. An empty/failed/partial fetch cannot assert complete=true. Append
+-- observations; later complete windows can fill gaps. No credentials live here.
+-- ponytail: observed source/location mappings cannot be reassigned in place;
+-- Program 14 needs an explicit remap/correction contract before changing them.
+create table pos_sales_coverage (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references breweries(id),
+  connection_id uuid not null,
+  external_location_id text not null,
+  location_id uuid not null,
+  starts_at timestamptz not null,
+  ends_at timestamptz not null check (ends_at > starts_at),
+  complete boolean not null,
+  observed_at timestamptz not null default now(),
+  foreign key (connection_id,external_location_id,location_id,brewery_id)
+    references pos_locations(connection_id,external_location_id,location_id,brewery_id)
+);
+create index pos_coverage_location_idx on pos_sales_coverage(brewery_id,location_id,starts_at,ends_at);
+alter table pos_sale_expectations enable row level security;
+alter table pos_sales_coverage enable row level security;
+create policy staff_read on pos_sale_expectations for select using (public.is_staff_of(brewery_id) or public.taproom_can(brewery_id,'pos_sale_expectations'));
+create policy staff_read on pos_sales_coverage for select using (public.is_staff_of(brewery_id) or public.taproom_can(brewery_id,'pos_sales_coverage'));
+grant select on pos_sale_expectations,pos_sales_coverage to authenticated;
+grant select,insert on pos_sale_expectations,pos_sales_coverage to service_role;
+
+-- Private durable owner; provider ingestion may call this inside its future
+-- narrow transaction. No fixture-only public mutation API or service grant.
+create function private.reconcile_pos_sale(p_brewery uuid,p_sale uuid) returns boolean
+language plpgsql set search_path = '' as $$
+declare s public.pos_sales; m public.pos_item_mappings; f public.formats; v_location uuid; v_brand uuid; v_ounces numeric; v_format uuid;
+begin
+  select * into s from public.pos_sales where id=p_sale and brewery_id=p_brewery for update;
+  if not found then raise exception 'sale not found'; end if;
+  if exists(select 1 from public.pos_sale_expectations where sale_id=p_sale and brewery_id=p_brewery) then return true; end if;
+  select location_id into v_location from public.pos_locations where connection_id=s.connection_id and external_location_id=s.external_location_id and brewery_id=p_brewery for share;
+  if v_location is null then return false; end if;
+  select * into m from public.pos_item_mappings where connection_id=s.connection_id and external_item_id=s.external_item_id and brewery_id=p_brewery for share;
+  if not found or m.ignored then return false; end if;
+  if m.format_id is not null then
+    select * into f from public.formats where id=m.format_id and brewery_id=p_brewery for share;
+    if f.basis <> 'poured' then raise exception 'map a brand-owned poured format'; end if;
+    v_brand:=f.brand_id; v_format:=f.id; v_ounces:=f.ounces;
+  else
+    select brand_id,format_id into v_brand,v_format from public.skus where id=m.sku_id and brewery_id=p_brewery for share;
+    -- Lock the format graph just as opening a tap does: catalog edits cannot
+    -- change its authoritative composed volume halfway through reconciliation.
+    perform 1 from public.formats where id=v_format and brewery_id=p_brewery for share;
+    perform 1 from public.format_components c join public.formats child on child.id=c.child_format_id and child.brewery_id=c.brewery_id
+      where c.parent_format_id=v_format and c.brewery_id=p_brewery order by child.id for share of child;
+    select bbl_per_unit * 3968 into v_ounces from public.format_volumes where id=v_format and brewery_id=p_brewery;
+  end if;
+  if v_ounces is null or v_ounces <= 0 or v_ounces::text in ('NaN','Infinity','-Infinity') then raise exception 'serving volume is unavailable'; end if;
+  insert into public.pos_sale_expectations(sale_id,brewery_id,location_id,brand_id,format_id,sku_id,serving_ounces,expected_bbl)
+    values(p_sale,p_brewery,v_location,v_brand,v_format,m.sku_id,v_ounces,s.qty*v_ounces/3968);
+  return true;
+end $$;
+revoke all on function private.reconcile_pos_sale(uuid,uuid) from public,anon,authenticated,service_role;
+
+-- One serving-allocation rule for both completed variance and the current
+-- draft-count projection. Packaged facts retain their frozen SKU volume;
+-- poured facts split across timestamp-active own taps, with excluded shares
+-- kept in the denominator and guest labels never inferred as a brand.
+create function private.taproom_pos_allocations(p_brewery uuid,p_location uuid,p_starts_at timestamptz,p_ends_at timestamptz)
+returns table(sale_id uuid,brand_id uuid,expected_bbl numeric,excluded_bbl numeric,unattributed_bbl numeric,split boolean,ignored boolean,unmapped boolean)
+language sql stable set search_path = '' as $$
+  with facts as (
+    select s.id,e.brand_id,e.expected_bbl,e.sku_id,coalesce(m.ignored,false) ignored,s.sold_at
+    from public.pos_sales s
+    left join public.pos_sale_expectations e on e.sale_id=s.id and e.brewery_id=p_brewery
+    left join public.pos_locations loc on loc.connection_id=s.connection_id and loc.external_location_id=s.external_location_id and loc.brewery_id=p_brewery
+    left join public.pos_item_mappings m on m.connection_id=s.connection_id and m.external_item_id=s.external_item_id and m.brewery_id=p_brewery
+    where s.brewery_id=p_brewery and s.sold_at>p_starts_at and s.sold_at<=p_ends_at
+      and coalesce(e.location_id,loc.location_id)=p_location
+  )
+  select f.id,f.brand_id,
+    f.expected_bbl * case when coalesce(t.n,0)=0 then 1 else (t.n-t.excluded)::numeric/t.n end,
+    f.expected_bbl * case when coalesce(t.n,0)=0 then 0 else t.excluded::numeric/t.n end,
+    case when coalesce(t.n,0)=0 and f.sku_id is null then f.expected_bbl else 0 end,
+    coalesce(t.n,0)>1,f.ignored,f.brand_id is null and not f.ignored
+  from facts f left join lateral (
+    select count(*) n,count(*) filter(where i.not_in_inventory) excluded from public.tap_intervals i
+    join public.skus s on s.id=i.sku_id and s.brewery_id=p_brewery
+    where i.brewery_id=p_brewery and i.location_id=p_location and s.brand_id=f.brand_id
+      and i.opened_at<=f.sold_at and (i.closed_at is null or f.sold_at<i.closed_at)
+  ) t on f.sku_id is null
+$$;
+revoke all on function private.taproom_pos_allocations(uuid,uuid,timestamp with time zone,timestamp with time zone) from public,anon,authenticated,service_role;
+
+-- Whole completed count periods, selected by the ending brewery-local date.
+-- Bounds are (prior.created_at,current.created_at]; opening tap bounds are
+-- [opened_at,closed_at). Timestamp-active equal shares are estimates, and
+-- excluded shares remain in their denominator. Fill chips never become actual.
+create function get_taproom_variance(p_brewery uuid,p_location uuid,p_weeks integer) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare v_today date; v_start date; v_result jsonb;
+begin
+  perform private.assert_staff(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
+  if p_weeks is null or p_weeks not in (4,12) then raise exception 'choose 4 or 12 weeks'; end if;
+  if not exists(select 1 from public.locations where id=p_location and brewery_id=p_brewery and kind='taproom') then raise exception 'choose an owned taproom location'; end if;
+  select (now() at time zone timezone)::date into v_today from public.breweries where id=p_brewery;
+  v_start:=v_today-p_weeks*7+1;
+  with periods as materialized (
+    select c.id count_id,c.prior_count_id,c.counted_on,prior.created_at starts_at,c.created_at ends_at,
+      (prior.created_at at time zone b.timezone)::date < v_start starts_before_window
+    from public.taproom_counts c join public.breweries b on b.id=c.brewery_id
+    left join public.taproom_counts prior on prior.id=c.prior_count_id and prior.brewery_id=c.brewery_id and prior.location_id=c.location_id
+    where c.brewery_id=p_brewery and c.location_id=p_location and c.counted_on between v_start and v_today
+  ), actual as materialized (
+    select p.count_id,s.brand_id,-sum(coalesce(m.bbl,0)) actual_bbl
+    from periods p join public.taproom_count_lines l on l.count_id=p.count_id and l.brewery_id=p_brewery
+    join public.skus s on s.id=l.sku_id and s.brewery_id=p_brewery
+    left join public.inventory_movements m on m.id=l.movement_id and m.brewery_id=p_brewery and m.type='depletion'
+    group by p.count_id,s.brand_id
+  ), sources as (
+    select l.connection_id,l.external_location_id,
+      (select range_agg(tstzrange(c.starts_at,c.ends_at,'(]')) from public.pos_sales_coverage c
+        where c.brewery_id=p_brewery and c.location_id=p_location and c.connection_id=l.connection_id and c.external_location_id=l.external_location_id and c.complete) covered
+    from public.pos_locations l where l.brewery_id=p_brewery and l.location_id=p_location
+  ), facts as materialized (
+    select p.count_id,f.* from periods p
+    cross join lateral private.taproom_pos_allocations(p_brewery,p_location,p.starts_at,p.ends_at) f
+  ), expected as materialized (
+    select count_id,brand_id,
+      sum(expected_bbl) expected_bbl,sum(excluded_bbl) excluded_bbl,
+      sum(unattributed_bbl) unattributed_bbl,bool_or(split) split
+    from facts where brand_id is not null group by count_id,brand_id
+  ), meta as materialized (
+    select p.*,
+      coalesce((select bool_and(coalesce(covered @> tstzrange(p.starts_at,p.ends_at,'(]'),false)) from sources),false) and p.prior_count_id is not null coverage_complete,
+      (select count(*) from facts f where f.count_id=p.count_id and f.unmapped) unmapped_lines,
+      (select sum(actual_bbl) from actual a where a.count_id=p.count_id) actual_bbl,
+      (select sum(expected_bbl) from expected e where e.count_id=p.count_id) mapped_bbl
+    from periods p
+  ), comparable as (
+    select m.*,case when prior_count_id is null then 'missing_baseline'
+      when mapped_bbl is null and not coverage_complete then 'no_pos_coverage' else null end reason
+    from meta m
+  ), brand_periods as (
+    select c.count_id,k.brand_id,coalesce(a.actual_bbl,0) actual_bbl,
+      case when e.brand_id is not null then e.expected_bbl when c.coverage_complete and c.unmapped_lines=0 then 0 else null end expected_bbl,
+      coalesce(e.excluded_bbl,0) excluded_bbl,coalesce(e.unattributed_bbl,0) unattributed_bbl,coalesce(e.split,false) split
+    from comparable c join (select count_id,brand_id from actual union select count_id,brand_id from expected) k on k.count_id=c.count_id
+    left join actual a on a.count_id=k.count_id and a.brand_id=k.brand_id
+    left join expected e on e.count_id=k.count_id and e.brand_id=k.brand_id
+    where c.reason is null
+  ), totals as (
+    select bp.brand_id,b.name brand_name,sum(actual_bbl) actual_bbl,
+      case when count(*)=count(expected_bbl) then sum(expected_bbl) end expected_bbl,
+      case when count(*)=count(expected_bbl) then sum(expected_bbl)-sum(actual_bbl) end variance_bbl,
+      sum(excluded_bbl) excluded_bbl,sum(unattributed_bbl) unattributed_bbl,bool_or(split) split,count(*) compared_periods
+    from brand_periods bp join public.brands b on b.id=bp.brand_id and b.brewery_id=p_brewery group by bp.brand_id,b.name
+  )
+  select jsonb_build_object('location_id',p_location,'weeks',p_weeks,'window_start',v_start,'window_end',v_today,'as_of',now(),
+    'projection','current; late reconciled sales can change expected and variance',
+    'reason',case when not exists(select 1 from periods where prior_count_id is not null) then 'no_completed_periods'
+      when not exists(select 1 from comparable where reason is null) then 'no_pos_coverage' else null end,
+    'rows',(select coalesce(jsonb_agg(to_jsonb(t) order by brand_name,brand_id),'[]'::jsonb) from totals t),
+    'periods',(select coalesce(jsonb_agg(to_jsonb(c)-'mapped_bbl' || jsonb_build_object('actual_bbl',coalesce(c.actual_bbl,0),
+      'expected_bbl',case when c.reason is null then coalesce(c.mapped_bbl,case when c.unmapped_lines=0 then 0 end) end)
+      order by c.ends_at,c.count_id),'[]'::jsonb) from comparable c)) into v_result;
+  return v_result;
+end $$;
+
+-- Live expected consumption beside an unsaved physical recount. Its baseline
+-- is always the latest durable count and its upper bound is this statement's
+-- server time; it neither freezes POS nor writes inventory.
+create function get_taproom_draft_projection(p_brewery uuid,p_location uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare v_count public.taproom_counts; v_as_of timestamptz:=now(); v_result jsonb;
+begin
+  perform private.assert_staff(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
+  if not exists(select 1 from public.locations where id=p_location and brewery_id=p_brewery and kind='taproom') then raise exception 'choose an owned taproom location'; end if;
+  select * into v_count from public.taproom_counts where brewery_id=p_brewery and location_id=p_location
+    order by created_at desc,id desc limit 1;
+  if not found then
+    return jsonb_build_object('location_id',p_location,'prior_count',null,'starts_at',null,'ends_at',v_as_of,'as_of',v_as_of,
+      'projection','current; late reconciled sales can change expected','reason','missing_baseline','expected_bbl',null,
+      'coverage_complete',false,'coverage_sources','[]'::jsonb,'mapped_lines',0,'unmapped_lines',0,'ignored_lines',0,
+      'excluded_bbl',0,'unattributed_bbl',0,'rows','[]'::jsonb);
+  end if;
+  with sources as materialized (
+    select l.connection_id,l.external_location_id,
+      coalesce(c.covered,'{}'::tstzmultirange) @> tstzrange(v_count.created_at,v_as_of,'(]') complete,
+      c.observed_starts_at,c.observed_ends_at,c.observed_windows
+    from public.pos_locations l cross join lateral (
+      select range_agg(tstzrange(c.starts_at,c.ends_at,'(]')) filter(where c.complete) covered,
+        min(greatest(c.starts_at,v_count.created_at)) observed_starts_at,
+        max(least(c.ends_at,v_as_of)) observed_ends_at,count(*) observed_windows
+      from public.pos_sales_coverage c where c.brewery_id=p_brewery and c.location_id=p_location
+        and c.connection_id=l.connection_id and c.external_location_id=l.external_location_id
+        and c.ends_at>v_count.created_at and c.starts_at<v_as_of
+    ) c where l.brewery_id=p_brewery and l.location_id=p_location
+  ), facts as materialized (
+    select * from private.taproom_pos_allocations(p_brewery,p_location,v_count.created_at,v_as_of)
+  ), brands as materialized (
+    select f.brand_id,b.name brand_name,sum(f.expected_bbl) expected_bbl,sum(f.excluded_bbl) excluded_bbl,
+      sum(f.unattributed_bbl) unattributed_bbl,bool_or(f.split) split
+    from facts f join public.brands b on b.id=f.brand_id and b.brewery_id=p_brewery
+    group by f.brand_id,b.name
+  ), meta as (
+    select (select sum(expected_bbl) from facts where brand_id is not null) mapped_bbl,
+      (select count(*) from facts where brand_id is not null) mapped_lines,
+      (select count(*) from facts where unmapped) unmapped_lines,
+      (select count(*) from facts where ignored) ignored_lines,
+      coalesce((select sum(excluded_bbl) from facts where brand_id is not null),0) excluded_bbl,
+      coalesce((select sum(unattributed_bbl) from facts where brand_id is not null),0) unattributed_bbl,
+      coalesce((select bool_and(complete) from sources),false) coverage_complete,
+      coalesce((select sum(observed_windows) from sources),0) observed_windows
+  )
+  select jsonb_build_object('location_id',p_location,
+    'prior_count',jsonb_build_object('id',v_count.id,'counted_on',v_count.counted_on,'created_at',v_count.created_at),
+    'starts_at',v_count.created_at,'ends_at',v_as_of,'as_of',v_as_of,
+    'projection','current; late reconciled sales can change expected',
+    'reason',case when m.mapped_bbl is not null then null
+      when m.coverage_complete and m.unmapped_lines=0 then null
+      when m.coverage_complete then 'unmapped_pos_lines'
+      when m.observed_windows=0 then 'no_pos_coverage' else 'incomplete_pos_coverage' end,
+    'expected_bbl',case when m.mapped_bbl is not null then m.mapped_bbl
+      when m.coverage_complete and m.unmapped_lines=0 then 0 end,
+    'coverage_complete',m.coverage_complete,
+    'coverage_sources',(select coalesce(jsonb_agg(to_jsonb(s)-'observed_windows' order by external_location_id,connection_id),'[]'::jsonb) from sources s),
+    'mapped_lines',m.mapped_lines,'unmapped_lines',m.unmapped_lines,'ignored_lines',m.ignored_lines,
+    'excluded_bbl',m.excluded_bbl,'unattributed_bbl',m.unattributed_bbl,
+    'rows',(select coalesce(jsonb_agg(to_jsonb(b) order by brand_name,brand_id),'[]'::jsonb) from brands b)) into v_result
+  from meta m;
+  return v_result;
+end $$;
+revoke all on function get_taproom_variance(uuid,uuid,integer),get_taproom_draft_projection(uuid,uuid) from public,anon,authenticated,service_role;
+grant execute on function get_taproom_variance(uuid,uuid,integer),get_taproom_draft_projection(uuid,uuid) to authenticated;

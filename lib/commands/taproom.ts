@@ -6,9 +6,9 @@
 // the fleet total is keg_fleet_totals (shipped kegs are still the fleet),
 // and what a customer holds is keg_customer_balances plus
 // keg_deposit_balances. Tap board writes
-// (tap/kick/swap) remain parked; durable physical counts are implemented below.
+// and durable physical counts are implemented below.
 import { z } from "zod";
-import { defineCommand, defineQuery, unwrap, type Ctx } from "./registry";
+import { CommandError, defineCommand, defineQuery, unwrap, type Ctx } from "./registry";
 
 export const KEG_SIZES = ["half_bbl", "quarter_bbl", "sixth_bbl", "fifty_l", "thirty_l", "twenty_l"] as const;
 export const KEG_POOL_KINDS = ["owned", "leased", "pay_per_fill"] as const;
@@ -132,14 +132,43 @@ defineQuery({
 
 const COUNT_ROLES = ["admin", "warehouse", "taproom"] as const;
 defineQuery({
-  name: "get_taproom_count_snapshot", description: "Prepare today's complete taproom count by bin, SKU and explicit lot UUID or null; includes zero buckets, safe labels, prior count and revision, without POS or lot-label access",
+  name: "get_taproom_count_snapshot", description: "Prepare today's complete taproom count by bin, SKU and explicit lot UUID or null; includes zero buckets, safe brand/package-volume labels, prior count and revision, without POS or lot-label access",
   input: z.object({ locationId: z.string().uuid() }), roles: [...COUNT_ROLES],
   handler: (ctx, i) => unwrap(ctx.db.rpc("get_taproom_count_snapshot", { p_brewery: ctx.breweryId, p_location: i.locationId })),
 });
 defineQuery({
-  name: "get_taproom_count", description: "Read a saved taproom count with every physical observation, prior count, movement identity and frozen depletion BBL",
+  name: "get_taproom_count", description: "Read a saved taproom count with every physical observation, safe bin and SKU labels, prior count, movement identity and frozen depletion BBL",
   input: z.object({ countId: z.string().uuid() }), roles: [...COUNT_ROLES],
   handler: (ctx, i) => unwrap(ctx.db.rpc("get_taproom_count", { p_brewery: ctx.breweryId, p_count: i.countId })),
+});
+defineQuery({
+  name: "list_taproom_counts", description: "Newest 50 durable physical-count headers at one owned taproom, with observation, movement and depleted-unit totals",
+  input: z.object({ locationId: z.string().uuid() }), roles: [...COUNT_ROLES],
+  handler: async (ctx, i) => {
+    const location = await unwrap(ctx.db.from("locations").select("kind").eq("brewery_id", ctx.breweryId).eq("id", i.locationId).maybeSingle()) as { kind: string } | null;
+    if (location?.kind !== "taproom") throw new CommandError("choose an owned taproom location");
+    const counts = await unwrap(ctx.db.from("taproom_counts")
+      .select("id,location_id,counted_on,counted_by,created_at,prior_count_id")
+      .eq("brewery_id", ctx.breweryId).eq("location_id", i.locationId)
+      .order("created_at", { ascending: false }).order("id", { ascending: false }).limit(50)) as unknown as {
+        id: string; location_id: string; counted_on: string; counted_by: string; created_at: string; prior_count_id: string | null;
+      }[];
+    const lines: { count_id: string; qty_before: number; qty_counted: number; movement_id: string | null }[] = [];
+    for (let start = 0; counts.length > 0; start += 500) {
+      const page = await unwrap(ctx.db.from("taproom_count_lines").select("count_id,qty_before,qty_counted,movement_id", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).in("count_id", counts.map((count) => count.id)).order("count_id").order("id").range(start, start + 499)) as unknown as typeof lines;
+      lines.push(...page);
+      if (page.length < 500) break;
+    }
+    return counts.map((count) => {
+      const observed = lines.filter((line) => line.count_id === count.id);
+      return ({ ...count,
+        observations: observed.length,
+        movements: observed.filter((line) => line.movement_id !== null).length,
+        depleted_units: observed.reduce((total, line) => total + Number(line.qty_before) - Number(line.qty_counted), 0),
+      });
+    });
+  },
 });
 defineCommand({
   name: "record_taproom_count", description: "Save today's complete explicit-bucket count of remaining whole packaged units using the prepared revision; partial kegs count as one until gone. Persist matching counts without movements; shortages alone post exact-lot depletion. Stale, incomplete, duplicate and overcounts are refused; count correction is not yet available",
@@ -150,4 +179,53 @@ defineCommand({
     p_brewery: ctx.breweryId, p_location: i.locationId, p_counted_on: i.countedOn, p_revision: i.revision,
     p_lines: i.lines.map(l => ({ bin_id: l.binId, sku_id: l.skuId, lot_id: l.lotId, qty_counted: l.qtyCounted })), p_request_id: execution.requestId,
   })),
+});
+
+const openingFill = z.union([z.literal(.25), z.literal(.5), z.literal(.6), z.literal(1)]);
+const closingFill = z.union([z.literal(0), z.literal(.25), z.literal(.5)]);
+const kegIdentity = z.union([
+  z.object({ skuId: z.string().uuid(), label: z.never().optional(), nominalBbl: z.never().optional() }),
+  z.object({ skuId: z.never().optional(), label: z.string().trim().min(1).max(200), nominalBbl: z.number().positive().finite() }),
+]);
+const tapNumber = z.string().trim().min(1).max(80).optional();
+defineCommand({
+  name: "tap_keg", description: "Open a keg interval at an owned taproom. keg is {skuId} for an own packaged keg or {label, nominalBbl} for a guest; freezes size and flags absent stock. Optional tap numbers may repeat. Does not change inventory",
+  input: z.object({ locationId: z.string().uuid(), keg: kegIdentity, tapNumber, openingFill }), roles: [...COUNT_ROLES],
+  handler: (ctx,i,e) => unwrap(ctx.db.rpc("tap_keg", { p_brewery: ctx.breweryId, p_location: i.locationId, p_sku: i.keg.skuId ?? null,
+    p_label: i.keg.label ?? null, p_nominal_bbl: i.keg.nominalBbl ?? null, p_tap_number: i.tapNumber ?? null, p_opening_fill: i.openingFill, p_request_id: e.requestId })),
+});
+defineCommand({
+  name: "kick_keg", description: "Close an open keg interval with estimated remaining fill (empty, quarter or half) and a reason. An already-closed conflict returns its safe closer label and timestamp. Does not change inventory",
+  input: z.object({ openIntervalId: z.string().uuid(), closeFill: closingFill, reason: z.string().trim().min(1).max(200) }), roles: [...COUNT_ROLES],
+  handler: (ctx,i,e) => unwrap(ctx.db.rpc("kick_keg", { p_brewery: ctx.breweryId, p_interval: i.openIntervalId, p_closing_fill: i.closeFill, p_reason: i.reason, p_request_id: e.requestId })),
+});
+defineCommand({
+  name: "swap_keg", description: "Atomically close the outgoing interval and open its replacement at the same location. incomingKeg is {skuId} or {label, nominalBbl}; omission defaults to the outgoing own SKU, while guests require explicit identity. Exact retries return the original pair; an already-closed conflict returns its safe closer label and timestamp. Does not change inventory",
+  input: z.object({ openIntervalId: z.string().uuid(), incomingKeg: kegIdentity.optional(), tapNumber, incomingOpeningFill: openingFill,
+    closeFill: closingFill, reason: z.string().trim().min(1).max(200) }), roles: [...COUNT_ROLES],
+  handler: (ctx,i,e) => unwrap(ctx.db.rpc("swap_keg", { p_brewery: ctx.breweryId, p_interval: i.openIntervalId, p_closing_fill: i.closeFill, p_reason: i.reason,
+    p_sku: i.incomingKeg?.skuId ?? null, p_label: i.incomingKeg?.label ?? null, p_nominal_bbl: i.incomingKeg?.nominalBbl ?? null,
+    p_tap_number: i.tapNumber ?? null, p_opening_fill: i.incomingOpeningFill, p_request_id: e.requestId })),
+});
+defineQuery({
+  name: "list_open_taps", description: "All open intervals at one taproom, numbered first; frozen size, fill, safe SKU and brand labels, stock flag and opening actor ID/handle/time. No POS yield or remaining-volume estimate",
+  input: z.object({ locationId: z.string().uuid() }), roles: [...COUNT_ROLES],
+  handler: (ctx,i) => unwrap(ctx.db.rpc("list_open_taps", { p_brewery: ctx.breweryId, p_location: i.locationId })),
+});
+defineQuery({
+  name: "list_tap_history", description: "The latest 50 closed intervals at one taproom with opening and closing actor IDs, safe handles, times, frozen nominal size, fill and reason",
+  input: z.object({ locationId: z.string().uuid() }), roles: [...COUNT_ROLES],
+  handler: (ctx,i) => unwrap(ctx.db.rpc("list_tap_history", { p_brewery: ctx.breweryId, p_location: i.locationId })),
+});
+
+
+defineQuery({
+  name: "get_taproom_variance", description: "Current brand comparison over completed count pairs ending in the last 4 or 12 brewery-local calendar weeks. Whole periods use (prior created_at, current created_at]; first counts lack a baseline. Actual is frozen count depletion, expected is frozen POS serving volume. Missing coverage stays null; explicitly complete empty observations permit zero. Mapped lines contribute despite mapping gaps. Timestamp-active equal-share tap estimates retain excluded out-of-stock shares; guest identity is never inferred. Late reconciled sales may change expected, never inventory. Returns bounds, as_of, coverage, mapping gaps and unattributed volume",
+  input: z.object({ locationId: z.string().uuid(), weeks: z.union([z.literal(4), z.literal(12)]) }), roles: [...COUNT_ROLES],
+  handler: (ctx,i) => unwrap(ctx.db.rpc("get_taproom_variance", { p_brewery: ctx.breweryId, p_location: i.locationId, p_weeks: i.weeks })),
+});
+defineQuery({
+  name: "get_taproom_draft_projection", description: "Expected consumption since the latest saved taproom count through the server as-of, grouped by brand for a draft recount. Returns the prior count identity and exact bounds, nullable expected BBL, coverage source bounds and completeness, mapping gaps, ignored lines, excluded shares and unattributed volume. Complete empty observation may mean zero; no baseline or usable observation stays null. Late reconciled sales may change this read, which never posts inventory or allocates physical lots",
+  input: z.object({ locationId: z.string().uuid() }), roles: [...COUNT_ROLES],
+  handler: (ctx,i) => unwrap(ctx.db.rpc("get_taproom_draft_projection", { p_brewery: ctx.breweryId, p_location: i.locationId })),
 });

@@ -27,10 +27,12 @@ function exampleBody(o: ApiOperation, input: Record<string, unknown>) {
   return JSON.stringify(body, null, 2);
 }
 
+const literalMdxText = (text: string) => text.replaceAll("{", "&#123;").replaceAll("}", "&#125;");
+
 function available(o: ApiOperation) {
   const schema = getCommandDefinition(o.name)?.input;
   const fields = schema ? fieldsOf(schema) : [];
-  const parts = [`#### ${o.name} [#${o.name}]`, `\`${o.kind}\` · ${o.roles}`, o.description ?? ""];
+  const parts = [`#### ${o.name} [#${o.name}]`, `\`${o.kind}\` · ${o.roles}`, o.description ? literalMdxText(o.description) : ""];
 
   parts.push(
     fields.length > 0

@@ -5,6 +5,13 @@ import { describe, expect, it } from "vitest";
 import { sql } from "./helpers";
 
 const AUTHENTICATED_RPCS = [
+  "get_taproom_draft_projection(uuid,uuid)",
+  "get_taproom_variance(uuid,uuid,integer)",
+  "tap_keg(uuid,uuid,uuid,text,numeric,text,numeric,uuid)",
+  "kick_keg(uuid,uuid,numeric,text,uuid)",
+  "swap_keg(uuid,uuid,numeric,text,uuid,text,numeric,text,numeric,uuid)",
+  "list_open_taps(uuid,uuid)",
+  "list_tap_history(uuid,uuid)",
   "get_taproom_count_snapshot(uuid,uuid)", "get_taproom_count(uuid,uuid)", "record_taproom_count(uuid,uuid,date,text,jsonb,uuid)",
   "taproom_can(uuid,text)", "staff_brewery_rows()", "keg_bin_on_hand_rows()", "on_hand_rows()",
   "get_chat_integration_health(uuid)",
@@ -76,6 +83,7 @@ const AUTHENTICATED_RPCS = [
   "replace_format_components(uuid,uuid,jsonb,uuid)",
   "resolve_short_pick(uuid,uuid,numeric,text,text,uuid)",
   "return_shipment(uuid,jsonb,uuid,text,uuid)",
+  "reverse_inventory_movement(uuid,uuid,text,uuid)",
   "schedule_batch(uuid,uuid,uuid,date,numeric,text,uuid)",
   "schedule_packaging_run(uuid,uuid,date,uuid,jsonb,uuid)",
   "send_purchase_order(uuid,uuid,text,uuid)",

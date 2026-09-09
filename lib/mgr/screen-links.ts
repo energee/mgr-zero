@@ -178,6 +178,7 @@ export const TAPS: [string | RegExp, string][] = [
  * to another product, add-a-row buttons — so the coverage test does not count
  * them as gaps. The explorer simply leaves them alone. */
 export const INERT: (string | RegExp)[] = [
+  "Refresh expected",
   "Record 7 sales + 1 refund as expected",
   "Main ship-to",
   "Dock ship-to",

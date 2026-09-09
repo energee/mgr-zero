@@ -4,7 +4,7 @@
 
 # API operations backlog
 
-17 operations the screens declare they need that the command registry does not yet answer, against 178 that it does.
+12 operations the screens declare they need that the command registry does not yet answer, against 188 that it does.
 
 This is the backend push, scoped. Each row names the operation a screen asked for and the screens waiting on it, so an area can be built and shipped whole rather than a command at a time. `/docs/api` publishes the same list per area, marked designed, so an integrator sees the roadmap without being told a date.
 
@@ -35,24 +35,11 @@ Nothing here is a schema decision. An operation appears because a screen named i
 | Operation | Kind | Needed by |
 | --- | --- | --- |
 | `get_format_components` | query | Repack |
-## Taproom & kegs: 4 to build, 13 built
-
-| Operation | Kind | Needed by |
-| --- | --- | --- |
-| `kick_keg` | command | Tap board, Kick keg |
-| `list_open_taps` | query | Tap board, Kick keg, Swap keg |
-| `swap_keg` | command | Tap board, Swap keg |
-| `tap_keg` | command | Tap board |
 ## Orders & invoicing: 1 to build, 25 built
 
 | Operation | Kind | Needed by |
 | --- | --- | --- |
 | `write_off_invoice` | command | Invoices |
-## Inventory & locations: 1 to build, 19 built
-
-| Operation | Kind | Needed by |
-| --- | --- | --- |
-| `reverse_inventory_movement` | command | SKU detail |
 ## Today & notifications: 2 to build, 21 built
 
 | Operation | Kind | Needed by |

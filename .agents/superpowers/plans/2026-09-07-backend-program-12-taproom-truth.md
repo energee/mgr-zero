@@ -68,7 +68,19 @@ second format identity table (§16.16 decision 2).
 
 ### Task 2: Variance report
 
-**Files:** view `taproom_variance` + query `get_taproom_variance`
+**Files:** baseline read RPC + registered `get_taproom_variance`, existing POS
+raw/mapping owners with frozen expectations and explicit coverage windows,
+`tests/taproom-variance.test.ts`.
+
+Implemented API/data contract: whole completed `(prior.created_at,current.created_at]`
+periods ending in the selected brewery-local 4/12-week date window; first count
+is unpaired. Immutable raw connection/order/line facts reconcile once to frozen
+serving interpretation. Complete observed coverage distinguishes zero from
+absence; mapped lines contribute with visible gaps. Timestamp-active equal
+shares retain excluded absent-stock shares in the denominator, and actual
+stays count-owned. Guest numeric yield lacks POS identity and remains absent.
+The helper is private and ungranted; Program 14 owns its future provider caller,
+revisions/returns and coverage completion. The page remains gated for Task 5.
 
 **Interfaces:**
 - Per brand, window 4 or 12 weeks: POS serving-volume expectations remain a separate projection/snapshot from physical count `qty_before` and `qty_counted`. Actual consumption comes from count-owned depletion, not summing remaining stock. Exclude guest/untracked intervals as specified by Task 3. Variance is expected consumption minus actual consumption (§16.15). Never writes movements. Without POS, the variance report is empty and the count's expected-consumption column is empty; physical counts still post depletion.
@@ -90,9 +102,9 @@ create table tap_intervals (
   brewery_id uuid not null references breweries(id),
   location_id uuid not null,
   tap_number text,                 -- optional, not unique
-  sku_id uuid,                     -- null when not_in_inventory guest (gated create)
+  sku_id uuid,                     -- null only for explicit guest identity
   label text,                      -- guest name; null when sku_id set
-  nominal_bbl numeric,
+  nominal_bbl numeric not null,    -- positive finite; frozen format BBL for own SKU
   opening_fill numeric not null default 1 check (opening_fill in (0.25,0.5,0.6,1)),
   closing_fill numeric check (closing_fill in (0,0.25,0.5)),
   not_in_inventory boolean not null default false,
@@ -105,11 +117,12 @@ create table tap_intervals (
 );
 ```
 
-- `swap_keg({ openIntervalId, incomingSkuId, tapNumber?, incomingOpeningFill?, closeFill, closeReason? })` one RPC: update A `closed_at` where `id = openIntervalId and closed_at is null` (0 rows → raise `'already swapped'`), insert B. No inventory_movements.
+- `swap_keg({ openIntervalId, incomingKeg?, tapNumber?, incomingOpeningFill, closeFill, reason })` one RPC: update A `closed_at` where `id = openIntervalId and closed_at is null` (0 rows → raise `'already swapped'`), insert B. No inventory_movements.
 - `kick_keg({ openIntervalId, closeFill, reason })` close only.
-- `tap_keg({ skuId, locationId, tapNumber?, openingFill })` open on empty tap.
+- `tap_keg({ keg: { skuId } | { label, nominalBbl }, locationId, tapNumber?, openingFill })` open on empty tap.
 - `list_open_taps({ locationId })`
-- Guest create (`not_in_inventory` + label + nominal_bbl) ungates when label and nominal size are stored; kick of an existing guest interval is allowed.
+- Guest identity is `{ label, nominalBbl }`; own identity is `{ skuId }`. Omitted incoming identity defaults only to an outgoing own SKU. Guest swaps require explicit identity. The server derives `not_in_inventory`; no inventory writes.
+- Successful exact replay precedes lifecycle CAS; changed payload conflicts. `list_tap_history({ locationId })` returns the latest 50 closed intervals with actor IDs and times. UI gates remain until the board is built.
 
 - [ ] **Step 1:** Swap twice with the same `openIntervalId` — second raises already swapped. Kick leaves remaining open stock (no ledger). list_open_taps returns B not A.
 

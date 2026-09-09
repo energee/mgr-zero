@@ -196,7 +196,7 @@ export function MovementForm({
           <p>{new Date(receipt.created_at).toLocaleString()}</p>
           <p className="break-all">Movement reference: {receipt.id}</p>
           {receipt.ref && <p className="break-all">Source reference: {receipt.ref}</p>}
-          <p>This entry cannot be edited or deleted. Record inventory correction is not available yet. Contact your admin before recording another entry to correct it.</p>
+          <p>This entry cannot be edited or deleted. Open this SKU’s inventory detail to reverse an eligible standalone adjustment or loss with a correction note. Other entries keep their original correction workflow.</p>
           <Button onClick={() => setReceipt(null)}>Done</Button>
         </div>}
       </CommandForm>
