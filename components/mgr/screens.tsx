@@ -72,6 +72,7 @@ import { NewTransferView } from "@/components/mgr/views/new-transfer";
 import { OrderView } from "@/components/mgr/views/order";
 import { OrdersView } from "@/components/mgr/views/orders-list";
 import { PackageBomView } from "@/components/mgr/views/package-bom";
+import { PackagingRunsView } from "@/components/mgr/views/packaging-runs";
 import { ParsView } from "@/components/mgr/views/pars";
 import { PickView } from "@/components/mgr/views/pick";
 import { PickSheetView } from "@/components/mgr/views/pick-sheet";
@@ -85,6 +86,7 @@ import { PriceGroupView } from "@/components/mgr/views/price-group";
 import { PriceGroupsView } from "@/components/mgr/views/price-groups";
 import { PurchaseOrdersView } from "@/components/mgr/views/purchase-orders";
 import { PutBackView } from "@/components/mgr/views/put-back";
+import { RepackView } from "@/components/mgr/views/repack";
 import { ReceiptView } from "@/components/mgr/views/receipt";
 import { ReceivePoView } from "@/components/mgr/views/receive-po";
 import { QuestionInvoiceView } from "@/components/mgr/views/question-invoice";
@@ -100,6 +102,7 @@ import { RoutesView } from "@/components/mgr/views/routes";
 import { ReviewOrderView } from "@/components/mgr/views/review-order";
 import { SaleChannelsView } from "@/components/mgr/views/sale-channels";
 import { ScheduleBatchView } from "@/components/mgr/views/schedule-batch";
+import { SchedulePackagingRunView } from "@/components/mgr/views/schedule-packaging-run";
 import { SearchView } from "@/components/mgr/views/search";
 import { SessionExpiredView } from "@/components/mgr/views/session-expired";
 import { SettingsView } from "@/components/mgr/views/settings";
@@ -158,6 +161,7 @@ import {
   newPoCountryMalt, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorYch, vendorsList,
 } from "@/lib/mgr/fixtures/purchasing";
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger } from "@/lib/mgr/fixtures/kegs";
+import { packagingRuns, repackCase, schedulePackagingRun } from "@/lib/mgr/fixtures/packaging";
 import { confirmDeliveryStop1, driverRouteA, returnRouteA, routeAPlan, routesDriver } from "@/lib/mgr/fixtures/delivery";
 import {
   brandApprovalStout, complianceMonthsDemo, complianceRegistryDemo, licensePaBrewery, lotTraceHazy, stateRegistrationHazy,
@@ -231,6 +235,9 @@ import { toRecipesViewProps } from "@/lib/mgr/recipes-view";
 import { toRecordMovementViewProps } from "@/lib/mgr/record-movement-view";
 import { toRunClosedViewProps } from "@/lib/mgr/run-closed-view";
 import { toScheduleBatchViewProps } from "@/lib/mgr/schedule-batch-view";
+import { toPackagingRunsViewProps } from "@/lib/mgr/packaging-runs-view";
+import { toRepackViewProps } from "@/lib/mgr/repack-view";
+import { toSchedulePackagingRunViewProps } from "@/lib/mgr/schedule-packaging-run-view";
 import { toReverseMovementViewProps } from "@/lib/mgr/reverse-movement-view";
 import { toReviewOrderViewProps } from "@/lib/mgr/review-order-view";
 import { toReturnCreditViewProps } from "@/lib/mgr/return-credit-view";
@@ -261,7 +268,6 @@ import { toWorkViewProps } from "@/lib/mgr/work-view";
 import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-icons";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
-import { formatVolume } from "@/lib/volume";
 import { saccharificationRest, type Step, totalDuration } from "@/lib/mgr/recipe-schedule";
 import { WifiDisconnected01Icon } from "@hugeicons/core-free-icons";
 
@@ -367,10 +373,7 @@ const OVERDUE_HOURS = "24";
 // A rough remaining fill, wherever a keg comes off a tap.
 const FILL_CHIPS = ["Empty", "About ¼ left", "About ½ left"];
 
-// The Work list chips, in the order every Work list draws them.
-const WORK_CHIPS = ["all", "orders", "transfers", "batches", "runs", "POs", "routes"];
-/** The screen each Work chip opens: the chips are one bar drawn on the Work lists. */
-export const WORK_TABS: Record<string, string> = { all: "Work", orders: "Orders", transfers: "Transfers", batches: "Batches", runs: "Packaging runs", POs: "Purchase orders", routes: "Routes" };
+export { WORK_TABS } from "@/lib/mgr/work-view";
 
 // The states every screen can reach; a record with designed states lists its own instead.
 const DEFAULT_STATES: NonNullable<Screen["states"]> = [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]];
@@ -1804,19 +1807,7 @@ export const SCREENS: Screen[] = [
     writes: "none [scheduling and closing happen on their own surfaces]",
     states: [["short", "a planned run whose materials fall short says so on the row and its next action is Resolve, not Start"], ["due today", "the same row also appears in Today for the brewer"], ["closed", "recent runs stay for a few weeks with lot, output and yield; after that they are history under Search and Lot trace"], ["empty", "no runs planned: the button is the only thing on the page"]],
     spec: "The Work list with the Runs tab active, which is the packaging list: Work is where everything in motion lives, so runs get no rail entry of their own. Upcoming sorts by planned date and every row names its next action. Recent breaks Work's in-motion rule on purpose, because a brewer plans the next run against the last one's yield; it is kept short and the full history stays in Search. Schedule run opens the sheet; a row opens the run, where closing happens.",
-    body: (<>
-      {E.hd("Work", "brewer default", E.btn("Schedule run"))}
-      {E.tabs(WORK_CHIPS, 4, "w-full", WORK_TABS)}
-      {E.ttl("Upcoming")}
-      {E.row("RUN-0031 · Hazy cans", "Fri 9/5 · FV3 · 118 cases planned · 480 ends short", E.act("Resolve", "attention"), "w")}
-      {E.row("RUN-0032 · Pils ½ bbl", "Tue 9/9 · FV1 · 40 kegs planned", E.act("Start", "info"))}
-      {E.row("RUN-0033 · Stout cans", "Thu 9/11 · no source yet", E.act("Pick source"))}
-      {E.ttl("Recent")}
-      {E.row("RUN-0030 · Pils cans", "closed Tue 9/2 · L-240902-PL · 96 cases · 97% yield", "", "ok")}
-      {E.row("RUN-0029 · Hazy ½ bbl", "closed Fri 8/29 · L-240829-HZ · 38 kegs · 95% yield", "", "ok")}
-      {E.row("RUN-0028 · Helles cans", "closed Wed 8/27 · L-240827-HL · 110 cases · 92% yield · 2 bbl loss", "", "w")}
-      {E.info("Recent keeps the last few weeks. Older runs are under Search and Lot trace.")}
-    </>),
+    body: <PackagingRunsView model={toPackagingRunsViewProps(packagingRuns)} />,
   },
   {
     step: 8,
@@ -1830,21 +1821,7 @@ export const SCREENS: Screen[] = [
     writes: "schedule_packaging_run [one RPC: run planned against a brand, with an optional source occupancy, + planned outputs, each flagged on/off the wholesale list] · update_packaging_run [same sheet reopens a planned run until it starts; picking the tank or starting both require one]",
     states: [["permission", "brewer or warehouse required", 1], ["source chosen", "the brand comes from what is in the vessel, so only that brand's formats are offered"], ["short", "the materials table shows the shortage now, not on the day; Save still works, Start will not"], ["editing", "a planned run reopens here with its values filled; a started run cannot be rescheduled, only closed"], ["no open occupancy", "nothing to package: the source picker says so and links to Cellar"]],
     spec: "The plan half of the packaging frame, pulled out so a run can be scheduled before it exists and edited until it starts. One source occupancy, chosen exactly, is the rule that lets close revalidate it later. Planned outputs are counts per format; the sheet converts to barrels and shows what is left in the vessel so a plan cannot exceed the source. Each output can be listed on the wholesale shop (the brand × package buyers will see); listing is the offer, not an ATP promise, and a format left off is absent from Shop. Materials are previewed from the format BOM so a shortage is a planning fact, not a surprise at the line. Saving writes the run and its planned outputs in one RPC and lands on the run; nothing moves in the ledger until close.",
-    body: (<>
-      {E.edit("Planned date", "2026-09-05", "date")}
-      {E.ttl("Source")}
-      {E.nav("FV3 · Hazy IPA", "B-0416 · 42.0 bbl · gravity 2.1 · ready")}
-      {E.ttl("Planned outputs")}
-      {E.row("Hazy · case · 24×16 oz", "39.6 bbl · on the wholesale list", <>{E.stq(118)}{E.sw(true, "On the wholesale list")}</>)}
-      {E.row("Hazy · ½ bbl keg", "2.0 bbl · on the wholesale list", <>{E.stq(4)}{E.sw(true, "On the wholesale list")}</>)}
-      {E.row("Hazy · ⅙ bbl keg", "not listed this run", <>{E.stq(0)}{E.sw(false, "On the wholesale list")}</>)}
-      {E.fld("Left in FV3", "0.4 bbl · loss at close unless held")}
-      {E.ttl("Materials")}
-      {E.tbl(["need", "have", "short"], [["cans 2,832", "3,100", "0"], ["ends 2,832", "2,400", <><span className="text-warning-foreground">432</span></>], ["labels 2,832", "5,000", "0"], ["trays 118", "140", "0"]])}
-      {E.note("432 ends short. Save the plan now; Start stays disabled until the shortage is resolved or overridden on the run.")}
-      {E.btn("Save run plan")}
-      {E.info("Nothing moves until the run closes. Saving writes the run and its planned outputs together.")}
-    </>),
+    body: <SchedulePackagingRunView model={toSchedulePackagingRunViewProps(schedulePackagingRun)} />,
   },
   {
     step: 7,
@@ -3016,17 +2993,7 @@ export const SCREENS: Screen[] = [
     writes: "record_repack [SCHEMA-GATE: revision 2 §16.10: repack movement type, shared ref, abs(sum(bbl)) < 0.000001 over the ref]",
     states: [["offered", "composition knows a case yields six four-packs · nobody types both halves"], ["breakage", "−1 case · +5 four-packs · +1 loss keeps the invariant absolute", 1], ["materials", "case tray returns to stock, PakTech is consumed · per-repack override"]],
     spec: "An adjustment cannot express a break: it has no way to pair the two halves, so the break reads as an unexplained loss beside an unexplained gain. The outbound leg's bbl is derived from the inbound leg's frozen total rather than recomputed from barrels per unit (rounding each leg independently leaves −0.00000001 on a 24×16oz case), and the constraint carries a tolerance to catch a hand-entered repack without rejecting a legitimate one. Build-direction repack is out of scope; the whole repack is one RPC sharing one ref so beer and materials cannot disagree.",
-    body: (<>
-      {E.fld("Break", "Hazy IPA · case · 24×16oz")}
-      {E.fld("Location · bin", "Warehouse · Walk-in")}
-      {E.qty("1", "case")}
-      {E.tape([["−1 case · repack", formatVolume("0.09677419")], ["+6 four-pack · repack", "derived from the case total"], ["Case tray ×1", "return to stock"], ["PakTech ×6", "consumed"]])}
-      {E.info(`Preview: conserves ${formatVolume("0.09677419")} · same location and bin · not a TTB removal`)}
-      {E.fld("Damaged on break", "0 four-pack · records as loss")}
-      {E.pin(<>
-        {E.gated("Record repack", "isn’t available yet: breaking a case has nowhere correct to land")}
-      </>)}
-    </>),
+    body: <><RepackView model={toRepackViewProps(repackCase)} footer={null} />{E.pin(E.gated("Record repack", repackCase.unavailable!))}</>,
   },
   // ---- The external venues. Not MGR screens: what QuickBooks, Square and Slack
   // show when MGR writes into them, drawn in each product's own design language

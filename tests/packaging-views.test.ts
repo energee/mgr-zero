@@ -26,15 +26,16 @@ describe("packaging views", () => {
     expect(runs.props.model).toEqual(toPackagingRunsViewProps(packagingRuns));
     expect(schedule.type).toBe(SchedulePackagingRunView);
     expect(schedule.props.model).toEqual(toSchedulePackagingRunViewProps(schedulePackagingRun));
-    expect(repack.type).toBe(RepackView);
-    expect(repack.props.model).toEqual(toRepackViewProps(repackCase));
+    const repackView = (repack.props as unknown as { children: [{ type: unknown; props: { model: unknown } }] }).children[0];
+    expect(repackView.type).toBe(RepackView);
+    expect(repackView.props.model).toEqual(toRepackViewProps(repackCase));
   });
 
   it("keeps fixture actions inert and explicit null slots empty", () => {
     const runs = htmlOf(createElement(PackagingRunsView, { model: toPackagingRunsViewProps(packagingRuns) }));
     expect(runs).not.toMatch(/href="\/packaging/);
     expect(htmlOf(createElement(SchedulePackagingRunView, { model: schedulePackagingRun, form: null }))).toBe("<div></div>");
-    expect(htmlOf(createElement(RepackView, { model: repackCase, form: null }))).toBe("<div></div>");
+    expect(htmlOf(createElement(RepackView, { model: repackCase, footer: null }))).not.toMatch(/Record repack/);
   });
 
   it("the live list mounts PackagingRunsView and slots both controlled forms", () => {
