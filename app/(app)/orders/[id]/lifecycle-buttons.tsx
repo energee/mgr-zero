@@ -14,8 +14,7 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useBrewery } from "../../brewery-provider";
-import { command } from "@/lib/commands/client";
+import { useCommandAction } from "@/lib/commands/use-command-form";
 import { AdjustLinesForm } from "./adjust-lines-form";
 import { PickForm, type PickLine } from "./pick-form";
 import { ShipForm, type ShipLine } from "./ship-form";
@@ -43,10 +42,8 @@ export function LifecycleButtons({
   skus: { id: string; label: string }[];
   pickLines: (PickLine & ShipLine)[];
 }) {
-  const breweryId = useBrewery();
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, setError, run: runAction } = useCommandAction();
   const [warnings, setWarnings] = useState<Warning[]>([]);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -55,33 +52,20 @@ export function LifecycleButtons({
   const skuNames = new Map(lines.map((l) => [l.skuId, l.skuName]));
 
   async function run(name: string) {
-    setBusy(true);
-    setError(null);
-    try {
-      const data = (await command(breweryId, name, { orderId })) as { warnings?: Warning[] };
-      setWarnings(data.warnings ?? []);
+    await runAction(name, { orderId }, data => {
+      const result = data as { warnings?: Warning[] };
+      setWarnings(result.warnings ?? []);
       router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : `${name} failed`);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   async function submitCancel(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      await command(breweryId, "cancel_order", { orderId, reason: cancelReason });
+    await runAction("cancel_order", { orderId, reason: cancelReason }, () => {
       setCancelOpen(false);
       setCancelReason("");
       router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "cancel_order failed");
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   const canCancel = canSell && status !== "shipped" && status !== "cancelled";

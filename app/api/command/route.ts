@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { buildContextFromBearer, buildRouteContext, isUuid } from "@/lib/commands/context";
 import {
+  type CommandContextExpectation,
   type CommandExecution,
   type CommandFailure,
   type CommandRequest,
@@ -13,6 +14,7 @@ import {
   getCommandDefinition,
   runCommand,
 } from "@/lib/commands/registry";
+import { z } from "zod";
 import "@/lib/commands/all"; // side-effect: registers every command
 
 // null = no Authorization header (use the cookie session); "" = a header that
@@ -37,6 +39,12 @@ function isCommandRequest(body: unknown): body is CommandRequest {
     && "input" in body;
 }
 
+const expectedContextSchema = z.object({
+  actorId: z.uuid(),
+  breweryId: z.uuid().optional(),
+  customerId: z.uuid().optional(),
+}).strict();
+
 
 export async function POST(req: Request) {
   const correlationId = crypto.randomUUID();
@@ -50,6 +58,12 @@ export async function POST(req: Request) {
       throw new CommandError("invalid command request", 400, "invalid_request");
     }
     requestId = typeof body.requestId === "string" ? body.requestId : undefined;
+    let expectedContext: CommandContextExpectation | undefined;
+    if ("expectedContext" in body) {
+      const parsed = expectedContextSchema.safeParse(body.expectedContext);
+      if (!parsed.success) throw new CommandError("invalid expected context", 400, "invalid_request");
+      expectedContext = parsed.data;
+    }
 
     const definition = getCommandDefinition(body.name);
     if (!definition) {
@@ -68,8 +82,8 @@ export async function POST(req: Request) {
     }
     const token = bearerToken(req);
     const ctx = token === null
-      ? await buildRouteContext(body.breweryId)
-      : await buildContextFromBearer(body.breweryId, token);
+      ? await buildRouteContext(body.breweryId, expectedContext)
+      : await buildContextFromBearer(body.breweryId, token, expectedContext);
     const response: CommandSuccess<unknown> = {
       ok: true,
       data: await runCommand(body.name, body.input, ctx, execution),

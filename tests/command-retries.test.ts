@@ -3,13 +3,17 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, expect, it, vi } from "vitest";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
-vi.mock("@/app/(app)/brewery-provider", () => ({ useBrewery: () => "brewery-a" }));
+let renderedContext = { actorId: "actor-a", breweryId: "brewery-a" };
+vi.mock("@/app/(app)/brewery-provider", () => ({
+  useBrewery: () => renderedContext.breweryId,
+  useCommandContext: () => renderedContext,
+}));
 import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
 import { command } from "@/lib/commands/client";
 afterEach(() => vi.unstubAllGlobals());
 
-it("retains a failed submission ID, resets changed intent, and resets after success", async () => {
-  const requests: { requestId: string }[] = [];
+it("retains a failed submission ID and rendered context, resets changed intent, and resets after success", async () => {
+  const requests: { requestId: string; expectedContext: unknown }[] = [];
   let fail = true;
   vi.stubGlobal("fetch", vi.fn(async (_url, init) => {
     requests.push(JSON.parse(init.body));
@@ -20,9 +24,12 @@ it("retains a failed submission ID, resets changed intent, and resets after succ
   function Harness() { action = useCommandAction(); return null; }
   renderToStaticMarkup(createElement(Harness));
   await action!.run("set_brewery_quiet_hours", { start: "21:00" });
+  renderedContext = { actorId: "actor-b", breweryId: "brewery-b" };
   await action!.run("set_brewery_quiet_hours", { start: "21:00" });
   await action!.run("set_brewery_quiet_hours", { start: "22:00" });
   expect(requests[0].requestId).toBe(requests[1].requestId);
+  expect(requests[0].expectedContext).toEqual({ actorId: "actor-a", breweryId: "brewery-a" });
+  expect(requests[1].expectedContext).toEqual(requests[0].expectedContext);
   expect(requests[2].requestId).not.toBe(requests[1].requestId);
   fail = false;
   await action!.run("set_brewery_quiet_hours", { start: "22:00" });
@@ -31,6 +38,7 @@ it("retains a failed submission ID, resets changed intent, and resets after succ
   expect(requests[4].requestId).not.toBe(requests[3].requestId);
   await command("brewery-a", "unchanged_three_argument_caller", {});
   expect(requests[5].requestId).toMatch(/^[0-9a-f-]{36}$/);
+  renderedContext = { actorId: "actor-a", breweryId: "brewery-a" };
 });
 
 it("only hands a committed result to the form receipt after success, including exact retry", async () => {

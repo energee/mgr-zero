@@ -24,7 +24,8 @@ content-type: application/json
   "breweryId": "<uuid>",
   "name": "<operation name>",
   "input": { },
-  "requestId": "<uuid, commands only>"
+  "requestId": "<uuid, commands only>",
+  "expectedContext": { "actorId": "<uuid>", "breweryId": "<uuid>", "customerId": "<uuid, portal only>" }
 }
 ```
 
@@ -33,6 +34,13 @@ operations and must be omitted for `provision_brewery`, the sole authenticated
 pre-tenant command. `requestId` is required for
 every command and optional for queries. See [idempotency](#idempotency) for why
 it exists and what reusing one does.
+
+`expectedContext` is optional for explicit bearer-token clients. The browser app
+includes it from the verified context that rendered an action and keeps it with
+an uncertain retry. It is a restriction, not identity proof: authentication and
+membership checks still decide what the caller may do. When supplied, its actor,
+brewery, and optional customer must match the authenticated request before the
+operation runs.
 
 ### Responses [#responses]
 
@@ -145,6 +153,8 @@ a portal user (`customer_users` linked to one of the brewery's customers, role
 The two failures are different, and that difference is worth handling.
 `401 unauthenticated` means the token is missing or expired: sign in again.
 `403 not_member` means the token is fine and the `breweryId` is wrong.
+`409 context_changed` means a supplied `expectedContext` no longer matches;
+return to that original account and workspace to retry an uncertain write.
 
 ### Roles are enforced twice [#enforcement]
 
@@ -451,6 +461,7 @@ one value that ties what your client saw to what the server recorded.
 | 404 | `not_found` | An id in the input matches no record the caller may see. | Confirm the id belongs to this brewery. Row-level security makes another tenant's row indistinguishable from a missing one. |
 | 404 | `unknown_command` | No operation is registered under that `name`. | Check the spelling. An operation marked designed is not registered yet and answers this. |
 | 409 | `conflict` | A `requestId` was reused with a different payload. | Reuse a requestId only to retry the identical write; generate a new one for a new write. |
+| 409 | `context_changed` | The authenticated account, brewery, or customer no longer matches the optional rendered-context expectation. | Return to the original signed-in context to retry the unchanged action; otherwise review the current state before starting a new request. |
 | 500 | `db_error` | The database refused the write for a reason not mapped to a public code. Logged server-side. | Retry once with the same `requestId`. If it persists, quote the `correlationId` from the response. |
 | 500 | `internal_error` | A handler threw something the endpoint could not map to a public code. A server fault, and the only code whose message carries no detail. | Retry once with the same `requestId`; a write may or may not have landed, so read the record back before retrying with a new one. Report it with the `correlationId`. |
 | 500 | `missing_execution` | A command reached its handler without execution metadata. A server fault. | Report it with the `correlationId`. |

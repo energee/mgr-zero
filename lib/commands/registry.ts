@@ -44,6 +44,13 @@ export type CommandRequest = {
   name: string;
   input: unknown;
   requestId?: string;
+  expectedContext?: CommandContextExpectation;
+};
+
+export type CommandContextExpectation = {
+  actorId: string;
+  breweryId?: string;
+  customerId?: string;
 };
 
 export class CommandError extends Error {

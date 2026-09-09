@@ -33,10 +33,11 @@ type CustomerMembershipRow = {
   customers: { brewery_id: string; name: string };
 };
 
-type RequestClientFactory = () => Promise<SupabaseClient>;
+type RequestClientFactory = (headers?: Record<string, string>) => Promise<SupabaseClient>;
 
 export interface RequestAuthContext {
   getSupabaseClient(): Promise<SupabaseClient>;
+  getScopedSupabaseClient(headers: Record<string, string>): Promise<SupabaseClient>;
   getIdentity(): Promise<RequestIdentity | null>;
   getStaffMemberships(): Promise<StaffMembership[]>;
   getCustomerMemberships(): Promise<CustomerMembership[]>;
@@ -115,6 +116,7 @@ export function createRequestAuthContext(createClient: RequestClientFactory = cr
 
   return {
     getSupabaseClient,
+    getScopedSupabaseClient: (headers) => createClient(headers),
     getIdentity,
     getStaffMemberships,
     getCustomerMemberships,

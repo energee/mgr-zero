@@ -17,7 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const [brewery, sidebarOpen, identity, memberships] = await Promise.all([getActiveBrewery(), sidebarOpenFromCookie(), getRequestIdentity(), getStaffMemberships()]);
   return (
     <SearchCacheProvider key={`${identity?.userId}:${brewery.id}:${brewery.role}`}>
-      <BreweryProvider id={brewery.id}>
+      <BreweryProvider id={brewery.id} actorId={identity!.userId}>
         <AppShell
           brand={brewery.name}
           items={navFor(shippedNav(STAFF_NAV), brewery.role)}

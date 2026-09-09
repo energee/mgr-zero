@@ -10,6 +10,7 @@ import { z } from "zod";
 import { publicEnv } from "@/lib/env/public";
 import { CommandError, unwrap } from "./registry";
 import type { Ctx, PreTenantCtx, OperationCtx } from "./registry";
+import type { CommandContextExpectation } from "./registry";
 
 const uuid = z.uuid();
 /** True for a canonical UUID string; shared by the command route and the bearer context. */
@@ -45,24 +46,51 @@ export async function ctxForBearer(db: SupabaseClient, userId: string, breweryId
   throw new CommandError("not a member of this brewery", 403, "not_member");
 }
 
-async function buildCookieContext(breweryId: string | undefined, request: RequestAuthContext): Promise<OperationCtx> {
+const contextChanged = () => new CommandError("Signed-in account or active workspace changed. Return to the original context to retry this unchanged action.", 409, "context_changed");
+
+function assertExpectedContext(ctx: OperationCtx, expected?: CommandContextExpectation) {
+  if (!expected) return;
+  if (expected.actorId !== ctx.userId
+    || expected.breweryId !== (ctx.breweryId ?? undefined)
+    || expected.customerId !== (ctx.role === "customer" ? ctx.customerId : undefined)) throw contextChanged();
+}
+
+function scopeHeaders(ctx: OperationCtx): Record<string, string> {
+  return {
+    "x-mgr-actor-id": ctx.userId,
+    ...(ctx.breweryId ? { "x-mgr-brewery-id": ctx.breweryId } : {}),
+    ...(ctx.role === "customer" && ctx.customerId ? { "x-mgr-customer-id": ctx.customerId } : {}),
+  };
+}
+
+async function buildCookieContext(breweryId: string | undefined, request: RequestAuthContext, expected?: CommandContextExpectation): Promise<OperationCtx> {
   const identity = await request.getIdentity();
   if (!identity) throw new CommandError("unauthenticated", 401, "unauthenticated");
 
-  const db = await request.getSupabaseClient();
-  if (breweryId === undefined) return { db, userId: identity.userId, breweryId: null, role: null };
+  const discoveryDb = await request.getSupabaseClient();
+  if (breweryId === undefined) {
+    const discovered = { db: discoveryDb, userId: identity.userId, breweryId: null, role: null } satisfies PreTenantCtx;
+    assertExpectedContext(discovered, expected);
+    return { ...discovered, db: await request.getScopedSupabaseClient(scopeHeaders(discovered)) };
+  }
   const staff = await request.getStaffMembership(breweryId);
-  if (staff) return { db, userId: identity.userId, breweryId, role: staff.role };
+  if (staff) {
+    const discovered = { db: discoveryDb, userId: identity.userId, breweryId, role: staff.role } satisfies Ctx;
+    assertExpectedContext(discovered, expected);
+    return { ...discovered, db: await request.getScopedSupabaseClient(scopeHeaders(discovered)) };
+  }
 
   const customer = await request.getCustomerMembership(breweryId);
   if (customer) {
-    return {
-      db,
+    const discovered = {
+      db: discoveryDb,
       userId: identity.userId,
       breweryId,
       role: "customer",
       customerId: customer.customerId,
-    };
+    } satisfies Ctx;
+    assertExpectedContext(discovered, expected);
+    return { ...discovered, db: await request.getScopedSupabaseClient(scopeHeaders(discovered)) };
   }
 
   throw new CommandError("not a member of this brewery", 403, "not_member");
@@ -77,13 +105,13 @@ function cookieContext(breweryId?: string): Promise<OperationCtx> {
 export const buildContext = cache(cookieContext);
 
 // Route handlers have no React Server Component cache, so compose explicitly.
-export async function buildRouteContext(breweryId?: string): Promise<OperationCtx> {
-  return buildCookieContext(breweryId, createRequestAuthContext());
+export async function buildRouteContext(breweryId?: string, expected?: CommandContextExpectation): Promise<OperationCtx> {
+  return buildCookieContext(breweryId, createRequestAuthContext(), expected);
 }
 
 // API clients supply a bearer token. Its validation and RLS-bound client are
 // intentionally explicit rather than sharing cookie-scoped request state.
-export async function buildContextFromBearer(breweryId: string | undefined, accessToken: string): Promise<OperationCtx> {
+export async function buildContextFromBearer(breweryId: string | undefined, accessToken: string, expected?: CommandContextExpectation): Promise<OperationCtx> {
   if (!accessToken) throw new CommandError("unauthenticated", 401, "unauthenticated");
 
   const verifier = createClient(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
@@ -95,10 +123,18 @@ export async function buildContextFromBearer(breweryId: string | undefined, acce
     throw new CommandError("unauthenticated", 401, "unauthenticated");
   }
 
-  const db = createClient(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
+  const discoveryDb = createClient(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
     auth: { persistSession: false, autoRefreshToken: false },
     accessToken: async () => accessToken,
   });
-  if (breweryId === undefined) return { db, userId, breweryId: null, role: null };
-  return ctxForBearer(db, userId, breweryId);
+  const discovered = breweryId === undefined
+    ? ({ db: discoveryDb, userId, breweryId: null, role: null } satisfies PreTenantCtx)
+    : await ctxForBearer(discoveryDb, userId, breweryId);
+  assertExpectedContext(discovered, expected);
+  const db = createClient(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    accessToken: async () => accessToken,
+    global: { headers: scopeHeaders(discovered) },
+  });
+  return { ...discovered, db };
 }
