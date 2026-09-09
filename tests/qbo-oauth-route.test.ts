@@ -38,12 +38,12 @@ describe("QuickBooks OAuth callback route", () => {
     vi.clearAllMocks();
   });
 
-  it("returns unavailable and does not claim a callback realm rejected by CompanyInfo", async () => {
+  it("returns unavailable and does not claim a callback realm denied by CompanyInfo", async () => {
     const fetch = vi.fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(new Response(JSON.stringify({
         access_token: "access-secret", refresh_token: "refresh-secret", expires_in: 3600,
       }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ CompanyInfo: { Id: "actual-realm" } }), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ Fault: { Detail: "access-secret" } }), { status: 403 }));
     vi.stubGlobal("fetch", fetch);
 
     const response = await GET(new Request(

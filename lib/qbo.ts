@@ -132,7 +132,9 @@ export class QboOAuthClient {
     });
     if (!response.ok) throw new Error("QuickBooks company verification failed");
     const body = await response.json() as { CompanyInfo?: { Id?: unknown } };
-    if (body.CompanyInfo?.Id !== realmId) throw new Error("QuickBooks company verification failed");
+    if (typeof body.CompanyInfo?.Id !== "string" || !body.CompanyInfo.Id.trim()) {
+      throw new Error("QuickBooks company verification failed");
+    }
   }
 
   async revoke(token: string) {

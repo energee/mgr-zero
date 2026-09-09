@@ -53,6 +53,27 @@ describe("QuickBooks OAuth transport", () => {
 });
 
 describe("QuickBooks OAuth lifecycle", () => {
+  it("accepts a realm-scoped CompanyInfo response whose entity Id differs from the realm", async () => {
+    const complete = vi.fn().mockResolvedValue("connection-1");
+    const fetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        access_token: "access-secret", refresh_token: "refresh-secret", expires_in: 3600,
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ CompanyInfo: { Id: "1" } }), { status: 200 }));
+
+    await expect(completeQboOAuth({
+      request: new Request(`${config.redirectUri}?code=one-time-code&state=opaque&realmId=9341452071117966`),
+      actorId: "actor-1", selectedBreweryId: "brewery-1", redirectUri: config.redirectUri,
+      client: new QboOAuthClient(config, fetch),
+      store: {
+        claim: vi.fn().mockResolvedValue({ intentId: "intent-1", breweryId: "brewery-1", providerIntent: "connect" }),
+        complete, fail: vi.fn(),
+      },
+    })).resolves.toBe("connection-1");
+    expect(String(fetch.mock.calls[1][0])).toBe("https://sandbox-quickbooks.api.intuit.com/v3/company/9341452071117966/companyinfo/9341452071117966?minorversion=75");
+    expect(complete).toHaveBeenCalledWith("intent-1", "actor-1", "9341452071117966", expect.any(Object));
+  });
+
   it("does not exchange an invalid intent", async () => {
     const fetch = vi.fn<typeof globalThis.fetch>();
     const claim = vi.fn().mockResolvedValue(null);
@@ -90,14 +111,14 @@ describe("QuickBooks OAuth lifecycle", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it("refuses a callback realm that the exchanged credential does not prove or is denied", async () => {
+  it("refuses a malformed CompanyInfo response or a realm-scoped request denial", async () => {
     const complete = vi.fn();
     const fail = vi.fn().mockResolvedValue(undefined);
     const fetch = vi.fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(new Response(JSON.stringify({
         access_token: "access-secret", refresh_token: "refresh-secret", expires_in: 3600,
       }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ CompanyInfo: { Id: "actual-realm" } }), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ CompanyInfo: { Id: "" } }), { status: 200 }));
 
     await expect(completeQboOAuth({
       request: new Request(`${config.redirectUri}?code=one-time-code&state=opaque&realmId=known-victim-realm`),

@@ -29,11 +29,11 @@ describe("QuickBooks durable lifecycle", () => {
       access_token: accessToken, refresh_token: "refresh-secret", expires_in: 3600,
       x_refresh_token_expires_in: 8640000,
     }), { status: 200, headers: { "content-type": "application/json" } });
-    const companyResponse = (realm: string) => new Response(JSON.stringify({ CompanyInfo: { Id: realm } }), {
+    const companyResponse = () => new Response(JSON.stringify({ CompanyInfo: { Id: "1" } }), {
       status: 200, headers: { "content-type": "application/json" },
     });
     const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (url) =>
-      String(url).includes("/tokens/bearer") ? tokenResponse() : companyResponse(realmId));
+      String(url).includes("/tokens/bearer") ? tokenResponse() : companyResponse());
     const store = { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth };
     const begin = (state: string) => ctx.db.rpc("begin_qbo_oauth", {
       p_brewery: brewery.id, p_redirect_uri: redirectUri, p_state_hash: hash(state),
@@ -69,7 +69,7 @@ describe("QuickBooks durable lifecycle", () => {
     expect((await begin(tamperedState)).error).toBeNull();
     const tamperedFetch = vi.fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(tokenResponse("attacker-access-secret"))
-      .mockResolvedValueOnce(companyResponse(`actual-${crypto.randomUUID()}`));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ Fault: { Detail: "attacker-access-secret" } }), { status: 403 }));
     await expect(completeQboOAuth({
       request: new Request(`${redirectUri}?code=tampered-code&state=${tamperedState}&realmId=${knownRealm}`),
       actorId: ctx.userId, selectedBreweryId: brewery.id, redirectUri,
@@ -89,7 +89,7 @@ describe("QuickBooks durable lifecycle", () => {
     })).error).toBeNull();
     const legitimateFetch = vi.fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(tokenResponse("legitimate-access-secret"))
-      .mockResolvedValueOnce(companyResponse(knownRealm));
+      .mockResolvedValueOnce(companyResponse());
     await expect(completeQboOAuth({
       request: new Request(`${redirectUri}?code=legitimate-code&state=${legitimateState}&realmId=${knownRealm}`),
       actorId: legitimateAdmin.userId, selectedBreweryId: legitimateBrewery.id, redirectUri,
@@ -127,7 +127,7 @@ describe("QuickBooks durable lifecycle", () => {
     const delayedFetch = vi.fn<typeof globalThis.fetch>().mockImplementation((url) =>
       String(url).includes("/tokens/bearer")
         ? new Promise((resolve) => { releaseExchange = resolve; })
-        : Promise.resolve(companyResponse(realmId)));
+        : Promise.resolve(companyResponse()));
     const delayedCallback = completeQboOAuth({
       request: new Request(`${redirectUri}?code=delayed-code&state=${delayedState}&realmId=${realmId}`),
       actorId: ctx.userId, selectedBreweryId: brewery.id, redirectUri,
