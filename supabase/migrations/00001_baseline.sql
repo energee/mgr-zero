@@ -1874,7 +1874,11 @@ create table qbo_connections (
   id uuid not null default gen_random_uuid(),
   brewery_id uuid primary key references breweries(id),
   realm_id text not null,
-  access_expires_at timestamptz, refresh_expires_at timestamptz,
+  realm_label text,
+  state text not null default 'connected' check (state in ('connected','disconnected','recovery_required')),
+  access_expires_at timestamptz, refresh_expires_at timestamptz, refresh_hard_expires_at timestamptz,
+  remote_revocation_state text not null default 'not_requested' check (remote_revocation_state in ('not_requested','confirmed','unresolved')),
+  last_error text,
   connected_by uuid references auth.users(id),
   updated_at timestamptz not null default now(),
   unique (id, brewery_id)
@@ -1900,12 +1904,40 @@ create table private.integration_tokens (
   connection_id uuid not null,
   access_token text not null,
   refresh_token text not null,
+  credential_version bigint not null default 1,
   updated_at timestamptz not null default now(),
   primary key (brewery_id, provider)
 );
 alter table private.integration_tokens enable row level security;
 revoke all on schema private from public, anon, authenticated, service_role;
 revoke all privileges on table private.integration_tokens from public, anon, authenticated, service_role;
+
+create table private.qbo_oauth_intents (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references public.breweries(id),
+  actor_id uuid not null references auth.users(id),
+  state_hash text not null unique,
+  redirect_uri text not null,
+  provider_intent text not null check (provider_intent in ('connect','reconnect')),
+  expires_at timestamptz not null,
+  consumed_at timestamptz,
+  exchange_state text not null default 'pending' check (exchange_state in ('pending','exchanging','completed','recovery_required')),
+  created_at timestamptz not null default now()
+);
+alter table private.qbo_oauth_intents enable row level security;
+revoke all privileges on table private.qbo_oauth_intents from public, anon, authenticated, service_role;
+
+create table private.qbo_connection_events (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references breweries(id),
+  connection_id uuid,
+  kind text not null check (kind in ('connected','disconnected','remote_revocation_unresolved','oauth_recovery_required')),
+  detail text,
+  created_at timestamptz not null default now()
+);
+create index qbo_connection_events_brewery_idx on private.qbo_connection_events (brewery_id, created_at desc);
+alter table private.qbo_connection_events enable row level security;
+revoke all privileges on table private.qbo_connection_events from public, anon, authenticated, service_role;
 
 -- These one-statement service-only functions recheck current membership and
 -- the concrete public connection identity before touching credentials. Passing
@@ -1927,7 +1959,7 @@ language sql security definer set search_path = '' as $$
     and (
       (p_provider = 'qbo' and exists (
         select 1 from public.qbo_connections q
-        where q.brewery_id = p_brewery and q.id = p_connection
+        where q.brewery_id = p_brewery and q.id = p_connection and q.state = 'connected'
       ))
       or
       (p_provider = 'square' and exists (
@@ -1948,6 +1980,7 @@ language sql security definer set search_path = '' as $$
       set connection_id = excluded.connection_id,
           access_token = excluded.access_token,
           refresh_token = excluded.refresh_token,
+          credential_version = t.credential_version + 1,
           updated_at = now()
     returning true
   )
@@ -1956,9 +1989,9 @@ $$;
 
 create function public.read_integration_tokens(
   p_brewery uuid, p_provider text, p_connection uuid, p_actor uuid
-) returns table (access_token text, refresh_token text)
+) returns table (access_token text, refresh_token text, credential_version bigint)
 language sql security definer set search_path = '' as $$
-  select t.access_token, t.refresh_token
+  select t.access_token, t.refresh_token, t.credential_version
   from private.integration_tokens t
   where t.brewery_id = p_brewery
     and t.provider = p_provider
@@ -1972,7 +2005,7 @@ language sql security definer set search_path = '' as $$
     and (
       (p_provider = 'qbo' and exists (
         select 1 from public.qbo_connections q
-        where q.brewery_id = p_brewery and q.id = p_connection
+        where q.brewery_id = p_brewery and q.id = p_connection and q.state = 'connected'
       ))
       or
       (p_provider = 'square' and exists (
@@ -1983,6 +2016,109 @@ language sql security definer set search_path = '' as $$
       ))
     );
 $$;
+
+create function public.begin_qbo_oauth(p_brewery uuid, p_redirect_uri text, p_state_hash text, p_provider_intent text, p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_id uuid;
+begin
+  if public.staff_role(p_brewery) <> 'admin' then raise exception 'permission denied'; end if;
+  v_replay := private.claim_command_request(p_brewery, 'begin_qbo_oauth', p_request_id,
+    jsonb_build_object('redirectUri',p_redirect_uri,'stateHash',p_state_hash,'providerIntent',p_provider_intent));
+  if v_replay is not null then return v_replay; end if;
+  insert into private.qbo_oauth_intents(brewery_id,actor_id,state_hash,redirect_uri,provider_intent,expires_at)
+  values(p_brewery,(select auth.uid()),p_state_hash,p_redirect_uri,p_provider_intent,now()+interval '10 minutes') returning id into v_id;
+  v_replay := jsonb_build_object('intentId',v_id);
+  perform private.complete_command_request(p_request_id,v_replay); return v_replay;
+end $$;
+
+create function public.claim_qbo_oauth(p_state_hash text,p_actor uuid,p_brewery uuid,p_redirect_uri text)
+returns table(intent_id uuid,brewery_id uuid,provider_intent text) language plpgsql security definer set search_path='' as $$
+begin
+ return query update private.qbo_oauth_intents i set consumed_at=now(),exchange_state='exchanging'
+ where i.state_hash=p_state_hash and i.actor_id=p_actor and i.brewery_id=p_brewery and i.redirect_uri=p_redirect_uri
+   and i.consumed_at is null and i.expires_at>=now()
+   and exists(select 1 from public.brewery_users u where u.brewery_id=i.brewery_id and u.user_id=p_actor and u.role='admin')
+ returning i.id,i.brewery_id,i.provider_intent;
+end $$;
+
+create function public.fail_qbo_oauth(p_intent uuid,p_actor uuid)
+returns boolean language sql security definer set search_path='' as $$
+ with changed as (
+  update private.qbo_oauth_intents set exchange_state='recovery_required'
+  where id=p_intent and actor_id=p_actor and exchange_state='exchanging' returning brewery_id
+ ), event as (
+  insert into private.qbo_connection_events(brewery_id,kind,detail)
+  select brewery_id,'oauth_recovery_required','OAuth exchange outcome is unknown; reconnect required' from changed
+ ) select coalesce((select true from changed),false)
+$$;
+
+create function public.complete_qbo_oauth(p_intent uuid,p_actor uuid,p_realm_id text,p_realm_label text,p_access_token text,p_refresh_token text,p_access_seconds int,p_refresh_seconds int,p_hard_seconds int)
+returns uuid language plpgsql security definer set search_path='' as $$
+declare i private.qbo_oauth_intents; c public.qbo_connections; v_id uuid:=private.new_uuid();
+begin
+ select * into i from private.qbo_oauth_intents where id=p_intent for update;
+ if i.id is null or i.actor_id<>p_actor or i.exchange_state<>'exchanging' or not exists(select 1 from public.brewery_users u where u.brewery_id=i.brewery_id and u.user_id=p_actor and u.role='admin') then raise exception 'oauth state invalid'; end if;
+ select * into c from public.qbo_connections where brewery_id=i.brewery_id for update;
+ if c.id is not null and c.realm_id=p_realm_id then v_id:=c.id; end if;
+ insert into public.qbo_connections(id,brewery_id,realm_id,realm_label,state,access_expires_at,refresh_expires_at,refresh_hard_expires_at,remote_revocation_state,last_error,connected_by,updated_at)
+ values(v_id,i.brewery_id,p_realm_id,p_realm_label,'connected',now()+make_interval(secs=>p_access_seconds),case when p_refresh_seconds is null then null else now()+make_interval(secs=>p_refresh_seconds) end,case when p_hard_seconds is null then null else now()+make_interval(secs=>p_hard_seconds) end,'not_requested',null,p_actor,now())
+ on conflict(brewery_id) do update set id=excluded.id,realm_id=excluded.realm_id,realm_label=excluded.realm_label,state='connected',access_expires_at=excluded.access_expires_at,refresh_expires_at=excluded.refresh_expires_at,refresh_hard_expires_at=excluded.refresh_hard_expires_at,remote_revocation_state='not_requested',last_error=null,connected_by=p_actor,updated_at=now();
+ insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token) values(i.brewery_id,'qbo',v_id,p_access_token,p_refresh_token)
+ on conflict(brewery_id,provider) do update set connection_id=excluded.connection_id,access_token=excluded.access_token,refresh_token=excluded.refresh_token,credential_version=private.integration_tokens.credential_version+1,updated_at=now();
+ update private.qbo_oauth_intents set exchange_state='completed' where id=i.id;
+ insert into private.qbo_connection_events(brewery_id,connection_id,kind) values(i.brewery_id,v_id,'connected'); return v_id;
+end $$;
+
+create function public.cas_integration_tokens(p_brewery uuid,p_provider text,p_connection uuid,p_actor uuid,p_expected_version bigint,p_access_token text,p_refresh_token text,p_access_seconds int,p_refresh_seconds int,p_hard_seconds int)
+returns boolean language sql security definer set search_path='' as $$
+ with changed as (
+  update private.integration_tokens t set access_token=p_access_token,refresh_token=p_refresh_token,credential_version=credential_version+1,updated_at=now()
+  where t.brewery_id=p_brewery and t.provider=p_provider and t.connection_id=p_connection and t.credential_version=p_expected_version
+  and exists(select 1 from public.brewery_users u where u.brewery_id=p_brewery and u.user_id=p_actor and u.role in ('admin','sales'))
+  and exists(select 1 from public.qbo_connections q where p_provider='qbo' and q.brewery_id=p_brewery and q.id=p_connection and q.state='connected') returning true
+ ), expiry as (
+  update public.qbo_connections q set access_expires_at=now()+make_interval(secs=>p_access_seconds),
+    refresh_expires_at=case when p_refresh_seconds is null then null else now()+make_interval(secs=>p_refresh_seconds) end,
+    refresh_hard_expires_at=case when p_hard_seconds is null then q.refresh_hard_expires_at else now()+make_interval(secs=>p_hard_seconds) end,
+    updated_at=now() where q.brewery_id=p_brewery and q.id=p_connection and exists(select 1 from changed)
+ ) select coalesce((select true from changed),false)
+$$;
+
+create function public.begin_qbo_disconnect(p_brewery uuid,p_connection uuid,p_actor uuid,p_request_id uuid)
+returns table(refresh_token text) language plpgsql security definer set search_path='' as $$
+begin
+ if not exists(select 1 from public.brewery_users where brewery_id=p_brewery and user_id=p_actor and role='admin') then raise exception 'permission denied'; end if;
+ update public.qbo_connections q set state='disconnected',remote_revocation_state='unresolved',updated_at=now()
+ where q.brewery_id=p_brewery and q.id=p_connection and q.state='connected';
+ if not found then raise exception 'connection not available'; end if;
+ return query delete from private.integration_tokens t where t.brewery_id=p_brewery and t.provider='qbo' and t.connection_id=p_connection returning t.refresh_token;
+ insert into private.qbo_connection_events(brewery_id,connection_id,kind) values(p_brewery,p_connection,'disconnected');
+end $$;
+
+create function public.finish_qbo_disconnect(p_brewery uuid,p_connection uuid,p_actor uuid,p_revoked boolean)
+returns boolean language sql security definer set search_path='' as $$
+ with changed as (update public.qbo_connections q set remote_revocation_state=case when p_revoked then 'confirmed' else 'unresolved' end,last_error=case when p_revoked then null else 'Remote revocation could not be confirmed' end,updated_at=now()
+ where q.brewery_id=p_brewery and q.id=p_connection and q.state='disconnected' and exists(select 1 from public.brewery_users u where u.brewery_id=p_brewery and u.user_id=p_actor and u.role='admin') returning true), event as
+ (insert into private.qbo_connection_events(brewery_id,connection_id,kind,detail) select p_brewery,p_connection,'remote_revocation_unresolved','Remote revocation could not be confirmed' from changed where not p_revoked)
+ select coalesce((select true from changed),false)
+$$;
+
+grant execute on function public.begin_qbo_oauth(uuid,text,text,text,uuid) to authenticated;
+grant execute on function public.claim_qbo_oauth(text,uuid,uuid,text),public.fail_qbo_oauth(uuid,uuid),
+ public.complete_qbo_oauth(uuid,uuid,text,text,text,text,int,int,int),
+ public.cas_integration_tokens(uuid,text,uuid,uuid,bigint,text,text,int,int,int),
+ public.begin_qbo_disconnect(uuid,uuid,uuid,uuid),public.finish_qbo_disconnect(uuid,uuid,uuid,boolean) to service_role;
+
+create function private.purge_qbo_identity() returns trigger language plpgsql security definer set search_path='' as $$
+begin
+ if old.realm_id is distinct from new.realm_id or old.id is distinct from new.id then
+  update public.customers set qbo_customer_id=null where brewery_id=old.brewery_id;
+  update public.skus set qbo_item_id=null where brewery_id=old.brewery_id;
+  update public.invoices set qbo_invoice_id=null,qbo_sync_status='pending',qbo_sync_error=null,qbo_tax_cents=null,qbo_total_cents=null,qbo_balance_cents=null where brewery_id=old.brewery_id;
+ end if; return new;
+end $$;
+revoke execute on function private.purge_qbo_identity() from public,anon,authenticated,service_role;
+create trigger qbo_connections_identity_purge_mappings after update of id,realm_id on qbo_connections for each row execute function private.purge_qbo_identity();
 
 -- A reconnect replaces the concrete external connection. Delete purges always;
 -- guarded updates purge only on an actual identity or tenant-key change, so a
@@ -8974,3 +9110,4 @@ grant execute on function get_taproom_variance(uuid,uuid,integer),get_taproom_dr
 -- transport-only exception. It accepts no caller-controlled identity or limit.
 revoke all on function public.consume_command_admission() from public, anon, authenticated, service_role;
 grant execute on function public.consume_command_admission() to authenticated;
+grant execute on function public.begin_qbo_oauth(uuid,text,text,text,uuid) to authenticated;

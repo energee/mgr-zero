@@ -10,12 +10,26 @@ export interface ServerEnv extends PublicEnv {
   vercelEnv?: "production" | "preview" | "development";
 }
 
+export interface QboEnv {
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+}
+
 type Environment = Record<string, string | undefined>;
 
 function required(env: Environment, name: string) {
   const value = env[name]?.trim();
   if (!value) throw new Error(`Missing required environment variable: ${name}`);
   return value;
+}
+
+export function readQboEnv(env: Environment = process.env): QboEnv {
+  return {
+    clientId: required(env, "QBO_CLIENT_ID"),
+    clientSecret: required(env, "QBO_CLIENT_SECRET"),
+    redirectUri: required(env, "QBO_REDIRECT_URI"),
+  };
 }
 
 export function readServerEnv(env: Environment = process.env): ServerEnv {

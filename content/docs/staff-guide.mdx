@@ -570,6 +570,8 @@ Admin opens **Team** from **Settings**. Each member shows as an **@handle** (the
 
 Admin opens **Settings** from **More** to edit the brewery's basics in one form: **Brewery name**, **Timezone** (a zone name MGR knows, such as America/New_York), **TTB registry number**, **PA license**, the **Customer-facing phone** the portal prints when online payment is unavailable, and **Reading overdue after (hours)**, which sets when a fermentation reading counts as overdue on Today. **Save brewery** writes them together. Below the form, rows open **Locations**, **Team**, **Chat**, and **Import**. Source water, Accounting, and Point of sale stay locked until their areas are built.
 
+QuickBooks connection setup requires the server-only `QBO_CLIENT_ID`, `QBO_CLIENT_SECRET`, and exact registered `QBO_REDIRECT_URI`. Only Admin can connect, reconnect, inspect connection health, or disconnect. A disconnect stops local work and removes the local credential before MGR attempts remote revocation. If Intuit is unavailable, health says the connection is disconnected and remote revocation is unresolved; reconnect creates a fresh connection. If an OAuth exchange outcome is unknown, MGR reports QuickBooks unavailable and requires a fresh reconnect instead of replaying the one-time code.
+
 ## No access [#no-access]
 
 <Screen name="Permission denied" />
