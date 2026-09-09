@@ -8,6 +8,8 @@ import { invoiceCurrentState } from "@/lib/mgr/invoice-state";
 import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
 import { toPortalInvoiceViewProps } from "@/lib/mgr/portal-invoice-view";
 import { toPortalInvoicesViewProps } from "@/lib/mgr/portal-invoices-view";
+import { toPortalOrderViewProps } from "@/lib/mgr/portal-order-view";
+import { portalOrderShipped } from "@/lib/mgr/fixtures/portal-orders";
 import { admin, makeBrewery, makeStaffCtx, seedCustomer, sql } from "./helpers";
 
 const config = {
@@ -136,6 +138,42 @@ describe("QuickBooks current invoice state", () => {
     await syncQboInvoices(f.ctx, crypto.randomUUID(), client);
     expect(sql(`select qbo_sync_token || '|' || qbo_accountant_drift::text from invoices where id='${f.invoice.id}'`))
       .toEqual(["11|true"]);
+  });
+
+  it("renders the authoritative synced total across staff and portal current views", () => {
+    const invoice = {
+      id: "invoice-edited", invoice_no: 42, kind: "invoice" as const,
+      issued_on: "2026-09-09", due_on: "2026-10-09", paid_at: null,
+      qbo_remote_state: "live" as const, qbo_total_cents: 10500, qbo_tax_cents: 500,
+      qbo_balance_cents: 10500, qbo_accountant_drift: true, written_off_at: null,
+      customers: { name: "Buyer" },
+    };
+    const lines = [{
+      id: "line-1", qty: 1, unit_price_cents: 10000, amount_cents: 10000,
+      description: "Frozen local line", skus: null,
+    }];
+    expect(toInvoiceViewProps({ invoice, lines, questions: [] })).toMatchObject({
+      total: "$105.00", summary: expect.stringContaining("edited in QuickBooks"),
+    });
+    expect(toPortalInvoiceViewProps({
+      invoice: { ...invoice, total_cents: 10000 }, lines: [{ ...lines[0], kind: "adjustment" }],
+      brewery: { name: "Brewery", customer_phone: null },
+    })).toMatchObject({ total: "$105.00", payable: true, paid: false });
+    expect(toPortalInvoicesViewProps({
+      customerName: "Buyer", invoices: [{ ...invoice, invoice_lines: [{ amount_cents: 10000 }] }],
+    }).rows[0]).toMatchObject({ total: "$105.00", unpaid: true });
+    expect(toPortalOrderViewProps({
+      ...portalOrderShipped,
+      shipment: { id: "shipment-1", invoices: [{ ...invoice, invoice_lines: [{ amount_cents: 10000 }] }] },
+    }).invoice).toMatchObject({ amount: "$105.00", detail: "unpaid", paid: false });
+
+    const local = { ...invoice, qbo_total_cents: null, qbo_accountant_drift: false };
+    expect(toInvoiceViewProps({ invoice: local, lines, questions: [] }).total).toBe("$100.00");
+    const paid = { ...invoice, paid_at: "2026-09-10T12:00:00Z", qbo_balance_cents: 0 };
+    expect(toPortalInvoiceViewProps({
+      invoice: { ...paid, total_cents: 10000 }, lines: [{ ...lines[0], kind: "adjustment" }],
+      brewery: { name: "Brewery", customer_phone: null },
+    })).toMatchObject({ total: "$105.00", payable: false, paid: true });
   });
 
   it("applies a fetched batch atomically and replays its frozen target set without provider calls", async () => {
