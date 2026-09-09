@@ -76,6 +76,7 @@ import { PackagingRunsView } from "@/components/mgr/views/packaging-runs";
 import { ParsView } from "@/components/mgr/views/pars";
 import { PickView } from "@/components/mgr/views/pick";
 import { PickSheetView } from "@/components/mgr/views/pick-sheet";
+import { PlanningView } from "@/components/mgr/views/planning";
 import { PortalAccountView } from "@/components/mgr/views/portal-account";
 import { PortalInvoiceView } from "@/components/mgr/views/portal-invoice";
 import { PortalInvoicesView } from "@/components/mgr/views/portal-invoices";
@@ -162,6 +163,7 @@ import {
 } from "@/lib/mgr/fixtures/purchasing";
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger } from "@/lib/mgr/fixtures/kegs";
 import { packagingRuns, repackCase, schedulePackagingRun } from "@/lib/mgr/fixtures/packaging";
+import { planningDemo } from "@/lib/mgr/fixtures/planning";
 import { confirmDeliveryStop1, driverRouteA, returnRouteA, routeAPlan, routesDriver } from "@/lib/mgr/fixtures/delivery";
 import {
   brandApprovalStout, complianceMonthsDemo, complianceRegistryDemo, licensePaBrewery, lotTraceHazy, stateRegistrationHazy,
@@ -236,6 +238,7 @@ import { toRecordMovementViewProps } from "@/lib/mgr/record-movement-view";
 import { toRunClosedViewProps } from "@/lib/mgr/run-closed-view";
 import { toScheduleBatchViewProps } from "@/lib/mgr/schedule-batch-view";
 import { toPackagingRunsViewProps } from "@/lib/mgr/packaging-runs-view";
+import { toPlanningViewProps } from "@/lib/mgr/planning-view";
 import { toRepackViewProps } from "@/lib/mgr/repack-view";
 import { toSchedulePackagingRunViewProps } from "@/lib/mgr/schedule-packaging-run-view";
 import { toReverseMovementViewProps } from "@/lib/mgr/reverse-movement-view";
@@ -2513,17 +2516,7 @@ export const SCREENS: Screen[] = [
     writes: "draft_purchase_order_from_requirements [one RPC: one draft PO per resolved vendor + lines; the buy-by date is needed-by less the vendor's lead time]",
     states: [["gap", "demand exceeds supply in that week · the only actionable row"], ["covered", "supply meets demand · shown so the horizon reads continuously"], ["one vendor", "the whole shortfall resolves to a single supplier · the verb is singular"], ["several vendors", "a bill of materials spans suppliers · one draft each, named before the verb commits"], ["partly unbuyable", "the slowest supplier is already past its buy-by date · its lines are drawn out of reach, the rest still draft", 1], ["no vendor", "no contract and no default supplier on the material · the row cannot draft", 1], ["empty", "nothing planned and nothing ordered"]],
     spec: "The three columns are defined so the gap is arithmetic rather than judgement. Demand is confirmed and submitted order lines by requested ship week, plus taproom pars; supply is on-hand availability plus the planned outputs of packaging runs already scheduled into that week, less anything already on an open purchase order. That last term is what stops a gap being ordered twice, and it is the mirror of the rule that an unreceived order never inflates what a packaging run believes it has. The horizon runs as far ahead as the slowest supplier behind the shortfall can still be acted on: a gap nobody can still buy for is a report, not a plan. A shortfall is summed per material first and resolved to a supplier second, so a material whose supplier changes mid-horizon does not fragment into two half-orders. Resolution is the active contract for that material, then the material’s default supplier, and otherwise the row cannot draft. Because an order carries one supplier, one shortfall becomes one draft per supplier, and the verb says how many before it commits. Quantities are the gap rounded up to the purchase unit, since nobody buys part of a bag. Lead time belongs to the supplier, not the material, so the buy-by date is the slowest of the suppliers a bill of materials resolves to: cans at three days stay orderable on a run whose labels at seven days no longer are. Nothing here ranks or prioritises, in keeping with Pars and allocation: every change stays a named quantity.",
-    body: (<>
-      {E.back("More", "Planning")}
-      {E.tbl(["week", "demand", "supply", "gap"], [["9/7", "48 bbl", "40 bbl", <><span className="text-warning-foreground">−8</span></>], ["9/14", "52 bbl", "60 bbl", "+8"]])}
-      {E.row("Sept 12 packaging", "short 480 ends · buy by 9/5", E.act("Review"), "w")}
-      {E.row("Hazy ATP negative 9/9", "open named shortfall", E.act("Review"))}
-      {E.ttl("Drafts this creates")}
-      {E.row("Lindenmeyr Munroe", "cans, ends, quadpacks, trays · 3 day lead", "4 lines")}
-      {E.row("Blue Label", "labels · 7 day lead · past the buy-by date", "out of reach", "w")}
-      {E.info("Labels can no longer arrive for the 9/7 week, so that line is left out. The four Lindenmeyr lines still draft.")}
-      {E.btn("Draft 1 purchase order")}
-    </>),
+    body: <PlanningView model={toPlanningViewProps(planningDemo)} />,
   },
   {
     step: 8,
