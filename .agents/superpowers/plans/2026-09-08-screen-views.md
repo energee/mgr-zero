@@ -1,7 +1,7 @@
 # Screen views — convert every MGR drawing to one component
 
 Date: 2026-09-08
-Status: In progress (packs 0–13 done; Monthly compliance remains)
+Status: Complete (packs 0–14 done; gated drawings wait for their live programs)
 Worktree: `.agents/worktrees/screen-view-compliance`
 
 **Goal:** The inventory record and the live page cannot drift. One view owns the drawing; a mock feeds `/docs/screens`; an adapter feeds the app.
@@ -68,6 +68,7 @@ Counts are `SCREEN_ROUTES` rows (live or parity-mapped). Order is 1 of ~110. Gat
 | 11 | **Compliance (done)** | `views/compliance/` | Compliance months, Compliance registry, Brand approval, State registration, License, Lot trace | Program 9 pages |
 | 12 | **Packaging (done)** | `views/` | Packaging runs, Schedule packaging run, Repack | Existing list plus controlled live form slots |
 | 13 | **Planning (done)** | `views/` | Planning | Live material requirements plus optional fixture-only horizon |
+| 14 | **Monthly compliance (done)** | `views/` | Monthly compliance | Live report/loss layout with controlled mutation slots |
 
 ### Convert with the program that ungates them (not now)
 
@@ -81,7 +82,7 @@ Do not pre-extract these. When that program ships the live page, the page **is**
 | 14 Square / menu | Point of sale, Connect Square, locations, connector, Menu, POS item / mapping / sale detail, Taproom sale, Refund |
 | 15 Composer | Composer proposal / question / answer, Offline outbox |
 | 16 Chat | Chat disconnected / settings, Linked people, Link Slack, Disconnect Slack, Reauthorization |
-| later | Mash / fermentation / water schedule sheets, Coming up, Monthly compliance, Keg report, Water profiles |
+| gated later | Mash / fermentation / water schedule sheets, Coming up, Keg report, Water profiles |
 
 ### Never
 

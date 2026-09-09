@@ -22,6 +22,8 @@ describe("Monthly compliance view", () => {
     const model = toMonthlyComplianceViewProps(monthlyComplianceAugust);
     const fixture = htmlOf(createElement(MonthlyComplianceView, { model }));
     expect(fixture).not.toMatch(/href="\/compliance/);
+    expect(fixture).toMatch(/0\.05741935 bbl/);
+    expect(fixture).toMatch(/Destination PA · prior allocation/);
     expect(htmlOf(createElement(MonthlyComplianceView, { model, lossAction: () => null, fileAction: null }))).not.toMatch(/Reattribute loss|Save filed snapshot/);
   });
 
