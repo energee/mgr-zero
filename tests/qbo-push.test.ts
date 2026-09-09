@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { Client } from "pg";
 import { describe, expect, it, vi } from "vitest";
 import { completeQboOAuth, pushInvoiceToQbo, QboOAuthClient } from "@/lib/qbo";
 import {
@@ -8,7 +9,7 @@ import {
   failQboOAuth,
   readVersionedIntegrationTokens,
 } from "@/lib/supabase/integration-tokens";
-import { admin, makeBrewery, makeCustomerUser, makeStaffCtx, priceSku, seedCatalog, seedCustomer, sql } from "./helpers";
+import { admin, DB, makeBrewery, makeCustomerUser, makeStaffCtx, priceSku, seedCatalog, seedCustomer, sql } from "./helpers";
 
 const config = {
   clientId: "client-id",
@@ -219,6 +220,58 @@ describe("QuickBooks durable outbound push", () => {
     });
     expect(finish.error?.code).toBe("MG409");
     expect(sql(`select status from public.qbo_pushes where id='${started.data.pushId}'`)).toEqual(["pending"]);
+  });
+
+  it("serializes finish with realm replacement so the old remote identity cannot return after purge", async () => {
+    const f = await pushFixture("invoice", "admin");
+    const started = await f.ctx.db.rpc("start_qbo_push", {
+      p_brewery: f.brewery.id, p_invoice: f.invoice.id, p_new_attempt_reason: null, p_request_id: crypto.randomUUID(),
+    });
+    expect(started.error).toBeNull();
+    const suffix = crypto.randomUUID().replaceAll("-", "");
+    const delayFunction = `delay_qbo_finish_${suffix}`;
+    const delayTrigger = `delay_qbo_finish_${suffix}`;
+    const finishClient = new Client({ connectionString: DB });
+    const replaceClient = new Client({ connectionString: DB });
+    await Promise.all([finishClient.connect(), replaceClient.connect()]);
+    const completionOrder: string[] = [];
+    try {
+      await replaceClient.query(`create function private.${delayFunction}() returns trigger language plpgsql set search_path='' as $$
+        begin perform pg_catalog.pg_sleep(0.5); return new; end $$`);
+      await replaceClient.query(`create trigger ${delayTrigger} before update on public.qbo_pushes
+        for each row when (old.id='${started.data.pushId}'::uuid) execute function private.${delayFunction}()`);
+      await finishClient.query("set application_name='qbo_finish_lock_regression'");
+      const finishing = finishClient.query(
+        "select public.finish_qbo_push($1,$2,$3,$4,$5,$6,$7::jsonb,$8)",
+        [f.brewery.id, started.data.pushId, f.ctx.userId, "pushed", "old-realm-remote", null,
+          JSON.stringify({ Id: "old-realm-remote", SyncToken: "0" }), started.data.finishRequestId],
+      ).then(() => { completionOrder.push("finish"); });
+      let sleeping = false;
+      for (let attempt = 0; attempt < 50; attempt += 1) {
+        const activity = await replaceClient.query(
+          "select wait_event from pg_catalog.pg_stat_activity where application_name='qbo_finish_lock_regression'",
+        );
+        if (activity.rows[0]?.wait_event === "PgSleep") { sleeping = true; break; }
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      expect(sleeping).toBe(true);
+      const replacementId = crypto.randomUUID();
+      const replacementRealm = `replacement-${f.realm}`;
+      const replacing = replaceClient.query(
+        "update public.qbo_connections set id=$1,realm_id=$2 where brewery_id=$3",
+        [replacementId, replacementRealm, f.brewery.id],
+      ).then(() => { completionOrder.push("replace"); });
+      await Promise.all([finishing, replacing]);
+
+      expect(completionOrder).toEqual(["finish", "replace"]);
+      expect(sql(`select id::text || '|' || realm_id from public.qbo_connections where brewery_id='${f.brewery.id}'`))
+        .toEqual([`${replacementId}|${replacementRealm}`]);
+      expect(sql(`select coalesce(qbo_invoice_id,'NULL') from public.invoices where id='${f.invoice.id}'`)).toEqual(["NULL"]);
+    } finally {
+      await replaceClient.query(`drop trigger if exists ${delayTrigger} on public.qbo_pushes`);
+      await replaceClient.query(`drop function if exists private.${delayFunction}()`);
+      await Promise.all([finishClient.end(), replaceClient.end()]);
+    }
   });
 
   it("uses CreditMemo with positive frozen quantities and refuses unsupported or unmapped lines before fetch", async () => {
