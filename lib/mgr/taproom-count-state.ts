@@ -18,6 +18,8 @@ export type TaproomCountSnapshot = {
   lines: TaproomCountSnapshotLine[];
 };
 
+type CapturedPriorCount = TaproomCountSnapshot["prior_count"];
+
 export type TaproomCountInput = {
   locationId: string;
   countedOn: string;
@@ -43,7 +45,7 @@ type FrozenAttempt = { kind: "submitting" | "unknown"; requestId: string; payloa
 type CountAttempt = FrozenAttempt | { kind: "idle" } | { kind: "stale" | "error"; message: string };
 
 export type TaproomCountState = {
-  draft: { locationId: string; countedOn: string; revision: string; lines: CountDraftLine[] };
+  draft: { locationId: string; countedOn: string; priorCount: CapturedPriorCount; revision: string; lines: CountDraftLine[] };
   projection: unknown;
   attempt: CountAttempt;
 };
@@ -52,10 +54,11 @@ const bucketKey = (line: Pick<TaproomCountSnapshotLine, "bin_id" | "sku_id" | "l
   `${line.bin_id}:${line.sku_id}:${line.lot_id ?? "untracked"}`;
 
 export function countDraftFromSnapshot(snapshot: TaproomCountSnapshot, projection: unknown): TaproomCountState {
-  return {
+  const state: TaproomCountState = {
     draft: {
       locationId: snapshot.location_id,
       countedOn: snapshot.counted_on,
+      priorCount: snapshot.prior_count,
       revision: snapshot.revision,
       lines: snapshot.lines.map((line) => ({
         key: bucketKey(line), binId: line.bin_id, binName: line.bin_name, skuId: line.sku_id, skuName: line.sku_name,
@@ -66,14 +69,34 @@ export function countDraftFromSnapshot(snapshot: TaproomCountSnapshot, projectio
     projection,
     attempt: { kind: "idle" },
   };
+  return projectionMatchesCountDraft(state) ? state : { ...state, attempt: { kind: "stale", message: "A newer saved count changed the comparison baseline. Start a fresh recount." } };
 }
 
 export function updateCountQuantity(state: TaproomCountState, key: string, quantity: string): TaproomCountState {
-  if (state.attempt.kind === "unknown" || state.attempt.kind === "submitting") return state;
+  if (state.attempt.kind === "unknown" || state.attempt.kind === "submitting" || state.attempt.kind === "stale") return state;
   return { ...state, attempt: { kind: "idle" }, draft: { ...state.draft, lines: state.draft.lines.map((line) => line.key === key ? { ...line, quantity } : line) } };
 }
 
-export const replaceCountProjection = (state: TaproomCountState, projection: unknown): TaproomCountState => ({ ...state, projection });
+type ProjectionPrior = { id: string; counted_on: string } | null;
+
+function declaredProjectionPrior(projection: unknown): { declared: boolean; prior: ProjectionPrior } {
+  if (typeof projection !== "object" || projection === null || !("prior_count" in projection)) return { declared: false, prior: null };
+  return { declared: true, prior: (projection as { prior_count: ProjectionPrior }).prior_count };
+}
+
+export function projectionMatchesCountDraft(state: TaproomCountState): boolean {
+  const projected = declaredProjectionPrior(state.projection);
+  if (!projected.declared) return true;
+  const captured = state.draft.priorCount;
+  return captured === null ? projected.prior === null
+    : projected.prior?.id === captured.id && projected.prior.counted_on === captured.counted_on;
+}
+
+export function replaceCountProjection(state: TaproomCountState, projection: unknown): TaproomCountState {
+  const next = { ...state, projection };
+  if (state.attempt.kind === "unknown" || state.attempt.kind === "submitting" || projectionMatchesCountDraft(next)) return next;
+  return { ...next, attempt: { kind: "stale", message: "A newer saved count changed the comparison baseline. Start a fresh recount." } };
+}
 
 type ProjectionForComparison = {
   coverage_complete?: boolean;
@@ -91,6 +114,7 @@ export type CountBrandComparison = {
 };
 
 export function countBrandComparison(state: TaproomCountState): CountBrandComparison[] {
+  if (!projectionMatchesCountDraft(state)) return [];
   const projection = (state.projection ?? {}) as ProjectionForComparison;
   const projected = new Map((projection.rows ?? []).map((row) => [row.brand_id, row]));
   const grouped = new Map<string, { brandName: string; actualBbl: number; complete: boolean }>();

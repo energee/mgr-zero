@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +14,7 @@ import {
   countDraftFromSnapshot,
   failCountAttempt,
   projectionExpectedText,
+  projectionMatchesCountDraft,
   replaceCountProjection,
   replaceCountSnapshot,
   updateCountQuantity,
@@ -42,19 +44,32 @@ const stale = (error: unknown) => error instanceof CommandResponseError && error
 
 const bbl = (value: number | null) => value === null ? "—" : `${Number(value).toLocaleString("en-US", { maximumFractionDigits: 4 })} bbl`;
 
-function Projection({ projection, comparison, busy, error, refresh }: { projection: DraftProjection; comparison: ReturnType<typeof countBrandComparison>; busy: boolean; error: string | null; refresh: () => void }) {
+function Projection({ projection, comparison, priorCount, locationId, aligned, locked, recoveryPending, busy, error, refresh }: {
+  projection: DraftProjection;
+  comparison: ReturnType<typeof countBrandComparison>;
+  priorCount: TaproomCountSnapshot["prior_count"];
+  locationId: string;
+  aligned: boolean;
+  locked: boolean;
+  recoveryPending: boolean;
+  busy: boolean;
+  error: string | null;
+  refresh: () => void;
+}) {
   const expected = projectionExpectedText(projection);
   return <section aria-labelledby="expected-heading" className="rounded-xl border bg-muted/20 p-4">
     <div className="flex flex-wrap items-start justify-between gap-2">
       <div>
         <h2 id="expected-heading" className="font-semibold">Expected consumption</h2>
         <p className="text-sm text-muted-foreground">
-          {projection.starts_at ? `${new Date(projection.starts_at).toLocaleString()} through ${new Date(projection.as_of).toLocaleString()}` : "Starts after the first saved count"}
+          {priorCount ? <>Captured prior · <Link className="underline" href={`/taproom?location=${locationId}&count=${priorCount.id}`}>{priorCount.counted_on}</Link> · <span className="break-all">{priorCount.id}</span></> : "Captured prior · first count"}
         </p>
+        {aligned && <p className="text-sm text-muted-foreground">{projection.starts_at ? `${new Date(projection.starts_at).toLocaleString()} through ${new Date(projection.as_of).toLocaleString()}` : "Expected comparison starts after the first saved count"}</p>}
       </div>
-      <Button type="button" size="sm" variant="outline" disabled={busy} onClick={refresh}>{busy ? "Refreshing…" : "Refresh expected"}</Button>
+      <Button type="button" size="sm" variant="outline" disabled={busy || locked || !aligned} onClick={refresh}>{busy ? "Refreshing…" : "Refresh expected"}</Button>
     </div>
-    {expected ? <p className="mt-3 text-2xl font-semibold">{expected}</p> : <p className="mt-3 text-sm">Expected consumption unavailable · {(projection.reason ?? "no usable POS observation").replaceAll("_", " ")}</p>}
+    {!aligned ? <p className="mt-3 text-sm text-warning-foreground">Expected comparison unavailable because a newer saved count changed its baseline. {recoveryPending ? "Recover the frozen submission before starting a fresh recount." : "Start a fresh recount."}</p>
+      : expected ? <p className="mt-3 text-2xl font-semibold">{expected}</p> : <p className="mt-3 text-sm">Expected consumption unavailable · {(projection.reason ?? "no usable POS observation").replaceAll("_", " ")}</p>}
     {comparison.length > 0 && <div aria-label="Draft brand comparison" className="mt-4 grid gap-2">
       {comparison.map((row) => <div key={row.brandId} className="rounded-lg border bg-background/60 p-3">
         <p className="font-medium">{row.brandName}</p>
@@ -66,7 +81,7 @@ function Projection({ projection, comparison, busy, error, refresh }: { projecti
       </div>)}
       <p className="text-xs text-muted-foreground">Draft actual is an estimate from this snapshot&apos;s package volumes. Expected minus actual is a comparison only; the saved receipt is authoritative.</p>
     </div>}
-    {(projection.unmapped_lines > 0 || projection.ignored_lines > 0 || Number(projection.excluded_bbl) > 0 || Number(projection.unattributed_bbl) > 0) &&
+    {aligned && (projection.unmapped_lines > 0 || projection.ignored_lines > 0 || Number(projection.excluded_bbl) > 0 || Number(projection.unattributed_bbl) > 0) &&
       <p className="mt-3 text-xs text-muted-foreground">Coverage {projection.coverage_complete ? "complete" : "incomplete"} · {projection.unmapped_lines} unmapped · {projection.ignored_lines} ignored · {Number(projection.excluded_bbl)} bbl excluded · {Number(projection.unattributed_bbl)} bbl unattributed</p>}
     <CommandFormMessage error={error} />
   </section>;
@@ -83,9 +98,10 @@ export function TaproomCountForm({ breweryId, snapshot, projection, lotLabels, r
   const [state, setState] = useState(() => countDraftFromSnapshot(snapshot, projection));
   const [projectionBusy, setProjectionBusy] = useState(false);
   const [projectionError, setProjectionError] = useState<string | null>(null);
-  const frozen = state.attempt.kind === "unknown" || state.attempt.kind === "submitting";
+  const locked = state.attempt.kind === "unknown" || state.attempt.kind === "submitting" || state.attempt.kind === "stale";
   const tracked = state.draft.lines.filter((line) => line.lotId !== null);
   const comparison = countBrandComparison(state);
+  const projectionAligned = projectionMatchesCountDraft(state);
 
   async function refreshProjection() {
     setProjectionBusy(true); setProjectionError(null);
@@ -121,7 +137,7 @@ export function TaproomCountForm({ breweryId, snapshot, projection, lotLabels, r
   }
 
   return <>
-    <Projection projection={state.projection as DraftProjection} comparison={comparison} busy={projectionBusy} error={projectionError} refresh={refreshProjection} />
+    <Projection projection={state.projection as DraftProjection} comparison={comparison} priorCount={state.draft.priorCount} locationId={state.draft.locationId} aligned={projectionAligned} locked={locked} recoveryPending={state.attempt.kind === "unknown" || state.attempt.kind === "submitting"} busy={projectionBusy} error={projectionError} refresh={refreshProjection} />
     <form onSubmit={submit} className="flex flex-col gap-4" aria-labelledby="count-heading">
       <div>
         <h2 id="count-heading" className="text-lg font-semibold">Count every stock bucket</h2>
@@ -134,7 +150,7 @@ export function TaproomCountForm({ breweryId, snapshot, projection, lotLabels, r
         const lot = line.lotId ? (role === "taproom" ? `Tracked worksheet row ${worksheet}` : `Lot ${lotLabels[line.key] ?? "label unavailable"} · worksheet row ${worksheet}`) : "Untracked stock";
         return <div key={line.key} className="grid gap-2 rounded-xl border p-3 md:grid-cols-[1fr_8rem] md:items-end">
           <div><p className="font-medium">{line.skuName}</p><p className="text-sm text-muted-foreground">{line.binName} · {lot} · recorded {line.qtyBefore}</p></div>
-          <div className="flex flex-col gap-1"><Label htmlFor={`count-${index}`}>Remaining units</Label><Input id={`count-${index}`} inputMode="numeric" type="number" min="0" max={line.qtyBefore} step="1" value={line.quantity} disabled={frozen} aria-invalid={state.attempt.kind === "error" ? true : undefined} onChange={(event) => setState((current) => updateCountQuantity(current, line.key, event.target.value))} required /></div>
+          <div className="flex flex-col gap-1"><Label htmlFor={`count-${index}`}>Remaining units</Label><Input id={`count-${index}`} inputMode="numeric" type="number" min="0" max={line.qtyBefore} step="1" value={line.quantity} disabled={locked} aria-invalid={state.attempt.kind === "error" ? true : undefined} onChange={(event) => setState((current) => updateCountQuantity(current, line.key, event.target.value))} required /></div>
         </div>;
       })}
       {state.attempt.kind === "unknown" && <CommandFormMessage tone="warning">No trustworthy response arrived. The request ID and every quantity are frozen. Retry this unchanged count to recover its original result.</CommandFormMessage>}

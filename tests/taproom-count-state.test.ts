@@ -4,6 +4,7 @@ import {
   countBrandComparison,
   countDraftFromSnapshot,
   failCountAttempt,
+  projectionMatchesCountDraft,
   projectionExpectedText,
   replaceCountProjection,
   replaceCountSnapshot,
@@ -49,6 +50,18 @@ describe("taproom count controlled state", () => {
     state = beginCountAttempt(state, "00000000-0000-4000-8000-000000000006");
     const frozen = state.attempt;
     state = failCountAttempt(state, "unknown", "No response received");
+    const unknown = state.attempt;
+    state = replaceCountProjection(state, {
+      expected_bbl: 1,
+      prior_count: {
+        id: "00000000-0000-4000-8000-000000000099",
+        counted_on: "2026-09-08",
+        created_at: "2026-09-08T23:00:00Z",
+      },
+    });
+
+    expect(projectionMatchesCountDraft(state)).toBe(false);
+    expect(state.attempt).toEqual(unknown);
     state = updateCountQuantity(state, state.draft.lines[0].key, "1");
     state = beginCountAttempt(state, "00000000-0000-4000-8000-000000000007");
 
@@ -61,12 +74,33 @@ describe("taproom count controlled state", () => {
     state = beginCountAttempt(state, "00000000-0000-4000-8000-000000000006");
     state = failCountAttempt(state, "stale", "Stock changed while you counted");
     expect(state.attempt).toMatchObject({ kind: "stale" });
+    const stale = state;
+    state = updateCountQuantity(state, state.draft.lines[0].key, "1");
+    expect(state).toBe(stale);
+    expect(state.attempt).toMatchObject({ kind: "stale" });
 
     const fresh = { ...snapshot, revision: "revision-two", lines: snapshot.lines.map((line) => ({ ...line, qty_before: 3 })) };
     state = replaceCountSnapshot(state, fresh);
     expect(state.attempt).toEqual({ kind: "idle" });
     expect(state.draft.revision).toBe("revision-two");
     expect(state.draft.lines.map((line) => line.quantity)).toEqual(["", ""]);
+  });
+
+  it("preserves the captured prior count through aligned projection refresh and rejects a newer baseline", () => {
+    const aligned = { prior_count: { ...snapshot.prior_count!, created_at: "2026-09-01T23:00:00Z" }, expected_bbl: 1, rows: [] };
+    let state = countDraftFromSnapshot(snapshot, aligned);
+    state = updateCountQuantity(state, state.draft.lines[0].key, "3");
+    state = replaceCountProjection(state, { ...aligned, expected_bbl: 2, as_of: "2026-09-08T22:00:00Z" });
+    expect(state.draft.priorCount).toEqual(snapshot.prior_count);
+    expect(state.draft.revision).toBe("revision-one");
+    expect(state.draft.lines[0].quantity).toBe("3");
+    expect(projectionMatchesCountDraft(state)).toBe(true);
+
+    state = replaceCountProjection(state, { ...aligned, prior_count: { id: "00000000-0000-4000-8000-000000000099", counted_on: "2026-09-08", created_at: "2026-09-08T23:00:00Z" } });
+    expect(projectionMatchesCountDraft(state)).toBe(false);
+    expect(state.attempt).toMatchObject({ kind: "stale" });
+    expect(state.draft.priorCount).toEqual(snapshot.prior_count);
+    expect(state.draft.lines[0].quantity).toBe("3");
   });
 
   it("requires every bucket explicitly and refuses fractions and overcounts before a request exists", () => {
