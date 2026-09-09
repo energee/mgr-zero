@@ -523,9 +523,16 @@ proves that root is referenced by exactly one completed batch and belongs to tha
 occupancy scope. Nonphysical rows do not change `occupancy_volumes`; all other adjustment
 rows do. No update/delete or application/service insert is permitted.
 
-**SCHEMA-GATE — re-attribution only:** the typed completion root is implemented, but the
-append-only reclassification allocation and reciprocal legs, loss-review command, and
-cellar-removal compliance projection remain the separate Program 12 T4d contract.
+`volume_adjustment_reclassifications` is the append-only allocation ledger: tenant,
+source completion adjustment, positive finite at-most-eight-decimal BBL, target class,
+frozen tax/state, actor, and audit time. A source may have several partial allocations.
+Each allocation owns exactly two nonphysical `volume_adjustments` through
+`reclassification_id` plus `reverse | replacement`: an equal positive generic-loss
+reversal and negative target replacement. Immediate tenant-safe foreign keys and a
+deferred reciprocal graph check prove the root, source occupancy, brewery, signs,
+amount, class, tax, state, and exactly-two-leg shape. The same graph limits total
+allocations to the root. Neither application nor service roles can mutate either
+append-only table directly.
 
 ### `fermentation_readings`
 `occupancy_id, at timestamptz, temp_f numeric(5,1), ph numeric(4,2), gravity_plato
@@ -593,6 +600,11 @@ unique `(brewery_id, state, kind)`. Destination-state supplier registrations (OH
 filed_by, note`. unique `(brewery_id, jurisdiction, period_start, period_end)`. The
 ledger stays recomputable; this is the snapshot that was actually filed (decision).
 Report generators are code, not schema; CBMA rates are code (§14).
+Generated figures keep `removals` as the one additive filing total and expose
+`cellarRemovals` only as an explanatory breakdown. Signed reclassification legs post in
+their actual creation period. A nonzero direct-cellar Taproom amount exposes an external
+mapping requirement and blocks filing until that mapping is separately approved;
+existing `report_filings.figures` snapshots remain immutable.
 
 ## 12. Kegs (owned / leased / pay-per-fill fleets)
 

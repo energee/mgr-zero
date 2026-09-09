@@ -846,16 +846,30 @@ create table volume_adjustments (   -- ledger: cellar losses/dumps/gains
   tax_treatment tax_treatment,
   dest_state text,
   affects_occupancy boolean not null default true,
+  reclassification_id uuid,
+  reclassification_leg text check (reclassification_leg in ('reverse','replacement')),
   at timestamptz not null default now(),
   note text,
   created_by uuid not null references auth.users(id),
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
   constraint volume_adjustment_classification check (
-    (removal_class is null and reason in ('gain','measurement') and tax_treatment is null and dest_state is null)
+    (reclassification_id is null and reclassification_leg is null and removal_class is null
+      and reason in ('gain','measurement') and tax_treatment is null and dest_state is null)
     or
-    (bbl < 0 and removal_class is not null and reason in ('loss','dump')
+    (reclassification_id is null and reclassification_leg is null and bbl < 0 and removal_class is not null and reason in ('loss','dump')
       and (reason <> 'dump' or removal_class = 'destruction')
+      and case removal_class
+        when 'sample' then tax_treatment is null and dest_state is not null and dest_state ~ '^[A-Z]{2}$'
+        when 'taproom' then tax_treatment is not null and dest_state is null
+        else tax_treatment is null and dest_state is null
+      end)
+    or
+    (reclassification_id is not null and reclassification_leg = 'reverse' and bbl > 0
+      and reason = 'loss' and removal_class = 'loss' and tax_treatment is null and dest_state is null and not affects_occupancy)
+    or
+    (reclassification_id is not null and reclassification_leg = 'replacement' and bbl < 0
+      and reason = 'loss' and removal_class in ('sample','taproom','destruction') and not affects_occupancy
       and case removal_class
         when 'sample' then tax_treatment is null and dest_state is not null and dest_state ~ '^[A-Z]{2}$'
         when 'taproom' then tax_treatment is not null and dest_state is null
@@ -865,6 +879,33 @@ create table volume_adjustments (   -- ledger: cellar losses/dumps/gains
   foreign key (occupancy_id, brewery_id) references vessel_occupancies (id, brewery_id)
 );
 create index volume_adjustments_occ_idx on volume_adjustments (occupancy_id);
+
+create table volume_adjustment_reclassifications (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references breweries(id),
+  source_adjustment_id uuid not null,
+  bbl numeric not null check (bbl > 0 and bbl not in ('NaN'::numeric, 'Infinity'::numeric, '-Infinity'::numeric) and bbl = round(bbl, 8)),
+  target_class cellar_removal_class not null check (target_class in ('sample','taproom','destruction')),
+  tax_treatment tax_treatment,
+  dest_state text,
+  created_by uuid not null references auth.users(id),
+  created_at timestamptz not null default now(),
+  unique (id, brewery_id),
+  foreign key (source_adjustment_id, brewery_id) references volume_adjustments (id, brewery_id),
+  constraint volume_adjustment_reclassification_target check (
+    case target_class
+      when 'sample' then tax_treatment is null and dest_state is not null and dest_state ~ '^[A-Z]{2}$'
+      when 'taproom' then tax_treatment is not null and dest_state is null
+      else tax_treatment is null and dest_state is null
+    end)
+);
+create index volume_adjustment_reclassifications_brewery_idx on volume_adjustment_reclassifications (brewery_id);
+create index volume_adjustment_reclassifications_source_idx on volume_adjustment_reclassifications (source_adjustment_id);
+
+alter table volume_adjustments add constraint volume_adjustments_reclassification_fk
+  foreign key (reclassification_id, brewery_id) references volume_adjustment_reclassifications (id, brewery_id);
+alter table volume_adjustments add constraint volume_adjustments_reclassification_leg_unique
+  unique (reclassification_id, reclassification_leg);
 
 alter table batches add column completion_adjustment_id uuid;
 alter table batches add constraint batches_completion_adjustment_unique unique (completion_adjustment_id, brewery_id);
@@ -888,17 +929,33 @@ end $$;
 create trigger volume_adjustments_classification before insert or update on volume_adjustments
 for each row execute function private.enforce_cellar_removal();
 
+create function private.enforce_loss_reclassification_target() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if new.target_class = 'taproom' then
+    select sc.tax_treatment into new.tax_treatment from public.sale_channels sc
+      where sc.brewery_id = new.brewery_id and sc.system_code = 'taproom';
+    if new.tax_treatment is null then raise exception 'Taproom sale channel is required'; end if;
+  end if;
+  return new;
+end $$;
+create trigger volume_adjustment_reclassifications_target before insert or update on volume_adjustment_reclassifications
+for each row execute function private.enforce_loss_reclassification_target();
+
 -- Validate the reciprocal completion graph at commit. Checking OLD as well as
 -- NEW prevents a privileged pointer removal/repoint or occupancy reparent from
 -- orphaning a root or moving its anchor outside the completed batch's scope.
 create function private.enforce_completion_adjustment_graph() returns trigger
 language plpgsql security definer set search_path = '' as $$
 declare
-  v_adjustment uuid; v_adjustments uuid[]; v_batch uuid;
-  a public.volume_adjustments; b public.batches; n int;
+  v_adjustment uuid; v_adjustments uuid[] := array[]::uuid[]; v_batch uuid;
+  v_reclassification uuid; v_reclassifications uuid[] := array[]::uuid[];
+  a public.volume_adjustments; source public.volume_adjustments; reverse_leg public.volume_adjustments; replacement public.volume_adjustments;
+  b public.batches; r public.volume_adjustment_reclassifications; n int;
 begin
   if tg_table_name = 'volume_adjustments' then
     v_adjustments := array[old.id, new.id];
+    v_reclassifications := array[old.reclassification_id, new.reclassification_id];
   elsif tg_table_name = 'batches' then
     v_adjustments := array[
       nullif(to_jsonb(old)->>'completion_adjustment_id', '')::uuid,
@@ -907,6 +964,9 @@ begin
   elsif tg_table_name = 'vessel_occupancies' then
     select coalesce(array_agg(distinct adjustment.id), array[]::uuid[]) into v_adjustments
       from public.volume_adjustments adjustment where adjustment.occupancy_id in (old.id, new.id);
+  elsif tg_table_name = 'volume_adjustment_reclassifications' then
+    v_adjustments := array[old.source_adjustment_id, new.source_adjustment_id];
+    v_reclassifications := array[old.id, new.id];
   end if;
 
   foreach v_adjustment in array v_adjustments loop
@@ -915,16 +975,49 @@ begin
     select count(*) into n from public.batches where completion_adjustment_id = v_adjustment;
     if a.id is null then
       if n <> 0 then raise exception 'invalid batch completion adjustment graph'; end if;
-    elsif not a.affects_occupancy or n <> 0 then
-      if n <> 1 then raise exception 'invalid batch completion adjustment graph'; end if;
-      select * into b from public.batches where completion_adjustment_id = v_adjustment;
-      if b.id is null or b.closed_at is null or b.brewery_id <> a.brewery_id
-        or a.bbl >= 0 or a.reason <> 'loss' or a.removal_class <> 'loss'
-        or a.tax_treatment is not null or a.dest_state is not null or a.affects_occupancy
-        or not exists (select 1 from public.vessel_occupancies o
-          where o.id = a.occupancy_id and o.brewery_id = b.brewery_id and o.batch_id = b.id)
-      then raise exception 'invalid batch completion adjustment graph'; end if;
+    elsif not a.affects_occupancy or n <> 0 or a.reclassification_id is not null then
+      if a.reclassification_id is null then
+        if n <> 1 then raise exception 'invalid batch completion adjustment graph'; end if;
+        select * into b from public.batches where completion_adjustment_id = v_adjustment;
+        if b.id is null or b.closed_at is null or b.brewery_id <> a.brewery_id
+          or a.bbl >= 0 or a.reason <> 'loss' or a.removal_class <> 'loss'
+          or a.tax_treatment is not null or a.dest_state is not null or a.affects_occupancy
+          or not exists (select 1 from public.vessel_occupancies o
+            where o.id = a.occupancy_id and o.brewery_id = b.brewery_id and o.batch_id = b.id)
+          or coalesce((select sum(x.bbl) from public.volume_adjustment_reclassifications x where x.source_adjustment_id = a.id), 0) > -a.bbl
+        then raise exception 'invalid batch completion adjustment graph'; end if;
+        select coalesce(array_agg(x.id), array[]::uuid[]) into v_reclassifications
+          from (select unnest(v_reclassifications) id union select id from public.volume_adjustment_reclassifications where source_adjustment_id = a.id) x;
+      elsif n <> 0 then
+        raise exception 'invalid batch completion adjustment graph';
+      end if;
     end if;
+  end loop;
+
+  foreach v_reclassification in array v_reclassifications loop
+    if v_reclassification is null then continue; end if;
+    select * into r from public.volume_adjustment_reclassifications where id = v_reclassification;
+    select count(*) into n from public.volume_adjustments where reclassification_id = v_reclassification;
+    if r.id is null then
+      if n <> 0 then raise exception 'invalid loss reclassification graph'; end if;
+      continue;
+    end if;
+    select * into source from public.volume_adjustments where id = r.source_adjustment_id and brewery_id = r.brewery_id;
+    select * into reverse_leg from public.volume_adjustments where reclassification_id = r.id and reclassification_leg = 'reverse';
+    select * into replacement from public.volume_adjustments where reclassification_id = r.id and reclassification_leg = 'replacement';
+    if n <> 2 or source.id is null or reverse_leg.id is null or replacement.id is null
+      or source.reclassification_id is not null or source.affects_occupancy or source.bbl >= 0
+      or source.reason <> 'loss' or source.removal_class <> 'loss' or source.tax_treatment is not null or source.dest_state is not null
+      or (select count(*) from public.batches where completion_adjustment_id = source.id and brewery_id = r.brewery_id) <> 1
+      or reverse_leg.brewery_id <> r.brewery_id or replacement.brewery_id <> r.brewery_id
+      or reverse_leg.occupancy_id <> source.occupancy_id or replacement.occupancy_id <> source.occupancy_id
+      or reverse_leg.affects_occupancy or replacement.affects_occupancy
+      or reverse_leg.bbl <> r.bbl or replacement.bbl <> -r.bbl
+      or reverse_leg.reason <> 'loss' or reverse_leg.removal_class <> 'loss'
+      or reverse_leg.tax_treatment is not null or reverse_leg.dest_state is not null
+      or replacement.reason <> 'loss' or replacement.removal_class <> r.target_class
+      or replacement.tax_treatment is distinct from r.tax_treatment or replacement.dest_state is distinct from r.dest_state
+    then raise exception 'invalid loss reclassification graph'; end if;
   end loop;
 
   if tg_table_name = 'batches' then
@@ -952,6 +1045,9 @@ after insert or update or delete on batches deferrable initially deferred
 for each row execute function private.enforce_completion_adjustment_graph();
 create constraint trigger vessel_occupancies_completion_graph
 after update of batch_id on vessel_occupancies deferrable initially deferred
+for each row execute function private.enforce_completion_adjustment_graph();
+create constraint trigger volume_adjustment_reclassifications_completion_graph
+after insert or update or delete on volume_adjustment_reclassifications deferrable initially deferred
 for each row execute function private.enforce_completion_adjustment_graph();
 
 create table fermentation_readings (   -- manual entry only; °F and °Plato per brewing-domain.md
@@ -4475,8 +4571,8 @@ end $$;
 -- line, so zeros are 0.00, never absent. Transfers and repacks stay inside a
 -- class and sit on neither side; a type this classifier does not know has no
 -- side, breaks the identity, and is named in warnings: an unhandled class
--- fails loudly. The cellar is the one exemption (beer leaves it by packaging),
--- reported as one in-process figure.
+-- fails loudly. Cellar adjustments contribute once to the removal totals and
+-- also appear in a clearly non-additive explanatory breakdown.
 create function private.report_movements(p_brewery uuid, p_end date)
 returns table (class public.package_type, bbl numeric, type public.movement_type, tax_treatment public.tax_treatment, dest_state text, d date, side text)
 language sql stable set search_path = '' as $$
@@ -4498,7 +4594,8 @@ $$;
 -- and adjustments to a date is the upgrade when a filed month needs it.
 create function generate_compliance_report(p_brewery uuid, p_jurisdiction text, p_start date, p_end date)
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
-declare v_lines jsonb; v_warnings text[]; v_removals jsonb; v_by_state jsonb; v_packaged numeric; v_in_process numeric;
+declare v_lines jsonb; v_warnings text[]; v_removals jsonb; v_cellar_removals jsonb; v_by_state jsonb;
+  v_packaged numeric; v_in_process numeric; v_external text[] := '{}';
 begin
   perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
   if p_end < p_start then raise exception 'the period ends before it starts'; end if;
@@ -4516,21 +4613,43 @@ begin
     (select jsonb_agg(jsonb_build_object('class', class, 'begin', round(b, 2), 'in', round(i, 2), 'out', round(o, 2), 'end', round(b, 2) + round(i, 2) - round(o, 2)) order by class) from per_class),
     coalesce((select array_agg(class::text || ' does not balance' order by class) from per_class where b + i - o <> e), '{}')
       || coalesce((select array_agg(distinct 'unclassified movement type ' || type::text) from r where d >= p_start and side is null), '{}'),
-    (select coalesce(jsonb_object_agg(k, round(v, 2)), '{}'::jsonb) from (
-      select case when type in ('sale_removal', 'depletion') then tax_treatment::text else type::text end as k, -sum(bbl) as v
-      from r where d >= p_start and side = 'out' and type <> 'adjustment' group by 1) t),
+    (select coalesce(jsonb_object_agg(k, v), '{}'::jsonb) from (
+      select k, sum(v) v from (
+        select case when type in ('sale_removal', 'depletion') then tax_treatment::text else type::text end as k, round(-sum(bbl), 2) as v
+          from r where d >= p_start and side = 'out' and type <> 'adjustment' group by 1
+        union all
+        select case when a.removal_class = 'taproom' then a.tax_treatment::text else a.removal_class::text end, -sum(a.bbl)
+          from public.volume_adjustments a join public.breweries brewery on brewery.id = a.brewery_id
+          where a.brewery_id = p_brewery and a.removal_class is not null
+            and (a.created_at at time zone brewery.timezone)::date between p_start and p_end
+          group by 1
+      ) removals where k is not null group by k having sum(v) <> 0) t),
     (select coalesce(jsonb_object_agg(dest_state, round(v, 2)), '{}'::jsonb) from (
       select dest_state, -sum(bbl) as v from r where d >= p_start and type = 'sale_removal' and tax_treatment = 'taxable' group by 1) t),
     (select coalesce(sum(bbl), 0) from r where d >= p_start and type = 'production_in')
     into v_lines, v_warnings, v_removals, v_by_state, v_packaged;
+  select coalesce(jsonb_object_agg(removal_class, bbl), '{}'::jsonb)
+    into v_cellar_removals from (
+      select a.removal_class::text removal_class, -sum(a.bbl) bbl
+      from public.volume_adjustments a join public.breweries brewery on brewery.id = a.brewery_id
+      where a.brewery_id = p_brewery and a.removal_class is not null
+        and (a.created_at at time zone brewery.timezone)::date between p_start and p_end
+      group by a.removal_class
+    ) cellar;
+  if coalesce((v_cellar_removals->>'taproom')::numeric, 0) <> 0 then
+    v_external := array['taproom'];
+  end if;
   select coalesce(sum(bbl), 0) into v_in_process from public.occupancy_volumes where brewery_id = p_brewery and ended_at is null;
   return jsonb_build_object(
     'figures', jsonb_build_object(
       'jurisdiction', p_jurisdiction, 'periodStart', p_start, 'periodEnd', p_end,
-      'lines', v_lines, 'removals', v_removals, 'byState', v_by_state,
+      'lines', v_lines, 'removals', v_removals, 'cellarRemovals', v_cellar_removals, 'byState', v_by_state,
       'packaged', round(v_packaged, 2), 'inProcess', round(v_in_process, 2),
       'balances', cardinality(v_warnings) = 0),
-    'warnings', to_jsonb(v_warnings));
+    'warnings', to_jsonb(v_warnings) || case when cardinality(v_external) > 0
+      then jsonb_build_array('Direct cellar Taproom removals need an approved external filing-line mapping before this period can be filed.')
+      else '[]'::jsonb end,
+    'externalMappingRequired', to_jsonb(v_external));
 end $$;
 create function file_compliance_report(p_brewery uuid, p_jurisdiction text, p_start date, p_end date, p_note text, p_request_id uuid)
 returns jsonb language plpgsql security definer set search_path = '' as $$
@@ -4544,6 +4663,9 @@ begin
   if not (v_report->'figures'->>'balances')::boolean then
     raise exception 'the report does not balance: %', array_to_string(array(select jsonb_array_elements_text(v_report->'warnings')), '; ');
   end if;
+  if v_report->'externalMappingRequired' ? 'taproom' then
+    raise exception 'direct cellar Taproom removals need an approved external filing-line mapping before filing';
+  end if;
   begin
     insert into public.report_filings (brewery_id, jurisdiction, period_start, period_end, figures, filed_at, filed_by, note)
       values (p_brewery, p_jurisdiction, p_start, p_end, v_report->'figures', now(), auth.uid(), p_note) returning * into v_row;
@@ -4551,6 +4673,110 @@ begin
     raise exception 'this period is already filed' using errcode = 'MG409';
   end;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $$;
+
+create function get_loss_review(p_brewery uuid, p_start date, p_end date)
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+declare v_result jsonb;
+begin
+  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
+  if p_end < p_start then raise exception 'the period ends before it starts'; end if;
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'adjustment_id', root.id,
+    'batch_id', batch.id,
+    'batch_no', batch.batch_no,
+    'closed_at', batch.closed_at,
+    'original_bbl', (-root.bbl)::text,
+    'remaining_bbl', (-root.bbl - coalesce(allocated.bbl, 0))::text,
+    'allocations', coalesce(allocated.rows, '[]'::jsonb)
+  ) order by batch.closed_at, batch.id), '[]'::jsonb) into v_result
+  from public.batches batch
+  join public.breweries brewery on brewery.id = batch.brewery_id
+  join public.volume_adjustments root on root.id = batch.completion_adjustment_id and root.brewery_id = batch.brewery_id
+  left join lateral (
+    select sum(r.bbl) bbl, jsonb_agg(jsonb_build_object(
+      'id', r.id, 'bbl', r.bbl::text, 'classification', r.target_class,
+      'destination_state', r.dest_state, 'tax_treatment', r.tax_treatment,
+      'created_at', r.created_at, 'created_by', r.created_by
+    ) order by r.created_at, r.id) rows
+    from public.volume_adjustment_reclassifications r
+    where r.brewery_id = batch.brewery_id and r.source_adjustment_id = root.id
+  ) allocated on true
+  where batch.brewery_id = p_brewery
+    and (batch.closed_at at time zone brewery.timezone)::date between p_start and p_end;
+  return v_result;
+end $$;
+
+create function reattribute_loss(
+  p_brewery uuid, p_adjustment uuid, p_bbl numeric, p_classification public.cellar_removal_class,
+  p_destination_state text, p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  v_actor uuid; v_replay jsonb; v_root public.volume_adjustments; v_row public.volume_adjustment_reclassifications;
+  v_tax public.tax_treatment; v_remaining numeric;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'reattribute_loss', p_request_id,
+    jsonb_build_object('adjustment', p_adjustment, 'bbl', p_bbl, 'classification', p_classification, 'destination_state', p_destination_state));
+  if v_replay is not null then return v_replay; end if;
+
+  perform private.lock_cellar_workflow(p_brewery);
+  select adjustment.* into v_root from public.volume_adjustments adjustment
+    join public.batches batch on batch.completion_adjustment_id = adjustment.id and batch.brewery_id = adjustment.brewery_id
+    where adjustment.id = p_adjustment and adjustment.brewery_id = p_brewery
+      and adjustment.bbl < 0 and adjustment.reason = 'loss' and adjustment.removal_class = 'loss'
+      and adjustment.tax_treatment is null and adjustment.dest_state is null
+      and not adjustment.affects_occupancy and adjustment.reclassification_id is null
+    for update of adjustment;
+  if v_root.id is null then raise exception 'completion loss not found'; end if;
+  perform 1 from public.volume_adjustment_reclassifications
+    where brewery_id = p_brewery and source_adjustment_id = v_root.id order by id for update;
+
+  if p_bbl is null or p_bbl in ('NaN'::numeric, 'Infinity'::numeric, '-Infinity'::numeric)
+    or p_bbl <= 0 or p_bbl <> round(p_bbl, 8) then
+    raise exception 'BBL must be positive, finite, and have at most eight fractional digits';
+  end if;
+  if p_classification is null or p_classification not in ('sample','taproom','destruction') then
+    raise exception 'classification must be sample, taproom, or destruction';
+  end if;
+  if p_classification = 'sample' then
+    if p_destination_state is null or p_destination_state !~ '^[A-Z]{2}$' then
+      raise exception 'sample destination state must be two uppercase letters';
+    end if;
+  elsif p_destination_state is not null then
+    raise exception 'destination state is only valid for samples';
+  end if;
+  if p_classification = 'taproom' then
+    select tax_treatment into v_tax from public.sale_channels
+      where brewery_id = p_brewery and system_code = 'taproom';
+    if v_tax is null then raise exception 'Taproom sale channel is required'; end if;
+  end if;
+  select -v_root.bbl - coalesce(sum(bbl), 0) into v_remaining
+    from public.volume_adjustment_reclassifications
+    where brewery_id = p_brewery and source_adjustment_id = v_root.id;
+  if p_bbl > v_remaining then raise exception 'allocation exceeds the remaining completion loss'; end if;
+
+  insert into public.volume_adjustment_reclassifications(
+    brewery_id, source_adjustment_id, bbl, target_class, tax_treatment, dest_state, created_by
+  ) values (p_brewery, v_root.id, p_bbl, p_classification, v_tax, p_destination_state, v_actor)
+  returning * into v_row;
+  insert into public.volume_adjustments(
+    brewery_id, occupancy_id, bbl, reason, removal_class, affects_occupancy,
+    reclassification_id, reclassification_leg, created_by
+  ) values (
+    p_brewery, v_root.occupancy_id, p_bbl, 'loss', 'loss', false, v_row.id, 'reverse', v_actor
+  );
+  insert into public.volume_adjustments(
+    brewery_id, occupancy_id, bbl, reason, removal_class, tax_treatment, dest_state, affects_occupancy,
+    reclassification_id, reclassification_leg, created_by
+  ) values (
+    p_brewery, v_root.occupancy_id, -p_bbl, 'loss', p_classification, v_tax, p_destination_state, false,
+    v_row.id, 'replacement', v_actor
+  );
+  return private.complete_command_request(p_request_id, jsonb_build_object(
+    'id', v_row.id, 'adjustment_id', v_root.id, 'bbl', v_row.bbl::text,
+    'classification', v_row.target_class, 'destination_state', v_row.dest_state,
+    'tax_treatment', v_row.tax_treatment, 'created_at', v_row.created_at));
 end $$;
 
 create function save_route(
@@ -6095,7 +6321,7 @@ begin
   end loop;
   -- Append-only ledgers retain staff reads. Only the inventory command paths
   -- below may append inventory movements; the other ledgers have no staff DML.
-  foreach t in array array['inventory_movements','material_movements','keg_events','transfers','volume_adjustments']
+  foreach t in array array['inventory_movements','material_movements','keg_events','transfers','volume_adjustments','volume_adjustment_reclassifications']
   loop
     execute format('alter table %I enable row level security', t);
     execute format('create policy staff_read on %I for select using (public.is_staff_of(brewery_id))', t);
@@ -7197,7 +7423,8 @@ grant select on bin_move_stock, on_hand, bin_on_hand, atp, invoice_totals, keg_d
   contract_balances, material_requirements, po_open_balances, vendor_lead_times,
   keg_bin_totals, keg_bin_on_hand, keg_fleet_totals, keg_customer_balances to authenticated;
 grant all on all tables in schema public to service_role;
-revoke insert, update, delete, truncate on inventory_movements, taproom_counts, taproom_count_lines, volume_adjustments from service_role;
+revoke insert, update, delete, truncate on inventory_movements, taproom_counts, taproom_count_lines, volume_adjustments, volume_adjustment_reclassifications from service_role;
+revoke insert, update, delete, truncate on volume_adjustments, volume_adjustment_reclassifications from authenticated;
 revoke update, delete, truncate on pos_sales from service_role;
 grant all on all sequences in schema public to service_role;
 
@@ -7322,15 +7549,18 @@ grant execute on function
   upsert_state_registration(uuid,uuid,text,text,date,date,uuid),
   upsert_brewery_state_license(uuid,text,text,text,date,text,uuid),
   generate_compliance_report(uuid,text,date,date),
-  file_compliance_report(uuid,text,date,date,text,uuid)
+  file_compliance_report(uuid,text,date,date,text,uuid),
+  get_loss_review(uuid,date,date),
+  reattribute_loss(uuid,uuid,numeric,public.cellar_removal_class,text,uuid)
   to authenticated;
 grant usage on schema private, extensions to service_role;
 -- service_role reaches `private` only for the UUID default its seed inserts
 -- evaluate; the ledger and token store stay behind owner-run definer functions.
 grant execute on function private.new_uuid() to service_role;
 grant execute on all functions in schema public to service_role;
+revoke execute on function get_loss_review(uuid,date,date), reattribute_loss(uuid,uuid,numeric,public.cellar_removal_class,text,uuid) from service_role;
 revoke execute on function private.lock_cellar_workflow(uuid), private.batch_completion_calculation(uuid,uuid),
-  private.enforce_cellar_removal(), private.enforce_completion_adjustment_graph()
+  private.enforce_cellar_removal(), private.enforce_loss_reclassification_target(), private.enforce_completion_adjustment_graph()
   from service_role;
 
 -- ---------------------------------------------------------------- chat Data API ACLs

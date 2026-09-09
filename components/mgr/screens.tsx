@@ -2536,26 +2536,33 @@ export const SCREENS: Screen[] = [
     slice: 6,
     tab: "More",
     name: "Monthly compliance",
-    to: { Confirm: "Monthly compliance" },
+    to: { Confirm: "Monthly compliance", "Reattribute loss": "Monthly compliance" },
     job: "Generate from ledgers, review, then record the external filing",
-    reads: "list_compliance_reports · generate_compliance_report · get_loss_review [view; SCHEMA-GATE for typed completion-loss identity]",
-    writes: "file_compliance_report · reattribute_loss [SCHEMA-GATE; requires typed origin/classification + atomic compensation]",
-    states: [["current", "generated from the ledger now"], ["does not balance", "a movement type the report cannot classify is named · Save stays off", 1], ["filed", "the snapshot is shown, not regenerated"], ["permission", "sales or admin required", 1]],
-    spec: "Reattribution waits for schema that identifies completion rows and cellar removal class; correction must be atomic append-only compensation, never free-text note matching. The identity checks are v1 lessons drawn in user copy: balance per class, cellar as in-process, 0.00 never blank, no transmission. Beer in process is the tanks now, not at period end, and says so. Removals are keyed by the tax treatment frozen on each movement, so editing a channel later does not move a past month; taxable removals also break down by destination state for the states that remit.",
+    reads: "list_compliance_reports · generate_compliance_report · get_loss_review",
+    writes: "file_compliance_report · reattribute_loss",
+    states: [["current", "generated from the ledger now"], ["does not balance", "a movement type the report cannot classify is named · Save stays off", 1], ["mapping required", "direct cellar Taproom volume needs an approved external filing-line mapping · Save stays off", 1], ["filed", "the snapshot is shown, not regenerated"], ["permission", "sales or admin required", 1]],
+    spec: "Admin and Sales review exact completion reconciliation losses and allocate each remainder to Sample, Taproom, or Destruction through append-only category changes, never free-text note matching. Corrections post in the period they are saved and leave earlier filed snapshots unchanged. The identity checks are v1 lessons drawn in user copy: balance per class, one additive removal total, an explanatory non-additive cellar breakdown, 0.00 never blank, no transmission. Beer in process is the tanks now, not at period end, and says so. Removals are keyed by frozen tax treatment; direct cellar Taproom volume requires an approved external filing-line mapping before Save turns on.",
     body: (<>
       {E.back("Compliance months", "August 2026")}
-      {E.gated("1 · Review auto-reconciled losses", "review isn’t available yet")}
+      {E.row("1 · Review auto-reconciled losses", "Completion reconciliations stay in history while allocations change their removal category.")}
+      {E.fld("Batch 1042 · original generic loss 0.05741935 bbl · allocated 0.02000000 bbl", "remaining 0.03741935 bbl")}
+      {E.fld("Sample · Destination PA · prior allocation", "0.02000000 bbl")}
+      {E.btn("Reattribute loss", "g")}
+      {E.info("An allocation changes removal categories in the period you save it. Earlier filed snapshots stay unchanged.")}
       {E.row("2 · Review generated figures", "", E.status("Current", "ok"))}
       {E.tbl(["class", "begin", "+", "−", "end"], [["kegs", "41.00", "30.50", "33.20", "38.30"], ["cans", "12.60", "18.00", "14.90", "15.70"], ["bottles", "0.00", "0.00", "0.00", "0.00"]])}
-      {E.info("Every class balances: begin + in − out = end, in barrels. Cellar leaves by packaging, not as a removal. Zeros print 0.00.")}
+      {E.info("Every package class balances: begin + in − out = end, in barrels. Cellar removals are included once below. Zeros print 0.00.")}
       {E.row("Beer in process", "tanks now, not at period end", "120.40 bbl")}
       {E.row("Packaged", "production into finished goods", "48.50 bbl")}
       {E.row("Taxpaid removals", "", "41.20 bbl")}
       {E.row("Export", "", "6.90 bbl")}
+      {E.fld("Losses", "0.05741935 bbl")}
+      {E.info("Cellar removals breakdown is explanatory and is already included once in the removal totals. Do not add it again.")}
+      {E.fld("Cellar · Losses · non-additive breakdown", "0.05741935 bbl")}
       {E.row("Taxpaid to PA", "destination state", "38.10 bbl")}
       {E.row("Taxpaid to OH", "destination state", "3.10 bbl")}
       {E.row("3 · Confirm filed outside MGR", "", "")}
-      {E.info("MGR saves the immutable snapshot; it does not transmit the filing. Save stays off until the report balances.")}
+      {E.info("MGR saves the immutable snapshot; it does not transmit the filing. Save stays off until the report balances and required external mappings are approved.")}
       {E.edit("Note · optional", "filed on pay.gov")}
       {E.btn("Save filed snapshot", "irr")}
     </>),

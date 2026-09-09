@@ -65,8 +65,8 @@ export function sql(q: string, quiet = false, errorVerbosity: "default" | "sqlst
   return execFileSync("psql", args, { encoding: "utf8" }).trim().split("\n").filter(Boolean);
 }
 
-type PrivilegedFixtureTable = "inventory_movements" | "taproom_counts" | "taproom_count_lines" | "volume_adjustments";
-const privilegedFixtureTables = new Set<PrivilegedFixtureTable>(["inventory_movements", "taproom_counts", "taproom_count_lines", "volume_adjustments"]);
+type PrivilegedFixtureTable = "inventory_movements" | "taproom_counts" | "taproom_count_lines" | "volume_adjustments" | "volume_adjustment_reclassifications";
+const privilegedFixtureTables = new Set<PrivilegedFixtureTable>(["inventory_movements", "taproom_counts", "taproom_count_lines", "volume_adjustments", "volume_adjustment_reclassifications"]);
 
 /** Insert protected append-only fixture rows through the existing test-database owner. */
 export function insertFixture<T = Record<string, unknown>>(table: PrivilegedFixtureTable, input: Record<string, unknown> | Record<string, unknown>[]): T[] {

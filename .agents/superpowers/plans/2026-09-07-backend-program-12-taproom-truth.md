@@ -156,9 +156,10 @@ Commit `docs: taproom count and tap board live`
 
 ### Task 6: superseded by accepted T4 cards
 
-The former caller-supplied completion-loss sketch is superseded. Implement T4b,
-T4c, and T4d only from the accepted 2026-09-09 contract. T4a does not claim
-those commands or schema changes are complete.
+The former caller-supplied completion-loss sketch is superseded. T4b, T4c, and
+T4d follow the accepted 2026-09-09 contract: latest-count correction, exact
+batch completion reconciliation, and append-only completion-loss review with
+the unresolved direct-cellar Taproom filing gate.
 
 ---
 

@@ -222,6 +222,7 @@ omitted. They have no roles until they are built.
 | `get_invoice` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |  |
 | `get_invoice_return_sources` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
 | `get_keg_fleet` | Taproom & kegs | ✓ |  | ✓ |  |  |  |
+| `get_loss_review` | Compliance | ✓ | ✓ |  |  |  |  |
 | `get_material_on_hand` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |  |
 | `get_material_requirements` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |  |
 | `get_notification_preferences` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
@@ -292,6 +293,7 @@ omitted. They have no roles until they are built.
 | `portal_update_draft_order` | Customer portal |  |  |  |  |  | ✓ |
 | `provision_brewery` | Team & brewery settings |  |  |  |  |  |  |
 | `raise_invoice_question` | Orders & invoicing |  |  |  |  |  | ✓ |
+| `reattribute_loss` | Compliance | ✓ | ✓ |  |  |  |  |
 | `receive_purchase_order` | Purchasing & materials | ✓ |  | ✓ |  |  |  |
 | `receive_stock_transfer` | Inventory & locations | ✓ |  | ✓ |  |  |  |
 | `record_brew_day` | Production | ✓ |  |  | ✓ |  |  |
@@ -3701,13 +3703,23 @@ changes the underlying records. Filing refuses not only an exact repeat of a
 period already on file but any period whose dates overlap one, in the same
 jurisdiction — the guard is a date range, not an equality check.
 
+Completion-loss review preserves the original generic-loss row. Each partial
+allocation creates an equal signed pair, so the additive removal total changes
+classification without changing total volume. `bbl` is positive, finite, and
+limited to eight fractional digits. `destinationState` is required for
+`sample` and must be omitted for `taproom` and `destruction`. Direct cellar
+Taproom volume freezes the system Taproom channel tax treatment; generated
+reports name the outstanding external mapping and filing refuses until that
+mapping is separately approved. The cellar breakdown is explanatory and must
+not be added to `figures.removals`.
+
 {/* ops:compliance */}
 
 #### file_compliance_report [#file_compliance_report]
 
 `command` · admin, sales
 
-Generate the period report and save it as the immutable filed snapshot; refused when the report does not balance or the period is already filed. MGR does not transmit the filing
+Generate and save an immutable filed snapshot; refused for imbalance, an overlapping filing, or direct cellar Taproom volume without an approved external mapping. MGR does not transmit the filing
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -3727,7 +3739,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales
 
-Compute a period report from the movement ledger: per package class begin + in − out = end in bbl, removals by frozen tax treatment and destination state, packaged volume, and beer in process; nothing is stored
+Compute a period report from finished-goods and cellar ledgers: package-class balances, one additive removal total, an explanatory cellar breakdown, packaged volume, and beer in process; nothing is stored
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -3755,6 +3767,24 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_compliance_registry", "input": {} }'
+```
+
+#### get_loss_review [#get_loss_review]
+
+`query` · admin, sales
+
+List completion reconciliation losses in a period with exact original, allocated, and remaining BBL
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `periodStart` | date (YYYY-MM-DD) | yes |
+| `periodEnd` | date (YYYY-MM-DD) | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_loss_review", "input": { "periodStart": "2026-01-31", "periodEnd": "2026-01-31" } }'
 ```
 
 #### list_compliance_reports [#list_compliance_reports]
@@ -3789,6 +3819,26 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_lots", "input": {} }'
+```
+
+#### reattribute_loss [#reattribute_loss]
+
+`command` · admin, sales
+
+Allocate part of a completion reconciliation loss to samples, direct cellar Taproom removals, or destruction while preserving the original and exact total
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `adjustmentId` | uuid | yes |
+| `bbl` | string or number | yes |
+| `classification` | sample or taproom or destruction | yes |
+| `destinationState` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "reattribute_loss", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "adjustmentId": "00000000-0000-0000-0000-000000000000", "bbl": "1", "classification": "sample" } }'
 ```
 
 #### trace_lot [#trace_lot]
@@ -3872,18 +3922,6 @@ curl -X POST "$MGR_URL/api/command" \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "upsert_state_registration", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "brandId": "00000000-0000-0000-0000-000000000000", "state": "CA" } }'
 ```
-
----
-
-**Designed, not yet available** {/* compliance-designed */}
-
-9 of the 10 operations in this area are available today; the 1 below are not.
-
-The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
-
-| Operation | Kind | Needed by |
-| --- | --- | --- |
-| `reattribute_loss` | command | Monthly compliance |
 
 {/* end ops:compliance */}
 
