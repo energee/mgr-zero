@@ -264,6 +264,22 @@ describe("completion root structure and privileges", () => {
     expect(sql(`select completion_adjustment_id::text from batches where id='${source.batchId}'`, true)).toEqual([completed.adjustmentId!]);
   });
 
+  it("rejects service-role reparenting of a completed root occupancy and rolls the row back", async () => {
+    const ordinary = await brew(1);
+    const ordinaryTarget = await brew(1);
+    expect((await admin.from("vessel_occupancies").update({ batch_id: ordinaryTarget.batchId }).eq("id", ordinary.occupancyId)).error)
+      .toBeNull();
+
+    const source = await brew(1);
+    expect((await complete(source.batchId)).adjustmentId).toBeTruthy();
+    const other = await brew(1);
+
+    const changed = await admin.from("vessel_occupancies").update({ batch_id: other.batchId }).eq("id", source.occupancyId);
+    expect(changed.error).not.toBeNull();
+    expect((await admin.from("vessel_occupancies").select("batch_id").eq("id", source.occupancyId).single()).data?.batch_id)
+      .toBe(source.batchId);
+  });
+
   it("requires explicit valid tax/state branches and derives Taproom tax from system identity", async () => {
     const source = await brew(1);
     for (const row of [

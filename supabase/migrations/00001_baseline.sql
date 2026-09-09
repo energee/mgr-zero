@@ -889,15 +889,27 @@ create trigger volume_adjustments_classification before insert or update on volu
 for each row execute function private.enforce_cellar_removal();
 
 -- Validate the reciprocal completion graph at commit. Checking OLD as well as
--- NEW prevents a privileged pointer removal/repoint from orphaning a root.
+-- NEW prevents a privileged pointer removal/repoint or occupancy reparent from
+-- orphaning a root or moving its anchor outside the completed batch's scope.
 create function private.enforce_completion_adjustment_graph() returns trigger
 language plpgsql security definer set search_path = '' as $$
-declare v_adjustment uuid; v_batch uuid; a public.volume_adjustments; b public.batches; n int;
+declare
+  v_adjustment uuid; v_adjustments uuid[]; v_batch uuid;
+  a public.volume_adjustments; b public.batches; n int;
 begin
-  foreach v_adjustment in array array[
-    case when tg_table_name = 'volume_adjustments' then old.id else nullif(to_jsonb(old)->>'completion_adjustment_id', '')::uuid end,
-    case when tg_table_name = 'volume_adjustments' then new.id else nullif(to_jsonb(new)->>'completion_adjustment_id', '')::uuid end
-  ] loop
+  if tg_table_name = 'volume_adjustments' then
+    v_adjustments := array[old.id, new.id];
+  elsif tg_table_name = 'batches' then
+    v_adjustments := array[
+      nullif(to_jsonb(old)->>'completion_adjustment_id', '')::uuid,
+      nullif(to_jsonb(new)->>'completion_adjustment_id', '')::uuid
+    ];
+  elsif tg_table_name = 'vessel_occupancies' then
+    select coalesce(array_agg(distinct adjustment.id), array[]::uuid[]) into v_adjustments
+      from public.volume_adjustments adjustment where adjustment.occupancy_id in (old.id, new.id);
+  end if;
+
+  foreach v_adjustment in array v_adjustments loop
     if v_adjustment is null then continue; end if;
     select * into a from public.volume_adjustments where id = v_adjustment;
     select count(*) into n from public.batches where completion_adjustment_id = v_adjustment;
@@ -937,6 +949,9 @@ after insert or update or delete on volume_adjustments deferrable initially defe
 for each row execute function private.enforce_completion_adjustment_graph();
 create constraint trigger batches_completion_graph
 after insert or update or delete on batches deferrable initially deferred
+for each row execute function private.enforce_completion_adjustment_graph();
+create constraint trigger vessel_occupancies_completion_graph
+after update of batch_id on vessel_occupancies deferrable initially deferred
 for each row execute function private.enforce_completion_adjustment_graph();
 
 create table fermentation_readings (   -- manual entry only; °F and °Plato per brewing-domain.md
