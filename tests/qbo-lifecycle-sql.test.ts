@@ -200,6 +200,13 @@ describe("QuickBooks durable lifecycle", () => {
     expect(sql(`select count(*) from private.integration_tokens where brewery_id='${brewery.id}'`)).toEqual(["0"]);
     expect((await admin.from("qbo_connections").select("state,remote_revocation_state,last_error").eq("brewery_id", brewery.id).single()).data)
       .toMatchObject({ state: "disconnected", remote_revocation_state: "unresolved", last_error: "Remote revocation could not be confirmed" });
+    const releasedRealm = await admin.from("qbo_connections").insert({
+      brewery_id: competingBrewery.id, realm_id: `realm-two-${run}`,
+    });
+    expect(releasedRealm.error).toBeNull();
+    expect((await admin.from("qbo_connections").select("realm_id,state").eq("brewery_id", brewery.id).single()).data)
+      .toEqual({ realm_id: `realm-two-${run}`, state: "disconnected" });
+    expect((await admin.from("qbo_connections").update({ state: "disconnected" }).eq("brewery_id", competingBrewery.id)).error).toBeNull();
     const newestConnection = await connect(`state-three-${run}`, `realm-two-${run}`);
     expect(newestConnection).not.toBe(newConnection);
     expect((await admin.from("customers").select("qbo_customer_id").eq("id", customer.customerId).single()).data?.qbo_customer_id).toBe("customer-current");

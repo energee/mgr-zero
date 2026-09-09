@@ -1873,7 +1873,7 @@ create trigger stock_transfer_lines_bins before insert or update on stock_transf
 create table qbo_connections (
   id uuid not null default gen_random_uuid(),
   brewery_id uuid primary key references breweries(id),
-  realm_id text not null unique,
+  realm_id text not null,
   realm_label text,
   state text not null default 'connected' check (state in ('connected','disconnected','recovery_required')),
   access_expires_at timestamptz, refresh_expires_at timestamptz, refresh_hard_expires_at timestamptz,
@@ -1883,6 +1883,8 @@ create table qbo_connections (
   updated_at timestamptz not null default now(),
   unique (id, brewery_id)
 );
+create unique index qbo_connections_current_realm_uidx on qbo_connections(realm_id)
+  where state <> 'disconnected';
 
 create table pos_connections (
   id uuid primary key default private.new_uuid(),

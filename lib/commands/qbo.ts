@@ -11,7 +11,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "disconnect_qbo", description: "Disable QuickBooks locally, purge its credential, and attempt remote revocation; the exact requestId replays the recorded outcome",
+  name: "disconnect_qbo", description: "Disable QuickBooks locally, release its company ownership, purge its credential, and attempt remote revocation; the exact requestId replays the recorded outcome",
   input: z.object({ connectionId: z.string().uuid() }), roles: ["admin"],
   handler: async (ctx, input, execution) => {
     const [{ disconnectQbo }, { qboConfig, QboOAuthClient }] = await Promise.all([
