@@ -7494,8 +7494,11 @@ declare v_result jsonb;
 begin
   perform private.assert_staff(p_brewery, array['admin','warehouse','taproom']::public.staff_role[]);
   select to_jsonb(c) || jsonb_build_object('lines', (select coalesce(jsonb_agg(to_jsonb(l) ||
-    jsonb_build_object('bbl', m.bbl) order by l.bin_id, l.sku_id, l.lot_id nulls first), '[]'::jsonb)
-    from public.taproom_count_lines l left join public.inventory_movements m on m.id = l.movement_id and m.brewery_id = l.brewery_id
+    jsonb_build_object('bbl', m.bbl, 'bin_name', b.name, 'sku_name', s.name) order by l.bin_id, l.sku_id, l.lot_id nulls first), '[]'::jsonb)
+    from public.taproom_count_lines l
+    left join public.inventory_movements m on m.id = l.movement_id and m.brewery_id = l.brewery_id
+    left join public.bins b on b.id = l.bin_id and b.brewery_id = l.brewery_id
+    left join public.skus s on s.id = l.sku_id and s.brewery_id = l.brewery_id
     where l.count_id = c.id and l.brewery_id = p_brewery)) into v_result
     from public.taproom_counts c where c.id = p_count and c.brewery_id = p_brewery;
   if v_result is null then raise exception 'count not found'; end if;
@@ -7520,7 +7523,7 @@ begin
     raise exception 'choose an owned taproom location';
   end if;
   v_snapshot := private.taproom_count_snapshot(p_brewery, p_location);
-  if p_counted_on is distinct from (v_snapshot->>'counted_on')::date then raise exception 'count today in the brewery timezone; historical counts cannot use current stock'; end if;
+  if p_counted_on is distinct from (v_snapshot->>'counted_on')::date then raise exception 'count today in the brewery timezone; historical counts cannot use current stock' using errcode = 'MG409'; end if;
   if p_counted_on <= (v_snapshot->'prior_count'->>'counted_on')::date then raise exception 'a count already exists on this date; count corrections are not yet available'; end if;
   if p_revision is distinct from v_snapshot->>'revision' then raise exception 'stock or prior count changed; refresh and review every bucket' using errcode = 'MG409'; end if;
   if jsonb_typeof(p_lines) is distinct from 'array' then raise exception 'count lines must be an array'; end if;

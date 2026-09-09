@@ -2226,9 +2226,9 @@ curl -X POST "$MGR_URL/api/command" \
 
 ### Taproom & kegs [#taproom]
 
-Physical counts are available to Admin, Warehouse, and Taproom through the commands below and the live **Taproom** page. Prepare a complete snapshot, then submit every explicit bin/SKU/lot bucket with its revision and today's brewery-local date. `lotId: null` names untracked stock, never automatic allocation. Quantities are remaining whole packages; a partial keg counts as one until gone. Matching counts persist without movements. Shortages alone post exact-bucket depletion, with the tenant's Taproom channel tax treatment and volume frozen at posting; POS does not change the posting. `list_taproom_counts` returns only the newest 50 headers for one owned taproom; use `get_taproom_count` for a durable receipt.
+Physical counts are available to Admin, Warehouse, and Taproom through the commands below and the live **Taproom** page. Prepare a complete snapshot, then submit every explicit bin/SKU/lot bucket with its revision and today's brewery-local date. `lotId: null` names untracked stock, never automatic allocation. Quantities are remaining whole packages; a partial keg counts as one until gone. Matching counts persist without movements. Shortages alone post exact-bucket depletion, with the tenant's Taproom channel tax treatment and volume frozen at posting; POS does not change the posting. `list_taproom_counts` returns only the newest 50 headers for one owned taproom; use `get_taproom_count` for a complete durable receipt with safe bin and SKU labels independent of list-query row caps.
 
-Changed stock or prior count requires refreshing the snapshot. Omitted, duplicate, extra, fractional, negative, overcount, historical and same-day repeat submissions are refused. An unchanged request ID returns the original result before these freshness checks; changed payload reuse conflicts. Saved-count correction remains unavailable, and generic inventory adjustments do not reverse count depletion. Printed lot labels are not exposed: ambiguous physical lot identity needs Warehouse assistance.
+Changed stock, prior count, or brewery-local date requires refreshing the snapshot. Omitted, duplicate, extra, fractional, negative, overcount, historical and same-day repeat submissions are refused. An unchanged request ID returns the original result before these freshness checks; changed payload reuse conflicts. A timeout or `5xx` leaves the exact count request frozen for retry, while a definitive first validation refusal allows correction. Saved-count correction remains unavailable, and generic inventory adjustments do not reverse count depletion. Printed lot labels are not exposed: ambiguous physical lot identity needs Warehouse assistance.
 
 `get_taproom_draft_projection` compares an unsaved recount with expected consumption from the latest saved count's creation time through the response's server `as_of`. It identifies that baseline and both bounds, groups expected BBL by brand, and reports coverage-source bounds and completeness, unmapped and ignored lines, excluded shares, and unattributed poured volume. No saved baseline or usable POS observation leaves expected null; a complete empty observation may return zero. This live read never posts inventory, allocates lots, freezes a POS snapshot, or replaces the count snapshot revision, and late reconciled facts may change a later response.
 
@@ -2332,7 +2332,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, warehouse, taproom
 
-Read a saved taproom count with every physical observation, prior count, movement identity and frozen depletion BBL
+Read a saved taproom count with every physical observation, safe bin and SKU labels, prior count, movement identity and frozen depletion BBL
 
 | Field | Type | Required |
 | --- | --- | --- |

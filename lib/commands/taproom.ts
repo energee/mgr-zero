@@ -137,7 +137,7 @@ defineQuery({
   handler: (ctx, i) => unwrap(ctx.db.rpc("get_taproom_count_snapshot", { p_brewery: ctx.breweryId, p_location: i.locationId })),
 });
 defineQuery({
-  name: "get_taproom_count", description: "Read a saved taproom count with every physical observation, prior count, movement identity and frozen depletion BBL",
+  name: "get_taproom_count", description: "Read a saved taproom count with every physical observation, safe bin and SKU labels, prior count, movement identity and frozen depletion BBL",
   input: z.object({ countId: z.string().uuid() }), roles: [...COUNT_ROLES],
   handler: (ctx, i) => unwrap(ctx.db.rpc("get_taproom_count", { p_brewery: ctx.breweryId, p_count: i.countId })),
 });

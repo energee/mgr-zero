@@ -1,3 +1,5 @@
+import { canRetireCommandFailure } from "@/lib/commands/failure";
+
 export type TaproomCountSnapshotLine = {
   bin_id: string;
   bin_name: string;
@@ -43,6 +45,7 @@ export type CountDraftLine = {
 
 type FrozenAttempt = { kind: "submitting" | "unknown"; requestId: string; payload: TaproomCountInput; message?: string };
 type CountAttempt = FrozenAttempt | { kind: "idle" } | { kind: "stale" | "error"; message: string };
+export type CountFailureKind = "unknown" | "stale" | "error";
 
 export type TaproomCountState = {
   draft: { locationId: string; countedOn: string; priorCount: CapturedPriorCount; revision: string; lines: CountDraftLine[] };
@@ -132,8 +135,8 @@ export function countBrandComparison(state: TaproomCountState): CountBrandCompar
     const expectedRow = projected.get(brandId);
     const expectedBbl = expectedRow ? Number(expectedRow.expected_bbl)
       : projection.coverage_complete && Number(projection.unmapped_lines ?? 0) === 0 ? 0 : null;
-    const complete = physical?.complete ?? false;
-    const actualBbl = complete ? physical!.actualBbl : null;
+    const complete = physical?.complete ?? true;
+    const actualBbl = physical ? (complete ? physical.actualBbl : null) : 0;
     return {
       brandId,
       brandName: physical?.brandName ?? expectedRow!.brand_name,
@@ -171,6 +174,12 @@ export function failCountAttempt(state: TaproomCountState, kind: "unknown" | "st
   if (state.attempt.kind === "stale") return { ...state, attempt: { kind: "stale", message } };
   if (!projectionMatchesCountDraft(state)) return { ...state, attempt: { kind: "stale", message: baselineChangedMessage } };
   return { ...state, attempt: { kind: kind === "unknown" ? "error" : kind, message } };
+}
+
+export function countFailureKind(status: number | null, message: string, retrying = false): CountFailureKind {
+  if (retrying) return "unknown";
+  if (status === 409 && /stock or prior count changed; refresh and review every bucket|count today in the brewery timezone/i.test(message)) return "stale";
+  return status !== null && canRetireCommandFailure(status, false) ? "error" : "unknown";
 }
 
 export function projectionExpectedText(projection: { expected_bbl: number | null }): string | null {

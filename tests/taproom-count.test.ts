@@ -3,6 +3,7 @@ import { DB } from "./helpers";
 import { describe, expect, it } from "vitest";
 import { admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
 import { runCommand } from "@/lib/commands/registry";
+import { countFailureKind } from "@/lib/mgr/taproom-count-state";
 import "@/lib/commands/all";
 
 async function fixture(qty = 7) {
@@ -90,6 +91,19 @@ it("7 remaining to 2 posts exactly -5, freezes tax and volume, and replays befor
   expect(await runCommand("get_taproom_count", { countId: first.data.id }, f.ctx)).toEqual(first.data);
   const changed = await f.ctx.db.rpc("record_taproom_count", { ...input, p_lines: [{ ...input.p_lines[0], qty_counted: 1 }] });
   expect(changed.error?.code).toBe("MG409"); expect(state(f)).toEqual(before);
+});
+
+it("replays the exact request after a committed count response is treated as an inner 500", async () => {
+  const f = await fixture();
+  const raw = await args(f);
+  const input = { locationId: raw.p_location, countedOn: raw.p_counted_on, revision: raw.p_revision,
+    lines: raw.p_lines.map(line => ({ binId: line.bin_id, skuId: line.sku_id, lotId: line.lot_id, qtyCounted: line.qty_counted })) };
+  const first = await runCommand("record_taproom_count", input, f.ctx, { requestId: raw.p_request_id, correlationId: crypto.randomUUID() });
+  expect(countFailureKind(500, "database error")).toBe("unknown");
+  const replay = await runCommand("record_taproom_count", input, f.ctx, { requestId: raw.p_request_id, correlationId: crypto.randomUUID() });
+
+  expect(replay).toEqual(first);
+  expect(state(f)).toEqual(["1:1:1:1"]);
 });
 
 it("snapshot carries authoritative brand volume and a pre-submit format change stales its revision", async () => {
@@ -225,7 +239,10 @@ it("uses all movements and all buckets beyond the API 1000-row ceiling", async (
     select '${f.brewery.id}','${f.cat.skuId}','${f.location.id}',id,1,'opening_balance','${f.ctx.userId}' from bins`);
   const input = await args(f); expect(input.p_lines).toHaveLength(1002);
   const result = await f.ctx.db.rpc("record_taproom_count", input); expect(result.error).toBeNull(); expect(result.data.lines).toHaveLength(1002);
-  expect((await f.ctx.db.rpc("get_taproom_count", { p_brewery: f.brewery.id, p_count: result.data.id })).data.lines).toHaveLength(1002);
+  const receipt = (await f.ctx.db.rpc("get_taproom_count", { p_brewery: f.brewery.id, p_count: result.data.id })).data;
+  expect(receipt.lines).toHaveLength(1002);
+  expect(receipt.lines.every((line: { bin_name?: string; sku_name?: string }) => line.bin_name && line.sku_name)).toBe(true);
+  expect(new Set(receipt.lines.map((line: { bin_name: string }) => line.bin_name)).size).toBe(1002);
   expect(await runCommand("list_taproom_counts", { locationId: f.location.id }, f.ctx)).toMatchObject([
     { id: result.data.id, observations: 1002, movements: 0, depleted_units: 0 },
   ]);
@@ -242,6 +259,7 @@ it("count tables are append-only with tenant-safe references and direct DML deni
   expect((await f.ctx.db.from("taproom_counts").insert(row)).error?.code).toBe("42501");
   expect((await admin.from("taproom_counts").insert({ ...row, prior_count_id: (await ins("taproom_counts", { ...row, brewery_id: other.brewery.id, location_id: other.location.id })).id })).error?.code).toBe("23503");
   const line = { ...result.data.lines[0] }; delete line.id; delete line.bbl;
+  delete line.bin_name; delete line.sku_name;
   expect((await admin.from("taproom_count_lines").insert({ ...line, count_id: crypto.randomUUID() })).error?.code).toBe("23503");
   expect((await other.ctx.db.rpc("get_taproom_count", { p_brewery: other.brewery.id, p_count: result.data.id })).error?.message).toBe("count not found");
   expect((await other.ctx.db.rpc("record_taproom_count", { ...await args(f) })).error?.code).toBe("42501");
@@ -255,7 +273,9 @@ it("uses the brewery's current date even when it differs from the database UTC d
     where (now() at time zone zone)::date <> (now() at time zone 'UTC')::date limit 1`)[0].split(",");
   expect((await admin.from("breweries").update({ timezone: zone }).eq("id", f.brewery.id)).error).toBeNull();
   const input = await args(f); expect((await prepare(f)).counted_on).toBe(localDay);
-  expect((await f.ctx.db.rpc("record_taproom_count", { ...input, p_counted_on: utcDay })).error?.message).toContain("brewery timezone");
+  const expired = (await f.ctx.db.rpc("record_taproom_count", { ...input, p_counted_on: utcDay })).error;
+  expect(expired).toMatchObject({ code: "MG409" });
+  expect(expired?.message).toContain("brewery timezone");
   expect((await f.ctx.db.rpc("record_taproom_count", { ...input, p_counted_on: localDay })).error).toBeNull();
 });
 

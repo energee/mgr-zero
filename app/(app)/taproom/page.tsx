@@ -10,11 +10,9 @@ import "@/lib/commands/all";
 import { TaproomCountForm, type DraftProjection } from "./count-form";
 
 type Location = { id: string; name: string; kind: string };
-type Bin = { id: string; location_id: string; name: string };
-type Sku = { id: string; name: string };
 type Stock = { bin_id: string; stock_id: string; lot_id: string | null; lot_code: string | null };
 type CountHeader = { id: string; location_id: string; counted_on: string; counted_by: string; created_at: string; prior_count_id: string | null; observations: number; movements: number; depleted_units: number };
-type ReceiptLine = { id: string; bin_id: string; sku_id: string; lot_id: string | null; qty_before: number; qty_counted: number; movement_id: string | null; bbl: number | null };
+type ReceiptLine = { id: string; bin_id: string; bin_name: string | null; sku_id: string; sku_name: string | null; lot_id: string | null; qty_before: number; qty_counted: number; movement_id: string | null; bbl: number | null };
 type Receipt = CountHeader & { lines: ReceiptLine[] };
 const key = (binId: string, skuId: string, lotId: string | null) => `${binId}:${skuId}:${lotId ?? "untracked"}`;
 
@@ -27,18 +25,14 @@ export default async function TaproomPage({ searchParams }: { searchParams: Prom
   const location = locations.find((item) => item.id === selected.location) ?? locations[0];
   if (!location) return <>{E.back("Beer", "Weekly count", undefined, "/beer")}{E.blank("No taproom locations yet. Ask Admin to add one under Locations.")}</>;
 
-  const [snapshot, projection, history, skus, bins, stock] = await Promise.all([
+  const [snapshot, projection, history, stock] = await Promise.all([
     runCommand("get_taproom_count_snapshot", { locationId: location.id }, ctx) as Promise<TaproomCountSnapshot>,
     runCommand("get_taproom_draft_projection", { locationId: location.id }, ctx) as Promise<DraftProjection>,
     runCommand("list_taproom_counts", { locationId: location.id }, ctx) as Promise<CountHeader[]>,
-    runCommand("list_skus", {}, ctx) as Promise<Sku[]>,
-    runCommand("list_bins", { locationId: location.id }, ctx) as Promise<Bin[]>,
     brewery.role === "admin" || brewery.role === "warehouse" ? runCommand("get_bin_move_stock", { locationId: location.id }, ctx) as Promise<Stock[]> : Promise.resolve([]),
   ]);
   const receipt = selected.count ? await runCommand("get_taproom_count", { countId: selected.count }, ctx) as Receipt : null;
   const shownReceipt = receipt?.location_id === location.id ? receipt : null;
-  const skuNames = new Map(skus.map((sku) => [sku.id, sku.name]));
-  const binNames = new Map(bins.map((bin) => [bin.id, bin.name]));
   const lotLabels = Object.fromEntries(stock.filter((row) => row.lot_id && row.lot_code).map((row) => [key(row.bin_id, row.stock_id, row.lot_id), row.lot_code!]));
 
   return <>
@@ -48,7 +42,7 @@ export default async function TaproomPage({ searchParams }: { searchParams: Prom
     {shownReceipt && <section aria-labelledby="receipt-heading" className="rounded-xl border p-4">
       <h2 id="receipt-heading" className="text-lg font-semibold">Saved count · {shownReceipt.counted_on}</h2>
       <p className="text-sm text-muted-foreground">Recorded by {shownReceipt.counted_by === ctx.userId ? "you" : "staff"} at <time dateTime={shownReceipt.created_at}>{new Date(shownReceipt.created_at).toLocaleString()}</time>{shownReceipt.prior_count_id ? <> · <Link className="underline" href={`/taproom?location=${location.id}&count=${shownReceipt.prior_count_id}`}>prior count</Link></> : " · first count"}</p>
-      {shownReceipt.lines.map((line, index) => <div key={line.id}>{E.row(skuNames.get(line.sku_id) ?? "Saved SKU", `${binNames.get(line.bin_id) ?? "Saved bin"} · ${line.lot_id ? brewery.role === "taproom" ? `tracked worksheet row ${shownReceipt.lines.slice(0, index + 1).filter((item) => item.lot_id).length}` : `tracked lot${lotLabels[key(line.bin_id, line.sku_id, line.lot_id)] ? ` ${lotLabels[key(line.bin_id, line.sku_id, line.lot_id)]}` : ""}` : "untracked stock"} · ${Number(line.qty_before)} recorded → ${Number(line.qty_counted)} counted · ${line.bbl == null ? "0 bbl depleted" : `${Math.abs(Number(line.bbl))} bbl depleted`}`, <span className="break-all text-xs">{line.movement_id ? `movement ${line.movement_id}` : "matched · no movement"}</span>)}</div>)}
+      {shownReceipt.lines.map((line, index) => <div key={line.id}>{E.row(line.sku_name ?? "Saved SKU", `${line.bin_name ?? "Saved bin"} · ${line.lot_id ? brewery.role === "taproom" ? `tracked worksheet row ${shownReceipt.lines.slice(0, index + 1).filter((item) => item.lot_id).length}` : `tracked lot${lotLabels[key(line.bin_id, line.sku_id, line.lot_id)] ? ` ${lotLabels[key(line.bin_id, line.sku_id, line.lot_id)]}` : ""}` : "untracked stock"} · ${Number(line.qty_before)} recorded → ${Number(line.qty_counted)} counted · ${line.bbl == null ? "0 bbl depleted" : `${Math.abs(Number(line.bbl))} bbl depleted`}`, <span className="break-all text-xs">{line.movement_id ? `movement ${line.movement_id}` : "matched · no movement"}</span>)}</div>)}
     </section>}
     <section aria-labelledby="history-heading">
       <h2 id="history-heading" className="text-lg font-semibold">Recent saved counts</h2>

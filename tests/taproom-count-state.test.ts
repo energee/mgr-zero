@@ -3,6 +3,7 @@ import {
   beginCountAttempt,
   countBrandComparison,
   countDraftFromSnapshot,
+  countFailureKind,
   failCountAttempt,
   projectionMatchesCountDraft,
   projectionExpectedText,
@@ -66,6 +67,31 @@ describe("taproom count controlled state", () => {
     state = beginCountAttempt(state, "00000000-0000-4000-8000-000000000007");
 
     expect(state.attempt).toEqual(frozen);
+  });
+
+  it("keeps a post-commit 500 and other uncertain failures frozen while definitive validation unlocks a fresh request", () => {
+    for (const status of [408, 429, 500, 502]) expect(countFailureKind(status, "request not confirmed")).toBe("unknown");
+    expect(countFailureKind(409, "count today in the brewery timezone; historical counts cannot use current stock")).toBe("stale");
+    let state = countDraftFromSnapshot(snapshot, null);
+    for (const line of state.draft.lines) state = updateCountQuantity(state, line.key, String(line.qtyBefore));
+    state = beginCountAttempt(state, "00000000-0000-4000-8000-000000000006");
+    const frozen = state.attempt.kind === "submitting" ? state.attempt : null;
+    state = failCountAttempt(state, countFailureKind(500, "database error"), "database error");
+    expect(state.attempt).toMatchObject({ kind: "unknown", requestId: frozen?.requestId, payload: frozen?.payload });
+
+    state = beginCountAttempt(state, "00000000-0000-4000-8000-000000000099");
+    expect(state.attempt).toMatchObject({ kind: "submitting", requestId: frozen?.requestId, payload: frozen?.payload });
+    state = failCountAttempt(state, countFailureKind(400, "invalid count", true), "invalid count");
+    expect(state.attempt).toMatchObject({ kind: "unknown", requestId: frozen?.requestId, payload: frozen?.payload });
+
+    let validation = countDraftFromSnapshot(snapshot, null);
+    for (const line of validation.draft.lines) validation = updateCountQuantity(validation, line.key, String(line.qtyBefore));
+    validation = beginCountAttempt(validation, "00000000-0000-4000-8000-000000000007");
+    validation = failCountAttempt(validation, countFailureKind(400, "invalid count"), "invalid count");
+    expect(validation.attempt).toMatchObject({ kind: "error" });
+    validation = updateCountQuantity(validation, validation.draft.lines[0].key, "0");
+    expect(validation.attempt).toEqual({ kind: "idle" });
+    expect(validation.draft.lines[0].quantity).toBe("0");
   });
 
   it("keeps a concurrent projection mismatch locked when submission ends in a definitive error", () => {
@@ -161,5 +187,14 @@ describe("taproom count controlled state", () => {
     const refreshed = replaceCountProjection(state, { ...projection, expected_bbl: 1.5, rows: [{ ...projection.rows[0], expected_bbl: 1.5 }] });
     expect(refreshed.draft).toEqual(state.draft);
     expect(countBrandComparison(refreshed)[0]).toMatchObject({ actualBbl: .5645, differenceBbl: .9355 });
+  });
+
+  it("treats a projected-only brand as zero actual when the complete snapshot has no bucket for it", () => {
+    const projection = { expected_bbl: .25, coverage_complete: true, unmapped_lines: 0,
+      rows: [{ brand_id: "brand-projected", brand_name: "Projected", expected_bbl: .25 }] };
+    const state = countDraftFromSnapshot({ ...snapshot, lines: [] }, projection);
+
+    expect(countBrandComparison(state)).toEqual([{ brandId: "brand-projected", brandName: "Projected", expectedBbl: .25,
+      actualBbl: 0, differenceBbl: .25, complete: true }]);
   });
 });

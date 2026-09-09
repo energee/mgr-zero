@@ -12,6 +12,7 @@ import {
   beginCountAttempt,
   countBrandComparison,
   countDraftFromSnapshot,
+  countFailureKind,
   failCountAttempt,
   projectionExpectedText,
   projectionMatchesCountDraft,
@@ -39,9 +40,6 @@ export type DraftProjection = {
 };
 
 const countError = (error: unknown) => error instanceof Error ? error.message : "Count failed";
-const stale = (error: unknown) => error instanceof CommandResponseError && error.status === 409
-  && /stock or prior count changed; refresh and review every bucket/i.test(error.message);
-
 const bbl = (value: number | null) => value === null ? "—" : `${Number(value).toLocaleString("en-US", { maximumFractionDigits: 4 })} bbl`;
 
 function Projection({ projection, comparison, priorCount, locationId, aligned, locked, recoveryPending, busy, error, refresh }: {
@@ -122,6 +120,7 @@ export function TaproomCountForm({ breweryId, snapshot, projection, lotLabels, r
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    const retrying = state.attempt.kind === "unknown";
     let started;
     try { started = beginCountAttempt(state, crypto.randomUUID()); }
     catch (error) { setState(failCountAttempt(state, "error", countError(error))); return; }
@@ -132,7 +131,8 @@ export function TaproomCountForm({ breweryId, snapshot, projection, lotLabels, r
       router.push(`/taproom?location=${state.draft.locationId}&count=${saved.id}`);
       router.refresh();
     } catch (error) {
-      setState((current) => failCountAttempt(current, stale(error) ? "stale" : error instanceof CommandResponseError ? "error" : "unknown", countError(error)));
+      const message = countError(error);
+      setState((current) => failCountAttempt(current, countFailureKind(error instanceof CommandResponseError ? error.status : null, message, retrying), message));
     }
   }
 
@@ -154,7 +154,7 @@ export function TaproomCountForm({ breweryId, snapshot, projection, lotLabels, r
         </div>;
       })}
       {state.attempt.kind === "unknown" && <CommandFormMessage tone="warning">No trustworthy response arrived. The request ID and every quantity are frozen. Retry this unchanged count to recover its original result.</CommandFormMessage>}
-      {state.attempt.kind === "stale" && <CommandFormMessage error={state.attempt.message}>The saved stock changed. Start a fresh recount; entered quantities will be cleared.</CommandFormMessage>}
+      {state.attempt.kind === "stale" && <CommandFormMessage error={state.attempt.message}>This count is out of date. Start a fresh recount; entered quantities will be cleared.</CommandFormMessage>}
       {state.attempt.kind === "error" && <CommandFormMessage error={state.attempt.message} />}
       <div className="flex flex-col gap-2 md:flex-row md:justify-end">
         {state.attempt.kind === "stale" && <Button type="button" variant="outline" onClick={refreshSnapshot}>Start fresh recount</Button>}
