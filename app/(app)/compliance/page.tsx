@@ -2,12 +2,12 @@
 // months): the recent months and every filed period, each with its filing
 // state, the registry link, and the lots a trace can start from. Sales and
 // Admin.
-import Link from "next/link";
-import { E } from "@/components/mgr/e";
+import { ComplianceMonthsView } from "@/components/mgr/views/compliance-months";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import type { Filing, LotRowOut } from "@/lib/commands/compliance";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
+import { toComplianceMonthsViewProps } from "@/lib/mgr/compliance-months-view";
 import "@/lib/commands/all";
 import { bbl, JURISDICTION, monthLabel, recentMonths } from "./period";
 
@@ -18,19 +18,18 @@ export default async function CompliancePage() {
   const filed = new Map(filings.filter((f) => f.jurisdiction === JURISDICTION).map((f) => [f.period_start.slice(0, 7), f]));
   const months = [...new Set([...recentMonths(today), ...filed.keys()])].sort().reverse();
   return (
-    <>
-      {E.hd("Compliance", "months")}
-      {months.map((m) => {
-        const f = filed.get(m);
-        return (
-          <Link key={m} href={`/compliance/${m}`}>
-            {f ? E.nav(monthLabel(m), `filed ${f.filed_at?.slice(0, 10)} · ${bbl(f.figures.removals.taxable ?? 0)} bbl taxable`, "ok") : E.nav(monthLabel(m), "not filed · ready to review", "w")}
-          </Link>
-        );
+    <ComplianceMonthsView
+      model={toComplianceMonthsViewProps({
+        months: months.map((m) => {
+          const f = filed.get(m);
+          return f
+            ? { key: m, title: monthLabel(m), detail: `filed ${f.filed_at?.slice(0, 10)} · ${bbl(f.figures.removals.taxable ?? 0)} bbl taxable`, tone: "ok" as const, href: `/compliance/${m}` }
+            : { key: m, title: monthLabel(m), detail: "not filed · ready to review", tone: "w" as const, href: `/compliance/${m}` };
+        }),
+        registry: { key: "registry", title: "Compliance registry", detail: "brands, states and licenses", href: "/compliance/registry" },
+        lots: lots.map((l) => ({ key: l.id, title: l.code, detail: `${l.brands?.name ?? ""} · packaged ${l.packaged_on}`, href: `/compliance/lots/${l.id}` })),
       })}
-      <Link href="/compliance/registry">{E.nav("Compliance registry", "brands, states and licenses")}</Link>
-      {lots.length > 0 && E.ttl("Lot trace")}
-      {lots.map((l) => <Link key={l.id} href={`/compliance/lots/${l.id}`}>{E.nav(l.code, `${l.brands?.name ?? ""} · packaged ${l.packaged_on}`)}</Link>)}
-    </>
+      linkRows
+    />
   );
 }

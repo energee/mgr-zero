@@ -29,6 +29,7 @@ import { BatchesView } from "@/components/mgr/views/batches";
 import { BeerView } from "@/components/mgr/views/beer";
 import { BinView } from "@/components/mgr/views/bin";
 import { BrewDayView } from "@/components/mgr/views/brew-day";
+import { BrandApprovalView } from "@/components/mgr/views/brand-approval";
 import { BrandView } from "@/components/mgr/views/brand";
 import { CatalogView } from "@/components/mgr/views/catalog";
 import { ChannelView } from "@/components/mgr/views/channel";
@@ -36,6 +37,8 @@ import { ClosePackagingRunView } from "@/components/mgr/views/close-packaging-ru
 import { CompleteTransferView } from "@/components/mgr/views/complete-transfer";
 import { ConfirmDeliveryView } from "@/components/mgr/views/confirm-delivery";
 import { ConfirmOrderView } from "@/components/mgr/views/confirm-order";
+import { ComplianceMonthsView } from "@/components/mgr/views/compliance-months";
+import { ComplianceRegistryView } from "@/components/mgr/views/compliance-registry";
 import { DriverRouteView } from "@/components/mgr/views/driver-route";
 import { ContractView } from "@/components/mgr/views/contract";
 import { ContractsView } from "@/components/mgr/views/contracts";
@@ -53,7 +56,9 @@ import { KegBalanceView } from "@/components/mgr/views/keg-balance";
 import { KegFleetView } from "@/components/mgr/views/keg-fleet";
 import { KegHistoryView } from "@/components/mgr/views/keg-history";
 import { LocationBinsView } from "@/components/mgr/views/location-bins";
+import { LicenseView } from "@/components/mgr/views/license";
 import { LocationView } from "@/components/mgr/views/location";
+import { LotTraceView } from "@/components/mgr/views/lot-trace";
 import { MaterialView } from "@/components/mgr/views/material";
 import { MaterialsView } from "@/components/mgr/views/materials";
 import { MaterialsOnHandView } from "@/components/mgr/views/materials-on-hand";
@@ -98,6 +103,7 @@ import { ScheduleBatchView } from "@/components/mgr/views/schedule-batch";
 import { SearchView } from "@/components/mgr/views/search";
 import { SessionExpiredView } from "@/components/mgr/views/session-expired";
 import { SettingsView } from "@/components/mgr/views/settings";
+import { StateRegistrationView } from "@/components/mgr/views/state-registration";
 import { ShipToView } from "@/components/mgr/views/ship-to";
 import { ShipView } from "@/components/mgr/views/ship";
 import { ShipmentDoneView } from "@/components/mgr/views/shipment-done";
@@ -153,11 +159,15 @@ import {
 } from "@/lib/mgr/fixtures/purchasing";
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger } from "@/lib/mgr/fixtures/kegs";
 import { confirmDeliveryStop1, driverRouteA, returnRouteA, routeAPlan, routesDriver } from "@/lib/mgr/fixtures/delivery";
+import {
+  brandApprovalStout, complianceMonthsDemo, complianceRegistryDemo, licensePaBrewery, lotTraceHazy, stateRegistrationHazy,
+} from "@/lib/mgr/fixtures/compliance";
 import { toAdjustLinesViewProps } from "@/lib/mgr/adjust-lines-view";
 import { toBatchesViewProps } from "@/lib/mgr/batches-view";
 import { toBeerViewProps } from "@/lib/mgr/beer-view";
 import { toBrewDayViewProps } from "@/lib/mgr/brew-day-view";
 import { toBinViewProps } from "@/lib/mgr/bin-view";
+import { toBrandApprovalViewProps } from "@/lib/mgr/brand-approval-view";
 import { toBrandViewProps } from "@/lib/mgr/brand-view";
 import { toCatalogViewProps } from "@/lib/mgr/catalog-view";
 import { toChannelViewProps } from "@/lib/mgr/channel-view";
@@ -168,6 +178,8 @@ import { toContractsViewProps } from "@/lib/mgr/contracts-view";
 import { toCycleCountViewProps } from "@/lib/mgr/cycle-count-view";
 import { toConfirmDeliveryViewProps } from "@/lib/mgr/confirm-delivery-view";
 import { toConfirmOrderViewProps } from "@/lib/mgr/confirm-order-view";
+import { toComplianceMonthsViewProps } from "@/lib/mgr/compliance-months-view";
+import { toComplianceRegistryViewProps } from "@/lib/mgr/compliance-registry-view";
 import { toDriverRouteViewProps } from "@/lib/mgr/driver-route-view";
 import { toCustomerViewProps } from "@/lib/mgr/customer-view";
 import { toCustomersViewProps } from "@/lib/mgr/customers-view";
@@ -182,7 +194,9 @@ import { toKegBalanceViewProps } from "@/lib/mgr/keg-balance-view";
 import { toKegFleetViewProps } from "@/lib/mgr/keg-fleet-view";
 import { toKegHistoryViewProps } from "@/lib/mgr/keg-history-view";
 import { toLocationBinsViewProps } from "@/lib/mgr/location-bins-view";
+import { toLicenseViewProps } from "@/lib/mgr/license-view";
 import { toLocationViewProps } from "@/lib/mgr/location-view";
+import { toLotTraceViewProps } from "@/lib/mgr/lot-trace-view";
 import { toLocationsViewProps } from "@/lib/mgr/locations-view";
 import { toMaterialViewProps } from "@/lib/mgr/material-view";
 import { toMaterialsViewProps } from "@/lib/mgr/materials-view";
@@ -227,6 +241,7 @@ import { toSaleChannelsViewProps } from "@/lib/mgr/sale-channels-view";
 import { toSearchViewProps } from "@/lib/mgr/search-view";
 import { toSessionExpiredViewProps } from "@/lib/mgr/session-expired-view";
 import { toSettingsViewProps } from "@/lib/mgr/settings-view";
+import { toStateRegistrationViewProps } from "@/lib/mgr/state-registration-view";
 import { toShipToViewProps } from "@/lib/mgr/ship-to-view";
 import { toShipViewProps } from "@/lib/mgr/ship-view";
 import { toShipmentDoneViewProps } from "@/lib/mgr/shipment-done-view";
@@ -1842,18 +1857,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["still on hand", "unsold units are the part a recall can actually stop"], ["no shipments", "no recorded shipment of this lot", 1], ["unknown lot", "not found"]],
     spec: "The lot is one packaging run, so the trace follows lot → run → tank → batch and lists every movement carrying the lot: the production that made it, samples and losses pulled from it. Shipping records explicit bin/lot allocations per order line; returns and transfers preserve them. Trace shows actual customer recipients, ship-to addresses, orders and invoices, and balances per SKU/bin plus barrels. Historical untracked consumption cannot be assigned to a lot. It does not descend into POS sale lines, because a sale posts nothing to the ledger and would imply a per-pint traceability MGR does not have.",
-    body: (<>
-      {E.back("Compliance months", "L-240831-HZ")}
-      {E.row("Hazy IPA · 16 oz case", "run 28 · packaged 8/31 · best by 2/27", "7.61 bbl recorded balance")}
-      {E.fld("Tank · batch", "FV-3 · batch 41 · brewed 8/10")}
-      {E.fld("Drawn", "25.00 bbl")}
-      {E.tape([["+120 · production in · Hazy IPA 16 oz case · Warehouse", "8/31"], ["−2 · sample · Hazy IPA 16 oz case · Warehouse", "9/02"]])}
-      {E.ttl("Recorded balances by SKU and bin")}
-      {E.row("Hazy IPA · 16 oz case", "Warehouse · Cooler", "118 units · 7.61 bbl")}
-      {E.ttl("Recipients")}
-      {E.blank("No recorded shipments of this lot")}
-      {E.note("Only recorded lot identities are traced. Historical untracked stock and consumption cannot be assigned to this lot.")}
-    </>),
+    body: <LotTraceView model={toLotTraceViewProps(lotTraceHazy)} />,
   },
   {
     step: 7,
@@ -2187,15 +2191,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["not filed", "ready to review", 1], ["filed", "immutable snapshot saved"], ["lots", "every packaged lot opens its trace"]],
     spec: "This is the shared destination for the registry back link, the month rows, and the lot trace. The last three months always show, plus every filed period; a month is TTB, the API takes other jurisdictions and ranges.",
-    body: (<>
-      {E.hd("Compliance", "months")}
-      {E.nav("September 2026", "not filed · ready to review", "w")}
-      {E.nav("August 2026", "filed 2026-09-02 · 41.20 bbl taxable", "ok")}
-      {E.nav("July 2026", "filed 2026-08-04 · 38.75 bbl taxable", "ok")}
-      {E.nav("Compliance registry", "brands, states and licenses")}
-      {E.ttl("Lot trace")}
-      {E.nav("L-240831-HZ", "Hazy IPA · packaged 2026-08-31")}
-    </>),
+    body: <ComplianceMonthsView model={toComplianceMonthsViewProps(complianceMonthsDemo)} />,
   },
   {
     step: 7,
@@ -2244,20 +2240,7 @@ export const SCREENS: Screen[] = [
     writes: "upsert_brand_approval · upsert_state_registration · upsert_brewery_state_license",
     states: [["pending", "a brand with no COLA is flagged", 1], ["empty", "no brands yet: nothing to register"], ["permission", "sales or admin required", 1]],
     spec: "Unregistered destination/brand combinations are meant to warn during order confirm and link here; that read is not built yet (drift: order warning). One page, two lists: each brand with its approvals and state registrations under it, then the brewery's licenses; the three sheets add or edit a row.",
-    body: (<>
-      {E.back("Compliance months", "Registry")}
-      {E.tabs(["brands", "licenses"])}
-      {E.ttl("Brands")}
-      {E.row("Hazy IPA", "COLA 23001001000123 · expires 2031-01-15")}
-      {E.row("COLA 23001001000123", "approved 2026-01-15 · expires 2031-01-15", E.act("Edit"))}
-      {E.row("OH registration", "OH-88214 · expires 2026-12-31", E.act("Edit"))}
-      {E.row("Stout", "COLA pending", "", "w")}
-      {E.btns(["Add approval", "Add registration"])}
-      {E.ttl("Licenses")}
-      {E.row("PA brewery", "G-21884 · expires 2027-06-30", E.act("Edit"))}
-      {E.btn("Add license", "g")}
-      {E.note("Order confirmation does not read this registry yet; a warning for an unregistered destination state is planned and will never block.")}
-    </>),
+    body: <ComplianceRegistryView model={toComplianceRegistryViewProps(complianceRegistryDemo)} />,
   },
   {
     step: 7,
@@ -2270,13 +2253,7 @@ export const SCREENS: Screen[] = [
     reads: "get_compliance_registry",
     writes: "upsert_brand_approval",
     states: [["approved", "orders may proceed"], ["duplicate", "the same number on the same brand is one record · conflict", 1]],
-    body: (<>
-      {E.pick("Brand", "Stout", ["Hazy IPA", "Pils", "Stout"])}
-      {E.pick("Approval", "COLA", ["COLA", "Formula"])}
-      {E.inp("COLA number")}
-      {E.cols(E.edit("Approved on · optional", "2026-01-15", "date"), E.edit("Expires · optional", "2031-01-15", "date"))}
-      {E.btn("Save approval")}
-    </>),
+    body: <BrandApprovalView model={toBrandApprovalViewProps(brandApprovalStout)} />,
   },
   {
     step: 7,
@@ -2289,13 +2266,7 @@ export const SCREENS: Screen[] = [
     reads: "get_compliance_registry",
     writes: "upsert_state_registration",
     states: [["registered", "brand may ship to the state"], ["missing", "order confirmation warns", 1], ["saved again", "one record per brand and state: saving replaces it"]],
-    body: (<>
-      {E.pick("Brand", "Hazy IPA", ["Hazy IPA", "Pils", "Stout"])}
-      {E.cols(E.edit("State (two letters)", "OH"), E.edit("Registration number · optional", "OH-88214"))}
-      {E.edit("Expires · optional", "2026-12-31", "date")}
-      {E.note("One record per brand and state: saving again replaces it.")}
-      {E.btn("Save registration")}
-    </>),
+    body: <StateRegistrationView model={toStateRegistrationViewProps(stateRegistrationHazy)} />,
   },
   {
     step: 7,
@@ -2308,12 +2279,7 @@ export const SCREENS: Screen[] = [
     reads: "get_compliance_registry",
     writes: "upsert_brewery_state_license",
     states: [["current", "orders may proceed"], ["expired", "order confirmation warns", 1], ["saved again", "one record per state and kind: saving replaces it"]],
-    body: (<>
-      {E.cols(E.edit("State (two letters)", "PA"), E.edit("Kind", "brewery"))}
-      {E.cols(E.edit("License number · optional", "G-21884"), E.edit("Expires · optional", "2027-06-30", "date"))}
-      {E.note("Kind is the license class the state uses: brewery, supplier, direct to consumer. One record per state and kind.")}
-      {E.btn("Save license")}
-    </>),
+    body: <LicenseView model={toLicenseViewProps(licensePaBrewery)} />,
   },
   {
     step: 7,
