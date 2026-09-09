@@ -44,4 +44,18 @@ describe("bounded command request bodies", () => {
     const { request } = streamed([], { "content-length": String(MAX_COMMAND_BODY_BYTES + 1) });
     expect((await POST(request)).status).toBe(413);
   });
+
+  it("keeps the stable 413 when stream cancellation rejects", async () => {
+    let sent = false;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (!sent) { sent = true; controller.enqueue(new Uint8Array(MAX_COMMAND_BODY_BYTES + 1)); }
+      },
+      cancel: () => Promise.reject(new Error("cancel failed")),
+    });
+    const request = new Request("http://localhost/api/command", { method: "POST", body, duplex: "half" } as RequestInit);
+    const response = await POST(request);
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toMatchObject({ error: { code: "request_too_large" } });
+  });
 });
