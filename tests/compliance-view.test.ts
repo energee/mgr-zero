@@ -140,10 +140,29 @@ describe("Lot trace", () => {
       movements: [{ ...lotTraceHazy.movements[1], id: "return", type: "return_in", bin: "Returns", bbl: 0.13, ref: "credit", source_movement_id: "shipped" }],
     }, "/compliance");
     const html = htmlOf(createElement(LotTraceView, { model, tape: null }));
-    expect(html).toMatch(/Returns · 2026-09-02/);
+    expect(html).toMatch(/Returns · 9\/2/);
     expect(html).toMatch(/0\.13 bbl recorded/);
     expect(html).toMatch(/href="#movement-shipped"/);
     expect(html).toMatch(/href="\/invoices\/credit"/);
+  });
+
+  it("formats every date as a short calendar day and owns every movement SKU", () => {
+    const model = toLotTraceViewProps(lotTraceHazy);
+    expect(model.skuDetail).toBe("run 28 · packaged 8/31 · best by 2/27");
+    expect(model.tankBatch).toBe("FV-3 · batch 41 · brewed 8/10");
+    expect(model.tape).toEqual([
+      { key: "in", label: "+120 · production in · Hazy IPA · 16 oz case · Warehouse", when: "8/31" },
+      { key: "sample", label: "−2 · sample · Hazy IPA · 16 oz case · Warehouse", when: "9/2" },
+    ]);
+    expect(model.movements?.map(({ title, detail }) => ({ title, detail }))).toEqual([
+      { title: "+120 · production in · Hazy IPA · 16 oz case", detail: "Warehouse · Cooler · 8/31" },
+      { title: "-2 · sample · Hazy IPA · 16 oz case", detail: "Warehouse · Cooler · 9/2" },
+    ]);
+    expect(model.balances.map(({ title }) => title)).toEqual(["Hazy IPA · 16 oz case"]);
+    expect(toLotTraceViewProps({
+      ...lotTraceHazy,
+      balances: [{ ...lotTraceHazy.balances[0], sku: "16 oz case" }],
+    }).balances.map(({ title }) => title)).toEqual(["Hazy IPA · 16 oz case"]);
   });
 
   it("does not repeat a brand-owned SKU name and keeps the empty-recipient state", () => {
