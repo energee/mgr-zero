@@ -190,6 +190,7 @@ it("A4/B2/NULL0 counts A3/B2/NULL0: only A loses one, no raw lot metadata", asyn
   input.p_lines.find(l => l.lot_id === a)!.qty_counted = 3;
   const saved = await f.ctx.db.rpc("record_taproom_count", input); expect(saved.error).toBeNull();
   expect(saved.data.lines).toHaveLength(3);
+  expect(saved.data.lines.map((line: { lot_id: string | null }) => line.lot_id)).toEqual([null, ...[a, b].sort()]);
   const movements = await admin.from("inventory_movements").select("qty,lot_id").eq("ref", saved.data.id);
   expect(movements.data).toEqual([{ qty: -1, lot_id: a }]);
   const snapshot = await prepare(f);
