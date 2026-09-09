@@ -3513,10 +3513,12 @@ begin
 
   select * into v_push from public.qbo_pushes where invoice_id=p_invoice and status='pending' order by created_at desc,id desc limit 1;
   if found then
-    if v_push.realm_id<>v_conn.realm_id then raise exception 'QuickBooks company changed; pending push cannot be retargeted' using errcode='MG409'; end if;
+    if v_push.connection_id<>v_conn.id or v_push.realm_id<>v_conn.realm_id then
+      raise exception 'QuickBooks connection changed; pending push remains frozen and cannot be retargeted' using errcode='MG409';
+    end if;
     v_result:=jsonb_build_object('pushId',v_push.id,'providerRequestId',v_push.provider_request_id,
       'finishRequestId',v_push.finish_request_id,'requestBody',v_push.request_body,'entityType',v_push.entity_type,
-      'realmId',v_push.realm_id,'connectionId',v_conn.id,'status',v_push.status);
+      'realmId',v_push.realm_id,'connectionId',v_push.connection_id,'status',v_push.status);
     return private.complete_command_request(p_request_id,v_result);
   end if;
 
@@ -3552,17 +3554,17 @@ begin
 
   select count(*) filter(where
       (v_inv.kind='invoice' and (il.kind not in ('sku','keg_deposit') or il.qty<=0 or il.unit_price_cents<0 or il.amount_cents<0))
-      or (v_inv.kind='credit_memo' and (il.kind<>'sku' or il.qty>=0 or il.unit_price_cents<0 or il.amount_cents>=0))),
+      or (v_inv.kind='credit_memo' and (il.kind not in ('sku','keg_deposit_refund') or il.qty>=0 or il.unit_price_cents<0 or il.amount_cents>=0))),
     count(*) filter(where
       (il.kind='sku' and (s.qbo_item_id is null or s.qbo_realm_id is distinct from v_conn.realm_id))
-      or (il.kind='keg_deposit' and v_conn.qbo_deposit_item_id is null))
+      or (il.kind in ('keg_deposit','keg_deposit_refund') and v_conn.qbo_deposit_item_id is null))
     into v_invalid,v_unmapped
   from public.invoice_lines il left join public.skus s on s.id=il.sku_id and s.brewery_id=il.brewery_id
   where il.invoice_id=p_invoice and il.brewery_id=p_brewery;
   if not exists(select 1 from public.invoice_lines where invoice_id=p_invoice and brewery_id=p_brewery) then raise exception 'invoice lines required'; end if;
   if v_invalid>0 then raise exception 'QuickBooks does not support this invoice line shape'; end if;
   if v_unmapped>0 then
-    if exists(select 1 from public.invoice_lines where invoice_id=p_invoice and kind='keg_deposit') and v_conn.qbo_deposit_item_id is null
+    if exists(select 1 from public.invoice_lines where invoice_id=p_invoice and kind in ('keg_deposit','keg_deposit_refund')) and v_conn.qbo_deposit_item_id is null
       then raise exception 'QuickBooks deposit item mapping required'; end if;
     raise exception 'QuickBooks item mapping required';
   end if;
@@ -3572,12 +3574,12 @@ begin
       'Description',il.description,
       'DetailType','SalesItemLineDetail',
       'SalesItemLineDetail',jsonb_build_object(
-        'ItemRef',jsonb_build_object('value',case when il.kind='keg_deposit' then v_conn.qbo_deposit_item_id else s.qbo_item_id end),
+        'ItemRef',jsonb_build_object('value',case when il.kind in ('keg_deposit','keg_deposit_refund') then v_conn.qbo_deposit_item_id else s.qbo_item_id end),
         'Qty',case when v_inv.kind='credit_memo' then -il.qty else il.qty end,
         'UnitPrice',round(il.unit_price_cents::numeric/100,2))) order by il.id),
     jsonb_agg(jsonb_build_object('id',il.id,'kind',il.kind,'skuId',il.sku_id,'qty',il.qty,
       'unitPriceCents',il.unit_price_cents,'amountCents',il.amount_cents,
-      'qboItemId',case when il.kind='keg_deposit' then v_conn.qbo_deposit_item_id else s.qbo_item_id end) order by il.id)
+      'qboItemId',case when il.kind in ('keg_deposit','keg_deposit_refund') then v_conn.qbo_deposit_item_id else s.qbo_item_id end) order by il.id)
     into v_lines,v_snapshot_lines
   from public.invoice_lines il left join public.skus s on s.id=il.sku_id and s.brewery_id=il.brewery_id
   where il.invoice_id=p_invoice and il.brewery_id=p_brewery;
@@ -3601,7 +3603,7 @@ begin
   update public.invoices set qbo_sync_status='pending',qbo_sync_error=null where id=p_invoice;
   v_result:=jsonb_build_object('pushId',v_push.id,'providerRequestId',v_push.provider_request_id,
     'finishRequestId',v_push.finish_request_id,'requestBody',v_push.request_body,'entityType',v_push.entity_type,
-    'realmId',v_push.realm_id,'connectionId',v_conn.id,'status',v_push.status);
+    'realmId',v_push.realm_id,'connectionId',v_push.connection_id,'status',v_push.status);
   return private.complete_command_request(p_request_id,v_result);
 end $$;
 
@@ -3613,8 +3615,8 @@ begin
     then raise insufficient_privilege using message='permission denied'; end if;
   select * into v_push from public.qbo_pushes where id=p_push and brewery_id=p_brewery for update;
   if not found then raise exception 'QuickBooks push not found'; end if;
-  if not exists(select 1 from public.qbo_connections where brewery_id=p_brewery and realm_id=v_push.realm_id and state='connected')
-    then raise exception 'QuickBooks company changed; push result cannot be retargeted' using errcode='MG409'; end if;
+  if not exists(select 1 from public.qbo_connections where brewery_id=p_brewery and id=v_push.connection_id and realm_id=v_push.realm_id and state='connected')
+    then raise exception 'QuickBooks connection changed; pending push remains frozen and cannot be finalized by another connection' using errcode='MG409'; end if;
   if p_request_id<>v_push.finish_request_id then raise exception 'invalid QuickBooks finish identity' using errcode='MG409'; end if;
   if p_status not in ('pushed','push_failed') then raise exception 'invalid QuickBooks push result'; end if;
   if p_status='pushed' and nullif(btrim(p_qbo_entity_id),'') is null then raise exception 'QuickBooks entity id required'; end if;
