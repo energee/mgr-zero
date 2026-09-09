@@ -18,7 +18,7 @@
 - Swap closes interval A and opens B in one RPC; carries `open_interval_id` and requires `closed_at is null` (compare-and-swap).
 - Remaining fill: chips only (`empty` | `quarter` | `half`). Stored as `closing_fill numeric` 0, 0.25, 0.5.
 - Reverse: new movement with `compensates_id` FK to original; original unchanged. TTB reports include originals and compensations with signed net amounts. Sign must be exact opposite qty and same type/channel/dest_state.
-- `complete_batch`, latest-count correction, and `reattribute_loss` remain unimplemented here; their accepted contracts and ordering are in the 2026-09-09 T4 spec.
+- Latest-count correction is implemented under §B of the 2026-09-09 T4 spec. `complete_batch` and `reattribute_loss` remain separate T4 cards governed by that spec.
 - TDD, docs:api, staff-guide, nav Taps + Taproom `planned` off.
 
 ## File map
@@ -40,15 +40,15 @@
 **Files:** baseline, `lib/commands/taproom.ts`, `tests/taproom-count.test.ts`, exhaustive RLS/RPC tests, command API and staff guide. No count page in this task.
 
 **Interfaces:**
-- `taproom_counts (id, brewery_id, location_id, counted_on, counted_by, created_at, prior_count_id)`; unique tenant/location/date; prior identity is constrained to the same tenant and location.
-- `taproom_count_lines (id, brewery_id, count_id, location_id, bin_id, sku_id, lot_id nullable, qty_before, qty_counted, movement_id nullable)`; NULL-aware unique count/bin/SKU/lot grain and composite tenant-safe foreign keys. Both tables are append-only.
+- `taproom_counts (id, brewery_id, location_id, counted_on, counted_by, observed_at, created_at, prior_count_id, corrects_count_id, correction_reason)`; roots are unique by tenant/location/date, correction and prior identities stay in the same tenant/location, and observation time remains separate from correction audit time.
+- `taproom_count_lines (id, brewery_id, count_id, location_id, bin_id, sku_id, lot_id nullable, qty_before, qty_counted, movement_id nullable, corrects_line_id)`; NULL-aware unique count/bin/SKU/lot grain and composite tenant-safe foreign keys. Both tables are append-only.
 - `get_taproom_count_snapshot({ locationId })` returns all current movement buckets, including historical zero balances, safe bin/SKU labels, today's brewery-local date, prior count identity, and a revision binding relevant movement IDs and prior count. SQL aggregation reads beyond API row limits. No raw lots or printed lot codes are exposed.
 - `record_taproom_count({ locationId, countedOn, revision, lines: [{ binId, skuId, lotId: UUID|null, qtyCounted }] })` permits Admin, Warehouse, and Taproom. Quantities mean remaining whole packaged units. A partly full keg counts as one until gone; fill chips never enter the ledger.
 - Authenticate → claim/replay request → count-scope advisory lock → existing global inventory ledger lock → validate brewery-local current date, chronology, revision and complete exact bucket keys → save header/all lines and only negative per-bucket depletion → freeze result. Replays precede stale/same-day checks; changed payload reuse conflicts.
 - `qty_before` is current ledger stock, **not POS expected consumption**. Depletion is `qty_before - qty_counted`, posted only when positive with exactly the supplied bucket's lot identity. NULL means untracked stock, never FIFO or aggregate allocation. Resolve the tenant's named Taproom channel in SQL and freeze its tax treatment; destination state stays null. Matching counts do not require a channel or POS connection.
 - Reject omitted/extra/duplicate canonical keys, wrong tenant/location/bin/SKU/lot, negative/fractional/nonfinite quantities, overcounts, stale snapshots and historical/same-day counts atomically. A later chronological count is accepted only on today's brewery-local date.
 - `get_taproom_count({ countId })` returns the durable occurrence, prior identity, every saved observation and linked frozen movement BBL.
-- T4a adds the approved exact-revision print projection without raw lot access. T4b later adds the separately accepted latest-count-only Admin correction; until it lands, a mistaken low count cannot be fixed by another depletion-only count or generic adjustment.
+- T4a adds the approved exact-revision print projection without raw lot access. T4b adds the separately accepted latest-count-only Admin correction with one effective logical history occurrence and append-only frozen compensation/replacement provenance. A generic adjustment never corrects count-owned depletion.
 
 - [ ] **Step 1:** Real-Postgres red against absent count RPC/tables. Cover matching header/all lines/no posting; 7→2 posts −5; A4/B2/NULL0→A3/B2/NULL0 changes only A; tracked and untracked coexist; invalid input leaves no partial rows; count/transfer concurrency and stale revisions; exact replay and changed-payload conflict; chronology with brewery-date fixtures; frozen alternate-channel tax/BBL; no POS; more than 1000 movements/buckets; exhaustive count-table RLS positive controls and role-safe writes.
 - [ ] **Step 2–5:** Implement, reset only the isolated test stack, run focused tests/typecheck/lint, then fresh spec review followed by quality review. Parent runs grouped full proof. Commit `feat(taproom): durable explicit-bucket counts post only depletion` after focused proof. Program 12 stays incomplete until remaining tasks and gates are resolved.

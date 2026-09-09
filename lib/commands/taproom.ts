@@ -8,7 +8,7 @@
 // keg_deposit_balances. Tap board writes
 // and durable physical counts are implemented below.
 import { z } from "zod";
-import { CommandError, defineCommand, defineQuery, unwrap, type Ctx } from "./registry";
+import { defineCommand, defineQuery, unwrap, type Ctx } from "./registry";
 
 export const KEG_SIZES = ["half_bbl", "quarter_bbl", "sixth_bbl", "fifty_l", "thirty_l", "twenty_l"] as const;
 export const KEG_POOL_KINDS = ["owned", "leased", "pay_per_fill"] as const;
@@ -144,47 +144,33 @@ defineQuery({
   })),
 });
 defineQuery({
-  name: "get_taproom_count", description: "Read a saved taproom count with every physical observation, safe bin and SKU labels, prior count, movement identity and frozen depletion BBL",
+  name: "get_taproom_count", description: "Read one logical saved taproom count resolved to its effective observations, correction audit, safe bin and SKU labels, prior count, movement identity and frozen depletion BBL",
   input: z.object({ countId: z.string().uuid() }), roles: [...COUNT_ROLES],
   handler: (ctx, i) => unwrap(ctx.db.rpc("get_taproom_count", { p_brewery: ctx.breweryId, p_count: i.countId })),
 });
 defineQuery({
-  name: "list_taproom_counts", description: "Newest 50 durable physical-count headers at one owned taproom, with observation, movement and depleted-unit totals",
+  name: "list_taproom_counts", description: "Newest 50 logical physical-count occurrences at one owned taproom, with effective correction, observation, movement and depleted-unit totals",
   input: z.object({ locationId: z.string().uuid() }), roles: [...COUNT_ROLES],
-  handler: async (ctx, i) => {
-    const location = await unwrap(ctx.db.from("locations").select("kind").eq("brewery_id", ctx.breweryId).eq("id", i.locationId).maybeSingle()) as { kind: string } | null;
-    if (location?.kind !== "taproom") throw new CommandError("choose an owned taproom location");
-    const counts = await unwrap(ctx.db.from("taproom_counts")
-      .select("id,location_id,counted_on,counted_by,created_at,prior_count_id")
-      .eq("brewery_id", ctx.breweryId).eq("location_id", i.locationId)
-      .order("created_at", { ascending: false }).order("id", { ascending: false }).limit(50)) as unknown as {
-        id: string; location_id: string; counted_on: string; counted_by: string; created_at: string; prior_count_id: string | null;
-      }[];
-    const lines: { count_id: string; qty_before: number; qty_counted: number; movement_id: string | null }[] = [];
-    for (let start = 0; counts.length > 0; start += 500) {
-      const page = await unwrap(ctx.db.from("taproom_count_lines").select("count_id,qty_before,qty_counted,movement_id", { count: "exact" })
-        .eq("brewery_id", ctx.breweryId).in("count_id", counts.map((count) => count.id)).order("count_id").order("id").range(start, start + 499)) as unknown as typeof lines;
-      lines.push(...page);
-      if (page.length < 500) break;
-    }
-    return counts.map((count) => {
-      const observed = lines.filter((line) => line.count_id === count.id);
-      return ({ ...count,
-        observations: observed.length,
-        movements: observed.filter((line) => line.movement_id !== null).length,
-        depleted_units: observed.reduce((total, line) => total + Number(line.qty_before) - Number(line.qty_counted), 0),
-      });
-    });
-  },
+  handler: (ctx, i) => unwrap(ctx.db.rpc("list_taproom_counts", { p_brewery: ctx.breweryId, p_location: i.locationId })),
 });
 defineCommand({
-  name: "record_taproom_count", description: "Save today's complete explicit-bucket count of remaining whole packaged units using the prepared revision; partial kegs count as one until gone. Persist matching counts without movements; shortages alone post exact-lot depletion. Stale, incomplete, duplicate and overcounts are refused; count correction is not yet available",
+  name: "record_taproom_count", description: "Save today's complete explicit-bucket count of remaining whole packaged units using the prepared revision; partial kegs count as one until gone. Persist matching counts without movements; shortages alone post exact-lot depletion. Stale, incomplete, duplicate and overcounts are refused",
   input: z.object({ locationId: z.string().uuid(), countedOn: z.string().date(), revision: z.string().min(1),
     lines: z.array(z.object({ binId: z.string().uuid(), skuId: z.string().uuid(), lotId: z.string().uuid().nullable(), qtyCounted: z.number().int().nonnegative() })) }),
   roles: [...COUNT_ROLES],
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("record_taproom_count", {
     p_brewery: ctx.breweryId, p_location: i.locationId, p_counted_on: i.countedOn, p_revision: i.revision,
     p_lines: i.lines.map(l => ({ bin_id: l.binId, sku_id: l.skuId, lot_id: l.lotId, qty_counted: l.qtyCounted })), p_request_id: execution.requestId,
+  })),
+});
+defineCommand({
+  name: "correct_taproom_count", description: "Admin-only replacement for the latest uncorrected mistaken-low Taproom count. Send only increased root-line quantities plus a reason; the original stays immutable and exact frozen compensation/replacement entries preserve reporting",
+  input: z.object({ countId: z.string().uuid(), corrections: z.array(z.object({ lineId: z.string().uuid(), qtyCounted: z.number().int().nonnegative() })).min(1), reason: z.string().trim().min(1) }),
+  roles: ["admin"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("correct_taproom_count", {
+    p_brewery: ctx.breweryId, p_count: i.countId,
+    p_corrections: i.corrections.map(line => ({ line_id: line.lineId, qty_counted: line.qtyCounted })),
+    p_reason: i.reason, p_request_id: execution.requestId,
   })),
 });
 
@@ -227,7 +213,7 @@ defineQuery({
 
 
 defineQuery({
-  name: "get_taproom_variance", description: "Current brand comparison over completed count pairs ending in the last 4 or 12 brewery-local calendar weeks. Whole periods use (prior created_at, current created_at]; first counts lack a baseline. Actual is frozen count depletion, expected is frozen POS serving volume. Missing coverage stays null; explicitly complete empty observations permit zero. Mapped lines contribute despite mapping gaps. Timestamp-active equal-share tap estimates retain excluded out-of-stock shares; guest identity is never inferred. Late reconciled sales may change expected, never inventory. Returns bounds, as_of, coverage, mapping gaps and unattributed volume",
+  name: "get_taproom_variance", description: "Current brand comparison over completed count pairs ending in the last 4 or 12 brewery-local calendar weeks. Whole periods use (prior observed_at, current observed_at]; first counts lack a baseline. Actual is effective frozen count depletion, expected is frozen POS serving volume. Missing coverage stays null; explicitly complete empty observations permit zero. Mapped lines contribute despite mapping gaps. Timestamp-active equal-share tap estimates retain excluded out-of-stock shares; guest identity is never inferred. Late reconciled sales may change expected, never inventory. Returns bounds, as_of, coverage, mapping gaps and unattributed volume",
   input: z.object({ locationId: z.string().uuid(), weeks: z.union([z.literal(4), z.literal(12)]) }), roles: [...COUNT_ROLES],
   handler: (ctx,i) => unwrap(ctx.db.rpc("get_taproom_variance", { p_brewery: ctx.breweryId, p_location: i.locationId, p_weeks: i.weeks })),
 });

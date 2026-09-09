@@ -23,8 +23,9 @@ describe("durable explicit taproom counts", () => {
     expect(snapshot.error).toBeNull();
     const input = { locationId: f.location.id, countedOn: f.day, revision: snapshot.data.revision,
       lines: [{ binId: f.location.binId, skuId: f.cat.skuId, lotId: null, qtyCounted: 7 }] };
-    const saved = await runCommand("record_taproom_count", input, f.ctx) as { id: string; lines: unknown[] };
+    const saved = await runCommand("record_taproom_count", input, f.ctx) as { id: string; correction_eligible: boolean; lines: unknown[] };
     expect(saved.lines).toMatchObject([{ qty_before: 7, qty_counted: 7, movement_id: null }]);
+    expect(saved.correction_eligible).toBe(false);
     expect((await admin.from("taproom_counts").select("id").eq("id", saved.id)).data).toHaveLength(1);
     expect((await admin.from("inventory_movements").select("id").eq("brewery_id", f.brewery.id)).data).toHaveLength(1);
   });
@@ -33,8 +34,8 @@ describe("durable explicit taproom counts", () => {
     const f = await fixture();
     const other = await fixture();
     const warehouse = await seedLocation(f.brewery.id, { name: "Warehouse" });
-    sql(`insert into public.taproom_counts(id,brewery_id,location_id,counted_on,counted_by,created_at)
-      select private.new_uuid(),'${f.brewery.id}','${f.location.id}',date '2026-01-01'+n,'${f.ctx.userId}',timestamptz '2026-01-01 12:00Z'+n*interval '1 day'
+    sql(`insert into public.taproom_counts(id,brewery_id,location_id,counted_on,counted_by,observed_at,created_at)
+      select private.new_uuid(),'${f.brewery.id}','${f.location.id}',date '2026-01-01'+n,'${f.ctx.userId}',timestamptz '2026-01-01 12:00Z'+n*interval '1 day',timestamptz '2026-01-01 12:00Z'+n*interval '1 day'
       from generate_series(0,50) n`);
 
     const rows = await runCommand("list_taproom_counts", { locationId: f.location.id }, f.ctx) as { counted_on: string }[];
@@ -157,6 +158,260 @@ it("7 remaining to 2 posts exactly -5, freezes tax and volume, and replays befor
   expect(await runCommand("get_taproom_count", { countId: first.data.id }, f.ctx)).toEqual(first.data);
   const changed = await f.ctx.db.rpc("record_taproom_count", { ...input, p_lines: [{ ...input.p_lines[0], qty_counted: 1 }] });
   expect(changed.error?.code).toBe("MG409"); expect(state(f)).toEqual(before);
+});
+
+it("corrects the latest mistaken-low count with frozen compensating and replacement legs", async () => {
+  const f = await fixture();
+  const adminCtx = await makeStaffCtx(f.brewery.id, "admin");
+  const input = await args(f); input.p_lines[0].qty_counted = 2;
+  const rootResult = await f.ctx.db.rpc("record_taproom_count", input); expect(rootResult.error).toBeNull();
+  const root = rootResult.data;
+  const originalMovement = (await admin.from("inventory_movements").select("sale_channel_id,tax_treatment,package_type,bin_id,sku_id,lot_id").eq("id", root.lines[0].movement_id).single()).data!;
+  const originalHeader = sql(`select to_jsonb(c)::text from public.taproom_counts c where id='${root.id}'`)[0];
+  const originalLine = sql(`select to_jsonb(l)::text from public.taproom_count_lines l where id='${root.lines[0].id}'`)[0];
+  expect((await admin.from("formats").update({ bbl_per_unit: .25 }).eq("id", f.cat.formatId)).error).toBeNull();
+  expect((await admin.from("sale_channels").update({ name: "Bar", tax_treatment: "research" }).eq("id", originalMovement.sale_channel_id)).error).toBeNull();
+
+  const corrected = await runCommand("correct_taproom_count", {
+    countId: root.id,
+    corrections: [{ lineId: root.lines[0].id, qtyCounted: 4 }],
+    reason: "Counted two unopened kegs as empty",
+  }, adminCtx) as { root_id: string; effective_id: string; observed_at: string; corrected_at: string; corrected_by: string; lines: { qty_before: number; qty_counted: number; bbl: number | null }[] };
+
+  expect(corrected).toMatchObject({
+    root_id: root.id,
+    corrected_by: adminCtx.userId,
+    lines: [{ qty_before: 7, qty_counted: 4, bbl: -1.5 }],
+  });
+  expect(corrected.effective_id).not.toBe(root.id);
+  expect((await admin.from("inventory_movements")
+    .select("qty,bbl,type,compensates_id,correction_source_id,ref,sale_channel_id,tax_treatment,package_type,bin_id,sku_id,lot_id")
+    .eq("brewery_id", f.brewery.id).eq("type", "depletion").order("created_at")).data).toEqual([
+      expect.objectContaining({ qty: -5, bbl: -2.5, type: "depletion", compensates_id: null, correction_source_id: null, ref: root.id }),
+      expect.objectContaining({ qty: 5, bbl: 2.5, type: "depletion", compensates_id: root.lines[0].movement_id, correction_source_id: null, ref: corrected.effective_id }),
+      expect.objectContaining({ qty: -3, bbl: -1.5, type: "depletion", compensates_id: null, correction_source_id: root.lines[0].movement_id, ref: corrected.effective_id }),
+    ]);
+  const frozen = (await admin.from("inventory_movements").select("sale_channel_id,tax_treatment,package_type,bin_id,sku_id,lot_id").eq("ref", corrected.effective_id)).data!;
+  expect(frozen).toEqual([originalMovement, originalMovement]);
+  expect(sql(`select sum(qty)::numeric::float8 from public.inventory_movements where brewery_id='${f.brewery.id}' and location_id='${f.location.id}'`)).toEqual(["4"]);
+  expect(await runCommand("get_taproom_count", { countId: root.id }, f.ctx)).toEqual(corrected);
+  const draft = await runCommand("get_taproom_draft_projection", { locationId: f.location.id }, f.ctx) as { prior_count: { id: string }; starts_at: string };
+  expect(draft.prior_count.id).toBe(corrected.effective_id);
+  expect(new Date(draft.starts_at).toISOString()).toBe(new Date(corrected.observed_at).toISOString());
+  expect(await runCommand("list_taproom_counts", { locationId: f.location.id }, f.ctx)).toMatchObject([
+    { id: root.id, root_id: root.id, effective_id: corrected.effective_id, corrected_at: corrected.corrected_at, corrected_by: adminCtx.userId,
+      observations: 1, movements: 1, depleted_units: 3 },
+  ]);
+  expect(sql(`select to_jsonb(c)::text from public.taproom_counts c where id='${root.id}'`)).toEqual([originalHeader]);
+  expect(sql(`select to_jsonb(l)::text from public.taproom_count_lines l where id='${root.lines[0].id}'`)).toEqual([originalLine]);
+});
+
+it("restores the recorded-before quantity with compensation only", async () => {
+  const f = await fixture(); const adminCtx = await makeStaffCtx(f.brewery.id, "admin");
+  const input = await args(f); input.p_lines[0].qty_counted = 2;
+  const rootResult = await f.ctx.db.rpc("record_taproom_count", input); expect(rootResult.error).toBeNull();
+  const root = rootResult.data;
+  const corrected = await runCommand("correct_taproom_count", {
+    countId: root.id, corrections: [{ lineId: root.lines[0].id, qtyCounted: 7 }], reason: "All seven kegs were present",
+  }, adminCtx) as { effective_id: string; lines: { qty_counted: number; movement_id: string | null; bbl: number | null }[] };
+
+  expect(corrected.lines).toMatchObject([{ qty_counted: 7, movement_id: null, bbl: null }]);
+  expect((await admin.from("inventory_movements").select("qty,compensates_id,correction_source_id").eq("ref", corrected.effective_id)).data)
+    .toEqual([{ qty: 5, compensates_id: root.lines[0].movement_id, correction_source_id: null }]);
+  expect(sql(`select sum(qty)::numeric::float8 from public.inventory_movements where brewery_id='${f.brewery.id}'`)).toEqual(["7"]);
+});
+
+it("copies every root line and counts an unchanged shortage exactly once", async () => {
+  const f = await fixture(); const adminCtx = await makeStaffCtx(f.brewery.id, "admin");
+  const other = await seedCatalog(f.brewery.id, { product: "Pils", sku: "Pils keg", packageType: "keg", bblPerUnit: .25 });
+  await ins("inventory_movements", { brewery_id: f.brewery.id, sku_id: other.skuId, location_id: f.location.id,
+    bin_id: f.location.binId, qty: 5, type: "opening_balance", created_by: f.ctx.userId });
+  const input = await args(f);
+  input.p_lines.find(line => line.sku_id === f.cat.skuId)!.qty_counted = 2;
+  input.p_lines.find(line => line.sku_id === other.skuId)!.qty_counted = 3;
+  const rootResult = await f.ctx.db.rpc("record_taproom_count", input); expect(rootResult.error).toBeNull();
+  const root = rootResult.data;
+  const changed = root.lines.find((line: { sku_id: string }) => line.sku_id === f.cat.skuId)!;
+  const corrected = await runCommand("correct_taproom_count", {
+    countId: root.id, corrections: [{ lineId: changed.id, qtyCounted: 4 }], reason: "Found two full kegs",
+  }, adminCtx) as { effective_id: string; lines: { sku_id: string; qty_counted: number; bbl: number | null }[] };
+
+  expect(corrected.lines).toHaveLength(2);
+  expect(corrected.lines.find(line => line.sku_id === f.cat.skuId)).toMatchObject({ qty_counted: 4, bbl: -1.5 });
+  expect(corrected.lines.find(line => line.sku_id === other.skuId)).toMatchObject({ qty_counted: 3, bbl: -.5 });
+  expect(sql(`select -sum(coalesce(bbl,0))::numeric::float8 from private.taproom_effective_counts where effective_id='${corrected.effective_id}'`)).toEqual(["2"]);
+  expect((await admin.from("inventory_movements").select("id").eq("ref", corrected.effective_id)).data).toHaveLength(2);
+});
+
+it("uses a correction as the next baseline, posts it in the audit period, and leaves a filed snapshot byte-identical", async () => {
+  const f = await fixture(); const adminCtx = await makeStaffCtx(f.brewery.id, "admin");
+  const historical = sql("select (current_date-40)::text||'|'||date_trunc('month',current_date-40)::date||'|'||(date_trunc('month',current_date-40)+interval '1 month'-interval '1 day')::date")[0].split("|");
+  const observed = sql("select (now()-interval '40 days')::text")[0];
+  const root = await ins("taproom_counts", { brewery_id: f.brewery.id, location_id: f.location.id, counted_on: historical[0],
+    observed_at: observed, created_at: observed, counted_by: f.ctx.userId });
+  const channel = (await admin.from("sale_channels").select("id,tax_treatment").eq("brewery_id", f.brewery.id).eq("system_code", "taproom").single()).data!;
+  const movementRow = await ins("inventory_movements", { brewery_id: f.brewery.id, sku_id: f.cat.skuId, location_id: f.location.id,
+    bin_id: f.location.binId, qty: -5, type: "depletion", sale_channel_id: channel.id, tax_treatment: channel.tax_treatment,
+    ref: root.id, created_by: f.ctx.userId, created_at: observed });
+  const line = await ins("taproom_count_lines", { brewery_id: f.brewery.id, count_id: root.id, location_id: f.location.id,
+    bin_id: f.location.binId, sku_id: f.cat.skuId, qty_before: 7, qty_counted: 2, movement_id: movementRow.id });
+  const filing = await runCommand("file_compliance_report", {
+    jurisdiction: "TTB", periodStart: historical[1], periodEnd: historical[2], note: "frozen before count correction",
+  }, adminCtx) as { id: string };
+  const filedBefore = sql(`select figures::text from public.report_filings where id='${filing.id}'`)[0];
+  const corrected = await runCommand("correct_taproom_count", {
+    countId: root.id, corrections: [{ lineId: line.id, qtyCounted: 4 }], reason: "Found two kegs",
+  }, adminCtx) as { effective_id: string };
+  expect(sql(`select ((created_at at time zone 'America/New_York')::date between date '${historical[1]}' and date '${historical[2]}')::text
+    from public.inventory_movements where id='${movementRow.id}'`)).toEqual(["true"]);
+  expect(sql(`select bool_and((created_at at time zone 'America/New_York')::date > date '${historical[2]}')::text
+    from public.inventory_movements where ref='${corrected.effective_id}'`)).toEqual(["true"]);
+  expect(sql(`select figures::text from public.report_filings where id='${filing.id}'`)).toEqual([filedBefore]);
+  const snapshot = await prepare(f);
+  expect(snapshot.prior_count?.id).toBe(corrected.effective_id);
+  expect(snapshot.lines).toMatchObject([{ qty_before: 4 }]);
+  const next = await f.ctx.db.rpc("record_taproom_count", { p_brewery: f.brewery.id, p_location: f.location.id,
+    p_counted_on: snapshot.counted_on, p_revision: snapshot.revision,
+    p_lines: snapshot.lines.map(row => ({ bin_id: row.bin_id, sku_id: row.sku_id, lot_id: row.lot_id, qty_counted: row.qty_before })),
+    p_request_id: crypto.randomUUID() });
+  expect(next.error).toBeNull(); expect(next.data.prior_count_id).toBe(corrected.effective_id);
+  expect(new Date((await admin.from("taproom_counts").select("observed_at").eq("id", corrected.effective_id).single()).data!.observed_at).toISOString()).toBe(new Date(observed).toISOString());
+});
+
+it("rejects invalid correction input, foreign provenance, later roots, and non-Admin callers atomically", async () => {
+  const makeRoot = async () => {
+    const f = await fixture(); const input = await args(f); input.p_lines[0].qty_counted = 2;
+    const saved = await f.ctx.db.rpc("record_taproom_count", input); expect(saved.error).toBeNull();
+    return { f, root: saved.data, adminCtx: await makeStaffCtx(f.brewery.id, "admin") };
+  };
+  const { f, root, adminCtx } = await makeRoot(); const other = await makeRoot(); const before = state(f);
+  const bad = [
+    [{ line_id: root.lines[0].id, qty_counted: 2 }],
+    [{ line_id: root.lines[0].id, qty_counted: 1 }],
+    [{ line_id: root.lines[0].id, qty_counted: 8 }],
+    [{ line_id: root.lines[0].id, qty_counted: 4 }, { line_id: root.lines[0].id, qty_counted: 5 }],
+    [{ line_id: other.root.lines[0].id, qty_counted: 4 }],
+  ];
+  for (const p_corrections of bad) {
+    expect((await adminCtx.db.rpc("correct_taproom_count", { p_brewery: f.brewery.id, p_count: root.id,
+      p_corrections, p_reason: "wrong", p_request_id: crypto.randomUUID() })).error).not.toBeNull();
+    expect(state(f)).toEqual(before);
+  }
+  expect((await adminCtx.db.rpc("correct_taproom_count", { p_brewery: f.brewery.id, p_count: root.id,
+    p_corrections: [{ line_id: root.lines[0].id, qty_counted: 4 }], p_reason: "   ", p_request_id: crypto.randomUUID() })).error).not.toBeNull();
+  await expect(runCommand("correct_taproom_count", { countId: root.id, corrections: [{ lineId: root.lines[0].id, qtyCounted: 4 }], reason: "wrong" }, f.ctx))
+    .rejects.toMatchObject({ code: "permission_denied" });
+  expect(state(f)).toEqual(before);
+
+  const later = await ins("taproom_counts", { brewery_id: f.brewery.id, location_id: f.location.id,
+    counted_on: sql("select current_date+1")[0], observed_at: sql("select (now()+interval '1 day')::text")[0], counted_by: adminCtx.userId });
+  expect(later.id).toBeTruthy();
+  expect((await adminCtx.db.rpc("correct_taproom_count", { p_brewery: f.brewery.id, p_count: root.id,
+    p_corrections: [{ line_id: root.lines[0].id, qty_counted: 4 }], p_reason: "late", p_request_id: crypto.randomUUID() })).error?.code).toBe("MG409");
+  expect((await admin.from("taproom_counts").select("id").eq("corrects_count_id", root.id)).data).toEqual([]);
+
+  const broken = await fixture(); const brokenAdmin = await makeStaffCtx(broken.brewery.id, "admin");
+  const header = await ins("taproom_counts", { brewery_id: broken.brewery.id, location_id: broken.location.id, counted_on: broken.day, counted_by: broken.ctx.userId });
+  const wrongMovement = await ins("inventory_movements", { brewery_id: broken.brewery.id, sku_id: broken.cat.skuId, location_id: broken.location.id,
+    bin_id: broken.location.binId, qty: -5, type: "adjustment", ref: header.id, created_by: broken.ctx.userId });
+  const brokenLine = await ins("taproom_count_lines", { brewery_id: broken.brewery.id, count_id: header.id, location_id: broken.location.id,
+    bin_id: broken.location.binId, sku_id: broken.cat.skuId, qty_before: 7, qty_counted: 2, movement_id: wrongMovement.id });
+  expect((await brokenAdmin.db.rpc("correct_taproom_count", { p_brewery: broken.brewery.id, p_count: header.id,
+    p_corrections: [{ line_id: brokenLine.id, qty_counted: 4 }], p_reason: "bad provenance", p_request_id: crypto.randomUUID() })).error).not.toBeNull();
+  expect((await admin.from("taproom_counts").select("id").eq("corrects_count_id", header.id)).data).toEqual([]);
+});
+
+it("replays exactly, rejects changed reuse and revoked Admin, and serializes two PostgreSQL corrections", async () => {
+  const f = await fixture(); const adminCtx = await makeStaffCtx(f.brewery.id, "admin"); const input = await args(f); input.p_lines[0].qty_counted = 2;
+  const rootResult = await f.ctx.db.rpc("record_taproom_count", input); expect(rootResult.error).toBeNull(); const root = rootResult.data;
+  const correction = { countId: root.id, corrections: [{ lineId: root.lines[0].id, qtyCounted: 4 }], reason: "Found two kegs" };
+  const requestId = crypto.randomUUID(); const execution = { requestId, correlationId: crypto.randomUUID() };
+  const first = await runCommand("correct_taproom_count", correction, adminCtx, execution);
+  expect(await runCommand("correct_taproom_count", correction, adminCtx, { requestId, correlationId: crypto.randomUUID() })).toEqual(first);
+  await expect(runCommand("correct_taproom_count", { ...correction, reason: "Changed reason" }, adminCtx,
+    { requestId, correlationId: crypto.randomUUID() })).rejects.toMatchObject({ status: 409 });
+  await expect(runCommand("correct_taproom_count", correction, adminCtx)).rejects.toThrow(/already corrected/);
+  await expect(runCommand("correct_taproom_count", { ...correction, countId: (first as { effective_id: string }).effective_id }, adminCtx)).rejects.toThrow(/original count/);
+  expect((await admin.from("taproom_counts").select("id").eq("corrects_count_id", root.id)).data).toHaveLength(1);
+
+  expect((await admin.from("brewery_users").update({ role: "warehouse" }).eq("brewery_id", f.brewery.id).eq("user_id", adminCtx.userId)).error).toBeNull();
+  expect((await adminCtx.db.rpc("correct_taproom_count", { p_brewery: f.brewery.id, p_count: root.id,
+    p_corrections: correction.corrections.map(row => ({ line_id: row.lineId, qty_counted: row.qtyCounted })),
+    p_reason: correction.reason, p_request_id: requestId })).error?.code).toBe("42501");
+
+  const race = await fixture(); const racer = await makeStaffCtx(race.brewery.id, "admin"); const raceInput = await args(race); raceInput.p_lines[0].qty_counted = 2;
+  const raceRootResult = await race.ctx.db.rpc("record_taproom_count", raceInput); expect(raceRootResult.error).toBeNull(); const raceRoot = raceRootResult.data;
+  const a = new Client({ connectionString: DB }), b = new Client({ connectionString: DB }); await Promise.all([a.connect(), b.connect()]);
+  const values = [race.brewery.id, raceRoot.id, JSON.stringify([{ line_id: raceRoot.lines[0].id, qty_counted: 4 }]), "Found two kegs"];
+  let pending: Promise<unknown> | undefined;
+  try {
+    await a.query("begin"); await a.query("select set_config('request.jwt.claim.sub',$1,true)", [racer.userId]); await a.query("set local role authenticated");
+    await a.query("select public.correct_taproom_count($1,$2,$3::jsonb,$4,$5)", [...values, crypto.randomUUID()]);
+    await a.query("reset role");
+    await b.query("begin"); await b.query("select set_config('request.jwt.claim.sub',$1,true)", [racer.userId]); await b.query("set local role authenticated");
+    const pid = (await b.query("select pg_backend_pid() pid")).rows[0].pid;
+    pending = b.query("select public.correct_taproom_count($1,$2,$3::jsonb,$4,$5)", [...values, crypto.randomUUID()]);
+    await expect.poll(async () => (await a.query("select wait_event_type from pg_stat_activity where pid=$1", [pid])).rows[0]?.wait_event_type).toBe("Lock");
+    await a.query("commit"); await expect(pending).rejects.toThrow(/already corrected/);
+    expect((await admin.from("taproom_counts").select("id").eq("corrects_count_id", raceRoot.id)).data).toHaveLength(1);
+  } finally { await a.query("rollback"); await b.query("rollback"); await Promise.all([a.end(), b.end()]); if (pending) await pending.catch(() => undefined); }
+});
+
+it("rejects incomplete or corrupted correction graphs at transaction commit", async () => {
+  const f = await fixture(); const input = await args(f); input.p_lines[0].qty_counted = 2;
+  const rootResult = await f.ctx.db.rpc("record_taproom_count", input); expect(rootResult.error).toBeNull(); const root = rootResult.data;
+  const rootLine = root.lines[0];
+  const extraSku = await seedCatalog(f.brewery.id, { product: "Extra", sku: "Extra keg", packageType: "keg", bblPerUnit: .5 });
+  const historical = await ins("taproom_counts", { brewery_id: f.brewery.id, location_id: f.location.id,
+    counted_on: sql("select current_date-1")[0], observed_at: sql("select (now()-interval '1 day')::text")[0], counted_by: f.ctx.userId });
+  const historicalLine = await ins("taproom_count_lines", { brewery_id: f.brewery.id, count_id: historical.id, location_id: f.location.id,
+    bin_id: f.location.binId, sku_id: extraSku.skuId, qty_before: 0, qty_counted: 0 });
+
+  async function rejectAtCommit(build: (client: Client, correctionId: string) => Promise<void>) {
+    const client = new Client({ connectionString: DB }); await client.connect(); const correctionId = crypto.randomUUID();
+    try {
+      await client.query("begin");
+      await client.query(`insert into public.taproom_counts(id,brewery_id,location_id,counted_on,counted_by,observed_at,prior_count_id,corrects_count_id,correction_reason)
+        select $1,brewery_id,location_id,counted_on,$2,observed_at,prior_count_id,id,'bad graph' from public.taproom_counts where id=$3`,
+        [correctionId, f.ctx.userId, root.id]);
+      await build(client, correctionId);
+      await expect(client.query("commit")).rejects.toThrow(/correction graph/);
+    } finally { await client.query("rollback"); await client.end(); }
+  }
+  async function compensation(client: Client, correctionId: string) {
+    const id = crypto.randomUUID();
+    await client.query(`insert into public.inventory_movements(id,brewery_id,sku_id,location_id,bin_id,lot_id,qty,type,sale_channel_id,tax_treatment,dest_state,compensates_id,ref,created_by)
+      select $1,brewery_id,sku_id,location_id,bin_id,lot_id,-qty,type,sale_channel_id,tax_treatment,dest_state,id,$2,$3 from public.inventory_movements where id=$4`,
+      [id, correctionId, f.ctx.userId, rootLine.movement_id]);
+    return id;
+  }
+  async function replacement(client: Client, correctionId: string) {
+    const id = crypto.randomUUID();
+    await client.query(`insert into public.inventory_movements(id,brewery_id,sku_id,location_id,bin_id,lot_id,qty,type,sale_channel_id,tax_treatment,dest_state,correction_source_id,ref,created_by)
+      select $1,brewery_id,sku_id,location_id,bin_id,lot_id,-3,type,sale_channel_id,tax_treatment,dest_state,id,$2,$3 from public.inventory_movements where id=$4`,
+      [id, correctionId, f.ctx.userId, rootLine.movement_id]);
+    return id;
+  }
+  async function line(client: Client, correctionId: string, movementId: string | null, qty = 4) {
+    await client.query(`insert into public.taproom_count_lines(brewery_id,count_id,location_id,bin_id,sku_id,lot_id,qty_before,qty_counted,movement_id,corrects_line_id)
+      select brewery_id,$1,location_id,bin_id,sku_id,lot_id,qty_before,$2,$3,id from public.taproom_count_lines where id=$4`,
+      [correctionId, qty, movementId, rootLine.id]);
+  }
+
+  await rejectAtCommit(async () => {}); // header only / missing full replacement
+  await rejectAtCommit(async (client, id) => { await compensation(client, id); await replacement(client, id); }); // orphan movements
+  await rejectAtCommit(async (client, id) => { await compensation(client, id); await line(client, id, null, 2); }); // unchanged line owns movement
+  await rejectAtCommit(async (client, id) => { const movement = await replacement(client, id); await line(client, id, movement); }); // replacement without compensation
+  await rejectAtCommit(async (client, id) => {
+    await compensation(client, id); const movement = await replacement(client, id); await line(client, id, movement);
+    await client.query("update public.inventory_movements set bbl=bbl+1 where id=$1", [movement]);
+  });
+  await rejectAtCommit(async (client, id) => {
+    await compensation(client, id); const movement = await replacement(client, id); await line(client, id, movement);
+    await client.query(`insert into public.taproom_count_lines(brewery_id,count_id,location_id,bin_id,sku_id,lot_id,qty_before,qty_counted,corrects_line_id)
+      select brewery_id,$1,location_id,bin_id,sku_id,lot_id,qty_before,qty_counted,id from public.taproom_count_lines where id=$2`, [id, historicalLine.id]);
+  });
+  expect((await admin.from("taproom_counts").select("id").eq("corrects_count_id", root.id)).data).toEqual([]);
 });
 
 it("replays the exact request after a committed count response is treated as an inner 500", async () => {
@@ -341,15 +596,25 @@ it("count tables are append-only with tenant-safe references and direct DML deni
     expect((await client.from(table).update(table === "taproom_counts" ? { counted_on: f.day } : { qty_counted: 1 }).eq("id", id)).error?.code).toBe("42501");
     expect((await client.from(table).delete().eq("id", id)).error?.code).toBe("42501");
   }
+  const movementId = result.data.lines[0].movement_id ?? (await admin.from("inventory_movements").select("id").eq("brewery_id", f.brewery.id).limit(1).single()).data!.id;
+  for (const client of [f.ctx.db, admin]) {
+    expect((await client.from("inventory_movements").update({ qty: 99 }).eq("id", movementId)).error?.code).toBe("42501");
+    expect((await client.from("inventory_movements").delete().eq("id", movementId)).error?.code).toBe("42501");
+  }
   const row = { brewery_id: f.brewery.id, location_id: f.location.id, counted_on: "2000-01-01", counted_by: f.ctx.userId };
   expect((await f.ctx.db.from("taproom_counts").insert(row)).error?.code).toBe("42501");
   expect((await admin.from("taproom_counts").insert({ ...row, prior_count_id: (await ins("taproom_counts", { ...row, brewery_id: other.brewery.id, location_id: other.location.id })).id })).error?.code).toBe("23503");
   const line = { ...result.data.lines[0] }; delete line.id; delete line.bbl;
+  delete line.effective_line_id;
   delete line.bin_name; delete line.sku_name;
   expect((await admin.from("taproom_count_lines").insert({ ...line, count_id: crypto.randomUUID() })).error?.code).toBe("23503");
   expect((await other.ctx.db.rpc("get_taproom_count", { p_brewery: other.brewery.id, p_count: result.data.id })).error?.message).toBe("count not found");
   expect((await other.ctx.db.rpc("record_taproom_count", { ...await args(f) })).error?.code).toBe("42501");
   expect((await other.ctx.db.rpc("get_taproom_count_snapshot", { p_brewery: f.brewery.id, p_location: f.location.id })).error?.code).toBe("42501");
+  expect(sql(`select has_table_privilege('authenticated','private.taproom_effective_counts','select'),
+    has_table_privilege('service_role','private.taproom_effective_counts','select'),
+    has_function_privilege('authenticated','private.validate_taproom_correction_graph(uuid)','execute'),
+    has_function_privilege('service_role','private.validate_taproom_correction_graph(uuid)','execute')`)).toEqual(["f|f|f|f"]);
 });
 
 it("uses the brewery's current date even when it differs from the database UTC day", async () => {

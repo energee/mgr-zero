@@ -80,7 +80,9 @@ The page also shows expected consumption while the next count is still a draft. 
 
 If the page cannot tell whether a submission reached the server, including a timeout or `5xx` response, it freezes every quantity and the request ID. Select **Retry unchanged count** to recover the original result without posting twice. A later refusal cannot unlock an already uncertain request. A definitive first validation error leaves the fields editable for a corrected new attempt.
 
-Saved counts cannot yet be corrected. If a submitted count is wrong, ask Admin to investigate; a generic inventory adjustment does not reverse that count's recorded depletion or its tax reporting.
+Admin can select **Correct count** on the latest saved count when one or more quantities were counted too low. Enter the corrected whole units, no more than the stock recorded before the count, and a reason. The form sends only increased lines but preserves every original bucket in the effective receipt. It cannot reduce a count, exceed the recorded-before quantity, correct a historical count, or correct an earlier correction. Warehouse and Taproom can read the corrected receipt and its author, time, and reason, but only Admin sees the action.
+
+The original header, observations, and ledger rows remain unchanged. MGR appends an exact compensation for each changed depletion and, when the corrected amount still falls below recorded stock, a smaller replacement depletion using the original package volume, channel, tax treatment, state, bin, SKU, and lot. The corrected count keeps the original observation time, appears as one logical occurrence in history, becomes the next count's baseline, and updates variance without counting unchanged lines twice. Its signed ledger entries belong to the time when Admin made the correction; an earlier filed compliance snapshot stays byte-for-byte unchanged. If the response is uncertain, **Retry unchanged correction** reuses the frozen reason, quantities, payload, and request ID.
 
 ## Tap intervals [#tap-intervals]
 
@@ -181,7 +183,7 @@ Wholesale Shop shows the packages the brewery has designated for wholesale â€” Â
 
 **Reverse movement** is available to Admin and Warehouse only for a standalone `adjustment` or `loss` that has not already been reversed. Select the exact history entry, enter a **Correction note**, then **Confirm reversal**. MGR appends the exact opposite quantity and frozen barrel volume in the original bin and lot, preserving package and reporting classification. The original remains; **Reversal recorded** and **Original movement** link the two entries. Removing a prior positive adjustment is refused if that exact bin/lot no longer holds enough stock. Retry an unchanged failed form to recover the same result.
 
-Sales sees history without correction controls. Shipments retain **Return shipment** through their order workflow. Count/depletion corrections remain unavailable; other compound entries keep their original correction owner. A generic adjustment is not a count correction.
+Sales sees history without correction controls. Shipments retain **Return shipment** through their order workflow. Taproom count depletion uses **Correct count** on the eligible latest saved count; other compound entries keep their original correction owner. A generic adjustment is not a count correction.
 
 ### Record a movement
 
@@ -634,6 +636,8 @@ A bookmarked staff page that your role cannot read opens **No access**, names th
 **A page says "Not found".** Opening an order, customer, or invoice link that matches nothing in your brewery shows a Not found page with a link back to Today, not an error. The record was removed, the link is wrong, or it belongs to a brewery you are not signed in to. Switch brewery, or ask the person who sent the link.
 
 **Inventory is wrong.** Do a physical count and figure out what happened. Record an adjustment only for a verified count difference. Never disguise a sale, sample, loss, destruction, festival removal, return, or transfer as another type. Put a note on the correction.
+
+**A saved Taproom count was too low.** Ask Admin to open the latest saved count and use **Correct count**. Keep the signed compensation and replacement entries with that count; do not add a generic inventory adjustment.
 
 **A shipped order or invoice is wrong.** Do not add an unrelated inventory movement. Use **Return** on the invoice so the credit and the returned stock stay linked to the shipment history.
 

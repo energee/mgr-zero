@@ -203,7 +203,10 @@ a gap to close, not a convention to trust.
   Taproom counts now persist headers and explicit bin/SKU/lot UUID-or-null lines,
   including zero-variance counts. Their one-RPC command rejects stale revisions,
   incomplete buckets and overcounts; shortages post exact-bucket depletion with
-  frozen BBL. The count UI and count correction remain pending.
+  frozen BBL. The count UI also exposes the latest uncorrected mistaken-low root
+  to Admin: one replacement count and linked signed movements preserve the root,
+  reporting classification, observation time, and effective next-count baseline.
+  See the accepted Program 12 completion and correction spec.
 - **Auth invitations use a durable external-write workflow.** One canonical
   command request claims a private invitation. Auth's first `invited_at` write
   binds its user id in that same transaction using an invitation token and

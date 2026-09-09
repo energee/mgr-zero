@@ -1247,9 +1247,17 @@ Three consequences worth stating:
 **Implemented comparison contract (Program 12 Task 2).** `get_taproom_variance`
 selects whole completed count pairs by the ending count's brewery-local date,
 from today minus 4/12 × 7 days plus one through today. Exact sale bounds are
-`(prior.created_at, current.created_at]`; first counts remain visible as
+`(prior.observed_at, current.observed_at]`; first counts remain visible as
 missing-baseline observations and cannot supply comparable variance. A period
 may start before the nominal window, which is exposed explicitly.
+
+**Implemented latest-count correction (Program 12 T4b).** `observed_at` is the
+immutable physical observation boundary while `created_at` remains audit time.
+Admin may append one replacement for the latest uncorrected mistaken-low root;
+effective count reads, next-count baseline, and variance resolve that replacement
+without rewriting the original or a filed report. The complete schema, graph,
+ledger, replay, and role rules live in
+`2026-09-09-program12-completion-and-count-correction.md` §B.
 
 `pos_sales` retains immutable connection/order/line identity, catalog variation
 identity separately, and source version. Versions are not additive facts;

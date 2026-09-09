@@ -569,15 +569,19 @@ create table inventory_movements (
   package_type package_type not null,             -- frozen report classification
   compensates_id uuid,                           -- exact standalone adjustment/loss correction
   source_movement_id uuid,                       -- exact shipped return / damaged-return provenance
+  correction_source_id uuid,                     -- corrected-count replacement depletion provenance
   ref uuid,                                      -- order_id / pos_sale id / run id
   note text,
   created_by uuid not null references auth.users(id),
   created_at timestamptz not null default now(),
   unique (id, brewery_id),
   unique (brewery_id, compensates_id),
+  unique (brewery_id, correction_source_id),
   foreign key (compensates_id, brewery_id) references inventory_movements (id, brewery_id),
-  check (compensates_id is null or (source_movement_id is null and compensates_id <> id)),
+  check (num_nonnulls(compensates_id, source_movement_id, correction_source_id) <= 1),
+  check (compensates_id is null or compensates_id <> id),
   foreign key (source_movement_id, brewery_id) references inventory_movements (id, brewery_id),
+  foreign key (correction_source_id, brewery_id) references inventory_movements (id, brewery_id),
   foreign key (sku_id, brewery_id) references skus (id, brewery_id),
   foreign key (location_id, brewery_id) references locations (id, brewery_id),
   -- the bin must be one of this location's bins, structurally (spec 2026-09-06 Decision 1)
@@ -589,7 +593,7 @@ create table inventory_movements (
   constraint removal_shape check (
     case type
       when 'sale_removal' then qty < 0 and sale_channel_id is not null and dest_state is not null and tax_treatment is not null
-      when 'depletion'    then qty < 0 and sale_channel_id is not null and dest_state is null and tax_treatment is not null
+      when 'depletion'    then (qty < 0 or compensates_id is not null) and sale_channel_id is not null and dest_state is null and tax_treatment is not null
       when 'destruction'      then qty < 0 and sale_channel_id is null and dest_state is null and tax_treatment is null
       when 'loss'             then (qty < 0 or compensates_id is not null) and sale_channel_id is null and dest_state is null and tax_treatment is null
       when 'sample'           then qty < 0 and dest_state is not null
@@ -606,21 +610,51 @@ create table inventory_movements (
 );
 create index movements_onhand_idx on inventory_movements (brewery_id, sku_id, location_id, bin_id);
 create index movements_source_idx on inventory_movements (brewery_id, source_movement_id) where source_movement_id is not null;
+create index movements_correction_source_idx on inventory_movements (brewery_id, correction_source_id) where correction_source_id is not null;
 create index movements_created_idx on inventory_movements (brewery_id, created_at);
 create index movements_lot_idx on inventory_movements (lot_id) where lot_id is not null;
 
 create function enforce_bbl_integrity() returns trigger language plpgsql set search_path = '' as $$
-declare original public.inventory_movements; returned_qty numeric; returned_bbl numeric;
+declare original public.inventory_movements; returned_qty numeric; returned_bbl numeric; root_line record;
 begin
   if new.compensates_id is not null then
     select * into original from public.inventory_movements where id = new.compensates_id and brewery_id = new.brewery_id;
     if original.id is null or original.id = new.id or original.compensates_id is not null
-       or original.type not in ('adjustment','loss') or original.ref is not null or original.source_movement_id is not null
-       or new.source_movement_id is not null or new.ref is not null
+       or original.source_movement_id is not null or original.correction_source_id is not null
+       or new.source_movement_id is not null or new.correction_source_id is not null
        or (new.sku_id, new.location_id, new.bin_id, new.lot_id, new.type, new.sale_channel_id, new.tax_treatment, new.dest_state)
           is distinct from (original.sku_id, original.location_id, original.bin_id, original.lot_id, original.type, original.sale_channel_id, original.tax_treatment, original.dest_state)
-       or new.qty <> -original.qty then raise exception 'invalid standalone movement compensation'; end if;
+       or new.qty <> -original.qty then raise exception 'invalid movement compensation'; end if;
+    if original.type in ('adjustment','loss') then
+      if original.ref is not null or new.ref is not null then raise exception 'invalid standalone movement compensation'; end if;
+    elsif original.type = 'depletion' then
+      select l.* into root_line from public.taproom_count_lines l
+      join public.taproom_counts root on root.id=l.count_id and root.brewery_id=l.brewery_id and root.corrects_count_id is null
+      join public.taproom_counts correction on correction.id=new.ref and correction.brewery_id=l.brewery_id
+        and correction.location_id=l.location_id and correction.corrects_count_id=root.id
+      where l.brewery_id=new.brewery_id and l.movement_id=original.id and original.ref=root.id;
+      if root_line.id is null or new.type <> 'depletion' or new.qty <= 0 then raise exception 'invalid count compensation'; end if;
+    else
+      raise exception 'invalid standalone movement compensation';
+    end if;
     new.bbl := -original.bbl;
+    new.package_type := original.package_type;
+    return new;
+  end if;
+  if new.correction_source_id is not null then
+    select * into original from public.inventory_movements where id = new.correction_source_id and brewery_id = new.brewery_id;
+    select l.* into root_line from public.taproom_count_lines l
+    join public.taproom_counts root on root.id=l.count_id and root.brewery_id=l.brewery_id and root.corrects_count_id is null
+    join public.taproom_counts correction on correction.id=new.ref and correction.brewery_id=l.brewery_id
+      and correction.location_id=l.location_id and correction.corrects_count_id=root.id
+    where l.brewery_id=new.brewery_id and l.movement_id=original.id and original.ref=root.id;
+    if original.id is null or root_line.id is null or original.type <> 'depletion' or new.type <> 'depletion'
+       or original.compensates_id is not null or original.source_movement_id is not null or original.correction_source_id is not null
+       or (new.sku_id, new.location_id, new.bin_id, new.lot_id, new.sale_channel_id, new.tax_treatment, new.dest_state)
+          is distinct from (original.sku_id, original.location_id, original.bin_id, original.lot_id, original.sale_channel_id, original.tax_treatment, original.dest_state)
+       or new.qty >= 0 or root_line.qty_before + new.qty <= root_line.qty_counted
+       or root_line.qty_before + new.qty >= root_line.qty_before then raise exception 'invalid corrected-count replacement'; end if;
+    new.bbl := round(original.bbl * new.qty / original.qty, 8);
     new.package_type := original.package_type;
     return new;
   end if;
@@ -1138,14 +1172,20 @@ create table taproom_counts (
   location_id uuid not null,
   counted_on date not null,
   counted_by uuid not null references auth.users(id),
+  observed_at timestamptz not null default now(),
   created_at timestamptz not null default now(),
   prior_count_id uuid,
+  corrects_count_id uuid unique,
+  correction_reason text,
   unique (id, brewery_id),
   unique (id, location_id, brewery_id),
-  unique (brewery_id, location_id, counted_on),
   foreign key (location_id, brewery_id) references locations(id, brewery_id),
-  foreign key (prior_count_id, location_id, brewery_id) references taproom_counts(id, location_id, brewery_id)
+  foreign key (prior_count_id, location_id, brewery_id) references taproom_counts(id, location_id, brewery_id),
+  foreign key (corrects_count_id, location_id, brewery_id) references taproom_counts(id, location_id, brewery_id),
+  check ((corrects_count_id is null and correction_reason is null)
+    or (corrects_count_id is not null and btrim(correction_reason) <> ''))
 );
+create unique index taproom_counts_root_day_uidx on taproom_counts(brewery_id,location_id,counted_on) where corrects_count_id is null;
 create function private.require_taproom_count_location() returns trigger
 language plpgsql set search_path = '' as $$
 begin
@@ -1167,16 +1207,91 @@ create table taproom_count_lines (
   qty_before numeric not null check (qty_before >= 0 and qty_before = trunc(qty_before) and qty_before::text not in ('NaN','Infinity','-Infinity')),
   qty_counted numeric not null check (qty_counted >= 0 and qty_counted <= qty_before and qty_counted = trunc(qty_counted)),
   movement_id uuid unique,
+  corrects_line_id uuid unique,
   unique (id, brewery_id),
+  unique (id, location_id, brewery_id),
   unique nulls not distinct (count_id, bin_id, sku_id, lot_id),
   foreign key (count_id, location_id, brewery_id) references taproom_counts(id, location_id, brewery_id),
   foreign key (bin_id, location_id, brewery_id) references bins(id, location_id, brewery_id),
   foreign key (sku_id, brewery_id) references skus(id, brewery_id),
   foreign key (lot_id, brewery_id) references lots(id, brewery_id),
   foreign key (movement_id, brewery_id) references inventory_movements(id, brewery_id),
-  check ((qty_before = qty_counted) = (movement_id is null))
+  foreign key (corrects_line_id, location_id, brewery_id) references taproom_count_lines(id, location_id, brewery_id),
+  check ((corrects_line_id is null and (qty_before = qty_counted) = (movement_id is null))
+    or (corrects_line_id is not null and (movement_id is null or qty_counted < qty_before)))
 );
 create index taproom_count_lines_brewery_idx on taproom_count_lines(brewery_id, count_id);
+
+-- ponytail: each deferred row trigger rechecks its one correction graph. Weekly
+-- counts are expected to stay small; batch-level validation is the upgrade if
+-- ordinary counts grow large enough for these repeated scans to matter.
+create function private.validate_taproom_correction_graph(p_correction uuid) returns void
+language plpgsql set search_path = '' as $$
+declare correction public.taproom_counts; root public.taproom_counts;
+begin
+  select * into correction from public.taproom_counts where id=p_correction;
+  if not found or correction.corrects_count_id is null then return; end if;
+  select * into root from public.taproom_counts where id=correction.corrects_count_id and brewery_id=correction.brewery_id;
+  if not found or root.corrects_count_id is not null
+     or (correction.location_id,correction.counted_on,correction.observed_at,correction.prior_count_id)
+        is distinct from (root.location_id,root.counted_on,root.observed_at,root.prior_count_id) then
+    raise exception 'invalid taproom correction header';
+  end if;
+  if exists(select 1 from public.taproom_count_lines rl where rl.count_id=root.id and rl.brewery_id=root.brewery_id
+       and not exists(select 1 from public.taproom_count_lines cl where cl.count_id=correction.id and cl.brewery_id=correction.brewery_id and cl.corrects_line_id=rl.id))
+    or exists(select 1 from public.taproom_count_lines cl where cl.count_id=correction.id and cl.brewery_id=correction.brewery_id
+       and not exists(select 1 from public.taproom_count_lines rl where rl.id=cl.corrects_line_id and rl.count_id=root.id and rl.brewery_id=root.brewery_id))
+    or exists(select 1 from public.taproom_count_lines cl join public.taproom_count_lines rl on rl.id=cl.corrects_line_id and rl.brewery_id=cl.brewery_id
+       where cl.count_id=correction.id and ((cl.location_id,cl.bin_id,cl.sku_id,cl.lot_id,cl.qty_before)
+         is distinct from (rl.location_id,rl.bin_id,rl.sku_id,rl.lot_id,rl.qty_before) or cl.qty_counted<rl.qty_counted))
+    or not exists(select 1 from public.taproom_count_lines cl join public.taproom_count_lines rl on rl.id=cl.corrects_line_id and rl.brewery_id=cl.brewery_id
+       where cl.count_id=correction.id and rl.count_id=root.id and cl.qty_counted>rl.qty_counted)
+    or exists(select 1 from public.taproom_count_lines cl join public.taproom_count_lines rl on rl.id=cl.corrects_line_id and rl.brewery_id=cl.brewery_id
+       where cl.count_id=correction.id and cl.qty_counted=rl.qty_counted and (cl.movement_id is not null
+         or exists(select 1 from public.inventory_movements m where m.brewery_id=cl.brewery_id and m.ref=correction.id
+           and (m.compensates_id=rl.movement_id or m.correction_source_id=rl.movement_id))))
+    or exists(select 1 from public.taproom_count_lines cl
+       join public.taproom_count_lines rl on rl.id=cl.corrects_line_id and rl.brewery_id=cl.brewery_id
+       left join public.inventory_movements rm on rm.id=rl.movement_id and rm.brewery_id=rl.brewery_id
+       where cl.count_id=correction.id and cl.qty_counted>rl.qty_counted and (rm.id is null
+         or not exists(select 1 from public.inventory_movements m where m.brewery_id=cl.brewery_id and m.ref=correction.id
+           and m.compensates_id=rm.id and m.correction_source_id is null and m.source_movement_id is null
+           and m.qty=-rm.qty and m.bbl=-rm.bbl and m.type='depletion'
+           and (m.location_id,m.bin_id,m.sku_id,m.lot_id,m.sale_channel_id,m.tax_treatment,m.dest_state,m.package_type)
+             is not distinct from (rm.location_id,rm.bin_id,rm.sku_id,rm.lot_id,rm.sale_channel_id,rm.tax_treatment,rm.dest_state,rm.package_type))
+         or (cl.qty_counted=cl.qty_before and cl.movement_id is not null)
+         or (cl.qty_counted<cl.qty_before and not exists(select 1 from public.inventory_movements m
+           where m.id=cl.movement_id and m.brewery_id=cl.brewery_id and m.ref=correction.id
+             and m.correction_source_id=rm.id and m.compensates_id is null and m.source_movement_id is null
+             and m.qty=cl.qty_counted-cl.qty_before and m.bbl=round(rm.bbl*(cl.qty_counted-cl.qty_before)/rm.qty,8) and m.type='depletion'
+             and (m.location_id,m.bin_id,m.sku_id,m.lot_id,m.sale_channel_id,m.tax_treatment,m.dest_state,m.package_type)
+               is not distinct from (rm.location_id,rm.bin_id,rm.sku_id,rm.lot_id,rm.sale_channel_id,rm.tax_treatment,rm.dest_state,rm.package_type)))))
+    or exists(select 1 from public.inventory_movements m where m.brewery_id=correction.brewery_id and m.ref=correction.id
+       and not exists(select 1 from public.taproom_count_lines cl join public.taproom_count_lines rl on rl.id=cl.corrects_line_id and rl.brewery_id=cl.brewery_id
+         where cl.count_id=correction.id and (m.id=cl.movement_id or m.compensates_id=rl.movement_id))) then
+    raise exception 'incomplete taproom correction graph';
+  end if;
+end $$;
+
+create function private.enforce_taproom_correction_graph() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare correction uuid;
+begin
+  if tg_table_name='taproom_counts' then correction:=new.id;
+  elsif tg_table_name='taproom_count_lines' then
+    select id into correction from public.taproom_counts where id=new.count_id and corrects_count_id is not null;
+  else
+    select id into correction from public.taproom_counts where id=new.ref and corrects_count_id is not null;
+  end if;
+  if correction is not null then perform private.validate_taproom_correction_graph(correction); end if;
+  return null;
+end $$;
+create constraint trigger taproom_counts_correction_graph after insert on taproom_counts
+  deferrable initially deferred for each row execute function private.enforce_taproom_correction_graph();
+create constraint trigger taproom_count_lines_correction_graph after insert on taproom_count_lines
+  deferrable initially deferred for each row execute function private.enforce_taproom_correction_graph();
+create constraint trigger inventory_movements_correction_graph after insert on inventory_movements
+  deferrable initially deferred for each row execute function private.enforce_taproom_correction_graph();
 
 -- A count is taken at one bin: on-hand is compared and adjusted there.
 create table material_counts (
@@ -6847,7 +6962,7 @@ grant select on bin_move_stock, on_hand, bin_on_hand, atp, invoice_totals, keg_d
   contract_balances, material_requirements, po_open_balances, vendor_lead_times,
   keg_bin_totals, keg_bin_on_hand, keg_fleet_totals, keg_customer_balances to authenticated;
 grant all on all tables in schema public to service_role;
-revoke update, delete, truncate on taproom_counts, taproom_count_lines, pos_sales from service_role;
+revoke update, delete, truncate on inventory_movements, taproom_counts, taproom_count_lines, pos_sales from service_role;
 grant all on all sequences in schema public to service_role;
 
 -- Availability badge tiers for portal customers: coarse tiers only, never raw
@@ -7504,11 +7619,31 @@ grant execute on function set_personal_notification_destination(uuid,text,uuid,u
 
 -- One statement owns the complete count snapshot, including history beyond API row limits.
 -- Private and invoker: only the checked definer entry points below may use it.
+create view private.taproom_effective_counts as
+  select root.brewery_id,root.location_id,root.id root_id,coalesce(correction.id,root.id) effective_id,
+    root.counted_on,root.observed_at,root.created_at,root.counted_by,
+    coalesce(correction.prior_count_id,root.prior_count_id) prior_count_id,
+    correction.created_at corrected_at,correction.counted_by corrected_by,correction.correction_reason,
+    effective_line.id line_id,root_line.id root_line_id,effective_line.bin_id,effective_line.sku_id,effective_line.lot_id,
+    effective_line.qty_before,effective_line.qty_counted,
+    case when correction.id is not null and effective_line.qty_counted=root_line.qty_counted
+      then root_line.movement_id else effective_line.movement_id end movement_id,
+    case when correction.id is not null and effective_line.qty_counted=root_line.qty_counted
+      then root_movement.bbl else effective_movement.bbl end bbl
+  from public.taproom_counts root
+  left join public.taproom_counts correction on correction.corrects_count_id=root.id and correction.brewery_id=root.brewery_id
+  left join public.taproom_count_lines effective_line on effective_line.count_id=coalesce(correction.id,root.id) and effective_line.brewery_id=root.brewery_id
+  left join public.taproom_count_lines root_line on root_line.id=coalesce(effective_line.corrects_line_id,effective_line.id) and root_line.brewery_id=root.brewery_id
+  left join public.inventory_movements root_movement on root_movement.id=root_line.movement_id and root_movement.brewery_id=root.brewery_id
+  left join public.inventory_movements effective_movement on effective_movement.id=effective_line.movement_id and effective_movement.brewery_id=root.brewery_id
+  where root.corrects_count_id is null;
+
 create function private.taproom_count_snapshot(p_brewery uuid, p_location uuid) returns jsonb
 language sql stable set search_path = '' as $$
   with prior as (
-    select id, counted_on from public.taproom_counts
-    where brewery_id = p_brewery and location_id = p_location order by counted_on desc limit 1
+    select effective_id id, counted_on from private.taproom_effective_counts
+    where brewery_id = p_brewery and location_id = p_location
+    group by effective_id,counted_on,observed_at order by observed_at desc,effective_id desc limit 1
   ), movements as materialized (
     select id, bin_id, sku_id, lot_id, qty from public.inventory_movements
     where brewery_id = p_brewery and location_id = p_location
@@ -7585,20 +7720,56 @@ end $$;
 
 create function get_taproom_count(p_brewery uuid, p_count uuid) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
-declare v_result jsonb;
+declare v_result jsonb; v_root uuid;
 begin
   perform private.assert_staff(p_brewery, array['admin','warehouse','taproom']::public.staff_role[]);
-  select to_jsonb(c) || jsonb_build_object('lines', (select coalesce(jsonb_agg(to_jsonb(l) ||
-    jsonb_build_object('bbl', m.bbl, 'bin_name', b.name, 'sku_name', s.name) order by l.bin_id, l.sku_id, l.lot_id nulls first), '[]'::jsonb)
-    from public.taproom_count_lines l
-    left join public.inventory_movements m on m.id = l.movement_id and m.brewery_id = l.brewery_id
-    left join public.bins b on b.id = l.bin_id and b.brewery_id = l.brewery_id
-    left join public.skus s on s.id = l.sku_id and s.brewery_id = l.brewery_id
-    where l.count_id = c.id and l.brewery_id = p_brewery)) into v_result
-    from public.taproom_counts c
-    join public.locations loc on loc.id = c.location_id and loc.brewery_id = c.brewery_id and loc.kind = 'taproom'
-    where c.id = p_count and c.brewery_id = p_brewery;
+  select root_id into v_root from private.taproom_effective_counts
+    where brewery_id=p_brewery and (root_id=p_count or effective_id=p_count) limit 1;
+  select jsonb_build_object('id',h.root_id,'root_id',h.root_id,'effective_id',h.effective_id,
+    'location_id',h.location_id,'counted_on',h.counted_on,'observed_at',h.observed_at,
+    'counted_by',h.counted_by,'created_at',h.created_at,'prior_count_id',h.prior_count_id,
+    'corrected_at',h.corrected_at,'corrected_by',h.corrected_by,'correction_reason',h.correction_reason,
+    'correction_eligible',h.corrected_at is null
+      and exists(select 1 from public.taproom_count_lines shortage where shortage.count_id=h.root_id and shortage.brewery_id=h.brewery_id and shortage.qty_counted<shortage.qty_before)
+      and not exists(select 1 from private.taproom_effective_counts newer
+      where newer.brewery_id=h.brewery_id and newer.location_id=h.location_id and newer.root_id<>h.root_id
+        and (newer.observed_at,newer.root_id)>(h.observed_at,h.root_id)),
+    'lines',(select coalesce(jsonb_agg(jsonb_build_object('id',e.root_line_id,'effective_line_id',e.line_id,
+      'corrects_line_id',case when e.line_id=e.root_line_id then null else e.root_line_id end,
+      'brewery_id',e.brewery_id,'count_id',e.effective_id,'location_id',e.location_id,
+      'bin_id',e.bin_id,'bin_name',b.name,'sku_id',e.sku_id,'sku_name',s.name,'lot_id',e.lot_id,
+      'qty_before',e.qty_before,'qty_counted',e.qty_counted,'movement_id',e.movement_id,'bbl',e.bbl)
+      order by e.bin_id,e.sku_id,e.lot_id nulls first),'[]'::jsonb)
+      from private.taproom_effective_counts e
+      left join public.bins b on b.id=e.bin_id and b.brewery_id=e.brewery_id
+      left join public.skus s on s.id=e.sku_id and s.brewery_id=e.brewery_id
+      where e.brewery_id=p_brewery and e.root_id=h.root_id and e.line_id is not null)) into v_result
+  from private.taproom_effective_counts h
+  join public.locations loc on loc.id=h.location_id and loc.brewery_id=h.brewery_id and loc.kind='taproom'
+  where h.brewery_id=p_brewery and h.root_id=v_root limit 1;
   if v_result is null then raise exception 'count not found'; end if;
+  return v_result;
+end $$;
+
+create function list_taproom_counts(p_brewery uuid,p_location uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare v_result jsonb;
+begin
+  perform private.assert_staff(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
+  if not exists(select 1 from public.locations where id=p_location and brewery_id=p_brewery and kind='taproom') then raise exception 'choose an owned taproom location'; end if;
+  with headers as (
+    select root_id,effective_id,location_id,counted_on,observed_at,counted_by,created_at,prior_count_id,corrected_at,corrected_by,correction_reason,
+      count(line_id) observations,count(movement_id) movements,
+      coalesce(sum(qty_before-qty_counted),0) depleted_units
+    from private.taproom_effective_counts where brewery_id=p_brewery and location_id=p_location
+    group by root_id,effective_id,location_id,counted_on,observed_at,counted_by,created_at,prior_count_id,corrected_at,corrected_by,correction_reason
+    order by observed_at desc,effective_id desc limit 50
+  )
+  select coalesce(jsonb_agg(jsonb_build_object('id',root_id,'root_id',root_id,'effective_id',effective_id,
+    'location_id',location_id,'counted_on',counted_on,'observed_at',observed_at,'counted_by',counted_by,'created_at',created_at,
+    'prior_count_id',prior_count_id,'corrected_at',corrected_at,'corrected_by',corrected_by,
+    'correction_reason',correction_reason,'observations',observations,'movements',movements,'depleted_units',depleted_units)
+    order by observed_at desc,effective_id desc),'[]'::jsonb) into v_result from headers;
   return v_result;
 end $$;
 
@@ -7669,9 +7840,79 @@ begin
   end loop;
   return private.complete_command_request(p_request_id, public.get_taproom_count(p_brewery, v_count));
 end $$;
+
+create function correct_taproom_count(p_brewery uuid,p_count uuid,p_corrections jsonb,p_reason text,p_request_id uuid)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid; v_replay jsonb; root public.taproom_counts; correction uuid; item record;
+  compensation uuid; replacement uuid;
+begin
+  v_actor:=private.assert_staff(p_brewery,array['admin']::public.staff_role[]);
+  v_replay:=private.claim_command_request(p_brewery,'correct_taproom_count',p_request_id,
+    jsonb_build_object('count',p_count,'corrections',p_corrections,'reason',p_reason));
+  if v_replay is not null then return v_replay; end if;
+  if p_reason is null or btrim(p_reason)='' then raise exception 'enter a correction reason'; end if;
+  if jsonb_typeof(p_corrections) is distinct from 'array' or jsonb_array_length(p_corrections)=0 then raise exception 'include at least one increased count line'; end if;
+  if exists(select 1 from jsonb_array_elements(p_corrections) e where jsonb_typeof(e) is distinct from 'object'
+    or not (e ?& array['line_id','qty_counted'])
+    or (select count(*) from jsonb_object_keys(e))<>2
+    or jsonb_typeof(e->'line_id') is distinct from 'string' or jsonb_typeof(e->'qty_counted') is distinct from 'number') then
+    raise exception 'line ID and corrected whole quantity are required';
+  end if;
+  if (select count(distinct (e->>'line_id')::uuid) from jsonb_array_elements(p_corrections) e)<>jsonb_array_length(p_corrections) then
+    raise exception 'duplicate correction line';
+  end if;
+  select * into root from public.taproom_counts where id=p_count and brewery_id=p_brewery;
+  if not found then raise exception 'count not found'; end if;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('taproom-count:'||p_brewery::text||':'||root.location_id::text,0));
+  lock table public.inventory_movements in share row exclusive mode;
+  select * into root from public.taproom_counts where id=p_count and brewery_id=p_brewery for update;
+  perform 1 from public.taproom_count_lines where count_id=root.id and brewery_id=p_brewery for update;
+  if root.corrects_count_id is not null then raise exception 'only an original count can be corrected' using errcode='MG409'; end if;
+  if exists(select 1 from public.taproom_counts where corrects_count_id=root.id and brewery_id=p_brewery) then raise exception 'count already corrected' using errcode='MG409'; end if;
+  if exists(select 1 from public.taproom_counts later where later.brewery_id=p_brewery and later.location_id=root.location_id
+    and later.corrects_count_id is null and (later.observed_at,later.id)>(root.observed_at,root.id)) then
+    raise exception 'only the latest count can be corrected' using errcode='MG409';
+  end if;
+  if exists(select 1 from jsonb_to_recordset(p_corrections) e(line_id uuid,qty_counted numeric)
+    left join public.taproom_count_lines l on l.id=e.line_id and l.brewery_id=p_brewery and l.count_id=root.id
+    left join public.inventory_movements m on m.id=l.movement_id and m.brewery_id=l.brewery_id
+    where l.id is null or e.qty_counted::text in ('NaN','Infinity','-Infinity') or e.qty_counted<>trunc(e.qty_counted)
+      or e.qty_counted<=l.qty_counted or e.qty_counted>l.qty_before
+      or m.id is null or m.type<>'depletion' or m.ref<>root.id or m.qty<>l.qty_counted-l.qty_before
+      or m.compensates_id is not null or m.source_movement_id is not null or m.correction_source_id is not null) then
+    raise exception 'corrections must increase owned depletion lines without exceeding recorded stock';
+  end if;
+  insert into public.taproom_counts(brewery_id,location_id,counted_on,counted_by,observed_at,prior_count_id,corrects_count_id,correction_reason)
+    values(p_brewery,root.location_id,root.counted_on,v_actor,root.observed_at,root.prior_count_id,root.id,btrim(p_reason)) returning id into correction;
+  for item in
+    select l.*,e.qty_counted requested from public.taproom_count_lines l
+    left join jsonb_to_recordset(p_corrections) e(line_id uuid,qty_counted numeric) on e.line_id=l.id
+    where l.count_id=root.id and l.brewery_id=p_brewery order by l.id
+  loop
+    compensation:=null; replacement:=null;
+    if item.requested is not null then
+      insert into public.inventory_movements(brewery_id,sku_id,location_id,bin_id,lot_id,qty,type,sale_channel_id,tax_treatment,dest_state,
+        compensates_id,ref,note,created_by)
+        select m.brewery_id,m.sku_id,m.location_id,m.bin_id,m.lot_id,-m.qty,m.type,m.sale_channel_id,m.tax_treatment,m.dest_state,
+          m.id,correction,btrim(p_reason),v_actor from public.inventory_movements m where m.id=item.movement_id and m.brewery_id=p_brewery
+        returning id into compensation;
+      if item.requested<item.qty_before then
+        insert into public.inventory_movements(brewery_id,sku_id,location_id,bin_id,lot_id,qty,type,sale_channel_id,tax_treatment,dest_state,
+          correction_source_id,ref,note,created_by)
+          select m.brewery_id,m.sku_id,m.location_id,m.bin_id,m.lot_id,item.requested-item.qty_before,m.type,m.sale_channel_id,m.tax_treatment,m.dest_state,
+            m.id,correction,btrim(p_reason),v_actor from public.inventory_movements m where m.id=item.movement_id and m.brewery_id=p_brewery
+          returning id into replacement;
+      end if;
+    end if;
+    insert into public.taproom_count_lines(brewery_id,count_id,location_id,bin_id,sku_id,lot_id,qty_before,qty_counted,movement_id,corrects_line_id)
+      values(p_brewery,correction,item.location_id,item.bin_id,item.sku_id,item.lot_id,item.qty_before,coalesce(item.requested,item.qty_counted),replacement,item.id);
+  end loop;
+  return private.complete_command_request(p_request_id,public.get_taproom_count(p_brewery,root.id));
+end $$;
 revoke all on function private.taproom_count_snapshot(uuid,uuid) from public,anon,authenticated,service_role;
-revoke all on function get_taproom_count_snapshot(uuid,uuid),get_taproom_print_labels(uuid,uuid,text),get_taproom_count(uuid,uuid),record_taproom_count(uuid,uuid,date,text,jsonb,uuid) from public,anon,authenticated,service_role;
-grant execute on function get_taproom_count_snapshot(uuid,uuid),get_taproom_print_labels(uuid,uuid,text),get_taproom_count(uuid,uuid),record_taproom_count(uuid,uuid,date,text,jsonb,uuid) to authenticated;
+revoke all on function private.validate_taproom_correction_graph(uuid),private.enforce_taproom_correction_graph() from public,anon,authenticated,service_role;
+revoke all on function get_taproom_count_snapshot(uuid,uuid),get_taproom_print_labels(uuid,uuid,text),get_taproom_count(uuid,uuid),list_taproom_counts(uuid,uuid),record_taproom_count(uuid,uuid,date,text,jsonb,uuid),correct_taproom_count(uuid,uuid,jsonb,text,uuid) from public,anon,authenticated,service_role;
+grant execute on function get_taproom_count_snapshot(uuid,uuid),get_taproom_print_labels(uuid,uuid,text),get_taproom_count(uuid,uuid),list_taproom_counts(uuid,uuid),record_taproom_count(uuid,uuid,date,text,jsonb,uuid),correct_taproom_count(uuid,uuid,jsonb,text,uuid) to authenticated;
 -- Named service-only reads. Recheck current admin membership in-statement;
 -- jobs.ts must not select chat_installations through the service client.
 create function get_chat_settings_installation(p_brewery uuid, p_installation uuid, p_actor uuid) returns jsonb
@@ -8004,7 +8245,7 @@ $$;
 revoke all on function private.taproom_pos_allocations(uuid,uuid,timestamp with time zone,timestamp with time zone) from public,anon,authenticated,service_role;
 
 -- Whole completed count periods, selected by the ending brewery-local date.
--- Bounds are (prior.created_at,current.created_at]; opening tap bounds are
+-- Bounds are (prior.observed_at,current.observed_at]; opening tap bounds are
 -- [opened_at,closed_at). Timestamp-active equal shares are estimates, and
 -- excluded shares remain in their denominator. Fill chips never become actual.
 create function get_taproom_variance(p_brewery uuid,p_location uuid,p_weeks integer) returns jsonb
@@ -8016,17 +8257,20 @@ begin
   if not exists(select 1 from public.locations where id=p_location and brewery_id=p_brewery and kind='taproom') then raise exception 'choose an owned taproom location'; end if;
   select (now() at time zone timezone)::date into v_today from public.breweries where id=p_brewery;
   v_start:=v_today-p_weeks*7+1;
-  with periods as materialized (
-    select c.id count_id,c.prior_count_id,c.counted_on,prior.created_at starts_at,c.created_at ends_at,
-      (prior.created_at at time zone b.timezone)::date < v_start starts_before_window
-    from public.taproom_counts c join public.breweries b on b.id=c.brewery_id
-    left join public.taproom_counts prior on prior.id=c.prior_count_id and prior.brewery_id=c.brewery_id and prior.location_id=c.location_id
-    where c.brewery_id=p_brewery and c.location_id=p_location and c.counted_on between v_start and v_today
+  with counts as materialized (
+    select brewery_id,location_id,root_id,effective_id,counted_on,observed_at,prior_count_id
+    from private.taproom_effective_counts where brewery_id=p_brewery and location_id=p_location
+    group by brewery_id,location_id,root_id,effective_id,counted_on,observed_at,prior_count_id
+  ), periods as materialized (
+    select c.effective_id count_id,c.prior_count_id,c.counted_on,prior.observed_at starts_at,c.observed_at ends_at,
+      (prior.observed_at at time zone b.timezone)::date < v_start starts_before_window
+    from counts c join public.breweries b on b.id=c.brewery_id
+    left join counts prior on prior.effective_id=c.prior_count_id and prior.brewery_id=c.brewery_id and prior.location_id=c.location_id
+    where c.counted_on between v_start and v_today
   ), actual as materialized (
-    select p.count_id,s.brand_id,-sum(coalesce(m.bbl,0)) actual_bbl
-    from periods p join public.taproom_count_lines l on l.count_id=p.count_id and l.brewery_id=p_brewery
+    select p.count_id,s.brand_id,-sum(coalesce(l.bbl,0)) actual_bbl
+    from periods p join private.taproom_effective_counts l on l.effective_id=p.count_id and l.brewery_id=p_brewery
     join public.skus s on s.id=l.sku_id and s.brewery_id=p_brewery
-    left join public.inventory_movements m on m.id=l.movement_id and m.brewery_id=p_brewery and m.type='depletion'
     group by p.count_id,s.brand_id
   ), sources as (
     select l.connection_id,l.external_location_id,
@@ -8083,12 +8327,13 @@ end $$;
 -- server time; it neither freezes POS nor writes inventory.
 create function get_taproom_draft_projection(p_brewery uuid,p_location uuid) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
-declare v_count public.taproom_counts; v_as_of timestamptz:=now(); v_result jsonb;
+declare v_count record; v_as_of timestamptz:=now(); v_result jsonb;
 begin
   perform private.assert_staff(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
   if not exists(select 1 from public.locations where id=p_location and brewery_id=p_brewery and kind='taproom') then raise exception 'choose an owned taproom location'; end if;
-  select * into v_count from public.taproom_counts where brewery_id=p_brewery and location_id=p_location
-    order by created_at desc,id desc limit 1;
+  select root_id,effective_id,counted_on,observed_at,created_at into v_count from private.taproom_effective_counts
+    where brewery_id=p_brewery and location_id=p_location
+    group by root_id,effective_id,counted_on,observed_at,created_at order by observed_at desc,effective_id desc limit 1;
   if not found then
     return jsonb_build_object('location_id',p_location,'prior_count',null,'starts_at',null,'ends_at',v_as_of,'as_of',v_as_of,
       'projection','current; late reconciled sales can change expected','reason','missing_baseline','expected_bbl',null,
@@ -8097,18 +8342,18 @@ begin
   end if;
   with sources as materialized (
     select l.connection_id,l.external_location_id,
-      coalesce(c.covered,'{}'::tstzmultirange) @> tstzrange(v_count.created_at,v_as_of,'(]') complete,
+      coalesce(c.covered,'{}'::tstzmultirange) @> tstzrange(v_count.observed_at,v_as_of,'(]') complete,
       c.observed_starts_at,c.observed_ends_at,c.observed_windows
     from public.pos_locations l cross join lateral (
       select range_agg(tstzrange(c.starts_at,c.ends_at,'(]')) filter(where c.complete) covered,
-        min(greatest(c.starts_at,v_count.created_at)) observed_starts_at,
+        min(greatest(c.starts_at,v_count.observed_at)) observed_starts_at,
         max(least(c.ends_at,v_as_of)) observed_ends_at,count(*) observed_windows
       from public.pos_sales_coverage c where c.brewery_id=p_brewery and c.location_id=p_location
         and c.connection_id=l.connection_id and c.external_location_id=l.external_location_id
-        and c.ends_at>v_count.created_at and c.starts_at<v_as_of
+        and c.ends_at>v_count.observed_at and c.starts_at<v_as_of
     ) c where l.brewery_id=p_brewery and l.location_id=p_location
   ), facts as materialized (
-    select * from private.taproom_pos_allocations(p_brewery,p_location,v_count.created_at,v_as_of)
+    select * from private.taproom_pos_allocations(p_brewery,p_location,v_count.observed_at,v_as_of)
   ), brands as materialized (
     select f.brand_id,b.name brand_name,sum(f.expected_bbl) expected_bbl,sum(f.excluded_bbl) excluded_bbl,
       sum(f.unattributed_bbl) unattributed_bbl,bool_or(f.split) split
@@ -8125,8 +8370,8 @@ begin
       coalesce((select sum(observed_windows) from sources),0) observed_windows
   )
   select jsonb_build_object('location_id',p_location,
-    'prior_count',jsonb_build_object('id',v_count.id,'counted_on',v_count.counted_on,'created_at',v_count.created_at),
-    'starts_at',v_count.created_at,'ends_at',v_as_of,'as_of',v_as_of,
+    'prior_count',jsonb_build_object('id',v_count.effective_id,'counted_on',v_count.counted_on,'created_at',v_count.created_at,'observed_at',v_count.observed_at),
+    'starts_at',v_count.observed_at,'ends_at',v_as_of,'as_of',v_as_of,
     'projection','current; late reconciled sales can change expected',
     'reason',case when m.mapped_bbl is not null then null
       when m.coverage_complete and m.unmapped_lines=0 then null

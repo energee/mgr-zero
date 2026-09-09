@@ -53,6 +53,82 @@ export type TaproomCountState = {
   attempt: CountAttempt;
 };
 
+export type TaproomCorrectionLine = {
+  id: string;
+  sku_name: string | null;
+  bin_name: string | null;
+  lot_id: string | null;
+  qty_before: number;
+  qty_counted: number;
+};
+
+export type TaproomCorrectionInput = {
+  countId: string;
+  corrections: { lineId: string; qtyCounted: number }[];
+  reason: string;
+};
+
+type FrozenCorrectionAttempt = { kind: "submitting" | "unknown"; requestId: string; payload: TaproomCorrectionInput; message?: string };
+export type TaproomCorrectionState = {
+  countId: string;
+  reason: string;
+  lines: (TaproomCorrectionLine & { quantity: string })[];
+  attempt: FrozenCorrectionAttempt | { kind: "idle" | "saved" } | { kind: "error"; message: string };
+};
+
+export function correctionStateFromReceipt(countId: string, lines: TaproomCorrectionLine[]): TaproomCorrectionState {
+  return {
+    countId,
+    reason: "",
+    lines: lines.map((line) => ({ ...line, qty_before: Number(line.qty_before), qty_counted: Number(line.qty_counted), quantity: String(Number(line.qty_counted)) })),
+    attempt: { kind: "idle" },
+  };
+}
+
+function correctionLocked(state: TaproomCorrectionState) {
+  return state.attempt.kind === "submitting" || state.attempt.kind === "unknown" || state.attempt.kind === "saved";
+}
+
+export function updateCorrectionQuantity(state: TaproomCorrectionState, lineId: string, quantity: string): TaproomCorrectionState {
+  if (correctionLocked(state)) return state;
+  return { ...state, attempt: { kind: "idle" }, lines: state.lines.map((line) => line.id === lineId ? { ...line, quantity } : line) };
+}
+
+export function updateCorrectionReason(state: TaproomCorrectionState, reason: string): TaproomCorrectionState {
+  if (correctionLocked(state)) return state;
+  return { ...state, reason, attempt: { kind: "idle" } };
+}
+
+function correctionPayload(state: TaproomCorrectionState): TaproomCorrectionInput {
+  const reason = state.reason.trim();
+  if (!reason) throw new Error("Enter a reason for the count correction.");
+  const corrections = state.lines.flatMap((line) => {
+    if (!/^\d+$/.test(line.quantity)) throw new Error("Correct to whole packaged units.");
+    const qtyCounted = Number(line.quantity);
+    if (!Number.isSafeInteger(qtyCounted)) throw new Error("Correct to whole packaged units.");
+    if (qtyCounted < line.qty_counted) throw new Error("A count correction cannot reduce a recorded quantity.");
+    if (qtyCounted > line.qty_before) throw new Error("A count correction cannot exceed the recorded stock before the count.");
+    return qtyCounted === line.qty_counted ? [] : [{ lineId: line.id, qtyCounted }];
+  });
+  if (corrections.length === 0) throw new Error("Please increase at least one counted quantity.");
+  return { countId: state.countId, corrections, reason };
+}
+
+export function beginCorrectionAttempt(state: TaproomCorrectionState, requestId: string): TaproomCorrectionState {
+  if (state.attempt.kind === "saved" || state.attempt.kind === "submitting") return state;
+  if (state.attempt.kind === "unknown") return { ...state, attempt: { ...state.attempt, kind: "submitting", message: undefined } };
+  return { ...state, attempt: { kind: "submitting", requestId, payload: correctionPayload(state) } };
+}
+
+export function failCorrectionAttempt(state: TaproomCorrectionState, kind: "unknown" | "error", message: string): TaproomCorrectionState {
+  if (kind === "unknown" && state.attempt.kind === "submitting") return { ...state, attempt: { ...state.attempt, kind, message } };
+  return { ...state, attempt: { kind: "error", message } };
+}
+
+export function completeCorrectionAttempt(state: TaproomCorrectionState): TaproomCorrectionState {
+  return { ...state, attempt: { kind: "saved" } };
+}
+
 const bucketKey = (line: Pick<TaproomCountSnapshotLine, "bin_id" | "sku_id" | "lot_id">) =>
   `${line.bin_id}:${line.sku_id}:${line.lot_id ?? "untracked"}`;
 const baselineChangedMessage = "A newer saved count changed the comparison baseline. Start a fresh recount.";
@@ -158,7 +234,7 @@ function payload(state: TaproomCountState): TaproomCountInput {
     if (!/^\d+$/.test(line.quantity)) throw new Error("Count remaining whole packaged units; a partial keg counts as one until gone.");
     const qtyCounted = Number(line.quantity);
     if (!Number.isSafeInteger(qtyCounted)) throw new Error("Count remaining whole packaged units; a partial keg counts as one until gone.");
-    if (qtyCounted > line.qtyBefore) throw new Error("Count exceeds recorded stock; ask Warehouse to investigate. Count correction is not yet available.");
+    if (qtyCounted > line.qtyBefore) throw new Error("Count exceeds recorded stock; ask Warehouse to investigate.");
     return { binId: line.binId, skuId: line.skuId, lotId: line.lotId, qtyCounted };
   });
   return { locationId: state.draft.locationId, countedOn: state.draft.countedOn, revision: state.draft.revision, lines };
