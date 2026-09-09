@@ -25,6 +25,7 @@ import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { AdjustLinesView } from "@/components/mgr/views/adjust-lines";
+import { BeerView } from "@/components/mgr/views/beer";
 import { BinView } from "@/components/mgr/views/bin";
 import { BrandView } from "@/components/mgr/views/brand";
 import { CatalogView } from "@/components/mgr/views/catalog";
@@ -33,13 +34,18 @@ import { CompleteTransferView } from "@/components/mgr/views/complete-transfer";
 import { ConfirmOrderView } from "@/components/mgr/views/confirm-order";
 import { CustomerView } from "@/components/mgr/views/customer";
 import { CustomersView } from "@/components/mgr/views/customers";
+import { DeniedView } from "@/components/mgr/views/denied";
+import { EntryView } from "@/components/mgr/views/entry";
 import { FinishedGoodsView } from "@/components/mgr/views/finished-goods";
+import { FirstRunView } from "@/components/mgr/views/first-run";
 import { FormatView } from "@/components/mgr/views/format";
 import { FormatsView } from "@/components/mgr/views/formats";
 import { InvoiceView } from "@/components/mgr/views/invoice";
 import { LocationBinsView } from "@/components/mgr/views/location-bins";
 import { LocationView } from "@/components/mgr/views/location";
 import { LocationsView } from "@/components/mgr/views/locations";
+import { MeView } from "@/components/mgr/views/me";
+import { MoreView } from "@/components/mgr/views/more";
 import { MovementRecordedView } from "@/components/mgr/views/movement-recorded";
 import { NewOrderView } from "@/components/mgr/views/new-order";
 import { NewTransferView } from "@/components/mgr/views/new-transfer";
@@ -64,6 +70,9 @@ import { ReverseMovementView } from "@/components/mgr/views/reverse-movement";
 import { ReturnCreditView } from "@/components/mgr/views/return-credit";
 import { ReviewOrderView } from "@/components/mgr/views/review-order";
 import { SaleChannelsView } from "@/components/mgr/views/sale-channels";
+import { SearchView } from "@/components/mgr/views/search";
+import { SessionExpiredView } from "@/components/mgr/views/session-expired";
+import { SettingsView } from "@/components/mgr/views/settings";
 import { ShipToView } from "@/components/mgr/views/ship-to";
 import { ShipView } from "@/components/mgr/views/ship";
 import { ShipmentDoneView } from "@/components/mgr/views/shipment-done";
@@ -71,12 +80,27 @@ import { ShopView } from "@/components/mgr/views/shop";
 import { ShortPickView } from "@/components/mgr/views/short-pick";
 import { SkuListView } from "@/components/mgr/views/sku-list";
 import { SkuView } from "@/components/mgr/views/sku";
+import { TeamView } from "@/components/mgr/views/team";
+import { TodayView } from "@/components/mgr/views/today";
+import { WorkView } from "@/components/mgr/views/work";
 import { TransferDetailView } from "@/components/mgr/views/transfer-detail";
 import { TransfersView } from "@/components/mgr/views/transfers";
 import { UnitsView } from "@/components/mgr/views/units";
 import { OHIO_STOUT_NOTE, LOC_TAPROOM, LOC_WAREHOUSE } from "@/lib/mgr/fixtures/demo";
+import { beerOverview } from "@/lib/mgr/fixtures/beer";
 import { brandHazy, catalogBrands, formatCan, formatsInventory, packageBomCase, skuHazyHalf, skuListHazy } from "@/lib/mgr/fixtures/catalog";
 import { customerRidgeline, customersList, shipToMain } from "@/lib/mgr/fixtures/customers";
+import { deniedInvoices } from "@/lib/mgr/fixtures/denied";
+import { expiredReset, noMembership, portalForgotPassword, portalSetPassword, portalSignIn, resetPassword, setPassword, signIn } from "@/lib/mgr/fixtures/entry";
+import { firstRunDemo } from "@/lib/mgr/fixtures/first-run";
+import { meMaria } from "@/lib/mgr/fixtures/me";
+import { moreNavs } from "@/lib/mgr/fixtures/more";
+import { entityPickerPalette, searchPalette } from "@/lib/mgr/fixtures/search";
+import { sessionExpiredQueued } from "@/lib/mgr/fixtures/session-expired";
+import { settingsDemo } from "@/lib/mgr/fixtures/settings";
+import { teamRoster } from "@/lib/mgr/fixtures/team";
+import { todayBrewer, todayDriver, todayEmpty, todaySales, todayTaproom, todayWarehouse } from "@/lib/mgr/fixtures/today";
+import { workWarehouse } from "@/lib/mgr/fixtures/work";
 import { invoiceFailedAls } from "@/lib/mgr/fixtures/invoice";
 import { finishedGoodsList, movementRecordedFestival, recordMovementFestival, reverseMovementAdjustment } from "@/lib/mgr/fixtures/inventory";
 import { binCold, locationBinsTaproom, locationTaproom, locationsList } from "@/lib/mgr/fixtures/locations";
@@ -92,6 +116,7 @@ import { priceGroupTwo, pricingGrid } from "@/lib/mgr/fixtures/pricing";
 import { channelExport, saleChannelsList, unitsPlato } from "@/lib/mgr/fixtures/settings-catalog";
 import { newTransferDraft, transferDetailSubmitted, transfersList } from "@/lib/mgr/fixtures/transfers";
 import { toAdjustLinesViewProps } from "@/lib/mgr/adjust-lines-view";
+import { toBeerViewProps } from "@/lib/mgr/beer-view";
 import { toBinViewProps } from "@/lib/mgr/bin-view";
 import { toBrandViewProps } from "@/lib/mgr/brand-view";
 import { toCatalogViewProps } from "@/lib/mgr/catalog-view";
@@ -100,13 +125,18 @@ import { toCompleteTransferViewProps } from "@/lib/mgr/complete-transfer-view";
 import { toConfirmOrderViewProps } from "@/lib/mgr/confirm-order-view";
 import { toCustomerViewProps } from "@/lib/mgr/customer-view";
 import { toCustomersViewProps } from "@/lib/mgr/customers-view";
+import { toDeniedViewProps } from "@/lib/mgr/denied-view";
+import { toEntryViewProps } from "@/lib/mgr/entry-view";
 import { toFinishedGoodsViewProps } from "@/lib/mgr/finished-goods-view";
+import { toFirstRunViewProps } from "@/lib/mgr/first-run-view";
 import { toFormatViewProps } from "@/lib/mgr/format-view";
 import { toFormatsViewProps } from "@/lib/mgr/formats-view";
 import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
 import { toLocationBinsViewProps } from "@/lib/mgr/location-bins-view";
 import { toLocationViewProps } from "@/lib/mgr/location-view";
 import { toLocationsViewProps } from "@/lib/mgr/locations-view";
+import { toMeViewProps } from "@/lib/mgr/me-view";
+import { toMoreViewProps } from "@/lib/mgr/more-view";
 import { toMovementRecordedViewProps } from "@/lib/mgr/movement-recorded-view";
 import { toNewOrderViewProps } from "@/lib/mgr/new-order-view";
 import { toNewTransferViewProps } from "@/lib/mgr/new-transfer-view";
@@ -131,6 +161,9 @@ import { toReverseMovementViewProps } from "@/lib/mgr/reverse-movement-view";
 import { toReviewOrderViewProps } from "@/lib/mgr/review-order-view";
 import { toReturnCreditViewProps } from "@/lib/mgr/return-credit-view";
 import { toSaleChannelsViewProps } from "@/lib/mgr/sale-channels-view";
+import { toSearchViewProps } from "@/lib/mgr/search-view";
+import { toSessionExpiredViewProps } from "@/lib/mgr/session-expired-view";
+import { toSettingsViewProps } from "@/lib/mgr/settings-view";
 import { toShipToViewProps } from "@/lib/mgr/ship-to-view";
 import { toShipViewProps } from "@/lib/mgr/ship-view";
 import { toShipmentDoneViewProps } from "@/lib/mgr/shipment-done-view";
@@ -138,17 +171,18 @@ import { toShopViewProps } from "@/lib/mgr/shop-view";
 import { toShortPickViewProps } from "@/lib/mgr/short-pick-view";
 import { toSkuListViewProps } from "@/lib/mgr/sku-list-view";
 import { toSkuViewProps } from "@/lib/mgr/sku-view";
+import { toTeamViewProps } from "@/lib/mgr/team-view";
+import { toTodayViewProps } from "@/lib/mgr/today-view";
 import { toTransferDetailViewProps } from "@/lib/mgr/transfer-detail-view";
 import { toTransfersViewProps } from "@/lib/mgr/transfers-view";
 import { toUnitsViewProps } from "@/lib/mgr/units-view";
+import { toWorkViewProps } from "@/lib/mgr/work-view";
 import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-icons";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
 import { formatVolume } from "@/lib/volume";
 import { saccharificationRest, type Step, totalDuration } from "@/lib/mgr/recipe-schedule";
-import {
-  BeerIcon, DeliveryTruck01Icon, Package01Icon, Route01Icon, TaskDone01Icon, ThermometerIcon, WifiDisconnected01Icon,
-} from "@hugeicons/core-free-icons";
+import { WifiDisconnected01Icon } from "@hugeicons/core-free-icons";
 
 /** The drawn mash schedule. Rows and footer both read it, so the total and the
  *  conversion rest can never disagree with the steps above them. */
@@ -207,12 +241,7 @@ export type Screen = {
  * portal screen under Portal, otherwise its group or tab. */
 export const area = (s: Screen) => s.venue?.name ?? s.group ?? (s.portal ? "Portal" : (s.tab ?? "Other"));
 
-const today = (rows: ReactNode) => (
-  <>
-    {E.hd("Today", "Thu 9/3")}
-    {rows}
-  </>
-);
+
 
 // One invoice threaded through the AR list, the portal and the QuickBooks
 // venue frames, plus its named siblings. Every invoice number in this file
@@ -276,13 +305,7 @@ export const SCREENS: Screen[] = [
     reads: "get_today [delivery rows require assigned warehouse member or admin]", writes: "none",
     states: [["empty", "one button: the role's first verb"], ["loading", "row-shaped skeletons"], ["error", "Today did not load · Retry", 1], ["offline", "cached rows · writes queue"], ["role hidden", "only relevant permitted work · no blank gaps"]],
     spec: "Drawn as the warehouse persona at honest 16px density. Rows are role-filtered per plan §3; the row verb is the action. A row standing for one order opens that order's Pick. This row stands for three, so Pick lands on the day's Pick sheet and each order opens its own Pick from there; the verb never becomes a noun to explain itself. The restock row appears while the order's restock flag is set and opens the order. Weekly count is gated: disabled with human copy, never a gate name.",
-    body: today(<>
-      {E.row("3 orders ready", "quantities default to ordered", E.act("Pick", "info"), "w", Package01Icon)}
-      {E.row("Staged · ORD-0229", "restock 3 Pils cases to Warehouse", E.act("Put back", "attention"), "w", Package01Icon)}
-      {E.row("PO-0142 · Country Malt", "arrives Thu", E.act("Receive", "info"), "", DeliveryTruck01Icon)}
-      {E.row("Next delivery · Ridgeline", "your route · stop 1 of 3", E.act("Resume", "info"), "", Route01Icon)}
-      {E.gated("Weekly count")}
-    </>),
+    body: <TodayView model={toTodayViewProps(todayWarehouse)} footer={E.gated("Weekly count")} />,
   },
   {
     step: 4, slice: "all", tab: "Today", name: "Today empty",
@@ -290,10 +313,7 @@ export const SCREENS: Screen[] = [
     reads: "get_today", writes: "none",
     states: [["empty", "one button: the role's first verb"]],
     spec: "Empty Today. When work exists the row is where you act; with nothing waiting the first verb stands alone.",
-    body: today(<>
-      {E.blank("Nothing waiting")}
-      {E.btn("Record movement", "g")}
-    </>),
+    body: <TodayView model={toTodayViewProps(todayEmpty)} />,
   },
   {
     step: 1, slice: "all", tab: "Today", name: "Sales",
@@ -302,15 +322,7 @@ export const SCREENS: Screen[] = [
     reads: "get_today [sales role filter] · get_shortfalls · list_invoice_questions", writes: "none",
     states: [["empty", "one button: the role's first verb"], ["role hidden", "no Pick/Receive; no blank gaps"], ["buyer question", "a portal question lands here, because nothing else in MGR would show it"]],
     spec: "The same Today read as the exemplar, filtered for sales. Confirm is the row verb (2 taps); shortfall rows open Shortfall, pars and standing allocation. A question raised from the portal's Question invoice sheet appears as a row here and opens that invoice, where Mark answered clears it: the note has a destination a person opens and a way to leave the list again. New order is the last row because the top button is gone.",
-    body: today(<>
-      {E.row("ORD-0231 · Ridgeline", "submitted · ships Thu", E.act("Confirm", "success"), "w", Package01Icon)}
-      {E.row("ORD-0235 · Teresa’s", "submitted · ships Fri", E.act("Confirm", "success"), "", Package01Icon)}
-      {E.row("Pils · 16 oz case", "Not enough Pils for 2 orders", E.act("Choose who gets it", "attention"), "w")}
-      {E.row("Hazy IPA · ½ bbl", "11 ready · fine", "")}
-      {E.row("Al’s Bar · OH", "Al’s Bar can’t receive Stout in OH", E.act("Fix registration", "attention"), "w")}
-      {E.row(`${INV.no} · Ridgeline`, "buyer asked about this invoice", E.act("Open"), "w")}
-      {E.nav("New order")}
-    </>),
+    body: <TodayView model={toTodayViewProps(todaySales)} footer={E.nav("New order")} />,
   },
   {
     step: 1, slice: "all", tab: "Today", name: "Brewer",
@@ -319,12 +331,7 @@ export const SCREENS: Screen[] = [
     reads: "get_today [brewer role filter]", writes: "none",
     states: [["empty", "one button: the role's first verb"], ["role hidden", "no picks or receipts"]],
     spec: "Reading opens the Fermentation reading sheet defaulted to the overdue vessel. Brew day and packaging rows open their Work frames. Warehouse picks never appear here. The row verb is the action.",
-    body: today(<>
-      {E.row("FV3 · Stout", "reading overdue 31 h", E.act("Reading", "info"), "w", ThermometerIcon)}
-      {E.row("B-0416 · Hazy IPA v4", "brew day Fri 9/4 · 15 bbl", E.act("Start", "info"), "", BeerIcon)}
-      {E.row("RUN-0031 · Hazy cans", "packaged today · close due", E.act("Close", "info"), "w", Package01Icon)}
-      {E.row("FV1 · Pils", "1.9 °P · read 4 h ago", "", "", ThermometerIcon)}
-    </>),
+    body: <TodayView model={toTodayViewProps(todayBrewer)} />,
   },
   {
     step: 1, slice: "all", tab: "Today", name: "Driver",
@@ -333,13 +340,7 @@ export const SCREENS: Screen[] = [
     reads: "get_today [delivery rows require route.driver_user_id = caller or admin]", writes: "none",
     states: [["empty", "No route today"], ["offline", "stop list cached · Delivered waits", 1], ["permission", "warehouse membership + assigned route", 1]],
     spec: "Resume opens Confirm delivery for the next incomplete stop. Route A opens Driver route (all stops, the load, Return). No Pick/Receive rows.",
-    body: today(<>
-      {E.btn("Resume · Stop 1 of 3")}
-      {E.row("Stop 1 · Ridgeline Tap Room", "4 Hazy halves · 6 Pils cases", "next", "w")}
-      {E.row("Stop 2 · Al’s Bar", "2 Stout sixths · later")}
-      {E.row("Stop 3 · Teresa’s", "8 Hazy halves · 12 Pils cases · later")}
-      {E.nav("Route A", "departed 8:10 · return open")}
-    </>),
+    body: <TodayView model={toTodayViewProps(todayDriver)} lead={E.btn("Resume · Stop 1 of 3")} footer={E.nav("Route A", "departed 8:10 · return open")} />,
   },
   {
     step: 1, slice: "all", tab: "Today", name: "Taproom",
@@ -348,78 +349,35 @@ export const SCREENS: Screen[] = [
     reads: "list_locations · list_open_taps · list_taproom_counts · get_taproom_variance", writes: "none",
     states: [["no location", "no observed taproom facts; Taproom stock remains available"], ["role hidden", "no Work, Search, orders, invoices, or brewery quiet settings", 1], ["narrow surface", "three permitted exits with last observed facts"]],
     spec: "Taproom Today uses only permitted taproom reads. It links the board, weekly count and four-week variance with last-opened, last-counted and report as-of facts. It does not invent an overdue count, shift schedule, or POS mapping action. Work, Search, business records and brewery quiet settings stay hidden.",
-    body: today(<>
-      {E.row("Tap board", "11 open · last opened Thu 11:20am", E.act("Open", "info"), "", BeerIcon)}
-      {E.row("Weekly count", "last saved Sep 7 at 9:14pm", E.act("Count", "info"), "", TaskDone01Icon)}
-      {E.row("Variance · 4 weeks", "+0.6 bbl expected minus actual · as of now", E.act("Review", "info"), "", TaskDone01Icon)}
-      {E.note("Observed facts only. No fabricated overdue or shift policy; no Work, Search, orders or invoices.")}
-    </>),
+    body: <TodayView model={toTodayViewProps(todayTaproom)} footer={E.note("Observed facts only. No fabricated overdue or shift policy; no Work, Search, orders or invoices.")} />,
   },
   {
     step: 1, slice: "all", tab: "Beer", name: "Beer", job: "Inventory, cellar, materials and kegs",
     to: { Taproom: "Weekly count", Materials: "Materials on hand" },
     reads: "get_beer_overview", writes: "none",
     states: DEFAULT_STATES,
-    body: (<>
-      {E.hd("Beer")}
-      {E.nav("Finished goods", "2 shortages · ATP by SKU")}
-      {E.nav("Taproom", "2 below par · weekly count due")}
-      {E.nav("Taps", "11 open · Tap board")}
-      {E.nav("Cellar", "6 vessels · 1 reading overdue")}
-      {E.nav("Materials", "3 shortages")}
-      {E.nav("Kegs", "142 out · 9 overdue")}
-      {E.blank("Each summary opens its dedicated area; this page does not expand indefinitely.")}
-    </>),
+    body: <BeerView model={toBeerViewProps(beerOverview)} />,
   },
   {
     step: 1, slice: "all", tab: "Work", name: "Work", job: "Everything currently in motion, ordered by next due action",
     reads: "list_work", writes: "none",
     states: DEFAULT_STATES,
     spec: "Warehouse default rows shown; the chips are the kinds the role may open (a brewer has no POs or routes) and an explicit chip choice is remembered. Rows sort by urgency/due time, not newest activity.",
-    body: (<>
-      {E.hd("Work", "warehouse default", E.btn("New order", "g"))}
-      {E.tabs(WORK_CHIPS, 0, "w-full", WORK_TABS)}
-      {E.row("ORD-0231 · Ridgeline", "submitted · ships today", E.act("Confirm", "success"), "", Package01Icon)}
-      {E.row("ORD-0229 · Al’s Bar", "picked · restock 3 Pils staged", E.act("Put back", "attention"), "w", Package01Icon)}
-      {E.row("PO-0142 · Country Malt", "due today", E.act("Receive", "info"), "", DeliveryTruck01Icon)}
-      {E.row("Route A", "3 stops · Thu", E.act("Resume", "info"), "", Route01Icon)}
-    </>),
+    body: <WorkView model={toWorkViewProps(workWarehouse)} />,
   },
   {
     step: 1, slice: "all", tab: "More", name: "More", job: "Setup and desk review, never standing work",
     reads: "none [role navigation manifest]", writes: "none",
     states: DEFAULT_STATES,
     spec: "Role-filtered; hidden entries leave no gaps. Standing work remains in Today, Beer or Work.",
-    body: (<>
-      {E.hd("More")}
-      {E.nav("Invoices", "QuickBooks Online mapping and push", "", QuickBooksMark)}
-      {E.nav("Catalog", "brands and SKUs")}
-      {E.nav("Price groups", "rows of the price grid")}
-      {E.nav("Customers", "accounts and ship-tos")}
-      {E.nav("Recipes", "formulas and versions")}
-      {E.nav("Compliance months", "reports and filing status")}
-      {E.nav("Vendors", "suppliers")}
-      {E.nav("Sale channels", "tax treatment")}
-      {E.nav("Formats", "package composition")}
-      {E.nav("Planning")}
-      {E.nav("Settings", "brewery and integrations")}
-      {E.nav("Locations", "warehouses, taprooms and bins")}
-      {E.nav("Bins", "physical subdivisions by location")}
-      {E.nav("Chat", "Slack and notifications")}
-    </>),
+    body: <MoreView model={toMoreViewProps(moreNavs)} />,
   },
   {
     step: 1, slice: "all", group: "Global", surface: "sheet", name: "Search", job: "Search every permitted entity kind",
     reads: "search_entities", writes: "none",
     states: [["empty", "No matches · change the term"], ["loading", "row-shaped skeletons"], ["offline", "cached matches only", 1], ["permission", "Results honor row access"], ["document number", "ORD-0231 matches exactly and sorts first"]],
     spec: "One registered search across the entity kinds the caller's role can read; results are grouped by kind and arrow keys move between matches; filtering never widens what is permitted, and RLS decides the rows either way, so a term matching a customer the caller cannot see returns nothing rather than a redacted row. A document number (ORD-0231, INV-1042, L-240831-HZ) matches exactly and sorts above name matches, because someone typing one is holding it in their hand; names match on prefix. This is also where history lives: a run closed months ago leaves the Work list and is found here.",
-    body: (<>
-      {E.palette("Search", [
-        { heading: "SKUs", items: [["Hazy IPA · ½ bbl", "ATP 11"]] },
-        { heading: "Orders", items: [["ORD-0231 · Ridgeline", "4 × Hazy"]] },
-        { heading: "Lots", items: [["L-240831-HZ", "packaged 8/31"]] },
-      ])}
-    </>),
+    body: <SearchView model={toSearchViewProps(searchPalette)} />,
   },
   {
     step: 1, slice: "all", group: "Global", surface: "sheet", name: "Me", job: "Who I am, which brewery, leave",
@@ -427,15 +385,7 @@ export const SCREENS: Screen[] = [
     reads: "supabase_auth_get_session [platform] · get_first_run_state", writes: "supabase_auth_sign_out [platform]",
     states: [["dedicated mode", "switcher hidden · one brewery"], ["single membership", "switcher hidden"]],
     spec: "Opened from the header Me control. Brewery switcher renders only in SaaS mode with more than one membership. Change password opens Set new password, as portal Me opens Portal set password: a signed-in person should not have to sign out and use the recovery flow. No notification history, no settings; those live under More.",
-    body: (<>
-      {E.row("Maria Alvarez", "admin", "", "", E.face({ className: "size-10" }))}
-      {E.fld("Signed in as", "maria@demobrewing.com")}
-      {E.ttl("Brewery")}
-      {E.row("Demo Brewing", "current", "✓", "ok")}
-      {E.row("Ridgeline Contract Brewing", "", E.act("Switch"))}
-      {E.sp()}
-      {E.btns([["Change password", "g"], ["Sign out", "del"]])}
-    </>),
+    body: <MeView model={toMeViewProps(meMaria)} />,
   },
   {
     step: 1, slice: "all", tab: "More", name: "Settings", job: "Edit brewery/location basics and route to rare setup",
@@ -443,26 +393,7 @@ export const SCREENS: Screen[] = [
     reads: "get_brewery · list_locations · list_team_members", writes: "update_brewery · update_location · set_portal_fulfillment_source",
     states: permitted("admin only"),
     spec: "Invoices remains a first-class More and desk-rail destination. TTB registry number and PA license are brewery columns and feed the compliance report header. The customer-facing phone is the number the portal prints when online payment is unavailable, so it is collected here rather than assumed. Deployment mode is read-only. Team opens the Team frame.",
-    body: (<>
-      {E.back("More", "Settings")}
-      {E.edit("Brewery name", "Demo Brewing")}
-      {E.pick("Timezone", "America/New_York", ["America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles"])}
-      {E.edit("TTB registry number", "BR-PA-12345")}
-      {E.edit("PA license", "G-1234")}
-      {E.edit("Customer-facing phone", "(610) 555-0142", "tel")}
-      {E.edit("Reading overdue after (hours)", OVERDUE_HOURS, "number")}
-      {E.fld("Deployment", "dedicated · read-only")}
-      {E.btn("Save brewery")}
-      {E.pick("Portal fulfillment warehouse", "Warehouse", ["Warehouse"])}
-      {E.btn("Save warehouse", "g")}
-      {E.nav("Source water · Municipal · Denver", "every recipe starts here unless it overrides")}
-      {E.nav("Locations", "Warehouse · Taproom")}
-      {E.nav("Team", "3 members · 1 pending invite")}
-      {E.nav("Accounting", "QuickBooks · connection and push defaults", "", QuickBooksMark)}
-      {E.nav("Point of sale", "Square · catalog and sales", "", SquareMark)}
-      {E.nav("Chat", "Slack and notifications", "", SlackMark)}
-      {E.nav("Import", "CSV wizard")}
-    </>),
+    body: <SettingsView model={toSettingsViewProps(settingsDemo)} />,
   },
   {
     step: 8,
@@ -496,15 +427,7 @@ export const SCREENS: Screen[] = [
     reads: "none [the denied query never runs]", writes: "none",
     states: [["bookmarked", "direct URL · denied, not empty rows", 1], ["revoked mid-session", "the next command is refused; the shell stays usable", 1]],
     spec: "Plan §3: navigation and Today hide inapplicable actions while the registry and RLS still deny direct URLs and commands, so this frame exists for the URL, not for a link. It names the refusal and the role that would satisfy it, never a blank table, a spinner, or the shape of data the caller may not read.",
-    body: (<>
-      {E.back("Today", "No access")}
-      {E.note("You do not have access to Invoices.")}
-      {E.fld("Signed in as", "@dave · brewer")}
-      {E.fld("Needs", "admin or sales")}
-      {E.info("An admin can change your role in Settings, then Team.")}
-      {E.btns([["Back to Today", "p"], ["Go to Beer", "g"]])}
-      {E.sp()}
-    </>),
+    body: <DeniedView model={toDeniedViewProps(deniedInvoices)} />,
   },
   {
     step: 2, slice: 1, group: "Entry", surface: "entry", name: "No membership",
@@ -513,15 +436,7 @@ export const SCREENS: Screen[] = [
     states: [["no brewery", "create a brewery on hosted MGR"], ["dedicated", "creation is hidden"], ["no customer", "contact the brewery"]],
     spec: "After sign-in with no brewery and no customer account. The queue is empty because nothing was writable.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: (<>
-      {E.sp()}
-      {E.ttl("No brewery yet")}
-      {E.note("This login is not on a brewery or a customer account.")}
-      {E.info("Contact your brewery administrator about access.")}
-      {E.btn("Create brewery")}
-      {E.btn("Sign out", "g")}
-      {E.sp()}
-    </>),
+    body: <EntryView model={toEntryViewProps(noMembership)} />,
   },
   {
     step: 2, slice: 1, group: "Entry", surface: "entry", name: "Expired invite",
@@ -547,13 +462,7 @@ export const SCREENS: Screen[] = [
     states: [["expired", "request a new reset link"]],
     spec: "A timed-out recovery token never opens Set new password.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: (<>
-      {E.sp()}
-      {E.ttl("Reset link expired")}
-      {E.note("This reset link is no longer valid.")}
-      {E.btn("Request a new link")}
-      {E.sp()}
-    </>),
+    body: <EntryView model={toEntryViewProps(expiredReset)} />,
   },
   {
     step: 4, slice: 1, group: "Global", surface: "sheet", name: "Session expired",
@@ -562,11 +471,7 @@ export const SCREENS: Screen[] = [
     reads: "local_outbox [client state]", writes: "none",
     states: [["queue kept", "3 writes waiting"], ["signed in", "Retry 1 waiting on the outbox"]],
     spec: "Mid-write expiry does not drop the outbox. Sign in, then Offline outbox still has the queued envelopes.",
-    body: (<>
-      {E.note("Your session ended. The 3 queued writes are still here.")}
-      {E.row("Record movement · Hazy", "waiting", "queued", "", WifiDisconnected01Icon)}
-      {E.btn("Sign in to retry")}
-    </>),
+    body: <SessionExpiredView model={toSessionExpiredViewProps(sessionExpiredQueued)} />,
   },
   // steps 2–8
   {
@@ -580,16 +485,7 @@ export const SCREENS: Screen[] = [
     writes: "supabase_auth_sign_in_with_password · supabase_auth_sign_in_with_otp [platform]",
     states: DEFAULT_STATES,
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: (<>
-      {E.sp()}
-      {E.ttl("Sign in")}
-      {E.inp("Email")}
-      {E.inp("Password")}
-      {E.btn("Sign in")}
-      {E.btn("Email me a link", "g")}
-      {E.link("Forgot password?", "Reset password")}
-      {E.sp()}
-    </>),
+    body: <EntryView model={toEntryViewProps(signIn)} />,
   },
   {
     step: 2,
@@ -624,13 +520,7 @@ export const SCREENS: Screen[] = [
     writes: "supabase_auth_reset_password_for_email [platform]",
     states: [["sent", "Check your email"], ["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["error", "Did not load · Retry", 1]],
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: (<>
-      {E.sp()}
-      {E.ttl("Reset password")}
-      {E.inp("Email")}
-      {E.btn("Send reset link")}
-      {E.sp()}
-    </>),
+    body: <EntryView model={toEntryViewProps(resetPassword)} />,
   },
   {
     step: 2,
@@ -644,14 +534,7 @@ export const SCREENS: Screen[] = [
     states: [["expired link", "Request a new reset link", 1], ["wrong audience", "portal user lands in the portal shell"]],
     spec: "The recovery token opens this, never Accept invite: no role row, no “Join” copy. After Save the existing membership decides the shell.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: (<>
-      {E.sp()}
-      {E.ttl("Set new password")}
-      {E.fld("Account", "maria@demobrewing.com")}
-      {E.inp("Choose a password")}
-      {E.btn("Save password")}
-      {E.sp()}
-    </>),
+    body: <EntryView model={toEntryViewProps(setPassword)} />,
   },
   {
     step: 6,
@@ -666,15 +549,7 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     spec: "Customer-only accounts land on Order. Forgot password is a text link, not a second primary.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: (<>
-      {E.sp()}
-      {E.ttl("Sign in to your account")}
-      {E.inp("Email")}
-      {E.inp("Password")}
-      {E.btn("Sign in")}
-      {E.link("Forgot password?", "Portal forgot password")}
-      {E.sp()}
-    </>),
+    body: <EntryView model={toEntryViewProps(portalSignIn)} />,
   },
   {
     step: 6,
@@ -689,14 +564,7 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     spec: "The sent state is this same screen with the info. Enumeration is never confirmed.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: (<>
-      {E.sp()}
-      {E.ttl("Reset password")}
-      {E.inp("Email")}
-      {E.btn("Send reset link")}
-      {E.info("If that email is on an account, a reset link is on its way.")}
-      {E.sp()}
-    </>),
+    body: <EntryView model={toEntryViewProps(portalForgotPassword)} />,
   },
   {
     step: 6,
@@ -711,14 +579,7 @@ export const SCREENS: Screen[] = [
     states: DEFAULT_STATES,
     spec: "After Save, a customer membership opens Order, not Today.",
     hd: E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>),
-    body: (<>
-      {E.sp()}
-      {E.ttl("Set new password")}
-      {E.fld("Account", PORTAL_BUYER.email)}
-      {E.inp("Choose a password")}
-      {E.btn("Save password")}
-      {E.sp()}
-    </>),
+    body: <EntryView model={toEntryViewProps(portalSetPassword)} />,
   },
   {
     step: 2,
@@ -730,14 +591,7 @@ export const SCREENS: Screen[] = [
     writes: "invite_staff [existing] · the taproom role [SCHEMA-GATE: revision 2 §16.13/§16.16 q3: staff_role gains taproom, but P-staff is role-agnostic, so the narrow per-role policies are undesigned] · update_staff_role · revoke_staff",
     states: [["last admin", "role change refused · keep one admin", 1], ["permission", "admin only", 1]],
     spec: "A person shows as @handle, derived from their email. Admin invites one staff role and changes or removes other memberships. The roster does not distinguish pending acceptance. Existing accounts cannot be attached or reinvited; removing membership leaves the Auth account.",
-    body: (<>
-      {E.back("Settings", "Team")}
-      {E.row("Maria Alvarez", "@maria · admin", "you", "", E.face())}
-      {E.nav("Dave Chen", "@dave · brewer", "", E.face({ src: "/mock/dave.jpg" }))}
-      {E.nav("Ted", "@ted · sales", "", E.face({ src: "/mock/ted.jpg" }))}
-      {E.nav("Sam Ortiz", "@sam · warehouse", "", E.face({ src: "/mock/sam.jpg" }))}
-      {E.btn("Invite staff")}
-    </>),
+    body: <TeamView model={toTeamViewProps(teamRoster)} />,
   },
   {
     step: 2, slice: 1, tab: "More", surface: "sheet", name: "Invite staff",
@@ -804,17 +658,7 @@ export const SCREENS: Screen[] = [
     writes: "invite_staff [existing] · create_location",
     states: permitted("admin only"),
     spec: "Admin sees this only while neither a location nor a brand exists; adding either ends the checklist. Import and staff invitation are optional and do not block onboarding. Team and first-run use the same staff invitation form with one role.",
-    body: (<>
-      {E.hd("Set up Demo Brewing", "5 steps")}
-      {E.row("1 · Add locations", "inline form expanded", "in progress", "ok")}
-      {E.fld("Location name", "Warehouse")}
-      {E.chips(["Warehouse", "Taproom"])}
-      {E.btn("Add location")}
-      {E.row("2 · Import CSV", "customers, catalog or opening balances", E.act("Import CSV"))}
-      {E.row("3 · Add a brand", "or let the import create them", E.act("Add"))}
-      {E.row("4 · Invite the team", "optional · email and one role", E.act("Invite staff"))}
-      {E.row("5 · Opening inventory", "count what’s on hand today", E.act("Record opening count", "info"))}
-    </>),
+    body: <FirstRunView model={toFirstRunViewProps(firstRunDemo)} />,
   },
   {
     step: 3,
@@ -909,15 +753,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: DEFAULT_STATES,
     spec: "48px rows; visible keyboard focus; one registered search behind the field.",
-    body: (<>
-      {E.palette("Search SKUs", [
-        { heading: "Recent", items: [["Hazy IPA · ½ bbl keg", "11 ready", "←"]] },
-        { heading: "All SKUs", items: [
-          ["Pils · 16 oz case", "6 short", "←"],
-          ["Stout · ⅙ bbl keg", "7 ready", "←"],
-        ] },
-      ])}
-    </>),
+    body: <SearchView model={toSearchViewProps(entityPickerPalette)} />,
   },
   {
     step: 4,
