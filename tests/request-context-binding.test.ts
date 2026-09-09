@@ -148,6 +148,29 @@ describe("request context headers", () => {
     }
   });
 
+  it("scopes security-definer staff reads, including direct membership projections", async () => {
+    await admin.from("orders").update({ status: "submitted" }).eq("id", orderId);
+    const scopedA = await db({ "x-mgr-actor-id": actor.id, "x-mgr-brewery-id": breweryA });
+    const wrongTeam = await scopedA.rpc("list_team_members", { p_brewery: breweryB });
+    const wrongToday = await scopedA.rpc("get_today_items", { p_brewery: breweryB, p_now: "2099-01-01T00:00:00Z" });
+
+    const scopedB = await db({ "x-mgr-actor-id": actor.id, "x-mgr-brewery-id": breweryB });
+    const ownTeam = await scopedB.rpc("list_team_members", { p_brewery: breweryB });
+    const ownToday = await scopedB.rpc("get_today_items", { p_brewery: breweryB, p_now: "2099-01-01T00:00:00Z" });
+    await admin.from("orders").update({ status: "draft" }).eq("id", orderId);
+    expect(wrongTeam.data).toEqual([]);
+    expect(wrongToday.data).toEqual([]);
+    expect(ownTeam.data?.length).toBeGreaterThan(0);
+    expect((ownToday.data as { subject_id: string }[] | null)?.some(row => row.subject_id === orderId)).toBe(true);
+
+    const customerScoped = await db({
+      "x-mgr-actor-id": actor.id,
+      "x-mgr-brewery-id": breweryB,
+      "x-mgr-customer-id": customerB,
+    });
+    expect((await customerScoped.rpc("get_loss_review", { p_brewery: breweryB, p_start: "2026-01-01", p_end: "2026-12-31" })).error?.code).toBe("42501");
+  });
+
   it("blocks cross-brewery target claims and replays before effects", async () => {
     const requestId = crypto.randomUUID();
     const wrong = await db({ "x-mgr-actor-id": actor.id, "x-mgr-brewery-id": breweryA });
@@ -202,6 +225,12 @@ describe("request context headers", () => {
       expect((await admin.from("breweries").select("name").eq("id", breweryB).single()).data?.name).not.toBe("Must stay unchanged");
       expect(sql(`select count(*) from private.command_requests where actor_id='${actor.id}' and request_id='${requestId}'`)).toEqual(["0"]);
     }
+
+    const valid = await db({ "x-mgr-actor-id": actor.id, "x-mgr-brewery-id": breweryB, "x-mgr-customer-id": customerA });
+    expect((await valid.rpc("update_brewery", {
+      p_brewery: breweryB, p_name: "Valid scoped write", p_timezone: "UTC", p_ttb_registry_no: null,
+      p_pa_license_no: null, p_customer_phone: null, p_reading_due_hours: 24, p_request_id: crypto.randomUUID(),
+    })).error).toBeNull();
   });
 
   it("restricts a multi-account portal question to the rendered customer", async () => {

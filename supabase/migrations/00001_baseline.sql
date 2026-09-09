@@ -3121,6 +3121,15 @@ begin
   end if;
 end $$;
 
+create function private.assert_staff_read(p_brewery uuid, p_roles public.staff_role[]) returns uuid
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not private.request_scope_allows(p_brewery) then
+    raise exception 'request context changed' using errcode = '42501';
+  end if;
+  return private.assert_staff(p_brewery, p_roles);
+end $$;
+
 create function private.assert_staff(p_brewery uuid, p_roles public.staff_role[]) returns uuid
 language plpgsql stable security definer set search_path = '' as $$
 declare v_actor uuid := auth.uid();
@@ -3532,6 +3541,7 @@ language sql stable security definer set search_path = '' as $$
     from public.brewery_users bu
     join auth.users u on u.id = bu.user_id
     where bu.brewery_id = p_brewery
+      and private.request_scope_allows(p_brewery)
       and exists (select 1 from public.brewery_users me where me.brewery_id = p_brewery and me.user_id = auth.uid()
                     and me.role = any (array['admin','sales','warehouse']::public.staff_role[]))
     order by bu.role, u.email;
@@ -4638,12 +4648,11 @@ $$;
 
 -- ponytail: inProcess is the tanks now, not at period end; replaying transfers
 -- and adjustments to a date is the upgrade when a filed month needs it.
-create function generate_compliance_report(p_brewery uuid, p_jurisdiction text, p_start date, p_end date)
+create function private.generate_compliance_report(p_brewery uuid, p_jurisdiction text, p_start date, p_end date)
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
 declare v_lines jsonb; v_warnings text[]; v_removals jsonb; v_cellar_removals jsonb; v_by_state jsonb;
   v_packaged numeric; v_in_process numeric; v_external text[] := '{}';
 begin
-  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
   if p_end < p_start then raise exception 'the period ends before it starts'; end if;
   -- one pass over the ledger; every figure is an aggregate of the same rows
   with r as materialized (select * from private.report_movements(p_brewery, p_end)),
@@ -4697,6 +4706,14 @@ begin
       else '[]'::jsonb end,
     'externalMappingRequired', to_jsonb(v_external));
 end $$;
+
+create function generate_compliance_report(p_brewery uuid, p_jurisdiction text, p_start date, p_end date)
+returns jsonb language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform private.assert_staff_read(p_brewery, array['admin','sales']::public.staff_role[]);
+  return private.generate_compliance_report(p_brewery, p_jurisdiction, p_start, p_end);
+end $$;
+
 create function file_compliance_report(p_brewery uuid, p_jurisdiction text, p_start date, p_end date, p_note text, p_request_id uuid)
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_replay jsonb; v_report jsonb; v_row public.report_filings;
@@ -4705,7 +4722,7 @@ begin
   v_replay := private.claim_command_request(p_brewery, 'file_compliance_report', p_request_id,
     jsonb_build_object('jurisdiction', p_jurisdiction, 'start', p_start, 'end', p_end, 'note', p_note));
   if v_replay is not null then return v_replay; end if;
-  v_report := public.generate_compliance_report(p_brewery, p_jurisdiction, p_start, p_end);
+  v_report := private.generate_compliance_report(p_brewery, p_jurisdiction, p_start, p_end);
   if not (v_report->'figures'->>'balances')::boolean then
     raise exception 'the report does not balance: %', array_to_string(array(select jsonb_array_elements_text(v_report->'warnings')), '; ');
   end if;
@@ -4725,7 +4742,7 @@ create function get_loss_review(p_brewery uuid, p_start date, p_end date)
 returns jsonb language plpgsql stable security definer set search_path = '' as $$
 declare v_result jsonb;
 begin
-  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
+  perform private.assert_staff_read(p_brewery, array['admin','sales']::public.staff_role[]);
   if p_end < p_start then raise exception 'the period ends before it starts'; end if;
   select coalesce(jsonb_agg(jsonb_build_object(
     'adjustment_id', root.id,
@@ -5071,7 +5088,7 @@ end $$;
 create function get_batch_completion_preview(p_brewery uuid, p_batch uuid) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 begin
-  perform private.assert_staff(p_brewery, array['admin','brewer']::public.staff_role[]);
+  perform private.assert_staff_read(p_brewery, array['admin','brewer']::public.staff_role[]);
   return private.batch_completion_calculation(p_brewery, p_batch);
 end $$;
 
@@ -6912,6 +6929,7 @@ language sql stable security definer set search_path = '' as $$
     from private.today_candidates c
     join public.brewery_users bu on bu.brewery_id = c.brewery_id and bu.user_id = auth.uid()
     where c.brewery_id = p_brewery
+      and private.request_scope_allows(p_brewery)
       and c.reason = any (public.today_live_reasons())
       and (c.reason = 'submitted_order' or c.due_at is null or c.due_at <= p_now)
       and (bu.role = 'admin'
@@ -8033,7 +8051,7 @@ create function get_chat_link_intent(p_brewery uuid,p_proof_hash text) returns j
 language plpgsql stable security definer set search_path = '' as $$
 declare v_result jsonb;
 begin
-  perform private.assert_staff(p_brewery,array['admin','sales','warehouse','brewer','taproom']::public.staff_role[]);
+  perform private.assert_staff_read(p_brewery,array['admin','sales','warehouse','brewer','taproom']::public.staff_role[]);
   select jsonb_build_object('brewery',b.name,'mgrIdentity',coalesce(nullif(u.raw_user_meta_data->>'full_name',''),u.email,u.id::text),
     'slackIdentity',l.external_user_id,'workspace',i.display_label,'expiresAt',l.proof_expires_at) into v_result
     from public.chat_user_links l join public.chat_installations i on i.id=l.installation_id
@@ -8196,7 +8214,7 @@ $$;
 create function get_taproom_count_snapshot(p_brewery uuid, p_location uuid) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 begin
-  perform private.assert_staff(p_brewery, array['admin','warehouse','taproom']::public.staff_role[]);
+  perform private.assert_staff_read(p_brewery, array['admin','warehouse','taproom']::public.staff_role[]);
   if not exists (select 1 from public.locations where id = p_location and brewery_id = p_brewery and kind = 'taproom') then
     raise exception 'choose an owned taproom location';
   end if;
@@ -8209,7 +8227,7 @@ create function get_taproom_print_labels(p_brewery uuid, p_location uuid, p_revi
 language plpgsql stable security definer set search_path = '' as $$
 declare v_snapshot jsonb;
 begin
-  perform private.assert_staff(p_brewery, array['admin','warehouse','taproom']::public.staff_role[]);
+  perform private.assert_staff_read(p_brewery, array['admin','warehouse','taproom']::public.staff_role[]);
   if not exists (select 1 from public.locations where id = p_location and brewery_id = p_brewery and kind = 'taproom') then
     raise exception 'choose an owned taproom location';
   end if;
@@ -8240,11 +8258,10 @@ begin
   ), '[]'::jsonb);
 end $$;
 
-create function get_taproom_count(p_brewery uuid, p_count uuid) returns jsonb
+create function private.get_taproom_count(p_brewery uuid, p_count uuid) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 declare v_result jsonb; v_root uuid;
 begin
-  perform private.assert_staff(p_brewery, array['admin','warehouse','taproom']::public.staff_role[]);
   select root_id into v_root from private.taproom_effective_counts
     where brewery_id=p_brewery and (root_id=p_count or effective_id=p_count) limit 1;
   select jsonb_build_object('id',h.root_id,'root_id',h.root_id,'effective_id',h.effective_id,
@@ -8273,11 +8290,18 @@ begin
   return v_result;
 end $$;
 
+create function get_taproom_count(p_brewery uuid, p_count uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform private.assert_staff_read(p_brewery, array['admin','warehouse','taproom']::public.staff_role[]);
+  return private.get_taproom_count(p_brewery, p_count);
+end $$;
+
 create function list_taproom_counts(p_brewery uuid,p_location uuid) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 declare v_result jsonb;
 begin
-  perform private.assert_staff(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
+  perform private.assert_staff_read(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
   if not exists(select 1 from public.locations where id=p_location and brewery_id=p_brewery and kind='taproom') then raise exception 'choose an owned taproom location'; end if;
   with headers as (
     select root_id,effective_id,location_id,counted_on,observed_at,counted_by,created_at,prior_count_id,corrected_at,corrected_by,correction_reason,
@@ -8360,7 +8384,7 @@ begin
     insert into public.taproom_count_lines(brewery_id, count_id, location_id, bin_id, sku_id, lot_id, qty_before, qty_counted, movement_id)
       values(p_brewery, v_count, p_location, v_bin, v_sku, v_lot, v_before, v_qty, v_movement);
   end loop;
-  return private.complete_command_request(p_request_id, public.get_taproom_count(p_brewery, v_count));
+  return private.complete_command_request(p_request_id, private.get_taproom_count(p_brewery, v_count));
 end $$;
 
 create function correct_taproom_count(p_brewery uuid,p_count uuid,p_corrections jsonb,p_reason text,p_request_id uuid)
@@ -8429,7 +8453,7 @@ begin
     insert into public.taproom_count_lines(brewery_id,count_id,location_id,bin_id,sku_id,lot_id,qty_before,qty_counted,movement_id,corrects_line_id)
       values(p_brewery,correction,item.location_id,item.bin_id,item.sku_id,item.lot_id,item.qty_before,coalesce(item.requested,item.qty_counted),replacement,item.id);
   end loop;
-  return private.complete_command_request(p_request_id,public.get_taproom_count(p_brewery,root.id));
+  return private.complete_command_request(p_request_id,private.get_taproom_count(p_brewery,root.id));
 end $$;
 revoke all on function private.taproom_count_snapshot(uuid,uuid) from public,anon,authenticated,service_role;
 revoke all on function private.validate_taproom_correction_graph(uuid),private.enforce_taproom_correction_graph() from public,anon,authenticated,service_role;
@@ -8633,7 +8657,7 @@ end $$;
 create function list_open_taps(p_brewery uuid,p_location uuid) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 begin
-  perform private.assert_staff(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
+  perform private.assert_staff_read(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
   if not exists(select 1 from public.locations where id=p_location and brewery_id=p_brewery and kind='taproom') then raise exception 'choose an owned taproom location'; end if;
   return (select coalesce(jsonb_agg(to_jsonb(t)||jsonb_build_object('sku_name',s.name,'brand_id',s.brand_id,'brand_name',b.name,'opened_by_label',split_part(u.email,'@',1))
     order by t.tap_number nulls last,t.opened_at,t.id),'[]'::jsonb)
@@ -8645,7 +8669,7 @@ end $$;
 create function list_tap_history(p_brewery uuid,p_location uuid) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 begin
-  perform private.assert_staff(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
+  perform private.assert_staff_read(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
   if not exists(select 1 from public.locations where id=p_location and brewery_id=p_brewery and kind='taproom') then raise exception 'choose an owned taproom location'; end if;
   return (select coalesce(jsonb_agg(to_jsonb(t)||jsonb_build_object('opened_by_label',split_part(o.email,'@',1),
     'closed_by_label',split_part(c.email,'@',1),'sku_name',s.name,'brand_name',b.name) order by t.closed_at desc,t.id),'[]'::jsonb) from
@@ -8774,7 +8798,7 @@ create function get_taproom_variance(p_brewery uuid,p_location uuid,p_weeks inte
 language plpgsql stable security definer set search_path = '' as $$
 declare v_today date; v_start date; v_result jsonb;
 begin
-  perform private.assert_staff(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
+  perform private.assert_staff_read(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
   if p_weeks is null or p_weeks not in (4,12) then raise exception 'choose 4 or 12 weeks'; end if;
   if not exists(select 1 from public.locations where id=p_location and brewery_id=p_brewery and kind='taproom') then raise exception 'choose an owned taproom location'; end if;
   select (now() at time zone timezone)::date into v_today from public.breweries where id=p_brewery;
@@ -8851,7 +8875,7 @@ create function get_taproom_draft_projection(p_brewery uuid,p_location uuid) ret
 language plpgsql stable security definer set search_path = '' as $$
 declare v_count record; v_as_of timestamptz:=now(); v_result jsonb;
 begin
-  perform private.assert_staff(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
+  perform private.assert_staff_read(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
   if not exists(select 1 from public.locations where id=p_location and brewery_id=p_brewery and kind='taproom') then raise exception 'choose an owned taproom location'; end if;
   select root_id,effective_id,counted_on,observed_at,created_at into v_count from private.taproom_effective_counts
     where brewery_id=p_brewery and location_id=p_location
