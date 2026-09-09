@@ -104,6 +104,7 @@ export async function completeQboOAuthStore(intentId: string, actorId: string, r
   const { data, error } = await createAdminClient().rpc("complete_qbo_oauth", {
     p_intent: intentId, p_actor: actorId, p_realm_id: realmId, p_realm_label: realmId,
     p_access_token: tokens.accessToken, p_refresh_token: tokens.refreshToken,
+    p_received_at: tokens.receivedAt,
     p_access_seconds: tokens.accessExpiresIn, p_refresh_seconds: tokens.refreshExpiresIn, p_hard_seconds: tokens.refreshHardExpiresIn,
   });
   if (error || typeof data !== "string") throw new Error("QuickBooks connection storage failed");
@@ -119,6 +120,7 @@ export async function compareAndSwapQboTokens(ctx: Ctx, expected: VersionedInteg
   const { data, error } = await createAdminClient().rpc("cas_integration_tokens", {
     p_brewery: ctx.breweryId, p_provider: "qbo", p_connection: expected.connectionId, p_actor: ctx.userId,
     p_expected_version: expected.credentialVersion, p_access_token: next.accessToken, p_refresh_token: next.refreshToken,
+    p_received_at: next.receivedAt,
     p_access_seconds: next.accessExpiresIn, p_refresh_seconds: next.refreshExpiresIn, p_hard_seconds: next.refreshHardExpiresIn,
   });
   if (error) throw new Error("QuickBooks token refresh storage failed");

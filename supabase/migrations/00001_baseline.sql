@@ -2055,14 +2055,14 @@ returns boolean language sql security definer set search_path='' as $$
  ) select coalesce((select true from changed),false)
 $$;
 
-create function public.complete_qbo_oauth(p_intent uuid,p_actor uuid,p_realm_id text,p_realm_label text,p_access_token text,p_refresh_token text,p_access_seconds int,p_refresh_seconds int,p_hard_seconds int)
+create function public.complete_qbo_oauth(p_intent uuid,p_actor uuid,p_realm_id text,p_realm_label text,p_access_token text,p_refresh_token text,p_received_at timestamptz,p_access_seconds int,p_refresh_seconds int,p_hard_seconds int)
 returns uuid language plpgsql security definer set search_path='' as $$
 declare i private.qbo_oauth_intents; v_id uuid:=private.new_uuid();
 begin
  select * into i from private.qbo_oauth_intents where id=p_intent for update;
  if i.id is null or i.actor_id<>p_actor or i.exchange_state<>'exchanging' or not exists(select 1 from public.brewery_users u where u.brewery_id=i.brewery_id and u.user_id=p_actor and u.role='admin') then raise exception 'oauth state invalid'; end if;
  insert into public.qbo_connections(id,brewery_id,realm_id,realm_label,state,access_expires_at,refresh_expires_at,refresh_hard_expires_at,remote_revocation_state,last_error,connected_by,updated_at)
- values(v_id,i.brewery_id,p_realm_id,p_realm_label,'connected',now()+make_interval(secs=>p_access_seconds),case when p_refresh_seconds is null then null else now()+make_interval(secs=>p_refresh_seconds) end,case when p_hard_seconds is null then null else now()+make_interval(secs=>p_hard_seconds) end,'not_requested',null,p_actor,now())
+ values(v_id,i.brewery_id,p_realm_id,p_realm_label,'connected',p_received_at+make_interval(secs=>p_access_seconds),case when p_refresh_seconds is null then null else p_received_at+make_interval(secs=>p_refresh_seconds) end,case when p_hard_seconds is null then null else p_received_at+make_interval(secs=>p_hard_seconds) end,'not_requested',null,p_actor,now())
  on conflict(brewery_id) do update set id=excluded.id,realm_id=excluded.realm_id,realm_label=excluded.realm_label,state='connected',access_expires_at=excluded.access_expires_at,refresh_expires_at=excluded.refresh_expires_at,refresh_hard_expires_at=excluded.refresh_hard_expires_at,remote_revocation_state='not_requested',last_error=null,connected_by=p_actor,updated_at=now();
  insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token) values(i.brewery_id,'qbo',v_id,p_access_token,p_refresh_token)
  on conflict(brewery_id,provider) do update set connection_id=excluded.connection_id,access_token=excluded.access_token,refresh_token=excluded.refresh_token,credential_version=private.integration_tokens.credential_version+1,updated_at=now();
@@ -2070,7 +2070,7 @@ begin
  insert into private.qbo_connection_events(brewery_id,connection_id,kind) values(i.brewery_id,v_id,'connected'); return v_id;
 end $$;
 
-create function public.cas_integration_tokens(p_brewery uuid,p_provider text,p_connection uuid,p_actor uuid,p_expected_version bigint,p_access_token text,p_refresh_token text,p_access_seconds int,p_refresh_seconds int,p_hard_seconds int)
+create function public.cas_integration_tokens(p_brewery uuid,p_provider text,p_connection uuid,p_actor uuid,p_expected_version bigint,p_access_token text,p_refresh_token text,p_received_at timestamptz,p_access_seconds int,p_refresh_seconds int,p_hard_seconds int)
 returns boolean language sql security definer set search_path='' as $$
  with changed as (
   update private.integration_tokens t set access_token=p_access_token,refresh_token=p_refresh_token,credential_version=credential_version+1,updated_at=now()
@@ -2078,9 +2078,9 @@ returns boolean language sql security definer set search_path='' as $$
   and exists(select 1 from public.brewery_users u where u.brewery_id=p_brewery and u.user_id=p_actor and u.role in ('admin','sales'))
   and exists(select 1 from public.qbo_connections q where p_provider='qbo' and q.brewery_id=p_brewery and q.id=p_connection and q.state='connected') returning true
  ), expiry as (
-  update public.qbo_connections q set access_expires_at=now()+make_interval(secs=>p_access_seconds),
-    refresh_expires_at=case when p_refresh_seconds is null then null else now()+make_interval(secs=>p_refresh_seconds) end,
-    refresh_hard_expires_at=case when p_hard_seconds is null then q.refresh_hard_expires_at else now()+make_interval(secs=>p_hard_seconds) end,
+  update public.qbo_connections q set access_expires_at=p_received_at+make_interval(secs=>p_access_seconds),
+    refresh_expires_at=case when p_refresh_seconds is null then null else p_received_at+make_interval(secs=>p_refresh_seconds) end,
+    refresh_hard_expires_at=case when p_hard_seconds is null then q.refresh_hard_expires_at else p_received_at+make_interval(secs=>p_hard_seconds) end,
     updated_at=now() where q.brewery_id=p_brewery and q.id=p_connection and exists(select 1 from changed)
  ) select coalesce((select true from changed),false)
 $$;
@@ -2108,8 +2108,8 @@ $$;
 
 grant execute on function public.begin_qbo_oauth(uuid,text,text,text,uuid) to authenticated;
 grant execute on function public.claim_qbo_oauth(text,uuid,uuid,text),public.fail_qbo_oauth(uuid,uuid),
- public.complete_qbo_oauth(uuid,uuid,text,text,text,text,int,int,int),
- public.cas_integration_tokens(uuid,text,uuid,uuid,bigint,text,text,int,int,int),
+ public.complete_qbo_oauth(uuid,uuid,text,text,text,text,timestamp with time zone,int,int,int),
+ public.cas_integration_tokens(uuid,text,uuid,uuid,bigint,text,text,timestamp with time zone,int,int,int),
  public.begin_qbo_disconnect(uuid,uuid,uuid,uuid),public.finish_qbo_disconnect(uuid,uuid,uuid,boolean) to service_role;
 
 create function private.purge_qbo_identity() returns trigger language plpgsql security definer set search_path='' as $$

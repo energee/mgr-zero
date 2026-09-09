@@ -46,6 +46,15 @@ describe("QuickBooks durable lifecycle", () => {
     await expect(callback(expiredState)).rejects.toThrow("oauth state invalid");
     expect(fetch).not.toHaveBeenCalled();
 
+    const demotedState = `demoted-${crypto.randomUUID()}`;
+    expect((await begin(demotedState)).error).toBeNull();
+    expect((await admin.from("brewery_users").update({ role: "brewer" })
+      .eq("brewery_id", brewery.id).eq("user_id", ctx.userId)).error).toBeNull();
+    await expect(callback(demotedState)).rejects.toThrow("oauth state invalid");
+    expect(fetch).not.toHaveBeenCalled();
+    expect((await admin.from("brewery_users").update({ role: "admin" })
+      .eq("brewery_id", brewery.id).eq("user_id", ctx.userId)).error).toBeNull();
+
     const validState = `valid-${crypto.randomUUID()}`;
     const supersededState = `superseded-${crypto.randomUUID()}`;
     expect((await begin(supersededState)).error).toBeNull();
@@ -55,6 +64,20 @@ describe("QuickBooks durable lifecycle", () => {
     await expect(callback(validState)).resolves.toEqual(expect.any(String));
     await expect(callback(validState)).rejects.toThrow("oauth state invalid");
     expect(fetch).toHaveBeenCalledTimes(1);
+
+    const lostState = `lost-${crypto.randomUUID()}`;
+    expect((await begin(lostState)).error).toBeNull();
+    const lostFetch = vi.fn<typeof globalThis.fetch>().mockRejectedValue(new TypeError("socket closed"));
+    await expect(completeQboOAuth({
+      request: new Request(`${redirectUri}?code=lost-code&state=${lostState}&realmId=realm-1`),
+      actorId: ctx.userId, selectedBreweryId: brewery.id, redirectUri,
+      client: new QboOAuthClient(config, lostFetch), store,
+    })).rejects.toThrow("QuickBooks is unavailable");
+    expect(lostFetch).toHaveBeenCalledTimes(1);
+    expect(sql(`select exchange_state from private.qbo_oauth_intents where state_hash='${hash(lostState)}'`))
+      .toEqual(["recovery_required"]);
+    expect(sql(`select count(*) from private.qbo_connection_events where brewery_id='${brewery.id}' and kind='oauth_recovery_required'`))
+      .toEqual(["1"]);
 
     const delayedState = `delayed-${crypto.randomUUID()}`;
     expect((await begin(delayedState)).error).toBeNull();
@@ -88,6 +111,7 @@ describe("QuickBooks durable lifecycle", () => {
 
     const connect = async (state: string, realm: string) => {
       const requestId = crypto.randomUUID();
+      const receivedAt = "2026-09-09T18:00:00.000Z";
       expect((await ctx.db.rpc("begin_qbo_oauth", {
         p_brewery: brewery.id, p_redirect_uri: redirect, p_state_hash: hash(state),
         p_provider_intent: "reconnect", p_request_id: requestId,
@@ -103,9 +127,16 @@ describe("QuickBooks durable lifecycle", () => {
       const result = await admin.rpc("complete_qbo_oauth", {
         p_intent: claim.data![0].intent_id, p_actor: ctx.userId, p_realm_id: realm, p_realm_label: realm,
         p_access_token: `access-${realm}`, p_refresh_token: `refresh-${realm}`,
+        p_received_at: receivedAt,
         p_access_seconds: 3600, p_refresh_seconds: 86400, p_hard_seconds: null,
       });
       expect(result.error).toBeNull();
+      const expiry = await admin.from("qbo_connections").select("access_expires_at,refresh_expires_at,refresh_hard_expires_at")
+        .eq("brewery_id", brewery.id).single();
+      expect(expiry.error).toBeNull();
+      expect(new Date(expiry.data!.access_expires_at!).toISOString()).toBe("2026-09-09T19:00:00.000Z");
+      expect(new Date(expiry.data!.refresh_expires_at!).toISOString()).toBe("2026-09-10T18:00:00.000Z");
+      expect(expiry.data!.refresh_hard_expires_at).toBeNull();
       return result.data as string;
     };
 
@@ -126,6 +157,7 @@ describe("QuickBooks durable lifecycle", () => {
     const stale = await admin.rpc("cas_integration_tokens", {
       p_brewery: brewery.id, p_provider: "qbo", p_connection: old.connectionId, p_actor: ctx.userId,
       p_expected_version: old.credentialVersion, p_access_token: "stale-access", p_refresh_token: "stale-refresh",
+      p_received_at: new Date().toISOString(),
       p_access_seconds: 3600, p_refresh_seconds: 86400, p_hard_seconds: null,
     });
     expect(stale).toMatchObject({ data: false, error: null });
@@ -145,6 +177,7 @@ describe("QuickBooks durable lifecycle", () => {
     expect((await admin.rpc("cas_integration_tokens", {
       p_brewery: brewery.id, p_provider: "qbo", p_connection: beforeDisconnect.connectionId, p_actor: ctx.userId,
       p_expected_version: beforeDisconnect.credentialVersion, p_access_token: "late-access", p_refresh_token: "late-refresh",
+      p_received_at: new Date().toISOString(),
       p_access_seconds: 3600, p_refresh_seconds: 86400, p_hard_seconds: null,
     }))).toMatchObject({ data: false, error: null });
     expect((await readVersionedIntegrationTokens(ctx, "qbo")).refreshToken).toBe(`refresh-realm-two-${run}`);
@@ -153,7 +186,8 @@ describe("QuickBooks durable lifecycle", () => {
     const refresh = (suffix: string) => admin.rpc("cas_integration_tokens", {
       p_brewery: brewery.id, p_provider: "qbo", p_connection: current.connectionId, p_actor: ctx.userId,
       p_expected_version: current.credentialVersion, p_access_token: `race-access-${suffix}`,
-      p_refresh_token: `race-refresh-${suffix}`, p_access_seconds: 3600, p_refresh_seconds: 86400, p_hard_seconds: null,
+      p_refresh_token: `race-refresh-${suffix}`, p_received_at: new Date().toISOString(),
+      p_access_seconds: 3600, p_refresh_seconds: 86400, p_hard_seconds: null,
     });
     const raced = await Promise.all([refresh("a"), refresh("b")]);
     expect(raced.map(({ data, error }) => [data, error]).sort()).toEqual([[false, null], [true, null]].sort());

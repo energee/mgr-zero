@@ -13,6 +13,7 @@ export type QboConfig = { clientId: string; clientSecret: string; redirectUri: s
 export type QboTokens = {
   accessToken: string;
   refreshToken: string;
+  receivedAt: string;
   accessExpiresIn: number;
   refreshExpiresIn: number | null;
   refreshHardExpiresIn: number | null;
@@ -29,7 +30,7 @@ function positiveSeconds(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
 }
 
-function parseTokens(value: unknown): QboTokens {
+function parseTokens(value: unknown, receivedAt: string): QboTokens {
   if (!value || typeof value !== "object") throw new Error("QuickBooks token response was invalid");
   const row = value as Record<string, unknown>;
   if (typeof row.access_token !== "string" || !row.access_token || typeof row.refresh_token !== "string" || !row.refresh_token) {
@@ -40,6 +41,7 @@ function parseTokens(value: unknown): QboTokens {
   return {
     accessToken: row.access_token,
     refreshToken: row.refresh_token,
+    receivedAt,
     accessExpiresIn,
     refreshExpiresIn: positiveSeconds(row.x_refresh_token_expires_in),
     refreshHardExpiresIn: positiveSeconds(row.x_refresh_token_hard_expires_in),
@@ -142,8 +144,9 @@ export class QboOAuthClient {
       body,
       redirect: "error",
     });
+    const receivedAt = new Date().toISOString();
     if (!response.ok) throw new Error("QuickBooks token request failed");
-    return parseTokens(await response.json());
+    return parseTokens(await response.json(), receivedAt);
   }
 }
 

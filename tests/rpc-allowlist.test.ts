@@ -36,6 +36,7 @@ const AUTHENTICATED_RPCS = [
   "adjust_order_lines(uuid,jsonb,text,uuid)",
   "begin_chat_installation(uuid,text,text,text,uuid)",
   "begin_chat_reauthorization(uuid,uuid,text,text,uuid)",
+  "begin_qbo_oauth(uuid,text,text,text,uuid)",
   "cancel_order(uuid,text,uuid)",
   "clear_channel_price(uuid,uuid,uuid,uuid,uuid)",
   "close_packaging_run(uuid,uuid,numeric,jsonb,text,date,date,uuid,uuid,uuid)",

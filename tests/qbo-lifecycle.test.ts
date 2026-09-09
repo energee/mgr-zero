@@ -27,13 +27,20 @@ describe("QuickBooks OAuth transport", () => {
   });
 
   it("refreshes with rotated credentials and treats missing hard expiry as unknown", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime("2026-09-09T18:00:00.000Z");
     const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({
       access_token: "next-access", refresh_token: "next-refresh", expires_in: 3600,
       x_refresh_token_expires_in: 8640000,
     }), { status: 200 }));
-    const tokens = await new QboOAuthClient(config, fetch).refresh("old-refresh");
-    expect(tokens.refreshToken).toBe("next-refresh");
-    expect(tokens.refreshHardExpiresIn).toBeNull();
+    try {
+      const tokens = await new QboOAuthClient(config, fetch).refresh("old-refresh");
+      expect(tokens).toMatchObject({
+        refreshToken: "next-refresh", refreshHardExpiresIn: null, receivedAt: "2026-09-09T18:00:00.000Z",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("revokes with the maintained JSON contract and sanitizes provider failures", async () => {

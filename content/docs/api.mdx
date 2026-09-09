@@ -195,7 +195,7 @@ omitted. They have no roles until they are built.
 | `confirm_delivery` | Delivery & routes | ✓ |  | ✓ |  |  |  |
 | `confirm_order` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
 | `confirm_restock` | Orders & invoicing | ✓ |  | ✓ |  |  |  |
-| `connect_qbo` |  | ✓ |  |  |  |  |  |
+| `connect_qbo` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `consume_chat_link_proof` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `correct_taproom_count` | Taproom & kegs | ✓ |  |  |  |  |  |
 | `create_bin` | Inventory & locations | ✓ |  | ✓ |  |  |  |
@@ -216,7 +216,7 @@ omitted. They have no roles until they are built.
 | `depart_route` | Delivery & routes | ✓ |  | ✓ |  |  |  |
 | `disable_chat_installation` | Today & notifications | ✓ |  |  |  |  |  |
 | `disconnect_chat_installation` | Today & notifications | ✓ |  |  |  |  |  |
-| `disconnect_qbo` |  | ✓ |  |  |  |  |  |
+| `disconnect_qbo` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `draft_purchase_order_from_requirements` | Purchasing & materials | ✓ |  | ✓ |  |  |  |
 | `file_compliance_report` | Compliance | ✓ | ✓ |  |  |  |  |
 | `generate_compliance_report` | Compliance | ✓ | ✓ |  |  |  |  |
@@ -252,7 +252,7 @@ omitted. They have no roles until they are built.
 | `get_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |  |
 | `get_portal_account` | Customer portal |  |  |  |  |  | ✓ |
 | `get_purchase_order` | Purchasing & materials | ✓ |  | ✓ |  |  |  |
-| `get_qbo_connection` |  | ✓ |  |  |  |  |  |
+| `get_qbo_connection` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `get_recipe` | Production | ✓ |  |  | ✓ |  |  |
 | `get_shortfalls` | Today & notifications | ✓ | ✓ | ✓ |  |  |  |
 | `get_stock_transfer` | Inventory & locations | ✓ | ✓ | ✓ |  |  |  |
@@ -3999,6 +3999,40 @@ location. Prices are nonnegative integer cents, at most 2147483647.
 
 {/* ops:team */}
 
+#### connect_qbo [#connect_qbo]
+
+`command` · admin
+
+Begin administrator consent for a QuickBooks connection
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `reconnect` | boolean | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "connect_qbo", "requestId": "11111111-1111-1111-1111-111111111111", "input": {} }'
+```
+
+#### disconnect_qbo [#disconnect_qbo]
+
+`command` · admin
+
+Disable QuickBooks locally, purge its credential, and attempt remote revocation
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `connectionId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "disconnect_qbo", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "connectionId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 #### get_brewery [#get_brewery]
 
 `query` · admin, sales, warehouse, brewer
@@ -4057,6 +4091,21 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_gravity_unit", "input": {} }'
+```
+
+#### get_qbo_connection [#get_qbo_connection]
+
+`query` · admin
+
+Get redacted QuickBooks connection health
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_qbo_connection", "input": {} }'
 ```
 
 #### import_csv [#import_csv]
