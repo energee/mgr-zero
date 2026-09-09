@@ -2030,10 +2030,16 @@ $$;
 
 create function public.read_integration_tokens(
   p_brewery uuid, p_provider text, p_connection uuid, p_actor uuid
-) returns table (access_token text, refresh_token text, credential_version bigint)
+) returns table (
+  access_token text, refresh_token text, credential_version bigint,
+  access_expires_at timestamptz, refresh_expires_at timestamptz, refresh_hard_expires_at timestamptz
+)
 language sql security definer set search_path = '' as $$
-  select t.access_token, t.refresh_token, t.credential_version
+  select t.access_token, t.refresh_token, t.credential_version,
+    q.access_expires_at,q.refresh_expires_at,q.refresh_hard_expires_at
   from private.integration_tokens t
+  left join public.qbo_connections q
+    on p_provider='qbo' and q.brewery_id=t.brewery_id and q.id=t.connection_id
   where t.brewery_id = p_brewery
     and t.provider = p_provider
     and t.connection_id = p_connection

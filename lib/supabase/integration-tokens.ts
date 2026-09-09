@@ -15,10 +15,23 @@ type IntegrationTokens = {
   accessToken: string;
   refreshToken: string;
 };
-export type VersionedIntegrationTokens = IntegrationTokens & { credentialVersion: number; connectionId: string };
+export type VersionedIntegrationTokens = IntegrationTokens & {
+  credentialVersion: number;
+  connectionId: string;
+  accessExpiresAt: string | null;
+  refreshExpiresAt: string | null;
+  refreshHardExpiresAt: string | null;
+};
 
 type ConnectionRow = { id: string };
-type TokenRow = { access_token: string; refresh_token: string; credential_version: number };
+type TokenRow = {
+  access_token: string;
+  refresh_token: string;
+  credential_version: number;
+  access_expires_at: string | null;
+  refresh_expires_at: string | null;
+  refresh_hard_expires_at: string | null;
+};
 
 function requireIntegrationRole(ctx: Ctx) {
   if (ctx.role !== "admin" && ctx.role !== "sales") {
@@ -31,10 +44,14 @@ function isConnectionRow(data: unknown): data is ConnectionRow {
 }
 
 function isTokenRow(data: unknown): data is TokenRow {
+  const nullableString = (value: unknown) => value === null || typeof value === "string";
   return typeof data === "object" && data !== null
     && typeof (data as TokenRow).access_token === "string"
     && typeof (data as TokenRow).refresh_token === "string"
-    && typeof (data as TokenRow).credential_version === "number";
+    && typeof (data as TokenRow).credential_version === "number"
+    && nullableString((data as TokenRow).access_expires_at)
+    && nullableString((data as TokenRow).refresh_expires_at)
+    && nullableString((data as TokenRow).refresh_hard_expires_at);
 }
 
 async function requireVisibleConnection(ctx: Ctx, provider: IntegrationProvider): Promise<string> {
@@ -88,7 +105,15 @@ export async function readVersionedIntegrationTokens(ctx: Ctx, provider: Integra
     })
     .maybeSingle();
   if (error || !isTokenRow(data)) throw new CommandError("integration tokens are not available", 404);
-  return { accessToken: data.access_token, refreshToken: data.refresh_token, credentialVersion: data.credential_version, connectionId };
+  return {
+    accessToken: data.access_token,
+    refreshToken: data.refresh_token,
+    credentialVersion: data.credential_version,
+    connectionId,
+    accessExpiresAt: data.access_expires_at,
+    refreshExpiresAt: data.refresh_expires_at,
+    refreshHardExpiresAt: data.refresh_hard_expires_at,
+  };
 }
 
 export async function claimQboOAuth(stateHash: string, actorId: string, breweryId: string, redirectUri: string) {

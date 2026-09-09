@@ -1,7 +1,12 @@
 import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
-import { compareAndSwapQboTokens, finishQboPush, readVersionedIntegrationTokens } from "@/lib/supabase/integration-tokens";
+import {
+  compareAndSwapQboTokens,
+  finishQboPush,
+  readVersionedIntegrationTokens,
+  type VersionedIntegrationTokens,
+} from "@/lib/supabase/integration-tokens";
 import { readQboEnv } from "@/lib/env/server-parser";
 
 const AUTHORIZE_URL = "https://appcenter.intuit.com/connect/oauth2";
@@ -79,11 +84,31 @@ export async function beginQboOAuth(ctx: Ctx, client: QboOAuthClient, providerIn
   return { authorizeUrl: client.authorizeUrl(state) };
 }
 
-export async function refreshQboTokens(ctx: Ctx, client: QboOAuthClient) {
-  const current = await readVersionedIntegrationTokens(ctx, "qbo");
+function isPast(value: string | null) {
+  return value !== null && Number.isFinite(Date.parse(value)) && Date.parse(value) <= Date.now();
+}
+
+async function refreshQboCredentials(ctx: Ctx, client: QboOAuthClient, expected?: VersionedIntegrationTokens) {
+  const current = expected ?? await readVersionedIntegrationTokens(ctx, "qbo");
+  if (isPast(current.refreshExpiresAt) || isPast(current.refreshHardExpiresAt)) {
+    throw new Error("QuickBooks is unavailable");
+  }
   const next = await client.refresh(current.refreshToken).catch((error) => { throw new Error(sanitizeQboError(error)); });
-  await compareAndSwapQboTokens(ctx, current, next);
-  return next.accessToken;
+  try {
+    await compareAndSwapQboTokens(ctx, current, next);
+  } catch (error) {
+    if (!(error instanceof CommandError) || error.status !== 409) throw new Error(sanitizeQboError(error));
+  }
+  const stored = await readVersionedIntegrationTokens(ctx, "qbo")
+    .catch((error) => { throw new Error(sanitizeQboError(error)); });
+  if (stored.connectionId !== current.connectionId || stored.credentialVersion <= current.credentialVersion) {
+    throw new Error("QuickBooks is unavailable");
+  }
+  return stored;
+}
+
+export async function refreshQboTokens(ctx: Ctx, client: QboOAuthClient) {
+  return (await refreshQboCredentials(ctx, client)).accessToken;
 }
 
 export async function completeQboOAuth(input: {
@@ -130,15 +155,29 @@ export async function pushInvoiceToQbo(
     || !start.entityType || !start.realmId || !start.connectionId) {
     throw new Error("QuickBooks push start was invalid");
   }
-  const tokens = await readVersionedIntegrationTokens(ctx, "qbo");
+  let tokens = await readVersionedIntegrationTokens(ctx, "qbo");
   if (tokens.connectionId !== start.connectionId) {
     throw new CommandError("QuickBooks connection changed; retry with the current connection", 409, "conflict");
+  }
+  let refreshed = false;
+  if (isPast(tokens.accessExpiresAt)) {
+    tokens = await refreshQboCredentials(ctx, client, tokens);
+    refreshed = true;
   }
   let created: Awaited<ReturnType<QboOAuthClient["createTransaction"]>>;
   try {
     created = await client.createTransaction(start.realmId, start.entityType, start.providerRequestId, start.requestBody, tokens.accessToken);
   } catch (error) {
     throw new Error(sanitizeQboError(error));
+  }
+  if (!created.ok && created.status === 401 && !refreshed) {
+    tokens = await refreshQboCredentials(ctx, client, tokens);
+    if (tokens.connectionId !== start.connectionId) throw new Error("QuickBooks is unavailable");
+    try {
+      created = await client.createTransaction(start.realmId, start.entityType, start.providerRequestId, start.requestBody, tokens.accessToken);
+    } catch (error) {
+      throw new Error(sanitizeQboError(error));
+    }
   }
   if (!created.ok) {
     if (created.definitive) {
