@@ -118,6 +118,31 @@ describe("QuickBooks durable outbound push", () => {
     expect(retarget.error?.code).toBe("MG409");
   });
 
+  it("refuses to resend or finish a pending attempt after a same-realm connection replacement", async () => {
+    const f = await pushFixture("invoice", "admin");
+    const started = await f.ctx.db.rpc("start_qbo_push", {
+      p_brewery: f.brewery.id, p_invoice: f.invoice.id, p_new_attempt_reason: null, p_request_id: crypto.randomUUID(),
+    });
+    expect(started.error).toBeNull();
+    const replacementId = crypto.randomUUID();
+    expect((await admin.from("qbo_connections").update({ id: replacementId }).eq("brewery_id", f.brewery.id)).error).toBeNull();
+    sql(`insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token)
+      values('${f.brewery.id}','qbo','${replacementId}','replacement-access','replacement-refresh')`);
+
+    const fetch = vi.fn<typeof globalThis.fetch>().mockRejectedValue(new TypeError("must not fetch"));
+    await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, crypto.randomUUID(), new QboOAuthClient(config, fetch)))
+      .rejects.toMatchObject({ status: 409 });
+    expect(fetch).not.toHaveBeenCalled();
+
+    const finish = await admin.rpc("finish_qbo_push", {
+      p_brewery: f.brewery.id, p_push: started.data.pushId, p_actor: f.ctx.userId,
+      p_status: "pushed", p_qbo_entity_id: "late-old-entity", p_error: null,
+      p_response: { Id: "late-old-entity" }, p_request_id: started.data.finishRequestId,
+    });
+    expect(finish.error?.code).toBe("MG409");
+    expect(sql(`select status from public.qbo_pushes where id='${started.data.pushId}'`)).toEqual(["pending"]);
+  });
+
   it("uses CreditMemo with positive frozen quantities and refuses unsupported or unmapped lines before fetch", async () => {
     const credit = await pushFixture("credit_memo");
     const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({
@@ -165,6 +190,49 @@ describe("QuickBooks durable outbound push", () => {
     await expect(pushInvoiceToQbo(foreign.ctx, deposit.invoice.id, crypto.randomUUID(), new QboOAuthClient(config, fetch)))
       .rejects.toThrow(/permission denied|invoice not found/);
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("maps a keg-deposit refund to a positive CreditMemo line and refuses missing mapping or invoice placement", async () => {
+    const credit = await pushFixture("credit_memo", "admin");
+    expect((await admin.from("invoice_lines").delete().eq("invoice_id", credit.invoice.id)).error).toBeNull();
+    const pool = await admin.from("keg_pools").insert({ brewery_id: credit.brewery.id, name: "Refund pool", kind: "owned" }).select("id").single();
+    expect(pool.error).toBeNull();
+    expect((await admin.from("invoice_lines").insert({
+      brewery_id: credit.brewery.id, invoice_id: credit.invoice.id, kind: "keg_deposit_refund",
+      keg_pool_id: pool.data!.id, keg_size: "half_bbl", qty: -2, unit_price_cents: 3000, description: "Keg deposit refund",
+    })).error).toBeNull();
+    const noFetch = vi.fn<typeof globalThis.fetch>();
+    await expect(pushInvoiceToQbo(credit.ctx, credit.invoice.id, crypto.randomUUID(), new QboOAuthClient(config, noFetch)))
+      .rejects.toThrow("QuickBooks deposit item mapping required");
+    expect(noFetch).not.toHaveBeenCalled();
+
+    expect((await credit.ctx.db.rpc("set_qbo_deposit_mapping", {
+      p_brewery: credit.brewery.id, p_qbo_item_id: "deposit-refund-item", p_request_id: crypto.randomUUID(),
+    })).error).toBeNull();
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({ CreditMemo: { Id: "refund-1" } }), { status: 200 }));
+    await expect(pushInvoiceToQbo(credit.ctx, credit.invoice.id, crypto.randomUUID(), new QboOAuthClient(config, fetch)))
+      .resolves.toMatchObject({ status: "pushed", remoteId: "refund-1" });
+    const body = String(fetch.mock.calls[0][1]?.body);
+    expect(String(fetch.mock.calls[0][0])).toContain("/creditmemo?");
+    expect(body).toContain('"value": "deposit-refund-item"');
+    expect(body).toContain('"Qty": 2');
+    expect(body).toContain('"UnitPrice": 30.00');
+    expect(body).toContain('"Amount": 60.00');
+
+    const invoice = await pushFixture("invoice", "admin");
+    expect((await invoice.ctx.db.rpc("set_qbo_deposit_mapping", {
+      p_brewery: invoice.brewery.id, p_qbo_item_id: "deposit-refund-item", p_request_id: crypto.randomUUID(),
+    })).error).toBeNull();
+    const invoicePool = await admin.from("keg_pools").insert({ brewery_id: invoice.brewery.id, name: "Invalid refund pool", kind: "owned" }).select("id").single();
+    expect(invoicePool.error).toBeNull();
+    expect((await admin.from("invoice_lines").insert({
+      brewery_id: invoice.brewery.id, invoice_id: invoice.invoice.id, kind: "keg_deposit_refund",
+      keg_pool_id: invoicePool.data!.id, keg_size: "half_bbl", qty: -1, unit_price_cents: 3000, description: "Invalid invoice refund",
+    })).error).toBeNull();
+    const invalidFetch = vi.fn<typeof globalThis.fetch>();
+    await expect(pushInvoiceToQbo(invoice.ctx, invoice.invoice.id, crypto.randomUUID(), new QboOAuthClient(config, invalidFetch)))
+      .rejects.toThrow("QuickBooks does not support this invoice line shape");
+    expect(invalidFetch).not.toHaveBeenCalled();
   });
 
   it("allows no direct authenticated push-log DML", async () => {
