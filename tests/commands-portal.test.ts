@@ -234,6 +234,24 @@ describe("portal commands", () => {
     expect(Object.keys(row)).not.toContain("qty");
   });
 
+  it("portal_catalog uses only the selected customer's brewery and sale channel", async () => {
+    const { data: otherChannel } = await admin.from("sale_channels").select("id").eq("brewery_id", b.id).eq("name", "DTC").single();
+    const sameBrewery = await seedCustomer(b.id, { name: "DTC account", saleChannelId: otherChannel!.id });
+    await admin.from("customer_users").insert({ customer_id: sameBrewery.customerId, user_id: custCtx.userId });
+    const selectedCatalog = await admin.from("skus").select("brand_id, format_id").eq("id", skuId).single();
+    await priceSku(b.id, { saleChannelId: otherChannel!.id, brandId: selectedCatalog.data!.brand_id, formatId: selectedCatalog.data!.format_id, cents: 9900 });
+
+    const otherBrewery = await makeBrewery();
+    const foreignCatalog = await seedCatalog(otherBrewery.id, { sku: "Foreign SKU" });
+    const foreignCustomer = await seedCustomer(otherBrewery.id);
+    await admin.from("customer_users").insert({ customer_id: foreignCustomer.customerId, user_id: custCtx.userId });
+    await priceSku(otherBrewery.id, { saleChannelId: foreignCustomer.saleChannelId, brandId: foreignCatalog.brandId, formatId: foreignCatalog.formatId, cents: 7700 });
+
+    const rows = await runCommand("portal_catalog", {}, custCtx) as { skuId: string; unitPriceCents: number }[];
+    expect(rows.filter(row => row.skuId === skuId)).toEqual([{ skuId, name: "IPA case", product: "IPA", unitPriceCents: 3600, badge: expect.any(String) }]);
+    expect(rows.some(row => row.skuId === foreignCatalog.skuId)).toBe(false);
+  });
+
   it("portal_orders lists only the caller's own orders; portal_invoices only their invoices", async () => {
     const otherCustomer = await seedCustomer(b.id, { name: "Other Bar", saleChannelId });
     await admin.from("orders").insert({ brewery_id: b.id, kind: "wholesale", customer_id: otherCustomer.customerId, ship_to_id: otherCustomer.shipToId, created_by: adminCtx.userId });

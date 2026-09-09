@@ -71,6 +71,35 @@ create type keg_event_reason as enum ('acquired','retired','shipped','returned',
 create type stock_transfer_status as enum ('draft','submitted','picked','in_transit','received','cancelled');
 create type approval_kind as enum ('cola','formula');
 
+-- Server-verified request headers may only narrow the authenticated JWT. Read
+-- policies use a boolean predicate so unrelated rows disappear instead of
+-- aborting an otherwise valid scan.
+create function private.request_scope_allows(p_brewery uuid, p_customer uuid default null, p_allow_unspecified_customer boolean default false) returns boolean
+language plpgsql stable security definer set search_path = '' as $$
+declare v_headers jsonb; v_actor uuid; v_brewery uuid; v_customer uuid;
+begin
+  begin
+    v_headers := nullif(current_setting('request.headers', true), '')::jsonb;
+    if v_headers is null then return true; end if;
+    if jsonb_typeof(v_headers) <> 'object' then return false; end if;
+    if v_headers ? 'x-mgr-actor-id' then
+      v_actor := (v_headers ->> 'x-mgr-actor-id')::uuid;
+      if v_actor is null or v_actor is distinct from auth.uid() then return false; end if;
+    end if;
+    if v_headers ? 'x-mgr-brewery-id' then
+      v_brewery := (v_headers ->> 'x-mgr-brewery-id')::uuid;
+      if v_brewery is null or v_brewery is distinct from p_brewery then return false; end if;
+    end if;
+    if v_headers ? 'x-mgr-customer-id' then
+      v_customer := (v_headers ->> 'x-mgr-customer-id')::uuid;
+      if v_customer is null or (p_customer is null and not p_allow_unspecified_customer) or (p_customer is not null and v_customer is distinct from p_customer) then return false; end if;
+    end if;
+    return true;
+  exception when others then
+    return false;
+  end;
+end $$;
+
 -- ---------------------------------------------------------------- core
 create table breweries (
   id uuid primary key default private.new_uuid(),
@@ -103,15 +132,15 @@ comment on column brewery_users.gravity_unit is
 -- Access helpers (security definer so RLS policies can call them cheaply).
 create function my_brewery_ids() returns setof uuid
 language sql stable security definer set search_path = '' as
-$$ select brewery_id from public.brewery_users where user_id = auth.uid() $$;
+$$ select brewery_id from public.brewery_users where user_id = auth.uid() and private.request_scope_allows(brewery_id) $$;
 
 create function is_staff_of(b uuid) returns boolean
 language sql stable security definer set search_path = '' as
-$$ select exists(select 1 from public.brewery_users where user_id = auth.uid() and brewery_id = b and role in ('admin','sales','warehouse','brewer')) $$;
+$$ select private.request_scope_allows(b) and exists(select 1 from public.brewery_users where user_id = auth.uid() and brewery_id = b and role in ('admin','sales','warehouse','brewer')) $$;
 
 create function staff_role(b uuid) returns staff_role
 language sql stable security definer set search_path = '' as
-$$ select role from public.brewery_users where user_id = auth.uid() and brewery_id = b $$;
+$$ select role from public.brewery_users where user_id = auth.uid() and brewery_id = b and private.request_scope_allows(b) $$;
 
 -- Explicit taproom vocabulary; location scope remains in the policies below.
 create function taproom_can(b uuid, t text) returns boolean
@@ -128,7 +157,7 @@ returns table (id uuid, name text, timezone text, gravity_unit text)
 language sql stable security definer set search_path = '' as $$
   select b.id, b.name, b.timezone, b.gravity_unit from public.breweries b
   join public.brewery_users u on u.brewery_id = b.id
-  where u.user_id = auth.uid();
+  where u.user_id = auth.uid() and private.request_scope_allows(b.id);
 $$;
 create view staff_brewery with (security_invoker = true) as
   select id, name, timezone, gravity_unit from public.staff_brewery_rows();
@@ -186,7 +215,9 @@ create table customer_users (
 
 create function my_customer_ids() returns setof uuid
 language sql stable security definer set search_path = '' as
-$$ select customer_id from public.customer_users where user_id = auth.uid() $$;
+$$ select cu.customer_id from public.customer_users cu
+   join public.customers c on c.id = cu.customer_id
+   where cu.user_id = auth.uid() and private.request_scope_allows(c.brewery_id, c.id) $$;
 
 create table ship_tos (
   id uuid primary key default private.new_uuid(),
@@ -3084,28 +3115,10 @@ create table private.command_requests (
 -- server-verified context that rendered it. They never grant membership.
 create function private.assert_request_scope(p_brewery uuid, p_customer uuid default null) returns void
 language plpgsql stable security definer set search_path = '' as $$
-declare v_headers jsonb; v_actor uuid := auth.uid(); v_expected_actor uuid; v_expected_brewery uuid; v_expected_customer uuid;
 begin
-  begin
-    v_headers := nullif(current_setting('request.headers', true), '')::jsonb;
-    if v_headers is not null and jsonb_typeof(v_headers) <> 'object' then raise invalid_text_representation; end if;
-    if v_headers ? 'x-mgr-actor-id' then
-      v_expected_actor := (v_headers ->> 'x-mgr-actor-id')::uuid;
-      if v_expected_actor is null or v_expected_actor is distinct from v_actor then raise insufficient_privilege; end if;
-    end if;
-    if v_headers ? 'x-mgr-brewery-id' then
-      v_expected_brewery := (v_headers ->> 'x-mgr-brewery-id')::uuid;
-      if v_expected_brewery is null or v_expected_brewery is distinct from p_brewery then raise insufficient_privilege; end if;
-    end if;
-    if v_headers ? 'x-mgr-customer-id' then
-      v_expected_customer := (v_headers ->> 'x-mgr-customer-id')::uuid;
-      if v_expected_customer is null or (p_customer is not null and v_expected_customer is distinct from p_customer) then
-        raise insufficient_privilege;
-      end if;
-    end if;
-  exception when others then
+  if not private.request_scope_allows(p_brewery, p_customer, true) then
     raise exception 'request context changed' using errcode = '42501';
-  end;
+  end if;
 end $$;
 
 create function private.assert_staff(p_brewery uuid, p_roles public.staff_role[]) returns uuid
@@ -6390,8 +6403,12 @@ alter table brewery_counters enable row level security;   -- no policies: only v
 
 create policy staff_read on breweries for select using (is_staff_of(id));
 -- (select auth.uid()) is evaluated once per statement, not once per row.
-create policy member_read on brewery_users for select using (user_id = (select auth.uid()) or is_staff_of(brewery_id));
-create policy self_read on customer_users for select using (user_id = (select auth.uid()));
+create policy member_read on brewery_users for select using (
+  (user_id = (select auth.uid()) and brewery_id in (select public.my_brewery_ids())) or is_staff_of(brewery_id)
+);
+create policy self_read on customer_users for select using (
+  user_id = (select auth.uid()) and customer_id in (select public.my_customer_ids())
+);
 
 -- Portal customers
 create policy customer_read_own on customers for select using (id in (select my_customer_ids()));
