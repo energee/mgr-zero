@@ -14,6 +14,13 @@ import { cartActionsDisabled, canRetirePortalFailure, cartLines, planDraftSync, 
 
 export type CatalogItem = { skuId: string; name: string; product: string; unitPriceCents: number };
 export type ShipToOption = { id: string; label: string; is_default?: boolean };
+type PortalQuote = {
+  quoteId: string; taxStatus: "pending" | "calculated"; subtotalCents: number; depositCents: number;
+  amountBeforeTaxCents: number; taxCents?: number; totalCents?: number;
+  source: { id: string; name: string }; destination: { id: string; label: string; address1: string; address2?: string | null; city: string; state: string; zip: string };
+  lines: { skuId: string; name: string; product: string; qty: number; unitPriceCents: number; amountCents: number }[];
+  deposits: { name: string; kegSize: string; qty: number; unitPriceCents: number; amountCents: number }[];
+};
 export function submissionFailureMessage(message: string, draftId: string | null) {
   return draftId ? `Order saved, but submission could not be confirmed (${message}). View the order status before retrying, or contact the brewery.` : message;
 }
@@ -36,12 +43,13 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource }: CartPr
   const initialFields = recovery.attempt?.fields ?? initial?.fields;
   const [fields, setFields] = useState<PortalFields>(initialFields ?? { shipToId: defaultShipToId(shipTos), poNumber: "", note: "", requestedShipDate: null, lines: [] });
   const [qty, setQty] = useState<Record<string, string>>(Object.fromEntries((initialFields?.lines ?? []).map(l => [l.skuId, String(l.qty)])));
-  const [draftId, setDraftId] = useState(recovery.attempt && "orderId" in recovery.attempt.input ? recovery.attempt.input.orderId : initial?.draftId ?? null);
+  const [draftId, setDraftId] = useState<string | null>(recovery.attempt && "orderId" in recovery.attempt.input ? recovery.attempt.input.orderId ?? null : initial?.draftId ?? null);
   const [attempt, setAttempt] = useState<PortalAttempt | null>(recovery.attempt);
   const ready = !recovery.error;
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
   const [review, setReview] = useState(false);
+  const [quote, setQuote] = useState<PortalQuote | null>(null);
   const [error, setError] = useState<string | null>(recovery.error);
   const lines = cartLines(qty);
   const locked = !ready || busy || attempt !== null;
@@ -58,12 +66,17 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource }: CartPr
     try {
       if (!active) {
         const snapshot = { ...fields, lines: lines! };
-        const plan = planDraftSync(draftId);
-        active = { scope, purpose, fields: snapshot, command: plan.command, requestId: crypto.randomUUID(), input: { ...snapshot, expectedIdentity: { actorId: scope.actorId, customerId: scope.customerId }, ...(plan.command === "portal_update_draft_order" ? { orderId: plan.orderId } : {}) } };
+        if (purpose === "submit") {
+          if (!quote) return;
+          active = { scope, purpose, fields: snapshot, command: "portal_submit_quote", requestId: crypto.randomUUID(), input: { quoteId: quote.quoteId, expectedIdentity: { actorId: scope.actorId, customerId: scope.customerId }, ...(draftId ? { orderId: draftId } : {}) } };
+        } else {
+          const plan = planDraftSync(draftId);
+          active = { scope, purpose, fields: snapshot, command: plan.command, requestId: crypto.randomUUID(), input: { ...snapshot, expectedIdentity: { actorId: scope.actorId, customerId: scope.customerId }, ...(plan.command === "portal_update_draft_order" ? { orderId: plan.orderId } : {}) } };
+        }
       }
       const id = await executePortalAttempt(active, sessionStorage, command, next => {
         active = next; setAttempt(next);
-        if ("orderId" in next.input) setDraftId(next.input.orderId);
+        if ("orderId" in next.input) setDraftId(next.input.orderId ?? null);
       });
       setAttempt(null);
       router.push(`/portal/orders/${id}`);
@@ -76,6 +89,16 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource }: CartPr
       }
       setError(err instanceof Error ? err.message : "Order response could not be confirmed.");
     } finally { inFlight.current = false; setBusy(false); }
+  }
+  async function openReview() {
+    if (disabled || !lines) return;
+    setBusy(true); setError(null);
+    try {
+      const next = await command(scope.breweryId, "portal_quote_order", { ...fields, lines }, crypto.randomUUID(), scope) as PortalQuote;
+      setQuote(next); setReview(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Order review is unavailable.");
+    } finally { setBusy(false); }
   }
   const feedback = <>
     <CommandFormMessage error={error} />
@@ -108,17 +131,19 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource }: CartPr
     {E.info("Taxes and keg deposits are not included. The brewery confirms final invoice amounts and the requested delivery date.")}
     {unavailable.length > 0 && E.info(`Pending request contains packages no longer in the catalog: ${unavailable.map(l => `${l.skuId} × ${l.qty}`).join(", ")}. Retry retains the original quantities.`)}
     {feedback}
-    <div className="flex gap-2"><Button variant="outline" disabled={disabled} onClick={() => run("draft")}>Save draft</Button><Button disabled={disabled} onClick={() => setReview(true)}>Review order</Button></div>
-    <CommandForm open={review} onOpenChange={setReview} title="Review order">
-      {E.fld("Ships from", fulfillmentSource?.name ?? "Not configured")}
-      {E.fld("Ship to", shipTos.find(s => s.id === fields.shipToId)?.label ?? "Select a ship-to")}
+    <div className="flex gap-2"><Button variant="outline" disabled={disabled} onClick={() => run("draft")}>Save draft</Button><Button disabled={disabled} onClick={openReview}>{busy ? "Preparing review…" : "Review order"}</Button></div>
+    <CommandForm open={review && quote !== null} onOpenChange={open => { setReview(open); if (!open) setQuote(null); }} title="Review order">
+      {E.fld("Ships from", quote?.source.name ?? fulfillmentSource?.name ?? "Not configured")}
+      {E.fld("Ship to", quote ? `${quote.destination.label} · ${quote.destination.address1}, ${quote.destination.city}, ${quote.destination.state} ${quote.destination.zip}` : "Select a ship-to")}
       {E.fld("Requested date", fields.requestedShipDate ?? "Not specified")}
       {fields.poNumber && E.fld("PO number", fields.poNumber)}{fields.note && E.fld("Note", fields.note)}
-      {(lines ?? []).map(l => <div key={l.skuId}>{E.row(items.find(i => i.skuId === l.skuId)?.name ?? "Item", `Quantity ${l.qty}`, `$${((items.find(i => i.skuId === l.skuId)?.unitPriceCents ?? 0) * l.qty / 100).toFixed(2)}`)}</div>)}
-      {E.fld("Current catalog subtotal", unavailable.length ? "Unavailable for the pending request" : `$${(subtotal / 100).toFixed(2)}`)}
-      {E.info("Taxes and keg deposits are pending; this is not a final invoice total.")}
+      {(quote?.lines ?? []).map(l => <div key={l.skuId}>{E.row(`${l.product} · ${l.name}`, `Quantity ${l.qty} at $${(l.unitPriceCents / 100).toFixed(2)}`, `$${(l.amountCents / 100).toFixed(2)}`)}</div>)}
+      {E.fld("Subtotal", quote ? `$${(quote.subtotalCents / 100).toFixed(2)}` : "Preparing")}
+      {quote?.deposits.map(d => <div key={`${d.name}:${d.kegSize}`}>{E.row(`${d.name} deposit`, `Quantity ${d.qty} at $${(d.unitPriceCents / 100).toFixed(2)}`, `$${(d.amountCents / 100).toFixed(2)}`)}</div>)}
+      {E.fld("Keg deposits", quote ? `$${(quote.depositCents / 100).toFixed(2)}` : "Preparing")}
+      {quote?.taxStatus === "calculated" ? <>{E.fld("Estimated tax", `$${((quote.taxCents ?? 0) / 100).toFixed(2)}`)}{E.fld("Estimated total", `$${((quote.totalCents ?? 0) / 100).toFixed(2)}`)}</> : <>{E.fld("Tax", "Tax pending")}{E.info("Subtotal and keg deposits are current. Tax and the final payable total will be set on the payment invoice.")}</>}
       {feedback}
-      <div className="flex gap-2 py-3"><Button variant="outline" disabled={busy} onClick={() => setReview(false)}>Back to edit</Button><Button disabled={disabled} onClick={() => run("submit")}>Submit order</Button></div>
+      <div className="flex gap-2 py-3"><Button variant="outline" disabled={busy} onClick={() => { setReview(false); setQuote(null); }}>Back to edit</Button><Button disabled={disabled || !quote} onClick={() => run("submit")}>Submit order</Button></div>
     </CommandForm>
   </div>;
 }

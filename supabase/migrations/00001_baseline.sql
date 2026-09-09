@@ -530,6 +530,7 @@ create table locations (
   brewery_id uuid not null references breweries(id),
   name text not null,
   kind location_kind not null,
+  address text,
   unique (id, brewery_id),
   unique (brewery_id, name)
 );
@@ -1893,6 +1894,7 @@ create table qbo_connections (
   qbo_deposit_item_id text,
   allow_online_ach_payment boolean not null default true,
   allow_online_credit_card_payment boolean not null default true,
+  granted_scopes text[] not null default '{}',
   credential_version bigint not null default 0,
   connected_by uuid references auth.users(id),
   updated_at timestamptz not null default now(),
@@ -2110,18 +2112,18 @@ returns boolean language sql security definer set search_path='' as $$
  ) select coalesce((select true from changed),false)
 $$;
 
-create function public.complete_qbo_oauth(p_intent uuid,p_actor uuid,p_realm_id text,p_realm_label text,p_access_token text,p_refresh_token text,p_received_at timestamptz,p_access_seconds int,p_refresh_seconds int,p_hard_seconds int)
+create function public.complete_qbo_oauth(p_intent uuid,p_actor uuid,p_realm_id text,p_realm_label text,p_access_token text,p_refresh_token text,p_received_at timestamptz,p_access_seconds int,p_refresh_seconds int,p_hard_seconds int,p_granted_scopes text[] default '{}')
 returns uuid language plpgsql security definer set search_path='' as $$
 declare i private.qbo_oauth_intents; v_id uuid:=private.new_uuid(); v_version bigint;
 begin
  select * into i from private.qbo_oauth_intents where id=p_intent for update;
  if i.id is null or i.actor_id<>p_actor or i.exchange_state<>'exchanging' or not exists(select 1 from public.brewery_users u where u.brewery_id=i.brewery_id and u.user_id=p_actor and u.role='admin') then raise exception 'oauth state invalid'; end if;
  perform 1 from private.integration_tokens where brewery_id=i.brewery_id and provider='qbo' for update;
- insert into public.qbo_connections(id,brewery_id,realm_id,realm_label,state,access_expires_at,refresh_expires_at,refresh_hard_expires_at,remote_revocation_state,last_error,credential_version,connected_by,updated_at)
- values(v_id,i.brewery_id,p_realm_id,p_realm_label,'connected',p_received_at+make_interval(secs=>p_access_seconds),case when p_refresh_seconds is null then null else p_received_at+make_interval(secs=>p_refresh_seconds) end,case when p_hard_seconds is null then null else p_received_at+make_interval(secs=>p_hard_seconds) end,'not_requested',null,1,p_actor,now())
+ insert into public.qbo_connections(id,brewery_id,realm_id,realm_label,state,access_expires_at,refresh_expires_at,refresh_hard_expires_at,remote_revocation_state,last_error,credential_version,connected_by,updated_at,granted_scopes)
+ values(v_id,i.brewery_id,p_realm_id,p_realm_label,'connected',p_received_at+make_interval(secs=>p_access_seconds),case when p_refresh_seconds is null then null else p_received_at+make_interval(secs=>p_refresh_seconds) end,case when p_hard_seconds is null then null else p_received_at+make_interval(secs=>p_hard_seconds) end,'not_requested',null,1,p_actor,now(),coalesce(p_granted_scopes,'{}'))
  on conflict(brewery_id) do update set id=case when qbo_connections.realm_id=excluded.realm_id then qbo_connections.id else excluded.id end,realm_id=excluded.realm_id,realm_label=excluded.realm_label,state='connected',access_expires_at=excluded.access_expires_at,refresh_expires_at=excluded.refresh_expires_at,refresh_hard_expires_at=excluded.refresh_hard_expires_at,remote_revocation_state='not_requested',last_error=null,
    qbo_deposit_item_id=case when qbo_connections.realm_id=excluded.realm_id then qbo_connections.qbo_deposit_item_id end,
-   credential_version=qbo_connections.credential_version+1,connected_by=p_actor,updated_at=now()
+   granted_scopes=excluded.granted_scopes,credential_version=qbo_connections.credential_version+1,connected_by=p_actor,updated_at=now()
  returning id,credential_version into v_id,v_version;
  insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token,credential_version)
  values(i.brewery_id,'qbo',v_id,p_access_token,p_refresh_token,v_version)
@@ -2181,7 +2183,7 @@ $$;
 
 grant execute on function public.begin_qbo_oauth(uuid,text,text,text,uuid) to authenticated;
 grant execute on function public.claim_qbo_oauth(text,uuid,uuid,text),public.fail_qbo_oauth(uuid,uuid),
- public.complete_qbo_oauth(uuid,uuid,text,text,text,text,timestamp with time zone,int,int,int),
+ public.complete_qbo_oauth(uuid,uuid,text,text,text,text,timestamp with time zone,int,int,int,text[]),
  public.cas_integration_tokens(uuid,text,uuid,uuid,bigint,text,text,timestamp with time zone,int,int,int),
  public.begin_qbo_disconnect(uuid,uuid,uuid,uuid),public.finish_qbo_disconnect(uuid,uuid,uuid,uuid,boolean) to service_role;
 
@@ -3359,6 +3361,30 @@ create table private.command_requests (
   primary key (actor_id, request_id),
   check ((brewery_id is null) = (command_name = 'provision_brewery'))
 );
+
+-- A portal quote is an immutable reviewed snapshot. It stays private because
+-- provider mappings and the credential-bound tax input are server-only.
+create table private.portal_order_quotes (
+  id uuid primary key default private.new_uuid(),
+  actor_id uuid not null,
+  brewery_id uuid not null references public.breweries(id),
+  customer_id uuid not null,
+  request_id uuid not null,
+  snapshot jsonb not null,
+  result jsonb not null,
+  connection_id uuid,
+  tax_status text not null default 'pending' check (tax_status in ('pending','calculated')),
+  tax_cents int check (tax_cents >= 0),
+  submitted_order_id uuid,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null default now() + interval '10 minutes',
+  unique (actor_id, request_id),
+  foreign key (actor_id, request_id) references private.command_requests(actor_id, request_id) on delete cascade,
+  foreign key (customer_id, brewery_id) references public.customers(id, brewery_id),
+  foreign key (connection_id, brewery_id) references public.qbo_connections(id, brewery_id),
+  foreign key (submitted_order_id, brewery_id) references public.orders(id, brewery_id)
+);
+alter table private.portal_order_quotes enable row level security;
 
 -- A failed provider read can be retried against this exact target set. Only
 -- the authenticated begin RPC and service-only completion RPC can reach it.
@@ -4814,6 +4840,205 @@ begin
   if v_replay is not null then return v_replay; end if;
   v_result := private.create_order_impl(p_brewery,p_kind,p_customer,p_ship_to,p_from_location,p_to_location,p_requested,p_po,p_note,p_lines);
   return private.complete_command_request(p_request_id,v_result);
+end $$;
+
+create function private.portal_quote_snapshot(
+  p_brewery uuid, p_customer uuid, p_ship_to uuid, p_requested date,
+  p_po text, p_note text, p_lines jsonb
+) returns jsonb language plpgsql stable set search_path='' as $$
+declare
+  v_customer public.customers; v_ship public.ship_tos; v_source public.locations;
+  v_lines jsonb; v_deposits jsonb; v_subtotal bigint; v_deposit bigint;
+begin
+  perform private.assert_order_lines(p_lines);
+  if exists (
+    select 1 from jsonb_array_elements(p_lines) e
+    where jsonb_typeof(e)<>'object' or not (e ?& array['sku_id','qty'])
+      or (select count(*) from jsonb_object_keys(e))<>2
+      or jsonb_typeof(e->'sku_id')<>'string' or jsonb_typeof(e->'qty')<>'number'
+      or (e->>'qty')::numeric<=0 or (e->>'qty')::numeric<>trunc((e->>'qty')::numeric)
+  ) then raise exception 'quote lines require a SKU and positive whole quantity'; end if;
+  if (select count(distinct (e->>'sku_id')::uuid) from jsonb_array_elements(p_lines) e)<>jsonb_array_length(p_lines) then
+    raise exception 'duplicate quote line';
+  end if;
+  select * into v_customer from public.customers where id=p_customer and brewery_id=p_brewery;
+  if not found then raise exception 'customer not found'; end if;
+  select * into v_ship from public.ship_tos where id=p_ship_to and customer_id=p_customer and brewery_id=p_brewery;
+  if not found then raise exception 'ship-to not found'; end if;
+  select l.* into v_source from public.breweries b join public.locations l
+    on l.id=b.portal_fulfillment_location_id and l.brewery_id=b.id
+    where b.id=p_brewery and l.kind='warehouse';
+  if not found then raise exception 'portal fulfillment source is not configured'; end if;
+
+  with requested as (
+    select (e->>'sku_id')::uuid sku_id,(e->>'qty')::numeric qty from jsonb_array_elements(p_lines) e
+  ), resolved as (
+    select r.sku_id,r.qty,p.sku_name,p.brand_name,p.unit_price_cents,
+      (r.qty*p.unit_price_cents)::bigint amount_cents,s.qbo_item_id,s.qbo_realm_id,
+      k.id pool_id,k.name pool_name,f.keg_size,k.deposit_cents
+    from requested r
+    join public.sku_prices p on p.brewery_id=p_brewery and p.sale_channel_id=v_customer.sale_channel_id
+      and p.sku_id=r.sku_id and p.active
+    join public.skus s on s.id=r.sku_id and s.brewery_id=p_brewery
+    join public.formats f on f.id=s.format_id
+    left join public.keg_pools k on k.id=s.keg_pool_id and k.brewery_id=p_brewery
+  )
+  select jsonb_agg(jsonb_build_object(
+      'skuId',sku_id,'name',sku_name,'product',brand_name,'qty',qty,
+      'unitPriceCents',unit_price_cents,'amountCents',amount_cents,
+      'qboItemId',qbo_item_id,'qboRealmId',qbo_realm_id) order by sku_id),
+    coalesce(sum(amount_cents),0)
+  into v_lines,v_subtotal from resolved;
+  if coalesce(jsonb_array_length(v_lines),0)<>jsonb_array_length(p_lines) then
+    raise exception 'sku is not active and priced for this customer';
+  end if;
+
+  with requested as (
+    select (e->>'sku_id')::uuid sku_id,(e->>'qty')::numeric qty from jsonb_array_elements(p_lines) e
+  ), deposits as (
+    select k.id pool_id,k.name,k.deposit_cents,f.keg_size,sum(r.qty)::int qty
+    from requested r join public.skus s on s.id=r.sku_id and s.brewery_id=p_brewery
+    join public.formats f on f.id=s.format_id
+    join public.keg_pools k on k.id=s.keg_pool_id and k.brewery_id=p_brewery
+    where k.deposit_cents>0 group by k.id,k.name,k.deposit_cents,f.keg_size
+  )
+  select coalesce(jsonb_agg(jsonb_build_object('poolId',pool_id,'name',name,'kegSize',keg_size,
+      'qty',qty,'unitPriceCents',deposit_cents,'amountCents',qty*deposit_cents) order by pool_id),'[]'),
+    coalesce(sum(qty*deposit_cents),0)
+  into v_deposits,v_deposit from deposits;
+
+  return jsonb_build_object(
+    'input',jsonb_build_object('shipToId',p_ship_to,'requestedShipDate',p_requested,'poNumber',p_po,'note',p_note,'lines',p_lines),
+    'customer',jsonb_build_object('id',v_customer.id,'name',v_customer.name,'qboCustomerId',v_customer.qbo_customer_id,'qboRealmId',v_customer.qbo_realm_id),
+    'source',jsonb_build_object('id',v_source.id,'name',v_source.name,'address',v_source.address),
+    'destination',jsonb_build_object('id',v_ship.id,'label',v_ship.label,'address1',v_ship.address1,'address2',v_ship.address2,'city',v_ship.city,'state',v_ship.state,'zip',v_ship.zip),
+    'lines',v_lines,'deposits',v_deposits,'subtotalCents',v_subtotal,
+    'depositCents',v_deposit,'amountBeforeTaxCents',v_subtotal+v_deposit
+  );
+end $$;
+
+create function portal_quote_order(
+  p_brewery uuid,p_customer uuid,p_ship_to uuid,p_requested date,p_po text,p_note text,
+  p_lines jsonb,p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path='' as $$
+declare
+  v_actor uuid; v_replay jsonb; v_snapshot jsonb; v_result jsonb;
+  v_quote uuid:=private.new_uuid(); v_connection uuid; v_realm text; v_deposit_item text;
+  v_public_lines jsonb; v_tax_lines jsonb; v_public_deposits jsonb;
+begin
+  v_actor:=private.assert_customer(p_brewery,p_customer);
+  v_replay:=private.claim_command_request(p_brewery,'portal_quote_order',p_request_id,
+    jsonb_build_object('brewery',p_brewery,'customer',p_customer,'shipToId',p_ship_to,'requestedShipDate',p_requested,'poNumber',p_po,'note',p_note,'lines',p_lines));
+  if v_replay is not null then return v_replay; end if;
+  v_snapshot:=private.portal_quote_snapshot(p_brewery,p_customer,p_ship_to,p_requested,p_po,p_note,p_lines);
+  select coalesce(jsonb_agg(x-array['qboItemId','qboRealmId']),'[]') into v_public_lines
+    from jsonb_array_elements(v_snapshot->'lines') x;
+  select coalesce(jsonb_agg(x-array['poolId']),'[]') into v_public_deposits
+    from jsonb_array_elements(v_snapshot->'deposits') x;
+  select c.id,c.realm_id,c.qbo_deposit_item_id into v_connection,v_realm,v_deposit_item
+  from public.qbo_connections c
+  where c.brewery_id=p_brewery and c.state='connected'
+    and 'indirect-tax.tax-calculation.quickbooks'=any(c.granted_scopes)
+    and c.realm_id=v_snapshot#>>'{customer,qboRealmId}'
+    and nullif(v_snapshot#>>'{customer,qboCustomerId}','') is not null
+    and nullif(v_snapshot#>>'{source,address}','') is not null
+    and not exists(select 1 from jsonb_array_elements(v_snapshot->'lines') x
+      where nullif(x->>'qboItemId','') is null or x->>'qboRealmId'<>c.realm_id)
+    and ((v_snapshot->>'depositCents')::bigint=0 or nullif(c.qbo_deposit_item_id,'') is not null)
+    and exists(select 1 from private.integration_tokens t where t.brewery_id=p_brewery and t.provider='qbo' and t.connection_id=c.id);
+  if v_connection is not null then
+    select coalesce(jsonb_agg(jsonb_build_object('itemId',x->>'qboItemId','qty',(x->>'qty')::numeric,
+      'unitPriceCents',(x->>'unitPriceCents')::int)),'[]') into v_tax_lines
+      from jsonb_array_elements(v_snapshot->'lines') x;
+    if (v_snapshot->>'depositCents')::bigint>0 then
+      v_tax_lines:=v_tax_lines||jsonb_build_array(jsonb_build_object(
+        'itemId',v_deposit_item,'qty',1,'unitPriceCents',(v_snapshot->>'depositCents')::int));
+    end if;
+    v_snapshot:=v_snapshot||jsonb_build_object('taxInput',jsonb_build_object(
+      'transactionDate',coalesce(p_requested,current_date),'customerId',v_snapshot#>>'{customer,qboCustomerId}',
+      'sourceAddress',v_snapshot#>>'{source,address}',
+      'destinationAddress',concat_ws(', ',v_snapshot#>>'{destination,address1}',v_snapshot#>>'{destination,address2}',v_snapshot#>>'{destination,city}',v_snapshot#>>'{destination,state}',v_snapshot#>>'{destination,zip}'),
+      'lines',v_tax_lines));
+  end if;
+  v_result:=jsonb_build_object('quoteId',v_quote,'expiresAt',now()+interval '10 minutes','taxStatus','pending',
+    'source',v_snapshot->'source','destination',v_snapshot->'destination','lines',v_public_lines,'deposits',v_public_deposits,
+    'subtotalCents',(v_snapshot->>'subtotalCents')::bigint,'depositCents',(v_snapshot->>'depositCents')::bigint,
+    'amountBeforeTaxCents',(v_snapshot->>'amountBeforeTaxCents')::bigint,'taxReady',v_connection is not null);
+  insert into private.portal_order_quotes(id,actor_id,brewery_id,customer_id,request_id,snapshot,result,connection_id)
+    values(v_quote,v_actor,p_brewery,p_customer,p_request_id,v_snapshot,v_result,v_connection);
+  return private.complete_command_request(p_request_id,v_result);
+end $$;
+
+create function portal_submit_quote(
+  p_brewery uuid,p_customer uuid,p_quote uuid,p_order uuid,p_request_id uuid
+) returns jsonb language plpgsql security definer set search_path='' as $$
+declare v_actor uuid; v_replay jsonb; v_row private.portal_order_quotes; v_current jsonb; v_result jsonb; v_order uuid;
+begin
+  v_actor:=private.assert_customer(p_brewery,p_customer);
+  v_replay:=private.claim_command_request(p_brewery,'portal_submit_quote',p_request_id,
+    jsonb_build_object('brewery',p_brewery,'customer',p_customer,'quoteId',p_quote,'orderId',p_order));
+  if v_replay is not null then return v_replay; end if;
+  select * into v_row from private.portal_order_quotes where id=p_quote and actor_id=v_actor
+    and brewery_id=p_brewery and customer_id=p_customer for update;
+  if not found then raise exception 'quote not found'; end if;
+  if v_row.submitted_order_id is not null then raise exception 'quote was already submitted' using errcode='MG409'; end if;
+  if v_row.expires_at<=now() then raise exception 'quote expired; review the order again' using errcode='MG409'; end if;
+  v_current:=private.portal_quote_snapshot(p_brewery,p_customer,
+    (v_row.snapshot#>>'{input,shipToId}')::uuid,(v_row.snapshot#>>'{input,requestedShipDate}')::date,
+    v_row.snapshot#>>'{input,poNumber}',v_row.snapshot#>>'{input,note}',v_row.snapshot#>'{input,lines}');
+  if (v_current-'taxInput')<>(v_row.snapshot-'taxInput') then
+    raise exception 'order details changed; review the current quote again' using errcode='MG409';
+  end if;
+  if p_order is null then
+    v_result:=private.create_order_impl(p_brewery,'wholesale',p_customer,
+      (v_row.snapshot#>>'{input,shipToId}')::uuid,(v_row.snapshot#>>'{source,id}')::uuid,null,
+      (v_row.snapshot#>>'{input,requestedShipDate}')::date,v_row.snapshot#>>'{input,poNumber}',v_row.snapshot#>>'{input,note}',v_row.snapshot#>'{input,lines}');
+    v_order:=(v_result->>'order_id')::uuid;
+  else
+    perform 1 from public.orders where id=p_order and brewery_id=p_brewery and customer_id=p_customer and status='draft' for update;
+    if not found then raise exception 'order not found'; end if;
+    v_result:=private.update_draft_order_impl(p_order,(v_row.snapshot#>>'{input,shipToId}')::uuid,
+      (v_row.snapshot#>>'{input,requestedShipDate}')::date,v_row.snapshot#>>'{input,poNumber}',v_row.snapshot#>>'{input,note}',v_row.snapshot#>'{input,lines}');
+    v_order:=p_order;
+  end if;
+  v_result:=private.submit_order_impl(v_order);
+  update private.portal_order_quotes set submitted_order_id=v_order where id=p_quote;
+  return private.complete_command_request(p_request_id,v_result);
+end $$;
+
+create function read_portal_quote_tax(p_brewery uuid,p_customer uuid,p_quote uuid,p_actor uuid)
+returns table(connection_id uuid,access_token text,tax_input jsonb)
+language sql stable security definer set search_path='' as $$
+  select q.connection_id,t.access_token,q.snapshot->'taxInput'
+  from private.portal_order_quotes q
+  join public.qbo_connections c on c.id=q.connection_id and c.brewery_id=q.brewery_id and c.state='connected'
+  join private.integration_tokens t on t.brewery_id=q.brewery_id and t.provider='qbo' and t.connection_id=c.id
+  where q.id=p_quote and q.actor_id=p_actor and q.brewery_id=p_brewery and q.customer_id=p_customer
+    and q.tax_status='pending' and q.expires_at>now() and q.snapshot ? 'taxInput'
+    and exists(select 1 from public.customer_users u where u.customer_id=p_customer and u.user_id=p_actor)
+$$;
+
+create function finish_portal_quote_tax(
+  p_brewery uuid,p_customer uuid,p_quote uuid,p_actor uuid,p_connection uuid,p_tax_cents int
+) returns jsonb language plpgsql security definer set search_path='' as $$
+declare q private.portal_order_quotes; v_result jsonb;
+begin
+  if p_tax_cents<0 then raise exception 'invalid tax amount'; end if;
+  select * into q from private.portal_order_quotes where id=p_quote and actor_id=p_actor
+    and brewery_id=p_brewery and customer_id=p_customer and connection_id=p_connection for update;
+  if not found or q.expires_at<=now() or not exists(select 1 from public.customer_users u where u.customer_id=p_customer and u.user_id=p_actor)
+    or not exists(select 1 from public.qbo_connections c where c.id=p_connection and c.brewery_id=p_brewery and c.state='connected') then
+    raise exception 'quote tax reconciliation is unavailable';
+  end if;
+  if q.tax_status='calculated' then
+    if q.tax_cents<>p_tax_cents then raise exception 'quote tax result changed' using errcode='MG409'; end if;
+    return q.result;
+  end if;
+  v_result:=(q.result-'taxReady')||jsonb_build_object('taxStatus','calculated','taxCents',p_tax_cents,
+    'totalCents',(q.result->>'amountBeforeTaxCents')::bigint+p_tax_cents);
+  update private.portal_order_quotes set tax_status='calculated',tax_cents=p_tax_cents,result=v_result where id=p_quote;
+  update private.command_requests set result=v_result where actor_id=p_actor and request_id=q.request_id;
+  return v_result;
 end $$;
 
 create function portal_create_order(
@@ -8224,6 +8449,8 @@ grant execute on function
   set_taproom_par(uuid,uuid,uuid,numeric,uuid),
   set_portal_fulfillment_source(uuid,uuid,uuid),
   create_order(uuid,public.order_kind,uuid,uuid,uuid,uuid,date,text,text,jsonb,uuid),
+  portal_quote_order(uuid,uuid,uuid,date,text,text,jsonb,uuid),
+  portal_submit_quote(uuid,uuid,uuid,uuid,uuid),
   portal_create_order(uuid,uuid,uuid,text,text,jsonb,uuid,date),
   update_draft_order(uuid,uuid,date,text,text,jsonb,uuid,boolean,uuid,uuid),
   submit_order(uuid,uuid,uuid,uuid),

@@ -131,6 +131,7 @@ export async function completeQboOAuthStore(intentId: string, actorId: string, r
     p_access_token: tokens.accessToken, p_refresh_token: tokens.refreshToken,
     p_received_at: tokens.receivedAt,
     p_access_seconds: tokens.accessExpiresIn, p_refresh_seconds: tokens.refreshExpiresIn, p_hard_seconds: tokens.refreshHardExpiresIn,
+    p_granted_scopes: tokens.grantedScopes,
   });
   if (error || typeof data !== "string") throw new Error("QuickBooks connection storage failed");
   return data;
@@ -281,4 +282,25 @@ export async function completeQboInvoiceSync(ctx: Ctx, input: {
   if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
   if (error) throw new Error("QuickBooks invoice sync could not be recorded");
   return data as QboInvoiceSyncResult;
+}
+
+export async function readPortalQuoteTax(ctx: Ctx, quoteId: string) {
+  if (!ctx.customerId) throw new CommandError("not a portal customer", 403);
+  const { data, error } = await createAdminClient().rpc("read_portal_quote_tax", {
+    p_brewery: ctx.breweryId, p_customer: ctx.customerId, p_quote: quoteId, p_actor: ctx.userId,
+  }).maybeSingle();
+  const row = data as { connection_id?: unknown; access_token?: unknown; tax_input?: unknown } | null;
+  if (error || typeof row?.connection_id !== "string" || typeof row.access_token !== "string"
+    || !row.tax_input || typeof row.tax_input !== "object") return null;
+  return { connectionId: row.connection_id, accessToken: row.access_token, input: row.tax_input as import("@/lib/qbo").QboTaxInput };
+}
+
+export async function finishPortalQuoteTax(ctx: Ctx, quoteId: string, connectionId: string, taxCents: number) {
+  if (!ctx.customerId) throw new CommandError("not a portal customer", 403);
+  const { data, error } = await createAdminClient().rpc("finish_portal_quote_tax", {
+    p_brewery: ctx.breweryId, p_customer: ctx.customerId, p_quote: quoteId, p_actor: ctx.userId,
+    p_connection: connectionId, p_tax_cents: taxCents,
+  });
+  if (error || !data || typeof data !== "object") throw new Error("QuickBooks tax calculation unavailable");
+  return data as Record<string, unknown>;
 }

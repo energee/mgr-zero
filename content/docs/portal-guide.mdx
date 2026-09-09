@@ -28,11 +28,13 @@ The header shows your customer account name. Navigation offers **Order**, **Orde
 2. Enter positive whole-unit quantities for the packages you want.
 3. Choose **Ship to**. Your default address is selected for a new cart.
 4. Optionally enter **Requested date**, **PO number** and **Note**, then check the **Current catalog subtotal**. Clearing the requested date removes it from a saved draft.
-5. Select **Review order**, check the quantities and delivery fields, then **Submit order**. **Back to edit** keeps your entries. Or select **Save draft** without submitting. The brewery reviews submitted orders before they are confirmed. Taxes and keg deposits are pending and excluded from the catalog subtotal; this is not a final invoice total.
+5. Select **Review order**. MGR takes a current server quote for the selected ship-to, fulfillment source, channel prices, and returnable-keg deposits. Review shows the deposit separately. When the brewery has entitled QuickBooks tax calculation configured, it also shows **Estimated tax** and **Estimated total**. Otherwise it says **Tax pending**: the subtotal and deposits are current, and the invoice supplies the final tax and total. Select **Submit order**, choose **Back to edit** to keep editing, or select **Save draft** without submitting. The brewery reviews submitted orders before they are confirmed.
 
 New carts select your default ship-to, or the first address if none is designated. You can choose another address; saving the cart keeps your explicit choice. Contact brewery staff to change the account default.
 
 Save draft and Review order stay disabled without a ship-to, without a positive line, without a configured shipping source, or while saving. Shop and review show **Ships from** with the brewery’s configured warehouse name. That holds even after a draft has been saved from this cart. With no priced products, Shop asks you to call the brewery.
+
+Submitting rechecks the price, ship-to address, shipping source, and keg deposit against the reviewed quote. If any changed, MGR creates no order and asks you to return to the cart and review the current details. After an uncertain submit response, **Retry order request** uses that exact reviewed quote and request; a later catalog change or quote expiry cannot create a duplicate or change a committed order.
 
 <Callout type="warn">
 **Before ordering:** if **Ships from** says **Not configured**, contact the brewery. Fresh saves and submissions stay disabled until the brewery configures its shipping warehouse. You can still retry an earlier uncertain request to confirm its outcome.

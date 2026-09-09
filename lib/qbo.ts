@@ -17,8 +17,16 @@ const TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer";
 const REVOKE_URL = "https://developer.api.intuit.com/v2/oauth2/tokens/revoke";
 const ACCOUNTING_MINOR_VERSION = "75";
 export const QBO_ACCOUNTING_SCOPE = "com.intuit.quickbooks.accounting";
+export const QBO_TAX_SCOPE = "indirect-tax.tax-calculation.quickbooks";
 
-export type QboConfig = { clientId: string; clientSecret: string; redirectUri: string; apiBaseUrl: string };
+export type QboConfig = { clientId: string; clientSecret: string; redirectUri: string; apiBaseUrl: string; taxApiBaseUrl?: string };
+export type QboTaxInput = {
+  transactionDate: string;
+  customerId: string;
+  sourceAddress: string;
+  destinationAddress: string;
+  lines: { itemId: string; qty: number; unitPriceCents: number }[];
+};
 export type QboTokens = {
   accessToken: string;
   refreshToken: string;
@@ -26,6 +34,7 @@ export type QboTokens = {
   accessExpiresIn: number;
   refreshExpiresIn: number | null;
   refreshHardExpiresIn: number | null;
+  grantedScopes: string[];
 };
 
 export type QboOAuthClaim = { intentId: string; breweryId: string; providerIntent: "connect" | "reconnect" };
@@ -79,6 +88,7 @@ function parseTokens(value: unknown, receivedAt: string): QboTokens {
     accessExpiresIn,
     refreshExpiresIn: positiveSeconds(row.x_refresh_token_expires_in),
     refreshHardExpiresIn: positiveSeconds(row.x_refresh_token_hard_expires_in),
+    grantedScopes: typeof row.scope === "string" ? row.scope.split(/\s+/).filter(Boolean) : [],
   };
 }
 
@@ -268,7 +278,7 @@ export class QboOAuthClient {
     url.searchParams.set("client_id", this.config.clientId);
     url.searchParams.set("redirect_uri", this.config.redirectUri);
     url.searchParams.set("response_type", "code");
-    url.searchParams.set("scope", QBO_ACCOUNTING_SCOPE);
+    url.searchParams.set("scope", [QBO_ACCOUNTING_SCOPE, ...(this.config.taxApiBaseUrl ? [QBO_TAX_SCOPE] : [])].join(" "));
     url.searchParams.set("state", state);
     return url.toString();
   }
@@ -366,6 +376,59 @@ export class QboOAuthClient {
       privateNote: typeof invoice.PrivateNote === "string" ? invoice.PrivateNote : "",
       content: meaningfulInvoiceContent(invoice),
     };
+  }
+
+  async calculateSalesTax(input: QboTaxInput, accessToken: string) {
+    if (!this.config.taxApiBaseUrl) throw new Error("QuickBooks tax calculation unavailable");
+    const response = await this.transport(this.config.taxApiBaseUrl, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json", "Content-Type": "application/json" },
+      redirect: "error",
+      body: JSON.stringify({
+        query: `mutation IndirectTaxCalculateSaleTransactionTax($input: IndirectTax_TaxCalculationInput!) { indirectTaxCalculateSaleTransactionTax(input: $input) { taxCalculation { taxTotals { totalTaxAmountExcludingShipping { value currency } } shipping { taxAmount { value currency } } } } }`,
+        variables: { input: {
+          transactionDate: input.transactionDate,
+          subject: { qbCustomerId: input.customerId },
+          shipping: {
+            shipFromAddress: { freeFormAddressLine: input.sourceAddress },
+            shipToAddress: { freeFormAddressLine: input.destinationAddress },
+          },
+          lineItems: input.lines.map((line) => ({
+            numberOfUnits: line.qty,
+            productVariantTaxability: { productVariantId: line.itemId },
+            pricePerUnitExcludingTaxes: { value: (line.unitPriceCents / 100).toFixed(2), currency: "USD" },
+          })),
+        } },
+      }),
+    });
+    if (!response.ok) throw new Error("QuickBooks tax calculation unavailable");
+    const payload = await response.json().catch(() => null);
+    if (!payload || typeof payload !== "object") throw new Error("QuickBooks tax calculation unavailable");
+    const root = payload as Record<string, unknown>;
+    if (Array.isArray(root.errors) && root.errors.length) throw new Error("QuickBooks tax calculation unavailable");
+    const data = root.data && typeof root.data === "object" ? root.data as Record<string, unknown> : null;
+    const operation = data?.indirectTaxCalculateSaleTransactionTax;
+    const operationRow = operation && typeof operation === "object" ? operation as Record<string, unknown> : null;
+    const calculationValue = operationRow?.taxCalculation;
+    const calculation = calculationValue && typeof calculationValue === "object" ? calculationValue as Record<string, unknown> : null;
+    const totalsValue = calculation?.taxTotals;
+    const totals = totalsValue && typeof totalsValue === "object" ? totalsValue as Record<string, unknown> : null;
+    const shippingValue = calculation?.shipping;
+    const shipping = shippingValue && typeof shippingValue === "object" ? shippingValue as Record<string, unknown> : null;
+    const cents = (money: unknown) => {
+      if (!money || typeof money !== "object") return null;
+      const row = money as { value?: unknown; currency?: unknown };
+      const value = typeof row.value === "number" ? String(row.value) : row.value;
+      if (row.currency !== "USD" || typeof value !== "string" || !/^\d+(?:\.\d{1,2})?$/.test(value)) return null;
+      const result = Number(value) * 100;
+      return Number.isSafeInteger(result) ? result : null;
+    };
+    const lineTax = cents(totals?.totalTaxAmountExcludingShipping);
+    const shippingTax = cents(shipping?.taxAmount);
+    if (lineTax === null || shippingTax === null || !Number.isSafeInteger(lineTax + shippingTax)) {
+      throw new Error("QuickBooks tax calculation unavailable");
+    }
+    return lineTax + shippingTax;
   }
 
   private basic() {

@@ -28,16 +28,18 @@ const fieldsSchema = z.object({ shipToId: z.string().uuid(), poNumber: z.string(
 const identitySchema = z.object({ actorId: z.string().uuid(), customerId: z.string().uuid() }).strict();
 const createInputSchema = fieldsSchema.extend({ expectedIdentity: identitySchema });
 const submitInputSchema = z.object({ orderId: z.string().uuid(), expectedIdentity: identitySchema }).strict();
+const submitQuoteInputSchema = z.object({ quoteId: z.string().uuid(), orderId: z.string().uuid().optional(), expectedIdentity: identitySchema }).strict();
 const attemptSchema = z.object({
   scope: scopeSchema, requestId: z.string().uuid(), purpose: z.enum(["draft", "submit"]), fields: fieldsSchema,
-  command: z.enum(["portal_create_order", "portal_update_draft_order", "portal_submit_order"]),
-  input: z.union([createInputSchema, createInputSchema.extend({ orderId: z.string().uuid() }), submitInputSchema]),
+  command: z.enum(["portal_create_order", "portal_update_draft_order", "portal_submit_order", "portal_submit_quote"]),
+  input: z.union([createInputSchema, createInputSchema.extend({ orderId: z.string().uuid() }), submitInputSchema, submitQuoteInputSchema]),
 }).strict().superRefine((a, ctx) => {
-  const expected = a.command === "portal_submit_order" ? submitInputSchema
+  const expected = a.command === "portal_submit_quote" ? submitQuoteInputSchema
+    : a.command === "portal_submit_order" ? submitInputSchema
     : a.command === "portal_create_order" ? createInputSchema : createInputSchema.extend({ orderId: z.string().uuid() });
   if (a.input.expectedIdentity.actorId !== a.scope.actorId || a.input.expectedIdentity.customerId !== a.scope.customerId) ctx.addIssue({ code: "custom", message: "Recovery identity changed" });
   if (!expected.safeParse(a.input).success || (a.command === "portal_submit_order" && a.purpose !== "submit")) ctx.addIssue({ code: "custom", message: "Invalid recovery stage" });
-  if (a.command !== "portal_submit_order") {
+  if (a.command === "portal_create_order" || a.command === "portal_update_draft_order") {
     const fields = fieldsSchema.parse(Object.fromEntries(Object.entries(a.input).filter(([key]) => key !== "orderId" && key !== "expectedIdentity")));
     if (JSON.stringify(fields) !== JSON.stringify(a.fields)) ctx.addIssue({ code: "custom", message: "Recovery fields changed" });
   }
@@ -98,7 +100,7 @@ export async function executePortalAttempt(
   const result = await send(attempt.scope.breweryId, attempt.command, attempt.input, attempt.requestId, attempt.scope) as { order_id?: string };
   const id = "orderId" in attempt.input ? attempt.input.orderId : result?.order_id;
   if (!id || !z.string().uuid().safeParse(id).success) throw new Error("Order response could not be confirmed. Retry the same request.");
-  if (attempt.purpose === "submit" && attempt.command !== "portal_submit_order") {
+  if (attempt.purpose === "submit" && (attempt.command === "portal_create_order" || attempt.command === "portal_update_draft_order")) {
     return executePortalAttempt({ ...attempt, command: "portal_submit_order", input: { orderId: id, expectedIdentity: attempt.input.expectedIdentity }, requestId: crypto.randomUUID() }, storage, send, onStage);
   }
   storage.removeItem(portalAttemptKey(attempt.scope));

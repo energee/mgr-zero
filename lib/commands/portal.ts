@@ -4,6 +4,7 @@
 import { z } from "zod";
 import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
 import { defineCommand, defineQuery, unwrap, CommandError, Ctx } from "./registry";
+import type { QboTaxInput } from "@/lib/qbo";
 
 const expectedIdentity = z.object({ actorId: z.string().uuid(), customerId: z.string().uuid() }).optional();
 function assertExpectedIdentity(ctx: Ctx, expected: z.infer<typeof expectedIdentity>) {
@@ -13,11 +14,60 @@ function assertExpectedIdentity(ctx: Ctx, expected: z.infer<typeof expectedIdent
 }
 
 const lines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive() })).min(1);
+const quoteLines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().int().positive() })).min(1);
+const quoteInput = z.object({
+  shipToId: z.string().uuid(), poNumber: z.string().optional(), note: z.string().optional(),
+  requestedShipDate: z.string().date().nullable().optional(), lines: quoteLines,
+});
+type PortalTaxClient = { calculateSalesTax(input: QboTaxInput, accessToken: string): Promise<number> };
 
 function requireCustomer(ctx: Ctx): string {
   if (!ctx.customerId) throw new CommandError("not a portal customer");
   return ctx.customerId;
 }
+
+export async function quotePortalOrder(ctx: Ctx, i: z.infer<typeof quoteInput>, requestId: string, client?: PortalTaxClient) {
+  const customerId = requireCustomer(ctx);
+  const start = await unwrap(ctx.db.rpc("portal_quote_order", {
+    p_brewery: ctx.breweryId, p_customer: customerId, p_ship_to: i.shipToId,
+    p_requested: i.requestedShipDate ?? null, p_po: i.poNumber ?? null, p_note: i.note ?? null,
+    p_lines: i.lines.map(l => ({ sku_id: l.skuId, qty: l.qty })), p_request_id: requestId,
+  })) as Record<string, unknown>;
+  const { taxReady, ...pending } = start;
+  if (taxReady !== true || start.taxStatus === "calculated" || typeof start.quoteId !== "string") return pending;
+  try {
+    const { readPortalQuoteTax, finishPortalQuoteTax } = await import("@/lib/supabase/integration-tokens");
+    const claim = await readPortalQuoteTax(ctx, start.quoteId);
+    if (!claim) return pending;
+    if (!client) {
+      const { qboConfig, QboOAuthClient } = await import("@/lib/qbo");
+      client = new QboOAuthClient(qboConfig());
+    }
+    const taxCents = await client.calculateSalesTax(claim.input, claim.accessToken);
+    return finishPortalQuoteTax(ctx, start.quoteId, claim.connectionId, taxCents);
+  } catch {
+    return pending;
+  }
+}
+
+defineCommand({
+  name: "portal_quote_order", description: "Portal: freeze current prices, deposits, addresses, and optional QuickBooks tax for review",
+  roles: "customer", input: quoteInput,
+  handler: (ctx, i, execution) => quotePortalOrder(ctx, i, execution.requestId),
+});
+
+defineCommand({
+  name: "portal_submit_quote", description: "Portal: atomically submit an unchanged reviewed quote as a new or existing draft order",
+  roles: "customer",
+  input: z.object({ quoteId: z.string().uuid(), orderId: z.string().uuid().optional(), expectedIdentity }),
+  handler: (ctx, i, execution) => {
+    assertExpectedIdentity(ctx, i.expectedIdentity);
+    return unwrap(ctx.db.rpc("portal_submit_quote", {
+      p_brewery: ctx.breweryId, p_customer: requireCustomer(ctx), p_quote: i.quoteId,
+      p_order: i.orderId ?? null, p_request_id: execution.requestId,
+    }));
+  },
+});
 
 defineCommand({
   name: "portal_create_order", description: "Portal: create a draft order for the caller's account",
