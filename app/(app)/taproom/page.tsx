@@ -37,6 +37,7 @@ export default async function TaproomPage({ searchParams }: { searchParams: Prom
 
   return <>
     {E.back("Beer", "Weekly count", undefined, "/beer")}
+    <div className="flex flex-wrap gap-3 text-sm"><Link className="underline" href={`/taproom/board?location=${location.id}`}>Tap board</Link><Link className="underline" href={`/taproom/variance?location=${location.id}`}>Variance by brand</Link></div>
     <LinkTabs items={locations.map((item) => [item.name, `/taproom?location=${item.id}`])} current={location.name} className="w-full md:w-fit" />
     <TaproomCountForm key={`${location.id}:${snapshot.revision}`} breweryId={brewery.id} snapshot={snapshot} projection={projection} lotLabels={lotLabels} role={brewery.role as "admin" | "warehouse" | "taproom"} />
     {shownReceipt && <section aria-labelledby="receipt-heading" className="rounded-xl border p-4">

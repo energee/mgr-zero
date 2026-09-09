@@ -70,6 +70,23 @@ defineCommand({
 const bySku = z.object({ skuId: z.string().uuid().optional() });
 const readRoles = ["admin", "sales", "warehouse"] as const;
 
+async function completeRows<T>(name: string, page: (start: number) => PromiseLike<{
+  data: T[] | null; error: { message: string; code?: string } | null; count: number | null;
+}>): Promise<T[]> {
+  const rows: T[] = [];
+  let total: number | undefined;
+  do {
+    const result = await page(rows.length);
+    const next = await unwrap(Promise.resolve(result));
+    if (result.count === null || (total !== undefined && result.count !== total) || !next || (!next.length && rows.length < result.count)) {
+      throw new CommandError(`${name} changed while loading. Reload and try again.`, 409, "conflict");
+    }
+    total = result.count;
+    rows.push(...next);
+  } while (rows.length < total);
+  return rows;
+}
+
 defineQuery({
   name: "get_on_hand", description: "On-hand quantity per SKU/location",
   input: bySku, roles: [...readRoles],
@@ -153,14 +170,17 @@ defineQuery({
   // Brewers read SKUs too: the packaging pages pick the SKU a run fills.
   name: "list_skus", description: "SKUs with their brand and format, alphabetical",
   input: z.object({}), roles: STAFF_ROLES,
-  handler: (ctx) => unwrap(ctx.db.from("skus").select("id, name, active, brand_id, format_id, brands(name), formats(name, bbl_per_unit, package_type), format_volume:format_volumes(bbl_per_unit)").eq("brewery_id", ctx.breweryId).order("name")),
+  handler: (ctx) => completeRows("SKU list", (start) => ctx.db.from("skus")
+    .select("id, name, active, brand_id, format_id, brands(name), formats(name, bbl_per_unit, package_type), format_volume:format_volumes(bbl_per_unit)", { count: "exact" })
+    .eq("brewery_id", ctx.breweryId).order("name").order("id").range(start, start + 499)),
 });
 
 defineQuery({
   // Brewers read locations too: a packaging run puts its output somewhere.
   name: "list_locations", description: "Warehouses and taprooms, alphabetical",
   input: z.object({}), roles: STAFF_ROLES,
-  handler: (ctx) => unwrap(ctx.db.from("locations").select("id, name, kind").eq("brewery_id", ctx.breweryId).order("name")),
+  handler: (ctx) => completeRows("Location list", (start) => ctx.db.from("locations").select("id, name, kind", { count: "exact" })
+    .eq("brewery_id", ctx.breweryId).order("name").order("id").range(start, start + 499)),
 });
 
 defineQuery({

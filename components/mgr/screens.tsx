@@ -131,7 +131,7 @@ import { MgrIcon } from "@/components/mgr-icon";
 import { formatVolume } from "@/lib/volume";
 import { saccharificationRest, type Step, totalDuration } from "@/lib/mgr/recipe-schedule";
 import {
-  BeerIcon, DeliveryTruck01Icon, Package01Icon, Route01Icon, Tag01Icon, TaskDone01Icon, ThermometerIcon, WifiDisconnected01Icon,
+  BeerIcon, DeliveryTruck01Icon, Package01Icon, Route01Icon, TaskDone01Icon, ThermometerIcon, WifiDisconnected01Icon,
 } from "@hugeicons/core-free-icons";
 
 /** The drawn mash schedule. Rows and footer both read it, so the total and the
@@ -336,17 +336,16 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 1, slice: "all", tab: "Today", name: "Taproom",
-    to: { Review: "Variance by brand", "Variance \u00b7 last week": "Variance by brand" },
-    job: "Bartender landing: what needs swapping, counting or mapping",
-    reads: "get_today [taproom role filter]", writes: "none",
-    states: [["empty", "one button: the role's first verb"], ["role hidden", "no picks, no orders, no invoices", 1], ["narrow surface", "tap board and POS reconcile, nothing else"]],
-    spec: "The taproom role maps to a shift rather than a function: a bartender needs the tap board and POS reconciliation and nothing else. The unmapped-item row is here because it silently blocks reconcile. The row verb is the action.",
+    to: { Open: "Tap board", Count: "Weekly count", Review: "Variance by brand", "Variance \u00b7 4 weeks": "Variance by brand" },
+    job: "Bartender landing: open the board, count, or review completed variance",
+    reads: "list_locations · list_open_taps · list_taproom_counts · get_taproom_variance", writes: "none",
+    states: [["no location", "no observed taproom facts; Taproom stock remains available"], ["role hidden", "no Work, Search, orders, invoices, or brewery quiet settings", 1], ["narrow surface", "three permitted exits with last observed facts"]],
+    spec: "Taproom Today uses only permitted taproom reads. It links the board, weekly count and four-week variance with last-opened, last-counted and report as-of facts. It does not invent an overdue count, shift schedule, or POS mapping action. Work, Search, business records and brewery quiet settings stay hidden.",
     body: today(<>
-      {E.row("Tap 5 · Pils", "nearly out · ~9% left", E.act("Swap", "info"), "w", BeerIcon)}
-      {E.gated("Weekly count")}
-      {E.row("Guest cider", "rung in Square · not mapped, blocks reconcile", "unmapped", "w", Tag01Icon)}
-      {E.row("Variance · last week", "−½ bbl Hazy unaccounted", E.act("Review"), "", TaskDone01Icon)}
-      {E.note("No picks, orders or invoices: the taproom role sees the taproom.")}
+      {E.row("Tap board", "11 open · last opened Thu 11:20am", E.act("Open", "info"), "", BeerIcon)}
+      {E.row("Weekly count", "last saved Sep 7 at 9:14pm", E.act("Count", "info"), "", TaskDone01Icon)}
+      {E.row("Variance · 4 weeks", "+0.6 bbl expected minus actual · as of now", E.act("Review", "info"), "", TaskDone01Icon)}
+      {E.note("Observed facts only. No fabricated overdue or shift policy; no Work, Search, orders or invoices.")}
     </>),
   },
   {
@@ -358,7 +357,7 @@ export const SCREENS: Screen[] = [
       {E.hd("Beer")}
       {E.nav("Finished goods", "2 shortages · ATP by SKU")}
       {E.nav("Taproom", "2 below par · weekly count due")}
-      {E.nav("Taps", "11 pouring · Tap board")}
+      {E.nav("Taps", "11 open · Tap board")}
       {E.nav("Cellar", "6 vessels · 1 reading overdue")}
       {E.nav("Materials", "3 shortages")}
       {E.nav("Kegs", "142 out · 9 overdue")}
@@ -1265,18 +1264,18 @@ export const SCREENS: Screen[] = [
     step: 5,
     slice: 1,
     tab: "Beer",
-    name: "Variance by brand", gatedBy: "Program 12",
+    name: "Variance by brand",
     to: { "Hazy IPA": "SKU detail" },
     job: "Where the gap between poured and counted keeps showing up",
     reads: "get_taproom_variance",
     writes: "none",
-    states: [["permission", "warehouse or admin required", 1], ["no POS", "no expected number · the report is empty, counts still post", 1], ["one bad week", "noise · a single week is not a pattern"], ["persistent", "same brand every week · the thing worth acting on", 1], ["not in inventory", "tapped outside stock · excluded from every column"]],
-    spec: "Variance is drawn twice on purpose. Inline on the count it catches a miscount while someone can still walk back to the shelf; here it answers a different question, whether the gap is noise or a pattern, which a single week can never show. Expected comes from POS sales, actual from the physical count, and the difference is reported and never posted: it is not a movement, it is the explanation for one. The named causes are what a taproom manager actually does something about (bad pours, comps, staff drinks, line cleaning, theft), so the report groups by brand first, because a brand that leaks every week points at one line or one shift. Kegs flagged as not in inventory are excluded from both columns rather than shown as loss.",
+    states: permitted("taproom, warehouse or admin required").concat([["no POS", "expected stays blank; actual count depletion remains visible", 1], ["first count", "actual is shown without a comparison"], ["incomplete coverage", "expected and variance stay blank"], ["unmapped", "mapped facts remain visible with the gap named"], ["not in inventory", "expected shares are explicitly excluded"]]),
+    spec: "Variance is drawn twice on purpose. Inline on the draft count it can catch a miscount; this completed-period page shows whether a difference repeats. Expected comes from frozen POS serving facts, actual from frozen count depletion, and variance is expected minus actual. The comparison is reported and never posted. Whole periods use exact (prior count, current count] timestamps and are selected by their ending brewery-local date. First-count, absent or incomplete coverage, unmapped facts, excluded expected shares, unattributed volume and report as-of remain visible. Null stays unknown; zero is read alongside coverage and excluded consumption. Kegs outside inventory exclude only their expected share; count-derived actual remains intact.",
     body: (<>
       {E.back("Beer", "Variance")}
       {E.ttl("Variance by brand")}
       {E.tabs(["4 weeks", "12 weeks"])}
-      {E.tbl(["Brand", "Expected", "Counted", "Variance"], [["Hazy IPA", "11.5 bbl", "11.0 bbl", "−0.5"], ["Pils", "8.0 bbl", "7.9 bbl", "−0.1"], ["Stout", "3.0 bbl", "3.0 bbl", "0.0"]])}
+      {E.tbl(["Brand", "Expected", "Actual", "Variance"], [["Hazy IPA", "11.5 bbl", "11.0 bbl", "+0.5"], ["Pils", "8.0 bbl", "7.9 bbl", "+0.1"], ["Stout", "3.0 bbl", "3.0 bbl", "0.0"]])}
       {E.nav("Hazy IPA", "short 4 weeks running · 1.8 bbl total · −4%")}
       {E.info("A brand short every week points at one line or one shift. A single short week is noise.")}
       {E.note("Reported, never posted. The count already wrote the depletion; this is the explanation for it.")}
@@ -2783,29 +2782,24 @@ export const SCREENS: Screen[] = [
     step: 7,
     slice: 7,
     tab: "Beer",
-    name: "Tap board", gatedBy: "Program 12",
+    name: "Tap board",
     to: { "Stout · ⅙ bbl": "Swap keg", Taproom: "Tap board", "7 \u00b7 Guest cider \u00b7 keg": "Kick keg", "Amber \u00b7 \u00bd bbl": "Swap keg" },
     job: "What is on, since when, and roughly how much is left",
-    reads: "list_open_taps [design; Realtime on this page only, 30s poll is an adequate fallback]",
-    writes: "tap_keg · swap_keg [design; closes A and opens B in one RPC] · kick_keg [design; compare-and-swap on the open interval id; Kick keg sheet]",
-    states: [["swap", "one act, one record · never kick-then-tap"], ["already swapped", "second attempt fails · Helles was already swapped out at 7:42pm", 1], ["not in taproom stock", "put on by a person · never discovered from Square", 1], ["guest or event keg", "yield from nominal size · excluded from variance", 1], ["two kegs, one brand", "taps 2 and 9 · sales split proportionally, yield labelled split", 1], ["no number", "sorts last · a number is never required"], ["duplicate number", "shown as entered · nothing downstream reads it"], ["kicked", "interval closed with a reason · the tap goes empty"], ["packaged short", "enters stock open · filled volume is measured, not guessed", 1], ["open, off tap", "still open stock · counted by volume, not as a whole keg", 1], ["no POS", "no sales to estimate against · no bar, see the note", 1]],
+    reads: "list_open_taps · list_tap_history · list_skus · list_locations",
+    writes: "tap_keg · swap_keg · kick_keg",
+    states: [["swap", "one act, one record · never kick-then-tap"], ["already swapped", "second attempt fails · safe closer and time shown", 1], ["not in taproom stock", "server-derived flag · expected shares excluded", 1], ["guest or event keg", "explicit label and nominal size · no numeric yield", 1], ["no number", "sorts last · a number is never required"], ["duplicate number", "shown as entered · nothing downstream reads it"], ["kicked", "interval closed with a reason · the tap goes empty"], ["no POS", "no usable numerator · no bar", 1]],
     redrawn: true,
-    spec: <>A tile opens Swap keg for that tap; Kick on a row opens Kick keg. No second filled button on this board. The decided schema (16.13) chose differently from the first drawing: the primitive is the <b>swap</b>, not tap-then-blow. A bartender changing a keg performs one act, and a kick-then-tap model asks for two records; the gap between them is where data goes missing, worst exactly when it matters, on a follow keg of the same beer where nothing looks wrong afterwards. The swap command closes A and opens B in one RPC, the same discipline as the keg-return RPC, so an interval can never be left open by a half-finished swap. That is also why lines were the wrong model: the ambiguity was never about where a keg is plugged in. Numbers here are the brewery’s own, optional and sparse (1, 3, 5 with nothing at 2 or 4). They sort this board and nothing else reads them, so MGR neither generates nor enforces them and two kegs numbered alike is a thing to look at, not a save error. Unnumbered kegs sort last. A keg that is not ours reaches this board one way only: somebody tapped it here. Nothing arrives from Square: an item the taproom created there is <i>ignored</i> under 16.14, never queued and never mapped, so the guest cider in the register and the guest cider on this line are two unrelated facts that happen to share a name. It is recorded because the board is what the website reads, and a board that silently omits a pouring tap lies to customers, and because the keg still earns a yield from its nominal size. Nothing here touches the ledger: the count posts depletion (16.15), which is what makes two writers safe and why a keg tapped outside taproom stock needs no special rule: it is flagged as not in inventory, still earns a yield from its nominal size, and is excluded from variance. A keg packaged short enters stock <b>open</b> rather than as sealed inventory, which is the decision that makes it obvious it should be used next and, more quietly, keeps a weekly count honest: counted as one keg it would overstate the shelf, counted by its volume it does not. That also means the opening fill for such a keg is <i>known</i>, measured at the packaging run and already in the ledger as that run’s output, rather than the eyeball the spec assumes; a yield derived from it is measured, not estimated. Remaining percent is estimated from POS sales against nominal volume, and it is the reason this screen is worth opening: a board that only takes data from people gets ignored. Two kegs of one brand open at once splits sales proportionally and any per-keg yield is labelled <i>split</i>, never presented as measured. The duplicate-swap risk is uncertainty, not simultaneity: the command carries the open interval id and requires that the interval is still open, so the second attempt fails with copy a human can act on rather than opening a phantom interval; the recent list below is the correction path, not a guard.</>,
+    spec: <>A row offers Swap and Kick. Swap closes one interval and opens the replacement atomically; an own replacement defaults to the outgoing SKU, while a guest replacement requires its own label and positive nominal BBL. Tap numbers are optional and may repeat, and unnumbered rows sort last. Opening and closing fill chips are coarse observations and never inventory quantities. A 30-second poll updates only the board and recent history, preserving dirty and uncertain sheets. Exact retries keep the original request. Own package size and inventory exclusion come from the server. Guest labels never match POS facts, so guest rows show no numeric yield. No usable numerator means no bar. Every action here writes zero finished-goods movements; weekly count owns depletion.</>,
     body: (<>
       {E.back("Beer", "Tap board")}
       {E.ttl("On tap")}
       {E.tabs(["Taproom", "Warehouse"])}
-      {E.tiles([["1", "Pils · ½ bbl", "on Mon", 0, 71], ["2", "Hazy IPA · ½ bbl", "on Mon", 0, 62], ["3", "Stout · ⅙ bbl", "on Tue · filled 60%", 0, 34], ["4", "Amber · ½ bbl", "on Sat", 0, 88], ["5", "Helles · ½ bbl", "on Wed · nearly out", 1, 9], ["6", "Saison · ½ bbl", "on Thu", 0, 54], ["8", "Porter · ⅙ bbl", "on Fri", 0, 46], ["9", "Hazy IPA · ½ bbl", "on Thu · second keg", 1, 93], ["10", "Kolsch · ½ bbl", "on Tue", 0, 27], ["11", "Barrel Dark · ⅙ bbl", "on Sun", 0, 80], ["unnumbered", "Wild Ale · ⅙ bbl", "on Thu · sorts last", 0, 66]])}
-      {E.row("7 · Guest cider · keg", "tapped here by Dana · not our stock, no depletion", E.act("Kick", "destructive"), "w")}
-      {E.note("Putting a new guest keg on isn’t available yet: the swap can’t save its name and size. This one is read and can still be kicked.")}
-      {E.ttl("Open, not on a tap")}
-      {E.row("Amber · ½ bbl", "packaged short · filled 60% · 0.30 bbl", E.act("Tap", "info"), "w")}
-      {E.row("Stout · ⅙ bbl", "pulled off tap 9 Sun · ~40% left", E.act("Tap", "info"), "w")}
-      {E.info("A keg that was never filled to nominal enters stock open, not sealed. It counts as beer, not as a keg, and it is meant to be used next.")}
+      {E.tiles([["1", "Pils · ½ bbl", "on Mon", 0], ["2", "Hazy IPA · ½ bbl", "on Mon", 0], ["3", "Stout · ⅙ bbl", "on Tue · opened 60%", 0], ["4", "Amber · ½ bbl", "on Sat", 0], ["5", "Helles · ½ bbl", "on Wed", 1], ["6", "Saison · ½ bbl", "on Thu", 0], ["8", "Porter · ⅙ bbl", "on Fri", 0], ["9", "Hazy IPA · ½ bbl", "on Thu · second keg", 1], ["10", "Kolsch · ½ bbl", "on Tue", 0], ["11", "Barrel Dark · ⅙ bbl", "on Sun", 0], ["unnumbered", "Wild Ale · ⅙ bbl", "on Thu · sorts last", 0]])}
+      {E.row("7 · Guest cider · keg", "nominal ½ bbl · tapped here by @dana · not our stock · no guest yield", E.act("Kick", "destructive"), "w")}
       {E.info("Tap 7 is empty. Unnumbered kegs sort last.")}
       {E.row("Recent · Kolsch tapped", "Dana · Tue 4:10pm")}
       {E.row("Recent · Saison swapped in", "Ali · Thu 11:20am")}
-      {E.note("Remaining is estimated from POS sales against nominal volume. With no POS connected a tile shows what is on and since when, and no bar: a guessed number is worse than none. Nothing on this board posts to the ledger; the weekly count does that.")}
+      {E.note("With no usable POS numerator, a row shows what is on and since when, with no bar. Guest labels are never matched to POS. Nothing on this board posts to the ledger; the weekly count does that.")}
     </>),
   },
   {
@@ -2813,12 +2807,12 @@ export const SCREENS: Screen[] = [
     slice: 7,
     tab: "Beer",
     surface: "sheet",
-    name: "Kick keg", gatedBy: "Program 12",
+    name: "Kick keg",
     to: { "Kick keg": "Tap board" },
     job: "Close one tap without opening a replacement keg",
-    reads: "list_open_taps [design]",
-    writes: "kick_keg [design; compare-and-swap on open interval id]",
-    states: [["permission", "warehouse or admin required", 1], ["empty", "tap becomes empty"], ["beer remaining", "open keg stays in taproom stock"], ["already closed", "reload before acting", 1]],
+    reads: "list_open_taps · list_tap_history",
+    writes: "kick_keg",
+    states: permitted("taproom, warehouse or admin required").concat([["empty", "tap becomes empty"], ["beer remaining", "closing fill is a coarse observation only"], ["already closed", "safe closer and time shown; reload before acting", 1], ["unknown response", "retry the frozen request unchanged", 1]]),
     spec: "Kick is separate from Swap because it leaves the tap empty and needs a closing reason.",
     body: (<>
       {E.ttl("Kick tap 5")}
@@ -2835,21 +2829,23 @@ export const SCREENS: Screen[] = [
     slice: 7,
     tab: "Beer",
     surface: "sheet",
-    name: "Swap keg", gatedBy: "Program 12",
-    to: { "Helles · ½ bbl": "Entity picker", "Swap · one record": "Tap board", Reload: "Tap board", "Not our stock": "Swap keg" },
+    name: "Swap keg",
+    to: { "Swap · one record": "Tap board", Reload: "Tap board" },
     job: "Close one keg and open the next in a single record",
-    reads: "list_open_taps · get_taproom_sellable [view]",
-    writes: "swap_keg [design; closes A and opens B in one RPC, carries the open interval id and requires closed_at null]",
-    states: [["permission", "warehouse or admin required", 1], ["same brand", "the follow keg is the default · one tap, not two records"], ["guest keg", "gated · name and nominal size would be typed, and have nowhere to persist", 1], ["already swapped", "Helles was swapped out at 7:42pm by Ali · nothing opens", 1], ["no number", "left blank · the keg sorts last on the board"], ["close fill", "three chips · never a typed number", 1], ["kicked instead", "closes with a reason · the tap goes empty"]],
-    spec: <>The surface every other tap decision assumed and none of them showed. One sheet, because the swap is one act: what comes off and what goes on are decided together and written by one RPC, so an interval can never be left open by a half-finished swap. Going on defaults to the same brand, which is the common case (a follow keg of the flagship) and is exactly the case a kick-then-tap model loses, because afterwards nothing looks wrong. Coming off asks for a rough remaining, never a number: yield is poured ÷ (nominal × (opening fill − closing fill)), and the honest input is three chips rather than a text field implying precision nobody has. Empty is the default because it is nearly always true. <b>Not our stock</b> is the toggle that answers where a guest keg comes from: nothing is discovered from Square, where such an item is <i>ignored</i> under 16.14 and never maps. A person puts it on and types it, which is why name and nominal size would be inputs here: there is no brand to read them from, and yield needs the size. They are not drawn, because the toggle is gated until the interval can hold them; a guest keg already on the tap board predates the gate and is read, never created. Gating the whole verb would take the ordinary same-brand swap down with it. SCHEMA-GATE: 16.13 says an interval flagged as not in inventory earns a yield from its nominal size but never says what identifies the beer when no brand exists behind it; the interval needs its own label and size columns. The tap number is typed and optional, here as everywhere: MGR has no concept of a physical line, so this field is the only place a number can enter the system. The conflict row is the compare-and-swap guard made visible: the command carries the open interval id and requires that the interval is still open, so the realistic failure (the website posted a swap, the bartender did not see it land and swaps again a minute later) fails with copy naming the beer, who and when instead of opening a phantom interval.</>,
+    reads: "list_open_taps · list_tap_history · list_skus",
+    writes: "swap_keg",
+    states: permitted("taproom, warehouse or admin required").concat([["same own SKU", "the follow keg is the default · one atomic record"], ["guest keg", "explicit label and positive nominal BBL"], ["already swapped", "safe closer and time shown · nothing opens", 1], ["no number", "left blank · the keg sorts last on the board"], ["close fill", "three chips · never a typed number", 1], ["unknown response", "retry the frozen request unchanged", 1]]),
+    spec: <>Swap is one atomic act: it closes the selected interval and opens the replacement, so a half-finished swap is not a state. The default reuses only an outgoing own SKU; a guest replacement always needs an explicit label and positive nominal BBL. The server freezes own nominal volume and decides inventory exclusion. Tap number stays optional and nonunique. Opening and closing chips are coarse observations and never ledger quantities. An already-closed conflict names the safe closer and time from recent history. An uncertain response freezes the payload and request ID for exact retry.</>,
     body: (<>
       {E.row("Already swapped", "Helles was swapped out at 7:42pm by Ali", E.act("Reload"), "w")}
       {E.ttl("Coming off")}
       {E.fld("Tap 5", "Helles · ½ bbl · on since Wed")}
       {E.chips(FILL_CHIPS, 0)}
       {E.ttl("Going on")}
-      {E.nav("Helles · ½ bbl", "taproom stock · 4 available · same brand")}
-      {E.gated("Not our stock", "guest and event kegs aren’t available yet: the interval has nowhere to keep a name and a size")}
+      {E.pick("Packaged keg SKU", "Helles · ½ bbl", ["Helles · ½ bbl", "Pils · ½ bbl"])}
+      {E.pick("Identity", "Same own SKU", ["Same own SKU", "Own keg", "Guest keg"])}
+      {E.fld("Guest keg label", "required for a guest")}
+      {E.fld("Guest nominal BBL", "positive number")}
       {E.fld("Tap number", "5 · optional")}
       {E.info("Remaining is a rough call, not a measurement; it only feeds the yield report and never the ledger.")}
       {E.btn("Swap · one record", "irr")}

@@ -119,6 +119,10 @@ it("returns every open interval beyond 1000 and bounded closed history without p
   sql(`insert into public.tap_intervals(brewery_id,location_id,label,nominal_bbl,opening_fill,not_in_inventory,opened_by,closed_at,closed_by,closing_fill,close_reason)
     select '${f.brewery.id}','${f.location.id}','Closed '||i,.5,1,true,'${f.ctx.userId}',now(),'${f.ctx.userId}',0,'Empty' from generate_series(1,55) i`);
   expect(await runCommand("list_tap_history", { locationId:f.location.id }, f.ctx)).toHaveLength(50);
+  const stale = await f.ctx.db.rpc("kick_keg", close(f, rows[0].id));
+  expect(stale.error).toMatchObject({ code: "MG409" });
+  expect(stale.error?.message).toMatch(/already closed.*@.* at /i);
+  expect(stale.error?.message).not.toContain(f.ctx.userId);
   expect((await runCommand("list_open_taps", { locationId: f.location.id }, f.ctx) as unknown[])).toHaveLength(1002);
 });
 

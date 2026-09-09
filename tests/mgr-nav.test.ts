@@ -68,5 +68,9 @@ it("taproom has Beer and own settings without forbidden Work", () => {
   const nav = navFor(shippedNav(STAFF_NAV), "taproom");
   expect(nav.map(t => t.label)).toEqual(["Today", "Beer", "More"]);
   expect(nav.find(t => t.label === "More")!.children!.map(t => t.label)).toEqual(["Chat", "Units"]);
-  expect(nav.find(t => t.label === "Beer")!.children).toEqual([{ label: "Taproom", href: "/taproom", roles: ["warehouse", "taproom"] }]);
+  expect(nav.find(t => t.label === "Beer")!.children).toEqual([
+    { label: "Taproom", href: "/taproom", roles: ["warehouse", "taproom"] },
+    { label: "Taps", href: "/taproom/board", roles: ["warehouse", "taproom"] },
+    { label: "Variance by brand", href: "/taproom/variance", roles: ["warehouse", "taproom"] },
+  ]);
 });

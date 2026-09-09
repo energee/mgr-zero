@@ -195,12 +195,12 @@ defineCommand({
     p_label: i.keg.label ?? null, p_nominal_bbl: i.keg.nominalBbl ?? null, p_tap_number: i.tapNumber ?? null, p_opening_fill: i.openingFill, p_request_id: e.requestId })),
 });
 defineCommand({
-  name: "kick_keg", description: "Close an open keg interval with estimated remaining fill (empty, quarter or half) and a reason. Does not change inventory",
+  name: "kick_keg", description: "Close an open keg interval with estimated remaining fill (empty, quarter or half) and a reason. An already-closed conflict returns its safe closer label and timestamp. Does not change inventory",
   input: z.object({ openIntervalId: z.string().uuid(), closeFill: closingFill, reason: z.string().trim().min(1).max(200) }), roles: [...COUNT_ROLES],
   handler: (ctx,i,e) => unwrap(ctx.db.rpc("kick_keg", { p_brewery: ctx.breweryId, p_interval: i.openIntervalId, p_closing_fill: i.closeFill, p_reason: i.reason, p_request_id: e.requestId })),
 });
 defineCommand({
-  name: "swap_keg", description: "Atomically close the outgoing interval and open its replacement at the same location. incomingKeg is {skuId} or {label, nominalBbl}; omission defaults to the outgoing own SKU, while guests require explicit identity. Exact retries return the original pair. Does not change inventory",
+  name: "swap_keg", description: "Atomically close the outgoing interval and open its replacement at the same location. incomingKeg is {skuId} or {label, nominalBbl}; omission defaults to the outgoing own SKU, while guests require explicit identity. Exact retries return the original pair; an already-closed conflict returns its safe closer label and timestamp. Does not change inventory",
   input: z.object({ openIntervalId: z.string().uuid(), incomingKeg: kegIdentity.optional(), tapNumber, incomingOpeningFill: openingFill,
     closeFill: closingFill, reason: z.string().trim().min(1).max(200) }), roles: [...COUNT_ROLES],
   handler: (ctx,i,e) => unwrap(ctx.db.rpc("swap_keg", { p_brewery: ctx.breweryId, p_interval: i.openIntervalId, p_closing_fill: i.closeFill, p_reason: i.reason,

@@ -33,14 +33,14 @@ describe("ungated screen writes", () => {
 });
 
 
-it("keeps interval pages gated while their command API is available", () => {
+it("ships interval pages with their command API", () => {
   for (const name of ["tap_keg", "kick_keg", "swap_keg", "list_open_taps"]) expect(getCommandDefinition(name)).toBeDefined();
-  for (const name of ["Tap board", "Kick keg", "Swap keg"]) expect(isUngated(SCREENS.find(s => s.name === name)!)).toBe(false);
+  for (const name of ["Tap board", "Kick keg", "Swap keg"]) expect(isUngated(SCREENS.find(s => s.name === name)!)).toBe(true);
 });
 
-it("keeps variance page gated while the read API is available", () => {
+it("ships the variance page with its read API", () => {
   expect(getCommandDefinition("get_taproom_variance")).toBeDefined();
-  expect(isUngated(SCREENS.find(s => s.name === "Variance by brand")!)).toBe(false);
+  expect(isUngated(SCREENS.find(s => s.name === "Variance by brand")!)).toBe(true);
 });
 
 it("ships the weekly count screen with its durable reads and write", () => {

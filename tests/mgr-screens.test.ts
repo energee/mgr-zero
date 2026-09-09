@@ -596,7 +596,7 @@ describe("SCREENS", () => {
     expect(html("Sales")).toMatch(/New order/);
     expect(html("Brewer")).not.toMatch(/grid-cols-2/);
     expect(html("Taproom")).not.toMatch(/<button[^>]*>Swap keg</);
-    expect(html("Taproom")).toMatch(/data-row-action[^>]*>Swap</);
+    expect(html("Taproom")).toMatch(/data-row-action[^>]*>Open</);
     expect(html("Driver")).toMatch(/Resume/);
     expect(html("Order")).not.toMatch(/Adjust line/);
     expect(html("Order")).toMatch(/>Add line</);

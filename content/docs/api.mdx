@@ -2401,7 +2401,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse, taproom
 
-Close an open keg interval with estimated remaining fill (empty, quarter or half) and a reason. Does not change inventory
+Close an open keg interval with estimated remaining fill (empty, quarter or half) and a reason. An already-closed conflict returns its safe closer label and timestamp. Does not change inventory
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -2584,7 +2584,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse, taproom
 
-Atomically close the outgoing interval and open its replacement at the same location. incomingKeg is &#123;skuId&#125; or &#123;label, nominalBbl&#125;; omission defaults to the outgoing own SKU, while guests require explicit identity. Exact retries return the original pair. Does not change inventory
+Atomically close the outgoing interval and open its replacement at the same location. incomingKeg is &#123;skuId&#125; or &#123;label, nominalBbl&#125;; omission defaults to the outgoing own SKU, while guests require explicit identity. Exact retries return the original pair; an already-closed conflict returns its safe closer label and timestamp. Does not change inventory
 
 | Field | Type | Required |
 | --- | --- | --- |

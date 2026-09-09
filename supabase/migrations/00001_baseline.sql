@@ -7722,11 +7722,14 @@ end $$;
 
 create function private.close_tap(p_brewery uuid,p_interval uuid,p_closing_fill numeric,p_reason text,p_actor uuid)
 returns jsonb language plpgsql set search_path = '' as $$
-declare v_row public.tap_intervals;
+declare v_row public.tap_intervals; v_closed_by_label text;
 begin
   select * into v_row from public.tap_intervals where id=p_interval and brewery_id=p_brewery for update;
   if not found then raise exception 'tap interval not found'; end if;
-  if v_row.closed_at is not null then raise exception 'Keg already closed by % at %; refresh the tap board',v_row.closed_by,v_row.closed_at using errcode='MG409'; end if;
+  if v_row.closed_at is not null then
+    select case when email is null then 'staff' else '@'||split_part(email,'@',1) end into v_closed_by_label from auth.users where id=v_row.closed_by;
+    raise exception 'Keg already closed by % at %; refresh the tap board',coalesce(v_closed_by_label,'staff'),v_row.closed_at using errcode='MG409';
+  end if;
   update public.tap_intervals set closed_at=now(),closed_by=p_actor,closing_fill=p_closing_fill,close_reason=btrim(p_reason)
     where id=p_interval and brewery_id=p_brewery returning * into v_row;
   return to_jsonb(v_row);

@@ -1,7 +1,7 @@
 // app/(app)/beer/page.tsx — the Beer landing: one row per area with the count
 // that area has to say for itself (get_beer_overview), each opening its
 // dedicated page. Taproom and Taps stay gated until Program 12 ships the
-// weekly count and the tap board.
+// weekly count and tap board.
 import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -17,6 +17,8 @@ export default async function BeerPage() {
   if ("taproomStock" in o) return <>
     {E.hd("Beer")}
     {E.nav("Weekly count", "record physical stock and review expected consumption", "", undefined, "/taproom")}
+    {E.nav("Tap board", "open, swap, and kick kegs", "", undefined, "/taproom/board")}
+    {E.nav("Variance by brand", "compare completed count periods", "", undefined, "/taproom/variance")}
     <section id="taproom">
       <h2 className="text-lg font-semibold">Taproom stock</h2>
       {o.taproomStock.length ? o.taproomStock.map(s => (
@@ -29,7 +31,7 @@ export default async function BeerPage() {
       {E.hd("Beer")}
       {E.nav("Finished goods", `${plural(o.fgShortages, "shortage")} · ATP by SKU`, "", undefined, "/inventory")}
       {(brewery.role === "admin" || brewery.role === "warehouse") && E.nav("Taproom", `${plural(o.taproomBelowPar, "SKU")} below par · weekly count`, "", undefined, "/taproom")}
-      {E.gated("Taps", "Tap board isn’t available yet")}
+      {(brewery.role === "admin" || brewery.role === "warehouse") && E.nav("Taps", `${plural(o.openTaps, "keg")} open · Tap board`, "", undefined, "/taproom/board")}
       {E.nav("Cellar", `${plural(o.openOccupancies, "tank")} with beer`, "", undefined, "/cellar")}
       {E.nav("Materials", plural(o.materialShortages, "shortage"), "", undefined, "/materials")}
       {E.nav("Kegs", `${o.kegsOut} out at customers`, "", undefined, "/kegs")}
