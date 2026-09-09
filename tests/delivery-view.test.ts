@@ -109,6 +109,13 @@ describe("Confirm delivery", () => {
     expect(html).toMatch(/On delivery · saved/);
   });
 
+  it("shows the shipment destination before delivery is confirmed", () => {
+    const model = { ...confirmDeliveryStop1, shipTo: "Tap Room · Phoenixville, PA" };
+    const html = htmlOf(createElement(ConfirmDeliveryView, { model }));
+    expect(html).toMatch(/Ship to/);
+    expect(html).toMatch(/Tap Room · Phoenixville, PA/);
+  });
+
   it("the live stop page mounts ConfirmDeliveryView and slots DeliveredForm", () => {
     const page = src("app/(app)/work/deliveries/[id]/page.tsx");
     expect(page).toMatch(/<ConfirmDeliveryView\b/);
