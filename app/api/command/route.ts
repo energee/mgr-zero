@@ -32,7 +32,7 @@ async function readJsonBody(req: Request): Promise<unknown> {
     if (done) break;
     size += value.byteLength;
     if (size > MAX_COMMAND_BODY_BYTES) {
-      await reader.cancel();
+      try { await reader.cancel(); } catch { /* The 413 remains stable after overflow is known. */ }
       throw new CommandError("request body is too large", 413, "request_too_large");
     }
     chunks.push(value);

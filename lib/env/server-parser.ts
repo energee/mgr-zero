@@ -1,7 +1,7 @@
 // lib/env/server-parser.ts — parses server configuration for server code, scripts, and tests.
 // Server-only contract: SUPABASE_SECRET_KEY plus the public values, and an
-// optional VERCEL_ENV. Rate limiting on /api/command is not yet implemented
-// (see docs/audits/2026-09-01-authz-audit.md A1), so no HMAC secret lives here.
+// optional VERCEL_ENV. Command admission is keyed by the verified Auth user in
+// Postgres and needs no caller-address or HMAC configuration here.
 import { readPublicEnv, type PublicEnv } from "./public";
 
 export interface ServerEnv extends PublicEnv {
