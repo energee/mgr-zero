@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { command, CommandResponseError } from "@/lib/commands/client";
+import { useCommandContext } from "@/app/(app)/brewery-provider";
 import {
   beginCorrectionAttempt,
   beginCountAttempt,
@@ -171,6 +172,7 @@ export function TaproomCountForm({ breweryId, snapshot, projection, lotLabels, r
   lotLabels: Record<string, string>;
   role: "admin" | "warehouse" | "taproom";
 }) {
+  const expectedContext = useRef(useCommandContext());
   const router = useRouter();
   const [state, setState] = useState(() => countDraftFromSnapshot(snapshot, projection));
   const [projectionBusy, setProjectionBusy] = useState(false);
@@ -205,7 +207,7 @@ export function TaproomCountForm({ breweryId, snapshot, projection, lotLabels, r
     setState(started);
     if (started.attempt.kind !== "submitting") return;
     try {
-      const saved = await command(breweryId, "record_taproom_count", started.attempt.payload, started.attempt.requestId) as { id: string };
+      const saved = await command(breweryId, "record_taproom_count", started.attempt.payload, started.attempt.requestId, expectedContext.current) as { id: string };
       router.push(`/taproom?location=${state.draft.locationId}&count=${saved.id}`);
       router.refresh();
     } catch (error) {
@@ -248,6 +250,7 @@ export function TaproomCountCorrection({ breweryId, locationId, countId, lines }
   countId: string;
   lines: TaproomCorrectionLine[];
 }) {
+  const expectedContext = useRef(useCommandContext());
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [state, setState] = useState(() => correctionStateFromReceipt(countId, lines));
@@ -263,7 +266,7 @@ export function TaproomCountCorrection({ breweryId, locationId, countId, lines }
     setState(started);
     if (started.attempt.kind !== "submitting") return;
     try {
-      await command(breweryId, "correct_taproom_count", started.attempt.payload, started.attempt.requestId);
+      await command(breweryId, "correct_taproom_count", started.attempt.payload, started.attempt.requestId, expectedContext.current);
     } catch (error) {
       const message = countError(error);
       const failure = countFailureKind(error instanceof CommandResponseError ? error.status : null, message, retrying);

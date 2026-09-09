@@ -3,9 +3,10 @@ import { createServerClient as createSSR } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { publicEnv } from "@/lib/env/public";
 
-export async function createServerClient() {
+export async function createServerClient(headers?: Record<string, string>) {
   const store = await cookies();
   return createSSR(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
+    ...(headers ? { global: { headers } } : {}),
     cookies: {
       getAll: () => store.getAll(),
       setAll: (all) => all.forEach(({ name, value, options }) => store.set(name, value, options)),

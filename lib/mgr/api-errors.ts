@@ -28,6 +28,8 @@ export const API_ERRORS: ApiError[] = [
     remedy: "Confirm the id belongs to this brewery. Row-level security makes another tenant's row indistinguishable from a missing one." },
   { code: "conflict", status: 409, meaning: "A `requestId` was reused with a different payload.",
     remedy: "Reuse a requestId only to retry the identical write; generate a new one for a new write." },
+  { code: "context_changed", status: 409, meaning: "The authenticated account, brewery, or customer no longer matches the optional rendered-context expectation.",
+    remedy: "Return to the original signed-in context to retry the unchanged action; otherwise review the current state before starting a new request." },
   { code: "db_error", status: 500, meaning: "The database refused the write for a reason not mapped to a public code. Logged server-side.",
     remedy: "Retry once with the same `requestId`. If it persists, quote the `correlationId` from the response." },
   { code: "invite_failed", status: 502, meaning: "The invitation was interrupted before membership completion was confirmed.",

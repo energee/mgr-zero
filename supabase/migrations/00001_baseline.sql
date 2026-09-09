@@ -3080,10 +3080,35 @@ create table private.command_requests (
   check ((brewery_id is null) = (command_name = 'provision_brewery'))
 );
 
+-- Optional PostgREST headers narrow an already-authenticated request to the
+-- server-verified context that rendered it. They never grant membership.
+create function private.assert_request_scope(p_brewery uuid, p_customer uuid default null) returns void
+language plpgsql stable security definer set search_path = '' as $$
+declare v_headers jsonb; v_actor uuid := auth.uid();
+begin
+  begin
+    v_headers := nullif(current_setting('request.headers', true), '')::jsonb;
+    if v_headers is not null and jsonb_typeof(v_headers) <> 'object' then raise invalid_text_representation; end if;
+    if v_headers ? 'x-mgr-actor-id' and (v_headers ->> 'x-mgr-actor-id')::uuid is distinct from v_actor then
+      raise insufficient_privilege;
+    end if;
+    if v_headers ? 'x-mgr-brewery-id' and (v_headers ->> 'x-mgr-brewery-id')::uuid is distinct from p_brewery then
+      raise insufficient_privilege;
+    end if;
+    if p_customer is not null and v_headers ? 'x-mgr-customer-id'
+      and (v_headers ->> 'x-mgr-customer-id')::uuid is distinct from p_customer then
+      raise insufficient_privilege;
+    end if;
+  exception when others then
+    raise exception 'request context changed' using errcode = '42501';
+  end;
+end $$;
+
 create function private.assert_staff(p_brewery uuid, p_roles public.staff_role[]) returns uuid
 language plpgsql stable security definer set search_path = '' as $$
 declare v_actor uuid := auth.uid();
 begin
+  perform private.assert_request_scope(p_brewery);
   if v_actor is null or not exists (
     select 1 from public.brewery_users
     where brewery_id = p_brewery and user_id = v_actor and role = any(p_roles)
@@ -3095,6 +3120,7 @@ create function private.assert_customer(p_brewery uuid, p_customer uuid) returns
 language plpgsql stable security definer set search_path = '' as $$
 declare v_actor uuid := auth.uid();
 begin
+  perform private.assert_request_scope(p_brewery, p_customer);
   if v_actor is null or not exists (
     select 1 from public.customer_users cu
     join public.customers c on c.id = cu.customer_id
@@ -3109,6 +3135,7 @@ create function private.claim_command_request(
 declare v_actor uuid := auth.uid(); v_request private.command_requests;
 begin
   if v_actor is null then raise exception 'permission denied' using errcode = '42501'; end if;
+  perform private.assert_request_scope(p_brewery);
   insert into private.command_requests (actor_id, brewery_id, request_id, command_name, payload_hash)
   values (v_actor, p_brewery, p_request_id, p_command, extensions.digest(p_payload::text, 'sha256'))
   on conflict (actor_id, request_id) do nothing;
@@ -3164,7 +3191,8 @@ begin
   return p_result;
 end $$;
 revoke all on function private.claim_command_request_for(uuid, uuid, text, uuid, jsonb),
-  private.complete_command_request_for(uuid, uuid, jsonb)
+  private.complete_command_request_for(uuid, uuid, jsonb),
+  private.assert_request_scope(uuid, uuid)
   from public, anon, authenticated, service_role;
 
 -- Bootstrap is authenticated but deliberately has no tenant identity yet.

@@ -15,7 +15,7 @@ import { MeSheet } from "@/components/mgr/me-sheet";
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const [customer, sidebarOpen, identity] = await Promise.all([getActiveCustomer(), sidebarOpenFromCookie(), getRequestIdentity()]);
   return (
-    <BreweryProvider id={customer.breweryId}>
+    <BreweryProvider id={customer.breweryId} actorId={identity!.userId} customerId={customer.customerId}>
       <PortalShell
         brand={customer.customerName}
         sidebarOpen={sidebarOpen}

@@ -90,12 +90,12 @@ export function reconcilePortalOrder(saved: PortalSavedOrder, items: { skuId: st
 export async function executePortalAttempt(
   attempt: PortalAttempt,
   storage: Pick<Storage, "setItem" | "removeItem">,
-  send: (breweryId: string, name: string, input: unknown, requestId: string) => Promise<unknown>,
+  send: (breweryId: string, name: string, input: unknown, requestId: string, expectedContext?: PortalScope) => Promise<unknown>,
   onStage: (attempt: PortalAttempt) => void,
 ): Promise<string> {
   storePortalAttempt(storage, attempt);
   onStage(attempt);
-  const result = await send(attempt.scope.breweryId, attempt.command, attempt.input, attempt.requestId) as { order_id?: string };
+  const result = await send(attempt.scope.breweryId, attempt.command, attempt.input, attempt.requestId, attempt.scope) as { order_id?: string };
   const id = "orderId" in attempt.input ? attempt.input.orderId : result?.order_id;
   if (!id || !z.string().uuid().safeParse(id).success) throw new Error("Order response could not be confirmed. Retry the same request.");
   if (attempt.purpose === "submit" && attempt.command !== "portal_submit_order") {

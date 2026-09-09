@@ -4,15 +4,18 @@ import { useMemo, useState } from "react";
 import { E } from "@/components/mgr/e";
 import { Button } from "@/components/ui/button";
 import { command } from "@/lib/commands/client";
+import { useCommandContext } from "@/app/(app)/brewery-provider";
+import type { CommandContextExpectation } from "@/lib/commands/registry";
 import { IMPORT_FIELDS, IMPORT_KINDS, IMPORT_ROW_CAP, mapCsvRows, parseCsv, validateImportRow, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
 
 export function ImportWizard({ breweryId, lookups }: { breweryId: string; lookups: ImportLookups }) {
+  const renderedContext = useCommandContext();
   const [kind, setKind] = useState<ImportKind>("customers");
   const [csv, setCsv] = useState<ReturnType<typeof parseCsv> | null>(null);
   const [mapping, setMapping] = useState<Record<string, number>>({});
   const [step, setStep] = useState(0);
   // ponytail: batch state lasts while this page stays open; persist it for reload recovery.
-  const [batch, setBatch] = useState<{ requestId: string; kind: ImportKind; rows: Record<string, string>[] } | null>(null);
+  const [batch, setBatch] = useState<{ requestId: string; kind: ImportKind; rows: Record<string, string>[]; expectedContext: CommandContextExpectation } | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -26,9 +29,9 @@ export function ImportWizard({ breweryId, lookups }: { breweryId: string; lookup
     setCsv(next); setMapping(Object.fromEntries(fields.map(f => [f.name, next.headers.indexOf(f.name)]))); setError(null);
   }
   async function commit() {
-    const action = batch ?? { requestId: crypto.randomUUID(), kind, rows };
+    const action = batch ?? { requestId: crypto.randomUUID(), kind, rows, expectedContext: renderedContext };
     setBatch(action); setBusy(true); setError(null); setStep(3);
-    try { setResult(await command(breweryId, "import_csv", { kind: action.kind, rows: action.rows }, action.requestId) as ImportResult); }
+    try { setResult(await command(action.expectedContext.breweryId ?? breweryId, "import_csv", { kind: action.kind, rows: action.rows }, action.requestId, action.expectedContext) as ImportResult); }
     catch (err) { setError(`${err instanceof Error ? err.message : "Import failed"}. Some rows may have committed. Retry this same batch to recover their results.`); }
     finally { setBusy(false); }
   }

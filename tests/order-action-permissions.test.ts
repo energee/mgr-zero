@@ -2,7 +2,10 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh() {} }) }));
-vi.mock("@/app/(app)/brewery-provider", () => ({ useBrewery: () => "brewery-a" }));
+vi.mock("@/app/(app)/brewery-provider", () => ({
+  useBrewery: () => "brewery-a",
+  useCommandContext: () => ({ actorId: "actor-a", breweryId: "brewery-a" }),
+}));
 import { LifecycleButtons } from "@/app/(app)/orders/[id]/lifecycle-buttons";
 import { canRun, type Ctx } from "@/lib/commands/registry";
 import "@/lib/commands/all";

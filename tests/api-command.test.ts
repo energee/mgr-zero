@@ -6,7 +6,7 @@ import { z } from "zod";
 import { command } from "@/lib/commands/client";
 import { type CommandExecution, type Ctx, defineCommand } from "@/lib/commands/registry";
 import { POST } from "@/app/api/command/route";
-import { makeBrewery, makeStaff } from "./helpers";
+import { makeBrewery, makeStaff, sql } from "./helpers";
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54341";
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
@@ -27,14 +27,19 @@ function commandReq(body: unknown, token?: string) {
 describe("POST /api/command bearer auth", () => {
   let breweryId: string;
   let adminToken: string;
+  let adminId: string;
+  let secondAdminToken: string;
   let warehouseToken: string;
   const executionHandler = vi.fn(async (_ctx: Ctx, _input: Record<string, never>, execution: CommandExecution) => execution);
 
   beforeAll(async () => {
     breweryId = (await makeBrewery()).id;
     const admin = await makeStaff(breweryId, "admin");
+    adminId = admin.id;
+    const secondAdmin = await makeStaff(breweryId, "admin");
     const warehouse = await makeStaff(breweryId, "warehouse");
     adminToken = await signIn(admin.email);
+    secondAdminToken = await signIn(secondAdmin.email);
     warehouseToken = await signIn(warehouse.email);
     defineCommand({
       name: "execution_metadata_probe",
@@ -51,10 +56,14 @@ describe("POST /api/command bearer auth", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     try {
-      await expect(command("brewery-id", "upsert_brand", { name: "Pils" })).resolves.toEqual({ created: true });
+      await expect(command("brewery-id", "upsert_brand", { name: "Pils" }, undefined, {
+        actorId: "00000000-0000-4000-8000-000000000001",
+        breweryId: "brewery-id",
+      })).resolves.toEqual({ created: true });
       const [, options] = fetchMock.mock.calls[0] as [string, { body: string }];
-      const body = JSON.parse(options.body) as { requestId: string };
+      const body = JSON.parse(options.body) as { requestId: string; expectedContext: unknown };
       expect(body.requestId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+      expect(body.expectedContext).toEqual({ actorId: "00000000-0000-4000-8000-000000000001", breweryId: "brewery-id" });
     } finally {
       vi.unstubAllGlobals();
     }
@@ -202,5 +211,42 @@ describe("POST /api/command bearer auth", () => {
       error: { code: "permission_denied", message: expect.any(String) },
       correlationId: expect.any(String),
     });
+  });
+
+  it("rejects a rendered actor mismatch before invoking the handler", async () => {
+    executionHandler.mockClear();
+    const res = await POST(commandReq({
+      breweryId,
+      name: "execution_metadata_probe",
+      input: {},
+      requestId: randomUUID(),
+      expectedContext: { actorId: randomUUID(), breweryId },
+    }, adminToken));
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({
+      ok: false,
+      error: { code: "context_changed", message: "Signed-in account or active workspace changed. Return to the original context to retry this unchanged action." },
+    });
+    expect(executionHandler).not.toHaveBeenCalled();
+  });
+
+  it("recovers actor A's result after an authorized actor B is refused", async () => {
+    const requestId = randomUUID();
+    const body = {
+      breweryId,
+      name: "upsert_brand",
+      input: { name: `Frozen-${requestId}` },
+      requestId,
+      expectedContext: { actorId: adminId, breweryId },
+    };
+    const first = await POST(commandReq(body, adminToken));
+    expect(first.status).toBe(200);
+    const original = await first.json();
+
+    expect((await POST(commandReq(body, secondAdminToken))).status).toBe(409);
+    await expect((await POST(commandReq(body, adminToken))).json()).resolves.toMatchObject({
+      ok: true, data: original.data, requestId,
+    });
+    expect(sql(`select count(*) from private.command_requests where request_id='${requestId}'`)).toEqual(["1"]);
   });
 });

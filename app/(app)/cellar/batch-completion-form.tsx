@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useBrewery } from "@/app/(app)/brewery-provider";
+import { useBrewery, useCommandContext } from "@/app/(app)/brewery-provider";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Label } from "@/components/ui/label";
@@ -24,6 +24,7 @@ const bbl = (value: number) => `${Number(value)} bbl`;
 
 export function BatchCompletionForm({ batches }: { batches: Batch[] }) {
   const breweryId = useBrewery();
+  const expectedContext = useRef(useCommandContext());
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [batchId, setBatchId] = useState("");
@@ -62,7 +63,7 @@ export function BatchCompletionForm({ batches }: { batches: Batch[] }) {
     setError(null);
     setPhase("submitting");
     try {
-      setPreview(await command(breweryId, "complete_batch", { batchId: reviewedBatchId }, requestId.current) as Preview);
+      setPreview(await command(breweryId, "complete_batch", { batchId: reviewedBatchId }, requestId.current, expectedContext.current) as Preview);
       requestId.current = null;
       setPhase("saved");
     } catch (cause) {
