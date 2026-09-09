@@ -52,6 +52,7 @@ export type TaproomCountState = {
 
 const bucketKey = (line: Pick<TaproomCountSnapshotLine, "bin_id" | "sku_id" | "lot_id">) =>
   `${line.bin_id}:${line.sku_id}:${line.lot_id ?? "untracked"}`;
+const baselineChangedMessage = "A newer saved count changed the comparison baseline. Start a fresh recount.";
 
 export function countDraftFromSnapshot(snapshot: TaproomCountSnapshot, projection: unknown): TaproomCountState {
   const state: TaproomCountState = {
@@ -69,7 +70,7 @@ export function countDraftFromSnapshot(snapshot: TaproomCountSnapshot, projectio
     projection,
     attempt: { kind: "idle" },
   };
-  return projectionMatchesCountDraft(state) ? state : { ...state, attempt: { kind: "stale", message: "A newer saved count changed the comparison baseline. Start a fresh recount." } };
+  return projectionMatchesCountDraft(state) ? state : { ...state, attempt: { kind: "stale", message: baselineChangedMessage } };
 }
 
 export function updateCountQuantity(state: TaproomCountState, key: string, quantity: string): TaproomCountState {
@@ -95,7 +96,7 @@ export function projectionMatchesCountDraft(state: TaproomCountState): boolean {
 export function replaceCountProjection(state: TaproomCountState, projection: unknown): TaproomCountState {
   const next = { ...state, projection };
   if (state.attempt.kind === "unknown" || state.attempt.kind === "submitting" || projectionMatchesCountDraft(next)) return next;
-  return { ...next, attempt: { kind: "stale", message: "A newer saved count changed the comparison baseline. Start a fresh recount." } };
+  return { ...next, attempt: { kind: "stale", message: baselineChangedMessage } };
 }
 
 type ProjectionForComparison = {
@@ -167,6 +168,8 @@ export function beginCountAttempt(state: TaproomCountState, requestId: string): 
 
 export function failCountAttempt(state: TaproomCountState, kind: "unknown" | "stale" | "error", message: string): TaproomCountState {
   if (kind === "unknown" && state.attempt.kind === "submitting") return { ...state, attempt: { ...state.attempt, kind, message } };
+  if (state.attempt.kind === "stale") return { ...state, attempt: { kind: "stale", message } };
+  if (!projectionMatchesCountDraft(state)) return { ...state, attempt: { kind: "stale", message: baselineChangedMessage } };
   return { ...state, attempt: { kind: kind === "unknown" ? "error" : kind, message } };
 }
 

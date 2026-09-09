@@ -132,7 +132,7 @@ export function TaproomCountForm({ breweryId, snapshot, projection, lotLabels, r
       router.push(`/taproom?location=${state.draft.locationId}&count=${saved.id}`);
       router.refresh();
     } catch (error) {
-      setState(failCountAttempt(started, stale(error) ? "stale" : error instanceof CommandResponseError ? "error" : "unknown", countError(error)));
+      setState((current) => failCountAttempt(current, stale(error) ? "stale" : error instanceof CommandResponseError ? "error" : "unknown", countError(error)));
     }
   }
 

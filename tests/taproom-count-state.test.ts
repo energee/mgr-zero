@@ -68,6 +68,31 @@ describe("taproom count controlled state", () => {
     expect(state.attempt).toEqual(frozen);
   });
 
+  it("keeps a concurrent projection mismatch locked when submission ends in a definitive error", () => {
+    const aligned = { prior_count: snapshot.prior_count, expected_bbl: 1, rows: [] };
+    let state = countDraftFromSnapshot(snapshot, aligned);
+    for (const line of state.draft.lines) state = updateCountQuantity(state, line.key, String(line.qtyBefore));
+    state = beginCountAttempt(state, "00000000-0000-4000-8000-000000000006");
+    const mismatched = {
+      ...aligned,
+      prior_count: { id: "00000000-0000-4000-8000-000000000099", counted_on: "2026-09-08" },
+    };
+    state = replaceCountProjection(state, mismatched);
+
+    expect(state.attempt).toMatchObject({ kind: "submitting" });
+    expect(projectionMatchesCountDraft(state)).toBe(false);
+    const submitting = state.attempt;
+    const unknown = failCountAttempt(state, "unknown", "No response received");
+    expect(unknown.projection).toBe(mismatched);
+    expect(unknown.attempt).toMatchObject({ ...submitting, kind: "unknown" });
+
+    state = failCountAttempt(state, "error", "A count already exists for this date");
+
+    expect(state.projection).toBe(mismatched);
+    expect(state.attempt).toMatchObject({ kind: "stale" });
+    expect(updateCountQuantity(state, state.draft.lines[0].key, "0")).toBe(state);
+  });
+
   it("makes stale state explicit and starts a blank recount from a fresh revision", () => {
     let state = countDraftFromSnapshot(snapshot, null);
     for (const line of state.draft.lines) state = updateCountQuantity(state, line.key, "0");
@@ -78,6 +103,8 @@ describe("taproom count controlled state", () => {
     state = updateCountQuantity(state, state.draft.lines[0].key, "1");
     expect(state).toBe(stale);
     expect(state.attempt).toMatchObject({ kind: "stale" });
+    state = failCountAttempt(state, "error", "Could not load fresh stock");
+    expect(state.attempt).toMatchObject({ kind: "stale", message: "Could not load fresh stock" });
 
     const fresh = { ...snapshot, revision: "revision-two", lines: snapshot.lines.map((line) => ({ ...line, qty_before: 3 })) };
     state = replaceCountSnapshot(state, fresh);
