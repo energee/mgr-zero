@@ -4020,7 +4020,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin
 
-Disable QuickBooks locally, purge its credential, and attempt remote revocation
+Disable QuickBooks locally, purge its credential, and attempt remote revocation; the exact requestId replays the recorded outcome
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -4097,7 +4097,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin
 
-Get redacted QuickBooks connection health
+Get redacted QuickBooks connection health and the connectionId required to disconnect
 
 Takes no input.
 

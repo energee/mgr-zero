@@ -1873,7 +1873,7 @@ create trigger stock_transfer_lines_bins before insert or update on stock_transf
 create table qbo_connections (
   id uuid not null default gen_random_uuid(),
   brewery_id uuid primary key references breweries(id),
-  realm_id text not null,
+  realm_id text not null unique,
   realm_label text,
   state text not null default 'connected' check (state in ('connected','disconnected','recovery_required')),
   access_expires_at timestamptz, refresh_expires_at timestamptz, refresh_hard_expires_at timestamptz,
@@ -2086,35 +2086,44 @@ returns boolean language sql security definer set search_path='' as $$
 $$;
 
 create function public.begin_qbo_disconnect(p_brewery uuid,p_connection uuid,p_actor uuid,p_request_id uuid)
-returns table(refresh_token text) language plpgsql security definer set search_path='' as $$
+returns table(refresh_token text,replay_result jsonb) language plpgsql security definer set search_path='' as $$
+declare v_replay jsonb; v_token text; v_result jsonb:=jsonb_build_object('disconnected',true,'remoteRevocationState','unresolved');
 begin
  if not exists(select 1 from public.brewery_users where brewery_id=p_brewery and user_id=p_actor and role='admin') then raise exception 'permission denied'; end if;
+ v_replay:=private.claim_command_request_for(p_actor,p_brewery,'disconnect_qbo',p_request_id,jsonb_build_object('connectionId',p_connection));
+ if v_replay is not null then return query select null::text,v_replay; return; end if;
  update private.qbo_oauth_intents set consumed_at=coalesce(consumed_at,now()),exchange_state='recovery_required'
  where brewery_id=p_brewery and exchange_state in ('pending','exchanging');
  update public.qbo_connections q set state='disconnected',remote_revocation_state='unresolved',updated_at=now()
  where q.brewery_id=p_brewery and q.id=p_connection and q.state='connected';
  if not found then raise exception 'connection not available'; end if;
- return query delete from private.integration_tokens t where t.brewery_id=p_brewery and t.provider='qbo' and t.connection_id=p_connection returning t.refresh_token;
+ delete from private.integration_tokens t where t.brewery_id=p_brewery and t.provider='qbo' and t.connection_id=p_connection returning t.refresh_token into v_token;
  insert into private.qbo_connection_events(brewery_id,connection_id,kind) values(p_brewery,p_connection,'disconnected');
+ perform private.complete_command_request_for(p_actor,p_request_id,v_result);
+ return query select v_token,null::jsonb;
 end $$;
 
-create function public.finish_qbo_disconnect(p_brewery uuid,p_connection uuid,p_actor uuid,p_revoked boolean)
-returns boolean language sql security definer set search_path='' as $$
- with changed as (update public.qbo_connections q set remote_revocation_state=case when p_revoked then 'confirmed' else 'unresolved' end,last_error=case when p_revoked then null else 'Remote revocation could not be confirmed' end,updated_at=now()
- where q.brewery_id=p_brewery and q.id=p_connection and q.state='disconnected' and exists(select 1 from public.brewery_users u where u.brewery_id=p_brewery and u.user_id=p_actor and u.role='admin') returning true), event as
- (insert into private.qbo_connection_events(brewery_id,connection_id,kind,detail) select p_brewery,p_connection,'remote_revocation_unresolved','Remote revocation could not be confirmed' from changed where not p_revoked)
- select coalesce((select true from changed),false)
+create function public.finish_qbo_disconnect(p_brewery uuid,p_connection uuid,p_actor uuid,p_request_id uuid,p_revoked boolean)
+returns jsonb language plpgsql security definer set search_path='' as $$
+declare v_result jsonb:=jsonb_build_object('disconnected',true,'remoteRevocationState',case when p_revoked then 'confirmed' else 'unresolved' end);
+begin
+ update public.qbo_connections q set remote_revocation_state=case when p_revoked then 'confirmed' else 'unresolved' end,last_error=case when p_revoked then null else 'Remote revocation could not be confirmed' end,updated_at=now()
+ where q.brewery_id=p_brewery and q.id=p_connection and q.state='disconnected' and exists(select 1 from public.brewery_users u where u.brewery_id=p_brewery and u.user_id=p_actor and u.role='admin');
+ if not found then raise exception 'disconnect reconciliation is not available'; end if;
+ if not p_revoked then insert into private.qbo_connection_events(brewery_id,connection_id,kind,detail) values(p_brewery,p_connection,'remote_revocation_unresolved','Remote revocation could not be confirmed'); end if;
+ return private.complete_command_request_for(p_actor,p_request_id,v_result);
+end
 $$;
 
 grant execute on function public.begin_qbo_oauth(uuid,text,text,text,uuid) to authenticated;
 grant execute on function public.claim_qbo_oauth(text,uuid,uuid,text),public.fail_qbo_oauth(uuid,uuid),
  public.complete_qbo_oauth(uuid,uuid,text,text,text,text,timestamp with time zone,int,int,int),
  public.cas_integration_tokens(uuid,text,uuid,uuid,bigint,text,text,timestamp with time zone,int,int,int),
- public.begin_qbo_disconnect(uuid,uuid,uuid,uuid),public.finish_qbo_disconnect(uuid,uuid,uuid,boolean) to service_role;
+ public.begin_qbo_disconnect(uuid,uuid,uuid,uuid),public.finish_qbo_disconnect(uuid,uuid,uuid,uuid,boolean) to service_role;
 
 create function private.purge_qbo_identity() returns trigger language plpgsql security definer set search_path='' as $$
 begin
- if old.realm_id is distinct from new.realm_id or old.id is distinct from new.id then
+ if old.realm_id is distinct from new.realm_id then
   update public.customers set qbo_customer_id=null where brewery_id=old.brewery_id;
   update public.skus set qbo_item_id=null where brewery_id=old.brewery_id;
   update public.invoices set qbo_invoice_id=null,qbo_sync_status='pending',qbo_sync_error=null,qbo_tax_cents=null,qbo_total_cents=null,qbo_balance_cents=null where brewery_id=old.brewery_id;

@@ -20,6 +20,7 @@ describe("QuickBooks durable lifecycle", () => {
     const ctx = await makeStaffCtx(brewery.id, "admin");
     const otherAdmin = await makeStaffCtx(brewery.id, "admin");
     const redirectUri = "https://mgr.test/api/integrations/qbo/oauth";
+    const realmId = `realm-${crypto.randomUUID()}`;
     const config = { clientId: "client-id", clientSecret: "client-secret", redirectUri };
     const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({
       access_token: "access-secret", refresh_token: "refresh-secret", expires_in: 3600,
@@ -31,7 +32,7 @@ describe("QuickBooks durable lifecycle", () => {
       p_provider_intent: "connect", p_request_id: crypto.randomUUID(),
     });
     const callback = (state: string, actorId = ctx.userId) => completeQboOAuth({
-      request: new Request(`${redirectUri}?code=one-time-code&state=${state}&realmId=realm-1`),
+      request: new Request(`${redirectUri}?code=one-time-code&state=${state}&realmId=${realmId}`),
       actorId, selectedBreweryId: brewery.id, redirectUri,
       client: new QboOAuthClient(config, fetch), store,
     });
@@ -69,7 +70,7 @@ describe("QuickBooks durable lifecycle", () => {
     expect((await begin(lostState)).error).toBeNull();
     const lostFetch = vi.fn<typeof globalThis.fetch>().mockRejectedValue(new TypeError("socket closed"));
     await expect(completeQboOAuth({
-      request: new Request(`${redirectUri}?code=lost-code&state=${lostState}&realmId=realm-1`),
+      request: new Request(`${redirectUri}?code=lost-code&state=${lostState}&realmId=${realmId}`),
       actorId: ctx.userId, selectedBreweryId: brewery.id, redirectUri,
       client: new QboOAuthClient(config, lostFetch), store,
     })).rejects.toThrow("QuickBooks is unavailable");
@@ -84,7 +85,7 @@ describe("QuickBooks durable lifecycle", () => {
     let releaseExchange!: (response: Response) => void;
     const delayedFetch = vi.fn<typeof globalThis.fetch>().mockImplementation(() => new Promise((resolve) => { releaseExchange = resolve; }));
     const delayedCallback = completeQboOAuth({
-      request: new Request(`${redirectUri}?code=delayed-code&state=${delayedState}&realmId=realm-1`),
+      request: new Request(`${redirectUri}?code=delayed-code&state=${delayedState}&realmId=${realmId}`),
       actorId: ctx.userId, selectedBreweryId: brewery.id, redirectUri,
       client: new QboOAuthClient(config, delayedFetch), store,
     });
@@ -142,7 +143,9 @@ describe("QuickBooks durable lifecycle", () => {
 
     const run = crypto.randomUUID();
     const oldConnection = await connect(`state-one-${run}`, `realm-one-${run}`);
-    expect(JSON.stringify(await getQboHealth(ctx))).not.toMatch(/access-|refresh-|token/i);
+    const health = await getQboHealth(ctx);
+    expect(health).toMatchObject({ connected: true, connectionId: oldConnection });
+    expect(JSON.stringify(health)).not.toMatch(/access-|refresh-|token/i);
     expect((await admin.from("customers").update({ qbo_customer_id: "customer-old" }).eq("id", customer.customerId)).error).toBeNull();
     expect((await admin.from("skus").update({ qbo_item_id: "item-old" }).eq("id", catalog.skuId)).error).toBeNull();
     expect((await admin.from("invoices").insert({ brewery_id: brewery.id, customer_id: customer.customerId, qbo_invoice_id: "invoice-old" })).error).toBeNull();
@@ -154,6 +157,12 @@ describe("QuickBooks durable lifecycle", () => {
     expect((await admin.from("skus").select("qbo_item_id").eq("id", catalog.skuId).single()).data?.qbo_item_id).toBeNull();
     expect((await admin.from("invoices").select("qbo_invoice_id").eq("brewery_id", brewery.id).single()).data?.qbo_invoice_id).toBeNull();
 
+    const competingBrewery = await makeBrewery();
+    const competingRealm = await admin.from("qbo_connections").insert({
+      brewery_id: competingBrewery.id, realm_id: `realm-two-${run}`,
+    });
+    expect(competingRealm.error?.code).toBe("23505");
+
     const stale = await admin.rpc("cas_integration_tokens", {
       p_brewery: brewery.id, p_provider: "qbo", p_connection: old.connectionId, p_actor: ctx.userId,
       p_expected_version: old.credentialVersion, p_access_token: "stale-access", p_refresh_token: "stale-refresh",
@@ -163,17 +172,40 @@ describe("QuickBooks durable lifecycle", () => {
     expect(stale).toMatchObject({ data: false, error: null });
     expect((await readVersionedIntegrationTokens(ctx, "qbo")).refreshToken).toBe(`refresh-realm-two-${run}`);
 
+    expect((await admin.from("customers").update({ qbo_customer_id: "customer-current" }).eq("id", customer.customerId)).error).toBeNull();
+    expect((await admin.from("skus").update({ qbo_item_id: "item-current" }).eq("id", catalog.skuId)).error).toBeNull();
+    expect((await admin.from("invoices").update({
+      qbo_invoice_id: "invoice-current", qbo_sync_status: "pushed",
+      qbo_tax_cents: 100, qbo_total_cents: 1100, qbo_balance_cents: 600,
+    }).eq("brewery_id", brewery.id)).error).toBeNull();
+
     const beforeDisconnect = await readVersionedIntegrationTokens(ctx, "qbo");
     const revoke = vi.fn().mockRejectedValue(new Error("provider unavailable"));
-    await expect(disconnectQbo(ctx, newConnection, revoke, crypto.randomUUID())).resolves.toEqual({
+    const disconnectRequestId = crypto.randomUUID();
+    await expect(disconnectQbo(ctx, newConnection, revoke, disconnectRequestId)).resolves.toEqual({
       disconnected: true, remoteRevocationState: "unresolved",
     });
     expect(revoke).toHaveBeenCalledWith(beforeDisconnect.refreshToken);
+    // The first server execution committed but its HTTP response may be lost;
+    // the exact retry reads the safe recorded result and never revokes twice.
+    const replayRevoke = vi.fn();
+    await expect(disconnectQbo(ctx, newConnection, replayRevoke, disconnectRequestId)).resolves.toEqual({
+      disconnected: true, remoteRevocationState: "unresolved",
+    });
+    expect(replayRevoke).not.toHaveBeenCalled();
+    expect(sql(`select result->>'remoteRevocationState' from private.command_requests where actor_id='${ctx.userId}' and request_id='${disconnectRequestId}'`))
+      .toEqual(["unresolved"]);
+    expect(sql(`select kind || ':' || count(*) from private.qbo_connection_events where connection_id='${newConnection}' and kind in ('disconnected','remote_revocation_unresolved') group by kind order by kind`))
+      .toEqual(["disconnected:1", "remote_revocation_unresolved:1"]);
     expect(sql(`select count(*) from private.integration_tokens where brewery_id='${brewery.id}'`)).toEqual(["0"]);
     expect((await admin.from("qbo_connections").select("state,remote_revocation_state,last_error").eq("brewery_id", brewery.id).single()).data)
       .toMatchObject({ state: "disconnected", remote_revocation_state: "unresolved", last_error: "Remote revocation could not be confirmed" });
     const newestConnection = await connect(`state-three-${run}`, `realm-two-${run}`);
     expect(newestConnection).not.toBe(newConnection);
+    expect((await admin.from("customers").select("qbo_customer_id").eq("id", customer.customerId).single()).data?.qbo_customer_id).toBe("customer-current");
+    expect((await admin.from("skus").select("qbo_item_id").eq("id", catalog.skuId).single()).data?.qbo_item_id).toBe("item-current");
+    expect((await admin.from("invoices").select("qbo_invoice_id,qbo_sync_status,qbo_tax_cents,qbo_total_cents,qbo_balance_cents").eq("brewery_id", brewery.id).single()).data)
+      .toMatchObject({ qbo_invoice_id: "invoice-current", qbo_sync_status: "pushed", qbo_tax_cents: 100, qbo_total_cents: 1100, qbo_balance_cents: 600 });
     expect((await admin.rpc("cas_integration_tokens", {
       p_brewery: brewery.id, p_provider: "qbo", p_connection: beforeDisconnect.connectionId, p_actor: ctx.userId,
       p_expected_version: beforeDisconnect.credentialVersion, p_access_token: "late-access", p_refresh_token: "late-refresh",

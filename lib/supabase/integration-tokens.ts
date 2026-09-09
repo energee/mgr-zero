@@ -135,7 +135,8 @@ export async function getQboHealth(ctx: Ctx) {
   if (error) throw new Error("QuickBooks health is unavailable");
   if (!data) return { connected: false, state: "disconnected" as const, realmLabel: null, lastError: null };
   return {
-    connected: data.state === "connected", state: data.state as "connected" | "disconnected" | "recovery_required",
+    connected: data.state === "connected", connectionId: data.id as string,
+    state: data.state as "connected" | "disconnected" | "recovery_required",
     realmLabel: data.realm_label as string | null, remoteRevocationState: data.remote_revocation_state as string,
     lastError: data.last_error as string | null, accessExpiresAt: data.access_expires_at as string | null,
     refreshExpiresAt: data.refresh_expires_at as string | null, refreshHardExpiresAt: data.refresh_hard_expires_at as string | null,
@@ -148,14 +149,18 @@ export async function disconnectQbo(ctx: Ctx, connectionId: string, revoke: (tok
   const { data, error } = await admin.rpc("begin_qbo_disconnect", {
     p_brewery: ctx.breweryId, p_connection: connectionId, p_actor: ctx.userId, p_request_id: requestId,
   }).maybeSingle();
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
   if (error) throw new Error("QuickBooks disconnect failed");
-  const row = data as { refresh_token?: unknown } | null;
+  const row = data as { refresh_token?: unknown; replay_result?: unknown } | null;
+  if (row?.replay_result && typeof row.replay_result === "object") {
+    return row.replay_result as { disconnected: true; remoteRevocationState: "confirmed" | "unresolved" };
+  }
   const token = typeof row?.refresh_token === "string" ? row.refresh_token : null;
   let revoked = false;
   if (token) revoked = await revoke(token).then(() => true, () => false);
   const { data: finished, error: finishError } = await admin.rpc("finish_qbo_disconnect", {
-    p_brewery: ctx.breweryId, p_connection: connectionId, p_actor: ctx.userId, p_revoked: revoked,
+    p_brewery: ctx.breweryId, p_connection: connectionId, p_actor: ctx.userId, p_request_id: requestId, p_revoked: revoked,
   });
-  if (finishError || finished !== true) throw new Error("QuickBooks disconnect reconciliation failed");
-  return { disconnected: true, remoteRevocationState: revoked ? "confirmed" : "unresolved" };
+  if (finishError || !finished || typeof finished !== "object") throw new Error("QuickBooks disconnect reconciliation failed");
+  return finished as { disconnected: true; remoteRevocationState: "confirmed" | "unresolved" };
 }
