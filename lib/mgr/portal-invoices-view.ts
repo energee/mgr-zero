@@ -1,9 +1,9 @@
 // lib/mgr/portal-invoices-view.ts — view-model for portal Invoice history.
-// portal_invoices returns raw invoice_lines (no invoice_totals subtotal), so
-// the adapter sums amount_cents the way the live list does.
+// portal_invoices returns the synchronized QBO total and frozen invoice lines.
+// The latter remain the fallback for local and not-yet-synchronized records.
 import { docNo } from "./doc-no";
 import { money } from "./money";
-import { invoiceCurrentState } from "./invoice-state";
+import { invoiceCurrentState, invoiceCurrentTotalCents } from "./invoice-state";
 
 export type PortalInvoicesRowView = {
   key: string;
@@ -31,6 +31,7 @@ export type PortalInvoicesSnapshot = {
     paid_at: string | null;
     qbo_remote_state?: "live" | "voided" | "deleted";
     qbo_balance_cents?: number | null;
+    qbo_total_cents?: number | null;
     written_off_at?: string | null;
     invoice_lines: { amount_cents: number }[];
   }[];
@@ -57,7 +58,7 @@ export function toPortalInvoicesViewProps({ customerName, invoices }: PortalInvo
       const credit = inv.kind === "credit_memo";
       const state = invoiceCurrentState(inv);
       const unpaid = !credit && state === "unpaid";
-      const total = inv.invoice_lines.reduce((sum, l) => sum + l.amount_cents, 0);
+      const total = invoiceCurrentTotalCents(inv, inv.invoice_lines.reduce((sum, l) => sum + l.amount_cents, 0));
       return {
         key: inv.id,
         title: docNo(credit ? "CM" : "INV", inv.invoice_no, credit ? "Credit memo" : "Invoice"),

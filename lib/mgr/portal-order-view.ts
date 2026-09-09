@@ -3,7 +3,7 @@
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { buyerStatus } from "./order-status";
-import { invoiceCurrentState } from "./invoice-state";
+import { invoiceCurrentState, invoiceCurrentTotalCents } from "./invoice-state";
 
 export type PortalOrderLineView = {
   key: string;
@@ -65,10 +65,11 @@ export type PortalOrderSnapshot = {
     invoices: {
       id: string;
       invoice_no: number | null;
-      kind: string;
+      kind: "invoice" | "credit_memo";
       paid_at: string | null;
       qbo_remote_state?: "live" | "voided" | "deleted";
       qbo_balance_cents?: number | null;
+      qbo_total_cents?: number | null;
       written_off_at?: string | null;
       invoice_lines: { amount_cents: number }[];
     }[];
@@ -114,7 +115,7 @@ export function toPortalOrderViewProps({ order, lines, events, shipment, backHre
         title: docNo("INV", invoice.invoice_no, "Invoice"),
         detail: invoiceState === "paid" ? `paid ${calendarDay(invoice.paid_at!)}`
           : invoiceState === "written_off" ? "written off" : invoiceState ?? "unpaid",
-        amount: money(invoice.invoice_lines.reduce((n, x) => n + x.amount_cents, 0)),
+        amount: money(invoiceCurrentTotalCents(invoice, invoice.invoice_lines.reduce((n, x) => n + x.amount_cents, 0))),
         href: `/portal/invoices/${invoice.id}`,
         paid: invoiceState === "paid",
       }

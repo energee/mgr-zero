@@ -13,3 +13,12 @@ export function invoiceCurrentState(invoice: {
 }
 
 export const invoiceIsCurrentlyPaid = (invoice: Parameters<typeof invoiceCurrentState>[0]) => invoiceCurrentState(invoice) === "paid";
+
+export function invoiceCurrentTotalCents(
+  invoice: { kind: "invoice" | "credit_memo"; qbo_total_cents?: number | null },
+  localTotalCents: number,
+) {
+  return invoice.kind === "invoice" && invoice.qbo_total_cents != null
+    ? invoice.qbo_total_cents
+    : localTotalCents;
+}

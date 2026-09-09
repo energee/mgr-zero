@@ -10,7 +10,9 @@ import { toPortalInvoiceViewProps } from "@/lib/mgr/portal-invoice-view";
 import { toPortalInvoicesViewProps } from "@/lib/mgr/portal-invoices-view";
 import { toPortalOrderViewProps } from "@/lib/mgr/portal-order-view";
 import { portalOrderShipped } from "@/lib/mgr/fixtures/portal-orders";
-import { admin, makeBrewery, makeStaffCtx, seedCustomer, sql } from "./helpers";
+import { runCommand } from "@/lib/commands/registry";
+import "@/lib/commands/all";
+import { admin, asUser, makeBrewery, makeCustomerUser, makeStaffCtx, seedCustomer, sql } from "./helpers";
 
 const config = {
   clientId: "client-id",
@@ -140,28 +142,32 @@ describe("QuickBooks current invoice state", () => {
       .toEqual(["11|true"]);
   });
 
-  it("renders the authoritative synced total across staff and portal current views", () => {
-    const invoice = {
-      id: "invoice-edited", invoice_no: 42, kind: "invoice" as const,
-      issued_on: "2026-09-09", due_on: "2026-10-09", paid_at: null,
-      qbo_remote_state: "live" as const, qbo_total_cents: 10500, qbo_tax_cents: 500,
-      qbo_balance_cents: 10500, qbo_accountant_drift: true, written_off_at: null,
-      customers: { name: "Buyer" },
-    };
-    const lines = [{
-      id: "line-1", qty: 1, unit_price_cents: 10000, amount_cents: 10000,
-      description: "Frozen local line", skus: null,
-    }];
+  it("renders a $105 synced edit over $100 frozen lines across staff and portal current views", async () => {
+    const f = await stateFixture();
+    expect((await admin.from("invoice_lines").insert({
+      brewery_id: f.brewery.id, invoice_id: f.invoice.id, kind: "adjustment",
+      qty: 1, unit_price_cents: 10000, description: "Frozen local line",
+    })).error).toBeNull();
+    await syncQboInvoices(f.ctx, crypto.randomUUID(), new QboOAuthClient(config,
+      vi.fn<typeof globalThis.fetch>().mockResolvedValue(invoiceResponse({ TotalAmt: 105 }))));
+    const detail = await runCommand("get_invoice", { invoiceId: f.invoice.id }, f.ctx) as Parameters<typeof toInvoiceViewProps>[0];
+    const list = await runCommand("list_invoices", {}, f.ctx) as { id: string; subtotal_cents: number; total_cents: number }[];
+    expect(list.find((row) => row.id === f.invoice.id)).toMatchObject({ subtotal_cents: 10000, total_cents: 10500 });
+    const invoice = detail.invoice;
+    const lines = detail.lines;
     expect(toInvoiceViewProps({ invoice, lines, questions: [] })).toMatchObject({
       total: "$105.00", summary: expect.stringContaining("edited in QuickBooks"),
     });
-    expect(toPortalInvoiceViewProps({
-      invoice: { ...invoice, total_cents: 10000 }, lines: [{ ...lines[0], kind: "adjustment" }],
-      brewery: { name: "Brewery", customer_phone: null },
-    })).toMatchObject({ total: "$105.00", payable: true, paid: false });
-    expect(toPortalInvoicesViewProps({
-      customerName: "Buyer", invoices: [{ ...invoice, invoice_lines: [{ amount_cents: 10000 }] }],
-    }).rows[0]).toMatchObject({ total: "$105.00", unpaid: true });
+    const customerUser = await makeCustomerUser(f.customer.customerId);
+    const portalCtx = {
+      db: await asUser(customerUser.email), userId: customerUser.id, breweryId: f.brewery.id,
+      role: "customer" as const, customerId: f.customer.customerId,
+    };
+    const portalDetail = await runCommand("portal_invoice", { invoiceId: f.invoice.id }, portalCtx) as Parameters<typeof toPortalInvoiceViewProps>[0];
+    const portalList = await runCommand("portal_invoices", {}, portalCtx) as Parameters<typeof toPortalInvoicesViewProps>[0]["invoices"];
+    expect(toPortalInvoiceViewProps(portalDetail)).toMatchObject({ total: "$105.00", payable: true, paid: false });
+    expect(toPortalInvoicesViewProps({ customerName: "Buyer", invoices: portalList }).rows[0])
+      .toMatchObject({ total: "$105.00", unpaid: true });
     expect(toPortalOrderViewProps({
       ...portalOrderShipped,
       shipment: { id: "shipment-1", invoices: [{ ...invoice, invoice_lines: [{ amount_cents: 10000 }] }] },
@@ -171,7 +177,7 @@ describe("QuickBooks current invoice state", () => {
     expect(toInvoiceViewProps({ invoice: local, lines, questions: [] }).total).toBe("$100.00");
     const paid = { ...invoice, paid_at: "2026-09-10T12:00:00Z", qbo_balance_cents: 0 };
     expect(toPortalInvoiceViewProps({
-      invoice: { ...paid, total_cents: 10000 }, lines: [{ ...lines[0], kind: "adjustment" }],
+      invoice: { ...paid, total_cents: 10000 }, lines: portalDetail.lines,
       brewery: { name: "Brewery", customer_phone: null },
     })).toMatchObject({ total: "$105.00", payable: false, paid: true });
   });

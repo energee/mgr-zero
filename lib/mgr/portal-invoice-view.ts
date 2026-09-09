@@ -3,7 +3,7 @@
 // Pay vs unavailable vs paid is a presentation prop on the view, not a mode.
 import { docNo } from "./doc-no";
 import { money } from "./money";
-import { invoiceCurrentState } from "./invoice-state";
+import { invoiceCurrentState, invoiceCurrentTotalCents } from "./invoice-state";
 
 export type PortalInvoiceLineView = {
   key: string;
@@ -39,6 +39,7 @@ export type PortalInvoiceSnapshot = {
     paid_at: string | null;
     qbo_remote_state?: "live" | "voided" | "deleted";
     qbo_balance_cents?: number | null;
+    qbo_total_cents?: number | null;
     written_off_at?: string | null;
     total_cents: number;
   };
@@ -66,7 +67,7 @@ export function toPortalInvoiceViewProps({ invoice, lines, brewery, backHref }: 
   return {
     backHref,
     title: docNo(credit ? "CM" : "INV", invoice.invoice_no, credit ? "Credit memo" : "Invoice"),
-    total: money(invoice.total_cents),
+    total: money(invoiceCurrentTotalCents(invoice, invoice.total_cents)),
     due: invoice.due_on ?? undefined,
     paidOn: paid ? day(invoice.paid_at!) : undefined,
     paid,

@@ -14,7 +14,7 @@ import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
 import { CreditMemoForm } from "./credit-memo-form";
 import { MarkAnswered } from "./mark-answered";
 
-type Invoice = { id: string; shipment_id: string | null; invoice_no: number | null; kind: "invoice" | "credit_memo"; issued_on: string; due_on: string | null; paid_at: string | null; qbo_remote_state: "live" | "voided" | "deleted"; qbo_balance_cents: number | null; qbo_accountant_drift: boolean; written_off_at: string | null; customers: { name: string } | null };
+type Invoice = { id: string; shipment_id: string | null; invoice_no: number | null; kind: "invoice" | "credit_memo"; issued_on: string; due_on: string | null; paid_at: string | null; qbo_remote_state: "live" | "voided" | "deleted"; qbo_total_cents: number | null; qbo_balance_cents: number | null; qbo_accountant_drift: boolean; written_off_at: string | null; customers: { name: string } | null };
 type InvoiceLine = { id: string; sku_id: string; qty: number; unit_price_cents: number; amount_cents: number; description: string; skus: { name: string } | null };
 type Question = { id: string; body: string; created_at: string; answered_at: string | null; customers: { name: string } | null };
 type LocationRow = { id: string; name: string };

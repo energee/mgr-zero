@@ -2,6 +2,7 @@
 // to one plpgsql function (00001_baseline.sql, iron rule 5); this layer does
 // zod validation, role gating, and camelCase→p_* argument mapping.
 import { z } from "zod";
+import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
 import { defineCommand, defineQuery, unwrap, runCommand, CommandError } from "./registry";
 
 const lines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive() })).min(1);
@@ -295,20 +296,23 @@ defineQuery({
 });
 
 defineQuery({
-  name: "list_invoices", description: "Invoices and credit memos with subtotal (from invoice_totals), newest first",
+  name: "list_invoices", description: "Invoices and credit memos with current total plus frozen local subtotal, newest first",
   roles: [...readRoles],
   input: z.object({ customerId: z.string().uuid().optional(), limit: z.number().int().max(200).default(50) }),
   handler: async (ctx, i) => {
     let q = ctx.db.from("invoices").select("*, customers(name)").eq("brewery_id", ctx.breweryId)
       .order("created_at", { ascending: false }).limit(i.limit);
     if (i.customerId) q = q.eq("customer_id", i.customerId);
-    const invoices = (await unwrap(q)) as { id: string }[];
+    const invoices = (await unwrap(q)) as { id: string; kind: "invoice" | "credit_memo"; qbo_total_cents: number | null }[];
     const ids = invoices.map(inv => inv.id);
     const totals = ids.length
       ? (await unwrap(ctx.db.from("invoice_totals").select("invoice_id, subtotal_cents").in("invoice_id", ids))) as { invoice_id: string; subtotal_cents: number }[]
       : [];
     const subtotalById = new Map(totals.map(t => [t.invoice_id, t.subtotal_cents]));
-    return invoices.map(inv => ({ ...inv, subtotal_cents: subtotalById.get(inv.id) ?? 0 }));
+    return invoices.map(inv => {
+      const subtotal_cents = subtotalById.get(inv.id) ?? 0;
+      return { ...inv, subtotal_cents, total_cents: invoiceCurrentTotalCents(inv, subtotal_cents) };
+    });
   },
 });
 

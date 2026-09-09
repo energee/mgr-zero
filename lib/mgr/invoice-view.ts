@@ -4,7 +4,7 @@
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { plural } from "./plural";
-import { invoiceCurrentState } from "./invoice-state";
+import { invoiceCurrentState, invoiceCurrentTotalCents } from "./invoice-state";
 
 export type InvoiceLineView = {
   key: string;
@@ -50,6 +50,7 @@ export type InvoiceSnapshot = {
     paid_at: string | null;
     qbo_remote_state?: "live" | "voided" | "deleted";
     qbo_balance_cents?: number | null;
+    qbo_total_cents?: number | null;
     qbo_accountant_drift?: boolean;
     written_off_at?: string | null;
     customers: { name: string } | null;
@@ -76,7 +77,7 @@ export type InvoiceSnapshot = {
 /** Map a get_invoice + list_invoice_questions payload onto InvoiceView. */
 export function toInvoiceViewProps({ invoice, lines, questions, mappings, backHref }: InvoiceSnapshot): InvoiceViewModel {
   const credit = invoice.kind === "credit_memo";
-  const total = lines.reduce((sum, l) => sum + l.amount_cents, 0);
+  const total = invoiceCurrentTotalCents(invoice, lines.reduce((sum, l) => sum + l.amount_cents, 0));
   const dueOrIssued = invoice.due_on ? `due ${invoice.due_on}` : `issued ${invoice.issued_on}`;
   const state = invoiceCurrentState(invoice);
   const stateDetail = state === "paid" ? ` · paid ${new Date(invoice.paid_at!).toLocaleDateString()}`
