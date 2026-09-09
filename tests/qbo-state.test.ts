@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { QboOAuthClient, syncQboInvoices } from "@/lib/qbo";
+import { PortalInvoiceView } from "@/components/mgr/views/portal-invoice";
 import { invoiceCurrentState } from "@/lib/mgr/invoice-state";
 import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
 import { toPortalInvoiceViewProps } from "@/lib/mgr/portal-invoice-view";
@@ -13,7 +16,11 @@ const config = {
   apiBaseUrl: "https://sandbox-quickbooks.api.intuit.com",
 };
 
-async function stateFixture(role: "admin" | "sales" | "warehouse" = "admin") {
+async function stateFixture(
+  role: "admin" | "sales" | "warehouse" = "admin",
+  invoiceId = crypto.randomUUID(),
+  remoteId = "remote-invoice",
+) {
   const brewery = await makeBrewery();
   const ctx = await makeStaffCtx(brewery.id, role);
   const customer = await seedCustomer(brewery.id);
@@ -26,9 +33,10 @@ async function stateFixture(role: "admin" | "sales" | "warehouse" = "admin") {
   sql(`insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token)
     values('${brewery.id}','qbo','${connection.data.id}','access-secret','refresh-secret')`);
   const invoice = await admin.from("invoices").insert({
+    id: invoiceId,
     brewery_id: brewery.id,
     customer_id: customer.customerId,
-    qbo_invoice_id: "remote-invoice",
+    qbo_invoice_id: remoteId,
     qbo_sync_status: "pushed",
   }).select("id").single();
   if (invoice.error) throw invoice.error;
@@ -38,8 +46,8 @@ async function stateFixture(role: "admin" | "sales" | "warehouse" = "admin") {
       brewery_id,invoice_id,connection_id,realm_id,entity_type,provider_request_id,
       request_body,local_snapshot,attempt_reason,status,qbo_entity_id,response,finished_at)
     values('${brewery.id}','${invoice.data.id}','${connection.data.id}','${connection.data.realm_id}',
-      'Invoice',gen_random_uuid(),'{}','{}','initial','pushed','remote-invoice',
-      '{"Id":"remote-invoice","SyncToken":"0","TotalAmt":100,"TotalTax":10,"Balance":100}',now())`);
+      'Invoice',gen_random_uuid(),'{"CustomerRef":{"value":"customer-42"},"DocNumber":"1","TxnDate":"2026-09-09","Line":[]}','{}','initial','pushed','${remoteId}',
+      '{"Id":"${remoteId}","SyncToken":"0","TotalAmt":100,"TotalTax":10,"Balance":100}',now())`);
   return { brewery, ctx, customer, connection: connection.data, invoice: invoice.data };
 }
 
@@ -53,6 +61,11 @@ function invoiceResponse(overrides: Record<string, unknown> = {}) {
       TxnTaxDetail: { TotalTax: 10 },
       LinkedTxn: [{ TxnId: "payment-1", TxnType: "Payment" }],
       MetaData: { LastUpdatedTime: "2026-09-09T15:00:00Z" },
+      CustomerRef: { value: "customer-42" },
+      DocNumber: "1",
+      TxnDate: "2026-09-09",
+      DueDate: "2026-10-09",
+      Line: [],
       ...overrides,
     },
   }), { status: 200 });
@@ -122,6 +135,52 @@ describe("QuickBooks current invoice state", () => {
     await syncQboInvoices(f.ctx, crypto.randomUUID(), client);
     expect(sql(`select qbo_sync_token || '|' || qbo_accountant_drift::text from invoices where id='${f.invoice.id}'`))
       .toEqual(["11|true"]);
+  });
+
+  it("applies a fetched batch atomically and replays its frozen target set without provider calls", async () => {
+    const firstId = "00000000-0000-4000-8000-000000000001";
+    const secondId = "00000000-0000-4000-8000-000000000002";
+    const f = await stateFixture("admin", firstId, "remote-one");
+    expect((await admin.from("invoices").insert({
+      id: secondId, brewery_id: f.brewery.id, customer_id: f.customer.customerId,
+      qbo_invoice_id: "remote-two", qbo_sync_status: "pushed",
+    })).error).toBeNull();
+    sql(`insert into public.qbo_pushes(
+      brewery_id,invoice_id,connection_id,realm_id,entity_type,provider_request_id,
+      request_body,local_snapshot,attempt_reason,status,qbo_entity_id,response,finished_at)
+      values('${f.brewery.id}','${secondId}','${f.connection.id}','${f.connection.realm_id}',
+      'Invoice',gen_random_uuid(),'{"CustomerRef":{"value":"customer-42"},"DocNumber":"1","TxnDate":"2026-09-09","Line":[]}',
+      '{}','initial','pushed','remote-two','{"Id":"remote-two","SyncToken":"0","TotalAmt":100,"TotalTax":10,"Balance":100}',now())`);
+    const requestId = crypto.randomUUID();
+    const failedFetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(invoiceResponse({ Id: "remote-one", SyncToken: "one" }))
+      .mockRejectedValueOnce(new TypeError("second invoice unavailable"));
+    await expect(syncQboInvoices(f.ctx, requestId, new QboOAuthClient(config, failedFetch)))
+      .rejects.toThrow("QuickBooks is unavailable");
+    expect(sql(`select id || ':' || coalesce(qbo_sync_token,'NULL') from invoices where id in ('${firstId}','${secondId}') order by id`))
+      .toEqual([`${firstId}:NULL`, `${secondId}:NULL`]);
+
+    const lateId = "00000000-0000-4000-8000-000000000003";
+    expect((await admin.from("invoices").insert({
+      id: lateId, brewery_id: f.brewery.id, customer_id: f.customer.customerId,
+      qbo_invoice_id: "remote-late", qbo_sync_status: "pushed",
+    })).error).toBeNull();
+    sql(`insert into public.qbo_pushes(
+      brewery_id,invoice_id,connection_id,realm_id,entity_type,provider_request_id,
+      request_body,local_snapshot,attempt_reason,status,qbo_entity_id,response,finished_at)
+      values('${f.brewery.id}','${lateId}','${f.connection.id}','${f.connection.realm_id}',
+      'Invoice',gen_random_uuid(),'{}','{}','initial','pushed','remote-late','{"Id":"remote-late"}',now())`);
+    const retryFetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (input) => {
+      const remoteId = new URL(String(input)).pathname.split("/").at(-1)!;
+      return invoiceResponse({ Id: remoteId, SyncToken: `synced-${remoteId}` });
+    });
+    const client = new QboOAuthClient(config, retryFetch);
+    const result = await syncQboInvoices(f.ctx, requestId, client);
+    expect(result).toMatchObject({ synced: 2 });
+    expect(retryFetch).toHaveBeenCalledTimes(2);
+    await expect(syncQboInvoices(f.ctx, requestId, client)).resolves.toEqual(result);
+    expect(retryFetch).toHaveBeenCalledTimes(2);
+    expect(sql(`select coalesce(qbo_sync_token,'NULL') from invoices where id='${lateId}'`)).toEqual(["NULL"]);
   });
 
   it("marks only a definitive 404 from the original current realm as deleted", async () => {
@@ -206,6 +265,14 @@ describe("QuickBooks current invoice state", () => {
     expect(toPortalInvoiceViewProps({
       invoice: { ...invoice, total_cents: 10000 }, lines: [], brewery: { name: "Brewery", customer_phone: null },
     })).toMatchObject({ paid: false, paidOn: undefined, status: "Voided" });
+    const html = renderToStaticMarkup(createElement(PortalInvoiceView, {
+      model: toPortalInvoiceViewProps({
+        invoice: { ...invoice, total_cents: 10000 }, lines: [], brewery: { name: "Brewery", customer_phone: null },
+      }),
+      footer: null,
+    }));
+    expect(html).toContain("This invoice is not payable.");
+    expect(html).not.toMatch(/still due|arrange payment|>Due</);
     expect(toPortalInvoicesViewProps({ customerName: "Buyer", invoices: [{ ...invoice, invoice_lines: [{ amount_cents: 10000 }] }] }).rows[0])
       .toMatchObject({ detail: "voided", unpaid: false });
   });
