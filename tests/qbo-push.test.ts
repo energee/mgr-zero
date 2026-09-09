@@ -167,6 +167,68 @@ describe("QuickBooks durable outbound push", () => {
     expect(sql(`select count(*) from public.qbo_pushes where invoice_id='${f.invoice.id}'`)).toEqual(["1"]);
   });
 
+  it("refreshes an expired access token before sending the frozen push and stores the rotated credential", async () => {
+    const f = await pushFixture("invoice", "admin");
+    const before = await readVersionedIntegrationTokens(f.ctx, "qbo");
+    expect((await admin.from("qbo_connections").update({ access_expires_at: "2026-01-01T00:00:00Z" })
+      .eq("brewery_id", f.brewery.id)).error).toBeNull();
+    const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (input, init) => {
+      if (String(input).includes("/tokens/bearer")) {
+        expect(String(init?.body)).toContain("refresh_token=refresh-secret");
+        return new Response(JSON.stringify({
+          access_token: "rotated-access", refresh_token: "rotated-refresh", expires_in: 3600,
+          x_refresh_token_expires_in: 86400, x_refresh_token_hard_expires_in: 172800,
+        }), { status: 200 });
+      }
+      expect(init?.headers).toMatchObject({ Authorization: "Bearer rotated-access" });
+      return new Response(JSON.stringify({ Invoice: { Id: "refreshed-invoice", SyncToken: "0" } }), { status: 200 });
+    });
+
+    await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, crypto.randomUUID(), new QboOAuthClient(config, fetch)))
+      .resolves.toMatchObject({ status: "pushed", remoteId: "refreshed-invoice" });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(String(fetch.mock.calls[0][0])).toContain("/tokens/bearer");
+    const current = await readVersionedIntegrationTokens(f.ctx, "qbo");
+    expect(current).toMatchObject({ accessToken: "rotated-access", refreshToken: "rotated-refresh" });
+    expect(current.credentialVersion).toBeGreaterThan(before.credentialVersion);
+    const expiry = await admin.from("qbo_connections")
+      .select("access_expires_at,refresh_expires_at,refresh_hard_expires_at").eq("brewery_id", f.brewery.id).single();
+    expect(expiry.error).toBeNull();
+    expect(new Date(expiry.data!.refresh_hard_expires_at!).getTime() - new Date(expiry.data!.access_expires_at!).getTime())
+      .toBe(47 * 60 * 60 * 1000);
+  });
+
+  it("refreshes once after a 401, resends the exact request, and leaves uncertainty pending if refresh fails", async () => {
+    const f = await pushFixture("invoice", "admin");
+    expect((await admin.from("qbo_connections").update({ access_expires_at: "2099-01-01T00:00:00Z" })
+      .eq("brewery_id", f.brewery.id)).error).toBeNull();
+    const fetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response("unauthorized", { status: 401 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        access_token: "after-401-access", refresh_token: "after-401-refresh", expires_in: 3600,
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ Invoice: { Id: "after-401-invoice" } }), { status: 200 }));
+    const client = new QboOAuthClient(config, fetch);
+
+    await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, crypto.randomUUID(), client))
+      .resolves.toMatchObject({ status: "pushed", remoteId: "after-401-invoice" });
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(String(fetch.mock.calls[0][0])).toBe(String(fetch.mock.calls[2][0]));
+    expect(fetch.mock.calls[0][1]?.body).toBe(fetch.mock.calls[2][1]?.body);
+    expect(fetch.mock.calls[2][1]?.headers).toMatchObject({ Authorization: "Bearer after-401-access" });
+
+    const uncertain = await pushFixture("invoice", "admin");
+    expect((await admin.from("qbo_connections").update({ access_expires_at: "2099-01-01T00:00:00Z" })
+      .eq("brewery_id", uncertain.brewery.id)).error).toBeNull();
+    const failedRefresh = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response("unauthorized", { status: 401 }))
+      .mockResolvedValueOnce(new Response("refresh unavailable", { status: 503 }));
+    await expect(pushInvoiceToQbo(uncertain.ctx, uncertain.invoice.id, crypto.randomUUID(), new QboOAuthClient(config, failedRefresh)))
+      .rejects.toThrow("QuickBooks is unavailable");
+    expect(failedRefresh).toHaveBeenCalledTimes(2);
+    expect(sql(`select status from public.qbo_pushes where invoice_id='${uncertain.invoice.id}'`)).toEqual(["pending"]);
+  });
+
   it("shares one active attempt under concurrency and freezes it across mapping edits", async () => {
     const f = await pushFixture();
     const [a, b] = await Promise.all([

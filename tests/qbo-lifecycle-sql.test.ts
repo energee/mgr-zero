@@ -2,7 +2,7 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { admin, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, sql } from "./helpers";
-import { completeQboOAuth, QboOAuthClient } from "@/lib/qbo";
+import { completeQboOAuth, QboOAuthClient, refreshQboTokens } from "@/lib/qbo";
 import {
   claimQboOAuth,
   completeQboOAuthStore,
@@ -281,5 +281,44 @@ describe("QuickBooks durable lifecycle", () => {
     expect((await admin.from("brewery_users").update({ role: "brewer" }).eq("brewery_id", brewery.id).eq("user_id", ctx.userId)).error).toBeNull();
     await expect(readVersionedIntegrationTokens(ctx, "qbo")).rejects.toMatchObject({ status: 403 });
     expect((await ctx.db.schema("private").from("integration_tokens").select("refresh_token")).error).not.toBeNull();
+  });
+
+  it("lets a concurrent refresh loser use the winner and rejects a response that arrives after disconnect", async () => {
+    const config = {
+      clientId: "client-id", clientSecret: "client-secret", redirectUri: "https://mgr.test/qbo",
+      apiBaseUrl: "https://sandbox-quickbooks.api.intuit.com",
+    };
+    const brewery = await makeBrewery();
+    const ctx = await makeStaffCtx(brewery.id, "admin");
+    const connection = await admin.from("qbo_connections").insert({
+      brewery_id: brewery.id, realm_id: `refresh-race-${crypto.randomUUID()}`, state: "connected", credential_version: 1,
+      access_expires_at: "2026-01-01T00:00:00Z",
+    }).select("id").single();
+    expect(connection.error).toBeNull();
+    sql(`insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token,credential_version)
+      values('${brewery.id}','qbo','${connection.data!.id}','old-access','old-refresh',1)`);
+    const releases: Array<(response: Response) => void> = [];
+    const refreshClient = (suffix: string) => new QboOAuthClient(config, vi.fn<typeof globalThis.fetch>(() =>
+      new Promise<Response>((resolve) => releases.push((response) => resolve(response)))).mockName(suffix));
+    const refreshes = [refreshQboTokens(ctx, refreshClient("a")), refreshQboTokens(ctx, refreshClient("b"))];
+    await vi.waitFor(() => expect(releases).toHaveLength(2));
+    releases[0](new Response(JSON.stringify({ access_token: "race-access-a", refresh_token: "race-refresh-a", expires_in: 3600 }), { status: 200 }));
+    releases[1](new Response(JSON.stringify({ access_token: "race-access-b", refresh_token: "race-refresh-b", expires_in: 3600 }), { status: 200 }));
+    const winners = await Promise.all(refreshes);
+    const persisted = await readVersionedIntegrationTokens(ctx, "qbo");
+    expect(winners).toEqual([persisted.accessToken, persisted.accessToken]);
+    expect(persisted.refreshToken).toMatch(/^race-refresh-[ab]$/);
+
+    let releaseLate!: (response: Response) => void;
+    const lateFetch = vi.fn<typeof globalThis.fetch>(() => new Promise<Response>((resolve) => { releaseLate = resolve; }));
+    const lateRefresh = refreshQboTokens(ctx, new QboOAuthClient(config, lateFetch));
+    await vi.waitFor(() => expect(lateFetch).toHaveBeenCalledTimes(1));
+    await expect(disconnectQbo(ctx, connection.data!.id, vi.fn().mockResolvedValue(undefined), crypto.randomUUID()))
+      .resolves.toMatchObject({ disconnected: true });
+    releaseLate(new Response(JSON.stringify({
+      access_token: "late-access", refresh_token: "late-refresh", expires_in: 3600,
+    }), { status: 200 }));
+    await expect(lateRefresh).rejects.toThrow("QuickBooks is unavailable");
+    expect(sql(`select count(*) from private.integration_tokens where brewery_id='${brewery.id}'`)).toEqual(["0"]);
   });
 });
