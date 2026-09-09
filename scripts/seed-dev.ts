@@ -6,6 +6,8 @@ import { createClient } from "@supabase/supabase-js";
 import { readServerEnv } from "@/lib/env/server-parser";
 import { assertLocalSeedUrl } from "@/scripts/seed-dev-url";
 
+const configuredSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+if (configuredSupabaseUrl !== undefined) assertLocalSeedUrl(configuredSupabaseUrl.trim());
 const serverEnv = readServerEnv();
 assertLocalSeedUrl(serverEnv.supabaseUrl);
 const admin = createClient(serverEnv.supabaseUrl, serverEnv.supabaseSecretKey, {
