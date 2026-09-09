@@ -233,6 +233,7 @@ omitted. They have no roles until they are built.
 | `get_stock_transfer` | Inventory & locations | ✓ | ✓ | ✓ |  |  |  |
 | `get_taproom_count` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
 | `get_taproom_count_snapshot` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
+| `get_taproom_draft_projection` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
 | `get_taproom_variance` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
 | `get_today` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `import_csv` | Team & brewery settings | ✓ |  |  |  |  |  |
@@ -2228,6 +2229,8 @@ Physical counts are available to Admin, Warehouse, and Taproom through the comma
 
 Changed stock or prior count requires refreshing the snapshot. Omitted, duplicate, extra, fractional, negative, overcount, historical and same-day repeat submissions are refused. An unchanged request ID returns the original result before these freshness checks; changed payload reuse conflicts. Saved-count correction remains unavailable, and generic inventory adjustments do not reverse count depletion. Printed lot labels are not exposed: ambiguous physical lot identity needs Warehouse assistance.
 
+`get_taproom_draft_projection` compares an unsaved recount with expected consumption from the latest saved count's creation time through the response's server `as_of`. It identifies that baseline and both bounds, groups expected BBL by brand, and reports coverage-source bounds and completeness, unmapped and ignored lines, excluded shares, and unattributed poured volume. No saved baseline or usable POS observation leaves expected null; a complete empty observation may return zero. This live read never posts inventory, allocates lots, freezes a POS snapshot, or replaces the count snapshot revision, and late reconciled facts may change a later response.
+
 A taproom holds stock like any other location, with two things a warehouse does
 not have: a par level per SKU, and standing allocations that reserve stock
 against a recurring need. Setting a standing allocation to zero releases it.
@@ -2356,6 +2359,23 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_taproom_count_snapshot", "input": { "locationId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+#### get_taproom_draft_projection [#get_taproom_draft_projection]
+
+`query` · admin, warehouse, taproom
+
+Expected consumption since the latest saved taproom count through the server as-of, grouped by brand for a draft recount. Returns the prior count identity and exact bounds, nullable expected BBL, coverage source bounds and completeness, mapping gaps, ignored lines, excluded shares and unattributed volume. Complete empty observation may mean zero; no baseline or usable observation stays null. Late reconciled sales may change this read, which never posts inventory or allocates physical lots
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_taproom_draft_projection", "input": { "locationId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### get_taproom_variance [#get_taproom_variance]

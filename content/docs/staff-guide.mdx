@@ -74,6 +74,8 @@ Use today's date in the brewery's timezone and the revision from the prepared co
 
 A matching count still saves its date, author, and all observations. Shortages post only the missing units to the exact bucket, using the Taproom sale channel. POS setup and sales do not affect this posting. Stock changes require a fresh review. Counts above recorded stock, incomplete counts, and a second count on the same date are refused. Retry an unchanged submission with the same request ID to recover the original result.
 
+The command API can also show expected consumption while the next count is still a draft. It uses the latest saved count as the starting observation and the server's current time as the end, and identifies that saved count and both timestamps. Expected amounts are grouped by brand because several package SKUs may belong to one beer; your physical entries remain separate by bin, SKU, and lot. No saved count means there is no baseline, and no usable POS observation leaves expected blank. A complete empty observation may show zero. Coverage bounds, partial coverage, unmapped or ignored lines, shares excluded because a tap was outside inventory, and poured volume without an active matching tap remain visible. Refreshing this live expectation never posts stock, allocates lots, or replaces the count form's stock revision. Late POS reconciliation may change it until the count is saved.
+
 Saved counts cannot yet be corrected. If a submitted count is wrong, ask Admin to investigate; a generic inventory adjustment does not reverse that count's recorded depletion or its tax reporting.
 
 ## Tap intervals [#tap-intervals]

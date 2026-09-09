@@ -7859,6 +7859,36 @@ begin
 end $$;
 revoke all on function private.reconcile_pos_sale(uuid,uuid) from public,anon,authenticated,service_role;
 
+-- One serving-allocation rule for both completed variance and the current
+-- draft-count projection. Packaged facts retain their frozen SKU volume;
+-- poured facts split across timestamp-active own taps, with excluded shares
+-- kept in the denominator and guest labels never inferred as a brand.
+create function private.taproom_pos_allocations(p_brewery uuid,p_location uuid,p_starts_at timestamptz,p_ends_at timestamptz)
+returns table(sale_id uuid,brand_id uuid,expected_bbl numeric,excluded_bbl numeric,unattributed_bbl numeric,split boolean,ignored boolean,unmapped boolean)
+language sql stable set search_path = '' as $$
+  with facts as (
+    select s.id,e.brand_id,e.expected_bbl,e.sku_id,coalesce(m.ignored,false) ignored,s.sold_at
+    from public.pos_sales s
+    left join public.pos_sale_expectations e on e.sale_id=s.id and e.brewery_id=p_brewery
+    left join public.pos_locations loc on loc.connection_id=s.connection_id and loc.external_location_id=s.external_location_id and loc.brewery_id=p_brewery
+    left join public.pos_item_mappings m on m.connection_id=s.connection_id and m.external_item_id=s.external_item_id and m.brewery_id=p_brewery
+    where s.brewery_id=p_brewery and s.sold_at>p_starts_at and s.sold_at<=p_ends_at
+      and coalesce(e.location_id,loc.location_id)=p_location
+  )
+  select f.id,f.brand_id,
+    f.expected_bbl * case when coalesce(t.n,0)=0 then 1 else (t.n-t.excluded)::numeric/t.n end,
+    f.expected_bbl * case when coalesce(t.n,0)=0 then 0 else t.excluded::numeric/t.n end,
+    case when coalesce(t.n,0)=0 and f.sku_id is null then f.expected_bbl else 0 end,
+    coalesce(t.n,0)>1,f.ignored,f.brand_id is null and not f.ignored
+  from facts f left join lateral (
+    select count(*) n,count(*) filter(where i.not_in_inventory) excluded from public.tap_intervals i
+    join public.skus s on s.id=i.sku_id and s.brewery_id=p_brewery
+    where i.brewery_id=p_brewery and i.location_id=p_location and s.brand_id=f.brand_id
+      and i.opened_at<=f.sold_at and (i.closed_at is null or f.sold_at<i.closed_at)
+  ) t on f.sku_id is null
+$$;
+revoke all on function private.taproom_pos_allocations(uuid,uuid,timestamp with time zone,timestamp with time zone) from public,anon,authenticated,service_role;
+
 -- Whole completed count periods, selected by the ending brewery-local date.
 -- Bounds are (prior.created_at,current.created_at]; opening tap bounds are
 -- [opened_at,closed_at). Timestamp-active equal shares are estimates, and
@@ -7890,33 +7920,17 @@ begin
         where c.brewery_id=p_brewery and c.location_id=p_location and c.connection_id=l.connection_id and c.external_location_id=l.external_location_id and c.complete) covered
     from public.pos_locations l where l.brewery_id=p_brewery and l.location_id=p_location
   ), facts as materialized (
-    select p.count_id,s.id,e.brand_id,e.expected_bbl,e.sku_id,e.location_id,
-      coalesce(m.ignored,false) ignored,s.sold_at
-    from periods p join public.pos_sales s on s.brewery_id=p_brewery and s.sold_at>p.starts_at and s.sold_at<=p.ends_at
-    left join public.pos_sale_expectations e on e.sale_id=s.id and e.brewery_id=p_brewery
-    left join public.pos_locations loc on loc.connection_id=s.connection_id and loc.external_location_id=s.external_location_id and loc.brewery_id=p_brewery
-    left join public.pos_item_mappings m on m.connection_id=s.connection_id and m.external_item_id=s.external_item_id and m.brewery_id=p_brewery
-    where coalesce(e.location_id,loc.location_id)=p_location
-  ), allocated as (
-    select f.*,coalesce(t.n,0) n,coalesce(t.excluded,0) excluded
-    from facts f left join lateral (
-      select count(*) n,count(*) filter(where i.not_in_inventory) excluded from public.tap_intervals i
-      join public.skus s on s.id=i.sku_id and s.brewery_id=p_brewery
-      where i.brewery_id=p_brewery and i.location_id=p_location and s.brand_id=f.brand_id
-        and i.opened_at<=f.sold_at and (i.closed_at is null or f.sold_at<i.closed_at)
-    ) t on f.sku_id is null
-    where f.brand_id is not null
+    select p.count_id,f.* from periods p
+    cross join lateral private.taproom_pos_allocations(p_brewery,p_location,p.starts_at,p.ends_at) f
   ), expected as materialized (
     select count_id,brand_id,
-      sum(expected_bbl * case when n=0 then 1 else (n-excluded)::numeric/n end) expected_bbl,
-      sum(expected_bbl * case when n=0 then 0 else excluded::numeric/n end) excluded_bbl,
-      sum(case when n=0 and sku_id is null then expected_bbl else 0 end) unattributed_bbl,
-      bool_or(n>1) split
-    from allocated group by count_id,brand_id
+      sum(expected_bbl) expected_bbl,sum(excluded_bbl) excluded_bbl,
+      sum(unattributed_bbl) unattributed_bbl,bool_or(split) split
+    from facts where brand_id is not null group by count_id,brand_id
   ), meta as materialized (
     select p.*,
       coalesce((select bool_and(coalesce(covered @> tstzrange(p.starts_at,p.ends_at,'(]'),false)) from sources),false) and p.prior_count_id is not null coverage_complete,
-      (select count(*) from facts f where f.count_id=p.count_id and f.brand_id is null and not f.ignored) unmapped_lines,
+      (select count(*) from facts f where f.count_id=p.count_id and f.unmapped) unmapped_lines,
       (select sum(actual_bbl) from actual a where a.count_id=p.count_id) actual_bbl,
       (select sum(expected_bbl) from expected e where e.count_id=p.count_id) mapped_bbl
     from periods p
@@ -7949,5 +7963,70 @@ begin
       order by c.ends_at,c.count_id),'[]'::jsonb) from comparable c)) into v_result;
   return v_result;
 end $$;
-revoke all on function get_taproom_variance(uuid,uuid,integer) from public,anon,authenticated,service_role;
-grant execute on function get_taproom_variance(uuid,uuid,integer) to authenticated;
+
+-- Live expected consumption beside an unsaved physical recount. Its baseline
+-- is always the latest durable count and its upper bound is this statement's
+-- server time; it neither freezes POS nor writes inventory.
+create function get_taproom_draft_projection(p_brewery uuid,p_location uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare v_count public.taproom_counts; v_as_of timestamptz:=now(); v_result jsonb;
+begin
+  perform private.assert_staff(p_brewery,array['admin','warehouse','taproom']::public.staff_role[]);
+  if not exists(select 1 from public.locations where id=p_location and brewery_id=p_brewery and kind='taproom') then raise exception 'choose an owned taproom location'; end if;
+  select * into v_count from public.taproom_counts where brewery_id=p_brewery and location_id=p_location
+    order by created_at desc,id desc limit 1;
+  if not found then
+    return jsonb_build_object('location_id',p_location,'prior_count',null,'starts_at',null,'ends_at',v_as_of,'as_of',v_as_of,
+      'projection','current; late reconciled sales can change expected','reason','missing_baseline','expected_bbl',null,
+      'coverage_complete',false,'coverage_sources','[]'::jsonb,'mapped_lines',0,'unmapped_lines',0,'ignored_lines',0,
+      'excluded_bbl',0,'unattributed_bbl',0,'rows','[]'::jsonb);
+  end if;
+  with sources as materialized (
+    select l.connection_id,l.external_location_id,
+      coalesce(c.covered,'{}'::tstzmultirange) @> tstzrange(v_count.created_at,v_as_of,'(]') complete,
+      c.observed_starts_at,c.observed_ends_at,c.observed_windows
+    from public.pos_locations l cross join lateral (
+      select range_agg(tstzrange(c.starts_at,c.ends_at,'(]')) filter(where c.complete) covered,
+        min(greatest(c.starts_at,v_count.created_at)) observed_starts_at,
+        max(least(c.ends_at,v_as_of)) observed_ends_at,count(*) observed_windows
+      from public.pos_sales_coverage c where c.brewery_id=p_brewery and c.location_id=p_location
+        and c.connection_id=l.connection_id and c.external_location_id=l.external_location_id
+        and c.ends_at>v_count.created_at and c.starts_at<v_as_of
+    ) c where l.brewery_id=p_brewery and l.location_id=p_location
+  ), facts as materialized (
+    select * from private.taproom_pos_allocations(p_brewery,p_location,v_count.created_at,v_as_of)
+  ), brands as materialized (
+    select f.brand_id,b.name brand_name,sum(f.expected_bbl) expected_bbl,sum(f.excluded_bbl) excluded_bbl,
+      sum(f.unattributed_bbl) unattributed_bbl,bool_or(f.split) split
+    from facts f join public.brands b on b.id=f.brand_id and b.brewery_id=p_brewery
+    group by f.brand_id,b.name
+  ), meta as (
+    select (select sum(expected_bbl) from facts where brand_id is not null) mapped_bbl,
+      (select count(*) from facts where brand_id is not null) mapped_lines,
+      (select count(*) from facts where unmapped) unmapped_lines,
+      (select count(*) from facts where ignored) ignored_lines,
+      coalesce((select sum(excluded_bbl) from facts where brand_id is not null),0) excluded_bbl,
+      coalesce((select sum(unattributed_bbl) from facts where brand_id is not null),0) unattributed_bbl,
+      coalesce((select bool_and(complete) from sources),false) coverage_complete,
+      coalesce((select sum(observed_windows) from sources),0) observed_windows
+  )
+  select jsonb_build_object('location_id',p_location,
+    'prior_count',jsonb_build_object('id',v_count.id,'counted_on',v_count.counted_on,'created_at',v_count.created_at),
+    'starts_at',v_count.created_at,'ends_at',v_as_of,'as_of',v_as_of,
+    'projection','current; late reconciled sales can change expected',
+    'reason',case when m.mapped_bbl is not null then null
+      when m.coverage_complete and m.unmapped_lines=0 then null
+      when m.coverage_complete then 'unmapped_pos_lines'
+      when m.observed_windows=0 then 'no_pos_coverage' else 'incomplete_pos_coverage' end,
+    'expected_bbl',case when m.mapped_bbl is not null then m.mapped_bbl
+      when m.coverage_complete and m.unmapped_lines=0 then 0 end,
+    'coverage_complete',m.coverage_complete,
+    'coverage_sources',(select coalesce(jsonb_agg(to_jsonb(s)-'observed_windows' order by external_location_id,connection_id),'[]'::jsonb) from sources s),
+    'mapped_lines',m.mapped_lines,'unmapped_lines',m.unmapped_lines,'ignored_lines',m.ignored_lines,
+    'excluded_bbl',m.excluded_bbl,'unattributed_bbl',m.unattributed_bbl,
+    'rows',(select coalesce(jsonb_agg(to_jsonb(b) order by brand_name,brand_id),'[]'::jsonb) from brands b)) into v_result
+  from meta m;
+  return v_result;
+end $$;
+revoke all on function get_taproom_variance(uuid,uuid,integer),get_taproom_draft_projection(uuid,uuid) from public,anon,authenticated,service_role;
+grant execute on function get_taproom_variance(uuid,uuid,integer),get_taproom_draft_projection(uuid,uuid) to authenticated;

@@ -17,6 +17,23 @@ import { admin, ins, seedCatalog, sql, channelId } from "./helpers";
 
 type Row = { brand_id: string; expected_bbl: number | null; actual_bbl: number; variance_bbl: number | null; excluded_bbl: number; unattributed_bbl: number; split: boolean };
 type Report = { rows: Row[]; periods: { count_id: string; prior_count_id: string | null; starts_at: string | null; ends_at: string; starts_before_window: boolean; coverage_complete: boolean; unmapped_lines: number; expected_bbl: number | null; actual_bbl: number; reason: string | null }[]; reason: string | null };
+type DraftProjection = {
+  location_id: string;
+  prior_count: { id: string; counted_on: string; created_at: string } | null;
+  starts_at: string | null;
+  ends_at: string;
+  as_of: string;
+  expected_bbl: number | null;
+  coverage_complete: boolean;
+  coverage_sources: { connection_id: string; external_location_id: string; observed_starts_at: string | null; observed_ends_at: string | null; complete: boolean }[];
+  mapped_lines: number;
+  unmapped_lines: number;
+  ignored_lines: number;
+  excluded_bbl: number;
+  unattributed_bbl: number;
+  rows: { brand_id: string; brand_name: string; expected_bbl: number; excluded_bbl: number; unattributed_bbl: number; split: boolean }[];
+  reason: string | null;
+};
 async function fixture() {
   const brewery = await makeBrewery();
   const ctx = await makeStaffCtx(brewery.id, "taproom");
@@ -52,6 +69,9 @@ async function coverage(f: F, start = -100, end = 0, complete = true, extra: Rec
 }
 async function report(f: F, weeks = 4) {
   return await runCommand("get_taproom_variance", { locationId: f.location.id, weeks }, f.ctx) as Report;
+}
+async function draft(f: F) {
+  return await runCommand("get_taproom_draft_projection", { locationId: f.location.id }, f.ctx) as DraftProjection;
 }
 const fingerprint = (f: F) => sql(`select md5(coalesce((select jsonb_agg(to_jsonb(t) order by id)::text from public.inventory_movements t where brewery_id='${f.brewery.id}'),'') ||
   coalesce((select jsonb_agg(to_jsonb(t) order by id)::text from public.taproom_counts t where brewery_id='${f.brewery.id}'),'') ||
@@ -248,4 +268,102 @@ it("every mapped source must cover the period, and concurrent reconciliation fre
     expect((await report(f)).rows[0].expected_bbl).toBe(5.25);
     expect(fingerprint(f)).toEqual(before);
   } finally {await a.query("rollback"); await Promise.all([a.end(),b.end()]);}
+});
+
+it("projects only frozen POS facts after the latest durable count through a server as-of", async () => {
+  const f = await fixture();
+  const first = await count(f, -14, null, 0);
+  await coverage(f, -14, 1);
+  reconcile(f, (await sale(f, -15, 248)).id);
+  reconcile(f, (await sale(f, -10, 248)).id);
+  const before = fingerprint(f);
+
+  const current = await draft(f);
+  expect(current).toMatchObject({
+    location_id: f.location.id,
+    prior_count: { id: first, counted_on: stamp(f, -14).slice(0, 10) },
+    expected_bbl: 1,
+    coverage_complete: true,
+    mapped_lines: 1,
+    unmapped_lines: 0,
+    ignored_lines: 0,
+    reason: null,
+  });
+  expect(new Date(current.starts_at!).toISOString()).toBe(stamp(f, -14));
+  expect(new Date(current.prior_count!.created_at).toISOString()).toBe(stamp(f, -14));
+  expect(current.ends_at).toBe(current.as_of);
+  expect(new Date(current.as_of).getTime()).toBeGreaterThan(new Date(current.starts_at!).getTime());
+  expect(current.coverage_sources).toHaveLength(1);
+  expect(current.coverage_sources[0]).toMatchObject({ external_location_id: "L", complete: true });
+  expect(new Date(current.coverage_sources[0].observed_starts_at!).toISOString()).toBe(stamp(f, -14));
+  expect(current.coverage_sources[0].observed_ends_at).toBe(current.as_of);
+  expect((await report(f)).rows).toEqual([]); // Completed periods deliberately omit the open draft interval.
+  expect(fingerprint(f)).toEqual(before);
+
+  const second = await count(f, -7, first, 0);
+  reconcile(f, (await sale(f, -1, 248)).id);
+  const afterAdvanceWrites = fingerprint(f);
+  const advanced = await draft(f);
+  expect(advanced).toMatchObject({ prior_count: { id: second }, expected_bbl: 1, mapped_lines: 1 });
+  expect(new Date(advanced.starts_at!).toISOString()).toBe(stamp(f, -7));
+  expect(fingerprint(f)).toEqual(afterAdvanceWrites);
+});
+
+it("keeps missing baseline, absent POS, incomplete observation and complete empty observation distinct", async () => {
+  const first = await fixture();
+  expect(await draft(first)).toMatchObject({ prior_count: null, starts_at: null, expected_bbl: null, reason: "missing_baseline", rows: [] });
+
+  await count(first, -14, null, 0);
+  expect(await draft(first)).toMatchObject({ expected_bbl: null, coverage_complete: false, reason: "no_pos_coverage" });
+  await coverage(first, -14, -7, false);
+  const incomplete = await draft(first);
+  expect(incomplete).toMatchObject({ expected_bbl: null, coverage_complete: false, reason: "incomplete_pos_coverage" });
+  expect(incomplete.coverage_sources).toMatchObject([{ external_location_id: "L", complete: false }]);
+  expect(new Date(incomplete.coverage_sources[0].observed_ends_at!).toISOString()).toBe(stamp(first, -7));
+
+  const empty = await fixture();
+  await count(empty, -14, null, 0); await coverage(empty, -14, 1);
+  expect(await draft(empty)).toMatchObject({ expected_bbl: 0, coverage_complete: true, reason: null, rows: [] });
+  const late = await sale(empty, -1, 248);
+  expect(await draft(empty)).toMatchObject({ expected_bbl: null, unmapped_lines: 1, reason: "unmapped_pos_lines" });
+  reconcile(empty, late.id);
+  expect(await draft(empty)).toMatchObject({ expected_bbl: 1, mapped_lines: 1, reason: null });
+});
+
+it("groups packaged SKUs by brand and reports mapping, exclusion and attribution limits", async () => {
+  const f = await fixture(); await count(f, -14, null, 0); await coverage(f, -14, 1);
+  const format = await ins("formats", { brewery_id: f.brewery.id, name: "Quarter keg", basis: "packaged", package_type: "keg", keg_size: "quarter_bbl", bbl_per_unit: .25 });
+  const sku = await ins("skus", { brewery_id: f.brewery.id, brand_id: f.cat.brandId, format_id: format.id, name: "Hazy quarter" });
+  await ins("pos_item_mappings", { brewery_id: f.brewery.id, connection_id: f.connection.id, external_item_id: "half-keg", sku_id: f.cat.skuId });
+  await ins("pos_item_mappings", { brewery_id: f.brewery.id, connection_id: f.connection.id, external_item_id: "quarter-keg", sku_id: sku.id });
+  for (const external_item_id of ["half-keg", "quarter-keg"]) reconcile(f, (await sale(f, -10, 1, { external_item_id })).id);
+  const unknown = await sale(f, -9, 1, { external_item_id: "unknown" }); expect(reconcile(f, unknown.id)).toBe("false");
+  await ins("pos_item_mappings", { brewery_id: f.brewery.id, connection_id: f.connection.id, external_item_id: "food", ignored: true });
+  const ignored = await sale(f, -8, 1, { external_item_id: "food" }); expect(reconcile(f, ignored.id)).toBe("false");
+  await interval(f, -11, -5, true);
+  reconcile(f, (await sale(f, -10, 248)).id);
+  reconcile(f, (await sale(f, -1, 248)).id);
+
+  const result = await draft(f);
+  expect(result).toMatchObject({ expected_bbl: 1.75, unmapped_lines: 1, ignored_lines: 1, excluded_bbl: 1, unattributed_bbl: 1 });
+  expect(result.rows).toEqual([{ brand_id: f.cat.brandId, brand_name: "Hazy", expected_bbl: 1.75, excluded_bbl: 1, unattributed_bbl: 1, split: false }]);
+  expect(result.rows[0]).not.toHaveProperty("sku_id");
+  expect(result.rows[0]).not.toHaveProperty("lot_id");
+});
+
+it("authorizes the draft projection by tenant and Taproom role and aggregates beyond the row cap", async () => {
+  const f = await fixture(); await count(f, -14, null, 0); await coverage(f, -14, 1);
+  sql(`insert into public.pos_sales(brewery_id,connection_id,external_order_id,external_line_id,external_item_id,external_location_id,sold_at,qty)
+    select '${f.brewery.id}','${f.connection.id}',n::text,'line','pint','L','${stamp(f, -1)}',1 from generate_series(1,1005) n`);
+  sql(`select private.reconcile_pos_sale(brewery_id,id) from public.pos_sales where brewery_id='${f.brewery.id}'`);
+  expect((await draft(f)).expected_bbl).toBeCloseTo(1005 * 16 / 3968, 10);
+
+  for (const role of ["sales", "brewer"] as const) {
+    const ctx = await makeStaffCtx(f.brewery.id, role);
+    await expect(runCommand("get_taproom_draft_projection", { locationId: f.location.id }, ctx)).rejects.toMatchObject({ code: "permission_denied" });
+  }
+  const other = await fixture();
+  expect((await f.ctx.db.rpc("get_taproom_draft_projection", { p_brewery: other.brewery.id, p_location: other.location.id })).error?.code).toBe("42501");
+  const warehouse = await seedLocation(f.brewery.id, { name: "Warehouse" });
+  expect((await f.ctx.db.rpc("get_taproom_draft_projection", { p_brewery: f.brewery.id, p_location: warehouse.id })).error).not.toBeNull();
 });

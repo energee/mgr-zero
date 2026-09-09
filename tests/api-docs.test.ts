@@ -35,7 +35,7 @@ describe("HTTP API reference", () => {
   });
 
   it("publishes explicit-bucket taproom count commands with truthful correction limits", () => {
-    for (const name of ["get_taproom_count_snapshot", "record_taproom_count", "get_taproom_count"]) {
+    for (const name of ["get_taproom_count_snapshot", "get_taproom_draft_projection", "record_taproom_count", "get_taproom_count"]) {
       expect(apiOperations().find(o => o.name === name)).toMatchObject({ status: "available", roles: "admin, warehouse, taproom" });
     }
     const definition = getCommandDefinition("record_taproom_count")!;

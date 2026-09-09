@@ -195,3 +195,8 @@ defineQuery({
   input: z.object({ locationId: z.string().uuid(), weeks: z.union([z.literal(4), z.literal(12)]) }), roles: [...COUNT_ROLES],
   handler: (ctx,i) => unwrap(ctx.db.rpc("get_taproom_variance", { p_brewery: ctx.breweryId, p_location: i.locationId, p_weeks: i.weeks })),
 });
+defineQuery({
+  name: "get_taproom_draft_projection", description: "Expected consumption since the latest saved taproom count through the server as-of, grouped by brand for a draft recount. Returns the prior count identity and exact bounds, nullable expected BBL, coverage source bounds and completeness, mapping gaps, ignored lines, excluded shares and unattributed volume. Complete empty observation may mean zero; no baseline or usable observation stays null. Late reconciled sales may change this read, which never posts inventory or allocates physical lots",
+  input: z.object({ locationId: z.string().uuid() }), roles: [...COUNT_ROLES],
+  handler: (ctx,i) => unwrap(ctx.db.rpc("get_taproom_draft_projection", { p_brewery: ctx.breweryId, p_location: i.locationId })),
+});
