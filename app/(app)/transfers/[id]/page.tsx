@@ -3,13 +3,13 @@
 // Receive. Receiving posts the paired ledger rows; the page then shows what
 // moved. Same movements as Complete transfer, no invoice.
 import type { BinMoveStock } from "@/lib/commands/inventory";
-import { E } from "@/components/mgr/e";
+import { TransferDetailView } from "@/components/mgr/views/transfer-detail";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
+import { toTransferDetailViewProps } from "@/lib/mgr/transfer-detail-view";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
-import { trfNo } from "@/lib/mgr/doc-no";
 import { TransferActions } from "./transfer-actions";
 
 type Detail = {
@@ -29,22 +29,28 @@ export default async function TransferPage({ params }: { params: Promise<{ id: s
   const what = (l: Detail["lines"][number]) => l.skus?.name ?? l.materials?.name ?? (l.keg_pools ? `${l.keg_pools.name} · ${l.keg_size?.replace("_", " ")}` : "Line");
   const done = transfer.status === "received";
   return (
-    <>
-      {E.back("Transfers", trfNo(transfer.transfer_no), undefined, "/transfers")}
-      {E.fld(<>From {E.arrow(null)} to</>, <>{transfer.from_location?.name ?? "—"} {E.arrow()} {transfer.to_location?.name ?? "—"}</>)}
-      {E.fld("Status", transfer.status.replace("_", " "))}
-      {transfer.note ? E.fld("Note", transfer.note) : null}
-      {lines.map((l) => (
-        <div key={l.id}>
-          {E.row(what(l), `${bin(l.from_bin_id)} → ${bin(l.to_bin_id)}`, l.qty_picked === null ? String(Number(l.qty)) : `${Number(l.qty_picked)} / ${Number(l.qty)}`, done ? "ok" : "")}
-        </div>
-      ))}
-      {done ? E.info("Received: the paired movements are on the ledger. No invoice: this is an internal move.") : (
-        <>
-          {E.sp()}
-          <TransferActions stock={stock} transferId={transfer.id} status={transfer.status} lines={lines.map((l) => ({ id: l.id, skuId: l.sku_id, materialId: l.material_id, fromBinId: l.from_bin_id, qty: Number(l.qty), qtyPicked: l.qty_picked === null ? null : Number(l.qty_picked) }))} />
-        </>
+    <TransferDetailView
+      model={toTransferDetailViewProps({
+        transfer: {
+          id: transfer.id,
+          transfer_no: transfer.transfer_no,
+          status: transfer.status,
+          note: transfer.note,
+          from_name: transfer.from_location?.name ?? "—",
+          to_name: transfer.to_location?.name ?? "—",
+        },
+        lines: lines.map((l) => ({
+          id: l.id,
+          name: what(l),
+          from_bin: bin(l.from_bin_id),
+          to_bin: bin(l.to_bin_id),
+          qty: Number(l.qty),
+          qty_picked: l.qty_picked === null ? null : Number(l.qty_picked),
+        })),
+      })}
+      footer={done ? undefined : (
+        <TransferActions stock={stock} transferId={transfer.id} status={transfer.status} lines={lines.map((l) => ({ id: l.id, skuId: l.sku_id, materialId: l.material_id, fromBinId: l.from_bin_id, qty: Number(l.qty), qtyPicked: l.qty_picked === null ? null : Number(l.qty_picked) }))} />
       )}
-    </>
+    />
   );
 }

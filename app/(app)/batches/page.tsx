@@ -4,9 +4,11 @@
 // (upsert_vessel via vessel-form.tsx) since they exist only to be picked at
 // brew day and in the cellar, never as their own tab.
 import { E } from "@/components/mgr/e";
+import { BatchesView } from "@/components/mgr/views/batches";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
+import { toBatchesViewProps } from "@/lib/mgr/batches-view";
 import "@/lib/commands/all";
 import { batNo } from "@/lib/mgr/doc-no";
 import { NewBatchForm } from "./new-batch-form";
@@ -28,17 +30,18 @@ export default async function BatchesPage() {
     runCommand("list_recipes", {}, ctx), runCommand("list_vessels", {}, ctx),
   ])) as [Batch[], Brand[], Recipe[], Vessel[]];
 
-  // schedule_batch names a recipe *version*; list_recipes carries each
-  // recipe's latest one, and a recipe with no version yet cannot be brewed.
   const recipeVersions = recipes.flatMap((r) =>
     r.latest_version_id ? [{ id: r.latest_version_id, label: `${r.name} v${r.latest_version}` }] : []);
 
   return (
-    <>
-      {E.hd("Batches", "brewed and planned", <NewBatchForm brands={brands} recipeVersions={recipeVersions} />)}
-      {batches.length === 0
-        ? E.blank("No batches yet")
-        : batches.map((b) => (
+    <BatchesView
+      model={toBatchesViewProps({ title: "Batches", subtitle: "brewed and planned" })}
+      createAction={<NewBatchForm brands={brands} recipeVersions={recipeVersions} />}
+      tabs={null}
+      list={
+        batches.length === 0
+          ? E.blank("No batches yet")
+          : batches.map((b) => (
             <div key={b.id}>
               {E.row(
                 batNo(b.batch_no),
@@ -47,17 +50,22 @@ export default async function BatchesPage() {
                 b.brewed_on ? "ok" : "",
               )}
             </div>
-          ))}
-      {E.sp()}
-      {E.ttl("Vessels")}
-      <VesselForm />
-      {vessels.length === 0
-        ? E.blank("No vessels yet")
-        : vessels.map((v) => (
-            <div key={v.id}>
-              {E.row(v.name, `${v.kind} · ${Number(v.capacity_bbl)} bbl`, <VesselForm vessel={v} />)}
-            </div>
-          ))}
-    </>
+          ))
+      }
+      footer={
+        <>
+          {E.sp()}
+          {E.ttl("Vessels")}
+          <VesselForm />
+          {vessels.length === 0
+            ? E.blank("No vessels yet")
+            : vessels.map((v) => (
+              <div key={v.id}>
+                {E.row(v.name, `${v.kind} · ${Number(v.capacity_bbl)} bbl`, <VesselForm vessel={v} />)}
+              </div>
+            ))}
+        </>
+      }
+    />
   );
 }
