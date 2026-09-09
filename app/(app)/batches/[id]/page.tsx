@@ -4,9 +4,11 @@
 // sense to offer, but record_brew_day itself is the one place that refuses
 // an overlap, so every vessel is offered here.
 import { E } from "@/components/mgr/e";
+import { BrewDayView } from "@/components/mgr/views/brew-day";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
+import { toBrewDayViewProps } from "@/lib/mgr/brew-day-view";
 import "@/lib/commands/all";
 import { orNotFound } from "@/lib/mgr/not-found";
 import { batNo } from "@/lib/mgr/doc-no";
@@ -29,11 +31,14 @@ export default async function BatchPage({ params }: { params: Promise<{ id: stri
   ])) as [{ batch: Batch; occupancy: Occupancy | null }, Vessel[]];
 
   return (
-    <>
-      {E.back("Batches", batNo(batch.batch_no))}
-      {E.fld("Planned", `${Number(batch.planned_bbl)} bbl · ${batch.planned_on}`)}
-      {batch.note ? E.fld("Note", batch.note) : null}
-      {occupancy ? (
+    <BrewDayView
+      model={toBrewDayViewProps({
+        title: batNo(batch.batch_no),
+        backHref: "/batches",
+        planned: `${Number(batch.planned_bbl)} bbl · ${batch.planned_on}`,
+        note: batch.note ?? undefined,
+      })}
+      body={occupancy ? (
         <>
           {E.fld("Vessel", occupancy.vessel_name)}
           {E.fld("Knockout", `${Number(occupancy.initial_bbl)} bbl`)}
@@ -46,6 +51,6 @@ export default async function BatchPage({ params }: { params: Promise<{ id: stri
           <RecordBrewDayForm batchId={batch.id} plannedBbl={Number(batch.planned_bbl)} vessels={vessels} />
         </>
       )}
-    </>
+    />
   );
 }

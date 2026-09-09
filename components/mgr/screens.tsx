@@ -25,11 +25,14 @@ import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 import { Fragment, type ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { AdjustLinesView } from "@/components/mgr/views/adjust-lines";
+import { BatchesView } from "@/components/mgr/views/batches";
 import { BeerView } from "@/components/mgr/views/beer";
 import { BinView } from "@/components/mgr/views/bin";
+import { BrewDayView } from "@/components/mgr/views/brew-day";
 import { BrandView } from "@/components/mgr/views/brand";
 import { CatalogView } from "@/components/mgr/views/catalog";
 import { ChannelView } from "@/components/mgr/views/channel";
+import { ClosePackagingRunView } from "@/components/mgr/views/close-packaging-run";
 import { CompleteTransferView } from "@/components/mgr/views/complete-transfer";
 import { ConfirmOrderView } from "@/components/mgr/views/confirm-order";
 import { CustomerView } from "@/components/mgr/views/customer";
@@ -65,11 +68,15 @@ import { PriceGroupView } from "@/components/mgr/views/price-group";
 import { PriceGroupsView } from "@/components/mgr/views/price-groups";
 import { PutBackView } from "@/components/mgr/views/put-back";
 import { QuestionInvoiceView } from "@/components/mgr/views/question-invoice";
+import { RecipeView } from "@/components/mgr/views/recipe";
+import { RecipesView } from "@/components/mgr/views/recipes";
 import { RecordMovementView } from "@/components/mgr/views/record-movement";
+import { RunClosedView } from "@/components/mgr/views/run-closed";
 import { ReverseMovementView } from "@/components/mgr/views/reverse-movement";
 import { ReturnCreditView } from "@/components/mgr/views/return-credit";
 import { ReviewOrderView } from "@/components/mgr/views/review-order";
 import { SaleChannelsView } from "@/components/mgr/views/sale-channels";
+import { ScheduleBatchView } from "@/components/mgr/views/schedule-batch";
 import { SearchView } from "@/components/mgr/views/search";
 import { SessionExpiredView } from "@/components/mgr/views/session-expired";
 import { SettingsView } from "@/components/mgr/views/settings";
@@ -86,6 +93,7 @@ import { WorkView } from "@/components/mgr/views/work";
 import { TransferDetailView } from "@/components/mgr/views/transfer-detail";
 import { TransfersView } from "@/components/mgr/views/transfers";
 import { UnitsView } from "@/components/mgr/views/units";
+import { VesselDetailView } from "@/components/mgr/views/vessel-detail";
 import { OHIO_STOUT_NOTE, LOC_TAPROOM, LOC_WAREHOUSE } from "@/lib/mgr/fixtures/demo";
 import { beerOverview } from "@/lib/mgr/fixtures/beer";
 import { brandHazy, catalogBrands, formatCan, formatsInventory, packageBomCase, skuHazyHalf, skuListHazy } from "@/lib/mgr/fixtures/catalog";
@@ -107,6 +115,10 @@ import { binCold, locationBinsTaproom, locationTaproom, locationsList } from "@/
 import { completeTransferTape, newOrderDraft, orderPickedRestock, orderPickedRestockPutBack, orderSubmittedRidgeline, orderTransferComplete, ordersWorkList } from "@/lib/mgr/fixtures/orders";
 import { orderAdjustLines, orderPick, orderReturnCredit, orderShipInvoice, orderShipOnDelivery, orderShipmentDone, orderShortPick } from "@/lib/mgr/fixtures/order-sheets";
 import { parsPils } from "@/lib/mgr/fixtures/pars";
+import {
+  batchesBrewer, brewDayHazy, closePackagingRunHazy, recipeHazyV4, recipesList,
+  runClosedHazy, scheduleBatchHazy, vesselFv3,
+} from "@/lib/mgr/fixtures/production";
 import { PICK_SHEET_DATE_CHIPS, pickSheet } from "@/lib/mgr/fixtures/pick-sheet";
 import { ridgelineReviewOrder, ridgelineShop } from "@/lib/mgr/fixtures/portal";
 import { portalAccountRidgeline, portalMeRidgeline } from "@/lib/mgr/fixtures/portal-account";
@@ -116,11 +128,14 @@ import { priceGroupTwo, pricingGrid } from "@/lib/mgr/fixtures/pricing";
 import { channelExport, saleChannelsList, unitsPlato } from "@/lib/mgr/fixtures/settings-catalog";
 import { newTransferDraft, transferDetailSubmitted, transfersList } from "@/lib/mgr/fixtures/transfers";
 import { toAdjustLinesViewProps } from "@/lib/mgr/adjust-lines-view";
+import { toBatchesViewProps } from "@/lib/mgr/batches-view";
 import { toBeerViewProps } from "@/lib/mgr/beer-view";
+import { toBrewDayViewProps } from "@/lib/mgr/brew-day-view";
 import { toBinViewProps } from "@/lib/mgr/bin-view";
 import { toBrandViewProps } from "@/lib/mgr/brand-view";
 import { toCatalogViewProps } from "@/lib/mgr/catalog-view";
 import { toChannelViewProps } from "@/lib/mgr/channel-view";
+import { toClosePackagingRunViewProps } from "@/lib/mgr/close-packaging-run-view";
 import { toCompleteTransferViewProps } from "@/lib/mgr/complete-transfer-view";
 import { toConfirmOrderViewProps } from "@/lib/mgr/confirm-order-view";
 import { toCustomerViewProps } from "@/lib/mgr/customer-view";
@@ -156,7 +171,11 @@ import { toPriceGroupViewProps } from "@/lib/mgr/price-group-view";
 import { toPriceGroupsViewProps } from "@/lib/mgr/price-groups-view";
 import { toPutBackViewProps } from "@/lib/mgr/put-back-view";
 import { toQuestionInvoiceViewProps } from "@/lib/mgr/question-invoice-view";
+import { toRecipeViewProps } from "@/lib/mgr/recipe-view";
+import { toRecipesViewProps } from "@/lib/mgr/recipes-view";
 import { toRecordMovementViewProps } from "@/lib/mgr/record-movement-view";
+import { toRunClosedViewProps } from "@/lib/mgr/run-closed-view";
+import { toScheduleBatchViewProps } from "@/lib/mgr/schedule-batch-view";
 import { toReverseMovementViewProps } from "@/lib/mgr/reverse-movement-view";
 import { toReviewOrderViewProps } from "@/lib/mgr/review-order-view";
 import { toReturnCreditViewProps } from "@/lib/mgr/return-credit-view";
@@ -176,6 +195,7 @@ import { toTodayViewProps } from "@/lib/mgr/today-view";
 import { toTransferDetailViewProps } from "@/lib/mgr/transfer-detail-view";
 import { toTransfersViewProps } from "@/lib/mgr/transfers-view";
 import { toUnitsViewProps } from "@/lib/mgr/units-view";
+import { toVesselDetailViewProps } from "@/lib/mgr/vessel-detail-view";
 import { toWorkViewProps } from "@/lib/mgr/work-view";
 import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-icons";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
@@ -1571,20 +1591,7 @@ export const SCREENS: Screen[] = [
     writes: "upsert_vessel [design; mutable facts only]",
     states: [["permission", "brewer or admin required", 1], ["occupied", "batch and fill shown"], ["empty", "available for a batch"], ["reading overdue", "last reading flagged", 1]],
     spec: "Batch occupancy and reading history are records; only the vessel name, type and capacity are editable here.",
-    body: (<>
-      {E.back("Cellar map", "FV3")}
-      {E.row("Stout · BATCH-0168", "13.5 / 15 bbl · 90% full", E.act("Open batch"), "w")}
-      {E.fld("Current reading", "5.2 °P · 68.2 °F · overdue 31 h")}
-      {E.ttl("Reading history")}
-      {E.row("9/02 · 7:10 AM", "5.2 °P · 68.2 °F", "Dana")}
-      {E.row("9/01 · 7:04 AM", "6.8 °P · 67.9 °F", "Ali")}
-      {E.row("8/31 · 6:58 AM", "8.6 °P · 67.5 °F", "Dana")}
-      {E.ttl("Vessel facts")}
-      {E.edit("Name", "FV3")}
-      {E.pick("Type", "Fermenter", ["Fermenter", "Brite", "Barrel", "Kettle", "Other"])}
-      {E.edit("Capacity", "15")}
-      {E.btn("Save vessel")}
-    </>),
+    body: <VesselDetailView model={toVesselDetailViewProps(vesselFv3)} />,
   },
   {
     step: 7,
@@ -1643,15 +1650,7 @@ export const SCREENS: Screen[] = [
     writes: "none [scheduling happens on Schedule batch; recording on Brew day]",
     states: [["planned", "Start is the next action"], ["active", "the row names the next reading or transfer"], ["empty", "no batches yet: New batch is the only action"]],
     spec: "The Work list with the Batches tab active. Planned batches sort before active batches due for attention; every row names its next action. New batch opens Schedule batch, and Schedule batch and Brew day return here.",
-    body: (<>
-      {E.hd("Work", "brewer default", E.btn("New batch"))}
-      {E.tabs(WORK_CHIPS, 3, "w-full", WORK_TABS)}
-      {E.ttl("Planned")}
-      {E.row("B-0416 · Hazy IPA v4", "Fri 9/4 · 15 bbl", E.act("Start", "info"))}
-      {E.ttl("Active")}
-      {E.row("B-0409 · Pils", "FV1 · 1.9 °P · read 4 h ago", E.act("Reading", "info"))}
-      {E.row("B-0413 · Stout", "FV3 · reading overdue 31 h", E.act("Reading", "info"), "w")}
-    </>),
+    body: <BatchesView model={toBatchesViewProps(batchesBrewer)} />,
   },
   {
     step: 7,
@@ -1663,15 +1662,7 @@ export const SCREENS: Screen[] = [
     writes: "schedule_batch [single planned-batch row; both the recipe version and the intended brand are nullable]",
     states: [["permission", "brewer or admin required", 1], ["planned", "Save schedule is the one verb"], ["no recipe yet", "date and barrels alone hold the slot"], ["no brand yet", "identity waits for packaging, which already requires one"], ["brew day", "Record brew day is its own screen"]],
     spec: "The planned mode of brew day: date, planned barrels, and two optional statements of intent. Only date and barrels commit anything: they reserve the slot. The recipe version is already optional in the schema, and revision 2 makes the brand optional too, because identity is optional at brew and required at packaging, where every finished lot must already name a brand. Requiring either here enforces nothing the lot does not, and only forces the decision earlier than the business makes it. Keeping brand as intent is also what keeps the gap between what a batch was meant to be and what it shipped as worth querying, rather than rewriting history when a batch blends or turns into something else. Record brew day is a separate screen so this page has one primary.",
-    body: (<>
-      {E.back("Batches", "B-0416 · Hazy")}
-      {E.pick("Recipe · optional", "Hazy IPA v4", ["Not decided", "Hazy IPA v4", "Pils v3", "Stout v2"])}
-      {E.pick("Brand · optional", "Hazy IPA", ["Not decided", "Hazy IPA", "Pils", "Stout"])}
-      {E.edit("Planned barrels", "15", "number")}
-      {E.edit("Date", "2026-09-04", "date")}
-      {E.sp()}
-      {E.btn("Save schedule")}
-    </>),
+    body: <ScheduleBatchView model={toScheduleBatchViewProps(scheduleBatchHazy)} />,
   },
   {
     step: 7,
@@ -1684,17 +1675,7 @@ export const SCREENS: Screen[] = [
     writes: "record_brew_day [design; one RPC: additions + material movements + occupancy]",
     states: permitted("brewer or admin required"),
     spec: "The brew sheet row is a read-out of the version’s process spec, opened frozen; brew day captures actuals, and fermentation reality arrives through Fermentation reading, so there is no mash-actuals form here. Brew-day mode: actual lots and knockout vessel. Planned recipe/date/barrels live on Schedule batch so this page has one primary. Record brew day posts immutable material consumption for mash/boil/whirlpool stages only; the 18 lb Citra dry hop is posted later from Cellar addition. Yeast is consumed as a material lot, not a culture generation (plan §8).",
-    body: (<>
-      {E.back("Batches", "B-0416 · Hazy")}
-      {E.nav("2-row", "lot L-0821 · 660 lb")}
-      {E.nav("Citra · boil", "lot L-0790 · 6 lb")}
-      {E.nav("Yeast", "WLP066 · lot Y-0312 · 1 brink")}
-      {E.fld("Knockout baseline", <>14.6 bbl {E.arrow()} FV2</>)}
-      {E.nav("Brew sheet · Hazy IPA v4", "mash 3 steps · whirlpool 20 min · read only")}
-      {E.tape([["Start B-0416 · Hazy IPA v4", ""], ["Consume additions", "named material lots"], [<>Knockout 14.6 bbl {E.arrow()} FV2</>, "loss baseline"]])}
-      {E.sp()}
-      {E.btn("Record brew day", "irr")}
-    </>),
+    body: <BrewDayView model={toBrewDayViewProps(brewDayHazy)} />,
   },
   {
     step: 7,
@@ -1731,20 +1712,7 @@ export const SCREENS: Screen[] = [
     writes: "schedule_packaging_run [one RPC: run planned against a brand, with an optional source occupancy, + planned outputs] · update_packaging_run [pick the tank, or stamp the run started: both require a tank] · close_packaging_run [one RPC: revalidate source + close + lot + outputs + material movements at explicit locations]",
     states: [["permission", "brewer or warehouse required", 1], ["short", "a material is short · resolve or explicitly override before starting", 1], ["no damage", "the ordinary close · both fields stay at zero and nothing extra posts"], ["damage", "a named quantity is written off to an explicit bin", 1]],
     spec: "The close half of the packaging frame; planning and editing the plan live in the Schedule packaging run sheet until the run starts. Close is a copper review ( revalidated source, actual outputs, lot, explicit finished-goods destination, material consumption and damage, yield/loss). Consumption is derived from what was actually packaged, never from the plan, which is why leftover material needs no entry: 118 cases consumed 2,832 cans and ends, and the rest never left the shelf to be returned. Damage is the one thing nobody can derive, so it is the one thing asked for, optional and starting at zero. It is asked only where material is issued in whole units and comes back short: labels and ends, not every line of the bill of materials, because a prompt on all five is friction nobody completes. Labels are never counted here. Nobody can count what is left on a roll, and a screen that asks will simply be given a guess that posts as fact; the roll is reconciled at cycle count by counting whole rolls instead. A damaged unit names its destination for the same reason finished goods do: material written off against the wrong bin is worse than material nobody tracked. Print labels is presentation after commit: measured thermal keg-collar/lot labels per plan §3. No packaging-day-actuals screen.",
-    body: (<>
-      {E.back("Work", "RUN-0031 · started")}
-      {E.fld("Packaging source", "FV3 · B-0416")}
-      {E.tbl(["need", "have", "short"], [["cans 2,880", "3,100", "0"], ["ends 2,880", "2,400", <><span className="text-warning-foreground">480</span></>], ["labels 2,880", "5,000", "0"]])}
-      {E.note("480 ends short · resolve or explicitly override before starting.")}
-      {E.fld("Packaged", "118 cases")}
-      {E.pick("Lot", "L-240905-HZ", ["L-240905-HZ", "new lot"])}
-      {E.pick("Finished goods destination", "Warehouse · selected", ["Warehouse · selected", "Taproom"])}
-      {E.edit("Labels damaged · optional", "6", "number")}
-      {E.edit("Ends damaged · optional", "0", "number")}
-      {E.pick("Write off to", "Warehouse · packaging bin", ["Warehouse · packaging bin", "Cellar · packaging bin"])}
-      {E.tape([["FV3 · B-0416", "source checked"], ["+118 cases · production in", "Warehouse · new lot"], ["−2,832 cans + ends · consumption", "derived from 118 cases"], ["−6 labels · damage", "Warehouse · packaging bin"], ["Beer loss · 0.30 bbl", "yield 97.9%"]])}
-      {E.btn("Close packaging run", "irr")}
-    </>),
+    body: <ClosePackagingRunView model={toClosePackagingRunViewProps(closePackagingRunHazy)} />,
   },
   {
     step: 7,
@@ -1757,13 +1725,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["permission", "brewer or warehouse required", 1], ["closed", "lot assigned · labels ready"], ["print", "keg collar and lot labels"]],
     spec: "Post-commit of Close packaging run. Print labels moves here; the close verb is gone.",
-    body: (<>
-      {E.back("Work", "RUN-0031 · closed")}
-      {E.fld("Lot", "L-240905-HZ")}
-      {E.fld("Output", "118 cases · Warehouse")}
-      {E.fld("Yield", "97.9% · 0.30 bbl loss")}
-      {E.btn("Print labels")}
-    </>),
+    body: <RunClosedView model={toRunClosedViewProps(runClosedHazy)} />,
   },
   {
     step: 8,
@@ -2120,12 +2082,7 @@ export const SCREENS: Screen[] = [
     writes: "none [creation and versioning happen on Recipe]",
     states: [["draft version", "Finish is the next action"], ["empty", "no recipes yet: Create recipe is the only action"]],
     spec: "The More landing's Recipes row opens this list. Each row opens Recipe at its current version and names the next action; Create recipe opens the same surface with only name and style.",
-    body: (<>
-      {E.back("More", "Recipes", E.btn("Create recipe"))}
-      {E.row("Hazy IPA v4", "IPA · 15 bbl · updated Aug 28", E.act("Review"))}
-      {E.row("Pils v3", "German pils · 15 bbl · updated Aug 21", E.act("Review"))}
-      {E.row("Stout v2", "Stout · draft version", E.act("Finish", "primary"), "w")}
-    </>),
+    body: <RecipesView model={toRecipesViewProps(recipesList)} />,
   },
   {
     step: 7,
@@ -2138,41 +2095,7 @@ export const SCREENS: Screen[] = [
     writes: "create_recipe [design; mutable parent row] · create_recipe_version [one RPC: immutable version + ingredients, with assumption columns on recipe_versions and per-ingredient extract snapshot on recipe_ingredients; SCHEMA-GATE: process-spec columns (pre-boil volume, whirlpool min/temp/rest, knockout temp) remain unbuilt]",
     states: [...permitted("brewer or admin required"), ["no group yet", "the brand picks one at packaging · nothing is blocked"]],
     spec: "Predictions come from one shared registry-layer formula over the version’s snapshotted inputs (assumptions + per-ingredient extract); the editor’s live preview and server reads call the same function; values are never stored, so there is no SQL copy. Versioning is disabled behind its schema gate. A new parent takes name and style only; versions append, and history is never edited. Costing lives on desk. A version is the executable process spec, not only the prediction inputs: volumes, boil, whirlpool and knockout are scalars here, while the mash and fermentation schedules and water open as their own screens because they repeat and carry add, reorder and delete. The mash temperature is gone from this page, because every mash step carries one and a scalar beside them is a second answer to one question. Batch size and knockout volume are gone too: the scale chips already state the batch size and Brew day already records knockout volume as its baseline. Three note fields become one.",
-    body: (<>
-      {E.back("Recipes", "Hazy IPA v4")}
-      {E.row("Recipe parent · Hazy IPA · IPA", "name and style only", E.act("Create"))}
-      {E.pick("Default price group · optional", "3", ["Not decided", "1", "2", "3", "4", "5", "6", "7", "8"])}
-      {E.info("A pre-fill for the brand a batch packages into, nothing more. The version carries no price and no group; changing this cuts no new version.")}
-      {E.chips(["per bbl", "15 bbl", "30 bbl"], 1)}
-      {E.row("2-row", "mash · 44 lb / bbl", "660 lb")}
-      {E.row("Citra", "boil · 10 min · 0.4 lb / bbl", "6 lb")}
-      {E.row("Citra", "dry hop · day 4 · 1.2 lb / bbl", "18 lb")}
-      {E.row("+ add ingredient", "material · stage · timing", "")}
-      {E.cols(
-        E.edit("Pre-boil volume bbl", "16.8", "number"),
-        E.edit("Boil time min", "60", "number"),
-      )}
-      {E.cols(
-        E.edit("Whirlpool min", "20", "number"),
-        E.edit("Whirlpool temp °F", "180", "number"),
-      )}
-      {E.cols(
-        E.edit("Whirlpool rest min", "10", "number"),
-        E.edit("Knockout temp °F", "65", "number"),
-      )}
-      {E.cols(
-        E.edit("Brewhouse efficiency %", "72", "number"),
-        E.edit("Yeast attenuation %", "78", "number"),
-      )}
-      {E.nav("Mash schedule · 3 steps", "152 °F saccharification rest")}
-      {E.nav("Fermentation schedule · 4 stages", "18 days · dry hop day 4 in Primary")}
-      {E.nav("Water · Municipal Denver to Hazy target", "3 salts and acids")}
-      {E.edit("Notes", "Whirlpool hard, knock out cold.")}
-      {E.info("Predicted: OG 15.2 °P · FG 3.3 °P · ABV 6.5%")}
-      {E.tape([["B-0413 · OG 14.8 · FG 3.5 · ABV 6.0%", "eff 68% · att 76%"], ["B-0398 · OG 15.1 · FG 3.4 · ABV 6.3%", "eff 71% · att 77%"]])}
-      {E.note("Actuals run −0.4 °P OG vs predicted (eff 68–71% vs 72% assumed). Lower the assumption on v5?")}
-      {E.gated("Create recipe version", "isn’t available yet: assumptions have no columns to live in. A brewery with no version cannot schedule a batch, so brew day waits on this too")}
-    </>),
+    body: <RecipeView model={toRecipeViewProps(recipeHazyV4)} />,
   },
   {
     step: 7,
