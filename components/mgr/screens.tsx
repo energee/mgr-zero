@@ -47,6 +47,9 @@ import { FirstRunView } from "@/components/mgr/views/first-run";
 import { FormatView } from "@/components/mgr/views/format";
 import { FormatsView } from "@/components/mgr/views/formats";
 import { InvoiceView } from "@/components/mgr/views/invoice";
+import { KegBalanceView } from "@/components/mgr/views/keg-balance";
+import { KegFleetView } from "@/components/mgr/views/keg-fleet";
+import { KegHistoryView } from "@/components/mgr/views/keg-history";
 import { LocationBinsView } from "@/components/mgr/views/location-bins";
 import { LocationView } from "@/components/mgr/views/location";
 import { MaterialView } from "@/components/mgr/views/material";
@@ -143,6 +146,7 @@ import {
   contractYchCitra, contractsList, cycleCountCans, materialCitra, materialsList, materialsOnHandList,
   newPoCountryMalt, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorYch, vendorsList,
 } from "@/lib/mgr/fixtures/purchasing";
+import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger } from "@/lib/mgr/fixtures/kegs";
 import { toAdjustLinesViewProps } from "@/lib/mgr/adjust-lines-view";
 import { toBatchesViewProps } from "@/lib/mgr/batches-view";
 import { toBeerViewProps } from "@/lib/mgr/beer-view";
@@ -166,6 +170,9 @@ import { toFirstRunViewProps } from "@/lib/mgr/first-run-view";
 import { toFormatViewProps } from "@/lib/mgr/format-view";
 import { toFormatsViewProps } from "@/lib/mgr/formats-view";
 import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
+import { toKegBalanceViewProps } from "@/lib/mgr/keg-balance-view";
+import { toKegFleetViewProps } from "@/lib/mgr/keg-fleet-view";
+import { toKegHistoryViewProps } from "@/lib/mgr/keg-history-view";
 import { toLocationBinsViewProps } from "@/lib/mgr/location-bins-view";
 import { toLocationViewProps } from "@/lib/mgr/location-view";
 import { toLocationsViewProps } from "@/lib/mgr/locations-view";
@@ -2346,25 +2353,7 @@ export const SCREENS: Screen[] = [
     writes: "create_keg_pool · update_keg_pool · record_keg_event",
     states: [["acquire", "qty into pool · no customer"], ["return empty", "customer required · deposit refund is a separate credit memo"], ["lost / found", "lost at a customer moves their balance · found never has a customer · no money"], ["retire", "cannot exceed what the bin holds · no customer"]],
     spec: "Return empty is a keg event only; the deposit refund is a separate credit memo (no refund line is posted with the keg event yet). Beer coming back with the keg is Return shipment (beer + deposit). No dirty/clean CIP status.",
-    body: (<>
-      {E.back("Beer", "Keg fleet")}
-      {E.fld("Selected pool", "Microstar ⅙ bbl · 76 kegs · pay per fill")}
-      {E.pick("Kind", "Owned", ["Owned", "Leased", "Pay per fill"])}
-      {E.fld("Vendor", "none · owned pools have no vendor")}
-      {E.edit("Per-fill cost", "$0.00")}
-      {E.btns([["Add keg pool", "g"], ["Save keg pool", "g"]])}
-      {E.row("Microstar ⅙ bbl · Warehouse", "36 on hand · Walk-in", "36")}
-      {E.row("Microstar ⅙ bbl · Storage", "40 on hand · Cold", "40")}
-      {E.nav("Customer keg balance", "Ridgeline · 38 out · $1,140")}
-      {E.nav("Keg report", "9 unreturned over 90 days")}
-      {E.nav("Keg event history", "acquired, returned, lost, found, retired")}
-      {E.chips(["acquire", "return empty", "lost / found", "retire"], 1)}
-      {E.pick("Customer", "Ridgeline Tap Room", ["Ridgeline Tap Room", "Al’s Bar"])}
-      {E.stq(4, "Kegs")}
-      {E.info(<>Preview: +4 returned · Ridgeline 38 {E.arrow()} 34 out</>)}
-      {E.note("Empty kegs only; beer return/credit is Return shipment. The deposit refund is a separate credit memo.")}
-      {E.btn("Record keg return", "irr")}
-    </>),
+    body: <KegFleetView model={toKegFleetViewProps(kegFleetMicrostar)} />,
   },
   {
     step: 7,
@@ -2377,14 +2366,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["permission", "warehouse or admin required", 1], ["current", "all pools and deposits shown"], ["overdue", "oldest unreturned kegs flagged", 1], ["none", "no kegs currently out"]],
     spec: "The same customer-owned detail is reachable from Customers and Keg fleet.",
-    body: (<>
-      {E.back("Keg fleet", "Ridgeline Tap Room")}
-      {E.num("38 kegs", "$1,140 deposits held")}
-      {E.row("Owned ½ bbl", "34 out · $30 deposit each", "$1,020")}
-      {E.row("Owned ⅙ bbl", "4 out · $30 deposit each", "$120")}
-      {E.row("Over 90 days", "9 kegs · oldest shipped 5/12/2026", E.act("Review history"), "w")}
-      {E.info("Beer returns use Return shipment. Empty keg returns are recorded from Keg fleet.")}
-    </>),
+    body: <KegBalanceView model={toKegBalanceViewProps(kegBalanceRidgeline)} />,
   },
   {
     step: 7,
@@ -2396,16 +2378,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["permission", "warehouse or admin required", 1], ["all", "newest first"], ["filtered", "customer and pool filters combine"], ["empty", "no matching events"]],
     spec: "This is the immutable keg ledger, not an editor.",
-    body: (<>
-      {E.back("Keg fleet", "Keg event history")}
-      {E.pick("Customer", "All customers", ["All customers", "Ridgeline Tap Room", "Al’s Bar"])}
-      {E.pick("Keg pool", "All pools", ["All pools", "Owned ½ bbl", "Owned ⅙ bbl"])}
-      {E.row("Returned · Ridgeline", "9/03 · 4 × Owned ½ bbl", "Dana", "ok")}
-      {E.row("Lost · Al’s Bar", "9/01 · 1 × Owned ½ bbl", "Ali", "w")}
-      {E.row("Found · Al’s Bar", "8/30 · 1 × Owned ½ bbl", "Dana")}
-      {E.row("Acquired", "8/28 · 12 × Owned ⅙ bbl", "Avery")}
-      {E.row("Retired", "8/22 · 2 × Owned ½ bbl", "Avery")}
-    </>),
+    body: <KegHistoryView model={toKegHistoryViewProps(kegHistoryLedger)} />,
   },
   {
     step: 7,
