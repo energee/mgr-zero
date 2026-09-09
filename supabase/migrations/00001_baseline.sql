@@ -3084,20 +3084,24 @@ create table private.command_requests (
 -- server-verified context that rendered it. They never grant membership.
 create function private.assert_request_scope(p_brewery uuid, p_customer uuid default null) returns void
 language plpgsql stable security definer set search_path = '' as $$
-declare v_headers jsonb; v_actor uuid := auth.uid();
+declare v_headers jsonb; v_actor uuid := auth.uid(); v_expected_actor uuid; v_expected_brewery uuid; v_expected_customer uuid;
 begin
   begin
     v_headers := nullif(current_setting('request.headers', true), '')::jsonb;
     if v_headers is not null and jsonb_typeof(v_headers) <> 'object' then raise invalid_text_representation; end if;
-    if v_headers ? 'x-mgr-actor-id' and (v_headers ->> 'x-mgr-actor-id')::uuid is distinct from v_actor then
-      raise insufficient_privilege;
+    if v_headers ? 'x-mgr-actor-id' then
+      v_expected_actor := (v_headers ->> 'x-mgr-actor-id')::uuid;
+      if v_expected_actor is null or v_expected_actor is distinct from v_actor then raise insufficient_privilege; end if;
     end if;
-    if v_headers ? 'x-mgr-brewery-id' and (v_headers ->> 'x-mgr-brewery-id')::uuid is distinct from p_brewery then
-      raise insufficient_privilege;
+    if v_headers ? 'x-mgr-brewery-id' then
+      v_expected_brewery := (v_headers ->> 'x-mgr-brewery-id')::uuid;
+      if v_expected_brewery is null or v_expected_brewery is distinct from p_brewery then raise insufficient_privilege; end if;
     end if;
-    if p_customer is not null and v_headers ? 'x-mgr-customer-id'
-      and (v_headers ->> 'x-mgr-customer-id')::uuid is distinct from p_customer then
-      raise insufficient_privilege;
+    if v_headers ? 'x-mgr-customer-id' then
+      v_expected_customer := (v_headers ->> 'x-mgr-customer-id')::uuid;
+      if v_expected_customer is null or (p_customer is not null and v_expected_customer is distinct from p_customer) then
+        raise insufficient_privilege;
+      end if;
     end if;
   exception when others then
     raise exception 'request context changed' using errcode = '42501';
