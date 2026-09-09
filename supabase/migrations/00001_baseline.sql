@@ -7546,6 +7546,43 @@ begin
   return private.taproom_count_snapshot(p_brewery, p_location);
 end $$;
 
+-- A checked print projection: lot codes cross the definer boundary only for
+-- positive stock in this exact current Taproom snapshot.
+create function get_taproom_print_labels(p_brewery uuid, p_location uuid, p_revision text) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare v_snapshot jsonb;
+begin
+  perform private.assert_staff(p_brewery, array['admin','warehouse','taproom']::public.staff_role[]);
+  if not exists (select 1 from public.locations where id = p_location and brewery_id = p_brewery and kind = 'taproom') then
+    raise exception 'choose an owned taproom location';
+  end if;
+  v_snapshot := private.taproom_count_snapshot(p_brewery, p_location);
+  if p_revision is distinct from v_snapshot->>'revision' then
+    raise exception 'stock or prior count changed; reload and review the count before printing' using errcode = 'MG409';
+  end if;
+  return coalesce((
+    select jsonb_agg(jsonb_build_object(
+      'worksheet_row', d.worksheet_row,
+      'bin_id', d.bin_id, 'bin_name', d.bin_name,
+      'sku_id', d.sku_id, 'sku_name', d.sku_name,
+      'brand_id', d.brand_id, 'brand_name', d.brand_name,
+      'package_volume_label', f.name,
+      'lot_id', d.lot_id, 'lot_code', l.code,
+      'qty', d.qty_before
+    ) order by d.worksheet_row)
+    from (
+      select row_number() over (order by s.bin_id, s.sku_id, s.lot_id nulls first) worksheet_row, s.*
+      from jsonb_to_recordset(v_snapshot->'lines') as s(
+        bin_id uuid, bin_name text, sku_id uuid, sku_name text, brand_id uuid,
+        brand_name text, bbl_per_unit numeric, lot_id uuid, qty_before numeric)
+    ) d
+    join public.skus s on s.id = d.sku_id and s.brewery_id = p_brewery
+    join public.formats f on f.id = s.format_id and f.brewery_id = p_brewery
+    left join public.lots l on l.id = d.lot_id and l.brewery_id = p_brewery
+    where d.qty_before > 0
+  ), '[]'::jsonb);
+end $$;
+
 create function get_taproom_count(p_brewery uuid, p_count uuid) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 declare v_result jsonb;
@@ -7633,8 +7670,8 @@ begin
   return private.complete_command_request(p_request_id, public.get_taproom_count(p_brewery, v_count));
 end $$;
 revoke all on function private.taproom_count_snapshot(uuid,uuid) from public,anon,authenticated,service_role;
-revoke all on function get_taproom_count_snapshot(uuid,uuid),get_taproom_count(uuid,uuid),record_taproom_count(uuid,uuid,date,text,jsonb,uuid) from public,anon,authenticated,service_role;
-grant execute on function get_taproom_count_snapshot(uuid,uuid),get_taproom_count(uuid,uuid),record_taproom_count(uuid,uuid,date,text,jsonb,uuid) to authenticated;
+revoke all on function get_taproom_count_snapshot(uuid,uuid),get_taproom_print_labels(uuid,uuid,text),get_taproom_count(uuid,uuid),record_taproom_count(uuid,uuid,date,text,jsonb,uuid) from public,anon,authenticated,service_role;
+grant execute on function get_taproom_count_snapshot(uuid,uuid),get_taproom_print_labels(uuid,uuid,text),get_taproom_count(uuid,uuid),record_taproom_count(uuid,uuid,date,text,jsonb,uuid) to authenticated;
 -- Named service-only reads. Recheck current admin membership in-statement;
 -- jobs.ts must not select chat_installations through the service client.
 create function get_chat_settings_installation(p_brewery uuid, p_installation uuid, p_actor uuid) returns jsonb

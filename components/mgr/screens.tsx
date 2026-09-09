@@ -1237,12 +1237,12 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "Beer",
     name: "Weekly count",
-    to: { "Hazy IPA": "SKU detail", "Record count": "Weekly count", "Open count": "Weekly count" },
+    to: { "Hazy IPA": "SKU detail", "Print current stock labels": "Weekly count", "Record count": "Weekly count", "Open count": "Weekly count" },
     job: "Record every physical stock bucket and compare the draft with expected brand consumption",
-    reads: "get_taproom_count_snapshot · get_taproom_draft_projection · list_taproom_counts · get_taproom_count · list_locations",
+    reads: "get_taproom_count_snapshot · get_taproom_print_labels · get_taproom_draft_projection · list_taproom_counts · get_taproom_count · list_locations",
     writes: "record_taproom_count",
     states: permitted("taproom, warehouse or admin required").concat([["unknown response", "timeouts and 5xx freeze every quantity and retry the same request", 1], ["stale", "changed stock or brewery date starts a fresh blank recount", 1], ["no POS", "expected stays blank; the physical count still records"], ["matching", "durable receipt with every observation and no movement"]]),
-    spec: "The physical count is the source of truth and posts depletion, connected or not. Every bin/SKU/lot-or-untracked bucket is entered explicitly in whole packaged units; omitted zeros, fractions, inferred allocation and overcounts are refused. Taproom sees worksheet row numbers for tracked buckets and must get a labeled worksheet from Warehouse instead of guessing physical lot identity; Admin and Warehouse may use their existing stock labels. The draft keeps and links the captured prior-count identity/date. Brand expectation refreshes independently and never replaces the captured stock revision; if its baseline changed, comparison and inputs lock until an explicit fresh recount. Draft actual groups explicit bucket depletion using captured package volumes; it and expected-minus-actual stay blank until every existing bucket for that brand is entered, while a projected brand with no physical bucket has zero actual. Both remain labeled as estimates until the authoritative receipt is saved. A timeout or 5xx response freezes request ID and payload for exact retry; a definitive first validation failure is editable. Changed stock or an expired brewery date offers a fresh blank recount. Saved receipts include safe bin/SKU labels for every observation beyond list-query caps, and the newest 50 headers remain readable even when every line matched and no movement was posted. Count correction remains unavailable.",
+    spec: "The physical count is the source of truth and posts depletion, connected or not. Every bin/SKU/lot-or-untracked bucket is entered explicitly in whole packaged units; omitted zeros, fractions, inferred allocation and overcounts are refused. Taproom sees the full worksheet row number on every bucket instead of raw lot identifiers on screen; all three count roles can print the current positive-stock worksheet through one checked projection with lot codes, stable original row numbers, and no history. Print rechecks the captured revision and refuses stale stock without changing count entries or uncertain retries. The draft keeps and links the captured prior-count identity/date. Brand expectation refreshes independently and never replaces the captured stock revision; if its baseline changed, comparison and inputs lock until an explicit fresh recount. Draft actual groups explicit bucket depletion using captured package volumes; it and expected-minus-actual stay blank until every existing bucket for that brand is entered, while a projected brand with no physical bucket has zero actual. Both remain labeled as estimates until the authoritative receipt is saved. A timeout or 5xx response freezes request ID and payload for exact retry; a definitive first validation failure is editable. Changed stock or an expired brewery date offers a fresh blank recount. Saved receipts include safe bin/SKU labels for every observation beyond list-query caps, and the newest 50 headers remain readable even when every line matched and no movement was posted. Count correction remains unavailable.",
     body: (<>
       {E.back("Beer", "Weekly count")}
       {E.tabs(["Ridgeline Tap Room", "Downtown"], 0, "w-full")}
@@ -1252,8 +1252,10 @@ export const SCREENS: Screen[] = [
       {E.btn("Refresh expected", "g")}
       {E.ttl("Count every stock bucket")}
       {E.note("Server date Sep 8 · whole remaining packages only · enter zero explicitly. A partly full keg is one.")}
-      {E.row("Pils · 16 oz case", "Cold · untracked stock · recorded 6", E.stq(4))}
-      {E.row("Hazy · ½ bbl keg", "Cold · lot L-260901-HZ · worksheet row 1 · recorded 3", E.stq(2), "w")}
+      {E.btn("Print current stock labels", "g")}
+      {E.note("Print includes only current positive stock and keeps the captured worksheet row numbers.")}
+      {E.row("Pils · 16 oz case", "Cold · untracked stock · worksheet row 1 · recorded 6", E.stq(4))}
+      {E.row("Hazy · ½ bbl keg", "Cold · lot L-260901-HZ · worksheet row 2 · recorded 3", E.stq(2), "w")}
       {E.btn("Record count")}
       {E.ttl("Recent saved counts")}
       {E.row("Weekly count · Sep 1", "3 observations · 1 movement · 1 unit depleted", E.act("Open count", "primary"))}

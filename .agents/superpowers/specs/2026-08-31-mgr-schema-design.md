@@ -1219,6 +1219,16 @@ and menu availability need anyway, and a month-end count yields the month's
 removal cleanly — satisfying the domain rule that a removal belongs to the month
 the beer left.
 
+**Implemented print projection (Program 12 T4a).**
+`get_taproom_print_labels(brewery, location, revision)` is the sole narrow lot-code
+boundary for Admin, Warehouse, and Taproom count work. It obtains one current
+`private.taproom_count_snapshot`, refuses a different exact revision, assigns
+worksheet ordinality across that complete snapshot, then returns only positive
+buckets in the same order. The fields are limited to the worksheet row, safe
+bin/SKU/brand/package labels, tracked lot UUID and code (or untracked), and
+quantity. It exposes no history or other lot metadata, adds no `lots` SELECT
+grant, and never claims a command request.
+
 Three consequences worth stating:
 
 1. **`inventory_movements.qty` does not need widening.** The `numeric(12,2)`

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Same as Program 1. `lib/commands/taproom.ts` (already from Program 7).
 
-**Spec:** Schema §16.13–16.15. Weekly count / Variance / Tap board / Kick / Swap screens. Remainder index recommended defaults for q2/q4/guest keg. Parent plan. DRIFT.md tap identity — guest create stays gated until interval has label+size.
+**Spec:** Schema §16.13–16.15. Weekly count / Variance / Tap board / Kick / Swap screens. T4 completion and correction work is governed by `../specs/2026-09-09-program12-completion-and-count-correction.md`; its cards land sequentially and this plan does not redefine them.
 
 ## Global Constraints
 
@@ -18,7 +18,7 @@
 - Swap closes interval A and opens B in one RPC; carries `open_interval_id` and requires `closed_at is null` (compare-and-swap).
 - Remaining fill: chips only (`empty` | `quarter` | `half`). Stored as `closing_fill numeric` 0, 0.25, 0.5.
 - Reverse: new movement with `compensates_id` FK to original; original unchanged. TTB reports include originals and compensations with signed net amounts. Sign must be exact opposite qty and same type/channel/dest_state.
-- complete_batch / reattribute_loss: Task 6 remains gated pending the user's completion/loss decision; it is outside count-core implementation.
+- `complete_batch`, latest-count correction, and `reattribute_loss` remain unimplemented here; their accepted contracts and ordering are in the 2026-09-09 T4 spec.
 - TDD, docs:api, staff-guide, nav Taps + Taproom `planned` off.
 
 ## File map
@@ -48,7 +48,7 @@
 - `qty_before` is current ledger stock, **not POS expected consumption**. Depletion is `qty_before - qty_counted`, posted only when positive with exactly the supplied bucket's lot identity. NULL means untracked stock, never FIFO or aggregate allocation. Resolve the tenant's named Taproom channel in SQL and freeze its tax treatment; destination state stays null. Matching counts do not require a channel or POS connection.
 - Reject omitted/extra/duplicate canonical keys, wrong tenant/location/bin/SKU/lot, negative/fractional/nonfinite quantities, overcounts, stale snapshots and historical/same-day counts atomically. A later chronological count is accepted only on today's brewery-local date.
 - `get_taproom_count({ countId })` returns the durable occurrence, prior identity, every saved observation and linked frozen movement BBL.
-- Printed-label access and Admin count correction remain pending domain decisions. Without a known physical lot identity, ask Warehouse; do not infer attribution. A mistaken low count cannot be fixed by another depletion-only count or generic adjustment.
+- T4a adds the approved exact-revision print projection without raw lot access. T4b later adds the separately accepted latest-count-only Admin correction; until it lands, a mistaken low count cannot be fixed by another depletion-only count or generic adjustment.
 
 - [ ] **Step 1:** Real-Postgres red against absent count RPC/tables. Cover matching header/all lines/no posting; 7→2 posts −5; A4/B2/NULL0→A3/B2/NULL0 changes only A; tracked and untracked coexist; invalid input leaves no partial rows; count/transfer concurrency and stale revisions; exact replay and changed-payload conflict; chronology with brewery-date fixtures; frozen alternate-channel tax/BBL; no POS; more than 1000 movements/buckets; exhaustive count-table RLS positive controls and role-safe writes.
 - [ ] **Step 2–5:** Implement, reset only the isolated test stack, run focused tests/typecheck/lint, then fresh spec review followed by quality review. Parent runs grouped full proof. Commit `feat(taproom): durable explicit-bucket counts post only depletion` after focused proof. Program 12 stays incomplete until remaining tasks and gates are resolved.
@@ -148,25 +148,17 @@ SKU detail writes `reverse_inventory_movement [SCHEMA-GATE…]` — ungate for a
 
 ### Task 5: Tap board + weekly count pages, ungate, docs
 
-Live Weekly count, Variance, Tap board, Kick, Swap. Nav Taproom + Taps. Guest create ungates with label and nominal size. `bun run docs:api`. Browse.
+Live Weekly count, Variance, Tap board, Kick, Swap. Nav Taproom + Taps. Guest create ungates with label and nominal size. T4a adds native printing from the positive-stock exact-revision projection; it does not grant raw lot history. `bun run docs:api`. Browse.
 
 Commit `docs: taproom count and tap board live`
 
 ---
 
-### Task 6: `complete_batch` and `reattribute_loss` (close remaining production/compliance gates)
+### Task 6: superseded by accepted T4 cards
 
-**Files:** production.ts, compliance.ts, `volume_adjustments` origin columns
-
-**Interfaces:**
-- `complete_batch({ batchId, lossBbl, classification: "evaporation"|"dump"|"packaging"|"other" })` one RPC: `batches.closed_at`, close remaining occupancies, `volume_adjustments` row with classification. Reject if an open packaging run still points at an occupancy of this batch.
-- `reattribute_loss({ adjustmentId, classification })` updates **nothing on the ledger row**; inserts a compensating pair? Spec said never identify from note. Store classification on `volume_adjustments.classification` at insert time only — **reattribute** writes a new adjustment reversing the old class and a new one with the new class, same bbl, linked by `compensates_id`. If that is too heavy, **defer this task** and keep the Monthly compliance loss verb gated.
-
-**If Task 6 is still ambiguous at execution, stop and ask.** Do not invent a class enum beyond the four strings above.
-
-- [ ] **Step 1 (complete_batch only if Task 6 proceeds):** Open run blocks complete; after close run, complete_batch sets closed_at and writes loss adjustment.
-
-- [ ] **Step 2–5:** Commit `feat(production): complete_batch closes occupancies and records classified loss` — or skip with the gate still on.
+The former caller-supplied completion-loss sketch is superseded. Implement T4b,
+T4c, and T4d only from the accepted 2026-09-09 contract. T4a does not claim
+those commands or schema changes are complete.
 
 ---
 

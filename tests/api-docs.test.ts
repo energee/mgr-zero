@@ -35,7 +35,7 @@ describe("HTTP API reference", () => {
   });
 
   it("publishes explicit-bucket taproom count commands with truthful correction limits", () => {
-    for (const name of ["get_taproom_count_snapshot", "get_taproom_draft_projection", "record_taproom_count", "get_taproom_count"]) {
+    for (const name of ["get_taproom_count_snapshot", "get_taproom_print_labels", "get_taproom_draft_projection", "record_taproom_count", "get_taproom_count"]) {
       expect(apiOperations().find(o => o.name === name)).toMatchObject({ status: "available", roles: "admin, warehouse, taproom" });
     }
     const definition = getCommandDefinition("record_taproom_count")!;
@@ -44,6 +44,8 @@ describe("HTTP API reference", () => {
     expect(definition.input.safeParse({ ...input, lines: [{ binId: "00000000-0000-0000-0000-000000000000", skuId: "00000000-0000-0000-0000-000000000000", qtyCounted: 1 }] }).success).toBe(false);
     expect(PAGE()).toContain("Saved-count correction remains unavailable");
     expect(PAGE()).toContain("partial keg counts as one until gone");
+    expect(PAGE()).toContain("current positive Taproom stock");
+    expect(PAGE()).toContain("Full lot history remains outside this projection");
   });
 
   it("documents provisioning as authenticated pre-tenant and omits brewery from its example", () => {

@@ -234,6 +234,7 @@ omitted. They have no roles until they are built.
 | `get_taproom_count` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
 | `get_taproom_count_snapshot` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
 | `get_taproom_draft_projection` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
+| `get_taproom_print_labels` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
 | `get_taproom_variance` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
 | `get_today` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `import_csv` | Team & brewery settings | ✓ |  |  |  |  |  |
@@ -2228,7 +2229,9 @@ curl -X POST "$MGR_URL/api/command" \
 
 Physical counts are available to Admin, Warehouse, and Taproom through the commands below and the live **Taproom** page. Prepare a complete snapshot, then submit every explicit bin/SKU/lot bucket with its revision and today's brewery-local date. `lotId: null` names untracked stock, never automatic allocation. Quantities are remaining whole packages; a partial keg counts as one until gone. Matching counts persist without movements. Shortages alone post exact-bucket depletion, with the tenant's Taproom channel tax treatment and volume frozen at posting; POS does not change the posting. `list_taproom_counts` returns only the newest 50 headers for one owned taproom; use `get_taproom_count` for a complete durable receipt with safe bin and SKU labels independent of list-query row caps.
 
-Changed stock, prior count, or brewery-local date requires refreshing the snapshot. Omitted, duplicate, extra, fractional, negative, overcount, historical and same-day repeat submissions are refused. An unchanged request ID returns the original result before these freshness checks; changed payload reuse conflicts. A timeout or `5xx` leaves the exact count request frozen for retry, while a definitive first validation refusal allows correction. Saved-count correction remains unavailable, and generic inventory adjustments do not reverse count depletion. Printed lot labels are not exposed: ambiguous physical lot identity needs Warehouse assistance.
+`get_taproom_print_labels` accepts the exact prepared revision and returns only current positive Taproom stock, retaining each bucket's row number from the complete count worksheet. It supplies safe bin, SKU, brand and package labels plus a tracked lot UUID and code, or untracked, and quantity. A changed revision is refused. Full lot history remains outside this projection, and the query neither posts inventory nor claims a command request.
+
+Changed stock, prior count, or brewery-local date requires refreshing the snapshot. Omitted, duplicate, extra, fractional, negative, overcount, historical and same-day repeat submissions are refused. An unchanged request ID returns the original result before these freshness checks; changed payload reuse conflicts. A timeout or `5xx` leaves the exact count request frozen for retry, while a definitive first validation refusal allows correction. Saved-count correction remains unavailable, and generic inventory adjustments do not reverse count depletion. Direct raw lot history remains unavailable; use the checked current-stock print projection to match a physical tracked lot without guessing.
 
 `get_taproom_draft_projection` compares an unsaved recount with expected consumption from the latest saved count's creation time through the response's server `as_of`. It identifies that baseline and both bounds, groups expected BBL by brand, and reports coverage-source bounds and completeness, unmapped and ignored lines, excluded shares, and unattributed poured volume. No saved baseline or usable POS observation leaves expected null; a complete empty observation may return zero. This live read never posts inventory, allocates lots, freezes a POS snapshot, or replaces the count snapshot revision, and late reconciled facts may change a later response.
 
@@ -2377,6 +2380,24 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_taproom_draft_projection", "input": { "locationId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+#### get_taproom_print_labels [#get_taproom_print_labels]
+
+`query` · admin, warehouse, taproom
+
+Printable labels for current positive stock in one exact Taproom count snapshot: original worksheet row, safe bin/SKU/brand/package labels, tracked lot code or untracked, and quantity; excludes zero and historical stock
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `locationId` | uuid | yes |
+| `revision` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_taproom_print_labels", "input": { "locationId": "00000000-0000-0000-0000-000000000000", "revision": "string" } }'
 ```
 
 #### get_taproom_variance [#get_taproom_variance]

@@ -52,6 +52,11 @@ describe("durable explicit taproom counts", () => {
 
 type Fixture = Awaited<ReturnType<typeof fixture>>;
 type Bucket = { bin_id: string; sku_id: string; lot_id: string | null; qty_before: number; brand_id: string; brand_name: string; bbl_per_unit: number };
+type PrintLabel = {
+  worksheet_row: number; bin_id: string; bin_name: string; sku_id: string; sku_name: string;
+  brand_id: string; brand_name: string; package_volume_label: string;
+  lot_id: string | null; lot_code: string | null; qty: number;
+};
 async function prepare(f: Fixture) {
   const result = await f.ctx.db.rpc("get_taproom_count_snapshot", { p_brewery: f.brewery.id, p_location: f.location.id });
   expect(result.error).toBeNull();
@@ -74,6 +79,67 @@ async function movement(f: Fixture, qty: number, lotId: string | null = null) {
   return ins("inventory_movements", { brewery_id: f.brewery.id, location_id: f.location.id, bin_id: f.location.binId, sku_id: f.cat.skuId,
     lot_id: lotId, qty, type: qty > 0 ? "opening_balance" : "adjustment", created_by: f.ctx.userId });
 }
+
+it("prints only current positive tracked and untracked buckets at their original worksheet rows", async () => {
+  const f = await fixture(0);
+  const binId = (lead: string) => `${lead}${f.brewery.id.slice(1)}`;
+  const zeroBin = binId("0"), untrackedBin = binId("1"), trackedBin = binId("2");
+  expect((await admin.from("bins").insert([
+    { id: zeroBin, brewery_id: f.brewery.id, location_id: f.location.id, name: "A history" },
+    { id: trackedBin, brewery_id: f.brewery.id, location_id: f.location.id, name: "B tracked" },
+    { id: untrackedBin, brewery_id: f.brewery.id, location_id: f.location.id, name: "C untracked" },
+  ])).error).toBeNull();
+  const historyLot = await lot(f, "HISTORY-ONLY"), trackedLot = await lot(f, "PRINT-260909");
+  for (const row of [
+    { bin_id: zeroBin, lot_id: historyLot, qty: 1, type: "opening_balance" },
+    { bin_id: zeroBin, lot_id: historyLot, qty: -1, type: "adjustment" },
+    { bin_id: trackedBin, lot_id: trackedLot, qty: 2, type: "opening_balance" },
+    { bin_id: untrackedBin, lot_id: null, qty: 3, type: "opening_balance" },
+  ]) expect((await admin.from("inventory_movements").insert({
+    brewery_id: f.brewery.id, location_id: f.location.id, sku_id: f.cat.skuId,
+    created_by: f.ctx.userId, ...row,
+  })).error).toBeNull();
+  const foreign = await fixture();
+  const foreignLot = await lot(foreign, "FOREIGN-LABEL");
+  await movement(foreign, 9, foreignLot);
+
+  const snapshot = await prepare(f);
+  expect(snapshot.lines.map(line => [line.bin_id, line.qty_before])).toEqual([
+    [zeroBin, 0], [untrackedBin, 3], [trackedBin, 2],
+  ]);
+  expect((await admin.from("brands").update({ name: "Renamed IPA" }).eq("id", f.cat.brandId)).error).toBeNull();
+  expect((await admin.from("skus").update({ name: "Renamed keg" }).eq("id", f.cat.skuId)).error).toBeNull();
+  expect((await admin.from("locations").update({ name: "Renamed taproom" }).eq("id", f.location.id)).error).toBeNull();
+  const labels = await runCommand("get_taproom_print_labels", { locationId: f.location.id, revision: snapshot.revision }, f.ctx) as PrintLabel[];
+
+  expect(labels).toEqual([
+    { worksheet_row: 2, bin_id: untrackedBin, bin_name: "C untracked", sku_id: f.cat.skuId, sku_name: "Renamed keg",
+      brand_id: f.cat.brandId, brand_name: "Renamed IPA", package_volume_label: "keg 0.5 bbl",
+      lot_id: null, lot_code: null, qty: 3 },
+    { worksheet_row: 3, bin_id: trackedBin, bin_name: "B tracked", sku_id: f.cat.skuId, sku_name: "Renamed keg",
+      brand_id: f.cat.brandId, brand_name: "Renamed IPA", package_volume_label: "keg 0.5 bbl",
+      lot_id: trackedLot, lot_code: "PRINT-260909", qty: 2 },
+  ]);
+  expect(JSON.stringify(labels)).not.toMatch(/HISTORY-ONLY|FOREIGN-LABEL|packaging_run|packaged_on|best_by|movement|recipient|customer/);
+  expect(sql(`select count(*) from private.command_requests where brewery_id='${f.brewery.id}'`)).toEqual(["0"]);
+});
+
+it("refuses a stale print revision and denies Sales and Brewer at both boundaries", async () => {
+  const f = await fixture();
+  const snapshot = await prepare(f);
+  await movement(f, 1);
+  await expect(runCommand("get_taproom_print_labels", { locationId: f.location.id, revision: snapshot.revision }, f.ctx))
+    .rejects.toMatchObject({ status: 409 });
+  expect(sql(`select count(*) from private.command_requests where brewery_id='${f.brewery.id}'`)).toEqual(["0"]);
+  for (const role of ["sales", "brewer"] as const) {
+    const denied = await makeStaffCtx(f.brewery.id, role);
+    await expect(runCommand("get_taproom_print_labels", { locationId: f.location.id, revision: (await prepare(f)).revision }, denied))
+      .rejects.toMatchObject({ code: "permission_denied" });
+    expect((await denied.db.rpc("get_taproom_print_labels", {
+      p_brewery: f.brewery.id, p_location: f.location.id, p_revision: (await prepare(f)).revision,
+    })).error?.code).toBe("42501");
+  }
+});
 
 it("7 remaining to 2 posts exactly -5, freezes tax and volume, and replays before chronology/staleness", async () => {
   const f = await fixture(); const input = await args(f); input.p_lines[0].qty_counted = 2;
