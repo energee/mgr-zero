@@ -78,6 +78,7 @@ describe("QuickBooks portal payment link", () => {
 
     await expect(readPortalInvoicePayment(ctx, invoice.data.id)).resolves.toMatchObject({
       connectionId: connection.data.id, realmId: connection.data.realm_id, remoteInvoiceId: "remote-pay-1",
+      credentialVersion: 1, grantedScopes: ["com.intuit.quickbooks.accounting"],
     });
 
     expect(sql(`select r.role from pg_proc p cross join (values ('anon'),('authenticated'),('service_role')) r(role)
@@ -159,7 +160,7 @@ describe("QuickBooks portal payment link", () => {
     expect(noFetch).not.toHaveBeenCalled();
   });
 
-  it("rechecks the invoice balance after reading a link and never persists it", async () => {
+  it("binds post-fetch confirmation to invoice and connection snapshots without persisting links", async () => {
     const brewery = await makeBrewery();
     const customer = await seedCustomer(brewery.id);
     const user = await makeCustomerUser(customer.customerId);
@@ -193,6 +194,41 @@ describe("QuickBooks portal payment link", () => {
     await expect(resolvePortalInvoicePayment(
       ctx, invoice.data.id, new QboOAuthClient(config, transport), new Set(["pay.example.test"]),
     )).resolves.toEqual({ kind: "unavailable", reason: "context_changed" });
+
+    expect((await admin.from("invoices").update({ qbo_balance_cents: 100 }).eq("id", invoice.data.id)).error).toBeNull();
+    const rotatedTransport = vi.fn<typeof globalThis.fetch>(async () => {
+      sql(`update private.integration_tokens set access_token='rotated-access',refresh_token='rotated-refresh',
+        credential_version=credential_version+1 where brewery_id='${brewery.id}' and provider='qbo'`);
+      expect((await admin.from("qbo_connections").update({ credential_version: 2 })
+        .eq("id", connection.data.id)).error).toBeNull();
+      return Response.json({ Invoice: { Id: "remote-pay-2", InvoiceLink: paymentUrl } });
+    });
+    await expect(resolvePortalInvoicePayment(
+      ctx, invoice.data.id, new QboOAuthClient(config, rotatedTransport), new Set(["pay.example.test"]),
+    )).resolves.toEqual({ kind: "unavailable", reason: "context_changed" });
+
+    const narrowedTransport = vi.fn<typeof globalThis.fetch>(async () => {
+      expect((await admin.from("qbo_connections").update({ granted_scopes: [] })
+        .eq("id", connection.data.id)).error).toBeNull();
+      return Response.json({ Invoice: { Id: "remote-pay-2", InvoiceLink: paymentUrl } });
+    });
+    await expect(resolvePortalInvoicePayment(
+      ctx, invoice.data.id, new QboOAuthClient(config, narrowedTransport), new Set(["pay.example.test"]),
+    )).resolves.toEqual({ kind: "unavailable", reason: "context_changed" });
+
+    expect((await admin.from("qbo_connections").update({
+      granted_scopes: ["com.intuit.quickbooks.accounting"], access_expires_at: "2026-09-08T12:00:00Z",
+    }).eq("id", connection.data.id)).error).toBeNull();
+    const refreshTransport = vi.fn<typeof globalThis.fetch>(async (_url, init) => init?.method === "POST"
+      ? Response.json({ access_token: "refreshed-access", refresh_token: "refreshed-refresh", expires_in: 3600 })
+      : Response.json({ Invoice: { Id: "remote-pay-2", InvoiceLink: paymentUrl } }));
+    await expect(resolvePortalInvoicePayment(
+      ctx, invoice.data.id, new QboOAuthClient(config, refreshTransport), new Set(["pay.example.test"]),
+    )).resolves.toEqual({ kind: "redirect", url: paymentUrl });
+    expect(refreshTransport).toHaveBeenCalledTimes(2);
+    expect(sql(`select c.credential_version||':'||t.credential_version from public.qbo_connections c
+      join private.integration_tokens t on t.brewery_id=c.brewery_id and t.connection_id=c.id
+      where c.id='${connection.data.id}'`)).toEqual(["3:3"]);
     expect(JSON.stringify(sql(`select encode(payload_hash,'hex')||coalesce(result::text,'') from private.command_requests where actor_id='${user.id}'`)))
       .not.toContain("bearer-secret");
     expect(JSON.stringify(sql(`select request_body||coalesce(response::text,'') from qbo_pushes where invoice_id='${invoice.data.id}'`)))
