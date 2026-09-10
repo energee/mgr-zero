@@ -153,6 +153,7 @@ describe("Recipes view", () => {
     const page = src("app/(app)/recipes/page.tsx");
     expect(page).toMatch(/<RecipesView\b/);
     expect(page).toMatch(/<NewRecipeForm\b/);
+    expect(src("app/(app)/recipes/new-recipe-form.tsx")).not.toMatch(/New recipe/);
   });
 
   it("the Recipe inventory record is RecipeView", () => {
