@@ -279,6 +279,14 @@ describe("Bin sheet", () => {
     expect(html).not.toMatch(/>Save bin</);
   });
 
+  it("the live bin form mounts the shared controlled body", () => {
+    const src = readFileSync("app/(app)/locations/bin-form.tsx", "utf8");
+    expect(src).toMatch(/from "@\/components\/mgr\/views\/bin"/);
+    expect(src).toMatch(/<BinView\b/);
+    expect(src).toMatch(/controls=\{\{ name: setName \}\}/);
+    expect(src).not.toMatch(/<Label\b|<Input\b/);
+  });
+
   it("the Bin inventory record is BinView", () => {
     const body = screen("Bin").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(BinView);
