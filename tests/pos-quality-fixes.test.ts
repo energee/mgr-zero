@@ -51,7 +51,7 @@ describe("Square quality-review lifecycle fences", () => {
     expect(fetch).toHaveBeenCalledTimes(3);
     expect(fetch.mock.calls[2][0]).toBe("https://connect.squareupsandbox.com/oauth2/revoke");
     expect(JSON.parse(String(fetch.mock.calls[2][1]?.body))).toEqual({
-      client_id: "sandbox-app", access_token: "issued-access-secret", revoke_only_access_token: false,
+      client_id: "sandbox-app", access_token: "issued-access-secret", revoke_only_access_token: true,
     });
     expect(fail.mock.calls).toEqual([
       ["intent-1", "actor-1", "pending", "merchant-1"],
@@ -59,6 +59,29 @@ describe("Square quality-review lifecycle fences", () => {
     ]);
     expect(JSON.stringify(fail.mock.calls)).not.toContain("issued-access-secret");
     expect(JSON.stringify(fail.mock.calls)).not.toContain("issued-refresh-secret");
+  });
+
+  it("does not revoke when the durable cleanup fence cannot be persisted", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "issued-access-secret",
+        refresh_token: "issued-refresh-secret", expires_at: "2026-10-10T00:00:00Z", merchant_id: "merchant-1" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ locations: [
+        { id: "L1", name: "Taproom", status: "ACTIVE", merchant_id: "merchant-1" },
+      ] }), { status: 200 }));
+    const fail = vi.fn()
+      .mockRejectedValueOnce(new Error("pending storage unavailable"))
+      .mockResolvedValueOnce(undefined);
+    await expect(completeSquareOAuth({
+      request: new Request("https://mgr.test/callback?code=one-time&state=opaque"), actorId: "actor-1",
+      selectedBreweryId: "brewery-1", redirectUri: config.redirectUri, client: new SquareClient(config, fetch),
+      store: { claim: vi.fn().mockResolvedValue({ intentId: "intent-1", breweryId: "brewery-1", providerIntent: "connect", requestedScopes: [] }),
+        complete: vi.fn().mockRejectedValue(new Error("adoption unavailable")), fail },
+    })).rejects.toThrow("Square is unavailable");
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fail.mock.calls).toEqual([
+      ["intent-1", "actor-1", "pending", "merchant-1"],
+      ["intent-1", "actor-1", "unresolved", "merchant-1"],
+    ]);
   });
 
   it("blocks adoption during disconnect revoke and makes a late old finish an exact harmless replay", async () => {
@@ -118,26 +141,39 @@ describe("Square quality-review lifecycle fences", () => {
       .toEqual(["new-access"]);
   });
 
-  it("purges the affected current generation and records unresolved OAuth cleanup honestly", async () => {
-    const brewery = await makeBrewery();
-    const ctx = await makeStaffCtx(brewery.id, "admin");
-    const connection = await connected(brewery.id);
-    const oauth = new URL((await beginSquareOAuth(ctx, new SquareClient(config, vi.fn()), "reconnect", crypto.randomUUID())).authorizeUrl);
+  it("preserves another brewery's healthy connection while cleaning up an unadopted duplicate-seller token", async () => {
+    const owner = await makeBrewery();
+    const ownerConnection = await connected(owner.id);
+    const contender = await makeBrewery();
+    const ctx = await makeStaffCtx(contender.id, "admin");
+    const oauth = new URL((await beginSquareOAuth(ctx, new SquareClient(config, vi.fn()), "connect", crypto.randomUUID())).authorizeUrl);
     const claim = await admin.rpc("claim_square_oauth", { p_state_hash: hash(oauth.searchParams.get("state")!),
-      p_actor: ctx.userId, p_brewery: brewery.id, p_redirect_uri: config.redirectUri });
+      p_actor: ctx.userId, p_brewery: contender.id, p_redirect_uri: config.redirectUri });
     const intentId = (claim.data as Array<{ intent_id: string }>)[0].intent_id;
 
-    await failSquareOAuth(intentId, ctx.userId, "pending", connection.merchantId);
+    const adoption = await admin.rpc("complete_square_oauth", { p_intent: intentId, p_actor: ctx.userId,
+      p_merchant_id: ownerConnection.merchantId, p_merchant_label: "duplicate", p_access_token: "issued-access",
+      p_refresh_token: "issued-refresh", p_access_expires_at: "2026-10-10T00:00:00Z",
+      p_granted_scopes: ["ITEMS_READ", "ITEMS_WRITE", "MERCHANT_PROFILE_READ", "ORDERS_READ"], p_locations: [],
+    });
+    expect(adoption.error).not.toBeNull();
+    await failSquareOAuth(intentId, ctx.userId, "pending", ownerConnection.merchantId);
+    expect(sql(`select cleanup_state from private.square_oauth_intents where id='${intentId}'`)).toEqual(["pending"]);
     expect((await admin.from("pos_connections").select("state,remote_revocation_state,credential_version,last_error")
-      .eq("id", connection.connectionId).single()).data).toEqual({ state: "recovery_required",
-      remote_revocation_state: "pending", credential_version: 2, last_error: "Square authorization cleanup is pending" });
-    expect(sql(`select count(*) from private.integration_tokens where brewery_id='${brewery.id}' and provider='square'`)).toEqual(["0"]);
+      .eq("id", ownerConnection.connectionId).single()).data).toEqual({ state: "connected",
+      remote_revocation_state: "not_requested", credential_version: 1, last_error: null });
+    expect(sql(`select access_token from private.integration_tokens where brewery_id='${owner.id}' and provider='square'`)).toEqual(["old-access"]);
+    await failSquareOAuth(intentId, ctx.userId, "confirmed", ownerConnection.merchantId);
+    expect((await admin.from("pos_connections").select("state,remote_revocation_state").eq("id", ownerConnection.connectionId).single()).data)
+      .toEqual({ state: "connected", remote_revocation_state: "not_requested" });
 
-    await failSquareOAuth(intentId, ctx.userId, "unresolved", connection.merchantId);
-    expect((await admin.from("pos_connections").select("state,remote_revocation_state,credential_version,last_error")
-      .eq("id", connection.connectionId).single()).data).toEqual({ state: "recovery_required",
-      remote_revocation_state: "unresolved", credential_version: 2, last_error: "Remote revocation could not be confirmed" });
-    expect(sql(`select cleanup_state from private.square_oauth_intents where id='${intentId}'`)).toEqual(["unresolved"]);
+    const fallbackOauth = new URL((await beginSquareOAuth(ctx, new SquareClient(config, vi.fn()), "connect", crypto.randomUUID())).authorizeUrl);
+    const fallbackClaim = await admin.rpc("claim_square_oauth", { p_state_hash: hash(fallbackOauth.searchParams.get("state")!),
+      p_actor: ctx.userId, p_brewery: contender.id, p_redirect_uri: config.redirectUri });
+    const fallbackIntent = (fallbackClaim.data as Array<{ intent_id: string }>)[0].intent_id;
+    await failSquareOAuth(fallbackIntent, ctx.userId, "unresolved", ownerConnection.merchantId);
+    expect(sql(`select exchange_state,cleanup_state from private.square_oauth_intents where id='${fallbackIntent}'`))
+      .toEqual(["recovery_required|unresolved"]);
   });
 
   it("serializes concurrent location and variation mappings and reconciles the sale exactly once", async () => {

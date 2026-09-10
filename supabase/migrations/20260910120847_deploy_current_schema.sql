@@ -1952,8 +1952,6 @@ CREATE TABLE private.square_oauth_intents (
   exchange_state text NOT NULL DEFAULT 'pending' CHECK (exchange_state IN ('pending','exchanging','completed','recovery_required')),
   cleanup_state text NOT NULL DEFAULT 'not_required' CHECK (cleanup_state IN ('not_required','pending','confirmed','unresolved')),
   cleanup_merchant_id text,
-  cleanup_connection_id uuid,
-  cleanup_connection_version bigint,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE private.square_oauth_intents ENABLE ROW LEVEL SECURITY;
@@ -2114,7 +2112,7 @@ END $$;
 
 CREATE FUNCTION public.fail_square_oauth(p_intent uuid,p_actor uuid,p_cleanup_state text,p_merchant_id text) RETURNS boolean
 LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-DECLARE i private.square_oauth_intents; c public.pos_connections; token_version bigint; next_version bigint;
+DECLARE i private.square_oauth_intents;
 BEGIN
   IF p_cleanup_state NOT IN ('not_required','pending','confirmed','unresolved') THEN
     RAISE EXCEPTION 'Square cleanup state invalid'; END IF;
@@ -2133,30 +2131,18 @@ BEGIN
   IF p_cleanup_state='pending' THEN
     IF NOT (i.exchange_state='exchanging' OR (i.exchange_state='recovery_required' AND i.cleanup_state='not_required')) THEN
       RETURN i.exchange_state='recovery_required' AND i.cleanup_state='pending' AND i.cleanup_merchant_id=p_merchant_id; END IF;
-    SELECT * INTO c FROM public.pos_connections WHERE brewery_id=i.brewery_id AND provider='square' FOR UPDATE;
-    IF c.id IS NOT NULL AND c.merchant_id=p_merchant_id AND c.remote_revocation_state<>'pending' THEN
-      DELETE FROM private.integration_tokens t WHERE t.brewery_id=i.brewery_id AND t.provider='square' AND t.connection_id=c.id
-        RETURNING t.credential_version INTO token_version;
-      next_version:=greatest(c.credential_version,coalesce(token_version,c.credential_version))+1;
-      UPDATE public.pos_connections SET state='recovery_required',remote_revocation_state='pending',
-        last_error='Square authorization cleanup is pending',credential_version=next_version,updated_at=now() WHERE id=c.id;
-      UPDATE private.square_oauth_intents SET exchange_state='recovery_required',cleanup_state='pending',
-        cleanup_merchant_id=p_merchant_id,cleanup_connection_id=c.id,cleanup_connection_version=next_version WHERE id=p_intent;
-    ELSE
-      UPDATE private.square_oauth_intents SET exchange_state='recovery_required',cleanup_state='pending',
-        cleanup_merchant_id=p_merchant_id,cleanup_connection_id=null,cleanup_connection_version=null WHERE id=p_intent;
-    END IF;
+    UPDATE private.square_oauth_intents SET exchange_state='recovery_required',cleanup_state='pending',cleanup_merchant_id=p_merchant_id
+      WHERE id=p_intent;
     RETURN true;
   END IF;
   IF i.exchange_state='recovery_required' AND i.cleanup_state='pending' AND i.cleanup_merchant_id=p_merchant_id THEN
     UPDATE private.square_oauth_intents SET cleanup_state=p_cleanup_state WHERE id=p_intent;
-    IF i.cleanup_connection_id IS NOT NULL THEN
-      UPDATE public.pos_connections SET state=CASE WHEN p_cleanup_state='confirmed' THEN 'disconnected' ELSE 'recovery_required' END,
-        remote_revocation_state=p_cleanup_state,
-        last_error=CASE WHEN p_cleanup_state='confirmed' THEN null ELSE 'Remote revocation could not be confirmed' END,updated_at=now()
-      WHERE id=i.cleanup_connection_id AND brewery_id=i.brewery_id AND credential_version=i.cleanup_connection_version
-        AND remote_revocation_state='pending';
-    END IF;
+    RETURN true;
+  END IF;
+  IF p_cleanup_state='unresolved' AND (i.exchange_state='exchanging'
+      OR (i.exchange_state='recovery_required' AND i.cleanup_state='not_required')) THEN
+    UPDATE private.square_oauth_intents SET exchange_state='recovery_required',cleanup_state='unresolved',cleanup_merchant_id=p_merchant_id
+      WHERE id=p_intent;
     RETURN true;
   END IF;
   RETURN i.exchange_state='recovery_required' AND i.cleanup_state=p_cleanup_state AND i.cleanup_merchant_id=p_merchant_id;

@@ -108,15 +108,19 @@ export class SquareClient {
     return this.token({ refresh_token: refreshToken, grant_type: "refresh_token" });
   }
 
-  async revoke(accessToken: string) {
+  private async revokeToken(accessToken: string, revokeOnlyAccessToken: boolean) {
     const response = await this.fetcher(`${this.oauthOrigin}/oauth2/revoke`, {
       method: "POST",
       headers: { "Square-Version": SQUARE_VERSION, Authorization: `Client ${this.config.applicationSecret}`, "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ client_id: this.config.applicationId, access_token: accessToken, revoke_only_access_token: false }),
+      body: JSON.stringify({ client_id: this.config.applicationId, access_token: accessToken, revoke_only_access_token: revokeOnlyAccessToken }),
     });
     const data = await response.json().catch(() => null) as { success?: unknown } | null;
     if (!response.ok || data?.success !== true) throw unavailable();
   }
+
+  revoke(accessToken: string) { return this.revokeToken(accessToken, false); }
+
+  revokeAccessToken(accessToken: string) { return this.revokeToken(accessToken, true); }
 
   private async api(path: string, accessToken: string, init?: RequestInit) {
     const response = await this.fetcher(`${this.apiOrigin}${path}`, {
@@ -224,8 +228,13 @@ export async function completeSquareOAuth(input: {
     if (!tokens) {
       await input.store.fail(claim.intentId, input.actorId, "not_required", null).catch(() => undefined);
     } else {
-      await input.store.fail(claim.intentId, input.actorId, "pending", tokens.merchantId).catch(() => undefined);
-      const cleanup = await input.client.revoke(tokens.accessToken).then(() => "confirmed" as const, () => "unresolved" as const);
+      try {
+        await input.store.fail(claim.intentId, input.actorId, "pending", tokens.merchantId);
+      } catch {
+        await input.store.fail(claim.intentId, input.actorId, "unresolved", tokens.merchantId).catch(() => undefined);
+        throw unavailable();
+      }
+      const cleanup = await input.client.revokeAccessToken(tokens.accessToken).then(() => "confirmed" as const, () => "unresolved" as const);
       await input.store.fail(claim.intentId, input.actorId, cleanup, tokens.merchantId).catch(() => undefined);
     }
     throw unavailable();
