@@ -60,7 +60,7 @@ export type ComposerState = {
   history: ComposerHistoryMessage[];
 };
 export type ComposerAction = {
-  id: "record_movement" | "read_atp" | "portal_availability";
+  id: "record_movement" | "read_atp";
   label: string;
   queries: string[];
   href?: string;
@@ -136,7 +136,7 @@ export function movementFormHref(input: MovementInput) {
 }
 
 export function composerActions(role: ComposerRole): ComposerAction[] {
-  if (role === "customer") return [{ id: "portal_availability", label: "Check account availability", queries: ["portal_catalog"] }];
+  if (role === "customer") return [];
   const reads: ComposerAction[] = [{ id: "read_atp", label: "Check available to promise", queries: ["list_skus", "get_atp"] }];
   if (role === "admin" || role === "warehouse") reads.unshift({
     id: "record_movement", label: "Record inventory movement",

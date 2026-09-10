@@ -14,6 +14,8 @@ import { DirectionIcon, Icon, type IconSvgElement } from "@/components/mgr/icon"
 import { TimeWindowField } from "@/components/mgr/time-window-field";
 import { VolumeField } from "@/components/mgr/volume-field";
 import { ComposerStripView } from "@/components/mgr/views/composer";
+import { composerActions } from "@/lib/composer/state";
+import type { StaffRole } from "@/lib/commands/registry";
 import { Qty, TabBar } from "@/components/mgr/qty";
 import { MARIA, UserAvatar } from "@/components/mgr/user-avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -421,7 +423,7 @@ export const E = {
    *  every call site writing the hole. */
   line: (t: React.ReactNode, s: React.ReactNode, n: React.ReactNode, cls: RowClass, fields: React.ReactNode) => E.row(t, s, n, cls, undefined, fields),
   sp: () => <div className="flex-1" />,
-  comp: (portal = false) => <ComposerStripView portal={portal} />,
+  comp: (role: StaffRole = "admin") => <ComposerStripView actions={composerActions(role).map((action) => ({ value: action.id, label: action.label }))} />,
 };
 
 function isPin(n: ReactNode) {

@@ -59,15 +59,16 @@ dependencies, rebuilds the authoritative snapshot in the same database
 transaction, and returns `409 conflict` if anything changed. A stale refusal
 leaves no movement, completed request, or conversation result.
 
-The current browser composer is a structured client of this same endpoint. It
-loads only the registered reads allowed for the current role, asks for every
+The current staff browser composer is a structured client of this same endpoint. It
+loads only the registered reads allowed for the current staff role, asks for every
 required movement field, calls `preview_command`, and sends `record_movement`
 only after the person selects **Commit movement**. Editing or dismissing a
 proposal sends no movement command. Staff ATP answers use `get_atp`; portal
-availability uses only `portal_catalog`. Conversation lists and messages are
-server-owned, author-and-brewery scoped, and contain no credentials or model
-transcripts. No model, voice provider, alternate write route, or client-local
-conversation history is involved.
+domain operations remain limited to the registered `portal_*` surface and no
+composer is mounted in the customer shell. Conversation lists and messages are
+staff-only, server-owned, author-and-brewery scoped, and contain no credentials
+or model transcripts. No model, voice provider, alternate write route, or
+client-local conversation history is involved.
 
 The endpoint accepts at most **8 MiB** of JSON per request and admits **120
 requests per authenticated account per 60 seconds**. The account budget is
@@ -233,7 +234,7 @@ omitted. They have no roles until they are built.
 | Operation | Area | admin | sales | warehouse | brewer | taproom | customer |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `adjust_order_lines` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
-| `append_chat_message` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `append_chat_message` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `begin_chat_installation` | Today & notifications | ✓ |  |  |  |  |  |
 | `begin_chat_reauthorization` | Today & notifications | ✓ |  |  |  |  |  |
 | `cancel_order` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
@@ -247,7 +248,7 @@ omitted. They have no roles until they are built.
 | `consume_chat_link_proof` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `correct_taproom_count` | Taproom & kegs | ✓ |  |  |  |  |  |
 | `create_bin` | Inventory & locations | ✓ |  | ✓ |  |  |  |
-| `create_chat_conversation` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `create_chat_conversation` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `create_credit_memo` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
 | `create_keg_pool` | Taproom & kegs | ✓ |  | ✓ |  |  |  |
 | `create_location` | Inventory & locations | ✓ |  |  |  |  |  |
@@ -277,7 +278,7 @@ omitted. They have no roles until they are built.
 | `get_brew_day` | Production | ✓ |  |  | ✓ |  |  |
 | `get_brewery` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ |  |  |
 | `get_brewery_operating_defaults` | Team & brewery settings | ✓ |  |  |  |  |  |
-| `get_chat_history` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `get_chat_history` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `get_chat_integration_health` | Today & notifications | ✓ |  |  |  |  |  |
 | `get_chat_link_intent` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `get_chat_link_status` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
@@ -321,7 +322,7 @@ omitted. They have no roles until they are built.
 | `list_brands` | Catalog & pricing | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `list_channel_prices` | Catalog & pricing | ✓ | ✓ |  |  |  |  |
 | `list_chat_channels` | Today & notifications | ✓ |  |  |  |  |  |
-| `list_chat_conversations` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `list_chat_conversations` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `list_chat_user_links` | Today & notifications | ✓ |  |  |  |  |  |
 | `list_compliance_reports` | Compliance | ✓ | ✓ |  |  |  |  |
 | `list_customers` | Customers | ✓ | ✓ | ✓ |  |  |  |
@@ -365,7 +366,7 @@ omitted. They have no roles until they are built.
 | `portal_submit_order` | Customer portal |  |  |  |  |  | ✓ |
 | `portal_submit_quote` | Customer portal |  |  |  |  |  | ✓ |
 | `portal_update_draft_order` | Customer portal |  |  |  |  |  | ✓ |
-| `preview_command` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `preview_command` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `provision_brewery` | Team & brewery settings |  |  |  |  |  |  |
 | `push_invoice_to_qbo` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
 | `raise_invoice_question` | Orders & invoicing |  |  |  |  |  | ✓ |
@@ -632,7 +633,7 @@ top of them.
 
 #### append_chat_message [#append_chat_message]
 
-`command` · any
+`command` · admin, sales, warehouse, brewer, taproom
 
 Append one message to the current author's composer conversation
 
@@ -700,7 +701,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 #### create_chat_conversation [#create_chat_conversation]
 
-`command` · any
+`command` · admin, sales, warehouse, brewer, taproom
 
 Create one server-owned composer conversation for the current author and brewery
 
@@ -766,7 +767,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 #### get_chat_history [#get_chat_history]
 
-`query` · any
+`query` · admin, sales, warehouse, brewer, taproom
 
 Read one composer conversation and its messages for the current author and brewery
 
@@ -898,7 +899,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 #### list_chat_conversations [#list_chat_conversations]
 
-`query` · any
+`query` · admin, sales, warehouse, brewer, taproom
 
 List the current author's composer conversations in this brewery
 
@@ -943,7 +944,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 #### preview_command [#preview_command]
 
-`query` · any
+`query` · admin, sales, warehouse, brewer, taproom
 
 Canonicalize one supported command into server-owned effects and a bound preview token without running its write handler
 

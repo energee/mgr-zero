@@ -1,10 +1,12 @@
 import { readFileSync } from "node:fs";
-import { createElement, isValidElement } from "react";
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { E } from "@/components/mgr/e";
 import { SCREENS } from "@/components/mgr/screens";
-import { ComposerAnswerView, ComposerProposalView, ComposerQuestionView, ComposerStripView } from "@/components/mgr/views/composer";
+import { ComposerProposalView, ComposerQuestionView, ComposerStripView } from "@/components/mgr/views/composer";
+import { canRun, runCommand } from "@/lib/commands/registry";
+import "@/lib/commands/all";
 import {
   beginComposerCommit,
   composerActions,
@@ -97,9 +99,16 @@ describe("structured composer state", () => {
     });
   });
 
-  it("limits customer reads to portal operations and clears rendered state on scope change", () => {
-    expect(composerActions("customer").flatMap((action) => action.queries)).toEqual(["portal_catalog"]);
+  it("denies composer and history operations to customers and does not mount a portal composer", async () => {
+    expect(composerActions("customer")).toEqual([]);
     expect(composerActions("sales").flatMap((action) => action.queries)).toEqual(["list_skus", "get_atp"]);
+    const customer = { breweryId: ids.locationId, userId: ids.skuId, customerId: ids.binId, role: "customer" } as Parameters<typeof canRun>[0];
+    for (const name of ["preview_command", "create_chat_conversation", "append_chat_message", "list_chat_conversations", "get_chat_history"]) {
+      expect(canRun(customer, name), name).toBe(false);
+      await expect(runCommand(name, {}, customer), name).rejects.toMatchObject({ status: 403, code: "permission_denied" });
+    }
+    expect(readFileSync("app/(portal)/layout.tsx", "utf8")).not.toMatch(/Composer|composer=/);
+    expect(readFileSync("components/mgr/screen-frame.tsx", "utf8")).not.toContain("E.comp(true)");
 
     const populated = {
       ...composerInitialState("actor-a:brewery-a:admin"),
@@ -109,23 +118,28 @@ describe("structured composer state", () => {
     expect(resetComposerScope(populated, "actor-b:brewery-b:admin")).toEqual(composerInitialState("actor-b:brewery-b:admin"));
   });
 
-  it("shares the composer views between inventory records and both live shells", () => {
+  it("shares structured composer views with the staff shell and filters shell actions by persona role", () => {
     expect(E.comp().type).toBe(ComposerStripView);
-    const bodyFor = (name: string) => {
-      const body = SCREENS.find((screen) => screen.name === name)?.body;
-      return isValidElement(body) ? body.type : null;
-    };
-    expect(bodyFor("Composer question")).toBe(ComposerQuestionView);
-    expect(bodyFor("Composer proposal")).toBe(ComposerProposalView);
-    expect(bodyFor("Composer answer")).toBe(ComposerAnswerView);
-    for (const file of ["app/(app)/layout.tsx", "app/(portal)/layout.tsx"]) {
-      expect(readFileSync(file, "utf8")).toMatch(/composer=\{<Composer[^>]+role=/);
-    }
+    const live = readFileSync("components/mgr/composer.tsx", "utf8");
+    expect(live).toContain("<ComposerMovementPickerView");
+    expect(readFileSync("app/(app)/layout.tsx", "utf8")).toMatch(/composer=\{<Composer[^>]+role=/);
+    expect(readFileSync("components/mgr/screen-frame.tsx", "utf8")).toContain("composer={E.comp(persona.role)}");
+    expect(composerActions("admin").map((action) => action.id)).toEqual(["record_movement", "read_atp"]);
+    expect(composerActions("sales").map((action) => action.id)).toEqual(["read_atp"]);
+    expect(composerActions("brewer")).toEqual([]);
   });
 
-  it("renders questions without a commit and proposals only from canonical effect fields", () => {
+  it("renders reachable structured picker states and proposals only from canonical effect fields", () => {
     const question = renderToStaticMarkup(createElement(ComposerQuestionView, { prompt: "Which package?" }));
     expect(question).not.toContain("Commit movement");
+    const questionScreen = renderToStaticMarkup(createElement("div", null, SCREENS.find((screen) => screen.name === "Composer question")!.body));
+    const proposalScreen = renderToStaticMarkup(createElement("div", null, SCREENS.find((screen) => screen.name === "Composer proposal")!.body));
+    for (const label of ["SKU / package", "Type", "Location", "Bin", "Lot", "Positive quantity"]) {
+      expect(questionScreen, label).toContain(label);
+      expect(proposalScreen, label).toContain(label);
+    }
+    expect(questionScreen).not.toContain("Blew a half");
+    expect(proposalScreen).not.toContain("Blew a half");
     const proposal = renderToStaticMarkup(createElement(ComposerProposalView, {
       effects: [{ label: "Canonical IPA · Taproom · Cold", qty: "-1", stockBeforeQty: "4", stockAfterQty: "3" }],
       warnings: ["Registration needs review"],

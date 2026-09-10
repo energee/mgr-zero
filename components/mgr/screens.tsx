@@ -11,8 +11,8 @@ import { INVENTORY_DETAIL } from "@/lib/mgr/fixtures/inventory-detail";
 // edit surface with empty values (Create brewery is the pattern), so Add
 // customer, Add location, New PO, Add keg pool and Create price group open the
 // records already here rather than earning frames of their own. And the
-// composer strip is shell chrome — screen-frame.tsx passes E.comp() to both
-// shells — so it is present under every staff and portal frame without any
+// composer strip is staff shell chrome — screen-frame.tsx passes E.comp() to
+// staff frames — so it is present under every staff frame without any
 // body naming it.
 //
 // Option casing follows the word, never the control that draws it. A proper
@@ -209,7 +209,7 @@ import { toLocationsViewProps } from "@/lib/mgr/locations-view";
 import { toMaterialViewProps } from "@/lib/mgr/material-view";
 import { toMaterialsViewProps } from "@/lib/mgr/materials-view";
 import { toMaterialsOnHandViewProps } from "@/lib/mgr/materials-on-hand-view";
-import { ComposerAnswerView, ComposerProposalView, ComposerQuestionView } from "@/components/mgr/views/composer";
+import { ComposerAnswerView, ComposerMovementPickerView, ComposerProposalView, ComposerQuestionView } from "@/components/mgr/views/composer";
 import { toMeViewProps } from "@/lib/mgr/me-view";
 import { toNewPoViewProps } from "@/lib/mgr/new-po-view";
 import { toMoreViewProps } from "@/lib/mgr/more-view";
@@ -852,20 +852,31 @@ export const SCREENS: Screen[] = [
     tab: "Today",
     group: "Global",
     name: "Composer proposal",
-    to: { "\u201cBlew a half of Hazy at the taproom\u201d": "Composer question", "Open as form": "Record movement", Dismiss: "Today", "Commit movement": "Movement recorded" },
-    job: "Candidate language becomes canonical server preview; signed effect leads",
-    reads: "preview_command [internal query, not an AI tool]",
+    to: { "Preview current data": "Composer proposal", "Open as form": "Record movement", Dismiss: "Today", "Commit movement": "Movement recorded" },
+    job: "Exact structured fields become a canonical server preview; signed effect leads",
+    reads: "list_skus · list_locations · list_bins · list_sale_channels · get_bin_move_stock · preview_command [internal query, not an AI tool]",
     writes: "record_movement [Commit; same requestId + previewToken; server revalidates]",
-    states: [["ambiguous", "One question · choice chips · no Commit button", 1], ["stale", "Reject and preview current data", 1], ["permission", "No proposal beyond allowed role", 1], ["offline", "Save candidate; no fake preview"]],
-    spec: "Ambiguity (“half” = ½ bbl keg, or half the remaining ⅙?) renders a question with choice chips and no Commit; this frame is the resolved proposal after that choice. The preview query is internal, never an AI tool.",
-    body: <ComposerProposalView
-      query="Blew a half of Hazy at the taproom"
-      effects={[{ label: "Hazy IPA · ½ bbl keg · Taproom · Walk-in", qty: "-1", bbl: "-0.50000000", stockBeforeQty: "3", stockAfterQty: "2", taxTreatment: "taxable", correction: "reverse_inventory_movement" }]}
-      warnings={[]}
-      openHref="#"
-      openTo="Record movement"
-      onCommit={() => undefined}
-    />,
+    states: [["editing", "Any field edit removes the proposal and Commit", 1], ["stale", "Reject and preview current data", 1], ["permission", "No proposal beyond allowed role", 1]],
+    spec: "The live no-model path requires exact fields before preview. The preview query is internal, never an AI tool; the proposal contains only its canonical effects and warnings.",
+    body: <>
+      <ComposerMovementPickerView
+        draft={{ skuId: "hazy-half", kind: "depletion", locationId: "taproom", binId: "walk-in", lotChoice: "untracked", qty: "1", saleChannelId: "taproom-channel" }}
+        skus={[{ id: "hazy-half", label: "Hazy IPA · ½ bbl keg" }]}
+        locations={[{ id: "taproom", label: "Taproom" }]}
+        bins={[{ id: "walk-in", label: "Walk-in" }]}
+        lots={[]}
+        channels={[{ id: "taproom-channel", label: "Taproom" }]}
+        question={false}
+        proposal
+      />
+      <ComposerProposalView
+        effects={[{ label: "Hazy IPA · ½ bbl keg · Taproom · Walk-in", qty: "-1", bbl: "-0.50000000", stockBeforeQty: "3", stockAfterQty: "2", taxTreatment: "taxable", correction: "reverse_inventory_movement" }]}
+        warnings={[]}
+        openHref="#"
+        openTo="Record movement"
+        onCommit={() => undefined}
+      />
+    </>,
   },
   {
     step: 4,
@@ -873,17 +884,23 @@ export const SCREENS: Screen[] = [
     tab: "Today",
     group: "Global",
     name: "Composer question",
-    to: { "\u201cBlew a half of Hazy at the taproom\u201d": "Composer proposal", "\u00bd bbl keg": "Composer proposal", "Half the remaining \u2159": "Composer proposal" },
-    job: "One question, chips, no Commit until the SKU is chosen",
-    reads: "preview_command [internal query, not an AI tool]",
+    to: { "Preview movement": "Composer question" },
+    job: "One exact missing-field question; no Commit until every required field is chosen",
+    reads: "list_skus · list_locations · list_bins · list_sale_channels · get_bin_move_stock",
     writes: "none",
-    states: [["ambiguous", "choice chips · no Commit"], ["resolved", "opens Composer proposal"]],
-    spec: "Named in Composer proposal states and never drawn until now. “Blew a half of Hazy” must pick the package before a Commit exists.",
-    body: <ComposerQuestionView
-      query="Blew a half of Hazy at the taproom"
-      prompt="Which half?"
-      choices={[{ value: "half-barrel", label: "½ bbl keg" }, { value: "half-remaining", label: "Half the remaining ⅙" }]}
-    />,
+    states: [["missing SKU", "structured picker · no Commit"], ["resolved", "Preview movement becomes available"]],
+    spec: "The no-model path asks for the first missing structured field. This initial state asks for the exact SKU / package and exposes no inferred candidate language or Commit verb.",
+    body: <>
+      <ComposerMovementPickerView
+        draft={{}}
+        skus={[{ id: "hazy-half", label: "Hazy IPA · ½ bbl keg" }]}
+        locations={[{ id: "taproom", label: "Taproom" }]}
+        bins={[]}
+        lots={[]}
+        channels={[{ id: "taproom-channel", label: "Taproom" }]}
+      />
+      <ComposerQuestionView prompt="Which SKU / package?" />
+    </>,
   },
   {
     step: 4,

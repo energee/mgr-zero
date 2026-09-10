@@ -5,12 +5,12 @@ import { useCommandContext } from "@/app/(app)/brewery-provider";
 import {
   ComposerAnswerView,
   ComposerHistoryView,
+  ComposerMovementPickerView,
   ComposerProposalView,
   ComposerQuestionView,
   ComposerStripView,
 } from "@/components/mgr/views/composer";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CommandResponseError, command } from "@/lib/commands/client";
 import {
@@ -25,31 +25,17 @@ import {
   type ComposerAction,
   type ComposerHistoryMessage,
   type ComposerProposal,
-  type ComposerRole,
   type MovementDraft,
-  type MovementKind,
 } from "@/lib/composer/state";
+import type { StaffRole } from "@/lib/commands/registry";
 
 type Sku = { id: string; name: string; active: boolean; brands: { name: string } | null; formats: { name: string } | null };
 type Location = { id: string; name: string; kind: string };
 type Bin = { id: string; location_id: string; name: string };
 type Channel = { id: string; name: string };
 type Stock = { bin_id: string; kind: string; stock_id: string; lot_id: string | null; lot_code: string | null; qty: number };
-type PortalSku = { skuId: string; name: string; product: string; badge: string; unitPriceCents: number };
 type Conversation = { id: string; title: string; updated_at: string };
 type Answer = { query: string; answer: string; detail?: string; observedAt: string };
-
-const MOVEMENT_TYPES: { value: MovementKind; label: string }[] = [
-  { value: "opening_balance", label: "Opening balance" },
-  { value: "production_in", label: "Production in" },
-  { value: "adjustment", label: "Adjustment" },
-  { value: "depletion", label: "Depletion" },
-  { value: "return_in", label: "Return in" },
-  { value: "destruction", label: "Destruction" },
-  { value: "loss", label: "Loss" },
-  { value: "sample", label: "Sample" },
-  { value: "festival_removal", label: "Festival removal" },
-];
 
 function skuLabel(sku: Sku) {
   return [sku.brands?.name, sku.name, sku.formats?.name].filter(Boolean).join(" · ");
@@ -59,7 +45,7 @@ function messageText(error: unknown) {
   return error instanceof Error ? error.message : "Composer unavailable";
 }
 
-export function Composer({ role, portal = false }: { role: ComposerRole; portal?: boolean }) {
+export function Composer({ role }: { role: StaffRole }) {
   const expectedContext = useCommandContext();
   const breweryId = expectedContext.breweryId ?? "";
   const scopeKey = `${expectedContext.actorId}:${breweryId}:${expectedContext.customerId ?? "staff"}:${role}`;
@@ -70,7 +56,6 @@ export function Composer({ role, portal = false }: { role: ComposerRole; portal?
   const [bins, setBins] = useState<Bin[]>([]);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [stock, setStock] = useState<Stock[]>([]);
-  const [portalSkus, setPortalSkus] = useState<PortalSku[]>([]);
   const [readSkuId, setReadSkuId] = useState("");
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -122,10 +107,8 @@ export function Composer({ role, portal = false }: { role: ComposerRole; portal?
         setLocations(locationRows as Location[]);
         setBins(binRows as Bin[]);
         setChannels(channelRows as Channel[]);
-      } else if (selected.id === "read_atp") {
-        setSkus(await run("list_skus", {}) as Sku[]);
       } else {
-        setPortalSkus(await run("portal_catalog", {}) as PortalSku[]);
+        setSkus(await run("list_skus", {}) as Sku[]);
       }
     } catch (cause) {
       setError(messageText(cause));
@@ -192,20 +175,11 @@ export function Composer({ role, portal = false }: { role: ComposerRole; portal?
     setBusy(true);
     setError(null);
     try {
-      const conversationId = await ensureConversation(portal ? "Account availability" : "Available to promise");
-      let next: Answer;
-      if (portal) {
-        const rows = await run("portal_catalog", {}) as PortalSku[];
-        setPortalSkus(rows);
-        const sku = rows.find((row) => row.skuId === readSkuId);
-        if (!sku) throw new Error("Choose an account SKU.");
-        next = { query: `Is ${sku.product} · ${sku.name} available?`, answer: sku.badge, detail: `Current account price $${(sku.unitPriceCents / 100).toFixed(2)}`, observedAt: new Date().toLocaleString() };
-      } else {
-        const rows = await run("get_atp", { skuId: readSkuId }) as { qty: number | string }[];
-        const sku = skus.find((row) => row.id === readSkuId);
-        const qty = rows.reduce((total, row) => total + Number(row.qty), 0);
-        next = { query: `How much ${sku ? skuLabel(sku) : "of this SKU"} is available to promise?`, answer: `${qty} SKU units`, detail: "Current ATP across this brewery", observedAt: new Date().toLocaleString() };
-      }
+      const conversationId = await ensureConversation("Available to promise");
+      const rows = await run("get_atp", { skuId: readSkuId }) as { qty: number | string }[];
+      const sku = skus.find((row) => row.id === readSkuId);
+      const qty = rows.reduce((total, row) => total + Number(row.qty), 0);
+      const next: Answer = { query: `How much ${sku ? skuLabel(sku) : "of this SKU"} is available to promise?`, answer: `${qty} SKU units`, detail: "Current ATP across this brewery", observedAt: new Date().toLocaleString() };
       await append(conversationId, "user", next.query);
       await append(conversationId, "assistant", `${next.answer}${next.detail ? ` · ${next.detail}` : ""} · observed ${next.observedAt}`);
       setAnswer(next);
@@ -247,35 +221,33 @@ export function Composer({ role, portal = false }: { role: ComposerRole; portal?
         <ComposerHistoryView messages={state.history} onClose={() => setState((current) => ({ ...current, historyOpen: false }))} />
       </>}
 
-      {action?.id === "record_movement" && <section className="grid gap-2 rounded-md border bg-card p-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Label>SKU / package<select className="mt-1 w-full rounded-md border bg-background p-2" value={state.draft.skuId ?? ""} onChange={(event) => void changeDraft({ skuId: event.target.value || undefined, lotChoice: undefined })}><option value="">Choose…</option>{skus.map((sku) => <option key={sku.id} value={sku.id}>{skuLabel(sku)}</option>)}</select></Label>
-        <Label>Type<select className="mt-1 w-full rounded-md border bg-background p-2" value={state.draft.kind ?? ""} onChange={(event) => void changeDraft({ kind: (event.target.value || undefined) as MovementKind | undefined, direction: undefined, saleChannelId: undefined, destState: undefined })}><option value="">Choose…</option>{MOVEMENT_TYPES.map((kind) => <option key={kind.value} value={kind.value}>{kind.label}</option>)}</select></Label>
-        {state.draft.kind === "adjustment" && <Label>Direction<select className="mt-1 w-full rounded-md border bg-background p-2" value={state.draft.direction ?? ""} onChange={(event) => void changeDraft({ direction: (event.target.value || undefined) as "add" | "remove" | undefined })}><option value="">Choose…</option><option value="add">Add stock</option><option value="remove">Remove stock</option></select></Label>}
-        <Label>Location<select className="mt-1 w-full rounded-md border bg-background p-2" value={state.draft.locationId ?? ""} onChange={(event) => void changeDraft({ locationId: event.target.value || undefined, binId: undefined, lotChoice: undefined })}><option value="">Choose…</option>{locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}</select></Label>
-        <Label>Bin<select className="mt-1 w-full rounded-md border bg-background p-2" value={state.draft.binId ?? ""} disabled={!state.draft.locationId} onChange={(event) => void changeDraft({ binId: event.target.value || undefined, lotChoice: undefined })}><option value="">Choose…</option>{bins.filter((bin) => bin.location_id === state.draft.locationId).map((bin) => <option key={bin.id} value={bin.id}>{bin.name}</option>)}</select></Label>
-        <Label>Lot<select className="mt-1 w-full rounded-md border bg-background p-2" value={state.draft.lotChoice ?? ""} disabled={!state.draft.binId || !state.draft.skuId} onChange={(event) => void changeDraft({ lotChoice: event.target.value || undefined })}><option value="">Choose…</option><option value="untracked">Untracked / legacy stock</option>{lotOptions.map((row) => <option key={row.lot_id!} value={row.lot_id!}>{row.lot_code} · {row.qty} available</option>)}</select></Label>
-        <Label>Positive quantity<Input className="mt-1" type="number" min="0.01" step="0.01" value={state.draft.qty ?? ""} onChange={(event) => void changeDraft({ qty: event.target.value })} /></Label>
-        {state.draft.kind === "depletion" && <Label>Sale channel<select className="mt-1 w-full rounded-md border bg-background p-2" value={state.draft.saleChannelId ?? ""} onChange={(event) => void changeDraft({ saleChannelId: event.target.value || undefined })}><option value="">Choose…</option>{channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name}</option>)}</select></Label>}
-        {(state.draft.kind === "sample" || state.draft.kind === "festival_removal") && <Label>Destination state<Input className="mt-1" maxLength={2} pattern="[A-Za-z]{2}" value={state.draft.destState ?? ""} onChange={(event) => void changeDraft({ destState: event.target.value.toUpperCase() })} /></Label>}
-        <Label className="sm:col-span-2">Note<Input className="mt-1" value={state.draft.note ?? ""} onChange={(event) => void changeDraft({ note: event.target.value })} /></Label>
-        <div className="flex items-end"><Button type="button" disabled={busy || Boolean(question)} onClick={() => void previewMovement()}>{busy ? "Loading…" : state.proposal ? "Preview current data" : "Preview movement"}</Button></div>
-      </section>}
+      {action?.id === "record_movement" && <ComposerMovementPickerView
+        draft={state.draft}
+        skus={skus.map((sku) => ({ id: sku.id, label: skuLabel(sku) }))}
+        locations={locations.map((location) => ({ id: location.id, label: location.name }))}
+        bins={bins.filter((bin) => bin.location_id === state.draft.locationId).map((bin) => ({ id: bin.id, label: bin.name }))}
+        lots={lotOptions.map((row) => ({ id: row.lot_id!, label: `${row.lot_code} · ${row.qty} available` }))}
+        channels={channels.map((channel) => ({ id: channel.id, label: channel.name }))}
+        busy={busy}
+        question={Boolean(question)}
+        proposal={Boolean(state.proposal)}
+        onChange={(patch) => void changeDraft(patch)}
+        onPreview={() => void previewMovement()}
+      />}
 
       {question && <ComposerQuestionView prompt={question.prompt} />}
       {state.proposal && <ComposerProposalView effects={state.proposal.effects} warnings={state.proposal.warnings} openHref={movementFormHref(state.proposal.input)} onDismiss={() => setState((current) => ({ ...current, proposal: null, commitRequestId: null }))} onCommit={() => void commitMovement()} committing={state.committing} />}
 
-      {(action?.id === "read_atp" || action?.id === "portal_availability") && <section className="flex flex-col gap-2 rounded-md border bg-card p-3 sm:flex-row sm:items-end">
-        <Label className="flex-1">SKU / package<select className="mt-1 w-full rounded-md border bg-background p-2" value={readSkuId} onChange={(event) => { setReadSkuId(event.target.value); setAnswer(null); }}><option value="">Choose…</option>{(portal ? portalSkus : skus).map((sku) => {
-          const id = "skuId" in sku ? sku.skuId : sku.id;
-          const label = "skuId" in sku ? `${sku.product} · ${sku.name}` : skuLabel(sku);
-          return <option key={id} value={id}>{label}</option>;
+      {action?.id === "read_atp" && <section className="flex flex-col gap-2 rounded-md border bg-card p-3 sm:flex-row sm:items-end">
+        <Label className="flex-1">SKU / package<select className="mt-1 w-full rounded-md border bg-background p-2" value={readSkuId} onChange={(event) => { setReadSkuId(event.target.value); setAnswer(null); }}><option value="">Choose…</option>{skus.map((sku) => {
+          return <option key={sku.id} value={sku.id}>{skuLabel(sku)}</option>;
         })}</select></Label>
         <Button type="button" disabled={!readSkuId || busy} onClick={() => void readAnswer()}>{busy ? "Refreshing…" : "Read current answer"}</Button>
       </section>}
       {answer && <ComposerAnswerView {...answer} />}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       {action && <Button type="button" variant="ghost" className="self-start" onClick={() => { setAction(null); setAnswer(null); setError(null); }}>Close composer</Button>}
-      <ComposerStripView portal={portal} actions={actions.map((item) => ({ value: item.id, label: item.label }))} onAction={(id) => void chooseAction(id)} onHistory={() => void loadHistory()} actionRef={actionRef} />
+      <ComposerStripView actions={actions.map((item) => ({ value: item.id, label: item.label }))} onAction={(id) => void chooseAction(id)} onHistory={() => void loadHistory()} actionRef={actionRef} />
       <p className="text-center text-[11px] text-muted-foreground">Structured actions only. Voice and a free-form model are not connected.</p>
     </div>
   );
