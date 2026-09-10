@@ -108,9 +108,12 @@ jobs:
 });
 
 describe("production-readiness workflow contract", () => {
-  it("runs the full Vitest suite in two isolated shards and includes invitation tests", () => {
-    expect(ci).toContain('shard: ["1/2", "2/2"]');
+  it("runs pure screen tests in parallel and the remaining suite in three isolated database shards", () => {
+    expect(ci).toContain('shard: ["1/3", "2/3", "3/3"]');
+    expect(ci).toContain("bunx vitest run --fileParallelism --maxWorkers=2");
     expect(ci).toContain('bunx vitest run --shard=${{ matrix.shard }}');
+    expect(ci).toContain("--exclude tests/mgr-screens.test.ts");
+    expect(ci).toMatch(/needs: \[quality, pure_tests, test_shard\]/);
     expect(vitestConfig).toMatch(/include:\s*\[\s*"tests\/\*\*\/\*\.test\.ts"/);
     expect(matchesGlob(INVITE_TEST, "tests/**/*.test.ts")).toBe(true);
     expect(configDefaults.exclude.some((pattern) => matchesGlob(INVITE_TEST, pattern))).toBe(false);

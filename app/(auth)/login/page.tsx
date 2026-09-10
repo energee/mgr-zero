@@ -14,8 +14,8 @@ const ERRORS: Record<string, string> = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>
+  searchParams: Promise<{ error?: string; sent?: string }>
 }) {
-  const { error } = await searchParams
-  return <LoginForm error={error ? ERRORS[error] ?? "Sign-in failed." : undefined} />
+  const { error, sent } = await searchParams
+  return <LoginForm error={error ? ERRORS[error] ?? "Sign-in failed." : undefined} sent={Boolean(sent)} />
 }

@@ -25,8 +25,8 @@ type Movement = { bin_id: string; bbl: string; dest_state: string | null; sale_c
 
 const sum = (rows: { sku_id: string; qty: string }[]) => rows.reduce((m, r) => m.set(r.sku_id, (m.get(r.sku_id) ?? 0) + Number(r.qty)), new Map<string, number>());
 
-export default async function InventoryPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
-  const { page: rawPage } = await searchParams;
+export default async function InventoryPage({ searchParams }: { searchParams: Promise<{ page?: string; recordMovement?: string }> }) {
+  const { page: rawPage, recordMovement } = await searchParams;
   const page = /^\d{1,6}$/.test(rawPage ?? "") ? Math.max(0, Number(rawPage) - 1) : 0;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
@@ -51,7 +51,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
           return { id: s.id, name: s.name, brands: s.brands, on_hand: on, atp: atpBySku.get(s.id) ?? on };
         }),
       })}
-      createAction={canMove ? <MovementForm skus={skus.map((s) => ({ id: s.id, label: skuLabel(s), bblPerUnit: s.format_volume?.bbl_per_unit == null ? null : Number(s.format_volume.bbl_per_unit) }))} locations={locations} bins={bins} channels={channels} /> : null}
+      createAction={canMove ? <MovementForm autoOpen={recordMovement === "1"} skus={skus.map((s) => ({ id: s.id, label: skuLabel(s), bblPerUnit: s.format_volume?.bbl_per_unit == null ? null : Number(s.format_volume.bbl_per_unit) }))} locations={locations} bins={bins} channels={channels} /> : null}
       afterHeader={canAddSku ? E.btn("Add SKU", "g", "/catalog") : undefined}
       linkRows
       footer={
