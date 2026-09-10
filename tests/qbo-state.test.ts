@@ -92,6 +92,22 @@ function paymentResponse(id: string, cash: number) {
   }), { status: 200 });
 }
 
+function multiInvoicePaymentResponse(id: string, cash: number) {
+  return new Response(JSON.stringify({
+    Payment: {
+      Id: id,
+      TotalAmt: cash,
+      UnappliedAmt: 0,
+      TxnDate: "2026-09-09",
+      Line: [
+        { Amount: 80, LinkedTxn: [{ TxnId: "remote-one", TxnType: "Invoice" }] },
+        { Amount: 80, LinkedTxn: [{ TxnId: "remote-two", TxnType: "Invoice" }] },
+        ...(cash < 160 ? [{ Amount: -(160 - cash), LinkedTxn: [{ TxnId: "credit-1", TxnType: "CreditMemo" }] }] : []),
+      ],
+    },
+  }), { status: 200 });
+}
+
 describe("QuickBooks current invoice state", () => {
   it("tracks partial, paid, reopened and voided states without mistaking credits for cash", async () => {
     const f = await stateFixture();
@@ -156,6 +172,77 @@ describe("QuickBooks current invoice state", () => {
     expect(sql(`select (paid_at is not null)::text from invoices where id='${mixed.invoice.id}'`)).toEqual(["true"]);
     expect(sql(`select collected_cents from invoice_totals where invoice_id='${mixed.invoice.id}'`)).toEqual(["4000"]);
     expect(mixedFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("fetches a shared Payment once and fails cash recognition closed when its invoice allocation is ambiguous", async () => {
+    const firstId = "00000000-0000-4000-8000-000000000101";
+    const secondId = "00000000-0000-4000-8000-000000000102";
+    const f = await stateFixture("admin", firstId, "remote-one");
+    expect((await admin.from("invoices").insert({
+      id: secondId, brewery_id: f.brewery.id, customer_id: f.customer.customerId,
+      qbo_invoice_id: "remote-two", qbo_sync_status: "pushed",
+    })).error).toBeNull();
+    sql(`update public.qbo_pushes set response='{"Id":"remote-one","SyncToken":"0","TotalAmt":80,"TotalTax":10,"Balance":80}'
+      where invoice_id='${firstId}'`);
+    sql(`insert into public.qbo_pushes(
+      brewery_id,invoice_id,connection_id,realm_id,entity_type,provider_request_id,
+      request_body,local_snapshot,attempt_reason,status,qbo_entity_id,response,finished_at)
+      values('${f.brewery.id}','${secondId}','${f.connection.id}','${f.connection.realm_id}',
+      'Invoice',gen_random_uuid(),'{"CustomerRef":{"value":"customer-42"},"DocNumber":"1","TxnDate":"2026-09-09","Line":[]}',
+      '{}','initial','pushed','remote-two','{"Id":"remote-two","SyncToken":"0","TotalAmt":80,"TotalTax":10,"Balance":80}',now())`);
+
+    const sharedFetch = (cash: number) => vi.fn<typeof globalThis.fetch>(async (input) => {
+      const path = new URL(String(input)).pathname;
+      if (path.endsWith("/payment/shared-payment")) return multiInvoicePaymentResponse("shared-payment", cash);
+      const remoteId = path.split("/").at(-1)!;
+      return invoiceResponse({
+        Id: remoteId, TotalAmt: 80, Balance: 0,
+        LinkedTxn: [{ TxnId: "shared-payment", TxnType: "Payment" }],
+      });
+    });
+
+    const ambiguous = sharedFetch(100);
+    await syncQboInvoices(f.ctx, crypto.randomUUID(), new QboOAuthClient(config, ambiguous));
+    expect(sql(`select qbo_invoice_id||'|'||qbo_cash_collected_cents||'|'||(paid_at is not null)::text
+      from invoices where id in ('${firstId}','${secondId}') order by id`))
+      .toEqual(["remote-one|0|false", "remote-two|0|false"]);
+    expect(ambiguous).toHaveBeenCalledTimes(3);
+
+    const allCash = sharedFetch(160);
+    await syncQboInvoices(f.ctx, crypto.randomUUID(), new QboOAuthClient(config, allCash));
+    expect(allCash).toHaveBeenCalledTimes(3);
+    expect(sql(`select qbo_invoice_id||'|'||qbo_cash_collected_cents from invoices
+      where id in ('${firstId}','${secondId}') order by id`))
+      .toEqual(["remote-one|8000", "remote-two|8000"]);
+
+    const separate = vi.fn<typeof globalThis.fetch>(async (input) => {
+      const path = new URL(String(input)).pathname;
+      if (path.endsWith("/payment/credit-payment")) {
+        return new Response(JSON.stringify({ Payment: {
+          Id: "credit-payment", TotalAmt: 0, UnappliedAmt: 0,
+          Line: [
+            { Amount: 80, LinkedTxn: [{ TxnId: "remote-one", TxnType: "Invoice" }] },
+            { Amount: -80, LinkedTxn: [{ TxnId: "credit-1", TxnType: "CreditMemo" }] },
+          ],
+        } }), { status: 200 });
+      }
+      if (path.endsWith("/payment/cash-payment")) {
+        return new Response(JSON.stringify({ Payment: {
+          Id: "cash-payment", TotalAmt: 80, UnappliedAmt: 0,
+          Line: [{ Amount: 80, LinkedTxn: [{ TxnId: "remote-two", TxnType: "Invoice" }] }],
+        } }), { status: 200 });
+      }
+      const remoteId = path.split("/").at(-1)!;
+      return invoiceResponse({
+        Id: remoteId, TotalAmt: 80, Balance: 0,
+        LinkedTxn: [{ TxnId: remoteId === "remote-one" ? "credit-payment" : "cash-payment", TxnType: "Payment" }],
+      });
+    });
+    await syncQboInvoices(f.ctx, crypto.randomUUID(), new QboOAuthClient(config, separate));
+    expect(separate).toHaveBeenCalledTimes(4);
+    expect(sql(`select qbo_invoice_id||'|'||qbo_cash_collected_cents from invoices
+      where id in ('${firstId}','${secondId}') order by id`))
+      .toEqual(["remote-one|0", "remote-two|8000"]);
   });
 
   it("distinguishes payment-only SyncToken changes from accountant total drift", async () => {
