@@ -15,10 +15,12 @@ not work around changes in the current checkout. After confirmation:
 
 1. Try `gh pr view <number>` first, then `gh issue view <number>` if it is not a
    PR. Read the title, body, base/head branches, merge state, and linked context.
-2. For a PR, use its existing clean head-branch worktree when present. Otherwise
-   create a worktree under `.agents/worktrees/<branch>` using the actual remote
-   head. For an issue, create a narrowly named branch and worktree from current
-   `origin/main` unless the user chose another base.
+2. Every issue gets its own narrowly named branch and worktree under
+   `.agents/worktrees/<branch>`, created from freshly fetched `origin/main`
+   unless the user chose another base. Never implement an issue in the repository
+   root or combine multiple issues in one branch/worktree. For a PR, use its
+   existing clean head-branch worktree when present; otherwise create one under
+   `.agents/worktrees/<branch>` using the actual remote head.
 3. Confirm the selected worktree is clean and on the intended branch before
    editing. Never borrow a dirty checkout merely because it is the repository
    root.
