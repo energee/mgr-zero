@@ -29,12 +29,17 @@ import { BatchesView } from "@/components/mgr/views/batches";
 import { BeerView } from "@/components/mgr/views/beer";
 import { BinView } from "@/components/mgr/views/bin";
 import { BrewDayView } from "@/components/mgr/views/brew-day";
+import { BrandApprovalView } from "@/components/mgr/views/brand-approval";
 import { BrandView } from "@/components/mgr/views/brand";
 import { CatalogView } from "@/components/mgr/views/catalog";
 import { ChannelView } from "@/components/mgr/views/channel";
 import { ClosePackagingRunView } from "@/components/mgr/views/close-packaging-run";
 import { CompleteTransferView } from "@/components/mgr/views/complete-transfer";
+import { ConfirmDeliveryView } from "@/components/mgr/views/confirm-delivery";
 import { ConfirmOrderView } from "@/components/mgr/views/confirm-order";
+import { ComplianceMonthsView } from "@/components/mgr/views/compliance-months";
+import { ComplianceRegistryView } from "@/components/mgr/views/compliance-registry";
+import { DriverRouteView } from "@/components/mgr/views/driver-route";
 import { ContractView } from "@/components/mgr/views/contract";
 import { ContractsView } from "@/components/mgr/views/contracts";
 import { CycleCountView } from "@/components/mgr/views/cycle-count";
@@ -51,7 +56,9 @@ import { KegBalanceView } from "@/components/mgr/views/keg-balance";
 import { KegFleetView } from "@/components/mgr/views/keg-fleet";
 import { KegHistoryView } from "@/components/mgr/views/keg-history";
 import { LocationBinsView } from "@/components/mgr/views/location-bins";
+import { LicenseView } from "@/components/mgr/views/license";
 import { LocationView } from "@/components/mgr/views/location";
+import { LotTraceView } from "@/components/mgr/views/lot-trace";
 import { MaterialView } from "@/components/mgr/views/material";
 import { MaterialsView } from "@/components/mgr/views/materials";
 import { MaterialsOnHandView } from "@/components/mgr/views/materials-on-hand";
@@ -59,15 +66,18 @@ import { LocationsView } from "@/components/mgr/views/locations";
 import { MeView } from "@/components/mgr/views/me";
 import { MoreView } from "@/components/mgr/views/more";
 import { MovementRecordedView } from "@/components/mgr/views/movement-recorded";
+import { MonthlyComplianceView } from "@/components/mgr/views/monthly-compliance";
 import { NewOrderView } from "@/components/mgr/views/new-order";
 import { NewPoView } from "@/components/mgr/views/new-po";
 import { NewTransferView } from "@/components/mgr/views/new-transfer";
 import { OrderView } from "@/components/mgr/views/order";
 import { OrdersView } from "@/components/mgr/views/orders-list";
 import { PackageBomView } from "@/components/mgr/views/package-bom";
+import { PackagingRunsView } from "@/components/mgr/views/packaging-runs";
 import { ParsView } from "@/components/mgr/views/pars";
 import { PickView } from "@/components/mgr/views/pick";
 import { PickSheetView } from "@/components/mgr/views/pick-sheet";
+import { PlanningView } from "@/components/mgr/views/planning";
 import { PortalAccountView } from "@/components/mgr/views/portal-account";
 import { PortalInvoiceView } from "@/components/mgr/views/portal-invoice";
 import { PortalInvoicesView } from "@/components/mgr/views/portal-invoices";
@@ -78,6 +88,7 @@ import { PriceGroupView } from "@/components/mgr/views/price-group";
 import { PriceGroupsView } from "@/components/mgr/views/price-groups";
 import { PurchaseOrdersView } from "@/components/mgr/views/purchase-orders";
 import { PutBackView } from "@/components/mgr/views/put-back";
+import { RepackView } from "@/components/mgr/views/repack";
 import { ReceiptView } from "@/components/mgr/views/receipt";
 import { ReceivePoView } from "@/components/mgr/views/receive-po";
 import { QuestionInvoiceView } from "@/components/mgr/views/question-invoice";
@@ -87,12 +98,17 @@ import { RecordMovementView } from "@/components/mgr/views/record-movement";
 import { RunClosedView } from "@/components/mgr/views/run-closed";
 import { ReverseMovementView } from "@/components/mgr/views/reverse-movement";
 import { ReturnCreditView } from "@/components/mgr/views/return-credit";
+import { ReturnRouteView } from "@/components/mgr/views/return-route";
+import { RouteView } from "@/components/mgr/views/route";
+import { RoutesView } from "@/components/mgr/views/routes";
 import { ReviewOrderView } from "@/components/mgr/views/review-order";
 import { SaleChannelsView } from "@/components/mgr/views/sale-channels";
 import { ScheduleBatchView } from "@/components/mgr/views/schedule-batch";
+import { SchedulePackagingRunView } from "@/components/mgr/views/schedule-packaging-run";
 import { SearchView } from "@/components/mgr/views/search";
 import { SessionExpiredView } from "@/components/mgr/views/session-expired";
 import { SettingsView } from "@/components/mgr/views/settings";
+import { StateRegistrationView } from "@/components/mgr/views/state-registration";
 import { ShipToView } from "@/components/mgr/views/ship-to";
 import { ShipView } from "@/components/mgr/views/ship";
 import { ShipmentDoneView } from "@/components/mgr/views/shipment-done";
@@ -147,11 +163,19 @@ import {
   newPoCountryMalt, purchaseOrdersWarehouse, receiptPoCountryMalt, receivePoCountryMalt, vendorYch, vendorsList,
 } from "@/lib/mgr/fixtures/purchasing";
 import { kegBalanceRidgeline, kegFleetMicrostar, kegHistoryLedger } from "@/lib/mgr/fixtures/kegs";
+import { packagingRuns, repackCase, schedulePackagingRun } from "@/lib/mgr/fixtures/packaging";
+import { planningDemo } from "@/lib/mgr/fixtures/planning";
+import { monthlyComplianceAugust } from "@/lib/mgr/fixtures/monthly-compliance";
+import { confirmDeliveryStop1, driverRouteA, returnRouteA, routeAPlan, routesDriver } from "@/lib/mgr/fixtures/delivery";
+import {
+  brandApprovalStout, complianceMonthsDemo, complianceRegistryDemo, licensePaBrewery, lotTraceHazy, stateRegistrationHazy,
+} from "@/lib/mgr/fixtures/compliance";
 import { toAdjustLinesViewProps } from "@/lib/mgr/adjust-lines-view";
 import { toBatchesViewProps } from "@/lib/mgr/batches-view";
 import { toBeerViewProps } from "@/lib/mgr/beer-view";
 import { toBrewDayViewProps } from "@/lib/mgr/brew-day-view";
 import { toBinViewProps } from "@/lib/mgr/bin-view";
+import { toBrandApprovalViewProps } from "@/lib/mgr/brand-approval-view";
 import { toBrandViewProps } from "@/lib/mgr/brand-view";
 import { toCatalogViewProps } from "@/lib/mgr/catalog-view";
 import { toChannelViewProps } from "@/lib/mgr/channel-view";
@@ -160,7 +184,11 @@ import { toCompleteTransferViewProps } from "@/lib/mgr/complete-transfer-view";
 import { toContractViewProps } from "@/lib/mgr/contract-view";
 import { toContractsViewProps } from "@/lib/mgr/contracts-view";
 import { toCycleCountViewProps } from "@/lib/mgr/cycle-count-view";
+import { toConfirmDeliveryViewProps } from "@/lib/mgr/confirm-delivery-view";
 import { toConfirmOrderViewProps } from "@/lib/mgr/confirm-order-view";
+import { toComplianceMonthsViewProps } from "@/lib/mgr/compliance-months-view";
+import { toComplianceRegistryViewProps } from "@/lib/mgr/compliance-registry-view";
+import { toDriverRouteViewProps } from "@/lib/mgr/driver-route-view";
 import { toCustomerViewProps } from "@/lib/mgr/customer-view";
 import { toCustomersViewProps } from "@/lib/mgr/customers-view";
 import { toDeniedViewProps } from "@/lib/mgr/denied-view";
@@ -174,7 +202,9 @@ import { toKegBalanceViewProps } from "@/lib/mgr/keg-balance-view";
 import { toKegFleetViewProps } from "@/lib/mgr/keg-fleet-view";
 import { toKegHistoryViewProps } from "@/lib/mgr/keg-history-view";
 import { toLocationBinsViewProps } from "@/lib/mgr/location-bins-view";
+import { toLicenseViewProps } from "@/lib/mgr/license-view";
 import { toLocationViewProps } from "@/lib/mgr/location-view";
+import { toLotTraceViewProps } from "@/lib/mgr/lot-trace-view";
 import { toLocationsViewProps } from "@/lib/mgr/locations-view";
 import { toMaterialViewProps } from "@/lib/mgr/material-view";
 import { toMaterialsViewProps } from "@/lib/mgr/materials-view";
@@ -209,13 +239,22 @@ import { toRecipesViewProps } from "@/lib/mgr/recipes-view";
 import { toRecordMovementViewProps } from "@/lib/mgr/record-movement-view";
 import { toRunClosedViewProps } from "@/lib/mgr/run-closed-view";
 import { toScheduleBatchViewProps } from "@/lib/mgr/schedule-batch-view";
+import { toPackagingRunsViewProps } from "@/lib/mgr/packaging-runs-view";
+import { toPlanningViewProps } from "@/lib/mgr/planning-view";
+import { toMonthlyComplianceViewProps } from "@/lib/mgr/monthly-compliance-view";
+import { toRepackViewProps } from "@/lib/mgr/repack-view";
+import { toSchedulePackagingRunViewProps } from "@/lib/mgr/schedule-packaging-run-view";
 import { toReverseMovementViewProps } from "@/lib/mgr/reverse-movement-view";
 import { toReviewOrderViewProps } from "@/lib/mgr/review-order-view";
 import { toReturnCreditViewProps } from "@/lib/mgr/return-credit-view";
+import { toReturnRouteViewProps } from "@/lib/mgr/return-route-view";
+import { toRouteViewProps } from "@/lib/mgr/route-view";
+import { toRoutesViewProps } from "@/lib/mgr/routes-view";
 import { toSaleChannelsViewProps } from "@/lib/mgr/sale-channels-view";
 import { toSearchViewProps } from "@/lib/mgr/search-view";
 import { toSessionExpiredViewProps } from "@/lib/mgr/session-expired-view";
 import { toSettingsViewProps } from "@/lib/mgr/settings-view";
+import { toStateRegistrationViewProps } from "@/lib/mgr/state-registration-view";
 import { toShipToViewProps } from "@/lib/mgr/ship-to-view";
 import { toShipViewProps } from "@/lib/mgr/ship-view";
 import { toShipmentDoneViewProps } from "@/lib/mgr/shipment-done-view";
@@ -235,7 +274,6 @@ import { toWorkViewProps } from "@/lib/mgr/work-view";
 import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-icons";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
-import { formatVolume } from "@/lib/volume";
 import { saccharificationRest, type Step, totalDuration } from "@/lib/mgr/recipe-schedule";
 import { WifiDisconnected01Icon } from "@hugeicons/core-free-icons";
 
@@ -341,10 +379,7 @@ const OVERDUE_HOURS = "24";
 // A rough remaining fill, wherever a keg comes off a tap.
 const FILL_CHIPS = ["Empty", "About ¼ left", "About ½ left"];
 
-// The Work list chips, in the order every Work list draws them.
-const WORK_CHIPS = ["all", "orders", "transfers", "batches", "runs", "POs", "routes"];
-/** The screen each Work chip opens: the chips are one bar drawn on the Work lists. */
-export const WORK_TABS: Record<string, string> = { all: "Work", orders: "Orders", transfers: "Transfers", batches: "Batches", runs: "Packaging runs", POs: "Purchase orders", routes: "Routes" };
+export { WORK_TABS } from "@/lib/mgr/work-view";
 
 // The states every screen can reach; a record with designed states lists its own instead.
 const DEFAULT_STATES: NonNullable<Screen["states"]> = [["empty", "Nothing here yet"], ["offline", "cached · retry when you are back", 1], ["permission", "you cannot open this", 1], ["already done", "this write already landed"], ["error", "Did not load · Retry", 1]];
@@ -1598,7 +1633,7 @@ export const SCREENS: Screen[] = [
     reads: "supabase_auth_get_session [platform]",
     writes: "supabase_auth_sign_out [platform]",
     states: DEFAULT_STATES,
-    spec: "Opened from the portal header Me control. No brewery switcher. Change password opens Portal set password. Sign out is outline here; the destructive accent is a staff Me follow-up.",
+    spec: "Opened from the portal header Me control. No brewery switcher. Change password opens Portal set password. Sign out uses the same destructive treatment as staff Me.",
     body: <PortalMeView model={toPortalMeViewProps(portalMeRidgeline)} />,
   },
   {
@@ -1779,19 +1814,7 @@ export const SCREENS: Screen[] = [
     writes: "none [scheduling and closing happen on their own surfaces]",
     states: [["short", "a planned run whose materials fall short says so on the row and its next action is Resolve, not Start"], ["due today", "the same row also appears in Today for the brewer"], ["closed", "recent runs stay for a few weeks with lot, output and yield; after that they are history under Search and Lot trace"], ["empty", "no runs planned: the button is the only thing on the page"]],
     spec: "The Work list with the Runs tab active, which is the packaging list: Work is where everything in motion lives, so runs get no rail entry of their own. Upcoming sorts by planned date and every row names its next action. Recent breaks Work's in-motion rule on purpose, because a brewer plans the next run against the last one's yield; it is kept short and the full history stays in Search. Schedule run opens the sheet; a row opens the run, where closing happens.",
-    body: (<>
-      {E.hd("Work", "brewer default", E.btn("Schedule run"))}
-      {E.tabs(WORK_CHIPS, 4, "w-full", WORK_TABS)}
-      {E.ttl("Upcoming")}
-      {E.row("RUN-0031 · Hazy cans", "Fri 9/5 · FV3 · 118 cases planned · 480 ends short", E.act("Resolve", "attention"), "w")}
-      {E.row("RUN-0032 · Pils ½ bbl", "Tue 9/9 · FV1 · 40 kegs planned", E.act("Start", "info"))}
-      {E.row("RUN-0033 · Stout cans", "Thu 9/11 · no source yet", E.act("Pick source"))}
-      {E.ttl("Recent")}
-      {E.row("RUN-0030 · Pils cans", "closed Tue 9/2 · L-240902-PL · 96 cases · 97% yield", "", "ok")}
-      {E.row("RUN-0029 · Hazy ½ bbl", "closed Fri 8/29 · L-240829-HZ · 38 kegs · 95% yield", "", "ok")}
-      {E.row("RUN-0028 · Helles cans", "closed Wed 8/27 · L-240827-HL · 110 cases · 92% yield · 2 bbl loss", "", "w")}
-      {E.info("Recent keeps the last few weeks. Older runs are under Search and Lot trace.")}
-    </>),
+    body: <PackagingRunsView model={toPackagingRunsViewProps(packagingRuns)} />,
   },
   {
     step: 8,
@@ -1805,21 +1828,7 @@ export const SCREENS: Screen[] = [
     writes: "schedule_packaging_run [one RPC: run planned against a brand, with an optional source occupancy, + planned outputs, each flagged on/off the wholesale list] · update_packaging_run [same sheet reopens a planned run until it starts; picking the tank or starting both require one]",
     states: [["permission", "brewer or warehouse required", 1], ["source chosen", "the brand comes from what is in the vessel, so only that brand's formats are offered"], ["short", "the materials table shows the shortage now, not on the day; Save still works, Start will not"], ["editing", "a planned run reopens here with its values filled; a started run cannot be rescheduled, only closed"], ["no open occupancy", "nothing to package: the source picker says so and links to Cellar"]],
     spec: "The plan half of the packaging frame, pulled out so a run can be scheduled before it exists and edited until it starts. One source occupancy, chosen exactly, is the rule that lets close revalidate it later. Planned outputs are counts per format; the sheet converts to barrels and shows what is left in the vessel so a plan cannot exceed the source. Each output can be listed on the wholesale shop (the brand × package buyers will see); listing is the offer, not an ATP promise, and a format left off is absent from Shop. Materials are previewed from the format BOM so a shortage is a planning fact, not a surprise at the line. Saving writes the run and its planned outputs in one RPC and lands on the run; nothing moves in the ledger until close.",
-    body: (<>
-      {E.edit("Planned date", "2026-09-05", "date")}
-      {E.ttl("Source")}
-      {E.nav("FV3 · Hazy IPA", "B-0416 · 42.0 bbl · gravity 2.1 · ready")}
-      {E.ttl("Planned outputs")}
-      {E.row("Hazy · case · 24×16 oz", "39.6 bbl · on the wholesale list", <>{E.stq(118)}{E.sw(true, "On the wholesale list")}</>)}
-      {E.row("Hazy · ½ bbl keg", "2.0 bbl · on the wholesale list", <>{E.stq(4)}{E.sw(true, "On the wholesale list")}</>)}
-      {E.row("Hazy · ⅙ bbl keg", "not listed this run", <>{E.stq(0)}{E.sw(false, "On the wholesale list")}</>)}
-      {E.fld("Left in FV3", "0.4 bbl · loss at close unless held")}
-      {E.ttl("Materials")}
-      {E.tbl(["need", "have", "short"], [["cans 2,832", "3,100", "0"], ["ends 2,832", "2,400", <><span className="text-warning-foreground">432</span></>], ["labels 2,832", "5,000", "0"], ["trays 118", "140", "0"]])}
-      {E.note("432 ends short. Save the plan now; Start stays disabled until the shortage is resolved or overridden on the run.")}
-      {E.btn("Save run plan")}
-      {E.info("Nothing moves until the run closes. Saving writes the run and its planned outputs together.")}
-    </>),
+    body: <SchedulePackagingRunView model={toSchedulePackagingRunViewProps(schedulePackagingRun)} />,
   },
   {
     step: 7,
@@ -1832,18 +1841,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["still on hand", "unsold units are the part a recall can actually stop"], ["no shipments", "no recorded shipment of this lot", 1], ["unknown lot", "not found"]],
     spec: "The lot is one packaging run, so the trace follows lot → run → tank → batch and lists every movement carrying the lot: the production that made it, samples and losses pulled from it. Shipping records explicit bin/lot allocations per order line; returns and transfers preserve them. Trace shows actual customer recipients, ship-to addresses, orders and invoices, and balances per SKU/bin plus barrels. Historical untracked consumption cannot be assigned to a lot. It does not descend into POS sale lines, because a sale posts nothing to the ledger and would imply a per-pint traceability MGR does not have.",
-    body: (<>
-      {E.back("Compliance months", "L-240831-HZ")}
-      {E.row("Hazy IPA · 16 oz case", "run 28 · packaged 8/31 · best by 2/27", "7.61 bbl recorded balance")}
-      {E.fld("Tank · batch", "FV-3 · batch 41 · brewed 8/10")}
-      {E.fld("Drawn", "25.00 bbl")}
-      {E.tape([["+120 · production in · Hazy IPA 16 oz case · Warehouse", "8/31"], ["−2 · sample · Hazy IPA 16 oz case · Warehouse", "9/02"]])}
-      {E.ttl("Recorded balances by SKU and bin")}
-      {E.row("Hazy IPA · 16 oz case", "Warehouse · Cooler", "118 units · 7.61 bbl")}
-      {E.ttl("Recipients")}
-      {E.blank("No recorded shipments of this lot")}
-      {E.note("Only recorded lot identities are traced. Historical untracked stock and consumption cannot be assigned to this lot.")}
-    </>),
+    body: <LotTraceView model={toLotTraceViewProps(lotTraceHazy)} />,
   },
   {
     step: 7,
@@ -2177,15 +2175,7 @@ export const SCREENS: Screen[] = [
     writes: "none",
     states: [["not filed", "ready to review", 1], ["filed", "immutable snapshot saved"], ["lots", "every packaged lot opens its trace"]],
     spec: "This is the shared destination for the registry back link, the month rows, and the lot trace. The last three months always show, plus every filed period; a month is TTB, the API takes other jurisdictions and ranges.",
-    body: (<>
-      {E.hd("Compliance", "months")}
-      {E.nav("September 2026", "not filed · ready to review", "w")}
-      {E.nav("August 2026", "filed 2026-09-02 · 41.20 bbl taxable", "ok")}
-      {E.nav("July 2026", "filed 2026-08-04 · 38.75 bbl taxable", "ok")}
-      {E.nav("Compliance registry", "brands, states and licenses")}
-      {E.ttl("Lot trace")}
-      {E.nav("L-240831-HZ", "Hazy IPA · packaged 2026-08-31")}
-    </>),
+    body: <ComplianceMonthsView model={toComplianceMonthsViewProps(complianceMonthsDemo)} />,
   },
   {
     step: 7,
@@ -2198,30 +2188,7 @@ export const SCREENS: Screen[] = [
     writes: "file_compliance_report · reattribute_loss",
     states: [["current", "generated from the ledger now"], ["does not balance", "a movement type the report cannot classify is named · Save stays off", 1], ["mapping required", "direct cellar Taproom volume needs an approved external filing-line mapping · Save stays off", 1], ["filed", "the snapshot is shown, not regenerated"], ["permission", "sales or admin required", 1]],
     spec: "Admin and Sales review exact completion reconciliation losses and allocate each remainder to Sample, Taproom, or Destruction through append-only category changes, never free-text note matching. Corrections post in the period they are saved and leave earlier filed snapshots unchanged. The identity checks are v1 lessons drawn in user copy: balance per class, one additive removal total, an explanatory non-additive cellar breakdown, 0.00 never blank, no transmission. Beer in process is the tanks now, not at period end, and says so. Removals are keyed by frozen tax treatment; direct cellar Taproom volume requires an approved external filing-line mapping before Save turns on.",
-    body: (<>
-      {E.back("Compliance months", "August 2026")}
-      {E.row("1 · Review auto-reconciled losses", "Completion reconciliations stay in history while allocations change their removal category.")}
-      {E.fld("Batch 1042 · original generic loss 0.05741935 bbl · allocated 0.02000000 bbl", "remaining 0.03741935 bbl")}
-      {E.fld("Sample · Destination PA · prior allocation", "0.02000000 bbl")}
-      {E.btn("Reattribute loss", "g")}
-      {E.info("An allocation changes removal categories in the period you save it. Earlier filed snapshots stay unchanged.")}
-      {E.row("2 · Review generated figures", "", E.status("Current", "ok"))}
-      {E.tbl(["class", "begin", "+", "−", "end"], [["kegs", "41.00", "30.50", "33.20", "38.30"], ["cans", "12.60", "18.00", "14.90", "15.70"], ["bottles", "0.00", "0.00", "0.00", "0.00"]])}
-      {E.info("Every package class balances: begin + in − out = end, in barrels. Cellar removals are included once below. Zeros print 0.00.")}
-      {E.row("Beer in process", "tanks now, not at period end", "120.40 bbl")}
-      {E.row("Packaged", "production into finished goods", "48.50 bbl")}
-      {E.row("Taxpaid removals", "", "41.20 bbl")}
-      {E.row("Export", "", "6.90 bbl")}
-      {E.fld("Losses", "0.05741935 bbl")}
-      {E.info("Cellar removals breakdown is explanatory and is already included once in the removal totals. Do not add it again.")}
-      {E.fld("Cellar · Losses · non-additive breakdown", "0.05741935 bbl")}
-      {E.row("Taxpaid to PA", "destination state", "38.10 bbl")}
-      {E.row("Taxpaid to OH", "destination state", "3.10 bbl")}
-      {E.row("3 · Confirm filed outside MGR", "", "")}
-      {E.info("MGR saves the immutable snapshot; it does not transmit the filing. Save stays off until the report balances and required external mappings are approved.")}
-      {E.edit("Note · optional", "filed on pay.gov")}
-      {E.btn("Save filed snapshot", "irr")}
-    </>),
+    body: <MonthlyComplianceView model={toMonthlyComplianceViewProps(monthlyComplianceAugust)} />,
   },
   {
     step: 7,
@@ -2234,20 +2201,7 @@ export const SCREENS: Screen[] = [
     writes: "upsert_brand_approval · upsert_state_registration · upsert_brewery_state_license",
     states: [["pending", "a brand with no COLA is flagged", 1], ["empty", "no brands yet: nothing to register"], ["permission", "sales or admin required", 1]],
     spec: "Unregistered destination/brand combinations are meant to warn during order confirm and link here; that read is not built yet (drift: order warning). One page, two lists: each brand with its approvals and state registrations under it, then the brewery's licenses; the three sheets add or edit a row.",
-    body: (<>
-      {E.back("Compliance months", "Registry")}
-      {E.tabs(["brands", "licenses"])}
-      {E.ttl("Brands")}
-      {E.row("Hazy IPA", "COLA 23001001000123 · expires 2031-01-15")}
-      {E.row("COLA 23001001000123", "approved 2026-01-15 · expires 2031-01-15", E.act("Edit"))}
-      {E.row("OH registration", "OH-88214 · expires 2026-12-31", E.act("Edit"))}
-      {E.row("Stout", "COLA pending", "", "w")}
-      {E.btns(["Add approval", "Add registration"])}
-      {E.ttl("Licenses")}
-      {E.row("PA brewery", "G-21884 · expires 2027-06-30", E.act("Edit"))}
-      {E.btn("Add license", "g")}
-      {E.note("Order confirmation does not read this registry yet; a warning for an unregistered destination state is planned and will never block.")}
-    </>),
+    body: <ComplianceRegistryView model={toComplianceRegistryViewProps(complianceRegistryDemo)} />,
   },
   {
     step: 7,
@@ -2260,13 +2214,7 @@ export const SCREENS: Screen[] = [
     reads: "get_compliance_registry",
     writes: "upsert_brand_approval",
     states: [["approved", "orders may proceed"], ["duplicate", "the same number on the same brand is one record · conflict", 1]],
-    body: (<>
-      {E.pick("Brand", "Stout", ["Hazy IPA", "Pils", "Stout"])}
-      {E.pick("Approval", "COLA", ["COLA", "Formula"])}
-      {E.inp("COLA number")}
-      {E.cols(E.edit("Approved on · optional", "2026-01-15", "date"), E.edit("Expires · optional", "2031-01-15", "date"))}
-      {E.btn("Save approval")}
-    </>),
+    body: <BrandApprovalView model={toBrandApprovalViewProps(brandApprovalStout)} />,
   },
   {
     step: 7,
@@ -2279,13 +2227,7 @@ export const SCREENS: Screen[] = [
     reads: "get_compliance_registry",
     writes: "upsert_state_registration",
     states: [["registered", "brand may ship to the state"], ["missing", "order confirmation warns", 1], ["saved again", "one record per brand and state: saving replaces it"]],
-    body: (<>
-      {E.pick("Brand", "Hazy IPA", ["Hazy IPA", "Pils", "Stout"])}
-      {E.cols(E.edit("State (two letters)", "OH"), E.edit("Registration number · optional", "OH-88214"))}
-      {E.edit("Expires · optional", "2026-12-31", "date")}
-      {E.note("One record per brand and state: saving again replaces it.")}
-      {E.btn("Save registration")}
-    </>),
+    body: <StateRegistrationView model={toStateRegistrationViewProps(stateRegistrationHazy)} />,
   },
   {
     step: 7,
@@ -2298,12 +2240,7 @@ export const SCREENS: Screen[] = [
     reads: "get_compliance_registry",
     writes: "upsert_brewery_state_license",
     states: [["current", "orders may proceed"], ["expired", "order confirmation warns", 1], ["saved again", "one record per state and kind: saving replaces it"]],
-    body: (<>
-      {E.cols(E.edit("State (two letters)", "PA"), E.edit("Kind", "brewery"))}
-      {E.cols(E.edit("License number · optional", "G-21884"), E.edit("Expires · optional", "2027-06-30", "date"))}
-      {E.note("Kind is the license class the state uses: brewery, supplier, direct to consumer. One record per state and kind.")}
-      {E.btn("Save license")}
-    </>),
+    body: <LicenseView model={toLicenseViewProps(licensePaBrewery)} />,
   },
   {
     step: 7,
@@ -2497,14 +2434,7 @@ export const SCREENS: Screen[] = [
     writes: "none [route planning happens on Route]",
     states: [["unassigned", "shipped orders and picked transfers waiting for a route are called out"], ["empty", "no routes yet: New route is the only action"]],
     spec: "Work › Deliveries. Every route not yet returned names its next action; New route opens Route in builder mode, and Route returns here. A stop is a shipped order or a picked stock transfer.",
-    body: (<>
-      {E.hd("Work", "driver default", E.btn("New route"))}
-      {E.tabs(WORK_CHIPS, 6, "w-full", WORK_TABS)}
-      {E.row("Route A · 2026-09-10", "departed · 1 of 3 delivered", E.act("Resume", "info"))}
-      {E.row("Route B · 2026-09-11", "2 stops · driver not assigned", E.act("Assign", "attention"), "w")}
-      {E.row("ORD-0236 · Ridgeline · Dock", "shipped · no route", E.act("Add to route", "attention"), "w")}
-      {E.row("TRF-0004 · Storage", "shipped · no route", E.act("Add to route", "attention"), "w")}
-    </>),
+    body: <RoutesView model={toRoutesViewProps(routesDriver)} />,
   },
   {
     step: 7,
@@ -2516,19 +2446,7 @@ export const SCREENS: Screen[] = [
     writes: "save_route · depart_route",
     states: [["permission", "warehouse membership; Depart needs the assigned driver or an admin", 1], ["departed", "the builder closes; Driver route and Return route take over"]],
     spec: "Planned state: Depart is the one primary; Save route plan is outline. Return lives on Return route once the route has departed. The stops are a checklist of this route's documents plus every shipped order and picked transfer on no route, each checked one with its stop number; driver, vehicle and stop order save in the same route-save RPC, and a delivered stop cannot be unchecked. There is no loaded status or mark-loaded command. A refused delivery has no screen: leave the stop open and assign it to a later route. A driver shows by the first characters of their id until staff have names.",
-    body: (<>
-      {E.back("Routes", "Route A · 2026-09-10")}
-      {E.edit("Delivery date", "2026-09-10", "date")}
-      {E.pick("Driver", "driver 7f3a21c0 · warehouse", ["driver 7f3a21c0 · warehouse", "driver 2b9e44d1 · admin"])}
-      {E.edit("Vehicle", "Box truck 2")}
-      {E.edit("Route name", "Route A")}
-      {E.ttl("Stops")}
-      {E.row("ORD-0231 · Ridgeline · Tap Room", "stop 1", "1")}
-      {E.row("ORD-0233 · Al’s Bar · Dock", "stop 2", "2")}
-      {E.row("TRF-0004 · Storage", "stop 3", "3")}
-      {E.row("ORD-0236 · Teresa’s · Dock", "shipped · no route", "", "w")}
-      {E.btns([["Save route plan", "g"], ["Depart route", "p"]])}
-    </>),
+    body: <RouteView model={toRouteViewProps(routeAPlan)} />,
   },
   {
     step: 7,
@@ -2541,16 +2459,7 @@ export const SCREENS: Screen[] = [
     writes: "return_route",
     states: [["permission", "the assigned driver or an admin", 1], ["planned", "Depart lives on Route"], ["departed", "Return is the one verb, enabled once every stop is delivered"], ["complete", "already returned: the return time replaces the button"]],
     spec: "The departed state of a route once every stop is delivered. Planned routes Depart on Route; this screen is only Return.",
-    body: (<>
-      {E.back("Routes", "Route A · 2026-09-10")}
-      {E.fld("Driver · vehicle", "driver 7f3a21c0 · Box truck 2")}
-      {E.fld("Departed", "8:10 AM")}
-      {E.row("Stop 1 · ORD-0231 · Ridgeline · Tap Room", "delivered 8:42 AM", "done", "ok")}
-      {E.row("Stop 2 · ORD-0233 · Al’s Bar · Dock", "delivered 9:15 AM", "done", "ok")}
-      {E.row("Stop 3 · TRF-0004 · Storage", "delivered 10:03 AM", "done", "ok")}
-      {E.sp()}
-      {E.btn("Return route")}
-    </>),
+    body: <ReturnRouteView model={toReturnRouteViewProps(returnRouteA)} />,
   },
   {
     step: 7,
@@ -2563,16 +2472,7 @@ export const SCREENS: Screen[] = [
     writes: "return_route",
     states: [["permission", "the assigned driver or an admin", 1], ["departed", "Return is the one verb, disabled while a stop is open"], ["next stop", "Resume opens Confirm delivery"]],
     spec: "The departed route as the driver runs it, reached from Deliveries (Resume) or the stop's Back. Route is for building; this is for running. Only the lowest undelivered stop is next; Today shows the same stop.",
-    body: (<>
-      {E.back("Routes", "Route A · 2026-09-10")}
-      {E.fld("Driver · vehicle", "driver 7f3a21c0 · Box truck 2")}
-      {E.fld("Departed", "8:10 AM")}
-      {E.row("Stop 1 · ORD-0231 · Ridgeline · Tap Room", "next", E.act("Resume", "info"), "w")}
-      {E.row("Stop 2 · ORD-0233 · Al’s Bar · Dock", "later")}
-      {E.row("Stop 3 · TRF-0004 · Storage", "later")}
-      {E.sp()}
-      {E.btn("Return route")}
-    </>),
+    body: <DriverRouteView model={toDriverRouteViewProps(driverRouteA)} />,
   },
   {
     step: 7,
@@ -2584,16 +2484,7 @@ export const SCREENS: Screen[] = [
     writes: "confirm_delivery [one RPC: delivered_at + signed_by + invoice only when persisted mode is on-delivery; never ships]",
     states: [["offline", "keep stop open; commit waits", 1], ["response lost", "same requestId returns result"], ["permission", "warehouse membership and being the route’s assigned driver, or admin", 1], ["success", "INV number after commit"], ["transfer stop", "destination and picked lines instead of a customer; stamped, never invoiced; Receive on the transfer moves the stock"]],
     spec: "2 taps: receiving-contact chip from the ship-to → Delivered. Back goes to Driver route. The receiving name is stored as text; the UI never implies a signature image is retained.",
-    body: (<>
-      {E.back("Driver route", "Route A · Stop 1 of 3")}
-      {E.ttl("Ridgeline Tap Room")}
-      {E.fld("Invoice timing", "On delivery · saved")}
-      {E.row("Hazy IPA · ½ bbl keg", "", "4")}
-      {E.row("Pils · 16 oz case", "", "6")}
-      {E.edit("Received by", "", "text", ["Dana", "Chris"])}
-      {E.sp()}
-      {E.btn("Delivered", "irr")}
-    </>),
+    body: <ConfirmDeliveryView model={toConfirmDeliveryViewProps(confirmDeliveryStop1)} />,
   },
   {
     step: 7,
@@ -2606,17 +2497,7 @@ export const SCREENS: Screen[] = [
     writes: "draft_purchase_order_from_requirements [one RPC: one draft PO per resolved vendor + lines; the buy-by date is needed-by less the vendor's lead time]",
     states: [["gap", "demand exceeds supply in that week · the only actionable row"], ["covered", "supply meets demand · shown so the horizon reads continuously"], ["one vendor", "the whole shortfall resolves to a single supplier · the verb is singular"], ["several vendors", "a bill of materials spans suppliers · one draft each, named before the verb commits"], ["partly unbuyable", "the slowest supplier is already past its buy-by date · its lines are drawn out of reach, the rest still draft", 1], ["no vendor", "no contract and no default supplier on the material · the row cannot draft", 1], ["empty", "nothing planned and nothing ordered"]],
     spec: "The three columns are defined so the gap is arithmetic rather than judgement. Demand is confirmed and submitted order lines by requested ship week, plus taproom pars; supply is on-hand availability plus the planned outputs of packaging runs already scheduled into that week, less anything already on an open purchase order. That last term is what stops a gap being ordered twice, and it is the mirror of the rule that an unreceived order never inflates what a packaging run believes it has. The horizon runs as far ahead as the slowest supplier behind the shortfall can still be acted on: a gap nobody can still buy for is a report, not a plan. A shortfall is summed per material first and resolved to a supplier second, so a material whose supplier changes mid-horizon does not fragment into two half-orders. Resolution is the active contract for that material, then the material’s default supplier, and otherwise the row cannot draft. Because an order carries one supplier, one shortfall becomes one draft per supplier, and the verb says how many before it commits. Quantities are the gap rounded up to the purchase unit, since nobody buys part of a bag. Lead time belongs to the supplier, not the material, so the buy-by date is the slowest of the suppliers a bill of materials resolves to: cans at three days stay orderable on a run whose labels at seven days no longer are. Nothing here ranks or prioritises, in keeping with Pars and allocation: every change stays a named quantity.",
-    body: (<>
-      {E.back("More", "Planning")}
-      {E.tbl(["week", "demand", "supply", "gap"], [["9/7", "48 bbl", "40 bbl", <><span className="text-warning-foreground">−8</span></>], ["9/14", "52 bbl", "60 bbl", "+8"]])}
-      {E.row("Sept 12 packaging", "short 480 ends · buy by 9/5", E.act("Review"), "w")}
-      {E.row("Hazy ATP negative 9/9", "open named shortfall", E.act("Review"))}
-      {E.ttl("Drafts this creates")}
-      {E.row("Lindenmeyr Munroe", "cans, ends, quadpacks, trays · 3 day lead", "4 lines")}
-      {E.row("Blue Label", "labels · 7 day lead · past the buy-by date", "out of reach", "w")}
-      {E.info("Labels can no longer arrive for the 9/7 week, so that line is left out. The four Lindenmeyr lines still draft.")}
-      {E.btn("Draft 1 purchase order")}
-    </>),
+    body: <PlanningView model={toPlanningViewProps(planningDemo)} />,
   },
   {
     step: 8,
@@ -3086,17 +2967,7 @@ export const SCREENS: Screen[] = [
     writes: "record_repack [SCHEMA-GATE: revision 2 §16.10: repack movement type, shared ref, abs(sum(bbl)) < 0.000001 over the ref]",
     states: [["offered", "composition knows a case yields six four-packs · nobody types both halves"], ["breakage", "−1 case · +5 four-packs · +1 loss keeps the invariant absolute", 1], ["materials", "case tray returns to stock, PakTech is consumed · per-repack override"]],
     spec: "An adjustment cannot express a break: it has no way to pair the two halves, so the break reads as an unexplained loss beside an unexplained gain. The outbound leg's bbl is derived from the inbound leg's frozen total rather than recomputed from barrels per unit (rounding each leg independently leaves −0.00000001 on a 24×16oz case), and the constraint carries a tolerance to catch a hand-entered repack without rejecting a legitimate one. Build-direction repack is out of scope; the whole repack is one RPC sharing one ref so beer and materials cannot disagree.",
-    body: (<>
-      {E.fld("Break", "Hazy IPA · case · 24×16oz")}
-      {E.fld("Location · bin", "Warehouse · Walk-in")}
-      {E.qty("1", "case")}
-      {E.tape([["−1 case · repack", formatVolume("0.09677419")], ["+6 four-pack · repack", "derived from the case total"], ["Case tray ×1", "return to stock"], ["PakTech ×6", "consumed"]])}
-      {E.info(`Preview: conserves ${formatVolume("0.09677419")} · same location and bin · not a TTB removal`)}
-      {E.fld("Damaged on break", "0 four-pack · records as loss")}
-      {E.pin(<>
-        {E.gated("Record repack", "isn’t available yet: breaking a case has nowhere correct to land")}
-      </>)}
-    </>),
+    body: <><RepackView model={toRepackViewProps(repackCase)} footer={null} />{E.pin(E.gated("Record repack", repackCase.unavailable!))}</>,
   },
   // ---- The external venues. Not MGR screens: what QuickBooks, Square and Slack
   // show when MGR writes into them, drawn in each product's own design language

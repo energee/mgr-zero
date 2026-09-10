@@ -3,10 +3,9 @@
 // app/globals.css maps onto --font-sans/--font-heading/--font-mono, plus
 // viewport-fit=cover so the shells can pad for the safe area. THEME_BOOT is an
 // inline, parser-blocking <head> script that applies the `.dark` class from
-// localStorage.theme or the OS preference before first paint (next/script's
-// beforeInteractive runs from the client bundle, i.e. after paint, so it is
-// not used). React then hydrates <html> against a class list the script
-// already changed, hence suppressHydrationWarning. components/mgr/theme-toggle.tsx
+// localStorage.theme or the OS preference before first paint. React then
+// hydrates <html> against a class list the script already changed, hence
+// suppressHydrationWarning. components/mgr/theme-toggle.tsx
 // flips the class and writes the preference.
 import type { Metadata, Viewport } from "next";
 import { Familjen_Grotesk, Instrument_Sans, JetBrains_Mono } from "next/font/google";
@@ -35,7 +34,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       suppressHydrationWarning
     >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
+        <script
+          type={typeof window === "undefined" ? "text/javascript" : "text/plain"}
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: THEME_BOOT }}
+        />
       </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

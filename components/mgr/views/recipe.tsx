@@ -29,20 +29,14 @@ export function RecipeView({
           ))}
           {E.row("+ add ingredient", "material · stage · timing", "")}
           {E.cols(
-            E.edit("Pre-boil volume bbl", model.preBoil ?? "", "number"),
-            E.edit("Boil time min", model.boilMin ?? "", "number"),
-          )}
-          {E.cols(
-            E.edit("Whirlpool min", model.whirlpoolMin ?? "", "number"),
-            E.edit("Whirlpool temp °F", model.whirlpoolTemp ?? "", "number"),
-          )}
-          {E.cols(
-            E.edit("Whirlpool rest min", model.whirlpoolRest ?? "", "number"),
-            E.edit("Knockout temp °F", model.knockoutTemp ?? "", "number"),
-          )}
-          {E.cols(
-            E.edit("Brewhouse efficiency %", model.efficiency ?? "", "number"),
-            E.edit("Yeast attenuation %", model.attenuation ?? "", "number"),
+            <Fragment key="pre-boil">{E.edit("Pre-boil volume bbl", model.preBoil ?? "", "number")}</Fragment>,
+            <Fragment key="boil">{E.edit("Boil time min", model.boilMin ?? "", "number")}</Fragment>,
+            <Fragment key="whirlpool-time">{E.edit("Whirlpool min", model.whirlpoolMin ?? "", "number")}</Fragment>,
+            <Fragment key="whirlpool-temp">{E.edit("Whirlpool temp °F", model.whirlpoolTemp ?? "", "number")}</Fragment>,
+            <Fragment key="whirlpool-rest">{E.edit("Whirlpool rest min", model.whirlpoolRest ?? "", "number")}</Fragment>,
+            <Fragment key="knockout">{E.edit("Knockout temp °F", model.knockoutTemp ?? "", "number")}</Fragment>,
+            <Fragment key="efficiency">{E.edit("Brewhouse efficiency %", model.efficiency ?? "", "number")}</Fragment>,
+            <Fragment key="attenuation">{E.edit("Yeast attenuation %", model.attenuation ?? "", "number")}</Fragment>,
           )}
           {model.mash ? E.nav(model.mash.title, model.mash.detail) : null}
           {model.fermentation ? E.nav(model.fermentation.title, model.fermentation.detail) : null}

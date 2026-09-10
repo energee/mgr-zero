@@ -294,9 +294,12 @@ export const E = {
       </Field>
     );
   },
-  /** Short fields side by side on desk, stacked on a phone. The frame is an
-   *  iframe, so md: means the desk width, never the docs page around it. */
-  cols: (...fields: React.ReactNode[]) => fieldGrid(fields, "md:grid-cols-2 md:gap-x-6"),
+  /** Short field pairs sit side by side on desk; larger groups fit four on desk
+   *  and two on phone. The frame is an iframe, so md: is the frame width. */
+  cols: (...fields: React.ReactNode[]) => fieldGrid(
+    fields,
+    fields.length > 2 ? "grid-cols-2 md:grid-cols-4 md:gap-x-6" : "md:grid-cols-2 md:gap-x-6",
+  ),
   /** Fields that read as one phrase (a quantity, its unit, and what it is per)
    *  stay on one line at every width; three at most, or the phone can’t. */
   inline: (...fields: [React.ReactNode, React.ReactNode, React.ReactNode?]) =>

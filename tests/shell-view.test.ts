@@ -7,6 +7,9 @@ import { createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
+import { ScreenFrame, ScreenSheet } from "../components/mgr/screen-frame";
+import { MeSheet } from "../components/mgr/me-sheet";
+import { EntrySurface } from "../components/mgr/entry-surface";
 import { BeerView } from "../components/mgr/views/beer";
 import { DeniedView } from "../components/mgr/views/denied";
 import { EntryView } from "../components/mgr/views/entry";
@@ -64,6 +67,33 @@ import { plural } from "../lib/mgr/plural";
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const src = (file: string) => readFileSync(file, "utf8");
+
+describe("Entry surface", () => {
+  it("uses the shared surface for inventory entry screens", () => {
+    expect(ScreenFrame({ screen: screen("Sign in") }).type).toBe(EntrySurface);
+  });
+
+  it("live auth routes mount EntryView without replacing its body", () => {
+    const files = [
+      "components/login-form.tsx",
+      "app/(auth)/no-membership/page.tsx",
+      "app/(auth)/reset/page.tsx",
+      "app/(auth)/password/page.tsx",
+    ];
+    for (const file of files) {
+      const source = src(file);
+      expect(source).toMatch(/<EntryView\b/);
+      expect(source).not.toMatch(/<EntryView[\s\S]*?\bbody=/);
+    }
+  });
+});
+
+describe("Reverse movement view", () => {
+  it("the live reversal form mounts the inventory view", () => {
+    const source = src("app/(app)/inventory/reversal-form.tsx");
+    expect(source).toMatch(/<ReverseMovementView\b/);
+  });
+});
 
 describe("Today view", () => {
   it("maps warehouse rows onto Pick / Put back / Receive / Resume", () => {
@@ -132,6 +162,11 @@ describe("Today view", () => {
     }));
     expect(html).toMatch(/MOVE/);
     expect(html).not.toMatch(/>Record movement</);
+  });
+
+  it("deep-links the live Today movement action into the open form", () => {
+    const source = readFileSync("app/(app)/page.tsx", "utf8");
+    expect(source).toContain('E.btn("Record movement", "g", "/inventory?recordMovement=1")');
   });
 
   it.each([
@@ -285,10 +320,24 @@ describe("Me view", () => {
     expect(body.props.model).toEqual(toMeViewProps(meMaria));
   });
 
-  it("live Me stays MeSheet", () => {
-    const page = src("components/mgr/me-sheet.tsx");
-    expect(page).not.toMatch(/MeView/);
-    expect(page).toMatch(/export function MeSheet/);
+  it("live staff and portal Me use the inventory views in the shared centered dialog", () => {
+    const dialog = src("components/mgr/me-sheet.tsx");
+    const staff = src("app/(app)/layout.tsx");
+    const portal = src("app/(portal)/layout.tsx");
+    const personas = src("components/mgr/demo-screens.tsx");
+    expect(dialog).toMatch(/export function MeSheet/);
+    expect(dialog).toMatch(/from "@\/components\/ui\/dialog"/);
+    expect(dialog).toMatch(/<DialogContent\b/);
+    expect(dialog).not.toMatch(/from "@\/components\/ui\/sheet"/);
+    expect(dialog).not.toMatch(/useIsMobile/);
+    expect(staff).toMatch(/<MeView\b/);
+    expect(portal).toMatch(/<PortalMeView\b/);
+    expect(personas).toMatch(/<MeView\b/);
+  });
+
+  it.each(["Me", "Portal Me"])("the %s inventory uses the shared Me dialog surface", (name) => {
+    const surface = ScreenSheet({ screen: screen(name) });
+    expect(surface.type).toBe(MeSheet);
   });
 });
 

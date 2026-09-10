@@ -79,12 +79,13 @@ describe("Finished goods view", () => {
     expect(body.props.model).toEqual(toFinishedGoodsViewProps(finishedGoodsList));
   });
 
-  it("the live inventory page mounts FinishedGoodsView and not MovementRecordedView", () => {
+  it("the live inventory movement receipt uses its shared view", () => {
     const src = readFileSync("app/(app)/inventory/page.tsx", "utf8");
+    const form = readFileSync("app/(app)/inventory/movement-form.tsx", "utf8");
     expect(src).toMatch(/from "@\/components\/mgr\/views\/finished-goods"/);
     expect(src).toMatch(/<FinishedGoodsView\b/);
     expect(src).toMatch(/<MovementForm\b/);
-    expect(src).not.toMatch(/from "@\/components\/mgr\/views\/movement-recorded"/);
+    expect(form).toMatch(/<MovementRecordedView\b/);
   });
 });
 

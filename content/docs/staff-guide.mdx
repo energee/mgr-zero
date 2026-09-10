@@ -14,7 +14,7 @@ Join through an invitation, then sign in with your email and the password you ch
 2. Select **Sign in**.
 3. MGR opens **Today** for the brewery you're a member of.
 
-Wrong credentials show **Incorrect email or password.** Signed in but not on a brewery? MGR shows **No brewery yet** with **Sign out**; ask an admin for access. On a hosted installation, **Create brewery** is also available to signed-in accounts. If your session ends while you work, the next action returns you to Sign in with **Your session ended. Sign in to retry.** Open **Me** in the header when you want **Sign out**.
+Wrong credentials show **Incorrect email or password.** You can also select **Email me a link** to receive a passwordless sign-in link without creating a new account. Signed in but not on a brewery? MGR shows **No brewery yet** with **Sign out**; ask an admin for access. On a hosted installation, **Create brewery** is also available to signed-in accounts. Entry cards sit near the bottom of a phone screen and center on wider screens. If your session ends while you work, the next action returns you to Sign in with **Your session ended. Sign in to retry.** Open **Me** in the header when you want **Sign out**.
 
 <Screen name="Reset password" />
 
@@ -114,7 +114,7 @@ Admin opens **Import** from **Settings** or the first-run checklist. See [Import
 **Brewer navigation:** Brewer sees Today, Beer (Cellar, Materials), Work (Batches, Packaging), and More (Recipes, Vendors, Planning). Brewer does not have permission to open Taproom, Taps, or Variance by brand. Repack, on the Packaging page, and the Draft purchase orders button on Planning are Admin and Warehouse only, so Brewer does not see them.
 </Callout>
 
-**Me** in the header shows the email you signed in with, your brewery and role, lets you **Switch to light mode** or **Switch to dark mode**, offers **Change password**, and **Sign out**. When your account belongs to more than one brewery, Me also lists them with **Switch** beside each one that is not current. Forms open as a panel from the bottom of the screen on a phone and as a centered dialog on a wider screen. On a phone, page actions such as **New Order** or **Save** span the column. On a wider screen, create actions sit on the title row and other actions hug their label instead of stretching across the page. Sign-in and other entry cards stay a narrow column, so their buttons still span that card.
+**Me** in the header shows the email you signed in with, your brewery and role, and offers **Change password** and **Sign out**. When your account belongs to more than one brewery, Me also lists them with **Switch** beside each one that is not current. Me is a centered dialog at every screen size. Other forms open as a panel from the bottom of the screen on a phone and as a centered dialog on a wider screen. On a phone, page actions such as **New Order** or **Save** span the column. On a wider screen, create actions sit on the title row and other actions hug their label instead of stretching across the page. Sign-in and other entry cards stay a narrow column, so their buttons still span that card.
 
 <Cards>
   <Card title="Today">The tab you land on after signing in. Admin sees everything; Sales sees submitted orders (**Confirm**); Warehouse sees confirmed orders whose requested ship date has arrived (**Pick**) and orders holding staged beer that needs restocking (**Put back**), including cancelled ones, until restock is confirmed. Taproom sees three permitted exits: **Tap board**, **Weekly count**, and **Variance · 4 weeks**, each with its latest observed fact and no invented overdue or shift rule. A mapped variance from incomplete POS coverage is labeled **partial POS coverage**. A dot on the icon marks a row needing attention. Other roles with nothing waiting see **Nothing waiting** and **Record movement**.</Card>
@@ -189,7 +189,7 @@ Sales sees history without correction controls. Shipments retain **Return shipme
 
 <Screen name="Record movement" />
 
-1. Open **Inventory** and select **Record Movement**.
+1. Select **Record movement** from Today, or open **Inventory** and select **Record Movement**. The Today shortcut opens the same form.
 2. Choose a **SKU**, **Location**, and **Bin**. Picking the location preselects its first bin alphabetically; change it if the stock sits elsewhere.
 3. Choose a **Type**. The default is `opening_balance`.
 4. For `depletion`, pick a **Channel**. The list is your brewery's own — every brewery starts with **Wholesale**, **Taproom**, **DTC**, and **Export**, and you edit that list under [**Sale channels**](#channels). **Taproom** is preselected. The channel decides how the removal is taxed, and that treatment is frozen onto the entry: editing the channel later never rewrites what is already recorded. `sale_removal` takes a channel too, but shipping sets it, not this form.
@@ -416,7 +416,7 @@ Each movement shows its actual bin and recorded barrels. Returns link to the ori
 
 <Screen name="Lot trace" />
 
-A lot is one closed packaging run. Its trace shows the brand and package, the run and packaging date, the tank and batch it was drawn from, the barrels drawn, and every ledger movement carrying the lot: the production that made it and any samples, losses, or destructions pulled from it, with what remains on hand. Shipping records the source bin and lot for every quantity. The trace lists actual customer recipients, ship-to addresses, orders and invoices, and recorded balances separately for each SKU and bin with total barrels. Historical untracked movements cannot be assigned to a lot; there is no per-pint POS trace.
+A lot is one closed packaging run. Its trace shows the brand and package, the run and packaging date, the tank and batch it was drawn from, the barrels drawn, and every ledger movement carrying the lot: the production that made it and any samples, losses, or destructions pulled from it, with what remains on hand. Dates on the trace use short month/day form, such as **8/31**. Every movement and balance row repeats the full **Brand · SKU** identity. Shipping records the source bin and lot for every quantity. The trace lists actual customer recipients, ship-to addresses, orders and invoices, and recorded balances separately for each SKU and bin with total barrels. Historical untracked movements cannot be assigned to a lot; there is no per-pint POS trace.
 
 ## Keg fleet [#kegs]
 

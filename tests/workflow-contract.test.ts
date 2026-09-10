@@ -108,11 +108,22 @@ jobs:
 });
 
 describe("production-readiness workflow contract", () => {
-  it("runs the full Vitest suite and includes invitation tests", () => {
-    expect(ci).toMatch(/^ {6}- run: bun run test(?:\s+#.*)?\s*$/m);
+  it("runs pure screen tests in parallel and the remaining suite in three isolated database shards", () => {
+    expect(ci).toContain('shard: ["1/3", "2/3", "3/3"]');
+    expect(ci).toContain("bunx vitest run --fileParallelism --maxWorkers=2");
+    expect(ci).toContain('bunx vitest run --shard=${{ matrix.shard }}');
+    expect(ci).toContain("--exclude tests/mgr-screens.test.ts");
+    expect(ci).toMatch(/needs: \[quality, pure_tests, test_shard\]/);
     expect(vitestConfig).toMatch(/include:\s*\[\s*"tests\/\*\*\/\*\.test\.ts"/);
     expect(matchesGlob(INVITE_TEST, "tests/**/*.test.ts")).toBe(true);
     expect(configDefaults.exclude.some((pattern) => matchesGlob(INVITE_TEST, pattern))).toBe(false);
+  });
+
+  it("cancels superseded runs and keeps database-free checks outside the test shards", () => {
+    expect(ci).toContain("cancel-in-progress: true");
+    expect(ci).toMatch(/^  quality:\s*$/m);
+    expect(ci).toMatch(/^  test:\s*$/m);
+    expect(ci.match(/supabase start/g)).toHaveLength(1);
   });
 
   it("installs and runs with bun, not npm", () => {

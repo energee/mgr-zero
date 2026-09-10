@@ -1,8 +1,8 @@
 # Screen views — convert every MGR drawing to one component
 
 Date: 2026-09-08
-Status: In progress (packs 0–4 landed on `screen-view-order`; one pack per PR applies after this PR)
-Worktree: `.agents/worktrees/screen-view-order`
+Status: Complete (packs 0–14 done; gated drawings wait for their live programs)
+Worktree: `.agents/worktrees/screen-view-compliance`
 
 **Goal:** The inventory record and the live page cannot drift. One view owns the drawing; a mock feeds `/docs/screens`; an adapter feeds the app.
 
@@ -60,12 +60,15 @@ Counts are `SCREEN_ROUTES` rows (live or parity-mapped). Order is 1 of ~110. Gat
 | 3 | **Customers (done)** | `views/` | Customers, Customer detail, Ship-to form | Feeds orders; small. Live CustomerForm / ShipToForm stay wrappers. |
 | 4 | **Catalog + locations + pricing (drawings extracted)** | `views/catalog/` | Catalog, Brand, SKU, SKU list, Formats, Format, Package BOM; Locations, Location detail, Location bins, Bin; Price groups, Price group; Sale channels, Channel; Units | One command-module family (`catalog.ts` + pricing) |
 | 5 | **Inventory + transfers (done on `screen-view-inventory`, based on #220)** | `views/` | Finished goods, Record movement, Movement recorded; Transfers, New transfer, Transfer detail. SKU detail / Reverse movement already shipped on #220 | Ledger grain; keep append-only copy in the view |
-| 6 | **Shell** | `views/shell/` | Today, Today empty, Sales, Brewer, Driver, Taproom, First-run checklist; Beer, Work, More; Search, Entity picker; Me, Settings, Team; Permission denied; Sign in, Session expired, Reset / Set password, Portal sign in / forgot / set password, No membership | High traffic; several records share `app/(app)/page.tsx` — one view per record name, or one landing view with mocks |
-| 7 | **Production** | `views/production/` | Batches, Schedule batch, Brew day, Vessel detail; Close packaging run, Run closed; Recipes, Recipe | Live pages exist; cellar sheets (reading, addition, transfer, map) convert when they have routes |
-| 8 | **Purchasing** | `views/purchasing/` | Purchase orders, New PO, Receive PO, Receipt; Materials on hand, Cycle count, Materials, Material; Vendors, Vendor, Contracts, Contract | Program 6 pages |
-| 9 | **Kegs** | `views/kegs/` | Keg fleet, Customer keg balance, Keg event history | Not tap board (Program 12) |
-| 10 | **Delivery** | `views/delivery/` | Routes, Route, Return route, Driver route, Confirm delivery | Program 8 pages |
-| 11 | **Compliance** | `views/compliance/` | Compliance months, Compliance registry, Brand approval, State registration, License, Lot trace | Program 9 pages |
+| 6 | **Shell (done)** | `views/shell/` | Today, Today empty, Sales, Brewer, Driver, Taproom, First-run checklist; Beer, Work, More; Search, Entity picker; Me, Settings, Team; Permission denied; Sign in, Session expired, Reset / Set password, Portal sign in / forgot / set password, No membership | High traffic; several records share `app/(app)/page.tsx` — one view per record name, or one landing view with mocks |
+| 7 | **Production (done)** | `views/production/` | Batches, Schedule batch, Brew day, Vessel detail; Close packaging run, Run closed; Recipes, Recipe | Live pages exist; cellar sheets (reading, addition, transfer, map) convert when they have routes |
+| 8 | **Purchasing (done)** | `views/purchasing/` | Purchase orders, New PO, Receive PO, Receipt; Materials on hand, Cycle count, Materials, Material; Vendors, Vendor, Contracts, Contract | Program 6 pages |
+| 9 | **Kegs (done)** | `views/kegs/` | Keg fleet, Customer keg balance, Keg event history | Not tap board (Program 12) |
+| 10 | **Delivery (done)** | `views/delivery/` | Routes, Route, Return route, Driver route, Confirm delivery | Program 8 pages |
+| 11 | **Compliance (done)** | `views/compliance/` | Compliance months, Compliance registry, Brand approval, State registration, License, Lot trace | Program 9 pages |
+| 12 | **Packaging (done)** | `views/` | Packaging runs, Schedule packaging run, Repack | Existing list plus controlled live form slots |
+| 13 | **Planning (done)** | `views/` | Planning | Live material requirements plus optional fixture-only horizon |
+| 14 | **Monthly compliance (done)** | `views/` | Monthly compliance | Live report/loss layout with controlled mutation slots |
 
 ### Convert with the program that ungates them (not now)
 
@@ -79,7 +82,7 @@ Do not pre-extract these. When that program ships the live page, the page **is**
 | 14 Square / menu | Point of sale, Connect Square, locations, connector, Menu, POS item / mapping / sale detail, Taproom sale, Refund |
 | 15 Composer | Composer proposal / question / answer, Offline outbox |
 | 16 Chat | Chat disconnected / settings, Linked people, Link Slack, Disconnect Slack, Reauthorization |
-| later | Packaging runs list, Schedule packaging run, Repack, Mash / fermentation / water schedule sheets, Planning, SKU detail, Coming up, Monthly compliance, Keg report, Water profiles |
+| gated later | Mash / fermentation / water schedule sheets, Coming up, Keg report, Water profiles |
 
 ### Never
 

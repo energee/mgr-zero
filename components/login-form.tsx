@@ -9,78 +9,38 @@
  * draws the buyer's variant (screen record Portal sign in).
  */
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { login } from "@/app/(auth)/actions"
+import { emailLogin, login } from "@/app/(auth)/actions"
 import { MgrIcon } from "@/components/mgr-icon"
-import Link from "next/link"
+import { E } from "@/components/mgr/e"
+import { EntrySurface } from "@/components/mgr/entry-surface"
+import { EntryView } from "@/components/mgr/views/entry"
+import { portalSignIn, signIn } from "@/lib/mgr/fixtures/entry"
 
 export function LoginForm({
   className,
   error,
+  sent,
   portal,
   ...props
-}: React.ComponentProps<"div"> & { error?: string; portal?: boolean }) {
+}: React.ComponentProps<"div"> & { error?: string; sent?: boolean; portal?: boolean }) {
+  const fixture = portal ? portalSignIn : signIn;
+  const model = {
+    ...fixture,
+    note: error,
+    info: sent ? "Check your email for a sign-in link." : undefined,
+  };
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
-        <CardHeader className="text-center">
-          <MgrIcon size={40} className="mx-auto" />
-          <CardTitle className="text-xl">{portal ? "Sign in to your account" : "Sign in to MGR"}</CardTitle>
-          <CardDescription>{portal ? "Wholesale ordering" : "Brewery operations management"}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form action={login}>
-            <FieldGroup>
-              {portal && <input type="hidden" name="portal" value="1" />}
-              {error && (
-                <p
-                  role="alert"
-                  className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
-                >
-                  {error}
-                </p>
-              )}
-              <Field>
-                <FieldLabel htmlFor="email">Email</FieldLabel>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="you@brewery.com"
-                  autoComplete="email"
-                  required
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="password">Password</FieldLabel>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                />
-              </Field>
-              <Field>
-                <Button type="submit">Sign in</Button>
-                <FieldDescription className="text-center">
-                  <Link href={portal ? "/reset?portal=1" : "/reset"} className="underline">Forgot password?</Link>
-                  {portal ? " Accounts are created by your brewery." : " Accounts are created by invitation. Ask an admin at your brewery for access."}
-                </FieldDescription>
-              </Field>
-            </FieldGroup>
-          </form>
-        </CardContent>
-      </Card>
+    <div className={cn("contents", className)} {...props}>
+      <EntrySurface>
+        {E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>)}
+        <EntryView
+          model={model}
+          action={login}
+          secondaryAction={portal ? undefined : emailLogin}
+          hidden={portal ? <input type="hidden" name="portal" value="1" /> : null}
+          linkHref={portal ? "/reset?portal=1" : "/reset"}
+        />
+      </EntrySurface>
     </div>
   )
 }

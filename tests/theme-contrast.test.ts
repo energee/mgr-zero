@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { expect, it } from "vitest";
 
 const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
+const layout = readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8");
 const luminance = (hex: string) => {
   const rgb = hex.match(/[a-f\d]{2}/gi)!.map((v) => {
     const c = parseInt(v, 16) / 255;
@@ -22,3 +23,8 @@ for (const mode of [":root", ".dark"]) {
     }
   });
 }
+
+it("keeps the pre-paint theme script inert on React client remounts", () => {
+  expect(layout).toMatch(/type=\{typeof window === "undefined" \? "text\/javascript" : "text\/plain"\}/);
+  expect(layout).toMatch(/<script[\s\S]*suppressHydrationWarning/);
+});

@@ -1,5 +1,6 @@
 // lib/mgr/portal-order-view.ts — view-model for portal Order detail.
 // portal_order (order, lines, events, shipment.invoices) plus buyerStatus.
+import { calendarDay } from "./calendar-day";
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { buyerStatus } from "./order-status";
@@ -75,12 +76,6 @@ export type PortalOrderSnapshot = {
     }[];
   } | null;
 };
-
-function calendarDay(iso: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
-  if (!m) return new Date(iso).toLocaleDateString();
-  return `${Number(m[2])}/${Number(m[3])}`;
-}
 
 /** Map a portal_order payload onto PortalOrderView. */
 export function toPortalOrderViewProps({ order, lines, events, shipment, backHref }: PortalOrderSnapshot): PortalOrderViewModel {
