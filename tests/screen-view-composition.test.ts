@@ -9,7 +9,6 @@ import { SCREEN_ROUTES } from "@/lib/mgr/screen-routes";
 /** Existing bypasses. Remove a row when the live implementation mounts the view. */
 const KNOWN_VIEW_DEBT = [
   "Session expired: SessionExpiredView <- app/(auth)/login/page.tsx",
-  "Reverse movement: ReverseMovementView <- app/(app)/inventory/reversal-form.tsx",
   "Record movement: RecordMovementView <- app/(app)/inventory/page.tsx",
   "Movement recorded: MovementRecordedView <- app/(app)/inventory/page.tsx",
   "Entity picker: SearchView <- components/mgr/search-palette.tsx",
