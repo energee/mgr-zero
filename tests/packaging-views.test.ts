@@ -33,6 +33,7 @@ describe("packaging views", () => {
 
   it("keeps fixture actions inert and explicit null slots empty", () => {
     const runs = htmlOf(createElement(PackagingRunsView, { model: toPackagingRunsViewProps(packagingRuns) }));
+    expect(runs).toMatch(/>Packaging</);
     expect(runs).not.toMatch(/href="\/packaging/);
     expect(htmlOf(createElement(SchedulePackagingRunView, { model: schedulePackagingRun, form: null }))).toBe("<div></div>");
     expect(htmlOf(createElement(RepackView, { model: repackCase, footer: null }))).not.toMatch(/Record repack/);

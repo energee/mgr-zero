@@ -85,6 +85,7 @@ describe("Finished goods view", () => {
     expect(src).toMatch(/from "@\/components\/mgr\/views\/finished-goods"/);
     expect(src).toMatch(/<FinishedGoodsView\b/);
     expect(src).toMatch(/<MovementForm\b/);
+    expect(form).not.toContain('title="Record Movement"');
     expect(form).toMatch(/<MovementRecordedView\b/);
   });
 });

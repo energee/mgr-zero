@@ -28,7 +28,7 @@ export function OrdersView({
 }) {
   return (
     <>
-      {E.hd("Work", model.subtitle, createAction !== undefined ? createAction : E.btn("New order"))}
+      {E.hd("Orders", model.subtitle, createAction !== undefined ? createAction : E.btn("New order"))}
       {filters !== undefined ? filters : (
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           {E.tabs(WORK_CHIPS, 1, "w-full md:w-fit", WORK_TABS)}
