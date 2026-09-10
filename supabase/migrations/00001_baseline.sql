@@ -2869,7 +2869,47 @@ create function private.adjust_order_lines_impl(p_order uuid, p_lines jsonb, p_r
 language plpgsql set search_path = '' as $$
 declare o public.orders; l record; v_line uuid; v_before jsonb;
 begin
+  perform private.assert_order_lines(p_lines);
   o := private.lock_order(p_order, array['confirmed','picked']::public.order_status[]);
+  if o.kind = 'wholesale' then
+    -- Freeze every mutable catalog row used by this replacement before any
+    -- order mutation. A concurrent config edit either finishes first and is
+    -- reviewed here, or waits until the adjusted order has its deposit rows.
+    perform 1 from public.skus s
+      where s.brewery_id=o.brewery_id
+        and s.id in (select (e->>'sku_id')::uuid from jsonb_array_elements(p_lines) e)
+      order by s.id for update;
+    perform 1 from public.formats f
+      where f.brewery_id=o.brewery_id and f.id in (
+        select s.format_id from public.skus s where s.brewery_id=o.brewery_id
+          and s.id in (select (e->>'sku_id')::uuid from jsonb_array_elements(p_lines) e)
+      ) order by f.id for update;
+    perform 1 from public.channel_prices cp
+      where cp.brewery_id=o.brewery_id and cp.sale_channel_id=o.sale_channel_id
+        and (cp.price_group_id,cp.format_id) in (
+          select b.price_group_id,s.format_id from public.skus s
+          join public.brands b on b.id=s.brand_id and b.brewery_id=s.brewery_id
+          where s.brewery_id=o.brewery_id
+            and s.id in (select (e->>'sku_id')::uuid from jsonb_array_elements(p_lines) e)
+        )
+      order by cp.price_group_id,cp.format_id for update;
+    perform 1 from public.keg_pools k
+      where k.brewery_id=o.brewery_id and k.id in (
+        select s.keg_pool_id from public.skus s where s.brewery_id=o.brewery_id
+          and s.id in (select (e->>'sku_id')::uuid from jsonb_array_elements(p_lines) e)
+      ) order by k.id for update;
+    if exists (
+      select 1 from jsonb_array_elements(p_lines) e
+      join public.skus s on s.id=(e->>'sku_id')::uuid and s.brewery_id=o.brewery_id
+      join public.formats f on f.id=s.format_id and f.brewery_id=o.brewery_id
+      left join public.keg_pools k on k.id=s.keg_pool_id and k.brewery_id=o.brewery_id
+      where s.container_source in ('owned_fleet','per_fill_rental')
+        and (f.package_type is distinct from 'keg' or f.keg_size is null
+          or k.id is null or k.deposit_cents<=0)
+    ) then
+      raise exception 'returnable keg deposit is not configured';
+    end if;
+  end if;
   select jsonb_object_agg(ol.sku_id, ol.qty_ordered) into v_before
   from public.order_lines ol where ol.order_id = p_order;
   -- Drop lines (and their open allocations) not present in the new set.
@@ -2891,6 +2931,19 @@ begin
     select o.brewery_id, l.sku_id, l.qty, 'order_line', v_line, 'open'
     where not exists (select 1 from public.allocations where source = 'order_line' and ref = v_line and status = 'open');
   end loop;
+  delete from public.order_deposit_lines where order_id=p_order;
+  if o.kind = 'wholesale' then
+    insert into public.order_deposit_lines(
+      brewery_id,order_id,order_line_id,keg_pool_id,keg_size,description,qty_ordered,unit_price_cents
+    )
+    select o.brewery_id,p_order,ol.id,k.id,f.keg_size,k.name||' deposit',ol.qty_ordered,k.deposit_cents
+    from public.order_lines ol
+    join public.skus s on s.id=ol.sku_id and s.brewery_id=o.brewery_id
+    join public.formats f on f.id=s.format_id and f.brewery_id=o.brewery_id
+    join public.keg_pools k on k.id=s.keg_pool_id and k.brewery_id=o.brewery_id
+    where ol.order_id=p_order and s.container_source in ('owned_fleet','per_fill_rental')
+      and f.package_type='keg' and f.keg_size is not null and k.deposit_cents>0;
+  end if;
   update public.orders set needs_restock = needs_restock or (o.status = 'picked') where id = p_order;
   insert into public.order_events (brewery_id, order_id, actor, event, payload)
   values (o.brewery_id, p_order, auth.uid(), 'lines_adjusted',

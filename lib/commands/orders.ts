@@ -58,7 +58,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "adjust_order_lines", description: "Replace lines on a confirmed/picked order; re-syncs allocations; flags restocking when picked",
+  name: "adjust_order_lines", description: "Replace lines on a confirmed/picked order; re-syncs allocations and returnable-keg deposits; flags restocking when picked",
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({ orderId: z.string().uuid(), reason: z.string().min(1), lines }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("adjust_order_lines", { p_order: i.orderId, p_lines: toLines(i.lines), p_reason: i.reason, p_request_id: execution.requestId })),

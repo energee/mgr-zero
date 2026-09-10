@@ -36,7 +36,7 @@ Save draft and Review order stay disabled without a ship-to, without a positive 
 
 Submitting rechecks the price, ship-to address, shipping source, and keg deposit against the reviewed quote. If any changed, MGR creates no order and asks you to return to the cart and review the current details. After an uncertain submit response, **Retry order request** uses that exact reviewed quote and request; a later catalog change or quote expiry cannot create a duplicate or change a committed order.
 
-For returnable kegs, the submitted order keeps the reviewed deposit price with the keg line. The invoice charges that frozen deposit price for the quantity actually shipped, even if staff later changes the deposit used on new orders.
+For returnable kegs, the submitted order keeps the reviewed deposit price with the keg line. If brewery staff later adjusts the order lines, MGR updates the deposit snapshot at the currently configured amount and refuses an added returnable keg without a positive configured deposit. The invoice charges the resulting frozen deposit price for the quantity actually shipped.
 
 <Callout type="warn">
 **Before ordering:** if **Ships from** says **Not configured**, contact the brewery. Fresh saves and submissions stay disabled until the brewery configures its shipping warehouse. You can still retry an earlier uncertain request to confirm its outcome.

@@ -55,6 +55,8 @@ describe("QuickBooks sales-tax calculation", () => {
       taxResponse(1.001, "USD", 0, "USD"),
       taxResponse(1e21, "USD", 0, "USD"),
       taxResponse(Number.MAX_SAFE_INTEGER + 1, "USD", 0, "USD"),
+      taxResponse(-0.01, "USD", 0, "USD"),
+      taxResponse(Number.POSITIVE_INFINITY, "USD", 0, "USD"),
       taxResponse(Number.NaN, "USD", 0, "USD"),
     ];
     for (const response of responses) {
