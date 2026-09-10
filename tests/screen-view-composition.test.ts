@@ -29,7 +29,6 @@ const KNOWN_VIEW_DEBT = [
   "Receipt: ReceiptView <- app/(app)/purchase-orders/[id]/page.tsx",
   "Cycle count: CycleCountView <- app/(app)/materials/page.tsx",
   "Materials: MaterialsView <- app/(app)/materials/page.tsx",
-  "Price group: PriceGroupView <- app/(app)/pricing/page.tsx",
 ] as const;
 
 /** Existing live screens whose inventory record still owns inline E.* markup. */

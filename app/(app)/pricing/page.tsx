@@ -6,6 +6,7 @@
 // remounts it). Groups are added, renamed and removed here too (GroupForm).
 import { PriceGroupsView } from "@/components/mgr/views/price-groups";
 import { toPriceGroupsViewProps } from "@/lib/mgr/price-groups-view";
+import { toPriceGroupViewProps } from "@/lib/mgr/price-group-view";
 import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -38,7 +39,7 @@ export default async function PricingPage() {
           {E.ttl(channel.name)}
           <div className="min-w-0 overflow-x-auto">
             {E.tbl(["Group", ...formats.map((f) => f.brands ? `${f.brands.name} · ${f.name}` : f.name)], groups.map((group) => [
-              <GroupForm key={group.id} group={group} />,
+              <GroupForm key={group.id} group={group} model={toPriceGroupViewProps({ channels, groups, formats, cells, groupId: group.id })} />,
               ...formats.map((f) => {
                 const cell = byKey.get(`${channel.id}|${group.id}|${f.id}`);
                 return <PriceCellForm key={cell?.unit_price_cents ?? "empty"} saleChannelId={channel.id} priceGroupId={group.id} formatId={f.id} cents={cell?.unit_price_cents ?? null} label={cell ? money(cell.unit_price_cents) : "not priced"} />;
