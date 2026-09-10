@@ -49,8 +49,8 @@ export function ImportWizard({ breweryId, lookups }: { breweryId: string; lookup
     stage({ headers: fields.map(f => f.name), rows: blocked.map(row => fields.map(f => row[f.name] ?? "")) });
     setBatch(null); setResult(null); setStep(2);
   }
-  return <>
-    <Timeline className="px-4 pt-4">
+  return <div className="flex items-start">
+    <Timeline className="shrink-0 px-2 pt-4 sm:px-4">
       {IMPORT_STEPS.map((title, index) => (
         <TimelineItem
           key={title}
@@ -61,7 +61,7 @@ export function ImportWizard({ breweryId, lookups }: { breweryId: string; lookup
         />
       ))}
     </Timeline>
-    <div className="flex flex-col gap-4 p-4">
+    <div className="min-w-0 flex-1 flex flex-col gap-4 p-4">
       {error && <p role="alert" className="text-destructive">{error}</p>}
       {step === 0 && <>
         <Field>
@@ -136,5 +136,5 @@ export function ImportWizard({ breweryId, lookups }: { breweryId: string; lookup
         {!!result?.blocked && <Button disabled={busy} onClick={correctBlocked}>Correct blocked rows in a new batch</Button>}
       </>}
     </div>
-  </>;
+  </div>;
 }

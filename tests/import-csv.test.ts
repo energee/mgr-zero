@@ -23,7 +23,8 @@ it("the import wizard composes shadcn Select, Attachment, and Timeline controls"
   expect(source).toMatch(/from "@\/components\/ui\/attachment"/);
   expect(source).toMatch(/<Attachment\b/);
   expect(source).toMatch(/from "@\/components\/ui\/timeline"/);
-  expect(source).toMatch(/<Timeline\b/);
+  expect(source).toMatch(/className="flex items-start"[\s\S]*<Timeline className="shrink-0/);
+  expect(source).toMatch(/<div className="min-w-0 flex-1/);
   expect(source).not.toMatch(/<select\b/);
   expect(source).not.toMatch(/E\.stp/);
   expect(source).not.toMatch(/<input type="file"[^>]*className=\{control\}/);
