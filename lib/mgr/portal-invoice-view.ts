@@ -22,7 +22,7 @@ export type PortalInvoiceViewModel = {
   payable: boolean;
   kind: "invoice" | "credit_memo";
   issued: string;
-  status: "Credit" | "Paid" | "Unpaid" | "Voided" | "Deleted" | "Written off";
+  status: "Credit" | "Paid" | "Unpaid" | "Voided" | "Deleted" | "Written off" | "Review";
   breweryName: string;
   breweryPhone: string | null;
   lines: PortalInvoiceLineView[];
@@ -40,6 +40,7 @@ export type PortalInvoiceSnapshot = {
     qbo_remote_state?: "live" | "voided" | "deleted";
     qbo_balance_cents?: number | null;
     qbo_total_cents?: number | null;
+    qbo_accountant_drift?: boolean;
     written_off_at?: string | null;
     total_cents: number;
   };
@@ -63,7 +64,9 @@ export function toPortalInvoiceViewProps({ invoice, lines, brewery, backHref }: 
   const credit = invoice.kind === "credit_memo";
   const state = invoiceCurrentState(invoice);
   const paid = !credit && state === "paid";
-  const status = state === "written_off" ? "Written off" : `${state[0].toUpperCase()}${state.slice(1)}` as PortalInvoiceViewModel["status"];
+  const status = invoice.qbo_accountant_drift && state === "unpaid"
+    ? "Review"
+    : state === "written_off" ? "Written off" : `${state[0].toUpperCase()}${state.slice(1)}` as PortalInvoiceViewModel["status"];
   return {
     backHref,
     title: docNo(credit ? "CM" : "INV", invoice.invoice_no, credit ? "Credit memo" : "Invoice"),
@@ -71,7 +74,7 @@ export function toPortalInvoiceViewProps({ invoice, lines, brewery, backHref }: 
     due: invoice.due_on ?? undefined,
     paidOn: paid ? day(invoice.paid_at!) : undefined,
     paid,
-    payable: !credit && state === "unpaid" && typeof invoice.qbo_balance_cents === "number" && invoice.qbo_balance_cents > 0,
+    payable: !credit && status === "Unpaid" && typeof invoice.qbo_balance_cents === "number" && invoice.qbo_balance_cents > 0,
     kind: invoice.kind,
     issued: invoice.issued_on,
     status: credit ? "Credit" : status,

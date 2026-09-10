@@ -121,6 +121,15 @@ describe("Portal invoice view", () => {
     expect(model.lines).toHaveLength(2);
   });
 
+  it("makes an invoice edited in QuickBooks review-only", () => {
+    const model = toPortalInvoiceViewProps({
+      ...portalInvoiceUnpaid,
+      invoice: { ...portalInvoiceUnpaid.invoice, qbo_accountant_drift: true },
+    });
+    expect(model.status).toBe("Review");
+    expect(model.payable).toBe(false);
+  });
+
   it("the pay drawing still shows Pay invoice, Download PDF, and Question", () => {
     const html = htmlOf(createElement(PortalInvoiceView, {
       model: toPortalInvoiceViewProps(portalInvoiceUnpaid),

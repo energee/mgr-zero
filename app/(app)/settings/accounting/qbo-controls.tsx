@@ -94,7 +94,7 @@ export function QboInvoiceRow({ invoiceId, detail, balanceCents, actions, health
 }) {
   return E.row(
     "QuickBooks",
-    `${detail}${balanceCents != null ? ` · ${money(balanceCents)} balance` : ""}`,
+    `${detail}${balanceCents != null && balanceCents > 0 && !detail.includes(money(balanceCents)) ? ` · ${money(balanceCents)} balance` : ""}`,
     <QboInvoiceActions invoiceId={invoiceId} actions={actions} />,
     healthy ? "ok" : "w",
   );
