@@ -36,10 +36,12 @@ describe("QuickBooks sales-tax calculation", () => {
   });
 
   it("parses valid decimal cents exactly without binary floating-point drift", async () => {
-    const client = new QboOAuthClient(config as any, vi.fn<typeof globalThis.fetch>().mockResolvedValue(
-      taxResponse("0.29", "USD", "0.00", "USD"),
-    )) as any;
-    await expect(client.calculateSalesTax(input, "access-secret")).resolves.toBe(29);
+    for (const value of ["0.29", 0.29]) {
+      const client = new QboOAuthClient(config as any, vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+        taxResponse(value, "USD", 0, "USD"),
+      )) as any;
+      await expect(client.calculateSalesTax(input, "access-secret")).resolves.toBe(29);
+    }
   });
 
   it("refuses HTTP, GraphQL, malformed, foreign-currency, and fractional-cent results", async () => {
@@ -50,6 +52,10 @@ describe("QuickBooks sales-tax calculation", () => {
       taxResponse("1.00", "CAD", "0.00", "CAD"),
       taxResponse("1.001", "USD", "0.00", "USD"),
       taxResponse("90071992547410.00", "USD", "0.00", "USD"),
+      taxResponse(1.001, "USD", 0, "USD"),
+      taxResponse(1e21, "USD", 0, "USD"),
+      taxResponse(Number.MAX_SAFE_INTEGER + 1, "USD", 0, "USD"),
+      taxResponse(Number.NaN, "USD", 0, "USD"),
     ];
     for (const response of responses) {
       const client = new QboOAuthClient(config as any, vi.fn<typeof globalThis.fetch>().mockResolvedValue(response)) as any;
@@ -58,7 +64,7 @@ describe("QuickBooks sales-tax calculation", () => {
   });
 });
 
-function taxResponse(line: string, lineCurrency: string, shipping: string, shippingCurrency: string) {
+function taxResponse(line: string | number, lineCurrency: string, shipping: string | number, shippingCurrency: string) {
   return new Response(JSON.stringify({ data: { indirectTaxCalculateSaleTransactionTax: { taxCalculation: {
     taxTotals: { totalTaxAmountExcludingShipping: { value: line, currency: lineCurrency } },
     shipping: { taxAmount: { value: shipping, currency: shippingCurrency } },
