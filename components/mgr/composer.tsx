@@ -18,9 +18,12 @@ import {
   beginComposerCommit,
   composerActions,
   composerInitialState,
+  completeComposerCommit,
   createComposerRequestGuard,
   editMovementDraft,
+  failComposerCommit,
   movementFormHref,
+  movementIsLocked,
   movementQuestion,
   receiveProposal,
   retireMovementProposal,
@@ -78,6 +81,7 @@ export function Composer({ role }: { role: StaffRole }) {
   const [outboxEntries, setOutboxEntries] = useState<OutboxAttempt[]>([]);
   const conversationRef = useRef<string | null>(null);
   const requestGuardRef = useRef(createComposerRequestGuard());
+  const movementLockRef = useRef(false);
   const actionRef = useRef<HTMLSelectElement | null>(null);
 
   useEffect(() => {
@@ -127,9 +131,11 @@ export function Composer({ role }: { role: StaffRole }) {
   }
 
   function retireMovement() {
+    if (movementLockRef.current) return false;
     invalidateMovementRequest();
     setState(retireMovementProposal);
     setError(null);
+    return true;
   }
 
   async function ensureConversation(title: string) {
@@ -146,7 +152,7 @@ export function Composer({ role }: { role: StaffRole }) {
 
   async function chooseAction(id: string) {
     const selected = actions.find((candidate) => candidate.id === id) ?? null;
-    retireMovement();
+    if (!retireMovement()) return;
     setAction(selected);
     setAnswer(null);
     if (!selected) return;
@@ -171,6 +177,7 @@ export function Composer({ role }: { role: StaffRole }) {
   }
 
   async function changeDraft(patch: Partial<MovementDraft>) {
+    if (movementLockRef.current) return;
     invalidateMovementRequest();
     setState((current) => editMovementDraft(current, patch));
     setError(null);
@@ -208,6 +215,7 @@ export function Composer({ role }: { role: StaffRole }) {
   async function commitMovement() {
     const started = beginComposerCommit(state);
     if (!started.envelope) return;
+    movementLockRef.current = true;
     setState(started.state);
     setError(null);
     try {
@@ -215,15 +223,26 @@ export function Composer({ role }: { role: StaffRole }) {
       const receipt = await requestGuardRef.current.run(() => run(envelope.name, envelope.input, envelope.requestId, {
         origin: "chat", conversationId: envelope.conversationId, previewToken: envelope.previewToken,
       }) as Promise<{ id?: string }>);
-      if (!receipt) return;
+      if (!receipt) {
+        movementLockRef.current = true;
+        setState((current) => failComposerCommit(current, null));
+        setError("The movement response could not be confirmed. Retry uses the exact saved request.");
+        return;
+      }
       setAnswer({ query: "Record inventory movement", answer: "Movement recorded", detail: receipt.id ? `Reference ${receipt.id}` : undefined, observedAt: new Date().toLocaleString() });
-      retireMovement();
+      movementLockRef.current = false;
+      setState(completeComposerCommit);
     } catch (cause) {
-      if (cause instanceof CommandResponseError && cause.status === 409) {
-        retireMovement();
+      const status = cause instanceof CommandResponseError ? cause.status : null;
+      const code = cause instanceof CommandResponseError ? cause.code : undefined;
+      const failed = failComposerCommit(started.state, status, code);
+      movementLockRef.current = movementIsLocked(failed);
+      setState((current) => failComposerCommit(current, status, code));
+      if (!movementLockRef.current && status === 409) {
         setError("The proposal changed or expired. Preview the current data again.");
+      } else if (movementLockRef.current) {
+        setError(`${messageText(cause)} Retry uses the exact confirmed request.`);
       } else {
-        setState((current) => ({ ...current, committing: false }));
         setError(messageText(cause));
       }
     }
@@ -290,6 +309,7 @@ export function Composer({ role }: { role: StaffRole }) {
   }
 
   const question = action?.id === "record_movement" ? movementQuestion(state.draft) : null;
+  const movementLocked = movementIsLocked(state);
   const lotOptions = stock.filter((row) => row.kind === "sku" && row.stock_id === state.draft.skuId && row.bin_id === state.draft.binId && row.lot_id);
 
   return (
@@ -332,6 +352,7 @@ export function Composer({ role }: { role: StaffRole }) {
         lots={lotOptions.map((row) => ({ id: row.lot_id!, label: `${row.lot_code} · ${row.qty} available` }))}
         channels={channels.map((channel) => ({ id: channel.id, label: channel.name }))}
         busy={busy}
+        disabled={movementLocked}
         question={Boolean(question)}
         proposal={Boolean(state.proposal)}
         onChange={(patch) => void changeDraft(patch)}
@@ -339,7 +360,7 @@ export function Composer({ role }: { role: StaffRole }) {
       />}
 
       {question && <ComposerQuestionView prompt={question.prompt} />}
-      {state.proposal && <ComposerProposalView effects={state.proposal.effects} warnings={state.proposal.warnings} openHref={movementFormHref(state.proposal.input)} onOpen={retireMovement} onDismiss={retireMovement} onCommit={() => void commitMovement()} committing={state.committing} />}
+      {state.proposal && <ComposerProposalView effects={state.proposal.effects} warnings={state.proposal.warnings} openHref={movementFormHref(state.proposal.input, state.commitRequestId ?? undefined)} onOpen={retireMovement} onDismiss={retireMovement} onCommit={() => void commitMovement()} committing={state.committing} locked={movementLocked} />}
 
       {action?.id === "read_atp" && <section className="flex flex-col gap-2 rounded-md border bg-card p-3 sm:flex-row sm:items-end">
         <Label className="flex-1">SKU / package<select className="mt-1 w-full rounded-md border bg-background p-2" value={readSkuId} onChange={(event) => { setReadSkuId(event.target.value); setAnswer(null); }}><option value="">Choose…</option>{skus.map((sku) => {
@@ -349,8 +370,8 @@ export function Composer({ role }: { role: StaffRole }) {
       </section>}
       {answer && <ComposerAnswerView {...answer} />}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      {action && <Button type="button" variant="ghost" className="self-start" onClick={() => { retireMovement(); setAction(null); setAnswer(null); }}>Close composer</Button>}
-      <ComposerStripView actions={actions.map((item) => ({ value: item.id, label: item.label }))} onAction={(id) => void chooseAction(id)} onHistory={() => void loadHistory()} onOutbox={() => setOutboxOpen(true)} outboxCount={outboxEntries.length} actionRef={actionRef} />
+      {action && <Button type="button" variant="ghost" className="self-start" disabled={movementLocked} onClick={() => { if (!retireMovement()) return; setAction(null); setAnswer(null); }}>Close composer</Button>}
+      <ComposerStripView actions={actions.map((item) => ({ value: item.id, label: item.label }))} onAction={(id) => void chooseAction(id)} onHistory={() => void loadHistory()} onOutbox={() => setOutboxOpen(true)} outboxCount={outboxEntries.length} actionRef={actionRef} disabled={movementLocked} />
       <p className="text-center text-[11px] text-muted-foreground">Structured actions only. Inventory movements require a live preview. Voice and a free-form model are not connected.</p>
     </div>
   );

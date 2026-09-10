@@ -1,4 +1,5 @@
 import type { StaffRole } from "@/lib/commands/registry";
+import { canRetireCommandFailure } from "@/lib/commands/failure";
 
 export type ComposerRole = StaffRole | "customer";
 export type MovementKind = "opening_balance" | "production_in" | "adjustment" | "depletion"
@@ -56,6 +57,7 @@ export type ComposerState = {
   conversationId: string | null;
   commitRequestId: string | null;
   committing: boolean;
+  commitHadUncertainOutcome: boolean;
   historyOpen: boolean;
   history: ComposerHistoryMessage[];
 };
@@ -67,7 +69,7 @@ export type ComposerAction = {
 };
 
 export function composerInitialState(scopeKey: string): ComposerState {
-  return { scopeKey, draft: {}, proposal: null, conversationId: null, commitRequestId: null, committing: false, historyOpen: false, history: [] };
+  return { scopeKey, draft: {}, proposal: null, conversationId: null, commitRequestId: null, committing: false, commitHadUncertainOutcome: false, historyOpen: false, history: [] };
 }
 
 export function movementQuestion(draft: MovementDraft) {
@@ -106,7 +108,22 @@ export function toMovementInput(draft: MovementDraft): MovementInput | null {
 }
 
 export function retireMovementProposal(state: ComposerState): ComposerState {
-  return { ...state, proposal: null, commitRequestId: null, committing: false };
+  return movementIsLocked(state) ? state : completeComposerCommit(state);
+}
+
+export function movementIsLocked(state: ComposerState) {
+  return state.committing || state.commitHadUncertainOutcome;
+}
+
+export function completeComposerCommit(state: ComposerState): ComposerState {
+  return { ...state, proposal: null, commitRequestId: null, committing: false, commitHadUncertainOutcome: false };
+}
+
+export function failComposerCommit(state: ComposerState, status: number | null, code?: string): ComposerState {
+  if (!state.committing) return state;
+  return status !== null && canRetireCommandFailure(status, state.commitHadUncertainOutcome, code)
+    ? completeComposerCommit(state)
+    : { ...state, committing: false, commitHadUncertainOutcome: true };
 }
 
 export function createComposerRequestGuard() {
@@ -127,11 +144,11 @@ export function createComposerRequestGuard() {
 }
 
 export function editMovementDraft(state: ComposerState, patch: Partial<MovementDraft>): ComposerState {
-  return { ...retireMovementProposal(state), draft: { ...state.draft, ...patch } };
+  return movementIsLocked(state) ? state : { ...retireMovementProposal(state), draft: { ...state.draft, ...patch } };
 }
 
 export function receiveProposal(state: ComposerState, proposal: ComposerProposal, conversationId: string, requestId: string): ComposerState {
-  return { ...state, proposal, conversationId, commitRequestId: requestId, committing: false };
+  return { ...state, proposal, conversationId, commitRequestId: requestId, committing: false, commitHadUncertainOutcome: false };
 }
 
 export function beginComposerCommit(state: ComposerState) {
@@ -141,11 +158,12 @@ export function beginComposerCommit(state: ComposerState) {
     envelope: {
       name: state.proposal.name, input: state.proposal.input, requestId: state.commitRequestId,
       conversationId: state.conversationId, previewToken: state.proposal.previewToken,
+      retrying: state.commitHadUncertainOutcome,
     },
   };
 }
 
-export function movementFormHref(input: MovementInput) {
+export function movementFormHref(input: MovementInput, handoffId?: string) {
   const query = new URLSearchParams({
     recordMovement: "1", skuId: input.skuId, locationId: input.locationId,
     binId: input.binId, qty: String(input.qty), type: input.type,
@@ -154,7 +172,12 @@ export function movementFormHref(input: MovementInput) {
   if (input.saleChannelId) query.set("saleChannelId", input.saleChannelId);
   if (input.destState) query.set("destState", input.destState);
   if (input.note) query.set("note", input.note);
+  if (handoffId) query.set("movementHandoff", handoffId);
   return `/inventory?${query}`;
+}
+
+export function movementFormInstanceKey(handoffId?: string) {
+  return handoffId ? `composer:${handoffId}` : "manual";
 }
 
 export function composerActions(role: ComposerRole): ComposerAction[] {

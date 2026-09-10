@@ -332,7 +332,7 @@ describe("action-specific offline outbox", () => {
     const form = readFileSync("app/(app)/cellar/[occupancyId]/reading/reading-form.tsx", "utf8");
     expect(form).toContain('addEventListener("mgr-outbox-change", reconcileAttempt)');
     expect(form).toContain('addEventListener("storage", onStorage)');
-    expect(form).toMatch(/function reconcileAttempt[\s\S]{0,500}readOutboxAttempt\(localStorage, attempt\.id\)[\s\S]{0,500}router\.refresh\(\)/);
+    expect(form).toMatch(/function reconcileAttempt[\s\S]{0,500}readOutboxAttempt\(localStorage, attempt!?\.id\)[\s\S]{0,500}router\.refresh\(\)/);
   });
 
   it("requires named discard confirmation and preserves siblings", () => {

@@ -9,7 +9,7 @@
 // reading that silently has none.
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCommandContext } from "@/app/(app)/brewery-provider";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import {
   discardOutbox,
   outboxDiscardConfirmation,
   readOutbox,
+  readOutboxAttempt,
   sendOutboxAttempt,
   storeOutboxAttempt,
   visibleOutbox,
@@ -81,16 +82,38 @@ export function ReadingForm({ occupancyId, occupancyLabel, unit, role, prior }: 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [occupancyId, expectedContext.actorId, expectedContext.breweryId, role]);
 
-  function reset() {
+  const reset = useCallback(() => {
     setTempF(""); setGravity(""); setPh(""); setNote(""); setObservedAt("");
     setAttempt(null); setError(null); setNotice(null);
-  }
+  }, []);
 
   function setOpen(next: boolean) {
     setOpenState(next);
     if (next && !observedAt) setObservedAt(localObservationValue());
     if (!next) reset();
   }
+
+  useEffect(() => {
+    if (!attempt) return;
+    function reconcileAttempt() {
+      try {
+        const current = readOutboxAttempt(localStorage, attempt!.id);
+        if (current) { setAttempt(current); return; }
+        setOpenState(false);
+        reset();
+        router.refresh();
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : "Offline outbox could not be read.");
+      }
+    }
+    const onStorage = (event: StorageEvent) => { if (event.storageArea === localStorage) reconcileAttempt(); };
+    addEventListener("mgr-outbox-change", reconcileAttempt);
+    addEventListener("storage", onStorage);
+    return () => {
+      removeEventListener("mgr-outbox-change", reconcileAttempt);
+      removeEventListener("storage", onStorage);
+    };
+  }, [attempt, reset, router]);
 
   async function deliver(entry: OutboxAttempt) {
     setSubmitting(true); setError(null);

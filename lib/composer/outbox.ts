@@ -171,6 +171,12 @@ export function readOutbox(storage: OutboxStorage): OutboxAttempt[] {
   return entries.sort((a, b) => a.capturedAt.localeCompare(b.capturedAt) || a.id.localeCompare(b.id));
 }
 
+export function readOutboxAttempt(storage: OutboxStorage, id: string) {
+  migrateLegacyOutbox(storage);
+  pruneRetired(storage);
+  return storedAttempt(storage, id);
+}
+
 export function createReadingAttempt(
   scope: OfflineScope,
   rawInput: ReadingInput,
