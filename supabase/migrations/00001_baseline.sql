@@ -3687,7 +3687,7 @@ begin
     jsonb_strip_nulls(jsonb_build_object('invoiceId',p_invoice,'newAttemptReason',p_new_attempt_reason)));
   if v_replay is not null then
     select * into v_push from public.qbo_pushes
-      where id=nullif(v_replay->>'pushId','')::uuid and brewery_id=p_brewery and invoice_id=p_invoice;
+      where id=nullif(v_replay->>'pushId','')::uuid and brewery_id=p_brewery and invoice_id=p_invoice for update;
     if found and v_push.status<>'pending' then
       return jsonb_strip_nulls(jsonb_build_object('pushId',v_push.id,'status',v_push.status,
         'remoteId',v_push.qbo_entity_id,'error',v_push.error,'alreadyFinished',true));
