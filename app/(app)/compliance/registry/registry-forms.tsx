@@ -7,29 +7,17 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BrandApprovalView } from "@/components/mgr/views/brand-approval";
+import { LicenseView } from "@/components/mgr/views/license";
+import { StateRegistrationView } from "@/components/mgr/views/state-registration";
 import type { Approval, License, Registration } from "@/lib/commands/compliance";
 import { useCommandForm } from "@/lib/commands/use-command-form";
+import { toBrandApprovalViewProps } from "@/lib/mgr/brand-approval-view";
+import { toLicenseViewProps } from "@/lib/mgr/license-view";
+import { toStateRegistrationViewProps } from "@/lib/mgr/state-registration-view";
 
 type Brand = { id: string; name: string };
-const field = (id: string, label: string, value: string, set: (v: string) => void, type = "text", required = false, locked = false) => (
-  <div className="flex flex-col gap-2">
-    <Label htmlFor={id}>{label}</Label>
-    <Input id={id} type={type} value={value} onChange={(e) => set(e.target.value)} required={required} disabled={locked} />
-  </div>
-);
 // key fields are locked when editing: registrations and licenses are addressed by them, so changing one would add a row, not move it
-const brandPick = (id: string, brands: Brand[], value: string, set: (v: string) => void, locked = false) => (
-  <div className="flex flex-col gap-2">
-    <Label htmlFor={id}>Brand</Label>
-    <Select value={value} onValueChange={set} disabled={locked}>
-      <SelectTrigger id={id}><SelectValue placeholder="Choose a brand" /></SelectTrigger>
-      <SelectContent>{brands.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
-    </Select>
-  </div>
-);
 const trigger = (edit: boolean, add: string) => edit ? <Button variant="ghost" size="sm">Edit</Button> : <Button size="sm">{add}</Button>;
 // One state object per sheet: the initial values come from the row being edited (or blanks), reset restores them.
 function useFields<T extends Record<string, string>>(initial: T) {
@@ -46,24 +34,30 @@ export function ApprovalForm({ brands, approval }: { brands: Brand[]; approval?:
     build: () => ({ id: approval?.id, brandId: v.brandId, kind: v.kind, ttbId: v.ttbId, approvedOn: orUndef(v.approvedOn), expiresOn: orUndef(v.expiresOn) }),
     reset,
   });
+  const model = toBrandApprovalViewProps({
+    brandId: v.brandId,
+    brand: brands.find(({ id }) => id === v.brandId)?.name ?? "Choose a brand",
+    brandOptions: brands.map(({ id, name: label }) => ({ id, label })),
+    kind: v.kind,
+    kindOptions: [{ value: "cola", label: "COLA" }, { value: "formula", label: "Formula" }],
+    numberLabel: v.kind === "cola" ? "COLA number" : "Formula number",
+    number: v.ttbId,
+    approvedOn: v.approvedOn,
+    expiresOn: v.expiresOn,
+  });
+  const controls = {
+    brandId: set("brandId"), kind: set("kind"), number: set("ttbId"),
+    approvedOn: set("approvedOn"), expiresOn: set("expiresOn"),
+  };
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title={approval ? "Brand approval" : "New brand approval"} trigger={trigger(!!approval, "Add approval")}>
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Brand approval" trigger={trigger(!!approval, "Add approval")}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
-        {brandPick("ap-brand", brands, v.brandId, set("brandId"))}
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="ap-kind">Approval</Label>
-          <Select value={v.kind} onValueChange={set("kind")}>
-            <SelectTrigger id="ap-kind"><SelectValue /></SelectTrigger>
-            <SelectContent><SelectItem value="cola">COLA</SelectItem><SelectItem value="formula">Formula</SelectItem></SelectContent>
-          </Select>
-        </div>
-        {field("ap-ttb", v.kind === "cola" ? "COLA number" : "Formula number", v.ttbId, set("ttbId"), "text", true)}
-        <div className="grid grid-cols-2 gap-2">
-          {field("ap-approved", "Approved on · optional", v.approvedOn, set("approvedOn"), "date")}
-          {field("ap-expires", "Expires · optional", v.expiresOn, set("expiresOn"), "date")}
-        </div>
-        <CommandFormMessage error={form.error} />
-        <CommandFormFooter><Button type="submit" disabled={form.submitting || !v.brandId || !v.ttbId.trim()}>{form.submitting ? "Saving…" : "Save approval"}</Button></CommandFormFooter>
+        <BrandApprovalView
+          model={model}
+          controls={controls}
+          messages={<CommandFormMessage error={form.error} />}
+          footer={<CommandFormFooter><Button type="submit" disabled={form.submitting || !v.brandId || !v.ttbId.trim()}>{form.submitting ? "Saving…" : "Save approval"}</Button></CommandFormFooter>}
+        />
       </form>
     </CommandForm>
   );
@@ -75,18 +69,28 @@ export function RegistrationForm({ brands, registration }: { brands: Brand[]; re
     build: () => ({ brandId: v.brandId, state: v.state.toUpperCase(), registrationNo: orUndef(v.registrationNo), expiresOn: orUndef(v.expiresOn) }),
     reset,
   });
+  const model = toStateRegistrationViewProps({
+    brandId: v.brandId,
+    brand: brands.find(({ id }) => id === v.brandId)?.name ?? "Choose a brand",
+    brandOptions: brands.map(({ id, name: label }) => ({ id, label })),
+    state: v.state,
+    registrationNo: v.registrationNo,
+    expiresOn: v.expiresOn,
+  });
+  const controls = {
+    brandId: set("brandId"), state: set("state"),
+    registrationNo: set("registrationNo"), expiresOn: set("expiresOn"),
+  };
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title={registration ? "State registration" : "New state registration"} trigger={trigger(!!registration, "Add registration")}>
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title="State registration" trigger={trigger(!!registration, "Add registration")}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
-        {brandPick("sr-brand", brands, v.brandId, set("brandId"), !!registration)}
-        <div className="grid grid-cols-2 gap-2">
-          {field("sr-state", "State (two letters)", v.state, set("state"), "text", true, !!registration)}
-          {field("sr-no", "Registration number · optional", v.registrationNo, set("registrationNo"))}
-        </div>
-        {field("sr-expires", "Expires · optional", v.expiresOn, set("expiresOn"), "date")}
-        <p className="text-sm text-muted-foreground">One record per brand and state: saving again replaces it.</p>
-        <CommandFormMessage error={form.error} />
-        <CommandFormFooter><Button type="submit" disabled={form.submitting || !v.brandId || !/^[A-Za-z]{2}$/.test(v.state)}>{form.submitting ? "Saving…" : "Save registration"}</Button></CommandFormFooter>
+        <StateRegistrationView
+          model={model}
+          controls={controls}
+          locked={Boolean(registration)}
+          messages={<CommandFormMessage error={form.error} />}
+          footer={<CommandFormFooter><Button type="submit" disabled={form.submitting || !v.brandId || !/^[A-Za-z]{2}$/.test(v.state)}>{form.submitting ? "Saving…" : "Save registration"}</Button></CommandFormFooter>}
+        />
       </form>
     </CommandForm>
   );
@@ -98,20 +102,23 @@ export function LicenseForm({ license }: { license?: License }) {
     build: () => ({ state: v.state.toUpperCase(), kind: v.kind, licenseNo: orUndef(v.licenseNo), expiresOn: orUndef(v.expiresOn) }),
     reset,
   });
+  const model = toLicenseViewProps({
+    state: v.state, kind: v.kind, licenseNo: v.licenseNo, expiresOn: v.expiresOn,
+  });
+  const controls = {
+    state: set("state"), kind: set("kind"),
+    licenseNo: set("licenseNo"), expiresOn: set("expiresOn"),
+  };
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title={license ? "License" : "New license"} trigger={trigger(!!license, "Add license")}>
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title="License" trigger={trigger(!!license, "Add license")}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
-        <div className="grid grid-cols-2 gap-2">
-          {field("li-state", "State (two letters)", v.state, set("state"), "text", true, !!license)}
-          {field("li-kind", "Kind", v.kind, set("kind"), "text", true, !!license)}
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          {field("li-no", "License number · optional", v.licenseNo, set("licenseNo"))}
-          {field("li-expires", "Expires · optional", v.expiresOn, set("expiresOn"), "date")}
-        </div>
-        <p className="text-sm text-muted-foreground">Kind is the license class the state uses: brewery, supplier, direct to consumer. One record per state and kind; it is saved lower-case.</p>
-        <CommandFormMessage error={form.error} />
-        <CommandFormFooter><Button type="submit" disabled={form.submitting || !/^[A-Za-z]{2}$/.test(v.state) || !v.kind.trim()}>{form.submitting ? "Saving…" : "Save license"}</Button></CommandFormFooter>
+        <LicenseView
+          model={model}
+          controls={controls}
+          locked={Boolean(license)}
+          messages={<CommandFormMessage error={form.error} />}
+          footer={<CommandFormFooter><Button type="submit" disabled={form.submitting || !/^[A-Za-z]{2}$/.test(v.state) || !v.kind.trim()}>{form.submitting ? "Saving…" : "Save license"}</Button></CommandFormFooter>}
+        />
       </form>
     </CommandForm>
   );

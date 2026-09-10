@@ -32,18 +32,21 @@ export const complianceRegistryDemo: ComplianceRegistrySnapshot = {
 };
 
 export const brandApprovalStout: BrandApprovalViewModel = {
+  brandId: "stout",
   brand: "Stout",
-  brandOptions: ["Hazy IPA", "Pils", "Stout"],
-  kind: "COLA",
-  kindOptions: ["COLA", "Formula"],
+  brandOptions: [{ id: "hazy", label: "Hazy IPA" }, { id: "pils", label: "Pils" }, { id: "stout", label: "Stout" }],
+  kind: "cola",
+  kindOptions: [{ value: "cola", label: "COLA" }, { value: "formula", label: "Formula" }],
   numberLabel: "COLA number",
+  number: "14203001000567",
   approvedOn: "2026-01-15",
   expiresOn: "2031-01-15",
 };
 
 export const stateRegistrationHazy: StateRegistrationViewModel = {
+  brandId: "hazy",
   brand: "Hazy IPA",
-  brandOptions: ["Hazy IPA", "Pils", "Stout"],
+  brandOptions: [{ id: "hazy", label: "Hazy IPA" }, { id: "pils", label: "Pils" }, { id: "stout", label: "Stout" }],
   state: "OH",
   registrationNo: "OH-88214",
   expiresOn: "2026-12-31",
