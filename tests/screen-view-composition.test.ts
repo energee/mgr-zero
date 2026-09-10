@@ -33,7 +33,6 @@ const KNOWN_VIEW_DEBT = [
   "Materials: MaterialsView <- app/(app)/materials/page.tsx",
   "Material: MaterialView <- app/(app)/materials/page.tsx",
   "Vendor: VendorView <- app/(app)/vendors/page.tsx",
-  "Contracts: ContractsView <- app/(app)/vendors/page.tsx",
   "Contract: ContractView <- app/(app)/vendors/page.tsx",
   "Brand approval: BrandApprovalView <- app/(app)/compliance/registry/page.tsx",
   "State registration: StateRegistrationView <- app/(app)/compliance/registry/page.tsx",
