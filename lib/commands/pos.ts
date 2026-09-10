@@ -55,6 +55,15 @@ defineCommand({
   },
 });
 
+defineCommand({
+  name: "sync_square_sales", description: "Resume a bounded Square UPDATED_AT scan, append immutable sale and return revisions, and complete honest coverage without changing inventory",
+  input: z.object({}), roles: ["admin"],
+  handler: async (ctx, _input, execution) => {
+    const { squareConfig, SquareClient, syncSquareSales } = await import("@/lib/pos");
+    return syncSquareSales(ctx, execution.requestId, new SquareClient(squareConfig()));
+  },
+});
+
 defineQuery({
   name: "list_pos_locations", description: "List every observed Square location and its explicit labeled MGR location mapping",
   input: z.object({}), roles: ["admin"],

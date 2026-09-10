@@ -33,6 +33,31 @@ export type SquareCatalogSyncStart = {
   requestId: string;
 };
 
+export type SquareSalesSyncStart = {
+  actorId: string;
+  requestId: string;
+  connectionId: string;
+  merchantId: string;
+  credentialVersion: number;
+  startsAt: string;
+  endsAt: string;
+  locationsCaptured: boolean;
+  locationIds: string[];
+  locationOffset: number;
+  cursor: string | null;
+  pages: number;
+};
+
+export type SquareSalesSyncResult = {
+  complete: true;
+  acceptedFacts: number;
+  unsupportedFacts: number;
+  pages: number;
+  locations: number;
+  startsAt: string;
+  endsAt: string;
+};
+
 export type PortalInvoicePaymentClaim = VersionedIntegrationTokens & {
   realmId: string;
   remoteInvoiceId: string;
@@ -274,6 +299,76 @@ export async function recordSquareCatalogSnapshot(
   if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
   if (error) throw new Error("Square catalog snapshot storage failed");
   return data as { locations: number; variations: number };
+}
+
+function squareSalesStart(data: unknown): SquareSalesSyncStart {
+  const row = data as Record<string, unknown> | null;
+  if (!row || typeof row.actorId !== "string" || typeof row.requestId !== "string"
+    || typeof row.connectionId !== "string" || typeof row.merchantId !== "string"
+    || typeof row.credentialVersion !== "number" || typeof row.startsAt !== "string" || typeof row.endsAt !== "string"
+    || typeof row.locationsCaptured !== "boolean" || !Array.isArray(row.locationIds)
+    || row.locationIds.some((id) => typeof id !== "string") || typeof row.locationOffset !== "number"
+    || (row.cursor !== null && typeof row.cursor !== "string") || typeof row.pages !== "number") {
+    throw new Error("Square sales sync start was invalid");
+  }
+  return row as SquareSalesSyncStart;
+}
+
+export async function beginSquareSalesSync(ctx: Ctx, requestId: string) {
+  const { data, error } = await ctx.db.rpc("begin_square_sales_sync", { p_brewery: ctx.breweryId, p_request_id: requestId });
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error?.message === "Square connection required") throw new CommandError(error.message, 404, "not_found");
+  if (error) throw new Error("Square sales sync could not be started");
+  const row = data as Record<string, unknown> | null;
+  if (row?.replayResult && typeof row.replayResult === "object") return { replayResult: row.replayResult as SquareSalesSyncResult } as const;
+  return squareSalesStart(data);
+}
+
+export async function advanceSquareSalesSync(ctx: Ctx, start: SquareSalesSyncStart, nextCredentialVersion: number) {
+  const { data, error } = await createAdminClient().rpc("advance_square_sales_sync", {
+    p_brewery: ctx.breweryId, p_connection: start.connectionId, p_actor: start.actorId, p_request_id: start.requestId,
+    p_expected_version: start.credentialVersion, p_next_version: nextCredentialVersion,
+  });
+  if (error || data !== true) throw new CommandError("Square connection changed", 409, "conflict");
+  return { ...start, credentialVersion: nextCredentialVersion };
+}
+
+export async function recordSquareSalesLocations(ctx: Ctx, start: SquareSalesSyncStart, locations: import("@/lib/pos").SquareLocation[]) {
+  const { data, error } = await createAdminClient().rpc("record_square_sales_locations", {
+    p_brewery: ctx.breweryId, p_connection: start.connectionId, p_actor: start.actorId, p_request_id: start.requestId,
+    p_expected_version: start.credentialVersion, p_locations: locations,
+  });
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error) throw new Error("Square sales locations could not be stored");
+  const row = data as Record<string, unknown> | null;
+  if (!row || !Array.isArray(row.locationIds) || row.locationIds.some((id) => typeof id !== "string")
+    || typeof row.locationOffset !== "number" || (row.cursor !== null && typeof row.cursor !== "string")
+    || typeof row.pages !== "number") throw new Error("Square sales location snapshot was invalid");
+  return { ...start, locationsCaptured: true, locationIds: row.locationIds as string[],
+    locationOffset: row.locationOffset, cursor: row.cursor as string | null, pages: row.pages };
+}
+
+export async function recordSquareSalesPage(
+  ctx: Ctx,
+  start: SquareSalesSyncStart,
+  page: { locationIds: string[]; cursor: string | null; nextCursor: string | null;
+    orders: import("@/lib/pos").SquareOrderSnapshot[]; facts: import("@/lib/pos").SquareSalesFact[] },
+): Promise<SquareSalesSyncStart | SquareSalesSyncResult> {
+  const { data, error } = await createAdminClient().rpc("record_square_sales_page", {
+    p_brewery: ctx.breweryId, p_connection: start.connectionId, p_actor: start.actorId, p_request_id: start.requestId,
+    p_expected_version: start.credentialVersion, p_location_ids: page.locationIds, p_cursor: page.cursor,
+    p_next_cursor: page.nextCursor, p_orders: page.orders, p_facts: page.facts,
+  });
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error) throw new Error("Square sales page could not be stored");
+  const row = data as Record<string, unknown> | null;
+  if (row?.complete === true) return row as SquareSalesSyncResult;
+  if (!row || row.complete !== false || !Array.isArray(row.locationIds) || typeof row.locationOffset !== "number"
+    || (row.cursor !== null && typeof row.cursor !== "string") || typeof row.pages !== "number") {
+    throw new Error("Square sales continuation was invalid");
+  }
+  return { ...start, locationIds: row.locationIds as string[], locationOffset: row.locationOffset,
+    cursor: row.cursor as string | null, pages: row.pages };
 }
 
 export async function getSquareHealth(ctx: Ctx) {

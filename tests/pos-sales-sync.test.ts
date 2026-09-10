@@ -250,7 +250,7 @@ describe("Square durable sales sync", () => {
     const variance = await f.ctx.db.rpc("get_taproom_variance", { p_brewery: f.brewery.id, p_location: f.locations[0].id, p_weeks: 4 });
     expect(draft.error ?? variance.error).toBeNull();
     expect((variance.data as any).periods.at(-1)).toMatchObject({ count_id: secondCount.id, expected_bbl: 16 / 3968 });
-    expect((draft.data as any).expected_bbl).toBe(0);
+    expect(draft.data).toMatchObject({ expected_bbl: null, coverage_complete: false, reason: "incomplete_pos_coverage" });
     expect(sql(`select md5(coalesce(jsonb_agg(to_jsonb(t) order by id)::text,'')) from public.taproom_counts t where brewery_id='${f.brewery.id}'`)[0]).toBe(physicalBefore);
     expect(sql(`select count(*) from public.inventory_movements where brewery_id='${f.brewery.id}'`)).toEqual(["0"]);
 

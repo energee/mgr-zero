@@ -4,12 +4,17 @@ import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import { readSquareEnv } from "@/lib/env/server-parser";
 import {
   advanceSquareCatalogSync,
+  advanceSquareSalesSync,
   beginSquareCatalogSync,
+  beginSquareSalesSync,
   compareAndSwapSquareTokens,
   markSquareAuthorizationFailed,
   readVersionedIntegrationTokens,
   recordSquareCatalogSnapshot,
+  recordSquareSalesLocations,
+  recordSquareSalesPage,
   type SquareCatalogSyncStart,
+  type SquareSalesSyncStart,
   type VersionedIntegrationTokens,
 } from "@/lib/supabase/integration-tokens";
 
@@ -37,6 +42,28 @@ export type SquareVariation = {
   variationName: string | null;
   version: number;
   available: boolean;
+};
+export type SquareOrderSnapshot = {
+  externalOrderId: string;
+  sourceVersion: number;
+  externalLocationId: string;
+  soldAt: string;
+  orderUpdatedAt: string;
+};
+export type SquareSalesFact = SquareOrderSnapshot & {
+  externalLineId: string;
+  factKind: "sale" | "return";
+  factStatus: "accepted" | "unsupported";
+  sourceQuantity: string | null;
+  qty: string | null;
+  grossCents: string | null;
+  externalVariationId: string | null;
+  catalogVersion: number | null;
+  quantityUnit: Record<string, unknown> | null;
+  sourceOrderId: string | null;
+  sourceLineId: string | null;
+  unsupportedReason: string | null;
+  sourceHash: string;
 };
 
 const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
@@ -183,6 +210,32 @@ export class SquareClient {
     for (const raw of objects) add(raw);
     return [...variations.values()].map((row) => ({ ...row, itemName: row.itemName ?? itemNames.get(row.itemId) ?? null }));
   }
+
+  async searchOrdersPage(
+    accessToken: string,
+    locationIds: string[],
+    window: { startsAt: string; endsAt: string },
+    cursor: string | null,
+  ) {
+    const body = {
+      location_ids: locationIds,
+      query: {
+        filter: {
+          date_time_filter: { updated_at: { start_at: window.startsAt, end_at: window.endsAt } },
+          state_filter: { states: ["COMPLETED"] },
+        },
+        sort: { sort_field: "UPDATED_AT", sort_order: "ASC" },
+      },
+      limit: 1000,
+      return_entries: false,
+      ...(cursor ? { cursor } : {}),
+    };
+    const data = await this.api("/v2/orders/search", accessToken, { method: "POST", body: JSON.stringify(body) });
+    if (!Array.isArray(data.orders)) throw unavailable();
+    const nextCursor = data.cursor === undefined ? null : text(data.cursor);
+    if (data.cursor !== undefined && !nextCursor) throw unavailable();
+    return { orders: data.orders, nextCursor };
+  }
 }
 
 export async function syncSquareCatalogFacts(client: SquareClient, accessToken: string, merchantId: string) {
@@ -300,4 +353,119 @@ export async function syncSquareCatalog(ctx: Ctx, requestId: string, client: Squ
     throw unavailable();
   }
   return recordSquareCatalogSnapshot(ctx, start, facts);
+}
+
+const timestamp = (value: unknown) => {
+  const result = text(value);
+  return result && Number.isFinite(Date.parse(result)) ? new Date(result).toISOString() : null;
+};
+
+const money = (value: unknown) => {
+  const row = value && typeof value === "object" ? value as Record<string, unknown> : null;
+  return row?.currency === "USD" && typeof row.amount === "number" && Number.isSafeInteger(row.amount)
+    ? String(row.amount) : null;
+};
+
+function normalizeSquareOrders(rawOrders: unknown[], merchantId: string, locationIds: string[]) {
+  const orders: SquareOrderSnapshot[] = [];
+  const facts: SquareSalesFact[] = [];
+  for (const raw of rawOrders) {
+    const order = raw && typeof raw === "object" ? raw as Record<string, unknown> : null;
+    const externalOrderId = text(order?.id), externalLocationId = text(order?.location_id);
+    const sourceVersion = finiteVersion(order?.version), soldAt = timestamp(order?.created_at), orderUpdatedAt = timestamp(order?.updated_at);
+    if (!externalOrderId || !externalLocationId || !locationIds.includes(externalLocationId) || sourceVersion === null
+      || !soldAt || !orderUpdatedAt || order?.state !== "COMPLETED") throw unavailable();
+    const snapshot = { externalOrderId, sourceVersion, externalLocationId, soldAt, orderUpdatedAt };
+    orders.push(snapshot);
+    const identities = new Set<string>();
+    const add = (rawLine: unknown, factKind: "sale" | "return", sourceOrderId: string | null) => {
+      const row = rawLine && typeof rawLine === "object" ? rawLine as Record<string, unknown> : null;
+      const externalLineId = text(row?.uid);
+      if (!externalLineId || identities.has(`${factKind}\0${externalLineId}`)) throw unavailable();
+      identities.add(`${factKind}\0${externalLineId}`);
+      const sourceQuantity = text(row?.quantity), externalVariationId = text(row?.catalog_object_id);
+      const catalogVersion = finiteVersion(row?.catalog_version);
+      const quantityUnit = row?.quantity_unit && typeof row.quantity_unit === "object"
+        ? row.quantity_unit as Record<string, unknown> : null;
+      const sourceLineId = factKind === "return" ? text(row?.source_line_item_uid) : null;
+      let unsupportedReason: string | null = null;
+      if (row?.item_type === "CUSTOM_AMOUNT") unsupportedReason = "custom_amount";
+      else if (factKind === "return" && (!sourceOrderId || !sourceLineId)) unsupportedReason = "unlinked_return";
+      else if (quantityUnit) unsupportedReason = "measured_quantity";
+      else if (!sourceQuantity || !/^[1-9]\d*$/.test(sourceQuantity)) unsupportedReason = "unsupported_count_quantity";
+      else if (!externalVariationId || catalogVersion === null) unsupportedReason = "missing_catalog_variation";
+      const grossCents = money(row?.total_money);
+      if (row?.total_money !== undefined && grossCents === null && !unsupportedReason) unsupportedReason = "unsupported_money";
+      const fact = {
+        ...snapshot,
+        externalLineId,
+        factKind,
+        factStatus: unsupportedReason ? "unsupported" as const : "accepted" as const,
+        sourceQuantity,
+        qty: unsupportedReason ? null : sourceQuantity,
+        grossCents,
+        externalVariationId,
+        catalogVersion,
+        quantityUnit,
+        sourceOrderId,
+        sourceLineId,
+        unsupportedReason,
+      };
+      facts.push({ ...fact, sourceHash: sha256(JSON.stringify({ merchantId, ...fact })) });
+    };
+    if (order.line_items !== undefined && !Array.isArray(order.line_items)) throw unavailable();
+    for (const rawLine of order.line_items as unknown[] ?? []) add(rawLine, "sale", null);
+    if (order.returns !== undefined && !Array.isArray(order.returns)) throw unavailable();
+    for (const rawReturn of order.returns as unknown[] ?? []) {
+      const returned = rawReturn && typeof rawReturn === "object" ? rawReturn as Record<string, unknown> : null;
+      const sourceOrderId = text(returned?.source_order_id);
+      if (returned?.return_line_items !== undefined && !Array.isArray(returned.return_line_items)) throw unavailable();
+      for (const rawLine of returned?.return_line_items as unknown[] ?? []) add(rawLine, "return", sourceOrderId);
+    }
+  }
+  return { orders, facts };
+}
+
+export async function syncSquareSales(ctx: Ctx, requestId: string, client: SquareClient) {
+  if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
+  let start = await beginSquareSalesSync(ctx, requestId);
+  if ("replayResult" in start) return start.replayResult;
+  let tokens = await readVersionedIntegrationTokens(ctx, "square");
+  if (tokens.connectionId !== start.connectionId || tokens.credentialVersion !== start.credentialVersion) {
+    throw new CommandError("Square connection changed", 409, "conflict");
+  }
+  if (tokens.accessExpiresAt && Date.parse(tokens.accessExpiresAt) <= Date.now()) {
+    const refreshed = await refreshSquareCredentials(ctx, client, tokens);
+    tokens = refreshed.tokens;
+    start = await advanceSquareSalesSync(ctx, start, tokens.credentialVersion);
+  }
+  if (!start.locationsCaptured) {
+    let locations: SquareLocation[];
+    try {
+      locations = await client.listLocations(tokens.accessToken, start.merchantId);
+    } catch (error) {
+      if (isTerminalAuthorization(error)) await markSquareAuthorizationFailed(ctx, start.connectionId, tokens.credentialVersion);
+      throw unavailable();
+    }
+    start = await recordSquareSalesLocations(ctx, start, locations);
+  }
+  for (;;) {
+    const locationIds = start.locationIds.slice(start.locationOffset, start.locationOffset + 10);
+    if (locationIds.length === 0) {
+      return recordSquareSalesPage(ctx, start, { locationIds, cursor: start.cursor, nextCursor: null, orders: [], facts: [] });
+    }
+    let page: Awaited<ReturnType<SquareClient["searchOrdersPage"]>>;
+    try {
+      page = await client.searchOrdersPage(tokens.accessToken, locationIds, start, start.cursor);
+    } catch (error) {
+      if (isTerminalAuthorization(error)) await markSquareAuthorizationFailed(ctx, start.connectionId, tokens.credentialVersion);
+      throw unavailable();
+    }
+    const normalized = normalizeSquareOrders(page.orders, start.merchantId, locationIds);
+    const stored = await recordSquareSalesPage(ctx, start, {
+      locationIds, cursor: start.cursor, nextCursor: page.nextCursor, ...normalized,
+    });
+    if ("complete" in stored) return stored;
+    start = stored;
+  }
 }

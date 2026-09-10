@@ -3105,3 +3105,397 @@ CREATE INDEX chat_messages_conversation_idx ON private.chat_messages USING btree
 ALTER TABLE "private"."command_requests"
   ADD CONSTRAINT "command_requests_preview_token_actor_id_brewery_id_command_fkey" FOREIGN KEY (preview_token, actor_id, brewery_id, command_name, conversation_id)
     REFERENCES private.command_previews(token, actor_id, brewery_id, rpc_name, conversation_id) DEFERRABLE INITIALLY DEFERRED;
+
+-- ---------------------------------------------------------------- Square durable sales facts and resumable UPDATED_AT windows
+ALTER TABLE public.pos_connections ADD COLUMN sales_synced_through timestamptz;
+
+ALTER TABLE public.pos_sales DROP CONSTRAINT pos_sales_connection_id_external_order_id_external_line_id_key;
+ALTER TABLE public.pos_sales DROP CONSTRAINT pos_sales_qty_check;
+ALTER TABLE public.pos_sales DROP CONSTRAINT pos_sales_source_version_check;
+ALTER TABLE public.pos_sales ALTER COLUMN source_version DROP DEFAULT;
+ALTER TABLE public.pos_sales ALTER COLUMN source_version TYPE bigint USING source_version::bigint;
+ALTER TABLE public.pos_sales ALTER COLUMN source_version SET DEFAULT 1;
+ALTER TABLE public.pos_sales ALTER COLUMN external_variation_id DROP NOT NULL;
+ALTER TABLE public.pos_sales ALTER COLUMN qty DROP NOT NULL;
+ALTER TABLE public.pos_sales ALTER COLUMN qty TYPE numeric;
+ALTER TABLE public.pos_sales ALTER COLUMN gross_cents TYPE bigint;
+ALTER TABLE public.pos_sales
+  ADD COLUMN merchant_id text,
+  ADD COLUMN fact_kind text NOT NULL DEFAULT 'sale' CHECK (fact_kind IN ('sale','return')),
+  ADD COLUMN fact_status text NOT NULL DEFAULT 'accepted' CHECK (fact_status IN ('accepted','removed','unsupported')),
+  ADD COLUMN source_quantity text,
+  ADD COLUMN source_order_updated_at timestamptz,
+  ADD COLUMN catalog_version bigint,
+  ADD COLUMN quantity_unit jsonb,
+  ADD COLUMN source_order_id text,
+  ADD COLUMN source_line_id text,
+  ADD COLUMN unsupported_reason text,
+  ADD COLUMN source_hash text,
+  ADD CONSTRAINT pos_sales_fact_shape CHECK (
+    (fact_status='accepted' AND qty>0 AND qty::text NOT IN ('NaN','Infinity','-Infinity') AND unsupported_reason IS NULL)
+    OR (fact_status='removed' AND qty IS NULL AND unsupported_reason IS NULL)
+    OR (fact_status='unsupported' AND qty IS NULL AND length(btrim(unsupported_reason))>0)
+  ),
+  ADD CONSTRAINT pos_sales_return_source CHECK (
+    fact_kind='sale' OR fact_status<>'accepted' OR (source_order_id IS NOT NULL AND source_line_id IS NOT NULL)
+  ),
+  ADD CONSTRAINT pos_sales_revision_key UNIQUE(connection_id,external_order_id,fact_kind,external_line_id,source_version);
+
+UPDATE public.pos_sales s SET merchant_id=c.merchant_id,source_quantity=s.qty::text,
+  source_order_updated_at=s.ingested_at,source_hash=encode(extensions.digest(to_jsonb(s)::text,'sha256'),'hex')
+FROM public.pos_connections c WHERE c.id=s.connection_id;
+
+ALTER TABLE public.pos_sale_expectations DROP CONSTRAINT pos_sale_expectations_expected_bbl_check;
+ALTER TABLE public.pos_sale_expectations ADD CONSTRAINT pos_sale_expectations_expected_bbl_check
+  CHECK (expected_bbl<>0 AND expected_bbl::text NOT IN ('NaN','Infinity','-Infinity'));
+
+CREATE VIEW private.pos_current_sales AS
+WITH ranked AS (
+  SELECT s.*,row_number() OVER (
+    PARTITION BY connection_id,external_order_id,fact_kind,external_line_id
+    ORDER BY source_version DESC,id DESC
+  ) AS revision_rank
+  FROM public.pos_sales s
+), current_facts AS (
+  SELECT * FROM ranked WHERE revision_rank=1
+)
+SELECT f.*,
+  f.fact_status='accepted' AND (
+    f.fact_kind='sale' OR (
+      EXISTS (
+        SELECT 1 FROM current_facts source
+        WHERE source.connection_id=f.connection_id AND source.external_order_id=f.source_order_id
+          AND source.fact_kind='sale' AND source.external_line_id=f.source_line_id
+          AND source.fact_status='accepted' AND source.external_variation_id=f.external_variation_id
+      )
+      AND (SELECT coalesce(sum(r.qty),0) FROM current_facts r
+        WHERE r.connection_id=f.connection_id AND r.fact_kind='return' AND r.fact_status='accepted'
+          AND r.source_order_id=f.source_order_id AND r.source_line_id=f.source_line_id)
+        <= (SELECT source.qty FROM current_facts source
+          WHERE source.connection_id=f.connection_id AND source.external_order_id=f.source_order_id
+            AND source.fact_kind='sale' AND source.external_line_id=f.source_line_id
+            AND source.fact_status='accepted' AND source.external_variation_id=f.external_variation_id)
+    )
+  ) AS contributes
+FROM current_facts f;
+REVOKE ALL ON private.pos_current_sales FROM public,anon,authenticated,service_role;
+
+DROP VIEW public.pos_unmapped_items;
+CREATE VIEW public.pos_unmapped_items WITH (security_invoker=true) AS
+  WITH ranked AS (
+    SELECT s.*,row_number() OVER (
+      PARTITION BY connection_id,external_order_id,fact_kind,external_line_id
+      ORDER BY source_version DESC,id DESC
+    ) revision_rank
+    FROM public.pos_sales s
+  )
+  SELECT DISTINCT s.brewery_id,s.connection_id,s.external_item_id,s.external_variation_id
+  FROM ranked s
+  LEFT JOIN public.pos_item_mappings m ON m.connection_id=s.connection_id
+    AND m.external_item_id=s.external_item_id AND m.external_variation_id=s.external_variation_id
+  WHERE s.revision_rank=1 AND s.fact_status<>'removed' AND m.connection_id IS NULL AND s.external_item_id IS NOT NULL;
+GRANT SELECT ON public.pos_unmapped_items TO authenticated;
+
+CREATE OR REPLACE FUNCTION private.reconcile_pos_sale(p_brewery uuid,p_sale uuid) RETURNS boolean
+LANGUAGE plpgsql SET search_path='' AS $$
+DECLARE s public.pos_sales; m public.pos_item_mappings; f public.formats; v_location uuid; v_brand uuid; v_ounces numeric; v_format uuid;
+BEGIN
+  SELECT * INTO s FROM public.pos_sales WHERE id=p_sale AND brewery_id=p_brewery FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'sale not found'; END IF;
+  IF s.fact_status<>'accepted' OR s.qty IS NULL THEN RETURN false; END IF;
+  IF EXISTS(SELECT 1 FROM public.pos_sale_expectations WHERE sale_id=p_sale AND brewery_id=p_brewery) THEN RETURN true; END IF;
+  SELECT location_id INTO v_location FROM public.pos_locations WHERE connection_id=s.connection_id
+    AND external_location_id=s.external_location_id AND brewery_id=p_brewery FOR SHARE;
+  IF v_location IS NULL THEN RETURN false; END IF;
+  SELECT * INTO m FROM public.pos_item_mappings WHERE connection_id=s.connection_id
+    AND external_item_id=s.external_item_id AND external_variation_id=s.external_variation_id AND brewery_id=p_brewery FOR SHARE;
+  IF NOT FOUND OR m.ignored THEN RETURN false; END IF;
+  IF m.format_id IS NOT NULL THEN
+    SELECT * INTO f FROM public.formats WHERE id=m.format_id AND brewery_id=p_brewery FOR SHARE;
+    IF f.basis<>'poured' THEN RAISE EXCEPTION 'map a brand-owned poured format'; END IF;
+    v_brand:=f.brand_id; v_format:=f.id; v_ounces:=f.ounces;
+  ELSE
+    SELECT brand_id,format_id INTO v_brand,v_format FROM public.skus WHERE id=m.sku_id AND brewery_id=p_brewery FOR SHARE;
+    PERFORM 1 FROM public.formats WHERE id=v_format AND brewery_id=p_brewery FOR SHARE;
+    PERFORM 1 FROM public.format_components c JOIN public.formats child ON child.id=c.child_format_id AND child.brewery_id=c.brewery_id
+      WHERE c.parent_format_id=v_format AND c.brewery_id=p_brewery ORDER BY child.id FOR SHARE OF child;
+    SELECT bbl_per_unit*3968 INTO v_ounces FROM public.format_volumes WHERE id=v_format AND brewery_id=p_brewery;
+  END IF;
+  IF v_ounces IS NULL OR v_ounces<=0 OR v_ounces::text IN ('NaN','Infinity','-Infinity') THEN RAISE EXCEPTION 'serving volume is unavailable'; END IF;
+  INSERT INTO public.pos_sale_expectations(sale_id,brewery_id,location_id,brand_id,format_id,sku_id,serving_ounces,expected_bbl)
+  VALUES(p_sale,p_brewery,v_location,v_brand,v_format,m.sku_id,v_ounces,
+    CASE s.fact_kind WHEN 'return' THEN -1 ELSE 1 END*s.qty*v_ounces/3968);
+  RETURN true;
+END $$;
+REVOKE ALL ON FUNCTION private.reconcile_pos_sale(uuid,uuid) FROM public,anon,authenticated,service_role;
+
+CREATE OR REPLACE FUNCTION private.taproom_pos_allocations(p_brewery uuid,p_location uuid,p_starts_at timestamptz,p_ends_at timestamptz)
+RETURNS TABLE(sale_id uuid,brand_id uuid,expected_bbl numeric,excluded_bbl numeric,unattributed_bbl numeric,split boolean,ignored boolean,unmapped boolean)
+LANGUAGE sql STABLE SET search_path='' AS $$
+  WITH facts AS (
+    SELECT s.id,e.brand_id,e.expected_bbl,e.sku_id,coalesce(m.ignored,false) ignored,s.sold_at,s.fact_status,s.contributes
+    FROM private.pos_current_sales s
+    LEFT JOIN public.pos_sale_expectations e ON e.sale_id=s.id AND e.brewery_id=p_brewery AND s.contributes
+    LEFT JOIN public.pos_locations loc ON loc.connection_id=s.connection_id AND loc.external_location_id=s.external_location_id AND loc.brewery_id=p_brewery
+    LEFT JOIN public.pos_item_mappings m ON m.connection_id=s.connection_id AND m.external_item_id=s.external_item_id
+      AND m.external_variation_id=s.external_variation_id AND m.brewery_id=p_brewery
+    WHERE s.brewery_id=p_brewery AND s.fact_status<>'removed' AND s.sold_at>p_starts_at AND s.sold_at<=p_ends_at
+      AND coalesce(e.location_id,loc.location_id)=p_location
+  )
+  SELECT f.id,f.brand_id,
+    f.expected_bbl*CASE WHEN coalesce(t.n,0)=0 THEN 1 ELSE (t.n-t.excluded)::numeric/t.n END,
+    f.expected_bbl*CASE WHEN coalesce(t.n,0)=0 THEN 0 ELSE t.excluded::numeric/t.n END,
+    CASE WHEN coalesce(t.n,0)=0 AND f.sku_id IS NULL THEN f.expected_bbl ELSE 0 END,
+    coalesce(t.n,0)>1,f.ignored,f.brand_id IS NULL AND NOT f.ignored
+  FROM facts f LEFT JOIN LATERAL (
+    SELECT count(*) n,count(*) FILTER(WHERE i.not_in_inventory) excluded FROM public.tap_intervals i
+    JOIN public.skus s ON s.id=i.sku_id AND s.brewery_id=p_brewery
+    WHERE i.brewery_id=p_brewery AND i.location_id=p_location AND s.brand_id=f.brand_id
+      AND i.opened_at<=f.sold_at AND (i.closed_at IS NULL OR f.sold_at<i.closed_at)
+  ) t ON f.sku_id IS NULL
+$$;
+REVOKE ALL ON FUNCTION private.taproom_pos_allocations(uuid,uuid,timestamptz,timestamptz) FROM public,anon,authenticated,service_role;
+
+CREATE TABLE private.square_sales_syncs (
+  actor_id uuid NOT NULL,
+  request_id uuid NOT NULL,
+  brewery_id uuid NOT NULL REFERENCES public.breweries(id),
+  connection_id uuid NOT NULL,
+  merchant_id text NOT NULL,
+  credential_version bigint NOT NULL,
+  starts_at timestamptz NOT NULL,
+  ends_at timestamptz NOT NULL,
+  coverage_starts_at timestamptz NOT NULL,
+  external_location_ids text[] NOT NULL DEFAULT '{}',
+  locations_captured boolean NOT NULL DEFAULT false,
+  location_offset integer NOT NULL DEFAULT 0,
+  cursor text,
+  pages integer NOT NULL DEFAULT 0,
+  accepted_facts integer NOT NULL DEFAULT 0,
+  unsupported_facts integer NOT NULL DEFAULT 0,
+  status text NOT NULL DEFAULT 'in_progress' CHECK(status IN ('in_progress','completed')),
+  result jsonb,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY(actor_id,request_id),
+  FOREIGN KEY(actor_id,request_id) REFERENCES private.command_requests(actor_id,request_id) ON DELETE CASCADE,
+  FOREIGN KEY(connection_id,brewery_id) REFERENCES public.pos_connections(id,brewery_id),
+  CHECK(ends_at>starts_at AND coverage_starts_at<=ends_at AND location_offset>=0)
+);
+ALTER TABLE private.square_sales_syncs ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON private.square_sales_syncs FROM public,anon,authenticated,service_role;
+
+CREATE FUNCTION public.begin_square_sales_sync(p_brewery uuid,p_request_id uuid) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE v_actor uuid; v_attempt private.square_sales_syncs; v_connection public.pos_connections;
+  v_replay jsonb; v_end timestamptz:=clock_timestamp(); v_epoch timestamptz:='1970-01-01T00:00:00Z';
+BEGIN
+  v_actor:=private.assert_staff(p_brewery,ARRAY['admin']::public.staff_role[]);
+  SELECT * INTO v_attempt FROM private.square_sales_syncs WHERE actor_id=v_actor AND request_id=p_request_id FOR UPDATE;
+  IF FOUND THEN
+    IF v_attempt.brewery_id<>p_brewery THEN RAISE EXCEPTION 'Square sales sync request changed' USING errcode='MG409'; END IF;
+    IF v_attempt.status='completed' THEN RETURN jsonb_build_object('replayResult',v_attempt.result); END IF;
+    PERFORM 1 FROM public.pos_connections c JOIN private.integration_tokens t
+      ON t.brewery_id=c.brewery_id AND t.provider='square' AND t.connection_id=c.id
+      WHERE c.id=v_attempt.connection_id AND c.brewery_id=p_brewery AND c.provider='square' AND c.state='connected'
+        AND c.merchant_id=v_attempt.merchant_id AND c.credential_version=v_attempt.credential_version
+        AND t.credential_version=v_attempt.credential_version FOR SHARE OF c,t;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Square connection changed' USING errcode='MG409'; END IF;
+  ELSE
+    v_replay:=private.claim_command_request(p_brewery,'sync_square_sales',p_request_id,'{}'::jsonb);
+    IF v_replay IS NOT NULL THEN RETURN jsonb_build_object('replayResult',v_replay); END IF;
+    SELECT * INTO v_connection FROM public.pos_connections c WHERE c.brewery_id=p_brewery AND c.provider='square' AND c.state='connected' FOR UPDATE;
+    IF NOT FOUND OR v_connection.merchant_id IS NULL THEN RAISE EXCEPTION 'Square connection required'; END IF;
+    PERFORM 1 FROM private.integration_tokens t WHERE t.brewery_id=p_brewery AND t.provider='square'
+      AND t.connection_id=v_connection.id AND t.credential_version=v_connection.credential_version FOR SHARE;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Square connection changed' USING errcode='MG409'; END IF;
+    INSERT INTO private.square_sales_syncs(actor_id,request_id,brewery_id,connection_id,merchant_id,credential_version,
+      starts_at,ends_at,coverage_starts_at)
+    VALUES(v_actor,p_request_id,p_brewery,v_connection.id,v_connection.merchant_id,v_connection.credential_version,
+      greatest(v_epoch,coalesce(v_connection.sales_synced_through-interval '72 hours',v_epoch)),v_end,
+      coalesce(v_connection.sales_synced_through,v_epoch)) RETURNING * INTO v_attempt;
+  END IF;
+  RETURN jsonb_build_object('actorId',v_attempt.actor_id,'requestId',v_attempt.request_id,'connectionId',v_attempt.connection_id,
+    'merchantId',v_attempt.merchant_id,'credentialVersion',v_attempt.credential_version,'startsAt',v_attempt.starts_at,
+    'endsAt',v_attempt.ends_at,'locationsCaptured',v_attempt.locations_captured,'locationIds',v_attempt.external_location_ids,
+    'locationOffset',v_attempt.location_offset,'cursor',v_attempt.cursor,'pages',v_attempt.pages);
+END $$;
+
+CREATE FUNCTION public.advance_square_sales_sync(p_brewery uuid,p_connection uuid,p_actor uuid,p_request_id uuid,
+  p_expected_version bigint,p_next_version bigint) RETURNS boolean
+LANGUAGE sql SECURITY DEFINER SET search_path='' AS $$
+  UPDATE private.square_sales_syncs a SET credential_version=p_next_version
+  WHERE a.actor_id=p_actor AND a.request_id=p_request_id AND a.brewery_id=p_brewery AND a.connection_id=p_connection
+    AND a.credential_version=p_expected_version AND a.status='in_progress'
+    AND EXISTS(SELECT 1 FROM public.brewery_users u WHERE u.brewery_id=p_brewery AND u.user_id=p_actor AND u.role='admin')
+    AND EXISTS(SELECT 1 FROM public.pos_connections c JOIN private.integration_tokens t
+      ON t.brewery_id=c.brewery_id AND t.provider='square' AND t.connection_id=c.id
+      WHERE c.id=p_connection AND c.brewery_id=p_brewery AND c.state='connected' AND c.credential_version=p_next_version
+        AND t.credential_version=p_next_version)
+  RETURNING true
+$$;
+
+CREATE FUNCTION public.record_square_sales_locations(p_brewery uuid,p_connection uuid,p_actor uuid,p_request_id uuid,
+  p_expected_version bigint,p_locations jsonb) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE v_attempt private.square_sales_syncs; v_ids text[];
+BEGIN
+  IF jsonb_typeof(p_locations)<>'array' THEN RAISE EXCEPTION 'Square locations invalid'; END IF;
+  SELECT coalesce(array_agg(x.id ORDER BY x.id),'{}') INTO v_ids
+    FROM jsonb_to_recordset(p_locations) x(id text,name text,status text)
+    WHERE nullif(btrim(x.id),'') IS NOT NULL AND nullif(btrim(x.name),'') IS NOT NULL AND nullif(btrim(x.status),'') IS NOT NULL;
+  IF cardinality(v_ids)<>jsonb_array_length(p_locations) OR cardinality(v_ids)<>cardinality(ARRAY(SELECT DISTINCT unnest(v_ids))) THEN
+    RAISE EXCEPTION 'Square locations invalid';
+  END IF;
+  SELECT * INTO v_attempt FROM private.square_sales_syncs WHERE actor_id=p_actor AND request_id=p_request_id FOR UPDATE;
+  IF NOT FOUND OR v_attempt.brewery_id<>p_brewery OR v_attempt.connection_id<>p_connection
+    OR v_attempt.credential_version<>p_expected_version OR v_attempt.status<>'in_progress'
+    OR NOT EXISTS(SELECT 1 FROM public.brewery_users WHERE brewery_id=p_brewery AND user_id=p_actor AND role='admin')
+    OR NOT EXISTS(SELECT 1 FROM public.pos_connections c JOIN private.integration_tokens t
+      ON t.brewery_id=c.brewery_id AND t.provider='square' AND t.connection_id=c.id
+      WHERE c.id=p_connection AND c.brewery_id=p_brewery AND c.state='connected' AND c.merchant_id=v_attempt.merchant_id
+        AND c.credential_version=p_expected_version AND t.credential_version=p_expected_version)
+  THEN RAISE EXCEPTION 'Square connection changed' USING errcode='MG409'; END IF;
+  IF v_attempt.locations_captured THEN
+    IF v_attempt.external_location_ids<>v_ids THEN RAISE EXCEPTION 'Square location snapshot changed' USING errcode='MG409'; END IF;
+  ELSE
+    INSERT INTO public.pos_locations(brewery_id,connection_id,external_location_id,external_name,external_status,available,last_seen_at)
+      SELECT p_brewery,p_connection,x.id,x.name,x.status,true,now() FROM jsonb_to_recordset(p_locations) x(id text,name text,status text)
+    ON CONFLICT(connection_id,external_location_id) DO UPDATE SET external_name=excluded.external_name,
+      external_status=excluded.external_status,available=true,last_seen_at=excluded.last_seen_at;
+    UPDATE public.pos_locations l SET available=false,last_seen_at=now() WHERE l.connection_id=p_connection
+      AND NOT(l.external_location_id=ANY(v_ids));
+    UPDATE private.square_sales_syncs SET external_location_ids=v_ids,locations_captured=true
+      WHERE actor_id=p_actor AND request_id=p_request_id RETURNING * INTO v_attempt;
+  END IF;
+  RETURN jsonb_build_object('locationIds',v_attempt.external_location_ids,'locationOffset',v_attempt.location_offset,
+    'cursor',v_attempt.cursor,'pages',v_attempt.pages);
+END $$;
+
+CREATE FUNCTION public.record_square_sales_page(p_brewery uuid,p_connection uuid,p_actor uuid,p_request_id uuid,
+  p_expected_version bigint,p_location_ids text[],p_cursor text,p_next_cursor text,p_orders jsonb,p_facts jsonb) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE v_attempt private.square_sales_syncs; v_expected_locations text[]; v_order jsonb; v_fact jsonb; v_previous record;
+  v_order_id text; v_line_id text; v_kind text; v_status text; v_reason text; v_source_order text; v_source_line text;
+  v_version bigint; v_qty numeric; v_source_qty numeric; v_returned numeric; v_sale_id uuid; v_hash text;
+  v_inserted integer:=0; v_accepted integer:=0; v_unsupported integer:=0; v_result jsonb;
+BEGIN
+  IF jsonb_typeof(p_orders)<>'array' OR jsonb_typeof(p_facts)<>'array' THEN RAISE EXCEPTION 'Square sales page invalid'; END IF;
+  SELECT * INTO v_attempt FROM private.square_sales_syncs WHERE actor_id=p_actor AND request_id=p_request_id FOR UPDATE;
+  IF NOT FOUND OR v_attempt.brewery_id<>p_brewery OR v_attempt.connection_id<>p_connection
+    OR v_attempt.credential_version<>p_expected_version OR v_attempt.status<>'in_progress' OR NOT v_attempt.locations_captured
+    OR v_attempt.cursor IS DISTINCT FROM p_cursor
+    OR NOT EXISTS(SELECT 1 FROM public.brewery_users WHERE brewery_id=p_brewery AND user_id=p_actor AND role='admin')
+    OR NOT EXISTS(SELECT 1 FROM public.pos_connections c JOIN private.integration_tokens t
+      ON t.brewery_id=c.brewery_id AND t.provider='square' AND t.connection_id=c.id
+      WHERE c.id=p_connection AND c.brewery_id=p_brewery AND c.state='connected' AND c.merchant_id=v_attempt.merchant_id
+        AND c.credential_version=p_expected_version AND t.credential_version=p_expected_version)
+  THEN RAISE EXCEPTION 'Square connection changed' USING errcode='MG409'; END IF;
+  v_expected_locations:=v_attempt.external_location_ids[v_attempt.location_offset+1:v_attempt.location_offset+10];
+  IF p_location_ids IS DISTINCT FROM v_expected_locations THEN RAISE EXCEPTION 'Square sales location page changed' USING errcode='MG409'; END IF;
+  IF p_next_cursor IS NOT NULL AND p_next_cursor IS NOT DISTINCT FROM p_cursor THEN RAISE EXCEPTION 'Square sales cursor repeated'; END IF;
+
+  FOR v_fact IN SELECT value FROM jsonb_array_elements(p_facts) WITH ORDINALITY rows(value,n)
+    ORDER BY (value->>'factKind'='return'),n
+  LOOP
+    v_order_id:=nullif(btrim(v_fact->>'externalOrderId'),''); v_line_id:=nullif(btrim(v_fact->>'externalLineId'),'');
+    v_kind:=v_fact->>'factKind'; v_status:=v_fact->>'factStatus'; v_reason:=nullif(v_fact->>'unsupportedReason','');
+    v_version:=(v_fact->>'sourceVersion')::bigint; v_qty:=CASE WHEN v_fact->>'qty' IS NULL THEN null ELSE (v_fact->>'qty')::numeric END;
+    v_source_order:=nullif(v_fact->>'sourceOrderId',''); v_source_line:=nullif(v_fact->>'sourceLineId',''); v_hash:=v_fact->>'sourceHash';
+    IF v_order_id IS NULL OR v_line_id IS NULL OR v_kind NOT IN ('sale','return') OR v_status NOT IN ('accepted','unsupported')
+      OR v_version<0 OR nullif(v_hash,'') IS NULL OR NOT((v_fact->>'externalLocationId')=ANY(p_location_ids))
+      OR NOT EXISTS(SELECT 1 FROM jsonb_array_elements(p_orders) o WHERE o->>'externalOrderId'=v_order_id
+        AND (o->>'sourceVersion')::bigint=v_version AND o->>'externalLocationId'=v_fact->>'externalLocationId')
+    THEN RAISE EXCEPTION 'Square sales fact invalid'; END IF;
+    IF v_status='accepted' AND (v_qty IS NULL OR v_qty<=0 OR v_qty::text IN ('NaN','Infinity','-Infinity')) THEN
+      RAISE EXCEPTION 'Square sales quantity invalid';
+    END IF;
+    IF v_kind='return' AND v_status='accepted' THEN
+      SELECT s.qty INTO v_source_qty FROM private.pos_current_sales s
+        WHERE s.connection_id=p_connection AND s.external_order_id=v_source_order AND s.fact_kind='sale'
+          AND s.external_line_id=v_source_line AND s.fact_status='accepted'
+          AND s.external_variation_id=v_fact->>'externalVariationId';
+      SELECT coalesce(sum(r.qty),0) INTO v_returned FROM private.pos_current_sales r
+        WHERE r.connection_id=p_connection AND r.fact_kind='return' AND r.fact_status='accepted'
+          AND r.source_order_id=v_source_order AND r.source_line_id=v_source_line
+          AND NOT(r.external_order_id=v_order_id AND r.external_line_id=v_line_id);
+      IF v_source_qty IS NULL THEN v_status:='unsupported'; v_reason:='return_source_not_found'; v_qty:=null;
+      ELSIF v_returned+v_qty>v_source_qty THEN v_status:='unsupported'; v_reason:='return_quantity_exceeds_source'; v_qty:=null;
+      END IF;
+    END IF;
+    INSERT INTO public.pos_sales(brewery_id,connection_id,merchant_id,external_order_id,external_line_id,source_version,
+      fact_kind,fact_status,source_quantity,qty,gross_cents,external_item_id,external_variation_id,external_location_id,
+      sold_at,source_order_updated_at,catalog_version,quantity_unit,source_order_id,source_line_id,unsupported_reason,source_hash)
+    VALUES(p_brewery,p_connection,v_attempt.merchant_id,v_order_id,v_line_id,v_version,v_kind,v_status,
+      v_fact->>'sourceQuantity',v_qty,CASE WHEN v_fact->>'grossCents' IS NULL THEN null ELSE (v_fact->>'grossCents')::bigint END,
+      (SELECT c.external_item_id FROM public.pos_catalog_variations c WHERE c.connection_id=p_connection
+        AND c.external_variation_id=v_fact->>'externalVariationId'),nullif(v_fact->>'externalVariationId',''),
+      v_fact->>'externalLocationId',(v_fact->>'soldAt')::timestamptz,(v_fact->>'orderUpdatedAt')::timestamptz,
+      CASE WHEN v_fact->>'catalogVersion' IS NULL THEN null ELSE (v_fact->>'catalogVersion')::bigint END,
+      v_fact->'quantityUnit',v_source_order,v_source_line,v_reason,v_hash)
+    ON CONFLICT(connection_id,external_order_id,fact_kind,external_line_id,source_version) DO NOTHING
+    RETURNING id INTO v_sale_id;
+    GET DIAGNOSTICS v_inserted=ROW_COUNT;
+    IF v_inserted=0 THEN
+      SELECT id INTO v_sale_id FROM public.pos_sales WHERE connection_id=p_connection AND external_order_id=v_order_id
+        AND fact_kind=v_kind AND external_line_id=v_line_id AND source_version=v_version AND source_hash=v_hash;
+      IF NOT FOUND THEN RAISE EXCEPTION 'Square fact changed within one source version' USING errcode='MG409'; END IF;
+    ELSE
+      IF v_status='accepted' THEN v_accepted:=v_accepted+1; ELSE v_unsupported:=v_unsupported+1; END IF;
+    END IF;
+    PERFORM private.reconcile_pos_sale(p_brewery,v_sale_id);
+  END LOOP;
+
+  FOR v_order IN SELECT value FROM jsonb_array_elements(p_orders)
+  LOOP
+    v_order_id:=v_order->>'externalOrderId'; v_version:=(v_order->>'sourceVersion')::bigint;
+    FOR v_previous IN SELECT s.* FROM private.pos_current_sales s
+      WHERE s.connection_id=p_connection AND s.external_order_id=v_order_id AND s.source_version<v_version
+        AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(p_facts) f WHERE f->>'externalOrderId'=v_order_id
+          AND f->>'factKind'=s.fact_kind AND f->>'externalLineId'=s.external_line_id)
+    LOOP
+      v_hash:=encode(extensions.digest(concat_ws('|',p_connection,v_order_id,v_previous.fact_kind,
+        v_previous.external_line_id,v_version,'removed'),'sha256'),'hex');
+      INSERT INTO public.pos_sales(brewery_id,connection_id,merchant_id,external_order_id,external_line_id,source_version,
+        fact_kind,fact_status,external_item_id,external_variation_id,external_location_id,sold_at,source_order_updated_at,
+        catalog_version,source_order_id,source_line_id,source_hash)
+      VALUES(p_brewery,p_connection,v_attempt.merchant_id,v_order_id,v_previous.external_line_id,v_version,
+        v_previous.fact_kind,'removed',v_previous.external_item_id,v_previous.external_variation_id,v_order->>'externalLocationId',
+        (v_order->>'soldAt')::timestamptz,(v_order->>'orderUpdatedAt')::timestamptz,v_previous.catalog_version,
+        v_previous.source_order_id,v_previous.source_line_id,v_hash)
+      ON CONFLICT(connection_id,external_order_id,fact_kind,external_line_id,source_version) DO NOTHING;
+    END LOOP;
+  END LOOP;
+
+  UPDATE private.square_sales_syncs SET pages=pages+1,accepted_facts=accepted_facts+v_accepted,
+    unsupported_facts=unsupported_facts+v_unsupported,cursor=p_next_cursor
+    WHERE actor_id=p_actor AND request_id=p_request_id RETURNING * INTO v_attempt;
+  IF p_next_cursor IS NULL AND v_attempt.location_offset+10<cardinality(v_attempt.external_location_ids) THEN
+    UPDATE private.square_sales_syncs SET location_offset=location_offset+10
+      WHERE actor_id=p_actor AND request_id=p_request_id RETURNING * INTO v_attempt;
+  ELSIF p_next_cursor IS NULL THEN
+    INSERT INTO public.pos_sales_coverage(brewery_id,connection_id,external_location_id,location_id,starts_at,ends_at,complete)
+      SELECT p_brewery,p_connection,l.external_location_id,l.location_id,v_attempt.coverage_starts_at,v_attempt.ends_at,true
+      FROM public.pos_locations l WHERE l.connection_id=p_connection AND l.external_location_id=ANY(v_attempt.external_location_ids)
+        AND l.location_id IS NOT NULL;
+    UPDATE public.pos_connections SET sales_synced_through=v_attempt.ends_at,updated_at=now()
+      WHERE id=p_connection AND brewery_id=p_brewery AND credential_version=p_expected_version;
+    v_result:=jsonb_build_object('complete',true,'acceptedFacts',v_attempt.accepted_facts,'unsupportedFacts',v_attempt.unsupported_facts,
+      'pages',v_attempt.pages,'locations',cardinality(v_attempt.external_location_ids),'startsAt',v_attempt.starts_at,'endsAt',v_attempt.ends_at);
+    UPDATE private.square_sales_syncs SET status='completed',result=v_result WHERE actor_id=p_actor AND request_id=p_request_id;
+    PERFORM private.complete_command_request_for(p_actor,p_request_id,v_result);
+    RETURN v_result;
+  END IF;
+  RETURN jsonb_build_object('complete',false,'locationIds',v_attempt.external_location_ids,
+    'locationOffset',v_attempt.location_offset,'cursor',v_attempt.cursor,'pages',v_attempt.pages);
+END $$;
+
+REVOKE ALL ON FUNCTION public.begin_square_sales_sync(uuid,uuid),
+  public.advance_square_sales_sync(uuid,uuid,uuid,uuid,bigint,bigint),
+  public.record_square_sales_locations(uuid,uuid,uuid,uuid,bigint,jsonb),
+  public.record_square_sales_page(uuid,uuid,uuid,uuid,bigint,text[],text,text,jsonb,jsonb)
+  FROM public,anon,authenticated,service_role;
+GRANT EXECUTE ON FUNCTION public.begin_square_sales_sync(uuid,uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.advance_square_sales_sync(uuid,uuid,uuid,uuid,bigint,bigint),
+  public.record_square_sales_locations(uuid,uuid,uuid,uuid,bigint,jsonb),
+  public.record_square_sales_page(uuid,uuid,uuid,uuid,bigint,text[],text,text,jsonb,jsonb)
+  TO postgres,service_role;
