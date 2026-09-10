@@ -43,7 +43,7 @@ tests.
 | 15 | Composer | `.agents/superpowers/plans/2026-09-07-backend-program-15-composer.md` | 18 | Composer proposal / question / answer, Offline outbox |
 | 16 | Chat settings | `.agents/superpowers/plans/2026-09-07-backend-program-16-chat-settings.md` | 9 | Chat disconnected / settings, Linked people, Disconnect Slack, Reauthorization |
 
-- [x] Program 10 — explorer parity merged
+- [ ] Program 10 — explorer parity merged
 - [x] Program 11 — access and import merged
 - [x] Program 16 — chat settings merged
 - [x] Program 12 — taproom truth merged (§16.16 decided 2026-09-07: brand-owned poured formats as name + ounces, three fill chips, guest kegs by label + nominal size)
