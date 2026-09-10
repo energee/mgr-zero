@@ -5,7 +5,7 @@
 import { command } from "@/lib/commands/client";
 import { useBrewery } from "../brewery-provider";
 import type { BinMoveStock } from "@/lib/commands/inventory";
-import { movementFields } from "@/lib/movement-form";
+import { movementFields, movementTypeLabel } from "@/lib/movement-form";
 import { formatVolume } from "@/lib/volume";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -132,7 +132,7 @@ export function MovementForm({
                 <SelectGroup>
                   {MOVEMENT_TYPES.map((t) => (
                     <SelectItem key={t} value={t}>
-                      {t}
+                      {movementTypeLabel(t)}
                     </SelectItem>
                   ))}
                 </SelectGroup>
@@ -175,7 +175,7 @@ export function MovementForm({
             <Label htmlFor="movement-note">Note</Label>
             <Input id="movement-note" value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
-          {fields && skuId && <p aria-live="polite" className="text-sm text-muted-foreground">Preview: {fields.qty > 0 ? "+" : ""}{fields.qty} SKU units{unitVolume != null ? ` · ${formatVolume(fields.qty * unitVolume)}` : ""} · {type.replace(/_/g, " ")}{fields.destState ? ` · ${fields.destState}` : ""}. Volume is calculated when recorded.</p>}
+          {fields && skuId && <p aria-live="polite" className="text-sm text-muted-foreground">Preview: {fields.qty > 0 ? "+" : ""}{fields.qty} SKU units{unitVolume != null ? ` · ${formatVolume(fields.qty * unitVolume)}` : ""} · {movementTypeLabel(type)}{fields.destState ? ` · ${fields.destState}` : ""}. Volume is calculated when recorded.</p>}
           <CommandFormMessage error={form.error} />
           <CommandFormFooter>
             <Button type="submit" disabled={form.submitting || !fields || (requiresChannel(type) && !saleChannelId) || !skuId || !locationId || !binId}>
@@ -186,7 +186,7 @@ export function MovementForm({
       </CommandForm>
       <CommandForm open={receipt !== null} onOpenChange={open => { if (!open) setReceipt(null); }} title="Movement recorded">
         {receipt && <div className="space-y-3 text-sm">
-          <p>{receipt.qty > 0 ? "+" : ""}{receipt.qty} {skus.find(s => s.id === receipt.sku_id)?.label ?? receipt.sku_id} · {receipt.type.replace(/_/g, " ")}</p>
+          <p>{receipt.qty > 0 ? "+" : ""}{receipt.qty} {skus.find(s => s.id === receipt.sku_id)?.label ?? receipt.sku_id} · {movementTypeLabel(receipt.type)}</p>
           <p>{locations.find(l => l.id === receipt.location_id)?.name ?? receipt.location_id} · {bins.find(b => b.id === receipt.bin_id)?.name ?? receipt.bin_id}</p>
           <p>Recorded volume: {receipt.bbl} bbl ({formatVolume(receipt.bbl)})</p>
           {receipt.sale_channel_id && <p>Channel: {channels.find(c => c.id === receipt.sale_channel_id)?.name ?? receipt.sale_channel_id}</p>}

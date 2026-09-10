@@ -1,6 +1,11 @@
 import { expect, it } from "vitest";
 import { stockLine } from "@/lib/commands/stock-line";
-import { movementFields, binStockKey, selectedBinStock } from "@/lib/movement-form";
+import { movementFields, movementTypeLabel, binStockKey, selectedBinStock } from "@/lib/movement-form";
+
+it("presents movement enum values as readable labels", () => {
+  expect(movementTypeLabel("opening_balance")).toBe("Opening balance");
+  expect(movementTypeLabel("festival_removal")).toBe("Festival removal");
+});
 
 it("stock lines identify exactly one stock kind and whole empty kegs", () => {
   const id = crypto.randomUUID();
