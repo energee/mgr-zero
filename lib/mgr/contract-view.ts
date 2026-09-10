@@ -1,7 +1,9 @@
 // lib/mgr/contract-view.ts — view-model for Contract (inventory sheet).
 export type ContractViewModel = {
-  vendor: string;
-  material: string;
+  vendorId: string;
+  vendorOptions: { id: string; label: string }[];
+  materialId: string;
+  materialOptions: { id: string; label: string }[];
   quantity: string;
   received: string;
   onOrder: string;
@@ -9,6 +11,7 @@ export type ContractViewModel = {
   starts: string;
   ends: string;
   unitCost: string;
+  contractNo: string;
 };
 
 export function toContractViewProps(s: ContractViewModel): ContractViewModel {
