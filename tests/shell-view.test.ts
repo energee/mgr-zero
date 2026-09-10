@@ -310,6 +310,8 @@ describe("Search view", () => {
     expect(page).toMatch(/from "@\/components\/mgr\/views\/search"/);
     expect(page).toMatch(/<SearchView\b/);
     expect(page).toMatch(/<SearchPalette\b/);
+    expect(src("components/mgr/search-palette.tsx")).toContain("No records found · Search matches record names and numbers, not app pages.");
+    expect(screen("Search").states).toContainEqual(["empty", "No records found · Search matches record names and numbers, not app pages."]);
   });
 });
 
