@@ -17,6 +17,7 @@ import {
   beginComposerCommit,
   composerActions,
   composerInitialState,
+  createComposerRequestGuard,
   editMovementDraft,
   movementFormHref,
   movementQuestion,
@@ -63,6 +64,7 @@ export function Composer({ role }: { role: StaffRole }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const conversationRef = useRef<string | null>(null);
+  const requestGuardRef = useRef(createComposerRequestGuard());
   const actionRef = useRef<HTMLSelectElement | null>(null);
 
   useEffect(() => {
@@ -80,6 +82,17 @@ export function Composer({ role }: { role: StaffRole }) {
   const run = (name: string, input: unknown, requestId?: string, provenance?: Parameters<typeof command>[5]) =>
     command(breweryId, name, input, requestId, expectedContext, provenance);
 
+  function invalidateMovementRequest() {
+    requestGuardRef.current.invalidate();
+    setBusy(false);
+  }
+
+  function retireMovement() {
+    invalidateMovementRequest();
+    setState(retireMovementProposal);
+    setError(null);
+  }
+
   async function ensureConversation(title: string) {
     if (conversationRef.current) return conversationRef.current;
     const conversation = await run("create_chat_conversation", { title }, crypto.randomUUID()) as { id: string };
@@ -94,10 +107,9 @@ export function Composer({ role }: { role: StaffRole }) {
 
   async function chooseAction(id: string) {
     const selected = actions.find((candidate) => candidate.id === id) ?? null;
-    setState(retireMovementProposal);
+    retireMovement();
     setAction(selected);
     setAnswer(null);
-    setError(null);
     if (!selected) return;
     setBusy(true);
     try {
@@ -120,6 +132,7 @@ export function Composer({ role }: { role: StaffRole }) {
   }
 
   async function changeDraft(patch: Partial<MovementDraft>) {
+    invalidateMovementRequest();
     setState((current) => editMovementDraft(current, patch));
     setError(null);
     if (patch.locationId) {
@@ -134,17 +147,21 @@ export function Composer({ role }: { role: StaffRole }) {
     setBusy(true);
     setError(null);
     try {
-      const conversationId = await ensureConversation("Inventory movement");
-      const result = await run("preview_command", { name: "record_movement", input, conversationId }) as {
-        valid: boolean; allowed: boolean; preview: Omit<ComposerProposal, "name" | "input"> | null;
-      };
-      if (!result.valid || !result.allowed || !result.preview) throw new Error("This movement cannot be previewed for your current role and fields.");
-      await append(conversationId, "user", `Preview ${input.qty} unit(s) of ${skus.find((sku) => sku.id === input.skuId)?.name ?? "the selected SKU"}.`);
-      await append(conversationId, "assistant", "Canonical movement proposal ready for review.");
-      setState((current) => receiveProposal(current, { name: "record_movement", input, ...result.preview! }, conversationId, crypto.randomUUID()));
+      const completed = await requestGuardRef.current.run(async () => {
+        const conversationId = await ensureConversation("Inventory movement");
+        const result = await run("preview_command", { name: "record_movement", input, conversationId }) as {
+          valid: boolean; allowed: boolean; preview: Omit<ComposerProposal, "name" | "input"> | null;
+        };
+        if (!result.valid || !result.allowed || !result.preview) throw new Error("This movement cannot be previewed for your current role and fields.");
+        await append(conversationId, "user", `Preview ${input.qty} unit(s) of ${skus.find((sku) => sku.id === input.skuId)?.name ?? "the selected SKU"}.`);
+        await append(conversationId, "assistant", "Canonical movement proposal ready for review.");
+        return { conversationId, preview: result.preview };
+      });
+      if (!completed) return;
+      setState((current) => receiveProposal(current, { name: "record_movement", input, ...completed.preview }, completed.conversationId, crypto.randomUUID()));
+      setBusy(false);
     } catch (cause) {
       setError(messageText(cause));
-    } finally {
       setBusy(false);
     }
   }
@@ -156,14 +173,15 @@ export function Composer({ role }: { role: StaffRole }) {
     setError(null);
     try {
       const envelope = started.envelope;
-      const receipt = await run(envelope.name, envelope.input, envelope.requestId, {
+      const receipt = await requestGuardRef.current.run(() => run(envelope.name, envelope.input, envelope.requestId, {
         origin: "chat", conversationId: envelope.conversationId, previewToken: envelope.previewToken,
-      }) as { id?: string };
+      }) as Promise<{ id?: string }>);
+      if (!receipt) return;
       setAnswer({ query: "Record inventory movement", answer: "Movement recorded", detail: receipt.id ? `Reference ${receipt.id}` : undefined, observedAt: new Date().toLocaleString() });
-      setState(retireMovementProposal);
+      retireMovement();
     } catch (cause) {
       if (cause instanceof CommandResponseError && cause.status === 409) {
-        setState(retireMovementProposal);
+        retireMovement();
         setError("The proposal changed or expired. Preview the current data again.");
       } else {
         setState((current) => ({ ...current, committing: false }));
@@ -238,7 +256,7 @@ export function Composer({ role }: { role: StaffRole }) {
       />}
 
       {question && <ComposerQuestionView prompt={question.prompt} />}
-      {state.proposal && <ComposerProposalView effects={state.proposal.effects} warnings={state.proposal.warnings} openHref={movementFormHref(state.proposal.input)} onOpen={() => setState(retireMovementProposal)} onDismiss={() => setState(retireMovementProposal)} onCommit={() => void commitMovement()} committing={state.committing} />}
+      {state.proposal && <ComposerProposalView effects={state.proposal.effects} warnings={state.proposal.warnings} openHref={movementFormHref(state.proposal.input)} onOpen={retireMovement} onDismiss={retireMovement} onCommit={() => void commitMovement()} committing={state.committing} />}
 
       {action?.id === "read_atp" && <section className="flex flex-col gap-2 rounded-md border bg-card p-3 sm:flex-row sm:items-end">
         <Label className="flex-1">SKU / package<select className="mt-1 w-full rounded-md border bg-background p-2" value={readSkuId} onChange={(event) => { setReadSkuId(event.target.value); setAnswer(null); }}><option value="">Choose…</option>{skus.map((sku) => {
@@ -248,7 +266,7 @@ export function Composer({ role }: { role: StaffRole }) {
       </section>}
       {answer && <ComposerAnswerView {...answer} />}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      {action && <Button type="button" variant="ghost" className="self-start" onClick={() => { setState(retireMovementProposal); setAction(null); setAnswer(null); setError(null); }}>Close composer</Button>}
+      {action && <Button type="button" variant="ghost" className="self-start" onClick={() => { retireMovement(); setAction(null); setAnswer(null); }}>Close composer</Button>}
       <ComposerStripView actions={actions.map((item) => ({ value: item.id, label: item.label }))} onAction={(id) => void chooseAction(id)} onHistory={() => void loadHistory()} actionRef={actionRef} />
       <p className="text-center text-[11px] text-muted-foreground">Structured actions only. Voice and a free-form model are not connected.</p>
     </div>

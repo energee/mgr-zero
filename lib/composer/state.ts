@@ -109,6 +109,23 @@ export function retireMovementProposal(state: ComposerState): ComposerState {
   return { ...state, proposal: null, commitRequestId: null, committing: false };
 }
 
+export function createComposerRequestGuard() {
+  let generation = 0;
+  return {
+    invalidate() { generation += 1; },
+    async run<T>(request: () => Promise<T>): Promise<T | null> {
+      const started = ++generation;
+      try {
+        const result = await request();
+        return started === generation ? result : null;
+      } catch (error) {
+        if (started === generation) throw error;
+        return null;
+      }
+    },
+  };
+}
+
 export function editMovementDraft(state: ComposerState, patch: Partial<MovementDraft>): ComposerState {
   return { ...retireMovementProposal(state), draft: { ...state.draft, ...patch } };
 }

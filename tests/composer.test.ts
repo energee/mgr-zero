@@ -11,6 +11,7 @@ import {
   beginComposerCommit,
   composerActions,
   composerInitialState,
+  createComposerRequestGuard,
   editMovementDraft,
   movementFormHref,
   movementQuestion,
@@ -28,6 +29,23 @@ const ids = {
 };
 
 describe("structured composer state", () => {
+  it("drops late success and failure after an in-flight Composer request is retired", async () => {
+    const guard = createComposerRequestGuard();
+    let resolveLate!: (value: string) => void;
+    const lateSuccess = guard.run(() => new Promise<string>((resolve) => { resolveLate = resolve; }));
+    guard.invalidate();
+    resolveLate("stale proposal");
+    await expect(lateSuccess).resolves.toBeNull();
+
+    let rejectLate!: (error: Error) => void;
+    const lateFailure = guard.run(() => new Promise<string>((_resolve, reject) => { rejectLate = reject; }));
+    guard.invalidate();
+    rejectLate(new Error("stale preview failure"));
+    await expect(lateFailure).resolves.toBeNull();
+
+    await expect(guard.run(async () => { throw new Error("current failure"); })).rejects.toThrow("current failure");
+  });
+
   it("accepts legal decimal strings without binary-float artifacts and rejects unsafe quantities", () => {
     const complete = {
       skuId: ids.skuId, kind: "adjustment" as const, direction: "add" as const,
@@ -105,10 +123,15 @@ describe("structured composer state", () => {
     expect(beginComposerCommit(retired).envelope).toBeNull();
 
     const live = readFileSync("components/mgr/composer.tsx", "utf8");
-    expect(live).toMatch(/async function chooseAction[\s\S]{0,300}setState\(retireMovementProposal\)/);
-    expect(live).toMatch(/onOpen=\{\(\) => setState\(retireMovementProposal\)\}/);
-    expect(live).toMatch(/onDismiss=\{\(\) => setState\(retireMovementProposal\)\}/);
-    expect(live).toMatch(/onClick=\{\(\) => \{ setState\(retireMovementProposal\);[\s\S]{0,200}Close composer/);
+    expect(live).toMatch(/function invalidateMovementRequest\(\)[\s\S]{0,120}requestGuardRef\.current\.invalidate\(\)/);
+    expect(live).toMatch(/function retireMovement\(\)[\s\S]{0,120}invalidateMovementRequest\(\)[\s\S]{0,120}setState\(retireMovementProposal\)/);
+    expect(live).toMatch(/async function chooseAction[\s\S]{0,300}retireMovement\(\)/);
+    expect(live).toContain("onOpen={retireMovement} onDismiss={retireMovement}");
+    expect(live).toMatch(/onClick=\{\(\) => \{ retireMovement\(\);[\s\S]{0,150}Close composer/);
+    expect(live).toMatch(/async function changeDraft[\s\S]{0,200}invalidateMovementRequest\(\)/);
+    expect(live).toMatch(/async function previewMovement[\s\S]{0,400}requestGuardRef\.current\.run/);
+    expect(live).toMatch(/async function commitMovement[\s\S]{0,400}requestGuardRef\.current\.run/);
+    expect(live.match(/requestGuardRef\.current\.run/g)).toHaveLength(2);
   });
 
   it("preserves known fields when opening the ordinary movement form", () => {
