@@ -10,6 +10,7 @@ export type PriceGroupViewModel = {
   name: string;
   position: string;
   costCeiling: string;
+  costCeilingInput: string;
   previousCeilingLabel?: string;
   previousCeiling?: string;
   prices: string;
@@ -51,6 +52,7 @@ export function toPriceGroupViewProps(snapshot: PriceGroupSnapshot): PriceGroupV
     name: group.name,
     position: String(group.position),
     costCeiling: group.cost_ceiling_cents == null ? "" : money(group.cost_ceiling_cents),
+    costCeilingInput: group.cost_ceiling_cents == null ? "" : (group.cost_ceiling_cents / 100).toFixed(2),
     previousCeilingLabel: previous ? `Cost ceiling · group ${previous.name}` : undefined,
     previousCeiling: previous
       ? previous.cost_ceiling_cents == null ? "none" : money(previous.cost_ceiling_cents)

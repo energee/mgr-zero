@@ -112,7 +112,7 @@ export function VendorView({
           </ButtonGroup>
         </Field>,
       )}
-      {E.info("The typed figure is what Planning dates a buy-by from. Received orders give an observed average that is read, never stored.")}
+      {E.info("Planning uses this lead time to calculate when to buy. Received orders show a separate observed average.")}
       {messages}
       {footer !== undefined ? footer : E.btn("Save vendor")}
     </>

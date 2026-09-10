@@ -98,7 +98,7 @@ export function SearchPalette({ placeholder = "Search", kinds, onPick, initialHi
         {loading && <div role="status" aria-label="Loading results" className="space-y-2 p-3">{[1, 2, 3].map((n) => <Skeleton key={n} className="h-12" />)}</div>}
         {currentStatus === "offline" && <p role="status" className="px-3 py-2 text-sm text-muted-foreground">Offline · {hits.length ? "cached matches only" : "no cached matches"}</p>}
         {currentStatus === "error" && <p role="alert" className="px-3 py-2 text-sm text-destructive">Search failed · {error}</p>}
-        {term && currentStatus === "ready" && hits.length === 0 && <CommandEmpty>No matches · change the term</CommandEmpty>}
+        {term && currentStatus === "ready" && hits.length === 0 && <CommandEmpty>No records found · Search matches record names and numbers, not app pages.</CommandEmpty>}
         {[...groups].map(([kind, items]) => (
           <CommandGroup key={kind} heading={HEADING[kind]}>
             {items.map((h) => <SearchItem key={`${h.kind}:${h.id}`} hit={h} onSelect={open} />)}

@@ -10,11 +10,12 @@ import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PriceGroupView, type PriceGroupViewModel } from "@/components/mgr/views/price-group";
 import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
 
 export type PriceGroupEditData = { id: string; name: string; position: number; cost_ceiling_cents: number | null };
 
-export function GroupForm({ group, defaultPosition = 1 }: { group?: PriceGroupEditData; defaultPosition?: number }) {
+export function GroupForm({ group, model, defaultPosition = 1 }: { group?: PriceGroupEditData; model?: PriceGroupViewModel; defaultPosition?: number }) {
   const isEdit = !!group;
   const initialName = group?.name ?? "";
   const initialPosition = String(group?.position ?? defaultPosition);
@@ -44,7 +45,18 @@ export function GroupForm({ group, defaultPosition = 1 }: { group?: PriceGroupEd
         </Button>
       }
     >
-      <form onSubmit={form.submit} className="flex flex-col gap-4">
+      {model ? <form onSubmit={form.submit} className="flex flex-col gap-4">
+        <PriceGroupView
+          model={{ ...model, name, position, costCeilingInput: ceiling }}
+          controls={{ name: setName, position: setPosition, costCeiling: setCeiling }}
+          back={null}
+          messages={<><CommandFormMessage error={form.error} /><CommandFormMessage error={remove.error} /></>}
+          footer={<CommandFormFooter>
+            <Button type="button" variant="ghost" disabled={remove.busy} onClick={() => remove.run("delete_price_group", { priceGroupId: group!.id })}>Delete</Button>
+            <Button type="submit" disabled={form.submitting}>{form.submitting ? "Saving…" : "Save price group"}</Button>
+          </CommandFormFooter>}
+        />
+      </form> : <form onSubmit={form.submit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <Label htmlFor="group-name">Name</Label>
           <Input id="group-name" value={name} onChange={(e) => setName(e.target.value)} required />
@@ -70,7 +82,7 @@ export function GroupForm({ group, defaultPosition = 1 }: { group?: PriceGroupEd
           )}
           <Button type="submit" disabled={form.submitting}>{form.submitting ? "Saving…" : "Save price group"}</Button>
         </CommandFormFooter>
-      </form>
+      </form>}
     </CommandForm>
   );
 }
