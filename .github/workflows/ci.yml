@@ -9,9 +9,16 @@ on:
   push:
     branches: [main]
   pull_request:
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
-  test:
+  quality:
     runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54341
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-build-only
+      SUPABASE_SECRET_KEY: ci-build-only
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 } # TDD gate diffs against the PR base
@@ -44,6 +51,24 @@ jobs:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: bun scripts/pr-directives.ts check
       - run: bun install --frozen-lockfile
+      - run: bun run lint
+      - run: bunx tsc --noEmit
+      - run: bun run build
+
+  test_shard:
+    name: test shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ["1/2", "2/2"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version-file: ".bun-version" }
+      - run: bun install --frozen-lockfile
       - uses: supabase/setup-cli@v1
         with: { version: 2.116.0 }
       # Only the services the tests touch: Postgres, Auth, PostgREST, Kong,
@@ -56,7 +81,13 @@ jobs:
         # The app accepts modern Supabase names only. The mapping script keeps
         # local CLI output compatible without reintroducing runtime fallbacks.
         run: supabase status -o env | node scripts/supabase-env.mjs >> "$GITHUB_ENV"
-      - run: bun run test
-      - run: bun run lint
-      - run: bunx tsc --noEmit
-      - run: bun run build
+      - run: bunx vitest run --shard=${{ matrix.shard }}
+
+  # Preserve the existing required-check name while the work runs in parallel.
+  test:
+    needs: [quality, test_shard]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every CI job
+        run: test "${{ needs.quality.result }}" = success && test "${{ needs.test_shard.result }}" = success
