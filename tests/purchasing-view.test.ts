@@ -126,7 +126,17 @@ describe("Vendors", () => {
 
   it("the Vendor inventory record is VendorView", () => {
     expect((screen("Vendor").body as { type: unknown }).type).toBe(VendorView);
-    expect(htmlOf(createElement(VendorView, { model: toVendorViewProps(vendorYch) }))).toMatch(/>Save vendor</);
+    const html = htmlOf(createElement(VendorView, { model: toVendorViewProps(vendorYch) }));
+    expect(html).toMatch(/>Save vendor</);
+    expect(html).toMatch(/Phone/);
+  });
+
+  it("the live vendor form mounts the shared controlled body", () => {
+    const form = src("app/(app)/vendors/vendor-form.tsx");
+    expect(form).toMatch(/from "@\/components\/mgr\/views\/vendor"/);
+    expect(form).toMatch(/<VendorView\b/);
+    expect(form).toMatch(/controls=\{\{/);
+    expect(form).not.toMatch(/<Label\b|<Input\b|<Select\b/);
   });
 
   it("the Contracts inventory record is ContractsView", () => {
