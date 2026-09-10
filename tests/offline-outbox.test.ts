@@ -11,6 +11,7 @@ import {
   createReadingAttempt,
   discardOutbox,
   flushOutbox,
+  OUTBOX_RETIREMENT_MAX_AGE_MS,
   outboxDiscardConfirmation,
   readOutbox,
   sendOutboxAttempt,
@@ -127,6 +128,70 @@ describe("action-specific offline outbox", () => {
     await late;
 
     expect(readOutbox(new TabStorage(backing))).toEqual([]);
+  });
+
+  it("timestamps and expires retirement markers to bound the storage keyspace", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-10T15:00:00.000Z"));
+    try {
+      const storage = new MemoryStorage();
+      for (const requestId of [ids.request, "55555555-5555-4555-8555-555555555555", "77777777-7777-4777-8777-777777777777"]) {
+        const frozen = attempt(requestId);
+        storeOutboxAttempt(storage, frozen);
+        await sendOutboxAttempt(storage, frozen.id, scope, async () => ({}));
+      }
+      const retired = () => [...storage.values.keys()].filter((key) => key.startsWith("mgr-offline-outbox:v2-retired:"));
+      expect(retired()).toHaveLength(3);
+      expect(JSON.parse(storage.getItem(retired()[0])!)).toEqual({ retiredAt: Date.now() });
+
+      vi.setSystemTime(Date.now() + OUTBOX_RETIREMENT_MAX_AGE_MS - 1);
+      readOutbox(storage);
+      expect(retired()).toHaveLength(3);
+      vi.setSystemTime(Date.now() + 2);
+      readOutbox(storage);
+      expect(retired()).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not resurrect a retired row when its marker expires during an older in-flight send", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-10T15:00:00.000Z"));
+    try {
+      const backing = new Map<string, string>();
+      const bootstrap = new TabStorage(backing);
+      const frozen = attempt();
+      storeOutboxAttempt(bootstrap, frozen);
+      const staleTab = new TabStorage(backing);
+      const currentTab = new TabStorage(backing);
+      let rejectLate!: (error: Error) => void;
+      const late = sendOutboxAttempt(staleTab, frozen.id, scope, () => new Promise((_, reject) => { rejectLate = reject; }));
+      await sendOutboxAttempt(currentTab, frozen.id, scope, async () => ({}));
+
+      vi.setSystemTime(Date.now() + OUTBOX_RETIREMENT_MAX_AGE_MS + 1);
+      readOutbox(new TabStorage(backing));
+      expect([...backing.keys()].some((key) => key.startsWith("mgr-offline-outbox:v2-retired:"))).toBe(false);
+      rejectLate(new TypeError("late offline result"));
+      await late;
+      expect(readOutbox(new TabStorage(backing))).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("retains the exact uncertain row when retirement marker storage fails", async () => {
+    const storage = new MemoryStorage();
+    const frozen = attempt();
+    storeOutboxAttempt(storage, frozen);
+    const setItem = storage.setItem.bind(storage);
+    storage.setItem = (key, value) => {
+      if (key.startsWith("mgr-offline-outbox:v2-retired:")) throw new Error("quota");
+      setItem(key, value);
+    };
+
+    await expect(sendOutboxAttempt(storage, frozen.id, scope, async () => ({}))).resolves.toMatchObject({ status: "uncertain" });
+    expect(readOutbox(storage)[0]).toMatchObject({ id: frozen.id, requestId: frozen.requestId, input: frozen.input, state: "uncertain" });
   });
 
   it("migrates the shipped array and isolates one malformed per-entry row", () => {

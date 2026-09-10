@@ -10,9 +10,11 @@ export { fermentationReadingInput, fermentationReadingOfflinePolicy } from "@/li
 export const OUTBOX_STORAGE_KEY = "mgr-offline-outbox:v1";
 export const OUTBOX_ENTRY_PREFIX = "mgr-offline-outbox:v2:";
 export const OUTBOX_RETIRED_PREFIX = "mgr-offline-outbox:v2-retired:";
+export const OUTBOX_RETIREMENT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 const staffRole = z.enum(["admin", "sales", "warehouse", "brewer", "taproom"]);
 const scopeSchema = z.object({ actorId: z.string().uuid(), breweryId: z.string().uuid(), role: staffRole }).strict();
+const retirementSchema = z.object({ retiredAt: z.number().int().nonnegative() }).strict();
 const attemptSchema = z.object({
   version: z.literal(1),
   id: z.string().uuid(),
@@ -55,7 +57,7 @@ const outboxSchema = z.array(attemptSchema).superRefine((entries, context) => {
     ids.add(entry.id);
   }
 });
-const sends = new WeakMap<object, Map<string, Promise<OutboxSendResult>>>();
+const sends = new WeakMap<object, Map<string, { startedAt: number; pending: Promise<OutboxSendResult> }>>();
 
 function parseOutbox(raw: string | null) {
   if (raw === null) return [];
@@ -77,6 +79,27 @@ function retiredKey(id: string) {
 
 function isRetired(storage: OutboxStorage, id: string) {
   return storage.getItem(retiredKey(id)) !== null;
+}
+
+function pruneRetired(storage: OutboxStorage, now = Date.now()) {
+  const keys = Array.from({ length: storage.length }, (_, index) => storage.key(index));
+  for (const key of keys) {
+    if (!key?.startsWith(OUTBOX_RETIRED_PREFIX)) continue;
+    const id = key.slice(OUTBOX_RETIRED_PREFIX.length);
+    const raw = storage.getItem(key);
+    let retiredAt: number;
+    try {
+      retiredAt = raw === "retired" ? now : retirementSchema.parse(JSON.parse(raw ?? "")).retiredAt;
+      if (raw === "retired") storage.setItem(key, JSON.stringify({ retiredAt }));
+    } catch { continue; }
+    if (now - retiredAt < OUTBOX_RETIREMENT_MAX_AGE_MS) continue;
+    const active = sends.get(storage as object)?.get(id);
+    if (active && now - active.startedAt < OUTBOX_RETIREMENT_MAX_AGE_MS) continue;
+    // Never remove the guard while a physical row could still be exposed.
+    try { storage.removeItem(entryKey(id)); } catch { continue; }
+    if (storage.getItem(entryKey(id)) !== null) continue;
+    try { storage.removeItem(key); } catch { /* retaining a marker is safe */ }
+  }
 }
 
 function sameImmutableAttempt(a: OutboxAttempt, b: OutboxAttempt) {
@@ -101,7 +124,7 @@ function writeAttempt(storage: OutboxStorage, entry: OutboxAttempt) {
 }
 
 function retireAttempt(storage: OutboxStorage, id: string) {
-  try { storage.setItem(retiredKey(id), "retired"); }
+  try { storage.setItem(retiredKey(id), JSON.stringify({ retiredAt: Date.now() })); }
   catch { throw new Error("Could not update the offline outbox. The saved request was retained."); }
   // The marker is authoritative if physical row cleanup is unavailable.
   try { storage.removeItem(entryKey(id)); } catch { /* ignored */ }
@@ -135,6 +158,7 @@ function migrateLegacyOutbox(storage: OutboxStorage) {
 
 export function readOutbox(storage: OutboxStorage): OutboxAttempt[] {
   migrateLegacyOutbox(storage);
+  pruneRetired(storage);
   const entries: OutboxAttempt[] = [];
   for (let index = 0; index < storage.length; index += 1) {
     const key = storage.key(index);
@@ -181,10 +205,13 @@ export function visibleOutbox(entries: OutboxAttempt[], scope: Pick<OfflineScope
   return entries.filter((entry) => entry.scope.actorId === scope.actorId && entry.scope.breweryId === scope.breweryId);
 }
 
-function replaceAttempt(storage: OutboxStorage, replacement: OutboxAttempt | null, id: string) {
+function replaceAttempt(storage: OutboxStorage, replacement: OutboxAttempt | null, id: string, startedAt?: number) {
   const current = storedAttempt(storage, id);
   if (!current) return;
   if (replacement) {
+    // An expired marker may be pruned only after this generation is old
+    // enough that its late result can no longer mutate durable state.
+    if (startedAt !== undefined && Date.now() - startedAt >= OUTBOX_RETIREMENT_MAX_AGE_MS) return;
     const parsed = attemptSchema.parse(replacement);
     if (!sameImmutableAttempt(current, parsed)) throw new Error("Outbox request identity changed.");
     writeAttempt(storage, parsed);
@@ -195,7 +222,7 @@ function failureMessage(error: unknown) {
   return error instanceof Error ? error.message : "The reading response could not be confirmed.";
 }
 
-async function sendOne(storage: OutboxStorage, id: string, scope: OfflineScope, send: OutboxTransport): Promise<OutboxSendResult> {
+async function sendOne(storage: OutboxStorage, id: string, scope: OfflineScope, send: OutboxTransport, startedAt: number): Promise<OutboxSendResult> {
   const entry = readOutbox(storage).find((candidate) => candidate.id === id);
   if (!entry || entry.scope.actorId !== scope.actorId || entry.scope.breweryId !== scope.breweryId) return { status: "not_current" };
   if (!fermentationReadingOfflinePolicy.roles.includes(scope.role as "admin" | "brewer")) {
@@ -227,7 +254,7 @@ async function sendOne(storage: OutboxStorage, id: string, scope: OfflineScope, 
       hadUncertainOutcome: !firstPermanent,
       lastError: failureMessage(error),
     };
-    replaceAttempt(storage, failed, id);
+    replaceAttempt(storage, failed, id, startedAt);
     return { status: failed.state, entry: failed };
   }
 }
@@ -236,9 +263,10 @@ export function sendOutboxAttempt(storage: OutboxStorage, id: string, scope: Off
   let active = sends.get(storage as object);
   if (!active) { active = new Map(); sends.set(storage as object, active); }
   const existing = active.get(id);
-  if (existing) return existing;
-  const pending = sendOne(storage, id, scope, send).finally(() => active!.delete(id));
-  active.set(id, pending);
+  if (existing) return existing.pending;
+  const startedAt = Date.now();
+  const pending = sendOne(storage, id, scope, send, startedAt).finally(() => active!.delete(id));
+  active.set(id, { startedAt, pending });
   return pending;
 }
 
