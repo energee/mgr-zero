@@ -85,6 +85,7 @@ describe("Finished goods view", () => {
     expect(src).toMatch(/from "@\/components\/mgr\/views\/finished-goods"/);
     expect(src).toMatch(/<FinishedGoodsView\b/);
     expect(src).toMatch(/<MovementForm\b/);
+    expect(form).toMatch(/<RecordMovementView\b/);
     expect(form).toMatch(/<MovementRecordedView\b/);
   });
 });
@@ -97,7 +98,7 @@ describe("Record movement view", () => {
     expect(model.sku).toBe(SKU_HAZY.name);
     expect(model.bin).toBe("Cold");
     expect(model.channel).toBe("Taproom");
-    expect(model.preview).toBe(`Preview: −1 keg · ${formatVolume("0.50000000")} · festival removal · PA · amounts are entered positive`);
+    expect(model.preview).toBe(`Preview: −1 SKU unit · ${formatVolume("0.50000000")} · festival removal · PA · amounts are entered positive`);
   });
 
   it("renders Kind, SKU, Destination state, and Record movement", () => {

@@ -189,7 +189,7 @@ Sales sees history without correction controls. Shipments retain **Return shipme
 
 <Screen name="Record movement" />
 
-1. Open **Inventory** and select **Record Movement**.
+1. Open **Inventory** and select **Record movement**.
 2. Choose a **SKU**, **Location**, and **Bin**. Picking the location preselects its first bin alphabetically; change it if the stock sits elsewhere.
 3. Choose a **Type**. The default is `opening_balance`.
 4. For `depletion`, pick a **Channel**. The list is your brewery's own — every brewery starts with **Wholesale**, **Taproom**, **DTC**, and **Export**, and you edit that list under [**Sale channels**](#channels). **Taproom** is preselected. The channel decides how the removal is taxed, and that treatment is frozen onto the entry: editing the channel later never rewrites what is already recorded. `sale_removal` takes a channel too, but shipping sets it, not this form.
