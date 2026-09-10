@@ -22,7 +22,13 @@ export function BinView({
     <>
       <Field>
         <FieldLabel>Bin name</FieldLabel>
-        <Input aria-label="Bin name" value={controls.name ? model.name : undefined} defaultValue={controls.name ? undefined : model.name} onChange={(event) => controls.name?.(event.target.value)} required={Boolean(controls.name)} />
+        <Input
+          aria-label="Bin name"
+          value={controls.name ? model.name : undefined}
+          defaultValue={controls.name ? undefined : model.name}
+          onChange={(event) => controls.name?.(event.target.value)}
+          required={Boolean(controls.name)}
+        />
       </Field>
       {E.info("A location keeps at least one bin. Rename the last one rather than removing it.")}
       {E.note("Tap lines are not bins. The tap board owns those.")}
