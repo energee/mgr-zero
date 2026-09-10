@@ -36,7 +36,7 @@ export type FormatsSnapshot = {
   /** get_format_components [design]; inventory supplies the child set. */
   components?: FormatsComponentRow[];
   backHref?: string;
-  formatHref?: (id: string) => string;
+  formatHref?: (format: FormatsFormatRow) => string | undefined;
 };
 
 function childLabel(child: FormatsFormatRow, composed: boolean): string {
@@ -69,7 +69,7 @@ export function toFormatsViewProps({ formats, components = [], backHref, formatH
     empty: formats.length === 0 ? "No formats yet" : undefined,
     rows: formats.map((f) => ({
       key: f.id,
-      href: formatHref?.(f.id),
+      href: formatHref?.(f),
       cells: [
         f.brands ? `${f.brands.name} · ${f.name}` : f.name,
         f.basis,

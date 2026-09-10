@@ -51,7 +51,10 @@ export default async function CatalogPage() {
       ))}
       footer={
         <FormatsView
-          model={toFormatsViewProps({ formats, formatHref: (formatId) => `/catalog/formats/${formatId}` })}
+          model={toFormatsViewProps({
+            formats,
+            formatHref: (format) => format.basis === "packaged" ? `/catalog/formats/${format.id}` : undefined,
+          })}
           header={E.hd("Formats", "package composition", canWrite ? <FormatForm /> : undefined)}
         />
       }
