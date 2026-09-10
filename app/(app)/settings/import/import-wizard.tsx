@@ -1,17 +1,25 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { E } from "@/components/mgr/e";
+import {
+  Attachment, AttachmentContent, AttachmentDescription, AttachmentTitle, AttachmentTrigger,
+} from "@/components/ui/attachment";
 import { Button } from "@/components/ui/button";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Timeline, TimelineItem } from "@/components/ui/timeline";
 import { command } from "@/lib/commands/client";
 import { useCommandContext } from "@/app/(app)/brewery-provider";
 import type { CommandContextExpectation } from "@/lib/commands/registry";
 import { IMPORT_FIELDS, IMPORT_KINDS, IMPORT_ROW_CAP, mapCsvRows, parseCsv, validateImportRow, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
 
+const IMPORT_STEPS = ["upload", "map", "preview", "commit"];
+
 export function ImportWizard({ breweryId, lookups }: { breweryId: string; lookups: ImportLookups }) {
   const renderedContext = useCommandContext();
   const [kind, setKind] = useState<ImportKind>("customers");
   const [csv, setCsv] = useState<ReturnType<typeof parseCsv> | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
   const [mapping, setMapping] = useState<Record<string, number>>({});
   const [step, setStep] = useState(0);
   // ponytail: batch state lasts while this page stays open; persist it for reload recovery.
@@ -41,29 +49,63 @@ export function ImportWizard({ breweryId, lookups }: { breweryId: string; lookup
     stage({ headers: fields.map(f => f.name), rows: blocked.map(row => fields.map(f => row[f.name] ?? "")) });
     setBatch(null); setResult(null); setStep(2);
   }
-  return <>
-    {E.stp(["upload", "map", "preview", "commit"], step)}
-    <div className="flex flex-col gap-4 p-4">
+  return <div className="flex items-start">
+    <Timeline className="shrink-0 px-2 pt-4 sm:px-4">
+      {IMPORT_STEPS.map((title, index) => (
+        <TimelineItem
+          key={title}
+          marker={`Step ${index + 1}`}
+          title={title}
+          status={index < step ? "completed" : index === step ? "in-progress" : "pending"}
+          showConnector={index < IMPORT_STEPS.length - 1}
+        />
+      ))}
+    </Timeline>
+    <div className="min-w-0 flex-1 flex flex-col gap-4 p-4">
       {error && <p role="alert" className="text-destructive">{error}</p>}
       {step === 0 && <>
-        <label className="flex flex-col gap-1">Import kind<select className={control} value={kind} onChange={e => { setKind(e.target.value as ImportKind); setCsv(null); }}>
-          {IMPORT_KINDS.map(k => <option key={k} value={k}>{k.replaceAll("_", " ")}</option>)}
-        </select></label>
+        <Field>
+          <FieldLabel>Import kind</FieldLabel>
+          <Select value={kind} onValueChange={value => { setKind(value as ImportKind); setCsv(null); setFileName(null); }}>
+            <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectGroup>
+              {IMPORT_KINDS.map(k => <SelectItem key={k} value={k}>{k.replaceAll("_", " ")}</SelectItem>)}
+            </SelectGroup></SelectContent>
+          </Select>
+        </Field>
         <p>Upload a CSV with a header row, up to {IMPORT_ROW_CAP} records. Quoted commas and newlines are supported.</p>
-        <label className="flex flex-col gap-1">CSV file<input type="file" accept=".csv,text/csv" className={control} onChange={async e => {
-          const file = e.target.files?.[0]; setCsv(null); setError(null);
-          if (!file) return;
-          try { stage(parseCsv(await file.text())); } catch (err) { setError(err instanceof Error ? err.message : "Could not read CSV"); }
-        }} /></label>
+        <Field>
+          <FieldLabel>CSV file</FieldLabel>
+          <Attachment state={csv ? "done" : "idle"} className="w-full">
+            <AttachmentContent>
+              <AttachmentTitle>{fileName ?? "Choose a CSV file"}</AttachmentTitle>
+              <AttachmentDescription>{csv ? `${csv.rows.length} rows ready to map` : ".csv · up to 5,000 rows"}</AttachmentDescription>
+            </AttachmentContent>
+            <AttachmentTrigger asChild aria-label="Choose CSV file">
+              <label className="cursor-pointer"><input type="file" accept=".csv,text/csv" className="sr-only" onChange={async e => {
+                const file = e.target.files?.[0]; setCsv(null); setError(null);
+                if (!file) return;
+                setFileName(file.name);
+                try { stage(parseCsv(await file.text())); } catch (err) { setError(err instanceof Error ? err.message : "Could not read CSV"); }
+              }} /></label>
+            </AttachmentTrigger>
+          </Attachment>
+        </Field>
         {csv && <Button onClick={() => setStep(1)}>Map {csv.rows.length} rows</Button>}
       </>}
       {step === 1 && <>
         <p>Map CSV columns to fields. Required fields are marked *. References use IDs from the lists below.</p>
-        {fields.map(f => <label key={f.name} className="flex flex-col gap-1">{f.name}{f.required ? " *" : ""}
-          <select className={control} value={mapping[f.name] ?? -1} onChange={e => setMapping({ ...mapping, [f.name]: Number(e.target.value) })}>
-            <option value={-1}>Not mapped</option>{csv?.headers.map((h, i) => <option key={i} value={i}>{h}</option>)}
-          </select>{f.values && <span className="text-sm text-muted-foreground">{f.values.join(", ")}</span>}
-        </label>)}
+        {fields.map(f => <Field key={f.name}>
+          <FieldLabel>{f.name}{f.required ? " *" : ""}</FieldLabel>
+          <Select value={String(mapping[f.name] ?? -1)} onValueChange={value => setMapping({ ...mapping, [f.name]: Number(value) })}>
+            <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectGroup>
+              <SelectItem value="-1">Not mapped</SelectItem>
+              {csv?.headers.map((h, i) => <SelectItem key={h} value={String(i)}>{h}</SelectItem>)}
+            </SelectGroup></SelectContent>
+          </Select>
+          {f.values && <span className="text-sm text-muted-foreground">{f.values.join(", ")}</span>}
+        </Field>)}
         <Button onClick={() => setStep(2)}>Preview {rows.length} rows</Button>
         <Button variant="outline" onClick={() => setStep(0)}>Back to upload</Button>
       </>}
@@ -94,5 +136,5 @@ export function ImportWizard({ breweryId, lookups }: { breweryId: string; lookup
         {!!result?.blocked && <Button disabled={busy} onClick={correctBlocked}>Correct blocked rows in a new batch</Button>}
       </>}
     </div>
-  </>;
+  </div>;
 }
