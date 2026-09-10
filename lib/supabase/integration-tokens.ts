@@ -24,6 +24,15 @@ export type VersionedIntegrationTokens = IntegrationTokens & {
   refreshHardExpiresAt: string | null;
 };
 
+export type SquareCatalogSyncStart = {
+  actorId: string;
+  connectionId: string;
+  merchantId: string;
+  credentialVersion: number;
+  catalogGeneration: number;
+  requestId: string;
+};
+
 export type PortalInvoicePaymentClaim = VersionedIntegrationTokens & {
   realmId: string;
   remoteInvoiceId: string;
@@ -208,15 +217,51 @@ export async function compareAndSwapSquareTokens(
   if (data !== true) throw new CommandError("Square connection changed; retry with the current connection", 409, "conflict");
 }
 
+export async function beginSquareCatalogSync(ctx: Ctx, requestId: string) {
+  const { data, error } = await ctx.db.rpc("begin_square_catalog_sync", {
+    p_brewery: ctx.breweryId, p_request_id: requestId,
+  });
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error) throw new Error("Square catalog sync could not be started");
+  const row = data as Record<string, unknown> | null;
+  if (row?.replayResult && typeof row.replayResult === "object") {
+    return { replayResult: row.replayResult as { locations: number; variations: number } } as const;
+  }
+  if (typeof row?.actorId !== "string" || typeof row.connectionId !== "string" || typeof row.merchantId !== "string"
+    || typeof row.credentialVersion !== "number" || typeof row.catalogGeneration !== "number" || typeof row.requestId !== "string") {
+    throw new Error("Square catalog sync start was invalid");
+  }
+  return row as SquareCatalogSyncStart;
+}
+
+export async function advanceSquareCatalogSync(
+  ctx: Ctx,
+  start: SquareCatalogSyncStart,
+  nextCredentialVersion: number,
+) {
+  const { data, error } = await createAdminClient().rpc("advance_square_catalog_sync", {
+    p_brewery: ctx.breweryId, p_connection: start.connectionId, p_actor: start.actorId, p_request_id: start.requestId,
+    p_expected_version: start.credentialVersion, p_next_version: nextCredentialVersion,
+  });
+  if (error || data !== true) throw new CommandError("Square connection changed", 409, "conflict");
+  return { ...start, credentialVersion: nextCredentialVersion };
+}
+
+export async function markSquareAuthorizationFailed(ctx: Ctx, connectionId: string, expectedCredentialVersion: number) {
+  const { error } = await createAdminClient().rpc("mark_square_authorization_failed", {
+    p_brewery: ctx.breweryId, p_connection: connectionId, p_actor: ctx.userId, p_expected_version: expectedCredentialVersion,
+  });
+  if (error) throw new Error("Square authorization health could not be updated");
+}
+
 export async function recordSquareCatalogSnapshot(
   ctx: Ctx,
-  expected: VersionedIntegrationTokens,
-  requestId: string,
+  expected: SquareCatalogSyncStart,
   facts: { locations: import("@/lib/pos").SquareLocation[]; variations: import("@/lib/pos").SquareVariation[] },
 ) {
   const { data, error } = await createAdminClient().rpc("record_square_catalog_snapshot", {
-    p_brewery: ctx.breweryId, p_connection: expected.connectionId, p_actor: ctx.userId,
-    p_expected_version: expected.credentialVersion, p_request_id: requestId,
+    p_brewery: ctx.breweryId, p_connection: expected.connectionId, p_actor: expected.actorId,
+    p_expected_version: expected.credentialVersion, p_request_id: expected.requestId,
     p_locations: facts.locations, p_variations: facts.variations,
   });
   if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");

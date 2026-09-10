@@ -3,9 +3,13 @@ import { createHash, randomUUID } from "node:crypto";
 import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import { readSquareEnv } from "@/lib/env/server-parser";
 import {
+  advanceSquareCatalogSync,
+  beginSquareCatalogSync,
   compareAndSwapSquareTokens,
+  markSquareAuthorizationFailed,
   readVersionedIntegrationTokens,
   recordSquareCatalogSnapshot,
+  type SquareCatalogSyncStart,
   type VersionedIntegrationTokens,
 } from "@/lib/supabase/integration-tokens";
 
@@ -39,6 +43,23 @@ const sha256 = (value: string) => createHash("sha256").update(value).digest("hex
 const unavailable = () => new Error("Square is unavailable");
 const text = (value: unknown) => typeof value === "string" && value.trim() ? value : null;
 const finiteVersion = (value: unknown) => typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+
+class SquareProviderError extends Error {
+  constructor(readonly terminalAuthorization: boolean) { super("Square is unavailable"); }
+}
+
+const terminalAuthorization = (status: number, data: unknown) => {
+  if (status === 401 || status === 403) return true;
+  const row = data && typeof data === "object" ? data as Record<string, unknown> : null;
+  if (row?.type === "invalid_grant") return true;
+  return Array.isArray(row?.errors) && row.errors.some((value) => {
+    const error = value && typeof value === "object" ? value as Record<string, unknown> : null;
+    return error?.category === "AUTHENTICATION_ERROR" || error?.code === "UNAUTHORIZED" || error?.code === "ACCESS_TOKEN_EXPIRED";
+  });
+};
+
+const isTerminalAuthorization = (error: unknown): error is SquareProviderError =>
+  error instanceof SquareProviderError && error.terminalAuthorization;
 
 export function squareConfig(): SquareConfig {
   return readSquareEnv();
@@ -74,7 +95,8 @@ export class SquareClient {
     const refreshToken = text(data?.refresh_token);
     const accessExpiresAt = text(data?.expires_at);
     const merchantId = text(data?.merchant_id);
-    if (!response.ok || !accessToken || !refreshToken || !accessExpiresAt || !merchantId || !Number.isFinite(Date.parse(accessExpiresAt))) throw unavailable();
+    if (!response.ok) throw new SquareProviderError(terminalAuthorization(response.status, data));
+    if (!accessToken || !refreshToken || !accessExpiresAt || !merchantId || !Number.isFinite(Date.parse(accessExpiresAt))) throw unavailable();
     return { accessToken, refreshToken, accessExpiresAt, merchantId, receivedAt };
   }
 
@@ -102,7 +124,8 @@ export class SquareClient {
       headers: { "Square-Version": SQUARE_VERSION, Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", Accept: "application/json" },
     });
     const data = await response.json().catch(() => null);
-    if (!response.ok || !data || typeof data !== "object") throw unavailable();
+    if (!response.ok) throw new SquareProviderError(terminalAuthorization(response.status, data));
+    if (!data || typeof data !== "object") throw unavailable();
     return data as Record<string, unknown>;
   }
 
@@ -203,18 +226,31 @@ export async function completeSquareOAuth(input: {
 
 const secondsUntil = (receivedAt: string, expiresAt: string) => Math.max(1, Math.ceil((Date.parse(expiresAt) - Date.parse(receivedAt)) / 1000));
 
-async function refreshSquareCredentials(ctx: Ctx, client: SquareClient, expected?: VersionedIntegrationTokens) {
+async function refreshSquareCredentials(
+  ctx: Ctx,
+  client: SquareClient,
+  expected?: VersionedIntegrationTokens,
+  syncStart?: SquareCatalogSyncStart,
+) {
   const current = expected ?? await readVersionedIntegrationTokens(ctx, "square");
-  const next = await client.refresh(current.refreshToken).catch(() => { throw unavailable(); });
-  if (next.merchantId !== (await getSquareMerchant(ctx))) throw unavailable();
+  let next: SquareTokens;
+  try {
+    next = await client.refresh(current.refreshToken);
+  } catch (error) {
+    if (isTerminalAuthorization(error)) await markSquareAuthorizationFailed(ctx, current.connectionId, current.credentialVersion);
+    throw unavailable();
+  }
+  if (next.merchantId !== (syncStart?.merchantId ?? await getSquareMerchant(ctx))) throw unavailable();
   try {
     await compareAndSwapSquareTokens(ctx, current, next, secondsUntil(next.receivedAt, next.accessExpiresAt));
   } catch (error) {
-    if (!(error instanceof CommandError) || error.status !== 409) throw unavailable();
+    if (syncStart || !(error instanceof CommandError) || error.status !== 409) throw unavailable();
   }
   const stored = await readVersionedIntegrationTokens(ctx, "square").catch(() => { throw unavailable(); });
   if (stored.connectionId !== current.connectionId || stored.credentialVersion <= current.credentialVersion) throw unavailable();
-  return stored;
+  if (!syncStart) return { tokens: stored };
+  if (stored.credentialVersion !== current.credentialVersion + 1) throw unavailable();
+  return { tokens: stored, syncStart: await advanceSquareCatalogSync(ctx, syncStart, stored.credentialVersion) };
 }
 
 async function getSquareMerchant(ctx: Ctx) {
@@ -224,12 +260,27 @@ async function getSquareMerchant(ctx: Ctx) {
 }
 
 export async function refreshSquareTokens(ctx: Ctx, client: SquareClient) {
-  return (await refreshSquareCredentials(ctx, client)).accessToken;
+  return (await refreshSquareCredentials(ctx, client)).tokens.accessToken;
 }
 
 export async function syncSquareCatalog(ctx: Ctx, requestId: string, client: SquareClient) {
+  let start = await beginSquareCatalogSync(ctx, requestId);
+  if ("replayResult" in start) return start.replayResult;
   let tokens = await readVersionedIntegrationTokens(ctx, "square");
-  if (tokens.accessExpiresAt && Date.parse(tokens.accessExpiresAt) <= Date.now()) tokens = await refreshSquareCredentials(ctx, client, tokens);
-  const facts = await syncSquareCatalogFacts(client, tokens.accessToken, await getSquareMerchant(ctx));
-  return recordSquareCatalogSnapshot(ctx, tokens, requestId, facts);
+  if (tokens.connectionId !== start.connectionId || tokens.credentialVersion !== start.credentialVersion) {
+    throw new CommandError("Square connection changed", 409, "conflict");
+  }
+  if (tokens.accessExpiresAt && Date.parse(tokens.accessExpiresAt) <= Date.now()) {
+    const refreshed = await refreshSquareCredentials(ctx, client, tokens, start);
+    tokens = refreshed.tokens;
+    start = refreshed.syncStart!;
+  }
+  let facts: Awaited<ReturnType<typeof syncSquareCatalogFacts>>;
+  try {
+    facts = await syncSquareCatalogFacts(client, tokens.accessToken, start.merchantId);
+  } catch (error) {
+    if (isTerminalAuthorization(error)) await markSquareAuthorizationFailed(ctx, start.connectionId, tokens.credentialVersion);
+    throw unavailable();
+  }
+  return recordSquareCatalogSnapshot(ctx, start, facts);
 }

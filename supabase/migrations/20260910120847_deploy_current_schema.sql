@@ -1964,6 +1964,7 @@ ALTER TABLE public.pos_connections
   ADD COLUMN remote_revocation_state text NOT NULL DEFAULT 'not_requested' CHECK (remote_revocation_state IN ('not_requested','confirmed','unresolved')),
   ADD COLUMN last_error text,
   ADD COLUMN credential_version bigint NOT NULL DEFAULT 0,
+  ADD COLUMN catalog_sync_generation bigint NOT NULL DEFAULT 0,
   ADD COLUMN granted_scopes text[] NOT NULL DEFAULT '{}'::text[];
 CREATE UNIQUE INDEX pos_connections_current_merchant_idx ON public.pos_connections(merchant_id)
   WHERE state='connected' AND merchant_id IS NOT NULL;
@@ -2002,6 +2003,22 @@ CREATE POLICY staff_read ON public.pos_catalog_variations FOR SELECT
   USING (public.staff_role(brewery_id) IN ('admin','warehouse'));
 GRANT SELECT ON public.pos_catalog_variations TO authenticated;
 GRANT ALL ON public.pos_catalog_variations TO service_role;
+
+CREATE TABLE private.square_catalog_syncs (
+  actor_id uuid NOT NULL REFERENCES auth.users(id),
+  request_id uuid NOT NULL,
+  brewery_id uuid NOT NULL REFERENCES public.breweries(id),
+  connection_id uuid NOT NULL,
+  merchant_id text NOT NULL,
+  credential_version bigint NOT NULL,
+  catalog_generation bigint NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY(actor_id,request_id),
+  FOREIGN KEY(actor_id,request_id) REFERENCES private.command_requests(actor_id,request_id) ON DELETE CASCADE,
+  FOREIGN KEY(connection_id,brewery_id) REFERENCES public.pos_connections(id,brewery_id)
+);
+ALTER TABLE private.square_catalog_syncs ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE private.square_catalog_syncs FROM public,anon,authenticated,service_role;
 
 DROP VIEW public.pos_unmapped_items;
 CREATE VIEW public.pos_unmapped_items WITH (security_invoker=true) AS
@@ -2134,6 +2151,11 @@ CREATE OR REPLACE FUNCTION public.cas_integration_tokens(p_brewery uuid,p_provid
 RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE v_version bigint;
 BEGIN
+  IF p_provider='square' THEN
+    PERFORM 1 FROM public.pos_connections p WHERE p.brewery_id=p_brewery AND p.id=p_connection
+      AND p.state='connected' AND p.credential_version=p_expected_version FOR UPDATE;
+    IF NOT FOUND THEN RETURN false; END IF;
+  END IF;
   UPDATE private.integration_tokens t SET access_token=p_access_token,refresh_token=p_refresh_token,
     credential_version=credential_version+1,updated_at=now()
   WHERE t.brewery_id=p_brewery AND t.provider=p_provider AND t.connection_id=p_connection AND t.credential_version=p_expected_version
@@ -2166,19 +2188,123 @@ LANGUAGE sql SECURITY DEFINER SET search_path='' AS $$
     AND ((p_provider='qbo' AND q.state='connected') OR (p_provider='square' AND p.state='connected'))
 $$;
 
-CREATE FUNCTION public.record_square_catalog_snapshot(p_brewery uuid,p_connection uuid,p_actor uuid,p_expected_version bigint,
+CREATE FUNCTION public.begin_square_catalog_sync(p_brewery uuid,p_request_id uuid) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE actor uuid; request private.command_requests; connection public.pos_connections; attempt private.square_catalog_syncs;
+  token_version bigint; payload_hash bytea:=extensions.digest('{}'::jsonb::text,'sha256');
+BEGIN
+  actor:=private.assert_staff(p_brewery,ARRAY['admin']::public.staff_role[]);
+  SELECT * INTO request FROM private.command_requests WHERE actor_id=actor AND request_id=p_request_id FOR UPDATE;
+  IF FOUND THEN
+    IF request.brewery_id IS DISTINCT FROM p_brewery OR request.command_name<>'sync_square_catalog' OR request.payload_hash<>payload_hash THEN
+      RAISE EXCEPTION 'request id was already used with a different payload' USING errcode='MG409';
+    END IF;
+    IF request.result IS NOT NULL THEN RETURN jsonb_build_object('replayResult',request.result); END IF;
+    SELECT * INTO attempt FROM private.square_catalog_syncs WHERE actor_id=actor AND request_id=p_request_id;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Square catalog sync request is incomplete' USING errcode='MG409'; END IF;
+    IF NOT EXISTS(SELECT 1 FROM public.pos_connections c JOIN private.integration_tokens t
+      ON t.brewery_id=c.brewery_id AND t.provider='square' AND t.connection_id=c.id
+      WHERE c.brewery_id=p_brewery AND c.id=attempt.connection_id AND c.merchant_id=attempt.merchant_id AND c.state='connected'
+        AND c.credential_version=attempt.credential_version AND c.catalog_sync_generation=attempt.catalog_generation
+        AND t.credential_version=attempt.credential_version) THEN
+      RAISE EXCEPTION 'Square connection changed' USING errcode='MG409';
+    END IF;
+    RETURN jsonb_build_object('actorId',actor,'connectionId',attempt.connection_id,'merchantId',attempt.merchant_id,
+      'credentialVersion',attempt.credential_version,'catalogGeneration',attempt.catalog_generation,'requestId',p_request_id);
+  END IF;
+
+  SELECT * INTO connection FROM public.pos_connections c
+    WHERE c.brewery_id=p_brewery AND c.provider='square' AND c.state='connected' FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Square connection required'; END IF;
+  SELECT credential_version INTO token_version FROM private.integration_tokens t
+    WHERE t.brewery_id=p_brewery AND t.provider='square' AND t.connection_id=connection.id FOR SHARE;
+  IF NOT FOUND OR token_version<>connection.credential_version THEN RAISE EXCEPTION 'Square connection changed' USING errcode='MG409'; END IF;
+  INSERT INTO private.command_requests(actor_id,brewery_id,request_id,command_name,payload_hash)
+    VALUES(actor,p_brewery,p_request_id,'sync_square_catalog',payload_hash) ON CONFLICT(actor_id,request_id) DO NOTHING;
+  IF NOT FOUND THEN
+    SELECT * INTO request FROM private.command_requests WHERE actor_id=actor AND request_id=p_request_id FOR UPDATE;
+    IF request.brewery_id IS DISTINCT FROM p_brewery OR request.command_name<>'sync_square_catalog' OR request.payload_hash<>payload_hash THEN
+      RAISE EXCEPTION 'request id was already used with a different payload' USING errcode='MG409';
+    END IF;
+    IF request.result IS NOT NULL THEN RETURN jsonb_build_object('replayResult',request.result); END IF;
+    SELECT * INTO attempt FROM private.square_catalog_syncs WHERE actor_id=actor AND request_id=p_request_id;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Square catalog sync request is incomplete' USING errcode='MG409'; END IF;
+    IF NOT EXISTS(SELECT 1 FROM public.pos_connections c JOIN private.integration_tokens t
+      ON t.brewery_id=c.brewery_id AND t.provider='square' AND t.connection_id=c.id
+      WHERE c.brewery_id=p_brewery AND c.id=attempt.connection_id AND c.merchant_id=attempt.merchant_id AND c.state='connected'
+        AND c.credential_version=attempt.credential_version AND c.catalog_sync_generation=attempt.catalog_generation
+        AND t.credential_version=attempt.credential_version) THEN
+      RAISE EXCEPTION 'Square connection changed' USING errcode='MG409';
+    END IF;
+    RETURN jsonb_build_object('actorId',actor,'connectionId',attempt.connection_id,'merchantId',attempt.merchant_id,
+      'credentialVersion',attempt.credential_version,'catalogGeneration',attempt.catalog_generation,'requestId',p_request_id);
+  END IF;
+  UPDATE public.pos_connections SET catalog_sync_generation=catalog_sync_generation+1 WHERE id=connection.id
+    RETURNING catalog_sync_generation INTO connection.catalog_sync_generation;
+  INSERT INTO private.square_catalog_syncs(actor_id,request_id,brewery_id,connection_id,merchant_id,credential_version,catalog_generation)
+    VALUES(actor,p_request_id,p_brewery,connection.id,connection.merchant_id,connection.credential_version,connection.catalog_sync_generation)
+    RETURNING * INTO attempt;
+  RETURN jsonb_build_object('actorId',actor,'connectionId',attempt.connection_id,'merchantId',attempt.merchant_id,
+    'credentialVersion',attempt.credential_version,'catalogGeneration',attempt.catalog_generation,'requestId',p_request_id);
+END $$;
+
+CREATE FUNCTION public.advance_square_catalog_sync(p_brewery uuid,p_connection uuid,p_actor uuid,p_request_id uuid,
+  p_expected_version bigint,p_next_version bigint) RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE changed integer;
+BEGIN
+  UPDATE private.square_catalog_syncs a SET credential_version=p_next_version
+    WHERE a.brewery_id=p_brewery AND a.connection_id=p_connection AND a.actor_id=p_actor AND a.request_id=p_request_id
+      AND a.credential_version=p_expected_version AND p_next_version>p_expected_version
+      AND EXISTS(SELECT 1 FROM public.brewery_users u WHERE u.brewery_id=p_brewery AND u.user_id=p_actor AND u.role='admin')
+      AND EXISTS(SELECT 1 FROM public.pos_connections c JOIN private.integration_tokens t
+        ON t.brewery_id=c.brewery_id AND t.provider='square' AND t.connection_id=c.id
+        WHERE c.brewery_id=p_brewery AND c.id=p_connection AND c.merchant_id=a.merchant_id AND c.state='connected'
+          AND c.credential_version=p_next_version AND c.catalog_sync_generation=a.catalog_generation
+          AND t.credential_version=p_next_version);
+  GET DIAGNOSTICS changed=ROW_COUNT;
+  RETURN changed=1;
+END $$;
+
+CREATE FUNCTION public.mark_square_authorization_failed(p_brewery uuid,p_connection uuid,p_actor uuid,p_expected_version bigint) RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE changed integer;
+BEGIN
+  UPDATE public.pos_connections c SET state='recovery_required',last_error='Square authorization expired or was revoked',updated_at=now()
+    WHERE c.brewery_id=p_brewery AND c.id=p_connection AND c.provider='square' AND c.state='connected'
+      AND c.credential_version=p_expected_version
+      AND EXISTS(SELECT 1 FROM public.brewery_users u WHERE u.brewery_id=p_brewery AND u.user_id=p_actor AND u.role='admin')
+      AND EXISTS(SELECT 1 FROM private.integration_tokens t WHERE t.brewery_id=p_brewery AND t.provider='square'
+        AND t.connection_id=p_connection AND t.credential_version=p_expected_version);
+  GET DIAGNOSTICS changed=ROW_COUNT;
+  RETURN changed=1;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.record_square_catalog_snapshot(p_brewery uuid,p_connection uuid,p_actor uuid,p_expected_version bigint,
   p_request_id uuid,p_locations jsonb,p_variations jsonb) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-DECLARE replay jsonb; result jsonb;
+DECLARE request private.command_requests; attempt private.square_catalog_syncs; connection public.pos_connections;
+  token_version bigint; result jsonb;
 BEGIN
-  IF NOT EXISTS(SELECT 1 FROM public.brewery_users u WHERE u.brewery_id=p_brewery AND u.user_id=p_actor AND u.role='admin')
-    OR NOT EXISTS(SELECT 1 FROM public.pos_connections c JOIN private.integration_tokens t ON t.brewery_id=c.brewery_id AND t.provider='square' AND t.connection_id=c.id
-      WHERE c.brewery_id=p_brewery AND c.id=p_connection AND c.state='connected' AND c.credential_version=p_expected_version AND t.credential_version=p_expected_version) THEN
-    RAISE EXCEPTION 'Square connection changed' USING errcode='MG409';
-  END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.brewery_users u WHERE u.brewery_id=p_brewery AND u.user_id=p_actor AND u.role='admin') THEN
+    RAISE insufficient_privilege USING message='permission denied'; END IF;
   IF jsonb_typeof(p_locations)<>'array' OR jsonb_typeof(p_variations)<>'array' THEN RAISE EXCEPTION 'Square snapshot invalid'; END IF;
-  replay:=private.claim_command_request_for(p_actor,p_brewery,'sync_square_catalog',p_request_id,jsonb_build_object('connectionId',p_connection,'credentialVersion',p_expected_version));
-  IF replay IS NOT NULL THEN RETURN replay; END IF;
+  SELECT * INTO request FROM private.command_requests WHERE actor_id=p_actor AND request_id=p_request_id FOR UPDATE;
+  IF NOT FOUND OR request.brewery_id IS DISTINCT FROM p_brewery OR request.command_name<>'sync_square_catalog'
+    OR request.payload_hash<>extensions.digest('{}'::jsonb::text,'sha256') THEN
+    RAISE EXCEPTION 'Square catalog sync request is invalid' USING errcode='MG409';
+  END IF;
+  IF request.result IS NOT NULL THEN RETURN request.result; END IF;
+  SELECT * INTO attempt FROM private.square_catalog_syncs WHERE actor_id=p_actor AND request_id=p_request_id FOR UPDATE;
+  IF NOT FOUND OR attempt.brewery_id<>p_brewery OR attempt.connection_id<>p_connection OR attempt.credential_version<>p_expected_version THEN
+    RAISE EXCEPTION 'Square connection changed' USING errcode='MG409'; END IF;
+  SELECT * INTO connection FROM public.pos_connections c WHERE c.brewery_id=p_brewery AND c.id=p_connection FOR UPDATE;
+  SELECT credential_version INTO token_version FROM private.integration_tokens t
+    WHERE t.brewery_id=p_brewery AND t.provider='square' AND t.connection_id=p_connection FOR UPDATE;
+  IF connection.id IS NULL OR connection.provider<>'square' OR connection.state<>'connected'
+    OR connection.merchant_id<>attempt.merchant_id OR connection.credential_version<>p_expected_version
+    OR connection.catalog_sync_generation<>attempt.catalog_generation OR token_version IS DISTINCT FROM p_expected_version THEN
+    RAISE EXCEPTION 'Square connection changed' USING errcode='MG409'; END IF;
   INSERT INTO public.pos_locations(brewery_id,connection_id,external_location_id,external_name,external_status,available,last_seen_at)
     SELECT p_brewery,p_connection,x.id,x.name,x.status,true,now() FROM jsonb_to_recordset(p_locations) AS x(id text,name text,status text)
     WHERE x.id IS NOT NULL AND btrim(x.id)<>''
@@ -2258,6 +2384,8 @@ BEGIN
   IF replay IS NOT NULL THEN RETURN QUERY SELECT null::text,replay; RETURN; END IF;
   UPDATE private.square_oauth_intents SET consumed_at=coalesce(consumed_at,now()),exchange_state='recovery_required'
     WHERE brewery_id=p_brewery AND exchange_state IN ('pending','exchanging');
+  PERFORM 1 FROM public.pos_connections WHERE brewery_id=p_brewery AND id=p_connection AND state='connected' FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'connection not available'; END IF;
   DELETE FROM private.integration_tokens t WHERE t.brewery_id=p_brewery AND t.provider='square' AND t.connection_id=p_connection
     RETURNING t.access_token,t.credential_version INTO token,version;
   UPDATE public.pos_connections SET state='disconnected',remote_revocation_state='unresolved',
@@ -2280,14 +2408,18 @@ BEGIN
   RETURN private.complete_command_request_for(p_actor,p_request_id,result);
 END $$;
 
-REVOKE ALL ON FUNCTION public.begin_square_oauth(uuid,text,text,text,uuid,text[]),public.claim_square_oauth(text,uuid,uuid,text),
+REVOKE ALL ON FUNCTION public.begin_square_oauth(uuid,text,text,text,uuid,text[]),public.begin_square_catalog_sync(uuid,uuid),
+  public.claim_square_oauth(text,uuid,uuid,text),
   public.fail_square_oauth(uuid,uuid),public.complete_square_oauth(uuid,uuid,text,text,text,text,timestamptz,text[],jsonb),
+  public.advance_square_catalog_sync(uuid,uuid,uuid,uuid,bigint,bigint),public.mark_square_authorization_failed(uuid,uuid,uuid,bigint),
   public.record_square_catalog_snapshot(uuid,uuid,uuid,bigint,uuid,jsonb,jsonb),
   public.set_pos_location_mapping(uuid,text,uuid,uuid),public.set_pos_item_mapping(uuid,text,text,uuid,uuid,boolean,uuid),
   public.begin_square_disconnect(uuid,uuid,uuid,uuid),public.finish_square_disconnect(uuid,uuid,uuid,uuid,boolean) FROM public,anon,authenticated,service_role;
-GRANT EXECUTE ON FUNCTION public.begin_square_oauth(uuid,text,text,text,uuid,text[]),public.set_pos_location_mapping(uuid,text,uuid,uuid),
+GRANT EXECUTE ON FUNCTION public.begin_square_oauth(uuid,text,text,text,uuid,text[]),public.begin_square_catalog_sync(uuid,uuid),
+  public.set_pos_location_mapping(uuid,text,uuid,uuid),
   public.set_pos_item_mapping(uuid,text,text,uuid,uuid,boolean,uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.claim_square_oauth(text,uuid,uuid,text),public.fail_square_oauth(uuid,uuid),
   public.complete_square_oauth(uuid,uuid,text,text,text,text,timestamptz,text[],jsonb),
+  public.advance_square_catalog_sync(uuid,uuid,uuid,uuid,bigint,bigint),public.mark_square_authorization_failed(uuid,uuid,uuid,bigint),
   public.record_square_catalog_snapshot(uuid,uuid,uuid,bigint,uuid,jsonb,jsonb),
   public.begin_square_disconnect(uuid,uuid,uuid,uuid),public.finish_square_disconnect(uuid,uuid,uuid,uuid,boolean) TO postgres,service_role;

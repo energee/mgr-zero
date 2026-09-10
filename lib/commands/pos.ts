@@ -1,5 +1,23 @@
 import { z } from "zod";
-import { defineCommand, defineQuery, rows, unwrap } from "./registry";
+import { CommandError, defineCommand, defineQuery, unwrap } from "./registry";
+
+async function completePosRows<T>(page: (start: number) => PromiseLike<{
+  data: unknown[] | null; error: { message: string; code?: string } | null; count: number | null;
+}>): Promise<T[]> {
+  const all: T[] = [];
+  let total: number | undefined;
+  do {
+    const result = await page(all.length);
+    const next = await unwrap(Promise.resolve(result));
+    if (result.count === null || !next || (total !== undefined && result.count !== total)
+      || (next.length === 0 && all.length < result.count)) {
+      throw new CommandError("The complete Square mapping list could not be loaded. Retry the read.", 409, "conflict");
+    }
+    total = result.count;
+    all.push(...next as T[]);
+  } while (all.length < total);
+  return all;
+}
 
 defineCommand({
   name: "connect_square", description: "Begin administrator consent for a Square seller connection",
@@ -38,29 +56,34 @@ defineCommand({
 });
 
 defineQuery({
-  name: "list_pos_locations", description: "List every observed Square location and its explicit MGR location mapping",
+  name: "list_pos_locations", description: "List every observed Square location and its explicit labeled MGR location mapping",
   input: z.object({}), roles: ["admin"],
   handler: async (ctx) => {
-    const data = await rows<{ external_location_id: string; external_name: string | null; external_status: string | null; available: boolean; location_id: string | null }>(
-      ctx.db.from("pos_locations").select("external_location_id,external_name,external_status,available,location_id")
-        .eq("brewery_id", ctx.breweryId).order("external_name"),
+    const data = await completePosRows<{ external_location_id: string; external_name: string | null; external_status: string | null;
+      available: boolean; location_id: string | null; locations: { name: string } | null }>((start) =>
+      ctx.db.from("pos_locations").select("external_location_id,external_name,external_status,available,location_id,locations(name)", { count: "exact" })
+        .eq("brewery_id", ctx.breweryId).order("external_location_id").range(start, start + 499),
     );
     return data.map((row) => ({ externalLocationId: row.external_location_id, name: row.external_name,
-      status: row.external_status, available: row.available, mgrLocationId: row.location_id }));
+      status: row.external_status, available: row.available, mgrLocationId: row.location_id,
+      mappingLabel: row.locations?.name ?? null }));
   },
 });
 
 defineQuery({
-  name: "list_pos_variations", description: "List observed Square variations with queued, ignored, or explicit packaged/poured mapping state",
+  name: "list_pos_variations", description: "List every observed Square variation with queued, ignored, or explicit labeled packaged/poured mapping state",
   input: z.object({}), roles: ["admin", "warehouse"],
   handler: async (ctx) => {
     const [data, mappings] = await Promise.all([
-      rows<{ external_item_id: string; external_variation_id: string; external_item_name: string | null; external_variation_name: string | null; available: boolean }>(
-        ctx.db.from("pos_catalog_variations").select("external_item_id,external_variation_id,external_item_name,external_variation_name,available")
-          .eq("brewery_id", ctx.breweryId).order("external_item_name"),
+      completePosRows<{ external_item_id: string; external_variation_id: string; external_item_name: string | null;
+        external_variation_name: string | null; available: boolean }>((start) =>
+        ctx.db.from("pos_catalog_variations").select("external_item_id,external_variation_id,external_item_name,external_variation_name,available", { count: "exact" })
+          .eq("brewery_id", ctx.breweryId).order("external_item_id").order("external_variation_id").range(start, start + 499),
       ),
-      rows<{ external_item_id: string; external_variation_id: string; sku_id: string | null; format_id: string | null; ignored: boolean }>(
-        ctx.db.from("pos_item_mappings").select("external_item_id,external_variation_id,sku_id,format_id,ignored").eq("brewery_id", ctx.breweryId),
+      completePosRows<{ external_item_id: string; external_variation_id: string; sku_id: string | null; format_id: string | null;
+        ignored: boolean; skus: { name: string } | null; formats: { name: string } | null }>((start) =>
+        ctx.db.from("pos_item_mappings").select("external_item_id,external_variation_id,sku_id,format_id,ignored,skus(name),formats(name)", { count: "exact" })
+          .eq("brewery_id", ctx.breweryId).order("external_item_id").order("external_variation_id").range(start, start + 499),
       ),
     ]);
     const byVariation = new Map(mappings.map((row) => [`${row.external_item_id}\0${row.external_variation_id}`, row]));
@@ -68,7 +91,9 @@ defineQuery({
       const mapping = byVariation.get(`${row.external_item_id}\0${row.external_variation_id}`);
       return { externalItemId: row.external_item_id, externalVariationId: row.external_variation_id,
         itemName: row.external_item_name, variationName: row.external_variation_name, available: row.available,
-        disposition: mapping?.ignored ? "ignored" : mapping ? "mapped" : "queued", skuId: mapping?.sku_id ?? null, formatId: mapping?.format_id ?? null };
+        disposition: mapping?.ignored ? "ignored" : mapping ? "mapped" : "queued", skuId: mapping?.sku_id ?? null, formatId: mapping?.format_id ?? null,
+        mappingLabel: mapping?.ignored ? "Ignored" : mapping?.sku_id && mapping.skus ? `SKU · ${mapping.skus.name}`
+          : mapping?.format_id && mapping.formats ? `Pour · ${mapping.formats.name}` : null };
     });
   },
 });
