@@ -10,7 +10,6 @@ import { SCREEN_ROUTES } from "@/lib/mgr/screen-routes";
 const KNOWN_VIEW_DEBT = [
   "Session expired: SessionExpiredView <- app/(auth)/login/page.tsx",
   "Record movement: RecordMovementView <- app/(app)/inventory/page.tsx",
-  "Movement recorded: MovementRecordedView <- app/(app)/inventory/page.tsx",
   "Entity picker: SearchView <- components/mgr/search-palette.tsx",
   "Adjust lines: AdjustLinesView <- app/(app)/orders/[id]/page.tsx",
   "Short pick: ShortPickView <- app/(app)/orders/[id]/page.tsx",
