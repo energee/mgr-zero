@@ -13,6 +13,7 @@ import { E, splitPinned } from "../components/mgr/e";
 import { VenueFrame } from "../components/mgr/venue";
 import { AppShell } from "../components/mgr/app-shell";
 import { ScreenFrame } from "../components/mgr/screen-frame";
+import { DatePicker } from "../components/mgr/date-picker";
 
 /** One screen's body as static markup, by name. Rendered once and kept: the
  *  suite asks for the same handful of screens across a dozen assertions. */
@@ -462,6 +463,11 @@ describe("SCREENS", () => {
       expect.soft(html, value).toContain("Best by");
     }
     expect(renderToStaticMarkup(createElement("div", null, E.edit("Best by", "", "date")))).toContain("Pick a date");
+  });
+
+  it("renders the controlled date value used by live shared forms", () => {
+    const html = renderToStaticMarkup(createElement(DatePicker, { label: "Date", defaultValue: "", value: "2027-08-31", onChange: () => {} }));
+    expect(html).toContain("August 31, 2027");
   });
 
   it("falls back to initials when a person has no fixture photo", () => {

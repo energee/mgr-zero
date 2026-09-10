@@ -8,6 +8,8 @@ export type MaterialViewModel = {
   purchaseUnitOptions: string[];
   unit: string;
   unitOptions: string[];
+  defaultVendorId?: string;
+  defaultVendorOptions: { id: string; label: string }[];
   lotTracked: boolean;
   active: boolean;
 };
