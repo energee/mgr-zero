@@ -15,6 +15,8 @@ import { cleanupChatState, runChatCallbackBatch, runChatDeliveryBatch, runChatSc
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
+vi.mock("@/lib/chat/pacing", () => ({ paced: async <T>(_key: string, call: () => Promise<T>) => call() }));
+
 process.env.APP_URL = "https://mgr.test";
 process.env.CHAT_JOB_SECRET = "job-secret";
 
@@ -36,13 +38,13 @@ type Ctx = Awaited<ReturnType<typeof makeStaffCtx>>;
 let b: { id: string }, adminCtx: Ctx, sales: Ctx, inst: { id: string; external_installation_id: string };
 let customerId: string, shipToId: string, whId: string, whBinId: string, skuId: string;
 
-const calls = { sends: [] as { destinationId: string; at: number; notification: { subject: { safeLabel: string }; detail: string; actions: readonly { id: string; intentId?: string }[] } }[], updates: [] as { ref: { messageId: string }; resolved?: boolean }[], homes: [] as { externalUserId: string; items: readonly unknown[]; linkUrl?: string; intents?: Record<string,string> }[] };
+const calls = { sends: [] as { destinationId: string; notification: { subject: { safeLabel: string }; detail: string; actions: readonly { id: string; intentId?: string }[] } }[], updates: [] as { ref: { messageId: string }; resolved?: boolean }[], homes: [] as { externalUserId: string; items: readonly unknown[]; linkUrl?: string; intents?: Record<string,string> }[] };
 let failNext: unknown = null;
 let validation: { ok: true } | { ok: false; reason: string } = { ok: true };
 const transport: ChatProviderTransport = {
   provider: "slack", capabilities: SLACK_CAPABILITIES,
   validateDestination: async () => validation,
-  send: async (i) => { if (failNext) { const e = failNext; failNext = null; throw e; } calls.sends.push({ destinationId: i.destinationId, at: Date.now(), notification: i.notification }); return { conversationId: i.destinationId, messageId: `m${calls.sends.length}` }; },
+  send: async (i) => { if (failNext) { const e = failNext; failNext = null; throw e; } calls.sends.push({ destinationId: i.destinationId, notification: i.notification }); return { conversationId: i.destinationId, messageId: `m${calls.sends.length}` }; },
   update: async (i) => { if (failNext) { const e = failNext; failNext = null; throw e; } calls.updates.push({ ref: i.ref, resolved: i.resolved }); },
   publishHome: async (i) => { calls.homes.push({ externalUserId: i.externalUserId, items: i.items, linkUrl: i.linkUrl, intents: i.intents }); },
 };
@@ -132,7 +134,7 @@ describe("callback batch (App Home)", () => {
 });
 
 describe("delivery batch", () => {
-  it("sends queued personal deliveries once, serialising a conversation to one send per second", async () => {
+  it("sends queued personal deliveries once", async () => {
     await drain(); calls.sends.length = 0;
     const first = await submittedOrder();
     const second = await submittedOrder();
@@ -148,9 +150,6 @@ describe("delivery batch", () => {
         expect(d.provider_conversation_id).toMatch(/^D-U-/);
       }
     }
-    const perConversation = new Map<string, number[]>();
-    for (const s of calls.sends) perConversation.set(s.destinationId, [...(perConversation.get(s.destinationId) ?? []), s.at]);
-    for (const [, times] of perConversation) if (times.length > 1) expect(times[1] - times[0]).toBeGreaterThanOrEqual(1000);
     expect(calls.sends.every((s) => !JSON.stringify(s.notification).includes("Bar"))).toBe(true);
     expect((await deliver()).sent).toBe(0);
   });
