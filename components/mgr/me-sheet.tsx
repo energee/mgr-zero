@@ -9,6 +9,7 @@
 // every other gallery fixture) supplies one.
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { logout, switchBrewery } from "@/app/(auth)/actions";
 import { Button } from "@/components/ui/button";
@@ -19,13 +20,14 @@ import { UserAvatar } from "@/components/mgr/user-avatar";
 import { UserCircleIcon } from "@hugeicons/core-free-icons";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-export function MeSheet({ fields, avatar, breweries, signOut = "destructive" }: {
-  fields: [string, string][];
+export function MeSheet({ fields = [], avatar, breweries, signOut = "destructive", content }: {
+  fields?: [string, string][];
   avatar?: { src?: string; name: string };
   /** Every brewery the account may operate as; the switcher shows with two or more. */
   breweries?: { id: string; name: string; current: boolean }[];
   /** Staff Me is destructive (plan §3 follow-up); portal Me stays outline. */
   signOut?: "destructive" | "outline";
+  content?: ReactNode;
 }) {
   const mobile = useIsMobile();
   return (
@@ -38,34 +40,42 @@ export function MeSheet({ fields, avatar, breweries, signOut = "destructive" }: 
           {avatar ? <UserAvatar {...avatar} className="size-10" /> : null}
           <SheetTitle>Me</SheetTitle>
         </SheetHeader>
-        <dl className="flex flex-col px-4 text-sm">
-          {fields.map(([k, v]) => (
-            <div key={k} className="flex items-center justify-between gap-4 py-2">
-              <dt className="text-muted-foreground">{k}</dt>
-              <dd className="text-right">{v}</dd>
-            </div>
-          ))}
-        </dl>
-        {breweries && breweries.length > 1 && (
-          <div className="flex flex-col gap-1 px-4 text-sm">
-            <h3 className="text-muted-foreground">Brewery</h3>
-            {breweries.map((b) => (
-              <form key={b.id} action={switchBrewery} className="flex items-center justify-between gap-2 py-1">
-                <input type="hidden" name="breweryId" value={b.id} />
-                <span>{b.name}</span>
-                {b.current ? <span className="text-muted-foreground">current</span> : <Button type="submit" variant="ghost" size="sm">Switch</Button>}
-              </form>
+        {content ?? <>
+          <dl className="flex flex-col px-4 text-sm">
+            {fields.map(([k, v]) => (
+              <div key={k} className="flex items-center justify-between gap-4 py-2">
+                <dt className="text-muted-foreground">{k}</dt>
+                <dd className="text-right">{v}</dd>
+              </div>
             ))}
-          </div>
-        )}
-        <div className="flex flex-col gap-2 px-4">
-          <ThemeToggle />
-          <Button variant="outline" asChild><Link href="/password">Change password</Link></Button>
-          <form action={logout}>
-            <Button type="submit" variant={signOut} className="w-full">Sign out</Button>
-          </form>
-        </div>
+          </dl>
+          {breweries && breweries.length > 1 && (
+            <div className="flex flex-col gap-1 px-4 text-sm">
+              <h3 className="text-muted-foreground">Brewery</h3>
+              {breweries.map((b) => (
+                <form key={b.id} action={switchBrewery} className="flex items-center justify-between gap-2 py-1">
+                  <input type="hidden" name="breweryId" value={b.id} />
+                  <span>{b.name}</span>
+                  {b.current ? <span className="text-muted-foreground">current</span> : <Button type="submit" variant="ghost" size="sm">Switch</Button>}
+                </form>
+              ))}
+            </div>
+          )}
+          <MeSheetActions signOut={signOut} />
+        </>}
       </SheetContent>
     </Sheet>
+  );
+}
+
+export function MeSheetActions({ signOut = "destructive" }: { signOut?: "destructive" | "outline" }) {
+  return (
+    <div className="flex flex-col gap-2 px-4">
+      <ThemeToggle />
+      <Button variant="outline" asChild><Link href="/password">Change password</Link></Button>
+      <form action={logout}>
+        <Button type="submit" variant={signOut} className="w-full">Sign out</Button>
+      </form>
+    </div>
   );
 }

@@ -101,4 +101,12 @@ describe("inventory and live Account", () => {
     expect(src).toMatch(/<PortalAccountView\b/);
     expect(src).not.toMatch(/from "@\/components\/mgr\/e"/);
   });
+
+  it("the live portal Me sheet mounts PortalMeView with the real actions", () => {
+    const layout = readFileSync("app/(portal)/layout.tsx", "utf8");
+    expect(layout).toMatch(/from "@\/components\/mgr\/views\/portal-me"/);
+    expect(layout).toMatch(/toPortalMeViewProps/);
+    expect(layout).toMatch(/<MeSheet[\s\S]*<PortalMeView\b/);
+    expect(layout).toMatch(/<MeSheetActions signOut="outline"/);
+  });
 });

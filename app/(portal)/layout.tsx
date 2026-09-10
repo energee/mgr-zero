@@ -10,7 +10,9 @@ import { getRequestIdentity } from "@/lib/auth/request-context";
 import { sidebarOpenFromCookie } from "@/lib/mgr/sidebar-state";
 import { BreweryProvider } from "@/app/(app)/brewery-provider";
 import { PortalShell } from "@/components/mgr/app-shell";
-import { MeSheet } from "@/components/mgr/me-sheet";
+import { MeSheet, MeSheetActions } from "@/components/mgr/me-sheet";
+import { PortalMeView } from "@/components/mgr/views/portal-me";
+import { toPortalMeViewProps } from "@/lib/mgr/portal-me-view";
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const [customer, sidebarOpen, identity] = await Promise.all([getActiveCustomer(), sidebarOpenFromCookie(), getRequestIdentity()]);
@@ -20,7 +22,14 @@ export default async function PortalLayout({ children }: { children: React.React
         brand={customer.customerName}
         sidebarOpen={sidebarOpen}
         headerRight={
-          <MeSheet fields={[["Signed in as", identity?.email ?? ""], ["Account", customer.customerName]]} signOut="outline" />
+          <MeSheet
+            content={
+              <PortalMeView
+                model={toPortalMeViewProps({ email: identity?.email ?? "", account: customer.customerName })}
+                footer={<MeSheetActions signOut="outline" />}
+              />
+            }
+          />
         }
       >
         {children}
