@@ -9,16 +9,21 @@ export type { FormatsViewModel };
 export function FormatsView({
   model,
   createAction,
+  header,
   footer,
 }: {
   model: FormatsViewModel;
   createAction?: ReactNode;
+  header?: ReactNode;
   footer?: ReactNode;
 }) {
   return (
     <>
-      {E.back("Settings", "Formats", createAction !== undefined ? createAction : E.btn("Add format"), model.backHref)}
-      {model.empty ? E.blank(model.empty) : E.tbl(model.headers, model.rows.map((r) => r.cells))}
+      {header ?? E.back("Settings", "Formats", createAction !== undefined ? createAction : E.btn("Add format"), model.backHref)}
+      {model.empty ? E.blank(model.empty) : E.tbl(
+        [...model.headers, ""],
+        model.rows.map((row) => [...row.cells, E.act("Open format", "primary", row.href)]),
+      )}
       {footer}
     </>
   );

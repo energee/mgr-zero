@@ -113,12 +113,13 @@ describe("Catalog view", () => {
     expect(body.props.model).toEqual(toCatalogViewProps(catalogBrands));
   });
 
-  it("the live Catalog page mounts CatalogView and does not mount FormatsView", () => {
+  it("the live Catalog page mounts CatalogView and the shared FormatsView", () => {
     const src = readFileSync("app/(app)/catalog/page.tsx", "utf8");
     expect(src).toMatch(/from "@\/components\/mgr\/views\/catalog"/);
     expect(src).toMatch(/<CatalogView\b/);
     expect(src).toMatch(/<BrandForm\b/);
-    expect(src).not.toMatch(/from "@\/components\/mgr\/views\/formats"/);
+    expect(src).toMatch(/from "@\/components\/mgr\/views\/formats"/);
+    expect(src).toMatch(/<FormatsView\b/);
     expect(src).not.toMatch(/waterProfileCount/);
     expect(src).toMatch(/backHref: "\/more"/);
   });
@@ -253,6 +254,7 @@ describe("Formats view", () => {
     expect(html).toMatch(/Pint/);
     expect(html).toContain(formatVolume("0.50000000"));
     expect(html).not.toMatch(/→/);
+    expect(html).toMatch(/Open format/);
   });
 
   it("the Formats inventory record is FormatsView", () => {

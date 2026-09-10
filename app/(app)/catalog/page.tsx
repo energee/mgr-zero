@@ -4,7 +4,9 @@
 // links to its components and Package BOM. A SKU is one brand × one packaged
 // format; bbl per unit lives on the format.
 import { CatalogView } from "@/components/mgr/views/catalog";
+import { FormatsView } from "@/components/mgr/views/formats";
 import { toCatalogViewProps } from "@/lib/mgr/catalog-view";
+import { toFormatsViewProps } from "@/lib/mgr/formats-view";
 import { E } from "@/components/mgr/e";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
@@ -47,12 +49,12 @@ export default async function CatalogPage() {
           {formats.filter((f) => f.brand_id === brand.id).map((f) => <div key={f.id}>{E.row(`${brand.name} · ${f.name}`, `${f.ounces} oz · poured`, canWrite ? <PourForm key={`${f.id}-${f.name}-${f.ounces}`} brand={brand} pour={{ id: f.id, name: f.name, ounces: f.ounces! }} /> : undefined)}</div>)}
         </div>
       ))}
-      footer={<>
-        {E.hd("Formats", "package composition", canWrite ? <FormatForm /> : undefined)}
-        {packaged.length === 0 ? E.blank("No formats yet") : formats.filter((f) => f.basis === "packaged").map((f) => (
-          <div key={f.id}>{E.row(f.name, `${f.basis}${f.package_type ? ` · ${f.package_type}${f.keg_size ? ` (${f.keg_size.replace(/_/g, " ")})` : ""}` : ""}${f.units_per_case ? ` · ${f.units_per_case} per case` : ""}${f.bbl_per_unit ? ` · ${formatVolume(f.bbl_per_unit)}` : ""}`, E.act("Open format", "primary", `/catalog/formats/${f.id}`))}</div>
-        ))}
-      </>}
+      footer={
+        <FormatsView
+          model={toFormatsViewProps({ formats, formatHref: (formatId) => `/catalog/formats/${formatId}` })}
+          header={E.hd("Formats", "package composition", canWrite ? <FormatForm /> : undefined)}
+        />
+      }
     />
   );
 }

@@ -30,7 +30,6 @@ const KNOWN_VIEW_DEBT = [
   "Receipt: ReceiptView <- app/(app)/purchase-orders/[id]/page.tsx",
   "Cycle count: CycleCountView <- app/(app)/materials/page.tsx",
   "Materials: MaterialsView <- app/(app)/materials/page.tsx",
-  "Formats: FormatsView <- app/(app)/catalog/page.tsx",
   "Format: FormatView <- app/(app)/catalog/formats/[id]/page.tsx",
   "Price group: PriceGroupView <- app/(app)/pricing/page.tsx",
 ] as const;
