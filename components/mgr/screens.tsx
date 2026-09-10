@@ -209,6 +209,7 @@ import { toLocationsViewProps } from "@/lib/mgr/locations-view";
 import { toMaterialViewProps } from "@/lib/mgr/material-view";
 import { toMaterialsViewProps } from "@/lib/mgr/materials-view";
 import { toMaterialsOnHandViewProps } from "@/lib/mgr/materials-on-hand-view";
+import { ComposerAnswerView, ComposerProposalView, ComposerQuestionView } from "@/components/mgr/views/composer";
 import { toMeViewProps } from "@/lib/mgr/me-view";
 import { toNewPoViewProps } from "@/lib/mgr/new-po-view";
 import { toMoreViewProps } from "@/lib/mgr/more-view";
@@ -851,23 +852,20 @@ export const SCREENS: Screen[] = [
     tab: "Today",
     group: "Global",
     name: "Composer proposal",
-    to: { "\u201cBlew a half of Hazy at the taproom\u201d": "Composer question" },
+    to: { "\u201cBlew a half of Hazy at the taproom\u201d": "Composer question", "Open as form": "Record movement", Dismiss: "Today", "Commit movement": "Movement recorded" },
     job: "Candidate language becomes canonical server preview; signed effect leads",
     reads: "preview_command [internal query, not an AI tool]",
     writes: "record_movement [Commit; same requestId + previewToken; server revalidates]",
     states: [["ambiguous", "One question · choice chips · no Commit button", 1], ["stale", "Reject and preview current data", 1], ["permission", "No proposal beyond allowed role", 1], ["offline", "Save candidate; no fake preview"]],
     spec: "Ambiguity (“half” = ½ bbl keg, or half the remaining ⅙?) renders a question with choice chips and no Commit; this frame is the resolved proposal after that choice. The preview query is internal, never an AI tool.",
-    body: (<>
-      {E.hd("Composer", "proposal")}
-      {E.row("“Blew a half of Hazy at the taproom”")}
-      {E.num("−1 × Hazy IPA · ½ bbl keg", "Taproom · depletion · −½ bbl")}
-      {E.nav("SKU / package", "Hazy IPA · ½ bbl keg")}
-      {E.pick("Location", "Taproom", ["Warehouse", "Taproom"])}
-      {E.pick("Type", "Depletion", ["Depletion", "Loss", "Adjustment"])}
-      {E.info("Document numbers are assigned on commit.")}
-      {E.sp()}
-      {E.btns([["Open as form", "g"], ["Commit movement", "irr"]])}
-    </>),
+    body: <ComposerProposalView
+      query="Blew a half of Hazy at the taproom"
+      effects={[{ label: "Hazy IPA · ½ bbl keg · Taproom · Walk-in", qty: "-1", bbl: "-0.50000000", stockBeforeQty: "3", stockAfterQty: "2", taxTreatment: "taxable", correction: "reverse_inventory_movement" }]}
+      warnings={[]}
+      openHref="#"
+      openTo="Record movement"
+      onCommit={() => undefined}
+    />,
   },
   {
     step: 4,
@@ -875,38 +873,36 @@ export const SCREENS: Screen[] = [
     tab: "Today",
     group: "Global",
     name: "Composer question",
-    to: { "\u201cBlew a half of Hazy at the taproom\u201d": "Composer proposal" },
+    to: { "\u201cBlew a half of Hazy at the taproom\u201d": "Composer proposal", "\u00bd bbl keg": "Composer proposal", "Half the remaining \u2159": "Composer proposal" },
     job: "One question, chips, no Commit until the SKU is chosen",
     reads: "preview_command [internal query, not an AI tool]",
     writes: "none",
     states: [["ambiguous", "choice chips · no Commit"], ["resolved", "opens Composer proposal"]],
     spec: "Named in Composer proposal states and never drawn until now. “Blew a half of Hazy” must pick the package before a Commit exists.",
-    body: (<>
-      {E.hd("Composer", "question")}
-      {E.row("“Blew a half of Hazy at the taproom”")}
-      {E.ttl("Which half?")}
-      {E.chips(["½ bbl keg", "Half the remaining ⅙"], -1)}
-      {E.info("The verb stays off until this is answered.")}
-    </>),
+    body: <ComposerQuestionView
+      query="Blew a half of Hazy at the taproom"
+      prompt="Which half?"
+      choices={[{ value: "half-barrel", label: "½ bbl keg" }, { value: "half-remaining", label: "Half the remaining ⅙" }]}
+    />,
   },
   {
     step: 4,
     slice: 1,
     tab: "Today",
     group: "Global",
-    name: "Composer answer", gatedBy: "Program 15",
+    name: "Composer answer",
     to: { "Shortfall detail": "Pars and allocation", Review: "Pars and allocation" },
     job: "Questions use named registered queries",
     reads: "get_atp · get_shortfalls",
     writes: "none",
     states: [["loading", "answer skeleton"], ["error", "Could not refresh ATP · Retry", 1], ["offline", "cached value + timestamp"]],
     spec: "History is a visible control in the composer strip; no swipe-only interaction.",
-    body: (<>
-      {E.hd("Composer", "answer")}
-      {E.row("“How much Hazy can I promise Friday?”")}
-      {E.num("11 × ½ bbl", "plus 40 cases · 2 orders compete for 6")}
-      {E.row("Shortfall detail", "who competes for the 6", E.act("Review"))}
-    </>),
+    body: <ComposerAnswerView
+      query="How much Hazy is available to promise?"
+      answer="11 × ½ bbl"
+      detail="plus 40 cases · current brewery ATP"
+      observedAt="Sep 10, 2026, 10:00 AM"
+    />,
   },
   {
     step: 4,

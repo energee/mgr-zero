@@ -59,6 +59,16 @@ dependencies, rebuilds the authoritative snapshot in the same database
 transaction, and returns `409 conflict` if anything changed. A stale refusal
 leaves no movement, completed request, or conversation result.
 
+The current browser composer is a structured client of this same endpoint. It
+loads only the registered reads allowed for the current role, asks for every
+required movement field, calls `preview_command`, and sends `record_movement`
+only after the person selects **Commit movement**. Editing or dismissing a
+proposal sends no movement command. Staff ATP answers use `get_atp`; portal
+availability uses only `portal_catalog`. Conversation lists and messages are
+server-owned, author-and-brewery scoped, and contain no credentials or model
+transcripts. No model, voice provider, alternate write route, or client-local
+conversation history is involved.
+
 The endpoint accepts at most **8 MiB** of JSON per request and admits **120
 requests per authenticated account per 60 seconds**. The account budget is
 shared by cookie and bearer authentication, every brewery, and the pre-tenant

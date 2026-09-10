@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { formatDateTime } from "@/lib/date-format";
 import { toMovementRecordedViewProps } from "@/lib/mgr/movement-recorded-view";
+import type { MovementInput } from "@/lib/composer/state";
 
 // Staff-facing movement types; sale_removal/taproom_transfer are produced by
 // order flows (plan 1B), not entered manually here.
@@ -34,12 +35,14 @@ const requiresChannel = (type: MovementType) => type === "depletion";
 
 export function MovementForm({
   autoOpen = false,
+  initial,
   skus,
   locations,
   bins,
   channels,
 }: {
   autoOpen?: boolean;
+  initial?: Partial<MovementInput>;
   skus: { id: string; label: string; bblPerUnit: number | null }[];
   locations: { id: string; name: string; kind: string }[];
   bins: { id: string; location_id: string; name: string }[];
@@ -48,20 +51,20 @@ export function MovementForm({
   const breweryId = useBrewery();
   const [receipt, setReceipt] = useState<MovementReceipt | null>(null);
   const [stock, setStock] = useState<BinMoveStock[]>([]);
-  const [lotId, setLotId] = useState("");
+  const [lotId, setLotId] = useState(initial?.lotId ?? "");
   const [stockError, setStockError] = useState<string | null>(null);
-  const [skuId, setSkuId] = useState("");
-  const [locationId, setLocationId] = useState("");
-  const [binId, setBinId] = useState("");
-  const [qty, setQty] = useState("");
-  const [direction, setDirection] = useState<"add" | "remove">("add");
-  const [destState, setDestState] = useState("");
-  const [type, setType] = useState<MovementType>("opening_balance");
+  const [skuId, setSkuId] = useState(initial?.skuId ?? "");
+  const [locationId, setLocationId] = useState(initial?.locationId ?? "");
+  const [binId, setBinId] = useState(initial?.binId ?? "");
+  const [qty, setQty] = useState(initial?.qty == null ? "" : String(Math.abs(initial.qty)));
+  const [direction, setDirection] = useState<"add" | "remove">((initial?.qty ?? 1) < 0 ? "remove" : "add");
+  const [destState, setDestState] = useState(initial?.destState ?? "");
+  const [type, setType] = useState<MovementType>((initial?.type as MovementType | undefined) ?? "opening_balance");
   // A hand-entered movement is a taproom event far more often than not, so
   // Taproom is preselected when the brewery still has that seeded channel.
   const defaultChannelId = (channels.find((c) => c.name === "Taproom") ?? channels[0])?.id ?? "";
-  const [saleChannelId, setSaleChannelId] = useState(defaultChannelId);
-  const [note, setNote] = useState("");
+  const [saleChannelId, setSaleChannelId] = useState(initial?.saleChannelId ?? defaultChannelId);
+  const [note, setNote] = useState(initial?.note ?? "");
   const form = useCommandForm("record_movement", {
     onSuccess: data => setReceipt(data as MovementReceipt),
     build: () => ({ skuId, locationId, binId, lotId: lotId || undefined, ...movementFields(type, qty, direction, destState, saleChannelId), type, note: note || undefined }),

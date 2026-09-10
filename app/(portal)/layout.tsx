@@ -13,6 +13,7 @@ import { PortalShell } from "@/components/mgr/app-shell";
 import { MeSheet, MeSheetActions } from "@/components/mgr/me-sheet";
 import { PortalMeView } from "@/components/mgr/views/portal-me";
 import { toPortalMeViewProps } from "@/lib/mgr/portal-me-view";
+import { Composer } from "@/components/mgr/composer";
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const [customer, sidebarOpen, identity] = await Promise.all([getActiveCustomer(), sidebarOpenFromCookie(), getRequestIdentity()]);
@@ -21,6 +22,7 @@ export default async function PortalLayout({ children }: { children: React.React
       <PortalShell
         brand={customer.customerName}
         sidebarOpen={sidebarOpen}
+        composer={<Composer key={`${identity!.userId}:${customer.breweryId}:${customer.customerId}`} role="customer" portal />}
         headerRight={
           <MeSheet>
             <PortalMeView
