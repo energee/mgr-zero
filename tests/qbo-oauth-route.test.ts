@@ -3,9 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const lifecycle = vi.hoisted(() => ({
   claim: vi.fn(), complete: vi.fn(), fail: vi.fn(),
 }));
+const session = vi.hoisted(() => ({ breweryCookie: "brewery-1" as string | undefined }));
 
 vi.mock("next/headers", () => ({
-  cookies: vi.fn(async () => ({ get: vi.fn(() => ({ value: "brewery-1" })) })),
+  cookies: vi.fn(async () => ({ get: vi.fn(() => session.breweryCookie ? { value: session.breweryCookie } : undefined) })),
+}));
+
+vi.mock("@/lib/brewery", () => ({
+  getActiveBrewery: vi.fn(async () => ({ id: "brewery-1", name: "Fixture brewery", role: "admin" })),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -24,6 +29,7 @@ import { GET } from "@/app/api/integrations/qbo/oauth/route";
 
 describe("QuickBooks OAuth callback route", () => {
   beforeEach(() => {
+    session.breweryCookie = "brewery-1";
     vi.stubEnv("QBO_CLIENT_ID", "client-id");
     vi.stubEnv("QBO_CLIENT_SECRET", "client-secret");
     vi.stubEnv("QBO_REDIRECT_URI", "https://mgr.test/api/integrations/qbo/oauth");
@@ -91,5 +97,23 @@ describe("QuickBooks OAuth callback route", () => {
     expect(response.headers.get("location")).toBe("https://mgr.test/settings/accounting?error=oauth");
     expect(fetch).not.toHaveBeenCalled();
     expect(lifecycle.complete).not.toHaveBeenCalled();
+  });
+
+  it("uses the verified membership default when an Admin returns without a brewery cookie", async () => {
+    session.breweryCookie = undefined;
+    const fetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        access_token: "access-secret", refresh_token: "refresh-secret", expires_in: 3600,
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ CompanyInfo: { Id: "1" } }), { status: 200 }));
+    vi.stubGlobal("fetch", fetch);
+
+    const response = await GET(new Request(
+      "https://mgr.test/api/integrations/qbo/oauth?code=secret-code&state=opaque&realmId=realm-1",
+    ));
+
+    expect(response.headers.get("location")).toBe("https://mgr.test/settings/accounting?connected=1");
+    expect(lifecycle.claim).toHaveBeenCalledWith(expect.any(String), "actor-1", "brewery-1", expect.any(String));
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 });

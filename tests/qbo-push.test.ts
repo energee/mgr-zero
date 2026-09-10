@@ -88,11 +88,15 @@ describe("QuickBooks durable outbound push", () => {
     await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, requestId, client)).resolves.toMatchObject({
       status: "pushed", remoteId: "invoice-remote-1",
     });
-    await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, requestId, client)).resolves.toMatchObject({
+    const completedReplayFetch = vi.fn<typeof globalThis.fetch>().mockRejectedValue(new Error("completed push must not POST"));
+    await expect(pushInvoiceToQbo(
+      f.ctx, f.invoice.id, requestId, new QboOAuthClient(config, completedReplayFetch),
+    )).resolves.toMatchObject({
       status: "pushed", remoteId: "invoice-remote-1",
     });
 
-    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(completedReplayFetch).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledTimes(2);
     expect(String(fetch.mock.calls[0][0])).toBe(String(fetch.mock.calls[1][0]));
     expect(fetch.mock.calls[0][1]?.body).toBe(fetch.mock.calls[1][1]?.body);
     expect(remote).toHaveLength(1);
