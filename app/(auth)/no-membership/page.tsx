@@ -3,7 +3,7 @@
 // belong somewhere is sent there instead, so a customer-only login never
 // sees it by landing on a staff route.
 import Link from "next/link";
-import { serverEnv } from "@/lib/env/server";
+import { getServerEnv } from "@/lib/env/server";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { E } from "@/components/mgr/e";
@@ -13,6 +13,7 @@ import { Entry } from "../entry";
 
 export default async function NoMembershipPage() {
   if (!(await getRequestIdentity())) redirect("/login");
+  const serverEnv = getServerEnv();
   if ((await getStaffMemberships()).length) redirect("/");
   if ((await getCustomerMemberships()).length) redirect("/portal");
   return (

@@ -4,14 +4,14 @@ import { E } from "@/components/mgr/e";
 import { buildRouteContext, isUuid } from "@/lib/commands/context";
 import { CommandError, runCommand } from "@/lib/commands/registry";
 import { getRequestIdentity } from "@/lib/auth/request-context";
-import { serverEnv } from "@/lib/env/server";
+import { getServerEnv } from "@/lib/env/server";
 import "@/lib/commands/all";
 import { Entry } from "../entry";
 import { CreateBreweryForm, type CreateBreweryState } from "./form";
 
 async function provision(_previous: CreateBreweryState, form: FormData): Promise<CreateBreweryState> {
   "use server";
-  if (serverEnv.dedicated) notFound();
+  if (getServerEnv().dedicated) notFound();
   const name = form.get("name");
   const timezone = form.get("timezone");
   const ttb = form.get("ttb");
@@ -38,8 +38,8 @@ async function provision(_previous: CreateBreweryState, form: FormData): Promise
 }
 
 export default async function CreateBreweryPage() {
-  if (serverEnv.dedicated) notFound();
   const identity = await getRequestIdentity();
+  if (getServerEnv().dedicated) notFound();
   if (!identity) redirect("/login");
   return <Entry title="Create brewery">
     {E.note("You will be the brewery’s first admin.")}
