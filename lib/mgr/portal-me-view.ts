@@ -1,5 +1,4 @@
-// lib/mgr/portal-me-view.ts — view-model for inventory Portal Me.
-// Email and account come from the snapshot; live MeSheet stays its own sheet.
+// lib/mgr/portal-me-view.ts — shared Portal Me view-model.
 
 export type PortalMeViewModel = {
   email: string;

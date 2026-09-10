@@ -8,7 +8,6 @@ import { SCREEN_ROUTES } from "@/lib/mgr/screen-routes";
 
 /** Existing bypasses. Remove a row when the live implementation mounts the view. */
 const KNOWN_VIEW_DEBT = [
-  "Me: MeView <- components/mgr/me-sheet.tsx",
   "No membership: EntryView <- app/(auth)/no-membership/page.tsx",
   "Expired reset: EntryView <- app/(auth)/reset/page.tsx",
   "Session expired: SessionExpiredView <- app/(auth)/login/page.tsx",
@@ -38,7 +37,6 @@ const KNOWN_VIEW_DEBT = [
   "SKU list: SkuListView <- app/(app)/catalog/page.tsx",
   "Review order: ReviewOrderView <- app/(portal)/portal/page.tsx",
   "Question invoice: QuestionInvoiceView <- app/(portal)/portal/invoices/[id]/page.tsx",
-  "Portal Me: PortalMeView <- components/mgr/me-sheet.tsx",
   "Vessel detail: VesselDetailView <- app/(app)/cellar/page.tsx",
   "Schedule batch: ScheduleBatchView <- app/(app)/batches/page.tsx",
   "New PO: NewPoView <- app/(app)/purchase-orders/page.tsx",
@@ -83,20 +81,7 @@ const KNOWN_INLINE_DEBT = [
 ] as const;
 
 const KNOWN_SURFACE_DEBT = [
-  "Me: CommandForm <- components/mgr/me-sheet.tsx",
-  "No membership: EntrySurface <- app/(auth)/no-membership/page.tsx",
-  "Expired invite: EntrySurface <- app/(auth)/invite-expired/page.tsx",
-  "Expired reset: EntrySurface <- app/(auth)/reset/page.tsx",
   "Session expired: CommandForm <- app/(auth)/login/page.tsx",
-  "Sign in: EntrySurface <- app/(auth)/login/page.tsx",
-  "Accept invite: EntrySurface <- app/(auth)/accept/page.tsx",
-  "Reset password: EntrySurface <- app/(auth)/reset/page.tsx",
-  "Set new password: EntrySurface <- app/(auth)/password/page.tsx",
-  "Portal sign in: EntrySurface <- app/(auth)/portal/login/page.tsx",
-  "Portal forgot password: EntrySurface <- app/(auth)/reset/page.tsx",
-  "Portal set password: EntrySurface <- app/(auth)/password/page.tsx",
-  "Create brewery: EntrySurface <- app/(auth)/create-brewery/page.tsx",
-  "Portal Me: CommandForm <- components/mgr/me-sheet.tsx",
   "Link your Slack: EntrySurface <- app/(app)/settings/chat/link/page.tsx",
   "Disconnect Slack: CommandForm <- app/(app)/settings/chat/disconnect/page.tsx",
 ] as const;
@@ -191,7 +176,9 @@ describe("screen/live component parity", () => {
   it("mounts the same named surface as the inventory frame", () => {
     const expectedSurface = { sheet: "CommandForm", entry: "EntrySurface" } as const;
     const bypasses = mapped.flatMap((screen) => {
-      const surface = screen.surface && expectedSurface[screen.surface as keyof typeof expectedSurface];
+      const surface = screen.name === "Me" || screen.name === "Portal Me"
+        ? "MeSheet"
+        : screen.surface && expectedSurface[screen.surface as keyof typeof expectedSurface];
       if (!surface) return [];
       const file = routes.get(screen.name)!;
       return mountedComponents(file).has(surface) ? [] : [`${screen.name}: ${surface} <- ${file}`];

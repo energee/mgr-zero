@@ -1,10 +1,9 @@
 // lib/mgr/me-view.ts — view-model for the staff Me sheet (inventory).
 export type MeViewModel = {
-  name: string;
+  name?: string;
   role: string;
   email: string;
-  currentBrewery: string;
-  otherBrewery: string;
+  breweries: { id?: string; name: string; current: boolean }[];
 };
 
 export function toMeViewProps(s: MeViewModel): MeViewModel {

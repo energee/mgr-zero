@@ -73,7 +73,6 @@ jobs:
           tests/mgr-screens.test.ts tests/tap-coverage.test.ts tests/screen-links.test.ts
           tests/theme-contrast.test.ts tests/screen-persona.test.ts
           tests/design-docs.test.ts tests/docs.test.ts
-
   test_shard:
     name: test shard ${{ matrix.shard }}
     runs-on: ubuntu-latest

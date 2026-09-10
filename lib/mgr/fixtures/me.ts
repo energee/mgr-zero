@@ -5,6 +5,8 @@ export const meMaria: MeViewModel = {
   name: "Maria Alvarez",
   role: "admin",
   email: "maria@demobrewing.com",
-  currentBrewery: "Demo Brewing",
-  otherBrewery: "Ridgeline Contract Brewing",
+  breweries: [
+    { name: "Demo Brewing", current: true },
+    { name: "Ridgeline Contract Brewing", current: false },
+  ],
 };
