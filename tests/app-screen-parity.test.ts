@@ -27,4 +27,14 @@ describe("explorer parity", () => {
     const bad = SCREEN_ROUTES.filter((r) => !names.has(r.name) || !existsSync(r.file)).map((r) => r.name);
     expect(bad).toEqual([]);
   });
+
+  it("maps live production screens without stale inventory gates", () => {
+    const routes = new Map(SCREEN_ROUTES.map((route) => [route.name, route.file]));
+    const names = new Set(ungatedMgrScreens().map((screen) => screen.name));
+    expect([...names].filter((name) => ["Packaging runs", "Planning"].includes(name))).toEqual([
+      "Packaging runs", "Planning",
+    ]);
+    expect(routes.get("Packaging runs")).toBe("app/(app)/packaging/page.tsx");
+    expect(routes.get("Planning")).toBe("app/(app)/planning/page.tsx");
+  });
 });
