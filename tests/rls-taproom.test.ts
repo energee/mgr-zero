@@ -20,9 +20,9 @@ const matrix = {
   fermentation_readings: "deny", material_movements: "deny", batch_additions: "deny", packaging_runs: "deny",
   lots: "deny", packaging_run_outputs: "deny", packaging_run_consumptions: "deny", material_contracts: "deny",
   purchase_orders: "deny", purchase_order_lines: "deny", receipts: "deny", receipt_lines: "deny",
-  material_counts: "deny", material_count_lines: "deny", orders: "deny", order_lines: "deny", order_events: "deny",
+  material_counts: "deny", material_count_lines: "deny", orders: "deny", order_lines: "deny", order_deposit_lines: "deny", order_events: "deny",
   shipments: "deny", invoices: "deny", invoice_questions: "deny", invoice_lines: "deny", keg_events: "deny",
-  stock_transfers: "deny", stock_transfer_lines: "deny", qbo_connections: "deny", pos_connections: "deny",
+  stock_transfers: "deny", stock_transfer_lines: "deny", qbo_connections: "deny", qbo_pushes: "deny", pos_connections: "deny",
   pos_locations: "tenant", pos_item_mappings: "tenant", pos_sales: "deny", pos_sale_expectations: "deny", pos_sales_coverage: "deny", brand_approvals: "deny",
   state_registrations: "deny", brewery_state_licenses: "deny", report_filings: "deny", routes: "deny",
   deliveries: "deny", chat_installations: "deny", chat_user_links: "self", notification_destinations: "self",
@@ -105,6 +105,7 @@ async function fixtures() {
   await put("material_count_lines", { count_id: count.id, material_id: material.id, qty_expected: 1, qty_counted: 1 });
   const order = await put("orders", { kind: "wholesale", from_location_id: wh.id, customer_id: customer.customerId, ship_to_id: customer.shipToId, sale_channel_id: customer.saleChannelId, created_by: owner.id });
   const line = await put("order_lines", { order_id: order.id, sku_id: cat.skuId, qty_ordered: 1, unit_price_cents: 1200 });
+  await put("order_deposit_lines", { order_id: order.id, order_line_id: line.id, keg_pool_id: pool.id, keg_size: "half_bbl", description: "Fleet deposit", qty_ordered: 1, unit_price_cents: 2500 });
   await put("allocations", { sku_id: cat.skuId, qty: 1, source: "order_line", ref: line.id });
   await put("order_events", { order_id: order.id, actor: owner.id, event: "created" });
   const shipment = await put("shipments", { order_id: order.id, created_by: owner.id });
@@ -113,7 +114,9 @@ async function fixtures() {
   await put("invoice_lines", { invoice_id: invoice.id, sku_id: cat.skuId, description: "IPA", qty: 1, unit_price_cents: 1200 });
   const transfer = await put("stock_transfers", { from_location_id: wh.id, to_location_id: taps[0].id, created_by: owner.id });
   await put("stock_transfer_lines", { transfer_id: transfer.id, sku_id: cat.skuId, qty: 1, from_bin_id: wh.binId, to_bin_id: taps[0].binId });
-  await put("qbo_connections", { realm_id: `realm-${brewery.id}` });
+  const qboConnection = await put("qbo_connections", { realm_id: `realm-${brewery.id}` });
+  await put("qbo_pushes", { invoice_id: invoice.id, connection_id: qboConnection.id, realm_id: `realm-${brewery.id}`,
+    entity_type: "Invoice", provider_request_id: crypto.randomUUID(), request_body: "{}", local_snapshot: {}, attempt_reason: "initial" });
   const pos = await put("pos_connections", { merchant_id: `merchant-${brewery.id}` });
   await put("pos_locations", { connection_id: pos.id, external_location_id: "L1", location_id: taps[0].id });
   await put("pos_item_mappings", { connection_id: pos.id, external_item_id: "I1", sku_id: cat.skuId });
@@ -284,6 +287,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     claim_invite_request: [B,`${name}@test.local`,"staff","warehouse",null,R()], complete_invite_membership: [inviteRequest], record_invite_failure: [failureRequest],
     record_keg_event: [B,f.pool.id,"half_bbl",1,"acquired",W,BIN,null,null,R()], update_keg_pool: [B,f.pool.id,name,null,null,0,true,R()], create_keg_pool: [B,name,"owned",null,null,0,R()],
     begin_chat_installation: [B,"slack","https://example.test/chat/callback","state",R()], begin_chat_reauthorization: [B,I,"https://example.test/chat/callback","state",R()],
+    begin_qbo_oauth: [B,"https://example.test/qbo/callback","state","connect",R(),["com.intuit.quickbooks.accounting"]], begin_qbo_invoice_sync: [B,R()],
     close_packaging_run: [B,readyRun.id,0.0645,[{sku_id:SKU,qty_actual:1}],name,day,null,W,BIN,R()],
     complete_batch: [B,f.batch.id,R()],
     reattribute_loss: [B,(await admin.from("volume_adjustments").select("id").eq("brewery_id", B).eq("reason", "loss").limit(1).single()).data!.id,0.01,"destruction",null,R()],
@@ -291,12 +295,16 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     create_recipe_version: [B,f.recipe.id,152,0.75,0.75,60,40,null,[{material_id:MAT,per_bbl_qty:1,stage:"mash"}],R()],
     delete_bin: [B,emptyBin,R()], disable_chat_installation: [B,I,R()], disconnect_chat_installation: [B,I,R()], draft_purchase_order_from_requirements: [B,[MAT],R()],
     portal_create_order: [B,f.customer.customerId,f.customer.shipToId,null,null,[{sku_id:SKU,qty:1}],R(),day],
+    portal_quote_order: [B,f.customer.customerId,f.customer.shipToId,day,null,null,[{sku_id:SKU,qty:1}],R()],
+    portal_submit_quote: [B,f.customer.customerId,R(),null,R()],
     receive_purchase_order: [B,sentPo.id,W,BIN,day,[{po_line_id:sentLine.id,qty_counted:1}],R()],
     record_brew_day: [B,plannedBatch.id,emptyVessel.id,2,day,R()], record_cellar_transfer: [B,f.occupancy.id,emptyVessel.id,1,0,R()],
     record_fermentation_reading: [B,f.occupancy.id,now,68,5,4.2,null,R()], record_material_count: [B,W,BIN,day,[{material_id:MAT,qty:1}],R()],
     record_repack: [B,W,BIN,parentSku.id,1,SKU,6,R()], record_stock_transfer_pick: [submitted.id,[{line_id:transferLine.id,qty:1}],R()], record_submitted_order_occurrence: [f.order.id],
     schedule_batch: [B,BRAND,f.version.id,day,2,null,R()], schedule_packaging_run: [B,BRAND,day,f.occupancy.id,[{sku_id:SKU,qty_planned:1}],R()], send_purchase_order: [B,draftPo.id,"external",R()],
     set_brewery_gravity_unit: [B,"sg",R()], set_brewery_quiet_hours: [B,I,"22:00","07:00",R()], set_portal_fulfillment_source: [B,W,R()], submit_stock_transfer: [f.transfer.id,R()],
+    set_qbo_customer_mapping: [B,f.customer.customerId,"qbo-customer",R()], set_qbo_item_mapping: [B,SKU,"qbo-item",R()],
+    set_qbo_deposit_mapping: [B,"qbo-deposit",R()], set_qbo_push_defaults: [B,true,true,R()], start_qbo_push: [B,f.invoice.id,"initial",R()], write_off_invoice: [B,f.invoice.id,"Fixture",R()],
     set_personal_quiet_hours: [B,"22:00","07:00","America/New_York",R()], snooze_notification: [B,delivery,new Date(Date.now()+3600000).toISOString(),R()],
     generate_compliance_report: [B,"TTB",day,day], get_chat_integration_health: [B], list_chat_user_links: [B],
     update_bin: [B,emptyBin,name,R()], update_location: [B,W,name,"warehouse",R()], update_sku: [B,SKU,true,null,R()], raise_invoice_question: [B,f.invoice.id,"Fixture question",R()],
@@ -328,12 +336,17 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   expect(sharedDestination.error?.code).toBe("42501");
   const before = sql(`select md5(string_agg(row_to_json(t)::text,'' order by request_id)) from private.command_requests t where brewery_id='${B}';
     select md5(string_agg(row_to_json(t)::text,'' order by request_id)) from private.invite_requests t where brewery_id='${B}'`);
+  const qboGenericPermission = new Set(["begin_qbo_oauth","begin_qbo_invoice_sync","set_qbo_customer_mapping","set_qbo_item_mapping","set_qbo_deposit_mapping","set_qbo_push_defaults","start_qbo_push","write_off_invoice"]);
   for (const [name, args] of Object.entries(cases)) {
     const definition = catalog.filter(c => c.name === name);
     expect(definition, `${name} has one classified signature`).toHaveLength(1);
     expect(args.length, `${name} arity`).toBe(definition[0].args.length);
     const result = await db.rpc(name, Object.fromEntries(definition[0].args.map((key,i) => [key,args[i]])));
-    expect(result.error?.code, `${definition[0].signature}: ${result.error?.message}`).toBe("42501");
+    if (qboGenericPermission.has(name)) {
+      expect(result.error?.message, definition[0].signature).toMatch(/permission denied/i);
+    } else {
+      expect(result.error?.code, `${definition[0].signature}: ${result.error?.message}`).toBe("42501");
+    }
   }
   expect(sql(`select md5(string_agg(row_to_json(t)::text,'' order by request_id)) from private.command_requests t where brewery_id='${B}';
     select md5(string_agg(row_to_json(t)::text,'' order by request_id)) from private.invite_requests t where brewery_id='${B}'`)).toEqual(before);
@@ -344,6 +357,14 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   const destination = (await admin.from("notification_destinations").select("id").eq("brewery_id", B).eq("user_id", f.taproom.id).single()).data!.id;
   const serviceCases: Record<string, unknown[]> = {
     store_integration_tokens: [B,"square",pos,f.owner.id,"fixture-access","fixture-refresh"], read_integration_tokens: [B,"square",pos,f.owner.id],
+    read_portal_quote_tax: [B,f.customer.customerId,R(),f.taproom.id], finish_portal_quote_tax: [B,f.customer.customerId,R(),f.taproom.id,R(),0],
+    begin_qbo_disconnect: [B,R(),f.taproom.id,R()], cas_integration_tokens: [B,"qbo",R(),f.taproom.id,1,"fixture-access","fixture-refresh",now,3600,3600,3600],
+    read_portal_qbo_payment: [B,f.customer.customerId,f.invoice.id,f.taproom.id],
+    cas_portal_qbo_payment_tokens: [B,f.customer.customerId,f.invoice.id,f.taproom.id,R(),"fixture-realm","fixture-id",["com.intuit.quickbooks.accounting"],1,"fixture-access","fixture-refresh",now,3600,3600,3600],
+    confirm_portal_qbo_payment: [B,f.customer.customerId,f.invoice.id,f.taproom.id,R(),"fixture-realm","fixture-id",1,["com.intuit.quickbooks.accounting"]],
+    claim_qbo_oauth: ["fixture-state",f.taproom.id,B,"https://example.test/qbo/callback"], complete_qbo_invoice_sync: [B,f.taproom.id,R(),R(),"fixture-realm",[]],
+    complete_qbo_oauth: [R(),f.taproom.id,"fixture-realm","Fixture","fixture-access","fixture-refresh",now,3600,3600,3600,[]], fail_qbo_oauth: [R(),f.taproom.id],
+    finish_qbo_disconnect: [B,R(),f.taproom.id,R(),true], finish_qbo_push: [B,R(),f.taproom.id,"pushed","fixture-id",null,{},R()],
     assert_chat_admin: [B], issue_chat_link_proof: [I,"U-PENDING","fixture-proof"], resolve_chat_actor: ["slack",B,f.taproom.id],
     scan_chat_today_candidates: [B,now], chat_quiet_release: [now,"22:00","07:00","America/New_York"], chat_upsert_occurrences: [B,now,f.order.id],
     chat_fanout_deliveries: [B,now,f.occurrence.id], scan_chat_notification_occurrences: [B,now], lease_chat_deliveries: [1,60,now], chat_take_lease: [delivery,now],

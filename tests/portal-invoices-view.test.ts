@@ -68,6 +68,28 @@ describe("Invoice history view", () => {
     });
   });
 
+  it("calls a zero-balance invoice without cash evidence settled instead of unpaid", () => {
+    const invoice = {
+      id: "credit-settled",
+      invoice_no: 43,
+      kind: "invoice" as const,
+      issued_on: "2026-09-09",
+      due_on: "2026-10-09",
+      paid_at: null,
+      qbo_remote_state: "live" as const,
+      qbo_balance_cents: 0,
+      qbo_total_cents: 10000,
+      invoice_lines: [{ amount_cents: 10000 }],
+    };
+    expect(toPortalInvoicesViewProps({ customerName: RIDGELINE.name, invoices: [invoice] }).rows[0])
+      .toMatchObject({ detail: "settled", unpaid: false, tone: "ok" });
+    expect(toPortalInvoiceViewProps({
+      invoice: { ...invoice, total_cents: 10000 },
+      lines: [],
+      brewery: { name: "Demo Brewing", customer_phone: null },
+    })).toMatchObject({ status: "Settled", due: undefined, paid: false, payable: false });
+  });
+
   it("the inventory drawing still offers Pay on the unpaid row", () => {
     const html = htmlOf(createElement(PortalInvoicesView, { model: toPortalInvoicesViewProps(portalInvoicesRidgeline) }));
     expect(html).toMatch(/Invoices/);
@@ -119,6 +141,15 @@ describe("Portal invoice view", () => {
     expect(model.paid).toBe(true);
     expect(model.paidOn).toBe("2026-08-29");
     expect(model.lines).toHaveLength(2);
+  });
+
+  it("makes an invoice edited in QuickBooks review-only", () => {
+    const model = toPortalInvoiceViewProps({
+      ...portalInvoiceUnpaid,
+      invoice: { ...portalInvoiceUnpaid.invoice, qbo_accountant_drift: true },
+    });
+    expect(model.status).toBe("Review");
+    expect(model.payable).toBe(false);
   });
 
   it("the pay drawing still shows Pay invoice, Download PDF, and Question", () => {

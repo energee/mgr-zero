@@ -2,7 +2,9 @@
 // ctx.customerId scopes everything. Mutations call request-ledger-backed RPCs
 // that derive the caller's tenant and role inside the database.
 import { z } from "zod";
+import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
 import { defineCommand, defineQuery, unwrap, CommandError, Ctx } from "./registry";
+import type { QboTaxInput } from "@/lib/qbo";
 
 const expectedIdentity = z.object({ actorId: z.string().uuid(), customerId: z.string().uuid() }).optional();
 function assertExpectedIdentity(ctx: Ctx, expected: z.infer<typeof expectedIdentity>) {
@@ -12,11 +14,60 @@ function assertExpectedIdentity(ctx: Ctx, expected: z.infer<typeof expectedIdent
 }
 
 const lines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive() })).min(1);
+const quoteLines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().int().positive() })).min(1);
+const quoteInput = z.object({
+  shipToId: z.string().uuid(), poNumber: z.string().optional(), note: z.string().optional(),
+  requestedShipDate: z.string().date().nullable().optional(), lines: quoteLines,
+});
+type PortalTaxClient = { calculateSalesTax(input: QboTaxInput, accessToken: string): Promise<number> };
 
 function requireCustomer(ctx: Ctx): string {
   if (!ctx.customerId) throw new CommandError("not a portal customer");
   return ctx.customerId;
 }
+
+export async function quotePortalOrder(ctx: Ctx, i: z.infer<typeof quoteInput>, requestId: string, client?: PortalTaxClient) {
+  const customerId = requireCustomer(ctx);
+  const start = await unwrap(ctx.db.rpc("portal_quote_order", {
+    p_brewery: ctx.breweryId, p_customer: customerId, p_ship_to: i.shipToId,
+    p_requested: i.requestedShipDate ?? null, p_po: i.poNumber ?? null, p_note: i.note ?? null,
+    p_lines: i.lines.map(l => ({ sku_id: l.skuId, qty: l.qty })), p_request_id: requestId,
+  })) as Record<string, unknown>;
+  const { taxReady, ...pending } = start;
+  if (taxReady !== true || start.taxStatus === "calculated" || typeof start.quoteId !== "string") return pending;
+  try {
+    const { readPortalQuoteTax, finishPortalQuoteTax } = await import("@/lib/supabase/integration-tokens");
+    const claim = await readPortalQuoteTax(ctx, start.quoteId);
+    if (!claim) return pending;
+    if (!client) {
+      const { qboConfig, QboOAuthClient } = await import("@/lib/qbo");
+      client = new QboOAuthClient(qboConfig());
+    }
+    const taxCents = await client.calculateSalesTax(claim.input, claim.accessToken);
+    return finishPortalQuoteTax(ctx, start.quoteId, claim.connectionId, taxCents);
+  } catch {
+    return pending;
+  }
+}
+
+defineCommand({
+  name: "portal_quote_order", description: "Portal: freeze current prices, deposits, addresses, and optional QuickBooks tax for review",
+  roles: "customer", input: quoteInput,
+  handler: (ctx, i, execution) => quotePortalOrder(ctx, i, execution.requestId),
+});
+
+defineCommand({
+  name: "portal_submit_quote", description: "Portal: atomically submit an unchanged reviewed quote as a new or existing draft order",
+  roles: "customer",
+  input: z.object({ quoteId: z.string().uuid(), orderId: z.string().uuid().optional(), expectedIdentity }),
+  handler: (ctx, i, execution) => {
+    assertExpectedIdentity(ctx, i.expectedIdentity);
+    return unwrap(ctx.db.rpc("portal_submit_quote", {
+      p_brewery: ctx.breweryId, p_customer: requireCustomer(ctx), p_quote: i.quoteId,
+      p_order: i.orderId ?? null, p_request_id: execution.requestId,
+    }));
+  },
+});
 
 defineCommand({
   name: "portal_create_order", description: "Portal: create a draft order for the caller's account",
@@ -103,7 +154,7 @@ defineQuery({
     const [ln, events, shipment] = await Promise.all([
       unwrap(ctx.db.from("order_lines").select("*, skus(name)").eq("order_id", i.orderId)),
       unwrap(ctx.db.from("order_events").select().eq("order_id", i.orderId).order("created_at")),
-      unwrap(ctx.db.from("shipments").select("id, invoices(id, invoice_no, kind, paid_at, invoice_lines(amount_cents))").eq("order_id", i.orderId).maybeSingle()),
+      unwrap(ctx.db.from("shipments").select("id, invoices(id, invoice_no, kind, paid_at, qbo_remote_state, qbo_total_cents, qbo_balance_cents, written_off_at, invoice_lines(amount_cents))").eq("order_id", i.orderId).maybeSingle()),
     ]);
     return { order, lines: ln, events, shipment };
   },
@@ -154,11 +205,12 @@ defineQuery({
     const customerId = requireCustomer(ctx);
     // RLS already scopes to the caller's customer; the customer_id filter makes a foreign id a plain not_found
     const [invoice, lines, brewery] = await Promise.all([
-      unwrap(ctx.db.from("invoices").select("id, invoice_no, kind, issued_on, due_on, paid_at").eq("id", i.invoiceId).eq("customer_id", customerId).single()),
+      unwrap(ctx.db.from("invoices").select("id, invoice_no, kind, issued_on, due_on, paid_at, qbo_remote_state, qbo_total_cents, qbo_tax_cents, qbo_balance_cents, qbo_accountant_drift, written_off_at").eq("id", i.invoiceId).eq("customer_id", customerId).single()),
       unwrap(ctx.db.from("invoice_lines").select("id, kind, qty, unit_price_cents, amount_cents, description, skus(name)").eq("invoice_id", i.invoiceId)),
       unwrap(ctx.db.from("portal_brewery").select("name, customer_phone").eq("id", ctx.breweryId).single()),
     ]);
-    const total_cents = (lines as { amount_cents: number }[]).reduce((n, l) => n + l.amount_cents, 0);
+    const localTotal = (lines as { amount_cents: number }[]).reduce((n, l) => n + l.amount_cents, 0);
+    const total_cents = invoiceCurrentTotalCents(invoice as { kind: "invoice" | "credit_memo"; qbo_total_cents: number | null }, localTotal);
     return { invoice: { ...invoice, total_cents }, lines, brewery };
   },
 });

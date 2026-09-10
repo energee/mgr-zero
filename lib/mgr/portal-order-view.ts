@@ -4,6 +4,7 @@ import { calendarDay } from "./calendar-day";
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { buyerStatus } from "./order-status";
+import { invoiceCurrentState, invoiceCurrentTotalCents, invoiceIsSettledWithoutPayment } from "./invoice-state";
 
 export type PortalOrderLineView = {
   key: string;
@@ -65,8 +66,12 @@ export type PortalOrderSnapshot = {
     invoices: {
       id: string;
       invoice_no: number | null;
-      kind: string;
+      kind: "invoice" | "credit_memo";
       paid_at: string | null;
+      qbo_remote_state?: "live" | "voided" | "deleted";
+      qbo_balance_cents?: number | null;
+      qbo_total_cents?: number | null;
+      written_off_at?: string | null;
       invoice_lines: { amount_cents: number }[];
     }[];
   } | null;
@@ -75,6 +80,7 @@ export type PortalOrderSnapshot = {
 /** Map a portal_order payload onto PortalOrderView. */
 export function toPortalOrderViewProps({ order, lines, events, shipment, backHref }: PortalOrderSnapshot): PortalOrderViewModel {
   const invoice = shipment?.invoices.find((v) => v.kind === "invoice");
+  const invoiceState = invoice ? invoiceCurrentState(invoice) : null;
   const ship = order.ship_tos;
   return {
     backHref,
@@ -102,10 +108,12 @@ export function toPortalOrderViewProps({ order, lines, events, shipment, backHre
     invoice: invoice
       ? {
         title: docNo("INV", invoice.invoice_no, "Invoice"),
-        detail: invoice.paid_at ? `paid ${calendarDay(invoice.paid_at)}` : "unpaid",
-        amount: money(invoice.invoice_lines.reduce((n, x) => n + x.amount_cents, 0)),
+        detail: invoiceState === "paid" ? `paid ${calendarDay(invoice.paid_at!)}`
+          : invoiceIsSettledWithoutPayment(invoice) ? "settled"
+          : invoiceState === "written_off" ? "written off" : invoiceState ?? "unpaid",
+        amount: money(invoiceCurrentTotalCents(invoice, invoice.invoice_lines.reduce((n, x) => n + x.amount_cents, 0))),
         href: `/portal/invoices/${invoice.id}`,
-        paid: Boolean(invoice.paid_at),
+        paid: invoiceState === "paid",
       }
       : undefined,
     reorder: order.status === "shipped",

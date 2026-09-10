@@ -4,6 +4,7 @@
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { plural } from "./plural";
+import { invoiceCurrentState, invoiceCurrentTotalCents } from "./invoice-state";
 
 export type InvoiceLineView = {
   key: string;
@@ -47,6 +48,11 @@ export type InvoiceSnapshot = {
     issued_on: string;
     due_on: string | null;
     paid_at: string | null;
+    qbo_remote_state?: "live" | "voided" | "deleted";
+    qbo_balance_cents?: number | null;
+    qbo_total_cents?: number | null;
+    qbo_accountant_drift?: boolean;
+    written_off_at?: string | null;
     customers: { name: string } | null;
   };
   lines: {
@@ -71,16 +77,19 @@ export type InvoiceSnapshot = {
 /** Map a get_invoice + list_invoice_questions payload onto InvoiceView. */
 export function toInvoiceViewProps({ invoice, lines, questions, mappings, backHref }: InvoiceSnapshot): InvoiceViewModel {
   const credit = invoice.kind === "credit_memo";
-  const total = lines.reduce((sum, l) => sum + l.amount_cents, 0);
+  const total = invoiceCurrentTotalCents(invoice, lines.reduce((sum, l) => sum + l.amount_cents, 0));
   const dueOrIssued = invoice.due_on ? `due ${invoice.due_on}` : `issued ${invoice.issued_on}`;
-  const paid = invoice.paid_at ? ` · paid ${new Date(invoice.paid_at).toLocaleDateString()}` : "";
+  const state = invoiceCurrentState(invoice);
+  const stateDetail = state === "paid" ? ` · paid ${new Date(invoice.paid_at!).toLocaleDateString()}`
+    : state === "written_off" ? " · written off" : state === "unpaid" ? "" : ` · ${state}`;
+  const drift = invoice.qbo_accountant_drift ? " · edited in QuickBooks" : "";
   return {
     backHref,
     title: docNo(credit ? "CM" : "INV", invoice.invoice_no, credit ? "Credit memo" : "Invoice"),
     customer: invoice.customers?.name ?? "—",
-    summary: `${dueOrIssued} · ${plural(lines.length, "line")}${paid}`,
+    summary: `${dueOrIssued} · ${plural(lines.length, "line")}${stateDetail}${drift}`,
     total: money(total),
-    headerTone: invoice.paid_at || credit ? "ok" : "",
+    headerTone: credit || state === "paid" || state === "written_off" ? "ok" : state === "unpaid" ? "" : "w",
     lines: lines.map((l) => ({
       key: l.id,
       name: l.skus?.name ?? l.description,

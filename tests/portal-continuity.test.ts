@@ -65,6 +65,11 @@ it("keeps identity when an uncertain create retry is rate-limited or loses acces
   for (const status of [401, 408, 429, 500]) expect(canRetirePortalFailure(status, false)).toBe(false);
   expect(canRetirePortalFailure(400, false)).toBe(true);
 });
+it("restores an exact quoted submit without rebuilding the reviewed fields", () => {
+  const quoted = { ...attempt, command: "portal_submit_quote", input: { quoteId: id, expectedIdentity: { actorId: id, customerId: id } } };
+  expect(restorePortalAttempt(JSON.stringify(quoted), scope)).toEqual(quoted);
+  expect(() => restorePortalAttempt(JSON.stringify({ ...quoted, input: { ...quoted.input, quoteId: "other" } }), scope)).toThrow();
+});
 it("keeps the create recovery when saving the next submit stage fails", async () => {
   let raw: string | null = null;
   let writes = 0;

@@ -3,6 +3,7 @@
 // Pay vs unavailable vs paid is a presentation prop on the view, not a mode.
 import { docNo } from "./doc-no";
 import { money } from "./money";
+import { invoiceCurrentState, invoiceCurrentTotalCents, invoiceIsSettledWithoutPayment } from "./invoice-state";
 
 export type PortalInvoiceLineView = {
   key: string;
@@ -18,9 +19,10 @@ export type PortalInvoiceViewModel = {
   due?: string;
   paidOn?: string;
   paid: boolean;
+  payable: boolean;
   kind: "invoice" | "credit_memo";
   issued: string;
-  status: "Credit" | "Paid" | "Unpaid";
+  status: "Credit" | "Paid" | "Unpaid" | "Settled" | "Voided" | "Deleted" | "Written off" | "Review";
   breweryName: string;
   breweryPhone: string | null;
   lines: PortalInvoiceLineView[];
@@ -35,6 +37,11 @@ export type PortalInvoiceSnapshot = {
     issued_on: string;
     due_on: string | null;
     paid_at: string | null;
+    qbo_remote_state?: "live" | "voided" | "deleted";
+    qbo_balance_cents?: number | null;
+    qbo_total_cents?: number | null;
+    qbo_accountant_drift?: boolean;
+    written_off_at?: string | null;
     total_cents: number;
   };
   lines: {
@@ -55,16 +62,24 @@ function day(iso: string): string {
 /** Map a portal_invoice payload onto PortalInvoiceView. */
 export function toPortalInvoiceViewProps({ invoice, lines, brewery, backHref }: PortalInvoiceSnapshot): PortalInvoiceViewModel {
   const credit = invoice.kind === "credit_memo";
+  const state = invoiceCurrentState(invoice);
+  const paid = !credit && state === "paid";
+  const settled = !credit && !invoice.qbo_accountant_drift && invoiceIsSettledWithoutPayment(invoice);
+  const status = invoice.qbo_accountant_drift && state === "unpaid"
+    ? "Review"
+    : settled ? "Settled"
+    : state === "written_off" ? "Written off" : `${state[0].toUpperCase()}${state.slice(1)}` as PortalInvoiceViewModel["status"];
   return {
     backHref,
     title: docNo(credit ? "CM" : "INV", invoice.invoice_no, credit ? "Credit memo" : "Invoice"),
-    total: money(invoice.total_cents),
-    due: invoice.due_on ?? undefined,
-    paidOn: invoice.paid_at ? day(invoice.paid_at) : undefined,
-    paid: !credit && invoice.paid_at !== null,
+    total: money(invoiceCurrentTotalCents(invoice, invoice.total_cents)),
+    due: status === "Unpaid" ? invoice.due_on ?? undefined : undefined,
+    paidOn: paid ? day(invoice.paid_at!) : undefined,
+    paid,
+    payable: !credit && status === "Unpaid" && typeof invoice.qbo_balance_cents === "number" && invoice.qbo_balance_cents > 0,
     kind: invoice.kind,
     issued: invoice.issued_on,
-    status: credit ? "Credit" : invoice.paid_at ? "Paid" : "Unpaid",
+    status: credit ? "Credit" : status,
     breweryName: brewery.name,
     breweryPhone: brewery.customer_phone,
     lines: lines.map((l) => ({

@@ -9,9 +9,11 @@ import type { PortalInvoiceViewModel } from "@/lib/mgr/portal-invoice-view";
 export type { PortalInvoiceViewModel };
 
 export type PortalInvoiceVariant = "pay" | "unavailable" | "paid";
+type ResolvedPortalInvoiceVariant = PortalInvoiceVariant | "nonpayable";
 
-function resolveVariant(variant: PortalInvoiceVariant | undefined, paid: boolean): PortalInvoiceVariant {
+function resolveVariant(variant: PortalInvoiceVariant | undefined, paid: boolean, payable: boolean): ResolvedPortalInvoiceVariant {
   if (variant) return variant;
+  if (!paid && !payable) return "nonpayable";
   return paid ? "paid" : "unavailable";
 }
 
@@ -29,7 +31,7 @@ export function PortalInvoiceView({
   /** Live/inventory: Pay and Download PDF. Unavailable has none by default. */
   footer?: ReactNode;
 }) {
-  const kind = model.kind === "credit_memo" ? "credit" : resolveVariant(variant, model.paid);
+  const kind = model.kind === "credit_memo" ? "credit" : resolveVariant(variant, model.paid, model.payable);
   const questionNav = E.nav("Question this invoice", `sends a note to ${model.breweryName}`);
   const questionSlot = question !== undefined ? question : questionNav;
   const payFooter = footer !== undefined ? footer : E.btns([["Pay invoice", "p"], ["Download PDF", "g"]]);
@@ -43,9 +45,10 @@ export function PortalInvoiceView({
       {kind === "unavailable"
         ? E.info("Online payment isn’t available for this invoice right now.")
         : null}
+      {kind === "nonpayable" ? E.info(model.status === "Unpaid" ? "Online payment isn’t available for this invoice right now." : model.status === "Review" ? "QuickBooks changes need review before online payment is available." : "This invoice is not payable.") : null}
       {kind === "paid"
         ? (model.paidOn ? E.row("Paid", model.paidOn, "", "ok") : null)
-        : kind !== "credit" ? (
+        : kind === "pay" || kind === "unavailable" ? (
           <>
             {model.due ? E.row("Due", model.due) : null}
           </>

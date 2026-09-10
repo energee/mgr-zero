@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { readPublicEnv } from "@/lib/env/public";
-import { readServerEnv } from "@/lib/env/server-parser";
+import { readQboEnv, readServerEnv } from "@/lib/env/server-parser";
 
 const validPublic = {
   NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54341",
@@ -35,6 +35,19 @@ describe("environment validation", () => {
     expect(() =>
       readServerEnv({ ...validServer, VERCEL_ENV: "staging" })
     ).toThrow("VERCEL_ENV");
+  });
+
+  it("parses the exact server-only QuickBooks OAuth and API names", () => {
+    expect(readQboEnv({
+      QBO_CLIENT_ID: "client", QBO_CLIENT_SECRET: "secret",
+      QBO_REDIRECT_URI: "https://mgr.test/api/integrations/qbo/oauth",
+      QBO_API_BASE: "https://sandbox-quickbooks.api.intuit.com",
+    })).toEqual({
+      clientId: "client", clientSecret: "secret",
+      redirectUri: "https://mgr.test/api/integrations/qbo/oauth",
+      apiBaseUrl: "https://sandbox-quickbooks.api.intuit.com",
+    });
+    expect(() => readQboEnv({ QBO_CLIENT_ID: "client" })).toThrow("QBO_CLIENT_SECRET");
   });
 
   it("needs only the Supabase secret key on the server; no rate-limit secret exists (audit 2026-09-05 A1)", () => {

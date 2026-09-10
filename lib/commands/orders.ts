@@ -2,6 +2,7 @@
 // to one plpgsql function (00001_baseline.sql, iron rule 5); this layer does
 // zod validation, role gating, and camelCase→p_* argument mapping.
 import { z } from "zod";
+import { invoiceCurrentTotalCents } from "@/lib/mgr/invoice-state";
 import { defineCommand, defineQuery, unwrap, runCommand, CommandError } from "./registry";
 
 const lines = z.array(z.object({ skuId: z.string().uuid(), qty: z.number().positive() })).min(1);
@@ -57,7 +58,7 @@ defineCommand({
 });
 
 defineCommand({
-  name: "adjust_order_lines", description: "Replace lines on a confirmed/picked order; re-syncs allocations; flags restocking when picked",
+  name: "adjust_order_lines", description: "Replace lines on a confirmed/picked order; re-syncs allocations and returnable-keg deposits; flags restocking when picked",
   roles: [...salesRoles], requiresConfirmation: true,
   input: z.object({ orderId: z.string().uuid(), reason: z.string().min(1), lines }),
   handler: (ctx, i, execution) => unwrap(ctx.db.rpc("adjust_order_lines", { p_order: i.orderId, p_lines: toLines(i.lines), p_reason: i.reason, p_request_id: execution.requestId })),
@@ -295,20 +296,25 @@ defineQuery({
 });
 
 defineQuery({
-  name: "list_invoices", description: "Invoices and credit memos with subtotal (from invoice_totals), newest first",
+  name: "list_invoices", description: "Invoices and credit memos with current total plus frozen local subtotal, newest first",
   roles: [...readRoles],
   input: z.object({ customerId: z.string().uuid().optional(), limit: z.number().int().max(200).default(50) }),
   handler: async (ctx, i) => {
     let q = ctx.db.from("invoices").select("*, customers(name)").eq("brewery_id", ctx.breweryId)
       .order("created_at", { ascending: false }).limit(i.limit);
     if (i.customerId) q = q.eq("customer_id", i.customerId);
-    const invoices = (await unwrap(q)) as { id: string }[];
+    const invoices = (await unwrap(q)) as { id: string; kind: "invoice" | "credit_memo"; qbo_total_cents: number | null }[];
     const ids = invoices.map(inv => inv.id);
-    const totals = ids.length
-      ? (await unwrap(ctx.db.from("invoice_totals").select("invoice_id, subtotal_cents").in("invoice_id", ids))) as { invoice_id: string; subtotal_cents: number }[]
-      : [];
+    const [totals, pendingPushes] = ids.length ? await Promise.all([
+      unwrap(ctx.db.from("invoice_totals").select("invoice_id, subtotal_cents").in("invoice_id", ids)) as PromiseLike<{ invoice_id: string; subtotal_cents: number }[]>,
+      unwrap(ctx.db.from("qbo_pushes").select("invoice_id").in("invoice_id", ids).eq("status", "pending")) as PromiseLike<{ invoice_id: string }[]>,
+    ]) : [[], []];
     const subtotalById = new Map(totals.map(t => [t.invoice_id, t.subtotal_cents]));
-    return invoices.map(inv => ({ ...inv, subtotal_cents: subtotalById.get(inv.id) ?? 0 }));
+    const pending = new Set(pendingPushes.map(push => push.invoice_id));
+    return invoices.map(inv => {
+      const subtotal_cents = subtotalById.get(inv.id) ?? 0;
+      return { ...inv, subtotal_cents, total_cents: invoiceCurrentTotalCents(inv, subtotal_cents), has_pending_qbo_push: pending.has(inv.id) };
+    });
   },
 });
 
@@ -317,9 +323,12 @@ defineQuery({
   roles: [...readRoles],
   input: z.object({ invoiceId: z.string().uuid() }),
   handler: async (ctx, i) => {
-    const invoice = await unwrap(ctx.db.from("invoices").select("*, customers(name)").eq("id", i.invoiceId).single());
-    const invLines = await unwrap(ctx.db.from("invoice_lines").select("*, skus(name)").eq("invoice_id", i.invoiceId));
-    return { invoice, lines: invLines };
+    const [invoice, invLines, pendingPush] = await Promise.all([
+      unwrap(ctx.db.from("invoices").select("*, customers(id,name,qbo_customer_id,qbo_realm_id)").eq("id", i.invoiceId).single()),
+      unwrap(ctx.db.from("invoice_lines").select("*, skus(name,qbo_item_id,qbo_realm_id)").eq("invoice_id", i.invoiceId)),
+      unwrap(ctx.db.from("qbo_pushes").select("id").eq("invoice_id", i.invoiceId).eq("brewery_id", ctx.breweryId).eq("status", "pending").maybeSingle()),
+    ]);
+    return { invoice, lines: invLines, hasPendingPush: Boolean(pendingPush) };
   },
 });
 

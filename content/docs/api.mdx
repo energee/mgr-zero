@@ -99,6 +99,16 @@ const order = await command(breweryId, "create_order", {
 });
 ```
 
+The customer portal's invoice-payment handoff is a session-authenticated `GET`
+instead of a registered operation. It authorizes one current live invoice only
+when QuickBooks has reported a positive balance, reads its payment link on the
+server, rechecks the balance and access, and redirects without returning or
+storing that bearer link in the command API. A zero or unknown current balance
+leaves payment unavailable; a reopened invoice with a positive balance remains
+eligible even when its history retains an earlier paid date. A reconnect,
+credential rotation, or loss of the required accounting permission while the
+link is being fetched also leaves payment unavailable.
+
 Outside the app, the equivalent is a POST with your own `requestId`:
 
 ```ts
@@ -195,6 +205,7 @@ omitted. They have no roles until they are built.
 | `confirm_delivery` | Delivery & routes | ✓ |  | ✓ |  |  |  |
 | `confirm_order` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
 | `confirm_restock` | Orders & invoicing | ✓ |  | ✓ |  |  |  |
+| `connect_qbo` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `consume_chat_link_proof` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `correct_taproom_count` | Taproom & kegs | ✓ |  |  |  |  |  |
 | `create_bin` | Inventory & locations | ✓ |  | ✓ |  |  |  |
@@ -215,6 +226,7 @@ omitted. They have no roles until they are built.
 | `depart_route` | Delivery & routes | ✓ |  | ✓ |  |  |  |
 | `disable_chat_installation` | Today & notifications | ✓ |  |  |  |  |  |
 | `disconnect_chat_installation` | Today & notifications | ✓ |  |  |  |  |  |
+| `disconnect_qbo` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `draft_purchase_order_from_requirements` | Purchasing & materials | ✓ |  | ✓ |  |  |  |
 | `file_compliance_report` | Compliance | ✓ | ✓ |  |  |  |  |
 | `generate_compliance_report` | Compliance | ✓ | ✓ |  |  |  |  |
@@ -250,6 +262,7 @@ omitted. They have no roles until they are built.
 | `get_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |  |
 | `get_portal_account` | Customer portal |  |  |  |  |  | ✓ |
 | `get_purchase_order` | Purchasing & materials | ✓ |  | ✓ |  |  |  |
+| `get_qbo_connection` | Team & brewery settings | ✓ | ✓ |  |  |  |  |
 | `get_recipe` | Production | ✓ |  |  | ✓ |  |  |
 | `get_shortfalls` | Today & notifications | ✓ | ✓ | ✓ |  |  |  |
 | `get_stock_transfer` | Inventory & locations | ✓ | ✓ | ✓ |  |  |  |
@@ -307,9 +320,12 @@ omitted. They have no roles until they are built.
 | `portal_invoices` | Customer portal |  |  |  |  |  | ✓ |
 | `portal_order` | Customer portal |  |  |  |  |  | ✓ |
 | `portal_orders` | Customer portal |  |  |  |  |  | ✓ |
+| `portal_quote_order` | Customer portal |  |  |  |  |  | ✓ |
 | `portal_submit_order` | Customer portal |  |  |  |  |  | ✓ |
+| `portal_submit_quote` | Customer portal |  |  |  |  |  | ✓ |
 | `portal_update_draft_order` | Customer portal |  |  |  |  |  | ✓ |
 | `provision_brewery` | Team & brewery settings |  |  |  |  |  |  |
+| `push_invoice_to_qbo` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
 | `raise_invoice_question` | Orders & invoicing |  |  |  |  |  | ✓ |
 | `reattribute_loss` | Compliance | ✓ | ✓ |  |  |  |  |
 | `receive_purchase_order` | Purchasing & materials | ✓ |  | ✓ |  |  |  |
@@ -348,6 +364,10 @@ omitted. They have no roles until they are built.
 | `set_notification_preference` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `set_personal_quiet_hours` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |  |
 | `set_portal_fulfillment_source` | Customers | ✓ |  |  |  |  |  |
+| `set_qbo_customer_mapping` | Customers | ✓ | ✓ |  |  |  |  |
+| `set_qbo_deposit_mapping` | Team & brewery settings | ✓ |  |  |  |  |  |
+| `set_qbo_item_mapping` | Team & brewery settings | ✓ | ✓ |  |  |  |  |
+| `set_qbo_push_defaults` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `set_standing_allocation` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
 | `set_taproom_par` | Taproom & kegs | ✓ | ✓ |  |  |  |  |
 | `ship_order` | Orders & invoicing | ✓ |  | ✓ |  |  |  |
@@ -355,6 +375,7 @@ omitted. They have no roles until they are built.
 | `submit_order` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
 | `submit_stock_transfer` | Inventory & locations | ✓ |  | ✓ |  |  |  |
 | `swap_keg` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
+| `sync_qbo_payments` | Team & brewery settings | ✓ | ✓ |  |  |  |  |
 | `tap_keg` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
 | `trace_lot` | Compliance | ✓ | ✓ |  |  |  |  |
 | `unlink_chat_user` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
@@ -379,6 +400,7 @@ omitted. They have no roles until they are built.
 | `upsert_state_registration` | Compliance | ✓ | ✓ |  |  |  |  |
 | `upsert_vendor` | Purchasing & materials | ✓ |  | ✓ | ✓ |  |  |
 | `upsert_vessel` | Production | ✓ |  |  | ✓ |  |  |
+| `write_off_invoice` | Orders & invoicing | ✓ |  |  |  |  |  |
 {/* end ops:roles */}
 
 ## Idempotency & retries [#idempotency]
@@ -960,7 +982,7 @@ movements. Invoices are never edited.
 
 `command` · admin, sales
 
-Replace lines on a confirmed/picked order; re-syncs allocations; flags restocking when picked
+Replace lines on a confirmed/picked order; re-syncs allocations and returnable-keg deposits; flags restocking when picked
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -1178,7 +1200,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `query` · admin, sales, warehouse
 
-Invoices and credit memos with subtotal (from invoice_totals), newest first
+Invoices and credit memos with current total plus frozen local subtotal, newest first
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -1226,6 +1248,24 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_standing_allocations", "input": {} }'
+```
+
+#### push_invoice_to_qbo [#push_invoice_to_qbo]
+
+`command` · admin, sales
+
+Push a frozen local invoice or credit memo to the current QuickBooks company with a durable request ID
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `invoiceId` | uuid | yes |
+| `newAttemptReason` | corrected or remote_deleted | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "push_invoice_to_qbo", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "invoiceId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### raise_invoice_question [#raise_invoice_question]
@@ -1416,17 +1456,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "update_draft_order", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "orderId": "00000000-0000-0000-0000-000000000000", "lines": [ { "skuId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
 ```
 
----
+#### write_off_invoice [#write_off_invoice]
 
-**Designed, not yet available** {/* orders-designed */}
+`command` · admin
 
-25 of the 26 operations in this area are available today; the 1 below are not.
+Mark a QuickBooks-voided or deleted invoice written off in MGR without recording cash or changing QuickBooks
 
-The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
-
-| Operation | Kind | Needed by |
+| Field | Type | Required |
 | --- | --- | --- |
-| `write_off_invoice` | command | Invoices |
+| `invoiceId` | uuid | yes |
+| `reason` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "write_off_invoice", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "invoiceId": "00000000-0000-0000-0000-000000000000", "reason": "string" } }'
+```
 
 {/* end ops:orders */}
 
@@ -2199,6 +2245,24 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_portal_fulfillment_source", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "locationId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+#### set_qbo_customer_mapping [#set_qbo_customer_mapping]
+
+`command` · admin, sales
+
+Bind a customer to a QuickBooks customer in the current company
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `customerId` | uuid | yes |
+| `qboCustomerId` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_qbo_customer_mapping", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "customerId": "00000000-0000-0000-0000-000000000000", "qboCustomerId": "string" } }'
 ```
 
 #### upsert_customer [#upsert_customer]
@@ -3996,6 +4060,40 @@ location. Prices are nonnegative integer cents, at most 2147483647.
 
 {/* ops:team */}
 
+#### connect_qbo [#connect_qbo]
+
+`command` · admin
+
+Begin administrator consent for a QuickBooks connection
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `reconnect` | boolean | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "connect_qbo", "requestId": "11111111-1111-1111-1111-111111111111", "input": {} }'
+```
+
+#### disconnect_qbo [#disconnect_qbo]
+
+`command` · admin
+
+Disable QuickBooks locally, release its company ownership, purge its credential, and attempt remote revocation; the exact requestId replays the recorded outcome
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `connectionId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "disconnect_qbo", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "connectionId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 #### get_brewery [#get_brewery]
 
 `query` · admin, sales, warehouse, brewer
@@ -4054,6 +4152,21 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_gravity_unit", "input": {} }'
+```
+
+#### get_qbo_connection [#get_qbo_connection]
+
+`query` · admin, sales
+
+Get redacted QuickBooks connection health and the connectionId required to disconnect
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_qbo_connection", "input": {} }'
 ```
 
 #### import_csv [#import_csv]
@@ -4211,6 +4324,74 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_my_gravity_unit", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "unit": "plato" } }'
+```
+
+#### set_qbo_deposit_mapping [#set_qbo_deposit_mapping]
+
+`command` · admin
+
+Set the QuickBooks item used for returnable-keg deposit charges
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `qboItemId` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_qbo_deposit_mapping", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "qboItemId": "string" } }'
+```
+
+#### set_qbo_item_mapping [#set_qbo_item_mapping]
+
+`command` · admin, sales
+
+Bind a SKU to a QuickBooks item in the current company
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `skuId` | uuid | yes |
+| `qboItemId` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_qbo_item_mapping", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "skuId": "00000000-0000-0000-0000-000000000000", "qboItemId": "string" } }'
+```
+
+#### set_qbo_push_defaults [#set_qbo_push_defaults]
+
+`command` · admin
+
+Set the ACH and card options copied onto future QuickBooks invoices
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `allowAch` | boolean | yes |
+| `allowCard` | boolean | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_qbo_push_defaults", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "allowAch": true, "allowCard": true } }'
+```
+
+#### sync_qbo_payments [#sync_qbo_payments]
+
+`command` · admin, sales
+
+Read one frozen batch of current QuickBooks invoice balances, payment evidence, edits, voids, and deletions, then apply it all-or-none; the exact requestId replays the recorded result
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "sync_qbo_payments", "requestId": "11111111-1111-1111-1111-111111111111", "input": {} }'
 ```
 
 #### update_brewery [#update_brewery]
@@ -4384,6 +4565,27 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "portal_orders", "input": {} }'
 ```
 
+#### portal_quote_order [#portal_quote_order]
+
+`command` · customer
+
+Portal: freeze current prices, deposits, addresses, and optional QuickBooks tax for review
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `shipToId` | uuid | yes |
+| `lines` | array of object | yes |
+| `poNumber` | string | no |
+| `note` | string | no |
+| `requestedShipDate` | date (YYYY-MM-DD) or null | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "portal_quote_order", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "shipToId": "00000000-0000-0000-0000-000000000000", "lines": [ { "skuId": "00000000-0000-0000-0000-000000000000", "qty": 1 } ] } }'
+```
+
 #### portal_submit_order [#portal_submit_order]
 
 `command` · customer
@@ -4400,6 +4602,25 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "portal_submit_order", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "orderId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+#### portal_submit_quote [#portal_submit_quote]
+
+`command` · customer
+
+Portal: atomically submit an unchanged reviewed quote as a new or existing draft order
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `quoteId` | uuid | yes |
+| `orderId` | uuid | no |
+| `expectedIdentity` | object | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "portal_submit_quote", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "quoteId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### portal_update_draft_order [#portal_update_draft_order]
@@ -4429,7 +4650,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* portal-designed */}
 
-9 of the 10 operations in this area are available today; the 1 below are not.
+11 of the 12 operations in this area are available today; the 1 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 

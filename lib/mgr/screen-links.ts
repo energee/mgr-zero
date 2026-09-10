@@ -212,6 +212,7 @@ export const INERT: (string | RegExp)[] = [
   "Complete batch",
   "Create recipe version",
   "Current state",
+  "Online payments",
   "Decrease",
   "Delivery enabled",
   "Demo Brewing LLC",

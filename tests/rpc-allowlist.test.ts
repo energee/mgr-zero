@@ -36,6 +36,14 @@ const AUTHENTICATED_RPCS = [
   "adjust_order_lines(uuid,jsonb,text,uuid)",
   "begin_chat_installation(uuid,text,text,text,uuid)",
   "begin_chat_reauthorization(uuid,uuid,text,text,uuid)",
+  "begin_qbo_oauth(uuid,text,text,text,uuid,text[])",
+  "begin_qbo_invoice_sync(uuid,uuid)",
+  "set_qbo_customer_mapping(uuid,uuid,text,uuid)",
+  "set_qbo_item_mapping(uuid,uuid,text,uuid)",
+  "set_qbo_deposit_mapping(uuid,text,uuid)",
+  "set_qbo_push_defaults(uuid,boolean,boolean,uuid)",
+  "write_off_invoice(uuid,uuid,text,uuid)",
+  "start_qbo_push(uuid,uuid,text,uuid)",
   "cancel_order(uuid,text,uuid)",
   "clear_channel_price(uuid,uuid,uuid,uuid,uuid)",
   "close_packaging_run(uuid,uuid,numeric,jsonb,text,date,date,uuid,uuid,uuid)",
@@ -72,6 +80,8 @@ const AUTHENTICATED_RPCS = [
   "portal_availability(uuid)",
   "portal_brewery_rows()",
   "portal_create_order(uuid,uuid,uuid,text,text,jsonb,uuid,date)",
+  "portal_quote_order(uuid,uuid,uuid,date,text,text,jsonb,uuid)",
+  "portal_submit_quote(uuid,uuid,uuid,uuid,uuid)",
   "receive_purchase_order(uuid,uuid,uuid,uuid,date,jsonb,uuid)",
   "receive_stock_transfer(uuid,jsonb,uuid)",
   "record_brew_day(uuid,uuid,uuid,numeric,date,uuid)",
@@ -156,6 +166,15 @@ it("grants action issuance and receipt consumption only to the service owner", (
     where p.pronamespace='public'::regnamespace and p.proname in ('issue_chat_action_intent','consume_chat_action_intent')
       and has_function_privilege(r.role,p.oid,'execute') order by 1`)).toEqual([
     "consume_chat_action_intent:service_role", "issue_chat_action_intent:service_role",
+  ]);
+});
+
+it("grants portal tax credential access only to the service owner", () => {
+  expect(sql(`select p.proname || ':' || r.role from pg_proc p
+    cross join (values ('anon'),('authenticated'),('service_role')) r(role)
+    where p.pronamespace='public'::regnamespace and p.proname in ('read_portal_quote_tax','finish_portal_quote_tax')
+      and has_function_privilege(r.role,p.oid,'execute') order by 1`)).toEqual([
+    "finish_portal_quote_tax:service_role", "read_portal_quote_tax:service_role",
   ]);
 });
 

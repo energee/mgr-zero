@@ -330,10 +330,18 @@ describe("account and invoice reads", () => {
   it("portal_invoice returns the caller's own invoice with lines, and not_found for another customer's", async () => {
     const { data: inv } = await admin.from("invoices").insert({ brewery_id: b.id, customer_id: customerId, kind: "invoice" }).select().single();
     await admin.from("invoice_lines").insert({ brewery_id: b.id, invoice_id: inv!.id, kind: "sku", sku_id: skuId, qty: 2, unit_price_cents: 3600, description: "IPA case" });
+    await admin.from("invoices").update({
+      qbo_remote_state: "live", qbo_total_cents: 10500, qbo_tax_cents: 500,
+      qbo_balance_cents: 10500, qbo_accountant_drift: true,
+    }).eq("id", inv!.id);
     const other = await seedCustomer(b.id, { name: "Not mine", saleChannelId });
     const { data: foreign } = await admin.from("invoices").insert({ brewery_id: b.id, customer_id: other.customerId, kind: "invoice" }).select().single();
-    const one = await runCommand("portal_invoice", { invoiceId: inv!.id }, custCtx) as { invoice: { id: string; total_cents: number }; lines: { qty: number }[] };
+    const one = await runCommand("portal_invoice", { invoiceId: inv!.id }, custCtx) as {
+      invoice: { id: string; total_cents: number; qbo_tax_cents: number; qbo_balance_cents: number; qbo_accountant_drift: boolean };
+      lines: { qty: number }[];
+    };
     expect(one.invoice.id).toBe(inv!.id);
+    expect(one.invoice).toMatchObject({ total_cents: 10500, qbo_tax_cents: 500, qbo_balance_cents: 10500, qbo_accountant_drift: true });
     expect(one.lines.map((l) => Number(l.qty))).toEqual([2]);
     await expect(runCommand("portal_invoice", { invoiceId: foreign!.id }, custCtx)).rejects.toMatchObject({ code: "not_found" });
   });

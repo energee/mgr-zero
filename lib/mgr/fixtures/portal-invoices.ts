@@ -31,6 +31,7 @@ export const portalInvoiceUnpaid: PortalInvoiceSnapshot = {
     issued_on: "2026-09-03",
     due_on: "2026-10-03",
     paid_at: null,
+    qbo_balance_cents: 94800,
     total_cents: 94800,
   },
   lines: [
