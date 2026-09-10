@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
 import { getCommandDefinition, runCommand, type Ctx } from "@/lib/commands/registry";
 import "@/lib/commands/all";
-import { channelId, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
+import { admin, channelId, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, seedLocation, sql } from "./helpers";
 
 describe("scoped composer history and provenance", () => {
   let breweryId: string;
@@ -45,6 +45,48 @@ describe("scoped composer history and provenance", () => {
       conversationId: conversation.id, role: "user", content: "Wrong brewery",
     }, foreignTenant)).rejects.toMatchObject({ code: "permission_denied" });
     expect(sql(`select count(*) from private.chat_messages where conversation_id='${conversation.id}'`)).toEqual(["1"]);
+  });
+
+  it("rejects direct composer RPCs after the current actor changes from staff to customer, then preserves staff compatibility", async () => {
+    const conversation = await owner.db.rpc("create_chat_conversation", {
+      p_brewery: breweryId, p_title: "Before role change", p_request_id: randomUUID(),
+    });
+    expect(conversation.error).toBeNull();
+    const conversationId = (conversation.data as { id: string }).id;
+    const customer = await seedCustomer(breweryId, { name: "Former staff account" });
+    expect((await admin.from("customer_users").insert({ customer_id: customer.customerId, user_id: owner.userId })).error).toBeNull();
+    expect((await admin.from("brewery_users").delete().eq("brewery_id", breweryId).eq("user_id", owner.userId)).error).toBeNull();
+    try {
+      const attempts = await Promise.all([
+        owner.db.rpc("create_chat_conversation", { p_brewery: breweryId, p_title: null, p_request_id: randomUUID() }),
+        owner.db.rpc("list_chat_conversations", { p_brewery: breweryId }),
+        owner.db.rpc("get_chat_history", { p_brewery: breweryId, p_conversation: conversationId }),
+        owner.db.rpc("append_chat_message", { p_brewery: breweryId, p_conversation: conversationId, p_role: "user", p_content: "customer retry", p_request_id: randomUUID() }),
+        owner.db.rpc("preview_inventory_movement", {
+          p_brewery: breweryId, p_sku: catalog.skuId, p_location: location.id, p_bin: location.binId,
+          p_qty: 1, p_type: "adjustment", p_sale_channel: null, p_dest_state: null, p_note: null,
+          p_lot: null, p_conversation: conversationId,
+        }),
+      ]);
+      expect(attempts.map((result) => result.error?.code ?? null)).toEqual(["42501", "42501", "42501", "42501", "42501"]);
+    } finally {
+      await admin.from("customer_users").delete().eq("customer_id", customer.customerId).eq("user_id", owner.userId);
+      await admin.from("brewery_users").insert({ brewery_id: breweryId, user_id: owner.userId, role: "admin" });
+    }
+    const restored = await owner.db.rpc("get_chat_history", { p_brewery: breweryId, p_conversation: conversationId });
+    expect(restored.error).toBeNull();
+    expect(restored.data).toMatchObject({ conversation: { id: conversationId, title: "Before role change" } });
+  });
+
+  it.each(["admin", "sales", "warehouse", "brewer", "taproom"] as const)("keeps direct conversation RPCs available to current %s staff", async (role) => {
+    const staff = role === "admin" ? owner : await makeStaffCtx(breweryId, role);
+    const created = await staff.db.rpc("create_chat_conversation", {
+      p_brewery: breweryId, p_title: `${role} conversation`, p_request_id: randomUUID(),
+    });
+    expect(created.error).toBeNull();
+    const listed = await staff.db.rpc("list_chat_conversations", { p_brewery: breweryId });
+    expect(listed.error).toBeNull();
+    expect(listed.data).toEqual(expect.arrayContaining([expect.objectContaining({ id: (created.data as { id: string }).id })]));
   });
 
   it("denies application roles direct access to preview and history tables", async () => {

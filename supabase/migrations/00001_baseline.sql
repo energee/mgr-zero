@@ -3669,14 +3669,8 @@ revoke all on function private.claim_command_request_for(uuid, uuid, text, uuid,
 
 create function private.assert_chat_member(p_brewery uuid) returns uuid
 language plpgsql stable security definer set search_path = '' as $$
-declare v_actor uuid := auth.uid();
 begin
-  if v_actor is null or not private.request_scope_allows(p_brewery, null, true) or not (
-    exists(select 1 from public.brewery_users where brewery_id=p_brewery and user_id=v_actor)
-    or exists(select 1 from public.customer_users cu join public.customers c on c.id=cu.customer_id
-      where cu.user_id=v_actor and c.brewery_id=p_brewery)
-  ) then raise exception 'permission denied' using errcode='42501'; end if;
-  return v_actor;
+  return private.assert_staff(p_brewery,array['admin','sales','warehouse','brewer','taproom']::public.staff_role[]);
 end $$;
 
 create function private.assert_chat_conversation(p_brewery uuid,p_conversation uuid) returns uuid
