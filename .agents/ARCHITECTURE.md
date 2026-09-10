@@ -19,6 +19,7 @@ never copy it into a second place.
 | `lib/commands/client.ts`, `use-command-form.ts` | How the UI calls commands. |
 | `lib/supabase/server.ts` | RLS-bound client for request paths. |
 | `lib/supabase/invites.ts` | Durable staff/customer invitations: RLS-bound claim and membership RPCs surround the sole Auth admin invite call. `private.invite_requests` and an Auth-transaction trigger preserve identity across lost responses; replay never regrants revoked membership. |
+| `lib/supabase/public-menu.ts` | Server-only website menu reader. It may call only the service-only `get_published_pos_menu` RPC, whose opaque public id and fixed safe projection expose explicitly published current rows without granting anonymous access to tenant tables. |
 | `lib/supabase/admin.ts` | Service-role client. Import restricted by eslint (see rule 4). |
 | `lib/brewery.ts`, `app/(app)/brewery-provider.tsx` | Current-brewery resolution and switching across the signed-in user's memberships. |
 | `lib/portal.ts` | `getActiveCustomer()`: resolves which customer account the session operates as from `customer_users`, mirroring `lib/brewery.ts`. Redirects to `/login` with no membership. |
@@ -138,7 +139,7 @@ a gap to close, not a convention to trust.
    `search_path` on every function, and an `RLS-EXCEPTION:` comment on any
    permissive policy.
 4. **`createAdminClient()` is restricted to `lib/supabase/integration-tokens.ts`,
-   `lib/supabase/invites.ts`, and `lib/chat/jobs.ts`.**
+   `lib/supabase/invites.ts`, `lib/supabase/public-menu.ts`, and `lib/chat/jobs.ts`.**
    The token boundary is the sole credential path: it admits only `admin`/`sales`,
    proves the concrete connection is visible through `ctx.db`, then passes the
    verified actor to a service-only RPC that rechecks current membership and role
@@ -162,6 +163,10 @@ a gap to close, not a convention to trust.
    never `from("chat_installations")`, never ordinary domain commands, and
    never mints a user token. Those activate/find RPCs are not granted to
    `authenticated` and must not trust a caller `token_store_key`.
+   `lib/supabase/public-menu.ts` may call only `get_published_pos_menu`; that
+   service-only function accepts an opaque public id and returns location name,
+   safe labels, prices, serving sizes, availability, and an as-of time for rows
+   explicitly published to the website. It cannot expose tenant or provider ids.
    *Enforced by:* `no-restricted-imports` in `eslint.config.mjs`, run in CI.
 5. **Every mutation is one idempotent Postgres transaction.**
    Application roles have no direct table DML. A write handler calls one

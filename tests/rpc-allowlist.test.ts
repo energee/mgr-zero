@@ -18,6 +18,9 @@ const AUTHENTICATED_RPCS = [
   "taproom_can(uuid,text)", "staff_brewery_rows()", "keg_bin_on_hand_rows()", "on_hand_rows()",
   "get_chat_integration_health(uuid)",
   "get_chat_link_intent(uuid,text)",
+  "configure_pos_menu(uuid,text,uuid,uuid,uuid)",
+  "get_pos_menu(uuid,text)",
+  "get_pos_menu_item(uuid,text,uuid)",
   "list_chat_user_links(uuid)",
   "set_brewery_operating_defaults(uuid,integer,uuid)",
 
@@ -118,6 +121,8 @@ const AUTHENTICATED_RPCS = [
   "set_portal_fulfillment_source(uuid,uuid,uuid)",
   "set_pos_item_mapping(uuid,text,text,uuid,uuid,boolean,uuid)",
   "set_pos_location_mapping(uuid,text,uuid,uuid)",
+  "set_pos_price_override(uuid,text,uuid,integer,uuid)",
+  "set_pos_website_publication(uuid,text,uuid,boolean,uuid)",
   "set_channel_price(uuid,uuid,uuid,uuid,integer,uuid)",
   "set_standing_allocation(uuid,uuid,numeric,uuid)",
   "set_taproom_par(uuid,uuid,uuid,numeric,uuid)",

@@ -23,7 +23,7 @@ const matrix = {
   material_counts: "deny", material_count_lines: "deny", orders: "deny", order_lines: "deny", order_deposit_lines: "deny", order_events: "deny",
   shipments: "deny", invoices: "deny", invoice_questions: "deny", invoice_lines: "deny", keg_events: "deny",
   stock_transfers: "deny", stock_transfer_lines: "deny", qbo_connections: "deny", qbo_pushes: "deny", pos_connections: "deny",
-  pos_locations: "tenant", pos_item_mappings: "tenant", pos_catalog_variations: "deny", pos_sales: "deny", pos_sale_expectations: "deny", pos_sales_coverage: "deny", brand_approvals: "deny",
+  pos_locations: "tenant", pos_item_mappings: "tenant", pos_catalog_variations: "deny", pos_menus: "deny", pos_menu_lines: "deny", pos_sales: "deny", pos_sale_expectations: "deny", pos_sales_coverage: "deny", brand_approvals: "deny",
   state_registrations: "deny", brewery_state_licenses: "deny", report_filings: "deny", routes: "deny",
   deliveries: "deny", chat_installations: "deny", chat_user_links: "self", notification_destinations: "self",
   notification_preferences: "self", notification_occurrences: "deny", notification_deliveries: "deny",
@@ -120,6 +120,9 @@ async function fixtures() {
     entity_type: "Invoice", provider_request_id: crypto.randomUUID(), request_body: "{}", local_snapshot: {}, attempt_reason: "initial" });
   const pos = await put("pos_connections", { merchant_id: `merchant-${brewery.id}` });
   await put("pos_locations", { connection_id: pos.id, external_location_id: "L1", location_id: taps[0].id });
+  const poured = await put("formats", { brand_id: cat.brandId, name: "Pint", basis: "poured", ounces: 16 });
+  const menu = await put("pos_menus", { connection_id: pos.id, external_location_id: "L1", location_id: taps[0].id, bin_id: taps[0].binId, sale_channel_id: customer.saleChannelId });
+  await put("pos_menu_lines", { menu_id: menu.id, format_id: poured.id, price_override_cents: 700 });
   await put("pos_catalog_variations", { connection_id: pos.id, external_item_id: "I1", external_variation_id: "V1", external_item_name: "IPA", external_variation_name: "Can", source_version: 1 });
   await put("pos_item_mappings", { connection_id: pos.id, external_item_id: "I1", external_variation_id: "V1", sku_id: cat.skuId });
   const sale = await put("pos_sales", { connection_id: pos.id, external_order_id: "O1", external_line_id: "S1", external_item_id: "I1", external_variation_id: "V1", external_location_id: "L1", sold_at: now, qty: 1 });
@@ -321,7 +324,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   const catalog = sql(`select json_build_object('name',p.proname,'signature',p.oid::regprocedure::text,'args',p.proargnames[1:p.pronargs]) from pg_proc p
     where p.pronamespace='public'::regnamespace and has_function_privilege('authenticated',p.oid,'execute')
       and not exists(select 1 from pg_depend d where d.objid=p.oid and d.deptype='e')`).map(row => JSON.parse(row) as {name:string;signature:string;args:string[]});
-  const readNames = ["get_batch_completion_preview","get_loss_review","get_taproom_draft_projection","get_taproom_variance","list_open_taps","list_tap_history","get_taproom_count_snapshot","get_taproom_print_labels","get_taproom_count","list_taproom_counts","taproom_can","staff_brewery_rows","keg_bin_on_hand_rows","on_hand_rows","get_chat_integration_health","get_chat_link_intent","list_chat_user_links","generate_compliance_report","get_today_items","is_staff_of","my_brewery_ids","my_customer_ids","portal_availability","portal_brewery_rows","staff_role","today_live_reasons","list_team_members","list_chat_conversations","get_chat_history"];
+  const readNames = ["get_batch_completion_preview","get_loss_review","get_pos_menu","get_pos_menu_item","get_taproom_draft_projection","get_taproom_variance","list_open_taps","list_tap_history","get_taproom_count_snapshot","get_taproom_print_labels","get_taproom_count","list_taproom_counts","taproom_can","staff_brewery_rows","keg_bin_on_hand_rows","on_hand_rows","get_chat_integration_health","get_chat_link_intent","list_chat_user_links","generate_compliance_report","get_today_items","is_staff_of","my_brewery_ids","my_customer_ids","portal_availability","portal_brewery_rows","staff_role","today_live_reasons","list_team_members","list_chat_conversations","get_chat_history"];
   const ownNames = ["set_my_gravity_unit","consume_chat_link_proof","unlink_chat_user","set_notification_preference","set_personal_notification_destination","create_chat_conversation","append_chat_message"];
   const existing = [...readFileSync(new URL("./rls-command-boundary.test.ts", import.meta.url), "utf8").matchAll(/rpc: "(\w+)"/g)].map(m => m[1]);
   const infrastructureNames = ["consume_command_admission"];
@@ -331,7 +334,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     return `select '${table}:' || md5(coalesce(jsonb_agg(to_jsonb(t) order by to_jsonb(t)::text)::text,'')) from public.${table} t where ${predicate}`;
   }).join(";"));
   const publicBefore = publicSnapshot();
-  const readSignatures = ["get_batch_completion_preview(uuid,uuid)","get_loss_review(uuid,date,date)","get_taproom_draft_projection(uuid,uuid)","get_taproom_variance(uuid,uuid,integer)","list_open_taps(uuid,uuid)","list_tap_history(uuid,uuid)","get_taproom_count_snapshot(uuid,uuid)","get_taproom_print_labels(uuid,uuid,text)","get_taproom_count(uuid,uuid)","list_taproom_counts(uuid,uuid)","taproom_can(uuid,text)","staff_brewery_rows()","keg_bin_on_hand_rows()","on_hand_rows()","get_chat_integration_health(uuid)","get_chat_link_intent(uuid,text)","list_chat_user_links(uuid)","generate_compliance_report(uuid,text,date,date)","get_today_items(uuid,timestamp with time zone)","is_staff_of(uuid)","my_brewery_ids()","my_customer_ids()","portal_availability(uuid)","portal_brewery_rows()","staff_role(uuid)","today_live_reasons()","list_team_members(uuid)","list_chat_conversations(uuid)","get_chat_history(uuid,uuid)"];
+  const readSignatures = ["get_batch_completion_preview(uuid,uuid)","get_loss_review(uuid,date,date)","get_pos_menu(uuid,text)","get_pos_menu_item(uuid,text,uuid)","get_taproom_draft_projection(uuid,uuid)","get_taproom_variance(uuid,uuid,integer)","list_open_taps(uuid,uuid)","list_tap_history(uuid,uuid)","get_taproom_count_snapshot(uuid,uuid)","get_taproom_print_labels(uuid,uuid,text)","get_taproom_count(uuid,uuid)","list_taproom_counts(uuid,uuid)","taproom_can(uuid,text)","staff_brewery_rows()","keg_bin_on_hand_rows()","on_hand_rows()","get_chat_integration_health(uuid)","get_chat_link_intent(uuid,text)","list_chat_user_links(uuid)","generate_compliance_report(uuid,text,date,date)","get_today_items(uuid,timestamp with time zone)","is_staff_of(uuid)","my_brewery_ids()","my_customer_ids()","portal_availability(uuid)","portal_brewery_rows()","staff_role(uuid)","today_live_reasons()","list_team_members(uuid)","list_chat_conversations(uuid)","get_chat_history(uuid,uuid)"];
   const ownSignatures = ["set_my_gravity_unit(uuid,text,uuid)","consume_chat_link_proof(uuid,text,uuid)","unlink_chat_user(uuid,uuid,uuid)","set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text,boolean,uuid)","set_personal_notification_destination(uuid,text,uuid,uuid)","create_chat_conversation(uuid,text,uuid)","append_chat_message(uuid,uuid,text,text,uuid)"];
   expect(catalog.filter(c => readNames.includes(c.name)).map(c => c.signature).sort()).toEqual(readSignatures.sort());
   expect(catalog.filter(c => ownNames.includes(c.name)).map(c => c.signature).sort()).toEqual([...ownSignatures].sort());
@@ -392,6 +395,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     set_notification_destination: [B,I,"shared",R(),f.owner.id,now], get_chat_settings_installation: [B,I,f.owner.id],
     chat_credential_has_canonical_owner: [B], has_active_canonical_chat_installation: [B], get_chat_installation_lifecycle: [I], prune_chat_integration_logs: ["90 days"],
     chat_settings_request_completed: [B,f.taproom.id,importRequest],
+    get_published_pos_menu: [R()],
   };
   const serviceCatalog = sql(`select json_build_object('name',p.proname,'signature',p.oid::regprocedure::text,'args',p.proargnames[1:p.pronargs]) from pg_proc p
     where p.pronamespace='public'::regnamespace and p.prorettype not in ('trigger'::regtype,'event_trigger'::regtype)

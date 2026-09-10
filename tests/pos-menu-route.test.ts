@@ -71,6 +71,7 @@ describe("GET /api/public/menus/[publicId]", () => {
     });
     expect((await anon.from("pos_menus").select("*")).error?.code).toBe("42501");
     expect((await anon.from("pos_menu_lines").select("*")).error?.code).toBe("42501");
+    expect((await anon.rpc("get_published_pos_menu", { p_public_id: configured.publicId })).error?.code).toBe("42501");
 
     await runCommand("set_pos_website_publication", {
       posLocationId: "PRIVATE-SQUARE-ID", formatId: pintId, published: false,

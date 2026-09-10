@@ -3845,4 +3845,4 @@ GRANT EXECUTE ON FUNCTION public.configure_pos_menu(uuid,text,uuid,uuid,uuid),
   public.set_pos_website_publication(uuid,text,uuid,boolean,uuid),
   public.get_pos_menu(uuid,text),public.get_pos_menu_item(uuid,text,uuid)
   TO authenticated;
-GRANT EXECUTE ON FUNCTION public.get_published_pos_menu(uuid) TO anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.get_published_pos_menu(uuid) TO service_role;

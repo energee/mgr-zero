@@ -1,6 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
 import { isUuid } from "@/lib/commands/context";
-import { publicEnv } from "@/lib/env/public";
+import { getPublishedMenu } from "@/lib/supabase/public-menu";
 
 const publicHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,12 +12,11 @@ export async function GET(_request: Request, context: { params: Promise<{ public
   const { publicId } = await context.params;
   if (!isUuid(publicId)) return missing();
 
-  const db = createClient(publicEnv.supabaseUrl, publicEnv.supabasePublishableKey, {
-    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-  });
-  const { data, error } = await db.rpc("get_published_pos_menu", { p_public_id: publicId });
-  if (error) {
-    console.error("public menu read failed:", error.code ?? "unknown");
+  let data;
+  try {
+    data = await getPublishedMenu(publicId);
+  } catch (error) {
+    console.error("public menu read failed:", error instanceof Error ? error.name : "unknown");
     return Response.json({ error: "menu unavailable" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
   if (!data) return missing();

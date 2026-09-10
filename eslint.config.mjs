@@ -19,13 +19,13 @@ const eslintConfig = defineConfig([
   {
     // Iron rule 4 (.agents/ARCHITECTURE.md): the service-role client bypasses RLS and
     // is only allowed in the RLS-checking integration-token boundary, durable
-    // invitation boundary, and chat internal-job owner.
+    // invitation boundary, chat internal-job owner, and safe website-menu projection.
     // Tests and scripts run outside request paths and are exempt below.
     files: ["app/**", "lib/**", "components/**", "proxy.ts"],
-    ignores: ["lib/supabase/admin.ts", "lib/supabase/integration-tokens.ts", "lib/supabase/invites.ts", "lib/chat/jobs.ts"],
+    ignores: ["lib/supabase/admin.ts", "lib/supabase/integration-tokens.ts", "lib/supabase/invites.ts", "lib/supabase/public-menu.ts", "lib/chat/jobs.ts"],
     rules: {
       "no-restricted-imports": ["error", {
-        paths: [{ name: "@/lib/supabase/admin", message: "createAdminClient() bypasses RLS. Only lib/supabase/integration-tokens.ts, lib/supabase/invites.ts and lib/chat/jobs.ts (chat internal jobs: named service_role RPCs, no user) may import it — see .agents/ARCHITECTURE.md iron rule 4." }],
+        paths: [{ name: "@/lib/supabase/admin", message: "createAdminClient() bypasses RLS. Only the named service boundaries in .agents/ARCHITECTURE.md iron rule 4 may import it." }],
       }],
     },
   },
