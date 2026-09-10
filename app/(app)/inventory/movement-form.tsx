@@ -30,11 +30,13 @@ type MovementType = (typeof MOVEMENT_TYPES)[number];
 const requiresChannel = (type: MovementType) => type === "depletion";
 
 export function MovementForm({
+  autoOpen = false,
   skus,
   locations,
   bins,
   channels,
 }: {
+  autoOpen?: boolean;
   skus: { id: string; label: string; bblPerUnit: number | null }[];
   locations: { id: string; name: string; kind: string }[];
   bins: { id: string; location_id: string; name: string }[];
@@ -62,6 +64,9 @@ export function MovementForm({
     build: () => ({ skuId, locationId, binId, lotId: lotId || undefined, ...movementFields(type, qty, direction, destState, saleChannelId), type, note: note || undefined }),
     reset: () => { setLotId(""); setStock([]); setSkuId(""); setLocationId(""); setBinId(""); setQty(""); setType("opening_balance"); setSaleChannelId(defaultChannelId); setNote(""); setDestState(""); setDirection("add"); },
   });
+  const { setOpen } = form;
+
+  useEffect(() => { if (autoOpen) setOpen(true); }, [autoOpen, setOpen]);
 
   useEffect(() => {
     if (!locationId || !form.open) return;
