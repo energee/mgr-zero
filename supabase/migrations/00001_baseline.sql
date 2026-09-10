@@ -3681,22 +3681,25 @@ declare
   v_invalid int; v_unmapped int;
 begin
   if public.staff_role(p_brewery) not in ('admin','sales') then raise insufficient_privilege using message='permission denied'; end if;
-  select * into v_conn from public.qbo_connections where brewery_id=p_brewery and state='connected' for share;
-  if not found then raise exception 'QuickBooks connection required'; end if;
-  select * into v_inv from public.invoices where id=p_invoice and brewery_id=p_brewery for update;
-  if not found then raise exception 'invoice not found'; end if;
-  if v_inv.written_off_at is not null then raise exception 'written-off invoice cannot be pushed'; end if;
   if p_new_attempt_reason is not null and p_new_attempt_reason not in ('corrected','remote_deleted') then raise exception 'invalid QuickBooks attempt reason'; end if;
 
   v_replay:=private.claim_command_request(p_brewery,'push_invoice_to_qbo',p_request_id,
     jsonb_strip_nulls(jsonb_build_object('invoiceId',p_invoice,'newAttemptReason',p_new_attempt_reason)));
   if v_replay is not null then
     select * into v_push from public.qbo_pushes
-      where id=nullif(v_replay->>'pushId','')::uuid and invoice_id=p_invoice;
+      where id=nullif(v_replay->>'pushId','')::uuid and brewery_id=p_brewery and invoice_id=p_invoice;
     if found and v_push.status<>'pending' then
       return jsonb_strip_nulls(jsonb_build_object('pushId',v_push.id,'status',v_push.status,
         'remoteId',v_push.qbo_entity_id,'error',v_push.error,'alreadyFinished',true));
     end if;
+  end if;
+
+  select * into v_conn from public.qbo_connections where brewery_id=p_brewery and state='connected' for share;
+  if not found then raise exception 'QuickBooks connection required'; end if;
+  select * into v_inv from public.invoices where id=p_invoice and brewery_id=p_brewery for update;
+  if not found then raise exception 'invoice not found'; end if;
+  if v_inv.written_off_at is not null then raise exception 'written-off invoice cannot be pushed'; end if;
+  if v_replay is not null then
     return v_replay;
   end if;
 

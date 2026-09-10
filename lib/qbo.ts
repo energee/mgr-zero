@@ -251,7 +251,10 @@ export async function pushInvoiceToQbo(
     p_brewery: ctx.breweryId, p_invoice: invoiceId,
     p_new_attempt_reason: newAttemptReason ?? null, p_request_id: requestId,
   })) as QboPushStart;
-  if ((start.alreadyPushed || start.alreadyFinished) && start.status === "pushed" && start.remoteId) {
+  if (start.alreadyFinished && start.status === "pushed" && start.remoteId && start.pushId) {
+    return { pushId: start.pushId, status: "pushed" as const, remoteId: start.remoteId };
+  }
+  if (start.alreadyPushed && start.status === "pushed" && start.remoteId) {
     return { status: "pushed" as const, remoteId: start.remoteId };
   }
   if (start.alreadyFinished && start.status === "push_failed") {
