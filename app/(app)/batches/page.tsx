@@ -56,7 +56,7 @@ export default async function BatchesPage() {
         <>
           {E.sp()}
           {E.ttl("Vessels")}
-          <VesselForm />
+          <div className="self-start"><VesselForm /></div>
           {vessels.length === 0
             ? E.blank("No vessels yet")
             : vessels.map((v) => (

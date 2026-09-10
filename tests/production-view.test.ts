@@ -51,6 +51,7 @@ describe("Batches view", () => {
     const page = src("app/(app)/batches/page.tsx");
     expect(page).toMatch(/from "@\/components\/mgr\/views\/batches"/);
     expect(page).toMatch(/<BatchesView\b/);
+    expect(page).toMatch(/className="self-start"><VesselForm \/>/);
     expect(page).toMatch(/<NewBatchForm\b/);
     expect(page).not.toMatch(/ScheduleBatchView/);
   });
