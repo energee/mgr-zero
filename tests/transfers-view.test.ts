@@ -67,9 +67,11 @@ describe("Transfers list", () => {
 
   it("the live Transfers page mounts TransfersView", () => {
     const src = readFileSync("app/(app)/transfers/page.tsx", "utf8");
+    const form = readFileSync("app/(app)/transfers/new-transfer-form.tsx", "utf8");
     expect(src).toMatch(/from "@\/components\/mgr\/views\/transfers"/);
     expect(src).toMatch(/<TransfersView\b/);
     expect(src).toMatch(/<NewTransferForm\b/);
+    expect(form).toMatch(/<NewTransferView\b/);
   });
 });
 

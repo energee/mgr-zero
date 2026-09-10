@@ -17,7 +17,6 @@ const KNOWN_VIEW_DEBT = [
   "Ship and invoice: ShipView <- app/(app)/orders/[id]/page.tsx",
   "Shipment done: ShipmentDoneView <- app/(app)/orders/[id]/page.tsx",
   "Ship on delivery: ShipView <- app/(app)/orders/[id]/page.tsx",
-  "New transfer: NewTransferView <- app/(app)/transfers/page.tsx",
   "Return and credit: ReturnCreditView <- app/(app)/orders/[id]/page.tsx",
   "New order: NewOrderView <- app/(app)/orders/page.tsx",
   "Ship-to form: ShipToView <- app/(app)/customers/[id]/page.tsx",
