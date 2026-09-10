@@ -22,14 +22,12 @@ export default async function PortalLayout({ children }: { children: React.React
         brand={customer.customerName}
         sidebarOpen={sidebarOpen}
         headerRight={
-          <MeSheet
-            content={
-              <PortalMeView
-                model={toPortalMeViewProps({ email: identity?.email ?? "", account: customer.customerName })}
-                footer={<MeSheetActions signOut="outline" />}
-              />
-            }
-          />
+          <MeSheet>
+            <PortalMeView
+              model={toPortalMeViewProps({ email: identity?.email ?? "", account: customer.customerName })}
+              footer={<MeSheetActions signOut="outline" />}
+            />
+          </MeSheet>
         }
       >
         {children}

@@ -20,14 +20,14 @@ import { UserAvatar } from "@/components/mgr/user-avatar";
 import { UserCircleIcon } from "@hugeicons/core-free-icons";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-export function MeSheet({ fields = [], avatar, breweries, signOut = "destructive", content }: {
+export function MeSheet({ fields = [], avatar, breweries, signOut = "destructive", children }: {
   fields?: [string, string][];
   avatar?: { src?: string; name: string };
   /** Every brewery the account may operate as; the switcher shows with two or more. */
   breweries?: { id: string; name: string; current: boolean }[];
   /** Staff Me is destructive (plan §3 follow-up); portal Me stays outline. */
   signOut?: "destructive" | "outline";
-  content?: ReactNode;
+  children?: ReactNode;
 }) {
   const mobile = useIsMobile();
   return (
@@ -40,7 +40,7 @@ export function MeSheet({ fields = [], avatar, breweries, signOut = "destructive
           {avatar ? <UserAvatar {...avatar} className="size-10" /> : null}
           <SheetTitle>Me</SheetTitle>
         </SheetHeader>
-        {content ?? <>
+        {children ?? <>
           <dl className="flex flex-col px-4 text-sm">
             {fields.map(([k, v]) => (
               <div key={k} className="flex items-center justify-between gap-4 py-2">
