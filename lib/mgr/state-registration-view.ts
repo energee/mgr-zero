@@ -1,7 +1,8 @@
 // lib/mgr/state-registration-view.ts — view-model for State registration sheet.
 export type StateRegistrationViewModel = {
+  brandId: string;
   brand: string;
-  brandOptions: string[];
+  brandOptions: { id: string; label: string }[];
   state: string;
   registrationNo?: string;
   expiresOn?: string;

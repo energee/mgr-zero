@@ -18,11 +18,13 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
  *  give them a second place to drift. */
 export function Qty({
   value,
+  onChange,
   unit,
   label,
   id,
 }: {
   value: string;
+  onChange?: (value: string) => void;
   unit?: ReactNode;
   label: string;
   id?: string;
@@ -38,7 +40,9 @@ export function Qty({
         type="number"
         inputMode="decimal"
         step="any"
-        defaultValue={value}
+        value={onChange ? value : undefined}
+        defaultValue={onChange ? undefined : value}
+        onChange={(event) => onChange?.(event.target.value)}
         aria-label={label}
         className="text-2xl font-semibold"
       />
@@ -67,14 +71,16 @@ export function TabBar({
   on,
   cls,
   to,
+  onChange,
 }: {
   names: string[];
   on: number;
   cls: string;
   to?: Record<string, string>;
+  onChange?: (value: string) => void;
 }) {
   return (
-    <Tabs defaultValue={names[on]} className="min-w-0">
+    <Tabs value={onChange ? names[on] : undefined} defaultValue={onChange ? undefined : names[on]} onValueChange={onChange} className="min-w-0">
       <TabsList variant="solid" className={cls}>
         {names.map((n) => <TabsTrigger key={n} value={n} data-to={to?.[n]}>{n}</TabsTrigger>)}
       </TabsList>

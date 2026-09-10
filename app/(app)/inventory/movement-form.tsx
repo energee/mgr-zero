@@ -11,9 +11,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
 import { MovementRecordedView } from "@/components/mgr/views/movement-recorded";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RecordMovementView, type RecordMovementViewModel } from "@/components/mgr/views/record-movement";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 import { formatDateTime } from "@/lib/date-format";
 import { toMovementRecordedViewProps } from "@/lib/mgr/movement-recorded-view";
@@ -101,6 +99,28 @@ export function MovementForm({
       ...(receipt.ref ? [{ label: "Source reference", value: receipt.ref }] : []),
     ],
   }) : null;
+  const kindOptions = MOVEMENT_TYPES.map(value => value.replaceAll("_", " "));
+  const selectedSku = skus.find(item => item.id === skuId);
+  const selectedLocation = locations.find(item => item.id === locationId);
+  const selectedBin = bins.find(item => item.id === binId);
+  const selectedChannel = channels.find(item => item.id === saleChannelId);
+  const availableLots = stock.filter(item => item.kind === "sku" && item.stock_id === skuId && item.bin_id === binId && item.lot_id);
+  const lotOptions = ["Untracked / legacy stock", ...availableLots.map(item => `${item.lot_code} · ${item.qty} available`)];
+  const movementModel: RecordMovementViewModel = {
+    kind: type.replaceAll("_", " "), kindIndex: MOVEMENT_TYPES.indexOf(type), kindOptions,
+    sku: selectedSku?.label ?? "", skuOptions: skus.map(item => item.label),
+    location: selectedLocation?.name ?? "", locationOptions: locations.map(item => item.name),
+    bin: selectedBin?.name ?? "", binOptions: bins.filter(item => item.location_id === locationId).map(item => item.name),
+    channel: selectedChannel?.name ?? "", channelOptions: requiresChannel(type) ? channels.map(item => item.name) : [],
+    destState, destStateOptions: [], destStateInput: type === "sample" || type === "festival_removal",
+    qty,
+    preview: fields && skuId ? `Preview: ${fields.qty > 0 ? "+" : ""}${fields.qty} SKU units${unitVolume != null ? ` · ${formatVolume(fields.qty * unitVolume)}` : ""} · ${type.replaceAll("_", " ")}${fields.destState ? ` · ${fields.destState}` : ""}. Volume is calculated when recorded.` : "Complete the required fields to preview this movement.",
+    direction: type === "adjustment" ? direction === "add" ? "Add stock" : "Remove stock" : undefined,
+    directionOptions: type === "adjustment" ? ["Add stock", "Remove stock"] : undefined,
+    lot: lotId ? availableLots.map(item => ({ id: item.lot_id, label: `${item.lot_code} · ${item.qty} available` })).find(item => item.id === lotId)?.label ?? lotId : "Untracked / legacy stock",
+    lotOptions,
+    note,
+  };
 
   function onTypeChange(next: MovementType) {
     setType(next);
@@ -110,107 +130,27 @@ export function MovementForm({
     <>
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="Record movement" trigger={<Button>Record movement</Button>}>
         <form onSubmit={e => { if (!fields) { e.preventDefault(); return; } void form.submit(e); }} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="movement-sku">SKU</Label>
-            <Select value={skuId} onValueChange={v => { setSkuId(v); setLotId(""); }}>
-              <SelectTrigger id="movement-sku">
-                <SelectValue placeholder="Select a SKU" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {skus.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="movement-location">Location</Label>
-            <Select value={locationId} onValueChange={(v) => { setLocationId(v); setLotId(""); setBinId(bins.filter((b) => b.location_id === v)[0]?.id ?? ""); }}>
-              <SelectTrigger id="movement-location">
-                <SelectValue placeholder="Select a location" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {locations.map((l) => (
-                    <SelectItem key={l.id} value={l.id}>
-                      {l.name}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="movement-bin">Bin</Label>
-            <select id="movement-bin" className="rounded-md border p-2" value={binId} onChange={e => { setBinId(e.target.value); setLotId(""); }} disabled={!locationId}>
-              <option value="">Select a bin</option>
-              {bins.filter(b => b.location_id === locationId).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="movement-type">Type</Label>
-            <Select value={type} onValueChange={(v) => onTypeChange(v as MovementType)}>
-              <SelectTrigger id="movement-type">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {MOVEMENT_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {movementTypeLabel(t)}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-          {requiresChannel(type) && (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="movement-channel">Channel</Label>
-              <Select value={saleChannelId} onValueChange={setSaleChannelId} required>
-                <SelectTrigger id="movement-channel"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {channels.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          {(type === "sample" || type === "festival_removal") && <div className="flex flex-col gap-2">
-            <Label htmlFor="movement-state">Destination state</Label>
-            <Input id="movement-state" value={destState} onChange={e => setDestState(e.target.value.toUpperCase())} required pattern="[A-Za-z]{2}" maxLength={2} placeholder="PA" />
-          </div>}
-          {type === "adjustment" && <div className="flex flex-col gap-2">
-            <Label htmlFor="movement-direction">Direction</Label>
-            <Select value={direction} onValueChange={v => setDirection(v as "add" | "remove")}>
-              <SelectTrigger id="movement-direction"><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="add">Add stock</SelectItem><SelectItem value="remove">Remove stock</SelectItem></SelectContent>
-            </Select>
-          </div>}
-          <Label className="flex flex-col gap-2">Lot<select className="rounded border p-2" value={lotId} onChange={e => setLotId(e.target.value)}><option value="">Untracked / legacy stock</option>{stock.filter(s => s.kind === "sku" && s.stock_id === skuId && s.bin_id === binId && s.lot_id).map(s => <option key={s.lot_id} value={s.lot_id!}>{s.lot_code} · {s.qty} available</option>)}</select></Label>
-          <CommandFormMessage error={stockError} />
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="movement-qty">
-              Qty <span className="font-normal text-muted-foreground">(positive SKU units)</span>
-            </Label>
-            <Input id="movement-qty" type="number" min="0.01" step="0.01" value={qty} onChange={(e) => setQty(e.target.value)} required />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="movement-note">Note</Label>
-            <Input id="movement-note" value={note} onChange={(e) => setNote(e.target.value)} />
-          </div>
-          {fields && skuId && <p aria-live="polite" className="text-sm text-muted-foreground">Preview: {fields.qty > 0 ? "+" : ""}{fields.qty} SKU units{unitVolume != null ? ` · ${formatVolume(fields.qty * unitVolume)}` : ""} · {movementTypeLabel(type)}{fields.destState ? ` · ${fields.destState}` : ""}. Volume is calculated when recorded.</p>}
-          <CommandFormMessage error={form.error} />
-          <CommandFormFooter>
+          <RecordMovementView
+            model={movementModel}
+            controls={{
+              kind: value => { const next = MOVEMENT_TYPES[kindOptions.indexOf(value)]; if (next) onTypeChange(next); },
+              sku: value => { setSkuId(skus.find(item => item.label === value)?.id ?? ""); setLotId(""); },
+              location: value => { const id = locations.find(item => item.name === value)?.id ?? ""; setLocationId(id); setLotId(""); setBinId(bins.find(item => item.location_id === id)?.id ?? ""); },
+              bin: value => { setBinId(bins.find(item => item.location_id === locationId && item.name === value)?.id ?? ""); setLotId(""); },
+              channel: value => setSaleChannelId(channels.find(item => item.name === value)?.id ?? ""),
+              destState: value => setDestState(value.toUpperCase()),
+              direction: value => setDirection(value === "Remove stock" ? "remove" : "add"),
+              lot: value => setLotId(value === "Untracked / legacy stock" ? "" : availableLots.find(item => `${item.lot_code} · ${item.qty} available` === value)?.lot_id ?? ""),
+              qty: setQty,
+              note: setNote,
+            }}
+            messages={<><CommandFormMessage error={stockError} /><CommandFormMessage error={form.error} /></>}
+            footer={<CommandFormFooter>
             <Button type="submit" disabled={form.submitting || !fields || (requiresChannel(type) && !saleChannelId) || !skuId || !locationId || !binId}>
-              {form.submitting ? "Recording…" : "Record"}
+              {form.submitting ? "Recording…" : "Record movement"}
             </Button>
-          </CommandFormFooter>
+          </CommandFormFooter>}
+          />
         </form>
       </CommandForm>
       <CommandForm open={receipt !== null} onOpenChange={open => { if (!open) setReceipt(null); }} title="Movement recorded">

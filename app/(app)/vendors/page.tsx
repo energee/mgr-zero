@@ -4,10 +4,12 @@
 // four drawdown numbers (committed · received · on order · available),
 // editable in contract-form.tsx → upsert_material_contract.
 import { E } from "@/components/mgr/e";
+import { ContractsView } from "@/components/mgr/views/contracts";
 import { VendorsView } from "@/components/mgr/views/vendors";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand } from "@/lib/mgr/page-query";
+import { toContractsViewProps } from "@/lib/mgr/contracts-view";
 import { toVendorsViewProps } from "@/lib/mgr/vendors-view";
 import "@/lib/commands/all";
 import { VendorForm, type Vendor } from "./vendor-form";
@@ -35,7 +37,11 @@ export default async function VendorsPage() {
     runCommand("list_vendors_and_contracts", {}, ctx), runCommand("list_materials", {}, ctx),
   ])) as [VendorRow[], Material[]];
   const options = vendors.map((v) => ({ id: v.id, name: v.name }));
-  const contracts = vendors.flatMap((v) => v.contracts.map((c) => ({ ...c, vendor_name: v.name })));
+  const contracts = vendors.flatMap((v) => v.contracts.map((c) => ({
+    ...c,
+    vendor_name: v.name,
+    base_uom: materials.find((material) => material.id === c.material_id)?.base_uom,
+  })));
 
   return (
     <VendorsView
@@ -54,19 +60,23 @@ export default async function VendorsPage() {
         return <VendorForm vendor={v} />;
       }}
       footer={
-        <>
-          {E.ttl("Contracts")}
-          <ContractForm vendors={options} materials={materials} />
-          {contracts.length === 0
-            ? E.blank("No commitments yet")
-            : contracts.map((c) => (
-              <div key={c.id}>
-                {E.row(`${c.vendor_name} · ${c.contract_no ?? c.material_name ?? "contract"}`,
-                  `${fmt(c.qty_committed)} committed · ${fmt(c.qty_received)} received · ${fmt(c.qty_on_order)} on order · ${fmt(c.qty_available)} available`,
-                  <ContractForm contract={c} vendors={options} materials={materials} />, c.qty_available <= 0 ? "w" : "")}
-              </div>
-            ))}
-        </>
+        <ContractsView
+          model={toContractsViewProps({
+            backHref: "/vendors",
+            rows: contracts.map((c) => ({
+              key: c.id,
+              title: `${c.vendor_name} · ${c.contract_no ?? c.material_name ?? "contract"}`,
+              detail: `${fmt(c.qty_committed)} committed · ${fmt(c.qty_received)} received · ${fmt(c.qty_on_order)} on order · ${fmt(c.qty_available)} available`,
+              verb: "Edit",
+              warning: c.qty_available <= 0,
+            })),
+          })}
+          createAction={<ContractForm vendors={options} materials={materials} />}
+          rowTrailing={(row) => {
+            const contract = contracts.find((c) => c.id === row.key)!;
+            return <ContractForm contract={contract} vendors={options} materials={materials} />;
+          }}
+        />
       }
     />
   );

@@ -2841,6 +2841,7 @@ export const SCREENS: Screen[] = [
     slice: 1,
     tab: "More",
     name: "Formats",
+    to: { "Open format": "Format" },
     job: "Enter volume once on an atomic format and derive every shape above it",
     reads: "list_formats · get_format_composition",
     writes: "upsert_format · replace_format_components [one RPC replaces the child set] · replace_format_bom [one RPC replaces the bill; formats, format_components and format_bom superseded skus.bbl_per_unit and sku_bom]",

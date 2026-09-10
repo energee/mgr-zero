@@ -102,6 +102,11 @@ export const materialCitra: MaterialViewModel = {
   purchaseUnitOptions: ["each", "lb", "kg", "oz", "g", "l", "gal", "ml"],
   unit: "lb",
   unitOptions: ["lb", "oz", "kg", "each"],
+  defaultVendorId: "ych",
+  defaultVendorOptions: [
+    { id: "ych", label: "YCH" },
+    { id: "cm", label: "Country Malt" },
+  ],
   lotTracked: true,
   active: true,
 };
@@ -119,6 +124,7 @@ export const vendorsList: VendorsSnapshot = {
 export const vendorYch: VendorViewModel = {
   name: "YCH",
   email: "orders@ych.example",
+  phone: "509-555-0142",
   terms: "Net 30",
   termsOptions: ["Due on receipt", "Net 15", "Net 30"],
   leadDays: "7",
@@ -132,13 +138,16 @@ export const contractsList: ContractsSnapshot = {
 };
 
 export const contractYchCitra: ContractViewModel = {
-  vendor: "YCH",
-  material: "Citra 2026",
+  vendorId: "ych",
+  vendorOptions: [{ id: "ych", label: "YCH" }],
+  materialId: "citra",
+  materialOptions: [{ id: "citra", label: "Citra 2026" }],
   quantity: "400",
   received: "262 lb · read-only",
   onOrder: "100 lb · read-only",
   available: "38 lb",
   starts: "2026-09-01",
   ends: "2026-10-31",
-  unitCost: "$9.40",
+  unitCost: "9.40",
+  contractNo: "CITRA-2026",
 };

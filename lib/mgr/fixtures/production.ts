@@ -23,12 +23,15 @@ export const batchesBrewer: BatchesSnapshot = {
 
 export const scheduleBatchHazy: ScheduleBatchViewModel = {
   title: "B-0416 · Hazy",
+  recipeId: "hazy-v4",
   recipe: "Hazy IPA v4",
-  recipeOptions: ["Not decided", "Hazy IPA v4", "Pils v3", "Stout v2"],
+  recipeOptions: [{ id: "hazy-v4", label: "Hazy IPA v4" }, { id: "pils-v3", label: "Pils v3" }, { id: "stout-v2", label: "Stout v2" }],
+  brandId: "hazy",
   brand: "Hazy IPA",
-  brandOptions: ["Not decided", "Hazy IPA", "Pils", "Stout"],
+  brandOptions: [{ id: "hazy", label: "Hazy IPA" }, { id: "pils", label: "Pils" }, { id: "stout", label: "Stout" }],
   plannedBbl: "15",
   date: "2026-09-04",
+  note: "Dry hop on day 4",
 };
 
 export const brewDayHazy: BrewDayViewModel = {

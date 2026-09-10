@@ -7,14 +7,14 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ContractView } from "@/components/mgr/views/contract";
 import { useCommandForm } from "@/lib/commands/use-command-form";
+import { toContractViewProps } from "@/lib/mgr/contract-view";
 
 export type Contract = {
   id: string; vendor_id: string; material_id: string; contract_no: string | null; unit_cost_cents: number | null;
   starts_on: string | null; ends_on: string | null; qty_committed: number;
+  qty_received?: number; qty_on_order?: number; qty_available?: number; base_uom?: string;
 };
 type Option = { id: string; name: string };
 
@@ -37,51 +37,44 @@ export function ContractForm({ contract, vendors, materials }: { contract?: Cont
   });
   const ready = vendorId && materialId && Number(qty) > 0;
   const trigger = contract ? <Button variant="ghost" size="sm">Edit</Button> : <Button size="sm" variant="outline">Add contract</Button>;
+  const unit = contract?.base_uom ? ` ${contract.base_uom}` : "";
+  const model = toContractViewProps({
+    vendorId,
+    vendorOptions: vendors.map(({ id, name }) => ({ id, label: name })),
+    materialId,
+    materialOptions: materials.map(({ id, name }) => ({ id, label: name })),
+    quantity: qty,
+    received: contract?.qty_received == null ? "" : `${contract.qty_received}${unit} · read-only`,
+    onOrder: contract?.qty_on_order == null ? "" : `${contract.qty_on_order}${unit} · read-only`,
+    available: contract?.qty_available == null ? "" : `${contract.qty_available}${unit}`,
+    starts: startsOn,
+    ends: endsOn,
+    unitCost: cost,
+    contractNo,
+  });
+  const controls = {
+    vendorId: setVendorId,
+    materialId: setMaterialId,
+    quantity: setQty,
+    unitCost: setCost,
+    starts: setStartsOn,
+    ends: setEndsOn,
+    contractNo: setContractNo,
+  };
+
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title={contract ? "Contract" : "New contract"} trigger={trigger}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="c-vendor">Vendor</Label>
-          <Select value={vendorId} onValueChange={setVendorId}>
-            <SelectTrigger id="c-vendor"><SelectValue placeholder="Vendor" /></SelectTrigger>
-            <SelectContent>{vendors.map((v) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
-          </Select>
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="c-material">Material</Label>
-          <Select value={materialId} onValueChange={setMaterialId}>
-            <SelectTrigger id="c-material"><SelectValue placeholder="Material" /></SelectTrigger>
-            <SelectContent>{materials.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}</SelectContent>
-          </Select>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="c-qty">Contract quantity</Label>
-            <Input id="c-qty" type="number" min="0" step="any" value={qty} onChange={(e) => setQty(e.target.value)} required />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="c-cost">Unit cost ($) · optional</Label>
-            <Input id="c-cost" type="number" min="0" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="c-starts">Starts · optional</Label>
-            <Input id="c-starts" type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="c-ends">Ends · optional</Label>
-            <Input id="c-ends" type="date" value={endsOn} onChange={(e) => setEndsOn(e.target.value)} />
-          </div>
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="c-no">Contract number · optional</Label>
-          <Input id="c-no" value={contractNo} onChange={(e) => setContractNo(e.target.value)} />
-        </div>
-        <CommandFormMessage error={form.error} />
-        <CommandFormFooter>
-          <Button type="submit" disabled={form.submitting || !ready}>{form.submitting ? "Saving…" : "Save contract"}</Button>
-        </CommandFormFooter>
+        <ContractView
+          model={model}
+          controls={controls}
+          messages={<CommandFormMessage error={form.error} />}
+          footer={
+            <CommandFormFooter>
+              <Button type="submit" disabled={form.submitting || !ready}>{form.submitting ? "Saving…" : "Save contract"}</Button>
+            </CommandFormFooter>
+          }
+        />
       </form>
     </CommandForm>
   );

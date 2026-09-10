@@ -1,6 +1,5 @@
 // tests/compliance-view.test.ts — Compliance months, registry, sheets, and
-// lot trace. Views own no sample data. Live ApprovalForm / RegistrationForm /
-// LicenseForm stay wrappers.
+// lot trace. Views own no sample data. Live registry forms stay wrappers.
 import { readFileSync } from "node:fs";
 import { createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -86,9 +85,9 @@ describe("registry sheets", () => {
   });
 
   it("lets live callers suppress fixture form and row-action defaults with null", () => {
-    expect(htmlOf(createElement(BrandApprovalView, { model: brandApprovalStout, form: null }))).not.toMatch(/Save approval/);
-    expect(htmlOf(createElement(StateRegistrationView, { model: stateRegistrationHazy, form: null }))).not.toMatch(/Save registration/);
-    expect(htmlOf(createElement(LicenseView, { model: licensePaBrewery, form: null }))).not.toMatch(/Save license/);
+    expect(htmlOf(createElement(BrandApprovalView, { model: brandApprovalStout, footer: null }))).not.toMatch(/Save approval/);
+    expect(htmlOf(createElement(StateRegistrationView, { model: stateRegistrationHazy, footer: null }))).not.toMatch(/Save registration/);
+    expect(htmlOf(createElement(LicenseView, { model: licensePaBrewery, footer: null }))).not.toMatch(/Save license/);
     const model = toComplianceRegistryViewProps(complianceRegistryDemo);
     const defaultRegistry = htmlOf(createElement(ComplianceRegistryView, { model }));
     const registry = htmlOf(createElement(ComplianceRegistryView, {
@@ -96,6 +95,15 @@ describe("registry sheets", () => {
       actions: { cola: null },
     }));
     expect(registry.match(/>Edit<\/button>/g)).toHaveLength((defaultRegistry.match(/>Edit<\/button>/g)?.length ?? 0) - 1);
+  });
+
+  it("the live registry wrappers mount the three shared controlled bodies", () => {
+    const forms = src("app/(app)/compliance/registry/registry-forms.tsx");
+    for (const view of ["BrandApprovalView", "StateRegistrationView", "LicenseView"]) {
+      expect(forms).toMatch(new RegExp(`<${view}\\b`));
+    }
+    expect(forms).toMatch(/controls=\{controls\}/);
+    expect(forms).not.toMatch(/<Label\b|<Input\b|<Select\b/);
   });
 });
 

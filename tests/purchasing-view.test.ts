@@ -106,7 +106,17 @@ describe("Materials", () => {
 
   it("the Material inventory record is MaterialView", () => {
     expect((screen("Material").body as { type: unknown }).type).toBe(MaterialView);
-    expect(htmlOf(createElement(MaterialView, { model: toMaterialViewProps(materialCitra) }))).toMatch(/>Save material</);
+    const html = htmlOf(createElement(MaterialView, { model: toMaterialViewProps(materialCitra) }));
+    expect(html).toMatch(/>Save material</);
+    expect(html).toMatch(/Default vendor/);
+  });
+
+  it("the live material form mounts the shared controlled body", () => {
+    const form = src("app/(app)/materials/material-form.tsx");
+    expect(form).toMatch(/from "@\/components\/mgr\/views\/material"/);
+    expect(form).toMatch(/<MaterialView\b/);
+    expect(form).toMatch(/controls=\{\{/);
+    expect(form).not.toMatch(/<Label\b|<Input\b|<Select\b|<Switch\b/);
   });
 
   it("the live materials page mounts MaterialsOnHandView and slots CountForm", () => {
@@ -126,7 +136,17 @@ describe("Vendors", () => {
 
   it("the Vendor inventory record is VendorView", () => {
     expect((screen("Vendor").body as { type: unknown }).type).toBe(VendorView);
-    expect(htmlOf(createElement(VendorView, { model: toVendorViewProps(vendorYch) }))).toMatch(/>Save vendor</);
+    const html = htmlOf(createElement(VendorView, { model: toVendorViewProps(vendorYch) }));
+    expect(html).toMatch(/>Save vendor</);
+    expect(html).toMatch(/Phone/);
+  });
+
+  it("the live vendor form mounts the shared controlled body", () => {
+    const form = src("app/(app)/vendors/vendor-form.tsx");
+    expect(form).toMatch(/from "@\/components\/mgr\/views\/vendor"/);
+    expect(form).toMatch(/<VendorView\b/);
+    expect(form).toMatch(/controls=\{\{/);
+    expect(form).not.toMatch(/<Label\b|<Input\b|<Select\b/);
   });
 
   it("the Contracts inventory record is ContractsView", () => {
@@ -136,12 +156,23 @@ describe("Vendors", () => {
 
   it("the Contract inventory record is ContractView", () => {
     expect((screen("Contract").body as { type: unknown }).type).toBe(ContractView);
-    expect(htmlOf(createElement(ContractView, { model: toContractViewProps(contractYchCitra) }))).toMatch(/>Save contract</);
+    const html = htmlOf(createElement(ContractView, { model: toContractViewProps(contractYchCitra) }));
+    expect(html).toMatch(/>Save contract</);
+    expect(html).toMatch(/Contract number/);
   });
 
-  it("the live vendors page mounts VendorsView and slots VendorForm / ContractForm", () => {
+  it("the live contract form mounts the shared controlled body", () => {
+    const form = src("app/(app)/vendors/contract-form.tsx");
+    expect(form).toMatch(/from "@\/components\/mgr\/views\/contract"/);
+    expect(form).toMatch(/<ContractView\b/);
+    expect(form).toMatch(/controls=\{controls\}/);
+    expect(form).not.toMatch(/<Label\b|<Input\b|<Select\b/);
+  });
+
+  it("the live vendors page mounts the shared vendor and contract views", () => {
     const page = src("app/(app)/vendors/page.tsx");
     expect(page).toMatch(/<VendorsView\b/);
+    expect(page).toMatch(/<ContractsView\b/);
     expect(page).toMatch(/<VendorForm\b/);
     expect(page).toMatch(/<ContractForm\b/);
   });

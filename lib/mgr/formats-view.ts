@@ -5,6 +5,7 @@ import { formatVolume } from "@/lib/volume";
 export type FormatsRowView = {
   key: string;
   cells: string[];
+  href?: string;
 };
 
 export type FormatsViewModel = {
@@ -35,6 +36,7 @@ export type FormatsSnapshot = {
   /** get_format_components [design]; inventory supplies the child set. */
   components?: FormatsComponentRow[];
   backHref?: string;
+  formatHref?: (format: FormatsFormatRow) => string | undefined;
 };
 
 function childLabel(child: FormatsFormatRow, composed: boolean): string {
@@ -60,13 +62,14 @@ function fromOf(
   return parts.join(" · ");
 }
 
-export function toFormatsViewProps({ formats, components = [], backHref }: FormatsSnapshot): FormatsViewModel {
+export function toFormatsViewProps({ formats, components = [], backHref, formatHref }: FormatsSnapshot): FormatsViewModel {
   return {
     backHref,
     headers: ["Format", "Basis", "Volume", "From"],
     empty: formats.length === 0 ? "No formats yet" : undefined,
     rows: formats.map((f) => ({
       key: f.id,
+      href: formatHref?.(f),
       cells: [
         f.brands ? `${f.brands.name} · ${f.name}` : f.name,
         f.basis,
