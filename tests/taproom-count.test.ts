@@ -269,8 +269,8 @@ it("copies every root line and counts an unchanged shortage exactly once", async
 
 it("uses a correction as the next baseline, posts it in the audit period, and leaves a filed snapshot byte-identical", async () => {
   const f = await fixture(); const adminCtx = await makeStaffCtx(f.brewery.id, "admin");
-  const historical = sql("select (current_date-40)::text||'|'||date_trunc('month',current_date-40)::date||'|'||(date_trunc('month',current_date-40)+interval '1 month'-interval '1 day')::date")[0].split("|");
-  const observed = sql("select (now()-interval '40 days')::text")[0];
+  const historical = sql(`select (date '${f.day}'-40)::text||'|'||date_trunc('month',date '${f.day}'-40)::date||'|'||(date_trunc('month',date '${f.day}'-40)+interval '1 month'-interval '1 day')::date`)[0].split("|");
+  const observed = sql(`select ((date '${historical[0]}' + time '12:00') at time zone 'America/New_York')::text`)[0];
   const root = await ins("taproom_counts", { brewery_id: f.brewery.id, location_id: f.location.id, counted_on: historical[0],
     observed_at: observed, created_at: observed, counted_by: f.ctx.userId });
   const channel = (await admin.from("sale_channels").select("id,tax_treatment").eq("brewery_id", f.brewery.id).eq("system_code", "taproom").single()).data!;
@@ -387,7 +387,7 @@ it("rejects incomplete or corrupted correction graphs at transaction commit", as
   const rootLine = root.lines[0];
   const extraSku = await seedCatalog(f.brewery.id, { product: "Extra", sku: "Extra keg", packageType: "keg", bblPerUnit: .5 });
   const historical = await ins("taproom_counts", { brewery_id: f.brewery.id, location_id: f.location.id,
-    counted_on: sql("select current_date-1")[0], observed_at: sql("select (now()-interval '1 day')::text")[0], counted_by: f.ctx.userId });
+    counted_on: sql(`select (date '${f.day}'-1)::text`)[0], observed_at: sql("select (now()-interval '1 day')::text")[0], counted_by: f.ctx.userId });
   const historicalLine = await ins("taproom_count_lines", { brewery_id: f.brewery.id, count_id: historical.id, location_id: f.location.id,
     bin_id: f.location.binId, sku_id: extraSku.skuId, qty_before: 0, qty_counted: 0 });
 
