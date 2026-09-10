@@ -1937,3 +1937,357 @@ GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON
 
 ALTER TABLE "public"."qbo_pushes"
   ADD CONSTRAINT "qbo_pushes_supersedes_push_id_fkey" FOREIGN KEY (supersedes_push_id) REFERENCES public.qbo_pushes(id);
+
+-- ---------------------------------------------------------------- Square lifecycle and explicit provider identity
+CREATE TABLE private.square_oauth_intents (
+  id uuid PRIMARY KEY DEFAULT private.new_uuid(),
+  brewery_id uuid NOT NULL REFERENCES public.breweries(id),
+  actor_id uuid NOT NULL REFERENCES auth.users(id),
+  state_hash text NOT NULL UNIQUE,
+  redirect_uri text NOT NULL,
+  provider_intent text NOT NULL CHECK (provider_intent IN ('connect','reconnect')),
+  requested_scopes text[] NOT NULL CHECK (requested_scopes = ARRAY['ITEMS_READ','ITEMS_WRITE','MERCHANT_PROFILE_READ','ORDERS_READ']::text[]),
+  expires_at timestamptz NOT NULL,
+  consumed_at timestamptz,
+  exchange_state text NOT NULL DEFAULT 'pending' CHECK (exchange_state IN ('pending','exchanging','completed','recovery_required')),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE private.square_oauth_intents ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE private.square_oauth_intents FROM public,anon,authenticated,service_role;
+
+ALTER TABLE public.pos_connections RENAME COLUMN expires_at TO access_expires_at;
+ALTER TABLE public.pos_connections
+  ADD COLUMN merchant_label text,
+  ADD COLUMN state text NOT NULL DEFAULT 'connected' CHECK (state IN ('connected','disconnected','recovery_required')),
+  ADD COLUMN refresh_expires_at timestamptz,
+  ADD COLUMN refresh_hard_expires_at timestamptz,
+  ADD COLUMN remote_revocation_state text NOT NULL DEFAULT 'not_requested' CHECK (remote_revocation_state IN ('not_requested','confirmed','unresolved')),
+  ADD COLUMN last_error text,
+  ADD COLUMN credential_version bigint NOT NULL DEFAULT 0,
+  ADD COLUMN granted_scopes text[] NOT NULL DEFAULT '{}'::text[];
+CREATE UNIQUE INDEX pos_connections_current_merchant_idx ON public.pos_connections(merchant_id)
+  WHERE state='connected' AND merchant_id IS NOT NULL;
+
+ALTER TABLE public.pos_locations ALTER COLUMN location_id DROP NOT NULL;
+ALTER TABLE public.pos_locations
+  ADD COLUMN external_name text,
+  ADD COLUMN external_status text,
+  ADD COLUMN available boolean NOT NULL DEFAULT true,
+  ADD COLUMN last_seen_at timestamptz;
+CREATE UNIQUE INDEX pos_locations_one_local_idx ON public.pos_locations(connection_id,location_id)
+  WHERE location_id IS NOT NULL;
+
+ALTER TABLE public.pos_item_mappings ADD COLUMN external_variation_id text NOT NULL DEFAULT '';
+ALTER TABLE public.pos_item_mappings DROP CONSTRAINT pos_item_mappings_pkey;
+ALTER TABLE public.pos_item_mappings ADD PRIMARY KEY(connection_id,external_item_id,external_variation_id);
+ALTER TABLE public.pos_sales ADD COLUMN external_variation_id text NOT NULL DEFAULT '';
+
+CREATE TABLE public.pos_catalog_variations (
+  brewery_id uuid NOT NULL REFERENCES public.breweries(id),
+  connection_id uuid NOT NULL,
+  external_item_id text NOT NULL CHECK (length(btrim(external_item_id))>0),
+  external_variation_id text NOT NULL CHECK (length(btrim(external_variation_id))>0),
+  external_item_name text,
+  external_variation_name text,
+  source_version bigint NOT NULL CHECK (source_version>=0),
+  available boolean NOT NULL DEFAULT true,
+  last_seen_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY(connection_id,external_item_id,external_variation_id),
+  UNIQUE(connection_id,external_item_id,external_variation_id,brewery_id),
+  FOREIGN KEY(connection_id,brewery_id) REFERENCES public.pos_connections(id,brewery_id)
+);
+CREATE INDEX pos_catalog_variations_brewery_idx ON public.pos_catalog_variations(brewery_id);
+ALTER TABLE public.pos_catalog_variations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY staff_read ON public.pos_catalog_variations FOR SELECT
+  USING (public.staff_role(brewery_id) IN ('admin','warehouse'));
+GRANT SELECT ON public.pos_catalog_variations TO authenticated;
+GRANT ALL ON public.pos_catalog_variations TO service_role;
+
+DROP VIEW public.pos_unmapped_items;
+CREATE VIEW public.pos_unmapped_items WITH (security_invoker=true) AS
+  SELECT DISTINCT s.brewery_id,s.connection_id,s.external_item_id,s.external_variation_id
+  FROM public.pos_sales s
+  LEFT JOIN public.pos_item_mappings m ON m.connection_id=s.connection_id
+    AND m.external_item_id=s.external_item_id AND m.external_variation_id=s.external_variation_id
+  WHERE m.connection_id IS NULL AND s.external_item_id IS NOT NULL;
+GRANT SELECT ON public.pos_unmapped_items TO authenticated;
+
+CREATE OR REPLACE FUNCTION private.reconcile_pos_sale(p_brewery uuid,p_sale uuid) RETURNS boolean
+LANGUAGE plpgsql SET search_path='' AS $$
+DECLARE s public.pos_sales; m public.pos_item_mappings; f public.formats; v_location uuid; v_brand uuid; v_ounces numeric; v_format uuid;
+BEGIN
+  SELECT * INTO s FROM public.pos_sales WHERE id=p_sale AND brewery_id=p_brewery FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'sale not found'; END IF;
+  IF EXISTS(SELECT 1 FROM public.pos_sale_expectations WHERE sale_id=p_sale AND brewery_id=p_brewery) THEN RETURN true; END IF;
+  SELECT location_id INTO v_location FROM public.pos_locations WHERE connection_id=s.connection_id
+    AND external_location_id=s.external_location_id AND brewery_id=p_brewery FOR SHARE;
+  IF v_location IS NULL THEN RETURN false; END IF;
+  SELECT * INTO m FROM public.pos_item_mappings WHERE connection_id=s.connection_id
+    AND external_item_id=s.external_item_id AND external_variation_id=s.external_variation_id AND brewery_id=p_brewery FOR SHARE;
+  IF NOT FOUND OR m.ignored THEN RETURN false; END IF;
+  IF m.format_id IS NOT NULL THEN
+    SELECT * INTO f FROM public.formats WHERE id=m.format_id AND brewery_id=p_brewery FOR SHARE;
+    IF f.basis<>'poured' THEN RAISE EXCEPTION 'map a brand-owned poured format'; END IF;
+    v_brand:=f.brand_id; v_format:=f.id; v_ounces:=f.ounces;
+  ELSE
+    SELECT brand_id,format_id INTO v_brand,v_format FROM public.skus WHERE id=m.sku_id AND brewery_id=p_brewery FOR SHARE;
+    PERFORM 1 FROM public.formats WHERE id=v_format AND brewery_id=p_brewery FOR SHARE;
+    PERFORM 1 FROM public.format_components c JOIN public.formats child ON child.id=c.child_format_id AND child.brewery_id=c.brewery_id
+      WHERE c.parent_format_id=v_format AND c.brewery_id=p_brewery ORDER BY child.id FOR SHARE OF child;
+    SELECT bbl_per_unit*3968 INTO v_ounces FROM public.format_volumes WHERE id=v_format AND brewery_id=p_brewery;
+  END IF;
+  IF v_ounces IS NULL OR v_ounces<=0 OR v_ounces::text IN ('NaN','Infinity','-Infinity') THEN RAISE EXCEPTION 'serving volume is unavailable'; END IF;
+  INSERT INTO public.pos_sale_expectations(sale_id,brewery_id,location_id,brand_id,format_id,sku_id,serving_ounces,expected_bbl)
+  VALUES(p_sale,p_brewery,v_location,v_brand,v_format,m.sku_id,v_ounces,s.qty*v_ounces/3968);
+  RETURN true;
+END $$;
+REVOKE ALL ON FUNCTION private.reconcile_pos_sale(uuid,uuid) FROM public,anon,authenticated,service_role;
+
+CREATE FUNCTION public.begin_square_oauth(p_brewery uuid,p_redirect_uri text,p_state_hash text,p_provider_intent text,p_request_id uuid,p_requested_scopes text[])
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE replay jsonb; intent uuid;
+BEGIN
+  PERFORM private.assert_staff(p_brewery,ARRAY['admin']::public.staff_role[]);
+  IF p_requested_scopes<>ARRAY['ITEMS_READ','ITEMS_WRITE','MERCHANT_PROFILE_READ','ORDERS_READ']::text[] THEN RAISE EXCEPTION 'oauth scopes invalid'; END IF;
+  PERFORM 1 FROM public.breweries WHERE id=p_brewery FOR UPDATE;
+  replay:=private.claim_command_request(p_brewery,'connect_square',p_request_id,jsonb_build_object('redirectUri',p_redirect_uri,'stateHash',p_state_hash,'providerIntent',p_provider_intent,'requestedScopes',p_requested_scopes));
+  IF replay IS NOT NULL THEN RETURN replay; END IF;
+  UPDATE private.square_oauth_intents SET consumed_at=coalesce(consumed_at,now()),exchange_state='recovery_required'
+    WHERE brewery_id=p_brewery AND exchange_state IN ('pending','exchanging');
+  INSERT INTO private.square_oauth_intents(brewery_id,actor_id,state_hash,redirect_uri,provider_intent,requested_scopes,expires_at)
+    VALUES(p_brewery,auth.uid(),p_state_hash,p_redirect_uri,p_provider_intent,p_requested_scopes,now()+interval '10 minutes') RETURNING id INTO intent;
+  replay:=jsonb_build_object('intentId',intent);
+  PERFORM private.complete_command_request(p_request_id,replay);
+  RETURN replay;
+END $$;
+
+CREATE FUNCTION public.claim_square_oauth(p_state_hash text,p_actor uuid,p_brewery uuid,p_redirect_uri text)
+RETURNS TABLE(intent_id uuid,brewery_id uuid,provider_intent text,requested_scopes text[])
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+BEGIN
+  RETURN QUERY UPDATE private.square_oauth_intents i SET consumed_at=now(),exchange_state='exchanging'
+    WHERE i.state_hash=p_state_hash AND i.actor_id=p_actor AND i.brewery_id=p_brewery AND i.redirect_uri=p_redirect_uri
+      AND i.consumed_at IS NULL AND i.exchange_state='pending' AND i.expires_at>=now()
+      AND EXISTS(SELECT 1 FROM public.brewery_users u WHERE u.brewery_id=i.brewery_id AND u.user_id=p_actor AND u.role='admin')
+    RETURNING i.id,i.brewery_id,i.provider_intent,i.requested_scopes;
+END $$;
+
+CREATE FUNCTION public.fail_square_oauth(p_intent uuid,p_actor uuid) RETURNS boolean
+LANGUAGE sql SECURITY DEFINER SET search_path='' AS $$
+  WITH changed AS (
+    UPDATE private.square_oauth_intents SET exchange_state='recovery_required'
+    WHERE id=p_intent AND actor_id=p_actor AND exchange_state='exchanging' RETURNING true
+  ) SELECT coalesce((SELECT true FROM changed),false)
+$$;
+
+CREATE FUNCTION public.complete_square_oauth(p_intent uuid,p_actor uuid,p_merchant_id text,p_merchant_label text,
+  p_access_token text,p_refresh_token text,p_access_expires_at timestamptz,p_granted_scopes text[],p_locations jsonb) RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE i private.square_oauth_intents; c public.pos_connections; v_id uuid:=private.new_uuid(); v_version bigint;
+BEGIN
+  SELECT * INTO i FROM private.square_oauth_intents WHERE id=p_intent FOR UPDATE;
+  IF i.id IS NULL OR i.actor_id<>p_actor OR i.exchange_state<>'exchanging'
+    OR NOT EXISTS(SELECT 1 FROM public.brewery_users u WHERE u.brewery_id=i.brewery_id AND u.user_id=p_actor AND u.role='admin') THEN
+    RAISE EXCEPTION 'oauth state invalid';
+  END IF;
+  IF p_merchant_id IS NULL OR btrim(p_merchant_id)='' OR p_access_token IS NULL OR p_refresh_token IS NULL
+    OR p_granted_scopes IS NULL OR NOT p_granted_scopes<@i.requested_scopes OR jsonb_typeof(p_locations)<>'array' THEN
+    RAISE EXCEPTION 'oauth response invalid';
+  END IF;
+  IF EXISTS(SELECT 1 FROM public.pos_connections x WHERE x.merchant_id=p_merchant_id AND x.brewery_id<>i.brewery_id AND x.state='connected') THEN
+    RAISE EXCEPTION 'Square seller is already connected to another brewery' USING errcode='MG409';
+  END IF;
+  SELECT * INTO c FROM public.pos_connections WHERE brewery_id=i.brewery_id AND provider='square' FOR UPDATE;
+  IF c.id IS NOT NULL AND c.merchant_id IS DISTINCT FROM p_merchant_id THEN
+    IF EXISTS(SELECT 1 FROM public.pos_sales WHERE connection_id=c.id)
+      OR EXISTS(SELECT 1 FROM public.pos_sales_coverage WHERE connection_id=c.id) THEN
+      RAISE EXCEPTION 'Square seller cannot be replaced while retained sales history exists' USING errcode='MG409';
+    END IF;
+    DELETE FROM public.pos_item_mappings WHERE connection_id=c.id;
+    DELETE FROM public.pos_catalog_variations WHERE connection_id=c.id;
+    DELETE FROM public.pos_locations WHERE connection_id=c.id;
+  END IF;
+  INSERT INTO public.pos_connections(id,brewery_id,provider,merchant_id,merchant_label,state,access_expires_at,remote_revocation_state,last_error,credential_version,connected_by,updated_at,granted_scopes)
+    VALUES(v_id,i.brewery_id,'square',p_merchant_id,p_merchant_label,'connected',p_access_expires_at,'not_requested',null,1,p_actor,now(),p_granted_scopes)
+  ON CONFLICT(brewery_id,provider) DO UPDATE SET merchant_id=excluded.merchant_id,merchant_label=excluded.merchant_label,state='connected',
+    access_expires_at=excluded.access_expires_at,remote_revocation_state='not_requested',last_error=null,
+    credential_version=pos_connections.credential_version+1,connected_by=p_actor,updated_at=now(),granted_scopes=excluded.granted_scopes
+  RETURNING id,credential_version INTO v_id,v_version;
+  INSERT INTO private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token,credential_version)
+    VALUES(i.brewery_id,'square',v_id,p_access_token,p_refresh_token,v_version)
+  ON CONFLICT(brewery_id,provider) DO UPDATE SET connection_id=excluded.connection_id,access_token=excluded.access_token,
+    refresh_token=excluded.refresh_token,credential_version=excluded.credential_version,updated_at=now();
+  INSERT INTO public.pos_locations(brewery_id,connection_id,external_location_id,external_name,external_status,available,last_seen_at)
+    SELECT i.brewery_id,v_id,x.id,x.name,x.status,true,now()
+    FROM jsonb_to_recordset(p_locations) AS x(id text,name text,status text)
+    WHERE x.id IS NOT NULL AND btrim(x.id)<>''
+  ON CONFLICT(connection_id,external_location_id) DO UPDATE SET external_name=excluded.external_name,
+    external_status=excluded.external_status,available=true,last_seen_at=excluded.last_seen_at;
+  UPDATE public.pos_locations l SET available=false,last_seen_at=now() WHERE l.connection_id=v_id
+    AND NOT EXISTS(SELECT 1 FROM jsonb_to_recordset(p_locations) AS x(id text,name text,status text) WHERE x.id=l.external_location_id);
+  UPDATE private.square_oauth_intents SET exchange_state='completed' WHERE id=i.id;
+  RETURN v_id;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.cas_integration_tokens(p_brewery uuid,p_provider text,p_connection uuid,p_actor uuid,
+  p_expected_version bigint,p_access_token text,p_refresh_token text,p_received_at timestamptz,p_access_seconds integer,p_refresh_seconds integer,p_hard_seconds integer)
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE v_version bigint;
+BEGIN
+  UPDATE private.integration_tokens t SET access_token=p_access_token,refresh_token=p_refresh_token,
+    credential_version=credential_version+1,updated_at=now()
+  WHERE t.brewery_id=p_brewery AND t.provider=p_provider AND t.connection_id=p_connection AND t.credential_version=p_expected_version
+    AND EXISTS(SELECT 1 FROM public.brewery_users u WHERE u.brewery_id=p_brewery AND u.user_id=p_actor AND u.role IN ('admin','sales'))
+    AND ((p_provider='qbo' AND EXISTS(SELECT 1 FROM public.qbo_connections q WHERE q.brewery_id=p_brewery AND q.id=p_connection AND q.state='connected'))
+      OR (p_provider='square' AND EXISTS(SELECT 1 FROM public.pos_connections p WHERE p.brewery_id=p_brewery AND p.id=p_connection AND p.state='connected')))
+  RETURNING credential_version INTO v_version;
+  IF NOT FOUND THEN RETURN false; END IF;
+  IF p_provider='qbo' THEN
+    UPDATE public.qbo_connections SET access_expires_at=p_received_at+make_interval(secs=>p_access_seconds),
+      refresh_expires_at=CASE WHEN p_refresh_seconds IS NULL THEN null ELSE p_received_at+make_interval(secs=>p_refresh_seconds) END,
+      refresh_hard_expires_at=CASE WHEN p_hard_seconds IS NULL THEN refresh_hard_expires_at ELSE p_received_at+make_interval(secs=>p_hard_seconds) END,
+      credential_version=v_version,updated_at=now() WHERE brewery_id=p_brewery AND id=p_connection;
+  ELSE
+    UPDATE public.pos_connections SET access_expires_at=p_received_at+make_interval(secs=>p_access_seconds),credential_version=v_version,updated_at=now()
+      WHERE brewery_id=p_brewery AND id=p_connection AND provider='square';
+  END IF;
+  RETURN true;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.read_integration_tokens(p_brewery uuid,p_provider text,p_connection uuid,p_actor uuid)
+RETURNS TABLE(access_token text,refresh_token text,credential_version bigint,access_expires_at timestamptz,refresh_expires_at timestamptz,refresh_hard_expires_at timestamptz)
+LANGUAGE sql SECURITY DEFINER SET search_path='' AS $$
+  SELECT t.access_token,t.refresh_token,t.credential_version,coalesce(q.access_expires_at,p.access_expires_at),q.refresh_expires_at,q.refresh_hard_expires_at
+  FROM private.integration_tokens t
+  LEFT JOIN public.qbo_connections q ON p_provider='qbo' AND q.brewery_id=t.brewery_id AND q.id=t.connection_id
+  LEFT JOIN public.pos_connections p ON p_provider='square' AND p.brewery_id=t.brewery_id AND p.id=t.connection_id
+  WHERE t.brewery_id=p_brewery AND t.provider=p_provider AND t.connection_id=p_connection
+    AND EXISTS(SELECT 1 FROM public.brewery_users u WHERE u.brewery_id=p_brewery AND u.user_id=p_actor AND u.role IN ('admin','sales'))
+    AND ((p_provider='qbo' AND q.state='connected') OR (p_provider='square' AND p.state='connected'))
+$$;
+
+CREATE FUNCTION public.record_square_catalog_snapshot(p_brewery uuid,p_connection uuid,p_actor uuid,p_expected_version bigint,
+  p_request_id uuid,p_locations jsonb,p_variations jsonb) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE replay jsonb; result jsonb;
+BEGIN
+  IF NOT EXISTS(SELECT 1 FROM public.brewery_users u WHERE u.brewery_id=p_brewery AND u.user_id=p_actor AND u.role='admin')
+    OR NOT EXISTS(SELECT 1 FROM public.pos_connections c JOIN private.integration_tokens t ON t.brewery_id=c.brewery_id AND t.provider='square' AND t.connection_id=c.id
+      WHERE c.brewery_id=p_brewery AND c.id=p_connection AND c.state='connected' AND c.credential_version=p_expected_version AND t.credential_version=p_expected_version) THEN
+    RAISE EXCEPTION 'Square connection changed' USING errcode='MG409';
+  END IF;
+  IF jsonb_typeof(p_locations)<>'array' OR jsonb_typeof(p_variations)<>'array' THEN RAISE EXCEPTION 'Square snapshot invalid'; END IF;
+  replay:=private.claim_command_request_for(p_actor,p_brewery,'sync_square_catalog',p_request_id,jsonb_build_object('connectionId',p_connection,'credentialVersion',p_expected_version));
+  IF replay IS NOT NULL THEN RETURN replay; END IF;
+  INSERT INTO public.pos_locations(brewery_id,connection_id,external_location_id,external_name,external_status,available,last_seen_at)
+    SELECT p_brewery,p_connection,x.id,x.name,x.status,true,now() FROM jsonb_to_recordset(p_locations) AS x(id text,name text,status text)
+    WHERE x.id IS NOT NULL AND btrim(x.id)<>''
+  ON CONFLICT(connection_id,external_location_id) DO UPDATE SET external_name=excluded.external_name,
+    external_status=excluded.external_status,available=true,last_seen_at=excluded.last_seen_at;
+  UPDATE public.pos_locations l SET available=false,last_seen_at=now() WHERE l.connection_id=p_connection
+    AND NOT EXISTS(SELECT 1 FROM jsonb_to_recordset(p_locations) AS x(id text,name text,status text) WHERE x.id=l.external_location_id);
+  INSERT INTO public.pos_catalog_variations(brewery_id,connection_id,external_item_id,external_variation_id,external_item_name,
+    external_variation_name,source_version,available,last_seen_at)
+    SELECT p_brewery,p_connection,x."itemId",x."variationId",x."itemName",x."variationName",x.version,x.available,now()
+    FROM jsonb_to_recordset(p_variations) AS x("itemId" text,"itemName" text,"variationId" text,"variationName" text,version bigint,available boolean)
+    WHERE x."itemId" IS NOT NULL AND btrim(x."itemId")<>'' AND x."variationId" IS NOT NULL AND btrim(x."variationId")<>'' AND x.version>=0 AND x.available IS NOT NULL
+  ON CONFLICT(connection_id,external_item_id,external_variation_id) DO UPDATE SET external_item_name=excluded.external_item_name,
+    external_variation_name=excluded.external_variation_name,source_version=excluded.source_version,available=excluded.available,last_seen_at=excluded.last_seen_at;
+  UPDATE public.pos_catalog_variations v SET available=false,last_seen_at=now() WHERE v.connection_id=p_connection
+    AND NOT EXISTS(SELECT 1 FROM jsonb_to_recordset(p_variations) AS x("itemId" text,"variationId" text) WHERE x."itemId"=v.external_item_id AND x."variationId"=v.external_variation_id);
+  result:=jsonb_build_object('locations',(SELECT count(*) FROM public.pos_locations WHERE connection_id=p_connection AND available),
+    'variations',(SELECT count(*) FROM public.pos_catalog_variations WHERE connection_id=p_connection AND available));
+  RETURN private.complete_command_request_for(p_actor,p_request_id,result);
+END $$;
+
+CREATE FUNCTION public.set_pos_location_mapping(p_brewery uuid,p_external_location text,p_location uuid,p_request_id uuid) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE c uuid; old_location uuid; replay jsonb; result jsonb;
+BEGIN
+  PERFORM private.assert_staff(p_brewery,ARRAY['admin']::public.staff_role[]);
+  replay:=private.claim_command_request(p_brewery,'set_pos_location_mapping',p_request_id,jsonb_build_object('posLocationId',p_external_location,'mgrLocationId',p_location));
+  IF replay IS NOT NULL THEN RETURN replay; END IF;
+  SELECT id INTO c FROM public.pos_connections WHERE brewery_id=p_brewery AND provider='square' AND state='connected' FOR SHARE;
+  IF c IS NULL OR NOT EXISTS(SELECT 1 FROM public.locations WHERE id=p_location AND brewery_id=p_brewery) THEN RAISE insufficient_privilege USING message='permission denied'; END IF;
+  SELECT location_id INTO old_location FROM public.pos_locations WHERE connection_id=c AND external_location_id=p_external_location AND brewery_id=p_brewery FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Square location not found'; END IF;
+  IF old_location IS DISTINCT FROM p_location AND old_location IS NOT NULL AND EXISTS(
+    SELECT 1 FROM public.pos_sales_coverage WHERE connection_id=c AND external_location_id=p_external_location AND location_id=old_location) THEN
+    RAISE EXCEPTION 'Square location mapping has observed history and cannot be changed in place' USING errcode='MG409';
+  END IF;
+  BEGIN
+    UPDATE public.pos_locations SET location_id=p_location WHERE connection_id=c AND external_location_id=p_external_location;
+  EXCEPTION WHEN unique_violation THEN RAISE EXCEPTION 'MGR location is already claimed by another Square location' USING errcode='MG409'; END;
+  PERFORM private.reconcile_pos_sale(p_brewery,s.id) FROM public.pos_sales s LEFT JOIN public.pos_sale_expectations e ON e.sale_id=s.id
+    WHERE s.connection_id=c AND s.external_location_id=p_external_location AND e.sale_id IS NULL;
+  result:=jsonb_build_object('mapped',true);
+  RETURN private.complete_command_request(p_request_id,result);
+END $$;
+
+CREATE FUNCTION public.set_pos_item_mapping(p_brewery uuid,p_external_item text,p_external_variation text,p_sku uuid,p_format uuid,p_ignored boolean,p_request_id uuid) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE c uuid; replay jsonb; result jsonb; item_name text;
+BEGIN
+  PERFORM private.assert_staff(p_brewery,ARRAY['admin','warehouse']::public.staff_role[]);
+  replay:=private.claim_command_request(p_brewery,'set_pos_item_mapping',p_request_id,jsonb_build_object('externalItemId',p_external_item,'externalVariationId',p_external_variation,'skuId',p_sku,'formatId',p_format,'ignored',p_ignored));
+  IF replay IS NOT NULL THEN RETURN replay; END IF;
+  IF (p_ignored AND num_nonnulls(p_sku,p_format)<>0) OR (NOT p_ignored AND num_nonnulls(p_sku,p_format)<>1) THEN RAISE EXCEPTION 'mapping target invalid'; END IF;
+  SELECT id INTO c FROM public.pos_connections WHERE brewery_id=p_brewery AND provider='square' AND state='connected' FOR SHARE;
+  SELECT external_item_name INTO item_name FROM public.pos_catalog_variations WHERE brewery_id=p_brewery AND connection_id=c
+    AND external_item_id=p_external_item AND external_variation_id=p_external_variation AND (available OR EXISTS(
+      SELECT 1 FROM public.pos_item_mappings m WHERE m.connection_id=c AND m.external_item_id=p_external_item AND m.external_variation_id=p_external_variation)) FOR SHARE;
+  IF c IS NULL OR NOT FOUND THEN RAISE EXCEPTION 'Square variation is unavailable'; END IF;
+  IF p_sku IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.skus WHERE id=p_sku AND brewery_id=p_brewery) THEN RAISE insufficient_privilege USING message='permission denied'; END IF;
+  IF p_format IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.formats WHERE id=p_format AND brewery_id=p_brewery AND basis='poured' AND brand_id IS NOT NULL) THEN RAISE insufficient_privilege USING message='permission denied'; END IF;
+  INSERT INTO public.pos_item_mappings(brewery_id,connection_id,external_item_id,external_variation_id,external_item_name,sku_id,format_id,ignored)
+    VALUES(p_brewery,c,p_external_item,p_external_variation,item_name,p_sku,p_format,p_ignored)
+  ON CONFLICT(connection_id,external_item_id,external_variation_id) DO UPDATE SET external_item_name=excluded.external_item_name,
+    sku_id=excluded.sku_id,format_id=excluded.format_id,ignored=excluded.ignored;
+  PERFORM private.reconcile_pos_sale(p_brewery,s.id) FROM public.pos_sales s LEFT JOIN public.pos_sale_expectations e ON e.sale_id=s.id
+    WHERE s.connection_id=c AND s.external_item_id=p_external_item AND s.external_variation_id=p_external_variation AND e.sale_id IS NULL;
+  result:=jsonb_build_object('mapped',NOT p_ignored,'ignored',p_ignored);
+  RETURN private.complete_command_request(p_request_id,result);
+END $$;
+
+CREATE FUNCTION public.begin_square_disconnect(p_brewery uuid,p_connection uuid,p_actor uuid,p_request_id uuid)
+RETURNS TABLE(access_token text,replay_result jsonb) LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE replay jsonb; token text; version bigint; result jsonb:=jsonb_build_object('disconnected',true,'remoteRevocationState','unresolved');
+BEGIN
+  IF NOT EXISTS(SELECT 1 FROM public.brewery_users WHERE brewery_id=p_brewery AND user_id=p_actor AND role='admin') THEN RAISE insufficient_privilege USING message='permission denied'; END IF;
+  replay:=private.claim_command_request_for(p_actor,p_brewery,'disconnect_square',p_request_id,jsonb_build_object('connectionId',p_connection));
+  IF replay IS NOT NULL THEN RETURN QUERY SELECT null::text,replay; RETURN; END IF;
+  UPDATE private.square_oauth_intents SET consumed_at=coalesce(consumed_at,now()),exchange_state='recovery_required'
+    WHERE brewery_id=p_brewery AND exchange_state IN ('pending','exchanging');
+  DELETE FROM private.integration_tokens t WHERE t.brewery_id=p_brewery AND t.provider='square' AND t.connection_id=p_connection
+    RETURNING t.access_token,t.credential_version INTO token,version;
+  UPDATE public.pos_connections SET state='disconnected',remote_revocation_state='unresolved',
+    credential_version=greatest(credential_version,coalesce(version,credential_version))+1,updated_at=now()
+    WHERE brewery_id=p_brewery AND id=p_connection AND state='connected';
+  IF NOT FOUND THEN RAISE EXCEPTION 'connection not available'; END IF;
+  PERFORM private.complete_command_request_for(p_actor,p_request_id,result);
+  RETURN QUERY SELECT token,null::jsonb;
+END $$;
+
+CREATE FUNCTION public.finish_square_disconnect(p_brewery uuid,p_connection uuid,p_actor uuid,p_request_id uuid,p_revoked boolean) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE result jsonb:=jsonb_build_object('disconnected',true,'remoteRevocationState',CASE WHEN p_revoked THEN 'confirmed' ELSE 'unresolved' END);
+BEGIN
+  UPDATE public.pos_connections SET remote_revocation_state=CASE WHEN p_revoked THEN 'confirmed' ELSE 'unresolved' END,
+    last_error=CASE WHEN p_revoked THEN null ELSE 'Remote revocation could not be confirmed' END,updated_at=now()
+    WHERE brewery_id=p_brewery AND id=p_connection AND state='disconnected'
+      AND EXISTS(SELECT 1 FROM public.brewery_users WHERE brewery_id=p_brewery AND user_id=p_actor AND role='admin');
+  IF NOT FOUND THEN RAISE EXCEPTION 'disconnect reconciliation is not available'; END IF;
+  RETURN private.complete_command_request_for(p_actor,p_request_id,result);
+END $$;
+
+REVOKE ALL ON FUNCTION public.begin_square_oauth(uuid,text,text,text,uuid,text[]),public.claim_square_oauth(text,uuid,uuid,text),
+  public.fail_square_oauth(uuid,uuid),public.complete_square_oauth(uuid,uuid,text,text,text,text,timestamptz,text[],jsonb),
+  public.record_square_catalog_snapshot(uuid,uuid,uuid,bigint,uuid,jsonb,jsonb),
+  public.set_pos_location_mapping(uuid,text,uuid,uuid),public.set_pos_item_mapping(uuid,text,text,uuid,uuid,boolean,uuid),
+  public.begin_square_disconnect(uuid,uuid,uuid,uuid),public.finish_square_disconnect(uuid,uuid,uuid,uuid,boolean) FROM public,anon,authenticated,service_role;
+GRANT EXECUTE ON FUNCTION public.begin_square_oauth(uuid,text,text,text,uuid,text[]),public.set_pos_location_mapping(uuid,text,uuid,uuid),
+  public.set_pos_item_mapping(uuid,text,text,uuid,uuid,boolean,uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.claim_square_oauth(text,uuid,uuid,text),public.fail_square_oauth(uuid,uuid),
+  public.complete_square_oauth(uuid,uuid,text,text,text,text,timestamptz,text[],jsonb),
+  public.record_square_catalog_snapshot(uuid,uuid,uuid,bigint,uuid,jsonb,jsonb),
+  public.begin_square_disconnect(uuid,uuid,uuid,uuid),public.finish_square_disconnect(uuid,uuid,uuid,uuid,boolean) TO postgres,service_role;

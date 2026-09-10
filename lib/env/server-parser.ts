@@ -18,6 +18,13 @@ export interface QboEnv {
   taxApiBaseUrl?: string;
 }
 
+export interface SquareEnv {
+  applicationId: string;
+  applicationSecret: string;
+  redirectUri: string;
+  environment: "sandbox" | "production";
+}
+
 type Environment = Record<string, string | undefined>;
 
 function required(env: Environment, name: string) {
@@ -34,6 +41,17 @@ export function readQboEnv(env: Environment = process.env): QboEnv {
     redirectUri: required(env, "QBO_REDIRECT_URI"),
     apiBaseUrl: required(env, "QBO_API_BASE"),
     ...(taxApiBaseUrl ? { taxApiBaseUrl } : {}),
+  };
+}
+
+export function readSquareEnv(env: Environment = process.env): SquareEnv {
+  const environment = required(env, "SQUARE_ENVIRONMENT");
+  if (environment !== "sandbox" && environment !== "production") throw new Error("Invalid environment variable: SQUARE_ENVIRONMENT");
+  return {
+    applicationId: required(env, "SQUARE_APPLICATION_ID"),
+    applicationSecret: required(env, "SQUARE_APPLICATION_SECRET"),
+    redirectUri: required(env, "SQUARE_REDIRECT_URI"),
+    environment,
   };
 }
 

@@ -163,6 +163,105 @@ export async function failQboOAuth(intentId: string, actorId: string) {
   if (error) throw new Error("QuickBooks recovery state could not be recorded");
 }
 
+export async function claimSquareOAuth(stateHash: string, actorId: string, breweryId: string, redirectUri: string) {
+  const { data, error } = await createAdminClient().rpc("claim_square_oauth", {
+    p_state_hash: stateHash, p_actor: actorId, p_brewery: breweryId, p_redirect_uri: redirectUri,
+  }).maybeSingle();
+  if (error || !data) return null;
+  const row = data as { intent_id: string; brewery_id: string; provider_intent: "connect" | "reconnect"; requested_scopes: unknown };
+  if (!Array.isArray(row.requested_scopes) || row.requested_scopes.some((scope) => typeof scope !== "string")) return null;
+  return { intentId: row.intent_id, breweryId: row.brewery_id, providerIntent: row.provider_intent, requestedScopes: row.requested_scopes };
+}
+
+export async function completeSquareOAuthStore(
+  intentId: string,
+  actorId: string,
+  tokens: import("@/lib/pos").SquareTokens,
+  locations: import("@/lib/pos").SquareLocation[],
+) {
+  const { data, error } = await createAdminClient().rpc("complete_square_oauth", {
+    p_intent: intentId, p_actor: actorId, p_merchant_id: tokens.merchantId, p_merchant_label: tokens.merchantId,
+    p_access_token: tokens.accessToken, p_refresh_token: tokens.refreshToken, p_access_expires_at: tokens.accessExpiresAt,
+    p_granted_scopes: ["ITEMS_READ", "ITEMS_WRITE", "MERCHANT_PROFILE_READ", "ORDERS_READ"], p_locations: locations,
+  });
+  if (error || typeof data !== "string") throw new Error("Square connection storage failed");
+  return data;
+}
+
+export async function failSquareOAuth(intentId: string, actorId: string) {
+  const { error } = await createAdminClient().rpc("fail_square_oauth", { p_intent: intentId, p_actor: actorId });
+  if (error) throw new Error("Square recovery state could not be recorded");
+}
+
+export async function compareAndSwapSquareTokens(
+  ctx: Ctx,
+  expected: VersionedIntegrationTokens,
+  next: import("@/lib/pos").SquareTokens,
+  accessExpiresIn: number,
+) {
+  const { data, error } = await createAdminClient().rpc("cas_integration_tokens", {
+    p_brewery: ctx.breweryId, p_provider: "square", p_connection: expected.connectionId, p_actor: ctx.userId,
+    p_expected_version: expected.credentialVersion, p_access_token: next.accessToken, p_refresh_token: next.refreshToken,
+    p_received_at: next.receivedAt, p_access_seconds: accessExpiresIn, p_refresh_seconds: null, p_hard_seconds: null,
+  });
+  if (error) throw new Error("Square token refresh storage failed");
+  if (data !== true) throw new CommandError("Square connection changed; retry with the current connection", 409, "conflict");
+}
+
+export async function recordSquareCatalogSnapshot(
+  ctx: Ctx,
+  expected: VersionedIntegrationTokens,
+  requestId: string,
+  facts: { locations: import("@/lib/pos").SquareLocation[]; variations: import("@/lib/pos").SquareVariation[] },
+) {
+  const { data, error } = await createAdminClient().rpc("record_square_catalog_snapshot", {
+    p_brewery: ctx.breweryId, p_connection: expected.connectionId, p_actor: ctx.userId,
+    p_expected_version: expected.credentialVersion, p_request_id: requestId,
+    p_locations: facts.locations, p_variations: facts.variations,
+  });
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error) throw new Error("Square catalog snapshot storage failed");
+  return data as { locations: number; variations: number };
+}
+
+export async function getSquareHealth(ctx: Ctx) {
+  if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
+  const { data, error } = await ctx.db.from("pos_connections")
+    .select("id,merchant_id,merchant_label,state,remote_revocation_state,last_error,access_expires_at")
+    .eq("brewery_id", ctx.breweryId).eq("provider", "square").maybeSingle();
+  if (error) throw new Error("Square health is unavailable");
+  if (!data) return { connected: false, state: "disconnected" as const, merchantId: null, merchantLabel: null, lastError: null };
+  return {
+    connected: data.state === "connected", connectionId: data.id as string,
+    state: data.state as "connected" | "disconnected" | "recovery_required",
+    merchantId: data.merchant_id as string | null, merchantLabel: data.merchant_label as string | null,
+    remoteRevocationState: data.remote_revocation_state as "not_requested" | "confirmed" | "unresolved",
+    lastError: data.last_error as string | null, accessExpiresAt: data.access_expires_at as string | null,
+  };
+}
+
+export async function disconnectSquare(ctx: Ctx, connectionId: string, revoke: (token: string) => Promise<void>, requestId: string) {
+  if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("begin_square_disconnect", {
+    p_brewery: ctx.breweryId, p_connection: connectionId, p_actor: ctx.userId, p_request_id: requestId,
+  }).maybeSingle();
+  if (error?.code === "MG409") throw new CommandError(error.message, 409, "conflict");
+  if (error) throw new Error("Square disconnect failed");
+  const row = data as { access_token?: unknown; replay_result?: unknown } | null;
+  if (row?.replay_result && typeof row.replay_result === "object") {
+    return row.replay_result as { disconnected: true; remoteRevocationState: "confirmed" | "unresolved" };
+  }
+  const token = typeof row?.access_token === "string" ? row.access_token : null;
+  let revoked = false;
+  if (token) revoked = await revoke(token).then(() => true, () => false);
+  const { data: finished, error: finishError } = await admin.rpc("finish_square_disconnect", {
+    p_brewery: ctx.breweryId, p_connection: connectionId, p_actor: ctx.userId, p_request_id: requestId, p_revoked: revoked,
+  });
+  if (finishError || !finished || typeof finished !== "object") throw new Error("Square disconnect reconciliation failed");
+  return finished as { disconnected: true; remoteRevocationState: "confirmed" | "unresolved" };
+}
+
 export async function compareAndSwapQboTokens(ctx: Ctx, expected: VersionedIntegrationTokens, next: import("@/lib/qbo").QboTokens) {
   const { data, error } = await createAdminClient().rpc("cas_integration_tokens", {
     p_brewery: ctx.breweryId, p_provider: "qbo", p_connection: expected.connectionId, p_actor: ctx.userId,

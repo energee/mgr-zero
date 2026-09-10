@@ -37,6 +37,7 @@ const AUTHENTICATED_RPCS = [
   "begin_chat_installation(uuid,text,text,text,uuid)",
   "begin_chat_reauthorization(uuid,uuid,text,text,uuid)",
   "begin_qbo_oauth(uuid,text,text,text,uuid,text[])",
+  "begin_square_oauth(uuid,text,text,text,uuid,text[])",
   "begin_qbo_invoice_sync(uuid,uuid)",
   "set_qbo_customer_mapping(uuid,uuid,text,uuid)",
   "set_qbo_item_mapping(uuid,uuid,text,uuid)",
@@ -108,6 +109,8 @@ const AUTHENTICATED_RPCS = [
   "set_personal_notification_destination(uuid,text,uuid,uuid)",
   "set_notification_preference(uuid,text,boolean,time without time zone,time without time zone,text,boolean,uuid)",
   "set_portal_fulfillment_source(uuid,uuid,uuid)",
+  "set_pos_item_mapping(uuid,text,text,uuid,uuid,boolean,uuid)",
+  "set_pos_location_mapping(uuid,text,uuid,uuid)",
   "set_channel_price(uuid,uuid,uuid,uuid,integer,uuid)",
   "set_standing_allocation(uuid,uuid,numeric,uuid)",
   "set_taproom_par(uuid,uuid,uuid,numeric,uuid)",
@@ -175,6 +178,19 @@ it("grants portal tax credential access only to the service owner", () => {
     where p.pronamespace='public'::regnamespace and p.proname in ('read_portal_quote_tax','finish_portal_quote_tax')
       and has_function_privilege(r.role,p.oid,'execute') order by 1`)).toEqual([
     "finish_portal_quote_tax:service_role", "read_portal_quote_tax:service_role",
+  ]);
+});
+
+it("grants Square credential lifecycle and snapshot writes only to the service owner", () => {
+  expect(sql(`select p.proname || ':' || r.role from pg_proc p
+    cross join (values ('anon'),('authenticated'),('service_role')) r(role)
+    where p.pronamespace='public'::regnamespace and p.proname in (
+      'claim_square_oauth','complete_square_oauth','fail_square_oauth',
+      'record_square_catalog_snapshot','begin_square_disconnect','finish_square_disconnect')
+      and has_function_privilege(r.role,p.oid,'execute') order by 1`)).toEqual([
+    "begin_square_disconnect:service_role", "claim_square_oauth:service_role",
+    "complete_square_oauth:service_role", "fail_square_oauth:service_role",
+    "finish_square_disconnect:service_role", "record_square_catalog_snapshot:service_role",
   ]);
 });
 

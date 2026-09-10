@@ -57,4 +57,27 @@ describe("Square OAuth callback", () => {
     expect(fetch).not.toHaveBeenCalled();
     expect(lifecycle.complete).not.toHaveBeenCalled();
   });
+
+  it("exchanges a claimed code, verifies the merchant locations, and stores the connection", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        access_token: "access-secret", refresh_token: "refresh-secret",
+        expires_at: "2026-10-10T12:00:00Z", merchant_id: "merchant-1",
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ locations: [
+        { id: "location-1", name: "Taproom", status: "ACTIVE", merchant_id: "merchant-1" },
+      ] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetch);
+    lifecycle.complete.mockResolvedValue("connection-1");
+
+    const response = await GET(new Request("https://mgr.test/api/integrations/square/oauth?code=one-time&state=opaque"));
+
+    expect(response.headers.get("location")).toBe("https://mgr.test/settings/pos?connected=1");
+    expect(lifecycle.complete).toHaveBeenCalledWith(
+      "intent-1", "actor-1",
+      expect.objectContaining({ merchantId: "merchant-1", accessToken: "access-secret" }),
+      [{ id: "location-1", name: "Taproom", status: "ACTIVE" }],
+    );
+    expect(lifecycle.fail).not.toHaveBeenCalled();
+  });
 });

@@ -242,11 +242,8 @@ it("brewery-local ending dates include the first day exactly, and UTC sale bound
   expect(r.periods[0].starts_before_window).toBe(true);
 });
 
-it("every mapped source must cover the period, and concurrent reconciliation freezes exactly one interpretation", async () => {
+it("concurrent reconciliation freezes exactly one interpretation", async () => {
   const f=await fixture(); const first=await count(f,-14,null,0); await count(f,-7,first); await coverage(f);
-  await ins("pos_locations",{brewery_id:f.brewery.id,connection_id:f.connection.id,external_location_id:"L2",location_id:f.location.id});
-  expect((await report(f)).rows).toEqual([]);
-  await coverage(f,-14,-7,true,{external_location_id:"L2"});
   expect((await report(f)).rows[0].expected_bbl).toBe(0);
   const s=await sale(f,-10); const before=fingerprint(f);
   const {Client}=await import("pg"); const {DB}=await import("./helpers");

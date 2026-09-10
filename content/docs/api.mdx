@@ -206,6 +206,7 @@ omitted. They have no roles until they are built.
 | `confirm_order` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
 | `confirm_restock` | Orders & invoicing | ✓ |  | ✓ |  |  |  |
 | `connect_qbo` | Team & brewery settings | ✓ |  |  |  |  |  |
+| `connect_square` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `consume_chat_link_proof` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `correct_taproom_count` | Taproom & kegs | ✓ |  |  |  |  |  |
 | `create_bin` | Inventory & locations | ✓ |  | ✓ |  |  |  |
@@ -227,6 +228,7 @@ omitted. They have no roles until they are built.
 | `disable_chat_installation` | Today & notifications | ✓ |  |  |  |  |  |
 | `disconnect_chat_installation` | Today & notifications | ✓ |  |  |  |  |  |
 | `disconnect_qbo` | Team & brewery settings | ✓ |  |  |  |  |  |
+| `disconnect_square` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `draft_purchase_order_from_requirements` | Purchasing & materials | ✓ |  | ✓ |  |  |  |
 | `file_compliance_report` | Compliance | ✓ | ✓ |  |  |  |  |
 | `generate_compliance_report` | Compliance | ✓ | ✓ |  |  |  |  |
@@ -261,6 +263,7 @@ omitted. They have no roles until they are built.
 | `get_order_ship_sources` | Orders & invoicing | ✓ |  | ✓ |  |  |  |
 | `get_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |  |
 | `get_portal_account` | Customer portal |  |  |  |  |  | ✓ |
+| `get_pos_integration_health` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `get_purchase_order` | Purchasing & materials | ✓ |  | ✓ |  |  |  |
 | `get_qbo_connection` | Team & brewery settings | ✓ | ✓ |  |  |  |  |
 | `get_recipe` | Production | ✓ |  |  | ✓ |  |  |
@@ -298,6 +301,8 @@ omitted. They have no roles until they are built.
 | `list_open_taps` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
 | `list_orders` | Orders & invoicing | ✓ | ✓ | ✓ |  |  |  |
 | `list_packaging_runs` | Packaging | ✓ |  | ✓ | ✓ |  |  |
+| `list_pos_locations` | Inventory & locations | ✓ |  |  |  |  |  |
+| `list_pos_variations` | Team & brewery settings | ✓ |  | ✓ |  |  |  |
 | `list_price_groups` | Catalog & pricing | ✓ | ✓ | ✓ |  |  |  |
 | `list_purchase_orders` | Purchasing & materials | ✓ |  | ✓ |  |  |  |
 | `list_recipes` | Production | ✓ |  |  | ✓ |  |  |
@@ -364,6 +369,8 @@ omitted. They have no roles until they are built.
 | `set_notification_preference` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `set_personal_quiet_hours` | Today & notifications | ✓ | ✓ | ✓ | ✓ |  |  |
 | `set_portal_fulfillment_source` | Customers | ✓ |  |  |  |  |  |
+| `set_pos_item_mapping` | Team & brewery settings | ✓ |  | ✓ |  |  |  |
+| `set_pos_location_mapping` | Inventory & locations | ✓ |  |  |  |  |  |
 | `set_qbo_customer_mapping` | Customers | ✓ | ✓ |  |  |  |  |
 | `set_qbo_deposit_mapping` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `set_qbo_item_mapping` | Team & brewery settings | ✓ | ✓ |  |  |  |  |
@@ -376,6 +383,7 @@ omitted. They have no roles until they are built.
 | `submit_stock_transfer` | Inventory & locations | ✓ |  | ✓ |  |  |  |
 | `swap_keg` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
 | `sync_qbo_payments` | Team & brewery settings | ✓ | ✓ |  |  |  |  |
+| `sync_square_catalog` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `tap_keg` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
 | `trace_lot` | Compliance | ✓ | ✓ |  |  |  |  |
 | `unlink_chat_user` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
@@ -1728,6 +1736,21 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_movements", "input": {} }'
 ```
 
+#### list_pos_locations [#list_pos_locations]
+
+`query` · admin
+
+List every observed Square location and its explicit MGR location mapping
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_pos_locations", "input": {} }'
+```
+
 #### list_stock_transfers [#list_stock_transfers]
 
 `query` · admin, sales, warehouse
@@ -1830,6 +1853,24 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "reverse_inventory_movement", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "movementId": "00000000-0000-0000-0000-000000000000", "note": "string" } }'
+```
+
+#### set_pos_location_mapping [#set_pos_location_mapping]
+
+`command` · admin
+
+Map one observed Square location to one unclaimed MGR location; observed history cannot be remapped in place
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `posLocationId` | string | yes |
+| `mgrLocationId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_pos_location_mapping", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "posLocationId": "string", "mgrLocationId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### submit_stock_transfer [#submit_stock_transfer]
@@ -4077,6 +4118,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "connect_qbo", "requestId": "11111111-1111-1111-1111-111111111111", "input": {} }'
 ```
 
+#### connect_square [#connect_square]
+
+`command` · admin
+
+Begin administrator consent for a Square seller connection
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `reconnect` | boolean | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "connect_square", "requestId": "11111111-1111-1111-1111-111111111111", "input": {} }'
+```
+
 #### disconnect_qbo [#disconnect_qbo]
 
 `command` · admin
@@ -4092,6 +4150,23 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "disconnect_qbo", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "connectionId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
+#### disconnect_square [#disconnect_square]
+
+`command` · admin
+
+Stop Square sync locally, purge its credential, and report whether remote revocation was confirmed
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `connectionId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "disconnect_square", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "connectionId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### get_brewery [#get_brewery]
@@ -4154,6 +4229,21 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_gravity_unit", "input": {} }'
 ```
 
+#### get_pos_integration_health [#get_pos_integration_health]
+
+`query` · admin
+
+Get redacted Square seller connection health
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_pos_integration_health", "input": {} }'
+```
+
 #### get_qbo_connection [#get_qbo_connection]
 
 `query` · admin, sales
@@ -4203,6 +4293,21 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "invite_staff", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "email": "user@example.com", "role": "admin" } }'
+```
+
+#### list_pos_variations [#list_pos_variations]
+
+`query` · admin, warehouse
+
+List observed Square variations with queued, ignored, or explicit packaged/poured mapping state
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_pos_variations", "input": {} }'
 ```
 
 #### list_team_members [#list_team_members]
@@ -4326,6 +4431,27 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_my_gravity_unit", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "unit": "plato" } }'
 ```
 
+#### set_pos_item_mapping [#set_pos_item_mapping]
+
+`command` · admin, warehouse
+
+Map one Square variation to a packaged SKU or brand-owned poured format, or explicitly ignore it
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `externalItemId` | string | yes |
+| `externalVariationId` | string | yes |
+| `disposition` | mapped or ignored | yes |
+| `skuId` | uuid | no |
+| `formatId` | uuid | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "set_pos_item_mapping", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "externalItemId": "string", "externalVariationId": "string", "disposition": "mapped", "skuId": "00000000-0000-0000-0000-000000000000" } }'
+```
+
 #### set_qbo_deposit_mapping [#set_qbo_deposit_mapping]
 
 `command` · admin
@@ -4392,6 +4518,21 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "sync_qbo_payments", "requestId": "11111111-1111-1111-1111-111111111111", "input": {} }'
+```
+
+#### sync_square_catalog [#sync_square_catalog]
+
+`command` · admin
+
+Refresh the complete Square location and catalog-variation snapshot without changing inventory
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "sync_square_catalog", "requestId": "11111111-1111-1111-1111-111111111111", "input": {} }'
 ```
 
 #### update_brewery [#update_brewery]
