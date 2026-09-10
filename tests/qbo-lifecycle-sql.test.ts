@@ -265,8 +265,17 @@ describe("QuickBooks durable lifecycle", () => {
     expect((await admin.from("invoices").insert({ brewery_id: brewery.id, customer_id: customer.customerId, qbo_invoice_id: "invoice-old" })).error).toBeNull();
     const old = await readVersionedIntegrationTokens(ctx, "qbo");
 
+    const retainedQuote = crypto.randomUUID();
+    const quoteRequest = crypto.randomUUID();
+    sql(`insert into private.command_requests(actor_id,brewery_id,request_id,command_name,payload_hash,result)
+      values('${ctx.userId}','${brewery.id}','${quoteRequest}','portal_quote_order',digest('{}','sha256'),'{}')`);
+    sql(`insert into private.portal_order_quotes(id,actor_id,brewery_id,customer_id,request_id,snapshot,result,connection_id,expires_at)
+      values('${retainedQuote}','${ctx.userId}','${brewery.id}','${customer.customerId}','${quoteRequest}','{}','{}','${oldConnection}',now()-interval '1 day')`);
+
     const newConnection = await connect(`state-two-${run}`, `realm-two-${run}`);
     expect(newConnection).not.toBe(oldConnection);
+    expect(sql(`select connection_id::text from private.portal_order_quotes where id='${retainedQuote}'`)).toEqual([oldConnection]);
+    expect(sql(`select count(*) from public.qbo_connections where id='${oldConnection}'`)).toEqual(["0"]);
     expect((await admin.from("customers").select("qbo_customer_id").eq("id", customer.customerId).single()).data?.qbo_customer_id).toBeNull();
     expect((await admin.from("skus").select("qbo_item_id").eq("id", catalog.skuId).single()).data?.qbo_item_id).toBeNull();
     expect((await admin.from("invoices").select("qbo_invoice_id").eq("brewery_id", brewery.id).single()).data?.qbo_invoice_id).toBeNull();

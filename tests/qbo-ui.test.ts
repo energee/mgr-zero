@@ -32,8 +32,17 @@ describe("QuickBooks invoice presentation", () => {
   });
 
   it("distinguishes a partial payment from a merely pushed invoice", () => {
-    expect(qboInvoicePresentation({ kind: "invoice", role: "sales", connected: true, syncStatus: "pushed", remoteState: "live", totalCents: 10000, balanceCents: 4000 }))
-      .toEqual({ detail: "partially paid in QuickBooks · $40.00 due", actions: [] });
+    expect(qboInvoicePresentation({ kind: "invoice", role: "sales", connected: true, syncStatus: "pushed", remoteState: "live", totalCents: 10000, balanceCents: 4000, cashCollectedCents: 6000 }))
+      .toEqual({ detail: "partially paid in QuickBooks · $60.00 cash received · $40.00 due", actions: [] });
+    expect(qboInvoicePresentation({ kind: "invoice", role: "sales", connected: true, syncStatus: "pushed", remoteState: "live", totalCents: 10000, balanceCents: 4000, cashCollectedCents: 0 }))
+      .toEqual({ detail: "$40.00 due in QuickBooks · no cash payment recorded", actions: [] });
+  });
+
+  it("calls a zero-balance invoice paid only with positive cash evidence", () => {
+    expect(qboInvoicePresentation({ kind: "invoice", role: "sales", connected: true, syncStatus: "pushed", remoteState: "live", balanceCents: 0, cashCollectedCents: 0 }))
+      .toEqual({ detail: "settled in QuickBooks · no cash payment recorded", actions: [] });
+    expect(qboInvoicePresentation({ kind: "invoice", role: "sales", connected: true, syncStatus: "pushed", remoteState: "live", balanceCents: 0, cashCollectedCents: 4000 }))
+      .toEqual({ detail: "settled in QuickBooks · $40.00 cash received", actions: [] });
   });
 
   it("keeps stored invoice status and local write-off available after disconnect", () => {

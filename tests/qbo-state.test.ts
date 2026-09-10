@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { Client } from "pg";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { QboOAuthClient, syncQboInvoices } from "@/lib/qbo";
@@ -12,7 +13,7 @@ import { toPortalOrderViewProps } from "@/lib/mgr/portal-order-view";
 import { portalOrderShipped } from "@/lib/mgr/fixtures/portal-orders";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
-import { admin, asUser, makeBrewery, makeCustomerUser, makeStaffCtx, seedCustomer, sql } from "./helpers";
+import { admin, asUser, DB, makeBrewery, makeCustomerUser, makeStaffCtx, seedCustomer, sql } from "./helpers";
 
 const config = {
   clientId: "client-id",
@@ -76,6 +77,21 @@ function invoiceResponse(overrides: Record<string, unknown> = {}) {
   }), { status: 200 });
 }
 
+function paymentResponse(id: string, cash: number) {
+  return new Response(JSON.stringify({
+    Payment: {
+      Id: id,
+      TotalAmt: cash,
+      UnappliedAmt: 0,
+      TxnDate: "2026-09-09",
+      Line: [
+        { Amount: 100, LinkedTxn: [{ TxnId: "remote-invoice", TxnType: "Invoice" }] },
+        { Amount: -(100 - cash), LinkedTxn: [{ TxnId: "credit-1", TxnType: "CreditMemo" }] },
+      ],
+    },
+  }), { status: 200 });
+}
+
 describe("QuickBooks current invoice state", () => {
   it("tracks partial, paid, reopened and voided states without mistaking credits for cash", async () => {
     const f = await stateFixture();
@@ -116,12 +132,28 @@ describe("QuickBooks current invoice state", () => {
       .toBe("voided");
 
     const creditOnly = await stateFixture();
-    const creditFetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(invoiceResponse({
-      Balance: 0,
-      LinkedTxn: [{ TxnId: "credit-1", TxnType: "CreditMemo" }],
-    }));
+    const creditFetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(invoiceResponse({
+        Balance: 0,
+        LinkedTxn: [{ TxnId: "zero-dollar-payment", TxnType: "Payment" }],
+      }))
+      .mockResolvedValueOnce(paymentResponse("zero-dollar-payment", 0));
     await syncQboInvoices(creditOnly.ctx, crypto.randomUUID(), new QboOAuthClient(config, creditFetch));
     expect(sql(`select coalesce(paid_at::text,'NULL') from invoices where id='${creditOnly.invoice.id}'`)).toEqual(["NULL"]);
+    expect(sql(`select collected_cents from invoice_totals where invoice_id='${creditOnly.invoice.id}'`)).toEqual(["0"]);
+    expect(creditFetch).toHaveBeenCalledTimes(2);
+
+    const mixed = await stateFixture();
+    const mixedFetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(invoiceResponse({
+        Balance: 0,
+        LinkedTxn: [{ TxnId: "mixed-payment", TxnType: "Payment" }],
+      }))
+      .mockResolvedValueOnce(paymentResponse("mixed-payment", 40));
+    await syncQboInvoices(mixed.ctx, crypto.randomUUID(), new QboOAuthClient(config, mixedFetch));
+    expect(sql(`select (paid_at is not null)::text from invoices where id='${mixed.invoice.id}'`)).toEqual(["true"]);
+    expect(sql(`select collected_cents from invoice_totals where invoice_id='${mixed.invoice.id}'`)).toEqual(["4000"]);
+    expect(mixedFetch).toHaveBeenCalledTimes(2);
   });
 
   it("distinguishes payment-only SyncToken changes from accountant total drift", async () => {
@@ -243,6 +275,62 @@ describe("QuickBooks current invoice state", () => {
       })),
     })).rejects.toThrow("QuickBooks invoice identity changed");
     expect(sql(`select qbo_sync_token from invoices where id='${firstId}'`)).toEqual(["synced-remote-one"]);
+  });
+
+  it("rejects older out-of-order sync completions after a newer invoice observation commits", async () => {
+    const sessions = [new Client({ connectionString: DB }), new Client({ connectionString: DB })];
+    await Promise.all(sessions.map((client) => client.connect()));
+    const complete = (
+      client: Client,
+      f: Awaited<ReturnType<typeof stateFixture>>,
+      requestId: string,
+      started: Exclude<Awaited<ReturnType<typeof beginQboInvoiceSync>>, { replayResult: unknown }>,
+      observation: Record<string, unknown>,
+    ) => client.query(
+      "select public.complete_qbo_invoice_sync($1,$2,$3,$4,$5,$6::jsonb)",
+      [f.brewery.id, started.actorId, requestId, started.connectionId, started.realmId,
+        JSON.stringify(started.targets.map((target) => ({ invoiceId: target.invoiceId, remoteId: target.remoteId, ...observation })))],
+    );
+    const begin = async (f: Awaited<ReturnType<typeof stateFixture>>, requestId: string) => {
+      const started = await beginQboInvoiceSync(f.ctx, requestId);
+      if ("replayResult" in started) throw new Error("unexpected replay");
+      return started;
+    };
+    try {
+      const voided = await stateFixture();
+      const olderVoidRequest = crypto.randomUUID();
+      const newerVoidRequest = crypto.randomUUID();
+      const olderVoid = await begin(voided, olderVoidRequest);
+      const newerVoid = await begin(voided, newerVoidRequest);
+      await complete(sessions[1], voided, newerVoidRequest, newerVoid, {
+        remoteState: "voided", syncToken: "newer-void", taxCents: 0,
+        totalCents: 0, balanceCents: 0, contentMatches: true, cashPaid: false, paidAt: null,
+      });
+      await expect(complete(sessions[0], voided, olderVoidRequest, olderVoid, {
+        remoteState: "live", syncToken: "older-live", taxCents: 1000,
+        totalCents: 10000, balanceCents: 10000, contentMatches: true, cashPaid: false, paidAt: null,
+      })).rejects.toMatchObject({ code: "MG409" });
+      expect(sql(`select qbo_remote_state||'|'||qbo_sync_token from invoices where id='${voided.invoice.id}'`))
+        .toEqual(["voided|newer-void"]);
+
+      const paid = await stateFixture();
+      const olderPaidRequest = crypto.randomUUID();
+      const newerPaidRequest = crypto.randomUUID();
+      const olderPaid = await begin(paid, olderPaidRequest);
+      const newerPaid = await begin(paid, newerPaidRequest);
+      await complete(sessions[1], paid, newerPaidRequest, newerPaid, {
+        remoteState: "live", syncToken: "newer-paid", taxCents: 1000,
+        totalCents: 10000, balanceCents: 0, contentMatches: true, cashPaid: true, paidAt: "2026-09-09T15:00:00Z",
+      });
+      await expect(complete(sessions[0], paid, olderPaidRequest, olderPaid, {
+        remoteState: "live", syncToken: "older-unpaid", taxCents: 1000,
+        totalCents: 10000, balanceCents: 10000, contentMatches: true, cashPaid: false, paidAt: null,
+      })).rejects.toMatchObject({ code: "MG409" });
+      expect(sql(`select qbo_sync_token||'|'||(paid_at is not null)::text from invoices where id='${paid.invoice.id}'`))
+        .toEqual(["newer-paid|true"]);
+    } finally {
+      await Promise.all(sessions.map((client) => client.end()));
+    }
   });
 
   it("marks only a definitive 404 from the original current realm as deleted", async () => {
