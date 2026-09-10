@@ -1,7 +1,7 @@
 // components/mgr/me-sheet.tsx — the header "Me" control (plan §3; screen
 // records Me and Portal Me): who I am, which brewery, light/dark, change
-// password, sign out. Bottom sheet on phones, right sheet at md+
-// (hooks/use-mobile.ts). The brewery switcher renders only when the account
+// password, sign out. Uses the same centered dialog at every viewport. The
+// brewery switcher renders only when the account
 // holds more than one membership (`breweries`); the portal passes none.
 // `avatar` swaps the UserCircle icon for the person: their photo, or their
 // initials when `src` is omitted. The schema has no avatar column, so the app
@@ -13,12 +13,11 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { logout, switchBrewery } from "@/app/(auth)/actions";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Icon } from "@/components/mgr/icon";
 import { ThemeToggle } from "@/components/mgr/theme-toggle";
 import { UserAvatar } from "@/components/mgr/user-avatar";
 import { UserCircleIcon } from "@hugeicons/core-free-icons";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 export function MeSheet({ fields = [], avatar, breweries, children }: {
   fields?: [string, string][];
@@ -27,17 +26,16 @@ export function MeSheet({ fields = [], avatar, breweries, children }: {
   breweries?: { id: string; name: string; current: boolean }[];
   children?: ReactNode;
 }) {
-  const mobile = useIsMobile();
   return (
-    <Sheet>
-      <SheetTrigger asChild>
+    <Dialog>
+      <DialogTrigger asChild>
         <Button variant="ghost" size="sm" aria-label="Me">{avatar ? <UserAvatar {...avatar} className="size-5 text-[0.6rem]" /> : <Icon icon={UserCircleIcon} />}Me</Button>
-      </SheetTrigger>
-      <SheetContent side={mobile ? "bottom" : "right"} className="pb-[max(1rem,env(safe-area-inset-bottom))]">
-        <SheetHeader className="flex-row items-center gap-3">
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader className="flex-row items-center gap-3">
           {avatar ? <UserAvatar {...avatar} className="size-10" /> : null}
-          <SheetTitle>Me</SheetTitle>
-        </SheetHeader>
+          <DialogTitle>Me</DialogTitle>
+        </DialogHeader>
         {children ?? <>
           <dl className="flex flex-col px-4 text-sm">
             {fields.map(([k, v]) => (
@@ -61,8 +59,8 @@ export function MeSheet({ fields = [], avatar, breweries, children }: {
           )}
           <MeSheetActions />
         </>}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 
