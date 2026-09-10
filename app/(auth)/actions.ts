@@ -31,6 +31,17 @@ export async function login(form: FormData) {
   redirect(await home(db));
 }
 
+/** Passwordless sign-in: the shared staff entry view's secondary action. */
+export async function emailLogin(form: FormData) {
+  const db = await createServerClient();
+  const origin = (await headers()).get("origin") ?? "";
+  await db.auth.signInWithOtp({
+    email: String(form.get("email")),
+    options: { shouldCreateUser: false, emailRedirectTo: `${origin}/auth/confirm?next=/` },
+  });
+  redirect("/login?sent=1");
+}
+
 export async function logout() {
   const db = await createServerClient();
   await db.auth.signOut();

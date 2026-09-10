@@ -10,10 +10,12 @@ import { formatVolume } from "@/lib/volume";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
+import { MovementRecordedView } from "@/components/mgr/views/movement-recorded";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
+import { toMovementRecordedViewProps } from "@/lib/mgr/movement-recorded-view";
 
 // Staff-facing movement types; sale_removal/taproom_transfer are produced by
 // order flows (plan 1B), not entered manually here.
@@ -72,6 +74,24 @@ export function MovementForm({
   let fields: ReturnType<typeof movementFields> | null = null;
   try { fields = movementFields(type, qty, direction, destState, saleChannelId); } catch { /* Incomplete inputs disable submission. */ }
   const unitVolume = skus.find(s => s.id === skuId)?.bblPerUnit;
+  const receiptModel = receipt ? toMovementRecordedViewProps({
+    sku: skus.find(s => s.id === receipt.sku_id)?.label ?? receipt.sku_id,
+    qty: receipt.qty,
+    unit: "SKU unit",
+    kind: receipt.type.replaceAll("_", " "),
+    destState: receipt.dest_state ?? undefined,
+    bbl: String(receipt.bbl),
+    when: new Date(receipt.created_at).toLocaleString(),
+    backHref: "/inventory",
+    details: [
+      { label: "Location", value: `${locations.find(l => l.id === receipt.location_id)?.name ?? receipt.location_id} / ${bins.find(b => b.id === receipt.bin_id)?.name ?? receipt.bin_id}` },
+      ...(receipt.sale_channel_id ? [{ label: "Channel", value: channels.find(c => c.id === receipt.sale_channel_id)?.name ?? receipt.sale_channel_id }] : []),
+      ...(receipt.lot_id ? [{ label: "Lot", value: receipt.lot_id }] : []),
+      ...(receipt.note ? [{ label: "Note", value: receipt.note }] : []),
+      { label: "Movement reference", value: receipt.id },
+      ...(receipt.ref ? [{ label: "Source reference", value: receipt.ref }] : []),
+    ],
+  }) : null;
 
   function onTypeChange(next: MovementType) {
     setType(next);
@@ -185,20 +205,7 @@ export function MovementForm({
         </form>
       </CommandForm>
       <CommandForm open={receipt !== null} onOpenChange={open => { if (!open) setReceipt(null); }} title="Movement recorded">
-        {receipt && <div className="space-y-3 text-sm">
-          <p>{receipt.qty > 0 ? "+" : ""}{receipt.qty} {skus.find(s => s.id === receipt.sku_id)?.label ?? receipt.sku_id} · {receipt.type.replace(/_/g, " ")}</p>
-          <p>{locations.find(l => l.id === receipt.location_id)?.name ?? receipt.location_id} · {bins.find(b => b.id === receipt.bin_id)?.name ?? receipt.bin_id}</p>
-          <p>Recorded volume: {receipt.bbl} bbl ({formatVolume(receipt.bbl)})</p>
-          {receipt.sale_channel_id && <p>Channel: {channels.find(c => c.id === receipt.sale_channel_id)?.name ?? receipt.sale_channel_id}</p>}
-          {receipt.dest_state && <p>Destination state: {receipt.dest_state}</p>}
-          {receipt.lot_id && <p className="break-all">Lot: {receipt.lot_id}</p>}
-          {receipt.note && <p>{receipt.note}</p>}
-          <p>{new Date(receipt.created_at).toLocaleString()}</p>
-          <p className="break-all">Movement reference: {receipt.id}</p>
-          {receipt.ref && <p className="break-all">Source reference: {receipt.ref}</p>}
-          <p>This entry cannot be edited or deleted. Open this SKU’s inventory detail to reverse an eligible standalone adjustment or loss with a correction note. Other entries keep their original correction workflow.</p>
-          <Button onClick={() => setReceipt(null)}>Done</Button>
-        </div>}
+        {receiptModel && <MovementRecordedView model={receiptModel} footer={<Button onClick={() => setReceipt(null)}>Done</Button>} />}
       </CommandForm>
     </>
   );
