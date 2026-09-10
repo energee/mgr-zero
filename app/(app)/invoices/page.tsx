@@ -10,7 +10,7 @@ import { qboInvoicePresentation } from "@/lib/mgr/qbo-ui";
 import "@/lib/commands/all";
 import { QboSyncButton } from "@/app/(app)/settings/accounting/qbo-controls";
 
-type Invoice = { id: string; invoice_no: number | null; kind: "invoice" | "credit_memo"; due_on: string | null; paid_at: string | null; qbo_sync_status: "pending" | "pushed" | "push_failed"; qbo_sync_error: string | null; qbo_remote_state: "live" | "voided" | "deleted"; qbo_balance_cents: number | null; qbo_accountant_drift: boolean; written_off_at: string | null; subtotal_cents: number; total_cents: number; has_pending_qbo_push: boolean; customers: { name: string } | null };
+type Invoice = { id: string; invoice_no: number | null; kind: "invoice" | "credit_memo"; due_on: string | null; paid_at: string | null; qbo_sync_status: "pending" | "pushed" | "push_failed"; qbo_sync_error: string | null; qbo_remote_state: "live" | "voided" | "deleted"; qbo_balance_cents: number | null; qbo_cash_collected_cents: number; qbo_accountant_drift: boolean; written_off_at: string | null; subtotal_cents: number; total_cents: number; has_pending_qbo_push: boolean; customers: { name: string } | null };
 
 export default async function InvoicesPage() {
   const brewery = await getActiveBrewery();
@@ -29,7 +29,7 @@ export default async function InvoicesPage() {
         const state = invoiceCurrentState(inv);
         const paid = state === "paid";
         const status = state === "written_off" ? "written off" : state;
-        const qbo = qboInvoicePresentation({ kind: inv.kind, role: brewery.role, connected: Boolean(health?.connected), syncStatus: inv.qbo_sync_status, hasPendingPush: inv.has_pending_qbo_push, syncError: inv.qbo_sync_error, remoteState: inv.qbo_remote_state, balanceCents: inv.qbo_balance_cents, totalCents: inv.total_cents, accountantDrift: inv.qbo_accountant_drift, writtenOff: Boolean(inv.written_off_at) });
+        const qbo = qboInvoicePresentation({ kind: inv.kind, role: brewery.role, connected: Boolean(health?.connected), syncStatus: inv.qbo_sync_status, hasPendingPush: inv.has_pending_qbo_push, syncError: inv.qbo_sync_error, remoteState: inv.qbo_remote_state, balanceCents: inv.qbo_balance_cents, cashCollectedCents: inv.qbo_cash_collected_cents, totalCents: inv.total_cents, accountantDrift: inv.qbo_accountant_drift, writtenOff: Boolean(inv.written_off_at) });
         const detail = inv.qbo_sync_status === "pushed" && state === "unpaid"
           ? qbo.detail : inv.qbo_sync_status !== "pushed" ? qbo.detail : paid ? `paid ${new Date(inv.paid_at!).toLocaleDateString()}` : status;
         return (

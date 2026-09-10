@@ -3,14 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const lifecycle = vi.hoisted(() => ({
   claim: vi.fn(), complete: vi.fn(), fail: vi.fn(),
 }));
-const session = vi.hoisted(() => ({ breweryCookie: "brewery-1" as string | undefined }));
+const session = vi.hoisted(() => ({ breweryCookie: "brewery-1" as string | undefined, role: "admin" }));
 
 vi.mock("next/headers", () => ({
   cookies: vi.fn(async () => ({ get: vi.fn(() => session.breweryCookie ? { value: session.breweryCookie } : undefined) })),
 }));
 
 vi.mock("@/lib/brewery", () => ({
-  getActiveBrewery: vi.fn(async () => ({ id: "brewery-1", name: "Fixture brewery", role: "admin" })),
+  getActiveBrewery: vi.fn(async () => ({ id: "brewery-1", name: "Fixture brewery", role: session.role })),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -30,6 +30,7 @@ import { GET } from "@/app/api/integrations/qbo/oauth/route";
 describe("QuickBooks OAuth callback route", () => {
   beforeEach(() => {
     session.breweryCookie = "brewery-1";
+    session.role = "admin";
     vi.stubEnv("QBO_CLIENT_ID", "client-id");
     vi.stubEnv("QBO_CLIENT_SECRET", "client-secret");
     vi.stubEnv("QBO_REDIRECT_URI", "https://mgr.test/api/integrations/qbo/oauth");
@@ -115,5 +116,23 @@ describe("QuickBooks OAuth callback route", () => {
     expect(response.headers.get("location")).toBe("https://mgr.test/settings/accounting?connected=1");
     expect(lifecycle.claim).toHaveBeenCalledWith(expect.any(String), "actor-1", "brewery-1", expect.any(String));
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ["a stale brewery cookie", "brewery-2", "admin"],
+    ["a non-Admin membership", "brewery-1", "sales"],
+  ])("rejects %s before claiming state or fetching QuickBooks", async (_label, cookie, role) => {
+    session.breweryCookie = cookie;
+    session.role = role;
+    const fetch = vi.fn<typeof globalThis.fetch>();
+    vi.stubGlobal("fetch", fetch);
+
+    const response = await GET(new Request(
+      "https://mgr.test/api/integrations/qbo/oauth?code=secret-code&state=opaque&realmId=realm-1",
+    ));
+
+    expect(response.headers.get("location")).toBe("https://mgr.test/settings/accounting?error=oauth");
+    expect(lifecycle.claim).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

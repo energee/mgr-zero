@@ -491,6 +491,10 @@ describe("QuickBooks durable outbound push", () => {
     const successFetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({ Invoice: { Id: "fixed-1", SyncToken: "0" } }), { status: 200 }));
     await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, crypto.randomUUID(), new QboOAuthClient(config, successFetch), "corrected"))
       .resolves.toMatchObject({ status: "pushed", remoteId: "fixed-1" });
+    const rejectedReplayFetch = vi.fn<typeof globalThis.fetch>();
+    await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, firstRequest, new QboOAuthClient(config, rejectedReplayFetch)))
+      .rejects.toThrow("QuickBooks rejected the invoice");
+    expect(rejectedReplayFetch).not.toHaveBeenCalled();
     const keys = sql(`select provider_request_id::text from public.qbo_pushes where invoice_id='${f.invoice.id}' order by created_at,id`);
     expect(keys).toHaveLength(2);
     expect(keys[1]).not.toBe(firstKey);

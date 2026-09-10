@@ -65,7 +65,7 @@ function invoiceResponse(overrides: Record<string, unknown> = {}) {
       TotalAmt: 100,
       Balance: 50,
       TxnTaxDetail: { TotalTax: 10 },
-      LinkedTxn: [{ TxnId: "payment-1", TxnType: "Payment" }],
+      LinkedTxn: [],
       MetaData: { LastUpdatedTime: "2026-09-09T15:00:00Z" },
       CustomerRef: { value: "customer-42" },
       DocNumber: "1",
@@ -97,9 +97,11 @@ describe("QuickBooks current invoice state", () => {
     const f = await stateFixture();
     const fetch = vi.fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(invoiceResponse())
-      .mockResolvedValueOnce(invoiceResponse({ Balance: 0, SyncToken: "2" }))
+      .mockResolvedValueOnce(invoiceResponse({ Balance: 0, SyncToken: "2", LinkedTxn: [{ TxnId: "payment-2", TxnType: "Payment" }] }))
+      .mockResolvedValueOnce(paymentResponse("payment-2", 100))
       .mockResolvedValueOnce(invoiceResponse({ Balance: 25, SyncToken: "3" }))
-      .mockResolvedValueOnce(invoiceResponse({ Balance: 0, SyncToken: "4" }))
+      .mockResolvedValueOnce(invoiceResponse({ Balance: 0, SyncToken: "4", LinkedTxn: [{ TxnId: "payment-4", TxnType: "Payment" }] }))
+      .mockResolvedValueOnce(paymentResponse("payment-4", 100))
       .mockResolvedValueOnce(invoiceResponse({
         Balance: 0,
         TotalAmt: 0,
@@ -271,7 +273,7 @@ describe("QuickBooks current invoice state", () => {
       observations: pending.targets.map((target) => ({
         invoiceId: target.invoiceId, remoteId: target.remoteId, remoteState: "live" as const,
         syncToken: "must-roll-back", taxCents: 1000, totalCents: 10000, balanceCents: 5000,
-        contentMatches: true, cashPaid: true, paidAt: "2026-09-09T15:00:00Z",
+        contentMatches: true, cashCollectedCents: 10000, paidAt: "2026-09-09T15:00:00Z",
       })),
     })).rejects.toThrow("QuickBooks invoice identity changed");
     expect(sql(`select qbo_sync_token from invoices where id='${firstId}'`)).toEqual(["synced-remote-one"]);
@@ -304,11 +306,11 @@ describe("QuickBooks current invoice state", () => {
       const newerVoid = await begin(voided, newerVoidRequest);
       await complete(sessions[1], voided, newerVoidRequest, newerVoid, {
         remoteState: "voided", syncToken: "newer-void", taxCents: 0,
-        totalCents: 0, balanceCents: 0, contentMatches: true, cashPaid: false, paidAt: null,
+        totalCents: 0, balanceCents: 0, contentMatches: true, cashCollectedCents: 0, paidAt: null,
       });
       await expect(complete(sessions[0], voided, olderVoidRequest, olderVoid, {
         remoteState: "live", syncToken: "older-live", taxCents: 1000,
-        totalCents: 10000, balanceCents: 10000, contentMatches: true, cashPaid: false, paidAt: null,
+        totalCents: 10000, balanceCents: 10000, contentMatches: true, cashCollectedCents: 0, paidAt: null,
       })).rejects.toMatchObject({ code: "MG409" });
       expect(sql(`select qbo_remote_state||'|'||qbo_sync_token from invoices where id='${voided.invoice.id}'`))
         .toEqual(["voided|newer-void"]);
@@ -320,11 +322,11 @@ describe("QuickBooks current invoice state", () => {
       const newerPaid = await begin(paid, newerPaidRequest);
       await complete(sessions[1], paid, newerPaidRequest, newerPaid, {
         remoteState: "live", syncToken: "newer-paid", taxCents: 1000,
-        totalCents: 10000, balanceCents: 0, contentMatches: true, cashPaid: true, paidAt: "2026-09-09T15:00:00Z",
+        totalCents: 10000, balanceCents: 0, contentMatches: true, cashCollectedCents: 10000, paidAt: "2026-09-09T15:00:00Z",
       });
       await expect(complete(sessions[0], paid, olderPaidRequest, olderPaid, {
         remoteState: "live", syncToken: "older-unpaid", taxCents: 1000,
-        totalCents: 10000, balanceCents: 10000, contentMatches: true, cashPaid: false, paidAt: null,
+        totalCents: 10000, balanceCents: 10000, contentMatches: true, cashCollectedCents: 0, paidAt: null,
       })).rejects.toMatchObject({ code: "MG409" });
       expect(sql(`select qbo_sync_token||'|'||(paid_at is not null)::text from invoices where id='${paid.invoice.id}'`))
         .toEqual(["newer-paid|true"]);

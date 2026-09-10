@@ -3,7 +3,7 @@
 import { docNo } from "./doc-no";
 import { money } from "./money";
 import { buyerStatus } from "./order-status";
-import { invoiceCurrentState, invoiceCurrentTotalCents } from "./invoice-state";
+import { invoiceCurrentState, invoiceCurrentTotalCents, invoiceIsSettledWithoutPayment } from "./invoice-state";
 
 export type PortalOrderLineView = {
   key: string;
@@ -114,6 +114,7 @@ export function toPortalOrderViewProps({ order, lines, events, shipment, backHre
       ? {
         title: docNo("INV", invoice.invoice_no, "Invoice"),
         detail: invoiceState === "paid" ? `paid ${calendarDay(invoice.paid_at!)}`
+          : invoiceIsSettledWithoutPayment(invoice) ? "settled"
           : invoiceState === "written_off" ? "written off" : invoiceState ?? "unpaid",
         amount: money(invoiceCurrentTotalCents(invoice, invoice.invoice_lines.reduce((n, x) => n + x.amount_cents, 0))),
         href: `/portal/invoices/${invoice.id}`,

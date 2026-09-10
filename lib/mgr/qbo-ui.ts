@@ -40,6 +40,7 @@ export function qboInvoicePresentation(input: {
   syncError?: string | null;
   remoteState?: "live" | "voided" | "deleted";
   balanceCents?: number | null;
+  cashCollectedCents?: number | null;
   totalCents?: number | null;
   accountantDrift?: boolean;
   writtenOff?: boolean;
@@ -57,9 +58,19 @@ export function qboInvoicePresentation(input: {
   if (input.remoteState === "voided") return { detail: "voided in QuickBooks · not paid", actions: canWriteOff ? ["write_off"] : [] };
   if (input.accountantDrift) return { detail: "edited in QuickBooks · review there", actions: [] };
   if (input.syncStatus === "pushed") {
-    if (input.balanceCents === 0) return { detail: "paid in QuickBooks", actions: [] };
+    const cash = input.cashCollectedCents ?? 0;
+    if (input.balanceCents === 0) {
+      if (cash > 0 && typeof input.totalCents === "number" && cash >= input.totalCents) {
+        return { detail: "paid in QuickBooks", actions: [] };
+      }
+      return { detail: cash > 0
+        ? `settled in QuickBooks · ${money(cash)} cash received`
+        : "settled in QuickBooks · no cash payment recorded", actions: [] };
+    }
     if (typeof input.balanceCents === "number" && typeof input.totalCents === "number" && input.balanceCents < input.totalCents) {
-      return { detail: `partially paid in QuickBooks · ${money(input.balanceCents)} due`, actions: [] };
+      return { detail: cash > 0
+        ? `partially paid in QuickBooks · ${money(cash)} cash received · ${money(input.balanceCents)} due`
+        : `${money(input.balanceCents)} due in QuickBooks · no cash payment recorded`, actions: [] };
     }
     if (typeof input.balanceCents === "number") return { detail: `${input.balanceCents > 0 ? "balance due" : "current"} in QuickBooks`, actions: [] };
     return { detail: "pushed to QuickBooks", actions: [] };

@@ -3,7 +3,7 @@
 // The latter remain the fallback for local and not-yet-synchronized records.
 import { docNo } from "./doc-no";
 import { money } from "./money";
-import { invoiceCurrentState, invoiceCurrentTotalCents } from "./invoice-state";
+import { invoiceCurrentState, invoiceCurrentTotalCents, invoiceIsSettledWithoutPayment } from "./invoice-state";
 
 export type PortalInvoicesRowView = {
   key: string;
@@ -45,6 +45,7 @@ function invoiceDetail(inv: PortalInvoicesSnapshot["invoices"][number]): string 
   if (inv.kind === "credit_memo") return "credit";
   const state = invoiceCurrentState(inv);
   if (state === "paid") return `paid ${day(inv.paid_at!)}`;
+  if (invoiceIsSettledWithoutPayment(inv)) return "settled";
   if (state !== "unpaid") return state === "written_off" ? "written off" : state;
   return inv.due_on ? `due ${inv.due_on}` : "unpaid";
 }
@@ -57,7 +58,7 @@ export function toPortalInvoicesViewProps({ customerName, invoices }: PortalInvo
     rows: invoices.map((inv) => {
       const credit = inv.kind === "credit_memo";
       const state = invoiceCurrentState(inv);
-      const unpaid = !credit && state === "unpaid";
+      const unpaid = !credit && state === "unpaid" && !invoiceIsSettledWithoutPayment(inv);
       const total = invoiceCurrentTotalCents(inv, inv.invoice_lines.reduce((sum, l) => sum + l.amount_cents, 0));
       return {
         key: inv.id,

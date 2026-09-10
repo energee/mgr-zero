@@ -258,7 +258,7 @@ export type QboInvoiceObservation = {
   totalCents: number | null;
   balanceCents: number | null;
   contentMatches: boolean;
-  cashPaid: boolean;
+  cashCollectedCents: number;
   paidAt: string | null;
 };
 

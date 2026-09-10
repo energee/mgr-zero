@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { completeQboOAuth, qboConfig, QboOAuthClient } from "@/lib/qbo";
 import { claimQboOAuth, completeQboOAuthStore, failQboOAuth } from "@/lib/supabase/integration-tokens";
+import { getActiveBrewery } from "@/lib/brewery";
 
 export async function GET(request: Request) {
   const destination = new URL("/settings/accounting", request.url);
@@ -11,10 +12,12 @@ export async function GET(request: Request) {
     const db = await createServerClient();
     const { data } = await db.auth.getClaims();
     const actorId = data?.claims.sub;
-    const breweryId = (await cookies()).get("brewery")?.value;
-    if (typeof actorId !== "string" || !breweryId) throw new Error("oauth state invalid");
+    const picked = (await cookies()).get("brewery")?.value;
+    const activeBrewery = await getActiveBrewery();
+    if (typeof actorId !== "string" || activeBrewery.role !== "admin"
+      || (picked && picked !== activeBrewery.id)) throw new Error("oauth state invalid");
     await completeQboOAuth({
-      request, actorId, selectedBreweryId: breweryId, redirectUri: config.redirectUri,
+      request, actorId, selectedBreweryId: activeBrewery.id, redirectUri: config.redirectUri,
       client: new QboOAuthClient(config),
       store: { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth },
     });

@@ -61,9 +61,11 @@ type QboPushStart = {
   entityType?: "Invoice" | "CreditMemo";
   realmId?: string;
   connectionId?: string;
-  status: "pending" | "pushed";
+  status: "pending" | "pushed" | "push_failed";
   remoteId?: string;
   alreadyPushed?: boolean;
+  alreadyFinished?: boolean;
+  error?: string;
 };
 
 type QboInvoiceRead = {
@@ -72,7 +74,7 @@ type QboInvoiceRead = {
   taxCents: number;
   totalCents: number;
   balanceCents: number;
-  cashPaid: boolean;
+  cashCollectedCents: number;
   paidAt: string | null;
   privateNote: string;
   content: Record<string, unknown>;
@@ -246,7 +248,12 @@ export async function pushInvoiceToQbo(
     p_brewery: ctx.breweryId, p_invoice: invoiceId,
     p_new_attempt_reason: newAttemptReason ?? null, p_request_id: requestId,
   })) as QboPushStart;
-  if (start.alreadyPushed) return { status: "pushed" as const, remoteId: start.remoteId };
+  if ((start.alreadyPushed || start.alreadyFinished) && start.status === "pushed" && start.remoteId) {
+    return { status: "pushed" as const, remoteId: start.remoteId };
+  }
+  if (start.alreadyFinished && start.status === "push_failed") {
+    throw new CommandError(start.error ?? "QuickBooks rejected the invoice; fix the mapping and choose corrected", 400);
+  }
   if (!start.pushId || !start.providerRequestId || !start.finishRequestId || !start.requestBody
     || !start.entityType || !start.realmId || !start.connectionId) {
     throw new Error("QuickBooks push start was invalid");
@@ -329,7 +336,7 @@ export async function syncQboInvoices(ctx: Ctx, requestId: string, client: QboOA
       totalCents: read.ok ? read.totalCents : null,
       balanceCents: read.ok ? read.balanceCents : null,
       contentMatches: read.ok && meaningfulInvoiceContentMatches(JSON.parse(target.requestBody), read.content),
-      cashPaid: read.ok && read.cashPaid,
+      cashCollectedCents: read.ok ? read.cashCollectedCents : 0,
       paidAt: read.ok ? read.paidAt : null,
     });
   }
@@ -442,15 +449,51 @@ export class QboOAuthClient {
       throw new Error("QuickBooks response was invalid");
     }
     const linked = Array.isArray(invoice.LinkedTxn) ? invoice.LinkedTxn : [];
+    const paymentIds = [...new Set(linked.flatMap((item) => item && typeof item === "object"
+      && (item as Record<string, unknown>).TxnType === "Payment"
+      && typeof (item as Record<string, unknown>).TxnId === "string"
+      ? [(item as Record<string, unknown>).TxnId as string] : []))];
+    let cashCollectedCents = 0;
+    for (const paymentId of paymentIds) {
+      cashCollectedCents += await this.readPaymentCashApplied(realmId, paymentId, remoteId, accessToken);
+    }
     const updated = invoice.MetaData && typeof invoice.MetaData === "object"
       ? (invoice.MetaData as Record<string, unknown>).LastUpdatedTime : null;
     return {
       ok: true, syncToken: invoice.SyncToken, totalCents, balanceCents, taxCents,
-      cashPaid: linked.some((item) => item && typeof item === "object" && (item as Record<string, unknown>).TxnType === "Payment"),
+      cashCollectedCents: Math.min(cashCollectedCents, totalCents),
       paidAt: typeof updated === "string" && Number.isFinite(Date.parse(updated)) ? updated : null,
       privateNote: typeof invoice.PrivateNote === "string" ? invoice.PrivateNote : "",
       content: meaningfulInvoiceContent(invoice),
     };
+  }
+
+  private async readPaymentCashApplied(realmId: string, paymentId: string, invoiceId: string, accessToken: string) {
+    const url = new URL(`/v3/company/${encodeURIComponent(realmId)}/payment/${encodeURIComponent(paymentId)}`, this.config.apiBaseUrl);
+    url.searchParams.set("minorversion", ACCOUNTING_MINOR_VERSION);
+    const response = await this.transport(url, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+      redirect: "error",
+    });
+    if (!response.ok) throw new Error("QuickBooks payment response was invalid");
+    const payload = await response.json() as { Payment?: Record<string, unknown> };
+    const payment = payload?.Payment;
+    const amount = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+    const total = amount(payment?.TotalAmt);
+    const unapplied = amount(payment?.UnappliedAmt);
+    if (!payment || payment.Id !== paymentId || total === null || unapplied === null || unapplied > total
+      || !Array.isArray(payment.Line)) throw new Error("QuickBooks payment response was invalid");
+    const applied = payment.Line.reduce((sum, line) => {
+      if (!line || typeof line !== "object") return sum;
+      const row = line as Record<string, unknown>;
+      const links = Array.isArray(row.LinkedTxn) ? row.LinkedTxn : [];
+      return links.some((link) => link && typeof link === "object"
+        && (link as Record<string, unknown>).TxnType === "Invoice"
+        && (link as Record<string, unknown>).TxnId === invoiceId)
+        && typeof row.Amount === "number" && Number.isFinite(row.Amount) && row.Amount > 0 ? sum + row.Amount : sum;
+    }, 0);
+    return Math.round(Math.min(applied, total - unapplied) * 100);
   }
 
   async readInvoiceLink(realmId: string, remoteId: string, accessToken: string) {

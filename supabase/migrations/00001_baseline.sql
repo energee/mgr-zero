@@ -1732,6 +1732,8 @@ create table invoices (
   qbo_sync_token text,
   qbo_remote_state qbo_remote_state not null default 'live',
   qbo_tax_cents int, qbo_total_cents int, qbo_balance_cents int,   -- written by the sync job only
+  qbo_cash_collected_cents int not null default 0 check (qbo_cash_collected_cents >= 0),
+  qbo_sync_generation bigint not null default 0,
   qbo_accountant_drift boolean not null default false,
   paid_at timestamptz,
   written_off_at timestamptz,
@@ -2224,7 +2226,7 @@ begin
  if old.realm_id is distinct from new.realm_id then
   update public.customers set qbo_customer_id=null,qbo_realm_id=null where brewery_id=old.brewery_id;
   update public.skus set qbo_item_id=null,qbo_realm_id=null where brewery_id=old.brewery_id;
-  update public.invoices set qbo_invoice_id=null,qbo_sync_status='pending',qbo_sync_error=null,qbo_sync_token=null,qbo_remote_state='live',qbo_tax_cents=null,qbo_total_cents=null,qbo_balance_cents=null,qbo_accountant_drift=false where brewery_id=old.brewery_id;
+  update public.invoices set qbo_invoice_id=null,qbo_sync_status='pending',qbo_sync_error=null,qbo_sync_token=null,qbo_remote_state='live',qbo_tax_cents=null,qbo_total_cents=null,qbo_balance_cents=null,qbo_cash_collected_cents=0,qbo_accountant_drift=false where brewery_id=old.brewery_id;
  end if; return new;
 end $$;
 revoke execute on function private.purge_qbo_identity() from public,anon,authenticated,service_role;
@@ -2485,8 +2487,7 @@ create view invoice_totals with (security_invoker = true) as
          coalesce(sum(l.amount_cents), 0)::int as subtotal_cents,
          i.qbo_tax_cents, i.qbo_total_cents, i.qbo_balance_cents,
          case when i.kind='invoice' and i.qbo_remote_state='live' and i.written_off_at is null
-                   and i.paid_at is not null and i.qbo_balance_cents=0
-              then coalesce(i.qbo_total_cents,0) else 0 end as collected_cents
+              then i.qbo_cash_collected_cents else 0 end as collected_cents
   from invoices i left join invoice_lines l on l.invoice_id = i.id
   group by i.id;
 
@@ -3475,7 +3476,6 @@ create table private.portal_order_quotes (
   unique (actor_id, request_id),
   foreign key (actor_id, request_id) references private.command_requests(actor_id, request_id) on delete cascade,
   foreign key (customer_id, brewery_id) references public.customers(id, brewery_id),
-  foreign key (connection_id, brewery_id) references public.qbo_connections(id, brewery_id),
   foreign key (submitted_order_id, brewery_id) references public.orders(id, brewery_id)
 );
 alter table private.portal_order_quotes enable row level security;
@@ -3690,7 +3690,15 @@ begin
 
   v_replay:=private.claim_command_request(p_brewery,'push_invoice_to_qbo',p_request_id,
     jsonb_strip_nulls(jsonb_build_object('invoiceId',p_invoice,'newAttemptReason',p_new_attempt_reason)));
-  if v_replay is not null then return v_replay; end if;
+  if v_replay is not null then
+    select * into v_push from public.qbo_pushes
+      where id=nullif(v_replay->>'pushId','')::uuid and invoice_id=p_invoice;
+    if found and v_push.status<>'pending' then
+      return jsonb_strip_nulls(jsonb_build_object('pushId',v_push.id,'status',v_push.status,
+        'remoteId',v_push.qbo_entity_id,'error',v_push.error,'alreadyFinished',true));
+    end if;
+    return v_replay;
+  end if;
 
   select * into v_push from public.qbo_pushes where invoice_id=p_invoice and status='pending' order by created_at desc,id desc limit 1;
   if found then
@@ -3872,9 +3880,15 @@ begin
     if not found then raise exception 'QuickBooks connection changed' using errcode='MG409'; end if;
     return jsonb_build_object('actorId',v_actor,'connectionId',v_conn.id,'realmId',v_conn.realm_id,'targets',v_targets);
   end if;
+  update public.invoices i set qbo_sync_generation=i.qbo_sync_generation+1
+  where i.brewery_id=p_brewery and i.kind='invoice' and i.qbo_sync_status='pushed'
+    and i.qbo_invoice_id is not null and exists(
+      select 1 from public.qbo_pushes qp where qp.invoice_id=i.id and qp.brewery_id=p_brewery
+        and qp.connection_id=v_conn.id and qp.realm_id=v_conn.realm_id and qp.status='pushed'
+        and qp.qbo_entity_id=i.qbo_invoice_id);
   select coalesce(jsonb_agg(jsonb_build_object(
       'invoiceId',i.id,'remoteId',i.qbo_invoice_id,'pushId',p.id,
-      'requestBody',p.request_body,'pushedResponse',p.response) order by i.id),'[]'::jsonb)
+      'generation',i.qbo_sync_generation,'requestBody',p.request_body,'pushedResponse',p.response) order by i.id),'[]'::jsonb)
     into v_targets
   from public.invoices i
   join lateral (
@@ -3896,7 +3910,7 @@ create function complete_qbo_invoice_sync(
 declare
   v_batch private.qbo_invoice_sync_batches; v_request private.command_requests;
   v_target jsonb; v_observation jsonb; v_inv public.invoices; v_push public.qbo_pushes;
-  v_state text; v_drift boolean; v_paid boolean;
+  v_state text; v_drift boolean; v_paid boolean; v_cash int;
   v_synced int:=0; v_paid_count int:=0; v_voided int:=0; v_deleted int:=0; v_drifted int:=0; v_result jsonb;
 begin
   if p_actor is null or not exists(select 1 from public.brewery_users
@@ -3935,7 +3949,8 @@ begin
     select * into v_push from public.qbo_pushes where id=(v_target->>'pushId')::uuid and brewery_id=p_brewery
       and invoice_id=v_inv.id and connection_id=p_connection and realm_id=p_realm and status='pushed'
       and qbo_entity_id=v_target->>'remoteId';
-    if v_inv.id is null or v_push.id is null or v_inv.qbo_invoice_id is distinct from v_target->>'remoteId' then
+    if v_inv.id is null or v_push.id is null or v_inv.qbo_invoice_id is distinct from v_target->>'remoteId'
+       or v_inv.qbo_sync_generation is distinct from (v_target->>'generation')::bigint then
       raise exception 'QuickBooks invoice identity changed' using errcode='MG409';
     end if;
     v_state:=v_observation->>'remoteState';
@@ -3948,13 +3963,18 @@ begin
         or (v_push.response ? 'TotalTax' and round((v_push.response->>'TotalTax')::numeric*100)::int
           is distinct from (v_observation->>'taxCents')::int);
     end if;
-    v_paid:=v_state='live' and (v_observation->>'cashPaid')::boolean
+    v_cash:=(v_observation->>'cashCollectedCents')::int;
+    if v_cash<0 or v_cash>coalesce((v_observation->>'totalCents')::int,0) then
+      raise exception 'invalid QuickBooks cash evidence';
+    end if;
+    v_paid:=v_state='live' and v_cash>0
       and (v_observation->>'balanceCents')::int=0 and (v_observation->>'totalCents')::int>0;
     update public.invoices set qbo_remote_state=v_state::public.qbo_remote_state,
       qbo_sync_token=v_observation->>'syncToken',
       qbo_tax_cents=case when v_observation->'taxCents'='null'::jsonb then null else (v_observation->>'taxCents')::int end,
       qbo_total_cents=case when v_observation->'totalCents'='null'::jsonb then null else (v_observation->>'totalCents')::int end,
       qbo_balance_cents=case when v_observation->'balanceCents'='null'::jsonb then null else (v_observation->>'balanceCents')::int end,
+      qbo_cash_collected_cents=case when v_state='live' then v_cash else qbo_cash_collected_cents end,
       qbo_accountant_drift=v_drift,
       paid_at=case when v_paid then coalesce(paid_at,nullif(v_observation->>'paidAt','')::timestamptz,now())
         when v_state='live' then null else paid_at end

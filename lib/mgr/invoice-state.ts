@@ -14,6 +14,11 @@ export function invoiceCurrentState(invoice: {
 
 export const invoiceIsCurrentlyPaid = (invoice: Parameters<typeof invoiceCurrentState>[0]) => invoiceCurrentState(invoice) === "paid";
 
+export const invoiceIsSettledWithoutPayment = (invoice: Parameters<typeof invoiceCurrentState>[0]) =>
+  invoiceCurrentState(invoice) === "unpaid"
+  && invoice.qbo_remote_state === "live"
+  && invoice.qbo_balance_cents === 0;
+
 export function invoiceCurrentTotalCents(
   invoice: { kind: "invoice" | "credit_memo"; qbo_total_cents?: number | null },
   localTotalCents: number,
