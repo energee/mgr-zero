@@ -8,6 +8,9 @@ import { AppShell, PortalShell } from "@/components/mgr/app-shell";
 import { CommandForm } from "@/components/mgr/command-form";
 import { E, splitPinned } from "@/components/mgr/e";
 import { MeSheet } from "@/components/mgr/me-sheet";
+import { MeView } from "@/components/mgr/views/me";
+import { PortalMeView } from "@/components/mgr/views/portal-me";
+import { UserAvatar } from "@/components/mgr/user-avatar";
 import type { Screen } from "@/components/mgr/screens";
 import { VenueFrame } from "@/components/mgr/venue";
 import "@/components/mgr/venue.css";
@@ -20,6 +23,9 @@ import { PERSONAS, type Persona, PORTAL_BUYER } from "@/lib/mgr/demo-personas";
 /** A sheet record as the command form it ships in. Pinned open unless `onClose`
  * is given (the explorer passes it, and `container` to keep the portal in its box). */
 export function ScreenSheet({ screen: s, container, onClose }: { screen: Screen; container?: HTMLElement | null; onClose?: () => void }) {
+  if (s.name === "Me" || s.name === "Portal Me") {
+    return <MeSheet open onOpenChange={(open) => !open && onClose?.()}>{s.body}</MeSheet>;
+  }
   const { rest, pin } = splitPinned(s.body);
   return (
     <CommandForm open onOpenChange={onClose && ((open) => !open && onClose())} container={container} title={s.name} footer={pin.length ? pin : undefined}>
@@ -54,9 +60,16 @@ export function ScreenFrame({ screen: s, persona = PERSONAS[0] }: { screen: Scre
   const body = s.surface === "sheet" ? <ScreenSheet screen={s} /> : s.body;
   // The staff user is the chosen persona's face; the portal user is the
   // customer's buyer (PORTAL_BUYER), a different person, shown by initials.
-  const me = <MeSheet avatar={{ src: persona.avatar, name: persona.name }} fields={[["Name", persona.name], ["Brewery", "Demo Brewing"], ["Role", `${persona.handle} · ${persona.role}`]]} />;
+  const me = (
+    <MeSheet avatar={{ src: persona.avatar, name: persona.name }}>
+      <MeView
+        model={{ name: persona.name, role: persona.role, email: `${persona.handle.slice(1)}@demobrewing.com`, breweries: [{ name: "Demo Brewing", current: true }] }}
+        avatar={<UserAvatar src={persona.avatar} name={persona.name} className="size-10" />}
+      />
+    </MeSheet>
+  );
   return s.portal ? (
-    <PortalShell brand="Demo Brewing wholesale" headerRight={<MeSheet avatar={{ name: PORTAL_BUYER.name }} fields={[["Name", PORTAL_BUYER.name], ["Account", PORTAL_BUYER.account], ["Signed in as", PORTAL_BUYER.email]]} />} composer={E.comp(true)} active={s.portal}>
+    <PortalShell brand="Demo Brewing wholesale" headerRight={<MeSheet avatar={{ name: PORTAL_BUYER.name }}><PortalMeView model={{ email: PORTAL_BUYER.email, account: PORTAL_BUYER.account }} /></MeSheet>} composer={E.comp(true)} active={s.portal}>
       {body}
     </PortalShell>
   ) : (

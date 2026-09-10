@@ -6,6 +6,7 @@
 import { E } from "@/components/mgr/e";
 import type { Screen } from "@/components/mgr/screens";
 import { UserAvatar } from "@/components/mgr/user-avatar";
+import { MeView } from "@/components/mgr/views/me";
 import { needsFor, type Persona } from "@/lib/mgr/demo-personas";
 
 const list = (xs: string[]) => (xs.length ? new Intl.ListFormat("en", { type: "disjunction" }).format(xs) : "admin");
@@ -15,16 +16,15 @@ export function asPersona(screen: Screen, persona: Persona, refused?: string): S
   if (screen.name === "Me") {
     return {
       ...screen,
-      body: (
-        <>
-          {E.row(persona.name, persona.role, "", "", <UserAvatar src={persona.avatar} name={persona.name} className="size-10" />)}
-          {E.fld("Signed in as", `${persona.handle.slice(1)}@demobrewing.com`)}
-          {E.ttl("Brewery")}
-          {E.row("Demo Brewing", "current", "✓", "ok")}
-          {E.sp()}
-          {E.btns([["Change password", "g"], ["Sign out", "del"]])}
-        </>
-      ),
+      body: <MeView
+        model={{
+          name: persona.name,
+          role: persona.role,
+          email: `${persona.handle.slice(1)}@demobrewing.com`,
+          breweries: [{ name: "Demo Brewing", current: true }],
+        }}
+        avatar={<UserAvatar src={persona.avatar} name={persona.name} className="size-10" />}
+      />,
     };
   }
   if (screen.name === "Permission denied" && refused) {

@@ -9,9 +9,11 @@ import { getRequestIdentity, getStaffMemberships } from "@/lib/auth/request-cont
 import { sidebarOpenFromCookie } from "@/lib/mgr/sidebar-state";
 import { BreweryProvider } from "./brewery-provider";
 import { AppShell } from "@/components/mgr/app-shell";
-import { MeSheet } from "@/components/mgr/me-sheet";
+import { MeSheet, MeSheetActions } from "@/components/mgr/me-sheet";
+import { MeView } from "@/components/mgr/views/me";
 import { navFor, shippedNav, STAFF_NAV } from "@/lib/mgr/nav";
 import { SearchCacheProvider, SearchSheet } from "@/components/mgr/search-palette";
+import { switchBrewery } from "@/app/(auth)/actions";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [brewery, sidebarOpen, identity, memberships] = await Promise.all([getActiveBrewery(), sidebarOpenFromCookie(), getRequestIdentity(), getStaffMemberships()]);
@@ -25,8 +27,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           headerRight={
             <>
               {brewery.role !== "taproom" && <SearchSheet />}
-              <MeSheet fields={[["Signed in as", identity?.email ?? ""], ["Brewery", brewery.name], ["Role", brewery.role]]}
-                breweries={memberships.map((m) => ({ id: m.breweryId, name: m.breweryName, current: m.breweryId === brewery.id }))} />
+              <MeSheet>
+                <MeView
+                  model={{
+                    role: brewery.role,
+                    email: identity?.email ?? "",
+                    breweries: memberships.map((m) => ({ id: m.breweryId, name: m.breweryName, current: m.breweryId === brewery.id })),
+                  }}
+                  switchAction={switchBrewery}
+                  footer={<MeSheetActions />}
+                />
+              </MeSheet>
             </>
           }
         >
