@@ -262,7 +262,7 @@ omitted. They have no roles until they are built.
 | `get_packaging_run` | Packaging | ✓ |  | ✓ | ✓ |  |  |
 | `get_portal_account` | Customer portal |  |  |  |  |  | ✓ |
 | `get_purchase_order` | Purchasing & materials | ✓ |  | ✓ |  |  |  |
-| `get_qbo_connection` | Team & brewery settings | ✓ |  |  |  |  |  |
+| `get_qbo_connection` | Team & brewery settings | ✓ | ✓ |  |  |  |  |
 | `get_recipe` | Production | ✓ |  |  | ✓ |  |  |
 | `get_shortfalls` | Today & notifications | ✓ | ✓ | ✓ |  |  |  |
 | `get_stock_transfer` | Inventory & locations | ✓ | ✓ | ✓ |  |  |  |
@@ -4156,7 +4156,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 #### get_qbo_connection [#get_qbo_connection]
 
-`query` · admin
+`query` · admin, sales
 
 Get redacted QuickBooks connection health and the connectionId required to disconnect
 

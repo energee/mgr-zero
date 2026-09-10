@@ -12,8 +12,8 @@ export type PortalInvoiceVariant = "pay" | "unavailable" | "paid";
 type ResolvedPortalInvoiceVariant = PortalInvoiceVariant | "nonpayable";
 
 function resolveVariant(variant: PortalInvoiceVariant | undefined, paid: boolean, payable: boolean): ResolvedPortalInvoiceVariant {
-  if (!paid && !payable) return "nonpayable";
   if (variant) return variant;
+  if (!paid && !payable) return "nonpayable";
   return paid ? "paid" : "unavailable";
 }
 
@@ -45,7 +45,7 @@ export function PortalInvoiceView({
       {kind === "unavailable"
         ? E.info("Online payment isn’t available for this invoice right now.")
         : null}
-      {kind === "nonpayable" ? E.info("This invoice is not payable.") : null}
+      {kind === "nonpayable" ? E.info(model.status === "Unpaid" ? "Online payment isn’t available for this invoice right now." : "This invoice is not payable.") : null}
       {kind === "paid"
         ? (model.paidOn ? E.row("Paid", model.paidOn, "", "ok") : null)
         : kind === "pay" || kind === "unavailable" ? (

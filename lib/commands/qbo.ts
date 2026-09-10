@@ -24,7 +24,7 @@ defineCommand({
 
 defineQuery({
   name: "get_qbo_connection", description: "Get redacted QuickBooks connection health and the connectionId required to disconnect",
-  input: z.object({}), roles: ["admin"],
+  input: z.object({}), roles: ["admin", "sales"],
   handler: async (ctx) => (await import("@/lib/supabase/integration-tokens")).getQboHealth(ctx),
 });
 

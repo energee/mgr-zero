@@ -71,7 +71,7 @@ export function toPortalInvoiceViewProps({ invoice, lines, brewery, backHref }: 
     due: invoice.due_on ?? undefined,
     paidOn: paid ? day(invoice.paid_at!) : undefined,
     paid,
-    payable: !credit && state === "unpaid",
+    payable: !credit && state === "unpaid" && typeof invoice.qbo_balance_cents === "number" && invoice.qbo_balance_cents > 0,
     kind: invoice.kind,
     issued: invoice.issued_on,
     status: credit ? "Credit" : status,

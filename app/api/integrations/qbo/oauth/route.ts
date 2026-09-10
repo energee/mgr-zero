@@ -5,7 +5,7 @@ import { completeQboOAuth, qboConfig, QboOAuthClient } from "@/lib/qbo";
 import { claimQboOAuth, completeQboOAuthStore, failQboOAuth } from "@/lib/supabase/integration-tokens";
 
 export async function GET(request: Request) {
-  const destination = new URL("/settings", request.url);
+  const destination = new URL("/settings/accounting", request.url);
   try {
     const config = qboConfig();
     const db = await createServerClient();
@@ -18,9 +18,9 @@ export async function GET(request: Request) {
       client: new QboOAuthClient(config),
       store: { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth },
     });
-    destination.searchParams.set("qbo", "connected");
+    destination.searchParams.set("connected", "1");
   } catch {
-    destination.searchParams.set("qbo", "unavailable");
+    destination.searchParams.set("error", "oauth");
   }
   return NextResponse.redirect(destination, 303);
 }

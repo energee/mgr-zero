@@ -51,7 +51,7 @@ describe("QuickBooks OAuth callback route", () => {
     ));
 
     expect(response.status).toBe(303);
-    expect(response.headers.get("location")).toBe("https://mgr.test/settings?qbo=unavailable");
+    expect(response.headers.get("location")).toBe("https://mgr.test/settings/accounting?error=oauth");
     expect(lifecycle.complete).not.toHaveBeenCalled();
     expect(lifecycle.fail).toHaveBeenCalledWith("intent-1", "actor-1");
     expect(JSON.stringify([...response.headers])).not.toMatch(/access-secret|refresh-secret|secret-code/);
@@ -74,7 +74,7 @@ describe("QuickBooks OAuth callback route", () => {
       "https://mgr.test/api/integrations/qbo/oauth?code=secret-code&state=opaque&realmId=realm-1",
     ));
 
-    expect(response.headers.get("location")).toBe("https://mgr.test/settings?qbo=connected");
+    expect(response.headers.get("location")).toBe("https://mgr.test/settings/accounting?connected=1");
     expect(lifecycle.complete).toHaveBeenCalledWith("intent-1", "actor-1", "realm-1",
       expect.objectContaining({ grantedScopes: requestedScopes }));
   });
@@ -88,7 +88,7 @@ describe("QuickBooks OAuth callback route", () => {
       "https://mgr.test/api/integrations/qbo/oauth?code=secret-code&state=invalid&realmId=realm-1",
     ));
 
-    expect(response.headers.get("location")).toBe("https://mgr.test/settings?qbo=unavailable");
+    expect(response.headers.get("location")).toBe("https://mgr.test/settings/accounting?error=oauth");
     expect(fetch).not.toHaveBeenCalled();
     expect(lifecycle.complete).not.toHaveBeenCalled();
   });

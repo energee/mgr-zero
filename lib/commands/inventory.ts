@@ -187,7 +187,7 @@ defineQuery({
   handler: async (ctx) => {
     const rows = await completeRows("SKU list", async (afterId) => {
       let query = ctx.db.from("skus")
-        .select("id, name, active, brand_id, format_id, brands(name), formats(name, bbl_per_unit, package_type), format_volume:format_volumes(bbl_per_unit)")
+        .select("id, name, active, brand_id, format_id, qbo_item_id, qbo_realm_id, brands(name), formats(name, bbl_per_unit, package_type), format_volume:format_volumes(bbl_per_unit)")
         .eq("brewery_id", ctx.breweryId).order("id").limit(500);
       if (afterId) query = query.gt("id", afterId);
       const [result, counted] = await Promise.all([

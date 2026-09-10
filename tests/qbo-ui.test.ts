@@ -23,4 +23,9 @@ describe("QuickBooks invoice presentation", () => {
     expect(qboInvoicePresentation({ role: "warehouse", connected: true, syncStatus: "pending" }))
       .toEqual({ detail: "not pushed", actions: [] });
   });
+
+  it("distinguishes a partial payment from a merely pushed invoice", () => {
+    expect(qboInvoicePresentation({ role: "sales", connected: true, syncStatus: "pushed", remoteState: "live", totalCents: 10000, balanceCents: 4000 }))
+      .toEqual({ detail: "partially paid in QuickBooks · $40.00 due", actions: [] });
+  });
 });

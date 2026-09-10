@@ -175,18 +175,19 @@ export async function compareAndSwapQboTokens(ctx: Ctx, expected: VersionedInteg
 }
 
 export async function getQboHealth(ctx: Ctx) {
-  if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
+  requireIntegrationRole(ctx);
   const { data, error } = await ctx.db.from("qbo_connections")
-    .select("id,realm_label,state,remote_revocation_state,last_error,access_expires_at,refresh_expires_at,refresh_hard_expires_at,allow_online_ach_payment,allow_online_credit_card_payment")
+    .select("id,realm_id,realm_label,state,remote_revocation_state,last_error,access_expires_at,refresh_expires_at,refresh_hard_expires_at,qbo_deposit_item_id,allow_online_ach_payment,allow_online_credit_card_payment")
     .eq("brewery_id", ctx.breweryId).maybeSingle();
   if (error) throw new Error("QuickBooks health is unavailable");
   if (!data) return { connected: false, state: "disconnected" as const, realmLabel: null, lastError: null };
   return {
     connected: data.state === "connected", connectionId: data.id as string,
-    state: data.state as "connected" | "disconnected" | "recovery_required",
+    state: data.state as "connected" | "disconnected" | "recovery_required", realmId: data.realm_id as string,
     realmLabel: data.realm_label as string | null, remoteRevocationState: data.remote_revocation_state as string,
     lastError: data.last_error as string | null, accessExpiresAt: data.access_expires_at as string | null,
     refreshExpiresAt: data.refresh_expires_at as string | null, refreshHardExpiresAt: data.refresh_hard_expires_at as string | null,
+    depositItemId: data.qbo_deposit_item_id as string | null,
     allowAch: data.allow_online_ach_payment as boolean,
     allowCard: data.allow_online_credit_card_payment as boolean,
   };

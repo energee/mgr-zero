@@ -67,7 +67,7 @@ it("resolves every tap in every MGR screen", () => {
 
 
 it("includes controls inside portaled sheets", () => {
-  for (const [name, label] of [["Mapping conflict", "Use"], ["Square → QuickBooks connector", "Understood"], ["Portal Me", "Change password"], ["Square locations", "Save mappings"]]) {
+  for (const [name, label] of [["Mapping conflict", "Save mapping"], ["Square → QuickBooks connector", "Understood"], ["Portal Me", "Change password"], ["Square locations", "Save mappings"]]) {
     const screen = SCREENS.find(s => s.name === name)!;
     expect(taps(screen, markup(screen)).map(([label]) => label), name).toContain(label);
   }

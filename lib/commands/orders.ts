@@ -305,13 +305,15 @@ defineQuery({
     if (i.customerId) q = q.eq("customer_id", i.customerId);
     const invoices = (await unwrap(q)) as { id: string; kind: "invoice" | "credit_memo"; qbo_total_cents: number | null }[];
     const ids = invoices.map(inv => inv.id);
-    const totals = ids.length
-      ? (await unwrap(ctx.db.from("invoice_totals").select("invoice_id, subtotal_cents").in("invoice_id", ids))) as { invoice_id: string; subtotal_cents: number }[]
-      : [];
+    const [totals, pendingPushes] = ids.length ? await Promise.all([
+      unwrap(ctx.db.from("invoice_totals").select("invoice_id, subtotal_cents").in("invoice_id", ids)) as PromiseLike<{ invoice_id: string; subtotal_cents: number }[]>,
+      unwrap(ctx.db.from("qbo_pushes").select("invoice_id").in("invoice_id", ids).eq("status", "pending")) as PromiseLike<{ invoice_id: string }[]>,
+    ]) : [[], []];
     const subtotalById = new Map(totals.map(t => [t.invoice_id, t.subtotal_cents]));
+    const pending = new Set(pendingPushes.map(push => push.invoice_id));
     return invoices.map(inv => {
       const subtotal_cents = subtotalById.get(inv.id) ?? 0;
-      return { ...inv, subtotal_cents, total_cents: invoiceCurrentTotalCents(inv, subtotal_cents) };
+      return { ...inv, subtotal_cents, total_cents: invoiceCurrentTotalCents(inv, subtotal_cents), has_pending_qbo_push: pending.has(inv.id) };
     });
   },
 });
@@ -321,9 +323,12 @@ defineQuery({
   roles: [...readRoles],
   input: z.object({ invoiceId: z.string().uuid() }),
   handler: async (ctx, i) => {
-    const invoice = await unwrap(ctx.db.from("invoices").select("*, customers(name)").eq("id", i.invoiceId).single());
-    const invLines = await unwrap(ctx.db.from("invoice_lines").select("*, skus(name)").eq("invoice_id", i.invoiceId));
-    return { invoice, lines: invLines };
+    const [invoice, invLines, pendingPush] = await Promise.all([
+      unwrap(ctx.db.from("invoices").select("*, customers(id,name,qbo_customer_id,qbo_realm_id)").eq("id", i.invoiceId).single()),
+      unwrap(ctx.db.from("invoice_lines").select("*, skus(name,qbo_item_id,qbo_realm_id)").eq("invoice_id", i.invoiceId)),
+      unwrap(ctx.db.from("qbo_pushes").select("id").eq("invoice_id", i.invoiceId).eq("brewery_id", ctx.breweryId).eq("status", "pending").maybeSingle()),
+    ]);
+    return { invoice, lines: invLines, hasPendingPush: Boolean(pendingPush) };
   },
 });
 

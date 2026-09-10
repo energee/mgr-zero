@@ -1245,9 +1245,9 @@ export const SCREENS: Screen[] = [
     name: "Accounting",
     to: { Review: "Customers", Disconnect: "Disconnect QuickBooks" },
     job: "One page for the QuickBooks connection, and for the three things a pay link needs",
-    reads: "get_qbo_connection [design; adds payments_enabled + push defaults]",
-    writes: "connect_qbo · disconnect_qbo · set_qbo_push_defaults [design; admin-only]",
-    states: [["permission", "admin only", 1], ["healthy", "token good; company id shown"], ["expired", "reconnect before mapping or push", 1], ["payments off", "no pay link can be generated for any invoice", 1], ["ACH only", "card disabled; cheaper, and slower to arrive"], ["defaults changed", "applies to the next push, never retroactively"]],
+    reads: "get_qbo_connection",
+    writes: "connect_qbo · disconnect_qbo · set_qbo_push_defaults",
+    states: [["permission", "admin only", 1], ["healthy", "safe company and expiry status shown"], ["expired", "reconnect before mapping or push", 1], ["payments unavailable", "the Pay route fails closed when QuickBooks returns no approved link", 1], ["ACH only", "card disabled; cheaper, and slower to arrive"], ["defaults changed", "applies to the next push, never retroactively"]],
     spec: "Square already had Settings · Point of sale; QuickBooks had nothing, and Settings · Integrations dead-ended. This is the other half. It exists mainly to make three invisible preconditions visible before a customer meets them: QuickBooks Payments must be active on the company, AllowOnlineACHPayment / AllowOnlineCreditCardPayment must ride every push, and the customer must carry an email. Any one missing and Intuit generates no InvoiceLink, so the portal Pay button either never renders or lands on the unavailable page. Payment method is a money decision, not a checkbox: card runs a percentage fee, so on a four-figure keg invoice the method the customer picks is real money; the fee is visible in the QuickBooks Payment sidebar and MGR does not model it. Push defaults live here rather than per invoice, so an invoice cannot be born unpayable by omission.",
     body: (<>
       {E.back("Settings", "Accounting")}
@@ -1255,7 +1255,7 @@ export const SCREENS: Screen[] = [
       {E.row("Demo Brewing LLC", "authorization expired · company 9341", E.act("Disconnect", "destructive"), "w")}
       {E.note("QuickBooks authorization expired. Push, payment links and paid-date sync are paused.")}
       {E.btn("Reconnect QuickBooks")}
-      {E.row("QuickBooks Payments", "active · card and bank", "", "ok", QuickBooksMark)}
+      {E.row("Online payments", "checked when a customer opens Pay", "fail closed", "ok", QuickBooksMark)}
       {E.ttl("Push defaults")}
       {E.info("Every invoice is pushed ready to pay. Turning both off means customers cannot pay online at all.")}
       {E.row("Bank transfer (ACH)", "on · lowest fee", E.sw(true, "Bank transfer payments"), "ok")}
@@ -1272,7 +1272,7 @@ export const SCREENS: Screen[] = [
     to: { "Connect QuickBooks": "Accounting" },
     job: "Authorize one QuickBooks company and explain the data exchange before OAuth",
     reads: "none [OAuth returns the selected company]",
-    writes: "connect_qbo [design]",
+    writes: "connect_qbo",
     states: [["permission", "admin only", 1], ["cancelled", "return to Accounting unchanged"], ["already connected", "show Mapping conflict", 1]],
     spec: "The disconnected Accounting state. OAuth is an external write, so the button is copper and the page says what MGR will exchange before leaving.",
     body: (<>
@@ -1289,16 +1289,16 @@ export const SCREENS: Screen[] = [
     group: "QuickBooks Online",
     surface: "sheet",
     name: "Mapping conflict",
-    to: { "Ridgeline Tap Room": "Mapping conflict", "Ridgeline Holdings": "Mapping conflict" },
+    to: { "Save mapping": "Accounting" },
     job: "Resolve an ambiguous QuickBooks customer or item without guessing",
-    reads: "get_qbo_mapping_candidates [design]",
-    writes: "set_qbo_customer_mapping · set_qbo_item_mapping [design]",
+    reads: "list_customers · list_skus · get_qbo_connection",
+    writes: "set_qbo_customer_mapping · set_qbo_item_mapping · set_qbo_deposit_mapping",
     states: [["permission", "admin only", 1], ["customer", "two candidates match"], ["item", "two candidates match"], ["company claimed", "this company is connected to another brewery", 1]],
-    spec: "A candidate is chosen explicitly. A company already claimed by another brewery cannot be overridden here.",
+    spec: "A person verifies and enters the exact QuickBooks record ID. MGR never chooses automatically from a matching name. A company already claimed by another brewery cannot be overridden here.",
     body: (<>
-      {E.note("Two QuickBooks customers match Ridgeline Tap Room. Choose the account this brewery invoices.")}
-      {E.row("Ridgeline Tap Room", "Phoenixville · active · customer 184", E.act("Use"))}
-      {E.row("Ridgeline Holdings", "Phoenixville · active · customer 227", E.act("Use"))}
+      {E.note("Two QuickBooks customers have similar names. Verify the intended account in QuickBooks; MGR never chooses automatically.")}
+      {E.edit("QuickBooks customer ID", "184")}
+      {E.btn("Save mapping")}
       {E.info("If this QuickBooks company belongs to another MGR brewery, disconnect it there first.")}
     </>),
   },
@@ -1311,8 +1311,8 @@ export const SCREENS: Screen[] = [
     name: "Disconnect QuickBooks",
     to: { "Disconnect QuickBooks": "Connect QuickBooks" },
     job: "Confirm the external effects of disconnecting QuickBooks",
-    reads: "get_qbo_connection [design]",
-    writes: "disconnect_qbo [design]",
+    reads: "get_qbo_connection",
+    writes: "disconnect_qbo",
     states: [["permission", "admin only", 1], ["confirmed", "connection disabled and tokens purged"]],
     spec: "The confirmation names what stops and what remains so reconnecting can resume without remapping.",
     body: (<>
@@ -1328,8 +1328,8 @@ export const SCREENS: Screen[] = [
     name: "Invoices",
     to: { Review: "Invoice", Open: "Invoice" , "Write off": "Invoice" },
     job: "The AR list: what is due, what QuickBooks changed underneath it, and the drill-in for one invoice",
-    reads: "list_invoices [qbo_sync_token + qbo_remote_state] · get_qbo_connection · get_qbo_mapping_candidates [design]",
-    writes: "connect_qbo · set_qbo_customer_mapping · set_qbo_item_mapping [design] · push_invoice_to_qbo [design; same requestId, except a deleted remote invoice, which pushes under a new one] · write_off_invoice [design; MGR status only, never touches QuickBooks]",
+    reads: "list_invoices · get_qbo_connection",
+    writes: "connect_qbo · set_qbo_customer_mapping · set_qbo_item_mapping · push_invoice_to_qbo · sync_qbo_payments · write_off_invoice",
     states: [["connection health", "QuickBooks · token healthy · company 9341"], ["expired", "Reconnect before mapping or push", 1], ["live", "the ordinary case; no badge at all"], ["edited there", "SyncToken changed since MGR pushed", 1], ["voided", "amounts zeroed; this is not payment", 1], ["deleted", "the id points at nothing; sync gets a 404", 1], ["not sent", "pushed but never delivered; only a fault if MGR is not the channel"], ["paid", "the paid date arrives from the QuickBooks Online sync · no user verb"], ["push failed", "the drill-in resolves each mapping", 1]],
     spec: <>QuickBooks has no read-only invoice. Once pushed, the accountant can edit, void or delete it from the Sales transactions sidebar and no API setting prevents that, so MGR detects rather than prevents. QuickBooks hands us the detector free: SyncToken increments on every modification and already rides the response the sync job reads for balance, so drift costs one column and no extra call. The rule this frame protects: <b>a voided invoice is not a paid invoice.</b> Voiding zeroes the amounts, so any logic inferring paid from a QuickBooks balance of zero books cancelled revenue as collected; collected revenue is a read-side rule, remote state live and balance zero, expressed once in the reporting view; no CHECK refuses a paid date, because paid-then-voided is a real history the row must be able to hold. MGR surfaces drift and stops: no re-push that overwrites an accountant’s correction, no field-level merge UI. The one exception is the deleted invoice, where the remote id points at nothing: dedupe on the original requestId would return the first result and create nothing, so that push carries a new requestId and produces a second QuickBooks invoice under the same MGR number. Ordinary retries keep the old requestId and stay protected. ASSUMPTION: a drifted invoice stays in AR at QuickBooks’ numbers, because QuickBooks owns the invoice after push. Drift is not a place, it is what some of these rows are doing, which is why it lives in the states of one list rather than a second one. Rows also carry the due date, push failure and credit-memo status; payments come back through the sync job and are read-only. A failed row opens the drill-in, where connection, each mapping and push are four independent commands, and push persists its exact payload and deterministic requestId before the remote POST. Creating a credit memo stays Return shipment.</>,
     body: (<>
@@ -1353,8 +1353,8 @@ export const SCREENS: Screen[] = [
     name: "Invoice",
     to: { "Customer mapping": "Mapping conflict", "Pils · case": "Fix mapping" },
     job: "Review one invoice, resolve its mappings and push it",
-    reads: "get_qbo_connection · get_qbo_mapping_candidates [design] · get_invoice · list_invoice_questions",
-    writes: "push_invoice_to_qbo [design] · resolve_invoice_question",
+    reads: "get_qbo_connection · get_invoice · list_invoice_questions",
+    writes: "push_invoice_to_qbo · resolve_invoice_question",
     states: [["permission", "sales or admin required", 1], ["unmapped", "push stays unavailable", 1], ["ready", "every customer and item is mapped"], ["pushed", "QuickBooks owns later accounting edits"], ["buyer question", "the note is read here, and answered off-system", 1]],
     spec: "The drill-in for one invoice, and where a buyer's question lands: the portal writes it, the sales Today row points here, and marking it answered is what clears that row. Nothing about the invoice changes; the reply happens in a phone call or an email, which is why the verb says answered rather than replied.",
     body: <InvoiceView model={toInvoiceViewProps(invoiceFailedAls)} />,
@@ -1367,11 +1367,12 @@ export const SCREENS: Screen[] = [
     name: "Fix mapping",
     to: { "Save mapping": "Invoice" },
     job: "Choose the QuickBooks record for one invoice customer or item",
-    reads: "get_qbo_mapping_candidates [design]",
-    writes: "set_qbo_customer_mapping · set_qbo_item_mapping [design]",
+    reads: "get_invoice · get_qbo_connection",
+    writes: "set_qbo_customer_mapping · set_qbo_item_mapping",
     states: [["permission", "sales or admin required", 1], ["candidate selected", "save enables invoice push"], ["no match", "create it in QuickBooks first", 1]],
     body: (<>
-      {E.pick("QuickBooks item", "Pils 16 oz", ["Pils 16 oz", "Pilsner case"])}
+      {E.note("Verify the intended item in QuickBooks; MGR never chooses automatically from its name.")}
+      {E.edit("QuickBooks item ID", "307")}
       {E.btn("Save mapping")}
     </>),
   },
@@ -1518,7 +1519,7 @@ export const SCREENS: Screen[] = [
     portal: "Invoices",
     name: "Pay invoice",
     job: "One stable MGR link that resolves to QuickBooks at the moment it is clicked",
-    reads: "portal_invoice · get_qbo_connection [design; payments_enabled flag]",
+    reads: "portal_invoice",
     writes: "none [Intuit takes the payment; paid_at returns through the sync job]",
     states: [["payable", "Pay opens QuickBooks in a new tab"], ["no payments account", "the button never renders; brewery has no QuickBooks Payments", 1], ["not pushed yet", "no QuickBooks invoice id yet; Pay is absent, not disabled"], ["link unavailable", "Intuit returned none: the unavailable page, never a 500", 1], ["already paid", "Pay is gone; the paid date came back from the sync"]],
     spec: "The whole design is one rule: MGR owns the link, Intuit owns the destination. What is shared (this row, the emailed reminder, the PDF footer) is always /portal/invoices/:id/pay, an MGR URL that is permanent because it resolves late. Intuit’s InvoiceLink is read-only, is generated only for a pay-enabled invoice with a customer email, has no documented expiry, and is intermittently absent; fetching it seconds before the redirect makes every one of those someone else’s problem. It is never stored in a column, never serialised to the client, never put in an email. It is a bearer URL (anyone holding it can pay), so authorization runs on every click before any Intuit call is made, and the 404 for a customer requesting somebody else’s invoice must land before the fetch, not after.",

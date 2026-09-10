@@ -586,3 +586,7 @@ function meaningfulInvoiceContentMatches(expectedInvoice: Record<string, unknown
 export function qboConfig(env: Record<string, string | undefined> = process.env): QboConfig {
   try { return readQboEnv(env); } catch { throw new Error("QuickBooks setup is unavailable"); }
 }
+
+export function isQboConfigured(env: Record<string, string | undefined> = process.env) {
+  try { readQboEnv(env); return true; } catch { return false; }
+}
