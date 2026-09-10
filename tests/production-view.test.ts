@@ -68,6 +68,15 @@ describe("Schedule batch view", () => {
     const html = htmlOf(createElement(ScheduleBatchView, { model: toScheduleBatchViewProps(scheduleBatchHazy) }));
     expect(html).toMatch(/>Save schedule</);
     expect(html).not.toMatch(/href="\/batches"/);
+    expect(html).toMatch(/Note · optional/);
+  });
+
+  it("the live new-batch wrapper mounts the shared controlled body", () => {
+    const form = src("app/(app)/batches/new-batch-form.tsx");
+    expect(form).toMatch(/from "@\/components\/mgr\/views\/schedule-batch"/);
+    expect(form).toMatch(/<ScheduleBatchView\b/);
+    expect(form).toMatch(/controls=\{controls\}/);
+    expect(form).not.toMatch(/<Label\b|<Input\b|<Select\b/);
   });
 });
 
