@@ -59,12 +59,20 @@ describe("portal order deposit adjustments", () => {
     const beforeLines = await admin.from("order_lines").select("sku_id,qty_ordered,unit_price_cents").eq("order_id", orderId).order("sku_id");
     const beforeDeposits = await deposits(orderId);
     const beforeEvents = await admin.from("order_events").select("id").eq("order_id", orderId);
-    await expect(runCommand("adjust_order_lines", { orderId, reason: "invalid deposit", lines: [
+    const adjustment = { orderId, reason: "invalid deposit", lines: [
       { skuId: f.first.skuId, qty: 2 }, { skuId: f.missingFormat.skuId, qty: 1 },
-    ] }, f.adminCtx)).rejects.toThrow(/deposit.*configured/i);
+    ] };
+    const execution = { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+    await expect(runCommand("adjust_order_lines", adjustment, f.adminCtx, execution)).rejects.toThrow(/deposit.*configured/i);
     expect((await admin.from("order_lines").select("sku_id,qty_ordered,unit_price_cents").eq("order_id", orderId).order("sku_id")).data).toEqual(beforeLines.data);
     expect(await deposits(orderId)).toEqual(beforeDeposits);
     expect((await admin.from("order_events").select("id").eq("order_id", orderId)).data).toEqual(beforeEvents.data);
+    expect((await admin.from("formats").update({ package_type: "keg", keg_size: "half_bbl" }).eq("id", f.missingFormat.formatId)).error).toBeNull();
+    await expect(runCommand("adjust_order_lines", adjustment, f.adminCtx, execution)).resolves.toMatchObject({ order_id: orderId });
+    expect(await deposits(orderId)).toEqual(expect.arrayContaining([
+      { sku_id: f.first.skuId, qty_ordered: 2, unit_price_cents: 2500 },
+      { sku_id: f.missingFormat.skuId, qty_ordered: 1, unit_price_cents: 2500 },
+    ]));
   });
 
   it.each(["now", "on_delivery"] as const)("invoices every adjusted returnable-keg line with %s timing", async (timing) => {

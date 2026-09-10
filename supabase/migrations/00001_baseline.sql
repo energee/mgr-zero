@@ -2867,7 +2867,7 @@ end $$;
 
 create function private.adjust_order_lines_impl(p_order uuid, p_lines jsonb, p_reason text) returns jsonb
 language plpgsql set search_path = '' as $$
-declare o public.orders; l record; v_line uuid; v_before jsonb;
+declare o public.orders; l record; v_line uuid; v_before jsonb; v_existing boolean;
 begin
   perform private.assert_order_lines(p_lines);
   o := private.lock_order(p_order, array['confirmed','picked']::public.order_status[]);
@@ -2905,7 +2905,7 @@ begin
       left join public.keg_pools k on k.id=s.keg_pool_id and k.brewery_id=o.brewery_id
       where s.container_source in ('owned_fleet','per_fill_rental')
         and (f.package_type is distinct from 'keg' or f.keg_size is null
-          or k.id is null or k.deposit_cents<=0)
+          or k.id is null)
     ) then
       raise exception 'returnable keg deposit is not configured';
     end if;
@@ -2920,6 +2920,9 @@ begin
   delete from public.order_lines where order_id = p_order
     and sku_id not in (select (e->>'sku_id')::uuid from jsonb_array_elements(p_lines) e);
   for l in select (e->>'sku_id')::uuid as sku_id, (e->>'qty')::numeric as qty from jsonb_array_elements(p_lines) e loop
+    select exists (
+      select 1 from public.order_lines where order_id=p_order and sku_id=l.sku_id
+    ) into v_existing;
     insert into public.order_lines (brewery_id, order_id, sku_id, qty_ordered, unit_price_cents)
     values (o.brewery_id, p_order, l.sku_id, l.qty,
             case when o.kind = 'wholesale' then private.order_line_price(o.brewery_id, o.sale_channel_id, l.sku_id) else 0 end)
@@ -2930,20 +2933,23 @@ begin
     insert into public.allocations (brewery_id, sku_id, qty, source, ref, status)
     select o.brewery_id, l.sku_id, l.qty, 'order_line', v_line, 'open'
     where not exists (select 1 from public.allocations where source = 'order_line' and ref = v_line and status = 'open');
+    if v_existing then
+      -- Retaining an order-line identity retains the charge it was reviewed
+      -- with; only its quantity follows the line adjustment.
+      update public.order_deposit_lines set qty_ordered=l.qty where order_line_id=v_line;
+    elsif o.kind = 'wholesale' then
+      insert into public.order_deposit_lines(
+        brewery_id,order_id,order_line_id,keg_pool_id,keg_size,description,qty_ordered,unit_price_cents
+      )
+      select o.brewery_id,p_order,v_line,k.id,f.keg_size,k.name||' deposit',l.qty,k.deposit_cents
+      from public.skus s
+      join public.formats f on f.id=s.format_id and f.brewery_id=o.brewery_id
+      join public.keg_pools k on k.id=s.keg_pool_id and k.brewery_id=o.brewery_id
+      where s.id=l.sku_id and s.brewery_id=o.brewery_id
+        and s.container_source in ('owned_fleet','per_fill_rental')
+        and f.package_type='keg' and f.keg_size is not null and k.deposit_cents>0;
+    end if;
   end loop;
-  delete from public.order_deposit_lines where order_id=p_order;
-  if o.kind = 'wholesale' then
-    insert into public.order_deposit_lines(
-      brewery_id,order_id,order_line_id,keg_pool_id,keg_size,description,qty_ordered,unit_price_cents
-    )
-    select o.brewery_id,p_order,ol.id,k.id,f.keg_size,k.name||' deposit',ol.qty_ordered,k.deposit_cents
-    from public.order_lines ol
-    join public.skus s on s.id=ol.sku_id and s.brewery_id=o.brewery_id
-    join public.formats f on f.id=s.format_id and f.brewery_id=o.brewery_id
-    join public.keg_pools k on k.id=s.keg_pool_id and k.brewery_id=o.brewery_id
-    where ol.order_id=p_order and s.container_source in ('owned_fleet','per_fill_rental')
-      and f.package_type='keg' and f.keg_size is not null and k.deposit_cents>0;
-  end if;
   update public.orders set needs_restock = needs_restock or (o.status = 'picked') where id = p_order;
   insert into public.order_events (brewery_id, order_id, actor, event, payload)
   values (o.brewery_id, p_order, auth.uid(), 'lines_adjusted',
