@@ -164,6 +164,11 @@ describe("Today view", () => {
     expect(html).not.toMatch(/>Record movement</);
   });
 
+  it("deep-links the live Today movement action into the open form", () => {
+    const source = readFileSync("app/(app)/page.tsx", "utf8");
+    expect(source).toContain('E.btn("Record movement", "g", "/inventory?recordMovement=1")');
+  });
+
   it.each([
     ["Today", TodayView, todayWarehouse],
     ["Today empty", TodayView, todayEmpty],
