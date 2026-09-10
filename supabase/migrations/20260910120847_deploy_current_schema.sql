@@ -2425,7 +2425,8 @@ BEGIN
   SELECT id INTO c FROM public.pos_connections WHERE brewery_id=p_brewery AND provider='square' AND state='connected' FOR UPDATE;
   SELECT external_item_name INTO item_name FROM public.pos_catalog_variations WHERE brewery_id=p_brewery AND connection_id=c
     AND external_item_id=p_external_item AND external_variation_id=p_external_variation AND (available OR EXISTS(
-      SELECT 1 FROM public.pos_item_mappings m WHERE m.connection_id=c AND m.external_item_id=p_external_item AND m.external_variation_id=p_external_variation)) FOR SHARE;
+      SELECT 1 FROM public.pos_item_mappings m WHERE m.connection_id=c AND m.external_item_id=p_external_item AND m.external_variation_id=p_external_variation)
+      OR EXISTS(SELECT 1 FROM public.pos_sales s WHERE s.connection_id=c AND s.external_variation_id=p_external_variation)) FOR SHARE;
   IF c IS NULL OR NOT FOUND THEN RAISE EXCEPTION 'Square variation is unavailable'; END IF;
   IF p_sku IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.skus WHERE id=p_sku AND brewery_id=p_brewery) THEN RAISE insufficient_privilege USING message='permission denied'; END IF;
   IF p_format IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.formats WHERE id=p_format AND brewery_id=p_brewery AND basis='poured' AND brand_id IS NOT NULL) THEN RAISE insufficient_privilege USING message='permission denied'; END IF;
@@ -2434,7 +2435,8 @@ BEGIN
   ON CONFLICT(connection_id,external_item_id,external_variation_id) DO UPDATE SET external_item_name=excluded.external_item_name,
     sku_id=excluded.sku_id,format_id=excluded.format_id,ignored=excluded.ignored;
   PERFORM private.reconcile_pos_sale(p_brewery,s.id) FROM public.pos_sales s LEFT JOIN public.pos_sale_expectations e ON e.sale_id=s.id
-    WHERE s.connection_id=c AND s.external_item_id=p_external_item AND s.external_variation_id=p_external_variation AND e.sale_id IS NULL;
+    WHERE s.connection_id=c AND s.external_variation_id=p_external_variation
+      AND (s.external_item_id=p_external_item OR s.external_item_id IS NULL) AND e.sale_id IS NULL;
   result:=jsonb_build_object('mapped',NOT p_ignored,'ignored',p_ignored);
   RETURN private.complete_command_request(p_request_id,result);
 END $$;
@@ -3185,6 +3187,9 @@ SELECT f.*,
 FROM current_facts f;
 REVOKE ALL ON private.pos_current_sales FROM public,anon,authenticated,service_role;
 
+ALTER TABLE public.pos_catalog_variations
+  ADD CONSTRAINT pos_catalog_variations_connection_variation_key UNIQUE(connection_id,external_variation_id);
+
 DROP VIEW public.pos_unmapped_items;
 CREATE VIEW public.pos_unmapped_items WITH (security_invoker=true) AS
   WITH ranked AS (
@@ -3196,12 +3201,15 @@ CREATE VIEW public.pos_unmapped_items WITH (security_invoker=true) AS
     ) revision_rank
     FROM public.pos_sales s
   )
-  SELECT DISTINCT s.brewery_id,s.connection_id,s.external_item_id,s.external_variation_id
+  SELECT DISTINCT s.brewery_id,s.connection_id,coalesce(s.external_item_id,c.external_item_id) external_item_id,s.external_variation_id
   FROM ranked s
+  LEFT JOIN public.pos_catalog_variations c ON c.connection_id=s.connection_id
+    AND c.external_variation_id=s.external_variation_id
   LEFT JOIN public.pos_item_mappings m ON m.connection_id=s.connection_id
-    AND m.external_item_id=s.external_item_id AND m.external_variation_id=s.external_variation_id
+    AND m.external_item_id=coalesce(s.external_item_id,c.external_item_id)
+    AND m.external_variation_id=s.external_variation_id
   WHERE s.revision_rank=1 AND s.source_version=s.order_version AND s.fact_status<>'removed'
-    AND m.connection_id IS NULL AND s.external_item_id IS NOT NULL;
+    AND m.connection_id IS NULL AND s.external_variation_id IS NOT NULL;
 GRANT SELECT ON public.pos_unmapped_items TO authenticated;
 
 CREATE OR REPLACE FUNCTION private.reconcile_pos_sale(p_brewery uuid,p_sale uuid) RETURNS boolean
@@ -3216,7 +3224,9 @@ BEGIN
     AND external_location_id=s.external_location_id AND brewery_id=p_brewery FOR SHARE;
   IF v_location IS NULL THEN RETURN false; END IF;
   SELECT * INTO m FROM public.pos_item_mappings WHERE connection_id=s.connection_id
-    AND external_item_id=s.external_item_id AND external_variation_id=s.external_variation_id AND brewery_id=p_brewery FOR SHARE;
+    AND external_item_id=coalesce(s.external_item_id,(SELECT c.external_item_id FROM public.pos_catalog_variations c
+      WHERE c.connection_id=s.connection_id AND c.external_variation_id=s.external_variation_id))
+    AND external_variation_id=s.external_variation_id AND brewery_id=p_brewery FOR SHARE;
   IF NOT FOUND OR m.ignored THEN RETURN false; END IF;
   IF m.format_id IS NOT NULL THEN
     SELECT * INTO f FROM public.formats WHERE id=m.format_id AND brewery_id=p_brewery FOR SHARE;
@@ -3245,7 +3255,8 @@ LANGUAGE sql STABLE SET search_path='' AS $$
     FROM private.pos_current_sales s
     LEFT JOIN public.pos_sale_expectations e ON e.sale_id=s.id AND e.brewery_id=p_brewery AND s.contributes
     LEFT JOIN public.pos_locations loc ON loc.connection_id=s.connection_id AND loc.external_location_id=s.external_location_id AND loc.brewery_id=p_brewery
-    LEFT JOIN public.pos_item_mappings m ON m.connection_id=s.connection_id AND m.external_item_id=s.external_item_id
+    LEFT JOIN public.pos_catalog_variations c ON c.connection_id=s.connection_id AND c.external_variation_id=s.external_variation_id
+    LEFT JOIN public.pos_item_mappings m ON m.connection_id=s.connection_id AND m.external_item_id=coalesce(s.external_item_id,c.external_item_id)
       AND m.external_variation_id=s.external_variation_id AND m.brewery_id=p_brewery
     WHERE s.brewery_id=p_brewery AND s.fact_status<>'removed' AND s.sold_at>p_starts_at AND s.sold_at<=p_ends_at
       AND coalesce(e.location_id,loc.location_id)=p_location
@@ -3292,6 +3303,20 @@ CREATE TABLE private.square_sales_syncs (
 );
 ALTER TABLE private.square_sales_syncs ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON private.square_sales_syncs FROM public,anon,authenticated,service_role;
+
+CREATE TABLE private.square_order_snapshots (
+  brewery_id uuid NOT NULL REFERENCES public.breweries(id),
+  connection_id uuid NOT NULL,
+  merchant_id text NOT NULL,
+  external_order_id text NOT NULL,
+  source_version bigint NOT NULL,
+  snapshot_hash text NOT NULL,
+  observed_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY(connection_id,external_order_id,source_version),
+  FOREIGN KEY(connection_id,brewery_id) REFERENCES public.pos_connections(id,brewery_id)
+);
+ALTER TABLE private.square_order_snapshots ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON private.square_order_snapshots FROM public,anon,authenticated,service_role;
 
 CREATE FUNCTION public.begin_square_sales_sync(p_brewery uuid,p_request_id uuid) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
@@ -3390,7 +3415,7 @@ CREATE FUNCTION public.record_square_sales_page(p_brewery uuid,p_connection uuid
 LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE v_attempt private.square_sales_syncs; v_expected_locations text[]; v_order jsonb; v_fact jsonb; v_previous record;
   v_order_id text; v_line_id text; v_kind text; v_status text; v_reason text; v_source_order text; v_source_line text;
-  v_version bigint; v_qty numeric; v_source_qty numeric; v_returned numeric; v_sale_id uuid; v_hash text;
+  v_version bigint; v_qty numeric; v_source_qty numeric; v_returned numeric; v_sale_id uuid; v_hash text; v_snapshot_hash text;
   v_inserted integer:=0; v_accepted integer:=0; v_unsupported integer:=0; v_result jsonb;
 BEGIN
   IF jsonb_typeof(p_orders)<>'array' OR jsonb_typeof(p_facts)<>'array' THEN RAISE EXCEPTION 'Square sales page invalid'; END IF;
@@ -3415,6 +3440,29 @@ BEGIN
   IF p_next_cursor IS NOT NULL AND (p_next_cursor IS NOT DISTINCT FROM p_cursor OR p_next_cursor=ANY(v_attempt.seen_cursors)) THEN
     RAISE EXCEPTION 'Square sales cursor repeated';
   END IF;
+
+  FOR v_order IN SELECT value FROM jsonb_array_elements(p_orders)
+  LOOP
+    v_order_id:=nullif(btrim(v_order->>'externalOrderId'),''); v_version:=(v_order->>'sourceVersion')::bigint;
+    IF v_order_id IS NULL OR v_version<0 OR NOT((v_order->>'externalLocationId')=ANY(p_location_ids)) THEN
+      RAISE EXCEPTION 'Square order snapshot invalid';
+    END IF;
+    v_snapshot_hash:=encode(extensions.digest(jsonb_build_object(
+      'externalOrderId',v_order_id,'sourceVersion',v_version,'externalLocationId',v_order->>'externalLocationId',
+      'soldAt',v_order->>'soldAt','orderUpdatedAt',v_order->>'orderUpdatedAt','facts',coalesce((
+        SELECT jsonb_agg(jsonb_build_object('factKind',f->>'factKind','externalLineId',f->>'externalLineId',
+          'sourceHash',f->>'sourceHash') ORDER BY f->>'factKind',f->>'externalLineId')
+        FROM jsonb_array_elements(p_facts) f WHERE f->>'externalOrderId'=v_order_id
+          AND (f->>'sourceVersion')::bigint=v_version
+      ),'[]'::jsonb))::text,'sha256'),'hex');
+    INSERT INTO private.square_order_snapshots(brewery_id,connection_id,merchant_id,external_order_id,source_version,snapshot_hash)
+    VALUES(p_brewery,p_connection,v_attempt.merchant_id,v_order_id,v_version,v_snapshot_hash)
+    ON CONFLICT(connection_id,external_order_id,source_version) DO NOTHING;
+    IF NOT FOUND AND NOT EXISTS(SELECT 1 FROM private.square_order_snapshots s WHERE s.connection_id=p_connection
+      AND s.external_order_id=v_order_id AND s.source_version=v_version AND s.snapshot_hash=v_snapshot_hash) THEN
+      RAISE EXCEPTION 'Square order changed within one source version' USING errcode='MG409';
+    END IF;
+  END LOOP;
 
   FOR v_fact IN SELECT value FROM jsonb_array_elements(p_facts) WITH ORDINALITY rows(value,n)
     ORDER BY (value->>'factKind'='return'),n
@@ -3486,6 +3534,12 @@ BEGIN
         (v_order->>'soldAt')::timestamptz,(v_order->>'orderUpdatedAt')::timestamptz,v_previous.catalog_version,
         v_previous.source_order_id,v_previous.source_line_id,v_hash)
       ON CONFLICT(connection_id,external_order_id,fact_kind,external_line_id,source_version) DO NOTHING;
+      IF NOT FOUND AND NOT EXISTS(SELECT 1 FROM public.pos_sales s WHERE s.connection_id=p_connection
+        AND s.external_order_id=v_order_id AND s.fact_kind=v_previous.fact_kind
+        AND s.external_line_id=v_previous.external_line_id AND s.source_version=v_version
+        AND s.fact_status='removed' AND s.source_hash=v_hash) THEN
+        RAISE EXCEPTION 'Square fact changed within one source version' USING errcode='MG409';
+      END IF;
     END LOOP;
   END LOOP;
 
@@ -3501,7 +3555,7 @@ BEGIN
       SELECT p_brewery,p_connection,l.external_location_id,l.location_id,v_attempt.coverage_starts_at,v_attempt.ends_at,true
       FROM public.pos_locations l WHERE l.connection_id=p_connection AND l.external_location_id=ANY(v_attempt.external_location_ids)
       ;
-    UPDATE public.pos_connections SET sales_synced_through=v_attempt.ends_at,updated_at=now()
+    UPDATE public.pos_connections SET sales_synced_through=greatest(coalesce(sales_synced_through,v_attempt.ends_at),v_attempt.ends_at),updated_at=now()
       WHERE id=p_connection AND brewery_id=p_brewery AND credential_version=p_expected_version;
     v_result:=jsonb_build_object('complete',true,'acceptedFacts',v_attempt.accepted_facts,'unsupportedFacts',v_attempt.unsupported_facts,
       'pages',v_attempt.pages,'locations',cardinality(v_attempt.external_location_ids),'startsAt',v_attempt.starts_at,'endsAt',v_attempt.ends_at);

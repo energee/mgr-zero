@@ -173,7 +173,7 @@ describe("Square durable sales sync", () => {
     expect(mapped.error).toBeNull();
     expect(sql(`select source_hash||':'||external_order_id||':'||external_line_id||':'||source_version::text
       from public.pos_sales where brewery_id='${f.brewery.id}'`)).toEqual([identityBefore]);
-    expect(sql(`select external_item_id is null from public.pos_sales where brewery_id='${f.brewery.id}'`)).toEqual(["true"]);
+    expect(sql(`select (external_item_id is null)::text from public.pos_sales where brewery_id='${f.brewery.id}'`)).toEqual(["true"]);
     expect(currentExpected(f.brewery.id)).toBeCloseTo(16 / 3968, 10);
     expect(sql(`select count(*) from public.inventory_movements where brewery_id='${f.brewery.id}'`)).toEqual(["0"]);
   });
@@ -296,11 +296,9 @@ describe("Square durable sales sync", () => {
       join public.pos_sales s on s.id=e.sale_id where s.brewery_id='${f.brewery.id}' and s.external_order_id='REV'`)[0]))
       .toBeCloseTo(5 * 16 / 3968, 10);
 
-    const lateV1 = saleOrder({ id: "REV", version: 1, updatedAt: updated1,
-      lines: [line("keep", "V1", "1"), line("remove", "V1", "2"), line("late-only", "V1", "9")] });
-    await syncSquareSales(f.ctx, crypto.randomUUID(), new SquareClient(config, squareFetch(f.merchantId, () => response({ orders: [lateV1] }))));
+    await syncSquareSales(f.ctx, crypto.randomUUID(), new SquareClient(config, squareFetch(f.merchantId, () => response({ orders: [v1] }))));
     expect(currentExpected(f.brewery.id)).toBeCloseTo(2 * 16 / 3968, 10);
-    expect(sql(`select count(*) from public.pos_sales where brewery_id='${f.brewery.id}' and external_order_id='REV'`)).toEqual(["5"]);
+    expect(sql(`select count(*) from public.pos_sales where brewery_id='${f.brewery.id}' and external_order_id='REV'`)).toEqual(["4"]);
     expect(sql(`select external_line_id from private.pos_current_sales where brewery_id='${f.brewery.id}' and external_order_id='REV' order by 1`))
       .toEqual(["keep", "remove"]);
   });
