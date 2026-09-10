@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { SquareClient, syncSquareSales } from "@/lib/pos";
+import { SquareClient, syncSquareCatalog, syncSquareSales } from "@/lib/pos";
 import { admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
 
 const config = {
@@ -69,7 +69,7 @@ const returned = (uid: string, sourceLine: string | null, quantity: string, extr
   ...extra,
 });
 
-async function fixture() {
+async function fixture(options: { squareCatalog?: boolean } = {}) {
   const brewery = await makeBrewery();
   const ctx = await makeStaffCtx(brewery.id, "admin");
   const merchantId = `merchant-${crypto.randomUUID()}`;
@@ -91,14 +91,16 @@ async function fixture() {
     { brewery_id: brewery.id, connection_id: connection.data!.id, external_location_id: "L1", location_id: one.id },
     { brewery_id: brewery.id, connection_id: connection.data!.id, external_location_id: "L2", location_id: two.id },
   ])).error).toBeNull();
-  expect((await admin.from("pos_catalog_variations").insert({
-    brewery_id: brewery.id, connection_id: connection.data!.id, external_item_id: "I1", external_variation_id: "V1",
-    external_item_name: "Hazy", external_variation_name: "Pint", source_version: 11, available: false,
-  })).error).toBeNull();
-  expect((await admin.from("pos_item_mappings").insert({
-    brewery_id: brewery.id, connection_id: connection.data!.id, external_item_id: "I1", external_variation_id: "V1",
-    format_id: pour.data!.id,
-  })).error).toBeNull();
+  if (options.squareCatalog !== false) {
+    expect((await admin.from("pos_catalog_variations").insert({
+      brewery_id: brewery.id, connection_id: connection.data!.id, external_item_id: "I1", external_variation_id: "V1",
+      external_item_name: "Hazy", external_variation_name: "Pint", source_version: 11, available: false,
+    })).error).toBeNull();
+    expect((await admin.from("pos_item_mappings").insert({
+      brewery_id: brewery.id, connection_id: connection.data!.id, external_item_id: "I1", external_variation_id: "V1",
+      format_id: pour.data!.id,
+    })).error).toBeNull();
+  }
   return { brewery, ctx, merchantId, connectionId: connection.data!.id as string, locations: [one, two], catalog, pour: pour.data! };
 }
 
@@ -108,6 +110,102 @@ function currentExpected(breweryId: string) {
 }
 
 describe("Square durable sales sync", () => {
+  it("rejects a disjoint same-version order snapshot atomically and replays an exact removal tombstone", async () => {
+    const f = await fixture();
+    const updated1 = new Date(Date.now() - 120_000).toISOString();
+    const v1 = saleOrder({ id: "SNAPSHOT", version: 1, updatedAt: updated1, lines: [line("A", "V1", "1")] });
+    await syncSquareSales(f.ctx, crypto.randomUUID(), new SquareClient(config,
+      squareFetch(f.merchantId, () => response({ orders: [v1] }))));
+    const before = sql(`select (select count(*) from public.pos_sales where brewery_id='${f.brewery.id}')||':'||
+      (select count(*) from public.pos_sales_coverage where brewery_id='${f.brewery.id}')||':'||
+      (select sales_synced_through::text from public.pos_connections where id='${f.connectionId}')`)[0];
+
+    const driftRequest = crypto.randomUUID();
+    const disjointV1 = saleOrder({ id: "SNAPSHOT", version: 1, updatedAt: updated1, lines: [line("B", "V1", "3")] });
+    await expect(syncSquareSales(f.ctx, driftRequest, new SquareClient(config,
+      squareFetch(f.merchantId, () => response({ orders: [disjointV1] }))))).rejects.toMatchObject({ status: 409 });
+    expect(sql(`select (select count(*) from public.pos_sales where brewery_id='${f.brewery.id}')||':'||
+      (select count(*) from public.pos_sales_coverage where brewery_id='${f.brewery.id}')||':'||
+      (select sales_synced_through::text from public.pos_connections where id='${f.connectionId}')`)).toEqual([before]);
+    expect(sql(`select pages||':'||coalesce(cursor,'none')||':'||status from private.square_sales_syncs
+      where request_id='${driftRequest}'`)).toEqual(["0:none:in_progress"]);
+
+    const updated2 = new Date(Date.now() - 60_000).toISOString();
+    const removedV2 = saleOrder({ id: "SNAPSHOT", version: 2, updatedAt: updated2, lines: [] });
+    await syncSquareSales(f.ctx, crypto.randomUUID(), new SquareClient(config,
+      squareFetch(f.merchantId, () => response({ orders: [removedV2] }))));
+    await syncSquareSales(f.ctx, crypto.randomUUID(), new SquareClient(config,
+      squareFetch(f.merchantId, () => response({ orders: [removedV2] }))));
+    expect(sql(`select source_version::text||':'||external_line_id||':'||fact_status from public.pos_sales
+      where brewery_id='${f.brewery.id}' and external_order_id='SNAPSHOT' order by source_version`))
+      .toEqual(["1:A:accepted", "2:A:removed"]);
+    expect(currentExpected(f.brewery.id)).toBe(0);
+    expect(sql(`select count(*) from public.inventory_movements where brewery_id='${f.brewery.id}'`)).toEqual(["0"]);
+  });
+
+  it("keeps a sale before catalog visible and reconciles it through a later deleted variation mapping", async () => {
+    const f = await fixture({ squareCatalog: false });
+    const order = saleOrder({ id: "BEFORE-CATALOG", updatedAt: new Date(Date.now() - 60_000).toISOString(),
+      lines: [line("early", "V1", "1")] });
+    await syncSquareSales(f.ctx, crypto.randomUUID(), new SquareClient(config,
+      squareFetch(f.merchantId, () => response({ orders: [order] }))));
+    const identityBefore = sql(`select source_hash||':'||external_order_id||':'||external_line_id||':'||source_version::text
+      from public.pos_sales where brewery_id='${f.brewery.id}'`)[0];
+    expect(sql(`select coalesce(external_item_id,'?')||':'||external_variation_id from public.pos_unmapped_items
+      where brewery_id='${f.brewery.id}'`)).toEqual(["?:V1"]);
+
+    const catalogFetch = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith("/v2/locations")) return response({ locations: [
+        { id: "L1", name: "Taproom", status: "ACTIVE", merchant_id: f.merchantId },
+        { id: "L2", name: "Beer garden", status: "ACTIVE", merchant_id: f.merchantId },
+      ] });
+      if (url.endsWith("/v2/catalog/search")) return response({ objects: [{ id: "I1", type: "ITEM", version: 12,
+        item_data: { name: "Hazy", variations: [{ id: "V1", type: "ITEM_VARIATION", version: 12, is_deleted: true,
+          item_variation_data: { item_id: "I1", name: "Pint" } }] } }] });
+      throw new Error(`unexpected Square request ${url}`);
+    });
+    await syncSquareCatalog(f.ctx, crypto.randomUUID(), new SquareClient(config, catalogFetch));
+    expect(sql(`select available::text from public.pos_catalog_variations where connection_id='${f.connectionId}'
+      and external_variation_id='V1'`)).toEqual(["false"]);
+    const mapped = await f.ctx.db.rpc("set_pos_item_mapping", { p_brewery: f.brewery.id, p_external_item: "I1",
+      p_external_variation: "V1", p_sku: null, p_format: f.pour.id, p_ignored: false, p_request_id: crypto.randomUUID() });
+    expect(mapped.error).toBeNull();
+    expect(sql(`select source_hash||':'||external_order_id||':'||external_line_id||':'||source_version::text
+      from public.pos_sales where brewery_id='${f.brewery.id}'`)).toEqual([identityBefore]);
+    expect(sql(`select external_item_id is null from public.pos_sales where brewery_id='${f.brewery.id}'`)).toEqual(["true"]);
+    expect(currentExpected(f.brewery.id)).toBeCloseTo(16 / 3968, 10);
+    expect(sql(`select count(*) from public.inventory_movements where brewery_id='${f.brewery.id}'`)).toEqual(["0"]);
+  });
+
+  it("keeps the sales watermark monotonic when a later request completes before an older one", async () => {
+    const f = await fixture();
+    let enterA!: () => void, releaseA!: () => void;
+    const enteredA = new Promise<void>((resolve) => { enterA = resolve; });
+    const releasedA = new Promise<void>((resolve) => { releaseA = resolve; });
+    const requestA = crypto.randomUUID(), requestB = crypto.randomUUID();
+    const a = syncSquareSales(f.ctx, requestA, new SquareClient(config, squareFetch(f.merchantId, async () => {
+      enterA(); await releasedA; return response({ orders: [] });
+    })));
+    await enteredA;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    let afterB = "";
+    try {
+      await syncSquareSales(f.ctx, requestB, new SquareClient(config,
+        squareFetch(f.merchantId, () => response({ orders: [] }))));
+      afterB = sql(`select sales_synced_through::text from public.pos_connections where id='${f.connectionId}'`)[0];
+    } finally {
+      releaseA();
+    }
+    await a;
+    const [aEnd, bEnd] = sql(`select ends_at::text from private.square_sales_syncs where request_id='${requestA}';
+      select ends_at::text from private.square_sales_syncs where request_id='${requestB}'`);
+    expect(Date.parse(bEnd)).toBeGreaterThan(Date.parse(aEnd));
+    expect(sql(`select sales_synced_through::text from public.pos_connections where id='${f.connectionId}'`)).toEqual([afterB]);
+    expect(sql(`select count(*) from public.pos_sales_coverage where brewery_id='${f.brewery.id}'`)).toEqual(["4"]);
+    expect(sql(`select count(*) from public.inventory_movements where brewery_id='${f.brewery.id}'`)).toEqual(["0"]);
+  });
+
   it("deduplicates pages and retries while preserving sales, linked returns, exchanges, unsupported facts, and zero inventory writes", async () => {
     const f = await fixture();
     const now = new Date(), late = new Date(now.getTime() - 10 * 86_400_000).toISOString();
