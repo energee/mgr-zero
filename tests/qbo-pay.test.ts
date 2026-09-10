@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { QboOAuthClient, resolvePortalInvoicePayment, validateQboPaymentUrl } from "@/lib/qbo";
-import { readPortalInvoicePayment } from "@/lib/supabase/integration-tokens";
+import { compareAndSwapPortalInvoicePaymentTokens, readPortalInvoicePayment } from "@/lib/supabase/integration-tokens";
 import { admin, asUser, insertFixture, makeBrewery, makeCustomerUser, seedCustomer, sql } from "./helpers";
 
 const config = {
@@ -12,7 +12,7 @@ const config = {
 
 describe("QuickBooks portal payment link", () => {
   it("reads InvoiceLink with a fixed authenticated request that refuses redirects", async () => {
-    const transport = vi.fn(async () => Response.json({
+    const transport = vi.fn<typeof globalThis.fetch>(async () => Response.json({
       Invoice: { Id: "invoice-7", InvoiceLink: "https://pay.example.test/session/secret" },
     }));
     const client = new QboOAuthClient(config, transport);
@@ -78,6 +78,44 @@ describe("QuickBooks portal payment link", () => {
     await expect(readPortalInvoicePayment(ctx, invoice.data.id)).resolves.toMatchObject({
       connectionId: connection.data.id, realmId: connection.data.realm_id, remoteInvoiceId: "remote-pay-1",
     });
+
+    expect(sql(`select r.role from pg_proc p cross join (values ('anon'),('authenticated'),('service_role')) r(role)
+      where p.oid='public.read_portal_qbo_payment(uuid,uuid,uuid,uuid)'::regprocedure
+        and has_function_privilege(r.role,p.oid,'execute') order by 1`)).toEqual(["service_role"]);
+    expect((await ctx.db.rpc("read_portal_qbo_payment", {
+      p_brewery: brewery.id, p_customer: customer.customerId, p_invoice: invoice.data.id, p_actor: user.id,
+    })).error?.code).toBe("42501");
+
+    for (const unavailable of [
+      { paid_at: "2026-09-09T12:00:00Z", qbo_balance_cents: 0, qbo_remote_state: "live", written_off_at: null },
+      { paid_at: null, qbo_balance_cents: 100, qbo_remote_state: "voided", written_off_at: null },
+      { paid_at: null, qbo_balance_cents: 100, qbo_remote_state: "deleted", written_off_at: null },
+      { paid_at: null, qbo_balance_cents: 100, qbo_remote_state: "deleted", written_off_at: "2026-09-09T12:00:00Z", written_off_by: user.id, written_off_reason: "Uncollectible" },
+    ]) {
+      expect((await admin.from("invoices").update(unavailable).eq("id", invoice.data.id)).error).toBeNull();
+      await expect(readPortalInvoicePayment(ctx, invoice.data.id)).resolves.toBeNull();
+    }
+    expect((await admin.from("invoices").update({
+      paid_at: null, qbo_balance_cents: 100, qbo_remote_state: "live", written_off_at: null,
+      written_off_by: null, written_off_reason: null,
+    }).eq("id", invoice.data.id)).error).toBeNull();
+    expect((await admin.from("qbo_connections").update({
+      allow_online_ach_payment: false, allow_online_credit_card_payment: false,
+    }).eq("id", connection.data.id)).error).toBeNull();
+    await expect(readPortalInvoicePayment(ctx, invoice.data.id)).resolves.toBeNull();
+    expect((await admin.from("qbo_connections").update({
+      allow_online_ach_payment: true,
+    }).eq("id", connection.data.id)).error).toBeNull();
+
+    const refreshClaim = await readPortalInvoicePayment(ctx, invoice.data.id);
+    if (!refreshClaim) throw new Error("expected payment claim");
+    sql(`delete from private.integration_tokens where brewery_id='${brewery.id}' and provider='qbo'`);
+    expect((await admin.from("qbo_connections").update({ state: "disconnected" }).eq("id", connection.data.id)).error).toBeNull();
+    await expect(compareAndSwapPortalInvoicePaymentTokens(ctx, invoice.data.id, refreshClaim, {
+      accessToken: "late-access", refreshToken: "late-refresh", receivedAt: new Date().toISOString(),
+      accessExpiresIn: 3600, refreshExpiresIn: null, refreshHardExpiresIn: null, grantedScopes: null,
+    })).resolves.toBe(false);
+    expect(sql(`select count(*) from private.integration_tokens where brewery_id='${brewery.id}' and provider='qbo'`)).toEqual(["0"]);
 
     const foreignCustomer = await seedCustomer(brewery.id, { name: "Other buyer" });
     const foreignUser = await makeCustomerUser(foreignCustomer.customerId);
