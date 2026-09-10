@@ -1632,7 +1632,7 @@ export const SCREENS: Screen[] = [
     reads: "supabase_auth_get_session [platform]",
     writes: "supabase_auth_sign_out [platform]",
     states: DEFAULT_STATES,
-    spec: "Opened from the portal header Me control. No brewery switcher. Change password opens Portal set password. Sign out is outline here; the destructive accent is a staff Me follow-up.",
+    spec: "Opened from the portal header Me control. No brewery switcher. Change password opens Portal set password. Sign out uses the same destructive treatment as staff Me.",
     body: <PortalMeView model={toPortalMeViewProps(portalMeRidgeline)} />,
   },
   {

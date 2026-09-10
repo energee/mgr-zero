@@ -67,6 +67,7 @@ describe("Portal Me view", () => {
     expect(html).toMatch(/jordan@ridgelinetap.com/);
     expect(html).toMatch(/Change password/);
     expect(html).toMatch(/Sign out/);
+    expect(html).toMatch(/bg-destructive/);
     expect(html).toContain(RIDGELINE.name);
     expect(html).not.toMatch(/→/);
   });
@@ -107,6 +108,8 @@ describe("inventory and live Account", () => {
     expect(layout).toMatch(/from "@\/components\/mgr\/views\/portal-me"/);
     expect(layout).toMatch(/toPortalMeViewProps/);
     expect(layout).toMatch(/<MeSheet[\s\S]*<PortalMeView\b/);
-    expect(layout).toMatch(/<MeSheetActions signOut="outline"/);
+    expect(layout).toMatch(/<MeSheetActions \/>/);
+    expect(layout).not.toMatch(/signOut="outline"/);
+    expect(readFileSync("components/mgr/me-sheet.tsx", "utf8")).toMatch(/variant="destructive" className="w-full bg-destructive! text-destructive-foreground!/);
   });
 });

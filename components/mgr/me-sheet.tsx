@@ -20,13 +20,11 @@ import { UserAvatar } from "@/components/mgr/user-avatar";
 import { UserCircleIcon } from "@hugeicons/core-free-icons";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-export function MeSheet({ fields = [], avatar, breweries, signOut = "destructive", children }: {
+export function MeSheet({ fields = [], avatar, breweries, children }: {
   fields?: [string, string][];
   avatar?: { src?: string; name: string };
   /** Every brewery the account may operate as; the switcher shows with two or more. */
   breweries?: { id: string; name: string; current: boolean }[];
-  /** Staff Me is destructive (plan §3 follow-up); portal Me stays outline. */
-  signOut?: "destructive" | "outline";
   children?: ReactNode;
 }) {
   const mobile = useIsMobile();
@@ -61,20 +59,20 @@ export function MeSheet({ fields = [], avatar, breweries, signOut = "destructive
               ))}
             </div>
           )}
-          <MeSheetActions signOut={signOut} />
+          <MeSheetActions />
         </>}
       </SheetContent>
     </Sheet>
   );
 }
 
-export function MeSheetActions({ signOut = "destructive" }: { signOut?: "destructive" | "outline" }) {
+export function MeSheetActions() {
   return (
     <div className="flex flex-col gap-2 px-4">
       <ThemeToggle />
       <Button variant="outline" asChild><Link href="/password">Change password</Link></Button>
       <form action={logout}>
-        <Button type="submit" variant={signOut} className="w-full">Sign out</Button>
+        <Button type="submit" variant="destructive" className="w-full bg-destructive! text-destructive-foreground! hover:bg-destructive/90!">Sign out</Button>
       </form>
     </div>
   );

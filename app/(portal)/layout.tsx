@@ -25,7 +25,7 @@ export default async function PortalLayout({ children }: { children: React.React
           <MeSheet>
             <PortalMeView
               model={toPortalMeViewProps({ email: identity?.email ?? "", account: customer.customerName })}
-              footer={<MeSheetActions signOut="outline" />}
+              footer={<MeSheetActions />}
             />
           </MeSheet>
         }
