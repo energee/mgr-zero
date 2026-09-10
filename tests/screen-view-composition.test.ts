@@ -40,7 +40,6 @@ const KNOWN_VIEW_DEBT = [
   "Brand approval: BrandApprovalView <- app/(app)/compliance/registry/page.tsx",
   "State registration: StateRegistrationView <- app/(app)/compliance/registry/page.tsx",
   "License: LicenseView <- app/(app)/compliance/registry/page.tsx",
-  "Channel: ChannelView <- app/(app)/settings/channels/page.tsx",
   "Formats: FormatsView <- app/(app)/catalog/page.tsx",
   "Format: FormatView <- app/(app)/catalog/formats/[id]/page.tsx",
   "Price group: PriceGroupView <- app/(app)/pricing/page.tsx",
