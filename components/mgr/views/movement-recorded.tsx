@@ -17,6 +17,7 @@ export function MovementRecordedView({
     <>
       {E.back("Beer", model.title, undefined, model.backHref)}
       {E.tape([[model.tapeLabel, model.tapeDetail]])}
+      {model.details?.map(({ label, value }) => <div key={label}>{E.fld(label, value)}</div>)}
       {footer !== undefined ? footer : E.gated("Record inventory correction", model.correctionGate)}
     </>
   );

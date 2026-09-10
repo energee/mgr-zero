@@ -55,13 +55,31 @@ jobs:
       - run: bunx tsc --noEmit
       - run: bun run build
 
+  pure_tests:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54341
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-test-only
+      SUPABASE_SECRET_KEY: ci-test-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version-file: ".bun-version" }
+      - run: bun install --frozen-lockfile
+      - run: >
+          bunx vitest run --fileParallelism --maxWorkers=2
+          tests/mgr-screens.test.ts tests/tap-coverage.test.ts tests/screen-links.test.ts
+          tests/theme-contrast.test.ts tests/screen-persona.test.ts
+          tests/design-docs.test.ts tests/docs.test.ts
   test_shard:
     name: test shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        shard: ["1/2", "2/2"]
+        shard: ["1/3", "2/3", "3/3"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -81,13 +99,18 @@ jobs:
         # The app accepts modern Supabase names only. The mapping script keeps
         # local CLI output compatible without reintroducing runtime fallbacks.
         run: supabase status -o env | node scripts/supabase-env.mjs >> "$GITHUB_ENV"
-      - run: bunx vitest run --shard=${{ matrix.shard }}
+      - run: >
+          bunx vitest run --shard=${{ matrix.shard }}
+          --exclude tests/mgr-screens.test.ts --exclude tests/tap-coverage.test.ts
+          --exclude tests/screen-links.test.ts --exclude tests/theme-contrast.test.ts
+          --exclude tests/screen-persona.test.ts --exclude tests/design-docs.test.ts
+          --exclude tests/docs.test.ts
 
   # Preserve the existing required-check name while the work runs in parallel.
   test:
-    needs: [quality, test_shard]
+    needs: [quality, pure_tests, test_shard]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Require every CI job
-        run: test "${{ needs.quality.result }}" = success && test "${{ needs.test_shard.result }}" = success
+        run: test "${{ needs.quality.result }}" = success && test "${{ needs.pure_tests.result }}" = success && test "${{ needs.test_shard.result }}" = success
