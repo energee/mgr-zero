@@ -1,17 +1,20 @@
 // lib/commands/client.ts — the one way client components mutate anything.
 // Callers may retain a request ID for an unchanged failed submission; ordinary
 // three-argument calls still generate one UUID per invocation.
-import type { CommandContextExpectation } from "./registry";
+import type { CommandContextExpectation, CommandOrigin } from "./registry";
 
 export class CommandResponseError extends Error {
   constructor(message: string, readonly status: number) { super(message); }
 }
 
-export async function command(breweryId: string, name: string, input: unknown, requestId: string = crypto.randomUUID(), expectedContext?: CommandContextExpectation) {
+export type CommandProvenance = { origin: Exclude<CommandOrigin, "chat"> }
+  | { origin: "chat"; conversationId: string; previewToken: string };
+
+export async function command(breweryId: string, name: string, input: unknown, requestId: string = crypto.randomUUID(), expectedContext?: CommandContextExpectation, provenance?: CommandProvenance) {
   const res = await fetch("/api/command", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ breweryId, name, input, requestId, ...(expectedContext ? { expectedContext } : {}) }),
+    body: JSON.stringify({ breweryId, name, input, requestId, ...(expectedContext ? { expectedContext } : {}), ...provenance }),
   });
   const json = await res.json().catch(() => null) as { ok?: boolean; data?: unknown; error?: { message?: string } } | null;
   // Proxies and gateways can answer with HTML or an empty body; only trust the envelope.

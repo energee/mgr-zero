@@ -2,7 +2,7 @@ import { z } from "zod";
 import { defineCommand, defineQuery, unwrap, Ctx, CommandExecution, CommandError, STAFF_ROLES } from "./registry";
 import { stockLine } from "./stock-line";
 
-const movementInput = z.object({
+export const movementInput = z.object({
   lotId: z.string().uuid().optional(),
   skuId: z.string().uuid(), locationId: z.string().uuid(), binId: z.string().uuid(),
   qty: z.number().refine(n => n !== 0, "qty cannot be 0"),
@@ -24,12 +24,21 @@ export function insertMovement(ctx: Ctx, input: z.infer<typeof movementInput>, e
     p_brewery: ctx.breweryId, p_sku: input.skuId, p_location: input.locationId, p_bin: input.binId, p_qty: input.qty,
     p_type: input.type, p_sale_channel: input.saleChannelId ?? null, p_dest_state: input.destState ?? null,
     p_note: input.note ?? null, p_lot: input.lotId ?? null, p_request_id: execution.requestId,
+    p_origin: execution.origin ?? "ui", p_conversation: execution.conversationId ?? null, p_preview_token: execution.previewToken ?? null,
   }));
 }
 
 defineCommand({
   name: "record_movement", description: "Append an inventory movement (immutable; corrections are reversals); sale_removal and depletion each name a saleChannelId, which no other type may carry",
-  input: movementInput, roles: ["admin", "warehouse"],
+  input: movementInput, roles: ["admin", "warehouse"], aiExposed: true,
+  risk: "append_only", requiresConfirmation: true,
+  compensation: "reverse_inventory_movement for an eligible standalone adjustment or loss",
+  idempotency: "dedupe", offlineReplay: false, atomicity: "rpc",
+  preview: (ctx, input, conversationId) => unwrap(ctx.db.rpc("preview_inventory_movement", {
+    p_brewery: ctx.breweryId, p_sku: input.skuId, p_location: input.locationId, p_bin: input.binId, p_qty: input.qty,
+    p_type: input.type, p_sale_channel: input.saleChannelId ?? null, p_dest_state: input.destState ?? null,
+    p_note: input.note ?? null, p_lot: input.lotId ?? null, p_conversation: conversationId,
+  })),
   handler: (ctx, input, execution) => insertMovement(ctx, input, execution),
 });
 

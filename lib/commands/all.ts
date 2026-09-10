@@ -2,6 +2,7 @@
 import "./catalog";
 import "./tenancy";
 import "./inventory";
+import "./preview";
 import "./transfers";
 import "./import";
 import "./invites";

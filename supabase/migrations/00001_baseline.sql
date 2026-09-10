@@ -3445,16 +3445,68 @@ create index chat_action_intents_expiry_idx on chat_action_intents (expires_at) 
 
 -- ---------------------------------------------------------------- command boundary
 -- The request ledger is private because it contains actor identities and replay payloads.
+create table private.chat_conversations (
+  id uuid primary key default private.new_uuid(),
+  actor_id uuid not null,
+  brewery_id uuid not null references public.breweries(id),
+  title text not null default 'New conversation' check (length(btrim(title)) between 1 and 120),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (id, brewery_id)
+);
+
+create table private.chat_messages (
+  id uuid primary key default private.new_uuid(),
+  conversation_id uuid not null,
+  brewery_id uuid not null,
+  actor_id uuid not null,
+  role text not null check (role in ('user','assistant','result')),
+  content text,
+  result jsonb,
+  request_id uuid,
+  created_at timestamptz not null default now(),
+  foreign key (conversation_id, brewery_id) references private.chat_conversations(id, brewery_id),
+  check ((role = 'result') = (result is not null)),
+  check ((role = 'result') = (content is null)),
+  check (content is null or length(btrim(content)) between 1 and 4000)
+);
+create unique index chat_messages_request_idx on private.chat_messages(actor_id, request_id) where request_id is not null;
+create index chat_messages_conversation_idx on private.chat_messages(conversation_id, created_at, id);
+
+create table private.command_previews (
+  token uuid primary key default private.new_uuid(),
+  actor_id uuid not null,
+  brewery_id uuid not null,
+  command_name text not null,
+  rpc_name text not null,
+  canonical_input jsonb not null,
+  effects jsonb not null check (jsonb_typeof(effects) = 'array'),
+  warnings jsonb not null check (jsonb_typeof(warnings) = 'array'),
+  version jsonb not null,
+  conversation_id uuid not null,
+  expires_at timestamptz not null default now() + interval '10 minutes',
+  created_at timestamptz not null default now(),
+  foreign key (conversation_id, brewery_id) references private.chat_conversations(id, brewery_id),
+  unique (token, actor_id, brewery_id, rpc_name, conversation_id)
+);
+create index command_previews_expiry_idx on private.command_previews(expires_at);
+
 create table private.command_requests (
   actor_id uuid not null,
   brewery_id uuid,
   request_id uuid not null,
   command_name text not null,
+  origin text not null default 'ui' check (origin in ('ui','chat')),
+  conversation_id uuid,
+  preview_token uuid,
   payload_hash bytea not null,
   result jsonb,
   created_at timestamptz not null default now(),
   primary key (actor_id, request_id),
-  check ((brewery_id is null) = (command_name = 'provision_brewery'))
+  check ((brewery_id is null) = (command_name = 'provision_brewery')),
+  check ((origin = 'chat') = (conversation_id is not null and preview_token is not null)),
+  foreign key (preview_token, actor_id, brewery_id, command_name, conversation_id)
+    references private.command_previews(token, actor_id, brewery_id, rpc_name, conversation_id)
 );
 
 -- A portal quote is an immutable reviewed snapshot. It stays private because
@@ -3539,19 +3591,22 @@ begin
 end $$;
 
 create function private.claim_command_request(
-  p_brewery uuid, p_command text, p_request_id uuid, p_payload jsonb
+  p_brewery uuid, p_command text, p_request_id uuid, p_payload jsonb,
+  p_origin text default 'ui', p_conversation uuid default null, p_preview uuid default null
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_actor uuid := auth.uid(); v_request private.command_requests;
 begin
   if v_actor is null then raise exception 'permission denied' using errcode = '42501'; end if;
   perform private.assert_request_scope(p_brewery);
-  insert into private.command_requests (actor_id, brewery_id, request_id, command_name, payload_hash)
-  values (v_actor, p_brewery, p_request_id, p_command, extensions.digest(p_payload::text, 'sha256'))
+  insert into private.command_requests (actor_id, brewery_id, request_id, command_name, origin, conversation_id, preview_token, payload_hash)
+  values (v_actor, p_brewery, p_request_id, p_command, p_origin, p_conversation, p_preview, extensions.digest(p_payload::text, 'sha256'))
   on conflict (actor_id, request_id) do nothing;
   if found then return null; end if;
   select * into v_request from private.command_requests
     where actor_id = v_actor and request_id = p_request_id for update;
   if v_request.brewery_id is distinct from p_brewery or v_request.command_name <> p_command
+     or v_request.origin <> p_origin or v_request.conversation_id is distinct from p_conversation
+     or v_request.preview_token is distinct from p_preview
      or v_request.payload_hash <> extensions.digest(p_payload::text, 'sha256') then
     -- Application SQLSTATE (class MG): every unique index raises 23505, so the
     -- replay mismatch gets its own code for the HTTP layer to map to 409.
@@ -3603,6 +3658,100 @@ revoke all on function private.claim_command_request_for(uuid, uuid, text, uuid,
   private.complete_command_request_for(uuid, uuid, jsonb),
   private.assert_request_scope(uuid, uuid)
   from public, anon, authenticated, service_role;
+
+create function private.assert_chat_member(p_brewery uuid) returns uuid
+language plpgsql stable security definer set search_path = '' as $$
+declare v_actor uuid := auth.uid();
+begin
+  if v_actor is null or not private.request_scope_allows(p_brewery, null, true) or not (
+    exists(select 1 from public.brewery_users where brewery_id=p_brewery and user_id=v_actor)
+    or exists(select 1 from public.customer_users cu join public.customers c on c.id=cu.customer_id
+      where cu.user_id=v_actor and c.brewery_id=p_brewery)
+  ) then raise exception 'permission denied' using errcode='42501'; end if;
+  return v_actor;
+end $$;
+
+create function private.assert_chat_conversation(p_brewery uuid,p_conversation uuid) returns uuid
+language plpgsql stable security definer set search_path = '' as $$
+declare v_actor uuid := private.assert_chat_member(p_brewery);
+begin
+  if not exists(select 1 from private.chat_conversations where id=p_conversation and brewery_id=p_brewery and actor_id=v_actor)
+    then raise exception 'permission denied' using errcode='42501'; end if;
+  return v_actor;
+end $$;
+
+create function create_chat_conversation(p_brewery uuid,p_title text,p_request_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid := private.assert_chat_member(p_brewery); v_replay jsonb; v_row private.chat_conversations;
+begin
+  if p_title is not null and length(btrim(p_title)) not between 1 and 120 then raise exception 'invalid conversation title'; end if;
+  v_replay := private.claim_command_request(p_brewery,'create_chat_conversation',p_request_id,jsonb_build_object('title',p_title));
+  if v_replay is not null then return v_replay; end if;
+  insert into private.chat_conversations(actor_id,brewery_id,title)
+    values(v_actor,p_brewery,coalesce(btrim(p_title),'New conversation')) returning * into v_row;
+  return private.complete_command_request(p_request_id,to_jsonb(v_row));
+end $$;
+
+create function append_chat_message(p_brewery uuid,p_conversation uuid,p_role text,p_content text,p_request_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid := private.assert_chat_conversation(p_brewery,p_conversation); v_replay jsonb; v_row private.chat_messages;
+begin
+  if p_role not in ('user','assistant') or p_content is null or length(btrim(p_content)) not between 1 and 4000
+    then raise exception 'invalid chat message'; end if;
+  v_replay := private.claim_command_request(p_brewery,'append_chat_message',p_request_id,
+    jsonb_build_object('conversation',p_conversation,'role',p_role,'content',p_content));
+  if v_replay is not null then return v_replay; end if;
+  insert into private.chat_messages(conversation_id,brewery_id,actor_id,role,content,request_id)
+    values(p_conversation,p_brewery,v_actor,p_role,btrim(p_content),p_request_id) returning * into v_row;
+  update private.chat_conversations set updated_at=now() where id=p_conversation and brewery_id=p_brewery and actor_id=v_actor;
+  return private.complete_command_request(p_request_id,to_jsonb(v_row));
+end $$;
+
+create function list_chat_conversations(p_brewery uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare v_actor uuid := private.assert_chat_member(p_brewery);
+begin
+  return coalesce((select jsonb_agg(to_jsonb(c) order by c.updated_at desc,c.id)
+    from (select id,title,created_at,updated_at from private.chat_conversations
+      where brewery_id=p_brewery and actor_id=v_actor order by updated_at desc,id limit 50) c),'[]'::jsonb);
+end $$;
+
+create function get_chat_history(p_brewery uuid,p_conversation uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare v_actor uuid := private.assert_chat_conversation(p_brewery,p_conversation); v_conversation jsonb;
+begin
+  select jsonb_build_object('id',id,'title',title,'created_at',created_at,'updated_at',updated_at)
+    into v_conversation from private.chat_conversations
+    where id=p_conversation and brewery_id=p_brewery and actor_id=v_actor;
+  return jsonb_build_object('conversation',v_conversation,'messages',coalesce((
+    select jsonb_agg(jsonb_build_object('id',id,'role',role,'content',content,'result',result,'request_id',request_id,'created_at',created_at)
+      order by created_at,id) from private.chat_messages
+    where conversation_id=p_conversation and brewery_id=p_brewery and actor_id=v_actor),'[]'::jsonb));
+end $$;
+
+create function preview_inventory_movement(
+  p_brewery uuid,p_sku uuid,p_location uuid,p_bin uuid,p_qty numeric,p_type public.movement_type,
+  p_sale_channel uuid,p_dest_state text,p_note text,p_lot uuid,p_conversation uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid; v_token uuid := private.new_uuid(); v_input jsonb; v_effects jsonb; v_version jsonb := '{}'::jsonb;
+begin
+  v_actor := private.assert_staff(p_brewery,array['admin','warehouse']::public.staff_role[]);
+  perform private.assert_chat_conversation(p_brewery,p_conversation);
+  if p_qty is null or p_qty::text in ('NaN','Infinity','-Infinity') or p_qty=0 or p_qty<>round(p_qty,2)
+    then raise exception 'invalid movement quantity'; end if;
+  if not exists(select 1 from public.skus where id=p_sku and brewery_id=p_brewery)
+    or not exists(select 1 from public.bins where id=p_bin and location_id=p_location and brewery_id=p_brewery)
+    then raise exception 'invalid movement selection'; end if;
+  v_input := jsonb_build_object('brewery',p_brewery,'sku',p_sku,'location',p_location,'bin',p_bin,'qty',p_qty,
+    'type',p_type,'sale_channel',p_sale_channel,'dest_state',p_dest_state,'note',p_note,'lot',p_lot);
+  select jsonb_build_array(jsonb_build_object('label',s.name||' · '||l.name||' · '||b.name,'qty',p_qty::text))
+    into v_effects from public.skus s cross join public.locations l cross join public.bins b
+    where s.id=p_sku and s.brewery_id=p_brewery and l.id=p_location and l.brewery_id=p_brewery
+      and b.id=p_bin and b.location_id=l.id and b.brewery_id=p_brewery;
+  insert into private.command_previews(token,actor_id,brewery_id,command_name,rpc_name,canonical_input,effects,warnings,version,conversation_id)
+    values(v_token,v_actor,p_brewery,'record_movement','record_inventory_movement',v_input,v_effects,'[]'::jsonb,v_version,p_conversation);
+  return jsonb_build_object('effects',v_effects,'warnings','[]'::jsonb,'version',v_version,'previewToken',v_token);
+end $$;
 
 create function set_qbo_customer_mapping(p_brewery uuid,p_customer uuid,p_qbo_customer_id text,p_request_id uuid)
 returns jsonb language plpgsql security definer set search_path='' as $$
@@ -4720,14 +4869,26 @@ end $$;
 
 create function record_inventory_movement(
   p_brewery uuid, p_sku uuid, p_location uuid, p_bin uuid, p_qty numeric, p_type public.movement_type,
-  p_sale_channel uuid, p_dest_state text, p_note text, p_request_id uuid, p_lot uuid default null
+  p_sale_channel uuid, p_dest_state text, p_note text, p_request_id uuid, p_lot uuid default null,
+  p_origin text default 'ui', p_conversation uuid default null, p_preview_token uuid default null
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_replay jsonb; v_row public.inventory_movements; v_tax public.tax_treatment;
+declare v_replay jsonb; v_row public.inventory_movements; v_tax public.tax_treatment; v_actor uuid; v_input jsonb;
 begin
-  perform private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
-  v_replay := private.claim_command_request(p_brewery, 'record_inventory_movement', p_request_id,
-    jsonb_build_object('brewery', p_brewery, 'sku', p_sku, 'location', p_location, 'bin', p_bin, 'qty', p_qty, 'type', p_type, 'sale_channel', p_sale_channel, 'dest_state', p_dest_state, 'note', p_note, 'lot', p_lot));
+  v_actor := private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
+  if (p_origin='chat') is distinct from (p_conversation is not null and p_preview_token is not null)
+    then raise exception 'chat preview token required'; end if;
+  if p_origin not in ('ui','chat') then raise exception 'invalid command origin'; end if;
+  v_input := jsonb_build_object('brewery', p_brewery, 'sku', p_sku, 'location', p_location, 'bin', p_bin, 'qty', p_qty, 'type', p_type, 'sale_channel', p_sale_channel, 'dest_state', p_dest_state, 'note', p_note, 'lot', p_lot);
+  if p_origin='chat' and not exists(select 1 from private.command_previews
+    where token=p_preview_token and actor_id=v_actor and brewery_id=p_brewery and command_name='record_movement'
+      and rpc_name='record_inventory_movement' and canonical_input=v_input and conversation_id=p_conversation)
+    then raise exception 'invalid preview token'; end if;
+  v_replay := private.claim_command_request(p_brewery, 'record_inventory_movement', p_request_id, v_input,
+    p_origin,p_conversation,p_preview_token);
   if v_replay is not null then return v_replay; end if;
+  if p_origin='chat' and not exists(select 1 from private.command_previews
+    where token=p_preview_token and expires_at>now())
+    then raise exception 'expired preview token'; end if;
   if p_qty is null or p_qty::text in ('NaN','Infinity','-Infinity') or p_qty = 0 or p_qty <> round(p_qty,2) then raise exception 'invalid movement quantity'; end if;
   if p_qty < 0 then
     -- ponytail: global ledger lock; shared stock-key locks across every writer at higher throughput.
@@ -4751,6 +4912,10 @@ begin
   end if;
   insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, lot_id, qty, type, sale_channel_id, tax_treatment, dest_state, note, created_by)
     values (p_brewery, p_sku, p_location, p_bin, p_lot, p_qty, p_type, p_sale_channel, v_tax, p_dest_state, p_note, auth.uid()) returning * into v_row;
+  if p_origin='chat' then
+    insert into private.chat_messages(conversation_id,brewery_id,actor_id,role,result,request_id)
+      values(p_conversation,p_brewery,v_actor,'result',to_jsonb(v_row),p_request_id);
+  end if;
   return private.complete_command_request(p_request_id, to_jsonb(v_row));
 end $$;
 
@@ -8698,7 +8863,10 @@ grant execute on function
   clear_channel_price(uuid,uuid,uuid,uuid,uuid),
   replace_format_bom(uuid,uuid,jsonb,uuid),
   reverse_inventory_movement(uuid,uuid,text,uuid),
-  record_inventory_movement(uuid,uuid,uuid,uuid,numeric,public.movement_type,uuid,text,text,uuid,uuid),
+  record_inventory_movement(uuid,uuid,uuid,uuid,numeric,public.movement_type,uuid,text,text,uuid,uuid,text,uuid,uuid),
+  preview_inventory_movement(uuid,uuid,uuid,uuid,numeric,public.movement_type,uuid,text,text,uuid,uuid),
+  create_chat_conversation(uuid,text,uuid), append_chat_message(uuid,uuid,text,text,uuid),
+  list_chat_conversations(uuid), get_chat_history(uuid,uuid),
   set_taproom_par(uuid,uuid,uuid,numeric,uuid),
   set_portal_fulfillment_source(uuid,uuid,uuid),
   create_order(uuid,public.order_kind,uuid,uuid,uuid,uuid,date,text,text,jsonb,uuid),

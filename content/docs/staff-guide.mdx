@@ -214,6 +214,8 @@ Sales sees history without correction controls. Shipments retain **Return shipme
 
 **Movement recorded** appears only after the server confirms the save. It shows the committed quantity, frozen barrel volume, bin, state/channel, note, timestamp and reference. A failed or uncertain response does not show this receipt; retry the unchanged form to recover the same save. **Done** returns to the ledger. Open the SKU’s inventory **Review** page to reverse an eligible standalone adjustment or loss; other entries retain their correction workflow.
 
+An assisted **Record movement** proposal is still only a proposal. Review its server-calculated effect, then confirm it in the same conversation. The confirmation is bound to you, this brewery, that conversation, and the exact proposed fields; changing any of them requires a new preview. A retry of the same confirmed request shows the original result once in that conversation and does not record the movement again.
+
 MGR freezes barrel volume when each entry posts. Ordinary entries use quantity × the format’s BBL per unit; exact reversals negate the original stored volume, and shipment returns retain their source volume. Movements cannot be edited or deleted. See [Errors and corrections](#errors-corrections) before you try to fix inventory.
 
 Dates use **Sep 10, 2026** in records, day headers use **Thu, Sep 10**, and timestamps use **Sep 10, 2026, 8:10 AM** without seconds.
