@@ -252,10 +252,11 @@ export function failCountAttempt(state: TaproomCountState, kind: "unknown" | "st
   return { ...state, attempt: { kind: kind === "unknown" ? "error" : kind, message } };
 }
 
-export function countFailureKind(status: number | null, message: string, retrying = false): CountFailureKind {
+export function countFailureKind(status: number | null, message: string, retrying = false, code?: string): CountFailureKind {
   if (retrying) return "unknown";
+  if (code === "context_changed") return "unknown";
   if (status === 409 && /stock or prior count changed; refresh and review every bucket|count today in the brewery timezone/i.test(message)) return "stale";
-  return status !== null && canRetireCommandFailure(status, false) ? "error" : "unknown";
+  return status !== null && canRetireCommandFailure(status, false, code) ? "error" : "unknown";
 }
 
 export function projectionExpectedText(projection: { expected_bbl: number | null }): string | null {

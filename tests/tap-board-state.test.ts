@@ -79,6 +79,20 @@ describe("tap board controlled state", () => {
     expect(editTapBoardSheet(state, { guestLabel: "Pear cider" }).sheet?.fields).toMatchObject({ guestLabel: "Pear cider" });
   });
 
+  it("keeps a first context change retryable while other first 409 conflicts retire", () => {
+    let changed = openTapBoardSheet(snapshot, "tap", null);
+    changed = editTapBoardSheet(changed, { identity: "guest", guestLabel: "Dry cider", guestNominalBbl: "0.25" });
+    changed = beginTapBoardAttempt(changed, id);
+    changed = failTapBoardAttempt(changed, 409, "context changed", false, "context_changed");
+    expect(changed.sheet?.attempt).toMatchObject({ kind: "unknown", requestId: id });
+
+    let conflict = openTapBoardSheet(snapshot, "tap", null);
+    conflict = editTapBoardSheet(conflict, { identity: "guest", guestLabel: "Dry cider", guestNominalBbl: "0.25" });
+    conflict = beginTapBoardAttempt(conflict, id);
+    conflict = failTapBoardAttempt(conflict, 409, "already closed", false, "conflict");
+    expect(conflict.sheet?.attempt).toEqual({ kind: "error", message: "already closed" });
+  });
+
   it("retires a successful write even when the following refresh is definitively rejected", async () => {
     let state = openTapBoardSheet(snapshot, "tap", null);
     state = editTapBoardSheet(state, { identity: "guest", guestLabel: "Dry cider", guestNominalBbl: "0.25" });

@@ -6,7 +6,10 @@ import { fermentationReadingInput, fermentationReadingOfflinePolicy } from "@/li
 
 export { fermentationReadingInput, fermentationReadingOfflinePolicy } from "@/lib/composer/offline-policy";
 
+/** Shipped C4 array key, read once and migrated to collision-free row keys. */
 export const OUTBOX_STORAGE_KEY = "mgr-offline-outbox:v1";
+export const OUTBOX_ENTRY_PREFIX = "mgr-offline-outbox:v2:";
+export const OUTBOX_RETIRED_PREFIX = "mgr-offline-outbox:v2-retired:";
 
 const staffRole = z.enum(["admin", "sales", "warehouse", "brewer", "taproom"]);
 const scopeSchema = z.object({ actorId: z.string().uuid(), breweryId: z.string().uuid(), role: staffRole }).strict();
@@ -35,7 +38,7 @@ const attemptSchema = z.object({
 export type OfflineScope = z.infer<typeof scopeSchema>;
 export type ReadingInput = z.infer<typeof fermentationReadingInput>;
 export type OutboxAttempt = z.infer<typeof attemptSchema>;
-type OutboxStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+type OutboxStorage = Pick<Storage, "getItem" | "setItem" | "removeItem" | "key" | "length">;
 type OutboxTransport = (
   breweryId: string,
   name: typeof fermentationReadingOfflinePolicy.name,
@@ -60,16 +63,88 @@ function parseOutbox(raw: string | null) {
   catch { throw new Error("Offline outbox could not be read. Nothing was sent or replaced."); }
 }
 
-function writeOutbox(storage: OutboxStorage, entries: OutboxAttempt[]) {
+function notifyOutboxChange() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("mgr-outbox-change"));
+}
+
+function entryKey(id: string) {
+  return `${OUTBOX_ENTRY_PREFIX}${id}`;
+}
+
+function retiredKey(id: string) {
+  return `${OUTBOX_RETIRED_PREFIX}${id}`;
+}
+
+function isRetired(storage: OutboxStorage, id: string) {
+  return storage.getItem(retiredKey(id)) !== null;
+}
+
+function sameImmutableAttempt(a: OutboxAttempt, b: OutboxAttempt) {
+  const immutable = (entry: OutboxAttempt) => ({
+    version: entry.version, id: entry.id, name: entry.name, label: entry.label,
+    input: entry.input, requestId: entry.requestId, capturedAt: entry.capturedAt,
+    scope: entry.scope, origin: entry.origin, conversationId: entry.conversationId,
+  });
+  return JSON.stringify(immutable(a)) === JSON.stringify(immutable(b));
+}
+
+function writeAttempt(storage: OutboxStorage, entry: OutboxAttempt) {
   try {
-    storage.setItem(OUTBOX_STORAGE_KEY, JSON.stringify(outboxSchema.parse(entries)));
-    if (typeof window !== "undefined") window.dispatchEvent(new Event("mgr-outbox-change"));
+    const parsed = attemptSchema.parse(entry);
+    if (isRetired(storage, parsed.id)) return;
+    storage.setItem(entryKey(parsed.id), JSON.stringify(parsed));
+    // A different tab may retire the row between the first check and write.
+    if (isRetired(storage, parsed.id)) storage.removeItem(entryKey(parsed.id));
+    notifyOutboxChange();
   }
   catch { throw new Error("Could not save the offline outbox. Enable local storage and retry; no new request was sent."); }
 }
 
-export function readOutbox(storage: Pick<Storage, "getItem">): OutboxAttempt[] {
-  return parseOutbox(storage.getItem(OUTBOX_STORAGE_KEY));
+function retireAttempt(storage: OutboxStorage, id: string) {
+  try { storage.setItem(retiredKey(id), "retired"); }
+  catch { throw new Error("Could not update the offline outbox. The saved request was retained."); }
+  // The marker is authoritative if physical row cleanup is unavailable.
+  try { storage.removeItem(entryKey(id)); } catch { /* ignored */ }
+  notifyOutboxChange();
+}
+
+function storedAttempt(storage: OutboxStorage, id: string): OutboxAttempt | null {
+  if (isRetired(storage, id)) return null;
+  const raw = storage.getItem(entryKey(id));
+  if (raw === null) return null;
+  try {
+    const parsed = attemptSchema.parse(JSON.parse(raw));
+    if (parsed.id !== id) throw new Error("key mismatch");
+    return parsed;
+  } catch { throw new Error("Offline outbox row could not be read. Nothing was sent or replaced."); }
+}
+
+function migrateLegacyOutbox(storage: OutboxStorage) {
+  const raw = storage.getItem(OUTBOX_STORAGE_KEY);
+  if (raw === null) return;
+  const legacy = parseOutbox(raw);
+  for (const entry of legacy) {
+    if (isRetired(storage, entry.id)) continue;
+    const current = storedAttempt(storage, entry.id);
+    if (current && !sameImmutableAttempt(current, entry)) throw new Error("Outbox request identity was already used.");
+    if (!current) writeAttempt(storage, entry);
+  }
+  try { storage.removeItem(OUTBOX_STORAGE_KEY); notifyOutboxChange(); }
+  catch { throw new Error("Could not update the offline outbox. The saved requests were retained."); }
+}
+
+export function readOutbox(storage: OutboxStorage): OutboxAttempt[] {
+  migrateLegacyOutbox(storage);
+  const entries: OutboxAttempt[] = [];
+  for (let index = 0; index < storage.length; index += 1) {
+    const key = storage.key(index);
+    if (!key?.startsWith(OUTBOX_ENTRY_PREFIX)) continue;
+    try {
+      const entry = attemptSchema.parse(JSON.parse(storage.getItem(key) ?? ""));
+      if (key === entryKey(entry.id) && !isRetired(storage, entry.id)) entries.push(entry);
+    } catch { /* One malformed row cannot hide or replace valid siblings. */ }
+  }
+  return entries.sort((a, b) => a.capturedAt.localeCompare(b.capturedAt) || a.id.localeCompare(b.id));
 }
 
 export function createReadingAttempt(
@@ -95,10 +170,11 @@ export function storeOutboxAttempt(storage: OutboxStorage, rawAttempt: OutboxAtt
   if (attempt.name !== fermentationReadingOfflinePolicy.name || !fermentationReadingOfflinePolicy.offlineReplay) {
     throw new Error(`${attempt.name} is not eligible for offline replay.`);
   }
-  const entries = readOutbox(storage);
-  const existing = entries.find((entry) => entry.id === attempt.id);
-  if (existing && JSON.stringify(existing) !== JSON.stringify(attempt)) throw new Error("Outbox request identity was already used.");
-  if (!existing) writeOutbox(storage, [...entries, attempt]);
+  migrateLegacyOutbox(storage);
+  if (isRetired(storage, attempt.id)) throw new Error("Outbox request identity was already retired.");
+  const existing = storedAttempt(storage, attempt.id);
+  if (existing && !sameImmutableAttempt(existing, attempt)) throw new Error("Outbox request identity was already used.");
+  if (!existing) writeAttempt(storage, attempt);
 }
 
 export function visibleOutbox(entries: OutboxAttempt[], scope: Pick<OfflineScope, "actorId" | "breweryId">) {
@@ -106,12 +182,13 @@ export function visibleOutbox(entries: OutboxAttempt[], scope: Pick<OfflineScope
 }
 
 function replaceAttempt(storage: OutboxStorage, replacement: OutboxAttempt | null, id: string) {
-  const entries = readOutbox(storage);
-  const index = entries.findIndex((entry) => entry.id === id);
-  if (index < 0) return;
-  if (replacement) entries[index] = attemptSchema.parse(replacement);
-  else entries.splice(index, 1);
-  writeOutbox(storage, entries);
+  const current = storedAttempt(storage, id);
+  if (!current) return;
+  if (replacement) {
+    const parsed = attemptSchema.parse(replacement);
+    if (!sameImmutableAttempt(current, parsed)) throw new Error("Outbox request identity changed.");
+    writeAttempt(storage, parsed);
+  } else retireAttempt(storage, id);
 }
 
 function failureMessage(error: unknown) {
@@ -142,7 +219,8 @@ async function sendOne(storage: OutboxStorage, id: string, scope: OfflineScope, 
     return { status: "sent" };
   } catch (error) {
     const status = error instanceof CommandResponseError ? error.status : null;
-    const firstPermanent = status !== null && canRetireCommandFailure(status, false) && !previouslyUncertain;
+    const code = error instanceof CommandResponseError ? error.code : undefined;
+    const firstPermanent = status !== null && canRetireCommandFailure(status, false, code) && !previouslyUncertain;
     const failed = {
       ...sending,
       state: firstPermanent ? "fix" as const : "uncertain" as const,
@@ -177,6 +255,5 @@ export function discardOutbox(storage: OutboxStorage, scope: OfflineScope, ids: 
   const selected = visibleOutbox(readOutbox(storage), scope).filter((entry) => ids.includes(entry.id));
   const expected = outboxDiscardConfirmation(selected);
   if (selected.length === 0 || confirmation !== expected) throw new Error("Named discard confirmation is required.");
-  const selectedIds = new Set(selected.map((entry) => entry.id));
-  writeOutbox(storage, readOutbox(storage).filter((entry) => !selectedIds.has(entry.id)));
+  for (const entry of selected) retireAttempt(storage, entry.id);
 }

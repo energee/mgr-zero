@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { CommandResponseError } from "@/lib/commands/client";
+import { command, CommandResponseError } from "@/lib/commands/client";
 import { getCommandDefinition } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { SCREENS } from "@/components/mgr/screens";
@@ -28,11 +28,27 @@ const ids = {
 const scope: OfflineScope = { actorId: ids.actor, breweryId: ids.brewery, role: "brewer" };
 const input = { occupancyId: ids.occupancy, at: "2026-09-10T14:15:16.000Z", tempF: 68, gravityPlato: 4.2, ph: 4.1, note: "steady" };
 
-class MemoryStorage implements Pick<Storage, "getItem" | "setItem" | "removeItem"> {
+class MemoryStorage implements Pick<Storage, "getItem" | "setItem" | "removeItem" | "key" | "length"> {
   values = new Map<string, string>();
+  get length() { return this.values.size; }
+  key(index: number) { return [...this.values.keys()][index] ?? null; }
   getItem(key: string) { return this.values.get(key) ?? null; }
   setItem(key: string, value: string) { this.values.set(key, value); }
   removeItem(key: string) { this.values.delete(key); }
+}
+
+class TabStorage implements Pick<Storage, "getItem" | "setItem" | "removeItem" | "key" | "length"> {
+  private snapshot: Map<string, string>;
+  constructor(private backing: Map<string, string>) { this.snapshot = new Map(backing); }
+  get length() { return this.snapshot.size; }
+  key(index: number) { return [...this.snapshot.keys()][index] ?? null; }
+  getItem(key: string) {
+    // Entries model a tab's stale captured state; retirement markers are the
+    // storage-owner guard that every mutation must consult before writing.
+    return (key.startsWith("mgr-offline-outbox:v2-retired:") ? this.backing : this.snapshot).get(key) ?? null;
+  }
+  setItem(key: string, value: string) { this.snapshot.set(key, value); this.backing.set(key, value); }
+  removeItem(key: string) { this.snapshot.delete(key); this.backing.delete(key); }
 }
 
 function attempt(requestId = ids.request, currentScope = scope) {
@@ -76,6 +92,61 @@ describe("action-specific offline outbox", () => {
     expect(() => storeOutboxAttempt(storage, { ...frozen, name: "record_movement" } as unknown as typeof frozen)).toThrow(/not eligible/i);
     storage.values.set("mgr-offline-outbox:v1", "{broken");
     expect(() => readOutbox(storage)).toThrow(/could not be read/i);
+  });
+
+  it("does not lose distinct readings saved from stale independent tab snapshots", () => {
+    const backing = new Map<string, string>();
+    const tabA = new TabStorage(backing);
+    const tabB = new TabStorage(backing);
+    const first = attempt();
+    const second = attempt("77777777-7777-4777-8777-777777777777");
+
+    storeOutboxAttempt(tabA, first);
+    storeOutboxAttempt(tabB, second);
+
+    const reloaded = new TabStorage(backing);
+    expect(readOutbox(reloaded).map((entry) => entry.id).sort()).toEqual([first.id, second.id].sort());
+  });
+
+  it.each(["discarded", "sent"] as const)("does not resurrect an entry %s by another tab after a stale send fails", async (retiredBy) => {
+    const backing = new Map<string, string>();
+    const bootstrap = new TabStorage(backing);
+    const frozen = attempt();
+    storeOutboxAttempt(bootstrap, frozen);
+    const tabA = new TabStorage(backing);
+    const tabB = new TabStorage(backing);
+    let rejectLate!: (error: Error) => void;
+    const late = sendOutboxAttempt(tabA, frozen.id, scope, () => new Promise((_, reject) => { rejectLate = reject; }));
+
+    if (retiredBy === "discarded") {
+      discardOutbox(tabB, scope, [frozen.id], outboxDiscardConfirmation([frozen]));
+    } else {
+      await sendOutboxAttempt(tabB, frozen.id, scope, async () => ({}));
+    }
+    rejectLate(new TypeError("late offline result"));
+    await late;
+
+    expect(readOutbox(new TabStorage(backing))).toEqual([]);
+  });
+
+  it("migrates the shipped array and isolates one malformed per-entry row", () => {
+    const storage = new MemoryStorage();
+    const frozen = attempt();
+    storage.values.set("mgr-offline-outbox:v1", JSON.stringify([frozen]));
+    expect(readOutbox(storage)).toEqual([frozen]);
+    expect(storage.getItem("mgr-offline-outbox:v1")).toBeNull();
+    expect([...storage.values.keys()].some((key) => key.startsWith("mgr-offline-outbox:v2:"))).toBe(true);
+
+    storage.values.set("mgr-offline-outbox:v2:88888888-8888-4888-8888-888888888888", "{broken");
+    expect(readOutbox(storage)).toEqual([frozen]);
+  });
+
+  it("does not replace immutable observation data for an existing request ID", () => {
+    const storage = new MemoryStorage();
+    const frozen = attempt();
+    storeOutboxAttempt(storage, frozen);
+    expect(() => storeOutboxAttempt(storage, { ...frozen, input: { ...frozen.input, tempF: 72 } })).toThrow(/identity was already used/i);
+    expect(readOutbox(storage)).toEqual([frozen]);
   });
 
   it("retains transient and uncertain attempts with the original ID and observation", async () => {
@@ -135,6 +206,39 @@ describe("action-specific offline outbox", () => {
     expect(send).toHaveBeenCalledTimes(1);
     expect((send.mock.calls[0] as unknown[])[3]).toBe(ids.request);
     expect(readOutbox(storage)).toEqual([]);
+  });
+
+  it("retains a first context_changed refusal until actor A returns", async () => {
+    const storage = new MemoryStorage();
+    storeOutboxAttempt(storage, attempt());
+    const changed = vi.fn(async () => { throw new CommandResponseError("context changed", 409, "context_changed"); });
+
+    await expect(sendOutboxAttempt(storage, ids.request, scope, changed)).resolves.toMatchObject({ status: "uncertain" });
+    expect(readOutbox(storage)[0]).toMatchObject({ id: ids.request, state: "uncertain", hadUncertainOutcome: true });
+
+    const actorB = { ...scope, actorId: "66666666-6666-4666-8666-666666666666" };
+    const success = vi.fn(async () => ({}));
+    await flushOutbox(storage, actorB, success);
+    expect(success).not.toHaveBeenCalled();
+    await flushOutbox(storage, scope, success);
+    expect(success).toHaveBeenCalledTimes(1);
+    expect((success.mock.calls[0] as unknown[])[3]).toBe(ids.request);
+    expect(readOutbox(storage)).toEqual([]);
+  });
+
+  it("preserves the command envelope error code used by recovery classification", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      ok: false,
+      error: { code: "context_changed", message: "context changed" },
+    }), { status: 409, headers: { "content-type": "application/json" } })));
+    try {
+      await expect(command(ids.brewery, "record_fermentation_reading", input, ids.request)).rejects.toMatchObject({
+        status: 409,
+        code: "context_changed",
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("uses one local flusher while server idempotency remains authoritative", async () => {
