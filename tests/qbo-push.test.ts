@@ -104,6 +104,78 @@ describe("QuickBooks durable outbound push", () => {
       .toEqual(["pushed:invoice-remote-1"]);
   });
 
+  it("replays terminal push truth before later connection, invoice, catalog, or mapping state", async () => {
+    const finish = async (f: Awaited<ReturnType<typeof pushFixture>>, requestId: string, remoteId: string) => {
+      const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({
+        Invoice: { Id: remoteId, SyncToken: "0" },
+      }), { status: 200 }));
+      const result = await pushInvoiceToQbo(f.ctx, f.invoice.id, requestId, new QboOAuthClient(config, fetch));
+      expect(fetch).toHaveBeenCalledTimes(1);
+      return result;
+    };
+    const replay = async (f: Awaited<ReturnType<typeof pushFixture>>, requestId: string) => {
+      const fetch = vi.fn<typeof globalThis.fetch>();
+      const result = await pushInvoiceToQbo(f.ctx, f.invoice.id, requestId, new QboOAuthClient(config, fetch));
+      expect(fetch).not.toHaveBeenCalled();
+      return result;
+    };
+
+    const disconnected = await pushFixture("invoice", "admin");
+    const disconnectedRequest = crypto.randomUUID();
+    const disconnectedResult = await finish(disconnected, disconnectedRequest, "completed-before-disconnect");
+    await disconnectQbo(disconnected.ctx, disconnected.connectionId, vi.fn().mockResolvedValue(undefined), crypto.randomUUID());
+
+    const replaced = await pushFixture("invoice", "admin");
+    const replacedRequest = crypto.randomUUID();
+    const replacedResult = await finish(replaced, replacedRequest, "completed-before-replacement");
+    expect((await admin.from("qbo_connections").update({
+      id: crypto.randomUUID(), realm_id: `replacement-${replaced.realm}`,
+    }).eq("brewery_id", replaced.brewery.id)).error).toBeNull();
+    expect((await admin.from("channel_prices").update({ unit_price_cents: 999 })
+      .eq("brewery_id", replaced.brewery.id)).error).toBeNull();
+    expect((await admin.from("skus").update({ qbo_item_id: null, qbo_realm_id: null })
+      .eq("id", replaced.catalog.skuId)).error).toBeNull();
+
+    const writtenOff = await pushFixture("invoice", "admin");
+    const writtenOffRequest = crypto.randomUUID();
+    const writtenOffResult = await finish(writtenOff, writtenOffRequest, "completed-before-write-off");
+    expect((await admin.from("invoices").update({ qbo_remote_state: "deleted" })
+      .eq("id", writtenOff.invoice.id)).error).toBeNull();
+    expect((await writtenOff.ctx.db.rpc("write_off_invoice", {
+      p_brewery: writtenOff.brewery.id,
+      p_invoice: writtenOff.invoice.id,
+      p_reason: "Confirmed deleted after the original push",
+      p_request_id: crypto.randomUUID(),
+    })).error).toBeNull();
+
+    await expect(replay(disconnected, disconnectedRequest)).resolves.toEqual(disconnectedResult);
+    await expect(replay(replaced, replacedRequest)).resolves.toEqual(replacedResult);
+    await expect(replay(writtenOff, writtenOffRequest)).resolves.toEqual(writtenOffResult);
+    expect(sql(`select count(*) from public.qbo_pushes where invoice_id in (
+      '${disconnected.invoice.id}','${replaced.invoice.id}','${writtenOff.invoice.id}')`)).toEqual(["3"]);
+
+    const differentPayloadFetch = vi.fn<typeof globalThis.fetch>();
+    await expect(pushInvoiceToQbo(
+      replaced.ctx, replaced.invoice.id, replacedRequest,
+      new QboOAuthClient(config, differentPayloadFetch), "corrected",
+    )).rejects.toThrow("different payload");
+    expect(differentPayloadFetch).not.toHaveBeenCalled();
+
+    const otherActor = await makeStaffCtx(disconnected.brewery.id, "sales");
+    const otherActorFetch = vi.fn<typeof globalThis.fetch>();
+    await expect(pushInvoiceToQbo(
+      otherActor, disconnected.invoice.id, disconnectedRequest, new QboOAuthClient(config, otherActorFetch),
+    )).rejects.toThrow("QuickBooks connection required");
+    expect(otherActorFetch).not.toHaveBeenCalled();
+
+    const foreign = await pushFixture("invoice", "admin");
+    const foreignFetch = vi.fn<typeof globalThis.fetch>();
+    await expect(pushInvoiceToQbo(
+      foreign.ctx, disconnected.invoice.id, disconnectedRequest, new QboOAuthClient(config, foreignFetch),
+    )).rejects.toThrow("invoice not found");
+    expect(foreignFetch).not.toHaveBeenCalled();
+  });
+
   it("recovers an unknown push through a verified same-realm reconnect without changing its identity", async () => {
     const f = await pushFixture("invoice", "admin");
     const beforeDisconnect = await readVersionedIntegrationTokens(f.ctx, "qbo");
@@ -485,6 +557,16 @@ describe("QuickBooks durable outbound push", () => {
     await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, firstRequest, new QboOAuthClient(config, validationFetch)))
       .rejects.toThrow("QuickBooks rejected the invoice");
     const firstKey = sql(`select provider_request_id::text from public.qbo_pushes where invoice_id='${f.invoice.id}'`)[0];
+    const storedFailure = sql(`select error from public.qbo_pushes where invoice_id='${f.invoice.id}'`)[0];
+    expect((await admin.from("customers").update({ qbo_customer_id: null, qbo_realm_id: null })
+      .eq("id", f.customer.customerId)).error).toBeNull();
+    const failedReplayFetch = vi.fn<typeof globalThis.fetch>();
+    await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, firstRequest, new QboOAuthClient(config, failedReplayFetch)))
+      .rejects.toThrow(storedFailure);
+    expect(failedReplayFetch).not.toHaveBeenCalled();
+    expect(sql(`select count(*) from public.qbo_pushes where invoice_id='${f.invoice.id}'`)).toEqual(["1"]);
+    expect((await admin.from("customers").update({ qbo_customer_id: "customer-42", qbo_realm_id: f.realm })
+      .eq("id", f.customer.customerId)).error).toBeNull();
     await expect(pushInvoiceToQbo(f.ctx, f.invoice.id, crypto.randomUUID(), new QboOAuthClient(config, vi.fn())))
       .rejects.toThrow("choose corrected");
 
