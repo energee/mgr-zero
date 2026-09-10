@@ -3831,7 +3831,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
         AND sf.basis='packaged' AND sf.package_type='keg'
       GROUP BY s.id HAVING sum(im.qty)>0)
   )
-  SELECT jsonb_build_object('location',loc.name,'asOf',transaction_timestamp(),
+  SELECT jsonb_build_object('location',loc.name,
     'items',coalesce((SELECT jsonb_agg(jsonb_build_object('brand',p.brand,'format',p.format,'ounces',p.ounces,
       'priceCents',p.price_cents,'available',true) ORDER BY p.brand,p.format) FROM published p),'[]'::jsonb))
   FROM menu m JOIN public.locations loc ON loc.id=m.location_id AND loc.brewery_id=m.brewery_id;

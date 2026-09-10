@@ -149,12 +149,15 @@ link is being fetched also leaves payment unavailable.
 
 The public website-menu feed is the other narrow `GET` exception:
 `/api/public/menus/{publicId}`. Its opaque id selects one configured POS
-location, and the response contains only its location name, an `asOf` time,
+location, and the response contains only its location name, a deterministic
+`version`,
 and explicitly published, currently stocked rows with `brand`, `format`,
 `ounces`, `priceCents`, and `available`. It exposes no tenant, catalog, stock,
 bin, channel, connection, or provider identifiers. Successful responses set
 `Cache-Control: public, max-age=0, s-maxage=60, stale-while-revalidate=300`;
-missing ids and failures are not cached. The endpoint does not accept writes.
+the quoted version is also its `ETag`, and a matching `If-None-Match` receives
+`304` with the same cache headers. Missing ids and failures are not cached. The
+endpoint does not accept writes.
 
 Outside the app, the equivalent is a POST with your own `requestId`:
 
