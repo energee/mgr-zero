@@ -176,6 +176,91 @@ describe("QuickBooks durable outbound push", () => {
     expect(foreignFetch).not.toHaveBeenCalled();
   });
 
+  it("waits for an in-flight finish and replays its committed terminal result without another POST", async () => {
+    const f = await pushFixture("invoice", "admin");
+    const requestId = crypto.randomUUID();
+    const started = await f.ctx.db.rpc("start_qbo_push", {
+      p_brewery: f.brewery.id,
+      p_invoice: f.invoice.id,
+      p_new_attempt_reason: null,
+      p_request_id: requestId,
+    });
+    expect(started.error).toBeNull();
+
+    const finishClient = new Client({ connectionString: DB });
+    const retryClient = new Client({ connectionString: DB });
+    await Promise.all([finishClient.connect(), retryClient.connect()]);
+    let retrying: Promise<unknown> | undefined;
+    try {
+      await retryClient.query("set application_name='qbo_terminal_replay_race'");
+      const retryPid = (await retryClient.query<{ pid: number }>("select pg_backend_pid() pid")).rows[0].pid;
+      await retryClient.query("set role authenticated");
+      await retryClient.query("select set_config('request.jwt.claim.sub',$1,false)", [f.ctx.userId]);
+
+      await finishClient.query("begin");
+      await finishClient.query(
+        "select public.finish_qbo_push($1,$2,$3,$4,$5,$6,$7::jsonb,$8)",
+        [
+          f.brewery.id,
+          started.data.pushId,
+          f.ctx.userId,
+          "pushed",
+          "race-remote",
+          null,
+          JSON.stringify({ Id: "race-remote", SyncToken: "0", TotalAmt: 9.99, Balance: 9.99 }),
+          started.data.finishRequestId,
+        ],
+      );
+
+      const retryDb = new Proxy(f.ctx.db, {
+        get(target, property, receiver) {
+          if (property === "rpc") {
+            return async (_name: string, args: Record<string, unknown>) => {
+              try {
+                const result = await retryClient.query<{ result: unknown }>(
+                  "select public.start_qbo_push($1,$2,$3,$4) result",
+                  [args.p_brewery, args.p_invoice, args.p_new_attempt_reason, args.p_request_id],
+                );
+                return { data: result.rows[0].result, error: null };
+              } catch (error) {
+                const pg = error as { message: string; code?: string };
+                return { data: null, error: { message: pg.message, code: pg.code } };
+              }
+            };
+          }
+          const value = Reflect.get(target, property, receiver);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      });
+      const noFetch = vi.fn<typeof globalThis.fetch>();
+      retrying = pushInvoiceToQbo(
+        { ...f.ctx, db: retryDb },
+        f.invoice.id,
+        requestId,
+        new QboOAuthClient(config, noFetch),
+      );
+
+      await expect.poll(async () => (await finishClient.query(
+        "select wait_event_type from pg_stat_activity where pid=$1",
+        [retryPid],
+      )).rows[0]?.wait_event_type, { timeout: 3000 }).toBe("Lock");
+      await finishClient.query("commit");
+
+      await expect(retrying).resolves.toEqual({
+        pushId: started.data.pushId,
+        status: "pushed",
+        remoteId: "race-remote",
+      });
+      expect(noFetch).not.toHaveBeenCalled();
+      expect(sql("select status||'|'||qbo_entity_id from qbo_pushes where id='" + started.data.pushId + "'"))
+        .toEqual(["pushed|race-remote"]);
+    } finally {
+      await finishClient.query("rollback").catch(() => undefined);
+      if (retrying) await Promise.allSettled([retrying]);
+      await Promise.all([finishClient.end(), retryClient.end()]);
+    }
+  });
+
   it("recovers an unknown push through a verified same-realm reconnect without changing its identity", async () => {
     const f = await pushFixture("invoice", "admin");
     const beforeDisconnect = await readVersionedIntegrationTokens(f.ctx, "qbo");
