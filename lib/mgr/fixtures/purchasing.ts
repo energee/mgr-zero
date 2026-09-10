@@ -119,6 +119,7 @@ export const vendorsList: VendorsSnapshot = {
 export const vendorYch: VendorViewModel = {
   name: "YCH",
   email: "orders@ych.example",
+  phone: "509-555-0142",
   terms: "Net 30",
   termsOptions: ["Due on receipt", "Net 15", "Net 30"],
   leadDays: "7",

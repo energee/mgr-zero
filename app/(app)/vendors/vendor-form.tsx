@@ -6,10 +6,9 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { VendorView } from "@/components/mgr/views/vendor";
 import { useCommandForm } from "@/lib/commands/use-command-form";
+import { toVendorViewProps } from "@/lib/mgr/vendor-view";
 
 export type Vendor = { id: string; name: string; email: string | null; phone: string | null; payment_terms: string; lead_time_days: number | null; active: boolean };
 
@@ -30,38 +29,14 @@ export function VendorForm({ vendor }: { vendor?: Vendor }) {
   });
   const trigger = vendor ? <Button variant="ghost" size="sm">Edit</Button> : <Button size="sm">Add vendor</Button>;
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title={vendor ? vendor.name : "New vendor"} trigger={trigger}>
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Vendor" trigger={trigger}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="v-name">Vendor name</Label>
-          <Input id="v-name" value={name} onChange={(e) => setName(e.target.value)} required />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="v-email">Email · optional</Label>
-          <Input id="v-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="v-phone">Phone · optional</Label>
-          <Input id="v-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="v-terms">Terms</Label>
-            <Select value={terms} onValueChange={setTerms}>
-              <SelectTrigger id="v-terms"><SelectValue /></SelectTrigger>
-              <SelectContent>{TERMS.map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="v-lead">Lead time (days)</Label>
-            <Input id="v-lead" type="number" min="0" step="1" value={lead} onChange={(e) => setLead(e.target.value)} />
-          </div>
-        </div>
-        <p className="text-sm text-muted-foreground">The typed figure is what Planning dates a buy-by from. Received orders give an observed average that is read, never stored.</p>
-        <CommandFormMessage error={form.error} />
-        <CommandFormFooter>
-          <Button type="submit" disabled={form.submitting || !name.trim()}>{form.submitting ? "Saving…" : "Save vendor"}</Button>
-        </CommandFormFooter>
+        <VendorView
+          model={toVendorViewProps({ name, email, phone, terms: TERMS.find(([value]) => value === terms)?.[1] ?? "Net 30", termsOptions: TERMS.map(([, label]) => label), leadDays: lead })}
+          controls={{ name: setName, email: setEmail, phone: setPhone, terms: (label) => setTerms(TERMS.find(([, value]) => value === label)?.[0] ?? "net30"), leadDays: setLead }}
+          messages={<CommandFormMessage error={form.error} />}
+          footer={<CommandFormFooter><Button type="submit" disabled={form.submitting || !name.trim()}>{form.submitting ? "Saving…" : "Save vendor"}</Button></CommandFormFooter>}
+        />
       </form>
     </CommandForm>
   );
