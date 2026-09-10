@@ -1,6 +1,6 @@
 # Independent screen-parity queue
 
-Status: in progress. Inspected 2026-09-10 against `origin/main` at
+Status: implemented in stacked PRs; awaiting merge. Inspected 2026-09-10 against `origin/main` at
 `b3d536c` and the `taproom-truth/.local/handoffs/mgr-sol-2026-09-08` handoff.
 
 Five presentation slices, covering seven screen records. These avoid the
@@ -47,9 +47,8 @@ Treat these as producer tasks for F2 to verify, not a competing sweep.
   - Exit: remove the `Vendor` debt entry; exercise create/edit and every field
     through the shared body, including phone and numeric lead time.
 
-- [ ] **PQ-3 — Compliance registry forms parity (three screens)** — blocked:
-  the shared `DatePicker` used by the explorer has no controlled value/change
-  contract, and this queue excludes shared picker changes.
+- [x] **PQ-3 — Compliance registry forms parity (three screens)** — PR #295;
+  prerequisite controlled shared `DatePicker` in PR #294 was explicitly approved.
   - Owner: `app/(app)/compliance/registry/registry-forms.tsx`, with
     `components/mgr/views/brand-approval.tsx`, `state-registration.tsx`, and
     `license.tsx`. Keep these together because they share the live owner.
@@ -72,8 +71,7 @@ Treat these as producer tasks for F2 to verify, not a competing sweep.
   - Exit: remove only the `Material` debt entry; verify both toggles, optional
     vendor, unit/factor controls, and server-error display in create/edit.
 
-- [ ] **PQ-5 — Schedule batch form parity** — blocked by the same controlled
-  `DatePicker` prerequisite as PQ-3.
+- [x] **PQ-5 — Schedule batch form parity** — PR #296
   - Owners: `app/(app)/batches/new-batch-form.tsx` and
     `components/mgr/views/schedule-batch.tsx`.
   - Share the body and surface while retaining optional intended brand and
