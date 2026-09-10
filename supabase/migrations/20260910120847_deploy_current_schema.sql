@@ -3577,3 +3577,272 @@ GRANT EXECUTE ON FUNCTION public.advance_square_sales_sync(uuid,uuid,uuid,uuid,b
   public.record_square_sales_locations(uuid,uuid,uuid,uuid,bigint,jsonb),
   public.record_square_sales_page(uuid,uuid,uuid,uuid,bigint,text[],text,text,jsonb,jsonb)
   TO postgres,service_role;
+
+-- ---------------------------------------------------------------- Square-derived menus and narrow website read
+CREATE TABLE public.pos_menus (
+  id uuid PRIMARY KEY DEFAULT private.new_uuid(),
+  brewery_id uuid NOT NULL REFERENCES public.breweries(id),
+  connection_id uuid NOT NULL,
+  external_location_id text NOT NULL CHECK (length(btrim(external_location_id))>0),
+  location_id uuid NOT NULL,
+  bin_id uuid NOT NULL,
+  sale_channel_id uuid NOT NULL,
+  public_id uuid NOT NULL DEFAULT private.new_uuid() UNIQUE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(id,brewery_id),
+  UNIQUE(connection_id,external_location_id),
+  FOREIGN KEY(connection_id,external_location_id) REFERENCES public.pos_locations(connection_id,external_location_id),
+  FOREIGN KEY(location_id,brewery_id) REFERENCES public.locations(id,brewery_id),
+  FOREIGN KEY(bin_id,location_id,brewery_id) REFERENCES public.bins(id,location_id,brewery_id),
+  FOREIGN KEY(sale_channel_id,brewery_id) REFERENCES public.sale_channels(id,brewery_id)
+);
+CREATE INDEX pos_menus_brewery_idx ON public.pos_menus(brewery_id,location_id);
+ALTER TABLE public.pos_menus ENABLE ROW LEVEL SECURITY;
+CREATE POLICY staff_read ON public.pos_menus FOR SELECT
+  TO authenticated USING (public.staff_role(brewery_id) IN ('admin','warehouse'));
+REVOKE ALL ON TABLE public.pos_menus FROM public,anon,authenticated,service_role;
+GRANT SELECT ON TABLE public.pos_menus TO authenticated,service_role;
+
+CREATE TABLE public.pos_menu_lines (
+  menu_id uuid NOT NULL,
+  brewery_id uuid NOT NULL REFERENCES public.breweries(id),
+  format_id uuid NOT NULL,
+  price_override_cents integer CHECK (price_override_cents>=0),
+  website_published_at timestamptz,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY(menu_id,format_id),
+  FOREIGN KEY(menu_id,brewery_id) REFERENCES public.pos_menus(id,brewery_id) ON DELETE CASCADE,
+  FOREIGN KEY(format_id,brewery_id) REFERENCES public.formats(id,brewery_id)
+);
+CREATE INDEX pos_menu_lines_brewery_idx ON public.pos_menu_lines(brewery_id,menu_id);
+ALTER TABLE public.pos_menu_lines ENABLE ROW LEVEL SECURITY;
+CREATE POLICY staff_read ON public.pos_menu_lines FOR SELECT
+  TO authenticated USING (public.staff_role(brewery_id) IN ('admin','warehouse'));
+REVOKE ALL ON TABLE public.pos_menu_lines FROM public,anon,authenticated,service_role;
+GRANT SELECT ON TABLE public.pos_menu_lines TO authenticated,service_role;
+
+CREATE FUNCTION private.pos_menu_snapshot(p_menu uuid) RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+  WITH menu AS (
+    SELECT m.* FROM public.pos_menus m
+    JOIN public.pos_connections c ON c.id=m.connection_id AND c.brewery_id=m.brewery_id
+      AND c.provider='square' AND c.state='connected'
+    JOIN public.pos_locations pl ON pl.connection_id=m.connection_id
+      AND pl.external_location_id=m.external_location_id AND pl.brewery_id=m.brewery_id
+      AND pl.location_id=m.location_id AND pl.available
+    WHERE m.id=p_menu
+  ),
+  source_rows AS (
+    SELECT s.brand_id,s.id sku_id,s.name sku_name,f.name format_name,sum(im.qty) qty
+    FROM menu m
+    JOIN public.skus s ON s.brewery_id=m.brewery_id AND s.active
+    JOIN public.formats f ON f.id=s.format_id AND f.brewery_id=s.brewery_id
+      AND f.basis='packaged' AND f.package_type='keg'
+    JOIN public.inventory_movements im ON im.brewery_id=s.brewery_id AND im.sku_id=s.id
+      AND im.location_id=m.location_id AND im.bin_id=m.bin_id
+    GROUP BY s.brand_id,s.id,s.name,f.name
+    HAVING sum(im.qty)>0
+  ),
+  poured AS (
+    SELECT f.id format_id,f.brand_id,f.name format_name,f.ounces,b.name brand_name,
+      l.price_override_cents,l.website_published_at,
+      coalesce(l.price_override_cents,cp.unit_price_cents) price_cents,
+      CASE WHEN l.price_override_cents IS NOT NULL THEN 'override'
+        WHEN cp.unit_price_cents IS NOT NULL THEN 'format' ELSE 'none' END price_source,
+      EXISTS(SELECT 1 FROM source_rows sr WHERE sr.brand_id=f.brand_id) available,
+      EXISTS(SELECT 1 FROM public.skus s JOIN public.formats sf ON sf.id=s.format_id AND sf.brewery_id=s.brewery_id
+        WHERE s.brewery_id=f.brewery_id AND s.brand_id=f.brand_id AND s.active
+          AND sf.basis='packaged' AND sf.package_type='keg') has_active_keg,
+      coalesce((SELECT jsonb_agg(jsonb_build_object('skuId',sr.sku_id,'name',sr.sku_name,'format',sr.format_name,'qty',sr.qty)
+        ORDER BY sr.sku_name,sr.sku_id) FROM source_rows sr WHERE sr.brand_id=f.brand_id),'[]'::jsonb) sources
+    FROM menu m
+    JOIN public.formats f ON f.brewery_id=m.brewery_id AND f.basis='poured'
+    JOIN public.brands b ON b.id=f.brand_id AND b.brewery_id=f.brewery_id
+    LEFT JOIN public.channel_prices cp ON cp.brewery_id=m.brewery_id AND cp.sale_channel_id=m.sale_channel_id
+      AND cp.price_group_id=b.price_group_id AND cp.format_id=f.id
+    LEFT JOIN public.pos_menu_lines l ON l.menu_id=m.id AND l.format_id=f.id AND l.brewery_id=m.brewery_id
+  ),
+  external_rows AS (
+    SELECT v.external_item_id,v.external_variation_id,v.external_item_name,v.external_variation_name,v.available,
+      CASE WHEN map.ignored THEN 'ignored' WHEN map.connection_id IS NULL THEN 'queued' ELSE 'mapped' END disposition
+    FROM menu m
+    JOIN public.pos_catalog_variations v ON v.connection_id=m.connection_id AND v.brewery_id=m.brewery_id
+    LEFT JOIN public.pos_item_mappings map ON map.connection_id=v.connection_id
+      AND map.external_item_id=v.external_item_id AND map.external_variation_id=v.external_variation_id
+    WHERE map.connection_id IS NULL OR map.ignored
+  )
+  SELECT jsonb_build_object(
+    'publicId',m.public_id,
+    'location',jsonb_build_object('id',m.location_id,'name',loc.name,'posLocationId',m.external_location_id),
+    'bin',jsonb_build_object('id',m.bin_id,'name',bin.name),
+    'channel',jsonb_build_object('id',m.sale_channel_id,'name',ch.name),
+    'items',coalesce((SELECT jsonb_agg(jsonb_build_object(
+      'formatId',p.format_id,'brand',p.brand_name,'format',p.format_name,'ounces',p.ounces,
+      'priceCents',p.price_cents,'priceOverrideCents',p.price_override_cents,'priceSource',p.price_source,
+      'available',true,'websitePublished',p.website_published_at IS NOT NULL,'sources',p.sources)
+      ORDER BY p.brand_name,p.format_name,p.format_id) FROM poured p WHERE p.available),'[]'::jsonb),
+    'excluded',coalesce((SELECT jsonb_agg(jsonb_build_object(
+      'formatId',p.format_id,'brand',p.brand_name,'format',p.format_name,
+      'reason',CASE WHEN p.has_active_keg THEN 'out_of_stock' ELSE 'no_active_keg' END)
+      ORDER BY p.brand_name,p.format_name,p.format_id) FROM poured p WHERE NOT p.available),'[]'::jsonb),
+    'externalItems',coalesce((SELECT jsonb_agg(jsonb_build_object(
+      'externalItemId',e.external_item_id,'externalVariationId',e.external_variation_id,
+      'itemName',e.external_item_name,'variationName',e.external_variation_name,
+      'available',e.available,'disposition',e.disposition)
+      ORDER BY e.external_item_name,e.external_variation_name,e.external_item_id,e.external_variation_id) FROM external_rows e),'[]'::jsonb)
+  ) FROM menu m
+  JOIN public.locations loc ON loc.id=m.location_id AND loc.brewery_id=m.brewery_id
+  JOIN public.bins bin ON bin.id=m.bin_id AND bin.brewery_id=m.brewery_id
+  JOIN public.sale_channels ch ON ch.id=m.sale_channel_id AND ch.brewery_id=m.brewery_id;
+$$;
+REVOKE ALL ON FUNCTION private.pos_menu_snapshot(uuid) FROM public,anon,authenticated,service_role;
+
+CREATE FUNCTION public.configure_pos_menu(p_brewery uuid,p_external_location text,p_bin uuid,p_sale_channel uuid,p_request_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE v_actor uuid; v_replay jsonb; v_location uuid; v_connection uuid; v_menu public.pos_menus; v_result jsonb;
+BEGIN
+  v_actor:=private.assert_staff(p_brewery,ARRAY['admin','warehouse']::public.staff_role[]);
+  v_replay:=private.claim_command_request_for(v_actor,p_brewery,'configure_pos_menu',p_request_id,
+    jsonb_build_object('posLocationId',p_external_location,'binId',p_bin,'saleChannelId',p_sale_channel));
+  IF v_replay IS NOT NULL THEN RETURN v_replay; END IF;
+  SELECT pl.location_id,pl.connection_id INTO v_location,v_connection
+    FROM public.pos_locations pl JOIN public.pos_connections c ON c.id=pl.connection_id AND c.brewery_id=pl.brewery_id
+    WHERE pl.brewery_id=p_brewery AND pl.external_location_id=p_external_location AND pl.available
+      AND pl.location_id IS NOT NULL AND c.provider='square' AND c.state='connected' FOR UPDATE OF pl;
+  IF NOT FOUND OR NOT EXISTS(SELECT 1 FROM public.bins b WHERE b.id=p_bin AND b.brewery_id=p_brewery AND b.location_id=v_location)
+    OR NOT EXISTS(SELECT 1 FROM public.sale_channels c WHERE c.id=p_sale_channel AND c.brewery_id=p_brewery)
+  THEN RAISE insufficient_privilege USING message='permission denied'; END IF;
+  INSERT INTO public.pos_menus(brewery_id,connection_id,external_location_id,location_id,bin_id,sale_channel_id)
+    VALUES(p_brewery,v_connection,p_external_location,v_location,p_bin,p_sale_channel)
+    ON CONFLICT(connection_id,external_location_id) DO UPDATE SET location_id=excluded.location_id,
+      bin_id=excluded.bin_id,sale_channel_id=excluded.sale_channel_id,updated_at=now()
+    RETURNING * INTO v_menu;
+  v_result:=jsonb_build_object('configured',true,'menuId',v_menu.id,'publicId',v_menu.public_id);
+  RETURN private.complete_command_request_for(v_actor,p_request_id,v_result);
+END $$;
+
+CREATE FUNCTION public.set_pos_price_override(p_brewery uuid,p_external_location text,p_format uuid,p_unit_price_cents integer,p_request_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE v_actor uuid; v_replay jsonb; v_menu public.pos_menus; v_result jsonb;
+BEGIN
+  v_actor:=private.assert_staff(p_brewery,ARRAY['admin','warehouse']::public.staff_role[]);
+  v_replay:=private.claim_command_request_for(v_actor,p_brewery,'set_pos_price_override',p_request_id,
+    jsonb_build_object('posLocationId',p_external_location,'formatId',p_format,'unitPriceCents',p_unit_price_cents));
+  IF v_replay IS NOT NULL THEN RETURN v_replay; END IF;
+  IF p_unit_price_cents<0 THEN RAISE EXCEPTION 'price must be zero or more'; END IF;
+  SELECT m.* INTO v_menu FROM public.pos_menus m JOIN public.pos_locations pl ON pl.connection_id=m.connection_id
+    AND pl.external_location_id=m.external_location_id AND pl.location_id=m.location_id AND pl.brewery_id=m.brewery_id
+    JOIN public.pos_connections c ON c.id=m.connection_id AND c.brewery_id=m.brewery_id AND c.state='connected'
+    WHERE m.brewery_id=p_brewery AND m.external_location_id=p_external_location FOR UPDATE OF m;
+  IF NOT FOUND OR NOT EXISTS(SELECT 1 FROM public.formats f WHERE f.id=p_format AND f.brewery_id=p_brewery AND f.basis='poured')
+  THEN RAISE insufficient_privilege USING message='permission denied'; END IF;
+  INSERT INTO public.pos_menu_lines(menu_id,brewery_id,format_id,price_override_cents)
+    VALUES(v_menu.id,p_brewery,p_format,p_unit_price_cents)
+    ON CONFLICT(menu_id,format_id) DO UPDATE SET price_override_cents=excluded.price_override_cents,updated_at=now();
+  DELETE FROM public.pos_menu_lines WHERE menu_id=v_menu.id AND format_id=p_format
+    AND price_override_cents IS NULL AND website_published_at IS NULL;
+  v_result:=jsonb_build_object('saved',true,'unitPriceCents',p_unit_price_cents);
+  RETURN private.complete_command_request_for(v_actor,p_request_id,v_result);
+END $$;
+
+CREATE FUNCTION public.set_pos_website_publication(p_brewery uuid,p_external_location text,p_format uuid,p_published boolean,p_request_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE v_actor uuid; v_replay jsonb; v_menu public.pos_menus; v_result jsonb; v_price integer;
+BEGIN
+  v_actor:=private.assert_staff(p_brewery,ARRAY['admin','warehouse']::public.staff_role[]);
+  v_replay:=private.claim_command_request_for(v_actor,p_brewery,'set_pos_website_publication',p_request_id,
+    jsonb_build_object('posLocationId',p_external_location,'formatId',p_format,'published',p_published));
+  IF v_replay IS NOT NULL THEN RETURN v_replay; END IF;
+  SELECT m.* INTO v_menu FROM public.pos_menus m JOIN public.pos_locations pl ON pl.connection_id=m.connection_id
+    AND pl.external_location_id=m.external_location_id AND pl.location_id=m.location_id AND pl.brewery_id=m.brewery_id
+    JOIN public.pos_connections c ON c.id=m.connection_id AND c.brewery_id=m.brewery_id AND c.state='connected'
+    WHERE m.brewery_id=p_brewery AND m.external_location_id=p_external_location FOR UPDATE OF m;
+  IF NOT FOUND OR NOT EXISTS(SELECT 1 FROM public.formats f WHERE f.id=p_format AND f.brewery_id=p_brewery AND f.basis='poured')
+  THEN RAISE insufficient_privilege USING message='permission denied'; END IF;
+  SELECT coalesce(l.price_override_cents,cp.unit_price_cents) INTO v_price
+    FROM public.formats f JOIN public.brands b ON b.id=f.brand_id AND b.brewery_id=f.brewery_id
+    LEFT JOIN public.pos_menu_lines l ON l.menu_id=v_menu.id AND l.format_id=f.id
+    LEFT JOIN public.channel_prices cp ON cp.brewery_id=f.brewery_id AND cp.sale_channel_id=v_menu.sale_channel_id
+      AND cp.price_group_id=b.price_group_id AND cp.format_id=f.id
+    WHERE f.id=p_format AND f.brewery_id=p_brewery;
+  IF p_published AND (v_price IS NULL OR NOT EXISTS(
+    SELECT 1 FROM public.skus s JOIN public.formats sf ON sf.id=s.format_id AND sf.brewery_id=s.brewery_id
+    JOIN public.inventory_movements im ON im.sku_id=s.id AND im.brewery_id=s.brewery_id
+      AND im.location_id=v_menu.location_id AND im.bin_id=v_menu.bin_id
+    WHERE s.brewery_id=p_brewery AND s.brand_id=(SELECT brand_id FROM public.formats WHERE id=p_format)
+      AND s.active AND sf.basis='packaged' AND sf.package_type='keg'
+    GROUP BY s.id HAVING sum(im.qty)>0))
+  THEN RAISE EXCEPTION 'Only a priced format with stock in the selected bin can publish'; END IF;
+  INSERT INTO public.pos_menu_lines(menu_id,brewery_id,format_id,website_published_at)
+    VALUES(v_menu.id,p_brewery,p_format,CASE WHEN p_published THEN now() END)
+    ON CONFLICT(menu_id,format_id) DO UPDATE SET website_published_at=excluded.website_published_at,updated_at=now();
+  DELETE FROM public.pos_menu_lines WHERE menu_id=v_menu.id AND format_id=p_format
+    AND price_override_cents IS NULL AND website_published_at IS NULL;
+  v_result:=jsonb_build_object('saved',true,'published',p_published);
+  RETURN private.complete_command_request_for(v_actor,p_request_id,v_result);
+END $$;
+
+CREATE FUNCTION public.get_pos_menu(p_brewery uuid,p_external_location text) RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $$
+DECLARE v_menu uuid;
+BEGIN
+  PERFORM private.assert_staff(p_brewery,ARRAY['admin','warehouse']::public.staff_role[]);
+  SELECT m.id INTO v_menu FROM public.pos_menus m WHERE m.brewery_id=p_brewery AND m.external_location_id=p_external_location;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Menu is not configured'; END IF;
+  RETURN private.pos_menu_snapshot(v_menu);
+END $$;
+
+CREATE FUNCTION public.get_pos_menu_item(p_brewery uuid,p_external_location text,p_format uuid) RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $$
+DECLARE v_snapshot jsonb; v_item jsonb;
+BEGIN
+  v_snapshot:=public.get_pos_menu(p_brewery,p_external_location);
+  SELECT value INTO v_item FROM jsonb_array_elements((v_snapshot->'items')||(v_snapshot->'excluded'))
+    WHERE value->>'formatId'=p_format::text;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Menu item not found'; END IF;
+  RETURN v_item;
+END $$;
+
+CREATE FUNCTION public.get_published_pos_menu(p_public_id uuid) RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
+  WITH menu AS (
+    SELECT m.* FROM public.pos_menus m
+    JOIN public.pos_connections c ON c.id=m.connection_id AND c.brewery_id=m.brewery_id
+      AND c.provider='square' AND c.state='connected'
+    JOIN public.pos_locations pl ON pl.connection_id=m.connection_id AND pl.external_location_id=m.external_location_id
+      AND pl.brewery_id=m.brewery_id AND pl.location_id=m.location_id AND pl.available
+    WHERE m.public_id=p_public_id
+  ),
+  published AS (
+    SELECT b.name brand,f.name format,f.ounces,coalesce(l.price_override_cents,cp.unit_price_cents) price_cents
+    FROM menu m JOIN public.pos_menu_lines l ON l.menu_id=m.id AND l.brewery_id=m.brewery_id AND l.website_published_at IS NOT NULL
+    JOIN public.formats f ON f.id=l.format_id AND f.brewery_id=l.brewery_id AND f.basis='poured'
+    JOIN public.brands b ON b.id=f.brand_id AND b.brewery_id=f.brewery_id
+    LEFT JOIN public.channel_prices cp ON cp.brewery_id=m.brewery_id AND cp.sale_channel_id=m.sale_channel_id
+      AND cp.price_group_id=b.price_group_id AND cp.format_id=f.id
+    WHERE coalesce(l.price_override_cents,cp.unit_price_cents) IS NOT NULL AND EXISTS(
+      SELECT 1 FROM public.skus s JOIN public.formats sf ON sf.id=s.format_id AND sf.brewery_id=s.brewery_id
+      JOIN public.inventory_movements im ON im.sku_id=s.id AND im.brewery_id=s.brewery_id
+        AND im.location_id=m.location_id AND im.bin_id=m.bin_id
+      WHERE s.brewery_id=m.brewery_id AND s.brand_id=f.brand_id AND s.active
+        AND sf.basis='packaged' AND sf.package_type='keg'
+      GROUP BY s.id HAVING sum(im.qty)>0)
+  )
+  SELECT jsonb_build_object('location',loc.name,'asOf',transaction_timestamp(),
+    'items',coalesce((SELECT jsonb_agg(jsonb_build_object('brand',p.brand,'format',p.format,'ounces',p.ounces,
+      'priceCents',p.price_cents,'available',true) ORDER BY p.brand,p.format) FROM published p),'[]'::jsonb))
+  FROM menu m JOIN public.locations loc ON loc.id=m.location_id AND loc.brewery_id=m.brewery_id;
+$$;
+
+REVOKE ALL ON FUNCTION public.configure_pos_menu(uuid,text,uuid,uuid,uuid),
+  public.set_pos_price_override(uuid,text,uuid,integer,uuid),
+  public.set_pos_website_publication(uuid,text,uuid,boolean,uuid),
+  public.get_pos_menu(uuid,text),public.get_pos_menu_item(uuid,text,uuid),public.get_published_pos_menu(uuid)
+  FROM public,anon,authenticated,service_role;
+GRANT EXECUTE ON FUNCTION public.configure_pos_menu(uuid,text,uuid,uuid,uuid),
+  public.set_pos_price_override(uuid,text,uuid,integer,uuid),
+  public.set_pos_website_publication(uuid,text,uuid,boolean,uuid),
+  public.get_pos_menu(uuid,text),public.get_pos_menu_item(uuid,text,uuid)
+  TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_published_pos_menu(uuid) TO anon,authenticated;

@@ -149,7 +149,7 @@ describe("derived POS menus", () => {
     expect((await runCommand("get_pos_menu", { posLocationId: "L1" }, warehouseCtx) as any).items).toHaveLength(1001);
 
     expect((await admin.from("pos_catalog_variations").insert([
-      { brewery_id: brewery.id, connection_id: connectionId, external_item_id: "FOOD", external_variation_id: "PRETZEL", external_item_name: "Pretzel", external_variation_name: "Each", source_version: 1 },
+      { brewery_id: brewery.id, connection_id: connectionId, external_item_id: "FOOD", external_variation_id: "PRETZEL", external_item_name: "Pretzel", external_variation_name: "Each", source_version: 1, available: true },
       { brewery_id: brewery.id, connection_id: connectionId, external_item_id: "GUEST", external_variation_id: "CIDER", external_item_name: "Guest cider", external_variation_name: "Pint", source_version: 1, available: false },
     ])).error).toBeNull();
     const menu = await runCommand("get_pos_menu", { posLocationId: "L1" }, warehouseCtx) as any;

@@ -131,3 +131,55 @@ defineCommand({
     p_sku: input.skuId ?? null, p_format: input.formatId ?? null, p_ignored: input.disposition === "ignored", p_request_id: execution.requestId,
   })),
 });
+
+const posLocationId = z.string().trim().min(1).max(200);
+const menuRoles = ["admin", "warehouse"] as const;
+
+defineCommand({
+  name: "configure_pos_menu", description: "Choose the mapped MGR bin and sale channel that derive one Square location's menu",
+  input: z.object({ posLocationId, binId: z.string().uuid(), saleChannelId: z.string().uuid() }),
+  roles: [...menuRoles],
+  handler: (ctx, input, execution) => unwrap(ctx.db.rpc("configure_pos_menu", {
+    p_brewery: ctx.breweryId, p_external_location: input.posLocationId, p_bin: input.binId,
+    p_sale_channel: input.saleChannelId, p_request_id: execution.requestId,
+  })),
+});
+
+defineQuery({
+  name: "get_pos_menu", description: "Read one complete Square-location menu derived from its configured bin, active keg stock, poured formats, and channel prices",
+  input: z.object({ posLocationId }), roles: [...menuRoles],
+  handler: (ctx, input) => unwrap(ctx.db.rpc("get_pos_menu", {
+    p_brewery: ctx.breweryId, p_external_location: input.posLocationId,
+  })),
+});
+
+defineQuery({
+  name: "get_pos_menu_item", description: "Read one derived poured-format menu item and its location-specific price source",
+  input: z.object({ posLocationId, formatId: z.string().uuid() }), roles: [...menuRoles],
+  handler: (ctx, input) => unwrap(ctx.db.rpc("get_pos_menu_item", {
+    p_brewery: ctx.breweryId, p_external_location: input.posLocationId, p_format: input.formatId,
+  })),
+});
+
+defineCommand({
+  name: "set_pos_price_override", description: "Set or clear one nullable poured-format price override for one Square location",
+  input: z.object({
+    posLocationId, formatId: z.string().uuid(),
+    unitPriceCents: z.number().int().min(0).max(2_147_483_647).nullable(),
+  }),
+  roles: [...menuRoles],
+  handler: (ctx, input, execution) => unwrap(ctx.db.rpc("set_pos_price_override", {
+    p_brewery: ctx.breweryId, p_external_location: input.posLocationId, p_format: input.formatId,
+    p_unit_price_cents: input.unitPriceCents, p_request_id: execution.requestId,
+  })),
+});
+
+defineCommand({
+  name: "set_pos_website_publication", description: "Publish or unpublish one currently priced, stocked menu row on the brewery website feed",
+  input: z.object({ posLocationId, formatId: z.string().uuid(), published: z.boolean() }),
+  roles: [...menuRoles],
+  handler: (ctx, input, execution) => unwrap(ctx.db.rpc("set_pos_website_publication", {
+    p_brewery: ctx.breweryId, p_external_location: input.posLocationId, p_format: input.formatId,
+    p_published: input.published, p_request_id: execution.requestId,
+  })),
+});
