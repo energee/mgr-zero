@@ -12,6 +12,7 @@ export type MovementRecordedViewModel = {
   tapeLabel: string;
   tapeDetail: string;
   correctionGate: string;
+  details?: { label: string; value: string }[];
 };
 
 export type MovementRecordedSnapshot = {
@@ -23,6 +24,7 @@ export type MovementRecordedSnapshot = {
   bbl: string;
   when?: string;
   backHref?: string;
+  details?: { label: string; value: string }[];
 };
 
 export function toMovementRecordedViewProps(s: MovementRecordedSnapshot): MovementRecordedViewModel {
@@ -34,5 +36,6 @@ export function toMovementRecordedViewProps(s: MovementRecordedSnapshot): Moveme
     tapeLabel: `${signed} ${s.unit} · ${s.kind}${dest}`,
     tapeDetail: `${formatVolume(s.bbl)} · ${s.when ?? "just now"}`,
     correctionGate: MOVEMENT_CORRECTION_GATE,
+    details: s.details,
   };
 }

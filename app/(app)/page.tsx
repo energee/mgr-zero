@@ -46,7 +46,7 @@ export default async function TodayPage() {
   return (
     <TodayView
       model={toTodayViewProps({ date, items, empty: "Nothing waiting", emptyVerb: "Record movement" })}
-      emptyAction={E.btn("Record movement", "g", "/inventory")}
+      emptyAction={E.btn("Record movement", "g", "/inventory?recordMovement=1")}
       linkRows
     />
   );
