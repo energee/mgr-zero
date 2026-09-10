@@ -88,6 +88,13 @@ describe("Entry surface", () => {
   });
 });
 
+describe("Reverse movement view", () => {
+  it("the live reversal form mounts the inventory view", () => {
+    const source = src("app/(app)/inventory/reversal-form.tsx");
+    expect(source).toMatch(/<ReverseMovementView\b/);
+  });
+});
+
 describe("Today view", () => {
   it("maps warehouse rows onto Pick / Put back / Receive / Resume", () => {
     const model = toTodayViewProps(todayWarehouse);
