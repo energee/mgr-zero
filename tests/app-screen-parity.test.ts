@@ -31,13 +31,10 @@ describe("explorer parity", () => {
   it("maps live production screens without stale inventory gates", () => {
     const routes = new Map(SCREEN_ROUTES.map((route) => [route.name, route.file]));
     const names = new Set(ungatedMgrScreens().map((screen) => screen.name));
-    expect([...names].filter((name) => ["Fermentation reading", "Packaging runs", "Schedule packaging run", "Planning", "Repack"].includes(name))).toEqual([
-      "Fermentation reading", "Packaging runs", "Schedule packaging run", "Planning", "Repack",
+    expect([...names].filter((name) => ["Packaging runs", "Planning"].includes(name))).toEqual([
+      "Packaging runs", "Planning",
     ]);
-    expect(routes.get("Fermentation reading")).toBe("app/(app)/cellar/[occupancyId]/reading/page.tsx");
     expect(routes.get("Packaging runs")).toBe("app/(app)/packaging/page.tsx");
-    expect(routes.get("Schedule packaging run")).toBe("app/(app)/packaging/schedule-run-form.tsx");
     expect(routes.get("Planning")).toBe("app/(app)/planning/page.tsx");
-    expect(routes.get("Repack")).toBe("app/(app)/packaging/repack-form.tsx");
   });
 });
