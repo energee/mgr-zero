@@ -3683,7 +3683,9 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
       'available',true,'websitePublished',p.website_published_at IS NOT NULL,'sources',p.sources)
       ORDER BY p.brand_name,p.format_name,p.format_id) FROM poured p WHERE p.available),'[]'::jsonb),
     'excluded',coalesce((SELECT jsonb_agg(jsonb_build_object(
-      'formatId',p.format_id,'brand',p.brand_name,'format',p.format_name,
+      'formatId',p.format_id,'brand',p.brand_name,'format',p.format_name,'ounces',p.ounces,
+      'priceCents',p.price_cents,'priceOverrideCents',p.price_override_cents,'priceSource',p.price_source,
+      'available',false,'websitePublished',p.website_published_at IS NOT NULL,'sources',p.sources,
       'reason',CASE WHEN p.has_active_keg THEN 'out_of_stock' ELSE 'no_active_keg' END)
       ORDER BY p.brand_name,p.format_name,p.format_id) FROM poured p WHERE NOT p.available),'[]'::jsonb),
     'externalItems',coalesce((SELECT jsonb_agg(jsonb_build_object(
