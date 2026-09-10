@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
+import { E } from "@/components/mgr/e";
 import { useCommandAction, useCommandForm } from "@/lib/commands/use-command-form";
+import { money } from "@/lib/mgr/money";
 import type { QboInvoiceAction } from "@/lib/mgr/qbo-ui";
 
 export function QboConnectionAction({ configured, reconnect = false }: { configured: boolean; reconnect?: boolean }) {
@@ -85,4 +87,15 @@ export function QboInvoiceActions({ invoiceId, actions }: { invoiceId: string; a
     </CommandForm>}
     <CommandFormMessage error={commandAction.error} />
   </div>;
+}
+
+export function QboInvoiceRow({ invoiceId, detail, balanceCents, actions, healthy }: {
+  invoiceId: string; detail: string; balanceCents: number | null; actions: QboInvoiceAction[]; healthy: boolean;
+}) {
+  return E.row(
+    "QuickBooks",
+    `${detail}${balanceCents != null ? ` · ${money(balanceCents)} balance` : ""}`,
+    <QboInvoiceActions invoiceId={invoiceId} actions={actions} />,
+    healthy ? "ok" : "w",
+  );
 }

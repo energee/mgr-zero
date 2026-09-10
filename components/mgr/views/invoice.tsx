@@ -23,8 +23,8 @@ export function InvoiceView({
   mappings?: InvoiceViewModel["mappings"];
   pushDisabled?: boolean;
   qbo?: ReactNode;
-  /** Live: QuickBooks mapping/push is not connected. Inventory omits this. */
-  qboGate?: string;
+  /** Live QuickBooks row, or a gate message while integration is unavailable. */
+  qboGate?: ReactNode;
 }) {
   const mappingRows = qbo !== undefined || qboGate ? undefined : mappings;
   const unanswered = (q: InvoiceQuestionView) => {
@@ -38,7 +38,7 @@ export function InvoiceView({
       {model.lines.map((line) => (
         <Fragment key={line.key}>{E.row(line.name, line.detail, line.amount)}</Fragment>
       ))}
-      {qbo !== undefined ? qbo : (qboGate ? E.gated("QuickBooks", qboGate) : null)}
+      {qbo !== undefined ? qbo : (typeof qboGate === "string" ? E.gated("QuickBooks", qboGate) : qboGate)}
       {mappingRows?.map((row) => (
         <Fragment key={row.key}>{E.row(row.title, row.detail, E.act("Fix", "attention"), row.tone ?? "")}</Fragment>
       ))}

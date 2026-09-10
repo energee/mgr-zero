@@ -13,10 +13,8 @@ import { orNotFound } from "@/lib/mgr/not-found";
 import { toInvoiceViewProps } from "@/lib/mgr/invoice-view";
 import { CreditMemoForm } from "./credit-memo-form";
 import { MarkAnswered } from "./mark-answered";
-import { E } from "@/components/mgr/e";
-import { money } from "@/lib/mgr/money";
 import { qboInvoicePresentation } from "@/lib/mgr/qbo-ui";
-import { QboInvoiceActions } from "@/app/(app)/settings/accounting/qbo-controls";
+import { QboInvoiceRow } from "@/app/(app)/settings/accounting/qbo-controls";
 
 type Invoice = { id: string; shipment_id: string | null; invoice_no: number | null; kind: "invoice" | "credit_memo"; issued_on: string; due_on: string | null; paid_at: string | null; qbo_invoice_id: string | null; qbo_sync_status: "pending" | "pushed" | "push_failed"; qbo_sync_error: string | null; qbo_remote_state: "live" | "voided" | "deleted"; qbo_total_cents: number | null; qbo_balance_cents: number | null; qbo_accountant_drift: boolean; written_off_at: string | null; customers: { id: string; name: string; qbo_customer_id: string | null; qbo_realm_id: string | null } | null };
 type InvoiceLine = { id: string; kind: string; sku_id: string | null; qty: number; unit_price_cents: number; amount_cents: number; description: string; skus: { name: string; qbo_item_id: string | null; qbo_realm_id: string | null } | null };
@@ -45,7 +43,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
       model={toInvoiceViewProps({ invoice, lines, questions, backHref: "/invoices" })}
       headerAction={memo}
       questionAction={(q) => <MarkAnswered questionId={q.id} />}
-      qbo={E.row("QuickBooks", `${presentation.detail}${invoice.qbo_balance_cents != null ? ` · ${money(invoice.qbo_balance_cents)} balance` : ""}`, <QboInvoiceActions invoiceId={invoice.id} actions={presentation.actions} />, invoice.qbo_sync_status === "pushed" && invoice.qbo_remote_state === "live" && !invoice.qbo_accountant_drift ? "ok" : "w")}
+      qboGate={<QboInvoiceRow invoiceId={invoice.id} detail={presentation.detail} balanceCents={invoice.qbo_balance_cents} actions={presentation.actions} healthy={invoice.qbo_sync_status === "pushed" && invoice.qbo_remote_state === "live" && !invoice.qbo_accountant_drift} />}
     />
   );
 }
