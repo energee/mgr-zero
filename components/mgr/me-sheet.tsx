@@ -43,7 +43,7 @@ export function MeSheetActions() {
     <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:justify-end">
       <Button variant="outline" className="w-full md:w-fit md:self-end" asChild><Link href="/password">Change password</Link></Button>
       <form action={logout}>
-        <Button type="submit" variant="destructive" className="w-full bg-destructive text-destructive-foreground hover:bg-destructive/90 dark:bg-destructive dark:hover:bg-destructive/90 md:w-fit md:self-end">Sign out</Button>
+        <Button type="submit" variant="destructive" className="w-full bg-destructive! text-destructive-foreground! hover:bg-destructive/90! md:w-fit md:self-end">Sign out</Button>
       </form>
     </div>
   );
