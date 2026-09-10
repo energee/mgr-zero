@@ -102,6 +102,16 @@ export function sanitizeQboError(error: unknown) {
   return "QuickBooks is unavailable";
 }
 
+export function validateQboPaymentUrl(value: string, allowedHosts: ReadonlySet<string>) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password && !url.port
+      && allowedHosts.has(url.hostname) ? url : null;
+  } catch {
+    return null;
+  }
+}
+
 const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
 
 export async function beginQboOAuth(ctx: Ctx, client: QboOAuthClient, providerIntent: "connect" | "reconnect", requestId: string = randomUUID()) {
@@ -389,6 +399,24 @@ export class QboOAuthClient {
       paidAt: typeof updated === "string" && Number.isFinite(Date.parse(updated)) ? updated : null,
       privateNote: typeof invoice.PrivateNote === "string" ? invoice.PrivateNote : "",
       content: meaningfulInvoiceContent(invoice),
+    };
+  }
+
+  async readInvoiceLink(realmId: string, remoteId: string, accessToken: string) {
+    const url = new URL(`/v3/company/${encodeURIComponent(realmId)}/invoice/${encodeURIComponent(remoteId)}`, this.config.apiBaseUrl);
+    url.searchParams.set("include", "invoiceLink");
+    url.searchParams.set("minorversion", ACCOUNTING_MINOR_VERSION);
+    const response = await this.transport(url, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+      redirect: "error",
+    });
+    if (!response.ok) return { ok: false as const, status: response.status };
+    const payload = await response.json() as { Invoice?: Record<string, unknown> };
+    if (!payload.Invoice || payload.Invoice.Id !== remoteId) throw new Error("QuickBooks response was invalid");
+    return {
+      ok: true as const,
+      invoiceLink: typeof payload.Invoice.InvoiceLink === "string" ? payload.Invoice.InvoiceLink : null,
     };
   }
 
