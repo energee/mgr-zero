@@ -3744,6 +3744,8 @@ declare v_actor uuid; v_token uuid := private.new_uuid(); v_input jsonb; v_effec
 begin
   v_actor := private.assert_staff(p_brewery,array['admin','warehouse']::public.staff_role[]);
   perform private.assert_chat_conversation(p_brewery,p_conversation);
+  if p_type not in ('opening_balance','production_in','adjustment','depletion','return_in','destruction','loss','sample','festival_removal')
+    then raise exception 'movement type is not supported in chat'; end if;
   if p_qty is null or p_qty::text in ('NaN','Infinity','-Infinity') or p_qty=0 or p_qty<>round(p_qty,2)
     then raise exception 'invalid movement quantity'; end if;
   if not exists(select 1 from public.skus where id=p_sku and brewery_id=p_brewery)
@@ -4909,6 +4911,8 @@ begin
   if (p_origin='chat') is distinct from (p_conversation is not null and p_preview_token is not null)
     then raise exception 'chat preview token required'; end if;
   if p_origin not in ('ui','chat') then raise exception 'invalid command origin'; end if;
+  if p_origin='chat' and p_type not in ('opening_balance','production_in','adjustment','depletion','return_in','destruction','loss','sample','festival_removal')
+    then raise exception 'movement type is not supported in chat'; end if;
   v_input := jsonb_build_object('brewery', p_brewery, 'sku', p_sku, 'location', p_location, 'bin', p_bin, 'qty', p_qty, 'type', p_type, 'sale_channel', p_sale_channel, 'dest_state', p_dest_state, 'note', p_note, 'lot', p_lot);
   if p_origin='chat' and not exists(select 1 from private.command_previews
     where token=p_preview_token and actor_id=v_actor and brewery_id=p_brewery and command_name='record_movement'

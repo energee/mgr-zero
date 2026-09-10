@@ -6,8 +6,9 @@ export const movementInput = z.object({
   lotId: z.string().uuid().optional(),
   skuId: z.string().uuid(), locationId: z.string().uuid(), binId: z.string().uuid(),
   qty: z.number().refine(n => n !== 0, "qty cannot be 0"),
-  type: z.enum(["opening_balance", "production_in", "adjustment", "sale_removal", "taproom_transfer",
-                "depletion", "return_in", "destruction", "loss", "sample", "festival_removal"]),
+  // Order-owned sale/transfer movements stay behind their atomic workflows.
+  type: z.enum(["opening_balance", "production_in", "adjustment", "depletion", "return_in",
+                "destruction", "loss", "sample", "festival_removal"]),
   saleChannelId: z.string().uuid().optional(),
   destState: z.string().length(2).optional(),
   note: z.string().optional(),
@@ -29,7 +30,7 @@ export function insertMovement(ctx: Ctx, input: z.infer<typeof movementInput>, e
 }
 
 defineCommand({
-  name: "record_movement", description: "Append an inventory movement (immutable; corrections are reversals); sale_removal and depletion each name a saleChannelId, which no other type may carry",
+  name: "record_movement", description: "Append a staff-entered inventory movement (immutable; corrections are reversals); depletion names a saleChannelId, which no other supported type may carry",
   input: movementInput, roles: ["admin", "warehouse"], aiExposed: true,
   risk: "append_only", requiresConfirmation: true,
   compensation: "reverse_inventory_movement for an eligible standalone adjustment or loss",

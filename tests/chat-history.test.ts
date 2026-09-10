@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
-import { runCommand, type Ctx } from "@/lib/commands/registry";
+import { getCommandDefinition, runCommand, type Ctx } from "@/lib/commands/registry";
 import "@/lib/commands/all";
-import { makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
+import { channelId, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
 
 describe("scoped composer history and provenance", () => {
   let breweryId: string;
@@ -102,6 +102,76 @@ describe("scoped composer history and provenance", () => {
       name: "record_movement", input, conversationId: conversation.id,
     }, owner) as { preview: { version: Record<string, unknown> } };
     expect(after.preview.version).not.toEqual(before.preview.version);
+  });
+
+  it("advertises only staff-entered movement types to composer preview", () => {
+    const input = { skuId: catalog.skuId, locationId: location.id, binId: location.binId, qty: -1 };
+    const commandSchema = getCommandDefinition("record_movement")!.input;
+    const previewSchema = getCommandDefinition("preview_command")!.input;
+    for (const type of ["opening_balance", "production_in", "adjustment", "depletion", "destruction", "loss", "sample", "festival_removal", "return_in"]) {
+      expect(commandSchema.safeParse({ ...input, type }).success, type).toBe(true);
+    }
+    for (const type of ["sale_removal", "taproom_transfer", "location_transfer", "repack"]) {
+      expect(commandSchema.safeParse({ ...input, type }).success, type).toBe(false);
+      expect(previewSchema.safeParse({
+        name: "record_movement", input: { ...input, type }, conversationId: randomUUID(),
+      }).success, `preview ${type}`).toBe(false);
+    }
+  });
+
+  it("refuses order-owned movement types at the SQL preview owner", async () => {
+    const conversation = await runCommand("create_chat_conversation", {}, owner) as { id: string };
+    const channel = await channelId(breweryId, "Wholesale");
+    const errors = [];
+    for (const type of ["sale_removal", "taproom_transfer"] as const) {
+      const result = await owner.db.rpc("preview_inventory_movement", {
+        p_brewery: breweryId, p_sku: catalog.skuId, p_location: location.id, p_bin: location.binId,
+        p_qty: -1, p_type: type, p_sale_channel: type === "sale_removal" ? channel : null,
+        p_dest_state: type === "sale_removal" ? "PA" : null, p_note: null, p_lot: null,
+        p_conversation: conversation.id,
+      });
+      errors.push(result.error?.message ?? null);
+    }
+    expect(errors).toEqual([
+      expect.stringMatching(/not supported in chat/i),
+      expect.stringMatching(/not supported in chat/i),
+    ]);
+  });
+
+  it("refuses order-owned chat commits at SQL while preserving ordinary-origin compatibility", async () => {
+    await runCommand("record_movement", {
+      skuId: catalog.skuId, locationId: location.id, binId: location.binId, qty: 10, type: "opening_balance",
+    }, owner);
+    const conversation = await runCommand("create_chat_conversation", {}, owner) as { id: string };
+    const channel = await channelId(breweryId, "Wholesale");
+    const results: { uiError: string | null; chatError: string | null }[] = [];
+    for (const type of ["sale_removal", "taproom_transfer"] as const) {
+      const saleChannel = type === "sale_removal" ? `'${channel}'::uuid` : "null::uuid";
+      const destState = type === "sale_removal" ? "'PA'::text" : "null::text";
+      const token = randomUUID();
+      sql(`insert into private.command_previews(token,actor_id,brewery_id,command_name,rpc_name,canonical_input,effects,warnings,version,conversation_id)
+        values('${token}','${owner.userId}','${breweryId}','record_movement','record_inventory_movement',
+          jsonb_build_object('brewery','${breweryId}'::uuid,'sku','${catalog.skuId}'::uuid,'location','${location.id}'::uuid,
+            'bin','${location.binId}'::uuid,'qty',-1,'type','${type}','sale_channel',${saleChannel},
+            'dest_state',${destState},'note',null,'lot',null),'[]','[]','{}','${conversation.id}')`);
+      const params = {
+        p_brewery: breweryId, p_sku: catalog.skuId, p_location: location.id, p_bin: location.binId,
+        p_qty: -1, p_type: type, p_sale_channel: type === "sale_removal" ? channel : null,
+        p_dest_state: type === "sale_removal" ? "PA" : null, p_note: null, p_lot: null,
+      };
+      const ui = await owner.db.rpc("record_inventory_movement", {
+        ...params, p_request_id: randomUUID(), p_origin: "ui", p_conversation: null, p_preview_token: null,
+      });
+      const chat = await owner.db.rpc("record_inventory_movement", {
+        ...params, p_request_id: randomUUID(), p_origin: "chat", p_conversation: conversation.id, p_preview_token: token,
+      });
+      results.push({ uiError: ui.error?.message ?? null, chatError: chat.error?.message ?? null });
+    }
+    expect(results.map(({ uiError }) => uiError)).toEqual([null, null]);
+    expect(results.map(({ chatError }) => chatError)).toEqual([
+      expect.stringMatching(/not supported in chat/i),
+      expect.stringMatching(/not supported in chat/i),
+    ]);
   });
 
   it("refuses chat-origin movement without a bound preview while ordinary form movement still works", async () => {

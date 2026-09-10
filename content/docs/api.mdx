@@ -1907,7 +1907,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse
 
-Append an inventory movement (immutable; corrections are reversals); sale_removal and depletion each name a saleChannelId, which no other type may carry
+Append a staff-entered inventory movement (immutable; corrections are reversals); depletion names a saleChannelId, which no other supported type may carry
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -1915,7 +1915,7 @@ Append an inventory movement (immutable; corrections are reversals); sale_remova
 | `locationId` | uuid | yes |
 | `binId` | uuid | yes |
 | `qty` | number | yes |
-| `type` | opening_balance or production_in or adjustment or sale_removal or taproom_transfer or depletion or return_in or destruction or loss or sample or festival_removal | yes |
+| `type` | opening_balance or production_in or adjustment or depletion or return_in or destruction or loss or sample or festival_removal | yes |
 | `lotId` | uuid | no |
 | `saleChannelId` | uuid | no |
 | `destState` | string, fixed length | no |
