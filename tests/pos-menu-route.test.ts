@@ -57,14 +57,43 @@ describe("GET /api/public/menus/[publicId]", () => {
     const body = await response.json();
     expect(body).toMatchObject({
       location: "Public Taproom",
-      asOf: expect.any(String),
+      version: expect.stringMatching(/^[a-f0-9]{64}$/),
       items: [{ brand: "Website Hazy", format: "Pint", ounces: 16, priceCents: 700, available: true }],
     });
+    const etag = response.headers.get("ETag");
+    expect(etag).toBe(`"${body.version}"`);
     expect(Object.keys(body.items[0]).sort()).toEqual(["available", "brand", "format", "ounces", "priceCents"]);
     expect(JSON.stringify(body)).not.toMatch(new RegExp([
       brewery.id, configured.publicId, connection.data!.id, location.id, location.binId, channel,
       keg.skuId, pintId, halfPintId, "PRIVATE-SQUARE-ID", "Private provider label", "Private keg label",
     ].join("|"), "i"));
+
+    const repeated = await GET(new Request(`http://localhost/api/public/menus/${configured.publicId}`), {
+      params: Promise.resolve({ publicId: configured.publicId }),
+    });
+    expect(await repeated.json()).toEqual(body);
+    expect(repeated.headers.get("ETag")).toBe(etag);
+
+    const unchanged = await GET(new Request(`http://localhost/api/public/menus/${configured.publicId}`, {
+      headers: { "If-None-Match": etag! },
+    }), { params: Promise.resolve({ publicId: configured.publicId }) });
+    expect(unchanged.status).toBe(304);
+    expect(await unchanged.text()).toBe("");
+    expect(unchanged.headers.get("ETag")).toBe(etag);
+    expect(unchanged.headers.get("Cache-Control")).toBe("public, max-age=0, s-maxage=60, stale-while-revalidate=300");
+    expect(unchanged.headers.get("Access-Control-Allow-Origin")).toBe("*");
+
+    await runCommand("set_pos_price_override", {
+      posLocationId: "PRIVATE-SQUARE-ID", formatId: pintId, unitPriceCents: 650,
+    }, ctx, execution());
+    const changed = await GET(new Request(`http://localhost/api/public/menus/${configured.publicId}`, {
+      headers: { "If-None-Match": etag! },
+    }), { params: Promise.resolve({ publicId: configured.publicId }) });
+    expect(changed.status).toBe(200);
+    expect(changed.headers.get("ETag")).not.toBe(etag);
+    const changedBody = await changed.json();
+    expect(changedBody).toMatchObject({ items: [{ priceCents: 650 }] });
+    expect(changedBody.version).not.toBe(body.version);
 
     const anon = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
       auth: { persistSession: false },
