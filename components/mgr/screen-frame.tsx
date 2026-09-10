@@ -6,6 +6,7 @@
 // wherever it is shown.
 import { AppShell, PortalShell } from "@/components/mgr/app-shell";
 import { CommandForm } from "@/components/mgr/command-form";
+import { EntrySurface } from "@/components/mgr/entry-surface";
 import { E, splitPinned } from "@/components/mgr/e";
 import { MeSheet } from "@/components/mgr/me-sheet";
 import { MeView } from "@/components/mgr/views/me";
@@ -48,14 +49,7 @@ export function ScreenFrame({ screen: s, persona = PERSONAS[0] }: { screen: Scre
     );
   }
   if (s.surface === "entry") {
-    return (
-      <div className="flex flex-col justify-end bg-background p-4 md:items-center md:justify-center">
-        <div className="flex w-full flex-col gap-2 rounded-xl border bg-card p-6 [&_[data-slot=button]]:w-full md:max-w-[420px]">
-          {s.hd}
-          {s.body}
-        </div>
-      </div>
-    );
+    return <EntrySurface>{s.hd}{s.body}</EntrySurface>;
   }
   const body = s.surface === "sheet" ? <ScreenSheet screen={s} /> : s.body;
   // The staff user is the chosen persona's face; the portal user is the

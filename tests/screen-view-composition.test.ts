@@ -81,18 +81,7 @@ const KNOWN_INLINE_DEBT = [
 ] as const;
 
 const KNOWN_SURFACE_DEBT = [
-  "No membership: EntrySurface <- app/(auth)/no-membership/page.tsx",
-  "Expired invite: EntrySurface <- app/(auth)/invite-expired/page.tsx",
-  "Expired reset: EntrySurface <- app/(auth)/reset/page.tsx",
   "Session expired: CommandForm <- app/(auth)/login/page.tsx",
-  "Sign in: EntrySurface <- app/(auth)/login/page.tsx",
-  "Accept invite: EntrySurface <- app/(auth)/accept/page.tsx",
-  "Reset password: EntrySurface <- app/(auth)/reset/page.tsx",
-  "Set new password: EntrySurface <- app/(auth)/password/page.tsx",
-  "Portal sign in: EntrySurface <- app/(auth)/portal/login/page.tsx",
-  "Portal forgot password: EntrySurface <- app/(auth)/reset/page.tsx",
-  "Portal set password: EntrySurface <- app/(auth)/password/page.tsx",
-  "Create brewery: EntrySurface <- app/(auth)/create-brewery/page.tsx",
   "Link your Slack: EntrySurface <- app/(app)/settings/chat/link/page.tsx",
   "Disconnect Slack: CommandForm <- app/(app)/settings/chat/disconnect/page.tsx",
 ] as const;
