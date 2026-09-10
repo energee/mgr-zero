@@ -13,6 +13,8 @@ import { useCommandContext } from "@/app/(app)/brewery-provider";
 import type { CommandContextExpectation } from "@/lib/commands/registry";
 import { IMPORT_FIELDS, IMPORT_KINDS, IMPORT_ROW_CAP, mapCsvRows, parseCsv, validateImportRow, type ImportKind, type ImportLookups, type ImportResult } from "@/lib/import-csv";
 
+const IMPORT_STEPS = ["upload", "map", "preview", "commit"];
+
 export function ImportWizard({ breweryId, lookups }: { breweryId: string; lookups: ImportLookups }) {
   const renderedContext = useCommandContext();
   const [kind, setKind] = useState<ImportKind>("customers");
@@ -49,13 +51,13 @@ export function ImportWizard({ breweryId, lookups }: { breweryId: string; lookup
   }
   return <>
     <Timeline className="px-4 pt-4">
-      {["upload", "map", "preview", "commit"].map((title, index, steps) => (
+      {IMPORT_STEPS.map((title, index) => (
         <TimelineItem
           key={title}
           marker={`Step ${index + 1}`}
           title={title}
           status={index < step ? "completed" : index === step ? "in-progress" : "pending"}
-          showConnector={index < steps.length - 1}
+          showConnector={index < IMPORT_STEPS.length - 1}
         />
       ))}
     </Timeline>

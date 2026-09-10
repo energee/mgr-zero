@@ -16,7 +16,7 @@ it("maps explicit fields and rejects blank, fractional cents and nondecimal numb
   expect(validateImportRow("channel_prices", { saleChannelId: "not-a-uuid", priceGroupId: ids.skuId, formatId: ids.skuId, unitPriceCents: "1" })).not.toEqual([]);
 });
 
-it("the import wizard composes shadcn Select and Attachment controls", () => {
+it("the import wizard composes shadcn Select, Attachment, and Timeline controls", () => {
   const source = readFileSync("app/(app)/settings/import/import-wizard.tsx", "utf8");
   expect(source).toMatch(/from "@\/components\/ui\/select"/);
   expect(source).toMatch(/<SelectGroup>/);
