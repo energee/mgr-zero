@@ -285,10 +285,14 @@ describe("Me view", () => {
     expect(body.props.model).toEqual(toMeViewProps(meMaria));
   });
 
-  it("live Me stays MeSheet", () => {
+  it("live Me uses the shared centered dialog", () => {
     const page = src("components/mgr/me-sheet.tsx");
     expect(page).not.toMatch(/MeView/);
     expect(page).toMatch(/export function MeSheet/);
+    expect(page).toMatch(/from "@\/components\/ui\/dialog"/);
+    expect(page).toMatch(/<DialogContent\b/);
+    expect(page).not.toMatch(/from "@\/components\/ui\/sheet"/);
+    expect(page).not.toMatch(/useIsMobile/);
   });
 });
 
