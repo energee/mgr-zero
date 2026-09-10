@@ -84,6 +84,7 @@ describe("Finished goods view", () => {
     expect(src).toMatch(/from "@\/components\/mgr\/views\/finished-goods"/);
     expect(src).toMatch(/<FinishedGoodsView\b/);
     expect(src).toMatch(/<MovementForm\b/);
+    expect(src).not.toContain('title="Record Movement"');
     expect(src).not.toMatch(/from "@\/components\/mgr\/views\/movement-recorded"/);
   });
 });

@@ -35,7 +35,7 @@ describe("shippedNav", () => {
 
   it("keeps the planned entries in the manifest for the docs and the inventory", () => {
     const all = flatten(STAFF_NAV).map((i) => i.label);
-    for (const label of ["Taproom", "Taps", "Cellar", "Materials", "Kegs", "Batches", "Packaging", "POs", "Deliveries", "Menu", "Recipes", "Compliance", "Planning", "Import"]) {
+    for (const label of ["Taproom", "Taps", "Cellar", "Materials", "Kegs", "Batches", "Packaging", "Purchase orders", "Deliveries", "Menu", "Recipes", "Compliance", "Planning", "Import"]) {
       expect.soft(all).toContain(label);
     }
   });

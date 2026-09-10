@@ -7,7 +7,7 @@ import { activeTab, isUnder, shippedNav, navFor, PORTAL_NAV, STAFF_NAV } from ".
 describe("navFor", () => {
   it("admin sees every item", () => {
     const labels = navFor(STAFF_NAV, "admin").flatMap((t) => (t.children ?? []).map((c) => c.label));
-    for (const label of ["Taproom", "Taps", "Cellar", "Materials", "Kegs", "Batches", "Packaging", "POs", "Deliveries", "Recipes", "Compliance", "Planning", "Import", "Settings"]) {
+    for (const label of ["Taproom", "Taps", "Cellar", "Materials", "Kegs", "Batches", "Packaging", "Purchase orders", "Deliveries", "Recipes", "Compliance", "Planning", "Import", "Settings"]) {
       expect.soft(labels).toContain(label);
     }
   });

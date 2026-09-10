@@ -79,7 +79,7 @@ export function MovementForm({
 
   return (
     <>
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Record Movement" trigger={<Button>Record Movement</Button>}>
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Record movement" trigger={<Button>Record movement</Button>}>
         <form onSubmit={e => { if (!fields) { e.preventDefault(); return; } void form.submit(e); }} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="movement-sku">SKU</Label>
