@@ -7,9 +7,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { NewTransferView } from "@/components/mgr/views/new-transfer";
 import { useCommandForm } from "@/lib/commands/use-command-form";
 
 type Location = { id: string; name: string };
@@ -31,50 +29,40 @@ export function NewTransferForm({ locations, bins, skus }: { locations: Location
     reset: () => { setFromId(""); setToId(""); setFromBin(""); setToBin(""); setLines([{ skuId: "", qty: "" }]); },
   });
   const ready = fromId && toId && fromId !== toId && fromBin && toBin && lines.some((l) => l.skuId && Number(l.qty) > 0);
+  const fromBins = bins.filter(bin => bin.location_id === fromId);
+  const toBins = bins.filter(bin => bin.location_id === toId);
+  const model = {
+    from: locations.find(location => location.id === fromId)?.name ?? "",
+    fromOptions: locations.map(location => location.name),
+    fromBin: fromBins.find(bin => bin.id === fromBin)?.name ?? "",
+    fromBinOptions: fromBins.map(bin => bin.name),
+    to: locations.find(location => location.id === toId)?.name ?? "",
+    toOptions: locations.filter(location => location.id !== fromId).map(location => location.name),
+    toBin: toBins.find(bin => bin.id === toBin)?.name ?? "",
+    toBinOptions: toBins.map(bin => bin.name),
+    skuOptions: skus.map(sku => sku.label),
+    lines: lines.map(line => ({ title: skus.find(sku => sku.id === line.skuId)?.label ?? "", qty: line.qty })),
+  };
   return (
     <CommandForm open={form.open} onOpenChange={form.setOpen} title="New transfer" trigger={<Button size="sm">New transfer</Button>}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
-        <div className="grid grid-cols-2 gap-2">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="trf-from">From</Label>
-            <Select value={fromId} onValueChange={(v) => { setFromId(v); setFromBin(firstBin(v)); }}>
-              <SelectTrigger id="trf-from"><SelectValue placeholder="Location" /></SelectTrigger>
-              <SelectContent>{locations.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent>
-            </Select>
-            <select aria-label="From bin" className="rounded-md border p-2" value={fromBin} onChange={e => setFromBin(e.target.value)} disabled={!fromId}>
-              <option value="">Bin</option>
-              {bins.filter(b => b.location_id === fromId).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="trf-to">To</Label>
-            <Select value={toId} onValueChange={(v) => { setToId(v); setToBin(firstBin(v)); }}>
-              <SelectTrigger id="trf-to"><SelectValue placeholder="Location" /></SelectTrigger>
-              <SelectContent>{locations.filter((l) => l.id !== fromId).map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}</SelectContent>
-            </Select>
-            <select aria-label="To bin" className="rounded-md border p-2" value={toBin} onChange={e => setToBin(e.target.value)} disabled={!toId}>
-              <option value="">Bin</option>
-              {bins.filter(b => b.location_id === toId).map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-          </div>
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label>Lines</Label>
-          {lines.map((l, i) => (
-            <div key={i} className="flex gap-2">
-              <Select value={l.skuId} onValueChange={(v) => setLines((prev) => prev.map((x, j) => (j === i ? { ...x, skuId: v } : x)))}>
-                <SelectTrigger aria-label={`Line ${i + 1} SKU`}><SelectValue placeholder="SKU" /></SelectTrigger>
-                <SelectContent>{skus.map((s) => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
-              </Select>
-              <Input aria-label={`Line ${i + 1} qty`} type="number" min="0" step="any" className="w-24" value={l.qty} onChange={(e) => setLines((prev) => prev.map((x, j) => (j === i ? { ...x, qty: e.target.value } : x)))} />
-            </div>
-          ))}
-          <Button type="button" variant="ghost" size="sm" className="w-fit" onClick={() => setLines((prev) => [...prev, { skuId: "", qty: "" }])}>Add line</Button>
-        </div>
-        <CommandFormMessage error={form.error} />
-        <CommandFormFooter>
+        <NewTransferView
+          model={model}
+          controls={{
+            from: value => { const id = locations.find(location => location.name === value)?.id ?? ""; setFromId(id); setFromBin(firstBin(id)); },
+            fromBin: value => setFromBin(fromBins.find(bin => bin.name === value)?.id ?? ""),
+            to: value => { const id = locations.find(location => location.name === value)?.id ?? ""; setToId(id); setToBin(firstBin(id)); },
+            toBin: value => setToBin(toBins.find(bin => bin.name === value)?.id ?? ""),
+            lineSku: (index, value) => setLines(previous => previous.map((line, lineIndex) => lineIndex === index ? { ...line, skuId: skus.find(sku => sku.label === value)?.id ?? "" } : line)),
+            lineQty: (index, value) => setLines(previous => previous.map((line, lineIndex) => lineIndex === index ? { ...line, qty: value } : line)),
+            addLine: () => setLines(previous => [...previous, { skuId: "", qty: "" }]),
+            removeLine: index => setLines(previous => previous.filter((_, lineIndex) => lineIndex !== index)),
+          }}
+          messages={<CommandFormMessage error={form.error} />}
+          footer={<CommandFormFooter>
           <Button type="submit" disabled={form.submitting || !ready}>{form.submitting ? "Saving…" : "Create transfer"}</Button>
-        </CommandFormFooter>
+        </CommandFormFooter>}
+        />
       </form>
     </CommandForm>
   );
