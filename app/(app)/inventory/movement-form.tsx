@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
+import { formatDateTime } from "@/lib/date-format";
 import { toMovementRecordedViewProps } from "@/lib/mgr/movement-recorded-view";
 
 // Staff-facing movement types; sale_removal/taproom_transfer are produced by
@@ -86,7 +87,7 @@ export function MovementForm({
     kind: movementTypeLabel(receipt.type),
     destState: receipt.dest_state ?? undefined,
     bbl: String(receipt.bbl),
-    when: new Date(receipt.created_at).toLocaleString(),
+    when: formatDateTime(receipt.created_at),
     backHref: "/inventory",
     details: [
       { label: "Location", value: `${locations.find(l => l.id === receipt.location_id)?.name ?? receipt.location_id} / ${bins.find(b => b.id === receipt.bin_id)?.name ?? receipt.bin_id}` },
