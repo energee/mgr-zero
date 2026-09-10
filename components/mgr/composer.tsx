@@ -21,6 +21,7 @@ import {
   movementFormHref,
   movementQuestion,
   receiveProposal,
+  retireMovementProposal,
   toMovementInput,
   type ComposerAction,
   type ComposerHistoryMessage,
@@ -93,6 +94,7 @@ export function Composer({ role }: { role: StaffRole }) {
 
   async function chooseAction(id: string) {
     const selected = actions.find((candidate) => candidate.id === id) ?? null;
+    setState(retireMovementProposal);
     setAction(selected);
     setAnswer(null);
     setError(null);
@@ -158,10 +160,10 @@ export function Composer({ role }: { role: StaffRole }) {
         origin: "chat", conversationId: envelope.conversationId, previewToken: envelope.previewToken,
       }) as { id?: string };
       setAnswer({ query: "Record inventory movement", answer: "Movement recorded", detail: receipt.id ? `Reference ${receipt.id}` : undefined, observedAt: new Date().toLocaleString() });
-      setState((current) => ({ ...current, proposal: null, commitRequestId: null, committing: false }));
+      setState(retireMovementProposal);
     } catch (cause) {
       if (cause instanceof CommandResponseError && cause.status === 409) {
-        setState((current) => ({ ...current, proposal: null, commitRequestId: null, committing: false }));
+        setState(retireMovementProposal);
         setError("The proposal changed or expired. Preview the current data again.");
       } else {
         setState((current) => ({ ...current, committing: false }));
@@ -236,7 +238,7 @@ export function Composer({ role }: { role: StaffRole }) {
       />}
 
       {question && <ComposerQuestionView prompt={question.prompt} />}
-      {state.proposal && <ComposerProposalView effects={state.proposal.effects} warnings={state.proposal.warnings} openHref={movementFormHref(state.proposal.input)} onDismiss={() => setState((current) => ({ ...current, proposal: null, commitRequestId: null }))} onCommit={() => void commitMovement()} committing={state.committing} />}
+      {state.proposal && <ComposerProposalView effects={state.proposal.effects} warnings={state.proposal.warnings} openHref={movementFormHref(state.proposal.input)} onOpen={() => setState(retireMovementProposal)} onDismiss={() => setState(retireMovementProposal)} onCommit={() => void commitMovement()} committing={state.committing} />}
 
       {action?.id === "read_atp" && <section className="flex flex-col gap-2 rounded-md border bg-card p-3 sm:flex-row sm:items-end">
         <Label className="flex-1">SKU / package<select className="mt-1 w-full rounded-md border bg-background p-2" value={readSkuId} onChange={(event) => { setReadSkuId(event.target.value); setAnswer(null); }}><option value="">Choose…</option>{skus.map((sku) => {
@@ -246,7 +248,7 @@ export function Composer({ role }: { role: StaffRole }) {
       </section>}
       {answer && <ComposerAnswerView {...answer} />}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      {action && <Button type="button" variant="ghost" className="self-start" onClick={() => { setAction(null); setAnswer(null); setError(null); }}>Close composer</Button>}
+      {action && <Button type="button" variant="ghost" className="self-start" onClick={() => { setState(retireMovementProposal); setAction(null); setAnswer(null); setError(null); }}>Close composer</Button>}
       <ComposerStripView actions={actions.map((item) => ({ value: item.id, label: item.label }))} onAction={(id) => void chooseAction(id)} onHistory={() => void loadHistory()} actionRef={actionRef} />
       <p className="text-center text-[11px] text-muted-foreground">Structured actions only. Voice and a free-form model are not connected.</p>
     </div>

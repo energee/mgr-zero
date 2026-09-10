@@ -114,12 +114,13 @@ function effectDescription(effect: ComposerEffect) {
   ].filter(Boolean).join(" · ");
 }
 
-export function ComposerProposalView({ query, effects, warnings, openHref, openTo, onDismiss, onCommit, committing = false }: {
+export function ComposerProposalView({ query, effects, warnings, openHref, openTo, onOpen, onDismiss, onCommit, committing = false }: {
   query?: string;
   effects: ComposerEffect[];
   warnings: string[];
   openHref?: string;
   openTo?: string;
+  onOpen?: () => void;
   onDismiss?: () => void;
   onCommit?: () => void;
   committing?: boolean;
@@ -137,7 +138,7 @@ export function ComposerProposalView({ query, effects, warnings, openHref, openT
       {warnings.map((warning) => <Alert key={warning} className="mt-2"><AlertDescription>{warning}</AlertDescription></Alert>)}
       <p className="mt-2 text-xs text-muted-foreground">The server assigns document numbers on commit. Editing any field requires a fresh preview.</p>
       <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:justify-end">
-        {openHref && <Button asChild variant="outline"><Link href={openHref} data-to={openTo}>Open as form <DirectionIcon label="Open" /></Link></Button>}
+        {openHref && <Button asChild variant="outline"><Link href={openHref} data-to={openTo} onClick={onOpen}>Open as form <DirectionIcon label="Open" /></Link></Button>}
         <Button type="button" variant="ghost" onClick={onDismiss}>Dismiss</Button>
         <Button type="button" onClick={onCommit} disabled={!onCommit || committing}>{committing ? "Recording…" : "Commit movement"}</Button>
       </div>

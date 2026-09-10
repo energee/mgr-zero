@@ -77,8 +77,9 @@ export function movementQuestion(draft: MovementDraft) {
   if (!draft.locationId) return { field: "locationId", prompt: "Which location?" } as const;
   if (!draft.binId) return { field: "binId", prompt: "Which bin?" } as const;
   if (!draft.lotChoice) return { field: "lotChoice", prompt: "Which tracked lot, or explicitly untracked stock?" } as const;
-  const qty = Number(draft.qty);
-  if (!draft.qty || !Number.isFinite(qty) || qty <= 0 || Math.round(qty * 100) !== qty * 100) {
+  const enteredQty = draft.qty?.trim() ?? "";
+  const qty = Number(enteredQty);
+  if (!/^(?:\d+|\d*\.\d{1,2})$/.test(enteredQty) || !Number.isFinite(qty) || qty <= 0) {
     return { field: "qty", prompt: "What positive quantity, up to two decimal places?" } as const;
   }
   if (draft.kind === "depletion" && !draft.saleChannelId) return { field: "saleChannelId", prompt: "Which sale channel?" } as const;
@@ -104,8 +105,12 @@ export function toMovementInput(draft: MovementDraft): MovementInput | null {
   };
 }
 
+export function retireMovementProposal(state: ComposerState): ComposerState {
+  return { ...state, proposal: null, commitRequestId: null, committing: false };
+}
+
 export function editMovementDraft(state: ComposerState, patch: Partial<MovementDraft>): ComposerState {
-  return { ...state, draft: { ...state.draft, ...patch }, proposal: null, commitRequestId: null, committing: false };
+  return { ...retireMovementProposal(state), draft: { ...state.draft, ...patch } };
 }
 
 export function receiveProposal(state: ComposerState, proposal: ComposerProposal, conversationId: string, requestId: string): ComposerState {

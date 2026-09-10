@@ -16,6 +16,7 @@ import {
   movementQuestion,
   receiveProposal,
   resetComposerScope,
+  retireMovementProposal,
   toMovementInput,
 } from "@/lib/composer/state";
 
@@ -27,6 +28,21 @@ const ids = {
 };
 
 describe("structured composer state", () => {
+  it("accepts legal decimal strings without binary-float artifacts and rejects unsafe quantities", () => {
+    const complete = {
+      skuId: ids.skuId, kind: "adjustment" as const, direction: "add" as const,
+      locationId: ids.locationId, binId: ids.binId, lotChoice: "untracked" as const,
+    };
+    for (const qty of ["0.07", "0.14", "0.29", "0.58", "1.15", ".5", "10", "10.20"]) {
+      expect(movementQuestion({ ...complete, qty }), qty).toBeNull();
+      expect(toMovementInput({ ...complete, qty })?.qty, qty).toBe(Number(qty));
+    }
+    for (const qty of ["", "0", "-1", "0.001", "1.234", "Infinity", "1e309", "1e2", "not-a-number"]) {
+      expect(movementQuestion({ ...complete, qty })?.field, qty).toBe("qty");
+      expect(toMovementInput({ ...complete, qty }), qty).toBeNull();
+    }
+  });
+
   it("asks for every risky blank and never creates a commit from a question", () => {
     let state = composerInitialState("actor:brewery:admin");
     expect(movementQuestion(state.draft)).toMatchObject({ field: "skuId", prompt: expect.stringMatching(/SKU|package/i) });
@@ -73,6 +89,26 @@ describe("structured composer state", () => {
     const edited = editMovementDraft(state, { qty: "2" });
     expect(edited.proposal).toBeNull();
     expect(edited.commitRequestId).toBeNull();
+  });
+
+  it("retires a proposal before another action, Close, Dismiss, or Open can leave its commit usable", () => {
+    const draft = {
+      skuId: ids.skuId, kind: "adjustment" as const, direction: "add" as const,
+      locationId: ids.locationId, binId: ids.binId, lotChoice: "untracked" as const, qty: "1",
+    };
+    const pending = receiveProposal({ ...composerInitialState("actor:brewery:admin"), draft }, {
+      name: "record_movement", input: toMovementInput(draft)!, previewToken: "55555555-5555-4555-8555-555555555555",
+      effects: [{ label: "Hazy IPA case · Taproom · Walk-in", qty: "1" }], warnings: [],
+    }, "66666666-6666-4666-8666-666666666666", "77777777-7777-4777-8777-777777777777");
+    const retired = retireMovementProposal({ ...pending, committing: true });
+    expect(retired).toMatchObject({ proposal: null, commitRequestId: null, committing: false, draft, conversationId: pending.conversationId });
+    expect(beginComposerCommit(retired).envelope).toBeNull();
+
+    const live = readFileSync("components/mgr/composer.tsx", "utf8");
+    expect(live).toMatch(/async function chooseAction[\s\S]{0,300}setState\(retireMovementProposal\)/);
+    expect(live).toMatch(/onOpen=\{\(\) => setState\(retireMovementProposal\)\}/);
+    expect(live).toMatch(/onDismiss=\{\(\) => setState\(retireMovementProposal\)\}/);
+    expect(live).toMatch(/onClick=\{\(\) => \{ setState\(retireMovementProposal\);[\s\S]{0,200}Close composer/);
   });
 
   it("preserves known fields when opening the ordinary movement form", () => {
