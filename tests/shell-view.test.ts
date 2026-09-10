@@ -72,6 +72,20 @@ describe("Entry surface", () => {
   it("uses the shared surface for inventory entry screens", () => {
     expect(ScreenFrame({ screen: screen("Sign in") }).type).toBe(EntrySurface);
   });
+
+  it("live auth routes mount EntryView without replacing its body", () => {
+    const files = [
+      "components/login-form.tsx",
+      "app/(auth)/no-membership/page.tsx",
+      "app/(auth)/reset/page.tsx",
+      "app/(auth)/password/page.tsx",
+    ];
+    for (const file of files) {
+      const source = src(file);
+      expect(source).toMatch(/<EntryView\b/);
+      expect(source).not.toMatch(/<EntryView[\s\S]*?\bbody=/);
+    }
+  });
 });
 
 describe("Today view", () => {

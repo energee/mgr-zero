@@ -8,15 +8,7 @@ import { SCREEN_ROUTES } from "@/lib/mgr/screen-routes";
 
 /** Existing bypasses. Remove a row when the live implementation mounts the view. */
 const KNOWN_VIEW_DEBT = [
-  "No membership: EntryView <- app/(auth)/no-membership/page.tsx",
-  "Expired reset: EntryView <- app/(auth)/reset/page.tsx",
   "Session expired: SessionExpiredView <- app/(auth)/login/page.tsx",
-  "Sign in: EntryView <- app/(auth)/login/page.tsx",
-  "Reset password: EntryView <- app/(auth)/reset/page.tsx",
-  "Set new password: EntryView <- app/(auth)/password/page.tsx",
-  "Portal sign in: EntryView <- app/(auth)/portal/login/page.tsx",
-  "Portal forgot password: EntryView <- app/(auth)/reset/page.tsx",
-  "Portal set password: EntryView <- app/(auth)/password/page.tsx",
   "Reverse movement: ReverseMovementView <- app/(app)/inventory/reversal-form.tsx",
   "Record movement: RecordMovementView <- app/(app)/inventory/page.tsx",
   "Movement recorded: MovementRecordedView <- app/(app)/inventory/page.tsx",
