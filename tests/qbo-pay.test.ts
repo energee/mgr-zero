@@ -66,6 +66,7 @@ describe("QuickBooks portal payment link", () => {
       values('${brewery.id}','qbo','${connection.data.id}','pay-access-secret','pay-refresh-secret')`);
     const invoice = await admin.from("invoices").insert({
       brewery_id: brewery.id, customer_id: customer.customerId, qbo_invoice_id: "remote-pay-1", qbo_sync_status: "pushed",
+      qbo_balance_cents: 100,
     }).select("id").single();
     if (invoice.error) throw invoice.error;
     insertFixture("qbo_pushes", {
@@ -86,15 +87,34 @@ describe("QuickBooks portal payment link", () => {
       p_brewery: brewery.id, p_customer: customer.customerId, p_invoice: invoice.data.id, p_actor: user.id,
     })).error?.code).toBe("42501");
 
+    const eligibilityFetch = vi.fn<typeof globalThis.fetch>();
     for (const unavailable of [
       { paid_at: "2026-09-09T12:00:00Z", qbo_balance_cents: 0, qbo_remote_state: "live", written_off_at: null },
+      { paid_at: null, qbo_balance_cents: 0, qbo_remote_state: "live", written_off_at: null },
+      { paid_at: null, qbo_balance_cents: null, qbo_remote_state: "live", written_off_at: null },
       { paid_at: null, qbo_balance_cents: 100, qbo_remote_state: "voided", written_off_at: null },
       { paid_at: null, qbo_balance_cents: 100, qbo_remote_state: "deleted", written_off_at: null },
       { paid_at: null, qbo_balance_cents: 100, qbo_remote_state: "deleted", written_off_at: "2026-09-09T12:00:00Z", written_off_by: user.id, written_off_reason: "Uncollectible" },
     ]) {
       expect((await admin.from("invoices").update(unavailable).eq("id", invoice.data.id)).error).toBeNull();
       await expect(readPortalInvoicePayment(ctx, invoice.data.id)).resolves.toBeNull();
+      await expect(resolvePortalInvoicePayment(
+        ctx, invoice.data.id, new QboOAuthClient(config, eligibilityFetch), new Set(["pay.example.test"]),
+      )).resolves.toEqual({ kind: "unavailable", reason: "not_configured" });
+      expect(eligibilityFetch).not.toHaveBeenCalled();
     }
+    expect((await admin.from("invoices").update({
+      paid_at: "2026-09-08T12:00:00Z", qbo_balance_cents: 100, qbo_remote_state: "live", written_off_at: null,
+      written_off_by: null, written_off_reason: null,
+    }).eq("id", invoice.data.id)).error).toBeNull();
+    await expect(readPortalInvoicePayment(ctx, invoice.data.id)).resolves.toMatchObject({ remoteInvoiceId: "remote-pay-1" });
+    const reopenedFetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({
+      Invoice: { Id: "remote-pay-1", InvoiceLink: "https://pay.example.test/session/reopened" },
+    }));
+    await expect(resolvePortalInvoicePayment(
+      ctx, invoice.data.id, new QboOAuthClient(config, reopenedFetch), new Set(["pay.example.test"]),
+    )).resolves.toEqual({ kind: "redirect", url: "https://pay.example.test/session/reopened" });
+    expect(reopenedFetch).toHaveBeenCalledOnce();
     expect((await admin.from("invoices").update({
       paid_at: null, qbo_balance_cents: 100, qbo_remote_state: "live", written_off_at: null,
       written_off_by: null, written_off_reason: null,
@@ -139,7 +159,7 @@ describe("QuickBooks portal payment link", () => {
     expect(noFetch).not.toHaveBeenCalled();
   });
 
-  it("rechecks customer and connection state after reading a link and never persists it", async () => {
+  it("rechecks the invoice balance after reading a link and never persists it", async () => {
     const brewery = await makeBrewery();
     const customer = await seedCustomer(brewery.id);
     const user = await makeCustomerUser(customer.customerId);
@@ -156,6 +176,7 @@ describe("QuickBooks portal payment link", () => {
       values('${brewery.id}','qbo','${connection.data.id}','access-secret','refresh-secret')`);
     const invoice = await admin.from("invoices").insert({
       brewery_id: brewery.id, customer_id: customer.customerId, qbo_invoice_id: "remote-pay-2", qbo_sync_status: "pushed",
+      qbo_balance_cents: 100,
     }).select("id").single();
     if (invoice.error) throw invoice.error;
     insertFixture("qbo_pushes", {
@@ -166,7 +187,7 @@ describe("QuickBooks portal payment link", () => {
     });
     const paymentUrl = "https://pay.example.test/session/bearer-secret";
     const transport = vi.fn<typeof globalThis.fetch>(async () => {
-      await admin.from("customer_users").delete().eq("user_id", user.id);
+      await admin.from("invoices").update({ qbo_balance_cents: 0 }).eq("id", invoice.data.id);
       return Response.json({ Invoice: { Id: "remote-pay-2", InvoiceLink: paymentUrl } });
     });
     await expect(resolvePortalInvoicePayment(
