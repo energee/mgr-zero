@@ -63,7 +63,7 @@ export function ScreenFrame({ screen: s, persona = PERSONAS[0] }: { screen: Scre
     </MeSheet>
   );
   return s.portal ? (
-    <PortalShell brand="Demo Brewing wholesale" headerRight={<MeSheet avatar={{ name: PORTAL_BUYER.name }}><PortalMeView model={{ email: PORTAL_BUYER.email, account: PORTAL_BUYER.account }} /></MeSheet>} composer={E.comp(true)} active={s.portal}>
+    <PortalShell brand="Demo Brewing wholesale" headerRight={<MeSheet avatar={{ name: PORTAL_BUYER.name }}><PortalMeView model={{ email: PORTAL_BUYER.email, account: PORTAL_BUYER.account }} /></MeSheet>} active={s.portal}>
       {body}
     </PortalShell>
   ) : (
@@ -71,7 +71,7 @@ export function ScreenFrame({ screen: s, persona = PERSONAS[0] }: { screen: Scre
       brand="Demo Brewing"
       items={navFor(STAFF_NAV, persona.role)}
       headerRight={<><Button variant="ghost" size="sm"><Icon icon={Search01Icon} />Search</Button>{me}</>}
-      composer={E.comp()}
+      composer={E.comp(persona.role)}
       active={s.tab}
     >
       {body}

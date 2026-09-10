@@ -35,6 +35,14 @@ async function client(userId: string, transaction: boolean) {
   return value;
 }
 
+async function ownerClient() {
+  const value = new Client({ connectionString: DB });
+  clients.push(value);
+  await value.connect();
+  await value.query("set statement_timeout='8s'; set lock_timeout='7s'");
+  return value;
+}
+
 async function brew(bbl = 10) {
   const catalog = await seedCatalog(breweryId, { product: `Lock ${crypto.randomUUID()}`, bblPerUnit: 0.01 });
   const vessel = await runCommand("upsert_vessel", { name: `Lock FV ${crypto.randomUUID()}`, kind: "fermenter", capacityBbl: 100 }, brewer) as { id: string };
@@ -50,6 +58,43 @@ async function waitForLock(observer: Client, pid: number) {
 const completionSql = "select public.complete_batch($1,$2,$3) result";
 
 describe.sequential("cellar workflow serialization", () => {
+  it("locks the observed occupancy through a first reading while completed retries bypass closure", async () => {
+    const f = await brew(1);
+    const requestId = crypto.randomUUID();
+    const a = await client(brewer.userId, true);
+    const first = (await a.query(
+      "select public.record_fermentation_reading($1,$2,$3,68,4.2,4.1,'frozen',$4) result",
+      [breweryId, f.occupancyId, "2026-09-10T14:15:16.000Z", requestId],
+    )).rows[0].result;
+    await a.query("reset role");
+
+    const b = await ownerClient();
+    const pid = (await b.query("select pg_backend_pid() pid")).rows[0].pid;
+    const closing = b.query("update public.vessel_occupancies set ended_at=now() where id=$1", [f.occupancyId]);
+    closing.catch(() => {});
+    await waitForLock(a, pid);
+    await a.query("commit");
+    await closing;
+
+    const retry = await client(brewer.userId, false);
+    const replay = (await retry.query(
+      "select public.record_fermentation_reading($1,$2,$3,68,4.2,4.1,'frozen',$4) result",
+      [breweryId, f.occupancyId, "2026-09-10T14:15:16.000Z", requestId],
+    )).rows[0].result;
+    expect(replay.id).toBe(first.id);
+    expect((await retry.query("select count(*)::int n from public.fermentation_readings where id=$1", [first.id])).rows[0].n).toBe(1);
+    await expect(retry.query(
+      "select public.record_fermentation_reading($1,$2,$3,69,4.2,4.1,'frozen',$4)",
+      [breweryId, f.occupancyId, "2026-09-10T14:15:16.000Z", requestId],
+    )).rejects.toThrow(/different payload/);
+    const firstFlushId = crypto.randomUUID();
+    await expect(retry.query(
+      "select public.record_fermentation_reading($1,$2,$3,68,4.2,4.1,'late',$4)",
+      [breweryId, f.occupancyId, "2026-09-10T15:00:00.000Z", firstFlushId],
+    )).rejects.toThrow(/occupancy is closed/);
+    expect((await b.query("select count(*)::int n from private.command_requests where actor_id=$1 and request_id=$2", [brewer.userId, firstFlushId])).rows[0].n).toBe(0);
+  });
+
   it("waits for a real packaging close and calculates from its committed frozen output", async () => {
     const f = await brew();
     const run = await runCommand("schedule_packaging_run", { brandId: f.brandId, plannedOn: "2026-09-02", occupancyId: f.occupancyId, outputs: [{ skuId: f.skuId, qtyPlanned: 995 }] }, brewer) as { id: string };

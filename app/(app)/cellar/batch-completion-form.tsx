@@ -69,7 +69,7 @@ export function BatchCompletionForm({ batches }: { batches: Batch[] }) {
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Could not complete this batch";
       setError(message);
-      if (cause instanceof CommandResponseError && canRetireCommandFailure(cause.status, retrying)) {
+      if (cause instanceof CommandResponseError && canRetireCommandFailure(cause.status, retrying, cause.code)) {
         requestId.current = null;
         setPhase("ready");
       } else {

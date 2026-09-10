@@ -12,11 +12,19 @@ export type Ctx = { db: SupabaseClient; userId: string; breweryId: string; role:
 
 /** Distinguishes side-effect-free reads from write operations that require idempotency metadata. */
 export type OperationKind = "query" | "command";
+export type CommandOrigin = "ui" | "chat";
+export type CommandRisk = "mutable" | "append_only" | "immutable" | "filed" | "external" | "destructive_local";
+export type CommandIdempotency = "dedupe" | "online_only";
+export type CommandAtomicity = "single_row" | "rpc" | "atomic_exempt_csv" | "external_intent";
+export type CommandPreview = { effects: { label: string; qty?: string }[]; warnings: string[]; version: unknown; previewToken?: string };
 
 /** Correlates one write request with its transport and downstream work. */
 export type CommandExecution = {
   requestId: string;
   correlationId: string;
+  origin?: CommandOrigin;
+  conversationId?: string;
+  previewToken?: string;
 };
 
 export type PublicError = {
@@ -45,6 +53,9 @@ export type CommandRequest = {
   input: unknown;
   requestId?: string;
   expectedContext?: CommandContextExpectation;
+  origin?: CommandOrigin;
+  conversationId?: string;
+  previewToken?: string;
 };
 
 export type CommandContextExpectation = {
@@ -107,10 +118,17 @@ type DefinitionBase<In> = {
   input: ZodType<In>;
   roles: StaffRole[] | "customer" | "any";
   requiresConfirmation?: boolean;
+  aiExposed?: boolean;
 };
 
 export type CommandDefinition<In, Out> = DefinitionBase<In> & {
   kind: "command";
+  risk?: CommandRisk;
+  compensation?: string | null;
+  idempotency?: CommandIdempotency;
+  offlineReplay?: boolean;
+  atomicity?: CommandAtomicity;
+  preview?: (ctx: Ctx, input: In, conversationId: string) => Promise<CommandPreview>;
   handler: (ctx: Ctx, input: In, execution: CommandExecution) => Promise<Out>;
 };
 
@@ -125,7 +143,16 @@ type QueryDefinitionInput<In, Out> = Omit<QueryDefinition<In, Out>, "kind">;
 export type CommandDefinitionMetadata = Pick<
   CommandDefinition<unknown, unknown> | QueryDefinition<unknown, unknown>,
   "name" | "description" | "input" | "roles" | "requiresConfirmation" | "kind"
-> & { scope: "tenant" | "pretenant" };
+> & {
+  scope: "tenant" | "pretenant";
+  aiExposed: boolean;
+  risk?: CommandRisk;
+  compensation?: string | null;
+  idempotency?: CommandIdempotency;
+  offlineReplay: boolean;
+  atomicity?: CommandAtomicity;
+  preview?: (ctx: Ctx, input: unknown, conversationId: string) => Promise<CommandPreview>;
+};
 
 type StoredDefinition = CommandDefinitionMetadata & {
   execute: (ctx: OperationCtx, input: unknown, execution?: CommandExecution) => Promise<unknown>;
@@ -143,9 +170,18 @@ function assertTenantCtx(ctx: OperationCtx): asserts ctx is Ctx {
 
 export function defineCommand<In, Out>(input: CommandDefinitionInput<In, Out>): CommandDefinition<In, Out> {
   requireUnusedName(input.name);
-  const definition: CommandDefinition<In, Out> = { ...input, kind: "command" };
+  if (input.aiExposed && !input.preview) throw new CommandError("AI-exposed commands require a preview hook", 400, "invalid_command_metadata");
+  if (input.aiExposed && input.requiresConfirmation !== true) throw new CommandError("AI-exposed commands require confirmation", 400, "invalid_command_metadata");
+  if (input.offlineReplay && input.idempotency !== "dedupe") throw new CommandError("offline replay requires durable dedupe", 400, "invalid_command_metadata");
+  const definition: CommandDefinition<In, Out> = {
+    risk: "mutable", compensation: null, idempotency: "online_only", offlineReplay: false, atomicity: "rpc",
+    ...input, aiExposed: input.aiExposed ?? false, kind: "command",
+  };
   registry.set(definition.name, {
     ...definition,
+    aiExposed: definition.aiExposed ?? false,
+    offlineReplay: definition.offlineReplay ?? false,
+    preview: definition.preview as StoredDefinition["preview"],
     scope: "tenant",
     execute: (ctx, parsed, execution) => {
       assertTenantCtx(ctx);
@@ -159,9 +195,11 @@ export function defineCommand<In, Out>(input: CommandDefinitionInput<In, Out>): 
 
 export function defineQuery<In, Out>(input: QueryDefinitionInput<In, Out>): QueryDefinition<In, Out> {
   requireUnusedName(input.name);
-  const definition: QueryDefinition<In, Out> = { ...input, kind: "query" };
+  const definition: QueryDefinition<In, Out> = { ...input, aiExposed: input.aiExposed ?? false, kind: "query" };
   registry.set(definition.name, {
     ...definition,
+    aiExposed: definition.aiExposed ?? false,
+    offlineReplay: false,
     scope: "tenant",
     execute: (ctx, parsed) => {
       assertTenantCtx(ctx);
@@ -181,7 +219,7 @@ export function definePreTenantCommand<In, Out>(definition: {
 }) {
   requireUnusedName(definition.name);
   registry.set(definition.name, {
-    ...definition, kind: "command", scope: "pretenant", roles: "any",
+    ...definition, kind: "command", scope: "pretenant", roles: "any", aiExposed: false, offlineReplay: false,
     execute: (ctx, parsed, execution) => {
       if (ctx.breweryId !== null) throw new CommandError("pre-tenant context required", 403, "permission_denied");
       if (!execution) throw new CommandError("command execution metadata is required", 500, "missing_execution");
@@ -200,13 +238,20 @@ export function getCommandDefinition(name: string): CommandDefinitionMetadata | 
     input: definition.input,
     roles: definition.roles,
     requiresConfirmation: definition.requiresConfirmation,
+    aiExposed: definition.aiExposed,
+    risk: definition.risk,
+    compensation: definition.compensation,
+    idempotency: definition.idempotency,
+    offlineReplay: definition.offlineReplay,
+    atomicity: definition.atomicity,
+    preview: definition.preview,
     kind: definition.kind,
     scope: definition.scope,
   };
 }
 
 function createExecution(): CommandExecution {
-  return { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() };
+  return { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID(), origin: "ui" };
 }
 
 /**
@@ -222,6 +267,16 @@ export function canRun(ctx: OperationCtx, name: string): boolean {
   return def.roles === "any" || (def.roles === "customer" ? ctx.role === "customer" : def.roles.includes(ctx.role as StaffRole));
 }
 
+/** Canonicalizes one candidate with its registered schema and preview hook without invoking its write handler. */
+export async function previewCommand(name: string, rawInput: unknown, ctx: Ctx, conversationId: string) {
+  const def = registry.get(name);
+  if (!def || def.kind !== "command" || !def.preview) return { valid: false, allowed: false, preview: null };
+  if (!canRun(ctx, name)) return { valid: true, allowed: false, preview: null };
+  const parsed = def.input.safeParse(rawInput);
+  if (!parsed.success) return { valid: false, allowed: true, preview: null, errors: parsed.error.issues.map((issue) => issue.message) };
+  return { valid: true, allowed: true, name, input: parsed.data, preview: await def.preview(ctx, parsed.data, conversationId) };
+}
+
 // Output is unknown: a string name cannot carry the handler's type; callers narrow.
 export async function runCommand(name: string, rawInput: unknown, ctx: OperationCtx, execution?: CommandExecution): Promise<unknown> {
   const def = registry.get(name);
@@ -233,8 +288,13 @@ export async function runCommand(name: string, rawInput: unknown, ctx: Operation
   // customerId") for forms, the portal cart and HTTP API callers alike, instead
   // of the serialized issue array zod puts in error.message.
   if (!parsed.success) throw new CommandError(`validation failed: ${z.prettifyError(parsed.error)}`, 400, "invalid_input");
+  const commandExecution = def.kind === "command" ? execution ?? createExecution() : undefined;
+  if (commandExecution?.origin === "chat" && (!def.aiExposed || !def.preview || !def.requiresConfirmation
+    || !commandExecution.previewToken || !commandExecution.conversationId)) {
+    throw new CommandError("chat commands require a confirmed preview", 400, "preview_required");
+  }
   try {
-    return await def.execute(ctx, parsed.data, def.kind === "command" ? execution ?? createExecution() : undefined);
+    return await def.execute(ctx, parsed.data, commandExecution);
   } catch (e: unknown) {
     if (e instanceof CommandError) throw e;
     console.error(`handler error in ${name}:`, e);
@@ -242,15 +302,25 @@ export async function runCommand(name: string, rawInput: unknown, ctx: Operation
   }
 }
 
-export function listTools() {
+export function listTools(options: { aiOnly?: boolean; ctx?: OperationCtx } = {}) {
   // inputSchema is a Zod object for same-process use (API clients see the schema structure)
-  return [...registry.values()].map(d => ({
+  return [...registry.values()].filter((d) => {
+    if (!options.aiOnly) return true;
+    if (!options.ctx || !d.aiExposed || !canRun(options.ctx, d.name)) return false;
+    return options.ctx.role !== "customer" || d.name.startsWith("portal_");
+  }).map(d => ({
     name: d.name,
     description: d.description ?? "",
     inputSchema: d.input,
     kind: d.kind,
     scope: d.scope,
     requiresConfirmation: !!d.requiresConfirmation,
+    aiExposed: d.aiExposed,
+    risk: d.risk,
+    compensation: d.compensation,
+    idempotency: d.idempotency,
+    offlineReplay: d.offlineReplay,
+    atomicity: d.atomicity,
   }));
 }
 

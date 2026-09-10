@@ -2508,3 +2508,600 @@ GRANT EXECUTE ON FUNCTION public.claim_square_oauth(text,uuid,uuid,text),public.
   public.advance_square_catalog_sync(uuid,uuid,uuid,uuid,bigint,bigint),public.mark_square_authorization_failed(uuid,uuid,uuid,bigint),
   public.record_square_catalog_snapshot(uuid,uuid,uuid,bigint,uuid,jsonb,jsonb),
   public.begin_square_disconnect(uuid,uuid,uuid,uuid),public.finish_square_disconnect(uuid,uuid,uuid,uuid,boolean) TO postgres,service_role;
+SET local check_function_bodies = off;
+
+DROP FUNCTION "private"."claim_command_request"(uuid, text, uuid, jsonb);
+
+DROP FUNCTION "public"."record_inventory_movement"(uuid, uuid, uuid, uuid, numeric, public.movement_type, uuid, text, text, uuid, uuid);
+
+CREATE TABLE "private"."chat_conversations" (
+  "actor_id"   uuid                     NOT NULL,
+  "brewery_id" uuid                     NOT NULL,
+  "title"      text                     NOT NULL DEFAULT 'New conversation'::text,
+  "created_at" timestamp with time zone NOT NULL DEFAULT now(),
+  "updated_at" timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT "chat_conversations_title_check" CHECK (((length(btrim(title)) >= 1) AND (length(btrim(title)) <= 120))),
+  "id"         uuid                     NOT NULL DEFAULT private.new_uuid(),
+  CONSTRAINT "chat_conversations_id_brewery_id_key" UNIQUE (id, brewery_id),
+  CONSTRAINT "chat_conversations_pkey" PRIMARY KEY (id)
+);
+
+ALTER TABLE "private"."chat_conversations"
+  ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE "private"."chat_messages" (
+  "conversation_id" uuid                     NOT NULL,
+  "brewery_id"      uuid                     NOT NULL,
+  "actor_id"        uuid                     NOT NULL,
+  "role"            text                     NOT NULL,
+  "content"         text,
+  "result"          jsonb,
+  "request_id"      uuid,
+  "created_at"      timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT "chat_messages_check1" CHECK (((role = 'result'::text) = (content IS NULL))),
+  CONSTRAINT "chat_messages_check" CHECK (((role = 'result'::text) = (result IS NOT NULL))),
+  CONSTRAINT "chat_messages_content_check" CHECK (((content IS NULL) OR ((length(btrim(content)) >= 1) AND (length(btrim(content)) <= 4000)))),
+  CONSTRAINT "chat_messages_role_check" CHECK ((role = ANY (ARRAY['user'::text, 'assistant'::text, 'result'::text]))),
+  "id"              uuid                     NOT NULL DEFAULT private.new_uuid(),
+  CONSTRAINT "chat_messages_pkey" PRIMARY KEY (id)
+);
+
+ALTER TABLE "private"."chat_messages"
+  ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE "private"."command_previews" (
+  "actor_id"        uuid                     NOT NULL,
+  "brewery_id"      uuid                     NOT NULL,
+  "command_name"    text                     NOT NULL,
+  "rpc_name"        text                     NOT NULL,
+  "canonical_input" jsonb                    NOT NULL,
+  "effects"         jsonb                    NOT NULL,
+  "warnings"        jsonb                    NOT NULL,
+  "version"         jsonb                    NOT NULL,
+  "conversation_id" uuid                     NOT NULL,
+  "expires_at"      timestamp with time zone NOT NULL DEFAULT (now() + '00:10:00'::interval),
+  "created_at"      timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT "command_previews_effects_check" CHECK ((jsonb_typeof(effects) = 'array'::text)),
+  CONSTRAINT "command_previews_warnings_check" CHECK ((jsonb_typeof(warnings) = 'array'::text)),
+  "token"           uuid                     NOT NULL DEFAULT private.new_uuid(),
+  CONSTRAINT "command_previews_pkey" PRIMARY KEY (token),
+  CONSTRAINT "command_previews_token_actor_id_brewery_id_rpc_name_convers_key" UNIQUE (token, actor_id, brewery_id, rpc_name, conversation_id)
+);
+
+ALTER TABLE "private"."command_previews"
+  ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE "private"."command_requests"
+  ADD COLUMN "origin" text NOT NULL DEFAULT 'ui'::text;
+
+ALTER TABLE "private"."command_requests"
+  ADD COLUMN "conversation_id" uuid;
+
+ALTER TABLE "private"."command_requests"
+  ADD COLUMN "preview_token" uuid;
+
+CREATE OR REPLACE FUNCTION private.assert_chat_conversation (
+  p_brewery      uuid,
+  p_conversation uuid
+)
+  RETURNS uuid
+  LANGUAGE plpgsql
+  STABLE
+  SECURITY DEFINER
+  SET search_path TO ''
+  AS $function$
+declare v_actor uuid := private.assert_chat_member(p_brewery);
+begin
+  if not exists(select 1 from private.chat_conversations where id=p_conversation and brewery_id=p_brewery and actor_id=v_actor)
+    then raise exception 'permission denied' using errcode='42501'; end if;
+  return v_actor;
+end $function$;
+
+CREATE OR REPLACE FUNCTION private.assert_chat_member (
+  p_brewery uuid
+)
+  RETURNS uuid
+  LANGUAGE plpgsql
+  STABLE
+  SECURITY DEFINER
+  SET search_path TO ''
+  AS $function$
+begin
+  return private.assert_staff(p_brewery,array['admin','sales','warehouse','brewer','taproom']::public.staff_role[]);
+end $function$;
+
+CREATE OR REPLACE FUNCTION private.assert_open_occupancy (
+  p_brewery   uuid,
+  p_occupancy uuid
+)
+  RETURNS void
+  LANGUAGE plpgsql
+  SET search_path TO ''
+  AS $function$
+declare v_ended timestamptz; v_found boolean;
+begin
+  if p_occupancy is null then return; end if;
+  select true, o.ended_at into v_found, v_ended from public.vessel_occupancies o
+  where o.id = p_occupancy and o.brewery_id = p_brewery for update;
+  if v_found is null then raise exception 'occupancy not found'; end if;
+  if v_ended is not null then raise exception 'occupancy is closed'; end if;
+end $function$;
+
+CREATE OR REPLACE FUNCTION private.claim_command_request (
+  p_brewery      uuid,
+  p_command      text,
+  p_request_id   uuid,
+  p_payload      jsonb,
+  p_origin       text  DEFAULT 'ui'::text,
+  p_conversation uuid  DEFAULT NULL::uuid,
+  p_preview      uuid  DEFAULT NULL::uuid
+)
+  RETURNS jsonb
+  LANGUAGE plpgsql
+  SECURITY DEFINER
+  SET search_path TO ''
+  AS $function$
+declare v_actor uuid := auth.uid(); v_request private.command_requests;
+begin
+  if v_actor is null then raise exception 'permission denied' using errcode = '42501'; end if;
+  perform private.assert_request_scope(p_brewery);
+  insert into private.command_requests (actor_id, brewery_id, request_id, command_name, origin, conversation_id, preview_token, payload_hash)
+  values (v_actor, p_brewery, p_request_id, p_command, p_origin, p_conversation, p_preview, extensions.digest(p_payload::text, 'sha256'))
+  on conflict (actor_id, request_id) do nothing;
+  if found then return null; end if;
+  select * into v_request from private.command_requests
+    where actor_id = v_actor and request_id = p_request_id for update;
+  if v_request.brewery_id is distinct from p_brewery or v_request.command_name <> p_command
+     or v_request.origin <> p_origin or v_request.conversation_id is distinct from p_conversation
+     or v_request.preview_token is distinct from p_preview
+     or v_request.payload_hash <> extensions.digest(p_payload::text, 'sha256') then
+    -- Application SQLSTATE (class MG): every unique index raises 23505, so the
+    -- replay mismatch gets its own code for the HTTP layer to map to 409.
+    raise exception 'request id was already used with a different payload' using errcode = 'MG409';
+  end if;
+  if v_request.result is null then raise exception 'request is incomplete'; end if;
+  return v_request.result;
+end $function$;
+
+CREATE OR REPLACE FUNCTION private.inventory_movement_proposal (
+  p_brewery      uuid,
+  p_sku          uuid,
+  p_location     uuid,
+  p_bin          uuid,
+  p_qty          numeric,
+  p_type         public.movement_type,
+  p_sale_channel uuid,
+  p_dest_state   text,
+  p_note         text,
+  p_lot          uuid,
+  p_lock         boolean              DEFAULT false
+)
+  RETURNS jsonb
+  LANGUAGE plpgsql
+  SET search_path TO ''
+  AS $function$
+declare v_meta jsonb; v_lot jsonb; v_channel jsonb; v_stock_qty numeric; v_stock_bbl numeric;
+  v_brand uuid; v_format uuid;
+  v_movement_count bigint; v_movement_ids jsonb; v_components jsonb; v_registration jsonb;
+  v_effects jsonb; v_warnings jsonb := '[]'::jsonb; v_version jsonb;
+begin
+  if p_type not in ('opening_balance','production_in','adjustment','depletion','return_in','destruction','loss','sample','festival_removal')
+    then raise exception 'movement type is not supported in chat'; end if;
+  if p_qty is null or p_qty::text in ('NaN','Infinity','-Infinity') or p_qty=0 or p_qty<>round(p_qty,2)
+    then raise exception 'invalid movement quantity'; end if;
+
+  if (p_type in ('opening_balance','production_in','return_in') and p_qty<0)
+     or (p_type in ('depletion','destruction','loss','sample','festival_removal') and p_qty>0)
+    then raise exception 'movement quantity has the wrong sign for its type'; end if;
+  if (p_type='depletion') is distinct from (p_sale_channel is not null)
+    then raise exception 'depletion requires a sale channel and other movements cannot carry one'; end if;
+  if (p_type in ('sample','festival_removal')) is distinct from (p_dest_state is not null)
+    or (p_dest_state is not null and p_dest_state !~ '^[A-Z]{2}$')
+    then raise exception 'sample and festival removals require a two-letter destination state'; end if;
+
+  if p_lock then
+    select brand_id,format_id into v_brand,v_format from public.skus
+      where id=p_sku and brewery_id=p_brewery for share;
+    perform 1 from public.brands where id=v_brand and brewery_id=p_brewery for share;
+    -- The parent row conflicts with complete component replacement, including
+    -- inserting a child where no component row existed at preview time.
+    perform 1 from public.formats where id=v_format and brewery_id=p_brewery for share;
+    perform 1 from public.format_components where brewery_id=p_brewery
+      and parent_format_id=v_format order by child_format_id for share;
+    perform 1 from public.formats where brewery_id=p_brewery and id in (
+      select child_format_id from public.format_components
+      where brewery_id=p_brewery and parent_format_id=v_format
+    ) order by id for share;
+    perform 1 from public.locations where id=p_location and brewery_id=p_brewery for share;
+    perform 1 from public.bins where id=p_bin and location_id=p_location and brewery_id=p_brewery for share;
+  end if;
+  -- Each statement gets a fresh READ COMMITTED snapshot. Build displayed
+  -- metadata only after every relevant row lock has completed.
+  select jsonb_build_object(
+    'skuId',s.id,'skuName',s.name,'skuActive',s.active,
+    'brandId',br.id,'brandName',br.name,'formatId',f.id,'formatName',f.name,
+    'packageType',f.package_type,'bblPerUnit',fv.bbl_per_unit,
+    'locationId',l.id,'locationName',l.name,'locationKind',l.kind,'binId',b.id,'binName',b.name
+  ) into v_meta
+  from public.skus s
+  join public.brands br on br.id=s.brand_id and br.brewery_id=s.brewery_id
+  join public.formats f on f.id=s.format_id and f.brewery_id=s.brewery_id
+  join public.format_volumes fv on fv.id=f.id and fv.brewery_id=f.brewery_id
+  join public.locations l on l.id=p_location and l.brewery_id=s.brewery_id
+  join public.bins b on b.id=p_bin and b.location_id=l.id and b.brewery_id=l.brewery_id
+  where s.id=p_sku and s.brewery_id=p_brewery;
+  if v_meta is null then raise exception 'invalid movement selection'; end if;
+  if not (v_meta->>'skuActive')::boolean then raise exception 'inactive SKU cannot receive a new movement'; end if;
+
+  select coalesce(jsonb_agg(jsonb_build_object('id',child.id,'name',child.name,'qty',fc.qty,
+    'bblPerUnit',child.bbl_per_unit) order by child.id),'[]'::jsonb) into v_components
+  from public.format_components fc join public.formats child
+    on child.id=fc.child_format_id and child.brewery_id=fc.brewery_id
+  where fc.brewery_id=p_brewery and fc.parent_format_id=(v_meta->>'formatId')::uuid;
+
+  if p_lot is not null then
+    if p_lock then perform 1 from public.lots where id=p_lot and brewery_id=p_brewery for share; end if;
+    select to_jsonb(lot) into v_lot from public.lots lot where id=p_lot and brewery_id=p_brewery;
+    if not found or not exists(select 1 from public.inventory_movements
+      where brewery_id=p_brewery and sku_id=p_sku and lot_id=p_lot)
+      then raise exception 'lot does not belong to SKU'; end if;
+  end if;
+
+  if p_sale_channel is not null then
+    if p_lock then perform 1 from public.sale_channels where id=p_sale_channel and brewery_id=p_brewery for share; end if;
+    select jsonb_build_object('id',id,'name',name,'taxTreatment',tax_treatment)
+      into v_channel from public.sale_channels where id=p_sale_channel and brewery_id=p_brewery;
+    if not found then raise exception 'invalid sale channel'; end if;
+  end if;
+
+  select count(*),coalesce(sum(qty),0),coalesce(sum(bbl),0),coalesce(jsonb_agg(id order by id),'[]'::jsonb)
+    into v_movement_count,v_stock_qty,v_stock_bbl,v_movement_ids
+  from public.inventory_movements where brewery_id=p_brewery and sku_id=p_sku and location_id=p_location
+    and bin_id=p_bin and lot_id is not distinct from p_lot;
+  if p_qty<0 and -p_qty>v_stock_qty then
+    if p_lot is null and exists(select 1 from public.inventory_movements
+      where brewery_id=p_brewery and sku_id=p_sku and location_id=p_location and bin_id=p_bin and lot_id is not null)
+      then raise exception 'choose the recorded lot for this removal'; end if;
+    raise exception 'insufficient selected bin and lot stock';
+  end if;
+
+  if p_dest_state is not null then
+    if p_lock then perform 1 from public.state_registrations where brewery_id=p_brewery
+      and brand_id=(v_meta->>'brandId')::uuid and state=p_dest_state for share; end if;
+    select to_jsonb(r) into v_registration from (
+      select id,state,registration_no,approved_on,expires_on from public.state_registrations
+      where brewery_id=p_brewery and brand_id=(v_meta->>'brandId')::uuid and state=p_dest_state
+    ) r;
+    if v_registration is null or (v_registration->>'approved_on')::date>current_date
+       or (v_registration->>'expires_on')::date<current_date then
+      v_warnings:=jsonb_build_array((v_meta->>'brandName')||' is not registered in '||p_dest_state);
+    end if;
+  end if;
+
+  v_version:=jsonb_build_object(
+    'sku',jsonb_build_object('id',v_meta->>'skuId','name',v_meta->>'skuName','active',(v_meta->>'skuActive')::boolean),
+    'brand',jsonb_build_object('id',v_meta->>'brandId','name',v_meta->>'brandName'),
+    'format',jsonb_build_object('id',v_meta->>'formatId','name',v_meta->>'formatName',
+      'packageType',v_meta->>'packageType','bblPerUnit',(v_meta->>'bblPerUnit')::numeric,'components',v_components),
+    'location',jsonb_build_object('id',v_meta->>'locationId','name',v_meta->>'locationName','kind',v_meta->>'locationKind'),
+    'bin',jsonb_build_object('id',v_meta->>'binId','name',v_meta->>'binName'),
+    'lot',case when p_lot is null then null else jsonb_build_object('id',v_lot->>'id','code',v_lot->>'code','packagedOn',v_lot->>'packaged_on','bestBy',v_lot->>'best_by') end,
+    'channel',v_channel,
+    'registration',v_registration,
+    'proposal',jsonb_build_object('qty',p_qty,'type',p_type,'destState',p_dest_state,'note',p_note),
+    'stock',jsonb_build_object('movementCount',v_movement_count,'movementIds',v_movement_ids,'qty',v_stock_qty,'bbl',v_stock_bbl));
+  v_effects:=jsonb_build_array(jsonb_build_object(
+    'label',(v_meta->>'skuName')||' · '||(v_meta->>'locationName')||' · '||(v_meta->>'binName'),
+    'qty',p_qty::text,'bbl',round(p_qty*(v_meta->>'bblPerUnit')::numeric,8)::text,
+    'stockBeforeQty',v_stock_qty::text,'stockAfterQty',(v_stock_qty+p_qty)::text,
+    'stockBeforeBbl',v_stock_bbl::text,'stockAfterBbl',round(v_stock_bbl+p_qty*(v_meta->>'bblPerUnit')::numeric,8)::text,
+    'type',p_type,'taxTreatment',v_channel->>'taxTreatment','destinationState',p_dest_state,
+    'correction',case when p_type in ('adjustment','loss') then 'reverse_inventory_movement' else null end));
+  return jsonb_build_object('effects',v_effects,'warnings',v_warnings,'version',v_version);
+end $function$;
+
+CREATE OR REPLACE FUNCTION public.append_chat_message (
+  p_brewery      uuid,
+  p_conversation uuid,
+  p_role         text,
+  p_content      text,
+  p_request_id   uuid
+)
+  RETURNS jsonb
+  LANGUAGE plpgsql
+  SECURITY DEFINER
+  SET search_path TO ''
+  AS $function$
+declare v_actor uuid := private.assert_chat_conversation(p_brewery,p_conversation); v_replay jsonb; v_row private.chat_messages;
+begin
+  if p_role not in ('user','assistant') or p_content is null or length(btrim(p_content)) not between 1 and 4000
+    then raise exception 'invalid chat message'; end if;
+  v_replay := private.claim_command_request(p_brewery,'append_chat_message',p_request_id,
+    jsonb_build_object('conversation',p_conversation,'role',p_role,'content',p_content));
+  if v_replay is not null then return v_replay; end if;
+  insert into private.chat_messages(conversation_id,brewery_id,actor_id,role,content,request_id)
+    values(p_conversation,p_brewery,v_actor,p_role,btrim(p_content),p_request_id) returning * into v_row;
+  update private.chat_conversations set updated_at=now() where id=p_conversation and brewery_id=p_brewery and actor_id=v_actor;
+  return private.complete_command_request(p_request_id,to_jsonb(v_row));
+end $function$;
+
+CREATE OR REPLACE FUNCTION public.create_chat_conversation (
+  p_brewery    uuid,
+  p_title      text,
+  p_request_id uuid
+)
+  RETURNS jsonb
+  LANGUAGE plpgsql
+  SECURITY DEFINER
+  SET search_path TO ''
+  AS $function$
+declare v_actor uuid := private.assert_chat_member(p_brewery); v_replay jsonb; v_row private.chat_conversations;
+begin
+  if p_title is not null and length(btrim(p_title)) not between 1 and 120 then raise exception 'invalid conversation title'; end if;
+  v_replay := private.claim_command_request(p_brewery,'create_chat_conversation',p_request_id,jsonb_build_object('title',p_title));
+  if v_replay is not null then return v_replay; end if;
+  insert into private.chat_conversations(actor_id,brewery_id,title)
+    values(v_actor,p_brewery,coalesce(btrim(p_title),'New conversation')) returning * into v_row;
+  return private.complete_command_request(p_request_id,to_jsonb(v_row));
+end $function$;
+
+CREATE OR REPLACE FUNCTION public.get_chat_history (
+  p_brewery      uuid,
+  p_conversation uuid
+)
+  RETURNS jsonb
+  LANGUAGE plpgsql
+  STABLE
+  SECURITY DEFINER
+  SET search_path TO ''
+  AS $function$
+declare v_actor uuid := private.assert_chat_conversation(p_brewery,p_conversation); v_conversation jsonb;
+begin
+  select jsonb_build_object('id',id,'title',title,'created_at',created_at,'updated_at',updated_at)
+    into v_conversation from private.chat_conversations
+    where id=p_conversation and brewery_id=p_brewery and actor_id=v_actor;
+  return jsonb_build_object('conversation',v_conversation,'messages',coalesce((
+    select jsonb_agg(jsonb_build_object('id',id,'role',role,'content',content,'result',result,'request_id',request_id,'created_at',created_at)
+      order by created_at,id) from private.chat_messages
+    where conversation_id=p_conversation and brewery_id=p_brewery and actor_id=v_actor),'[]'::jsonb));
+end $function$;
+
+CREATE OR REPLACE FUNCTION public.list_chat_conversations (
+  p_brewery uuid
+)
+  RETURNS jsonb
+  LANGUAGE plpgsql
+  STABLE
+  SECURITY DEFINER
+  SET search_path TO ''
+  AS $function$
+declare v_actor uuid := private.assert_chat_member(p_brewery);
+begin
+  return coalesce((select jsonb_agg(to_jsonb(c) order by c.updated_at desc,c.id)
+    from (select id,title,created_at,updated_at from private.chat_conversations
+      where brewery_id=p_brewery and actor_id=v_actor order by updated_at desc,id limit 50) c),'[]'::jsonb);
+end $function$;
+
+CREATE OR REPLACE FUNCTION public.preview_inventory_movement (
+  p_brewery      uuid,
+  p_sku          uuid,
+  p_location     uuid,
+  p_bin          uuid,
+  p_qty          numeric,
+  p_type         public.movement_type,
+  p_sale_channel uuid,
+  p_dest_state   text,
+  p_note         text,
+  p_lot          uuid,
+  p_conversation uuid
+)
+  RETURNS jsonb
+  LANGUAGE plpgsql
+  SECURITY DEFINER
+  SET search_path TO ''
+  AS $function$
+declare v_actor uuid; v_token uuid := private.new_uuid(); v_input jsonb; v_proposal jsonb;
+begin
+  v_actor := private.assert_staff(p_brewery,array['admin','warehouse']::public.staff_role[]);
+  perform private.assert_chat_conversation(p_brewery,p_conversation);
+  v_proposal:=private.inventory_movement_proposal(p_brewery,p_sku,p_location,p_bin,p_qty,p_type,
+    p_sale_channel,p_dest_state,p_note,p_lot);
+  v_input := jsonb_build_object('brewery',p_brewery,'sku',p_sku,'location',p_location,'bin',p_bin,'qty',p_qty,
+    'type',p_type,'sale_channel',p_sale_channel,'dest_state',p_dest_state,'note',p_note,'lot',p_lot);
+  insert into private.command_previews(token,actor_id,brewery_id,command_name,rpc_name,canonical_input,effects,warnings,version,conversation_id)
+    values(v_token,v_actor,p_brewery,'record_movement','record_inventory_movement',v_input,
+      v_proposal->'effects',v_proposal->'warnings',v_proposal->'version',p_conversation);
+  return v_proposal||jsonb_build_object('previewToken',v_token);
+end $function$;
+
+CREATE OR REPLACE FUNCTION public.record_inventory_movement (
+  p_brewery       uuid,
+  p_sku           uuid,
+  p_location      uuid,
+  p_bin           uuid,
+  p_qty           numeric,
+  p_type          public.movement_type,
+  p_sale_channel  uuid,
+  p_dest_state    text,
+  p_note          text,
+  p_request_id    uuid,
+  p_lot           uuid                 DEFAULT NULL::uuid,
+  p_origin        text                 DEFAULT 'ui'::text,
+  p_conversation  uuid                 DEFAULT NULL::uuid,
+  p_preview_token uuid                 DEFAULT NULL::uuid
+)
+  RETURNS jsonb
+  LANGUAGE plpgsql
+  SECURITY DEFINER
+  SET search_path TO ''
+  AS $function$
+declare v_replay jsonb; v_row public.inventory_movements; v_tax public.tax_treatment; v_actor uuid; v_input jsonb;
+  v_preview private.command_previews; v_current jsonb;
+begin
+  v_actor := private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
+  if (p_origin='chat') is distinct from (p_conversation is not null and p_preview_token is not null)
+    then raise exception 'chat preview token required'; end if;
+  if p_origin not in ('ui','chat') then raise exception 'invalid command origin'; end if;
+  if p_origin='chat' and p_type not in ('opening_balance','production_in','adjustment','depletion','return_in','destruction','loss','sample','festival_removal')
+    then raise exception 'movement type is not supported in chat'; end if;
+  v_input := jsonb_build_object('brewery', p_brewery, 'sku', p_sku, 'location', p_location, 'bin', p_bin, 'qty', p_qty, 'type', p_type, 'sale_channel', p_sale_channel, 'dest_state', p_dest_state, 'note', p_note, 'lot', p_lot);
+  v_replay := private.claim_command_request(p_brewery, 'record_inventory_movement', p_request_id, v_input,
+    p_origin,p_conversation,p_preview_token);
+  if v_replay is not null then return v_replay; end if;
+
+  if p_origin='chat' then
+    select * into v_preview from private.command_previews
+      where token=p_preview_token and actor_id=v_actor and brewery_id=p_brewery
+        and command_name='record_movement' and rpc_name='record_inventory_movement'
+        and canonical_input=v_input and conversation_id=p_conversation;
+    if not found then raise exception 'invalid preview token'; end if;
+    if v_preview.expires_at<=now() then raise exception 'expired preview token'; end if;
+    -- ponytail: serializes inventory writers; upgrade to shared per-stock
+    -- locks across every writer if throughput requires.
+    lock table public.inventory_movements in share row exclusive mode;
+    v_current:=private.inventory_movement_proposal(p_brewery,p_sku,p_location,p_bin,p_qty,p_type,
+      p_sale_channel,p_dest_state,p_note,p_lot,true);
+    if v_current->'version' is distinct from v_preview.version
+       or v_current->'effects' is distinct from v_preview.effects
+       or v_current->'warnings' is distinct from v_preview.warnings then
+      raise exception 'preview changed; preview again' using errcode='MG409';
+    end if;
+    v_tax:=(v_current->'effects'->0->>'taxTreatment')::public.tax_treatment;
+  else
+    if p_qty is null or p_qty::text in ('NaN','Infinity','-Infinity') or p_qty = 0 or p_qty <> round(p_qty,2) then raise exception 'invalid movement quantity'; end if;
+    if p_qty < 0 then
+    -- ponytail: global ledger lock; shared stock-key locks across every writer at higher throughput.
+      lock table public.inventory_movements in share row exclusive mode;
+      if p_lot is null and exists (select 1 from public.inventory_movements where brewery_id = p_brewery and sku_id = p_sku and bin_id = p_bin and lot_id is not null)
+         and -p_qty > (select coalesce(sum(qty),0) from public.inventory_movements where brewery_id = p_brewery and sku_id = p_sku and bin_id = p_bin and lot_id is null) then raise exception 'choose the recorded lot for this removal'; end if;
+    end if;
+    if p_lot is not null then
+      if not exists (select 1 from public.inventory_movements where brewery_id = p_brewery and sku_id = p_sku and lot_id = p_lot) then raise exception 'lot does not belong to SKU'; end if;
+      if p_qty < 0 then
+        if -p_qty > (select coalesce(sum(qty),0) from public.inventory_movements where brewery_id = p_brewery and sku_id = p_sku and bin_id = p_bin and lot_id = p_lot) then raise exception 'insufficient selected lot stock'; end if;
+      end if;
+    end if;
+    -- A staff-entered movement has no customer, so the channel default is the
+    -- resolved treatment; the composite FK below rejects another brewery's channel.
+    if p_sale_channel is not null then
+      select tax_treatment into v_tax from public.sale_channels
+       where id = p_sale_channel and brewery_id = p_brewery;
+    end if;
+  end if;
+  insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, lot_id, qty, type, sale_channel_id, tax_treatment, dest_state, note, created_by)
+    values (p_brewery, p_sku, p_location, p_bin, p_lot, p_qty, p_type, p_sale_channel, v_tax, p_dest_state, p_note, auth.uid()) returning * into v_row;
+  if p_origin='chat' then
+    insert into private.chat_messages(conversation_id,brewery_id,actor_id,role,result,request_id)
+      values(p_conversation,p_brewery,v_actor,'result',to_jsonb(v_row),p_request_id);
+  end if;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $function$;
+
+CREATE OR REPLACE FUNCTION public.upsert_state_registration (
+  p_brewery         uuid,
+  p_brand           uuid,
+  p_state           text,
+  p_registration_no text,
+  p_approved_on     date,
+  p_expires_on      date,
+  p_request_id      uuid
+)
+  RETURNS jsonb
+  LANGUAGE plpgsql
+  SECURITY DEFINER
+  SET search_path TO ''
+  AS $function$
+declare v_replay jsonb; v_row public.state_registrations;
+begin
+  perform private.assert_staff(p_brewery, array['admin','sales']::public.staff_role[]);
+  v_replay := private.claim_command_request(p_brewery, 'upsert_state_registration', p_request_id,
+    jsonb_build_object('brand', p_brand, 'state', p_state, 'registration_no', p_registration_no, 'approved_on', p_approved_on, 'expires_on', p_expires_on));
+  if v_replay is not null then return v_replay; end if;
+  -- Composer previews lock the same parent row so an absent registration
+  -- cannot appear between their warning snapshot and commit.
+  perform 1 from public.brands where id=p_brand and brewery_id=p_brewery for update;
+  if not found then raise exception 'brand not found'; end if;
+  -- the composite FK pins the brand to this brewery, and the conflict key is the brand, so the row hit is this brewery's
+  insert into public.state_registrations (brewery_id, brand_id, state, registration_no, approved_on, expires_on)
+    values (p_brewery, p_brand, p_state, p_registration_no, p_approved_on, p_expires_on)
+    on conflict (brand_id, state) do update
+      set registration_no = excluded.registration_no, approved_on = excluded.approved_on, expires_on = excluded.expires_on
+    returning * into v_row;
+  return private.complete_command_request(p_request_id, to_jsonb(v_row));
+end $function$;
+
+ALTER TABLE "private"."chat_conversations"
+  ADD CONSTRAINT "chat_conversations_brewery_id_fkey" FOREIGN KEY (brewery_id) REFERENCES public.breweries(id);
+
+ALTER TABLE "private"."command_requests"
+  ADD CONSTRAINT "command_requests_check1" CHECK (((origin = 'chat'::text) = ((conversation_id IS NOT NULL) AND (preview_token IS NOT NULL))));
+
+ALTER TABLE "private"."command_requests"
+  ADD CONSTRAINT "command_requests_origin_check" CHECK ((origin = ANY (ARRAY['ui'::text, 'chat'::text])));
+
+CREATE UNIQUE INDEX chat_messages_request_idx ON private.chat_messages USING btree (actor_id, request_id)
+  WHERE (request_id IS NOT NULL);
+
+CREATE INDEX command_previews_expiry_idx ON private.command_previews USING btree (expires_at);
+
+REVOKE ALL ON FUNCTION "private"."assert_chat_conversation"(uuid, uuid) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION "private"."assert_chat_conversation"(uuid, uuid) TO "postgres";
+
+REVOKE ALL ON FUNCTION "private"."assert_chat_member"(uuid) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION "private"."assert_chat_member"(uuid) TO "postgres";
+
+REVOKE ALL ON FUNCTION "private"."claim_command_request"(uuid, text, uuid, jsonb, text, uuid, uuid) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION "private"."claim_command_request"(uuid, text, uuid, jsonb, text, uuid, uuid) TO "postgres";
+
+REVOKE ALL ON FUNCTION "private"."inventory_movement_proposal"(uuid, uuid, uuid, uuid, numeric, public.movement_type, uuid, text, text, uuid, boolean) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION "private"."inventory_movement_proposal"(uuid, uuid, uuid, uuid, numeric, public.movement_type, uuid, text, text, uuid, boolean) TO "postgres";
+
+REVOKE ALL ON FUNCTION "public"."append_chat_message"(uuid, uuid, text, text, uuid) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION "public"."append_chat_message"(uuid, uuid, text, text, uuid) TO "authenticated", "postgres", "service_role";
+
+REVOKE ALL ON FUNCTION "public"."create_chat_conversation"(uuid, text, uuid) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION "public"."create_chat_conversation"(uuid, text, uuid) TO "authenticated", "postgres", "service_role";
+
+REVOKE ALL ON FUNCTION "public"."get_chat_history"(uuid, uuid) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION "public"."get_chat_history"(uuid, uuid) TO "authenticated", "postgres", "service_role";
+
+REVOKE ALL ON FUNCTION "public"."list_chat_conversations"(uuid) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION "public"."list_chat_conversations"(uuid) TO "authenticated", "postgres", "service_role";
+
+REVOKE ALL ON FUNCTION "public"."preview_inventory_movement"(uuid, uuid, uuid, uuid, numeric, public.movement_type, uuid, text, text, uuid, uuid) FROM PUBLIC;
+
+GRANT EXECUTE
+  ON FUNCTION "public"."preview_inventory_movement"(uuid, uuid, uuid, uuid, numeric, public.movement_type, uuid, text, text, uuid, uuid)
+  TO "authenticated", "postgres", "service_role";
+
+REVOKE ALL ON FUNCTION "public"."record_inventory_movement"(uuid, uuid, uuid, uuid, numeric, public.movement_type, uuid, text, text, uuid, uuid, text, uuid, uuid) FROM PUBLIC;
+
+GRANT EXECUTE
+  ON FUNCTION "public"."record_inventory_movement"(uuid, uuid, uuid, uuid, numeric, public.movement_type, uuid, text, text, uuid, uuid, text, uuid, uuid)
+  TO "authenticated", "postgres", "service_role";
+
+GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE "private"."chat_conversations" TO "postgres";
+
+GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE "private"."chat_messages" TO "postgres";
+
+GRANT DELETE, INSERT, MAINTAIN, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON TABLE "private"."command_previews" TO "postgres";
+
+ALTER TABLE "private"."chat_messages"
+  ADD CONSTRAINT "chat_messages_conversation_id_brewery_id_fkey" FOREIGN KEY (conversation_id, brewery_id) REFERENCES private.chat_conversations(id, brewery_id);
+
+ALTER TABLE "private"."command_previews"
+  ADD CONSTRAINT "command_previews_conversation_id_brewery_id_fkey" FOREIGN KEY (conversation_id, brewery_id) REFERENCES private.chat_conversations(id, brewery_id);
+
+CREATE INDEX chat_messages_conversation_idx ON private.chat_messages USING btree (conversation_id, created_at, id);
+
+ALTER TABLE "private"."command_requests"
+  ADD CONSTRAINT "command_requests_preview_token_actor_id_brewery_id_command_fkey" FOREIGN KEY (preview_token, actor_id, brewery_id, command_name, conversation_id)
+    REFERENCES private.command_previews(token, actor_id, brewery_id, rpc_name, conversation_id) DEFERRABLE INITIALLY DEFERRED;

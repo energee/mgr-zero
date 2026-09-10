@@ -72,6 +72,16 @@ const expectedContextSchema = z.object({
   customerId: z.uuid().optional(),
 }).strict();
 
+const provenanceSchema = z.object({
+  origin: z.enum(["ui", "chat"]).default("ui"),
+  conversationId: z.uuid().optional(),
+  previewToken: z.uuid().optional(),
+}).refine((value) => value.origin === "chat"
+  ? Boolean(value.conversationId && value.previewToken)
+  : !value.conversationId && !value.previewToken, {
+  message: "chat commands require a confirmed preview",
+});
+
 
 export async function POST(req: Request) {
   const correlationId = crypto.randomUUID();
@@ -99,7 +109,13 @@ export async function POST(req: Request) {
       if (!isUuid(requestId)) {
         throw new CommandError("requestId must be a UUID for commands", 400, "invalid_request_id");
       }
-      execution = { requestId, correlationId };
+      const provenance = provenanceSchema.safeParse({
+        origin: "origin" in body ? body.origin : undefined,
+        conversationId: "conversationId" in body ? body.conversationId : undefined,
+        previewToken: "previewToken" in body ? body.previewToken : undefined,
+      });
+      if (!provenance.success) throw new CommandError("chat commands require a confirmed preview", 400, "preview_required");
+      execution = { requestId, correlationId, ...provenance.data };
     }
 
     if (definition.scope === "pretenant" && body.breweryId !== undefined) {
