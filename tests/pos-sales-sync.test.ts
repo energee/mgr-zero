@@ -206,6 +206,36 @@ describe("Square durable sales sync", () => {
     expect(sql(`select count(*) from public.inventory_movements where brewery_id='${f.brewery.id}'`)).toEqual(["0"]);
   });
 
+  it("keeps an empty newer order version current when a delayed older line finishes afterward", async () => {
+    const f = await fixture();
+    const updated1 = new Date(Date.now() - 120_000).toISOString();
+    const updated2 = new Date(Date.now() - 60_000).toISOString();
+    let enterA!: () => void, releaseA!: () => void;
+    const enteredA = new Promise<void>((resolve) => { enterA = resolve; });
+    const releasedA = new Promise<void>((resolve) => { releaseA = resolve; });
+    const older = saleOrder({ id: "EMPTY-NEWER", version: 1, updatedAt: updated1, lines: [line("old", "V1", "4")] });
+    const newer = saleOrder({ id: "EMPTY-NEWER", version: 2, updatedAt: updated2, lines: [] });
+    const a = syncSquareSales(f.ctx, crypto.randomUUID(), new SquareClient(config, squareFetch(f.merchantId, async () => {
+      enterA(); await releasedA; return response({ orders: [older] });
+    })));
+    await enteredA;
+    try {
+      await syncSquareSales(f.ctx, crypto.randomUUID(), new SquareClient(config,
+        squareFetch(f.merchantId, () => response({ orders: [newer] }))));
+    } finally {
+      releaseA();
+    }
+    await a;
+    expect(sql(`select source_version::text from private.square_order_snapshots where brewery_id='${f.brewery.id}'
+      and external_order_id='EMPTY-NEWER' order by source_version`)).toEqual(["1", "2"]);
+    expect(sql(`select source_version::text||':'||external_line_id||':'||fact_status from public.pos_sales
+      where brewery_id='${f.brewery.id}' and external_order_id='EMPTY-NEWER'`)).toEqual(["1:old:accepted"]);
+    expect(sql(`select external_line_id from private.pos_current_sales where brewery_id='${f.brewery.id}'
+      and external_order_id='EMPTY-NEWER'`)).toEqual([]);
+    expect(currentExpected(f.brewery.id)).toBe(0);
+    expect(sql(`select count(*) from public.inventory_movements where brewery_id='${f.brewery.id}'`)).toEqual(["0"]);
+  });
+
   it("deduplicates pages and retries while preserving sales, linked returns, exchanges, unsupported facts, and zero inventory writes", async () => {
     const f = await fixture();
     const now = new Date(), late = new Date(now.getTime() - 10 * 86_400_000).toISOString();
@@ -358,6 +388,23 @@ describe("Square durable sales sync", () => {
     expect(sql(`select count(*) from public.pos_sales where brewery_id='${f.brewery.id}'`)).toEqual(["0"]);
     expect(sql(`select pages from private.square_sales_syncs where brewery_id='${f.brewery.id}' and request_id='${requestId}'`)).toEqual(["0"]);
     expect(sql(`select count(*) from public.pos_sales_coverage where brewery_id='${f.brewery.id}'`)).toEqual(["0"]);
+  });
+
+  it("treats an omitted orders field as an observed empty page and still rejects malformed orders", async () => {
+    const f = await fixture();
+    const empty = await syncSquareSales(f.ctx, crypto.randomUUID(), new SquareClient(config,
+      squareFetch(f.merchantId, () => response({}))));
+    expect(empty).toMatchObject({ complete: true, acceptedFacts: 0, unsupportedFacts: 0, pages: 1, locations: 2 });
+    const before = sql(`select (select count(*) from public.pos_sales_coverage where brewery_id='${f.brewery.id}')||':'||
+      (select sales_synced_through::text from public.pos_connections where id='${f.connectionId}')`)[0];
+    expect(before.startsWith("2:")).toBe(true);
+
+    const malformedRequest = crypto.randomUUID();
+    await expect(syncSquareSales(f.ctx, malformedRequest, new SquareClient(config,
+      squareFetch(f.merchantId, () => response({ orders: null }))))).rejects.toThrow("Square is unavailable");
+    expect(sql(`select (select count(*) from public.pos_sales_coverage where brewery_id='${f.brewery.id}')||':'||
+      (select sales_synced_through::text from public.pos_connections where id='${f.connectionId}')`)).toEqual([before]);
+    expect(sql(`select pages::text from private.square_sales_syncs where request_id='${malformedRequest}'`)).toEqual(["0"]);
   });
 
   it("enforces current Admin, tenant, and connection generation while feeding P12 current draft and completed variance only", async () => {
