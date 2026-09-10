@@ -16,6 +16,12 @@ below just in time — don't preload everything.
 
 ## Current focus: screens
 
+For screen, form, dialog, and entry-flow changes or parity audits, use
+`.agents/skills/screen-parity/SKILL.md`. Inventory and live application must
+share the same views, controls, and surface wrappers; fixtures versus
+database-backed data/actions are the boundary. The screen explorer is the
+interface source of truth. Validate this in code.
+
 Decided 2026-09-06. `components/mgr/screens.tsx` and the pages that render it
 are the work. Schema, migrations, RPCs, and the database-backed test suites
 wait for the backend push; when that starts, tests get their own throwaway
