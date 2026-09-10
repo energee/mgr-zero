@@ -106,7 +106,17 @@ describe("Materials", () => {
 
   it("the Material inventory record is MaterialView", () => {
     expect((screen("Material").body as { type: unknown }).type).toBe(MaterialView);
-    expect(htmlOf(createElement(MaterialView, { model: toMaterialViewProps(materialCitra) }))).toMatch(/>Save material</);
+    const html = htmlOf(createElement(MaterialView, { model: toMaterialViewProps(materialCitra) }));
+    expect(html).toMatch(/>Save material</);
+    expect(html).toMatch(/Default vendor/);
+  });
+
+  it("the live material form mounts the shared controlled body", () => {
+    const form = src("app/(app)/materials/material-form.tsx");
+    expect(form).toMatch(/from "@\/components\/mgr\/views\/material"/);
+    expect(form).toMatch(/<MaterialView\b/);
+    expect(form).toMatch(/controls=\{\{/);
+    expect(form).not.toMatch(/<Label\b|<Input\b|<Select\b|<Switch\b/);
   });
 
   it("the live materials page mounts MaterialsOnHandView and slots CountForm", () => {

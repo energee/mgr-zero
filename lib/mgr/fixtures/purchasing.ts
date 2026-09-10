@@ -102,6 +102,11 @@ export const materialCitra: MaterialViewModel = {
   purchaseUnitOptions: ["each", "lb", "kg", "oz", "g", "l", "gal", "ml"],
   unit: "lb",
   unitOptions: ["lb", "oz", "kg", "each"],
+  defaultVendorId: "ych",
+  defaultVendorOptions: [
+    { id: "ych", label: "YCH" },
+    { id: "cm", label: "Country Malt" },
+  ],
   lotTracked: true,
   active: true,
 };

@@ -31,7 +31,6 @@ const KNOWN_VIEW_DEBT = [
   "Receipt: ReceiptView <- app/(app)/purchase-orders/[id]/page.tsx",
   "Cycle count: CycleCountView <- app/(app)/materials/page.tsx",
   "Materials: MaterialsView <- app/(app)/materials/page.tsx",
-  "Material: MaterialView <- app/(app)/materials/page.tsx",
   "Contract: ContractView <- app/(app)/vendors/page.tsx",
   "Brand approval: BrandApprovalView <- app/(app)/compliance/registry/page.tsx",
   "State registration: StateRegistrationView <- app/(app)/compliance/registry/page.tsx",
