@@ -56,20 +56,20 @@ tests.
 Backend exists; each is a form or button. Most belong to Program 10 and can
 land early as their own small PRs.
 
-- [ ] `set_taproom_par`, `set_standing_allocation`, `release_allocation` on `/replenishment` (Pars and allocation)
-- [ ] `replace_format_bom`, `replace_format_components` on Format (Package BOM)
-- [ ] `move_stock_bin` on Location bins
+- [x] `set_taproom_par`, `set_standing_allocation`, `release_allocation` on `/replenishment` (Pars and allocation)
+- [x] `replace_format_bom`, `replace_format_components` on Format (Package BOM)
+- [x] `move_stock_bin` on Location bins
 - [x] `set_notification_destination`, `set_notification_preference`, `set_brewery_quiet_hours` (Program 16 page at `/settings/chat`)
 - [x] `unlink_chat_user` (Linked people)
-- [ ] `set_portal_fulfillment_source` (Settings)
+- [x] `set_portal_fulfillment_source` (Settings)
 - [x] `invite_staff`, `invite_customer_user`, `import_csv` — wait for Program 11's gate
 
 ## Partial pages to finish (Program 10 unless noted)
 
-- [x] Beer / Work / More area pages: drop `planned` children as 6, 7, 8, 9 land
+- [ ] Beer / Work / More area pages: drop `planned` children as 6, 7, 8, 9 land
 - [x] Taproom persona rows on Today (Program 12)
 - [x] Confirm order and Complete transfer review screens
-- [ ] Ship on delivery exposes `invoice_timing = on_delivery`
+- [x] Ship on delivery exposes `invoice_timing = on_delivery`
 - [x] Customer detail portal-invite section (Program 11)
 - [x] No membership as its own entry screen
 
@@ -80,9 +80,9 @@ Owner tagged there. Schema-affecting ones gate the programs above.
 - [ ] Guest keg identity (§16.13) — before 7 / 12 swap
 - [ ] Taproom TTB removal types — before 12
 - [ ] Taproom role: do not ship; Weekly count uses warehouse — before 12
-- [ ] Lot trace vs `ship_order_impl` lot_id — before 9
+- [x] Lot trace vs `ship_order_impl` lot_id — before 9
 - [ ] UI-plan §2 missing verbs (disconnect-QBO, write-off, invoice-question, push-defaults)
-- [ ] Invoice timing self-disagreement — Program 5/10
+- [x] Invoice timing self-disagreement — Program 5/10
 - [ ] Review order Tax $0.00 — Program 13
 - [ ] Sections A–D of the screens pass (ungate what 1–4b landed, add missing frames, fix contradicting copy)
 
