@@ -29,7 +29,7 @@ export default async function InvoicesPage() {
         const state = invoiceCurrentState(inv);
         const paid = state === "paid";
         const status = state === "written_off" ? "written off" : state;
-        const qbo = qboInvoicePresentation({ role: brewery.role, connected: Boolean(health?.connected), syncStatus: inv.qbo_sync_status, hasPendingPush: inv.has_pending_qbo_push, syncError: inv.qbo_sync_error, remoteState: inv.qbo_remote_state, balanceCents: inv.qbo_balance_cents, totalCents: inv.total_cents, accountantDrift: inv.qbo_accountant_drift, writtenOff: Boolean(inv.written_off_at) });
+        const qbo = qboInvoicePresentation({ kind: inv.kind, role: brewery.role, connected: Boolean(health?.connected), syncStatus: inv.qbo_sync_status, hasPendingPush: inv.has_pending_qbo_push, syncError: inv.qbo_sync_error, remoteState: inv.qbo_remote_state, balanceCents: inv.qbo_balance_cents, totalCents: inv.total_cents, accountantDrift: inv.qbo_accountant_drift, writtenOff: Boolean(inv.written_off_at) });
         const detail = inv.qbo_sync_status === "pushed" && !inv.qbo_accountant_drift && state === "unpaid"
           ? qbo.detail : inv.qbo_sync_status !== "pushed" ? qbo.detail : paid ? `paid ${new Date(inv.paid_at!).toLocaleDateString()}` : status;
         return (

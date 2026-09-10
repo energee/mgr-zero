@@ -37,7 +37,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const realm = health?.connected ? health.realmId : null;
   const missingMappings = !invoice.customers?.qbo_customer_id || (realm && invoice.customers.qbo_realm_id !== realm)
     || lines.some(line => line.kind === "sku" ? !line.skus?.qbo_item_id || (realm && line.skus.qbo_realm_id !== realm) : /keg_deposit/.test(line.kind) && !health?.depositItemId);
-  const presentation = qboInvoicePresentation({ role: brewery.role, connected: Boolean(health?.connected), syncStatus: invoice.qbo_sync_status, hasPendingPush, syncError: invoice.qbo_sync_error, remoteState: invoice.qbo_remote_state, balanceCents: invoice.qbo_balance_cents, totalCents: invoice.qbo_total_cents, accountantDrift: invoice.qbo_accountant_drift, writtenOff: Boolean(invoice.written_off_at), missingMappings: Boolean(missingMappings) });
+  const presentation = qboInvoicePresentation({ kind: invoice.kind, role: brewery.role, connected: Boolean(health?.connected), syncStatus: invoice.qbo_sync_status, hasPendingPush, syncError: invoice.qbo_sync_error, remoteState: invoice.qbo_remote_state, balanceCents: invoice.qbo_balance_cents, totalCents: invoice.qbo_total_cents, accountantDrift: invoice.qbo_accountant_drift, writtenOff: Boolean(invoice.written_off_at), missingMappings: Boolean(missingMappings) });
   return (
     <InvoiceView
       model={toInvoiceViewProps({ invoice, lines, questions, backHref: "/invoices" })}

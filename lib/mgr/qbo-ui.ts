@@ -4,6 +4,7 @@ import { money } from "./money";
 export type QboInvoiceAction = "push" | "retry" | "fix_mapping" | "corrected_push" | "repush" | "write_off";
 
 export function qboInvoicePresentation(input: {
+  kind: "invoice" | "credit_memo";
   role: StaffRole;
   connected: boolean;
   syncStatus: "pending" | "pushed" | "push_failed";
@@ -16,13 +17,14 @@ export function qboInvoicePresentation(input: {
   writtenOff?: boolean;
   missingMappings?: boolean;
 }): { detail: string; actions: QboInvoiceAction[] } {
+  const canWriteOff = input.kind === "invoice" && input.role === "admin";
   if (input.writtenOff) return { detail: "written off in MGR", actions: [] };
   if (input.role === "warehouse" || input.role === "brewer" || input.role === "taproom") {
     return { detail: input.syncStatus === "pushed" ? "QuickBooks status available to Sales" : "not pushed", actions: [] };
   }
   if (!input.connected) return { detail: "QuickBooks connection required", actions: [] };
-  if (input.remoteState === "deleted") return { detail: "deleted in QuickBooks", actions: ["repush", ...(input.role === "admin" ? ["write_off" as const] : [])] };
-  if (input.remoteState === "voided") return { detail: "voided in QuickBooks · not paid", actions: input.role === "admin" ? ["write_off"] : [] };
+  if (input.remoteState === "deleted") return { detail: "deleted in QuickBooks", actions: ["repush", ...(canWriteOff ? ["write_off" as const] : [])] };
+  if (input.remoteState === "voided") return { detail: "voided in QuickBooks · not paid", actions: canWriteOff ? ["write_off"] : [] };
   if (input.syncStatus === "push_failed") return {
     detail: `push failed${input.syncError ? ` · ${input.syncError}` : ""}`,
     actions: ["fix_mapping", "corrected_push"],
