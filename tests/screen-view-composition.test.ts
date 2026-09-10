@@ -40,7 +40,6 @@ const KNOWN_VIEW_DEBT = [
   "Formats: FormatsView <- app/(app)/catalog/page.tsx",
   "Format: FormatView <- app/(app)/catalog/formats/[id]/page.tsx",
   "Price group: PriceGroupView <- app/(app)/pricing/page.tsx",
-  "Bin: BinView <- app/(app)/locations/[id]/bins/page.tsx",
 ] as const;
 
 /** Existing live screens whose inventory record still owns inline E.* markup. */
