@@ -194,7 +194,7 @@ Sales sees history without correction controls. Shipments retain **Return shipme
 3. Choose a **Type**. The default is **Opening balance** (`opening_balance` in the API).
 4. For `depletion`, pick a **Channel**. The list is your brewery's own — every brewery starts with **Wholesale**, **Taproom**, **DTC**, and **Export**, and you edit that list under [**Sale channels**](#channels). **Taproom** is preselected. The channel decides how the removal is taxed, and that treatment is frozen onto the entry: editing the channel later never rewrites what is already recorded. `sale_removal` takes a channel too, but shipping sets it, not this form.
 5. Enter a positive **Qty** in SKU units, to two decimal places if needed. The type decides whether stock is added or removed; for `adjustment`, choose **Add stock** or **Remove stock**. Zero is rejected. Samples and festival removals require a two-letter **Destination state**. Check the signed quantity and estimated volume in the preview.
-6. Add an optional **Note**, then select **Record**.
+6. Add an optional **Note**, then select **Record movement**.
 
 | Type | Use | Normal sign |
 | --- | --- | --- |

@@ -28,7 +28,6 @@ export const recordMovementFestival: RecordMovementSnapshot = {
   destState: "PA · where the beer is poured",
   destStateOptions: ["PA · where the beer is poured", "OH · where the beer is poured"],
   qty: 1,
-  unit: "keg",
   bbl: "0.50000000",
 };
 
