@@ -14,7 +14,6 @@ import {
   recordSquareSalesLocations,
   recordSquareSalesPage,
   type SquareCatalogSyncStart,
-  type SquareSalesSyncStart,
   type VersionedIntegrationTokens,
 } from "@/lib/supabase/integration-tokens";
 
@@ -366,7 +365,9 @@ const money = (value: unknown) => {
     ? String(row.amount) : null;
 };
 
-function normalizeSquareOrders(rawOrders: unknown[], merchantId: string, locationIds: string[]) {
+function normalizeSquareOrders(
+  rawOrders: unknown[], merchantId: string, locationIds: string[], window: { startsAt: string; endsAt: string },
+) {
   const orders: SquareOrderSnapshot[] = [];
   const facts: SquareSalesFact[] = [];
   for (const raw of rawOrders) {
@@ -374,7 +375,8 @@ function normalizeSquareOrders(rawOrders: unknown[], merchantId: string, locatio
     const externalOrderId = text(order?.id), externalLocationId = text(order?.location_id);
     const sourceVersion = finiteVersion(order?.version), soldAt = timestamp(order?.created_at), orderUpdatedAt = timestamp(order?.updated_at);
     if (!externalOrderId || !externalLocationId || !locationIds.includes(externalLocationId) || sourceVersion === null
-      || !soldAt || !orderUpdatedAt || order?.state !== "COMPLETED") throw unavailable();
+      || !soldAt || !orderUpdatedAt || order?.state !== "COMPLETED" || Date.parse(soldAt) > Date.parse(orderUpdatedAt)
+      || Date.parse(orderUpdatedAt) < Date.parse(window.startsAt) || Date.parse(orderUpdatedAt) > Date.parse(window.endsAt)) throw unavailable();
     const snapshot = { externalOrderId, sourceVersion, externalLocationId, soldAt, orderUpdatedAt };
     orders.push(snapshot);
     const identities = new Set<string>();
@@ -461,7 +463,7 @@ export async function syncSquareSales(ctx: Ctx, requestId: string, client: Squar
       if (isTerminalAuthorization(error)) await markSquareAuthorizationFailed(ctx, start.connectionId, tokens.credentialVersion);
       throw unavailable();
     }
-    const normalized = normalizeSquareOrders(page.orders, start.merchantId, locationIds);
+    const normalized = normalizeSquareOrders(page.orders, start.merchantId, locationIds, start);
     const stored = await recordSquareSalesPage(ctx, start, {
       locationIds, cursor: start.cursor, nextCursor: page.nextCursor, ...normalized,
     });

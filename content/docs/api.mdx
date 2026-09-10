@@ -427,6 +427,7 @@ omitted. They have no roles until they are built.
 | `swap_keg` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
 | `sync_qbo_payments` | Team & brewery settings | ✓ | ✓ |  |  |  |  |
 | `sync_square_catalog` | Team & brewery settings | ✓ |  |  |  |  |  |
+| `sync_square_sales` | Team & brewery settings | ✓ |  |  |  |  |  |
 | `tap_keg` | Taproom & kegs | ✓ |  | ✓ |  | ✓ |  |
 | `trace_lot` | Compliance | ✓ | ✓ |  |  |  |  |
 | `unlink_chat_user` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
@@ -4672,6 +4673,21 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "sync_square_catalog", "requestId": "11111111-1111-1111-1111-111111111111", "input": {} }'
+```
+
+#### sync_square_sales [#sync_square_sales]
+
+`command` · admin
+
+Resume a bounded Square UPDATED_AT scan, append immutable sale and return revisions, and complete honest coverage without changing inventory
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "sync_square_sales", "requestId": "11111111-1111-1111-1111-111111111111", "input": {} }'
 ```
 
 #### update_brewery [#update_brewery]

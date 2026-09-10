@@ -20,13 +20,13 @@ function response(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
 
-function squareFetch(merchantId: string, pages: (body: Record<string, unknown>) => Response | Promise<Response>) {
+function squareFetch(merchantId: string, pages: (body: Record<string, unknown>) => Response | Promise<Response>, locations = [
+  { id: "L1", name: "Taproom", status: "ACTIVE", merchant_id: merchantId },
+  { id: "L2", name: "Beer garden", status: "ACTIVE", merchant_id: merchantId },
+]) {
   return vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
-    if (url.endsWith("/v2/locations")) return response({ locations: [
-      { id: "L1", name: "Taproom", status: "ACTIVE", merchant_id: merchantId },
-      { id: "L2", name: "Beer garden", status: "ACTIVE", merchant_id: merchantId },
-    ] });
+    if (url.endsWith("/v2/locations")) return response({ locations });
     if (url.endsWith("/v2/orders/search")) return pages(JSON.parse(String(init?.body)) as Record<string, unknown>);
     throw new Error(`unexpected Square request ${url}`);
   });
@@ -138,7 +138,7 @@ describe("Square durable sales sync", () => {
     const seenBodies: Record<string, unknown>[] = [];
     const fetcher = squareFetch(f.merchantId, (body) => {
       seenBodies.push(body);
-      return body.cursor ? response({ orders: orders.slice(4) }) : response({ orders: orders.slice(0, 4), cursor: "page-2" });
+      return body.cursor ? response({ orders: orders.slice(2) }) : response({ orders: orders.slice(0, 4), cursor: "page-2" });
     });
     const requestId = crypto.randomUUID();
     const before = sql(`select count(*) from public.inventory_movements where brewery_id='${f.brewery.id}'`)[0];
@@ -192,16 +192,27 @@ describe("Square durable sales sync", () => {
     expect(sql(`select source_version::text||':'||external_line_id||':'||fact_status from public.pos_sales
       where brewery_id='${f.brewery.id}' and external_order_id='REV' order by source_version,external_line_id`)).toEqual([
         "1:keep:accepted", "1:remove:accepted", "2:keep:accepted", "2:remove:removed",
-      ]);
+    ]);
     expect(currentExpected(f.brewery.id)).toBeCloseTo(2 * 16 / 3968, 10);
+    expect(Number(sql(`select sum(e.expected_bbl)::text from public.pos_sale_expectations e
+      join public.pos_sales s on s.id=e.sale_id where s.brewery_id='${f.brewery.id}' and s.external_order_id='REV'`)[0]))
+      .toBeCloseTo(5 * 16 / 3968, 10);
 
-    await syncSquareSales(f.ctx, crypto.randomUUID(), new SquareClient(config, squareFetch(f.merchantId, () => response({ orders: [v1] }))));
+    const lateV1 = saleOrder({ id: "REV", version: 1, updatedAt: updated1,
+      lines: [line("keep", "V1", "1"), line("remove", "V1", "2"), line("late-only", "V1", "9")] });
+    await syncSquareSales(f.ctx, crypto.randomUUID(), new SquareClient(config, squareFetch(f.merchantId, () => response({ orders: [lateV1] }))));
     expect(currentExpected(f.brewery.id)).toBeCloseTo(2 * 16 / 3968, 10);
-    expect(sql(`select count(*) from public.pos_sales where brewery_id='${f.brewery.id}' and external_order_id='REV'`)).toEqual(["4"]);
+    expect(sql(`select count(*) from public.pos_sales where brewery_id='${f.brewery.id}' and external_order_id='REV'`)).toEqual(["5"]);
+    expect(sql(`select external_line_id from private.pos_current_sales where brewery_id='${f.brewery.id}' and external_order_id='REV' order by 1`))
+      .toEqual(["keep", "remove"]);
   });
 
   it("resumes the exact failed page/window and records coverage only after all locations and pages complete", async () => {
     const f = await fixture();
+    const locations = Array.from({ length: 11 }, (_, index) => ({ id: `L${index + 1}`, name: `Location ${index + 1}`,
+      status: "ACTIVE", merchant_id: f.merchantId }));
+    expect((await admin.from("pos_locations").update({ location_id: null }).eq("connection_id", f.connectionId)
+      .eq("external_location_id", "L2")).error).toBeNull();
     const updated = new Date(Date.now() - 60_000).toISOString();
     const pageOne = saleOrder({ id: "PAGE1", updatedAt: updated, lines: [line("one", "V1", "1")] });
     const requestId = crypto.randomUUID();
@@ -209,7 +220,7 @@ describe("Square durable sales sync", () => {
     const failing = squareFetch(f.merchantId, (body) => {
       firstWindow ??= (body as any).query.filter.date_time_filter.updated_at;
       return body.cursor ? response({ errors: [{ category: "API_ERROR" }] }, 503) : response({ orders: [pageOne], cursor: "resume-here" });
-    });
+    }, locations);
     await expect(syncSquareSales(f.ctx, requestId, new SquareClient(config, failing))).rejects.toThrow("Square is unavailable");
     expect(sql(`select count(*) from public.pos_sales where brewery_id='${f.brewery.id}'`)).toEqual(["1"]);
     expect(sql(`select count(*) from public.pos_sales_coverage where brewery_id='${f.brewery.id}'`)).toEqual(["0"]);
@@ -219,15 +230,38 @@ describe("Square durable sales sync", () => {
     const resumed = squareFetch(f.merchantId, (body) => {
       resumedBodies.push(body);
       return response({ orders: [] });
-    });
+    }, locations);
     const result = await syncSquareSales(f.ctx, requestId, new SquareClient(config, resumed));
-    expect(result).toMatchObject({ complete: true, pages: 2, locations: 2 });
-    expect(resumedBodies).toHaveLength(1);
+    expect(result).toMatchObject({ complete: true, pages: 3, locations: 11 });
+    expect(resumedBodies).toHaveLength(2);
     expect(resumedBodies[0]).toMatchObject({ cursor: "resume-here" });
+    expect((resumedBodies[0].location_ids as string[])).toHaveLength(10);
+    expect((resumedBodies[1].location_ids as string[])).toHaveLength(1);
     expect((resumedBodies[0] as any).query.filter.date_time_filter.updated_at).toEqual(firstWindow);
     expect(sql(`select external_location_id||':'||complete::text from public.pos_sales_coverage
-      where brewery_id='${f.brewery.id}' order by external_location_id`)).toEqual(["L1:true", "L2:true"]);
+      where brewery_id='${f.brewery.id}' and external_location_id in ('L1','L2') order by external_location_id`))
+      .toEqual(["L1:true", "L2:true"]);
+    expect(sql(`select coalesce(location_id::text,'unmapped') from public.pos_sales_coverage where brewery_id='${f.brewery.id}' and external_location_id='L2'`))
+      .toEqual(["unmapped"]);
+    expect((await f.ctx.db.rpc("set_pos_location_mapping", { p_brewery: f.brewery.id, p_external_location: "L2",
+      p_location: f.locations[1].id, p_request_id: crypto.randomUUID() })).error).toBeNull();
+    expect(sql(`select location_id::text from public.pos_sales_coverage where brewery_id='${f.brewery.id}' and external_location_id='L2'`))
+      .toEqual([f.locations[1].id]);
     expect(sql(`select count(*) from public.inventory_movements where brewery_id='${f.brewery.id}'`)).toEqual(["0"]);
+  });
+
+  it("refuses an order outside the fixed provider window without facts, checkpoint, or coverage", async () => {
+    const f = await fixture();
+    const requestId = crypto.randomUUID();
+    const fetcher = squareFetch(f.merchantId, (body) => {
+      const end = (body as any).query.filter.date_time_filter.updated_at.end_at as string;
+      return response({ orders: [saleOrder({ id: "OUTSIDE", updatedAt: new Date(Date.parse(end) + 1).toISOString(),
+        lines: [line("outside", "V1", "1")] })] });
+    });
+    await expect(syncSquareSales(f.ctx, requestId, new SquareClient(config, fetcher))).rejects.toThrow("Square is unavailable");
+    expect(sql(`select count(*) from public.pos_sales where brewery_id='${f.brewery.id}'`)).toEqual(["0"]);
+    expect(sql(`select pages from private.square_sales_syncs where brewery_id='${f.brewery.id}' and request_id='${requestId}'`)).toEqual(["0"]);
+    expect(sql(`select count(*) from public.pos_sales_coverage where brewery_id='${f.brewery.id}'`)).toEqual(["0"]);
   });
 
   it("enforces current Admin, tenant, and connection generation while feeding P12 current draft and completed variance only", async () => {

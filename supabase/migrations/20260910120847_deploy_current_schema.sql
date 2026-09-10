@@ -2406,6 +2406,8 @@ BEGIN
   BEGIN
     UPDATE public.pos_locations SET location_id=p_location WHERE connection_id=c AND external_location_id=p_external_location;
   EXCEPTION WHEN unique_violation THEN RAISE EXCEPTION 'MGR location is already claimed by another Square location' USING errcode='MG409'; END;
+  UPDATE public.pos_sales_coverage SET location_id=p_location
+    WHERE connection_id=c AND external_location_id=p_external_location AND location_id IS NULL;
   PERFORM private.reconcile_pos_sale(p_brewery,s.id) FROM public.pos_sales s LEFT JOIN public.pos_sale_expectations e ON e.sale_id=s.id
     WHERE s.connection_id=c AND s.external_location_id=p_external_location AND e.sale_id IS NULL;
   result:=jsonb_build_object('mapped',true);
@@ -3148,16 +3150,19 @@ FROM public.pos_connections c WHERE c.id=s.connection_id;
 ALTER TABLE public.pos_sale_expectations DROP CONSTRAINT pos_sale_expectations_expected_bbl_check;
 ALTER TABLE public.pos_sale_expectations ADD CONSTRAINT pos_sale_expectations_expected_bbl_check
   CHECK (expected_bbl<>0 AND expected_bbl::text NOT IN ('NaN','Infinity','-Infinity'));
+ALTER TABLE public.pos_sales_coverage ALTER COLUMN location_id DROP NOT NULL;
 
 CREATE VIEW private.pos_current_sales AS
 WITH ranked AS (
-  SELECT s.*,row_number() OVER (
+  SELECT s.*,max(source_version) OVER (
+    PARTITION BY connection_id,external_order_id
+  ) AS order_version,row_number() OVER (
     PARTITION BY connection_id,external_order_id,fact_kind,external_line_id
     ORDER BY source_version DESC,id DESC
   ) AS revision_rank
   FROM public.pos_sales s
 ), current_facts AS (
-  SELECT * FROM ranked WHERE revision_rank=1
+  SELECT * FROM ranked WHERE revision_rank=1 AND source_version=order_version
 )
 SELECT f.*,
   f.fact_status='accepted' AND (
@@ -3183,7 +3188,9 @@ REVOKE ALL ON private.pos_current_sales FROM public,anon,authenticated,service_r
 DROP VIEW public.pos_unmapped_items;
 CREATE VIEW public.pos_unmapped_items WITH (security_invoker=true) AS
   WITH ranked AS (
-    SELECT s.*,row_number() OVER (
+    SELECT s.*,max(source_version) OVER (
+      PARTITION BY connection_id,external_order_id
+    ) AS order_version,row_number() OVER (
       PARTITION BY connection_id,external_order_id,fact_kind,external_line_id
       ORDER BY source_version DESC,id DESC
     ) revision_rank
@@ -3193,7 +3200,8 @@ CREATE VIEW public.pos_unmapped_items WITH (security_invoker=true) AS
   FROM ranked s
   LEFT JOIN public.pos_item_mappings m ON m.connection_id=s.connection_id
     AND m.external_item_id=s.external_item_id AND m.external_variation_id=s.external_variation_id
-  WHERE s.revision_rank=1 AND s.fact_status<>'removed' AND m.connection_id IS NULL AND s.external_item_id IS NOT NULL;
+  WHERE s.revision_rank=1 AND s.source_version=s.order_version AND s.fact_status<>'removed'
+    AND m.connection_id IS NULL AND s.external_item_id IS NOT NULL;
 GRANT SELECT ON public.pos_unmapped_items TO authenticated;
 
 CREATE OR REPLACE FUNCTION private.reconcile_pos_sale(p_brewery uuid,p_sale uuid) RETURNS boolean
@@ -3270,6 +3278,7 @@ CREATE TABLE private.square_sales_syncs (
   locations_captured boolean NOT NULL DEFAULT false,
   location_offset integer NOT NULL DEFAULT 0,
   cursor text,
+  seen_cursors text[] NOT NULL DEFAULT '{}',
   pages integer NOT NULL DEFAULT 0,
   accepted_facts integer NOT NULL DEFAULT 0,
   unsupported_facts integer NOT NULL DEFAULT 0,
@@ -3355,6 +3364,11 @@ BEGIN
       WHERE c.id=p_connection AND c.brewery_id=p_brewery AND c.state='connected' AND c.merchant_id=v_attempt.merchant_id
         AND c.credential_version=p_expected_version AND t.credential_version=p_expected_version)
   THEN RAISE EXCEPTION 'Square connection changed' USING errcode='MG409'; END IF;
+  PERFORM 1 FROM public.pos_connections c JOIN private.integration_tokens t
+    ON t.brewery_id=c.brewery_id AND t.provider='square' AND t.connection_id=c.id
+    WHERE c.id=p_connection AND c.brewery_id=p_brewery AND c.state='connected' AND c.merchant_id=v_attempt.merchant_id
+      AND c.credential_version=p_expected_version AND t.credential_version=p_expected_version FOR SHARE OF c,t;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Square connection changed' USING errcode='MG409'; END IF;
   IF v_attempt.locations_captured THEN
     IF v_attempt.external_location_ids<>v_ids THEN RAISE EXCEPTION 'Square location snapshot changed' USING errcode='MG409'; END IF;
   ELSE
@@ -3390,9 +3404,17 @@ BEGIN
       WHERE c.id=p_connection AND c.brewery_id=p_brewery AND c.state='connected' AND c.merchant_id=v_attempt.merchant_id
         AND c.credential_version=p_expected_version AND t.credential_version=p_expected_version)
   THEN RAISE EXCEPTION 'Square connection changed' USING errcode='MG409'; END IF;
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_connection::text,0));
+  PERFORM 1 FROM public.pos_connections c JOIN private.integration_tokens t
+    ON t.brewery_id=c.brewery_id AND t.provider='square' AND t.connection_id=c.id
+    WHERE c.id=p_connection AND c.brewery_id=p_brewery AND c.state='connected' AND c.merchant_id=v_attempt.merchant_id
+      AND c.credential_version=p_expected_version AND t.credential_version=p_expected_version FOR SHARE OF c,t;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Square connection changed' USING errcode='MG409'; END IF;
   v_expected_locations:=v_attempt.external_location_ids[v_attempt.location_offset+1:v_attempt.location_offset+10];
   IF p_location_ids IS DISTINCT FROM v_expected_locations THEN RAISE EXCEPTION 'Square sales location page changed' USING errcode='MG409'; END IF;
-  IF p_next_cursor IS NOT NULL AND p_next_cursor IS NOT DISTINCT FROM p_cursor THEN RAISE EXCEPTION 'Square sales cursor repeated'; END IF;
+  IF p_next_cursor IS NOT NULL AND (p_next_cursor IS NOT DISTINCT FROM p_cursor OR p_next_cursor=ANY(v_attempt.seen_cursors)) THEN
+    RAISE EXCEPTION 'Square sales cursor repeated';
+  END IF;
 
   FOR v_fact IN SELECT value FROM jsonb_array_elements(p_facts) WITH ORDINALITY rows(value,n)
     ORDER BY (value->>'factKind'='return'),n
@@ -3448,10 +3470,11 @@ BEGIN
   FOR v_order IN SELECT value FROM jsonb_array_elements(p_orders)
   LOOP
     v_order_id:=v_order->>'externalOrderId'; v_version:=(v_order->>'sourceVersion')::bigint;
-    FOR v_previous IN SELECT s.* FROM private.pos_current_sales s
+    FOR v_previous IN SELECT DISTINCT ON (s.fact_kind,s.external_line_id) s.* FROM public.pos_sales s
       WHERE s.connection_id=p_connection AND s.external_order_id=v_order_id AND s.source_version<v_version
         AND NOT EXISTS(SELECT 1 FROM jsonb_array_elements(p_facts) f WHERE f->>'externalOrderId'=v_order_id
           AND f->>'factKind'=s.fact_kind AND f->>'externalLineId'=s.external_line_id)
+      ORDER BY s.fact_kind,s.external_line_id,s.source_version DESC,s.id DESC
     LOOP
       v_hash:=encode(extensions.digest(concat_ws('|',p_connection,v_order_id,v_previous.fact_kind,
         v_previous.external_line_id,v_version,'removed'),'sha256'),'hex');
@@ -3467,7 +3490,8 @@ BEGIN
   END LOOP;
 
   UPDATE private.square_sales_syncs SET pages=pages+1,accepted_facts=accepted_facts+v_accepted,
-    unsupported_facts=unsupported_facts+v_unsupported,cursor=p_next_cursor
+    unsupported_facts=unsupported_facts+v_unsupported,cursor=p_next_cursor,
+    seen_cursors=CASE WHEN p_next_cursor IS NULL THEN seen_cursors ELSE array_append(seen_cursors,p_next_cursor) END
     WHERE actor_id=p_actor AND request_id=p_request_id RETURNING * INTO v_attempt;
   IF p_next_cursor IS NULL AND v_attempt.location_offset+10<cardinality(v_attempt.external_location_ids) THEN
     UPDATE private.square_sales_syncs SET location_offset=location_offset+10
@@ -3476,7 +3500,7 @@ BEGIN
     INSERT INTO public.pos_sales_coverage(brewery_id,connection_id,external_location_id,location_id,starts_at,ends_at,complete)
       SELECT p_brewery,p_connection,l.external_location_id,l.location_id,v_attempt.coverage_starts_at,v_attempt.ends_at,true
       FROM public.pos_locations l WHERE l.connection_id=p_connection AND l.external_location_id=ANY(v_attempt.external_location_ids)
-        AND l.location_id IS NOT NULL;
+      ;
     UPDATE public.pos_connections SET sales_synced_through=v_attempt.ends_at,updated_at=now()
       WHERE id=p_connection AND brewery_id=p_brewery AND credential_version=p_expected_version;
     v_result:=jsonb_build_object('complete',true,'acceptedFacts',v_attempt.accepted_facts,'unsupportedFacts',v_attempt.unsupported_facts,

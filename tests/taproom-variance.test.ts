@@ -145,8 +145,10 @@ it("mapped lines survive unmapped order siblings, ignored is explicit, line UID 
   await ins("pos_item_mappings", { brewery_id: f.brewery.id, connection_id: f.connection.id, external_item_id: "pretzel", ignored: true });
   expect(reconcile(f, pretzel.id)).toBe("false");
   expect((await report(f)).periods.at(-1)?.unmapped_lines).toBe(1);
-  const duplicate = await admin.from("pos_sales").insert({ brewery_id: f.brewery.id, connection_id: f.connection.id, external_order_id: order, external_line_id: "line", sold_at: stamp(f, -10), qty: 248, source_version: "2" });
-  expect(duplicate.error?.code).toBe("23505");
+  const revision = await admin.from("pos_sales").insert({ brewery_id: f.brewery.id, connection_id: f.connection.id, external_order_id: order, external_line_id: "line", external_item_id: "pint", external_location_id: "L", sold_at: stamp(f, -10), qty: 248, source_version: "2" }).select("id").single();
+  expect(revision.error).toBeNull();
+  reconcile(f, revision.data!.id);
+  expect((await report(f)).rows[0].expected_bbl).toBe(1);
   reconcile(f, (await sale(f, -10, 248, { external_line_id: "line" })).id);
   expect((await report(f)).rows[0].expected_bbl).toBe(2);
 });

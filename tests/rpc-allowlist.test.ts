@@ -39,6 +39,7 @@ const AUTHENTICATED_RPCS = [
   "begin_qbo_oauth(uuid,text,text,text,uuid,text[])",
   "begin_square_oauth(uuid,text,text,text,uuid,text[])",
   "begin_square_catalog_sync(uuid,uuid)",
+  "begin_square_sales_sync(uuid,uuid)",
   "begin_qbo_invoice_sync(uuid,uuid)",
   "set_qbo_customer_mapping(uuid,uuid,text,uuid)",
   "set_qbo_item_mapping(uuid,uuid,text,uuid)",
@@ -192,13 +193,16 @@ it("grants Square credential lifecycle and snapshot writes only to the service o
     cross join (values ('anon'),('authenticated'),('service_role')) r(role)
     where p.pronamespace='public'::regnamespace and p.proname in (
       'claim_square_oauth','complete_square_oauth','fail_square_oauth',
-      'advance_square_catalog_sync','mark_square_authorization_failed',
-      'record_square_catalog_snapshot','begin_square_disconnect','finish_square_disconnect')
+      'advance_square_catalog_sync','advance_square_sales_sync','mark_square_authorization_failed',
+      'record_square_catalog_snapshot','record_square_sales_locations','record_square_sales_page',
+      'begin_square_disconnect','finish_square_disconnect')
       and has_function_privilege(r.role,p.oid,'execute') order by 1`)).toEqual([
-    "advance_square_catalog_sync:service_role", "begin_square_disconnect:service_role", "claim_square_oauth:service_role",
+    "advance_square_catalog_sync:service_role", "advance_square_sales_sync:service_role",
+    "begin_square_disconnect:service_role", "claim_square_oauth:service_role",
     "complete_square_oauth:service_role", "fail_square_oauth:service_role",
     "finish_square_disconnect:service_role", "mark_square_authorization_failed:service_role",
-    "record_square_catalog_snapshot:service_role",
+    "record_square_catalog_snapshot:service_role", "record_square_sales_locations:service_role",
+    "record_square_sales_page:service_role",
   ]);
 });
 
