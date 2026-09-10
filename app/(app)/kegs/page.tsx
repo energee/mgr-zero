@@ -64,7 +64,6 @@ export default async function KegsPage() {
           {fleet.customers.map((c) => <Link key={c.customer_id} href={`/kegs/customers/${c.customer_id}`}>{E.nav("Customer keg balance", `${c.name} · ${c.kegs_out} out`)}</Link>)}
         </>
       }
-      note={E.note("Empty kegs only; beer return and credit is Return shipment. One-way kegs are materials, not fleet.")}
     />
   );
 }

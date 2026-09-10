@@ -5,7 +5,7 @@
 import { command } from "@/lib/commands/client";
 import { useBrewery } from "../brewery-provider";
 import type { BinMoveStock } from "@/lib/commands/inventory";
-import { movementFields } from "@/lib/movement-form";
+import { movementFields, movementTypeLabel } from "@/lib/movement-form";
 import { formatVolume } from "@/lib/volume";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -83,7 +83,7 @@ export function MovementForm({
     sku: skus.find(s => s.id === receipt.sku_id)?.label ?? receipt.sku_id,
     qty: receipt.qty,
     unit: "SKU unit",
-    kind: receipt.type.replaceAll("_", " "),
+    kind: movementTypeLabel(receipt.type),
     destState: receipt.dest_state ?? undefined,
     bbl: String(receipt.bbl),
     when: new Date(receipt.created_at).toLocaleString(),
@@ -104,7 +104,7 @@ export function MovementForm({
 
   return (
     <>
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Record Movement" trigger={<Button>Record Movement</Button>}>
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Record movement" trigger={<Button>Record movement</Button>}>
         <form onSubmit={e => { if (!fields) { e.preventDefault(); return; } void form.submit(e); }} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="movement-sku">SKU</Label>
@@ -157,7 +157,7 @@ export function MovementForm({
                 <SelectGroup>
                   {MOVEMENT_TYPES.map((t) => (
                     <SelectItem key={t} value={t}>
-                      {t}
+                      {movementTypeLabel(t)}
                     </SelectItem>
                   ))}
                 </SelectGroup>
@@ -200,7 +200,7 @@ export function MovementForm({
             <Label htmlFor="movement-note">Note</Label>
             <Input id="movement-note" value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
-          {fields && skuId && <p aria-live="polite" className="text-sm text-muted-foreground">Preview: {fields.qty > 0 ? "+" : ""}{fields.qty} SKU units{unitVolume != null ? ` · ${formatVolume(fields.qty * unitVolume)}` : ""} · {type.replace(/_/g, " ")}{fields.destState ? ` · ${fields.destState}` : ""}. Volume is calculated when recorded.</p>}
+          {fields && skuId && <p aria-live="polite" className="text-sm text-muted-foreground">Preview: {fields.qty > 0 ? "+" : ""}{fields.qty} SKU units{unitVolume != null ? ` · ${formatVolume(fields.qty * unitVolume)}` : ""} · {movementTypeLabel(type)}{fields.destState ? ` · ${fields.destState}` : ""}. Volume is calculated when recorded.</p>}
           <CommandFormMessage error={form.error} />
           <CommandFormFooter>
             <Button type="submit" disabled={form.submitting || !fields || (requiresChannel(type) && !saleChannelId) || !skuId || !locationId || !binId}>

@@ -38,6 +38,8 @@ describe("Keg fleet", () => {
     expect(page).toMatch(/<KegFleetView\b/);
     expect(page).toMatch(/<PoolForm\b/);
     expect(page).toMatch(/<KegEventForm\b/);
+    expect(page).not.toMatch(/\bnote=/);
+    expect(src("app/(app)/kegs/event-form.tsx").match(/Beer coming back with a keg/g)).toHaveLength(1);
   });
 });
 

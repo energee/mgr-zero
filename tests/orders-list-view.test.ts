@@ -38,6 +38,7 @@ describe("Orders list view loop", () => {
   });
 
   it("the inventory list still offers New order and the next-action verbs", () => {
+    expect(html("Orders")).toMatch(/>Orders</);
     expect(html("Orders")).toMatch(/>New order</);
     expect(html("Orders")).toMatch(/>Confirm</);
     expect(html("Orders")).toMatch(/>Put back</);

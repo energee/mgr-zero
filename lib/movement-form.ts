@@ -1,5 +1,7 @@
 import type { BinMoveStock } from "./commands/inventory";
 
+export const movementTypeLabel = (type: string) => type.replace(/_/g, " ").replace(/^./, (letter) => letter.toUpperCase());
+
 /** Positive form quantities become the existing signed movement API input. */
 export function movementFields(type: string, quantity: string, direction: "add" | "remove", state: string, channel: string) {
   const qty = Number(quantity);
