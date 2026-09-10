@@ -21,8 +21,19 @@ function parseISODate(value: string) {
   return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
-export function DatePicker({ label, defaultValue }: { label: string; defaultValue: string }) {
-  const [date, setDate] = React.useState<Date | undefined>(() => parseISODate(defaultValue));
+function formatISODate(date: Date) {
+  const part = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${part(date.getMonth() + 1)}-${part(date.getDate())}`;
+}
+
+export function DatePicker({ label, defaultValue = "", value, onChange }: { label: string; defaultValue?: string; value?: string; onChange?: (value: string) => void }) {
+  const [internalDate, setInternalDate] = React.useState<Date | undefined>(() => parseISODate(defaultValue));
+  const controlled = value !== undefined;
+  const date = controlled ? parseISODate(value) : internalDate;
+  const selectDate = (next: Date | undefined) => {
+    if (!controlled) setInternalDate(next);
+    onChange?.(next ? formatISODate(next) : "");
+  };
   // A <label for> does not name a button, so the trigger points back at both the
   // label and itself: "Best by, September 5, 2026".
   const labelId = React.useId();
@@ -44,7 +55,7 @@ export function DatePicker({ label, defaultValue }: { label: string; defaultValu
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="end">
-          <Calendar mode="single" selected={date} onSelect={setDate} defaultMonth={date} />
+          <Calendar mode="single" selected={date} onSelect={selectDate} defaultMonth={date} />
         </PopoverContent>
       </Popover>
     </Field>
