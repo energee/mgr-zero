@@ -1,6 +1,7 @@
 // lib/supabase/integration-tokens.ts — the only server boundary for private integration credentials.
 import "server-only";
 import { CommandError, type Ctx } from "@/lib/commands/registry";
+import { isUuid } from "@/lib/commands/context";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type IntegrationProvider = "qbo" | "square";
@@ -321,10 +322,13 @@ export async function finishPortalQuoteTax(ctx: Ctx, quoteId: string, connection
 }
 
 export async function readPortalInvoicePayment(ctx: Ctx, invoiceId: string): Promise<PortalInvoicePaymentClaim | null> {
-  if (ctx.role !== "customer" || !ctx.customerId) throw new CommandError("invoice not found", 404, "not_found");
+  if (ctx.role !== "customer" || !ctx.customerId || !isUuid(invoiceId)) {
+    throw new CommandError("invoice not found", 404, "not_found");
+  }
   const visible = await ctx.db.from("invoices").select("id").eq("id", invoiceId)
     .eq("brewery_id", ctx.breweryId).eq("customer_id", ctx.customerId).maybeSingle();
-  if (visible.error || !visible.data) throw new CommandError("invoice not found", 404, "not_found");
+  if (visible.error) throw new Error("invoice payment is unavailable");
+  if (!visible.data) throw new CommandError("invoice not found", 404, "not_found");
   const { data, error } = await createAdminClient().rpc("read_portal_qbo_payment", {
     p_brewery: ctx.breweryId, p_customer: ctx.customerId, p_invoice: invoiceId, p_actor: ctx.userId,
   }).maybeSingle();

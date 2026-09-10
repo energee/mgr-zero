@@ -125,6 +125,9 @@ describe("QuickBooks portal payment link", () => {
     };
     const noFetch = vi.fn<typeof globalThis.fetch>();
     await expect(resolvePortalInvoicePayment(
+      ctx, "not-a-uuid", new QboOAuthClient(config, noFetch), new Set(["pay.example.test"]),
+    )).rejects.toMatchObject({ status: 404 });
+    await expect(resolvePortalInvoicePayment(
       foreignCtx, invoice.data.id, new QboOAuthClient(config, noFetch), new Set(["pay.example.test"]),
     )).rejects.toMatchObject({ status: 404 });
     expect(noFetch).not.toHaveBeenCalled();
