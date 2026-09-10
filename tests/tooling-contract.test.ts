@@ -15,9 +15,9 @@ const packageJson = JSON.parse(
 };
 
 describe("production tooling contract", () => {
-  it("pins the Node 22 runtime across local and package metadata", () => {
-    expect(readFileSync(resolve(root, ".node-version"), "utf8").trim()).toBe("22");
-    expect(packageJson.engines?.node).toBe("22.x");
+  it("pins the Node 24 runtime across local and package metadata", () => {
+    expect(readFileSync(resolve(root, ".node-version"), "utf8").trim()).toBe("24");
+    expect(packageJson.engines?.node).toBe("24.x");
   });
 
   it("uses Bun as the package manager and pins its version", () => {
