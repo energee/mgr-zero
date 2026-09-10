@@ -20,6 +20,7 @@ export type PackageBomSnapshot = {
     id?: string;
     material: { id: string; name: string } | null;
     qty_per_unit: number | string;
+    on_break?: "consumed" | "return_to_stock";
   }[];
 };
 
@@ -31,7 +32,7 @@ export function toPackageBomViewProps({ format, lines }: PackageBomSnapshot): Pa
     rows: lines.map((line, i) => ({
       key: line.id ?? line.material?.id ?? String(i),
       title: line.material?.name ?? "—",
-      detail: `quantity ${line.qty_per_unit}`,
+      detail: `quantity ${line.qty_per_unit}${line.on_break ? ` · ${line.on_break.replaceAll("_", " ")}` : ""}`,
       href: "/catalog",
     })),
   };

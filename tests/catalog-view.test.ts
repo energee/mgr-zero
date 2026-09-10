@@ -113,12 +113,13 @@ describe("Catalog view", () => {
     expect(body.props.model).toEqual(toCatalogViewProps(catalogBrands));
   });
 
-  it("the live Catalog page mounts CatalogView and does not mount FormatsView", () => {
+  it("the live Catalog page mounts CatalogView and the shared FormatsView", () => {
     const src = readFileSync("app/(app)/catalog/page.tsx", "utf8");
     expect(src).toMatch(/from "@\/components\/mgr\/views\/catalog"/);
     expect(src).toMatch(/<CatalogView\b/);
     expect(src).toMatch(/<BrandForm\b/);
-    expect(src).not.toMatch(/from "@\/components\/mgr\/views\/formats"/);
+    expect(src).toMatch(/from "@\/components\/mgr\/views\/formats"/);
+    expect(src).toMatch(/<FormatsView\b/);
     expect(src).not.toMatch(/waterProfileCount/);
     expect(src).toMatch(/backHref: "\/more"/);
   });
@@ -253,6 +254,7 @@ describe("Formats view", () => {
     expect(html).toMatch(/Pint/);
     expect(html).toContain(formatVolume("0.50000000"));
     expect(html).not.toMatch(/→/);
+    expect(html).toMatch(/Open format/);
   });
 
   it("the Formats inventory record is FormatsView", () => {
@@ -291,6 +293,14 @@ describe("Format view", () => {
     expect(body.type).toBe(FormatView);
     expect(body.props.model).toEqual(toFormatViewProps(formatCan));
   });
+
+  it("the live format form mounts the shared controlled FormatView", () => {
+    const form = readFileSync("app/(app)/catalog/format-form.tsx", "utf8");
+    expect(form).toMatch(/from "@\/components\/mgr\/views\/format"/);
+    expect(form).toMatch(/<FormatView\b/);
+    expect(form).toMatch(/controls=\{controls\}/);
+    expect(form).not.toMatch(/<Label\b|<Input\b|<Select\b/);
+  });
 });
 
 describe("Package BOM view", () => {
@@ -298,9 +308,9 @@ describe("Package BOM view", () => {
     const model = toPackageBomViewProps(packageBomCase);
     expect(model.format).toBe("case · 24×16 oz");
     expect(model.rows.map((r) => [r.title, r.detail])).toEqual([
-      ["16 oz can", "quantity 24"],
-      ["Can end", "quantity 24"],
-      ["Case tray", "quantity 1"],
+      ["16 oz can", "quantity 24 · consumed"],
+      ["Can end", "quantity 24 · consumed"],
+      ["Case tray", "quantity 1 · return to stock"],
     ]);
   });
 
@@ -327,5 +337,11 @@ describe("Package BOM view", () => {
     const body = screen("Package BOM").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(PackageBomView);
     expect(body.props.model).toEqual(toPackageBomViewProps(packageBomCase));
+  });
+
+  it("the live format page mounts the shared PackageBomView", () => {
+    const page = readFileSync("app/(app)/catalog/formats/[id]/page.tsx", "utf8");
+    expect(page).toMatch(/from "@\/components\/mgr\/views\/package-bom"/);
+    expect(page).toMatch(/<PackageBomView\b/);
   });
 });

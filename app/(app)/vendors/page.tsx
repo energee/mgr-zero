@@ -37,7 +37,11 @@ export default async function VendorsPage() {
     runCommand("list_vendors_and_contracts", {}, ctx), runCommand("list_materials", {}, ctx),
   ])) as [VendorRow[], Material[]];
   const options = vendors.map((v) => ({ id: v.id, name: v.name }));
-  const contracts = vendors.flatMap((v) => v.contracts.map((c) => ({ ...c, vendor_name: v.name })));
+  const contracts = vendors.flatMap((v) => v.contracts.map((c) => ({
+    ...c,
+    vendor_name: v.name,
+    base_uom: materials.find((material) => material.id === c.material_id)?.base_uom,
+  })));
 
   return (
     <VendorsView

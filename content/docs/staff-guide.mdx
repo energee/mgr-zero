@@ -138,12 +138,12 @@ Use **Edit brand** beside an existing brand to change its name, style, ABV, desc
 
 1. Under **Formats**, select **New Format**.
 2. Enter **Name**. This form creates a packaged format that holds stock.
-3. For a packaged format choose **Package type** (`keg`, `can`, or `bottle`), the **Keg size** for kegs, and optionally **Units per case** and **BBL per unit**.
+3. For a packaged format choose **Package type** (`keg`, `can`, or `bottle`), the **Keg size** for kegs, and optionally **Units per case**. Enter **Volume** in ounces, gallons, or barrels; MGR stores its canonical barrel value.
 4. Select **Create**. Packaged format names must be unique within the brewery.
 
 For a glass served at the taproom, select **New pour** beside its brand in **Catalog**. Enter a **Name** (such as Pint or Taster) and a positive size in **Ounces**, then **Create pour**. Each brand owns its pours: two brands can both have a Pint with different sizes, but names must be unique within each brand. The saved row shows the brand, name and ounces. **Edit pour** starts with the saved values; select **Save pour** after changing the name or size. Admin and Sales can create and edit pours. Pours never hold stock and cannot be SKUs, components or packaging BOMs.
 
-Select **Open format** on a format row to see its components and **Package BOM**. Admin and Sales can **Replace components** or **Replace BOM**; Warehouse can read them. Each save replaces that entire list. Add rows, choose distinct items, enter positive quantities, and remove rows you no longer need. An empty list requires checking the explicit clear confirmation before saving.
+Select **Open format** on a format row to see its components and **Package BOM**. Each BOM row also shows whether that material is **consumed** or **returned to stock** when the package is broken. Admin and Sales can **Replace components** or **Replace BOM**; Warehouse can read them. Each save replaces that entire list. Add rows, choose distinct items, enter positive quantities, and remove rows you no longer need. An empty list requires checking the explicit clear confirmation before saving.
 
 Components must be other atomic packaged formats with a typed volume. To create a composed format, leave **BBL per unit** blank when creating it, then open it and add components. A format with a typed volume, a poured format, or a format already used as a child cannot have its components replaced here. Clearing components leaves no volume, so the format cannot hold stock until components are added again.
 

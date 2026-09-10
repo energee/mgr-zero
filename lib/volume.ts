@@ -3,6 +3,14 @@
 export const GALLONS_PER_BBL = 31;
 export const OUNCES_PER_BBL = 3_968;
 
+export function parseVolumeToBbl(value: string, unit: "oz" | "gal" | "bbl") {
+  const amount = Number(value);
+  if (value.trim() === "" || !Number.isFinite(amount) || amount <= 0) return undefined;
+  if (unit === "oz") return amount / OUNCES_PER_BBL;
+  if (unit === "gal") return amount / GALLONS_PER_BBL;
+  return amount;
+}
+
 /** Keg fractions shown as glyphs, by denominator. */
 const FRACTIONS = [[2, "½"], [4, "¼"], [6, "⅙"], [8, "⅛"]] as const;
 const closeTo = (value: number, target: number) => Math.abs(value - target) < 0.0001;

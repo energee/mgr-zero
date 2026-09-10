@@ -93,7 +93,7 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Brand", file: "app/(app)/catalog/page.tsx" },
   { name: "SKU", file: "app/(app)/catalog/page.tsx" },
   { name: "Formats", file: "app/(app)/catalog/page.tsx" },
-  { name: "Format", file: "app/(app)/catalog/formats/[id]/page.tsx" },
+  { name: "Format", file: "app/(app)/catalog/format-form.tsx" },
   { name: "Package BOM", file: "app/(app)/catalog/formats/[id]/page.tsx" },
   { name: "SKU list", file: "app/(app)/catalog/page.tsx" },
   { name: "Shop", file: "app/(portal)/portal/page.tsx" },
