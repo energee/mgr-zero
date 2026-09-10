@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
+import { formatDateTime } from "@/lib/date-format";
 
 // Staff-facing movement types; sale_removal/taproom_transfer are produced by
 // order flows (plan 1B), not entered manually here.
@@ -193,7 +194,7 @@ export function MovementForm({
           {receipt.dest_state && <p>Destination state: {receipt.dest_state}</p>}
           {receipt.lot_id && <p className="break-all">Lot: {receipt.lot_id}</p>}
           {receipt.note && <p>{receipt.note}</p>}
-          <p>{new Date(receipt.created_at).toLocaleString()}</p>
+          <p>{formatDateTime(receipt.created_at)}</p>
           <p className="break-all">Movement reference: {receipt.id}</p>
           {receipt.ref && <p className="break-all">Source reference: {receipt.ref}</p>}
           <p>This entry cannot be edited or deleted. Open this SKU’s inventory detail to reverse an eligible standalone adjustment or loss with a correction note. Other entries keep their original correction workflow.</p>
