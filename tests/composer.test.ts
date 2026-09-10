@@ -11,9 +11,13 @@ import {
   beginComposerCommit,
   composerActions,
   composerInitialState,
+  completeComposerCommit,
   createComposerRequestGuard,
   editMovementDraft,
+  failComposerCommit,
   movementFormHref,
+  movementFormInstanceKey,
+  movementIsLocked,
   movementQuestion,
   receiveProposal,
   resetComposerScope,
@@ -109,7 +113,7 @@ describe("structured composer state", () => {
     expect(edited.commitRequestId).toBeNull();
   });
 
-  it("retires a proposal before another action, Close, Dismiss, or Open can leave its commit usable", () => {
+  it("retires an unsubmitted proposal but freezes a dispatched or uncertain attempt on its exact identity", () => {
     const draft = {
       skuId: ids.skuId, kind: "adjustment" as const, direction: "add" as const,
       locationId: ids.locationId, binId: ids.binId, lotChoice: "untracked" as const, qty: "1",
@@ -118,23 +122,49 @@ describe("structured composer state", () => {
       name: "record_movement", input: toMovementInput(draft)!, previewToken: "55555555-5555-4555-8555-555555555555",
       effects: [{ label: "Hazy IPA case · Taproom · Walk-in", qty: "1" }], warnings: [],
     }, "66666666-6666-4666-8666-666666666666", "77777777-7777-4777-8777-777777777777");
-    const retired = retireMovementProposal({ ...pending, committing: true });
+    const retired = retireMovementProposal(pending);
     expect(retired).toMatchObject({ proposal: null, commitRequestId: null, committing: false, draft, conversationId: pending.conversationId });
     expect(beginComposerCommit(retired).envelope).toBeNull();
 
+    const dispatched = beginComposerCommit(pending);
+    expect(dispatched.envelope).toMatchObject({ requestId: pending.commitRequestId, input: pending.proposal?.input, retrying: false });
+    expect(movementIsLocked(dispatched.state)).toBe(true);
+    expect(retireMovementProposal(dispatched.state)).toBe(dispatched.state);
+    expect(editMovementDraft(dispatched.state, { qty: "2" })).toBe(dispatched.state);
+
+    const unknown = failComposerCommit(dispatched.state, null);
+    expect(unknown).toMatchObject({
+      proposal: pending.proposal,
+      commitRequestId: pending.commitRequestId,
+      conversationId: pending.conversationId,
+      committing: false,
+      commitHadUncertainOutcome: true,
+    });
+    expect(retireMovementProposal(unknown)).toBe(unknown);
+    const retry = beginComposerCommit(unknown);
+    expect(retry.envelope).toMatchObject({ requestId: pending.commitRequestId, input: pending.proposal?.input, retrying: true });
+    expect(failComposerCommit(retry.state, 409, "conflict")).toMatchObject({
+      proposal: pending.proposal,
+      commitRequestId: pending.commitRequestId,
+      commitHadUncertainOutcome: true,
+    });
+
+    const contextChanged = failComposerCommit(dispatched.state, 409, "context_changed");
+    expect(contextChanged).toMatchObject({ proposal: pending.proposal, commitRequestId: pending.commitRequestId, commitHadUncertainOutcome: true });
+    expect(failComposerCommit(dispatched.state, 409, "conflict")).toMatchObject({ proposal: null, commitRequestId: null, commitHadUncertainOutcome: false });
+    expect(completeComposerCommit(retry.state)).toMatchObject({ proposal: null, commitRequestId: null, committing: false, commitHadUncertainOutcome: false });
+
     const live = readFileSync("components/mgr/composer.tsx", "utf8");
-    expect(live).toMatch(/function invalidateMovementRequest\(\)[\s\S]{0,120}requestGuardRef\.current\.invalidate\(\)/);
-    expect(live).toMatch(/function retireMovement\(\)[\s\S]{0,120}invalidateMovementRequest\(\)[\s\S]{0,120}setState\(retireMovementProposal\)/);
-    expect(live).toMatch(/async function chooseAction[\s\S]{0,300}retireMovement\(\)/);
-    expect(live).toContain("onOpen={retireMovement} onDismiss={retireMovement}");
-    expect(live).toMatch(/onClick=\{\(\) => \{ retireMovement\(\);[\s\S]{0,150}Close composer/);
-    expect(live).toMatch(/async function changeDraft[\s\S]{0,200}invalidateMovementRequest\(\)/);
+    expect(live).toMatch(/function retireMovement\(\)[\s\S]{0,160}movementLockRef\.current[\s\S]{0,160}invalidateMovementRequest\(\)/);
+    expect(live).toMatch(/async function chooseAction[\s\S]{0,220}if \(!retireMovement\(\)\) return/);
+    expect(live).toMatch(/async function changeDraft[\s\S]{0,160}movementLockRef\.current/);
     expect(live).toMatch(/async function previewMovement[\s\S]{0,400}requestGuardRef\.current\.run/);
     expect(live).toMatch(/async function commitMovement[\s\S]{0,400}requestGuardRef\.current\.run/);
     expect(live.match(/requestGuardRef\.current\.run/g)).toHaveLength(2);
   });
 
   it("preserves known fields when opening the ordinary movement form", () => {
+    const handoffId = "88888888-8888-4888-8888-888888888888";
     const href = movementFormHref({
       skuId: ids.skuId,
       locationId: ids.locationId,
@@ -143,7 +173,7 @@ describe("structured composer state", () => {
       type: "depletion",
       saleChannelId: ids.channelId,
       note: "Festival tent",
-    });
+    }, handoffId);
     const url = new URL(href, "https://mgr.test");
     expect(url.pathname).toBe("/inventory");
     expect(Object.fromEntries(url.searchParams)).toMatchObject({
@@ -155,7 +185,14 @@ describe("structured composer state", () => {
       type: "depletion",
       saleChannelId: ids.channelId,
       note: "Festival tent",
+      movementHandoff: handoffId,
     });
+    expect(movementFormInstanceKey(handoffId)).toBe(movementFormInstanceKey(handoffId));
+    expect(movementFormInstanceKey("99999999-9999-4999-8999-999999999999")).not.toBe(movementFormInstanceKey(handoffId));
+    expect(movementFormInstanceKey()).toBe("manual");
+
+    const page = readFileSync("app/(app)/inventory/page.tsx", "utf8");
+    expect(page).toContain("key={movementFormInstanceKey(handoffId)}");
   });
 
   it("denies composer and history operations to customers and does not mount a portal composer", async () => {

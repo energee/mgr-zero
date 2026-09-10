@@ -13,6 +13,7 @@ import {
   flushOutbox,
   OUTBOX_RETIREMENT_MAX_AGE_MS,
   outboxDiscardConfirmation,
+  readOutboxAttempt,
   readOutbox,
   sendOutboxAttempt,
   storeOutboxAttempt,
@@ -317,6 +318,21 @@ describe("action-specific offline outbox", () => {
     finish();
     await Promise.all([first, second]);
     expect(readOutbox(storage)).toEqual([]);
+  });
+
+  it("lets a retained reading form observe exact-attempt retirement by the shell flusher", async () => {
+    const storage = new MemoryStorage();
+    const frozen = attempt();
+    storeOutboxAttempt(storage, frozen);
+
+    expect(readOutboxAttempt(storage, frozen.id)).toEqual(frozen);
+    await flushOutbox(storage, scope, async () => ({ id: "saved-reading" }));
+    expect(readOutboxAttempt(storage, frozen.id)).toBeNull();
+
+    const form = readFileSync("app/(app)/cellar/[occupancyId]/reading/reading-form.tsx", "utf8");
+    expect(form).toContain('addEventListener("mgr-outbox-change", reconcileAttempt)');
+    expect(form).toContain('addEventListener("storage", onStorage)');
+    expect(form).toMatch(/function reconcileAttempt[\s\S]{0,500}readOutboxAttempt\(localStorage, attempt\.id\)[\s\S]{0,500}router\.refresh\(\)/);
   });
 
   it("requires named discard confirmation and preserves siblings", () => {
