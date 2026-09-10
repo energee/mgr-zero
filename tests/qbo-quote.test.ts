@@ -1,11 +1,12 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
+import { Client } from "pg";
 import { runCommand } from "@/lib/commands/registry";
 import { quotePortalOrder } from "@/lib/commands/portal";
 import { QboOAuthClient } from "@/lib/qbo";
 import "@/lib/commands/all";
 import {
   admin, asUser, makeBrewery, makeCustomerUser, makeStaffCtx,
-  priceSku, seedCatalog, seedCustomer, seedLocation, sql,
+  DB, priceSku, seedCatalog, seedCustomer, seedLocation, sql,
 } from "./helpers";
 
 describe("portal order quote", () => {
@@ -109,6 +110,72 @@ describe("portal order quote", () => {
       expect.objectContaining({ productVariantTaxability: { productVariantId: "beer-item" } }),
       expect.objectContaining({ productVariantTaxability: { productVariantId: "deposit-item" } }),
     ]));
+  });
+
+  it("persists the reviewed deposit and invoices its frozen cents through the mapped QBO line", async () => {
+    const quote = await runCommand("portal_quote_order", quoteInput(fixture), fixture.ctx) as any;
+    const submitted = await runCommand("portal_submit_quote", { quoteId: quote.quoteId }, fixture.ctx) as any;
+    expect(sql(`select qty_ordered::text||'|'||unit_price_cents::text||'|'||amount_cents::text
+      from order_deposit_lines where order_id='${submitted.order_id}'`)).toEqual(["2.00|2500|5000"]);
+
+    expect((await admin.from("keg_pools").update({ deposit_cents: 9900 }).eq("id", fixture.poolId)).error).toBeNull();
+    sql(`insert into inventory_movements(brewery_id,sku_id,location_id,bin_id,qty,bbl,type,created_by)
+      values('${fixture.brewery.id}','${fixture.catalog.skuId}','${fixture.source.id}','${fixture.source.binId}',2,1,'opening_balance','${fixture.adminCtx.userId}')`);
+    await runCommand("confirm_order", { orderId: submitted.order_id }, fixture.adminCtx);
+    const line = (await admin.from("order_lines").select("id").eq("order_id", submitted.order_id).single()).data!;
+    await runCommand("record_pick", { orderId: submitted.order_id, picks: [{ lineId: line.id, qty: 2 }] }, fixture.adminCtx);
+    const shipped = await runCommand("ship_order", { orderId: submitted.order_id, ship: [{ lineId: line.id, qty: 2 }] }, fixture.adminCtx) as any;
+    expect(sql(`select qty::text||'|'||unit_price_cents::text||'|'||amount_cents::text
+      from invoice_lines where invoice_id='${shipped.invoice_id}' and kind='keg_deposit'`)).toEqual(["2.00|2500|5000"]);
+
+    expect((await admin.from("customers").update({ email: "buyer@example.test" }).eq("id", fixture.customer.customerId)).error).toBeNull();
+    const started = await fixture.adminCtx.db.rpc("start_qbo_push", {
+      p_brewery: fixture.brewery.id, p_invoice: shipped.invoice_id,
+      p_new_attempt_reason: null, p_request_id: crypto.randomUUID(),
+    });
+    expect(started.error).toBeNull();
+    expect(JSON.stringify(started.data)).toContain('"value": "deposit-item"');
+    expect(JSON.stringify(started.data)).toContain('"UnitPrice": 25');
+    expect((await admin.from("keg_pools").update({ deposit_cents: 2500 }).eq("id", fixture.poolId)).error).toBeNull();
+  });
+
+  it("serializes a concurrent price change before drift validation and permits a safe retry", async () => {
+    const quote = await runCommand("portal_quote_order", quoteInput(fixture), fixture.ctx) as any;
+    const requestId = crypto.randomUUID();
+    const before = await orderCount(fixture.brewery.id);
+    const writer = new Client({ connectionString: DB, application_name: "q4-price-writer" });
+    const submitter = new Client({ connectionString: DB, application_name: "q4-submit-race" });
+    await writer.connect(); await submitter.connect();
+    try {
+      await writer.query("begin");
+      await writer.query(`update channel_prices set unit_price_cents=3700
+        where brewery_id=$1 and sale_channel_id=$2 and format_id=$3`, [fixture.brewery.id, fixture.customer.saleChannelId, fixture.catalog.formatId]);
+      await submitter.query("begin");
+      await submitter.query("set local role authenticated");
+      await submitter.query("select set_config('request.jwt.claim.sub',$1,true)", [fixture.ctx.userId]);
+      const outcome = submitter.query("select portal_submit_quote($1,$2,$3,$4,$5)", [
+        fixture.brewery.id, fixture.customer.customerId, quote.quoteId, null, requestId,
+      ]).then(value => ({ value, error: null }), error => ({ value: null, error }));
+      let blocked = false;
+      for (let attempt = 0; attempt < 80; attempt++) {
+        if (sql("select count(*) from pg_stat_activity where application_name='q4-submit-race' and wait_event_type='Lock'")[0] === "1") { blocked = true; break; }
+        await new Promise(resolve => setTimeout(resolve, 25));
+      }
+      expect(blocked).toBe(true);
+      await writer.query("commit");
+      const result = await outcome;
+      expect(String(result.error)).toMatch(/review the current quote/);
+      await submitter.query("rollback");
+      expect(await orderCount(fixture.brewery.id)).toBe(before);
+
+      await priceSku(fixture.brewery.id, { saleChannelId: fixture.customer.saleChannelId, brandId: fixture.catalog.brandId, formatId: fixture.catalog.formatId, cents: 3600 });
+      await expect(runCommand("portal_submit_quote", { quoteId: quote.quoteId }, fixture.ctx, { requestId, correlationId: crypto.randomUUID() }))
+        .resolves.toMatchObject({ order_id: expect.any(String) });
+      expect(sql(`select distinct unit_price_cents from order_lines where order_id=(select submitted_order_id from private.portal_order_quotes where id='${quote.quoteId}')`)).toEqual(["3600"]);
+    } finally {
+      await writer.query("rollback").catch(() => {}); await submitter.query("rollback").catch(() => {});
+      await writer.end(); await submitter.end();
+    }
   });
 });
 

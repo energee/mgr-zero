@@ -35,6 +35,13 @@ describe("QuickBooks sales-tax calculation", () => {
     });
   });
 
+  it("parses valid decimal cents exactly without binary floating-point drift", async () => {
+    const client = new QboOAuthClient(config as any, vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+      taxResponse("0.29", "USD", "0.00", "USD"),
+    )) as any;
+    await expect(client.calculateSalesTax(input, "access-secret")).resolves.toBe(29);
+  });
+
   it("refuses HTTP, GraphQL, malformed, foreign-currency, and fractional-cent results", async () => {
     const responses = [
       new Response("down", { status: 503 }),
@@ -42,6 +49,7 @@ describe("QuickBooks sales-tax calculation", () => {
       new Response(JSON.stringify({ data: {} }), { status: 200 }),
       taxResponse("1.00", "CAD", "0.00", "CAD"),
       taxResponse("1.001", "USD", "0.00", "USD"),
+      taxResponse("90071992547410.00", "USD", "0.00", "USD"),
     ];
     for (const response of responses) {
       const client = new QboOAuthClient(config as any, vi.fn<typeof globalThis.fetch>().mockResolvedValue(response)) as any;
