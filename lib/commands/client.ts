@@ -24,7 +24,7 @@ export async function command(breweryId: string, name: string, input: unknown, r
   if (res.status === 401) {
     const back = location.pathname.startsWith("/portal") ? "/portal/login?error=expired" : "/login?error=expired";
     location.assign(new URL(back, location.origin).href);
-    throw new Error("session expired");
+    throw new CommandResponseError("session expired", 401);
   }
   if (typeof json?.ok !== "boolean") throw new Error(`malformed response (${res.status})`);
   if (!json.ok) throw new CommandResponseError(json.error?.message ?? `request failed (${res.status})`, res.status);

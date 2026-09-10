@@ -11,6 +11,14 @@ import type { ComposerEffect, ComposerHistoryMessage, MovementDraft, MovementKin
 export type ComposerChoice = { value: string; label: string };
 export type ComposerStripAction = { value: string; label: string };
 export type ComposerPickerOption = { id: string; label: string };
+export type OfflineOutboxRow = {
+  id: string;
+  label: string;
+  status: string;
+  retryable?: boolean;
+  fixHref?: string;
+  fixTo?: string;
+};
 
 const MOVEMENT_TYPES: { value: MovementKind; label: string }[] = [
   { value: "opening_balance", label: "Opening balance" },
@@ -58,11 +66,15 @@ export function ComposerStripView({
   actions = [{ value: "record_movement", label: "Record inventory movement" }, { value: "read_atp", label: "Check available to promise" }],
   onAction,
   onHistory,
+  onOutbox,
+  outboxCount = 0,
   actionRef,
 }: {
   actions?: ComposerStripAction[];
   onAction?: (value: string) => void;
   onHistory?: () => void;
+  onOutbox?: () => void;
+  outboxCount?: number;
   actionRef?: Ref<HTMLSelectElement>;
 }) {
   return (
@@ -78,9 +90,43 @@ export function ComposerStripView({
         {actions.map((action) => <option key={action.value} value={action.value}>{action.label}</option>)}
       </select>
       <InputGroupAddon align="inline-end">
+        <Button type="button" variant="ghost" size="sm" onClick={onOutbox}>Outbox{outboxCount ? ` (${outboxCount})` : ""}</Button>
         <Button type="button" variant="ghost" size="sm" onClick={onHistory}>History</Button>
       </InputGroupAddon>
     </InputGroup>
+  );
+}
+
+export function OfflineOutboxView({ rows, busy = false, onRetry, onDiscard, onRetryAll, onDiscardAll }: {
+  rows: OfflineOutboxRow[];
+  busy?: boolean;
+  onRetry?: (id: string) => void;
+  onDiscard?: (id: string) => void;
+  onRetryAll?: () => void;
+  onDiscardAll?: () => void;
+}) {
+  const retryable = rows.filter((row) => row.retryable);
+  return (
+    <section aria-label="Offline outbox" className="rounded-md border bg-card p-3 shadow-sm">
+      <h2 className="font-medium">Offline outbox</h2>
+      <p className="mt-1 text-xs text-muted-foreground">Only exact fermentation readings can wait here. Inventory movements, picks, and transfers require a live connection.</p>
+      {rows.length === 0 ? <p className="mt-3 text-sm text-muted-foreground">No queued readings.</p> : (
+        <div className="mt-3 flex flex-col gap-2">{rows.map((row) => (
+          <div key={row.id} className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center">
+            <div className="min-w-0 flex-1"><p className="text-sm font-medium">{row.label}</p><p className="text-xs text-muted-foreground">{row.status}</p></div>
+            <div className="flex flex-wrap gap-2">
+              {row.retryable && <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => onRetry?.(row.id)}>Retry exact reading</Button>}
+              {row.fixHref && <Button asChild size="sm" variant="outline"><Link href={row.fixHref} data-to={row.fixTo}>Fix</Link></Button>}
+              <Button type="button" size="sm" variant="destructive" disabled={busy} onClick={() => onDiscard?.(row.id)}>Discard</Button>
+            </div>
+          </div>
+        ))}</div>
+      )}
+      {rows.length > 0 && <div className="mt-3 flex flex-wrap justify-end gap-2">
+        {retryable.length > 0 && <Button type="button" variant="outline" disabled={busy} onClick={onRetryAll}>Retry {retryable.length} waiting</Button>}
+        <Button type="button" variant="destructive" disabled={busy} onClick={onDiscardAll}>Discard {rows.length} queued reading{rows.length === 1 ? "" : "s"}</Button>
+      </div>}
+    </section>
   );
 }
 

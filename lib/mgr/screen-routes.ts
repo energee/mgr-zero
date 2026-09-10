@@ -34,6 +34,7 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Composer proposal", file: "components/mgr/composer.tsx" },
   { name: "Composer question", file: "components/mgr/composer.tsx" },
   { name: "Composer answer", file: "components/mgr/composer.tsx" },
+  { name: "Offline outbox", file: "components/mgr/composer.tsx" },
   { name: "Me", file: "app/(app)/layout.tsx" },
   { name: "Chat disconnected", file: "app/(app)/settings/chat/page.tsx" },
   { name: "Chat settings", file: "app/(app)/settings/chat/page.tsx" },

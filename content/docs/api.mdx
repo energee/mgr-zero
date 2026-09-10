@@ -482,6 +482,13 @@ A **new** `requestId` is a new write, every time. Generating one inside your
 retry loop rather than outside it is the single most common way to create
 duplicate orders, because each attempt then looks like a fresh intention.
 
+Offline eligibility is narrower than idempotency. The browser currently queues
+only `record_fermentation_reading`, after persisting its exact input,
+observation time, request ID, actor, brewery, and role before transport. A
+reload or reconnect retries that same envelope. `record_movement`,
+`record_pick`, and stock transfers require current server state and are never
+queued; a stable request ID alone does not make an operation safe offline.
+
 This holds for every command that writes through a ledger RPC. Five do not yet:
 `set_notification_preference`, `set_brewery_quiet_hours`,
 `set_notification_destination`, `consume_chat_link_proof`, and
@@ -3434,7 +3441,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, brewer
 
-Log a fermentation reading against an open occupancy: temperature in °F, optionally gravity in °Plato, pH and a note
+Log one timestamped fermentation reading against an open occupancy; this is the only current operation eligible for exact offline replay
 
 | Field | Type | Required |
 | --- | --- | --- |

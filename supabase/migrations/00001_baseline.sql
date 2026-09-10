@@ -6714,7 +6714,7 @@ declare v_ended timestamptz; v_found boolean;
 begin
   if p_occupancy is null then return; end if;
   select true, o.ended_at into v_found, v_ended from public.vessel_occupancies o
-  where o.id = p_occupancy and o.brewery_id = p_brewery;
+  where o.id = p_occupancy and o.brewery_id = p_brewery for update;
   if v_found is null then raise exception 'occupancy not found'; end if;
   if v_ended is not null then raise exception 'occupancy is closed'; end if;
 end $$;

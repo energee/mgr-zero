@@ -6,6 +6,7 @@ import {
   ComposerAnswerView,
   ComposerHistoryView,
   ComposerMovementPickerView,
+  OfflineOutboxView,
   ComposerProposalView,
   ComposerQuestionView,
   ComposerStripView,
@@ -30,6 +31,15 @@ import {
   type MovementDraft,
 } from "@/lib/composer/state";
 import type { StaffRole } from "@/lib/commands/registry";
+import {
+  discardOutbox,
+  flushOutbox,
+  outboxDiscardConfirmation,
+  readOutbox,
+  sendOutboxAttempt,
+  visibleOutbox,
+  type OutboxAttempt,
+} from "@/lib/composer/outbox";
 
 type Sku = { id: string; name: string; active: boolean; brands: { name: string } | null; formats: { name: string } | null };
 type Location = { id: string; name: string; kind: string };
@@ -63,6 +73,9 @@ export function Composer({ role }: { role: StaffRole }) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [outboxOpen, setOutboxOpen] = useState(false);
+  const [outboxBusy, setOutboxBusy] = useState(false);
+  const [outboxEntries, setOutboxEntries] = useState<OutboxAttempt[]>([]);
   const conversationRef = useRef<string | null>(null);
   const requestGuardRef = useRef(createComposerRequestGuard());
   const actionRef = useRef<HTMLSelectElement | null>(null);
@@ -77,6 +90,32 @@ export function Composer({ role }: { role: StaffRole }) {
     addEventListener("keydown", focusComposer);
     return () => removeEventListener("keydown", focusComposer);
   }, []);
+
+  useEffect(() => {
+    const scope = { actorId: expectedContext.actorId, breweryId, role };
+    const refresh = () => {
+      try { setOutboxEntries(visibleOutbox(readOutbox(localStorage), scope)); }
+      catch (cause) { setError(messageText(cause)); }
+    };
+    const flush = async () => {
+      if (!navigator.onLine) { refresh(); return; }
+      setOutboxBusy(true);
+      try { await flushOutbox(localStorage, scope, command); refresh(); }
+      catch (cause) { setError(messageText(cause)); }
+      finally { setOutboxBusy(false); }
+    };
+    const onStorage = (event: StorageEvent) => { if (event.storageArea === localStorage) refresh(); };
+    addEventListener("online", flush);
+    addEventListener("storage", onStorage);
+    addEventListener("mgr-outbox-change", refresh);
+    refresh();
+    if (navigator.onLine) void flush();
+    return () => {
+      removeEventListener("online", flush);
+      removeEventListener("storage", onStorage);
+      removeEventListener("mgr-outbox-change", refresh);
+    };
+  }, [breweryId, expectedContext.actorId, role]);
 
   const actions = composerActions(role);
   const run = (name: string, input: unknown, requestId?: string, provenance?: Parameters<typeof command>[5]) =>
@@ -227,6 +266,29 @@ export function Composer({ role }: { role: StaffRole }) {
     }
   }
 
+  async function retryOutbox(id?: string) {
+    const scope = { actorId: expectedContext.actorId, breweryId, role };
+    setOutboxBusy(true);
+    setError(null);
+    try {
+      if (id) await sendOutboxAttempt(localStorage, id, scope, command);
+      else await flushOutbox(localStorage, scope, command);
+      setOutboxEntries(visibleOutbox(readOutbox(localStorage), scope));
+    } catch (cause) { setError(messageText(cause)); }
+    finally { setOutboxBusy(false); }
+  }
+
+  function discardEntries(ids: string[]) {
+    const scope = { actorId: expectedContext.actorId, breweryId, role };
+    const selected = outboxEntries.filter((entry) => ids.includes(entry.id));
+    const confirmation = outboxDiscardConfirmation(selected);
+    if (!confirm(confirmation)) return;
+    try {
+      discardOutbox(localStorage, scope, ids, confirmation);
+      setOutboxEntries(visibleOutbox(readOutbox(localStorage), scope));
+    } catch (cause) { setError(messageText(cause)); }
+  }
+
   const question = action?.id === "record_movement" ? movementQuestion(state.draft) : null;
   const lotOptions = stock.filter((row) => row.kind === "sku" && row.stock_id === state.draft.skuId && row.bin_id === state.draft.binId && row.lot_id);
 
@@ -239,6 +301,27 @@ export function Composer({ role }: { role: StaffRole }) {
           </select>
         </Label>}
         <ComposerHistoryView messages={state.history} onClose={() => setState((current) => ({ ...current, historyOpen: false }))} />
+      </>}
+
+      {outboxOpen && <>
+        <OfflineOutboxView
+          rows={outboxEntries.map((entry) => ({
+            id: entry.id,
+            label: entry.label,
+            status: entry.state === "queued" ? "waiting for connection"
+              : entry.state === "permission_changed" ? entry.lastError ?? `your role changed from ${entry.scope.role} · this will not be sent`
+              : entry.state === "fix" ? entry.lastError ?? "the server refused this first attempt · review a fresh draft"
+              : entry.lastError ? `response not confirmed · ${entry.lastError}` : "response not confirmed",
+            retryable: entry.state === "queued" || entry.state === "uncertain",
+            fixHref: entry.state === "fix" || entry.state === "uncertain" ? `/cellar/${entry.input.occupancyId}/reading?fixReading=${entry.id}` : undefined,
+          }))}
+          busy={outboxBusy}
+          onRetry={(id) => void retryOutbox(id)}
+          onRetryAll={() => void retryOutbox()}
+          onDiscard={(id) => discardEntries([id])}
+          onDiscardAll={() => discardEntries(outboxEntries.map((entry) => entry.id))}
+        />
+        <Button type="button" variant="ghost" className="self-start" onClick={() => setOutboxOpen(false)}>Close outbox</Button>
       </>}
 
       {action?.id === "record_movement" && <ComposerMovementPickerView
@@ -267,8 +350,8 @@ export function Composer({ role }: { role: StaffRole }) {
       {answer && <ComposerAnswerView {...answer} />}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       {action && <Button type="button" variant="ghost" className="self-start" onClick={() => { retireMovement(); setAction(null); setAnswer(null); }}>Close composer</Button>}
-      <ComposerStripView actions={actions.map((item) => ({ value: item.id, label: item.label }))} onAction={(id) => void chooseAction(id)} onHistory={() => void loadHistory()} actionRef={actionRef} />
-      <p className="text-center text-[11px] text-muted-foreground">Structured actions only. Voice and a free-form model are not connected.</p>
+      <ComposerStripView actions={actions.map((item) => ({ value: item.id, label: item.label }))} onAction={(id) => void chooseAction(id)} onHistory={() => void loadHistory()} onOutbox={() => setOutboxOpen(true)} outboxCount={outboxEntries.length} actionRef={actionRef} />
+      <p className="text-center text-[11px] text-muted-foreground">Structured actions only. Inventory movements require a live preview. Voice and a free-form model are not connected.</p>
     </div>
   );
 }

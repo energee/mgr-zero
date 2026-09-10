@@ -27,7 +27,12 @@ export default async function OccupancyReadingPage({ params }: { params: Promise
 
   return (
     <>
-      {E.back("Cellar", occupancy ? `${occupancy.vessel_name ?? "—"} · ${occupancy.brand_name ?? "no brand yet"}` : "Fermentation reading", <ReadingForm occupancyId={occupancyId} unit={gravityUnit.effective} />)}
+      {E.back("Cellar", occupancy ? `${occupancy.vessel_name ?? "—"} · ${occupancy.brand_name ?? "no brand yet"}` : "Fermentation reading", <ReadingForm
+        occupancyId={occupancyId}
+        occupancyLabel={occupancy?.vessel_name ?? "unknown vessel"}
+        unit={gravityUnit.effective}
+        role={brewery.role as "admin" | "brewer"}
+      />)}
       {readings.length === 0
         ? E.blank("No readings yet")
         : readings.map((r) => (

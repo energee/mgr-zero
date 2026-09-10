@@ -209,7 +209,7 @@ import { toLocationsViewProps } from "@/lib/mgr/locations-view";
 import { toMaterialViewProps } from "@/lib/mgr/material-view";
 import { toMaterialsViewProps } from "@/lib/mgr/materials-view";
 import { toMaterialsOnHandViewProps } from "@/lib/mgr/materials-on-hand-view";
-import { ComposerAnswerView, ComposerMovementPickerView, ComposerProposalView, ComposerQuestionView } from "@/components/mgr/views/composer";
+import { ComposerAnswerView, ComposerMovementPickerView, ComposerProposalView, ComposerQuestionView, OfflineOutboxView } from "@/components/mgr/views/composer";
 import { toMeViewProps } from "@/lib/mgr/me-view";
 import { toNewPoViewProps } from "@/lib/mgr/new-po-view";
 import { toMoreViewProps } from "@/lib/mgr/more-view";
@@ -276,7 +276,6 @@ import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-ic
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
 import { saccharificationRest, type Step, totalDuration } from "@/lib/mgr/recipe-schedule";
-import { WifiDisconnected01Icon } from "@hugeicons/core-free-icons";
 
 /** The drawn mash schedule. Rows and footer both read it, so the total and the
  *  conversion rest can never disagree with the steps above them. */
@@ -557,11 +556,11 @@ export const SCREENS: Screen[] = [
   },
   {
     step: 4, slice: 1, group: "Global", surface: "sheet", name: "Session expired",
-    to: { "Sign in to retry": "Sign in", "Record movement · Hazy": "Offline outbox" },
-    job: "Sign in again; queued writes stay in the outbox",
+    to: { "Sign in to retry": "Sign in", "Record fermentation reading · FV3": "Offline outbox" },
+    job: "Sign in again; queued eligible readings stay in the outbox",
     reads: "local_outbox [client state]", writes: "none",
-    states: [["queue kept", "3 writes waiting"], ["signed in", "Retry 1 waiting on the outbox"]],
-    spec: "Mid-write expiry does not drop the outbox. Sign in, then Offline outbox still has the queued envelopes.",
+    states: [["queue kept", "1 reading waiting"], ["signed in", "Retry 1 waiting on the outbox"]],
+    spec: "Mid-write expiry does not drop an eligible frozen reading. Sign in as its original actor and brewery, then Offline outbox can retry that exact envelope. Movement, pick and transfer actions are never queued.",
     body: <SessionExpiredView model={toSessionExpiredViewProps(sessionExpiredQueued)} />,
   },
   // steps 2–8
@@ -814,8 +813,8 @@ export const SCREENS: Screen[] = [
     job: "Enter a positive amount; the form derives direction and the server calculates barrels",
     reads: "list_skus · list_locations · list_bins · get_atp",
     writes: "record_movement [existing; one append-only inventory movement]",
-    states: [["offline", "Queue with requestId"], ["stale", "ATP changed · preview again", 1], ["permission", "admin or warehouse required · sales reads Beer only", 1], ["echo", "Committed row · eligible standalone adjustment/loss correction opens inventory SKU detail"], ["unregistered destination", "Stout to OH warns and links to the registry · never blocks", 1]],
-    spec: "The form derives the signed API quantity from the movement kind (adjustments ask Add or Remove); the server derives 0.50000000 bbl and never accepts client-supplied barrels. Drawn with festival removal selected: sample and festival removal leave the premises and require a destination state (the schema enforces it); destruction, loss and depletion never carry one. An unregistered brand and destination warn here with the same copy the order screens use, because a festival removal leaves the premises exactly as a shipment does and was the one path that crossed a state line without saying so. This frame carries Hazy IPA into PA, which is registered, so the warning is a state rather than drawn copy. Channel stays.",
+    states: [["offline", "Wait for a connection; movements are never queued"], ["stale", "ATP changed · preview again", 1], ["permission", "admin or warehouse required · sales reads Beer only", 1], ["echo", "Committed row · eligible standalone adjustment/loss correction opens inventory SKU detail"], ["unregistered destination", "Stout to OH warns and links to the registry · never blocks", 1]],
+    spec: "The form derives the signed API quantity from the movement kind (adjustments ask Add or Remove); the server derives 0.50000000 bbl and never accepts client-supplied barrels. It requires a live connection and is never put in the offline outbox. Drawn with festival removal selected: sample and festival removal leave the premises and require a destination state (the schema enforces it); destruction, loss and depletion never carry one. An unregistered brand and destination warn here with the same copy the order screens use, because a festival removal leaves the premises exactly as a shipment does and was the one path that crossed a state line without saying so. This frame carries Hazy IPA into PA, which is registered, so the warning is a state rather than drawn copy. Channel stays.",
     body: (<>
       <RecordMovementView model={toRecordMovementViewProps(recordMovementFestival)} footer={null} />
       {E.pin(<>{E.btn("Record movement", "irr")}</>)}
@@ -925,23 +924,17 @@ export const SCREENS: Screen[] = [
     step: 4,
     slice: 1,
     group: "Global",
-    surface: "sheet",
-    name: "Offline outbox", gatedBy: "Program 15",
-    to: { Fix: "Cellar transfer", Discard: "Offline outbox", "Record movement · Hazy": "Record movement", "Record fermentation reading · FV3": "Fermentation reading", "Record cellar transfer · FV2": "Cellar transfer", "Record pick · ORD-0229": "Pick" },
-    job: "Retry safely; separate response loss from permanent rejection",
+    name: "Offline outbox",
+    to: { "Retry exact reading": "Offline outbox", "Retry 1 waiting": "Offline outbox", Fix: "Fermentation reading", Discard: "Offline outbox", "Discard 2 queued readings": "Offline outbox", "Record fermentation reading · FV3": "Fermentation reading", "Record fermentation reading · FV2": "Fermentation reading" },
+    job: "Retry an exact captured reading without broadening offline writes",
     reads: "local_outbox [client state]",
     writes: "none [client replays envelope’s exact registered command with same requestId; confirmed discard is local]",
-    states: [["response lost", "Server dedupe returns prior result"], ["permanent", "Open form; preserve fields", 1], ["session expired", "Sign in; keep queue"], ["permission changed", "the row says why and offers only Discard", 1], ["one row", "discarding one leaves the others queued"]],
-    spec: "The discard confirmation names every queued write; response loss resolves by requestId and shows the prior result. Discard is per row as well as bulk: a write that can never succeed (a role that changed under it, a validation the server will refuse again) otherwise forces someone to bin the two retryable writes beside it to clear the one that is stuck. A row whose permission changed is never replayed, so it carries no Retry at all; the copy names the role it was written under, because the person holding the phone is usually not the person who changed it.",
-    body: (<>
-      {E.row("Record movement · Hazy", "waiting for wifi", <>{E.act("Retry", "attention")}{E.act("Discard", "destructive")}</>, "", WifiDisconnected01Icon)}
-      {E.row("Record fermentation reading · FV3", "response lost", <>{E.act("Check")}{E.act("Discard", "destructive")}</>, "", WifiDisconnected01Icon)}
-      {E.row("Record cellar transfer · FV2", "validation failed", <>{E.act("Fix", "attention")}{E.act("Discard", "destructive")}</>, "w", WifiDisconnected01Icon)}
-      {E.row("Record pick · ORD-0229", "your role changed · this will not be sent", E.act("Discard", "destructive"), "w", WifiDisconnected01Icon)}
-      {E.btn("Retry 1 waiting")}
-      {E.note("Discard asks you to confirm. These 4 unsent writes are deleted.")}
-      {E.btn("Discard 4 queued writes", "del")}
-    </>),
+    states: [["response lost", "Server dedupe returns the prior reading"], ["permanent", "Fix opens a reviewed fresh reading; original stays queued", 1], ["session expired", "Sign in; keep queue"], ["permission changed", "the row says why and offers only Discard", 1], ["one row", "discarding one leaves sibling readings queued"]],
+    spec: "Only fermentation readings are eligible. Their captured observation time, parsed values, occupancy, actor, brewery, role and request ID are persisted before transport and reused exactly. Movement, pick and transfer commands require current server state and never enter this outbox. Named discard confirmation works per row or in bulk; Fix starts a reviewed fresh ID without silently deleting an uncertain original.",
+    body: <OfflineOutboxView rows={[
+      { id: "reading-fv3", label: "Record fermentation reading · FV3", status: "response not confirmed", retryable: true, fixHref: "#", fixTo: "Fermentation reading" },
+      { id: "reading-fv2", label: "Record fermentation reading · FV2", status: "your role changed from brewer · this will not be sent" },
+    ]} />,
   },
   {
     step: 5,
