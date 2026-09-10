@@ -165,7 +165,7 @@ describe("QuickBooks current invoice state", () => {
     };
     const portalDetail = await runCommand("portal_invoice", { invoiceId: f.invoice.id }, portalCtx) as Parameters<typeof toPortalInvoiceViewProps>[0];
     const portalList = await runCommand("portal_invoices", {}, portalCtx) as Parameters<typeof toPortalInvoicesViewProps>[0]["invoices"];
-    expect(toPortalInvoiceViewProps(portalDetail)).toMatchObject({ total: "$105.00", payable: true, paid: false });
+    expect(toPortalInvoiceViewProps(portalDetail)).toMatchObject({ total: "$105.00", payable: false, paid: false, status: "Review" });
     expect(toPortalInvoicesViewProps({ customerName: "Buyer", invoices: portalList }).rows[0])
       .toMatchObject({ total: "$105.00", unpaid: true });
     expect(toPortalOrderViewProps({
