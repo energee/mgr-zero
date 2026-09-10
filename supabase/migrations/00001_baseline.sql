@@ -5180,6 +5180,82 @@ begin
   return v_result;
 end $$;
 
+-- The portal payment broker is the only customer path to a QBO credential.
+-- It returns one fixed invoice identity only while the current actor, customer,
+-- connection and pushed document are all still eligible.
+create function read_portal_qbo_payment(p_brewery uuid,p_customer uuid,p_invoice uuid,p_actor uuid)
+returns table(connection_id uuid,realm_id text,remote_invoice_id text,access_token text,refresh_token text,
+  credential_version bigint,access_expires_at timestamptz,refresh_expires_at timestamptz,refresh_hard_expires_at timestamptz)
+language sql stable security definer set search_path='' as $$
+  select c.id,c.realm_id,i.qbo_invoice_id,t.access_token,t.refresh_token,t.credential_version,
+    c.access_expires_at,c.refresh_expires_at,c.refresh_hard_expires_at
+  from public.invoices i
+  join public.qbo_connections c on c.brewery_id=i.brewery_id and c.state='connected'
+  join private.integration_tokens t on t.brewery_id=i.brewery_id and t.provider='qbo' and t.connection_id=c.id
+  where i.id=p_invoice and i.brewery_id=p_brewery and i.customer_id=p_customer and i.kind='invoice'
+    and i.qbo_invoice_id is not null and i.qbo_sync_status='pushed' and i.qbo_remote_state='live' and i.written_off_at is null
+    and (i.paid_at is null or (i.qbo_balance_cents is not null and i.qbo_balance_cents<>0))
+    and (c.allow_online_ach_payment or c.allow_online_credit_card_payment)
+    and 'com.intuit.quickbooks.accounting'=any(c.granted_scopes)
+    and exists(select 1 from public.customer_users u where u.customer_id=p_customer and u.user_id=p_actor)
+    and exists(select 1 from public.qbo_pushes p where p.invoice_id=i.id and p.brewery_id=i.brewery_id
+      and p.connection_id=c.id and p.realm_id=c.realm_id and p.entity_type='Invoice'
+      and p.status='pushed' and p.qbo_entity_id=i.qbo_invoice_id)
+  limit 1
+$$;
+
+create function cas_portal_qbo_payment_tokens(
+  p_brewery uuid,p_customer uuid,p_invoice uuid,p_actor uuid,p_connection uuid,p_remote_invoice_id text,
+  p_expected_version bigint,p_access_token text,p_refresh_token text,p_received_at timestamptz,
+  p_access_seconds int,p_refresh_seconds int,p_hard_seconds int
+) returns boolean language sql security definer set search_path='' as $$
+  with changed as (
+    update private.integration_tokens t set access_token=p_access_token,refresh_token=p_refresh_token,
+      credential_version=credential_version+1,updated_at=now()
+    where t.brewery_id=p_brewery and t.provider='qbo' and t.connection_id=p_connection
+      and t.credential_version=p_expected_version and exists(
+        select 1 from public.invoices i join public.qbo_connections c on c.brewery_id=i.brewery_id
+        where i.id=p_invoice and i.brewery_id=p_brewery and i.customer_id=p_customer and i.kind='invoice'
+          and i.qbo_invoice_id=p_remote_invoice_id and i.qbo_sync_status='pushed' and i.qbo_remote_state='live'
+          and i.written_off_at is null and (i.paid_at is null or (i.qbo_balance_cents is not null and i.qbo_balance_cents<>0))
+          and c.id=p_connection and c.state='connected' and (c.allow_online_ach_payment or c.allow_online_credit_card_payment)
+          and exists(select 1 from public.customer_users u where u.customer_id=p_customer and u.user_id=p_actor)
+          and exists(select 1 from public.qbo_pushes p where p.invoice_id=i.id and p.brewery_id=i.brewery_id
+            and p.connection_id=c.id and p.realm_id=c.realm_id and p.entity_type='Invoice'
+            and p.status='pushed' and p.qbo_entity_id=i.qbo_invoice_id)
+      ) returning t.credential_version
+  ), expiry as (
+    update public.qbo_connections c set access_expires_at=p_received_at+make_interval(secs=>p_access_seconds),
+      refresh_expires_at=case when p_refresh_seconds is null then null else p_received_at+make_interval(secs=>p_refresh_seconds) end,
+      refresh_hard_expires_at=case when p_hard_seconds is null then c.refresh_hard_expires_at else p_received_at+make_interval(secs=>p_hard_seconds) end,
+      credential_version=changed.credential_version,updated_at=now() from changed
+    where c.brewery_id=p_brewery and c.id=p_connection
+  ) select coalesce((select true from changed),false)
+$$;
+
+create function confirm_portal_qbo_payment(
+  p_brewery uuid,p_customer uuid,p_invoice uuid,p_actor uuid,p_connection uuid,p_remote_invoice_id text
+) returns boolean language sql stable security definer set search_path='' as $$
+  select exists(
+    select 1 from public.invoices i join public.qbo_connections c on c.brewery_id=i.brewery_id
+    where i.id=p_invoice and i.brewery_id=p_brewery and i.customer_id=p_customer and i.kind='invoice'
+      and i.qbo_invoice_id=p_remote_invoice_id and i.qbo_sync_status='pushed' and i.qbo_remote_state='live'
+      and i.written_off_at is null and (i.paid_at is null or (i.qbo_balance_cents is not null and i.qbo_balance_cents<>0))
+      and c.id=p_connection and c.state='connected' and (c.allow_online_ach_payment or c.allow_online_credit_card_payment)
+      and exists(select 1 from public.customer_users u where u.customer_id=p_customer and u.user_id=p_actor)
+      and exists(select 1 from public.qbo_pushes p where p.invoice_id=i.id and p.brewery_id=i.brewery_id
+        and p.connection_id=c.id and p.realm_id=c.realm_id and p.entity_type='Invoice'
+        and p.status='pushed' and p.qbo_entity_id=i.qbo_invoice_id)
+  )
+$$;
+
+revoke execute on function read_portal_qbo_payment(uuid,uuid,uuid,uuid),
+  cas_portal_qbo_payment_tokens(uuid,uuid,uuid,uuid,uuid,text,bigint,text,text,timestamptz,int,int,int),
+  confirm_portal_qbo_payment(uuid,uuid,uuid,uuid,uuid,text) from public,anon,authenticated;
+grant execute on function read_portal_qbo_payment(uuid,uuid,uuid,uuid),
+  cas_portal_qbo_payment_tokens(uuid,uuid,uuid,uuid,uuid,text,bigint,text,text,timestamptz,int,int,int),
+  confirm_portal_qbo_payment(uuid,uuid,uuid,uuid,uuid,text) to service_role;
+
 create function portal_create_order(
   p_brewery uuid, p_customer uuid, p_ship_to uuid, p_po text, p_note text,
   p_lines jsonb, p_request_id uuid, p_requested date default null

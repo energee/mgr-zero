@@ -23,6 +23,11 @@ export type VersionedIntegrationTokens = IntegrationTokens & {
   refreshHardExpiresAt: string | null;
 };
 
+export type PortalInvoicePaymentClaim = VersionedIntegrationTokens & {
+  realmId: string;
+  remoteInvoiceId: string;
+};
+
 type ConnectionRow = { id: string };
 type TokenRow = {
   access_token: string;
@@ -52,6 +57,12 @@ function isTokenRow(data: unknown): data is TokenRow {
     && nullableString((data as TokenRow).access_expires_at)
     && nullableString((data as TokenRow).refresh_expires_at)
     && nullableString((data as TokenRow).refresh_hard_expires_at);
+}
+
+function isPortalPaymentRow(data: unknown): data is TokenRow & { connection_id: string; realm_id: string; remote_invoice_id: string } {
+  return isTokenRow(data) && typeof (data as { connection_id?: unknown }).connection_id === "string"
+    && typeof (data as { realm_id?: unknown }).realm_id === "string"
+    && typeof (data as { remote_invoice_id?: unknown }).remote_invoice_id === "string";
 }
 
 async function requireVisibleConnection(ctx: Ctx, provider: IntegrationProvider): Promise<string> {
@@ -307,4 +318,48 @@ export async function finishPortalQuoteTax(ctx: Ctx, quoteId: string, connection
   });
   if (error || !data || typeof data !== "object") throw new Error("QuickBooks tax calculation unavailable");
   return data as Record<string, unknown>;
+}
+
+export async function readPortalInvoicePayment(ctx: Ctx, invoiceId: string): Promise<PortalInvoicePaymentClaim | null> {
+  if (ctx.role !== "customer" || !ctx.customerId) throw new CommandError("invoice not found", 404, "not_found");
+  const visible = await ctx.db.from("invoices").select("id").eq("id", invoiceId)
+    .eq("brewery_id", ctx.breweryId).eq("customer_id", ctx.customerId).maybeSingle();
+  if (visible.error || !visible.data) throw new CommandError("invoice not found", 404, "not_found");
+  const { data, error } = await createAdminClient().rpc("read_portal_qbo_payment", {
+    p_brewery: ctx.breweryId, p_customer: ctx.customerId, p_invoice: invoiceId, p_actor: ctx.userId,
+  }).maybeSingle();
+  if (error || !isPortalPaymentRow(data)) return null;
+  return {
+    accessToken: data.access_token, refreshToken: data.refresh_token,
+    credentialVersion: data.credential_version, connectionId: data.connection_id,
+    realmId: data.realm_id, remoteInvoiceId: data.remote_invoice_id,
+    accessExpiresAt: data.access_expires_at, refreshExpiresAt: data.refresh_expires_at,
+    refreshHardExpiresAt: data.refresh_hard_expires_at,
+  };
+}
+
+export async function compareAndSwapPortalInvoicePaymentTokens(
+  ctx: Ctx,
+  invoiceId: string,
+  expected: PortalInvoicePaymentClaim,
+  next: import("@/lib/qbo").QboTokens,
+) {
+  if (!ctx.customerId) return false;
+  const { data, error } = await createAdminClient().rpc("cas_portal_qbo_payment_tokens", {
+    p_brewery: ctx.breweryId, p_customer: ctx.customerId, p_invoice: invoiceId, p_actor: ctx.userId,
+    p_connection: expected.connectionId, p_remote_invoice_id: expected.remoteInvoiceId,
+    p_expected_version: expected.credentialVersion, p_access_token: next.accessToken, p_refresh_token: next.refreshToken,
+    p_received_at: next.receivedAt, p_access_seconds: next.accessExpiresIn,
+    p_refresh_seconds: next.refreshExpiresIn, p_hard_seconds: next.refreshHardExpiresIn,
+  });
+  return !error && data === true;
+}
+
+export async function confirmPortalInvoicePayment(ctx: Ctx, invoiceId: string, claim: PortalInvoicePaymentClaim) {
+  if (!ctx.customerId) return false;
+  const { data, error } = await createAdminClient().rpc("confirm_portal_qbo_payment", {
+    p_brewery: ctx.breweryId, p_customer: ctx.customerId, p_invoice: invoiceId, p_actor: ctx.userId,
+    p_connection: claim.connectionId, p_remote_invoice_id: claim.remoteInvoiceId,
+  });
+  return !error && data === true;
 }

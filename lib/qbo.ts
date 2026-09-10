@@ -3,11 +3,15 @@ import { createHash, randomUUID } from "node:crypto";
 import { CommandError, unwrap, type Ctx } from "@/lib/commands/registry";
 import {
   beginQboInvoiceSync,
+  compareAndSwapPortalInvoicePaymentTokens,
   compareAndSwapQboTokens,
   completeQboInvoiceSync,
+  confirmPortalInvoicePayment,
   finishQboPush,
+  readPortalInvoicePayment,
   readVersionedIntegrationTokens,
   type QboInvoiceObservation,
+  type PortalInvoicePaymentClaim,
   type VersionedIntegrationTokens,
 } from "@/lib/supabase/integration-tokens";
 import { readQboEnv } from "@/lib/env/server-parser";
@@ -110,6 +114,53 @@ export function validateQboPaymentUrl(value: string, allowedHosts: ReadonlySet<s
   } catch {
     return null;
   }
+}
+
+export type PortalInvoicePaymentResult =
+  | { kind: "redirect"; url: string }
+  | { kind: "unavailable"; reason: "not_configured" | "provider_unavailable" | "link_unavailable" | "context_changed" };
+
+async function refreshPortalInvoicePayment(
+  ctx: Ctx,
+  invoiceId: string,
+  claim: PortalInvoicePaymentClaim,
+  client: QboOAuthClient,
+) {
+  if (isPast(claim.refreshExpiresAt) || isPast(claim.refreshHardExpiresAt)) return null;
+  const next = await client.refresh(claim.refreshToken).catch(() => null);
+  if (!next || !await compareAndSwapPortalInvoicePaymentTokens(ctx, invoiceId, claim, next)) return null;
+  return readPortalInvoicePayment(ctx, invoiceId);
+}
+
+export async function resolvePortalInvoicePayment(
+  ctx: Ctx,
+  invoiceId: string,
+  client: QboOAuthClient,
+  allowedHosts: ReadonlySet<string> = new Set(),
+): Promise<PortalInvoicePaymentResult> {
+  let claim = await readPortalInvoicePayment(ctx, invoiceId);
+  if (!claim) return { kind: "unavailable", reason: "not_configured" };
+  let refreshed = false;
+  if (isPast(claim.accessExpiresAt)) {
+    const next = await refreshPortalInvoicePayment(ctx, invoiceId, claim, client);
+    if (!next) return { kind: "unavailable", reason: "provider_unavailable" };
+    claim = next;
+    refreshed = true;
+  }
+  let read = await client.readInvoiceLink(claim.realmId, claim.remoteInvoiceId, claim.accessToken).catch(() => null);
+  if (read && !read.ok && read.status === 401 && !refreshed) {
+    const next = await refreshPortalInvoicePayment(ctx, invoiceId, claim, client);
+    if (!next) return { kind: "unavailable", reason: "provider_unavailable" };
+    claim = next;
+    read = await client.readInvoiceLink(claim.realmId, claim.remoteInvoiceId, claim.accessToken).catch(() => null);
+  }
+  if (!read || !read.ok) return { kind: "unavailable", reason: "provider_unavailable" };
+  const url = read.invoiceLink ? validateQboPaymentUrl(read.invoiceLink, allowedHosts) : null;
+  if (!url) return { kind: "unavailable", reason: "link_unavailable" };
+  if (!await confirmPortalInvoicePayment(ctx, invoiceId, claim)) {
+    return { kind: "unavailable", reason: "context_changed" };
+  }
+  return { kind: "redirect", url: url.href };
 }
 
 const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
