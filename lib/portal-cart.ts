@@ -108,6 +108,6 @@ export async function executePortalAttempt(
 }
 
 // A later refusal cannot establish whether an earlier uncertain send committed.
-export function canRetirePortalFailure(status: number, retrying: boolean) {
-  return canRetireCommandFailure(status, retrying);
+export function canRetirePortalFailure(status: number, retrying: boolean, code?: string) {
+  return canRetireCommandFailure(status, retrying, code);
 }

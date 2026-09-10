@@ -25,7 +25,10 @@ content-type: application/json
   "name": "<operation name>",
   "input": { },
   "requestId": "<uuid, commands only>",
-  "expectedContext": { "actorId": "<uuid>", "breweryId": "<uuid>", "customerId": "<uuid, portal only>" }
+  "expectedContext": { "actorId": "<uuid>", "breweryId": "<uuid>", "customerId": "<uuid, portal only>" },
+  "origin": "<ui or chat; defaults to ui>",
+  "conversationId": "<uuid, chat commands only>",
+  "previewToken": "<uuid, chat commands only>"
 }
 ```
 
@@ -41,6 +44,31 @@ an uncertain retry. It is a restriction, not identity proof: authentication and
 membership checks still decide what the caller may do. When supplied, its actor,
 brewery, and optional customer must match the authenticated request before the
 operation runs.
+
+`origin` defaults to `ui`. A `chat` command must include both `conversationId`
+and `previewToken`. The server issues that token from `preview_command` after it
+validates and canonicalizes the proposed input for the signed-in author,
+brewery, conversation, and registered write. A token cannot confirm another
+input or conversation. Retrying the confirmed command with the same `requestId`
+returns its original result even after the preview expires or stock changes and
+does not append a second history result. For `record_movement`, the preview
+returns signed units, frozen barrel volume, selected bin/lot stock before and
+after, displayed SKU/package/location labels, channel tax, destination warnings,
+and the lawful correction. Commit locks the inventory ledger and those displayed
+dependencies, rebuilds the authoritative snapshot in the same database
+transaction, and returns `409 conflict` if anything changed. A stale refusal
+leaves no movement, completed request, or conversation result.
+
+The current staff browser composer is a structured client of this same endpoint. It
+loads only the registered reads allowed for the current staff role, asks for every
+required movement field, calls `preview_command`, and sends `record_movement`
+only after the person selects **Commit movement**. Editing or dismissing a
+proposal sends no movement command. Staff ATP answers use `get_atp`; portal
+domain operations remain limited to the registered `portal_*` surface and no
+composer is mounted in the customer shell. Conversation lists and messages are
+staff-only, server-owned, author-and-brewery scoped, and contain no credentials
+or model transcripts. No model, voice provider, alternate write route, or
+client-local conversation history is involved.
 
 The endpoint accepts at most **8 MiB** of JSON per request and admits **120
 requests per authenticated account per 60 seconds**. The account budget is
@@ -96,6 +124,16 @@ const order = await command(breweryId, "create_order", {
   kind: "wholesale",
   fromLocationId: warehouseId,
   lines: [{ skuId, qty: 10 }],
+});
+```
+
+The optional sixth argument carries provenance for a confirmed composer write:
+
+```ts
+await command(breweryId, "record_movement", input, requestId, expectedContext, {
+  origin: "chat",
+  conversationId,
+  previewToken,
 });
 ```
 
@@ -196,6 +234,7 @@ omitted. They have no roles until they are built.
 | Operation | Area | admin | sales | warehouse | brewer | taproom | customer |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `adjust_order_lines` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
+| `append_chat_message` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `begin_chat_installation` | Today & notifications | ✓ |  |  |  |  |  |
 | `begin_chat_reauthorization` | Today & notifications | ✓ |  |  |  |  |  |
 | `cancel_order` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
@@ -209,6 +248,7 @@ omitted. They have no roles until they are built.
 | `consume_chat_link_proof` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `correct_taproom_count` | Taproom & kegs | ✓ |  |  |  |  |  |
 | `create_bin` | Inventory & locations | ✓ |  | ✓ |  |  |  |
+| `create_chat_conversation` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `create_credit_memo` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
 | `create_keg_pool` | Taproom & kegs | ✓ |  | ✓ |  |  |  |
 | `create_location` | Inventory & locations | ✓ |  |  |  |  |  |
@@ -238,6 +278,7 @@ omitted. They have no roles until they are built.
 | `get_brew_day` | Production | ✓ |  |  | ✓ |  |  |
 | `get_brewery` | Team & brewery settings | ✓ | ✓ | ✓ | ✓ |  |  |
 | `get_brewery_operating_defaults` | Team & brewery settings | ✓ |  |  |  |  |  |
+| `get_chat_history` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `get_chat_integration_health` | Today & notifications | ✓ |  |  |  |  |  |
 | `get_chat_link_intent` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `get_chat_link_status` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
@@ -281,6 +322,7 @@ omitted. They have no roles until they are built.
 | `list_brands` | Catalog & pricing | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `list_channel_prices` | Catalog & pricing | ✓ | ✓ |  |  |  |  |
 | `list_chat_channels` | Today & notifications | ✓ |  |  |  |  |  |
+| `list_chat_conversations` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `list_chat_user_links` | Today & notifications | ✓ |  |  |  |  |  |
 | `list_compliance_reports` | Compliance | ✓ | ✓ |  |  |  |  |
 | `list_customers` | Customers | ✓ | ✓ | ✓ |  |  |  |
@@ -324,6 +366,7 @@ omitted. They have no roles until they are built.
 | `portal_submit_order` | Customer portal |  |  |  |  |  | ✓ |
 | `portal_submit_quote` | Customer portal |  |  |  |  |  | ✓ |
 | `portal_update_draft_order` | Customer portal |  |  |  |  |  | ✓ |
+| `preview_command` | Today & notifications | ✓ | ✓ | ✓ | ✓ | ✓ |  |
 | `provision_brewery` | Team & brewery settings |  |  |  |  |  |  |
 | `push_invoice_to_qbo` | Orders & invoicing | ✓ | ✓ |  |  |  |  |
 | `raise_invoice_question` | Orders & invoicing |  |  |  |  |  | ✓ |
@@ -439,6 +482,13 @@ A **new** `requestId` is a new write, every time. Generating one inside your
 retry loop rather than outside it is the single most common way to create
 duplicate orders, because each attempt then looks like a fresh intention.
 
+Offline eligibility is narrower than idempotency. The browser currently queues
+only `record_fermentation_reading`, after persisting its exact input,
+observation time, request ID, actor, brewery, and role before transport. A
+reload or reconnect retries that same envelope. `record_movement`,
+`record_pick`, and stock transfers require current server state and are never
+queued; a stable request ID alone does not make an operation safe offline.
+
 This holds for every command that writes through a ledger RPC. Five do not yet:
 `set_notification_preference`, `set_brewery_quiet_hours`,
 `set_notification_destination`, `consume_chat_link_proof`, and
@@ -482,15 +532,17 @@ one value that ties what your client saw to what the server recorded.
 | --- | --- | --- | --- |
 | 400 | `bad_request` | A domain rule refused the write, such as shipping an order that was never picked. | Read the message: it is the rule, written for a person. Change the state or the input. |
 | 400 | `duplicate_command` | Two operations tried to register the same name. A server fault, not a caller one. | Report it; no request will succeed until it is fixed. |
+| 400 | `invalid_command_metadata` | A registered operation declared an unsafe or contradictory execution policy. A server fault, not a caller one. | Report it; the operation registration must be corrected before the server can start. |
 | 400 | `invalid_input` | The `input` failed the operation's schema. The message names each offending field. | Fix the fields the message names. The operation's field table lists types and which are required. |
 | 400 | `invalid_request` | The body was not JSON, required envelope fields were missing, or the brewery did not match the operation scope. | Send `name` and `input`; include `breweryId` for tenant operations and omit it for `provision_brewery`. |
 | 400 | `invalid_request_id` | A command arrived without a `requestId`, or with one that is not an RFC 9562/4122 UUID. | Generate a UUID per write and send it; queries may omit it. |
+| 400 | `preview_required` | A chat-origin command arrived without a confirmed preview bound to its conversation. | Call `preview_command`, show its effects for confirmation, then send its `previewToken` with the same input and `conversationId`. |
 | 401 | `unauthenticated` | No usable session cookie or bearer token. | Send `authorization: Bearer <supabase access_token>`, or call from a logged-in browser session. |
 | 403 | `not_member` | Authenticated, but not a member of the brewery named by `breweryId`. | Check the `breweryId`. Membership is staff (`brewery_users`) or a portal user (`customer_users`). |
 | 403 | `permission_denied` | A member of the brewery, but the operation does not admit that role. | Each operation lists the roles allowed to call it; the role matrix collects them. |
 | 404 | `not_found` | An id in the input matches no record the caller may see. | Confirm the id belongs to this brewery. Row-level security makes another tenant's row indistinguishable from a missing one. |
 | 404 | `unknown_command` | No operation is registered under that `name`. | Check the spelling. An operation marked designed is not registered yet and answers this. |
-| 409 | `conflict` | A `requestId` was reused with a different payload. | Reuse a requestId only to retry the identical write; generate a new one for a new write. |
+| 409 | `conflict` | A `requestId` was reused with a different payload, or a confirmed preview changed before its first commit. | Reuse a requestId only to retry the identical write. Preview current data again after a stale refusal; generate a new requestId for the newly confirmed proposal. |
 | 409 | `context_changed` | The authenticated account, brewery, or customer no longer matches the optional rendered-context expectation. | Return to the original signed-in context to retry the unchanged action; otherwise review the current state before starting a new request. |
 | 413 | `request_too_large` | The JSON request body exceeded the 8 MiB transport limit. | Send a smaller batch. CSV imports still allow up to 5,000 rows, but unusually large string cells may require splitting the file. |
 | 429 | `rate_limited` | This authenticated account exceeded 120 command-endpoint requests in the current 60-second window. | Wait for the number of seconds in the `Retry-After` response header, then retry. An unchanged write keeps its original `requestId`. |
@@ -586,6 +638,25 @@ top of them.
 
 {/* ops:today */}
 
+#### append_chat_message [#append_chat_message]
+
+`command` · admin, sales, warehouse, brewer, taproom
+
+Append one message to the current author's composer conversation
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `conversationId` | uuid | yes |
+| `role` | user or assistant | yes |
+| `content` | string | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "append_chat_message", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "conversationId": "00000000-0000-0000-0000-000000000000", "role": "user", "content": "string" } }'
+```
+
 #### begin_chat_installation [#begin_chat_installation]
 
 `command` · admin
@@ -635,6 +706,23 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "consume_chat_link_proof", "requestId": "11111111-1111-1111-1111-111111111111", "input": { "proof": "string" } }'
 ```
 
+#### create_chat_conversation [#create_chat_conversation]
+
+`command` · admin, sales, warehouse, brewer, taproom
+
+Create one server-owned composer conversation for the current author and brewery
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `title` | string | no |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "create_chat_conversation", "requestId": "11111111-1111-1111-1111-111111111111", "input": {} }'
+```
+
 #### disable_chat_installation [#disable_chat_installation]
 
 `command` · admin
@@ -682,6 +770,23 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_beer_overview", "input": {} }'
+```
+
+#### get_chat_history [#get_chat_history]
+
+`query` · admin, sales, warehouse, brewer, taproom
+
+Read one composer conversation and its messages for the current author and brewery
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `conversationId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "get_chat_history", "input": { "conversationId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### get_chat_integration_health [#get_chat_integration_health]
@@ -799,6 +904,21 @@ curl -X POST "$MGR_URL/api/command" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_chat_channels", "input": { "installationId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
+#### list_chat_conversations [#list_chat_conversations]
+
+`query` · admin, sales, warehouse, brewer, taproom
+
+List the current author's composer conversations in this brewery
+
+Takes no input.
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_chat_conversations", "input": {} }'
+```
+
 #### list_chat_user_links [#list_chat_user_links]
 
 `query` · admin
@@ -827,6 +947,25 @@ curl -X POST "$MGR_URL/api/command" \
   -H 'content-type: application/json' \
   -H "authorization: Bearer $MGR_TOKEN" \
   -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "list_work", "input": {} }'
+```
+
+#### preview_command [#preview_command]
+
+`query` · admin, sales, warehouse, brewer, taproom
+
+Canonicalize one supported command into server-owned effects and a bound preview token without running its write handler
+
+| Field | Type | Required |
+| --- | --- | --- |
+| `name` | record_movement | yes |
+| `input` | object | yes |
+| `conversationId` | uuid | yes |
+
+```bash
+curl -X POST "$MGR_URL/api/command" \
+  -H 'content-type: application/json' \
+  -H "authorization: Bearer $MGR_TOKEN" \
+  -d '{ "breweryId": "00000000-0000-0000-0000-000000000000", "name": "preview_command", "input": { "name": "record_movement", "input": { "skuId": "00000000-0000-0000-0000-000000000000", "locationId": "00000000-0000-0000-0000-000000000000", "binId": "00000000-0000-0000-0000-000000000000", "qty": 1, "type": "opening_balance" }, "conversationId": "00000000-0000-0000-0000-000000000000" } }'
 ```
 
 #### search_entities [#search_entities]
@@ -944,7 +1083,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 **Designed, not yet available** {/* today-designed */}
 
-21 of the 23 operations in this area are available today; the 2 below are not.
+26 of the 28 operations in this area are available today; the 2 below are not.
 
 The screens need them and the backend has not built them, so calling one returns `404 unknown_command`. They are listed so you can see what is coming, and which screen is waiting, without a date attached.
 
@@ -1793,7 +1932,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, warehouse
 
-Append an inventory movement (immutable; corrections are reversals); sale_removal and depletion each name a saleChannelId, which no other type may carry
+Append a staff-entered inventory movement (immutable; corrections are reversals); depletion names a saleChannelId, which no other supported type may carry
 
 | Field | Type | Required |
 | --- | --- | --- |
@@ -1801,7 +1940,7 @@ Append an inventory movement (immutable; corrections are reversals); sale_remova
 | `locationId` | uuid | yes |
 | `binId` | uuid | yes |
 | `qty` | number | yes |
-| `type` | opening_balance or production_in or adjustment or sale_removal or taproom_transfer or depletion or return_in or destruction or loss or sample or festival_removal | yes |
+| `type` | opening_balance or production_in or adjustment or depletion or return_in or destruction or loss or sample or festival_removal | yes |
 | `lotId` | uuid | no |
 | `saleChannelId` | uuid | no |
 | `destState` | string, fixed length | no |
@@ -3302,7 +3441,7 @@ curl -X POST "$MGR_URL/api/command" \
 
 `command` · admin, brewer
 
-Log a fermentation reading against an open occupancy: temperature in °F, optionally gravity in °Plato, pH and a note
+Log one timestamped fermentation reading against an open occupancy; this is the only current operation eligible for exact offline replay
 
 | Field | Type | Required |
 | --- | --- | --- |

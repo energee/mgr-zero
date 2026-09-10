@@ -110,6 +110,7 @@ export function TapBoard({ breweryId, locationId, initial, skus }: { breweryId: 
     if (result.kind === "write_failed") {
       const error = result.error;
       const status = error instanceof CommandResponseError ? error.status : null;
+      const code = error instanceof CommandResponseError ? error.code : undefined;
       let message = error instanceof Error ? error.message : "Tap action failed";
       let snapshot: TapBoardSnapshot | null = null;
       if (status === 409 && submitted.interval) {
@@ -120,7 +121,7 @@ export function TapBoard({ breweryId, locationId, initial, skus }: { breweryId: 
         }
         catch { /* keep the safe conflict copy returned by the close command */ }
       }
-      setState((current) => failTapBoardAttempt(snapshot ? replaceTapBoardSnapshot(current, snapshot) : current, status, message, retrying));
+      setState((current) => failTapBoardAttempt(snapshot ? replaceTapBoardSnapshot(current, snapshot) : current, status, message, retrying, code));
       return;
     }
     setState((current) => completeTapBoardAttempt(current, result.snapshot));

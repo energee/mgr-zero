@@ -14,6 +14,7 @@ import { toFinishedGoodsViewProps, skuLabel } from "@/lib/mgr/finished-goods-vie
 import "@/lib/commands/all";
 import { MovementForm } from "./movement-form";
 import { formatDateTime } from "@/lib/date-format";
+import { movementFormInstanceKey, type MovementInput, type MovementKind } from "@/lib/composer/state";
 
 type Sku = { id: string; name: string; format_volume: { bbl_per_unit: number | null } | null; brands: { name: string } | null };
 type Location = { id: string; name: string; kind: string };
@@ -25,8 +26,12 @@ type Movement = { bin_id: string; bbl: string; dest_state: string | null; sale_c
 
 const sum = (rows: { sku_id: string; qty: string }[]) => rows.reduce((m, r) => m.set(r.sku_id, (m.get(r.sku_id) ?? 0) + Number(r.qty)), new Map<string, number>());
 
-export default async function InventoryPage({ searchParams }: { searchParams: Promise<{ page?: string; recordMovement?: string }> }) {
-  const { page: rawPage, recordMovement } = await searchParams;
+type InventorySearch = { page?: string; recordMovement?: string; movementHandoff?: string; skuId?: string; locationId?: string; binId?: string; lotId?: string; qty?: string; type?: string; saleChannelId?: string; destState?: string; note?: string };
+const movementKinds = new Set<MovementKind>(["opening_balance", "production_in", "adjustment", "depletion", "return_in", "destruction", "loss", "sample", "festival_removal"]);
+
+export default async function InventoryPage({ searchParams }: { searchParams: Promise<InventorySearch> }) {
+  const params = await searchParams;
+  const { page: rawPage, recordMovement } = params;
   const page = /^\d{1,6}$/.test(rawPage ?? "") ? Math.max(0, Number(rawPage) - 1) : 0;
   const brewery = await getActiveBrewery();
   const ctx = await buildContext(brewery.id);
@@ -43,6 +48,19 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   const stocked = skus.filter((s) => have.has(s.id) || atpBySku.has(s.id));
   const canMove = brewery.role === "admin" || brewery.role === "warehouse";
   const canAddSku = brewery.role === "admin" || brewery.role === "sales";
+  const requestedQty = Number(params.qty);
+  const handoffId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(params.movementHandoff ?? "") ? params.movementHandoff : undefined;
+  const initial: Partial<MovementInput> | undefined = recordMovement === "1" ? {
+    ...(skus.some((sku) => sku.id === params.skuId) ? { skuId: params.skuId } : {}),
+    ...(locations.some((location) => location.id === params.locationId) ? { locationId: params.locationId } : {}),
+    ...(bins.some((bin) => bin.id === params.binId && (!params.locationId || bin.location_id === params.locationId)) ? { binId: params.binId } : {}),
+    ...(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(params.lotId ?? "") ? { lotId: params.lotId } : {}),
+    ...(Number.isFinite(requestedQty) && requestedQty !== 0 ? { qty: requestedQty } : {}),
+    ...(movementKinds.has(params.type as MovementKind) ? { type: params.type as MovementKind } : {}),
+    ...(channels.some((channel) => channel.id === params.saleChannelId) ? { saleChannelId: params.saleChannelId } : {}),
+    ...(/^[A-Za-z]{2}$/.test(params.destState ?? "") ? { destState: params.destState!.toUpperCase() } : {}),
+    ...(params.note?.trim() ? { note: params.note.slice(0, 500) } : {}),
+  } : undefined;
   return (
     <FinishedGoodsView
       model={toFinishedGoodsViewProps({
@@ -51,7 +69,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
           return { id: s.id, name: s.name, brands: s.brands, on_hand: on, atp: atpBySku.get(s.id) ?? on };
         }),
       })}
-      createAction={canMove ? <MovementForm autoOpen={recordMovement === "1"} skus={skus.map((s) => ({ id: s.id, label: skuLabel(s), bblPerUnit: s.format_volume?.bbl_per_unit == null ? null : Number(s.format_volume.bbl_per_unit) }))} locations={locations} bins={bins} channels={channels} /> : null}
+      createAction={canMove ? <MovementForm key={movementFormInstanceKey(handoffId)} autoOpen={recordMovement === "1"} initial={initial} skus={skus.map((s) => ({ id: s.id, label: skuLabel(s), bblPerUnit: s.format_volume?.bbl_per_unit == null ? null : Number(s.format_volume.bbl_per_unit) }))} locations={locations} bins={bins} channels={channels} /> : null}
       afterHeader={canAddSku ? E.btn("Add SKU", "g", "/catalog") : undefined}
       linkRows
       footer={

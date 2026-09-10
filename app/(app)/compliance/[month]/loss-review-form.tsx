@@ -55,7 +55,7 @@ export function LossReviewForm({ loss }: { loss: LossReview }) {
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Could not save this allocation";
       setError(message);
-      if (cause instanceof CommandResponseError && canRetireCommandFailure(cause.status, retrying)) {
+      if (cause instanceof CommandResponseError && canRetireCommandFailure(cause.status, retrying, cause.code)) {
         requestId.current = null; payload.current = null; setPhase("idle");
       } else setPhase("unknown");
     }

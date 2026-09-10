@@ -14,6 +14,7 @@ import { MeView } from "@/components/mgr/views/me";
 import { navFor, shippedNav, STAFF_NAV } from "@/lib/mgr/nav";
 import { SearchCacheProvider, SearchSheet } from "@/components/mgr/search-palette";
 import { switchBrewery } from "@/app/(auth)/actions";
+import { Composer } from "@/components/mgr/composer";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [brewery, sidebarOpen, identity, memberships] = await Promise.all([getActiveBrewery(), sidebarOpenFromCookie(), getRequestIdentity(), getStaffMemberships()]);
@@ -24,6 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           brand={brewery.name}
           items={navFor(shippedNav(STAFF_NAV), brewery.role)}
           sidebarOpen={sidebarOpen}
+          composer={<Composer key={`${identity!.userId}:${brewery.id}:${brewery.role}`} role={brewery.role} />}
           headerRight={
             <>
               {brewery.role !== "taproom" && <SearchSheet />}

@@ -156,10 +156,12 @@ describe("sale channel commands", () => {
     const { skuId: sku } = await seedCatalog(b.id, { packageType: "keg", bblPerUnit: 0.5 });
     const loc = await seedLocation(b.id);
     const taproom = await channelId(b.id, "Taproom");
-    await runCommand("record_movement", {
-      skuId: sku, locationId: loc.id, binId: loc.binId, qty: -1, type: "sale_removal",
-      saleChannelId: taproom, destState: "PA",
-    }, c);
+    const movement = await c.db.rpc("record_inventory_movement", {
+      p_brewery: b.id, p_sku: sku, p_location: loc.id, p_bin: loc.binId, p_qty: -1,
+      p_type: "sale_removal", p_sale_channel: taproom, p_dest_state: "PA", p_note: null,
+      p_request_id: crypto.randomUUID(), p_lot: null, p_origin: "ui", p_conversation: null, p_preview_token: null,
+    });
+    expect(movement.error).toBeNull();
     await expect(runCommand("delete_sale_channel", { channelId: taproom }, c))
       .rejects.toMatchObject({ message: "channel is in use" });
   });

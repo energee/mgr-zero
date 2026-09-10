@@ -83,7 +83,7 @@ function ReadyCart({ items, shipTos, scope, initial, fulfillmentSource }: CartPr
     } catch (err) {
       // Only a definitive first refusal can unlock edits; a later refusal
       // cannot disprove an earlier uncertain success.
-      if (err instanceof CommandResponseError && canRetirePortalFailure(err.status, active?.requestId === attempt?.requestId)) {
+      if (err instanceof CommandResponseError && canRetirePortalFailure(err.status, active?.requestId === attempt?.requestId, err.code)) {
         try { sessionStorage.removeItem(portalAttemptKey(scope)); setAttempt(null); }
         catch { /* Keep the exact attempt if storage cannot retire it. */ }
       }
