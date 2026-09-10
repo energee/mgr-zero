@@ -50,7 +50,14 @@ and `previewToken`. The server issues that token from `preview_command` after it
 validates and canonicalizes the proposed input for the signed-in author,
 brewery, conversation, and registered write. A token cannot confirm another
 input or conversation. Retrying the confirmed command with the same `requestId`
-returns its original result and does not append a second history result.
+returns its original result even after the preview expires or stock changes and
+does not append a second history result. For `record_movement`, the preview
+returns signed units, frozen barrel volume, selected bin/lot stock before and
+after, displayed SKU/package/location labels, channel tax, destination warnings,
+and the lawful correction. Commit locks the inventory ledger and those displayed
+dependencies, rebuilds the authoritative snapshot in the same database
+transaction, and returns `409 conflict` if anything changed. A stale refusal
+leaves no movement, completed request, or conversation result.
 
 The endpoint accepts at most **8 MiB** of JSON per request and admits **120
 requests per authenticated account per 60 seconds**. The account budget is
@@ -517,7 +524,7 @@ one value that ties what your client saw to what the server recorded.
 | 403 | `permission_denied` | A member of the brewery, but the operation does not admit that role. | Each operation lists the roles allowed to call it; the role matrix collects them. |
 | 404 | `not_found` | An id in the input matches no record the caller may see. | Confirm the id belongs to this brewery. Row-level security makes another tenant's row indistinguishable from a missing one. |
 | 404 | `unknown_command` | No operation is registered under that `name`. | Check the spelling. An operation marked designed is not registered yet and answers this. |
-| 409 | `conflict` | A `requestId` was reused with a different payload. | Reuse a requestId only to retry the identical write; generate a new one for a new write. |
+| 409 | `conflict` | A `requestId` was reused with a different payload, or a confirmed preview changed before its first commit. | Reuse a requestId only to retry the identical write. Preview current data again after a stale refusal; generate a new requestId for the newly confirmed proposal. |
 | 409 | `context_changed` | The authenticated account, brewery, or customer no longer matches the optional rendered-context expectation. | Return to the original signed-in context to retry the unchanged action; otherwise review the current state before starting a new request. |
 | 413 | `request_too_large` | The JSON request body exceeded the 8 MiB transport limit. | Send a smaller batch. CSV imports still allow up to 5,000 rows, but unusually large string cells may require splitting the file. |
 | 429 | `rate_limited` | This authenticated account exceeded 120 command-endpoint requests in the current 60-second window. | Wait for the number of seconds in the `Retry-After` response header, then retry. An unchanged write keeps its original `requestId`. |

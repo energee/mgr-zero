@@ -3514,6 +3514,7 @@ create table private.command_requests (
   check ((origin = 'chat') = (conversation_id is not null and preview_token is not null)),
   foreign key (preview_token, actor_id, brewery_id, command_name, conversation_id)
     references private.command_previews(token, actor_id, brewery_id, rpc_name, conversation_id)
+    deferrable initially deferred
 );
 
 -- A portal quote is an immutable reviewed snapshot. It stays private because
@@ -3736,54 +3737,146 @@ begin
     where conversation_id=p_conversation and brewery_id=p_brewery and actor_id=v_actor),'[]'::jsonb));
 end $$;
 
-create function preview_inventory_movement(
+create function private.inventory_movement_proposal(
   p_brewery uuid,p_sku uuid,p_location uuid,p_bin uuid,p_qty numeric,p_type public.movement_type,
-  p_sale_channel uuid,p_dest_state text,p_note text,p_lot uuid,p_conversation uuid
-) returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_actor uuid; v_token uuid := private.new_uuid(); v_input jsonb; v_effects jsonb; v_version jsonb;
+  p_sale_channel uuid,p_dest_state text,p_note text,p_lot uuid,p_lock boolean default false
+) returns jsonb language plpgsql set search_path = '' as $$
+declare v_meta jsonb; v_lot jsonb; v_channel jsonb; v_stock_qty numeric; v_stock_bbl numeric;
+  v_brand uuid; v_format uuid;
+  v_movement_count bigint; v_movement_ids jsonb; v_components jsonb; v_registration jsonb;
+  v_effects jsonb; v_warnings jsonb := '[]'::jsonb; v_version jsonb;
 begin
-  v_actor := private.assert_staff(p_brewery,array['admin','warehouse']::public.staff_role[]);
-  perform private.assert_chat_conversation(p_brewery,p_conversation);
   if p_type not in ('opening_balance','production_in','adjustment','depletion','return_in','destruction','loss','sample','festival_removal')
     then raise exception 'movement type is not supported in chat'; end if;
   if p_qty is null or p_qty::text in ('NaN','Infinity','-Infinity') or p_qty=0 or p_qty<>round(p_qty,2)
     then raise exception 'invalid movement quantity'; end if;
-  if not exists(select 1 from public.skus where id=p_sku and brewery_id=p_brewery)
-    or not exists(select 1 from public.bins where id=p_bin and location_id=p_location and brewery_id=p_brewery)
-    then raise exception 'invalid movement selection'; end if;
-  v_input := jsonb_build_object('brewery',p_brewery,'sku',p_sku,'location',p_location,'bin',p_bin,'qty',p_qty,
-    'type',p_type,'sale_channel',p_sale_channel,'dest_state',p_dest_state,'note',p_note,'lot',p_lot);
-  -- C1 persists the real proposal dependencies. C2 will lock, rebuild and
-  -- compare this version atomically before the first commit.
+
+  if (p_type in ('opening_balance','production_in','return_in') and p_qty<0)
+     or (p_type in ('depletion','destruction','loss','sample','festival_removal') and p_qty>0)
+    then raise exception 'movement quantity has the wrong sign for its type'; end if;
+  if (p_type='depletion') is distinct from (p_sale_channel is not null)
+    then raise exception 'depletion requires a sale channel and other movements cannot carry one'; end if;
+  if (p_type in ('sample','festival_removal')) is distinct from (p_dest_state is not null)
+    or (p_dest_state is not null and p_dest_state !~ '^[A-Z]{2}$')
+    then raise exception 'sample and festival removals require a two-letter destination state'; end if;
+
+  if p_lock then
+    select brand_id,format_id into v_brand,v_format from public.skus
+      where id=p_sku and brewery_id=p_brewery for share;
+    perform 1 from public.brands where id=v_brand and brewery_id=p_brewery for share;
+    -- The parent row conflicts with complete component replacement, including
+    -- inserting a child where no component row existed at preview time.
+    perform 1 from public.formats where id=v_format and brewery_id=p_brewery for share;
+    perform 1 from public.format_components where brewery_id=p_brewery
+      and parent_format_id=v_format order by child_format_id for share;
+    perform 1 from public.formats where brewery_id=p_brewery and id in (
+      select child_format_id from public.format_components
+      where brewery_id=p_brewery and parent_format_id=v_format
+    ) order by id for share;
+    perform 1 from public.locations where id=p_location and brewery_id=p_brewery for share;
+    perform 1 from public.bins where id=p_bin and location_id=p_location and brewery_id=p_brewery for share;
+  end if;
+  -- Each statement gets a fresh READ COMMITTED snapshot. Build displayed
+  -- metadata only after every relevant row lock has completed.
   select jsonb_build_object(
-    'sku',jsonb_build_object('id',s.id,'name',s.name),
-    'brand',jsonb_build_object('id',br.id,'name',br.name),
-    'format',jsonb_build_object('id',f.id,'name',f.name,'bblPerUnit',coalesce(f.bbl_per_unit,
-      (select sum(fc.qty*child.bbl_per_unit) from public.format_components fc
-        join public.formats child on child.id=fc.child_format_id and child.brewery_id=fc.brewery_id
-        where fc.brewery_id=p_brewery and fc.parent_format_id=f.id))),
-    'location',jsonb_build_object('id',l.id,'name',l.name),
-    'bin',jsonb_build_object('id',b.id,'name',b.name),
-    'lot',(select jsonb_build_object('id',lot.id,'code',lot.code,'packagedOn',lot.packaged_on,'bestBy',lot.best_by)
-      from public.lots lot where lot.id=p_lot and lot.brewery_id=p_brewery),
-    'channel',(select jsonb_build_object('id',ch.id,'name',ch.name,'taxTreatment',ch.tax_treatment)
-      from public.sale_channels ch where ch.id=p_sale_channel and ch.brewery_id=p_brewery),
-    'stock',(select jsonb_build_object('movementCount',count(*),'qty',coalesce(sum(m.qty),0),'bbl',coalesce(sum(m.bbl),0))
-      from public.inventory_movements m where m.brewery_id=p_brewery and m.sku_id=p_sku and m.location_id=p_location
-        and m.bin_id=p_bin and m.lot_id is not distinct from p_lot)
-  ) into v_version
-  from public.skus s join public.brands br on br.id=s.brand_id and br.brewery_id=s.brewery_id
+    'skuId',s.id,'skuName',s.name,'skuActive',s.active,
+    'brandId',br.id,'brandName',br.name,'formatId',f.id,'formatName',f.name,
+    'packageType',f.package_type,'bblPerUnit',fv.bbl_per_unit,
+    'locationId',l.id,'locationName',l.name,'locationKind',l.kind,'binId',b.id,'binName',b.name
+  ) into v_meta
+  from public.skus s
+  join public.brands br on br.id=s.brand_id and br.brewery_id=s.brewery_id
   join public.formats f on f.id=s.format_id and f.brewery_id=s.brewery_id
+  join public.format_volumes fv on fv.id=f.id and fv.brewery_id=f.brewery_id
   join public.locations l on l.id=p_location and l.brewery_id=s.brewery_id
   join public.bins b on b.id=p_bin and b.location_id=l.id and b.brewery_id=l.brewery_id
   where s.id=p_sku and s.brewery_id=p_brewery;
-  select jsonb_build_array(jsonb_build_object('label',s.name||' · '||l.name||' · '||b.name,'qty',p_qty::text))
-    into v_effects from public.skus s cross join public.locations l cross join public.bins b
-    where s.id=p_sku and s.brewery_id=p_brewery and l.id=p_location and l.brewery_id=p_brewery
-      and b.id=p_bin and b.location_id=l.id and b.brewery_id=p_brewery;
+  if v_meta is null then raise exception 'invalid movement selection'; end if;
+  if not (v_meta->>'skuActive')::boolean then raise exception 'inactive SKU cannot receive a new movement'; end if;
+
+  select coalesce(jsonb_agg(jsonb_build_object('id',child.id,'name',child.name,'qty',fc.qty,
+    'bblPerUnit',child.bbl_per_unit) order by child.id),'[]'::jsonb) into v_components
+  from public.format_components fc join public.formats child
+    on child.id=fc.child_format_id and child.brewery_id=fc.brewery_id
+  where fc.brewery_id=p_brewery and fc.parent_format_id=(v_meta->>'formatId')::uuid;
+
+  if p_lot is not null then
+    if p_lock then perform 1 from public.lots where id=p_lot and brewery_id=p_brewery for share; end if;
+    select to_jsonb(lot) into v_lot from public.lots lot where id=p_lot and brewery_id=p_brewery;
+    if not found or not exists(select 1 from public.inventory_movements
+      where brewery_id=p_brewery and sku_id=p_sku and lot_id=p_lot)
+      then raise exception 'lot does not belong to SKU'; end if;
+  end if;
+
+  if p_sale_channel is not null then
+    if p_lock then perform 1 from public.sale_channels where id=p_sale_channel and brewery_id=p_brewery for share; end if;
+    select jsonb_build_object('id',id,'name',name,'taxTreatment',tax_treatment)
+      into v_channel from public.sale_channels where id=p_sale_channel and brewery_id=p_brewery;
+    if not found then raise exception 'invalid sale channel'; end if;
+  end if;
+
+  select count(*),coalesce(sum(qty),0),coalesce(sum(bbl),0),coalesce(jsonb_agg(id order by id),'[]'::jsonb)
+    into v_movement_count,v_stock_qty,v_stock_bbl,v_movement_ids
+  from public.inventory_movements where brewery_id=p_brewery and sku_id=p_sku and location_id=p_location
+    and bin_id=p_bin and lot_id is not distinct from p_lot;
+  if p_qty<0 and -p_qty>v_stock_qty then
+    if p_lot is null and exists(select 1 from public.inventory_movements
+      where brewery_id=p_brewery and sku_id=p_sku and location_id=p_location and bin_id=p_bin and lot_id is not null)
+      then raise exception 'choose the recorded lot for this removal'; end if;
+    raise exception 'insufficient selected bin and lot stock';
+  end if;
+
+  if p_dest_state is not null then
+    if p_lock then perform 1 from public.state_registrations where brewery_id=p_brewery
+      and brand_id=(v_meta->>'brandId')::uuid and state=p_dest_state for share; end if;
+    select to_jsonb(r) into v_registration from (
+      select id,state,registration_no,approved_on,expires_on from public.state_registrations
+      where brewery_id=p_brewery and brand_id=(v_meta->>'brandId')::uuid and state=p_dest_state
+    ) r;
+    if v_registration is null or (v_registration->>'approved_on')::date>current_date
+       or (v_registration->>'expires_on')::date<current_date then
+      v_warnings:=jsonb_build_array((v_meta->>'brandName')||' is not registered in '||p_dest_state);
+    end if;
+  end if;
+
+  v_version:=jsonb_build_object(
+    'sku',jsonb_build_object('id',v_meta->>'skuId','name',v_meta->>'skuName','active',(v_meta->>'skuActive')::boolean),
+    'brand',jsonb_build_object('id',v_meta->>'brandId','name',v_meta->>'brandName'),
+    'format',jsonb_build_object('id',v_meta->>'formatId','name',v_meta->>'formatName',
+      'packageType',v_meta->>'packageType','bblPerUnit',(v_meta->>'bblPerUnit')::numeric,'components',v_components),
+    'location',jsonb_build_object('id',v_meta->>'locationId','name',v_meta->>'locationName','kind',v_meta->>'locationKind'),
+    'bin',jsonb_build_object('id',v_meta->>'binId','name',v_meta->>'binName'),
+    'lot',case when p_lot is null then null else jsonb_build_object('id',v_lot->>'id','code',v_lot->>'code','packagedOn',v_lot->>'packaged_on','bestBy',v_lot->>'best_by') end,
+    'channel',v_channel,
+    'registration',v_registration,
+    'proposal',jsonb_build_object('qty',p_qty,'type',p_type,'destState',p_dest_state,'note',p_note),
+    'stock',jsonb_build_object('movementCount',v_movement_count,'movementIds',v_movement_ids,'qty',v_stock_qty,'bbl',v_stock_bbl));
+  v_effects:=jsonb_build_array(jsonb_build_object(
+    'label',(v_meta->>'skuName')||' · '||(v_meta->>'locationName')||' · '||(v_meta->>'binName'),
+    'qty',p_qty::text,'bbl',round(p_qty*(v_meta->>'bblPerUnit')::numeric,8)::text,
+    'stockBeforeQty',v_stock_qty::text,'stockAfterQty',(v_stock_qty+p_qty)::text,
+    'stockBeforeBbl',v_stock_bbl::text,'stockAfterBbl',round(v_stock_bbl+p_qty*(v_meta->>'bblPerUnit')::numeric,8)::text,
+    'type',p_type,'taxTreatment',v_channel->>'taxTreatment','destinationState',p_dest_state,
+    'correction',case when p_type in ('adjustment','loss') then 'reverse_inventory_movement' else null end));
+  return jsonb_build_object('effects',v_effects,'warnings',v_warnings,'version',v_version);
+end $$;
+
+create function preview_inventory_movement(
+  p_brewery uuid,p_sku uuid,p_location uuid,p_bin uuid,p_qty numeric,p_type public.movement_type,
+  p_sale_channel uuid,p_dest_state text,p_note text,p_lot uuid,p_conversation uuid
+) returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_actor uuid; v_token uuid := private.new_uuid(); v_input jsonb; v_proposal jsonb;
+begin
+  v_actor := private.assert_staff(p_brewery,array['admin','warehouse']::public.staff_role[]);
+  perform private.assert_chat_conversation(p_brewery,p_conversation);
+  v_proposal:=private.inventory_movement_proposal(p_brewery,p_sku,p_location,p_bin,p_qty,p_type,
+    p_sale_channel,p_dest_state,p_note,p_lot);
+  v_input := jsonb_build_object('brewery',p_brewery,'sku',p_sku,'location',p_location,'bin',p_bin,'qty',p_qty,
+    'type',p_type,'sale_channel',p_sale_channel,'dest_state',p_dest_state,'note',p_note,'lot',p_lot);
   insert into private.command_previews(token,actor_id,brewery_id,command_name,rpc_name,canonical_input,effects,warnings,version,conversation_id)
-    values(v_token,v_actor,p_brewery,'record_movement','record_inventory_movement',v_input,v_effects,'[]'::jsonb,v_version,p_conversation);
-  return jsonb_build_object('effects',v_effects,'warnings','[]'::jsonb,'version',v_version,'previewToken',v_token);
+    values(v_token,v_actor,p_brewery,'record_movement','record_inventory_movement',v_input,
+      v_proposal->'effects',v_proposal->'warnings',v_proposal->'version',p_conversation);
+  return v_proposal||jsonb_build_object('previewToken',v_token);
 end $$;
 
 create function set_qbo_customer_mapping(p_brewery uuid,p_customer uuid,p_qbo_customer_id text,p_request_id uuid)
@@ -4906,6 +4999,7 @@ create function record_inventory_movement(
   p_origin text default 'ui', p_conversation uuid default null, p_preview_token uuid default null
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_replay jsonb; v_row public.inventory_movements; v_tax public.tax_treatment; v_actor uuid; v_input jsonb;
+  v_preview private.command_previews; v_current jsonb;
 begin
   v_actor := private.assert_staff(p_brewery, array['admin','warehouse']::public.staff_role[]);
   if (p_origin='chat') is distinct from (p_conversation is not null and p_preview_token is not null)
@@ -4914,36 +5008,48 @@ begin
   if p_origin='chat' and p_type not in ('opening_balance','production_in','adjustment','depletion','return_in','destruction','loss','sample','festival_removal')
     then raise exception 'movement type is not supported in chat'; end if;
   v_input := jsonb_build_object('brewery', p_brewery, 'sku', p_sku, 'location', p_location, 'bin', p_bin, 'qty', p_qty, 'type', p_type, 'sale_channel', p_sale_channel, 'dest_state', p_dest_state, 'note', p_note, 'lot', p_lot);
-  if p_origin='chat' and not exists(select 1 from private.command_previews
-    where token=p_preview_token and actor_id=v_actor and brewery_id=p_brewery and command_name='record_movement'
-      and rpc_name='record_inventory_movement' and canonical_input=v_input and conversation_id=p_conversation)
-    then raise exception 'invalid preview token'; end if;
   v_replay := private.claim_command_request(p_brewery, 'record_inventory_movement', p_request_id, v_input,
     p_origin,p_conversation,p_preview_token);
   if v_replay is not null then return v_replay; end if;
-  if p_origin='chat' and not exists(select 1 from private.command_previews
-    where token=p_preview_token and expires_at>now())
-    then raise exception 'expired preview token'; end if;
-  if p_qty is null or p_qty::text in ('NaN','Infinity','-Infinity') or p_qty = 0 or p_qty <> round(p_qty,2) then raise exception 'invalid movement quantity'; end if;
-  if p_qty < 0 then
-    -- ponytail: global ledger lock; shared stock-key locks across every writer at higher throughput.
+
+  if p_origin='chat' then
+    select * into v_preview from private.command_previews
+      where token=p_preview_token and actor_id=v_actor and brewery_id=p_brewery
+        and command_name='record_movement' and rpc_name='record_inventory_movement'
+        and canonical_input=v_input and conversation_id=p_conversation;
+    if not found then raise exception 'invalid preview token'; end if;
+    if v_preview.expires_at<=now() then raise exception 'expired preview token'; end if;
+    -- ponytail: serializes inventory writers; upgrade to shared per-stock
+    -- locks across every writer if throughput requires.
     lock table public.inventory_movements in share row exclusive mode;
-    if p_lot is null and exists (select 1 from public.inventory_movements where brewery_id = p_brewery and sku_id = p_sku and bin_id = p_bin and lot_id is not null)
-       and -p_qty > (select coalesce(sum(qty),0) from public.inventory_movements where brewery_id = p_brewery and sku_id = p_sku and bin_id = p_bin and lot_id is null) then raise exception 'choose the recorded lot for this removal'; end if;
-  end if;
-  if p_lot is not null then
-    if not exists (select 1 from public.inventory_movements where brewery_id = p_brewery and sku_id = p_sku and lot_id = p_lot) then raise exception 'lot does not belong to SKU'; end if;
-    if p_qty < 0 then
-      -- ponytail: global ledger lock; shared key locks across all writers when needed.
-      lock table public.inventory_movements in share row exclusive mode;
-      if -p_qty > (select coalesce(sum(qty),0) from public.inventory_movements where brewery_id = p_brewery and sku_id = p_sku and bin_id = p_bin and lot_id = p_lot) then raise exception 'insufficient selected lot stock'; end if;
+    v_current:=private.inventory_movement_proposal(p_brewery,p_sku,p_location,p_bin,p_qty,p_type,
+      p_sale_channel,p_dest_state,p_note,p_lot,true);
+    if v_current->'version' is distinct from v_preview.version
+       or v_current->'effects' is distinct from v_preview.effects
+       or v_current->'warnings' is distinct from v_preview.warnings then
+      raise exception 'preview changed; preview again' using errcode='MG409';
     end if;
-  end if;
-  -- A staff-entered movement has no customer, so the channel default is the
-  -- resolved treatment; the composite FK below rejects another brewery's channel.
-  if p_sale_channel is not null then
-    select tax_treatment into v_tax from public.sale_channels
-     where id = p_sale_channel and brewery_id = p_brewery;
+    v_tax:=(v_current->'effects'->0->>'taxTreatment')::public.tax_treatment;
+  else
+    if p_qty is null or p_qty::text in ('NaN','Infinity','-Infinity') or p_qty = 0 or p_qty <> round(p_qty,2) then raise exception 'invalid movement quantity'; end if;
+    if p_qty < 0 then
+    -- ponytail: global ledger lock; shared stock-key locks across every writer at higher throughput.
+      lock table public.inventory_movements in share row exclusive mode;
+      if p_lot is null and exists (select 1 from public.inventory_movements where brewery_id = p_brewery and sku_id = p_sku and bin_id = p_bin and lot_id is not null)
+         and -p_qty > (select coalesce(sum(qty),0) from public.inventory_movements where brewery_id = p_brewery and sku_id = p_sku and bin_id = p_bin and lot_id is null) then raise exception 'choose the recorded lot for this removal'; end if;
+    end if;
+    if p_lot is not null then
+      if not exists (select 1 from public.inventory_movements where brewery_id = p_brewery and sku_id = p_sku and lot_id = p_lot) then raise exception 'lot does not belong to SKU'; end if;
+      if p_qty < 0 then
+        if -p_qty > (select coalesce(sum(qty),0) from public.inventory_movements where brewery_id = p_brewery and sku_id = p_sku and bin_id = p_bin and lot_id = p_lot) then raise exception 'insufficient selected lot stock'; end if;
+      end if;
+    end if;
+    -- A staff-entered movement has no customer, so the channel default is the
+    -- resolved treatment; the composite FK below rejects another brewery's channel.
+    if p_sale_channel is not null then
+      select tax_treatment into v_tax from public.sale_channels
+       where id = p_sale_channel and brewery_id = p_brewery;
+    end if;
   end if;
   insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, lot_id, qty, type, sale_channel_id, tax_treatment, dest_state, note, created_by)
     values (p_brewery, p_sku, p_location, p_bin, p_lot, p_qty, p_type, p_sale_channel, v_tax, p_dest_state, p_note, auth.uid()) returning * into v_row;
@@ -5923,6 +6029,10 @@ begin
   v_replay := private.claim_command_request(p_brewery, 'upsert_state_registration', p_request_id,
     jsonb_build_object('brand', p_brand, 'state', p_state, 'registration_no', p_registration_no, 'approved_on', p_approved_on, 'expires_on', p_expires_on));
   if v_replay is not null then return v_replay; end if;
+  -- Composer previews lock the same parent row so an absent registration
+  -- cannot appear between their warning snapshot and commit.
+  perform 1 from public.brands where id=p_brand and brewery_id=p_brewery for update;
+  if not found then raise exception 'brand not found'; end if;
   -- the composite FK pins the brand to this brewery, and the conflict key is the brand, so the row hit is this brewery's
   insert into public.state_registrations (brewery_id, brand_id, state, registration_no, approved_on, expires_on)
     values (p_brewery, p_brand, p_state, p_registration_no, p_approved_on, p_expires_on)
