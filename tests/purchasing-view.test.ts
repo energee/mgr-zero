@@ -139,9 +139,10 @@ describe("Vendors", () => {
     expect(htmlOf(createElement(ContractView, { model: toContractViewProps(contractYchCitra) }))).toMatch(/>Save contract</);
   });
 
-  it("the live vendors page mounts VendorsView and slots VendorForm / ContractForm", () => {
+  it("the live vendors page mounts the shared vendor and contract views", () => {
     const page = src("app/(app)/vendors/page.tsx");
     expect(page).toMatch(/<VendorsView\b/);
+    expect(page).toMatch(/<ContractsView\b/);
     expect(page).toMatch(/<VendorForm\b/);
     expect(page).toMatch(/<ContractForm\b/);
   });

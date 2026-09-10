@@ -106,6 +106,13 @@ describe("Sale channels view", () => {
 });
 
 describe("Channel view", () => {
+  it("the live channel form mounts ChannelView", () => {
+    const source = readFileSync("app/(app)/settings/channels/channel-form.tsx", "utf8");
+    expect(source).toMatch(/<ChannelView\b/);
+    expect(source).toContain('title="Channel"');
+    expect(source).not.toMatch(/components\/ui\/(input|label|select)/);
+  });
+
   it("maps Export onto chips index 1", () => {
     const model = toChannelViewProps(channelExport);
     expect(model.name).toBe("Export");
