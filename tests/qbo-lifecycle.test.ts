@@ -53,6 +53,39 @@ describe("QuickBooks OAuth transport", () => {
 });
 
 describe("QuickBooks OAuth lifecycle", () => {
+  it("falls back to the claimed scopes when the token response omits optional scope and refuses broader response scope", async () => {
+    const requestedScopes = ["com.intuit.quickbooks.accounting", "indirect-tax.tax-calculation.quickbooks"];
+    const complete = vi.fn().mockResolvedValue("connection-1");
+    const fail = vi.fn().mockResolvedValue(undefined);
+    const callback = (scope?: string) => completeQboOAuth({
+      request: new Request(`${config.redirectUri}?code=one-time-code&state=opaque&realmId=realm-1`),
+      actorId: "actor-1", selectedBreweryId: "brewery-1", redirectUri: config.redirectUri,
+      client: new QboOAuthClient(config, vi.fn<typeof globalThis.fetch>()
+        .mockResolvedValueOnce(new Response(JSON.stringify({
+          access_token: "access-secret", refresh_token: "refresh-secret", expires_in: 3600,
+          ...(scope === undefined ? {} : { scope }),
+        }), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ CompanyInfo: { Id: "1" } }), { status: 200 }))),
+      store: {
+        claim: vi.fn().mockResolvedValue({ intentId: "intent-1", breweryId: "brewery-1", providerIntent: "connect", requestedScopes }),
+        complete, fail,
+      },
+    });
+
+    await expect(callback()).resolves.toBe("connection-1");
+    expect(complete).toHaveBeenLastCalledWith("intent-1", "actor-1", "realm-1",
+      expect.objectContaining({ grantedScopes: requestedScopes }));
+
+    await expect(callback("com.intuit.quickbooks.accounting")).resolves.toBe("connection-1");
+    expect(complete).toHaveBeenLastCalledWith("intent-1", "actor-1", "realm-1",
+      expect.objectContaining({ grantedScopes: ["com.intuit.quickbooks.accounting"] }));
+
+    complete.mockClear();
+    await expect(callback("com.intuit.quickbooks.accounting unrequested.scope")).rejects.toThrow("QuickBooks is unavailable");
+    expect(complete).not.toHaveBeenCalled();
+    expect(fail).toHaveBeenCalledWith("intent-1", "actor-1");
+  });
+
   it("accepts a realm-scoped CompanyInfo response whose entity Id differs from the realm", async () => {
     const complete = vi.fn().mockResolvedValue("connection-1");
     const fetch = vi.fn<typeof globalThis.fetch>()
