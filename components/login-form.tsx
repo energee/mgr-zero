@@ -10,17 +10,12 @@
  */
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { login } from "@/app/(auth)/actions"
 import { MgrIcon } from "@/components/mgr-icon"
+import { E } from "@/components/mgr/e"
+import { EntrySurface } from "@/components/mgr/entry-surface"
 import Link from "next/link"
 
 export function LoginForm({
@@ -30,14 +25,12 @@ export function LoginForm({
   ...props
 }: React.ComponentProps<"div"> & { error?: string; portal?: boolean }) {
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
-        <CardHeader className="text-center">
-          <MgrIcon size={40} className="mx-auto" />
-          <CardTitle className="text-xl">{portal ? "Sign in to your account" : "Sign in to MGR"}</CardTitle>
-          <CardDescription>{portal ? "Wholesale ordering" : "Brewery operations management"}</CardDescription>
-        </CardHeader>
-        <CardContent>
+    <div className={cn("contents", className)} {...props}>
+      <EntrySurface>
+        {E.hd(<><MgrIcon size={16} className="mr-1 inline" />MGR</>)}
+        {E.sp()}
+        {E.ttl(portal ? "Sign in to your account" : "Sign in to MGR")}
+        {E.info(portal ? "Wholesale ordering" : "Brewery operations management")}
           <form action={login}>
             <FieldGroup>
               {portal && <input type="hidden" name="portal" value="1" />}
@@ -79,8 +72,8 @@ export function LoginForm({
               </Field>
             </FieldGroup>
           </form>
-        </CardContent>
-      </Card>
+        {E.sp()}
+      </EntrySurface>
     </div>
   )
 }

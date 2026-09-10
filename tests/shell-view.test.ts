@@ -7,8 +7,9 @@ import { createElement, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SCREENS } from "../components/mgr/screens";
-import { ScreenSheet } from "../components/mgr/screen-frame";
+import { ScreenFrame, ScreenSheet } from "../components/mgr/screen-frame";
 import { MeSheet } from "../components/mgr/me-sheet";
+import { EntrySurface } from "../components/mgr/entry-surface";
 import { BeerView } from "../components/mgr/views/beer";
 import { DeniedView } from "../components/mgr/views/denied";
 import { EntryView } from "../components/mgr/views/entry";
@@ -66,6 +67,12 @@ import { plural } from "../lib/mgr/plural";
 const htmlOf = (node: ReactNode) => renderToStaticMarkup(createElement("div", null, node));
 const screen = (name: string) => SCREENS.find((s) => s.name === name)!;
 const src = (file: string) => readFileSync(file, "utf8");
+
+describe("Entry surface", () => {
+  it("uses the shared surface for inventory entry screens", () => {
+    expect(ScreenFrame({ screen: screen("Sign in") }).type).toBe(EntrySurface);
+  });
+});
 
 describe("Today view", () => {
   it("maps warehouse rows onto Pick / Put back / Receive / Resume", () => {

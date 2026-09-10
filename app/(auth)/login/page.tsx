@@ -17,11 +17,5 @@ export default async function LoginPage({
   searchParams: Promise<{ error?: string }>
 }) {
   const { error } = await searchParams
-  return (
-    <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
-      <div className="w-full max-w-sm">
-        <LoginForm error={error ? ERRORS[error] ?? "Sign-in failed." : undefined} />
-      </div>
-    </div>
-  )
+  return <LoginForm error={error ? ERRORS[error] ?? "Sign-in failed." : undefined} />
 }
