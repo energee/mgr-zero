@@ -5185,16 +5185,17 @@ end $$;
 -- connection and pushed document are all still eligible.
 create function read_portal_qbo_payment(p_brewery uuid,p_customer uuid,p_invoice uuid,p_actor uuid)
 returns table(connection_id uuid,realm_id text,remote_invoice_id text,access_token text,refresh_token text,
-  credential_version bigint,access_expires_at timestamptz,refresh_expires_at timestamptz,refresh_hard_expires_at timestamptz)
+  credential_version bigint,granted_scopes text[],access_expires_at timestamptz,refresh_expires_at timestamptz,refresh_hard_expires_at timestamptz)
 language sql stable security definer set search_path='' as $$
   select c.id,c.realm_id,i.qbo_invoice_id,t.access_token,t.refresh_token,t.credential_version,
-    c.access_expires_at,c.refresh_expires_at,c.refresh_hard_expires_at
+    c.granted_scopes,c.access_expires_at,c.refresh_expires_at,c.refresh_hard_expires_at
   from public.invoices i
   join public.qbo_connections c on c.brewery_id=i.brewery_id and c.state='connected'
   join private.integration_tokens t on t.brewery_id=i.brewery_id and t.provider='qbo' and t.connection_id=c.id
   where i.id=p_invoice and i.brewery_id=p_brewery and i.customer_id=p_customer and i.kind='invoice'
     and i.qbo_invoice_id is not null and i.qbo_sync_status='pushed' and i.qbo_remote_state='live' and i.written_off_at is null
     and i.qbo_balance_cents>0
+    and c.credential_version=t.credential_version
     and (c.allow_online_ach_payment or c.allow_online_credit_card_payment)
     and 'com.intuit.quickbooks.accounting'=any(c.granted_scopes)
     and exists(select 1 from public.customer_users u where u.customer_id=p_customer and u.user_id=p_actor)
@@ -5205,7 +5206,7 @@ language sql stable security definer set search_path='' as $$
 $$;
 
 create function cas_portal_qbo_payment_tokens(
-  p_brewery uuid,p_customer uuid,p_invoice uuid,p_actor uuid,p_connection uuid,p_remote_invoice_id text,
+  p_brewery uuid,p_customer uuid,p_invoice uuid,p_actor uuid,p_connection uuid,p_realm_id text,p_remote_invoice_id text,p_granted_scopes text[],
   p_expected_version bigint,p_access_token text,p_refresh_token text,p_received_at timestamptz,
   p_access_seconds int,p_refresh_seconds int,p_hard_seconds int
 ) returns boolean language sql security definer set search_path='' as $$
@@ -5218,7 +5219,9 @@ create function cas_portal_qbo_payment_tokens(
         where i.id=p_invoice and i.brewery_id=p_brewery and i.customer_id=p_customer and i.kind='invoice'
           and i.qbo_invoice_id=p_remote_invoice_id and i.qbo_sync_status='pushed' and i.qbo_remote_state='live'
           and i.written_off_at is null and i.qbo_balance_cents>0
-          and c.id=p_connection and c.state='connected' and (c.allow_online_ach_payment or c.allow_online_credit_card_payment)
+          and c.id=p_connection and c.realm_id=p_realm_id and c.credential_version=p_expected_version
+          and c.granted_scopes=p_granted_scopes and 'com.intuit.quickbooks.accounting'=any(c.granted_scopes)
+          and c.state='connected' and (c.allow_online_ach_payment or c.allow_online_credit_card_payment)
           and exists(select 1 from public.customer_users u where u.customer_id=p_customer and u.user_id=p_actor)
           and exists(select 1 from public.qbo_pushes p where p.invoice_id=i.id and p.brewery_id=i.brewery_id
             and p.connection_id=c.id and p.realm_id=c.realm_id and p.entity_type='Invoice'
@@ -5234,14 +5237,19 @@ create function cas_portal_qbo_payment_tokens(
 $$;
 
 create function confirm_portal_qbo_payment(
-  p_brewery uuid,p_customer uuid,p_invoice uuid,p_actor uuid,p_connection uuid,p_remote_invoice_id text
+  p_brewery uuid,p_customer uuid,p_invoice uuid,p_actor uuid,p_connection uuid,p_realm_id text,p_remote_invoice_id text,
+  p_expected_version bigint,p_granted_scopes text[]
 ) returns boolean language sql stable security definer set search_path='' as $$
   select exists(
     select 1 from public.invoices i join public.qbo_connections c on c.brewery_id=i.brewery_id
+      join private.integration_tokens t on t.brewery_id=i.brewery_id and t.provider='qbo' and t.connection_id=c.id
     where i.id=p_invoice and i.brewery_id=p_brewery and i.customer_id=p_customer and i.kind='invoice'
       and i.qbo_invoice_id=p_remote_invoice_id and i.qbo_sync_status='pushed' and i.qbo_remote_state='live'
       and i.written_off_at is null and i.qbo_balance_cents>0
-      and c.id=p_connection and c.state='connected' and (c.allow_online_ach_payment or c.allow_online_credit_card_payment)
+      and c.id=p_connection and c.realm_id=p_realm_id and c.credential_version=p_expected_version
+      and t.credential_version=p_expected_version and c.granted_scopes=p_granted_scopes
+      and 'com.intuit.quickbooks.accounting'=any(c.granted_scopes)
+      and c.state='connected' and (c.allow_online_ach_payment or c.allow_online_credit_card_payment)
       and exists(select 1 from public.customer_users u where u.customer_id=p_customer and u.user_id=p_actor)
       and exists(select 1 from public.qbo_pushes p where p.invoice_id=i.id and p.brewery_id=i.brewery_id
         and p.connection_id=c.id and p.realm_id=c.realm_id and p.entity_type='Invoice'
@@ -5250,11 +5258,11 @@ create function confirm_portal_qbo_payment(
 $$;
 
 revoke execute on function read_portal_qbo_payment(uuid,uuid,uuid,uuid),
-  cas_portal_qbo_payment_tokens(uuid,uuid,uuid,uuid,uuid,text,bigint,text,text,timestamptz,int,int,int),
-  confirm_portal_qbo_payment(uuid,uuid,uuid,uuid,uuid,text) from public,anon,authenticated;
+  cas_portal_qbo_payment_tokens(uuid,uuid,uuid,uuid,uuid,text,text,text[],bigint,text,text,timestamptz,int,int,int),
+  confirm_portal_qbo_payment(uuid,uuid,uuid,uuid,uuid,text,text,bigint,text[]) from public,anon,authenticated;
 grant execute on function read_portal_qbo_payment(uuid,uuid,uuid,uuid),
-  cas_portal_qbo_payment_tokens(uuid,uuid,uuid,uuid,uuid,text,bigint,text,text,timestamptz,int,int,int),
-  confirm_portal_qbo_payment(uuid,uuid,uuid,uuid,uuid,text) to service_role;
+  cas_portal_qbo_payment_tokens(uuid,uuid,uuid,uuid,uuid,text,text,text[],bigint,text,text,timestamptz,int,int,int),
+  confirm_portal_qbo_payment(uuid,uuid,uuid,uuid,uuid,text,text,bigint,text[]) to service_role;
 
 create function portal_create_order(
   p_brewery uuid, p_customer uuid, p_ship_to uuid, p_po text, p_note text,

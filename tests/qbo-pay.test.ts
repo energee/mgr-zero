@@ -49,7 +49,7 @@ describe("QuickBooks portal payment link", () => {
     expect(validateQboPaymentUrl("https://pay.example.test/session/secret", new Set())).toBeNull();
   });
 
-  it("authorizes only the current customer's live unpaid mapped invoice before provider work", async () => {
+  it("authorizes only the current customer's live positive-balance mapped invoice before provider work", async () => {
     const brewery = await makeBrewery();
     const customer = await seedCustomer(brewery.id);
     const user = await makeCustomerUser(customer.customerId);
@@ -59,7 +59,7 @@ describe("QuickBooks portal payment link", () => {
     };
     const connection = await admin.from("qbo_connections").insert({
       brewery_id: brewery.id, realm_id: `realm-${crypto.randomUUID()}`, state: "connected",
-      granted_scopes: ["com.intuit.quickbooks.accounting"],
+      granted_scopes: ["com.intuit.quickbooks.accounting"], credential_version: 1,
     }).select("id,realm_id").single();
     if (connection.error) throw connection.error;
     sql(`insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token)
@@ -170,7 +170,7 @@ describe("QuickBooks portal payment link", () => {
     };
     const connection = await admin.from("qbo_connections").insert({
       brewery_id: brewery.id, realm_id: `realm-${crypto.randomUUID()}`, state: "connected",
-      granted_scopes: ["com.intuit.quickbooks.accounting"],
+      granted_scopes: ["com.intuit.quickbooks.accounting"], credential_version: 1,
     }).select("id,realm_id").single();
     if (connection.error) throw connection.error;
     sql(`insert into private.integration_tokens(brewery_id,provider,connection_id,access_token,refresh_token)

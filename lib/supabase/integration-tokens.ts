@@ -27,6 +27,7 @@ export type VersionedIntegrationTokens = IntegrationTokens & {
 export type PortalInvoicePaymentClaim = VersionedIntegrationTokens & {
   realmId: string;
   remoteInvoiceId: string;
+  grantedScopes: string[];
 };
 
 type ConnectionRow = { id: string };
@@ -60,10 +61,14 @@ function isTokenRow(data: unknown): data is TokenRow {
     && nullableString((data as TokenRow).refresh_hard_expires_at);
 }
 
-function isPortalPaymentRow(data: unknown): data is TokenRow & { connection_id: string; realm_id: string; remote_invoice_id: string } {
+function isPortalPaymentRow(data: unknown): data is TokenRow & {
+  connection_id: string; realm_id: string; remote_invoice_id: string; granted_scopes: string[];
+} {
+  const grantedScopes = (data as { granted_scopes?: unknown } | null)?.granted_scopes;
   return isTokenRow(data) && typeof (data as { connection_id?: unknown }).connection_id === "string"
     && typeof (data as { realm_id?: unknown }).realm_id === "string"
-    && typeof (data as { remote_invoice_id?: unknown }).remote_invoice_id === "string";
+    && typeof (data as { remote_invoice_id?: unknown }).remote_invoice_id === "string"
+    && Array.isArray(grantedScopes) && grantedScopes.every((scope) => typeof scope === "string");
 }
 
 async function requireVisibleConnection(ctx: Ctx, provider: IntegrationProvider): Promise<string> {
@@ -336,7 +341,7 @@ export async function readPortalInvoicePayment(ctx: Ctx, invoiceId: string): Pro
   return {
     accessToken: data.access_token, refreshToken: data.refresh_token,
     credentialVersion: data.credential_version, connectionId: data.connection_id,
-    realmId: data.realm_id, remoteInvoiceId: data.remote_invoice_id,
+    realmId: data.realm_id, remoteInvoiceId: data.remote_invoice_id, grantedScopes: data.granted_scopes,
     accessExpiresAt: data.access_expires_at, refreshExpiresAt: data.refresh_expires_at,
     refreshHardExpiresAt: data.refresh_hard_expires_at,
   };
@@ -351,7 +356,8 @@ export async function compareAndSwapPortalInvoicePaymentTokens(
   if (!ctx.customerId) return false;
   const { data, error } = await createAdminClient().rpc("cas_portal_qbo_payment_tokens", {
     p_brewery: ctx.breweryId, p_customer: ctx.customerId, p_invoice: invoiceId, p_actor: ctx.userId,
-    p_connection: expected.connectionId, p_remote_invoice_id: expected.remoteInvoiceId,
+    p_connection: expected.connectionId, p_realm_id: expected.realmId,
+    p_remote_invoice_id: expected.remoteInvoiceId, p_granted_scopes: expected.grantedScopes,
     p_expected_version: expected.credentialVersion, p_access_token: next.accessToken, p_refresh_token: next.refreshToken,
     p_received_at: next.receivedAt, p_access_seconds: next.accessExpiresIn,
     p_refresh_seconds: next.refreshExpiresIn, p_hard_seconds: next.refreshHardExpiresIn,
@@ -363,7 +369,9 @@ export async function confirmPortalInvoicePayment(ctx: Ctx, invoiceId: string, c
   if (!ctx.customerId) return false;
   const { data, error } = await createAdminClient().rpc("confirm_portal_qbo_payment", {
     p_brewery: ctx.breweryId, p_customer: ctx.customerId, p_invoice: invoiceId, p_actor: ctx.userId,
-    p_connection: claim.connectionId, p_remote_invoice_id: claim.remoteInvoiceId,
+    p_connection: claim.connectionId, p_realm_id: claim.realmId,
+    p_remote_invoice_id: claim.remoteInvoiceId, p_expected_version: claim.credentialVersion,
+    p_granted_scopes: claim.grantedScopes,
   });
   return !error && data === true;
 }
