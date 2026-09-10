@@ -24,7 +24,7 @@ export function NewRecipeForm({ brands }: { brands: Brand[] }) {
     reset: () => { setName(""); setBrandId(""); setNote(""); },
   });
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title="New recipe" trigger={<Button size="sm">New recipe</Button>}>
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Create recipe" trigger={<Button size="sm">Create recipe</Button>}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <Label htmlFor="rec-name">Name</Label>

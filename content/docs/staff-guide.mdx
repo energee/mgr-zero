@@ -412,7 +412,7 @@ A month is generated from the inventory ledger when you open it, so nothing is s
 
 <Screen name="Compliance registry" />
 
-The registry has two tabs. **Brands** lists each brand with its COLA or formula approvals and its state registrations; a brand with no COLA is flagged *COLA pending*. **Add approval** takes the brand, the approval kind, its TTB number, and optional approved and expiry dates; the same kind and number on the same brand is one record, so saving it twice is refused. **Add registration** takes the brand, the two-letter state, and an optional number and expiry; one record exists per brand and state, so saving again replaces it, and **Edit** keeps the brand and state fixed. **Licenses** lists the brewery's own state licenses by state and kind (brewery, supplier, direct to consumer); **Add license** works the same way, one record per state and kind, with state and kind fixed on **Edit**. **Edit** on any row opens the same sheet filled in. Kind is stored lower-case and trimmed. Order confirmation does not read this registry yet; the planned warning for an unregistered destination state will never block.
+The registry has two tabs. **Brands** lists each brand with its COLA or formula approvals and its state registrations; a brand with no COLA is flagged *COLA pending*. **Add approval** takes the brand, the approval kind, its TTB number, and optional approved and expiry dates; the same kind and number on the same brand is one record, so saving it twice is refused. **Add registration** takes the brand, the two-letter state, and an optional number and expiry; one record exists per brand and state, so saving again replaces it, and **Edit** keeps the brand and state fixed. **Licenses** lists the brewery's own state licenses by state and kind (**Brewery**, **Supplier**, or **Direct to consumer**); **Add license** works the same way, one record per state and kind, with state and kind fixed on **Edit**. **Edit** on any row opens the same sheet filled in. Order confirmation does not read this registry yet; the planned warning for an unregistered destination state will never block.
 
 Each movement shows its actual bin and recorded barrels. Returns link to the original shipped movement and the credit memo; damaged losses link to their return movement.
 
@@ -478,7 +478,7 @@ The page says **No taprooms yet: add one under Locations** when none exist, or *
 
 *Admin and Brewer.*
 
-Open **Recipes** from the **More** navigation to see every recipe, alphabetical, with the brand each one brews. Select **New recipe** for a **Name**, an optional **Brand**, and an optional note; the brand is intent only — identity is required at packaging, not here. Select a row to open the recipe.
+Open **Recipes** from the **More** navigation to see every recipe, alphabetical, with the brand each one brews. Select **Create recipe** for a **Name**, an optional **Brand**, and an optional note; the brand is intent only — identity is required at packaging, not here. Select a row to open the recipe.
 
 A recipe version is the process spec a brewer follows: the mash temperature, brewhouse efficiency and yeast attenuation, an optional boil length and target IBU, and its ingredients — each a material, a quantity per barrel, the stage it enters at (*mash*, *boil*, *whirlpool*, *fermentation*, *dry hop*, *packaging*, or *other*), and an optional timing in minutes. A version cannot be edited once it is saved; select **New version** to write the next one, so what a past batch was brewed from stays true.
 

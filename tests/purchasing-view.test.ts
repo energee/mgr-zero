@@ -139,6 +139,7 @@ describe("Vendors", () => {
     const html = htmlOf(createElement(VendorView, { model: toVendorViewProps(vendorYch) }));
     expect(html).toMatch(/>Save vendor</);
     expect(html).toMatch(/Phone/);
+    expect(html).toContain("Planning uses this lead time to calculate when to buy. Received orders show a separate observed average.");
   });
 
   it("the live vendor form mounts the shared controlled body", () => {

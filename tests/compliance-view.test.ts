@@ -82,6 +82,7 @@ describe("registry sheets", () => {
     const body = screen("License").body as { type: unknown; props: { model: unknown } };
     expect(body.type).toBe(LicenseView);
     expect(body.props.model).toEqual(toLicenseViewProps(licensePaBrewery));
+    expect(src("components/mgr/views/license.tsx")).toMatch(/value: "brewery", label: "Brewery"/);
   });
 
   it("lets live callers suppress fixture form and row-action defaults with null", () => {
