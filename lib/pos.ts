@@ -230,10 +230,10 @@ export class SquareClient {
       ...(cursor ? { cursor } : {}),
     };
     const data = await this.api("/v2/orders/search", accessToken, { method: "POST", body: JSON.stringify(body) });
-    if (!Array.isArray(data.orders)) throw unavailable();
+    if (data.orders !== undefined && !Array.isArray(data.orders)) throw unavailable();
     const nextCursor = data.cursor === undefined ? null : text(data.cursor);
     if (data.cursor !== undefined && !nextCursor) throw unavailable();
-    return { orders: data.orders, nextCursor };
+    return { orders: data.orders ?? [], nextCursor };
   }
 }
 

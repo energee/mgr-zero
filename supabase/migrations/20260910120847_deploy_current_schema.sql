@@ -3154,11 +3154,25 @@ ALTER TABLE public.pos_sale_expectations ADD CONSTRAINT pos_sale_expectations_ex
   CHECK (expected_bbl<>0 AND expected_bbl::text NOT IN ('NaN','Infinity','-Infinity'));
 ALTER TABLE public.pos_sales_coverage ALTER COLUMN location_id DROP NOT NULL;
 
+CREATE TABLE private.square_order_snapshots (
+  brewery_id uuid NOT NULL REFERENCES public.breweries(id),
+  connection_id uuid NOT NULL,
+  merchant_id text NOT NULL,
+  external_order_id text NOT NULL,
+  source_version bigint NOT NULL,
+  snapshot_hash text NOT NULL,
+  observed_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY(connection_id,external_order_id,source_version),
+  FOREIGN KEY(connection_id,brewery_id) REFERENCES public.pos_connections(id,brewery_id)
+);
+ALTER TABLE private.square_order_snapshots ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON private.square_order_snapshots FROM public,anon,authenticated,service_role;
+
 CREATE VIEW private.pos_current_sales AS
 WITH ranked AS (
-  SELECT s.*,max(source_version) OVER (
-    PARTITION BY connection_id,external_order_id
-  ) AS order_version,row_number() OVER (
+  SELECT s.*,coalesce((SELECT max(o.source_version) FROM private.square_order_snapshots o
+    WHERE o.connection_id=s.connection_id AND o.external_order_id=s.external_order_id),
+    max(s.source_version) OVER (PARTITION BY s.connection_id,s.external_order_id)) AS order_version,row_number() OVER (
     PARTITION BY connection_id,external_order_id,fact_kind,external_line_id
     ORDER BY source_version DESC,id DESC
   ) AS revision_rank
@@ -3193,9 +3207,9 @@ ALTER TABLE public.pos_catalog_variations
 DROP VIEW public.pos_unmapped_items;
 CREATE VIEW public.pos_unmapped_items WITH (security_invoker=true) AS
   WITH ranked AS (
-    SELECT s.*,max(source_version) OVER (
-      PARTITION BY connection_id,external_order_id
-    ) AS order_version,row_number() OVER (
+    SELECT s.*,coalesce((SELECT max(o.source_version) FROM private.square_order_snapshots o
+      WHERE o.connection_id=s.connection_id AND o.external_order_id=s.external_order_id),
+      max(s.source_version) OVER (PARTITION BY s.connection_id,s.external_order_id)) AS order_version,row_number() OVER (
       PARTITION BY connection_id,external_order_id,fact_kind,external_line_id
       ORDER BY source_version DESC,id DESC
     ) revision_rank
@@ -3303,20 +3317,6 @@ CREATE TABLE private.square_sales_syncs (
 );
 ALTER TABLE private.square_sales_syncs ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON private.square_sales_syncs FROM public,anon,authenticated,service_role;
-
-CREATE TABLE private.square_order_snapshots (
-  brewery_id uuid NOT NULL REFERENCES public.breweries(id),
-  connection_id uuid NOT NULL,
-  merchant_id text NOT NULL,
-  external_order_id text NOT NULL,
-  source_version bigint NOT NULL,
-  snapshot_hash text NOT NULL,
-  observed_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY(connection_id,external_order_id,source_version),
-  FOREIGN KEY(connection_id,brewery_id) REFERENCES public.pos_connections(id,brewery_id)
-);
-ALTER TABLE private.square_order_snapshots ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON private.square_order_snapshots FROM public,anon,authenticated,service_role;
 
 CREATE FUNCTION public.begin_square_sales_sync(p_brewery uuid,p_request_id uuid) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
