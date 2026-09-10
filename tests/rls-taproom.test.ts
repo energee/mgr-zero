@@ -370,7 +370,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
     claim_qbo_oauth: ["fixture-state",f.taproom.id,B,"https://example.test/qbo/callback"], complete_qbo_invoice_sync: [B,f.taproom.id,R(),R(),"fixture-realm",[]],
     complete_qbo_oauth: [R(),f.taproom.id,"fixture-realm","Fixture","fixture-access","fixture-refresh",now,3600,3600,3600,[]], fail_qbo_oauth: [R(),f.taproom.id],
     finish_qbo_disconnect: [B,R(),f.taproom.id,R(),true], finish_qbo_push: [B,R(),f.taproom.id,"pushed","fixture-id",null,{},R()],
-    claim_square_oauth: ["fixture-state",f.taproom.id,B,"https://example.test/square/callback"], fail_square_oauth: [R(),f.taproom.id],
+    claim_square_oauth: ["fixture-state",f.taproom.id,B,"https://example.test/square/callback"], fail_square_oauth: [R(),f.taproom.id,"not_required",null],
     complete_square_oauth: [R(),f.taproom.id,"fixture-merchant","Fixture","fixture-access","fixture-refresh",now,["ITEMS_READ"],[]],
     record_square_catalog_snapshot: [B,pos,f.taproom.id,1,R(),[],[]],
     advance_square_catalog_sync: [B,pos,f.taproom.id,R(),1,2], mark_square_authorization_failed: [B,pos,f.taproom.id,1],

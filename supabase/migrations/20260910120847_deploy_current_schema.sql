@@ -1950,6 +1950,10 @@ CREATE TABLE private.square_oauth_intents (
   expires_at timestamptz NOT NULL,
   consumed_at timestamptz,
   exchange_state text NOT NULL DEFAULT 'pending' CHECK (exchange_state IN ('pending','exchanging','completed','recovery_required')),
+  cleanup_state text NOT NULL DEFAULT 'not_required' CHECK (cleanup_state IN ('not_required','pending','confirmed','unresolved')),
+  cleanup_merchant_id text,
+  cleanup_connection_id uuid,
+  cleanup_connection_version bigint,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE private.square_oauth_intents ENABLE ROW LEVEL SECURITY;
@@ -1961,7 +1965,7 @@ ALTER TABLE public.pos_connections
   ADD COLUMN state text NOT NULL DEFAULT 'connected' CHECK (state IN ('connected','disconnected','recovery_required')),
   ADD COLUMN refresh_expires_at timestamptz,
   ADD COLUMN refresh_hard_expires_at timestamptz,
-  ADD COLUMN remote_revocation_state text NOT NULL DEFAULT 'not_requested' CHECK (remote_revocation_state IN ('not_requested','confirmed','unresolved')),
+  ADD COLUMN remote_revocation_state text NOT NULL DEFAULT 'not_requested' CHECK (remote_revocation_state IN ('not_requested','pending','confirmed','unresolved')),
   ADD COLUMN last_error text,
   ADD COLUMN credential_version bigint NOT NULL DEFAULT 0,
   ADD COLUMN catalog_sync_generation bigint NOT NULL DEFAULT 0,
@@ -2020,6 +2024,20 @@ CREATE TABLE private.square_catalog_syncs (
 ALTER TABLE private.square_catalog_syncs ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE private.square_catalog_syncs FROM public,anon,authenticated,service_role;
 
+CREATE TABLE private.square_disconnects (
+  actor_id uuid NOT NULL REFERENCES auth.users(id),
+  request_id uuid NOT NULL,
+  brewery_id uuid NOT NULL REFERENCES public.breweries(id),
+  connection_id uuid NOT NULL,
+  credential_version bigint NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY(actor_id,request_id),
+  FOREIGN KEY(actor_id,request_id) REFERENCES private.command_requests(actor_id,request_id) ON DELETE CASCADE,
+  FOREIGN KEY(connection_id,brewery_id) REFERENCES public.pos_connections(id,brewery_id)
+);
+ALTER TABLE private.square_disconnects ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE private.square_disconnects FROM public,anon,authenticated,service_role;
+
 DROP VIEW public.pos_unmapped_items;
 CREATE VIEW public.pos_unmapped_items WITH (security_invoker=true) AS
   SELECT DISTINCT s.brewery_id,s.connection_id,s.external_item_id,s.external_variation_id
@@ -2069,6 +2087,9 @@ BEGIN
   PERFORM 1 FROM public.breweries WHERE id=p_brewery FOR UPDATE;
   replay:=private.claim_command_request(p_brewery,'connect_square',p_request_id,jsonb_build_object('redirectUri',p_redirect_uri,'stateHash',p_state_hash,'providerIntent',p_provider_intent,'requestedScopes',p_requested_scopes));
   IF replay IS NOT NULL THEN RETURN replay; END IF;
+  IF EXISTS(SELECT 1 FROM public.pos_connections WHERE brewery_id=p_brewery AND provider='square' AND remote_revocation_state='pending')
+    OR EXISTS(SELECT 1 FROM private.square_oauth_intents WHERE brewery_id=p_brewery AND cleanup_state='pending') THEN
+    RAISE EXCEPTION 'Square authorization cleanup is still pending' USING errcode='MG409'; END IF;
   UPDATE private.square_oauth_intents SET consumed_at=coalesce(consumed_at,now()),exchange_state='recovery_required'
     WHERE brewery_id=p_brewery AND exchange_state IN ('pending','exchanging');
   INSERT INTO private.square_oauth_intents(brewery_id,actor_id,state_hash,redirect_uri,provider_intent,requested_scopes,expires_at)
@@ -2086,15 +2107,60 @@ BEGIN
     WHERE i.state_hash=p_state_hash AND i.actor_id=p_actor AND i.brewery_id=p_brewery AND i.redirect_uri=p_redirect_uri
       AND i.consumed_at IS NULL AND i.exchange_state='pending' AND i.expires_at>=now()
       AND EXISTS(SELECT 1 FROM public.brewery_users u WHERE u.brewery_id=i.brewery_id AND u.user_id=p_actor AND u.role='admin')
+      AND NOT EXISTS(SELECT 1 FROM public.pos_connections c WHERE c.brewery_id=i.brewery_id AND c.provider='square' AND c.remote_revocation_state='pending')
+      AND NOT EXISTS(SELECT 1 FROM private.square_oauth_intents cleanup WHERE cleanup.brewery_id=i.brewery_id AND cleanup.cleanup_state='pending')
     RETURNING i.id,i.brewery_id,i.provider_intent,i.requested_scopes;
 END $$;
 
-CREATE FUNCTION public.fail_square_oauth(p_intent uuid,p_actor uuid) RETURNS boolean
-LANGUAGE sql SECURITY DEFINER SET search_path='' AS $$
-  WITH changed AS (
-    UPDATE private.square_oauth_intents SET exchange_state='recovery_required'
-    WHERE id=p_intent AND actor_id=p_actor AND exchange_state='exchanging' RETURNING true
-  ) SELECT coalesce((SELECT true FROM changed),false)
+CREATE FUNCTION public.fail_square_oauth(p_intent uuid,p_actor uuid,p_cleanup_state text,p_merchant_id text) RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE i private.square_oauth_intents; c public.pos_connections; token_version bigint; next_version bigint;
+BEGIN
+  IF p_cleanup_state NOT IN ('not_required','pending','confirmed','unresolved') THEN
+    RAISE EXCEPTION 'Square cleanup state invalid'; END IF;
+  IF (p_cleanup_state='not_required' AND p_merchant_id IS NOT NULL)
+    OR (p_cleanup_state<>'not_required' AND (p_merchant_id IS NULL OR btrim(p_merchant_id)='')) THEN
+    RAISE EXCEPTION 'Square cleanup merchant invalid'; END IF;
+  SELECT brewery_id INTO i.brewery_id FROM private.square_oauth_intents WHERE id=p_intent AND actor_id=p_actor;
+  IF NOT FOUND THEN RETURN false; END IF;
+  PERFORM 1 FROM public.breweries WHERE id=i.brewery_id FOR UPDATE;
+  SELECT * INTO i FROM private.square_oauth_intents WHERE id=p_intent AND actor_id=p_actor FOR UPDATE;
+  IF p_cleanup_state='not_required' THEN
+    UPDATE private.square_oauth_intents SET exchange_state='recovery_required',cleanup_state='not_required'
+      WHERE id=p_intent AND actor_id=p_actor AND exchange_state='exchanging';
+    RETURN FOUND;
+  END IF;
+  IF p_cleanup_state='pending' THEN
+    IF NOT (i.exchange_state='exchanging' OR (i.exchange_state='recovery_required' AND i.cleanup_state='not_required')) THEN
+      RETURN i.exchange_state='recovery_required' AND i.cleanup_state='pending' AND i.cleanup_merchant_id=p_merchant_id; END IF;
+    SELECT * INTO c FROM public.pos_connections WHERE brewery_id=i.brewery_id AND provider='square' FOR UPDATE;
+    IF c.id IS NOT NULL AND c.merchant_id=p_merchant_id AND c.remote_revocation_state<>'pending' THEN
+      DELETE FROM private.integration_tokens t WHERE t.brewery_id=i.brewery_id AND t.provider='square' AND t.connection_id=c.id
+        RETURNING t.credential_version INTO token_version;
+      next_version:=greatest(c.credential_version,coalesce(token_version,c.credential_version))+1;
+      UPDATE public.pos_connections SET state='recovery_required',remote_revocation_state='pending',
+        last_error='Square authorization cleanup is pending',credential_version=next_version,updated_at=now() WHERE id=c.id;
+      UPDATE private.square_oauth_intents SET exchange_state='recovery_required',cleanup_state='pending',
+        cleanup_merchant_id=p_merchant_id,cleanup_connection_id=c.id,cleanup_connection_version=next_version WHERE id=p_intent;
+    ELSE
+      UPDATE private.square_oauth_intents SET exchange_state='recovery_required',cleanup_state='pending',
+        cleanup_merchant_id=p_merchant_id,cleanup_connection_id=null,cleanup_connection_version=null WHERE id=p_intent;
+    END IF;
+    RETURN true;
+  END IF;
+  IF i.exchange_state='recovery_required' AND i.cleanup_state='pending' AND i.cleanup_merchant_id=p_merchant_id THEN
+    UPDATE private.square_oauth_intents SET cleanup_state=p_cleanup_state WHERE id=p_intent;
+    IF i.cleanup_connection_id IS NOT NULL THEN
+      UPDATE public.pos_connections SET state=CASE WHEN p_cleanup_state='confirmed' THEN 'disconnected' ELSE 'recovery_required' END,
+        remote_revocation_state=p_cleanup_state,
+        last_error=CASE WHEN p_cleanup_state='confirmed' THEN null ELSE 'Remote revocation could not be confirmed' END,updated_at=now()
+      WHERE id=i.cleanup_connection_id AND brewery_id=i.brewery_id AND credential_version=i.cleanup_connection_version
+        AND remote_revocation_state='pending';
+    END IF;
+    RETURN true;
+  END IF;
+  RETURN i.exchange_state='recovery_required' AND i.cleanup_state=p_cleanup_state AND i.cleanup_merchant_id=p_merchant_id;
+END
 $$;
 
 CREATE FUNCTION public.complete_square_oauth(p_intent uuid,p_actor uuid,p_merchant_id text,p_merchant_label text,
@@ -2102,10 +2168,20 @@ CREATE FUNCTION public.complete_square_oauth(p_intent uuid,p_actor uuid,p_mercha
 LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE i private.square_oauth_intents; c public.pos_connections; v_id uuid:=private.new_uuid(); v_version bigint;
 BEGIN
+  SELECT brewery_id INTO i.brewery_id FROM private.square_oauth_intents WHERE id=p_intent AND actor_id=p_actor;
+  IF NOT FOUND THEN RAISE EXCEPTION 'oauth state invalid'; END IF;
+  PERFORM 1 FROM public.breweries WHERE id=i.brewery_id FOR UPDATE;
   SELECT * INTO i FROM private.square_oauth_intents WHERE id=p_intent FOR UPDATE;
   IF i.id IS NULL OR i.actor_id<>p_actor OR i.exchange_state<>'exchanging'
     OR NOT EXISTS(SELECT 1 FROM public.brewery_users u WHERE u.brewery_id=i.brewery_id AND u.user_id=p_actor AND u.role='admin') THEN
     RAISE EXCEPTION 'oauth state invalid';
+  END IF;
+  IF EXISTS(SELECT 1 FROM public.pos_connections current_connection WHERE current_connection.provider='square'
+      AND current_connection.remote_revocation_state='pending'
+      AND (current_connection.brewery_id=i.brewery_id OR current_connection.merchant_id=p_merchant_id))
+    OR EXISTS(SELECT 1 FROM private.square_oauth_intents pending WHERE pending.id<>i.id AND pending.cleanup_state='pending'
+      AND (pending.brewery_id=i.brewery_id OR pending.cleanup_merchant_id=p_merchant_id)) THEN
+    RAISE EXCEPTION 'Square authorization cleanup is still pending' USING errcode='MG409';
   END IF;
   IF p_merchant_id IS NULL OR btrim(p_merchant_id)='' OR p_access_token IS NULL OR p_refresh_token IS NULL
     OR p_granted_scopes IS NULL OR NOT p_granted_scopes<@i.requested_scopes OR jsonb_typeof(p_locations)<>'array' THEN
@@ -2333,7 +2409,7 @@ BEGIN
   PERFORM private.assert_staff(p_brewery,ARRAY['admin']::public.staff_role[]);
   replay:=private.claim_command_request(p_brewery,'set_pos_location_mapping',p_request_id,jsonb_build_object('posLocationId',p_external_location,'mgrLocationId',p_location));
   IF replay IS NOT NULL THEN RETURN replay; END IF;
-  SELECT id INTO c FROM public.pos_connections WHERE brewery_id=p_brewery AND provider='square' AND state='connected' FOR SHARE;
+  SELECT id INTO c FROM public.pos_connections WHERE brewery_id=p_brewery AND provider='square' AND state='connected' FOR UPDATE;
   IF c IS NULL OR NOT EXISTS(SELECT 1 FROM public.locations WHERE id=p_location AND brewery_id=p_brewery) THEN RAISE insufficient_privilege USING message='permission denied'; END IF;
   SELECT location_id INTO old_location FROM public.pos_locations WHERE connection_id=c AND external_location_id=p_external_location AND brewery_id=p_brewery FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Square location not found'; END IF;
@@ -2358,7 +2434,7 @@ BEGIN
   replay:=private.claim_command_request(p_brewery,'set_pos_item_mapping',p_request_id,jsonb_build_object('externalItemId',p_external_item,'externalVariationId',p_external_variation,'skuId',p_sku,'formatId',p_format,'ignored',p_ignored));
   IF replay IS NOT NULL THEN RETURN replay; END IF;
   IF (p_ignored AND num_nonnulls(p_sku,p_format)<>0) OR (NOT p_ignored AND num_nonnulls(p_sku,p_format)<>1) THEN RAISE EXCEPTION 'mapping target invalid'; END IF;
-  SELECT id INTO c FROM public.pos_connections WHERE brewery_id=p_brewery AND provider='square' AND state='connected' FOR SHARE;
+  SELECT id INTO c FROM public.pos_connections WHERE brewery_id=p_brewery AND provider='square' AND state='connected' FOR UPDATE;
   SELECT external_item_name INTO item_name FROM public.pos_catalog_variations WHERE brewery_id=p_brewery AND connection_id=c
     AND external_item_id=p_external_item AND external_variation_id=p_external_variation AND (available OR EXISTS(
       SELECT 1 FROM public.pos_item_mappings m WHERE m.connection_id=c AND m.external_item_id=p_external_item AND m.external_variation_id=p_external_variation)) FOR SHARE;
@@ -2377,40 +2453,63 @@ END $$;
 
 CREATE FUNCTION public.begin_square_disconnect(p_brewery uuid,p_connection uuid,p_actor uuid,p_request_id uuid)
 RETURNS TABLE(access_token text,replay_result jsonb) LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-DECLARE replay jsonb; token text; version bigint; result jsonb:=jsonb_build_object('disconnected',true,'remoteRevocationState','unresolved');
+DECLARE request private.command_requests; connection public.pos_connections; token text; token_version bigint; next_version bigint;
+  payload_hash bytea:=extensions.digest(jsonb_build_object('connectionId',p_connection)::text,'sha256');
 BEGIN
   IF NOT EXISTS(SELECT 1 FROM public.brewery_users WHERE brewery_id=p_brewery AND user_id=p_actor AND role='admin') THEN RAISE insufficient_privilege USING message='permission denied'; END IF;
-  replay:=private.claim_command_request_for(p_actor,p_brewery,'disconnect_square',p_request_id,jsonb_build_object('connectionId',p_connection));
-  IF replay IS NOT NULL THEN RETURN QUERY SELECT null::text,replay; RETURN; END IF;
+  PERFORM 1 FROM public.breweries WHERE id=p_brewery FOR UPDATE;
+  INSERT INTO private.command_requests(actor_id,brewery_id,request_id,command_name,payload_hash)
+    VALUES(p_actor,p_brewery,p_request_id,'disconnect_square',payload_hash) ON CONFLICT(actor_id,request_id) DO NOTHING;
+  IF NOT FOUND THEN
+    SELECT * INTO request FROM private.command_requests WHERE actor_id=p_actor AND request_id=p_request_id FOR UPDATE;
+    IF request.brewery_id IS DISTINCT FROM p_brewery OR request.command_name<>'disconnect_square' OR request.payload_hash<>payload_hash THEN
+      RAISE EXCEPTION 'request id was already used with a different payload' USING errcode='MG409'; END IF;
+    IF request.result IS NOT NULL THEN RETURN QUERY SELECT null::text,request.result; RETURN; END IF;
+    RAISE EXCEPTION 'Square disconnect is still being reconciled' USING errcode='MG409';
+  END IF;
   UPDATE private.square_oauth_intents SET consumed_at=coalesce(consumed_at,now()),exchange_state='recovery_required'
     WHERE brewery_id=p_brewery AND exchange_state IN ('pending','exchanging');
-  PERFORM 1 FROM public.pos_connections WHERE brewery_id=p_brewery AND id=p_connection AND state='connected' FOR UPDATE;
-  IF NOT FOUND THEN RAISE EXCEPTION 'connection not available'; END IF;
+  SELECT * INTO connection FROM public.pos_connections WHERE brewery_id=p_brewery AND id=p_connection AND state='connected' FOR UPDATE;
+  IF NOT FOUND OR connection.remote_revocation_state='pending' THEN RAISE EXCEPTION 'connection not available'; END IF;
   DELETE FROM private.integration_tokens t WHERE t.brewery_id=p_brewery AND t.provider='square' AND t.connection_id=p_connection
-    RETURNING t.access_token,t.credential_version INTO token,version;
-  UPDATE public.pos_connections SET state='disconnected',remote_revocation_state='unresolved',
-    credential_version=greatest(credential_version,coalesce(version,credential_version))+1,updated_at=now()
+    RETURNING t.access_token,t.credential_version INTO token,token_version;
+  IF token IS NULL THEN RAISE EXCEPTION 'connection credential not available'; END IF;
+  next_version:=greatest(connection.credential_version,token_version)+1;
+  UPDATE public.pos_connections SET state='recovery_required',remote_revocation_state='pending',
+    last_error='Square authorization revocation is pending',credential_version=next_version,updated_at=now()
     WHERE brewery_id=p_brewery AND id=p_connection AND state='connected';
   IF NOT FOUND THEN RAISE EXCEPTION 'connection not available'; END IF;
-  PERFORM private.complete_command_request_for(p_actor,p_request_id,result);
+  INSERT INTO private.square_disconnects(actor_id,request_id,brewery_id,connection_id,credential_version)
+    VALUES(p_actor,p_request_id,p_brewery,p_connection,next_version);
   RETURN QUERY SELECT token,null::jsonb;
 END $$;
 
 CREATE FUNCTION public.finish_square_disconnect(p_brewery uuid,p_connection uuid,p_actor uuid,p_request_id uuid,p_revoked boolean) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
-DECLARE result jsonb:=jsonb_build_object('disconnected',true,'remoteRevocationState',CASE WHEN p_revoked THEN 'confirmed' ELSE 'unresolved' END);
+DECLARE request private.command_requests; attempt private.square_disconnects;
+  payload_hash bytea:=extensions.digest(jsonb_build_object('connectionId',p_connection)::text,'sha256');
+  result jsonb:=jsonb_build_object('disconnected',true,'remoteRevocationState',CASE WHEN p_revoked THEN 'confirmed' ELSE 'unresolved' END);
 BEGIN
-  UPDATE public.pos_connections SET remote_revocation_state=CASE WHEN p_revoked THEN 'confirmed' ELSE 'unresolved' END,
+  PERFORM 1 FROM public.breweries WHERE id=p_brewery FOR UPDATE;
+  SELECT * INTO request FROM private.command_requests WHERE actor_id=p_actor AND request_id=p_request_id FOR UPDATE;
+  IF NOT FOUND OR request.brewery_id IS DISTINCT FROM p_brewery OR request.command_name<>'disconnect_square' OR request.payload_hash<>payload_hash THEN
+    RAISE EXCEPTION 'disconnect reconciliation is not available' USING errcode='MG409'; END IF;
+  IF request.result IS NOT NULL THEN RETURN request.result; END IF;
+  SELECT * INTO attempt FROM private.square_disconnects WHERE actor_id=p_actor AND request_id=p_request_id FOR UPDATE;
+  IF NOT FOUND OR attempt.brewery_id<>p_brewery OR attempt.connection_id<>p_connection THEN
+    RAISE EXCEPTION 'disconnect reconciliation is not available' USING errcode='MG409'; END IF;
+  UPDATE public.pos_connections SET state=CASE WHEN p_revoked THEN 'disconnected' ELSE 'recovery_required' END,
+    remote_revocation_state=CASE WHEN p_revoked THEN 'confirmed' ELSE 'unresolved' END,
     last_error=CASE WHEN p_revoked THEN null ELSE 'Remote revocation could not be confirmed' END,updated_at=now()
-    WHERE brewery_id=p_brewery AND id=p_connection AND state='disconnected'
-      AND EXISTS(SELECT 1 FROM public.brewery_users WHERE brewery_id=p_brewery AND user_id=p_actor AND role='admin');
-  IF NOT FOUND THEN RAISE EXCEPTION 'disconnect reconciliation is not available'; END IF;
+    WHERE brewery_id=p_brewery AND id=p_connection AND state='recovery_required' AND remote_revocation_state='pending'
+      AND credential_version=attempt.credential_version;
+  IF NOT FOUND THEN RAISE EXCEPTION 'disconnect reconciliation is not available' USING errcode='MG409'; END IF;
   RETURN private.complete_command_request_for(p_actor,p_request_id,result);
 END $$;
 
 REVOKE ALL ON FUNCTION public.begin_square_oauth(uuid,text,text,text,uuid,text[]),public.begin_square_catalog_sync(uuid,uuid),
   public.claim_square_oauth(text,uuid,uuid,text),
-  public.fail_square_oauth(uuid,uuid),public.complete_square_oauth(uuid,uuid,text,text,text,text,timestamptz,text[],jsonb),
+  public.fail_square_oauth(uuid,uuid,text,text),public.complete_square_oauth(uuid,uuid,text,text,text,text,timestamptz,text[],jsonb),
   public.advance_square_catalog_sync(uuid,uuid,uuid,uuid,bigint,bigint),public.mark_square_authorization_failed(uuid,uuid,uuid,bigint),
   public.record_square_catalog_snapshot(uuid,uuid,uuid,bigint,uuid,jsonb,jsonb),
   public.set_pos_location_mapping(uuid,text,uuid,uuid),public.set_pos_item_mapping(uuid,text,text,uuid,uuid,boolean,uuid),
@@ -2418,7 +2517,7 @@ REVOKE ALL ON FUNCTION public.begin_square_oauth(uuid,text,text,text,uuid,text[]
 GRANT EXECUTE ON FUNCTION public.begin_square_oauth(uuid,text,text,text,uuid,text[]),public.begin_square_catalog_sync(uuid,uuid),
   public.set_pos_location_mapping(uuid,text,uuid,uuid),
   public.set_pos_item_mapping(uuid,text,text,uuid,uuid,boolean,uuid) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.claim_square_oauth(text,uuid,uuid,text),public.fail_square_oauth(uuid,uuid),
+GRANT EXECUTE ON FUNCTION public.claim_square_oauth(text,uuid,uuid,text),public.fail_square_oauth(uuid,uuid,text,text),
   public.complete_square_oauth(uuid,uuid,text,text,text,text,timestamptz,text[],jsonb),
   public.advance_square_catalog_sync(uuid,uuid,uuid,uuid,bigint,bigint),public.mark_square_authorization_failed(uuid,uuid,uuid,bigint),
   public.record_square_catalog_snapshot(uuid,uuid,uuid,bigint,uuid,jsonb,jsonb),

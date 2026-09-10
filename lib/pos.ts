@@ -206,7 +206,8 @@ export async function completeSquareOAuth(input: {
   store: {
     claim(stateHash: string, actorId: string, breweryId: string, redirectUri: string): Promise<{ intentId: string; breweryId: string; providerIntent: "connect" | "reconnect"; requestedScopes: string[] } | null>;
     complete(intentId: string, actorId: string, tokens: SquareTokens, locations: SquareLocation[]): Promise<string>;
-    fail(intentId: string, actorId: string): Promise<void>;
+    fail(intentId: string, actorId: string, cleanupState: "not_required" | "pending" | "confirmed" | "unresolved",
+      merchantId: string | null): Promise<void>;
   };
 }) {
   const params = new URL(input.request.url).searchParams;
@@ -214,12 +215,19 @@ export async function completeSquareOAuth(input: {
   if (!state || !code || params.get("error")) throw new Error("oauth state invalid");
   const claim = await input.store.claim(sha256(state), input.actorId, input.selectedBreweryId, input.redirectUri);
   if (!claim || claim.breweryId !== input.selectedBreweryId) throw new Error("oauth state invalid");
+  let tokens: SquareTokens | null = null;
   try {
-    const tokens = await input.client.exchange(code);
+    tokens = await input.client.exchange(code);
     const locations = await input.client.listLocations(tokens.accessToken, tokens.merchantId);
     return await input.store.complete(claim.intentId, input.actorId, tokens, locations);
   } catch {
-    await input.store.fail(claim.intentId, input.actorId);
+    if (!tokens) {
+      await input.store.fail(claim.intentId, input.actorId, "not_required", null).catch(() => undefined);
+    } else {
+      await input.store.fail(claim.intentId, input.actorId, "pending", tokens.merchantId).catch(() => undefined);
+      const cleanup = await input.client.revoke(tokens.accessToken).then(() => "confirmed" as const, () => "unresolved" as const);
+      await input.store.fail(claim.intentId, input.actorId, cleanup, tokens.merchantId).catch(() => undefined);
+    }
     throw unavailable();
   }
 }

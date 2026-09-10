@@ -55,6 +55,6 @@ describe("Square durable credential lifecycle", () => {
     });
     expect(replayRevoke).not.toHaveBeenCalled();
     expect((await admin.from("pos_connections").select("state,remote_revocation_state,last_error").eq("id", connection.data!.id).single()).data)
-      .toEqual({ state: "disconnected", remote_revocation_state: "unresolved", last_error: "Remote revocation could not be confirmed" });
+      .toEqual({ state: "recovery_required", remote_revocation_state: "unresolved", last_error: "Remote revocation could not be confirmed" });
   });
 });

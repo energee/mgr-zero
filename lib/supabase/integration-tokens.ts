@@ -197,9 +197,16 @@ export async function completeSquareOAuthStore(
   return data;
 }
 
-export async function failSquareOAuth(intentId: string, actorId: string) {
-  const { error } = await createAdminClient().rpc("fail_square_oauth", { p_intent: intentId, p_actor: actorId });
-  if (error) throw new Error("Square recovery state could not be recorded");
+export async function failSquareOAuth(
+  intentId: string,
+  actorId: string,
+  cleanupState: "not_required" | "pending" | "confirmed" | "unresolved",
+  merchantId: string | null,
+) {
+  const { data, error } = await createAdminClient().rpc("fail_square_oauth", {
+    p_intent: intentId, p_actor: actorId, p_cleanup_state: cleanupState, p_merchant_id: merchantId,
+  });
+  if (error || data !== true) throw new Error("Square recovery state could not be recorded");
 }
 
 export async function compareAndSwapSquareTokens(
@@ -280,7 +287,7 @@ export async function getSquareHealth(ctx: Ctx) {
     connected: data.state === "connected", connectionId: data.id as string,
     state: data.state as "connected" | "disconnected" | "recovery_required",
     merchantId: data.merchant_id as string | null, merchantLabel: data.merchant_label as string | null,
-    remoteRevocationState: data.remote_revocation_state as "not_requested" | "confirmed" | "unresolved",
+    remoteRevocationState: data.remote_revocation_state as "not_requested" | "pending" | "confirmed" | "unresolved",
     lastError: data.last_error as string | null, accessExpiresAt: data.access_expires_at as string | null,
   };
 }
