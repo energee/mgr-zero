@@ -13,9 +13,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCommandContext } from "@/app/(app)/brewery-provider";
 import { Button } from "@/components/ui/button";
-import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { CommandForm } from "@/components/mgr/command-form";
+import { FermentationReadingActionsView, FermentationReadingView, type FermentationReadingValues } from "@/components/mgr/views/fermentation-reading";
 import { command } from "@/lib/commands/client";
 import {
   createReadingAttempt,
@@ -27,18 +26,19 @@ import {
   visibleOutbox,
   type OutboxAttempt,
 } from "@/lib/composer/outbox";
-import { formatGravity, gravityPlaceholder, gravityUnitShort, INVALID_GRAVITY, parseGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
+import { formatGravity, INVALID_GRAVITY, parseGravity, type GravityUnit } from "@/lib/mgr/gravity-unit";
 
 function localObservationValue(iso = new Date().toISOString()) {
   const date = new Date(iso);
   return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 19);
 }
 
-export function ReadingForm({ occupancyId, occupancyLabel, unit, role }: {
+export function ReadingForm({ occupancyId, occupancyLabel, unit, role, prior }: {
   occupancyId: string;
   occupancyLabel: string;
   unit: GravityUnit;
   role: "admin" | "brewer";
+  prior?: Partial<Pick<FermentationReadingValues, "tempF" | "gravity" | "ph">>;
 }) {
   const router = useRouter();
   const expectedContext = useCommandContext();
@@ -144,55 +144,36 @@ export function ReadingForm({ occupancyId, occupancyLabel, unit, role }: {
     catch (cause) { setError(cause instanceof Error ? cause.message : "The queued reading was not discarded."); }
   }
 
-  const locked = attempt !== null;
+  const values = { observedAt, tempF, gravity, ph, note };
+  const recovery = attempt ? { state: attempt.state, discardLabel: `${occupancyLabel} reading` } : undefined;
+  const formId = "fermentation-reading-form";
   return (
-    <CommandForm open={open} onOpenChange={setOpen} title="Reading" trigger={<Button size="sm">Reading</Button>}>
-      <form onSubmit={submit} className="flex flex-col gap-4">
-        <fieldset disabled={locked || submitting} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="fr-observed">Observed at</Label>
-          <Input id="fr-observed" type="datetime-local" step="1" value={observedAt} onChange={(e) => setObservedAt(e.target.value)} required />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="fr-temp">Temperature (°F)</Label>
-          <Input id="fr-temp" type="number" step="any" value={tempF} onChange={(e) => setTempF(e.target.value)} required />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="fr-gravity">Gravity ({gravityUnitShort(unit)}) · optional</Label>
-          {/* Deliberately not type="number": that hands back "" for unreadable
-              input, so the field could never tell the brewer what was wrong. */}
-          <Input
-            id="fr-gravity" type="text" inputMode="decimal" placeholder={gravityPlaceholder(unit)}
-            value={gravity} onChange={(e) => setGravity(e.target.value)}
-            aria-invalid={gravityInvalid} aria-describedby={gravityInvalid ? "fr-gravity-error" : undefined}
-          />
-          {gravityInvalid ? (
-            <p id="fr-gravity-error" role="alert" className="text-sm text-destructive">
-              {unit === "sg"
-                ? "Enter a gravity like 1.050 or 1050, or leave it blank."
-                : "Enter a gravity in °Plato like 12.5, or leave it blank."}
-            </p>
-          ) : null}
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="fr-ph">pH · optional</Label>
-          <Input id="fr-ph" type="number" step="any" value={ph} onChange={(e) => setPh(e.target.value)} />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="fr-note">Note · optional</Label>
-          <Input id="fr-note" value={note} onChange={(e) => setNote(e.target.value)} />
-        </div>
-        </fieldset>
-        {notice && <p role="status" className="text-sm text-muted-foreground">{notice}</p>}
-        <CommandFormMessage error={error} />
-        <CommandFormFooter>
-          {attempt ? <>
-            {(attempt.state === "queued" || attempt.state === "uncertain") && <Button type="submit" variant="outline" disabled={submitting}>{submitting ? "Retrying…" : "Retry exact reading"}</Button>}
-            <Button type="button" variant="outline" disabled={submitting} onClick={startFix}>Fix as new reading</Button>
-            <Button type="button" variant="destructive" disabled={submitting} onClick={discardAttempt}>Discard queued reading</Button>
-          </> : <Button type="submit" disabled={submitting || !tempF || !observedAt || gravityInvalid}>{submitting ? "Saving…" : "Save reading"}</Button>}
-        </CommandFormFooter>
-      </form>
+    <CommandForm
+      open={open}
+      onOpenChange={setOpen}
+      title="Reading"
+      trigger={<Button size="sm">Reading</Button>}
+      footer={<FermentationReadingActionsView formId={formId} values={values} recovery={recovery} busy={submitting} gravityInvalid={gravityInvalid} onFix={startFix} onDiscard={discardAttempt} />}
+    >
+      <FermentationReadingView
+        formId={formId}
+        values={values}
+        unit={unit}
+        prior={prior}
+        locked={attempt !== null}
+        busy={submitting}
+        gravityInvalid={gravityInvalid}
+        error={error}
+        notice={notice}
+        onChange={(field, value) => {
+          if (field === "observedAt") setObservedAt(value);
+          else if (field === "tempF") setTempF(value);
+          else if (field === "gravity") setGravity(value);
+          else if (field === "ph") setPh(value);
+          else setNote(value);
+        }}
+        onSubmit={submit}
+      />
     </CommandForm>
   );
 }

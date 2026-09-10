@@ -6,6 +6,7 @@ import { CommandResponseError } from "@/lib/commands/client";
 import { getCommandDefinition } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { SCREENS } from "@/components/mgr/screens";
+import { FermentationReadingActionsView, FermentationReadingView } from "@/components/mgr/views/fermentation-reading";
 import {
   createReadingAttempt,
   discardOutbox,
@@ -171,9 +172,14 @@ describe("action-specific offline outbox", () => {
     expect(markup).not.toMatch(/Record movement ·|Record pick ·|Record cellar transfer ·/);
 
     const form = readFileSync("app/(app)/cellar/[occupancyId]/reading/reading-form.tsx", "utf8");
-    expect(form).toContain('type="datetime-local"');
     expect(form.indexOf("storeOutboxAttempt(localStorage, next)")).toBeLessThan(form.indexOf("await deliver(next)"));
-    expect(form).toContain("Retry exact reading");
-    expect(form).toContain("Fix as new reading");
+    const values = { observedAt: "2026-09-10T08:10:00", tempF: "68", gravity: "4.2", ph: "4.1", note: "steady" };
+    const editing = renderToStaticMarkup(createElement(FermentationReadingView, { formId: "reading", values, unit: "plato" }));
+    const recovery = renderToStaticMarkup(createElement(FermentationReadingActionsView, { formId: "reading", values, recovery: { state: "uncertain", discardLabel: "FV3 reading" } }));
+    expect(editing).toContain('type="datetime-local"');
+    expect(renderToStaticMarkup(createElement(FermentationReadingActionsView, { formId: "reading", values }))).toContain("Save reading");
+    expect(recovery).toContain("Retry exact reading");
+    expect(recovery).toContain("Fix as new reading");
+    expect(recovery).toContain("Discard FV3 reading");
   });
 });

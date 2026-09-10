@@ -113,6 +113,7 @@ export const SCREEN_ROUTES: { name: string; file: string }[] = [
   { name: "Portal Me", file: "app/(portal)/layout.tsx" },
   { name: "Vessel detail", file: "app/(app)/cellar/page.tsx" },
   { name: "Cellar map", file: "app/(app)/cellar/page.tsx" },
+  { name: "Fermentation reading", file: "app/(app)/cellar/[occupancyId]/reading/reading-form.tsx" },
   { name: "Batches", file: "app/(app)/batches/page.tsx" },
   { name: "Schedule batch", file: "app/(app)/batches/page.tsx" },
   { name: "Brew day", file: "app/(app)/batches/[id]/page.tsx" },

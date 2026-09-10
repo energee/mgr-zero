@@ -32,6 +32,11 @@ export default async function OccupancyReadingPage({ params }: { params: Promise
         occupancyLabel={occupancy?.vessel_name ?? "unknown vessel"}
         unit={gravityUnit.effective}
         role={brewery.role as "admin" | "brewer"}
+        prior={readings[0] ? {
+          tempF: String(readings[0].temp_f),
+          gravity: readings[0].gravity_plato == null ? undefined : formatGravity(readings[0].gravity_plato, gravityUnit.effective),
+          ph: readings[0].ph == null ? undefined : String(readings[0].ph),
+        } : undefined}
       />)}
       {readings.length === 0
         ? E.blank("No readings yet")

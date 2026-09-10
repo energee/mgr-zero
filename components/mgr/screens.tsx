@@ -48,6 +48,7 @@ import { CustomersView } from "@/components/mgr/views/customers";
 import { DeniedView } from "@/components/mgr/views/denied";
 import { EntryView } from "@/components/mgr/views/entry";
 import { FinishedGoodsView } from "@/components/mgr/views/finished-goods";
+import { FermentationReadingActionsView, FermentationReadingView } from "@/components/mgr/views/fermentation-reading";
 import { FirstRunView } from "@/components/mgr/views/first-run";
 import { FormatView } from "@/components/mgr/views/format";
 import { FormatsView } from "@/components/mgr/views/formats";
@@ -1681,22 +1682,20 @@ export const SCREENS: Screen[] = [
     group: "Global",
     surface: "sheet",
     name: "Fermentation reading",
-    to: { "Record reading": "Vessel detail" },
+    to: { "Save reading": "Vessel detail", "Retry exact reading": "Fermentation reading", "Fix as new reading": "Fermentation reading", "Discard FV3 reading": "Fermentation reading" },
     job: "Record any values taken, in the unit set on Settings · Units",
-    reads: "get_cellar_map [view; occupancy + last reading] · get_gravity_unit",
-    writes: "record_fermentation_reading [design; mutable reading row]",
-    states: permitted("brewer or admin required"),
-    spec: "One reading may contain gravity, temperature, pH, or any combination. Blank values remain absent; prior values are reference only, never silently copied. Each value is typed; Gravity is the default. The gravity field is labelled and read in whichever unit the reader chose on Settings, then Units; there is no toggle on this sheet, because a unit is a standing preference rather than a per-reading decision. Gravity is stored in degrees Plato whatever is chosen, so switching never moves a reading already taken.",
-    body: (<>
-      {E.qty("1.019", "prior 1.021", "Gravity (per your unit setting)")}
-      {E.qty("68.2", "°F · prior 67.8", "Temperature")}
-      {E.qty("", "prior 4.21", "pH")}
-      {E.info("Enter only values taken now; blanks are not rewritten.")}
-      {E.inp("Note", "optional")}
-      {E.pin(<>
-        {E.btn("Record reading")}
-      </>)}
-    </>),
+    reads: "list_occupancies · list_fermentation_readings · get_gravity_unit",
+    writes: "record_fermentation_reading [one immutable reading row]",
+    states: [...permitted("brewer or admin required"), ["offline or response lost", "Retry exact reading · Fix as new reading · Discard FV3 reading", 1]],
+    spec: "Observed at and Temperature are required. Gravity, pH and Note are optional; blanks remain absent, and prior values are reference only, never silently copied. Saving freezes every parsed field and the observation time before transport. Exact retry preserves that request; Fix starts a reviewed fresh request while the uncertain original remains queued; named discard removes only the selected attempt. The gravity field uses the reader's standing unit preference and stores degrees Plato.",
+    body: (() => {
+      const formId = "fermentation-reading-form";
+      const values = { observedAt: "2026-09-10T08:10:00", tempF: "68.2", gravity: "1.019", ph: "", note: "" };
+      return <>
+        <FermentationReadingView formId={formId} values={values} unit="sg" prior={{ tempF: "67.8", gravity: "1.021", ph: "4.21" }} />
+        {E.pin(<FermentationReadingActionsView formId={formId} values={values} />)}
+      </>;
+    })(),
   },
   {
     step: 7,
