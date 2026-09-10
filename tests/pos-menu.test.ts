@@ -93,10 +93,31 @@ describe("derived POS menus", () => {
       sources: [expect.objectContaining({ skuId: keg.skuId, name: "Hazy half", format: "Half bbl", qty: 3 })],
     }));
 
+    await runCommand("set_pos_price_override", {
+      posLocationId: "L1", formatId: pintId, unitPriceCents: 650,
+    }, ctx, execution());
+    await runCommand("set_pos_website_publication", {
+      posLocationId: "L1", formatId: pintId, published: true,
+    }, ctx, execution());
+
     await admin.from("skus").update({ active: false }).eq("id", keg.skuId);
     const inactive = await runCommand("get_pos_menu", { posLocationId: "L1" }, ctx) as any;
     expect(inactive.items).toEqual([]);
-    expect(inactive.excluded).toContainEqual(expect.objectContaining({ formatId: pintId, reason: "no_active_keg" }));
+    expect(inactive.excluded).toContainEqual({
+      formatId: pintId,
+      brand: "Hazy",
+      format: "Pint",
+      ounces: 16,
+      priceCents: 650,
+      priceOverrideCents: 650,
+      priceSource: "override",
+      available: false,
+      websitePublished: true,
+      sources: [],
+      reason: "no_active_keg",
+    });
+    await expect(runCommand("get_pos_menu_item", { posLocationId: "L1", formatId: pintId }, ctx))
+      .resolves.toEqual(inactive.excluded[0]);
   });
 
   it("keeps nullable price overrides independent per Square location and restores fallback when cleared", async () => {
