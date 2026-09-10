@@ -20,7 +20,7 @@ const matrix = {
   fermentation_readings: "deny", material_movements: "deny", batch_additions: "deny", packaging_runs: "deny",
   lots: "deny", packaging_run_outputs: "deny", packaging_run_consumptions: "deny", material_contracts: "deny",
   purchase_orders: "deny", purchase_order_lines: "deny", receipts: "deny", receipt_lines: "deny",
-  material_counts: "deny", material_count_lines: "deny", orders: "deny", order_lines: "deny", order_events: "deny",
+  material_counts: "deny", material_count_lines: "deny", orders: "deny", order_lines: "deny", order_deposit_lines: "deny", order_events: "deny",
   shipments: "deny", invoices: "deny", invoice_questions: "deny", invoice_lines: "deny", keg_events: "deny",
   stock_transfers: "deny", stock_transfer_lines: "deny", qbo_connections: "deny", qbo_pushes: "deny", pos_connections: "deny",
   pos_locations: "tenant", pos_item_mappings: "tenant", pos_sales: "deny", pos_sale_expectations: "deny", pos_sales_coverage: "deny", brand_approvals: "deny",
@@ -105,6 +105,7 @@ async function fixtures() {
   await put("material_count_lines", { count_id: count.id, material_id: material.id, qty_expected: 1, qty_counted: 1 });
   const order = await put("orders", { kind: "wholesale", from_location_id: wh.id, customer_id: customer.customerId, ship_to_id: customer.shipToId, sale_channel_id: customer.saleChannelId, created_by: owner.id });
   const line = await put("order_lines", { order_id: order.id, sku_id: cat.skuId, qty_ordered: 1, unit_price_cents: 1200 });
+  await put("order_deposit_lines", { order_id: order.id, order_line_id: line.id, keg_pool_id: pool.id, keg_size: "half_bbl", description: "Fleet deposit", qty_ordered: 1, unit_price_cents: 2500 });
   await put("allocations", { sku_id: cat.skuId, qty: 1, source: "order_line", ref: line.id });
   await put("order_events", { order_id: order.id, actor: owner.id, event: "created" });
   const shipment = await put("shipments", { order_id: order.id, created_by: owner.id });

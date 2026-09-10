@@ -128,14 +128,15 @@ describe("portal order quote", () => {
     expect(sql(`select qty::text||'|'||unit_price_cents::text||'|'||amount_cents::text
       from invoice_lines where invoice_id='${shipped.invoice_id}' and kind='keg_deposit'`)).toEqual(["2.00|2500|5000"]);
 
-    expect((await admin.from("customers").update({ email: "buyer@example.test" }).eq("id", fixture.customer.customerId)).error).toBeNull();
     const started = await fixture.adminCtx.db.rpc("start_qbo_push", {
       p_brewery: fixture.brewery.id, p_invoice: shipped.invoice_id,
       p_new_attempt_reason: null, p_request_id: crypto.randomUUID(),
     });
     expect(started.error).toBeNull();
-    expect(JSON.stringify(started.data)).toContain('"value": "deposit-item"');
-    expect(JSON.stringify(started.data)).toContain('"UnitPrice": 25');
+    const pushed = JSON.parse((started.data as { requestBody: string }).requestBody);
+    expect(pushed.Line.find((line: any) => line.SalesItemLineDetail.ItemRef.value === "deposit-item")).toMatchObject({
+      Amount: 50, SalesItemLineDetail: { Qty: 2, UnitPrice: 25 },
+    });
     expect((await admin.from("keg_pools").update({ deposit_cents: 2500 }).eq("id", fixture.poolId)).error).toBeNull();
   });
 

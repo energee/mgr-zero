@@ -1650,6 +1650,27 @@ create table order_lines (
 );
 create index order_lines_sku_idx on order_lines (sku_id);
 
+-- Deposit charges reviewed with a portal order belong to that order line.
+-- The SKU remains on order_lines; this row freezes only the separate charge.
+create table order_deposit_lines (
+  id uuid primary key default private.new_uuid(),
+  brewery_id uuid not null references breweries(id),
+  order_id uuid not null,
+  order_line_id uuid not null,
+  keg_pool_id uuid not null,
+  keg_size keg_size not null,
+  description text not null,
+  qty_ordered numeric(12,2) not null check (qty_ordered > 0),
+  unit_price_cents int not null check (unit_price_cents >= 0),
+  amount_cents int generated always as (round(qty_ordered * unit_price_cents)::int) stored,
+  unique (id, brewery_id),
+  unique (order_line_id),
+  foreign key (order_id, brewery_id) references orders(id, brewery_id) on delete cascade,
+  foreign key (order_line_id, brewery_id) references order_lines(id, brewery_id) on delete cascade,
+  foreign key (keg_pool_id, brewery_id) references keg_pools(id, brewery_id)
+);
+create index order_deposit_lines_order_idx on order_deposit_lines(order_id);
+
 -- Append-only per-order change log (spec 1B decision 3). Written inside the
 -- same plpgsql command functions that make each change; payload is the
 -- minimal diff, e.g. {"sku": "...", "qty": [24, 18], "reason": "..."}.
@@ -2976,6 +2997,9 @@ begin
           insert into public.invoice_lines (brewery_id, invoice_id, kind, sku_id, qty, unit_price_cents, description)
           select o.brewery_id, v_invoice, 'sku', ol.sku_id, sp.qty, ol.unit_price_cents, s.name
           from public.order_lines ol join public.skus s on s.id = ol.sku_id where ol.id = sp.line_id;
+          insert into public.invoice_lines (brewery_id, invoice_id, kind, order_line_id, keg_pool_id, keg_size, qty, unit_price_cents, description)
+          select o.brewery_id,v_invoice,'keg_deposit',d.order_line_id,d.keg_pool_id,d.keg_size,sp.qty,d.unit_price_cents,d.description
+          from public.order_deposit_lines d where d.order_id=p_order and d.order_line_id=sp.line_id;
         end if;
       else
         insert into public.inventory_movements (brewery_id, sku_id, location_id, bin_id, lot_id, qty, type, ref, created_by)
@@ -4886,7 +4910,9 @@ begin
   select jsonb_agg(jsonb_build_object(
       'skuId',sku_id,'name',sku_name,'product',brand_name,'qty',qty,
       'unitPriceCents',unit_price_cents,'amountCents',amount_cents,
-      'qboItemId',qbo_item_id,'qboRealmId',qbo_realm_id) order by sku_id),
+      'qboItemId',qbo_item_id,'qboRealmId',qbo_realm_id,
+      'depositPoolId',pool_id,'depositName',pool_name,'kegSize',keg_size,
+      'depositUnitPriceCents',case when deposit_cents>0 then deposit_cents end) order by sku_id),
     coalesce(sum(amount_cents),0)
   into v_lines,v_subtotal from resolved;
   if coalesce(jsonb_array_length(v_lines),0)<>jsonb_array_length(p_lines) then
@@ -4931,7 +4957,7 @@ begin
     jsonb_build_object('brewery',p_brewery,'customer',p_customer,'shipToId',p_ship_to,'requestedShipDate',p_requested,'poNumber',p_po,'note',p_note,'lines',p_lines));
   if v_replay is not null then return v_replay; end if;
   v_snapshot:=private.portal_quote_snapshot(p_brewery,p_customer,p_ship_to,p_requested,p_po,p_note,p_lines);
-  select coalesce(jsonb_agg(x-array['qboItemId','qboRealmId']),'[]') into v_public_lines
+  select coalesce(jsonb_agg(x-array['qboItemId','qboRealmId','depositPoolId','depositName','kegSize','depositUnitPriceCents']),'[]') into v_public_lines
     from jsonb_array_elements(v_snapshot->'lines') x;
   select coalesce(jsonb_agg(x-array['poolId']),'[]') into v_public_deposits
     from jsonb_array_elements(v_snapshot->'deposits') x;
@@ -4983,6 +5009,37 @@ begin
   if not found then raise exception 'quote not found'; end if;
   if v_row.submitted_order_id is not null then raise exception 'quote was already submitted' using errcode='MG409'; end if;
   if v_row.expires_at<=now() then raise exception 'quote expired; review the order again' using errcode='MG409'; end if;
+  -- Lock every mutable row that contributed to the quote. Ordinary writers
+  -- acquire these same row locks when updating, so the comparison and order
+  -- line writes below observe one serialized state at READ COMMITTED.
+  perform 1 from public.customers where id=p_customer and brewery_id=p_brewery for update;
+  perform 1 from public.ship_tos where id=(v_row.snapshot#>>'{input,shipToId}')::uuid and brewery_id=p_brewery for update;
+  perform 1 from public.breweries where id=p_brewery for update;
+  perform 1 from public.locations where id=(v_row.snapshot#>>'{source,id}')::uuid and brewery_id=p_brewery for update;
+  perform 1 from public.skus s where s.id in (
+    select (e->>'sku_id')::uuid from jsonb_array_elements(v_row.snapshot#>'{input,lines}') e
+  ) order by s.id for update;
+  perform 1 from public.brands b where b.id in (
+    select s.brand_id from public.skus s where s.id in (
+      select (e->>'sku_id')::uuid from jsonb_array_elements(v_row.snapshot#>'{input,lines}') e
+    )
+  ) order by b.id for update;
+  perform 1 from public.formats f where f.id in (
+    select s.format_id from public.skus s where s.id in (
+      select (e->>'sku_id')::uuid from jsonb_array_elements(v_row.snapshot#>'{input,lines}') e
+    )
+  ) order by f.id for update;
+  perform 1 from public.channel_prices cp
+  join public.brands b on b.price_group_id=cp.price_group_id and b.brewery_id=cp.brewery_id
+  join public.skus s on s.brand_id=b.id and s.format_id=cp.format_id and s.brewery_id=cp.brewery_id
+  where cp.brewery_id=p_brewery
+    and cp.sale_channel_id=(select sale_channel_id from public.customers where id=p_customer)
+    and s.id in (select (e->>'sku_id')::uuid from jsonb_array_elements(v_row.snapshot#>'{input,lines}') e)
+  order by cp.sale_channel_id,cp.price_group_id,cp.format_id for update of cp;
+  perform 1 from public.keg_pools k where k.id in (
+    select (e->>'depositPoolId')::uuid from jsonb_array_elements(v_row.snapshot->'lines') e
+    where e->>'depositPoolId' is not null
+  ) order by k.id for update;
   v_current:=private.portal_quote_snapshot(p_brewery,p_customer,
     (v_row.snapshot#>>'{input,shipToId}')::uuid,(v_row.snapshot#>>'{input,requestedShipDate}')::date,
     v_row.snapshot#>>'{input,poNumber}',v_row.snapshot#>>'{input,note}',v_row.snapshot#>'{input,lines}');
@@ -5001,6 +5058,15 @@ begin
       (v_row.snapshot#>>'{input,requestedShipDate}')::date,v_row.snapshot#>>'{input,poNumber}',v_row.snapshot#>>'{input,note}',v_row.snapshot#>'{input,lines}');
     v_order:=p_order;
   end if;
+  delete from public.order_deposit_lines where order_id=v_order;
+  insert into public.order_deposit_lines(
+    brewery_id,order_id,order_line_id,keg_pool_id,keg_size,description,qty_ordered,unit_price_cents
+  )
+  select p_brewery,v_order,ol.id,(e->>'depositPoolId')::uuid,(e->>'kegSize')::public.keg_size,
+    coalesce(nullif(e->>'depositName',''),'Keg')||' deposit',(e->>'qty')::numeric,(e->>'depositUnitPriceCents')::int
+  from jsonb_array_elements(v_row.snapshot->'lines') e
+  join public.order_lines ol on ol.order_id=v_order and ol.sku_id=(e->>'skuId')::uuid
+  where e->>'depositPoolId' is not null and (e->>'depositUnitPriceCents')::int>0;
   v_result:=private.submit_order_impl(v_order);
   update private.portal_order_quotes set submitted_order_id=v_order where id=p_quote;
   return private.complete_command_request(p_request_id,v_result);
@@ -5301,6 +5367,10 @@ begin
     select o.brewery_id, v_invoice, 'sku', ol.sku_id, ol.qty_shipped, ol.unit_price_cents, s.name
     from public.order_lines ol join public.skus s on s.id = ol.sku_id
     where ol.order_id = o.id and coalesce(ol.qty_shipped, 0) > 0;
+    insert into public.invoice_lines (brewery_id, invoice_id, kind, order_line_id, keg_pool_id, keg_size, qty, unit_price_cents, description)
+    select o.brewery_id,v_invoice,'keg_deposit',odl.order_line_id,odl.keg_pool_id,odl.keg_size,ol.qty_shipped,odl.unit_price_cents,odl.description
+    from public.order_deposit_lines odl join public.order_lines ol on ol.id=odl.order_line_id and ol.order_id=odl.order_id
+    where odl.order_id=o.id and coalesce(ol.qty_shipped,0)>0;
   end if;
   insert into public.order_events (brewery_id, order_id, actor, event, payload)
   values (o.brewery_id, o.id, auth.uid(), 'delivered', jsonb_build_object('delivery_id', p_delivery, 'signed_by', p_signed_by, 'invoice_id', v_invoice));
@@ -7219,6 +7289,7 @@ create index material_counts_brewery_idx on material_counts (brewery_id);
 create index material_lots_brewery_idx on material_lots (brewery_id);
 create index order_events_brewery_idx on order_events (brewery_id);
 create index order_lines_brewery_idx on order_lines (brewery_id);
+create index order_deposit_lines_brewery_idx on order_deposit_lines (brewery_id);
 create index packaging_run_consumptions_brewery_idx on packaging_run_consumptions (brewery_id);
 create index packaging_run_outputs_brewery_idx on packaging_run_outputs (brewery_id);
 create index pos_item_mappings_brewery_idx on pos_item_mappings (brewery_id);
@@ -7248,7 +7319,7 @@ begin
     'recipes','recipe_versions','recipe_ingredients','vessels','batches','vessel_occupancies',
     'fermentation_readings','batch_additions','packaging_runs','lots','packaging_run_outputs',
     'packaging_run_consumptions','material_contracts','purchase_orders','purchase_order_lines',
-    'receipts','receipt_lines','material_counts','material_count_lines','taproom_counts','taproom_count_lines','orders','order_lines',
+    'receipts','receipt_lines','material_counts','material_count_lines','taproom_counts','taproom_count_lines','orders','order_lines','order_deposit_lines',
     'shipments','invoices','invoice_lines','pos_locations','pos_item_mappings','pos_sales',
     'brand_approvals','state_registrations','brewery_state_licenses','report_filings',
     'routes','deliveries','invoice_questions']
@@ -7330,6 +7401,8 @@ create policy customer_read_portal_source on locations for select
   );
 create policy customer_read on orders for select using (customer_id in (select my_customer_ids()));
 create policy customer_read on order_lines for select
+  using (order_id in (select id from public.orders where customer_id in (select public.my_customer_ids())));
+create policy customer_read on order_deposit_lines for select
   using (order_id in (select id from public.orders where customer_id in (select public.my_customer_ids())));
 create policy customer_read on shipments for select
   using (order_id in (select id from orders where customer_id in (select my_customer_ids())));
@@ -8362,7 +8435,7 @@ grant select on breweries, brewery_users, customer_users,
   volume_adjustments, fermentation_readings, material_movements, batch_additions, packaging_runs,
   lots, packaging_run_outputs, packaging_run_consumptions, material_contracts, purchase_orders,
   purchase_order_lines, receipts, receipt_lines, material_counts, material_count_lines, taproom_counts, taproom_count_lines, orders,
-  order_lines, order_events, shipments, invoices, invoice_lines, invoice_questions, keg_events,
+  order_lines, order_deposit_lines, order_events, shipments, invoices, invoice_lines, invoice_questions, keg_events,
   pos_locations, pos_item_mappings, pos_sales, brand_approvals, state_registrations,
   brewery_state_licenses, report_filings, routes, deliveries, qbo_connections, qbo_pushes, pos_connections
   to authenticated;

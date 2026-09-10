@@ -418,10 +418,11 @@ export class QboOAuthClient {
     const cents = (money: unknown) => {
       if (!money || typeof money !== "object") return null;
       const row = money as { value?: unknown; currency?: unknown };
-      const value = typeof row.value === "number" ? String(row.value) : row.value;
-      if (row.currency !== "USD" || typeof value !== "string" || !/^\d+(?:\.\d{1,2})?$/.test(value)) return null;
-      const result = Number(value) * 100;
-      return Number.isSafeInteger(result) ? result : null;
+      if (row.currency !== "USD" || typeof row.value !== "string") return null;
+      const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(row.value);
+      if (!match) return null;
+      const result = BigInt(match[1]) * BigInt(100) + BigInt((match[2] ?? "").padEnd(2, "0") || "0");
+      return result <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(result) : null;
     };
     const lineTax = cents(totals?.totalTaxAmountExcludingShipping);
     const shippingTax = cents(shipping?.taxAmount);
