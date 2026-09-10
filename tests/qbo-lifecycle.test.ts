@@ -99,7 +99,7 @@ describe("QuickBooks OAuth lifecycle", () => {
       actorId: "actor-1", selectedBreweryId: "brewery-1", redirectUri: config.redirectUri,
       client: new QboOAuthClient(config, fetch),
       store: {
-        claim: vi.fn().mockResolvedValue({ intentId: "intent-1", breweryId: "brewery-1", providerIntent: "connect" }),
+        claim: vi.fn().mockResolvedValue({ intentId: "intent-1", breweryId: "brewery-1", providerIntent: "connect", requestedScopes: ["com.intuit.quickbooks.accounting"] }),
         complete, fail: vi.fn(),
       },
     })).resolves.toBe("connection-1");
@@ -134,7 +134,7 @@ describe("QuickBooks OAuth lifecycle", () => {
       redirectUri: config.redirectUri,
       client: new QboOAuthClient(config, fetch),
       store: {
-        claim: vi.fn().mockResolvedValue({ intentId: "intent-1", breweryId: "brewery-1", providerIntent: "connect" }),
+        claim: vi.fn().mockResolvedValue({ intentId: "intent-1", breweryId: "brewery-1", providerIntent: "connect", requestedScopes: ["com.intuit.quickbooks.accounting"] }),
         complete: vi.fn(),
         fail,
       },
@@ -158,7 +158,7 @@ describe("QuickBooks OAuth lifecycle", () => {
       actorId: "actor-1", selectedBreweryId: "brewery-1", redirectUri: config.redirectUri,
       client: new QboOAuthClient(config, fetch),
       store: {
-        claim: vi.fn().mockResolvedValue({ intentId: "intent-1", breweryId: "brewery-1", providerIntent: "connect" }),
+        claim: vi.fn().mockResolvedValue({ intentId: "intent-1", breweryId: "brewery-1", providerIntent: "connect", requestedScopes: ["com.intuit.quickbooks.accounting"] }),
         complete, fail,
       },
     })).rejects.toThrow("QuickBooks is unavailable");
@@ -182,7 +182,7 @@ describe("QuickBooks OAuth lifecycle", () => {
       actorId: "actor-1", selectedBreweryId: "brewery-1", redirectUri: config.redirectUri,
       client: new QboOAuthClient(config, deniedFetch),
       store: {
-        claim: vi.fn().mockResolvedValue({ intentId: "intent-2", breweryId: "brewery-1", providerIntent: "connect" }),
+        claim: vi.fn().mockResolvedValue({ intentId: "intent-2", breweryId: "brewery-1", providerIntent: "connect", requestedScopes: ["com.intuit.quickbooks.accounting"] }),
         complete: deniedComplete, fail: deniedFail,
       },
     })).rejects.toThrow("QuickBooks is unavailable");

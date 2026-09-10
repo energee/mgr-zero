@@ -34,10 +34,15 @@ export type QboTokens = {
   accessExpiresIn: number;
   refreshExpiresIn: number | null;
   refreshHardExpiresIn: number | null;
-  grantedScopes: string[];
+  grantedScopes: string[] | null;
 };
 
-export type QboOAuthClaim = { intentId: string; breweryId: string; providerIntent: "connect" | "reconnect" };
+export type QboOAuthClaim = {
+  intentId: string;
+  breweryId: string;
+  providerIntent: "connect" | "reconnect";
+  requestedScopes: string[];
+};
 export type QboOAuthStore = {
   claim(stateHash: string, actorId: string, selectedBreweryId: string, redirectUri: string): Promise<QboOAuthClaim | null>;
   complete(intentId: string, actorId: string, realmId: string, tokens: QboTokens): Promise<string>;
@@ -88,7 +93,7 @@ function parseTokens(value: unknown, receivedAt: string): QboTokens {
     accessExpiresIn,
     refreshExpiresIn: positiveSeconds(row.x_refresh_token_expires_in),
     refreshHardExpiresIn: positiveSeconds(row.x_refresh_token_hard_expires_in),
-    grantedScopes: typeof row.scope === "string" ? row.scope.split(/\s+/).filter(Boolean) : [],
+    grantedScopes: typeof row.scope === "string" ? row.scope.split(/\s+/).filter(Boolean) : null,
   };
 }
 
@@ -104,7 +109,7 @@ export async function beginQboOAuth(ctx: Ctx, client: QboOAuthClient, providerIn
   const state = sha256(`${requestId}:${ctx.userId}`);
   await unwrap(ctx.db.rpc("begin_qbo_oauth", {
     p_brewery: ctx.breweryId, p_redirect_uri: client.redirectUri, p_state_hash: sha256(state),
-    p_provider_intent: providerIntent, p_request_id: requestId,
+    p_provider_intent: providerIntent, p_request_id: requestId, p_requested_scopes: client.requestedScopes,
   }));
   return { authorizeUrl: client.authorizeUrl(state) };
 }
@@ -153,8 +158,13 @@ export async function completeQboOAuth(input: {
   if (!claim || claim.breweryId !== input.selectedBreweryId) throw new Error("oauth state invalid");
   try {
     const tokens = await input.client.exchange(code);
+    if (tokens.grantedScopes?.some((scope) => !claim.requestedScopes.includes(scope))) {
+      throw new Error("QuickBooks token response was invalid");
+    }
     await input.client.verifyRealm(realmId, tokens.accessToken);
-    return await input.store.complete(claim.intentId, input.actorId, realmId, tokens);
+    return await input.store.complete(claim.intentId, input.actorId, realmId, {
+      ...tokens, grantedScopes: tokens.grantedScopes ?? [...claim.requestedScopes],
+    });
   } catch (error) {
     await input.store.fail(claim.intentId, input.actorId);
     throw new Error(sanitizeQboError(error));
@@ -273,12 +283,16 @@ export class QboOAuthClient {
 
   get redirectUri() { return this.config.redirectUri; }
 
+  get requestedScopes() {
+    return [QBO_ACCOUNTING_SCOPE, ...(this.config.taxApiBaseUrl ? [QBO_TAX_SCOPE] : [])];
+  }
+
   authorizeUrl(state: string) {
     const url = new URL(AUTHORIZE_URL);
     url.searchParams.set("client_id", this.config.clientId);
     url.searchParams.set("redirect_uri", this.config.redirectUri);
     url.searchParams.set("response_type", "code");
-    url.searchParams.set("scope", [QBO_ACCOUNTING_SCOPE, ...(this.config.taxApiBaseUrl ? [QBO_TAX_SCOPE] : [])].join(" "));
+    url.searchParams.set("scope", this.requestedScopes.join(" "));
     url.searchParams.set("state", state);
     return url.toString();
   }

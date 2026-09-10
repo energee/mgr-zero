@@ -1,8 +1,9 @@
 // Real isolated-Postgres proof for QBO state, realm replacement and credential races.
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import { admin, makeBrewery, makeStaffCtx, seedCatalog, seedCustomer, sql } from "./helpers";
-import { completeQboOAuth, QboOAuthClient, refreshQboTokens } from "@/lib/qbo";
+import { admin, asUser, makeBrewery, makeCustomerUser, makeStaffCtx, priceSku, seedCatalog, seedCustomer, seedLocation, sql } from "./helpers";
+import { beginQboOAuth, completeQboOAuth, QBO_ACCOUNTING_SCOPE, QBO_TAX_SCOPE, QboOAuthClient, refreshQboTokens } from "@/lib/qbo";
+import { quotePortalOrder } from "@/lib/commands/portal";
 import {
   claimQboOAuth,
   completeQboOAuthStore,
@@ -15,6 +16,75 @@ import {
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 
 describe("QuickBooks durable lifecycle", () => {
+  it("carries exact intent scopes through an omitted token scope into the tax credential path", async () => {
+    const brewery = await makeBrewery();
+    const ctx = await makeStaffCtx(brewery.id, "admin");
+    const source = await seedLocation(brewery.id, { name: "OAuth scope warehouse" });
+    const catalog = await seedCatalog(brewery.id, { product: "OAuth scope beer", sku: "OAuth scope case", packageType: "can", bblPerUnit: 0.0645 });
+    const customer = await seedCustomer(brewery.id);
+    await priceSku(brewery.id, { saleChannelId: customer.saleChannelId, brandId: catalog.brandId, formatId: catalog.formatId, cents: 3600 });
+    const realm = `realm-${crypto.randomUUID()}`;
+    expect((await admin.from("breweries").update({ portal_fulfillment_location_id: source.id }).eq("id", brewery.id)).error).toBeNull();
+    expect((await admin.from("locations").update({ address: "10 Brewery Rd, Town, PA 19000" }).eq("id", source.id)).error).toBeNull();
+    expect((await admin.from("customers").update({ qbo_customer_id: "customer-item", qbo_realm_id: realm }).eq("id", customer.customerId)).error).toBeNull();
+    expect((await admin.from("skus").update({ qbo_item_id: "beer-item", qbo_realm_id: realm }).eq("id", catalog.skuId)).error).toBeNull();
+    const config = {
+      clientId: "client-id", clientSecret: "client-secret",
+      redirectUri: "https://mgr.test/api/integrations/qbo/oauth",
+      apiBaseUrl: "https://sandbox-quickbooks.api.intuit.com",
+      taxApiBaseUrl: "https://qb-sandbox.api.intuit.com/graphql",
+    };
+    const requestedScopes = [QBO_ACCOUNTING_SCOPE, QBO_TAX_SCOPE];
+    const oauthFetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        access_token: "access-secret", refresh_token: "refresh-secret", expires_in: 3600,
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ CompanyInfo: { Id: "1" } }), { status: 200 }));
+    const oauthClient = new QboOAuthClient(config, oauthFetch);
+    const started = await beginQboOAuth(ctx, oauthClient, "connect", crypto.randomUUID());
+    const authorize = new URL(started.authorizeUrl);
+    expect(authorize.searchParams.get("scope")).toBe(requestedScopes.join(" "));
+    expect(sql(`select array_to_json(requested_scopes)::text from private.qbo_oauth_intents where state_hash='${hash(authorize.searchParams.get("state")!)}'`))
+      .toEqual([JSON.stringify(requestedScopes)]);
+    await completeQboOAuth({
+      request: new Request(`${config.redirectUri}?code=one-time-code&state=${authorize.searchParams.get("state")}&realmId=${realm}`),
+      actorId: ctx.userId, selectedBreweryId: brewery.id, redirectUri: config.redirectUri,
+      client: oauthClient, store: { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth },
+    });
+    expect((await admin.from("qbo_connections").select("granted_scopes").eq("brewery_id", brewery.id).single()).data?.granted_scopes)
+      .toEqual(requestedScopes);
+
+    const buyer = await makeCustomerUser(customer.customerId);
+    const portalCtx = { db: await asUser(buyer.email), userId: buyer.id, breweryId: brewery.id,
+      customerId: customer.customerId, role: "customer" as const };
+    const taxFetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(new Response(JSON.stringify({
+      data: { indirectTaxCalculateSaleTransactionTax: { taxCalculation: {
+        taxTotals: { totalTaxAmountExcludingShipping: { value: "1.00", currency: "USD" } },
+        shipping: { taxAmount: { value: "0.00", currency: "USD" } },
+      } } },
+    }), { status: 200 }));
+    await expect(quotePortalOrder(portalCtx, {
+      shipToId: customer.shipToId, lines: [{ skuId: catalog.skuId, qty: 1 }],
+    }, crypto.randomUUID(), new QboOAuthClient(config, taxFetch))).resolves.toMatchObject({ taxStatus: "calculated", taxCents: 100 });
+    expect(taxFetch).toHaveBeenCalledTimes(1);
+
+    const narrowFetch = vi.fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        access_token: "narrow-access", refresh_token: "narrow-refresh", expires_in: 3600,
+        scope: QBO_ACCOUNTING_SCOPE,
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ CompanyInfo: { Id: "1" } }), { status: 200 }));
+    const narrowClient = new QboOAuthClient(config, narrowFetch);
+    const narrow = new URL((await beginQboOAuth(ctx, narrowClient, "reconnect", crypto.randomUUID())).authorizeUrl);
+    await completeQboOAuth({
+      request: new Request(`${config.redirectUri}?code=narrow-code&state=${narrow.searchParams.get("state")}&realmId=${realm}`),
+      actorId: ctx.userId, selectedBreweryId: brewery.id, redirectUri: config.redirectUri,
+      client: narrowClient, store: { claim: claimQboOAuth, complete: completeQboOAuthStore, fail: failQboOAuth },
+    });
+    expect((await admin.from("qbo_connections").select("granted_scopes").eq("brewery_id", brewery.id).single()).data?.granted_scopes)
+      .toEqual([QBO_ACCOUNTING_SCOPE]);
+  });
+
   it("rejects wrong-actor, expired, and replayed callbacks before the mocked token fetch", async () => {
     const brewery = await makeBrewery();
     const ctx = await makeStaffCtx(brewery.id, "admin");

@@ -121,8 +121,12 @@ export async function claimQboOAuth(stateHash: string, actorId: string, breweryI
     p_state_hash: stateHash, p_actor: actorId, p_brewery: breweryId, p_redirect_uri: redirectUri,
   }).maybeSingle();
   if (error || !data) return null;
-  const row = data as { intent_id: string; brewery_id: string; provider_intent: "connect" | "reconnect" };
-  return { intentId: row.intent_id, breweryId: row.brewery_id, providerIntent: row.provider_intent };
+  const row = data as { intent_id: string; brewery_id: string; provider_intent: "connect" | "reconnect"; requested_scopes: unknown };
+  if (!Array.isArray(row.requested_scopes) || row.requested_scopes.some((scope) => typeof scope !== "string")) return null;
+  return {
+    intentId: row.intent_id, breweryId: row.brewery_id,
+    providerIntent: row.provider_intent, requestedScopes: row.requested_scopes,
+  };
 }
 
 export async function completeQboOAuthStore(intentId: string, actorId: string, realmId: string, tokens: import("@/lib/qbo").QboTokens) {

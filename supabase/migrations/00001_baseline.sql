@@ -1986,6 +1986,10 @@ create table private.qbo_oauth_intents (
   state_hash text not null unique,
   redirect_uri text not null,
   provider_intent text not null check (provider_intent in ('connect','reconnect')),
+  requested_scopes text[] not null check (
+    requested_scopes=array['com.intuit.quickbooks.accounting']::text[]
+    or requested_scopes=array['com.intuit.quickbooks.accounting','indirect-tax.tax-calculation.quickbooks']::text[]
+  ),
   expires_at timestamptz not null,
   consumed_at timestamptz,
   exchange_state text not null default 'pending' check (exchange_state in ('pending','exchanging','completed','recovery_required')),
@@ -2095,31 +2099,36 @@ language sql security definer set search_path = '' as $$
     );
 $$;
 
-create function public.begin_qbo_oauth(p_brewery uuid, p_redirect_uri text, p_state_hash text, p_provider_intent text, p_request_id uuid)
+create function public.begin_qbo_oauth(p_brewery uuid, p_redirect_uri text, p_state_hash text, p_provider_intent text, p_request_id uuid,
+  p_requested_scopes text[] default array['com.intuit.quickbooks.accounting']::text[])
 returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_replay jsonb; v_id uuid;
 begin
   if public.staff_role(p_brewery) <> 'admin' then raise exception 'permission denied'; end if;
+  if p_requested_scopes<>array['com.intuit.quickbooks.accounting']::text[]
+    and p_requested_scopes<>array['com.intuit.quickbooks.accounting','indirect-tax.tax-calculation.quickbooks']::text[] then
+    raise exception 'oauth scopes invalid';
+  end if;
   perform 1 from public.breweries where id=p_brewery for update;
   v_replay := private.claim_command_request(p_brewery, 'begin_qbo_oauth', p_request_id,
-    jsonb_build_object('redirectUri',p_redirect_uri,'stateHash',p_state_hash,'providerIntent',p_provider_intent));
+    jsonb_build_object('redirectUri',p_redirect_uri,'stateHash',p_state_hash,'providerIntent',p_provider_intent,'requestedScopes',p_requested_scopes));
   if v_replay is not null then return v_replay; end if;
   update private.qbo_oauth_intents set consumed_at=coalesce(consumed_at,now()),exchange_state='recovery_required'
   where brewery_id=p_brewery and exchange_state in ('pending','exchanging');
-  insert into private.qbo_oauth_intents(brewery_id,actor_id,state_hash,redirect_uri,provider_intent,expires_at)
-  values(p_brewery,(select auth.uid()),p_state_hash,p_redirect_uri,p_provider_intent,now()+interval '10 minutes') returning id into v_id;
+  insert into private.qbo_oauth_intents(brewery_id,actor_id,state_hash,redirect_uri,provider_intent,requested_scopes,expires_at)
+  values(p_brewery,(select auth.uid()),p_state_hash,p_redirect_uri,p_provider_intent,p_requested_scopes,now()+interval '10 minutes') returning id into v_id;
   v_replay := jsonb_build_object('intentId',v_id);
   perform private.complete_command_request(p_request_id,v_replay); return v_replay;
 end $$;
 
 create function public.claim_qbo_oauth(p_state_hash text,p_actor uuid,p_brewery uuid,p_redirect_uri text)
-returns table(intent_id uuid,brewery_id uuid,provider_intent text) language plpgsql security definer set search_path='' as $$
+returns table(intent_id uuid,brewery_id uuid,provider_intent text,requested_scopes text[]) language plpgsql security definer set search_path='' as $$
 begin
  return query update private.qbo_oauth_intents i set consumed_at=now(),exchange_state='exchanging'
  where i.state_hash=p_state_hash and i.actor_id=p_actor and i.brewery_id=p_brewery and i.redirect_uri=p_redirect_uri
    and i.consumed_at is null and i.exchange_state='pending' and i.expires_at>=now()
    and exists(select 1 from public.brewery_users u where u.brewery_id=i.brewery_id and u.user_id=p_actor and u.role='admin')
- returning i.id,i.brewery_id,i.provider_intent;
+ returning i.id,i.brewery_id,i.provider_intent,i.requested_scopes;
 end $$;
 
 create function public.fail_qbo_oauth(p_intent uuid,p_actor uuid)
@@ -2133,15 +2142,17 @@ returns boolean language sql security definer set search_path='' as $$
  ) select coalesce((select true from changed),false)
 $$;
 
-create function public.complete_qbo_oauth(p_intent uuid,p_actor uuid,p_realm_id text,p_realm_label text,p_access_token text,p_refresh_token text,p_received_at timestamptz,p_access_seconds int,p_refresh_seconds int,p_hard_seconds int,p_granted_scopes text[] default '{}')
+create function public.complete_qbo_oauth(p_intent uuid,p_actor uuid,p_realm_id text,p_realm_label text,p_access_token text,p_refresh_token text,p_received_at timestamptz,p_access_seconds int,p_refresh_seconds int,p_hard_seconds int,p_granted_scopes text[] default null)
 returns uuid language plpgsql security definer set search_path='' as $$
-declare i private.qbo_oauth_intents; v_id uuid:=private.new_uuid(); v_version bigint;
+declare i private.qbo_oauth_intents; v_id uuid:=private.new_uuid(); v_version bigint; v_scopes text[];
 begin
  select * into i from private.qbo_oauth_intents where id=p_intent for update;
  if i.id is null or i.actor_id<>p_actor or i.exchange_state<>'exchanging' or not exists(select 1 from public.brewery_users u where u.brewery_id=i.brewery_id and u.user_id=p_actor and u.role='admin') then raise exception 'oauth state invalid'; end if;
+ if p_granted_scopes is not null and not p_granted_scopes<@i.requested_scopes then raise exception 'oauth scopes invalid'; end if;
+ v_scopes:=coalesce(p_granted_scopes,i.requested_scopes);
  perform 1 from private.integration_tokens where brewery_id=i.brewery_id and provider='qbo' for update;
  insert into public.qbo_connections(id,brewery_id,realm_id,realm_label,state,access_expires_at,refresh_expires_at,refresh_hard_expires_at,remote_revocation_state,last_error,credential_version,connected_by,updated_at,granted_scopes)
- values(v_id,i.brewery_id,p_realm_id,p_realm_label,'connected',p_received_at+make_interval(secs=>p_access_seconds),case when p_refresh_seconds is null then null else p_received_at+make_interval(secs=>p_refresh_seconds) end,case when p_hard_seconds is null then null else p_received_at+make_interval(secs=>p_hard_seconds) end,'not_requested',null,1,p_actor,now(),coalesce(p_granted_scopes,'{}'))
+ values(v_id,i.brewery_id,p_realm_id,p_realm_label,'connected',p_received_at+make_interval(secs=>p_access_seconds),case when p_refresh_seconds is null then null else p_received_at+make_interval(secs=>p_refresh_seconds) end,case when p_hard_seconds is null then null else p_received_at+make_interval(secs=>p_hard_seconds) end,'not_requested',null,1,p_actor,now(),v_scopes)
  on conflict(brewery_id) do update set id=case when qbo_connections.realm_id=excluded.realm_id then qbo_connections.id else excluded.id end,realm_id=excluded.realm_id,realm_label=excluded.realm_label,state='connected',access_expires_at=excluded.access_expires_at,refresh_expires_at=excluded.refresh_expires_at,refresh_hard_expires_at=excluded.refresh_hard_expires_at,remote_revocation_state='not_requested',last_error=null,
    qbo_deposit_item_id=case when qbo_connections.realm_id=excluded.realm_id then qbo_connections.qbo_deposit_item_id end,
    granted_scopes=excluded.granted_scopes,credential_version=qbo_connections.credential_version+1,connected_by=p_actor,updated_at=now()
@@ -2202,7 +2213,7 @@ begin
 end
 $$;
 
-grant execute on function public.begin_qbo_oauth(uuid,text,text,text,uuid) to authenticated;
+grant execute on function public.begin_qbo_oauth(uuid,text,text,text,uuid,text[]) to authenticated;
 grant execute on function public.claim_qbo_oauth(text,uuid,uuid,text),public.fail_qbo_oauth(uuid,uuid),
  public.complete_qbo_oauth(uuid,uuid,text,text,text,text,timestamp with time zone,int,int,int,text[]),
  public.cas_integration_tokens(uuid,text,uuid,uuid,bigint,text,text,timestamp with time zone,int,int,int),
@@ -5023,6 +5034,7 @@ begin
   select c.id,c.realm_id,c.qbo_deposit_item_id into v_connection,v_realm,v_deposit_item
   from public.qbo_connections c
   where c.brewery_id=p_brewery and c.state='connected'
+    and 'com.intuit.quickbooks.accounting'=any(c.granted_scopes)
     and 'indirect-tax.tax-calculation.quickbooks'=any(c.granted_scopes)
     and c.realm_id=v_snapshot#>>'{customer,qboRealmId}'
     and nullif(v_snapshot#>>'{customer,qboCustomerId}','') is not null
@@ -5140,6 +5152,8 @@ language sql stable security definer set search_path='' as $$
   join private.integration_tokens t on t.brewery_id=q.brewery_id and t.provider='qbo' and t.connection_id=c.id
   where q.id=p_quote and q.actor_id=p_actor and q.brewery_id=p_brewery and q.customer_id=p_customer
     and q.tax_status='pending' and q.expires_at>now() and q.snapshot ? 'taxInput'
+    and 'com.intuit.quickbooks.accounting'=any(c.granted_scopes)
+    and 'indirect-tax.tax-calculation.quickbooks'=any(c.granted_scopes)
     and exists(select 1 from public.customer_users u where u.customer_id=p_customer and u.user_id=p_actor)
 $$;
 
@@ -9958,7 +9972,7 @@ grant execute on function get_taproom_variance(uuid,uuid,integer),get_taproom_dr
 -- transport-only exception. It accepts no caller-controlled identity or limit.
 revoke all on function public.consume_command_admission() from public, anon, authenticated, service_role;
 grant execute on function public.consume_command_admission() to authenticated;
-grant execute on function public.begin_qbo_oauth(uuid,text,text,text,uuid) to authenticated;
+grant execute on function public.begin_qbo_oauth(uuid,text,text,text,uuid,text[]) to authenticated;
 grant execute on function public.set_qbo_customer_mapping(uuid,uuid,text,uuid),
   public.set_qbo_item_mapping(uuid,uuid,text,uuid),public.set_qbo_deposit_mapping(uuid,text,uuid),
   public.set_qbo_push_defaults(uuid,boolean,boolean,uuid),public.write_off_invoice(uuid,uuid,text,uuid),
