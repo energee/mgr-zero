@@ -104,6 +104,12 @@ that resolve JSX symbols and composition, or component assembly tests that
 assert the actual shared component and surface identities. Do not build a
 new generic analysis framework when a focused existing test can prove it.
 
+Before changing a parity branch, check the latest `main` CI result and its
+runtime/tooling contract. Record unrelated failures as prerequisites instead
+of spending a parity CI cycle rediscovering them. A worktree may also need the
+repository's validated `.env.test.local` copied into it even for pure Vitest,
+because test configuration loads the environment before selecting test files.
+
 Refactor in this direction:
 
 `explorer drawing → shared interactive view ← live data/action adapter`
@@ -135,6 +141,14 @@ implementation, not merely a parent page that exists. Do not weaken assertions
 or add blanket exceptions to make existing bypasses pass. Report existing debt
 explicitly; do not claim global enforcement from checks covering only one flow.
 
+When introducing a repo-wide composition gate, keep current debt as exact,
+reviewable entries so CI blocks growth without pretending the debt is fixed.
+Track view composition, inline inventory JSX, and surface mismatches separately;
+each conversion must remove its exact entries, and stale entries must fail.
+Follow locally imported components that are actually mounted. Prove the check
+with two tiny fixtures: a delegating wrapper that passes and an unused expected
+import beside different JSX that fails.
+
 ## Completion gate
 
 For changed behavior, demonstrate the relevant regression failing before the
@@ -147,3 +161,9 @@ Screenshots and browser checks may satisfy the repository's visual smoke-test
 requirement, but never establish architectural parity. Report the shared view,
 surface, fixture adapter, live adapter, code-based evidence, and any remaining
 gap. Skill installation alone does not add a CI gate or repair existing UI.
+
+Track delivery pace in each PR: original engineering estimate, agent
+implementation elapsed time, full-CI cycles and duration, rework cause, and the
+number of parity-debt entries removed. After each completed slice, use the
+observed throughput to revise the remaining estimate. Keep CI wait separate
+from implementation time so a slow gate does not masquerade as slow conversion.
