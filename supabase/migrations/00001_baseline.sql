@@ -3491,6 +3491,13 @@ create table private.command_previews (
 );
 create index command_previews_expiry_idx on private.command_previews(expires_at);
 
+-- These rows are reachable only through the author/tenant-checking definer
+-- functions below. Keep RLS policy-free so a future direct table grant still
+-- exposes no rows rather than silently becoming a second access path.
+alter table private.chat_conversations enable row level security;
+alter table private.chat_messages enable row level security;
+alter table private.command_previews enable row level security;
+
 create table private.command_requests (
   actor_id uuid not null,
   brewery_id uuid,
@@ -3733,7 +3740,7 @@ create function preview_inventory_movement(
   p_brewery uuid,p_sku uuid,p_location uuid,p_bin uuid,p_qty numeric,p_type public.movement_type,
   p_sale_channel uuid,p_dest_state text,p_note text,p_lot uuid,p_conversation uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_actor uuid; v_token uuid := private.new_uuid(); v_input jsonb; v_effects jsonb; v_version jsonb := '{}'::jsonb;
+declare v_actor uuid; v_token uuid := private.new_uuid(); v_input jsonb; v_effects jsonb; v_version jsonb;
 begin
   v_actor := private.assert_staff(p_brewery,array['admin','warehouse']::public.staff_role[]);
   perform private.assert_chat_conversation(p_brewery,p_conversation);
@@ -3744,6 +3751,30 @@ begin
     then raise exception 'invalid movement selection'; end if;
   v_input := jsonb_build_object('brewery',p_brewery,'sku',p_sku,'location',p_location,'bin',p_bin,'qty',p_qty,
     'type',p_type,'sale_channel',p_sale_channel,'dest_state',p_dest_state,'note',p_note,'lot',p_lot);
+  -- C1 persists the real proposal dependencies. C2 will lock, rebuild and
+  -- compare this version atomically before the first commit.
+  select jsonb_build_object(
+    'sku',jsonb_build_object('id',s.id,'name',s.name),
+    'brand',jsonb_build_object('id',br.id,'name',br.name),
+    'format',jsonb_build_object('id',f.id,'name',f.name,'bblPerUnit',coalesce(f.bbl_per_unit,
+      (select sum(fc.qty*child.bbl_per_unit) from public.format_components fc
+        join public.formats child on child.id=fc.child_format_id and child.brewery_id=fc.brewery_id
+        where fc.brewery_id=p_brewery and fc.parent_format_id=f.id))),
+    'location',jsonb_build_object('id',l.id,'name',l.name),
+    'bin',jsonb_build_object('id',b.id,'name',b.name),
+    'lot',(select jsonb_build_object('id',lot.id,'code',lot.code,'packagedOn',lot.packaged_on,'bestBy',lot.best_by)
+      from public.lots lot where lot.id=p_lot and lot.brewery_id=p_brewery),
+    'channel',(select jsonb_build_object('id',ch.id,'name',ch.name,'taxTreatment',ch.tax_treatment)
+      from public.sale_channels ch where ch.id=p_sale_channel and ch.brewery_id=p_brewery),
+    'stock',(select jsonb_build_object('movementCount',count(*),'qty',coalesce(sum(m.qty),0),'bbl',coalesce(sum(m.bbl),0))
+      from public.inventory_movements m where m.brewery_id=p_brewery and m.sku_id=p_sku and m.location_id=p_location
+        and m.bin_id=p_bin and m.lot_id is not distinct from p_lot)
+  ) into v_version
+  from public.skus s join public.brands br on br.id=s.brand_id and br.brewery_id=s.brewery_id
+  join public.formats f on f.id=s.format_id and f.brewery_id=s.brewery_id
+  join public.locations l on l.id=p_location and l.brewery_id=s.brewery_id
+  join public.bins b on b.id=p_bin and b.location_id=l.id and b.brewery_id=l.brewery_id
+  where s.id=p_sku and s.brewery_id=p_brewery;
   select jsonb_build_array(jsonb_build_object('label',s.name||' · '||l.name||' · '||b.name,'qty',p_qty::text))
     into v_effects from public.skus s cross join public.locations l cross join public.bins b
     where s.id=p_sku and s.brewery_id=p_brewery and l.id=p_location and l.brewery_id=p_brewery
