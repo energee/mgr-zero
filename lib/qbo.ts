@@ -80,6 +80,9 @@ type QboInvoiceRead = {
   content: Record<string, unknown>;
 } | { ok: false; status: number; definitive: boolean };
 
+type QboPaymentCashAllocations = ReadonlyMap<string, number>;
+type QboPaymentCache = Map<string, Promise<QboPaymentCashAllocations>>;
+
 function positiveSeconds(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
 }
@@ -315,13 +318,14 @@ export async function syncQboInvoices(ctx: Ctx, requestId: string, client: QboOA
   if (isPast(tokens.accessExpiresAt)) tokens = await refreshQboCredentials(ctx, client, tokens);
 
   const observations: QboInvoiceObservation[] = [];
+  const paymentCache: QboPaymentCache = new Map();
   for (const target of start.targets) {
-    let read = await client.readInvoice(start.realmId, target.remoteId, tokens.accessToken)
+    let read = await client.readInvoice(start.realmId, target.remoteId, tokens.accessToken, paymentCache)
       .catch(() => { throw new Error("QuickBooks is unavailable"); });
     if (!read.ok && read.status === 401) {
       tokens = await refreshQboCredentials(ctx, client, tokens);
       if (tokens.connectionId !== start.connectionId) throw new Error("QuickBooks is unavailable");
-      read = await client.readInvoice(start.realmId, target.remoteId, tokens.accessToken)
+      read = await client.readInvoice(start.realmId, target.remoteId, tokens.accessToken, paymentCache)
         .catch(() => { throw new Error("QuickBooks is unavailable"); });
     }
     if (!read.ok && !read.definitive) throw new Error("QuickBooks is unavailable");
@@ -427,7 +431,12 @@ export class QboOAuthClient {
     return { ok: true as const, remoteId: row.Id as string, response: safe };
   }
 
-  async readInvoice(realmId: string, remoteId: string, accessToken: string): Promise<QboInvoiceRead> {
+  async readInvoice(
+    realmId: string,
+    remoteId: string,
+    accessToken: string,
+    paymentCache: QboPaymentCache = new Map(),
+  ): Promise<QboInvoiceRead> {
     const url = new URL(`/v3/company/${encodeURIComponent(realmId)}/invoice/${encodeURIComponent(remoteId)}`, this.config.apiBaseUrl);
     url.searchParams.set("minorversion", ACCOUNTING_MINOR_VERSION);
     const response = await this.transport(url, {
@@ -455,7 +464,13 @@ export class QboOAuthClient {
       ? [(item as Record<string, unknown>).TxnId as string] : []))];
     let cashCollectedCents = 0;
     for (const paymentId of paymentIds) {
-      cashCollectedCents += await this.readPaymentCashApplied(realmId, paymentId, remoteId, accessToken);
+      const key = `${realmId}:${paymentId}`;
+      let allocations = paymentCache.get(key);
+      if (!allocations) {
+        allocations = this.readPaymentCashAllocations(realmId, paymentId, accessToken);
+        paymentCache.set(key, allocations);
+      }
+      cashCollectedCents += (await allocations).get(remoteId) ?? 0;
     }
     const updated = invoice.MetaData && typeof invoice.MetaData === "object"
       ? (invoice.MetaData as Record<string, unknown>).LastUpdatedTime : null;
@@ -468,7 +483,7 @@ export class QboOAuthClient {
     };
   }
 
-  private async readPaymentCashApplied(realmId: string, paymentId: string, invoiceId: string, accessToken: string) {
+  private async readPaymentCashAllocations(realmId: string, paymentId: string, accessToken: string) {
     const url = new URL(`/v3/company/${encodeURIComponent(realmId)}/payment/${encodeURIComponent(paymentId)}`, this.config.apiBaseUrl);
     url.searchParams.set("minorversion", ACCOUNTING_MINOR_VERSION);
     const response = await this.transport(url, {
@@ -479,21 +494,46 @@ export class QboOAuthClient {
     if (!response.ok) throw new Error("QuickBooks payment response was invalid");
     const payload = await response.json() as { Payment?: Record<string, unknown> };
     const payment = payload?.Payment;
-    const amount = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
-    const total = amount(payment?.TotalAmt);
-    const unapplied = amount(payment?.UnappliedAmt);
+    const cents = (value: unknown) => {
+      if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return null;
+      const result = Math.round(value * 100);
+      return Number.isSafeInteger(result) ? result : null;
+    };
+    const total = cents(payment?.TotalAmt);
+    const unapplied = cents(payment?.UnappliedAmt);
     if (!payment || payment.Id !== paymentId || total === null || unapplied === null || unapplied > total
       || !Array.isArray(payment.Line)) throw new Error("QuickBooks payment response was invalid");
-    const applied = payment.Line.reduce((sum, line) => {
-      if (!line || typeof line !== "object") return sum;
+
+    const applications = new Map<string, number>();
+    let attributionAmbiguous = false;
+    for (const line of payment.Line) {
+      if (!line || typeof line !== "object") continue;
       const row = line as Record<string, unknown>;
       const links = Array.isArray(row.LinkedTxn) ? row.LinkedTxn : [];
-      return links.some((link) => link && typeof link === "object"
+      const invoiceIds = [...new Set(links.flatMap((link) => link && typeof link === "object"
         && (link as Record<string, unknown>).TxnType === "Invoice"
-        && (link as Record<string, unknown>).TxnId === invoiceId)
-        && typeof row.Amount === "number" && Number.isFinite(row.Amount) && row.Amount > 0 ? sum + row.Amount : sum;
-    }, 0);
-    return Math.round(Math.min(applied, total - unapplied) * 100);
+        && typeof (link as Record<string, unknown>).TxnId === "string"
+        ? [(link as Record<string, unknown>).TxnId as string] : []))];
+      if (invoiceIds.length === 0) continue;
+      const lineCents = cents(row.Amount);
+      if (lineCents === null || invoiceIds.length !== 1) {
+        attributionAmbiguous = true;
+        for (const invoiceId of invoiceIds) applications.set(invoiceId, 0);
+        continue;
+      }
+      applications.set(invoiceIds[0], (applications.get(invoiceIds[0]) ?? 0) + lineCents);
+    }
+
+    const appliedCash = total - unapplied;
+    const totalApplications = [...applications.values()].reduce((sum, amount) => sum + amount, 0);
+    if (attributionAmbiguous || (applications.size > 1 && appliedCash < totalApplications)) {
+      return new Map([...applications.keys()].map((invoiceId) => [invoiceId, 0]));
+    }
+    if (applications.size === 1) {
+      const [invoiceId, applied] = applications.entries().next().value!;
+      applications.set(invoiceId, Math.min(applied, appliedCash));
+    }
+    return applications;
   }
 
   async readInvoiceLink(realmId: string, remoteId: string, accessToken: string) {
