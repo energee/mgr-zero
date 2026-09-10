@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { formatVolume } from "@/lib/volume";
+import { formatVolume, parseVolumeToBbl } from "@/lib/volume";
+
+describe("parseVolumeToBbl", () => {
+  it("converts supported display units and preserves an empty composed volume", () => {
+    expect(parseVolumeToBbl("3968", "oz")).toBe(1);
+    expect(parseVolumeToBbl("31", "gal")).toBe(1);
+    expect(parseVolumeToBbl("0.5", "bbl")).toBe(0.5);
+    expect(parseVolumeToBbl("", "bbl")).toBeUndefined();
+  });
+});
 
 describe("formatVolume", () => {
   it.each([

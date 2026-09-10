@@ -11,13 +11,25 @@ import * as React from "react";
 import { Qty, TabBar } from "@/components/mgr/qty";
 import { Field, FieldLabel } from "@/components/ui/field";
 
-export function VolumeField({ value, units, on }: { value: string; units: string[]; on: number }) {
+export function VolumeField({ value, units, on, onValueChange, onUnitChange }: {
+  value: string;
+  units: string[];
+  on: number;
+  onValueChange?: (value: string) => void;
+  onUnitChange?: (unit: string) => void;
+}) {
   const id = React.useId();
   return (
     <Field>
       {/* htmlFor, so the visible label focuses the input and names it once. */}
       <FieldLabel htmlFor={id}>Volume</FieldLabel>
-      <Qty value={value} unit={<TabBar names={units} on={on} cls="w-fit" />} label="Volume" id={id} />
+      <Qty
+        value={value}
+        onChange={onValueChange}
+        unit={<TabBar names={units} on={on} cls="w-fit" onChange={onUnitChange} />}
+        label="Volume"
+        id={id}
+      />
     </Field>
   );
 }

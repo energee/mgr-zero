@@ -19,7 +19,6 @@ const KNOWN_VIEW_DEBT = [
   "Return and credit: ReturnCreditView <- app/(app)/orders/[id]/page.tsx",
   "New order: NewOrderView <- app/(app)/orders/page.tsx",
   "Ship-to form: ShipToView <- app/(app)/customers/[id]/page.tsx",
-  "Package BOM: PackageBomView <- app/(app)/catalog/formats/[id]/page.tsx",
   "Brand: BrandView <- app/(app)/catalog/page.tsx",
   "SKU: SkuView <- app/(app)/catalog/page.tsx",
   "SKU list: SkuListView <- app/(app)/catalog/page.tsx",
@@ -30,7 +29,6 @@ const KNOWN_VIEW_DEBT = [
   "Receipt: ReceiptView <- app/(app)/purchase-orders/[id]/page.tsx",
   "Cycle count: CycleCountView <- app/(app)/materials/page.tsx",
   "Materials: MaterialsView <- app/(app)/materials/page.tsx",
-  "Format: FormatView <- app/(app)/catalog/formats/[id]/page.tsx",
   "Price group: PriceGroupView <- app/(app)/pricing/page.tsx",
 ] as const;
 
