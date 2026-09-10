@@ -5194,7 +5194,7 @@ language sql stable security definer set search_path='' as $$
   join private.integration_tokens t on t.brewery_id=i.brewery_id and t.provider='qbo' and t.connection_id=c.id
   where i.id=p_invoice and i.brewery_id=p_brewery and i.customer_id=p_customer and i.kind='invoice'
     and i.qbo_invoice_id is not null and i.qbo_sync_status='pushed' and i.qbo_remote_state='live' and i.written_off_at is null
-    and (i.paid_at is null or (i.qbo_balance_cents is not null and i.qbo_balance_cents<>0))
+    and i.qbo_balance_cents>0
     and (c.allow_online_ach_payment or c.allow_online_credit_card_payment)
     and 'com.intuit.quickbooks.accounting'=any(c.granted_scopes)
     and exists(select 1 from public.customer_users u where u.customer_id=p_customer and u.user_id=p_actor)
@@ -5217,7 +5217,7 @@ create function cas_portal_qbo_payment_tokens(
         select 1 from public.invoices i join public.qbo_connections c on c.brewery_id=i.brewery_id
         where i.id=p_invoice and i.brewery_id=p_brewery and i.customer_id=p_customer and i.kind='invoice'
           and i.qbo_invoice_id=p_remote_invoice_id and i.qbo_sync_status='pushed' and i.qbo_remote_state='live'
-          and i.written_off_at is null and (i.paid_at is null or (i.qbo_balance_cents is not null and i.qbo_balance_cents<>0))
+          and i.written_off_at is null and i.qbo_balance_cents>0
           and c.id=p_connection and c.state='connected' and (c.allow_online_ach_payment or c.allow_online_credit_card_payment)
           and exists(select 1 from public.customer_users u where u.customer_id=p_customer and u.user_id=p_actor)
           and exists(select 1 from public.qbo_pushes p where p.invoice_id=i.id and p.brewery_id=i.brewery_id
@@ -5240,7 +5240,7 @@ create function confirm_portal_qbo_payment(
     select 1 from public.invoices i join public.qbo_connections c on c.brewery_id=i.brewery_id
     where i.id=p_invoice and i.brewery_id=p_brewery and i.customer_id=p_customer and i.kind='invoice'
       and i.qbo_invoice_id=p_remote_invoice_id and i.qbo_sync_status='pushed' and i.qbo_remote_state='live'
-      and i.written_off_at is null and (i.paid_at is null or (i.qbo_balance_cents is not null and i.qbo_balance_cents<>0))
+      and i.written_off_at is null and i.qbo_balance_cents>0
       and c.id=p_connection and c.state='connected' and (c.allow_online_ach_payment or c.allow_online_credit_card_payment)
       and exists(select 1 from public.customer_users u where u.customer_id=p_customer and u.user_id=p_actor)
       and exists(select 1 from public.qbo_pushes p where p.invoice_id=i.id and p.brewery_id=i.brewery_id

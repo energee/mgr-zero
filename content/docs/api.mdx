@@ -100,9 +100,12 @@ const order = await command(breweryId, "create_order", {
 ```
 
 The customer portal's invoice-payment handoff is a session-authenticated `GET`
-instead of a registered operation. It authorizes one current invoice, reads its
-QuickBooks payment link on the server, rechecks access, and redirects without
-returning or storing that bearer link in the command API.
+instead of a registered operation. It authorizes one current live invoice only
+when QuickBooks has reported a positive balance, reads its payment link on the
+server, rechecks the balance and access, and redirects without returning or
+storing that bearer link in the command API. A zero or unknown current balance
+leaves payment unavailable; a reopened invoice with a positive balance remains
+eligible even when its history retains an earlier paid date.
 
 Outside the app, the equivalent is a POST with your own `requestId`:
 
