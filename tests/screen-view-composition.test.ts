@@ -26,7 +26,6 @@ const KNOWN_VIEW_DEBT = [
   "Review order: ReviewOrderView <- app/(portal)/portal/page.tsx",
   "Question invoice: QuestionInvoiceView <- app/(portal)/portal/invoices/[id]/page.tsx",
   "Vessel detail: VesselDetailView <- app/(app)/cellar/page.tsx",
-  "Schedule batch: ScheduleBatchView <- app/(app)/batches/page.tsx",
   "New PO: NewPoView <- app/(app)/purchase-orders/page.tsx",
   "Receipt: ReceiptView <- app/(app)/purchase-orders/[id]/page.tsx",
   "Cycle count: CycleCountView <- app/(app)/materials/page.tsx",

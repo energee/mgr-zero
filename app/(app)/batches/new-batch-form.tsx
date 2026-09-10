@@ -7,10 +7,10 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CommandForm, CommandFormFooter, CommandFormMessage } from "@/components/mgr/command-form";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { NONE, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScheduleBatchView } from "@/components/mgr/views/schedule-batch";
+import { NONE } from "@/components/ui/select";
 import { useCommandForm } from "@/lib/commands/use-command-form";
+import { toScheduleBatchViewProps } from "@/lib/mgr/schedule-batch-view";
 
 
 type Brand = { id: string; name: string };
@@ -30,45 +30,42 @@ export function NewBatchForm({ brands, recipeVersions }: { brands: Brand[]; reci
     reset: () => { setIntendedBrandId(""); setRecipeVersionId(""); setPlannedOn(""); setPlannedBbl(""); setNote(""); },
   });
   const ready = plannedOn && Number(plannedBbl) > 0;
+  const model = toScheduleBatchViewProps({
+    backHref: "/batches",
+    title: "New batch",
+    recipeId: recipeVersionId,
+    recipe: recipeVersions.find(({ id }) => id === recipeVersionId)?.label ?? "Not decided",
+    recipeOptions: recipeVersions,
+    brandId: intendedBrandId,
+    brand: brands.find(({ id }) => id === intendedBrandId)?.name ?? "Not decided",
+    brandOptions: brands.map(({ id, name: label }) => ({ id, label })),
+    plannedBbl,
+    date: plannedOn,
+    note,
+  });
+  const optional = (set: (value: string) => void) => (value: string) => set(value === NONE ? "" : value);
+  const controls = {
+    recipeId: optional(setRecipeVersionId),
+    brandId: optional(setIntendedBrandId),
+    plannedBbl: setPlannedBbl,
+    date: setPlannedOn,
+    note: setNote,
+  };
   return (
-    <CommandForm open={form.open} onOpenChange={form.setOpen} title="New batch" trigger={<Button size="sm">New batch</Button>}>
+    <CommandForm open={form.open} onOpenChange={form.setOpen} title="Schedule batch" trigger={<Button size="sm">New batch</Button>}>
       <form onSubmit={form.submit} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="bat-recipe">Recipe version · optional</Label>
-          <Select value={recipeVersionId || NONE} onValueChange={(v) => setRecipeVersionId(v === NONE ? "" : v)}>
-            <SelectTrigger id="bat-recipe"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NONE}>Not decided</SelectItem>
-              {recipeVersions.map((v) => <SelectItem key={v.id} value={v.id}>{v.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="bat-brand">Brand · optional</Label>
-          <Select value={intendedBrandId || NONE} onValueChange={(v) => setIntendedBrandId(v === NONE ? "" : v)}>
-            <SelectTrigger id="bat-brand"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NONE}>Not decided</SelectItem>
-              {brands.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="bat-bbl">Planned barrels</Label>
-          <Input id="bat-bbl" type="number" min="0" step="any" value={plannedBbl} onChange={(e) => setPlannedBbl(e.target.value)} required />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="bat-date">Date</Label>
-          <Input id="bat-date" type="date" value={plannedOn} onChange={(e) => setPlannedOn(e.target.value)} required />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="bat-note">Note · optional</Label>
-          <Input id="bat-note" value={note} onChange={(e) => setNote(e.target.value)} />
-        </div>
-        <CommandFormMessage error={form.error} />
-        <CommandFormFooter>
-          <Button type="submit" disabled={form.submitting || !ready}>{form.submitting ? "Saving…" : "Save schedule"}</Button>
-        </CommandFormFooter>
+        <ScheduleBatchView
+          model={model}
+          controls={controls}
+          messages={<CommandFormMessage error={form.error} />}
+          footer={
+            <CommandFormFooter>
+              <Button type="submit" disabled={form.submitting || !ready}>
+                {form.submitting ? "Saving…" : "Save schedule"}
+              </Button>
+            </CommandFormFooter>
+          }
+        />
       </form>
     </CommandForm>
   );
