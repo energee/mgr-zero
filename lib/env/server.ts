@@ -4,4 +4,8 @@ import { readServerEnv } from "./server-parser";
 
 export { readServerEnv, type ServerEnv } from "./server-parser";
 
-export const serverEnv = readServerEnv();
+let serverEnv: ReturnType<typeof readServerEnv> | undefined;
+
+export function getServerEnv() {
+  return (serverEnv ??= readServerEnv());
+}

@@ -70,4 +70,11 @@ describe("environment validation", () => {
     expect(serverOnlyDeclaration).toContain('declare module "server-only"');
     expect(seed).not.toContain('from "@/lib/env/server";');
   });
+
+  it("does not read server secrets while Next.js collects route modules", () => {
+    const serverEnv = readFileSync(resolve(__dirname, "..", "lib", "env", "server.ts"), "utf8");
+
+    expect(serverEnv).toContain("export function getServerEnv()");
+    expect(serverEnv).not.toContain("export const serverEnv = readServerEnv()");
+  });
 });

@@ -1,4 +1,4 @@
-import { serverEnv } from "@/lib/env/server";
+import { getServerEnv } from "@/lib/env/server";
 import { E } from "@/components/mgr/e";
 import { SettingsView } from "@/components/mgr/views/settings";
 import { getActiveBrewery } from "@/lib/brewery";
@@ -14,6 +14,7 @@ import { SettingsForm, type BrewerySettings } from "./settings-form";
 
 export default async function SettingsPage() {
   const brewery = await getActiveBrewery();
+  const serverEnv = getServerEnv();
   if (brewery.role !== "admin") redirect(deniedHref("Settings", ["admin"]));
   const ctx = await buildContext(brewery.id);
   const [row, locations, team] = await Promise.all([
