@@ -86,8 +86,9 @@ export function ComposerStripView({
   );
 }
 
-export function ComposerConversationView({ messages, activity, error, onRetry, onNewChat, onMinimize }: {
+export function ComposerConversationView({ messages, model, activity, error, onRetry, onNewChat, onMinimize }: {
   messages: ComposerConversationMessage[];
+  model?: string;
   activity?: string;
   error?: string;
   onRetry?: () => void;
@@ -96,8 +97,8 @@ export function ComposerConversationView({ messages, activity, error, onRetry, o
 }) {
   return (
     <section aria-label="MGR conversation" className="overflow-hidden rounded-2xl border bg-card shadow-xl">
-      <header className="flex items-center justify-between border-b px-4 py-3">
-        <div><h2 className="font-semibold">Ask MGR</h2><p className="text-xs text-muted-foreground">Answers use your brewery data and permissions.</p></div>
+      <header className="flex flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div><h2 className="font-semibold">Ask MGR</h2><p className="text-xs text-muted-foreground">Answers use your brewery data and permissions.{model ? ` · ${model}` : ""}</p></div>
         <div className="flex gap-1"><Button type="button" size="sm" variant="ghost" onClick={onNewChat}>New chat</Button><Button type="button" size="sm" variant="ghost" onClick={onMinimize}>Minimize</Button></div>
       </header>
       <div role="log" aria-live="polite" className="max-h-[28rem] space-y-3 overflow-y-auto p-4">

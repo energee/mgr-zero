@@ -19,6 +19,7 @@ export function Composer({ role }: { role: StaffRole }) {
   const breweryId = expectedContext.breweryId ?? "";
   const [conversationId, setConversationId] = useState<string>();
   const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
+  const [model, setModel] = useState("");
   const [minimized, setMinimized] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [setupError, setSetupError] = useState<string>();
@@ -49,8 +50,12 @@ export function Composer({ role }: { role: StaffRole }) {
     let active = true;
     void (async () => {
       try {
-        const conversations = await run("list_chat_conversations", {}) as { id: string }[];
+        const [conversations, ai] = await Promise.all([
+          run("list_chat_conversations", {}) as Promise<{ id: string }[]>,
+          run("get_brewery_ai_model", {}) as Promise<{ model: string }>,
+        ]);
         if (!active) return;
+        setModel(ai.model);
         if (!conversations[0]) { await newChat(); return; }
         const id = conversations[0].id;
         const history = await run("get_chat_history", { conversationId: id }) as { messages: StoredMessage[] };
@@ -107,7 +112,7 @@ export function Composer({ role }: { role: StaffRole }) {
   }
 
   return <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
-    {minimized ? <Button type="button" variant="outline" className="self-end" onClick={() => setMinimized(false)}>Open conversation</Button> : <ComposerConversationView messages={transcript} activity={status === "submitted" ? "Thinking…" : status === "streaming" ? "Responding…" : undefined} error={setupError ?? error?.message} onRetry={() => { clearError(); void regenerate(); }} onNewChat={() => void newChat()} onMinimize={() => setMinimized(true)} />}
+    {minimized ? <Button type="button" variant="outline" className="self-end" onClick={() => setMinimized(false)}>Open conversation</Button> : <ComposerConversationView messages={transcript} model={model} activity={status === "submitted" ? "Thinking…" : status === "streaming" ? "Responding…" : undefined} error={setupError ?? error?.message} onRetry={() => { clearError(); void regenerate(); }} onNewChat={() => void newChat()} onMinimize={() => setMinimized(true)} />}
     {proposal && !receipt && <ComposerProposalView effects={proposal.effects} warnings={proposal.warnings} openHref={movementFormHref(proposal.input)} onCommit={() => void commitProposal()} committing={committing} />}
     {receipt && <p role="status" className="rounded-md border bg-card p-3 text-sm font-medium">{receipt}</p>}
     {outboxOpen && <><OfflineOutboxView rows={outboxEntries.map((entry) => ({ id: entry.id, label: entry.label, status: entry.lastError ?? entry.state, retryable: entry.state === "queued" || entry.state === "uncertain" }))} busy={outboxBusy} onRetry={(id) => void retryOutbox(id)} onRetryAll={() => void retryOutbox()} onDiscard={(id) => discardEntries([id])} onDiscardAll={() => discardEntries(outboxEntries.map((entry) => entry.id))} /><Button type="button" variant="ghost" className="self-start" onClick={() => setOutboxOpen(false)}>Close outbox</Button></>}

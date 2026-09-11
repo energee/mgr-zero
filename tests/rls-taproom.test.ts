@@ -230,7 +230,7 @@ describe("taproom complete public RLS read boundary", () => {
   });
 
   it("projects only safe brewery columns through both view and direct function", async () => {
-    const expected = [{ id: own.brewery.id, name: own.brewery.name, timezone: "America/New_York", gravity_unit: "plato" }];
+    const expected = [{ id: own.brewery.id, name: own.brewery.name, timezone: "America/New_York", gravity_unit: "plato", ai_model: null }];
     const view = await db.from("staff_brewery").select("*");
     const direct = await db.rpc("staff_brewery_rows");
     expect(view.error).toBeNull(); expect(direct.error).toBeNull();
@@ -293,7 +293,7 @@ it("classifies and rejects every remaining tenant RPC using owned resources", as
   const cases: Record<string, unknown[]> = {
     reverse_inventory_movement: [B,reversible.id,"Wrong entry",R()],
     preview_inventory_movement: [B,SKU,W,BIN,1,"adjustment",null,null,null,null,R()],
-    set_brewery_operating_defaults: [B,24,R()], begin_csv_import: [B,"opening_balances",importRows,R()], import_csv_row: [B,importRequest,0],
+    set_brewery_operating_defaults: [B,24,R()], set_brewery_ai_model: [B,"openai/gpt-5.4",R()], begin_csv_import: [B,"opening_balances",importRows,R()], import_csv_row: [B,importRequest,0],
     claim_invite_request: [B,`${name}@test.local`,"staff","warehouse",null,R()], complete_invite_membership: [inviteRequest], record_invite_failure: [failureRequest],
     record_keg_event: [B,f.pool.id,"half_bbl",1,"acquired",W,BIN,null,null,R()], update_keg_pool: [B,f.pool.id,name,null,null,0,true,R()], create_keg_pool: [B,name,"owned",null,null,0,R()],
     begin_chat_installation: [B,"slack","https://example.test/chat/callback","state",R()], begin_chat_reauthorization: [B,I,"https://example.test/chat/callback","state",R()],

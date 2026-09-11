@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { E } from "@/components/mgr/e";
 import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-icons";
 import type { SettingsViewModel } from "@/lib/mgr/settings-view";
+import { AiModelSettingsView } from "@/components/mgr/views/ai-model-settings";
 
 export type { SettingsViewModel };
 
@@ -11,12 +12,14 @@ export function SettingsView({
   model,
   breweryForm,
   fulfillmentForm,
+  aiModelForm,
   deployment,
   links,
 }: {
   model: SettingsViewModel;
   breweryForm?: ReactNode;
   fulfillmentForm?: ReactNode;
+  aiModelForm?: ReactNode;
   deployment?: ReactNode;
   links?: ReactNode;
 }) {
@@ -41,6 +44,7 @@ export function SettingsView({
           {E.btn("Save warehouse", "g")}
         </>
       )}
+      {aiModelForm ?? <AiModelSettingsView value={model.aiModel} models={model.aiModels} />}
       {deployment}
       {links ?? (
         <>

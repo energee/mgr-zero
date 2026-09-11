@@ -8,6 +8,8 @@ export type SettingsViewModel = {
   paLicense: string;
   phone: string;
   overdueHours: string;
+  aiModel: string;
+  aiModels: { id: string; name: string }[];
   deployment: string;
   warehouse: string;
   warehouseOptions: string[];

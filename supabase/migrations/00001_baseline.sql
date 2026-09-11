@@ -187,16 +187,16 @@ $$;
 
 -- Own account display/defaults without private brewery settings.
 create function staff_brewery_rows()
-returns table (id uuid, name text, timezone text, gravity_unit text)
+returns table (id uuid, name text, timezone text, gravity_unit text, ai_model text)
 language sql stable security definer set search_path = '' as $$
-  select b.id, b.name, b.timezone, b.gravity_unit from public.breweries b
+  select b.id, b.name, b.timezone, b.gravity_unit, b.settings->>'ai_model' from public.breweries b
   join public.brewery_users u on u.brewery_id = b.id
   where u.user_id = auth.uid() and private.request_scope_allows(b.id);
 $$;
 create view staff_brewery with (security_invoker = true) as
-  select id, name, timezone, gravity_unit from public.staff_brewery_rows();
+  select id, name, timezone, gravity_unit, ai_model from public.staff_brewery_rows();
 comment on function staff_brewery_rows() is
-  'Own staff account projection only; never add private settings or license identifiers.';
+  'Own staff account projection only; exposes the safe AI model preference, never private settings or license identifiers.';
 
 -- Per-brewery document numbers (orders, invoices, POs, batches, runs).
 create table brewery_counters (
@@ -8183,6 +8183,23 @@ begin
 end $$;
 revoke all on function set_brewery_operating_defaults(uuid,int,uuid) from public,anon,authenticated,service_role;
 grant execute on function set_brewery_operating_defaults(uuid,int,uuid) to authenticated;
+
+create function set_brewery_ai_model(p_brewery uuid,p_model text,p_request_id uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare v_replay jsonb; v_result jsonb;
+begin
+  perform private.assert_staff(p_brewery,array['admin']::public.staff_role[]);
+  if p_model !~ '^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$' or length(p_model)>200 then
+    raise exception 'invalid AI Gateway model' using errcode='P0001';
+  end if;
+  v_replay:=private.claim_command_request(p_brewery,'set_brewery_ai_model',p_request_id,jsonb_build_object('model',p_model));
+  if v_replay is not null then return v_replay; end if;
+  update public.breweries set settings=jsonb_set(settings,'{ai_model}',to_jsonb(p_model)) where id=p_brewery;
+  v_result:=jsonb_build_object('model',p_model);
+  return private.complete_command_request(p_request_id,v_result);
+end $$;
+revoke all on function set_brewery_ai_model(uuid,text,uuid) from public,anon,authenticated,service_role;
+grant execute on function set_brewery_ai_model(uuid,text,uuid) to authenticated;
 
 -- A completed request needs no new provider validation. This reveals only
 -- presence; the authenticated write still checks the full canonical identity.

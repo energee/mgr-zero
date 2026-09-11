@@ -10,6 +10,7 @@
 import { z } from "zod";
 import { defineCommand, defineQuery, unwrap, STAFF_ROLES } from "./registry";
 import { GRAVITY_UNITS, type GravityUnit } from "@/lib/mgr/gravity-unit";
+import { chatModelFromSettings, DEFAULT_CHAT_MODEL } from "@/lib/chat/models";
 
 defineQuery({
   name: "get_gravity_unit",
@@ -49,6 +50,7 @@ defineCommand({
 });
 
 const readingDueHours = z.number().int().min(1).max(168);
+const gatewayModel = z.string().trim().min(3).max(200).regex(/^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*$/i);
 const BREWERY_COLUMNS = "id, name, timezone, ttb_registry_no, pa_license_no, customer_phone, fermentation_reading_due_hours, gravity_unit, portal_fulfillment_location_id";
 
 defineQuery({
@@ -71,6 +73,23 @@ defineCommand({
     p_brewery: ctx.breweryId, p_name: i.name, p_timezone: i.timezone, p_ttb_registry_no: i.ttbRegistryNo || null,
     p_pa_license_no: i.paLicenseNo || null, p_customer_phone: i.customerPhone || null, p_reading_due_hours: i.readingDueHours,
     p_request_id: execution.requestId,
+  })),
+});
+
+defineQuery({
+  name: "get_brewery_ai_model", description: "Read the brewery-wide AI Gateway model used by Ask MGR",
+  input: z.object({}), roles: STAFF_ROLES,
+  handler: async (ctx) => {
+    const row = await unwrap(ctx.db.from("staff_brewery").select("ai_model").eq("id", ctx.breweryId).single()) as { ai_model: string | null };
+    return { model: chatModelFromSettings({ ai_model: row.ai_model }, process.env.AI_GATEWAY_MODEL ?? DEFAULT_CHAT_MODEL) };
+  },
+});
+
+defineCommand({
+  name: "set_brewery_ai_model", description: "Set the brewery-wide AI Gateway model used by Ask MGR",
+  input: z.object({ model: gatewayModel }), roles: ["admin"],
+  handler: (ctx, i, execution) => unwrap(ctx.db.rpc("set_brewery_ai_model", {
+    p_brewery: ctx.breweryId, p_model: i.model, p_request_id: execution.requestId,
   })),
 });
 
