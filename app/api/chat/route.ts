@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { buildRouteContext } from "@/lib/commands/context";
 import { CommandError, runCommand, type Ctx } from "@/lib/commands/registry";
 import { createComposerTools } from "@/lib/chat/agent";
-import { parseChatRequest } from "@/lib/chat/request";
+import { readChatRequest } from "@/lib/chat/request";
 import "@/lib/commands/all";
 
 const SYSTEM = `You are MGR, a concise brewery operations assistant. Use tools for brewery facts; never invent records, quantities, units, identifiers, or current state. Ask one focused question when required input is missing or ambiguous. Writes are proposals only: explain the exact server preview and tell the user to confirm it in the interface. Never claim a write happened from a tool call.`;
@@ -14,7 +14,7 @@ function execution(requestId = crypto.randomUUID()) {
 
 export async function POST(req: Request) {
   try {
-    const body = parseChatRequest(await req.json());
+    const body = await readChatRequest(req);
     const context = await buildRouteContext(body.breweryId, body.expectedContext);
     if (context.breweryId === null) throw new CommandError("brewery context required", 403, "permission_denied");
     if (!process.env.AI_GATEWAY_API_KEY && !process.env.VERCEL_OIDC_TOKEN) {
