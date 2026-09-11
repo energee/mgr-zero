@@ -20,6 +20,7 @@ const AUTHORIZE_URL = "https://appcenter.intuit.com/connect/oauth2";
 const TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer";
 const REVOKE_URL = "https://developer.api.intuit.com/v2/oauth2/tokens/revoke";
 const ACCOUNTING_MINOR_VERSION = "75";
+const QBO_PAYMENT_HOSTS = new Set(["connect.intuit.com"]);
 export const QBO_ACCOUNTING_SCOPE = "com.intuit.quickbooks.accounting";
 export const QBO_TAX_SCOPE = "indirect-tax.tax-calculation.quickbooks";
 
@@ -141,7 +142,7 @@ export async function resolvePortalInvoicePayment(
   ctx: Ctx,
   invoiceId: string,
   client: QboOAuthClient,
-  allowedHosts: ReadonlySet<string> = new Set(),
+  allowedHosts: ReadonlySet<string> = QBO_PAYMENT_HOSTS,
 ): Promise<PortalInvoicePaymentResult> {
   let claim = await readPortalInvoicePayment(ctx, invoiceId);
   if (!claim) return { kind: "unavailable", reason: "not_configured" };
