@@ -216,6 +216,8 @@ describe("structured composer state", () => {
 
   it("shares structured composer views with the staff shell and filters shell actions by persona role", () => {
     expect(E.comp().type).toBe(ComposerStripView);
+    const strip = renderToStaticMarkup(createElement(ComposerStripView));
+    expect(strip).toMatch(/<select[^>]*class="[^"]*min-w-0/);
     const live = readFileSync("components/mgr/composer.tsx", "utf8");
     expect(live).toContain("<ComposerMovementPickerView");
     expect(readFileSync("app/(app)/layout.tsx", "utf8")).toMatch(/composer=\{<Composer[^>]+role=/);

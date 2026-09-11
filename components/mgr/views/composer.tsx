@@ -88,7 +88,7 @@ export function ComposerStripView({
         disabled={disabled}
         defaultValue=""
         onChange={(event) => { if (event.target.value) onAction?.(event.target.value); event.target.value = ""; }}
-        className="min-h-9 flex-1 bg-transparent px-3 text-sm outline-none"
+        className="min-h-9 min-w-0 flex-1 bg-transparent px-3 text-sm outline-none"
       >
         <option value="">Choose a supported action…</option>
         {actions.map((action) => <option key={action.value} value={action.value}>{action.label}</option>)}
