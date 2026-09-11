@@ -3,7 +3,9 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { E } from "@/components/mgr/e";
+import { AiModelSettingsView } from "@/components/mgr/views/ai-model-settings";
 import { ComposerProposalView, ComposerStripView } from "@/components/mgr/views/composer";
+import { chatModelFromSettings, gatewayLanguageModels } from "@/lib/chat/models";
 import { canRun } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { movementFormHref, movementFormInstanceKey } from "@/lib/composer/state";
@@ -15,6 +17,33 @@ const ids = {
 };
 
 describe("AI composer", () => {
+  it("uses the saved brewery model and safely falls back", () => {
+    expect(chatModelFromSettings({ ai_model: "openai/gpt-5.4" }, "anthropic/claude-sonnet-4.5")).toBe("openai/gpt-5.4");
+    expect(chatModelFromSettings({ ai_model: "not a gateway model" }, "anthropic/claude-sonnet-4.5")).toBe("anthropic/claude-sonnet-4.5");
+    expect(chatModelFromSettings(null, "anthropic/claude-sonnet-4.5")).toBe("anthropic/claude-sonnet-4.5");
+  });
+
+  it("offers every language model returned by Gateway", () => {
+    expect(gatewayLanguageModels([
+      { id: "openai/gpt-5.4", name: "GPT-5.4", modelType: "language" },
+      { id: "google/veo", name: "Veo", modelType: "video" },
+      { id: "anthropic/claude", name: "Claude", modelType: null },
+    ])).toEqual([
+      { id: "anthropic/claude", name: "Claude" },
+      { id: "openai/gpt-5.4", name: "GPT-5.4" },
+    ]);
+  });
+
+  it("renders model selection as a shared Settings control", () => {
+    const html = renderToStaticMarkup(createElement(AiModelSettingsView, {
+      value: "openai/gpt-5.4",
+      models: [{ id: "openai/gpt-5.4", name: "GPT-5.4" }],
+    }));
+    expect(html).toContain("AI model");
+    expect(html).toContain("GPT-5.4");
+    expect(html).toContain("Save AI model");
+  });
+
   it("preserves known fields when opening the ordinary movement form", () => {
     const handoffId = "88888888-8888-4888-8888-888888888888";
     const href = movementFormHref({ ...ids, qty: -0.5, type: "depletion", note: "Festival tent" }, handoffId);
