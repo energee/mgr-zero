@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { runCommand } from "@/lib/commands/registry";
-import { toFinishedGoodsViewProps } from "@/lib/mgr/finished-goods-view";
+import { assembleFinishedGoods, toFinishedGoodsViewProps } from "@/lib/mgr/finished-goods-view";
 import { admin, insertFixture, makeBrewery, makeStaffCtx, seedCatalog, seedLocation } from "./helpers";
 import "@/lib/commands/all";
 
@@ -78,19 +78,7 @@ describe("complete finished-goods reads", () => {
       runCommand("get_bin_on_hand", {}, ctx) as Promise<StockRow[]>,
       runCommand("get_atp", {}, ctx) as Promise<StockRow[]>,
     ]);
-    const sum = (rows: StockRow[]) => rows.reduce(
-      (totals, row) => totals.set(row.sku_id, (totals.get(row.sku_id) ?? 0) + Number(row.qty)),
-      new Map<string, number>(),
-    );
-    const onHand = sum(binRows);
-    const atp = new Map(atpRows.map((row) => [row.sku_id, Number(row.qty)]));
-    const model = toFinishedGoodsViewProps({
-      skus: skus.filter((sku) => onHand.has(sku.id) || atp.has(sku.id)).map((sku) => ({
-        ...sku,
-        on_hand: onHand.get(sku.id) ?? 0,
-        atp: atp.get(sku.id) ?? onHand.get(sku.id) ?? 0,
-      })),
-    });
+    const model = toFinishedGoodsViewProps(assembleFinishedGoods(skus, binRows, atpRows));
 
     expect({ binRows: binRows.length, atpRows: atpRows.length, assembled: model.rows.length })
       .toEqual({ binRows: 1_001, atpRows: 1_001, assembled: 1_001 });
