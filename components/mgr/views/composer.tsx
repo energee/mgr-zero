@@ -72,8 +72,7 @@ export function ComposerStripView({
   onStop?: () => void;
 }) {
   return (
-    <div className="shrink-0">
-      <form onSubmit={onSubmit ? (event) => { event.preventDefault(); const message = value?.trim(); if (message) onSubmit(message); } : undefined}>
+      <form className="shrink-0" onSubmit={onSubmit ? (event) => { event.preventDefault(); const message = value?.trim(); if (message) onSubmit(message); } : undefined}>
         <InputGroup className="h-auto rounded-xl border-0 bg-muted/40 shadow-none">
           <Textarea
             ref={promptRef}
@@ -108,7 +107,6 @@ export function ComposerStripView({
           </InputGroupAddon>
         </InputGroup>
       </form>
-    </div>
   );
 }
 
