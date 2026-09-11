@@ -14,6 +14,9 @@ import type { StaffRole } from "@/lib/commands/registry";
 
 type StoredMessage = { id: string; role: "user" | "assistant" | "result"; content: string | null };
 
+export const isComposerShortcut = (event: { key?: string; metaKey?: boolean; ctrlKey?: boolean }) =>
+  event.key?.toLowerCase() === "k" && Boolean(event.metaKey || event.ctrlKey);
+
 export function Composer({ role }: { role: StaffRole }) {
   const expectedContext = useCommandContext();
   const breweryId = expectedContext.breweryId ?? "";
@@ -72,7 +75,7 @@ export function Composer({ role }: { role: StaffRole }) {
   }, [breweryId, expectedContext.actorId]);
 
   useEffect(() => {
-    const focus = (event: KeyboardEvent) => { if (event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey)) { event.preventDefault(); setOpen(true); requestAnimationFrame(() => promptRef.current?.focus()); } };
+    const focus = (event: KeyboardEvent) => { if (isComposerShortcut(event)) { event.preventDefault(); setOpen(true); requestAnimationFrame(() => promptRef.current?.focus()); } };
     addEventListener("keydown", focus); return () => removeEventListener("keydown", focus);
   }, []);
 

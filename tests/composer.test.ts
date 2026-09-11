@@ -9,6 +9,7 @@ import { chatModelFromSettings, gatewayLanguageModels } from "@/lib/chat/models"
 import { canRun } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 import { movementFormHref, movementFormInstanceKey } from "@/lib/composer/state";
+import { isComposerShortcut } from "@/components/mgr/composer";
 
 const ids = {
   skuId: "11111111-1111-4111-8111-111111111111",
@@ -17,6 +18,11 @@ const ids = {
 };
 
 describe("AI composer", () => {
+  it("ignores keydown-like events without a key", () => {
+    expect(isComposerShortcut({ metaKey: true })).toBe(false);
+    expect(isComposerShortcut({ key: "K", ctrlKey: true })).toBe(true);
+  });
+
   it("uses the saved brewery model and safely falls back", () => {
     expect(chatModelFromSettings({ ai_model: "openai/gpt-5.4" }, "anthropic/claude-sonnet-4.5")).toBe("openai/gpt-5.4");
     expect(chatModelFromSettings({ ai_model: "not a gateway model" }, "anthropic/claude-sonnet-4.5")).toBe("anthropic/claude-sonnet-4.5");
