@@ -69,7 +69,7 @@ export const STAFF_NAV: readonly NavItem[] = [
     children: [
       { label: "Invoices", href: "/invoices", roles: ["sales"], about: "QuickBooks Online mapping and push" },
       { label: "Catalog", href: "/catalog", roles: ["sales"], about: "brands and SKUs" },
-      { label: "Menu", href: "/catalog#menu", planned: true, roles: ["warehouse"] },
+      { label: "Menu", href: "/menu", roles: ["warehouse"], about: "Square menu, availability and location prices" },
       { label: "Customers", href: "/customers", roles: ["sales"], about: "accounts and ship-tos" },
       { label: "Price groups", href: "/pricing", roles: ["sales"], about: "rows of the price grid" },
       { label: "Recipes", href: "/recipes", roles: ["brewer"], about: "formulas and versions" },

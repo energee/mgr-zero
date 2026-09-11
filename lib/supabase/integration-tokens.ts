@@ -516,7 +516,7 @@ export async function finishSquarePublication(
 export async function getSquareHealth(ctx: Ctx) {
   if (ctx.role !== "admin") throw new CommandError("permission denied: brewery admin required", 403);
   const { data, error } = await ctx.db.from("pos_connections")
-    .select("id,merchant_id,merchant_label,state,remote_revocation_state,last_error,access_expires_at")
+    .select("id,merchant_id,merchant_label,state,remote_revocation_state,last_error,access_expires_at,sales_synced_through,catalog_sync_generation,updated_at")
     .eq("brewery_id", ctx.breweryId).eq("provider", "square").maybeSingle();
   if (error) throw new Error("Square health is unavailable");
   if (!data) return { connected: false, state: "disconnected" as const, merchantId: null, merchantLabel: null, lastError: null };
@@ -526,6 +526,8 @@ export async function getSquareHealth(ctx: Ctx) {
     merchantId: data.merchant_id as string | null, merchantLabel: data.merchant_label as string | null,
     remoteRevocationState: data.remote_revocation_state as "not_requested" | "pending" | "confirmed" | "unresolved",
     lastError: data.last_error as string | null, accessExpiresAt: data.access_expires_at as string | null,
+    salesSyncedThrough: data.sales_synced_through as string | null,
+    catalogGeneration: Number(data.catalog_sync_generation), updatedAt: data.updated_at as string,
   };
 }
 

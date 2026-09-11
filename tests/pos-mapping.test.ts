@@ -49,6 +49,20 @@ describe("Square explicit mapping", () => {
     await runCommand("set_pos_item_mapping", { externalItemId: "I1", externalVariationId: "V16", formatId: half.id, disposition: "mapped" }, ctx, { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID() });
     expect((await admin.from("pos_sale_expectations").select("format_id,serving_ounces").eq("brewery_id", brewery.id).order("serving_ounces", { ascending: false })).data)
       .toMatchObject([{ format_id: pint.id, serving_ounces: 16 }, { format_id: half.id, serving_ounces: 8 }]);
+
+    expect((await admin.from("pos_sales_coverage").insert({ brewery_id: brewery.id, connection_id: connectionId,
+      external_location_id: "L1", location_id: location.id, starts_at: "2026-09-01T00:00:00Z", ends_at: "2026-09-02T00:00:00Z", complete: true })).error).toBeNull();
+    const warehouseCtx = await makeStaffCtx(brewery.id, "warehouse");
+    const listing = await runCommand("list_pos_sales", {}, warehouseCtx) as { sales: { id: string; mappingStatus: string; expectedBbl: number | null; current: boolean }[]; coverage: { complete: boolean }[] };
+    expect(listing.sales).toHaveLength(2);
+    expect(listing.sales).toEqual(expect.arrayContaining([
+      expect.objectContaining({ mappingStatus: "mapped", expectedBbl: expect.any(Number), current: true }),
+    ]));
+    expect(listing.coverage).toEqual([expect.objectContaining({ complete: true })]);
+    const detail = await runCommand("get_pos_sale", { saleId: listing.sales[0].id }, warehouseCtx) as { sale: { id: string }; revisions: { id: string }[] };
+    expect(detail.sale.id).toBe(listing.sales[0].id);
+    expect(detail.revisions).toHaveLength(2);
+    await expect(runCommand("list_pos_sales", {}, await makeStaffCtx(brewery.id, "sales"))).rejects.toMatchObject({ status: 403 });
   });
 
   it("refuses duplicate, cross-tenant, and historically observed location remaps", async () => {

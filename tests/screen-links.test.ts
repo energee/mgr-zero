@@ -108,8 +108,8 @@ describe("reported explorer flows", () => {
     ["Disconnect Square", "Disconnect Square", "Connect Square"],
     ["Connect QuickBooks", "Connect QuickBooks", "Accounting"],
     ["Connect Square", "Connect Square", "Square locations"],
-    ["Point of sale", "Review", "Square → QuickBooks connector"],
-    ["Square → QuickBooks connector", "Understood", BACK],
+    ["Point of sale", "Square QuickBooks connectorReview the separate taproom revenue feed", "Square → QuickBooks connector"],
+    ["Square → QuickBooks connector", "Open Accounting", "Accounting"],
   ])("%s: %s → %s", (screen, tap, target) => {
     expect(resolveTap(by(screen), tap)).toBe(target);
   });

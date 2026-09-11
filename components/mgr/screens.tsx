@@ -79,6 +79,7 @@ import { ParsView } from "@/components/mgr/views/pars";
 import { PickView } from "@/components/mgr/views/pick";
 import { PickSheetView } from "@/components/mgr/views/pick-sheet";
 import { PlanningView } from "@/components/mgr/views/planning";
+import { ConnectSquareView, DisconnectSquareView, PointOfSaleView, PosItemView, PosMappingView, PosMenuView, PosSaleDetailView, SquareConnectorView, SquareLocationsView } from "@/components/mgr/views/pos";
 import { PortalAccountView } from "@/components/mgr/views/portal-account";
 import { PortalInvoiceView } from "@/components/mgr/views/portal-invoice";
 import { PortalInvoicesView } from "@/components/mgr/views/portal-invoices";
@@ -273,7 +274,7 @@ import { toVendorViewProps } from "@/lib/mgr/vendor-view";
 import { toVendorsViewProps } from "@/lib/mgr/vendors-view";
 import { toVesselDetailViewProps } from "@/lib/mgr/vessel-detail-view";
 import { toWorkViewProps } from "@/lib/mgr/work-view";
-import { QuickBooksMark, SlackMark, SquareMark } from "@/components/mgr/brand-icons";
+import { QuickBooksMark, SlackMark } from "@/components/mgr/brand-icons";
 import { S, sqItemFilters, sqTxnHead, X, type Venue } from "@/components/mgr/venue";
 import { MgrIcon } from "@/components/mgr-icon";
 import { saccharificationRest, type Step, totalDuration } from "@/lib/mgr/recipe-schedule";
@@ -369,9 +370,6 @@ export const INV = {
   creditMajor: "106",
   fee: "$9.48",
 } as const;
-
-// The sale channels, in the order every picker offers them.
-const CHANNELS = ["Wholesale", "Taproom", "DTC", "Export"];
 
 // Hours before a fermentation reading counts as overdue. Settings owns it;
 // Chat settings shows the same number back.
@@ -2251,52 +2249,28 @@ export const SCREENS: Screen[] = [
     step: 7,
     slice: 7,
     tab: "More",
-    gatedBy: "Program 14 P5",
     name: "POS mapping",
-    job: "Sync idempotently, map reversibly, then post explicit depletion",
-    reads: "get_pos_setup [design]",
-    writes: "connect_square · sync_square_sales [design; one security-invoker batch RPC per fetched page, deduped by unique external line ID] · set_pos_location_mapping · set_pos_item_mapping · reconcile_pos_sales [design; one RPC: selected depletion movements + sale links]",
-    states: [["permission", "warehouse or admin required", 1], ["disconnected", "Connect Square starts external OAuth", 1], ["invalid mapping", "Reconcile disabled until brand/format and quantity per sale validate", 1], ["unmapped location", "its sales hold · nothing reconciles from it", 1], ["location added in Square", "found on the next sync · appears unmapped", 1], ["mapped late", "held sales reconcile at their own dates", 1], ["closed in Square", "mapping and history kept · nothing new arrives", 1]],
+    to: { "Save mapping": "POS mapping", Open: "POS sale detail", "Taproom · Sep 1 to Sep 8": "POS mapping", "Sale · Hazy IPA · pint": "POS sale detail", "Return · Hazy IPA · pint": "POS sale detail" },
+    job: "Map or ignore Square variations and inspect immutable sales coverage without posting inventory",
+    reads: "list_pos_variations · list_skus · list_formats · list_pos_sales",
+    writes: "set_pos_item_mapping · sync_square_catalog · sync_square_sales",
+    states: [["permission", "warehouse or admin required", 1], ["disconnected", "the queue and coverage remain empty", 1], ["queued", "choose one mapping or explicitly ignore", 1], ["ignored", "sales retain an explicit disposition"], ["mapped", "expected consumption resolves from the chosen format or SKU"], ["partial sync", "never counts as complete coverage", 1], ["return", "retained as a source fact; never posts stock"]],
     spec: "Locations are never typed: ListLocations returns them at connect and they land in MGR’s list of POS locations, so the left of each row is Square’s truth and only the right is a choice. Both choices open the shared entity picker rather than a mapping page of their own: three rows do not earn a screen, and lifting them out would hide the gate from the reconcile that is blocked by it. MGR holds one Square location to one MGR location: a second claim on the same MGR location is refused, or two registers would deplete one shelf without either knowing. ListLocations runs on every sync, not only at connect: a location opened next year has to surface on its own, or its sales disappear with nothing on screen to explain it. It appears unmapped rather than defaulting to anything. Its held sales are the reason the row counts them: raw rows never delete, so mapping makes a backlog reconcilable rather than forgiving it, and each depletion posts at its own sale date. Posting a month of pours on the mapping date would balance the ledger and falsify every variance report built on it. Nothing else is asked for: once mapped, availability derives from that location’s stock and prices inherit their format defaults, so the menu fills itself. A location closed in Square keeps its mapping and its history and simply stops producing sales. External fetch/retry reuses requestId; raw sale rows never delete; no durable cursor is claimed. Reconcile posts immutable rows only after both mapping fields validate. A former SCHEMA-GATE is closed here: the sale channel is no longer a fixed four-value list pinned to Taproom but a per-brewery table of channels, so on-premise and off-premise report separately without a movement-model change. Each depletion carries a sale channel resolved as the item’s channel override, falling back to the location’s channel: never inferred, and never the old Taproom literal, so two Square locations can post under different channels. Refund lines are in the same list and the same RPC/requestId: a refund previews as a positive adjustment (inventory credit); sales-only reconcile is how v1 lost units. INVERTED (was drawn the other way round): the physical count is the source of truth and posts the depletion; POS sales post nothing and supply expected consumption. The gap between them is the product (bad pours, theft, staff drinks, comps, line cleaning), and it exists only because both halves are kept. Reconcile therefore records the expected figure and the sale links, never a movement.",
-    body: (<>
-      {E.back("Settings", "Square")}
-      {E.btn("Sync Square sales", "g")}
-      {E.info("Locations come from Square. Choose what each one feeds and which channel its sales post under.")}
-      {E.nav("Square Taproom", "MGR Taproom · channel Taproom", "ok")}
-      {E.nav("Square Warehouse", "MGR Warehouse · channel DTC", "ok")}
-      {E.nav("Square Events", "new · 42 held sales since Aug 12", "w")}
-      {E.btn("Save location mapping", "g")}
-      {E.nav("“Hazy 16 oz draft”", "Hazy IPA · ½ bbl keg")}
-      {E.fld("Qty per sale", "1/124 keg per 16 oz")}
-      {E.pick("Channel override", "Taproom", CHANNELS)}
-      {E.btn("Save item mapping", "g")}
-      {E.row("7 sales · Hazy 16 oz", "expected consumption · not posted", "−112 oz")}
-      {E.row("1 refund · Hazy 16 oz", "expected credit · not posted", "+16 oz", "w")}
-      {E.note("The weekly count posts the depletion. These sales are the expected number the count is measured against.")}
-      {E.btn("Record 7 sales + 1 refund as expected", "irr")}
-    </>),
+    body: <PosMappingView variations={[{ externalItemId: "item-hazy", externalVariationId: "var-pint", label: "Hazy IPA · pint", detail: "available · Pour · pint", disposition: "mapped" }, { externalItemId: "item-guest", externalVariationId: "var-guest", label: "Guest cider · pint", detail: "available · choose a mapping or ignore", disposition: "queued" }]} targets={[{ value: "format:pint", label: "Pour · Hazy IPA · pint" }]} coverage={["Taproom · Sep 1 to Sep 8"]} sales={[{ id: "sale-1", label: "Sale · Hazy IPA · pint", detail: "Taproom · current revision", amount: "$7.00", status: "mapped" }, { id: "return-1", label: "Return · Hazy IPA · pint", detail: "Taproom · current revision", amount: "−$7.00", status: "mapped" }]} />,
   },
   {
     step: 7,
     slice: 7,
     tab: "More",
     group: "POS",
-    name: "POS sale detail", gatedBy: "Program 14",
-    to: { "Hazy 16 oz draft \u00d7 1": "POS mapping" },
+    name: "POS sale detail",
+    to: { "Taproom · Sep 2 · 8:14 PM": "POS sale detail", "Revision 2 · sale": "POS sale detail", "Revision 1 · sale": "POS sale detail" },
     job: "Trace one Square sale through mapping, expected barrels and reconciliation",
-    reads: "get_pos_sale [design]",
+    reads: "get_pos_sale",
     writes: "none [mapping changes on POS mapping]",
     states: [["permission", "warehouse or admin required", 1], ["reconciled", "linked to a count", 0], ["unmapped", "held until item mapping validates", 1], ["refund", "expected consumption reverses"]],
     spec: "The sale detail explains expected consumption only. The physical count remains the inventory write.",
-    body: (<>
-      {E.back("POS mapping", "Square sale SQ-88421")}
-      {E.row("Square Taproom · 9/02 8:14 PM", "$7.00 · completed", "SQ-88421", "ok", SquareMark)}
-      {E.row("Hazy 16 oz draft × 1", "mapped to Hazy IPA · ½ bbl keg", E.act("Open mapping"))}
-      {E.fld("Expected consumption", "1/124 keg · 16 oz")}
-      {E.fld("Sales channel", "Taproom · inherited from location")}
-      {E.row("Weekly count · 9/03", "included in expected total · count posted depletion", E.act("Open count"), "ok")}
-      {E.info("Square supplied the expected amount. No inventory movement was posted by this sale.")}
-    </>),
+    body: <PosSaleDetailView title="Square sale SQ-88421" sale={{ id: "sale-1", label: "Hazy IPA · pint", detail: "accepted · Pour · pint", amount: "$7.00", status: "mapped", location: "Taproom", soldAt: "Sep 2 · 8:14 PM", quantity: "1", expected: "0.004 bbl · 16 oz", source: "order SQ-88421 · line 1 · revision 2" }} revisions={[{ label: "Revision 2 · sale", detail: "accepted · 1 · Pour · pint", current: true }, { label: "Revision 1 · sale", detail: "removed · retained history", current: false }]} />,
   },
   {
     step: 7,
@@ -2638,22 +2612,13 @@ export const SCREENS: Screen[] = [
     tab: "More",
     group: "POS",
     name: "Point of sale",
-    to: { Review: "Square → QuickBooks connector", Disconnect: "Disconnect Square" },
+    to: { Disconnect: "Disconnect Square", "Square locations2 mapped · 1 needs mapping": "Square locations", "POS mappingMap or ignore every Square variation; review sales and coverage": "POS mapping", "MenuOne catalog · per-location stock and price": "Menu", "Square QuickBooks connectorReview the separate taproom revenue feed": "Square → QuickBooks connector" },
     job: "Connect one POS provider and see both directions at a glance",
-    reads: "get_pos_integration_health [design; provider-neutral]",
-    writes: "begin_pos_installation · disable_pos_installation · disconnect_pos_installation [design; admin-only]",
+    reads: "get_pos_integration_health · list_pos_locations",
+    writes: "sync_square_catalog · sync_square_sales · disconnect_square",
     states: [["permission", "admin only", 1], ["no provider", "connect one before a menu can publish"], ["healthy", "catalog and sales both current"], ["sales lagging", "the menu still publishes", 1], ["token revoked", "publishing and sync both stop", 1], ["connector detected", "Square already posts taproom revenue to QuickBooks", 1], ["second location", "its own MGR location and its own channel", 1], ["unmapped location", "its sales cannot reconcile until it is mapped", 1]],
-    spec: "Provider-neutral by construction, mirroring the chat integration that already solved this: portable contracts, one adapter per provider, and a conformance test every adapter must pass (see the chat contracts module and its adapter conformance test). Square is the only adapter today and the only value this screen can offer; nothing in the copy, the commands or the schema names it. The integration tokens table already records which provider each token belongs to (QuickBooks or Square), so the seam exists below this screen. DISCOVERED from a live Square library: a taproom may already run Square’s own QuickBooks connector, which posts taproom sales into QuickBooks as Sales receipts without MGR. That is a different revenue stream from the wholesale invoices MGR pushes, so today it does not double-count, but only by luck, and a brewery running both without knowing is the failure mode. This screen detects it and says so rather than letting the accountant find two sources of taproom revenue at month end.",
-    body: (<>
-      {E.back("Settings", "Point of sale")}
-      {E.info("Publish what the taproom can sell, and read its sales back. One provider is connected at a time.")}
-      {E.row("Square · Demo Brewing LLC", "catalog published · sales syncing", E.act("Disconnect", "destructive"), "ok", SquareMark)}
-      {E.row(<>Square {E.arrow()} QuickBooks connector</>, "detected · Square posts taproom sales to QuickBooks Online itself", E.act("Review"), "w", SquareMark)}
-      {E.nav("Square locations", "2 mapped · 1 needs mapping")}
-      {E.fld("Last sales sync", "Today · 6:58 PM")}
-      {E.nav("Menu", "one catalog · Square, the website, per-location price")}
-      {E.btn("Disable", "g")}
-    </>),
+    spec: "Square is the sole POS provider in this slice. This page reports connection, mapping, and completed sync state without exposing token material. Square’s optional QuickBooks connector remains a separate accountant-reviewed revenue feed: MGR provides a note and Accounting deep link, but does not detect, configure, or synchronize it.",
+    body: <PointOfSaleView model={{ connected: true, merchant: "Demo Brewing LLC", state: "connected", locations: "2 mapped · 1 needs mapping", lastSync: "Today · 6:58 PM" }} />,
   },
   {
     step: 7,
@@ -2663,16 +2628,11 @@ export const SCREENS: Screen[] = [
     name: "Connect Square",
     to: { "Connect Square": "Square locations" },
     job: "Authorize one Square seller and explain the data exchange before OAuth",
-    reads: "none [OAuth returns the selected seller]",
-    writes: "begin_pos_installation [design]",
+    reads: "get_pos_integration_health",
+    writes: "connect_square",
     states: [["permission", "admin only", 1], ["cancelled", "return to Point of sale unchanged"], ["connected", "continue to Square locations"]],
     spec: "The page explains both catalog writes and sales reads before leaving MGR.",
-    body: (<>
-      {E.back("Settings", "Connect Square")}
-      {E.info("MGR publishes catalog items and availability to Square. It reads completed sales to deplete taproom stock.")}
-      {E.note("Connecting does not publish a menu or import old sales.")}
-      {E.btn("Connect Square", "irr")}
-    </>),
+    body: <ConnectSquareView />,
   },
   {
     step: 7,
@@ -2680,26 +2640,14 @@ export const SCREENS: Screen[] = [
     tab: "More",
     group: "POS",
     surface: "sheet",
-    gatedBy: "Program 14 P5",
     name: "Square locations",
-    to: { "Save mappings": "Point of sale" },
+    to: { "Save mapping": "Point of sale" },
     job: "Map each Square location to one MGR location and sales channel",
-    reads: "list_pos_locations · list_locations · list_sale_channels [design]",
-    writes: "set_pos_location_mapping [design]",
+    reads: "list_pos_locations · list_locations",
+    writes: "set_pos_location_mapping",
     states: [["permission", "admin only", 1], ["mapped", "two locations ready"], ["unmapped", "sales cannot reconcile", 1], ["claimed", "an MGR location cannot be claimed twice", 1]],
-    spec: "Each provider location needs both owners before its sales can change inventory.",
-    body: (<>
-      {E.ttl("Taproom")}
-      {E.pick("MGR location", "Taproom", ["Taproom", "Warehouse", "Select location"])}
-      {E.pick("Sales channel", "Taproom", [...CHANNELS, "Select channel"])}
-      {E.ttl("Warehouse")}
-      {E.pick("MGR location", "Warehouse", ["Taproom", "Warehouse", "Select location"])}
-      {E.pick("Sales channel", "DTC", [...CHANNELS, "Select channel"])}
-      {E.ttl("Third location · needs mapping")}
-      {E.pick("MGR location", "Select location", ["Taproom", "Warehouse", "Select location"])}
-      {E.pick("Sales channel", "Select channel", [...CHANNELS, "Select channel"])}
-      {E.btn("Save mappings")}
-    </>),
+    spec: "A provider location maps to exactly one MGR location. Sales remain expected-consumption facts; the physical count owns depletion.",
+    body: <SquareLocationsView locations={[{ id: "taproom", name: "Taproom" }, { id: "warehouse", name: "Warehouse" }]} rows={[{ externalLocationId: "square-tap", name: "Square Taproom", detail: "active · available · Taproom", mgrLocationId: "taproom" }, { externalLocationId: "square-events", name: "Third location", detail: "active · available · needs mapping", mgrLocationId: "" }]} />,
   },
   {
     step: 7,
@@ -2708,16 +2656,13 @@ export const SCREENS: Screen[] = [
     group: "POS",
     surface: "sheet",
     name: "Square → QuickBooks connector",
-    job: "Acknowledge that Square already posts taproom revenue to QuickBooks",
-    reads: "get_pos_integration_health [design]",
-    writes: "acknowledge_pos_accounting_connector [design; no external write]",
-    states: [["permission", "admin only", 1], ["detected", "acknowledgement required", 1], ["acknowledged", "health warning dismissed"]],
-    spec: "Acknowledging records awareness only. MGR does not configure or disable Square's connector.",
-    body: (<>
-      {E.note("Square already posts taproom sales to QuickBooks Online as sales receipts.")}
-      {E.info("MGR pushes wholesale invoices only. Confirm with your accountant that the two revenue streams stay separate.")}
-      {E.btn("Understood", "g")}
-    </>),
+    to: { "Open Accounting": "Accounting" },
+    job: "Explain the separate Square revenue feed and link to MGR accounting",
+    reads: "none",
+    writes: "none",
+    states: [["permission", "admin only", 1], ["review", "accountant confirms that the revenue streams stay separate"]],
+    spec: "This is a note and deep link only. MGR neither detects nor configures Square's QuickBooks connector.",
+    body: <SquareConnectorView />,
   },
   {
     step: 7,
@@ -2728,15 +2673,11 @@ export const SCREENS: Screen[] = [
     name: "Disconnect Square",
     to: { "Disconnect Square": "Connect Square" },
     job: "Confirm the external effects of disconnecting Square",
-    reads: "get_pos_integration_health [design]",
-    writes: "disconnect_pos_installation [design]",
+    reads: "get_pos_integration_health",
+    writes: "disconnect_square",
     states: [["permission", "admin only", 1], ["confirmed", "installation disabled and token purged"]],
     spec: "The confirmation names what stops and what remains so reconnecting can reuse mappings.",
-    body: (<>
-      {E.note("Stops: menu publishing, availability updates and sales sync.")}
-      {E.info("Stays: MGR stock, location mappings, sales history and published item ids.")}
-      {E.btn("Disconnect Square", "del")}
-    </>),
+    body: <DisconnectSquareView />,
   },
   {
     step: 7,
@@ -2744,27 +2685,14 @@ export const SCREENS: Screen[] = [
     tab: "More",
     group: "POS",
     name: "Menu",
-    gatedBy: "Program 14 P5",
-    to: { Taproom: "Menu", Warehouse: "Menu", "Stout · pint": "POS item", "Guest cider \u00b7 pint": "POS mapping", Pretzel: "POS mapping" },
+    to: { Taproom: "Menu", Warehouse: "Menu", Open: "POS item", Map: "POS mapping", "Guest cider · pint": "POS mapping" },
     job: "One catalog, published to every destination that sells from it",
     reads: "get_pos_menu [derived from brands × formats × configured-bin stock]",
     writes: "configure_pos_menu · set_pos_price_override [nullable, per POS location] · set_pos_website_publication · publish_pos_menu [complete derived location change set]",
     states: [["permission", "warehouse or admin required", 1], ["derived", "every row is a brand, a format and stock on hand"], ["override", "one row priced away from its format default", 1], ["no price anywhere", "no format default and no override: that row cannot publish", 1], ["out of stock", "row retires itself; price and provider id are kept"], ["provider rejected", "the row keeps its edit; nothing half-published", 1], ["second location", "same catalog, scoped · its own price and stock", 1], ["present at one only", "the other location never sees the row", 1], ["one destination", "a row can publish to Square and not the website", 1], ["website beer unmapped", "adopted by matching it to a brand once", 1]],
     redrawn: true,
     spec: <>This was an authoring surface and is now a read-out. Brand, format and availability are all derived (brand from what is in the bin, formats from the brand, availability from taproom stock), so publishing is zero-touch and a new brand reaches the register the moment stock lands. Retail resolves as the location’s own price override, falling back to the format’s default retail price, which is why the table shows the inherited number and names its Source: an exception has to be legible, or a stale price from last summer becomes silently authoritative. The override column stays empty unless someone sets it, so a format-wide price change actually propagates; writing the default into every row on publish would freeze each one at its first price, which is the failure mode this drawing exists to prevent. Publish changes survives because MGR still owns when the provider copy is refreshed, and sends the complete derived change set for the selected location. Square keeps one durable parent item per brand’s poured menu group, with pint, taster and the brand’s other poured formats as variations; publishing one brand updates that whole item. Location is a scope rather than a column: Square uses per-location presence on the variations, so MGR maintains one catalog and varies where each format appears; two parallel menus would fight that model and double every retire. Everything under the switcher is read for one location: stock, availability, and the price override that is keyed by POS location. A column would only serve a cross-location comparison nobody performs, while every action here is taken against one register. Renamed from POS menu: the register is no longer the only destination. The website is the third consumer of this catalog after Square and QuickBooks, not an integration of its own: a bespoke web feed would produce a third answer to what are we selling right now, and would leak unannounced beer, which is the same ownership boundary the Square item library taught. So the website is a read client keeping no copy, and the sync logic it runs today exists only because it keeps one. Its existing beers are adopted exactly as pre-integration Square items are: matched to a brand once, then maintained from here, so nothing vanishes from a public page the day MGR connects. Transport is deliberately not drawn: a menu changes a handful of times a day, so a cached read of the published rows is as fresh as a socket per visitor without opening an anonymous realtime path. Destination-native rows sit <i>below</i> that button rather than in the table: position is what says they are outside the publishable set, which no label reliably does. They appear at all because an unmapped taproom item is the reason a sale fails to reconcile, and Map is the only action MGR ever offers against a row it does not own.</>,
-    body: (<>
-      {E.back("More", "Menu")}
-      {E.tabs(["Taproom", "Warehouse"])}
-      {E.info("One catalog, scoped to a location. Price and availability are read for the location above.")}
-      <div className="min-w-0 overflow-x-auto">{E.tbl(["Brand · format", "Retail", "Source", "Publishes to"], [[E.link("Hazy IPA · pint", "POS item"), "$7.00", "format", "Square · Website"], [E.link("Hazy IPA · crowler", "POS item"), "$9.00", "format", "Square"], [E.link("Pils · pint", "POS item"), "$6.50", "override", "Square · Website"], [E.link("Pils · crowler", "POS item"), "$12.00", "format", "Square"]])}</div>
-      {E.row("Stout · pint", "no taproom stock · off the register", E.status("Retired", "w"), "w")}
-      {E.info("Pils · pint is the only override: $6.50 against a format default of $7.00. Every other row follows its format.")}
-      {E.btn("Publish changes")}
-      {E.ttl("Also on these destinations")}
-      {E.info("Created in Square or on the website, not by MGR. MGR never renames, prices or retires these; it maps them so their sales reconcile.")}
-      {E.row("Guest cider · pint", "not mapped · its sales cannot reconcile", E.act("Map"), "w")}
-      {E.row("Pretzel", "not mapped · no MGR stock behind it", E.act("Map"))}
-    </>),
+    body: <PosMenuView model={{ locations: [{ id: "taproom", label: "Taproom" }, { id: "warehouse", label: "Warehouse" }], selectedLocationId: "taproom", locationName: "Taproom", binName: "Cold", channelName: "Taproom", items: [{ brandId: "hazy", formatId: "pint", label: "Hazy IPA · pint", retail: "$7.00", source: "format", destinations: "Square · Website", available: true }], excluded: [{ brandId: "stout", formatId: "stout-pint", label: "Stout · pint", retail: "$7.00", source: "format", destinations: "Square", available: false, reason: "no taproom stock" }], externalItems: [{ label: "Guest cider · pint", detail: "Not mapped · sales stay queued", disposition: "queued" }] }} />,
   },
   {
     step: 7,
@@ -2773,28 +2701,14 @@ export const SCREENS: Screen[] = [
     group: "POS",
     surface: "sheet",
     name: "POS item",
-    gatedBy: "Program 14 P5",
-    to: { "Save override": "Menu" },
+    to: { "Save override": "Menu", "Publish item to Square": "POS item" },
     job: "Override one price; everything else is inherited from the format",
     reads: "get_pos_menu_item",
-    writes: "set_pos_price_override [nullable override keyed by POS location; null clears]",
+    writes: "set_pos_price_override · set_pos_website_publication · publish_pos_item",
     states: [["permission", "warehouse or admin required", 1], ["inherited", "no override · the format price is what publishes"], ["overridden", "this row is priced away from the default", 1], ["reset", "override cleared · the row rejoins the format price"], ["no price at all", "no format default and no override · Save stays disabled", 1], ["per location", "a second taproom overrides the same row separately", 1], ["format changed", "conversion and premise follow the format, not this sheet"], ["tax preserved", "publishing never clears the provider’s tax assignment", 1]],
     redrawn: true,
     spec: "Against the brand and format schema, Serving and Premise are no longer authored here. A format owns its conversion (a pint is 1/124 of a ½ bbl) and its premise, so this sheet reads them instead of asking again. What is left is a register price, not a wholesale grid cell: an optional override keyed by POS location, so an empty field lets a format-wide Taproom cell propagate and the Warehouse register can ring a different number than the Taproom without either row copying a wholesale price. Availability stays a rule, not a per-keg switch: MGR retires the row when taproom stock runs out and re-publishes under the same provider id when it returns. Price still lands on the variation rather than the item, so an override writes to the format’s variation id.",
-    body: (<>
-      {E.fld("Brand", "Hazy IPA")}
-      {E.fld("Format", "pint · poured")}
-      {E.fld("Pours from", "½ bbl keg · Taproom")}
-      {E.fld("Serving", "1/124 of a ½ bbl · 16 oz · from the format")}
-      {E.fld("Premise", "On-premise · from the format")}
-      {E.fld("Tax", "On-premise rate · held by the provider")}
-      {E.fld("Format price", "$7.00")}
-      {E.edit("Price override", "$6.50")}
-      {E.btn("Reset to format price", "g")}
-      {E.row("Sell while taproom stock remains", "retires itself when it runs out", E.sw(true, "Sell while taproom stock remains"))}
-      {E.info("Leave the override empty and this row follows the format. A price set here applies to this location only.")}
-      {E.btn("Save override")}
-    </>),
+    body: <PosItemView item={{ brand: "Hazy IPA", format: "pint · poured", sources: "½ bbl keg · Taproom", serving: "16 oz · from the format", price: "$7.00", override: "6.50", websitePublished: true, available: true }} />,
   },
   // Revision 2 (schema §16, designed 2026-09-02). Most commits here are still
   // drawn gated — the frames exist so the interface can settle before the

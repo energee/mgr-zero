@@ -220,6 +220,10 @@ export function squareConfig(): SquareConfig {
   return readSquareEnv();
 }
 
+export function isSquareConfigured(env: Record<string, string | undefined> = process.env) {
+  try { readSquareEnv(env); return true; } catch { return false; }
+}
+
 export class SquareClient {
   private readonly oauthOrigin: string;
   private readonly apiOrigin: string;
