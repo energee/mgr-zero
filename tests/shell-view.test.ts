@@ -352,10 +352,14 @@ describe("Settings view", () => {
 
   it("the live Settings page mounts SettingsView and slots the forms", () => {
     const page = src("app/(app)/settings/page.tsx");
+    const settingsForm = src("app/(app)/settings/settings-form.tsx");
+    const sharedView = src("components/mgr/views/settings.tsx");
     expect(page).toMatch(/from "@\/components\/mgr\/views\/settings"/);
     expect(page).toMatch(/<SettingsView\b/);
     expect(page).toMatch(/<SettingsForm\b/);
     expect(page).toMatch(/<PortalFulfillmentForm\b/);
+    expect(settingsForm).toMatch(/<BrewerySettingsFormView\b/);
+    expect(sharedView).toMatch(/<BrewerySettingsFormView\b/);
   });
 });
 

@@ -51,17 +51,7 @@ export default async function SettingsPage() {
       fulfillmentForm={<PortalFulfillmentForm key={row.portal_fulfillment_location_id ?? "unconfigured"} locations={warehouses} currentId={row.portal_fulfillment_location_id} />}
       aiModelForm={<AiModelSettingsForm current={ai.model} models={aiModels} />}
       deployment={E.fld("Deployment", `${serverEnv.dedicated ? "dedicated" : "hosted"} · read-only`)}
-      links={
-        <>
-          {E.gated("Source water", "water profiles aren’t available yet")}
-          {E.nav("Locations", locations.map((l) => l.name).join(" · ") || "none yet", "", undefined, "/locations")}
-          {E.nav("Team", plural(team.length, "member"), "", undefined, "/settings/team")}
-          {E.nav("Accounting", "QuickBooks connection, mappings and payment defaults", "", undefined, "/settings/accounting")}
-          {E.nav("Point of sale", "Square connection, location mappings, sync and menu", "", undefined, "/settings/pos")}
-          {E.nav("Chat", "Slack notifications and preferences", "", undefined, "/settings/chat")}
-          {E.nav("Import", "upload, map and commit CSV rows", "", undefined, "/settings/import")}
-        </>
-      }
+      hrefs={{ locations: "/locations", team: "/settings/team", accounting: "/settings/accounting", pos: "/settings/pos", chat: "/settings/chat", import: "/settings/import" }}
     />
   );
 }
