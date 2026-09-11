@@ -28,7 +28,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: New admin, no setup data.
 Expected outcome: Checklist follows actual dependencies; create first usable order without hidden database work.
-Observed outcome and evidence: Historical evidence label: **Review question**. Fresh provisioning/import/invite tests; no customer-ready first-order cutover job. See [exact A01 execution and boundary](evidence/2026-09-11-f3-execution.md#a01).
+Observed outcome and evidence: Historical evidence label: **Review question**. Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/provision-brewery.test.ts` — “provisions without membership via Bearer and replays concurrently without duplicate breweries”; `tests/commands-import.test.ts` — “imports ship-tos and channel price cells and reports duplicate creates explicitly”. No customer-ready first-order cutover job was exercised. See [exact A01 execution and boundary](evidence/2026-09-11-f3-execution.md#a01).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#a01).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -42,7 +42,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Expired/used invitation, password reset, user without membership.
 Expected outcome: Clear destination, retry path, and responsible contact; no login loop.
-Observed outcome and evidence: Historical evidence label: **Review question**. Fresh auth/invite tests plus reused exact `invite-expired-375`, `password-no-session-375`, and `no-membership-375`; used-invite recovery was backend-only. See [exact A02 execution and boundary](evidence/2026-09-11-f3-execution.md#a02).
+Observed outcome and evidence: Historical evidence label: **Review question**. Reused browser artifacts from `95ca6c09b0aa7f263641a434db20fd1ed2ab1aec`: `f3-browser/invite-expired-375.json`, `password-no-session-375.json`, and `no-membership-375.json`; rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/auth-confirm.test.ts` — “sets a session cookie once, then rejects replay” and `tests/invite-auth.test.ts` — “derives the displayed destination from membership”. Used-invite recovery was backend-only. See [exact A02 execution and boundary](evidence/2026-09-11-f3-execution.md#a02).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#a02).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -70,7 +70,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Switch brewery/account while a form is dirty.
 Expected outcome: Explicit discard/preserve decision; no draft crosses tenant boundaries.
-Observed outcome and evidence: Historical evidence label: **Review question**. Fresh request-auth/tenancy tests; no dirty-form account/brewery switch decision UI. See [exact A04 execution and boundary](evidence/2026-09-11-f3-execution.md#a04).
+Observed outcome and evidence: Historical evidence label: **Review question**. Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/request-context-binding.test.ts` — “limits selected-context reads across detail families while preserving explicit switching”. No dirty-form account/brewery switch decision UI was exercised. See [exact A04 execution and boundary](evidence/2026-09-11-f3-execution.md#a04).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#a04).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -84,7 +84,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Access revoked while a page remains open.
 Expected outcome: Failed save preserves understandable context; no success fiction or sensitive cached account bleed.
-Observed outcome and evidence: Historical evidence label: **Review question**. Fresh team/revocation tests; no open dirty page → revoked save → cache inspection browser chain. See [exact A05 execution and boundary](evidence/2026-09-11-f3-execution.md#a05).
+Observed outcome and evidence: Historical evidence label: **Review question**. Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/team.test.ts` — “revokes a membership but never self or the last admin, and keeps the Auth user”. No open dirty page → revoked save → cache inspection browser chain was exercised. See [exact A05 execution and boundary](evidence/2026-09-11-f3-execution.md#a05).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#a05).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -140,7 +140,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Format defaults, SKU overrides, mixed packs, repack.
 Expected outcome: Inheritance is visible; changing a default has clear scope; repack accounts for source, destination, and volume.
-Observed outcome and evidence: Historical evidence label: **Review question**. Fresh format-component/BOM and repack tests prove volume-neutral source/destination legs; there is no single visible default/inheritance → mixed-pack → repack job. See [exact I03 execution and boundary](evidence/2026-09-11-f3-execution.md#i03).
+Observed outcome and evidence: Historical evidence label: **Review question**. Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/formats.test.ts` — “replace_format_bom writes the format's bill with on_break; sku_bom is gone” and `tests/packaging.test.ts` — “breaks one case into six four-packs, volume-neutral, and returns the tray to stock”. No single visible default/inheritance → mixed-pack → repack job was exercised. See [exact I03 execution and boundary](evidence/2026-09-11-f3-execution.md#i03).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#i03).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -210,7 +210,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Existing inbound transfer when opening replenishment again.
 Expected outcome: Explain whether suggestions include in-flight supply; prevent accidental duplicate demand or clearly warn.
-Observed outcome and evidence: Historical evidence label: **Review question**. Rerun at the tested code SHA covers par/standing controls and ordinary replenishment creation, but no connected existing-inbound-transfer effect on suggestions or duplicate-demand result was captured. See [exact I08 execution and boundary](evidence/2026-09-11-f3-execution.md#i08).
+Observed outcome and evidence: Historical evidence label: **Review question**. Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/replenishment-form.test.ts` — “requires a SKU and a finite nonnegative quantity, allowing explicit zero to release” and `tests/purchasing.test.ts` — “one draft per resolved vendor, gap rounded up to the purchase unit; a material with no vendor is skipped”. No connected existing-inbound-transfer effect on suggestions or duplicate-demand result was exercised. See [exact I08 execution and boundary](evidence/2026-09-11-f3-execution.md#i08).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#i08).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -224,7 +224,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Archive product/location/bin still referenced by history.
 Expected outcome: Historical records remain intelligible; new use is constrained without destroying references.
-Observed outcome and evidence: Historical evidence label: **Review question**. Rerun at the tested code SHA deactivates one referenced SKU, renames the location/bin, preserves legible history, and blocks bin deletion/new SKU movement. Product and location/bin retirement do not exist, so the complete three-entity archive scenario is absent. See [exact I09 execution and boundary](evidence/2026-09-11-f3-execution.md#i09).
+Observed outcome and evidence: Historical evidence label: **Review question**. Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/commands-inventory.test.ts` — “keeps a referenced SKU, location, and bin legible after edits and blocks new movement on the inactive SKU”. Product and location/bin retirement do not exist, so the complete three-entity archive scenario remains absent. See [exact I09 execution and boundary](evidence/2026-09-11-f3-execution.md#i09).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#i09).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -238,7 +238,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Customer lacks price list, SKU price, or ship-to.
 Expected outcome: Block near the missing input and link the authorized person to the remedy; preserve order work.
-Observed outcome and evidence: Historical evidence label: **Review question**. Fresh pricing/order tests exercise each refusal; no rendered adjacent remedy preserving the same dirty order. See [exact O01 execution and boundary](evidence/2026-09-11-f3-execution.md#o01).
+Observed outcome and evidence: Historical evidence label: **Review question**. Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/pricing.test.ts` — “create_order copies the customer's channel and prices lines from it; an unpriced sku is refused” and `tests/commands-portal.test.ts` — “rejects a ship-to that belongs to another customer”. No rendered adjacent remedy preserving the dirty order was exercised. See [exact O01 execution and boundary](evidence/2026-09-11-f3-execution.md#o01).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#o01).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -252,7 +252,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Price/address changes while an order is drafted or open.
 Expected outcome: Explicit price and address snapshot policy; review shows any changes before commitment.
-Observed outcome and evidence: Historical evidence label: **Review question**. Fresh snapshot tests preserve committed price/address; changed draft facts are not visibly compared before commitment. See [exact O02 execution and boundary](evidence/2026-09-11-f3-execution.md#o02).
+Observed outcome and evidence: Historical evidence label: **Review question**. Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/qbo-quote.test.ts` — “freezes the selected customer's price, deposit, addresses, and honest pending tax” and “rejects price, ship-to, source, or deposit drift without writing an order”. Changed facts were not visibly compared before commitment. See [exact O02 execution and boundary](evidence/2026-09-11-f3-execution.md#o02).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#o02).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -294,7 +294,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Pick all zero; then attempt shipment.
 Expected outcome: Deliberate explanation of whether this closes the order or should be cancellation; no misleading “delivered” implication.
-Observed outcome and evidence: Historical evidence label: **Review question**. Fresh all-zero fulfillment test proves no invoice and allocation release; rendered explanation/closed-versus-cancelled naming is absent. See [exact O05 execution and boundary](evidence/2026-09-11-f3-execution.md#o05).
+Observed outcome and evidence: Historical evidence label: **Review question**. Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/orders-fulfillment.test.ts` — “ship with all lines qty_shipped 0 creates no invoice and releases allocations”. No rendered explanation of closed-versus-cancelled meaning was exercised. See [exact O05 execution and boundary](evidence/2026-09-11-f3-execution.md#o05).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#o05).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -364,7 +364,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Self-delivery with failed stop, partial delivery, route return.
 Expected outcome: Distinguish loaded/shipped/delivered; explicit invoice timing; returned goods and outstanding work remain accounted for.
-Observed outcome and evidence: Historical evidence label: **Review question**. Fresh delivery regression proves failed/unconfirmed stops stay open, block return, remain on Today, and create no invoice; partial/refusal stock handling is unimplemented. See [exact O10 execution and boundary](evidence/2026-09-11-f3-execution.md#o10).
+Observed outcome and evidence: Historical evidence label: **Review question**. New regression, rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/delivery.test.ts` — “keeps a failed stop open and blocks return without creating delivery money or stock effects”. Partial/refusal stock handling is unimplemented. See [exact O10 execution and boundary](evidence/2026-09-11-f3-execution.md#o10).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#o10).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -406,7 +406,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Save draft, sign out, return next day.
 Expected outcome: Resume, edit, review, and submit the same draft.
-Observed outcome and evidence: Historical evidence label: **Review question**. Reused exact save/sign-out/relogin/edit browser flow plus fresh persistence tests; that same recovered browser draft was not submitted. See [exact P01 execution and boundary](evidence/2026-09-11-f3-execution.md#p01).
+Observed outcome and evidence: Historical evidence label: **Review question**. Reused browser artifacts from `95ca6c09b0aa7f263641a434db20fd1ed2ab1aec`: `f3-browser/portal-draft-saved.json`, `portal-draft-relogin.json`, and `portal-draft-continued.txt`; rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/portal-continuity.test.ts` — “restores only a validated exact attempt in the same actor/customer/brewery scope”. That same recovered browser draft was not submitted. See [exact P01 execution and boundary](evidence/2026-09-11-f3-execution.md#p01).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#p01).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -448,7 +448,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Availability or price changes after cart review.
 Expected outcome: Refresh/revalidation policy is visible; no silent substitution or surprise total.
-Observed outcome and evidence: Historical evidence label: **Review question**. Fresh quote/snapshot tests reject stale facts; no rendered cart review comparison after a price/availability change. See [exact P04 execution and boundary](evidence/2026-09-11-f3-execution.md#p04).
+Observed outcome and evidence: Historical evidence label: **Review question**. Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/qbo-quote.test.ts` — “rejects price, ship-to, source, or deposit drift without writing an order” and “serializes a concurrent price change before drift validation and permits a safe retry”. No rendered cart-review comparison was exercised. See [exact P04 execution and boundary](evidence/2026-09-11-f3-execution.md#p04).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#p04).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -462,7 +462,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Decimal, negative, huge, blank, and pasted quantity.
 Expected outcome: Consistent whole/fractional-unit rules across UI, command, and database; row-specific accessible errors.
-Observed outcome and evidence: Historical evidence label: **Review question**. RED/GREEN fixed command/database whole-unit inconsistency and fresh UI rules cover decimal/negative/blank/huge/paste; a full browser row-error matrix was not captured. See [exact P05 execution and boundary](evidence/2026-09-11-f3-execution.md#p05).
+Observed outcome and evidence: Historical evidence label: **Review question**. New RED/GREEN regression, rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/commands-portal.test.ts` — “rejects fractional packaged quantities at the command and direct RPC boundaries”; `tests/mgr-screens.test.ts` — “edits a whole number with the same stepper Weekly count uses”. A full browser decimal/negative/blank/huge/paste row-error matrix was not captured. See [exact P05 execution and boundary](evidence/2026-09-11-f3-execution.md#p05).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#p05).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -518,7 +518,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Recipe changes after a batch is scheduled.
 Expected outcome: Batch retains the intended version; substitutions and recalculations are explicit.
-Observed outcome and evidence: Historical evidence label: **Review question**. Fresh recipe-version/scheduling tests retain the chosen version; no connected substitution/recalculation production walkthrough. See [exact R01 execution and boundary](evidence/2026-09-11-f3-execution.md#r01).
+Observed outcome and evidence: Historical evidence label: **Review question**. Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/production.test.ts` — “creates a recipe, then two versions whose ingredients snapshot extract potential” and “schedules a batch with no brand, brews it into the fermenter, and refuses a second brew there”. No connected substitution/recalculation production walkthrough was exercised. See [exact R01 execution and boundary](evidence/2026-09-11-f3-execution.md#r01).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#r01).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -532,7 +532,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Vessel conflict, split/merge transfer, late fermentation reading.
 Expected outcome: Capacity, occupancy, chronology, and source/destination are reconciled; invalid transitions explain the remedy.
-Observed outcome and evidence: Historical evidence label: **Review question**. Fresh vessel/fermentation tests cover conflicts and chronology; connected rendered split/merge/late-reading design was not walked. See [exact R02 execution and boundary](evidence/2026-09-11-f3-execution.md#r02).
+Observed outcome and evidence: Historical evidence label: **Review question**. Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/production.test.ts` — “moves part of a batch into an empty vessel, then closes the source when it empties”, “blends into an occupied vessel, leaving the target's batch identity alone”, and “records readings and lists them newest first”. No connected rendered split/merge/late-reading job was exercised. See [exact R02 execution and boundary](evidence/2026-09-11-f3-execution.md#r02).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#r02).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -546,7 +546,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Packaging closes with less beer or more material consumption than planned.
 Expected outcome: Actual output, materials, lot identity, remaining beer, and loss reconcile in one reviewed outcome.
-Observed outcome and evidence: Historical evidence label: **Review question**. Fresh packaging tests prove atomic output/material/lot/loss reconciliation; connected rendered plan-versus-actual production job was not walked. See [exact R03 execution and boundary](evidence/2026-09-11-f3-execution.md#r03).
+Observed outcome and evidence: Historical evidence label: **Review question**. Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/packaging.test.ts` — “writes the lot, a production_in per package filled, the BOM consumptions, and draws the tank down”. No connected rendered plan-versus-actual production job was exercised. See [exact R03 execution and boundary](evidence/2026-09-11-f3-execution.md#r03).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#r03).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -560,7 +560,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Batch completion loss later reclassified as samples/destruction.
 Expected outcome: Original loss identity survives; exact compensation and classification are visible; named schema gate remains until supported.
-Observed outcome and evidence: Historical evidence label: **Review question**. Fresh loss-reclassification tests prove immutable original and exact compensation; connected rendered review and remaining schema gate were not walked. See [exact R04 execution and boundary](evidence/2026-09-11-f3-execution.md#r04).
+Observed outcome and evidence: Historical evidence label: **Review question**. Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/completion-loss-review.test.ts` — “posts signed corrections in their actual period, leaves occupancy unchanged, preserves filed snapshots, and gates cellar Taproom filing”. No connected rendered review was exercised, and the remaining schema gate stays explicit. See [exact R04 execution and boundary](evidence/2026-09-11-f3-execution.md#r04).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#r04).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -574,7 +574,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Partial PO receipt, damaged material, over-receipt, duplicate receipt.
 Expected outcome: Remaining order quantity, actual usable stock, supplier disposition, and retry outcome are clear.
-Observed outcome and evidence: Historical evidence label: **Review question**. Fresh PO test records ordered 10/received 12, variance +2, exact retry and one receipt/movement; damage isolation and supplier disposition are absent. See [exact R05 execution and boundary](evidence/2026-09-11-f3-execution.md#r05).
+Observed outcome and evidence: Historical evidence label: **Review question**. New regression, rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/purchasing.test.ts` — “records an overreceipt once and makes the missing damage/disposition contract explicit”. Damage isolation and supplier disposition remain absent. See [exact R05 execution and boundary](evidence/2026-09-11-f3-execution.md#r05).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#r05).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -588,7 +588,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Material substitution, lot recall, count correction.
 Expected outcome: Trace source lots through batches and packages to affected recipients; demonstrate both forward and backward trace.
-Observed outcome and evidence: Historical evidence label: **Review question**. Fresh trace tests cover finished-goods lots/recipients; full material-lot forward/back recall remains absent. See [exact R06 execution and boundary](evidence/2026-09-11-f3-execution.md#r06).
+Observed outcome and evidence: Historical evidence label: **Review question**. Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/compliance.test.ts` — “follows the lot to its run, tank, and batch, and lists every ledger movement tagged with it”; `tests/shipping-lots.test.ts` — “traces more than 1000 movements without combining incompatible package units”. Full material-lot forward/back recall remains absent. See [exact R06 execution and boundary](evidence/2026-09-11-f3-execution.md#r06).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#r06).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -602,7 +602,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Plan changes after production or purchasing starts.
 Expected outcome: Separate suggestion from commitment; show dependencies and what cannot be undone.
-Observed outcome and evidence: Historical evidence label: **Review question**. Fresh planning tests distinguish suggestion and commitment; no connected undo/dependency walkthrough after work starts. See [exact R07 execution and boundary](evidence/2026-09-11-f3-execution.md#r07).
+Observed outcome and evidence: Historical evidence label: **Review question**. Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/purchasing.test.ts` — “one draft per resolved vendor, gap rounded up to the purchase unit; a material with no vendor is skipped”. No connected undo/dependency walkthrough after work starts was exercised. See [exact R07 execution and boundary](evidence/2026-09-11-f3-execution.md#r07).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#r07).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -742,7 +742,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: New sale channel or destination lacks reporting setup.
 Expected outcome: Missing configuration is discoverable before reporting; no “compliant” claim inferred from collecting a state code.
-Observed outcome and evidence: Historical evidence label: **Review question**. Fresh compliance/channel tests expose unclassified data; there is no pre-reporting configuration workflow. See [exact X10 execution and boundary](evidence/2026-09-11-f3-execution.md#x10).
+Observed outcome and evidence: Historical evidence label: **Review question**. Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/commands-inventory.test.ts` — “record_movement surfaces CHECK failure for unclassified sale_removal” and `tests/sale-channels.test.ts` — “a new brewery has four channels and Export is untaxpaid”. No pre-reporting configuration workflow exists. See [exact X10 execution and boundary](evidence/2026-09-11-f3-execution.md#x10).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#x10).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -756,7 +756,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Empty, loading, unavailable, forbidden, not found, and server error.
 Expected outcome: Distinct meaning and next action; not every failure is an empty list or generic Retry.
-Observed outcome and evidence: Historical evidence label: **Review question**. Fresh route/error tests cover empty, forbidden, not-found, and several failures; no connected rendered loading/unavailable/server-error action matrix. See [exact U01 execution and boundary](evidence/2026-09-11-f3-execution.md#u01).
+Observed outcome and evidence: Historical evidence label: **Review question**. Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/not-found.test.ts` — “unknown uuid → 404 not_found” and “surfaces a membership-query database failure as 500 db_error, not 403 not_member”. No connected rendered loading/unavailable/forbidden/not-found/server-error action matrix was exercised. See [exact U01 execution and boundary](evidence/2026-09-11-f3-execution.md#u01).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#u01).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -770,7 +770,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Double click, slow request, offline, reload during save.
 Expected outcome: Clear saving/unknown/confirmed states; no duplicate effects; inputs survive recoverable failures.
-Observed outcome and evidence: Historical evidence label: **Review question**. Rerun at the tested code SHA proves portal/movement/count exact replay and single effects. Double-click, slow, offline, reload-during-save UI states and input survival were not captured. See [exact U02 execution and boundary](evidence/2026-09-11-f3-execution.md#u02).
+Observed outcome and evidence: Historical evidence label: **Review question**. Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/portal-continuity.test.ts` — “reload retries the persisted submit directly after a lost response”; `tests/taproom-count.test.ts` — “replays the exact request after a committed count response is treated as an inner 500”. Double-click, slow, offline, reload-during-save UI states and input survival were not captured. See [exact U02 execution and boundary](evidence/2026-09-11-f3-execution.md#u02).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#u02).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -798,7 +798,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Old open record beyond first 50; large catalog/history.
 Expected outcome: Paging/search reaches the record; counts indicate scope; latency remains usable with realistic data.
-Observed outcome and evidence: Historical evidence label: **Review question**. New order search/browser proof at the remediation SHA reaches ORD-0005 beyond 55 newer orders. Old invoice and portal history, visible scope counts, and realistic latency were not exercised. See [exact U04 execution and boundary](evidence/2026-09-11-f3-execution.md#u04).
+Observed outcome and evidence: Historical evidence label: **Review question**. New browser evidence at `34af080bd65e147a607aba1e83d06f5361b8faca`: `f3-review-browser/u04-search-result.json`, `u04-search-open.txt`, `u04-old-order.txt`, and `u04-open-url.txt`; rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/search.test.ts` — “reaches an old open order after it falls beyond the newest fifty”. Old invoice and portal history, visible scope counts, and realistic latency were not exercised. See [exact U04 execution and boundary](evidence/2026-09-11-f3-execution.md#u04).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#u04).
 Impact / priority: Medium — reachability, accessibility or scale.
@@ -812,7 +812,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Keyboard-only, 200% zoom, narrow phone, long names.
 Expected outcome: Reachable actions, visible focus, correct dialog focus return, no trapped or clipped critical controls.
-Observed outcome and evidence: Historical evidence label: **Review question**. Reused exact keyboard/375 px/focus-return captures and composer overflow fix; the 720×450 CSS canvas is not true 200% browser zoom. See [exact U05 execution and boundary](evidence/2026-09-11-f3-execution.md#u05).
+Observed outcome and evidence: Historical evidence label: **Review question**. Reused browser artifacts from `95ca6c09b0aa7f263641a434db20fd1ed2ab1aec`: `f3-browser/composer-phone-after.json`, `movement-close-phone.json`, `weekly-count-keyboard.json`, and `admin-today-720-css-equivalent.png`; rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/mgr-screens.test.ts` — “keeps phone tables contained and avoids duplicate page titles”. The CSS-sized 720×450 canvas is not true 200% browser zoom. See [exact U05 execution and boundary](evidence/2026-09-11-f3-execution.md#u05).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#u05).
 Impact / priority: Medium — reachability, accessibility or scale.
@@ -840,7 +840,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Browser/device timezone differs from brewery.
 Expected outcome: Dates, due work, timeline, and reporting periods use an explicit coherent policy.
-Observed outcome and evidence: Historical evidence label: **Review question**. Fresh brewery-date/timezone tests pass; cross-device rendered date consistency was not exercised. See [exact U07 execution and boundary](evidence/2026-09-11-f3-execution.md#u07).
+Observed outcome and evidence: Historical evidence label: **Review question**. Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/date-format.test.ts` — “uses consistent user-facing date formats without timestamp seconds” and `tests/locations-view.test.ts` — “timezone without an IANA extra is the brewery default”. Cross-device rendered date consistency was not exercised. See [exact U07 execution and boundary](evidence/2026-09-11-f3-execution.md#u07).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#u07).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -882,7 +882,7 @@ Walkthrough commit: `662979b991d41d133a647bf6039e97ae8dd7894a` (base `5f8743915a
 Persona / account / viewport: Isolated local fixture for the scenario roles; browser at 1440×900 and/or 375×812 where rendered evidence is cited; backend-only cases used isolated API 54351 / Postgres 54352.
 Starting state and action: Support needs to investigate uncertain save.
 Expected outcome: User can supply an action/record reference and correlation information without exposing credentials.
-Observed outcome and evidence: Historical evidence label: **Review question**. Fresh uncertain-save results expose record/request IDs; no connected UI demonstrates an actionable support reference. See [exact U10 execution and boundary](evidence/2026-09-11-f3-execution.md#u10).
+Observed outcome and evidence: Historical evidence label: **Review question**. Rerun at `662979b991d41d133a647bf6039e97ae8dd7894a`: `tests/api-command.test.ts` — “runs a query without a request id and returns a correlation id”. No connected uncertain-save UI demonstrates an actionable support reference. See [exact U10 execution and boundary](evidence/2026-09-11-f3-execution.md#u10).
 Design status: Partial — executable portions were exercised; the complete connected outcome was not established.
 Implementation status / proof link: **Source only** — [durable proof index](evidence/2026-09-11-f3-execution.md#u10).
 Impact / priority: High — stock, money, access or recovery correctness.
@@ -904,8 +904,8 @@ The historical label is copied from the authoritative review and remains separat
 | B07 | Observed | Partial | P02/U02 | Backend lost-response replay is proven; the complete user-facing uncertainty-state matrix is partial. |
 | B08 | Observed | Partial | O04/O05 | 10→6→4 is proven; all-zero rendered meaning remains partial. |
 | B09 | Observed | Proven | O06 | Staged cancellation/restock work has a durable completion. |
-| B10 | Documented gap | Gated | O08 | Independent stock/credit disposition policy is unsettled. |
-| B11 | Observed | Proven | I05/I07 | Linked corrections and stale-count recovery are exercised. |
+| B10 | Observed | Gated | O08 | Independent stock/credit disposition policy is unsettled. |
+| B11 | Documented gap | Proven | I05/I07 | Linked corrections and stale-count recovery are exercised. |
 | B12 | Observed | Partial | O12/U07 | Backend timezone proof exists; physical print review does not. |
 | B13 | Observed | Proven | I06/O03 | Source zero versus brewery ATP ten is shown and actionable. |
 | B14 | Observed | Partial | U04 | Old order search is proven; old invoice/portal history, scope counts, and latency remain partial. |
