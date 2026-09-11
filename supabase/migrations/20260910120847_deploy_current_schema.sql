@@ -458,6 +458,7 @@ declare
   v_channel uuid; v_tax public.tax_treatment; v_sources jsonb; src record; v_line public.order_lines; v_available numeric;
 begin
   o := private.lock_order(p_order, array['picked']::public.order_status[]);
+  if o.needs_restock then raise exception 'order is waiting for restock'; end if;
   -- ponytail: serialize ledger consumers globally; use shared per-stock-key
   -- locks in every writer if warehouse write throughput outgrows this lock.
   lock table public.inventory_movements in share row exclusive mode;
