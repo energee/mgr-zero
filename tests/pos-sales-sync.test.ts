@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
+import { runCommand } from "@/lib/commands/registry";
 import { SquareClient, syncSquareCatalog, syncSquareSales } from "@/lib/pos";
+import "@/lib/commands/all";
 import { admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
 
 const config = {
@@ -146,8 +148,17 @@ describe("Square durable sales sync", () => {
       squareFetch(f.merchantId, () => response({ orders: [order] }))));
     const identityBefore = sql(`select source_hash||':'||external_order_id||':'||external_line_id||':'||source_version::text
       from public.pos_sales where brewery_id='${f.brewery.id}'`)[0];
-    expect(sql(`select coalesce(external_item_id,'?')||':'||external_variation_id from public.pos_unmapped_items
-      where brewery_id='${f.brewery.id}'`)).toEqual(["?:V1"]);
+    const queue = await f.ctx.db.from("pos_unmapped_items").select("brewery_id,external_item_id,external_variation_id")
+      .eq("brewery_id", f.brewery.id);
+    expect(queue.error).toBeNull();
+    expect(queue.data).toEqual([{ brewery_id: f.brewery.id, external_item_id: null, external_variation_id: "V1" }]);
+    const foreign = await makeBrewery();
+    const foreignCtx = await makeStaffCtx(foreign.id, "admin");
+    const foreignQueue = await foreignCtx.db.from("pos_unmapped_items").select("brewery_id").eq("brewery_id", f.brewery.id);
+    expect(foreignQueue.error).toBeNull();
+    expect(foreignQueue.data).toEqual([]);
+    const privateRead = await f.ctx.db.schema("private").from("square_order_snapshots").select("external_order_id");
+    expect(privateRead.error).not.toBeNull();
 
     const catalogFetch = vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
@@ -227,6 +238,14 @@ describe("Square durable sales sync", () => {
       where brewery_id='${f.brewery.id}' and external_order_id='EMPTY-NEWER'`)).toEqual(["1:old:accepted"]);
     expect(sql(`select external_line_id from private.pos_current_sales where brewery_id='${f.brewery.id}'
       and external_order_id='EMPTY-NEWER'`)).toEqual([]);
+    const listing = await runCommand("list_pos_sales", {}, f.ctx) as { sales: Array<{ id: string; externalOrderId: string; current: boolean }> };
+    const historical = listing.sales.find((sale) => sale.externalOrderId === "EMPTY-NEWER");
+    expect(historical).toMatchObject({ current: false });
+    const detail = await runCommand("get_pos_sale", { saleId: historical!.id }, f.ctx) as {
+      sale: { current: boolean }; revisions: Array<{ current: boolean }>;
+    };
+    expect(detail.sale.current).toBe(false);
+    expect(detail.revisions).toEqual([expect.objectContaining({ current: false })]);
     expect(currentExpected(f.brewery.id)).toBe(0);
     expect(sql(`select count(*) from public.inventory_movements where brewery_id='${f.brewery.id}'`)).toEqual(["0"]);
   });

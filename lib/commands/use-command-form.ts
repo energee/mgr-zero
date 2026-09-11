@@ -9,13 +9,14 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useBrewery, useCommandContext } from "@/app/(app)/brewery-provider";
-import { command } from "./client";
+import { classifyCommandFailure, command, type CommandFailureDetail } from "./client";
 
 export function useCommandAction() {
   const breweryId = useBrewery();
   const expectedContext = useCommandContext();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [failure, setFailure] = useState<CommandFailureDetail | null>(null);
   const [busy, setBusy] = useState(false);
 
   const pending = useRef<{ key: string; requestId: string; expectedContext: typeof expectedContext } | null>(null);
@@ -24,6 +25,7 @@ export function useCommandAction() {
   async function run(name: string, input: unknown, onSuccess?: (data: unknown) => void, requestId?: string) {
     setBusy(true);
     setError(null);
+    setFailure(null);
     try {
       const key = JSON.stringify([name, input]);
       if (pending.current?.key !== key) pending.current = { key, requestId: crypto.randomUUID(), expectedContext };
@@ -34,14 +36,16 @@ export function useCommandAction() {
       router.refresh();
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : `${name} failed`);
+      const detail = classifyCommandFailure(err);
+      setFailure(detail);
+      setError(detail.message === "command failed" ? `${name} failed` : detail.message);
       return false;
     } finally {
       setBusy(false);
     }
   }
 
-  return { busy, error, setError, run };
+  return { busy, error, failure, setError, run };
 }
 
 export function useCommandForm(name: string, opts: { build: () => unknown; reset: () => void; onSuccess?: (data: unknown) => void }) {

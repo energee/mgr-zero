@@ -7,6 +7,22 @@ export class CommandResponseError extends Error {
   constructor(message: string, readonly status: number, readonly code?: string) { super(message); }
 }
 
+export type CommandFailureDetail = {
+  message: string;
+  kind: "definitive" | "unknown";
+  status?: number;
+  code?: string;
+};
+
+export function classifyCommandFailure(error: unknown): CommandFailureDetail {
+  const value = error as { message?: unknown; status?: unknown; code?: unknown } | null;
+  const status = typeof value?.status === "number" ? value.status : undefined;
+  const code = typeof value?.code === "string" ? value.code : undefined;
+  const message = error instanceof Error ? error.message : "command failed";
+  const definitive = status !== undefined && status >= 400 && status < 500 && status !== 408 && status !== 429;
+  return { message, kind: definitive ? "definitive" : "unknown", ...(status === undefined ? {} : { status }), ...(code ? { code } : {}) };
+}
+
 export type CommandProvenance = { origin: Exclude<CommandOrigin, "chat"> }
   | { origin: "chat"; conversationId: string; previewToken: string };
 
