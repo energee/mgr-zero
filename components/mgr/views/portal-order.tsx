@@ -36,6 +36,7 @@ export function PortalOrderView({
         </Fragment>
       ))}
       {model.adjusted ? E.info(model.adjusted) : null}
+      {model.shortageExplanation ? E.info(model.shortageExplanation) : null}
       {model.invoice
         ? E.nav(
           model.invoice.title,

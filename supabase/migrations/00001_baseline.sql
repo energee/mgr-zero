@@ -2524,6 +2524,23 @@ begin
     raise exception 'order requires at least one line';
   end if;
 end $$;
+
+-- Portal buyers order packaged units, which are whole at every public entry
+-- point. Keep this guard below TypeScript so direct RPC callers cannot create
+-- a fractional cart that the Shop and quote paths cannot represent.
+create function private.assert_portal_order_lines(p_lines jsonb) returns void
+language plpgsql immutable set search_path = '' as $$
+begin
+  perform private.assert_order_lines(p_lines);
+  if exists (
+    select 1
+    from jsonb_array_elements(p_lines) e
+    where (e->>'qty')::numeric <= 0
+       or (e->>'qty')::numeric <> trunc((e->>'qty')::numeric)
+  ) then
+    raise exception 'portal orders require positive whole packaged units';
+  end if;
+end $$;
 -- Order-driven movements have no bin on the order (a later phase may add one),
 -- so they post to the location's alphabetically first bin ('Cold' for a fresh
 -- location). Name, not created_at: the seeded trio shares one transaction
@@ -2695,6 +2712,7 @@ declare
   v_channel uuid; v_tax public.tax_treatment; v_sources jsonb; src record; v_line public.order_lines; v_available numeric;
 begin
   o := private.lock_order(p_order, array['picked']::public.order_status[]);
+  if o.needs_restock then raise exception 'order is waiting for restock'; end if;
   -- ponytail: serialize ledger consumers globally; use shared per-stock-key
   -- locks in every writer if warehouse write throughput outgrows this lock.
   lock table public.inventory_movements in share row exclusive mode;
@@ -3962,6 +3980,14 @@ begin
     jsonb_build_object('brewery', p_brewery, 'sku', p_sku, 'location', p_location, 'bin', p_bin, 'qty', p_qty, 'type', p_type, 'sale_channel', p_sale_channel, 'dest_state', p_dest_state, 'note', p_note, 'lot', p_lot));
   if v_replay is not null then return v_replay; end if;
   if p_qty is null or p_qty::text in ('NaN','Infinity','-Infinity') or p_qty = 0 or p_qty <> round(p_qty,2) then raise exception 'invalid movement quantity'; end if;
+  if not exists (select 1 from public.skus where id = p_sku and brewery_id = p_brewery and active) then
+    raise exception 'inactive SKU cannot receive a new movement';
+  end if;
+  if (p_type in ('sample','festival_removal','sale_removal')
+      and (p_dest_state is null or p_dest_state !~ '^[A-Z]{2}$'))
+     or (p_type not in ('sample','festival_removal','sale_removal') and p_dest_state is not null) then
+    raise exception 'classified removals require a two-letter uppercase destination state';
+  end if;
   if p_qty < 0 then
     -- ponytail: global ledger lock; shared stock-key locks across every writer at higher throughput.
     lock table public.inventory_movements in share row exclusive mode;
@@ -4207,9 +4233,7 @@ begin
   if not exists (
     select 1 from public.ship_tos where id = p_ship_to and customer_id = p_customer and brewery_id = p_brewery
   ) then raise exception 'ship-to not found'; end if;
-  if jsonb_typeof(p_lines) <> 'array' or jsonb_array_length(p_lines) = 0 then
-    raise exception 'order requires at least one line';
-  end if;
+  perform private.assert_portal_order_lines(p_lines);
   if exists (
     select 1 from jsonb_array_elements(p_lines) e
     where not exists (
@@ -4251,9 +4275,16 @@ end $$;
 create function update_draft_order(
   p_order uuid, p_ship_to uuid, p_requested date, p_po text, p_note text, p_lines jsonb, p_request_id uuid, p_clear_requested boolean default false, p_expected_brewery uuid default null, p_expected_customer uuid default null
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
-declare v_brewery uuid; v_replay jsonb; v_result jsonb;
+declare v_brewery uuid; v_customer uuid; v_replay jsonb; v_result jsonb; v_is_staff boolean;
 begin
-  select o.brewery_id into v_brewery
+  select o.brewery_id, o.customer_id,
+    exists (
+      select 1 from public.brewery_users bu
+      where bu.brewery_id = o.brewery_id
+        and bu.user_id = auth.uid()
+        and bu.role = any(array['admin','sales']::public.staff_role[])
+    )
+    into v_brewery, v_customer, v_is_staff
   from public.orders o
   where o.id = p_order
     and (p_expected_brewery is null or o.brewery_id = p_expected_brewery)
@@ -4271,6 +4302,13 @@ begin
       )
     );
   if v_brewery is null then raise exception 'permission denied' using errcode = '42501'; end if;
+  -- The portal adapter supplies p_expected_customer. A customer calling this
+  -- RPC directly cannot omit that argument to bypass whole-unit validation;
+  -- an authorized staff call keeps its fractional-quantity contract even when
+  -- the same user also belongs to the order's customer account.
+  if p_expected_customer is not null or not v_is_staff then
+    perform private.assert_portal_order_lines(p_lines);
+  end if;
   v_replay := private.claim_command_request(v_brewery,'update_draft_order',p_request_id,jsonb_build_object('order',p_order,'ship_to',p_ship_to,'requested',p_requested,'po',p_po,'note',p_note,'lines',p_lines,'clear_requested',p_clear_requested,'expected_brewery',p_expected_brewery,'expected_customer',p_expected_customer));
   if v_replay is not null then return v_replay; end if;
   -- Keep the shared claim-before-order-lock ordering. The first scope check

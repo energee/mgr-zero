@@ -174,7 +174,8 @@ projects and configure `NEXT_PUBLIC_SUPABASE_URL`,
 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY` in Vercel.
 Then run `bunx supabase db push` against
 the hosted project, deploy, and verify login → catalog → inventory on the
-preview URL.
+preview URL. Follow the full [hosted release checklist](docs/operations/release-checklist.md)
+for approvals, environment separation, hosted advisors, smoke tests, and rollback evidence.
 
 ## CI
 

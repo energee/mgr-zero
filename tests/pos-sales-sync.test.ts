@@ -1,6 +1,8 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { runCommand } from "@/lib/commands/registry";
 import { SquareClient, syncSquareCatalog, syncSquareSales } from "@/lib/pos";
-import { admin, ins, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
+import "@/lib/commands/all";
+import { admin, channelId, ins, makeBrewery, makeStaffCtx, seedCatalog, seedLocation, sql } from "./helpers";
 
 const config = {
   applicationId: "app",
@@ -10,11 +12,6 @@ const config = {
 };
 
 type Order = Record<string, unknown>;
-
-beforeAll(() => {
-  expect(process.env.NEXT_PUBLIC_SUPABASE_URL).toBe("http://127.0.0.1:54351");
-  expect(process.env.DATABASE_URL).toContain(":54352/");
-});
 
 function response(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -110,6 +107,58 @@ function currentExpected(breweryId: string) {
 }
 
 describe("Square durable sales sync", () => {
+  it("keeps one physical count effect while a delayed sale and linked refund change expected only", async () => {
+    const f = await fixture();
+    const today = sql("select (now() at time zone 'America/New_York')::date")[0];
+    const at = (days: number) => new Date(`${today}T16:00:00Z`).getTime() + days * 86_400_000;
+    const priorAt = new Date(at(-14)).toISOString();
+    const countedAt = new Date(at(-7)).toISOString();
+    const prior = await ins("taproom_counts", {
+      brewery_id: f.brewery.id, location_id: f.locations[0].id, counted_on: priorAt.slice(0, 10),
+      observed_at: priorAt, created_at: priorAt, counted_by: f.ctx.userId,
+    });
+    const counted = await ins("taproom_counts", {
+      brewery_id: f.brewery.id, location_id: f.locations[0].id, counted_on: countedAt.slice(0, 10),
+      observed_at: countedAt, created_at: countedAt, counted_by: f.ctx.userId, prior_count_id: prior.id,
+    });
+    const movement = await ins("inventory_movements", {
+      brewery_id: f.brewery.id, location_id: f.locations[0].id, bin_id: f.locations[0].binId,
+      sku_id: f.catalog.skuId, qty: -2, type: "depletion", sale_channel_id: await channelId(f.brewery.id, "Taproom"),
+      tax_treatment: "taxable", created_by: f.ctx.userId, ref: counted.id, created_at: countedAt,
+    });
+    await ins("taproom_count_lines", {
+      brewery_id: f.brewery.id, count_id: counted.id, location_id: f.locations[0].id, bin_id: f.locations[0].binId,
+      sku_id: f.catalog.skuId, qty_before: 10, qty_counted: 8, movement_id: movement.id,
+    });
+
+    const soldAt = new Date(at(-10)).toISOString();
+    const saleUpdated = new Date(Date.now() - 120_000).toISOString();
+    const sale = saleOrder({ id: "COUNT-OVERLAP-SALE", updatedAt: saleUpdated, createdAt: soldAt, lines: [line("beer", "V1", "2")] });
+    await syncSquareSales(f.ctx, crypto.randomUUID(), new SquareClient(config,
+      squareFetch(f.merchantId, () => response({ orders: [sale] }))));
+    const afterSale = await runCommand("get_taproom_variance", { locationId: f.locations[0].id, weeks: 4 }, f.ctx) as {
+      periods: { count_id: string; expected_bbl: number; actual_bbl: number }[];
+    };
+    expect(afterSale.periods.find((period) => period.count_id === counted.id)).toMatchObject({ expected_bbl: 32 / 3968, actual_bbl: 1 });
+
+    const refund = saleOrder({ id: "COUNT-OVERLAP-REFUND", updatedAt: new Date(Date.now() - 60_000).toISOString(), createdAt: soldAt, returns: [
+      { uid: "refund", source_order_id: "COUNT-OVERLAP-SALE", return_line_items: [returned("beer-refund", "beer", "1")] },
+    ] });
+    const refundRequest = crypto.randomUUID();
+    const refundResult = await syncSquareSales(f.ctx, refundRequest, new SquareClient(config,
+      squareFetch(f.merchantId, () => response({ orders: [refund] }))));
+    const retryFetch = squareFetch(f.merchantId, () => { throw new Error("completed overlap replay contacted Square"); });
+    await expect(syncSquareSales(f.ctx, refundRequest, new SquareClient(config, retryFetch))).resolves.toEqual(refundResult);
+    expect(retryFetch).not.toHaveBeenCalled();
+
+    const afterRefund = await runCommand("get_taproom_variance", { locationId: f.locations[0].id, weeks: 4 }, f.ctx) as {
+      periods: { count_id: string; expected_bbl: number; actual_bbl: number }[];
+    };
+    expect(afterRefund.periods.find((period) => period.count_id === counted.id)).toMatchObject({ expected_bbl: 16 / 3968, actual_bbl: 1 });
+    expect(sql(`select count(*) from public.inventory_movements where brewery_id='${f.brewery.id}'`)).toEqual(["1"]);
+    expect(sql(`select count(*) from public.inventory_movements where brewery_id='${f.brewery.id}' and ref='${counted.id}'`)).toEqual(["1"]);
+  });
+
   it("rejects a disjoint same-version order snapshot atomically and replays an exact removal tombstone", async () => {
     const f = await fixture();
     const updated1 = new Date(Date.now() - 120_000).toISOString();
@@ -151,8 +200,17 @@ describe("Square durable sales sync", () => {
       squareFetch(f.merchantId, () => response({ orders: [order] }))));
     const identityBefore = sql(`select source_hash||':'||external_order_id||':'||external_line_id||':'||source_version::text
       from public.pos_sales where brewery_id='${f.brewery.id}'`)[0];
-    expect(sql(`select coalesce(external_item_id,'?')||':'||external_variation_id from public.pos_unmapped_items
-      where brewery_id='${f.brewery.id}'`)).toEqual(["?:V1"]);
+    const queue = await f.ctx.db.from("pos_unmapped_items").select("brewery_id,external_item_id,external_variation_id")
+      .eq("brewery_id", f.brewery.id);
+    expect(queue.error).toBeNull();
+    expect(queue.data).toEqual([{ brewery_id: f.brewery.id, external_item_id: null, external_variation_id: "V1" }]);
+    const foreign = await makeBrewery();
+    const foreignCtx = await makeStaffCtx(foreign.id, "admin");
+    const foreignQueue = await foreignCtx.db.from("pos_unmapped_items").select("brewery_id").eq("brewery_id", f.brewery.id);
+    expect(foreignQueue.error).toBeNull();
+    expect(foreignQueue.data).toEqual([]);
+    const privateRead = await f.ctx.db.schema("private").from("square_order_snapshots").select("external_order_id");
+    expect(privateRead.error).not.toBeNull();
 
     const catalogFetch = vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
@@ -232,6 +290,14 @@ describe("Square durable sales sync", () => {
       where brewery_id='${f.brewery.id}' and external_order_id='EMPTY-NEWER'`)).toEqual(["1:old:accepted"]);
     expect(sql(`select external_line_id from private.pos_current_sales where brewery_id='${f.brewery.id}'
       and external_order_id='EMPTY-NEWER'`)).toEqual([]);
+    const listing = await runCommand("list_pos_sales", {}, f.ctx) as { sales: Array<{ id: string; externalOrderId: string; current: boolean }> };
+    const historical = listing.sales.find((sale) => sale.externalOrderId === "EMPTY-NEWER");
+    expect(historical).toMatchObject({ current: false });
+    const detail = await runCommand("get_pos_sale", { saleId: historical!.id }, f.ctx) as {
+      sale: { current: boolean }; revisions: Array<{ current: boolean }>;
+    };
+    expect(detail.sale.current).toBe(false);
+    expect(detail.revisions).toEqual([expect.objectContaining({ current: false })]);
     expect(currentExpected(f.brewery.id)).toBe(0);
     expect(sql(`select count(*) from public.inventory_movements where brewery_id='${f.brewery.id}'`)).toEqual(["0"]);
   });
@@ -420,7 +486,7 @@ describe("Square durable sales sync", () => {
       observed_at: second.toISOString(), created_at: second.toISOString(), counted_by: f.ctx.userId, prior_count_id: firstCount.id,
     });
     const physicalBefore = sql(`select md5(coalesce(jsonb_agg(to_jsonb(t) order by id)::text,'')) from public.taproom_counts t where brewery_id='${f.brewery.id}'`)[0];
-    const order = saleOrder({ id: "P12", updatedAt: new Date().toISOString(), createdAt: new Date(observed.getTime() + 3_600_000).toISOString(),
+    const order = saleOrder({ id: "P12", updatedAt: new Date(Date.now() - 1_000).toISOString(), createdAt: new Date(observed.getTime() + 3_600_000).toISOString(),
       lines: [line("p12", "V1", "1")] });
     await syncSquareSales(f.ctx, crypto.randomUUID(), new SquareClient(config, squareFetch(f.merchantId, () => response({ orders: [order] }))));
     const draft = await f.ctx.db.rpc("get_taproom_draft_projection", { p_brewery: f.brewery.id, p_location: f.locations[0].id });

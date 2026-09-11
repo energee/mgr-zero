@@ -5,13 +5,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { runCommand } from "@/lib/commands/registry";
 import "@/lib/commands/all";
 
-let b: { id: string }, staffDb: SupabaseClient, staffId: string;
+let b: { id: string }, staffDb: SupabaseClient, staffId: string, staffEmail: string;
 let customerId: string, shipToId: string, whId: string, whBinId: string, tapId: string, skuId: string, saleChannelId: string;
 
 beforeAll(async () => {
   // identical seed to tests/orders-lifecycle.test.ts, plus a taproom location:
   b = await makeBrewery();
-  const staff = await makeStaff(b.id); staffId = staff.id; staffDb = await asUser(staff.email);
+  const staff = await makeStaff(b.id); staffId = staff.id; staffEmail = staff.email; staffDb = await asUser(staff.email);
   ({ id: whId, binId: whBinId } = await seedLocation(b.id));
   tapId = (await seedLocation(b.id, { name: "Taproom", kind: "taproom" })).id;
   const cat = await seedCatalog(b.id, { sku: "IPA 1/2bbl", packageType: "keg", bblPerUnit: 0.5 });
@@ -41,6 +41,82 @@ async function lineOf(orderId: string) {
 }
 
 describe("pick and ship", () => {
+  it("connects ordered 10 → picked 6 → shipped 4 → put back 2 with six cancelled and demand released", async () => {
+    const id = await confirmedOrder(10);
+    const line = await lineOf(id);
+    await staffDb.rpc("record_pick", {
+      p_order: id,
+      p_picks: [{ line_id: line.id, qty_picked: 6 }],
+      p_request_id: crypto.randomUUID(),
+    });
+    const shipped = await staffDb.rpc("ship_order", {
+      p_order: id,
+      p_ship: [{ line_id: line.id, qty_shipped: 4 }],
+      p_carrier: "self",
+      p_tracking: null,
+      p_request_id: crypto.randomUUID(),
+    });
+    expect(shipped.error).toBeNull();
+
+    const invoiceId = (shipped.data as { invoice_id: string }).invoice_id;
+    expect(await lineOf(id)).toMatchObject({ qty_ordered: 10, qty_picked: 6, qty_shipped: 4 });
+    expect((await admin.from("orders").select("status,needs_restock").eq("id", id).single()).data)
+      .toEqual({ status: "shipped", needs_restock: true });
+    expect((await admin.from("invoice_lines").select("qty,amount_cents").eq("invoice_id", invoiceId)).data)
+      .toEqual([{ qty: 4, amount_cents: 48000 }]);
+    expect((await admin.from("inventory_movements").select("qty").eq("ref", id)).data)
+      .toEqual([{ qty: -4 }]);
+    expect((await admin.from("allocations").select("qty,status").eq("ref", line.id).single()).data)
+      .toEqual({ qty: 10, status: "fulfilled" });
+
+    await staffDb.rpc("confirm_restock", { p_order: id, p_request_id: crypto.randomUUID() });
+    expect((await admin.from("orders").select("needs_restock").eq("id", id).single()).data)
+      .toEqual({ needs_restock: false });
+    expect((await admin.from("order_events").select("event").eq("order_id", id).order("created_at")).data?.map((event) => event.event))
+      .toEqual(["created", "submitted", "confirmed", "picked", "shipped", "restocked"]);
+  });
+
+  it("serializes distinct workers racing shipment and adjustment so only one transition wins", async () => {
+    const [shipperDb, adjusterDb] = await Promise.all([asUser(staffEmail), asUser(staffEmail)]);
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const id = await confirmedOrder(6);
+      const line = await lineOf(id);
+      await staffDb.rpc("record_pick", {
+        p_order: id,
+        p_picks: [{ line_id: line.id, qty_picked: 6 }],
+        p_request_id: crypto.randomUUID(),
+      });
+      const [ship, adjust] = await Promise.all([
+        shipperDb.rpc("ship_order", {
+          p_order: id,
+          p_ship: [{ line_id: line.id, qty_shipped: 4 }],
+          p_carrier: null,
+          p_tracking: null,
+          p_request_id: crypto.randomUUID(),
+        }),
+        adjusterDb.rpc("adjust_order_lines", {
+          p_order: id,
+          p_lines: [{ sku_id: skuId, qty: 4 }],
+          p_reason: `concurrent customer change ${attempt}`,
+          p_request_id: crypto.randomUUID(),
+        }),
+      ]);
+      expect([ship, adjust].filter((result) => result.error === null)).toHaveLength(1);
+      const persisted = await admin.from("orders").select("status,needs_restock").eq("id", id).single();
+      expect(["picked", "shipped"]).toContain(persisted.data?.status);
+      if (ship.error === null) {
+        expect(persisted.data).toEqual({ status: "shipped", needs_restock: true });
+      } else {
+        expect(persisted.data).toEqual({ status: "picked", needs_restock: true });
+        expect(ship.error.message).toMatch(/waiting for restock/);
+      }
+      expect((await admin.from("order_events").select("event").eq("order_id", id).in("event", ["lines_adjusted", "shipped"])).data)
+        .toHaveLength(1);
+      expect((await admin.from("shipments").select("id").eq("order_id", id)).data)
+        .toHaveLength(ship.error === null ? 1 : 0);
+    }
+  });
+
   it("short ship writes movement + invoice for shipped qty and fulfills allocations", async () => {
     const id = await confirmedOrder(10);
     const line = await lineOf(id);
@@ -75,9 +151,24 @@ describe("pick and ship", () => {
     let { data: o } = await admin.from("orders").select().eq("id", id).single();
     expect(o!.needs_restock).toBe(true);
     const l2 = await lineOf(id);
+    const shipRequestId = crypto.randomUUID();
+    const beforeRepick = await staffDb.rpc("ship_order", {
+      p_order: id, p_ship: [{ line_id: l2.id, qty_shipped: 6 }],
+      p_carrier: null, p_tracking: null, p_request_id: shipRequestId,
+    });
+    expect(beforeRepick.error?.message).toMatch(/waiting for restock/);
+    expect((await admin.from("shipments").select("id").eq("order_id", id)).data).toEqual([]);
+    expect((await admin.from("inventory_movements").select("id").eq("ref", id)).data).toEqual([]);
     await staffDb.rpc("record_pick", { p_order: id, p_picks: [{ line_id: l2.id, qty_picked: 6 }], p_request_id: crypto.randomUUID() });
     ({ data: o } = await admin.from("orders").select().eq("id", id).single());
     expect(o!.needs_restock).toBe(false);
+    const afterRepick = await staffDb.rpc("ship_order", {
+      p_order: id, p_ship: [{ line_id: l2.id, qty_shipped: 6 }],
+      p_carrier: null, p_tracking: null, p_request_id: shipRequestId,
+    });
+    expect(afterRepick.error).toBeNull();
+    expect((await admin.from("shipments").select("id").eq("order_id", id)).data).toHaveLength(1);
+    expect((await admin.from("inventory_movements").select("id").eq("ref", id)).data).toHaveLength(1);
   });
   it("ship with all lines qty_shipped 0 creates no invoice and releases allocations", async () => {
     const id = await confirmedOrder(4);

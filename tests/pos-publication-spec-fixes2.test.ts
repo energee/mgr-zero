@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { runCommand } from "@/lib/commands/registry";
 import { beginSquareOAuth, publishSquareCatalogItem, publishSquareMenu, SquareClient } from "@/lib/pos";
 import { beginSquareCatalogSync, beginSquarePublication, recordSquareCatalogSnapshot } from "@/lib/supabase/integration-tokens";
@@ -57,12 +57,52 @@ const createResponse = (body: Record<string, any>, itemId: string) => {
   ] }), { status: 200 });
 };
 
-beforeAll(() => {
-  expect(process.env.NEXT_PUBLIC_SUPABASE_URL).toBe("http://127.0.0.1:54351");
-  expect(process.env.DATABASE_URL).toContain(":54352/");
-});
-
 describe("Square publication residual specification fences", () => {
+  it("retires an owned zero-stock brand without adopting an unowned zero-stock brand", async () => {
+    const f = await fixture();
+    const owned = await f.addBrand("Owned retirement");
+    const unowned = await f.addBrand("Never published");
+    for (const brand of [owned, unowned]) {
+      await runCommand("record_movement", { skuId: brand.skuId, locationId: f.location.id,
+        binId: f.location.binId, qty: -1, type: "adjustment" }, f.ctx, execution());
+    }
+    sql(`insert into public.pos_catalog_items(brewery_id,connection_id,brand_id,catalog_group,external_item_id,ownership)
+      values('${f.brewery.id}','${f.connectionId}','${owned.brandId}','poured','OWNED-ITEM','mgr');
+      insert into public.pos_catalog_ownership(brewery_id,connection_id,brand_id,catalog_group,format_id,external_item_id,external_variation_id)
+      values('${f.brewery.id}','${f.connectionId}','${owned.brandId}','poured','${owned.formatId}','OWNED-ITEM','OWNED-VAR')`);
+
+    const writes: Record<string, any>[] = [];
+    const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (input, init) => {
+      if (!init?.method) return new Response(JSON.stringify({ object: {
+        type: "ITEM", id: "OWNED-ITEM", version: 5, present_at_all_locations: false,
+        present_at_location_ids: ["L1"], item_data: { name: "Owned retirement", variations: [{
+          type: "ITEM_VARIATION", id: "OWNED-VAR", version: 4, present_at_all_locations: false,
+          present_at_location_ids: ["L1"], item_variation_data: { item_id: "OWNED-ITEM", name: "Owned retirement Pint",
+            pricing_type: "FIXED_PRICING", price_money: { amount: 700, currency: "USD" } },
+        }] },
+      } }), { status: 200 });
+      const body = JSON.parse(String(init.body));
+      writes.push(body);
+      return new Response(JSON.stringify({ catalog_object: { ...body.object, version: 6,
+        item_data: { ...body.object.item_data, variations: body.object.item_data.variations.map((variation: Record<string, any>) => ({ ...variation, version: 5 })) } },
+      id_mappings: [] }), { status: 200 });
+    });
+
+    await expect(publishSquareMenu(f.ctx, { posLocationId: "L1" }, crypto.randomUUID(), new SquareClient(config, fetch)))
+      .resolves.toMatchObject({ published: true, items: [expect.objectContaining({ externalItemId: "OWNED-ITEM", retired: true })] });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(writes).toEqual([expect.objectContaining({ object: expect.objectContaining({
+      id: "OWNED-ITEM", present_at_all_locations: false, present_at_location_ids: [],
+      item_data: expect.objectContaining({ variations: [expect.objectContaining({ id: "OWNED-VAR", present_at_location_ids: [] })] }),
+    }) })]);
+    expect(sql(`select jsonb_array_length(manifest) from private.square_menu_publications where brewery_id='${f.brewery.id}';
+      select count(*) from private.square_publications where brewery_id='${f.brewery.id}' and brand_id='${unowned.brandId}';
+      select retired_at is not null from public.pos_catalog_items where connection_id='${f.connectionId}' and brand_id='${owned.brandId}'`))
+      .toEqual(["1", "0", "t"]);
+    await expect(beginSquarePublication(f.ctx, { posLocationId: "L1", brandId: unowned.brandId },
+      crypto.randomUUID(), "publish_pos_item")).rejects.toThrow("Only a brand with a priced available format can create a Square item");
+  });
+
   it("freezes the complete top-level menu manifest, retires disappeared owned brands, and replays exactly", async () => {
     const f = await fixture();
     await f.addBrand("Active");

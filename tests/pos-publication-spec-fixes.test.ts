@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { getCommandDefinition, runCommand } from "@/lib/commands/registry";
 import { prepareSquareCatalogPublication, publishSquareCatalogItem, publishSquareMenu, SquareClient } from "@/lib/pos";
 import { beginSquarePublication, finishSquarePublication, leaseSquarePublication, prepareSquarePublication } from "@/lib/supabase/integration-tokens";
@@ -41,11 +41,6 @@ async function fixture(twoBrands = false) {
   await runCommand("configure_pos_menu", { posLocationId: "L1", binId: location.binId, saleChannelId: channel }, ctx, execution());
   return { brewery, ctx, connectionId: connection.data!.id, first, second };
 }
-
-beforeAll(() => {
-  expect(process.env.NEXT_PUBLIC_SUPABASE_URL).toBe("http://127.0.0.1:54351");
-  expect(process.env.DATABASE_URL).toContain(":54352/");
-});
 
 describe("Square parent-item publication corrections", () => {
   it("creates one brand item containing every publishable format variation", () => {

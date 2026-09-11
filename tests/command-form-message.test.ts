@@ -4,10 +4,18 @@
 // so screen readers announce what a sighted user sees after Save.
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { CommandFormMessage } from "@/components/mgr/command-form";
 
 describe("CommandFormMessage", () => {
+  it("routes the shared pointer Close control through the controlled form boundary", () => {
+    const source = readFileSync("components/mgr/command-form.tsx", "utf8");
+    expect(source).toContain('type="button"');
+    expect(source).toContain("onClick={() => onClose?.(false)}");
+    expect(source.match(/onClose={onOpenChange}/g)).toHaveLength(3);
+  });
+
   it("renders an error as role=alert", () => {
     const html = renderToStaticMarkup(createElement(CommandFormMessage, { error: "Save failed" }));
     expect(html).toContain('role="alert"');

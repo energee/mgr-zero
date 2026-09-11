@@ -184,6 +184,31 @@ describe("depart, confirm, and return a route", () => {
 });
 
 describe("route edges", () => {
+  it("keeps a failed stop open and blocks return without creating delivery money or stock effects", async () => {
+    const driver = await makeStaffCtx(b.id, "warehouse");
+    const sh = await shipment(4, "on_delivery");
+    const { routeId } = await runCommand("save_route", {
+      name: "Failed stop remains open", deliveryDate: "2026-09-17", driverUserId: driver.userId,
+      stops: [{ shipmentId: sh, stopNo: 1 }],
+    }, adminCtx) as { routeId: string };
+    await runCommand("depart_route", { routeId }, driver);
+    const { data: stop } = await admin.from("deliveries").select("id").eq("route_id", routeId).single();
+
+    // V1 has no failed/partial-delivery mutation. Leaving the stop unconfirmed is
+    // the documented safe state: it stays actionable and the route cannot return.
+    await expect(runCommand("return_route", { routeId }, driver)).rejects.toThrow(/stop/i);
+    const detail = await runCommand("get_delivery_stop", { deliveryId: stop!.id }, driver) as {
+      delivery: { delivered_at: string | null }; lines: { qty: number }[]; invoice: unknown;
+    };
+    expect(detail.delivery.delivered_at).toBeNull();
+    expect(detail.lines.map((line) => line.qty)).toEqual([4]);
+    expect(detail.invoice).toBeNull();
+    expect((await admin.from("invoices").select("id").eq("shipment_id", sh)).data).toEqual([]);
+    expect((await admin.from("routes").select("returned_at").eq("id", routeId).single()).data?.returned_at).toBeNull();
+    const today = await runCommand("get_today", { now: "2026-09-17T12:00:00Z" }, driver) as { reason: string; subjectId: string }[];
+    expect(today).toContainEqual(expect.objectContaining({ reason: "delivery_next", subjectId: stop!.id }));
+  });
+
   it("keeps stop ids across a re-save, refuses removing a delivered stop, a duplicate stop number, and a foreign document", async () => {
     const driver = await makeStaffCtx(b.id, "warehouse");
     const [sh1, sh2] = [await shipment(), await shipment()];

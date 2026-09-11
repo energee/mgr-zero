@@ -604,8 +604,27 @@ it("waits for a real concurrent bin transfer, then refuses its stale observation
       [f.brewery.id, f.cat.skuId, f.location.binId, bin.id, crypto.randomUUID()]);
     await client.query("commit");
     expect((await count).error?.code).toBe("MG409");
-    expect((await prepare(f)).lines.map(l => l.qty_before).sort()).toEqual([1, 6]);
+    const refreshed = await prepare(f);
+    expect(refreshed.lines.map(l => l.qty_before).sort()).toEqual([1, 6]);
     expect((await admin.from("taproom_counts").select("id").eq("brewery_id", f.brewery.id)).data).toEqual([]);
+
+    const refreshedInput = {
+      p_brewery: f.brewery.id, p_location: f.location.id, p_counted_on: refreshed.counted_on,
+      p_revision: refreshed.revision, p_request_id: crypto.randomUUID(),
+      p_lines: refreshed.lines.map(line => ({
+        bin_id: line.bin_id, sku_id: line.sku_id, lot_id: line.lot_id,
+        qty_counted: line.bin_id === f.location.binId ? line.qty_before - 1 : line.qty_before,
+      })),
+    };
+    const saved = await f.ctx.db.rpc("record_taproom_count", refreshedInput);
+    expect(saved.error).toBeNull();
+    expect(saved.data.lines).toEqual(expect.arrayContaining([
+      expect.objectContaining({ bin_id: f.location.binId, qty_before: 6, qty_counted: 5, bbl: -.5 }),
+      expect.objectContaining({ bin_id: bin.id, qty_before: 1, qty_counted: 1, movement_id: null }),
+    ]));
+    expect((await admin.from("inventory_movements").select("qty,bbl,type,ref").eq("ref", saved.data.id)).data)
+      .toEqual([{ qty: -1, bbl: -.5, type: "depletion", ref: saved.data.id }]);
+    expect(await runCommand("get_taproom_count", { countId: saved.data.id }, f.ctx)).toEqual(saved.data);
   } finally { await client.query("rollback"); await client.end(); if (pending) await pending; }
 });
 

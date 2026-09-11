@@ -10,7 +10,7 @@ import { FinishedGoodsView } from "@/components/mgr/views/finished-goods";
 import { getActiveBrewery } from "@/lib/brewery";
 import { buildContext } from "@/lib/commands/context";
 import { runPageQuery as runCommand, requirePagePermission } from "@/lib/mgr/page-query";
-import { toFinishedGoodsViewProps, skuLabel } from "@/lib/mgr/finished-goods-view";
+import { assembleFinishedGoods, toFinishedGoodsViewProps, skuLabel } from "@/lib/mgr/finished-goods-view";
 import "@/lib/commands/all";
 import { MovementForm } from "./movement-form";
 import { formatDateTime } from "@/lib/date-format";
@@ -23,8 +23,6 @@ type SaleChannel = { id: string; name: string; tax_treatment: string };
 type BinOnHandRow = { sku_id: string; location_id: string; bin_id: string; qty: string };
 type AtpRow = { sku_id: string; qty: string };
 type Movement = { bin_id: string; bbl: string; dest_state: string | null; sale_channel_id: string | null; ref: string | null; id: string; created_at: string; type: string; qty: string; sku_id: string; location_id: string; note: string | null };
-
-const sum = (rows: { sku_id: string; qty: string }[]) => rows.reduce((m, r) => m.set(r.sku_id, (m.get(r.sku_id) ?? 0) + Number(r.qty)), new Map<string, number>());
 
 type InventorySearch = { page?: string; recordMovement?: string; movementHandoff?: string; skuId?: string; locationId?: string; binId?: string; lotId?: string; qty?: string; type?: string; saleChannelId?: string; destState?: string; note?: string };
 const movementKinds = new Set<MovementKind>(["opening_balance", "production_in", "adjustment", "depletion", "return_in", "destruction", "loss", "sample", "festival_removal"]);
@@ -43,9 +41,6 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   const skuById = new Map(skus.map((s) => [s.id, s]));
   const locationById = new Map(locations.map((l) => [l.id, l.name]));
   const locationName = (id: string) => locationById.get(id) ?? "—";
-  const have = sum(onHand);
-  const atpBySku = new Map(atp.map((a) => [a.sku_id, Number(a.qty)]));
-  const stocked = skus.filter((s) => have.has(s.id) || atpBySku.has(s.id));
   const canMove = brewery.role === "admin" || brewery.role === "warehouse";
   const canAddSku = brewery.role === "admin" || brewery.role === "sales";
   const requestedQty = Number(params.qty);
@@ -63,12 +58,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
   } : undefined;
   return (
     <FinishedGoodsView
-      model={toFinishedGoodsViewProps({
-        skus: stocked.map((s) => {
-          const on = have.get(s.id) ?? 0;
-          return { id: s.id, name: s.name, brands: s.brands, on_hand: on, atp: atpBySku.get(s.id) ?? on };
-        }),
-      })}
+      model={toFinishedGoodsViewProps(assembleFinishedGoods(skus, onHand, atp))}
       createAction={canMove ? <MovementForm key={movementFormInstanceKey(handoffId)} autoOpen={recordMovement === "1"} initial={initial} skus={skus.map((s) => ({ id: s.id, label: skuLabel(s), bblPerUnit: s.format_volume?.bbl_per_unit == null ? null : Number(s.format_volume.bbl_per_unit) }))} locations={locations} bins={bins} channels={channels} /> : null}
       afterHeader={canAddSku ? E.btn("Add SKU", "g", "/catalog") : undefined}
       linkRows
