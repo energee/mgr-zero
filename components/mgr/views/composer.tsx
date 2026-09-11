@@ -66,7 +66,7 @@ export function ComposerMovementPickerView({ draft, skus, locations, bins, lots,
 }
 
 export function ComposerStripView({
-  actions = [{ value: "record_movement", label: "Record inventory movement" }, { value: "read_atp", label: "Check available to promise" }],
+  actions = [{ value: "attention", label: "What needs attention?" }, { value: "inventory", label: "Check inventory" }, { value: "movement", label: "Record a movement" }],
   onAction,
   onHistory,
   onOutbox,

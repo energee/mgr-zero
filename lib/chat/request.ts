@@ -5,6 +5,7 @@ const requestSchema = z.object({
   breweryId: z.uuid(),
   expectedContext: z.object({ actorId: z.uuid(), breweryId: z.uuid() }).strict().optional(),
   message: z.object({
+    id: z.uuid(),
     role: z.literal("user"),
     parts: z.array(z.discriminatedUnion("type", [z.object({ type: z.literal("text"), text: z.string().max(4000) }).strict()])).min(1),
   }).strict(),

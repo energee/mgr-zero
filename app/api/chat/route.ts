@@ -8,8 +8,8 @@ import "@/lib/commands/all";
 
 const SYSTEM = `You are MGR, a concise brewery operations assistant. Use tools for brewery facts; never invent records, quantities, units, identifiers, or current state. Ask one focused question when required input is missing or ambiguous. Writes are proposals only: explain the exact server preview and tell the user to confirm it in the interface. Never claim a write happened from a tool call.`;
 
-function execution() {
-  return { requestId: crypto.randomUUID(), correlationId: crypto.randomUUID(), origin: "ui" as const };
+function execution(requestId = crypto.randomUUID()) {
+  return { requestId, correlationId: crypto.randomUUID(), origin: "ui" as const };
 }
 
 export async function POST(req: Request) {
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     const history = await runCommand("get_chat_history", { conversationId: body.id }, ctx) as {
       messages: { role: "user" | "assistant" | "result"; content: string | null }[];
     };
-    await runCommand("append_chat_message", { conversationId: body.id, role: "user", content: body.text }, ctx, execution());
+    await runCommand("append_chat_message", { conversationId: body.id, role: "user", content: body.text }, ctx, execution(body.message.id));
     const messages: ModelMessage[] = history.messages
       .filter((message): message is { role: "user" | "assistant"; content: string } => message.role !== "result" && Boolean(message.content))
       .map((message) => ({ role: message.role, content: message.content }));

@@ -71,6 +71,7 @@ defineQuery({
   description: "Search SKUs, orders, invoices, lots, customers, purchase orders and batches by name prefix or exact document number (ORD-, INV-, PO-, B-, L-); exact numbers sort first; RLS decides the rows and kinds only narrow",
   input: z.object({ q: z.string().trim().min(1).max(80), kinds: z.array(z.enum(SEARCH_KINDS)).optional() }),
   roles: ["admin", "sales", "warehouse", "brewer"],
+  aiExposed: true,
   handler: async (ctx, i): Promise<SearchHit[]> => {
     const kinds = i.kinds?.length ? i.kinds : [...SEARCH_KINDS];
     const hits = (await Promise.all(kinds.map((k) => byKind(ctx, k, i.q)))).flat();
